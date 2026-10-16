@@ -7340,6 +7340,24 @@ html[dir='rtl'] .quick-title-row {
   gap: 8px;
 }
 
+.uw-act-location-row > .uw-act-select {
+  flex: 1 1 38%;
+  width: auto;
+  max-width: 45%;
+}
+
+@media (max-width: 900px) {
+  .uw-act-location-row {
+    flex-direction: column;
+  }
+
+  .uw-act-location-row > .uw-act-select {
+    flex: none;
+    width: 100%;
+    max-width: none;
+  }
+}
+
 .uw-act-file {
   display: flex;
   align-items: center;

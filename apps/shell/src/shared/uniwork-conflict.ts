@@ -30,6 +30,15 @@ export interface UniworkConflictView {
   path: string
   documentId: string
   title: string
+  /**
+   * FD-11: the source document's workspace, and the folder holding it (null =
+   * the workspace root), filled by main while it builds the view. The "Save as
+   * a copy" Location control opens `workspaceId`'s tree and starts on
+   * `parentId`; `parentId` stays absent while main has no server read to
+   * answer it (the control then starts at the root).
+   */
+  workspaceId?: string
+  parentId?: string | null
   /** module of the open document; 'docs' shows "View differences" (v1: Docs/DOCX only) */
   module: 'docs' | 'sheets' | 'slides' | 'other'
   mine: { baseVersion: number | null }
@@ -57,7 +66,17 @@ export type UniworkConflictAction =
   | { kind: 'cancel' }
   | { kind: 'reload'; keep: 'draft' | 'discard'; stopAi: boolean }
   | { kind: 'overwrite'; stopAi: boolean }
-  | { kind: 'save-copy'; stopAi: boolean }
+  | {
+      kind: 'save-copy'
+      stopAi: boolean
+      /**
+       * FD-11: where the copy is created. Absent = next to its source, which is
+       * today's behaviour; `folderId: null` is the workspace root. The copy
+       * route keeps the copy in the source's own workspace, so `workspaceId`
+       * only says which tree the person picked the folder in.
+       */
+      targetFolder?: { workspaceId: string; folderId: string | null }
+    }
   /** G5-12: the no-seat fallback of Save as a copy - the local version to a file the person picks */
   | { kind: 'download-mine'; stopAi: boolean }
 

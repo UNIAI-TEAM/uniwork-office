@@ -17,6 +17,12 @@ interface ActionsBridge {
   uniworkArchiveDocument(documentId: string): Promise<unknown>
   uniworkCancelUploadDocument(uploadId: string): Promise<void>
   onUniworkUploadProgress(cb: (event: unknown) => void): () => void
+  uniworkFolderTree(workspaceId: string): Promise<unknown>
+  uniworkListChildren(q: unknown): Promise<unknown>
+  uniworkSearchDocuments(q: unknown): Promise<unknown>
+  uniworkCreateFolder(i: unknown): Promise<unknown>
+  uniworkMoveDocument(i: unknown): Promise<unknown>
+  onUniworkTreeChanged(cb: (event: unknown) => void): () => void
 }
 
 /**
@@ -117,5 +123,71 @@ describe('the upload cancel and progress of the preload (FX10)', () => {
     push({}, { uploadId: '', path: 'C:/Q4.docx', loaded: 0, total: 10 })
     push({}, { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 0, total: 10 })
     expect(seen).toEqual([{ uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 0, total: 10 }])
+  })
+})
+
+describe('the FD-11 folder bridge members (FD11-A-R1-03)', () => {
+  it('invokes each of the five folder channels with its argument and guards the reply', async () => {
+    const okReply = { ok: true, value: { id: 'fold_1' } }
+    const { bridge, invoked } = await loadBridge(okReply)
+    invoked.length = 0
+
+    expect(await bridge.uniworkFolderTree('ws_1')).toEqual(okReply)
+    expect(await bridge.uniworkListChildren({ workspaceId: 'ws_1', parentId: null })).toEqual(
+      okReply,
+    )
+    expect(
+      await bridge.uniworkSearchDocuments({ workspaceId: 'ws_1', query: 'Q4', kind: 'all' }),
+    ).toEqual(okReply)
+    expect(
+      await bridge.uniworkCreateFolder({
+        workspaceId: 'ws_1',
+        parentId: 'fold_1',
+        title: 'Specs',
+      }),
+    ).toEqual(okReply)
+    expect(await bridge.uniworkMoveDocument({ documentId: 'doc_1', parentId: 'fold_1' })).toEqual(
+      okReply,
+    )
+
+    expect(invoked).toEqual([
+      { channel: UNIWORK_DOC_CHANNELS.folderTree, args: ['ws_1'] },
+      {
+        channel: UNIWORK_DOC_CHANNELS.listChildren,
+        args: [{ workspaceId: 'ws_1', parentId: null }],
+      },
+      {
+        channel: UNIWORK_DOC_CHANNELS.searchDocuments,
+        args: [{ workspaceId: 'ws_1', query: 'Q4', kind: 'all' }],
+      },
+      {
+        channel: UNIWORK_DOC_CHANNELS.createFolder,
+        args: [{ workspaceId: 'ws_1', parentId: 'fold_1', title: 'Specs' }],
+      },
+      {
+        channel: UNIWORK_DOC_CHANNELS.moveDocument,
+        args: [{ documentId: 'doc_1', parentId: 'fold_1' }],
+      },
+    ])
+  })
+
+  it('guards onUniworkTreeChanged with asUniworkTreeChanged and removes the subscriber on unsubscribe', async () => {
+    const { bridge, handlers } = await loadBridge(undefined)
+    const seen: unknown[] = []
+    const off = bridge.onUniworkTreeChanged((event) => seen.push(event))
+    const push = handlers.get(UNIWORK_DOC_CHANNELS.treeChanged)!
+
+    // malformed payloads without a non-empty string workspaceId are dropped
+    push({}, null)
+    push({}, {})
+    push({}, { workspaceId: '' })
+    push({}, { workspaceId: 42 })
+    push({}, { workspaceId: 'ws_1', extra: 'ignored' })
+    expect(seen).toEqual([{ workspaceId: 'ws_1' }])
+
+    // unsubscribing stops further deliveries
+    off()
+    push({}, { workspaceId: 'ws_2' })
+    expect(seen).toEqual([{ workspaceId: 'ws_1' }])
   })
 })

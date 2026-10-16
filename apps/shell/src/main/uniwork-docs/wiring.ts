@@ -12,9 +12,13 @@ import {
   type SignOutPromptRequest,
   type UniworkConflictAction,
   type UniworkCreateDocInput,
+  type UniworkCreateFolderInput,
   type UniworkDocListQuery,
   type UniworkDocLock,
+  type UniworkFolderQuery,
+  type UniworkMoveDocumentInput,
   type UniworkRemoteAction,
+  type UniworkSearchQuery,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
 } from '../../shared/home-api'
@@ -71,6 +75,7 @@ import {
 } from './service'
 import { UPLOAD_EXTENSIONS } from './formats'
 import { tUniworkDocs } from './strings'
+import { createTreeChangedCoalescer } from './tree-changed'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
 import { clipboard } from 'electron'
@@ -405,6 +410,11 @@ function libraryLayerFor(): StoreLayer {
 export interface SyncRuntimeSeam {
   fetch?: FetchLike
   now?(): number
+  /**
+   * FD-11: a committed feed page carried rows for this workspace, so its tree
+   * views are stale. The wiring hands this to the push coalescer.
+   */
+  treeChanged?(workspaceId: string): void
 }
 
 /**
@@ -502,6 +512,9 @@ export function createSyncRuntime(
     // G5-03a: the same change IS the S6 newer-version notice (head version +
     // version id), so one feed tick drives both
     onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision, change),
+    // FD-11: a committed page with rows makes that workspace's tree stale; the
+    // seam hands it to the coalescer the shell pushes through
+    ...(seam.treeChanged ? { onWorkspaceChanged: seam.treeChanged } : {}),
     // G5-03a: a full resync that no longer lists an open, bound document asks
     // the service to classify it (403/404 -> revoked, 410 -> deleted); the
     // runtime learns ids only, never paths
@@ -627,6 +640,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
   const syncStore = syncStoreFor().access
+  /**
+   * FD-11: the one tree-changed push of this process. A feed page (through the
+   * runtime) and this app's own folder actions (through the service) both report
+   * here; the coalescer turns a burst into at most one push per workspace per
+   * 500 ms. Only the workspace id leaves main.
+   */
+  const treeChanged = createTreeChangedCoalescer({
+    emit: (workspaceId) => push(UNIWORK_DOC_CHANNELS.treeChanged, { workspaceId }),
+  })
   // the service is built before the runtime, but its save queue reads the
   // runtime's capability cache: this holder breaks the cycle (the read happens
   // only after `createSyncRuntime` assigned it, below)
@@ -694,6 +716,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pickDownloadPath: (defaultName) => pickDownloadPath(wiring, defaultName),
     pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),
     pushDocRenamed: (event) => push(UNIWORK_DOC_CHANNELS.docRenamed, event),
+    // FD-11: this app's own folder/tree actions; the coalescer decides when the
+    // renderer actually hears about them
+    pushTreeChanged: (event) => treeChanged.notify(event.workspaceId),
     notifyPathRenamed: (oldPath, newPath) => wiring.notifyPathRenamed(oldPath, newPath),
     notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
@@ -808,8 +833,21 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
     service.restoreDocument(documentId as string),
   )
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.listFolders, (_event, workspaceId: unknown) =>
-    service.listFolders(workspaceId as string),
+  // FD-11: the folder-tree surface
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, (_event, workspaceId: unknown) =>
+    service.folderTree(workspaceId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listChildren, (_event, q: unknown) =>
+    service.listChildren((q ?? {}) as UniworkFolderQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.searchDocuments, (_event, q: unknown) =>
+    service.searchDocuments((q ?? {}) as UniworkSearchQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.createFolder, (_event, input: unknown) =>
+    service.createFolder((input ?? {}) as UniworkCreateFolderInput),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.moveDocument, (_event, input: unknown) =>
+    service.moveDocument((input ?? {}) as UniworkMoveDocumentInput),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),
@@ -849,11 +887,16 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pending.resolve(answer?.confirmed === true)
   })
   setUniworkCloseGuard(service)
-  const runtime = createSyncRuntime(service)
+  const runtime = createSyncRuntime(service, {
+    treeChanged: (workspaceId) => treeChanged.notify(workspaceId),
+  })
   seamRef.runtime = runtime
   /** stops the feed pass and remembers it, so the next status push restarts it */
   const stopFeed = (): void => {
     runtime.stop()
+    // FD-11: a window still pending belongs to the pass that just stopped (the
+    // account may be switching): it must not reach the renderer afterwards
+    treeChanged.cancel()
     feedRunning = false
   }
   // Sign out and a sign-in as someone else close the previous account's
@@ -1007,8 +1050,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       onUniworkAccountStatus((status) => {
         // the session's account may have changed: it becomes the last owner
         service.noteSessionIdentity()
-        // G8-16 S16: changing the organization reloads the library data
-        service.noteSelectedOrg(status.org?.id ?? null)
+        // G8-16 S16: changing the organization reloads the library data. An
+        // org-less push carrying orgsError is a transient /orgs failure; an
+        // org-less push without it (deactivation, the picker) is a lasting
+        // loss and a real session boundary (R5-01).
+        service.noteSelectedOrg(status.org?.id ?? null, status.orgsError === undefined)
         void syncCenter.noteAccount()
         const identity = uniworkSessionIdentity()
         if (identity) {

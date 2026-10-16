@@ -1,8 +1,8 @@
 import type {
-  UniworkDocFolderRef,
   UniworkDocFormat,
   UniworkDocNewFormat,
   UniworkDocSummary,
+  UniworkFolderNode,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'
@@ -14,9 +14,10 @@ import {
   parseCommitLookup,
   parseDetail,
   parseDocumentList,
+  parseDocumentRef,
   parseDocumentSummary,
   parseExchange,
-  parseFolders,
+  parseFolderTree,
   parseMembershipRole,
   parseOrgMembers,
   parseProperties,
@@ -29,6 +30,7 @@ import type {
   DocumentDetail,
   DocumentListResult,
   DocumentProperties,
+  DocumentRef,
   LaunchDescriptor,
   OrgMemberPage,
   UploadReceipt,
@@ -58,14 +60,6 @@ export const TRANSFER_TIMEOUT_MS = 120_000
 export const STREAM_CEILING_MS = 60 * 60_000
 /** the server stages at most 50 MiB per upload; a download far past that is refused */
 const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
-/**
- * The folder list follows D's `next_cursor` for the "Location" field. D caps a
- * page at 100 rows; 10 pages bound one read at 1000 folders, so a pathological
- * workspace cannot make the dialog read for ever (residual: past the bound the
- * remaining folders are not offered).
- */
-const FOLDERS_PAGE_SIZE = 100
-const FOLDERS_MAX_PAGES = 10
 const ID = /^[A-Za-z0-9_-]{1,128}$/
 
 export interface UniworkDocsClientOptions {
@@ -112,11 +106,52 @@ export interface UniworkDocsClient {
   /** the properties panel of one document (ids/times/level/version, no names) */
   documentProperties(documentId: string): Promise<DocumentProperties>
   /**
-   * the workspace's folders (S18 location field): every `kind=folder` page,
-   * following `next_cursor` up to `FOLDERS_MAX_PAGES` (a bigger workspace's
-   * remaining folders are simply not offered - documented residual, no D change)
+   * FD-11: the workspace's whole folder tree (`folders_only=true`), root nodes
+   * first, following no cursor (the route answers the tree in one body).
    */
-  listFolders(workspaceId: string): Promise<UniworkDocFolderRef[]>
+  folderTree(workspaceId: string): Promise<UniworkFolderNode[]>
+  /**
+   * FD-11: one folder's contents - folders, files and pages in the server's
+   * order. `parentId: null` is the workspace root, sent as an empty
+   * `parent_id` (omitting it would mean the workspace's whole list).
+   */
+  listChildren(input: {
+    workspaceId: string
+    parentId: string | null
+    cursor?: string
+    limit?: number
+  }): Promise<DocumentListResult>
+  /**
+   * FD-11: title search across a workspace (`match=title`); every row carries
+   * the ancestors it sits under. `kind: 'all'` sends no kind filter.
+   */
+  searchDocuments(input: {
+    workspaceId: string
+    query: string
+    kind: 'all' | 'folder' | 'document'
+    cursor?: string
+    limit?: number
+  }): Promise<DocumentListResult>
+  /** FD-11: create one folder in a workspace/folder (root when `parentId` is null) */
+  createFolder(input: {
+    workspaceId: string
+    parentId: string | null
+    title: string
+    idempotencyKey: string
+  }): Promise<UniworkDocSummary>
+  /** FD-11: one document's own fields, whatever its kind (rename/move read this) */
+  documentRef(documentId: string): Promise<DocumentRef>
+  /**
+   * FD-11: move a document or folder under another folder (null = the root).
+   * The current revision is read first; a `revision_conflict` re-reads it once
+   * and retries. `renamedTo` is the title the server gave the document when a
+   * name collision made it rename itself.
+   */
+  moveDocument(input: {
+    documentId: string
+    parentId: string | null
+    idempotencyKey: string
+  }): Promise<{ summary: UniworkDocSummary; renamedTo: string | null }>
   /** create a blank document (S18); `format` must have a blank generator */
   createBlank(input: {
     workspaceId: string
@@ -375,6 +410,22 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
   const streamCeiling = options.streamCeilingMs ?? STREAM_CEILING_MS
   const send = createUniworkSend(options)
   const json = (response: Response): Promise<unknown> => response.json()
+  /**
+   * FD-11: one document's own fields, whatever its kind (a folder has no file
+   * block, so the detail reader cannot serve it). Rename and move read the
+   * revision, the current title and the level from here.
+   */
+  const readDocumentRef = async (documentId: string): Promise<DocumentRef> => {
+    const raw = await send({
+      method: 'GET',
+      route: `/documents/${id(documentId)}`,
+      timeoutMs: metadataTimeout,
+      read: json,
+    })
+    const ref = parseDocumentRef(raw)
+    if (ref.id !== documentId) throw new UniworkDocError('malformed_response')
+    return ref
+  }
 
   return {
     async listWorkspaces(orgId) {
@@ -449,29 +500,112 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return properties
     },
 
-    async listFolders(workspaceId) {
-      const ws = id(workspaceId)
-      const folders: UniworkDocFolderRef[] = []
-      let cursor: string | undefined
-      let pages = 0
-      do {
-        const params = new URLSearchParams()
-        params.set('kind', 'folder')
-        params.set('limit', String(FOLDERS_PAGE_SIZE))
-        if (cursor) params.set('cursor', cursor.slice(0, 512))
-        const raw = await send({
-          method: 'GET',
-          route: `/workspaces/${ws}/documents`,
-          query: params,
-          timeoutMs: metadataTimeout,
-          read: json,
-        })
-        const page = parseFolders(raw)
-        folders.push(...page.folders)
-        cursor = page.nextCursor ?? undefined
-        pages += 1
-      } while (cursor && pages < FOLDERS_MAX_PAGES)
-      return folders
+    async folderTree(workspaceId) {
+      const params = new URLSearchParams()
+      // the tree route answers folders only; without the flag it lists everything
+      params.set('folders_only', 'true')
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${id(workspaceId)}/documents/tree`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseFolderTree(raw)
+    },
+
+    async listChildren(input) {
+      const params = new URLSearchParams()
+      // the root is an EMPTY `parent_id` on purpose: with the parameter absent
+      // the route answers the workspace's whole list, not the root's children
+      params.set('parent_id', input.parentId === null ? '' : id(input.parentId))
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      const ws = id(input.workspaceId)
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${ws}/documents`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async searchDocuments(input) {
+      const params = new URLSearchParams()
+      // D matches the query against the title only on this route
+      params.set('match', 'title')
+      const q = input.query.trim().slice(0, 200)
+      if (q) params.set('q', q)
+      // `document` is the server's value for "everything that is not a folder"
+      // (pages included); 'all' sends no kind at all
+      if (input.kind !== 'all') params.set('kind', input.kind)
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      const ws = id(input.workspaceId)
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${ws}/documents`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async createFolder(input) {
+      const raw = await send({
+        method: 'POST',
+        route: `/workspaces/${id(input.workspaceId)}/documents`,
+        json: {
+          kind: 'folder',
+          title: input.title,
+          // the root is the field's absence, never an empty string
+          ...(input.parentId ? { parent_id: id(input.parentId) } : {}),
+        },
+        idempotencyKey: input.idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
+    documentRef: readDocumentRef,
+
+    async moveDocument(input) {
+      const documentId = input.documentId
+      const target = input.parentId === null ? null : id(input.parentId)
+      let ref = await readDocumentRef(documentId)
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          const raw = await send({
+            method: 'POST',
+            route: `/documents/${id(documentId)}/move`,
+            // `parent_id` is always sent: null IS the root, while the absent
+            // field would leave the document where it is
+            json: { parent_id: target, revision: ref.revision },
+            idempotencyKey: input.idempotencyKey,
+            timeoutMs: metadataTimeout,
+            read: json,
+          })
+          const summary = parseDocumentSummary(raw)
+          // the server renamed it on a name collision ("Name (2)"): that is the
+          // only case in which its title differs from the one read before
+          return { summary, renamedTo: summary.title === ref.title ? null : summary.title }
+        } catch (error) {
+          // the head moved between our read and the move: re-read it once and
+          // retry; a second conflict is the caller's to report
+          const raced =
+            attempt === 0 &&
+            error instanceof UniworkDocError &&
+            error.serverCode === 'revision_conflict'
+          if (!raced) throw error
+          ref = await readDocumentRef(documentId)
+        }
+      }
     },
 
     async createBlank(input) {
@@ -598,7 +732,13 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         timeoutMs: metadataTimeout,
         read: json,
       })
-      return parseDocumentList(raw, input.workspaceId)
+      const page = parseDocumentList(raw, input.workspaceId)
+      // FD-11: the reader now carries folders and pages as well (the children
+      // route needs them); this library list is files only
+      return {
+        documents: page.documents.filter((doc) => doc.kind === 'file'),
+        nextCursor: page.nextCursor,
+      }
     },
 
     async getDocument(documentId) {

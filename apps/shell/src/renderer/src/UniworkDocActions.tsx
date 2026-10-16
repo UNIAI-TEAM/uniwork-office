@@ -1,8 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
-import type { UniworkWorkspaceRef } from '../../shared/home-api'
-import { useI18n } from './locale'
+import type { UniworkFolderNode, UniworkResult, UniworkWorkspaceRef } from '../../shared/home-api'
+import { useI18n, type StringKey } from './locale'
 import {
   DOC_NAME_ERROR_KEYS,
   NEW_DOC_FORMATS,
@@ -15,6 +15,8 @@ import {
   type NewDocFormat,
   type RowActions,
 } from './uniwork-docs-model'
+import { UniworkFolderPicker } from './uniwork-folders/UniworkFolderPicker'
+import type { PathPart } from './uniwork-folders/uniwork-folders-model'
 
 /**
  * S18 pieces of the UniWork library: the New document / Upload dialog, the
@@ -25,17 +27,17 @@ import {
 const FOCUSABLE =
   'button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex="0"]'
 
-/** a folder the document can be put in; null id = the workspace's top level */
-export interface FolderChoice {
-  id: string
-  title: string
-}
-
 /** where a new or uploaded document goes */
 export interface DocTarget {
   workspaceId: string
+  /** null = the workspace's top level */
   folderId: string | null
+  /** FD-11: the folder's root-first path, for the Location button's label (never sent) */
+  folderPath?: PathPart[]
 }
+
+/** FD-11: reads a workspace's folder tree for the Location picker */
+export type LoadFolderTree = (workspaceId: string) => Promise<UniworkResult<UniworkFolderNode[]>>
 
 /** errors a dialog field shows in place; every other failure is a toast */
 export type DocFieldError = DocNameError | 'unsupported_format'
@@ -55,7 +57,7 @@ export interface UploadProgress {
  * focus goes back to whatever opened it. Keys never reach the library dialog
  * underneath (it would close on the same Escape).
  */
-function ActionModal({
+export function ActionModal({
   labelledBy,
   className,
   onCancel,
@@ -135,88 +137,110 @@ function ActionModal({
 
 const FORMAT_LABEL: Record<NewDocFormat, string> = { docx: 'DOCX', xlsx: 'XLSX', pptx: 'PPTX' }
 
-/** the location fields shared by New document and Upload */
-function LocationFields({
+/**
+ * The location fields shared by New document and Upload (FD-11 S4): the
+ * workspace select, then a "Location" button that shows the chosen path and
+ * opens the folder picker (folders deeper than the server allows are listed
+ * disabled with their reason).
+ */
+export function LocationFields({
   workspaces,
   target,
-  folders,
+  loadTree,
   locked,
   onChange,
 }: {
   workspaces: UniworkWorkspaceRef[]
   target: DocTarget
-  folders: FolderChoice[]
+  loadTree: LoadFolderTree
   /** an upload is under way: the place it goes to cannot change any more */
   locked?: boolean
   onChange: (target: DocTarget) => void
 }) {
   const { t } = useI18n()
   const id = useId()
+  const [picking, setPicking] = useState(false)
+  const path = target.folderId ? (target.folderPath ?? []) : []
+  const label =
+    path.length > 0 ? [t('ufRoot'), ...path.map((p) => p.title)].join(' › ') : t('ufLocationRoot')
   return (
     <fieldset className="uw-act-field uw-act-location">
-      <legend className="uw-act-label">{t('uwDocLocation')}</legend>
+      <legend className="uw-act-label">{t('ufLocation')}</legend>
       <div className="uw-act-location-row">
-        <select
-          className="uw-act-select"
-          id={`${id}-ws`}
-          aria-label={t('uwPickWorkspace')}
-          value={target.workspaceId}
-          disabled={locked}
-          onChange={(e) => onChange({ workspaceId: e.target.value, folderId: null })}
+        {workspaces.length > 0 && (
+          <select
+            className="uw-act-select"
+            id={`${id}-ws`}
+            aria-label={t('uwPickWorkspace')}
+            value={target.workspaceId}
+            disabled={locked}
+            onChange={(e) => onChange({ workspaceId: e.target.value, folderId: null })}
+          >
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id}>
+                {workspaceLabel(w, t)}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          type="button"
+          className="uwf-location-btn"
+          title={label}
+          aria-label={`${t('ufLocation')}: ${label}`}
+          aria-haspopup="dialog"
+          aria-disabled={locked || undefined}
+          onClick={() => {
+            if (!locked) setPicking(true)
+          }}
         >
-          {workspaces.map((w) => (
-            <option key={w.id} value={w.id}>
-              {workspaceLabel(w, t)}
-            </option>
-          ))}
-        </select>
-        <select
-          className="uw-act-select"
-          aria-label={t('uwDocLocation')}
-          value={target.folderId ?? ''}
-          disabled={locked || folders.length === 0}
-          onChange={(e) => onChange({ ...target, folderId: e.target.value || null })}
-        >
-          <option value="">{t('uwDocLocationTop')}</option>
-          {folders.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.title}
-            </option>
-          ))}
-        </select>
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M1.75 4.25c0-.69.56-1.25 1.25-1.25h3l1.5 1.5h5.5c.69 0 1.25.56 1.25 1.25v6c0 .69-.56 1.25-1.25 1.25H3c-.69 0-1.25-.56-1.25-1.25z"
+              fill="currentColor"
+            />
+          </svg>
+          <span className="uwf-location-path">{label}</span>
+        </button>
       </div>
+      {picking && (
+        <UniworkFolderPicker
+          title={t('ufChooseLocation')}
+          confirmLabel={t('ufChoose')}
+          workspaceId={target.workspaceId}
+          loadTree={loadTree}
+          initialFolderId={target.folderId}
+          onPick={(picked) => {
+            setPicking(false)
+            onChange({
+              workspaceId: target.workspaceId,
+              folderId: picked.folderId,
+              folderPath: picked.path,
+            })
+          }}
+          onCancel={() => setPicking(false)}
+        />
+      )}
     </fieldset>
   )
 }
 
-/** the folders of the chosen workspace (none when the call is missing or fails) */
-function useFolders(
-  workspaceId: string,
-  loadFolders: (workspaceId: string) => Promise<FolderChoice[]>,
-): FolderChoice[] {
-  const [folders, setFolders] = useState<FolderChoice[]>([])
-  useEffect(() => {
-    let live = true
-    setFolders([])
-    loadFolders(workspaceId)
-      .then((list) => {
-        if (live) setFolders(list)
-      })
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [workspaceId, loadFolders])
-  return folders
-}
-
-function FieldError({ id, error }: { id: string; error: DocFieldError | null }) {
+export function FieldError({
+  id,
+  error,
+  keys = DOC_NAME_ERROR_KEYS,
+}: {
+  id: string
+  error: DocFieldError | null
+  /** the copy per error (a folder name has its own 255 wording) */
+  keys?: Record<DocNameError, StringKey>
+}) {
   const { t } = useI18n()
   const key =
     error === 'unsupported_format'
       ? UNIWORK_ERROR_KEYS.unsupported_format
       : error
-        ? DOC_NAME_ERROR_KEYS[error]
+        ? keys[error]
         : null
   // always in the DOM so aria-describedby points at something stable
   return (
@@ -233,13 +257,13 @@ function FieldError({ id, error }: { id: string; error: DocFieldError | null }) 
 export function NewDocDialog({
   workspaces,
   initialTarget,
-  loadFolders,
+  loadTree,
   onCreate,
   onCancel,
 }: {
   workspaces: UniworkWorkspaceRef[]
   initialTarget: DocTarget
-  loadFolders: (workspaceId: string) => Promise<FolderChoice[]>
+  loadTree: LoadFolderTree
   onCreate: (input: DocTarget & { name: string; format: NewDocFormat }) => Promise<ActionOutcome>
   onCancel: () => void
 }) {
@@ -250,7 +274,6 @@ export function NewDocDialog({
   const [target, setTarget] = useState(initialTarget)
   const [error, setError] = useState<DocFieldError | null>(null)
   const [busy, setBusy] = useState(false)
-  const folders = useFolders(target.workspaceId, loadFolders)
   const nameRef = useRef<HTMLInputElement>(null)
 
   const submit = () => {
@@ -269,7 +292,12 @@ export function NewDocDialog({
       return
     }
     setBusy(true)
-    void onCreate({ ...target, name: sent, format }).then((outcome) => {
+    void onCreate({
+      workspaceId: target.workspaceId,
+      folderId: target.folderId,
+      name: sent,
+      format,
+    }).then((outcome) => {
       setBusy(false)
       if (outcome.ok || outcome.error === 'failed') return
       setError(outcome.error)
@@ -330,7 +358,7 @@ export function NewDocDialog({
         <LocationFields
           workspaces={workspaces}
           target={target}
-          folders={folders}
+          loadTree={loadTree}
           onChange={setTarget}
         />
         <div className="modal-buttons">
@@ -359,7 +387,7 @@ export function NewDocDialog({
 export function UploadDocDialog({
   workspaces,
   initialTarget,
-  loadFolders,
+  loadTree,
   pickFile,
   onUpload,
   progress,
@@ -367,7 +395,7 @@ export function UploadDocDialog({
 }: {
   workspaces: UniworkWorkspaceRef[]
   initialTarget: DocTarget
-  loadFolders: (workspaceId: string) => Promise<FolderChoice[]>
+  loadTree: LoadFolderTree
   pickFile: () => Promise<{ path: string; name: string } | null>
   onUpload: (input: DocTarget & { path: string; name: string }) => Promise<ActionOutcome>
   progress: UploadProgress | null
@@ -379,7 +407,6 @@ export function UploadDocDialog({
   const [target, setTarget] = useState(initialTarget)
   const [error, setError] = useState<DocFieldError | null>(null)
   const [busy, setBusy] = useState(false)
-  const folders = useFolders(target.workspaceId, loadFolders)
   const pickRef = useRef<HTMLButtonElement>(null)
 
   const choose = () => {
@@ -397,7 +424,12 @@ export function UploadDocDialog({
   const submit = () => {
     if (busy || !file) return
     setBusy(true)
-    void onUpload({ ...target, path: file.path, name: file.name }).then((outcome) => {
+    void onUpload({
+      workspaceId: target.workspaceId,
+      folderId: target.folderId,
+      path: file.path,
+      name: file.name,
+    }).then((outcome) => {
       setBusy(false)
       if (outcome.ok || outcome.error === 'failed') return
       setError(outcome.error)
@@ -432,7 +464,7 @@ export function UploadDocDialog({
       <LocationFields
         workspaces={workspaces}
         target={target}
-        folders={folders}
+        loadTree={loadTree}
         locked={busy}
         onChange={setTarget}
       />
@@ -509,7 +541,7 @@ const MENU_EDGE = 8
  * scrollable list or clipped dialog can cut it off. It drops below the button
  * and flips upward when the room below is smaller than it is (and larger above).
  */
-function placeMenu(button: HTMLElement, menu: HTMLElement) {
+export function placeMenu(button: HTMLElement, menu: HTMLElement) {
   const anchor = button.getBoundingClientRect()
   const { width, height } = menu.getBoundingClientRect()
   const below = window.innerHeight - anchor.bottom - MENU_GAP - MENU_EDGE
@@ -686,6 +718,8 @@ export function RenameField({
   onSave,
   onCancel,
   onEdit,
+  errorKeys,
+  nameLabel,
 }: {
   initial: string
   label: string
@@ -694,6 +728,10 @@ export function RenameField({
   onSave: (value: string) => void
   onCancel: () => void
   onEdit: () => void
+  /** FD-11: a folder's own error copy */
+  errorKeys?: Record<DocNameError, StringKey>
+  /** FD-11: the field's name ("Folder name"); default "Name" */
+  nameLabel?: string
 }) {
   const { t } = useI18n()
   const id = useId()
@@ -710,7 +748,7 @@ export function RenameField({
         className="uw-act-input uw-rename-input"
         type="text"
         value={value}
-        aria-label={`${t('uwDocName')} · ${label}`}
+        aria-label={`${nameLabel ?? t('uwDocName')} · ${label}`}
         aria-invalid={error !== null}
         aria-describedby={`${id}-error`}
         aria-busy={busy || undefined}
@@ -733,7 +771,7 @@ export function RenameField({
           }
         }}
       />
-      <FieldError id={`${id}-error`} error={error} />
+      <FieldError id={`${id}-error`} error={error} keys={errorKeys} />
     </span>
   )
 }
@@ -742,14 +780,29 @@ export function RenameField({
  * Failure note near the foot of the library (an action did not apply): icon,
  * the message, and a dismiss button; it also clears itself after a while.
  */
-export function ActionToast({ message, onDone }: { message: string; onDone: () => void }) {
+export function ActionToast({
+  message,
+  onDone,
+  tone = 'error',
+}: {
+  message: string
+  onDone: () => void
+  /**
+   * FD-11 'ok': a done note (moved, created). It has no live role: the caller
+   * says it once through the shell's uniwork-live region instead.
+   */
+  tone?: 'error' | 'ok'
+}) {
   const { t } = useI18n()
   useEffect(() => {
     const timer = window.setTimeout(onDone, 6000)
     return () => window.clearTimeout(timer)
   }, [message, onDone])
   return (
-    <div className="uw-act-toast" role="alert">
+    <div
+      className={`uw-act-toast${tone === 'ok' ? ' ok' : ''}`}
+      role={tone === 'ok' ? undefined : 'alert'}
+    >
       <svg
         className="uw-act-toast-icon"
         width="16"

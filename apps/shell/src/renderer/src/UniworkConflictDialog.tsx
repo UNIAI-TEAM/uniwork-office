@@ -24,6 +24,8 @@ import {
   type ConflictStep1ActionId,
 } from './uniwork-conflict-model'
 import './uniwork-conflict-dialog.css'
+import { ConflictCopyLocation } from './uniwork-folders/ConflictCopyLocation'
+import type { PickedFolder } from './uniwork-folders/UniworkFolderPicker'
 
 export interface UniworkConflictBridge {
   onUniworkConflict?: (cb: (view: UniworkConflictView) => void) => () => void
@@ -118,9 +120,14 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   const [state, setState] = useState<ConflictDialogState>(() => createInitialConflictState(view))
   const [busy, setBusy] = useState(false)
   const [alertClearing, setAlertClearing] = useState(false)
+  /** FD-11 S5: the folder chosen for Save a copy; null = the source's own folder */
+  const [copyFolder, setCopyFolder] = useState<PickedFolder | null>(null)
 
   useEffect(() => {
     if (prevViewRef.current !== view) {
+      if (prevViewRef.current.sessionId !== view.sessionId) {
+        setCopyFolder(null)
+      }
       const isFromReply = replyViewRef.current === view
       replyViewRef.current = null
       const prevResolved = resolveConflictNotice(prevViewRef.current)
@@ -341,6 +348,15 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
     if (busyRef.current) return
     const payload = buildConfirmPayload(state, view)
     if (!payload) return
+    // FD-11 S5: a chosen folder rides on the save-copy action (absent = next to the source)
+    const workspaceId = view.workspaceId
+    if (payload.kind === 'save-copy' && copyFolder && workspaceId) {
+      void sendAction({
+        ...payload,
+        targetFolder: { workspaceId, folderId: copyFolder.folderId },
+      })
+      return
+    }
     void sendAction(payload)
   }
 
@@ -473,6 +489,15 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
                 <p className="uw-conflict-note">{t(step1Model.noEditKey)}</p>
               )}
             </>
+          )}
+
+          {state.step === 'save-copy' && !saveCopyDownload && (
+            <ConflictCopyLocation
+              view={view}
+              chosen={copyFolder}
+              disabled={busy}
+              onChoose={setCopyFolder}
+            />
           )}
 
           {state.step === 'reload' && (
@@ -824,6 +849,7 @@ export const UniworkConflictHost: React.FC<UniworkConflictHostProps> = ({ onView
 
   return (
     <UniworkConflictDialog
+      key={view.sessionId}
       view={view}
       onAct={handleAct}
       onClosed={handleClosed}

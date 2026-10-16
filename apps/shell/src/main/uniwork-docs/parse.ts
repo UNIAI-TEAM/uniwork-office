@@ -1,7 +1,8 @@
 import type {
-  UniworkDocFolderRef,
   UniworkDocFormat,
   UniworkDocSummary,
+  UniworkEntryKind,
+  UniworkFolderNode,
 } from '../../shared/home-api'
 import { UniworkDocError } from './errors'
 import { formatForMime, formatForName, isDecimalString } from './formats'
@@ -150,17 +151,58 @@ function formatOf(doc: Record<string, unknown>, title: string): UniworkDocFormat
   return formatForName(title)
 }
 
+/** FD-11: the three entry kinds; a row of any other kind is skipped, never guessed */
+function kindOf(value: unknown): UniworkEntryKind | null {
+  return value === 'folder' || value === 'file' || value === 'page' ? value : null
+}
+
+/**
+ * FD-11: `parent_id` as the renderer's `parentId`. Absent, `null` and `''` all
+ * mean the workspace root; a malformed one fails closed.
+ */
+function parentIdOf(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') return null
+  if (typeof value !== 'string' || value.length > 128) bad()
+  return value
+}
+
+/**
+ * FD-11: the ancestors a search row carries, root first (D cuts the list at
+ * the first ancestor the caller cannot read). Absent on every other route.
+ */
+function pathOf(row: Record<string, unknown>): { id: string; title: string }[] | undefined {
+  const path = row.path
+  if (path === undefined || path === null) return undefined
+  if (!Array.isArray(path)) bad()
+  const ancestors: { id: string; title: string }[] = []
+  for (const value of path) {
+    const node = record(value)
+    ancestors.push({ id: str(node.id, 128), title: str(node.title) })
+  }
+  return ancestors
+}
+
 /** one list row as the renderer's summary (title is the only name the server sends) */
-function summaryRow(row: Record<string, unknown>, workspaceId: string): UniworkDocSummary {
+function summaryRow(
+  row: Record<string, unknown>,
+  workspaceId: string,
+  kind: UniworkEntryKind,
+): UniworkDocSummary {
   const title = str(row.title)
+  const path = pathOf(row)
   return {
     id: str(row.id, 128),
     workspaceId:
       typeof row.workspace_id === 'string' && row.workspace_id ? row.workspace_id : workspaceId,
     title,
-    format: formatOf(row, title),
+    // a folder has no document format, whatever its name ends in: only the
+    // row's own file block (or a file/page title) decides that
+    format: kind === 'folder' ? null : formatOf(row, title),
     updatedAt: str(row.updated_at, 64),
     ...summaryFlags(row),
+    kind,
+    parentId: parentIdOf(row.parent_id),
+    ...(path ? { path } : {}),
   }
 }
 
@@ -246,6 +288,45 @@ export function parseDetail(raw: unknown): DocumentDetail {
   }
 }
 
+/**
+ * FD-11: one document's own fields, whatever its kind (a folder has no `file`
+ * block, so `parseDetail` cannot read it). The rename and move flows read this
+ * to learn the revision, the title to compare a move's answer with, the kind
+ * for the name cap, and the level to gate the action on.
+ */
+export interface DocumentRef {
+  id: string
+  workspaceId: string
+  title: string
+  /** decimal string, never a JS number */
+  revision: string
+  kind: UniworkEntryKind
+  parentId: string | null
+  myLevel: string | null
+  archivedAt: string | null
+  format: UniworkDocFormat | null
+}
+
+export function parseDocumentRef(raw: unknown): DocumentRef {
+  const doc = record(record(raw).document)
+  const kind = kindOf(doc.kind)
+  if (!kind) bad()
+  const title = str(doc.title)
+  const myLevel = doc.my_level
+  if (myLevel !== undefined && myLevel !== null && typeof myLevel !== 'string') bad()
+  return {
+    id: str(doc.id, 128),
+    workspaceId: str(doc.workspace_id, 128),
+    title,
+    revision: revision(doc.revision),
+    kind,
+    parentId: parentIdOf(doc.parent_id),
+    myLevel: typeof myLevel === 'string' ? myLevel : null,
+    archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
+    format: kind === 'folder' ? null : formatOf(doc, title),
+  }
+}
+
 export function parseDocumentList(raw: unknown, workspaceId: string): DocumentListResult {
   const body = record(raw)
   if (!Array.isArray(body.documents)) bad()
@@ -254,8 +335,11 @@ export function parseDocumentList(raw: unknown, workspaceId: string): DocumentLi
   const documents: UniworkDocSummary[] = []
   for (const value of body.documents) {
     const row = record(value)
-    if (row.kind !== 'file') continue
-    documents.push(summaryRow(row, workspaceId))
+    // FD-11: the children route lists folders and pages too; a caller that
+    // wants files only (the library list) filters on the carried `kind`
+    const kind = kindOf(row.kind)
+    if (!kind) continue
+    documents.push(summaryRow(row, workspaceId, kind))
   }
   return { documents, nextCursor: typeof next === 'string' && next ? next : null }
 }
@@ -418,8 +502,9 @@ export function parseSharedWithMe(raw: unknown, workspaceId: string): DocumentLi
   const documents: UniworkDocSummary[] = []
   for (const value of body.documents) {
     const row = record(value)
+    // "shared with me" is the library: files only, a folder is never shared
     if (row.kind !== 'file') continue
-    documents.push(summaryRow(row, workspaceId))
+    documents.push(summaryRow(row, workspaceId, 'file'))
   }
   return { documents, nextCursor: typeof next === 'string' && next ? next : null }
 }
@@ -475,51 +560,62 @@ export function parseOrgMembers(raw: unknown): OrgMemberPage {
 }
 
 /**
- * `POST .../documents/files[/blank]` and `PATCH /documents/{id}` answer with a
- * full `DocumentSDO`. The library row only needs the summary fields plus the
- * S18 action flags, so this reads exactly that and fails closed on a malformed
- * core (id, title, revision, workspace).
+ * `POST .../documents/files[/blank]`, `PATCH /documents/{id}` and the FD-11
+ * folder/move routes answer with a full `DocumentSDO`. The library row only
+ * needs the summary fields plus the S18 action flags, so this reads exactly
+ * that and fails closed on a malformed core (id, title, revision, workspace).
+ * FD-11 adds the entry's kind and where it sits, when the answer carries them.
  */
 export function parseDocumentSummary(raw: unknown): UniworkDocSummary {
   const doc = record(record(raw).document)
   const title = str(doc.title)
   const workspaceId = str(doc.workspace_id, 128)
+  const kind = kindOf(doc.kind)
   return {
     id: str(doc.id, 128),
     workspaceId,
     title,
-    format: formatOf(doc, title),
+    // a folder has no document format, whatever its name ends in
+    format: kind === 'folder' ? null : formatOf(doc, title),
     updatedAt: typeof doc.updated_at === 'string' ? doc.updated_at.slice(0, 64) : '',
     ...actionFlags(
       typeof doc.my_level === 'string' ? doc.my_level : null,
       typeof doc.archived_at === 'string' ? doc.archived_at : null,
     ),
+    ...(kind ? { kind } : {}),
+    ...(doc.parent_id === undefined ? {} : { parentId: parentIdOf(doc.parent_id) }),
   }
 }
 
 /**
- * `GET /workspaces/{ws}/documents?kind=folder` -> one page of folder choices
- * for the "Location" field, plus D's opaque `next_cursor` (null at the end). A
- * row without a usable id or title is skipped rather than failing the dialog.
+ * `GET /workspaces/{ws}/documents/tree?folders_only=true` -> the folder tree,
+ * root nodes first. Every node is a folder (the route asks for folders only),
+ * `children` is always present (empty at a leaf), and a node past the server's
+ * own depth cap (20) fails closed rather than recursing for ever.
  */
-export function parseFolders(raw: unknown): {
-  folders: UniworkDocFolderRef[]
-  nextCursor: string | null
-} {
+const MAX_TREE_DEPTH = 20
+
+function folderNode(value: unknown, depth: number): UniworkFolderNode {
+  if (depth > MAX_TREE_DEPTH) bad()
+  const node = record(value)
+  if (node.kind !== 'folder') bad()
+  const children = node.children
+  if (!Array.isArray(children)) bad()
+  const position = node.position
+  if (typeof position !== 'number' || !Number.isFinite(position)) bad()
+  return {
+    id: str(node.id, 128),
+    parentId: parentIdOf(node.parent_id),
+    title: str(node.title),
+    position,
+    children: children.map((child) => folderNode(child, depth + 1)),
+  }
+}
+
+export function parseFolderTree(raw: unknown): UniworkFolderNode[] {
   const body = record(raw)
   if (!Array.isArray(body.documents)) bad()
-  const next = body.next_cursor
-  if (next !== null && next !== undefined && typeof next !== 'string') bad()
-  const folders: UniworkDocFolderRef[] = []
-  for (const value of body.documents) {
-    if (!isRecord(value)) continue
-    if (value.kind !== 'folder') continue
-    const id = value.id
-    const title = value.title
-    if (typeof id !== 'string' || !id || typeof title !== 'string' || !title) continue
-    folders.push({ id, title })
-  }
-  return { folders, nextCursor: typeof next === 'string' && next ? next : null }
+  return body.documents.map((value) => folderNode(value, 1))
 }
 
 /**

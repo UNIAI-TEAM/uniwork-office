@@ -40,11 +40,15 @@ export type DocCacheCommitFailure = 'store_full' | 'store_unavailable'
  * a document the cache already held.
  */
 export type DocCacheCommit =
-  { kind: 'ok'; applied?: readonly string[] } | { kind: 'failed'; failure: DocCacheCommitFailure }
+  | { kind: 'ok'; applied?: readonly string[]; dropped?: readonly string[] }
+  | { kind: 'failed'; failure: DocCacheCommitFailure }
 
 export interface DocCache {
   /** upsert the page's rows as one atomic step; a replayed page has no further effect */
-  applyPage(changes: readonly FeedChange[]): Promise<DocCacheCommit>
+  applyPage(
+    changes: readonly FeedChange[],
+    options?: { hadRows?: boolean },
+  ): Promise<DocCacheCommit>
   /** full resync: keep exactly `ids` (plus local drafts), evict every other cached entry */
   reconcile(ids: ReadonlySet<string>, options: { keepDrafts: true }): Promise<DocCacheCommit>
 }
@@ -196,7 +200,9 @@ export class FeedConsumer {
       const afterFetch = this.stopReason()
       if (afterFetch) return { kind: 'stopped', result: afterFetch }
       if (page.kind !== 'page') return page
-      const applied = await this.options.cache.applyPage(page.changes)
+      const applied = await this.options.cache.applyPage(page.changes, {
+        hadRows: page.hadRows ?? page.changes.length > 0,
+      })
       // a page the store refused is never skipped: no cursor move, the page
       // comes back on the next tick
       if (applied.kind !== 'ok') return { kind: 'stopped', result: commitFailed(applied) }
@@ -225,7 +231,9 @@ export class FeedConsumer {
       // server cannot serve this feed, and a fallback of a fallback would loop
       if (page.kind === 'feed_cursor_unsupported') return { kind: 'failed', error: page.error }
       if (page.kind !== 'page') return this.backOff()
-      const applied = await this.options.cache.applyPage(page.changes)
+      const applied = await this.options.cache.applyPage(page.changes, {
+        hadRows: page.hadRows ?? page.changes.length > 0,
+      })
       if (applied.kind !== 'ok') return commitFailed(applied)
       for (const change of page.changes) seen.add(change.documentId)
       pages += 1

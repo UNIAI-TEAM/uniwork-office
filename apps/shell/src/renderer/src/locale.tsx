@@ -13,6 +13,7 @@ import { strings } from './strings'
 import { accountStrings } from './i18n/strings-account'
 import { cloudStrings } from './i18n/strings-cloud'
 import { uniworkDocumentStrings } from './i18n/strings-uniwork-documents'
+import { uniworkFolderStrings } from './i18n/strings-uniwork-folders'
 import { syncStrings } from './i18n/strings-sync'
 import { workbenchStrings } from './i18n/strings-workbench'
 import { discussionStrings } from './i18n/strings-discussion'
@@ -23,6 +24,7 @@ export type StringKey =
   | keyof typeof accountStrings.zh
   | keyof typeof cloudStrings.zh
   | keyof typeof uniworkDocumentStrings.zh
+  | keyof typeof uniworkFolderStrings.zh
   | keyof typeof syncStrings.zh
   | keyof typeof workbenchStrings.zh
   | keyof typeof discussionStrings.zh
@@ -37,6 +39,7 @@ const dicts = Object.fromEntries(
       ...accountStrings[l],
       ...cloudStrings[l],
       ...uniworkDocumentStrings[l],
+      ...uniworkFolderStrings[l],
       ...syncStrings[l],
       ...workbenchStrings[l],
       ...discussionStrings[l],

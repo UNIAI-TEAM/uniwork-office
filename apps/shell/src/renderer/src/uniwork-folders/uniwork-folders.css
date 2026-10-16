@@ -1,0 +1,532 @@
+/*
+ * FD-11 UniWork folder tree: browser, tree, picker. Chrome only, so every
+ * color is a token from packages/ui/src/tokens.css (light + dark) or the
+ * app's --accent family.
+ */
+
+/* the Open dialog grows when it holds the browser (tree + contents side by side) */
+.modal.uw-pick.with-browser {
+  width: min(880px, calc(var(--ui-vw) * 94));
+  max-height: min(680px, calc(var(--ui-vh) * 88));
+}
+
+.uwf-browser {
+  display: grid;
+  grid-template-columns: minmax(180px, 32%) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.uwf-browser.uwf-pane {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.uwf-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px;
+  overflow-y: auto;
+  border-inline-end: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
+}
+
+.uwf-own-search {
+  flex: 0 0 auto;
+  margin-bottom: 6px;
+}
+
+.uwf-side-state {
+  margin: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.uwf-side-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* host views above the tree (Recent / Shared with me) share the tree row look */
+.uwf-view {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.uwf-view:hover {
+  background: var(--hover);
+}
+
+.uwf-view[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.uwf-view-sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--border-subtle);
+}
+
+/* ── tree ── */
+
+.uwf-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uwf-tree-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding-inline-end: 32px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.uwf-tree-row:hover {
+  background: var(--hover);
+}
+
+.uwf-tree-row.selected {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.uwf-tree-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.uwf-tree-row.blocked {
+  cursor: default;
+}
+
+.uwf-tree-row.blocked .uwf-tree-title,
+.uwf-tree-row.blocked .uwf-glyph {
+  color: var(--text-muted);
+}
+
+.uwf-twisty {
+  display: grid;
+  flex: 0 0 16px;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+}
+
+.uwf-chevron {
+  transition: transform 0.12s ease;
+}
+
+.uwf-chevron.open {
+  transform: rotate(90deg);
+}
+
+[dir='rtl'] .uwf-chevron:not(.open) {
+  transform: scaleX(-1);
+}
+
+.uwf-glyph {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.uwf-tree-row.selected .uwf-glyph {
+  color: var(--accent);
+}
+
+.uwf-tree-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+.uwf-tree-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uwf-reason {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.uwf-tree-row .uw-rename {
+  flex: 1;
+  padding: 2px 0;
+}
+
+/* the row "…" sits at the end of a tree or contents row; shown on hover / focus / open */
+.uwf-menu {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 4px;
+  transform: translateY(-50%);
+}
+
+.uwf-tree-row .uw-row-menu-btn,
+.uwf-contents .uwf-menu .uw-row-menu-btn {
+  opacity: 0;
+}
+
+.uwf-tree-row:hover .uw-row-menu-btn,
+.uwf-tree-row:focus-within .uw-row-menu-btn,
+.uwf-contents .uw-pick-item:hover .uw-row-menu-btn,
+.uwf-contents .uw-pick-item:focus-within .uw-row-menu-btn,
+.uwf-menu .uw-row-menu-btn.on {
+  opacity: 1;
+}
+
+/* ── main column ── */
+
+.uwf-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.uwf-main > .uw-pick-body {
+  border-top: none;
+}
+
+.uwf-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.uwf-bar-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.uwf-sort {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.uwf-sort:focus-visible,
+.uwf-chip:focus-visible,
+.uwf-crumb-btn:focus-visible,
+.uwf-view:focus-visible,
+.uwf-contents .uwf-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uwf-new-folder {
+  min-height: 32px;
+}
+
+.uwf-list {
+  flex: 1;
+  min-height: min(280px, calc(var(--ui-vh) * 40));
+  overflow-y: auto;
+  padding: 4px 12px 12px;
+}
+
+.uwf-notice {
+  margin: 8px 12px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 13px;
+}
+
+.uwf-hidden {
+  margin: 8px 8px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.uwf-row {
+  min-height: 32px;
+  user-select: none;
+}
+
+.uwf-list .uw-pick-state {
+  user-select: none;
+}
+
+.uwf-row-icon {
+  display: grid;
+  flex: 0 0 24px;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
+}
+
+.uw-pick-row-meta.uwf-path {
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── breadcrumb ── */
+
+.uwf-crumbs {
+  min-width: 0;
+  flex: 1;
+}
+
+.uwf-crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.uwf-crumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.uwf-crumb .uwf-menu {
+  position: static;
+  transform: none;
+}
+
+.uwf-crumb-btn {
+  min-height: 28px;
+  max-width: 180px;
+  padding: 0 6px;
+  overflow: hidden;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.uwf-crumb-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.uwf-crumb-current {
+  max-width: 220px;
+  padding: 0 6px;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uwf-crumb-sep {
+  color: var(--text-muted);
+}
+
+/* ── search chips ── */
+
+.uwf-chips {
+  display: flex;
+  gap: 6px;
+}
+
+.uwf-chip {
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.uwf-chip:hover {
+  background: var(--hover);
+}
+
+.uwf-chip.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ── picker ── */
+
+.modal.uw-act.uwf-picker {
+  width: min(460px, calc(var(--ui-vw) * 92));
+}
+
+.uwf-picker-body {
+  max-height: min(360px, calc(var(--ui-vh) * 50));
+  margin: 8px 0;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.uwf-picker-state {
+  margin: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.uwf-picker-path {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* the "Location" button of New / Upload / Save a copy */
+.uwf-location-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.uwf-location-btn:hover {
+  background: var(--hover);
+}
+
+.uwf-location-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uwf-location-btn[aria-disabled='true'] {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.uwf-location-btn > svg {
+  flex: 0 0 auto;
+}
+
+.uwf-location-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* a done note (moved, created): the success family, not the failure one */
+.uw-act-toast.ok {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+@media (max-width: 640px) {
+  .uwf-browser {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(120px, 36%) minmax(0, 1fr);
+  }
+
+  .uwf-side {
+    border-inline-end: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+}
+
+@media (pointer: coarse) {
+  .uwf-tree-row,
+  .uwf-view,
+  .uwf-row,
+  .uwf-sort,
+  .uwf-chip,
+  .uwf-crumb-btn,
+  .uwf-new-folder,
+  .uwf-location-btn {
+    min-height: 44px;
+  }
+
+  .uwf-tree-row .uw-row-menu-btn,
+  .uwf-contents .uwf-menu .uw-row-menu-btn {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uwf-chevron {
+    transition: none;
+  }
+}
+
+/* S5: Save a copy's Location row inside the conflict dialog */
+.uw-conflict-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.uw-conflict-location-label {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 13px;
+}

@@ -30,6 +30,7 @@ import type {
   UploadProgressEvent,
 } from '../src/renderer/src/uniwork-library-api'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
+import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
 
 /**
  * S18: New document, Upload, Rename, Archive / Restore from the UniWork
@@ -40,6 +41,7 @@ const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONM
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const en = uniworkDocumentStrings.en
+const folderEn = uniworkFolderStrings.en
 
 const WORKSPACES = [
   { id: 'w1', name: 'Sales', orgId: 'o1', myRole: 'admin' },
@@ -99,7 +101,11 @@ function makeApi(docs: LibraryDocRow[]) {
     ),
     uniworkArchiveDocument: vi.fn(async (_id: string) => ok({})),
     uniworkRestoreDocument: vi.fn(async (_id: string) => ok({})),
-    uniworkListFolders: vi.fn(async (_ws: string) => ok([{ id: 'f1', title: 'Contracts' }])),
+    // FD-11: the Location picker reads the workspace's folder tree
+    uniworkFolderTree: vi.fn(async (_ws: string) =>
+      ok([{ id: 'f1', parentId: null, title: 'Contracts', position: 0, children: [] }]),
+    ),
+    uniworkListChildren: vi.fn(async () => ok({ items: [], nextCursor: null })),
     onUniworkDocRenamed: vi.fn((cb: (e: DocRenamedEvent) => void) => {
       renamed = cb
       return () => {
@@ -250,12 +256,20 @@ describe('S18 new document', () => {
     expect(document.activeElement).toBe(name)
     await type(name, 'Q4 plan')
     await click(dialog.querySelector('input[value="pptx"]')!)
-    const folder = dialog.querySelectorAll<HTMLSelectElement>('select')[1]!
-    expect(api.uniworkListFolders).toHaveBeenCalledWith('w1')
-    await act(async () => {
-      folder.value = 'f1'
-      folder.dispatchEvent(new Event('change', { bubbles: true }))
-    })
+    // FD-11 S4: "Location" is a button showing the chosen path; it opens the folder picker
+    const location = dialog.querySelector<HTMLButtonElement>('.uwf-location-btn')!
+    expect(location.textContent).toContain(folderEn.ufLocationRoot)
+    expect(dialog.querySelectorAll('select')).toHaveLength(1)
+    await click(location)
+    const picker = host.querySelector('.uwf-picker')!
+    expect(api.uniworkFolderTree).toHaveBeenCalledWith('w1')
+    const contracts = Array.from(picker.querySelectorAll<HTMLElement>('[role="treeitem"]')).find(
+      (el) => el.textContent?.includes('Contracts'),
+    )!
+    await click(contracts)
+    await click(buttonByText(picker as HTMLElement, folderEn.ufChoose))
+    expect(host.querySelector('.uwf-picker')).toBeNull()
+    expect(location.textContent).toContain('UniWork › Contracts')
     await click(buttonByText(dialog, en.uwDocCreate))
     expect(api.uniworkCreateDocument).toHaveBeenCalledWith({
       workspaceId: 'w1',
@@ -267,6 +281,41 @@ describe('S18 new document', () => {
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('new1')
     expect(api.uniworkOpenDocument).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('V1-1: location row renders both controls, button carries path text + title, and flex layout shares/stacks without squeezing', async () => {
+    await render([])
+    await click(buttonByText(host, en.uwDocNew))
+    const dialog = modal()!
+    const locRow = dialog.querySelector<HTMLElement>('.uw-act-location-row')!
+    expect(locRow).not.toBeNull()
+    const select = locRow.querySelector<HTMLSelectElement>('.uw-act-select')!
+    const btn = locRow.querySelector<HTMLButtonElement>('.uwf-location-btn')!
+    expect(select).not.toBeNull()
+    expect(btn).not.toBeNull()
+    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe(folderEn.ufLocationRoot)
+    expect(btn.getAttribute('title')).toBe(folderEn.ufLocationRoot)
+
+    await click(btn)
+    const picker = host.querySelector('.uwf-picker')!
+    const contracts = Array.from(picker.querySelectorAll<HTMLElement>('[role="treeitem"]')).find(
+      (el) => el.textContent?.includes('Contracts'),
+    )!
+    await click(contracts)
+    await click(buttonByText(picker as HTMLElement, folderEn.ufChoose))
+    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe('UniWork › Contracts')
+    expect(btn.getAttribute('title')).toBe('UniWork › Contracts')
+
+    const homeCss = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const foldersCss = readFileSync(
+      join(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
+      'utf8',
+    )
+    expect(homeCss).toMatch(/\.uw-act-location-row\s*>\s*\.uw-act-select\s*\{[^}]*width:\s*auto/)
+    expect(foldersCss).toMatch(/\.uwf-location-btn\s*>\s*svg\s*\{[^}]*flex:\s*0\s+0\s+auto/)
+    expect(homeCss).toMatch(
+      /@media\s*\(max-width:\s*900px\)\s*\{[\s\S]*?\.uw-act-location-row\s*\{[^}]*flex-direction:\s*column/,
+    )
   })
 
   it('shows an empty name at the field, without calling main', async () => {
@@ -1003,16 +1052,21 @@ describe('G8-17 review r1 fixes', () => {
     expect(host.querySelector('.uw-act-toast')).toBeNull()
   })
 
-  it('RFE17-05: the location selects are locked while an upload is busy', async () => {
+  it('RFE17-05: the location fields are locked while an upload is busy', async () => {
     await render([])
     api.uniworkUploadDocument.mockImplementationOnce(() => new Promise(() => undefined))
     await click(buttonByText(host, en.uwDocUpload))
     const dialog = modal()!
     await click(buttonByText(dialog, en.uwDocUploadPick))
     const selects = () => Array.from(dialog.querySelectorAll<HTMLSelectElement>('select'))
+    const location = () => dialog.querySelector<HTMLButtonElement>('.uwf-location-btn')!
     expect(selects()[0]!.disabled).toBe(false)
+    expect(location().getAttribute('aria-disabled')).toBeNull()
     await click(dialog.querySelector('.btn-primary')!)
     expect(selects().every((sel) => sel.disabled)).toBe(true)
+    expect(location().getAttribute('aria-disabled')).toBe('true')
+    await click(location())
+    expect(host.querySelector('.uwf-picker')).toBeNull()
   })
 
   it('RFE17-02: a successful rename is announced once in the polite live region', async () => {

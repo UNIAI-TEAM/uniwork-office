@@ -52,22 +52,30 @@ import type {
   UniworkConflictReply,
   UniworkConflictView,
   UniworkCreateDocInput,
+  UniworkCreateFolderInput,
   UniworkDocActionResult,
   UniworkDocErrorCode,
-  UniworkDocFolderRef,
   UniworkDocListPage,
   UniworkDocLock,
   UniworkDocProperties,
   UniworkDocRenamedEvent,
   UniworkDocStatus,
   UniworkDocSummary,
+  UniworkFolderChildren,
+  UniworkFolderNode,
+  UniworkFolderQuery,
   UniworkLaunchEvent,
+  UniworkMoveDocumentInput,
+  UniworkMoveResult,
   UniworkQueuePopoverRequest,
   UniworkRemoteBar,
   UniworkRemoteAction,
   UniworkResult,
+  UniworkSearchPage,
+  UniworkSearchQuery,
   UniworkSharedPage,
   UniworkSharedQuery,
+  UniworkTreeChangedEvent,
   UniworkUploadDocInput,
   UniworkUploadProgress,
   UniworkWorkspaceRef,
@@ -131,6 +139,16 @@ ipcRenderer.on(UNIWORK_DOC_CHANNELS.docRenamed, (_event: IpcRendererEvent, raw: 
   const event = asDocRenamed(raw)
   if (!event) return
   for (const cb of [...docRenamedSubscribers]) cb(event)
+})
+// FD-11: a workspace's document tree changed in the server's view (a feed page
+// or one of this app's own folder actions), coalesced in main. No replay: the
+// browser re-reads the tree and the open folder when it hears it, and window
+// focus covers a push missed while nothing was mounted.
+const treeChangedSubscribers = new Set<(event: UniworkTreeChangedEvent) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.treeChanged, (_event: IpcRendererEvent, raw: unknown) => {
+  const event = asUniworkTreeChanged(raw)
+  if (!event) return
+  for (const cb of [...treeChangedSubscribers]) cb(event)
 })
 // S18: upload bytes sent of the total, while the dialog is open
 const uploadProgressSubscribers = new Set<(event: UniworkUploadProgress) => void>()
@@ -320,6 +338,13 @@ function asDocRenamed(raw: unknown): UniworkDocRenamedEvent | null {
   if (typeof r.documentId !== 'string' || !r.documentId) return null
   if (typeof r.title !== 'string' || !r.title) return null
   return { documentId: r.documentId, title: r.title }
+}
+
+/** FD-11: a push whose payload is not a workspace id is ignored, never thrown */
+function asUniworkTreeChanged(raw: unknown): UniworkTreeChangedEvent | null {
+  if (!raw || typeof raw !== 'object' || !('workspaceId' in raw)) return null
+  const workspaceId = raw.workspaceId
+  return typeof workspaceId === 'string' && workspaceId ? { workspaceId } : null
 }
 
 /** an upload-progress push: the upload's own id, a local path and finite, non-negative byte counts */
@@ -1137,10 +1162,36 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.restoreDocument, documentId),
     )
   },
-  async uniworkListFolders(workspaceId: string) {
-    return asUniworkResult<UniworkDocFolderRef[]>(
-      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listFolders, workspaceId),
+  async uniworkFolderTree(workspaceId: string) {
+    return asUniworkResult<UniworkFolderNode[]>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.folderTree, workspaceId),
     )
+  },
+  async uniworkListChildren(q: UniworkFolderQuery) {
+    return asUniworkResult<UniworkFolderChildren>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listChildren, q),
+    )
+  },
+  async uniworkSearchDocuments(q: UniworkSearchQuery) {
+    return asUniworkResult<UniworkSearchPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.searchDocuments, q),
+    )
+  },
+  async uniworkCreateFolder(i: UniworkCreateFolderInput) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.createFolder, i),
+    )
+  },
+  async uniworkMoveDocument(i: UniworkMoveDocumentInput) {
+    return asUniworkActionResult<UniworkMoveResult>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.moveDocument, i),
+    )
+  },
+  onUniworkTreeChanged(cb: (event: UniworkTreeChangedEvent) => void) {
+    treeChangedSubscribers.add(cb)
+    return () => {
+      treeChangedSubscribers.delete(cb)
+    }
   },
   onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void) {
     docRenamedSubscribers.add(cb)

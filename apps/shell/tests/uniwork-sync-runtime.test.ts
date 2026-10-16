@@ -84,6 +84,8 @@ function harness(
     keepDraft?: (documentId: string) => Promise<boolean>
     /** S18: a page the doc cache committed (a renamed-elsewhere notice) */
     onFeedChange?: (change: Change) => void
+    /** FD-11: a committed page with rows for a workspace (the tree-changed notice) */
+    onWorkspaceChanged?: (workspaceId: string) => void
     /** wraps one registered store's records (a refused write, a torn commit, ...) */
     wrapRecords?: (name: string, records: StoreRecords) => StoreRecords
   } = {},
@@ -145,6 +147,7 @@ function harness(
     client: () => client,
     keepDraft: options.keepDraft ?? (async () => false),
     ...(options.onFeedChange ? { onFeedChange: options.onFeedChange } : {}),
+    ...(options.onWorkspaceChanged ? { onWorkspaceChanged: options.onWorkspaceChanged } : {}),
     clock,
     onSessionExpired: () => {
       expired += 1
@@ -234,6 +237,123 @@ describe('the feed runtime', () => {
     expect(await cursorOf(h, 'org_a', 'ws_2')).toBe('c1')
     // sync_feed off: no request, no cursor for that workspace
     expect(await cursorOf(h, 'org_b', 'ws_3')).toBeNull()
+  })
+
+  // FD-11: one tree-changed notice per workspace whose committed page carried a
+  // row, so an open browser re-reads its tree; an empty page changes nothing -
+  // a snapshot that lists nothing new is not a reason to re-read.
+  it('names a workspace whose page carried rows, once, and stays quiet for an empty page', async () => {
+    const changed: string[] = []
+    const h = harness({
+      orgs: ['org_a'],
+      workspaces: { org_a: ['ws_1', 'ws_2'] },
+      pages: ({ workspaceId }) =>
+        workspaceId === 'ws_2'
+          ? { ...PAGE, changes: [], nextCursor: 'c2' }
+          : { ...PAGE, changes: [change('doc_1')], nextCursor: 'c1' },
+      onWorkspaceChanged: (workspaceId) => changed.push(workspaceId),
+    })
+
+    await h.runtime.tick()
+    expect(changed).toEqual(['ws_1'])
+
+    // the next pass replays the page (its cursor did not move): a page that
+    // carried rows is announced again, so a stale view is never left behind
+    changed.length = 0
+    await h.runtime.tick()
+    expect(changed).toEqual(['ws_1'])
+  })
+
+  it('FD11-C-R1-01: announces onWorkspaceChanged for a committed removal-only feed page while keeping removal rows out of the doc index', async () => {
+    const changed: string[] = []
+    let pass = 0
+    const h = harness({
+      pages: () => {
+        pass += 1
+        return pass === 1
+          ? { ...PAGE, changes: [], hadRows: false, nextCursor: 'feed:0' }
+          : {
+              phase: 'feed',
+              changes: [],
+              hadRows: true,
+              hasMore: false,
+              nextCursor: 'feed:1',
+              expiresAt: '',
+            }
+      },
+      onWorkspaceChanged: (workspaceId) => changed.push(workspaceId),
+    })
+
+    await h.runtime.tick()
+    expect(changed).toEqual([])
+    await h.runtime.tick()
+    expect(changed).toEqual(['ws_1'])
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual([])
+  })
+
+  it('FD11-C-R1-02: announces onWorkspaceChanged when a full resync snapshot is empty but reconcile evicts cached entries', async () => {
+    const changed: string[] = []
+    let expire = false
+    let snapshot: Change[] = [change('doc_1')]
+    const h = harness({
+      pages: ({ cursor }) => {
+        if (expire && cursor) {
+          expire = false
+          return new FeedError({ kind: 'cursor_expired' })
+        }
+        return {
+          ...PAGE,
+          changes: snapshot,
+          hadRows: snapshot.length > 0,
+          nextCursor: `c_${snapshot.length}`,
+        }
+      },
+      onWorkspaceChanged: (workspaceId) => changed.push(workspaceId),
+    })
+
+    await h.runtime.tick()
+    expect(changed).toEqual(['ws_1'])
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual(['doc_1'])
+
+    changed.length = 0
+    snapshot = []
+    expire = true
+    await h.runtime.tick()
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual([])
+    expect(changed).toEqual(['ws_1'])
+  })
+
+  it('FD11-C-R1-03: suppresses onWorkspaceChanged when applyPage resolves after runtime.stop()', async () => {
+    const changed: string[] = []
+    let releaseWrite!: () => void
+    const writeGate = new Promise<void>((resolve) => {
+      releaseWrite = resolve
+    })
+    let enteredWrite!: () => void
+    const writing = new Promise<void>((resolve) => {
+      enteredWrite = resolve
+    })
+    const h = harness({
+      onWorkspaceChanged: (workspaceId) => changed.push(workspaceId),
+      wrapRecords: (name, records) =>
+        name === DOC_INDEX_REGISTRATION.name
+          ? {
+              ...records,
+              write: async (key, value) => {
+                enteredWrite()
+                await writeGate
+                return records.write(key, value)
+              },
+            }
+          : records,
+    })
+
+    const tick = h.runtime.tick()
+    await writing
+    h.runtime.stop()
+    releaseWrite()
+    await tick
+    expect(changed).toEqual([])
   })
 
   it('a crash mid-page keeps the cursor on the applied page; the replay is idempotent', async () => {
@@ -331,13 +451,15 @@ describe('the feed runtime', () => {
     expect(recordFiles(DOC_INDEX_REGISTRATION.name)).toHaveLength(1)
   })
 
-  it('a store_full page apply never moves the cursor, and the page is retried (G504-be-1)', async () => {
+  it('a store_full page apply never moves the cursor, announces no workspace change, and the page is retried (G504-be-1 / FD11-C-R1-07)', async () => {
     let full = false
+    const changed: string[] = []
     const h = harness({
       pages: ({ cursor }) =>
         cursor
           ? { ...PAGE, changes: [change('doc_2')], nextCursor: 'c2' }
           : { ...PAGE, changes: [change('doc_1')], nextCursor: 'c1' },
+      onWorkspaceChanged: (workspaceId) => changed.push(workspaceId),
       wrapRecords: (name, records) =>
         name === DOC_INDEX_REGISTRATION.name
           ? {
@@ -350,20 +472,25 @@ describe('the feed runtime', () => {
     })
     await h.runtime.tick()
     expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c1')
+    expect(changed).toEqual(['ws_1'])
+    changed.length = 0
     full = true
     await h.runtime.tick()
-    // the page could not be applied: the cursor stays on the applied page
+    // the page could not be applied: the cursor stays on the applied page and no workspace notice fires
     expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c1')
     expect(await indexOf(h, 'org_a', 'ws_1')).toEqual(['doc_1'])
+    expect(changed).toEqual([])
     // and the next tick asks the server for exactly that page again
     await h.runtime.tick()
     expect(h.calls.at(-1)?.cursor).toBe('c1')
     expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c1')
+    expect(changed).toEqual([])
     // the budget frees up: the same page lands once and the cursor moves
     full = false
     await h.runtime.tick()
     expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c2')
     expect(await indexOf(h, 'org_a', 'ws_1')).toEqual(['doc_1', 'doc_2'])
+    expect(changed).toEqual(['ws_1'])
   })
 
   it('another account or deployment never sees this stream', async () => {
