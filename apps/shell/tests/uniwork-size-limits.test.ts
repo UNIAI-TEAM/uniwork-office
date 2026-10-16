@@ -414,6 +414,93 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(await service.saveLocalCopy(ownedPath)).toBe(false)
       expect(existsSync(dest2)).toBe(false)
     })
+
+    it('saveLocalCopy refuses a target identical to the working copy (path, realpath, dev+ino) and reads bytes after the picker returns (d1-3)', async () => {
+      let pickerImpl: () => Promise<string | null> = async () => null
+      const service = new UniworkDocsService({
+        userDataDir: dir,
+        profile: () => ({
+          deploymentId: 'default',
+          apiOrigin: 'https://uniwork.example',
+          clientId: 'uniwork-office',
+          channel: 'stable',
+        }),
+        channel: () => 'stable',
+        applyProfile: async () => 'unchanged',
+        identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+        selectedOrg: () => ({ id: ORG_ID, slug: 'acme' }),
+        authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
+        fetch: (async () => new Response('{}', { status: 404 })) as unknown as FetchLike,
+        openPath: () => true,
+        isPathOpen: () => false,
+        requestModuleSave: () => false,
+        reloadPath: () => undefined,
+        activePath: () => undefined,
+        pickDownloadPath: () => pickerImpl(),
+        ui: { chooseUnsavedClose: async () => 'cancel' },
+        pushStatus: () => undefined,
+        pushLaunch: () => undefined,
+        reveal: () => undefined,
+      })
+
+      const docDir = service.store.dirFor('default', 'acc_1', DOC_ID)
+      const initialBytes = enc('before-picker')
+      await service.store.write(docDir, {
+        schema: 2,
+        documentId: DOC_ID,
+        orgId: ORG_ID,
+        workspaceId: WS_ID,
+        title: 'Report.docx',
+        filename: 'Report.docx',
+        format: 'docx',
+        access: 'edit',
+        baseRevision: '10',
+        baseVersion: 1,
+        baseChecksum: sha256Hex(initialBytes),
+        state: 'failed',
+        error: 'too_large',
+        minStoreLevel: 1,
+        minAppVersion: '0.0.0',
+      })
+      const workingPath = await service.store.writeWorkingCopy(docDir, 'Report.docx', initialBytes)
+
+      // 1. Hold the picker open, rewrite the working copy with newer edits, then resolve the picker
+      //    with the working copy path itself: must refuse and preserve the newer edits on disk
+      pickerImpl = async () => {
+        writeFileSync(workingPath, enc('newer-edits-during-dialog'))
+        return workingPath
+      }
+      expect(await service.saveLocalCopy(workingPath)).toBe(false)
+      expect(readFileSync(workingPath, 'utf8')).toBe('newer-edits-during-dialog')
+
+      // 2. Symlink and hardlink aliases to the working copy are also refused without writing
+      const symlinkPath = join(dir, 'symlink-to-working.docx')
+      symlinkSync(workingPath, symlinkPath)
+      pickerImpl = async () => {
+        writeFileSync(workingPath, enc('edits-before-symlink-refusal'))
+        return symlinkPath
+      }
+      expect(await service.saveLocalCopy(workingPath)).toBe(false)
+      expect(readFileSync(workingPath, 'utf8')).toBe('edits-before-symlink-refusal')
+
+      const hardlinkPath = join(dir, 'hardlink-to-working.docx')
+      linkSync(workingPath, hardlinkPath)
+      pickerImpl = async () => {
+        writeFileSync(workingPath, enc('edits-before-hardlink-refusal'))
+        return hardlinkPath
+      }
+      expect(await service.saveLocalCopy(workingPath)).toBe(false)
+      expect(readFileSync(workingPath, 'utf8')).toBe('edits-before-hardlink-refusal')
+
+      // 3. A distinct destination reads the snapshot AFTER the picker returns (post-dialog edits)
+      const distinctDest = join(dir, 'distinct-export.docx')
+      pickerImpl = async () => {
+        writeFileSync(workingPath, enc('latest-bytes-at-picker-return'))
+        return distinctDest
+      }
+      expect(await service.saveLocalCopy(workingPath)).toBe(true)
+      expect(readFileSync(distinctDest, 'utf8')).toBe('latest-bytes-at-picker-return')
+    })
   })
 
   describe('3. pre-enqueue check and warn band (SaveCoordinator.save)', () => {

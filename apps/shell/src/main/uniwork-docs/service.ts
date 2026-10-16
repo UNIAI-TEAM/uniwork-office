@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -1182,12 +1182,6 @@ export class UniworkDocsService {
     if (typeof path !== 'string' || !path) return false
     const doc = this.store.lookup(path)
     if (!doc || !this.ownsLocally(doc)) return false
-    let localBytes: Uint8Array
-    try {
-      localBytes = new Uint8Array(await readFile(doc.path))
-    } catch {
-      return false
-    }
     const defaultName = doc.binding.filename
     let target: string | null = null
     try {
@@ -1208,12 +1202,42 @@ export class UniworkDocsService {
     ) {
       return false
     }
+    if (await this.isSameWorkingCopy(current.path, target)) return false
     try {
+      const localBytes = new Uint8Array(await readFile(current.path))
       await writeFile(target, localBytes)
       return true
     } catch {
       return false
     }
+  }
+
+  /** true when `targetPath` points to the same file as `sourcePath` (resolved, realpath, or dev+ino) */
+  private async isSameWorkingCopy(sourcePath: string, targetPath: string): Promise<boolean> {
+    const resolvedSource = resolve(sourcePath)
+    const resolvedTarget = resolve(targetPath)
+    if (pathKey(resolvedSource) === pathKey(resolvedTarget)) return true
+    const [sourceStat, targetStat] = await Promise.all([
+      stat(resolvedSource).catch(() => null),
+      stat(resolvedTarget).catch(() => null),
+    ])
+    if (
+      sourceStat &&
+      targetStat &&
+      sourceStat.dev === targetStat.dev &&
+      sourceStat.ino === targetStat.ino &&
+      sourceStat.ino !== 0
+    ) {
+      return true
+    }
+    const realSource = await realpath(resolvedSource).catch(() => resolvedSource)
+    const realTarget = await realpath(resolvedTarget).catch(async () => {
+      const realParent = await realpath(dirname(resolvedTarget)).catch(() =>
+        dirname(resolvedTarget),
+      )
+      return join(realParent, basename(resolvedTarget))
+    })
+    return pathKey(realSource) === pathKey(realTarget)
   }
 
   /** this build's version, as stamped into bindings (display only, never a gate) */
