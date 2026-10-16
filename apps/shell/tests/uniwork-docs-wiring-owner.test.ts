@@ -107,8 +107,13 @@ describe('last owner follows the session identity (R2-5)', () => {
     identity = { accountId: 'acc_9', deviceSessionId: 'dev_1', deploymentId: 'default' }
     statusListener?.({ state: 'signed-in' })
     expect(note).toHaveBeenCalledTimes(1)
-    // G8-16 S16: a status push also tells the service the selected org (here: none)
-    expect(noteOrg).toHaveBeenCalledWith(null)
+    // G8-16 S16 / R5-01: a status push also tells the service the selected org
+    // (here: none, and without orgsError the absence is a lasting boundary)
+    expect(noteOrg).toHaveBeenCalledWith(null, true)
+    // a failed /orgs read is transient: the same org-less push forwards
+    // orgGone=false so the service keeps the last known org
+    statusListener?.({ state: 'signed-in', needsOrgChoice: true, orgsError: 'network' })
+    expect(noteOrg).toHaveBeenCalledWith(null, false)
     const doc = {
       deploymentId: 'default',
       userId: 'acc_9',

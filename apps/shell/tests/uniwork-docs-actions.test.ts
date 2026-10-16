@@ -1819,4 +1819,133 @@ describe('the FD-11 tree-changed push', () => {
     }
     expect(emitted).toEqual([{ workspaceId: WS }])
   })
+
+  it('R5-01: suppresses pushTreeChanged when a lasting org loss (org-less status push without orgsError) lands while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+    ctx.setStopRuntime(() => coalescer.cancel())
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Lasting org-less folder',
+    })
+    await onPostReached
+
+    // The selected org was deactivated / the picker came back: an org-less
+    // status push WITHOUT orgsError is a real session boundary, not the
+    // transient /orgs read failure R4-02 keeps.
+    ctx.setSelectedOrg(null)
+    ctx.service.noteSelectedOrg(null, true)
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R5-02: suppresses pushTreeChanged when noteSelectedOrg goes A -> null (transient) -> B while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+    ctx.setStopRuntime(() => coalescer.cancel())
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Transient null then org switch folder',
+    })
+    await onPostReached
+
+    // A transient /orgs failure reports null first; the session then lands on
+    // a DIFFERENT org (never back to A): the null must not eat the A -> B edge.
+    ctx.setSelectedOrg(null)
+    ctx.service.noteSelectedOrg(null)
+    ctx.setSelectedOrg({ id: 'org_b', slug: 'beta' })
+    ctx.service.noteSelectedOrg('org_b')
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
 })
