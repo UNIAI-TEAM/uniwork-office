@@ -180,7 +180,11 @@ function classifyOpenRefusal(err: unknown): {
   if (/Workbook contains too many ZIP entries/i.test(msg)) {
     return { reason: 'too_complex' }
   }
-  if (/(?:zip|xlsx) rejected:/i.test(msg)) {
+  if (
+    /(?:zip|xlsx) rejected:.*(?:declares\s+\d+\s+uncompressed bytes|total uncompressed size)/i.test(
+      msg,
+    )
+  ) {
     // declared / inflated size gates of the zip reader (no part count measure)
     return { reason: 'too_large_to_open' }
   }

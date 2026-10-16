@@ -894,6 +894,51 @@ describe('too large and open refusal (SIZE-F1)', () => {
       expect(fatal[0]!.fatal).toBe(true)
     },
   )
+
+  it('treats zip "cannot be inflated" as a corrupt file (not open_refused) and keeps declared/total uncompressed size gates as too_large_to_open (d2-4)', async () => {
+    const fake = fakeTransport()
+    let failureMsg =
+      'zip rejected: part xl/worksheets/sheet1.xml cannot be inflated: invalid block type'
+    const transport: SheetsEngineTransport = {
+      ...fake.transport,
+      async open() {
+        throw new Error(failureMsg)
+      },
+    }
+    const corrupt = setup({ transport })
+    corrupt.mock.init({ documentId: corrupt.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const corruptErr = await corrupt.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((corruptErr as { code?: string }).code).not.toBe('too_large')
+    expect(corrupt.mock.openRefused).toEqual([])
+
+    failureMsg =
+      'zip rejected: part xl/worksheets/sheet1.xml declares 300000000 uncompressed bytes (over the 268435456 per-part limit)'
+    const declared = setup({ transport })
+    declared.mock.init({ documentId: declared.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const declaredErr = await declared.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((declaredErr as { code?: string }).code).toBe('too_large')
+    expect(declared.mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: 2,
+      },
+    ])
+
+    failureMsg = 'zip rejected: total uncompressed size 600000000 exceeds the 536870912 limit'
+    const total = setup({ transport })
+    total.mock.init({ documentId: total.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const totalErr = await total.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((totalErr as { code?: string }).code).toBe('too_large')
+    expect(total.mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: 2,
+      },
+    ])
+  })
 })
 
 describe('keyboard accelerators (the desktop File menu keys)', () => {

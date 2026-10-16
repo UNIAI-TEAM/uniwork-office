@@ -996,6 +996,42 @@ describe('open_refused and zip part-count refusal (SIZE-F1)', () => {
     expect((await api.save()).ok).toBe(true)
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
+
+  it('does not emit open_refused for a corrupt zip entry ("cannot be inflated") and keeps declared uncompressed size gate as too_large_to_open (d2-4)', async () => {
+    const corruptZip = await JSZip.loadAsync(FIXTURE)
+    corruptZip.file('ppt/presentation.xml', 'x'.repeat(2_000), { compression: 'DEFLATE' })
+    const rawZip = await corruptZip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+    const nameLen = rawZip[26]! | (rawZip[27]! << 8)
+    const extraLen = rawZip[28]! | (rawZip[29]! << 8)
+    const dataOffset = 30 + nameLen + extraLen
+    for (let i = 0; i < 16 && dataOffset + i < rawZip.length; i++) {
+      rawZip[dataOffset + i] = 0xff
+    }
+    const corrupt = await setup({ bytes: rawZip })
+    expect(await corrupt.api.consumePendingOpen(FIT)).toBeNull()
+    expect(corrupt.mock.openRefused).toEqual([])
+
+    const hugeHeaderZip = new Uint8Array(FIXTURE)
+    const view = new DataView(
+      hugeHeaderZip.buffer,
+      hugeHeaderZip.byteOffset,
+      hugeHeaderZip.byteLength,
+    )
+    for (let p = 0; p + 46 <= hugeHeaderZip.length; p++) {
+      if (view.getUint32(p, true) === 0x02014b50) {
+        view.setUint32(p + 24, 600 * 1024 * 1024, true)
+        break
+      }
+    }
+    const oversize = await setup({ bytes: hugeHeaderZip })
+    expect(await oversize.api.consumePendingOpen(FIT)).toBeNull()
+    expect(oversize.mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: hugeHeaderZip.byteLength,
+      },
+    ])
+  })
 })
 
 describe('save size gate (SIZE-F1, UNI-1861)', () => {

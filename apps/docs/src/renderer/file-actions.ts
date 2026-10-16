@@ -422,7 +422,13 @@ function classifyOpenRefusal(msg: string): {
     }
   }
   if (/out of memory/i.test(msg)) return { reason: 'engine_out_of_memory' }
-  if (/(?:zip|docx) rejected:/i.test(msg)) return { reason: 'too_large_to_open' }
+  if (
+    /(?:zip|docx) rejected:.*(?:declares\s+\d+\s+uncompressed bytes|total uncompressed size)/i.test(
+      msg,
+    )
+  ) {
+    return { reason: 'too_large_to_open' }
+  }
   return null
 }
 

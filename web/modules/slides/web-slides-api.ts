@@ -490,7 +490,11 @@ export function createWebSlidesApi(
         message,
       }
     }
-    if (/(?:zip|pptx) rejected:/i.test(message)) {
+    if (
+      /(?:zip|pptx) rejected:.*(?:declares\s+\d+\s+uncompressed bytes|total uncompressed size)/i.test(
+        message,
+      )
+    ) {
       return { reason: 'too_large_to_open', message }
     }
     if (/out of memory/i.test(message)) {
