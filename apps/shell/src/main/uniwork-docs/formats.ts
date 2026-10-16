@@ -42,7 +42,8 @@ export function formatForName(name: string): UniworkDocFormat | null {
 }
 
 export function formatForMime(mime: string): UniworkDocFormat | null {
-  return BY_MIME[mime.split(';', 1)[0]?.trim().toLowerCase() ?? ''] ?? null
+  const key = mime.split(';', 1)[0]?.trim().toLowerCase() ?? ''
+  return Object.hasOwn(BY_MIME, key) ? (BY_MIME[key] ?? null) : null
 }
 
 export function mimeForFormat(format: UniworkDocFormat): string {
