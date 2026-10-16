@@ -18,6 +18,7 @@ import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import { createDocLock } from '../src/main/uniwork-sync/doc-lock'
+import type { CapabilitySource } from '../src/main/uniwork-sync/capability/cache'
 import { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
 import {
@@ -218,6 +219,8 @@ interface Ctx {
   setCapabilityOffline: (value: boolean) => void
   /** true = the capability read answers `session_expired` (the session is still gone) */
   setCapabilityExpired: (value: boolean) => void
+  /** the `source` an `ok` capability read answers with (default: `fresh`) */
+  setCapabilitySource: (source: CapabilitySource) => void
   /** move the service clock (the blocked re-probe's backoff is wall-clock) */
   advanceClock: (ms: number) => void
 }
@@ -239,6 +242,8 @@ function setup(
   let capabilityOffline = false
   /** true = the capability read answers the session is gone (still `session_expired`) */
   let capabilityExpired = false
+  /** how real the `ok` capability answer is: only `fresh` proves the refusals lifted */
+  let capabilitySource: CapabilitySource = 'fresh'
   let clock = Date.now()
   const safeStorage: LockableSafeStorage = createLockableSafeStorage()
   const layer: StoreLayer = createStoreLayer({
@@ -295,7 +300,7 @@ function setup(
         return {
           kind: 'ok' as const,
           capabilities: { sync_write: syncWrite },
-          source: 'fresh' as const,
+          source: capabilitySource,
         }
       },
     },
@@ -320,6 +325,9 @@ function setup(
     },
     setCapabilityExpired: (value: boolean) => {
       capabilityExpired = value
+    },
+    setCapabilitySource: (source: CapabilitySource) => {
+      capabilitySource = source
     },
     advanceClock: (ms: number) => {
       clock += ms
@@ -698,6 +706,58 @@ describe('G5-06 W4b save queue wiring', () => {
       ])
     })
 
+    it('a lift leaves no refusal code in the binding while the user pause holds it', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await blockedSave(ctx, server, { route: 'commit', kind: 401 })
+      expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+        state: 'blocked',
+        lastError: 'session_expired',
+      })
+      await vi.waitFor(() =>
+        expect(binding(path)).toMatchObject({ state: 'blocked', error: 'session_expired' }),
+      )
+      // the user's own pause is in front of the queue, so the lift leaves the
+      // intent waiting: the binding patch is durable and observable
+      await ctx.service.pauseSending()
+      await ctx.service.pollSaveQueue()
+      expect((await storedIntent(ctx, path))?.intent).toMatchObject({ state: 'paused_user' })
+      // the chip patch rides the record's own, asynchronous publish: wait for
+      // the waiting state to land and read exactly what it wrote
+      await vi.waitFor(() => {
+        const written = binding(path)
+        expect(written).toMatchObject({ state: 'paused_user' })
+        // the code the block was parked with must not survive the lift
+        expect(written.error).toBeUndefined()
+      })
+      expect(commits(server)).toHaveLength(1)
+    })
+
+    it('the queued chip a lift publishes carries no refusal code before the commit lands', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await blockedSave(ctx, server, { route: 'commit', kind: 401 })
+      expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+        state: 'blocked',
+        lastError: 'session_expired',
+      })
+      // one pass lifts and commits: the queued patch the lift publishes (the
+      // chip the user reads before the receipt) is what must be clean
+      await ctx.service.pollSaveQueue()
+      await vi.waitFor(async () =>
+        expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+      )
+      await vi.waitFor(() =>
+        expect(
+          ctx.statuses.some((status) => status.path === path && status.state === 'queued'),
+        ).toBe(true),
+      )
+      const queued = ctx.statuses.filter(
+        (status) => status.path === path && status.state === 'queued',
+      )
+      expect(queued.map((status) => status.error)).toEqual(queued.map(() => undefined))
+    })
+
     it.each(['member_deactivated', 'organization_suspended'] as const)(
       'the org/member active again lifts a %s block',
       async (code) => {
@@ -715,6 +775,30 @@ describe('G5-06 W4b save queue wiring', () => {
           blocked!.intent.idempotencyKey,
           blocked!.intent.idempotencyKey,
         ])
+      },
+    )
+
+    it.each(['cached', 'default'] as const)(
+      'a %s capability answer never lifts a session_expired block',
+      async (source) => {
+        const server = fakeServer({ bytes: enc('v3') })
+        const ctx = setup(server)
+        const path = await blockedSave(ctx, server, { route: 'commit', kind: 401 })
+        const blocked = await storedIntent(ctx, path)
+        expect(blocked?.intent).toMatchObject({ state: 'blocked', lastError: 'session_expired' })
+        // the org answers "writes allowed", but not from a real read: a cached or
+        // never-read answer may predate the refusal, so it proves nothing about
+        // the session. The block stands, no attempt moves, nothing is sent
+        ctx.setCapabilitySource(source)
+        const before = { commits: commits(server).length, uploads: uploads(server).length }
+        await ctx.service.pollSaveQueue()
+        expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+          state: 'blocked',
+          lastError: 'session_expired',
+          attempt: blocked!.intent.attempt,
+        })
+        expect(commits(server)).toHaveLength(before.commits)
+        expect(uploads(server)).toHaveLength(before.uploads)
       },
     )
 
@@ -806,6 +890,37 @@ describe('G5-06 W4b save queue wiring', () => {
         blocked!.intent.idempotencyKey,
         blocked!.intent.idempotencyKey,
       ])
+    })
+
+    it('a reopen clears an archived block only once the read proves the archive lifted', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await openDoc(ctx)
+      writeFileSync(path, 'v4')
+      // the copy is blocked `document_archived` with no record left (the user
+      // dropped the draft from the sync center): the binding is the only thing
+      // that remembers the block, and a reopen is its only way back
+      writeFileSync(
+        join(dirname(path), BINDING_FILE),
+        JSON.stringify({ ...binding(path), state: 'blocked', error: 'document_archived' }),
+      )
+      // still archived: the reopen answers the archive, so the block stays and a
+      // Save stays refused - nothing is sent
+      server.state.archivedAt = '2026-10-01T00:00:00.000Z'
+      await openDoc(ctx)
+      expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_archived' })
+      await ctx.service.save(path)
+      expect(commits(server)).toHaveLength(0)
+      expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_archived' })
+      // out of the archive: the read proves the archive lifted, the reopen clears
+      // the block and the local work can be saved again
+      server.state.archivedAt = null
+      await openDoc(ctx)
+      expect(binding(path)).toMatchObject({ state: 'dirty' })
+      expect(binding(path).error).toBeUndefined()
+      await ctx.service.save(path)
+      await vi.waitFor(() => expect(binding(path).state).toBe('saved'))
+      expect(commits(server)).toHaveLength(1)
     })
 
     it("never lifts a block of another account's intent", async () => {

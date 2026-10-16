@@ -634,6 +634,11 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   else if (state === 'blocked') patched.error = error ?? 'server_error'
   else if (state === 'reconciling-stuck') patched.error = error ?? 'intent_unknown'
   else if (state === 'failed') patched.error = error ?? 'server_error'
+  // the waiting states carry no refusal: a block that lifted (the `unblock`
+  // event: `blocked -> queued`, or `paused_user` while the user's own pause
+  // holds it) must not keep the code it was parked with. The explicit
+  // `undefined` overwrites the stale code in the merge; the store's JSON drops it
+  else if (state === 'queued' || state === 'paused_user') patched.error = undefined
   // G8-12: a refused permission is a fact about the caller's level, as on the inline path
   if (patched.error === 'permission_revoked' || patched.error === 'forbidden') {
     patched.level = 'view'
@@ -5563,16 +5568,22 @@ export class UniworkDocsService {
             delete binding.error
           }
           // the document answers again (restored from the trash, a transient
-          // 404): its local work can be saved once more
+          // 404): its local work can be saved once more. An archived document
+          // answers again only when THIS read proves the archive lifted - while
+          // it holds, the write is still refused and clearing the block would
+          // only earn it again (the rule the queue's blocked re-probe reads:
+          // probeBlockedDoc lifts an archived block only past `!archived`)
           if (
             existing.state === 'blocked' &&
             (existing.error === 'not_found' ||
               existing.error === 'deleted' ||
-              existing.error === 'document_deleted')
+              existing.error === 'document_deleted' ||
+              (existing.error === 'document_archived' && detail.archivedAt === null))
           ) {
             binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
-            // the document answers again: the deleted verdict it earned is spent
+            // the document answers again: the verdict it earned is spent (an
+            // archived block raised no lock, so this is a no-op for it)
             this.clearRemoteLock(documentId, local)
           }
           // the sweep still owns this copy's pre-store intent: the rewrite is
