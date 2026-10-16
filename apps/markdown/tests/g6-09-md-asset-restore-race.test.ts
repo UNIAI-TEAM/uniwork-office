@@ -3,31 +3,49 @@
 // as restored while leaving it deleted — the redone markup would point at a file that is gone.
 // The discard holds the manifest lock for its whole body (its unlink included), so the restore has
 // to run inside that same lock/queue: either fully before or fully after the unlink.
-// The interleaving below is driven by an fs stub, never by timing: the discard's unlink waits at a
-// gate, and the gate opens once the restore has read the asset for its own "same bytes" checks —
-// the exact window the reviewer reproduced by hand.
+// RBG4-1: one restore call carries several pictures, so the lock has to be held for the whole
+// CALL, not per name: a discard slipping in between two names would delete a picture the call had
+// already put back and still be answered with `restored: [a, b], errors: []`.
+// The interleavings below are driven by an fs stub, never by timing: a read or an unlink waits at
+// a gate, and the gate opens on a bounded event-loop turn — the exact windows the reviewer
+// reproduced by hand.
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  ASSET_MANIFEST_FILENAME,
   discardPendingOwnedAssetNames,
+  discardPendingOwnedAssets,
   readOwnedAssetManifest,
   restoreOwnedAssetFiles,
   writeImageIntoOwnedAssets,
 } from '../src/main/asset-lifecycle'
 
 const race = vi.hoisted(() => {
-  const gate = (): { promise: Promise<void>; resolve: () => void } => {
+  type Gate = { promise: Promise<void>; resolve: () => void }
+  type Race = {
+    heldUnlink: string
+    unlinkReached: Gate
+    openUnlink: Gate
+    watchedRead: string
+    readsToWait: number
+    readsSeen: Gate
+    heldRead: string
+    readReached: Gate
+    openRead: Gate
+    reset: () => void
+  }
+  const gate = (): Gate => {
     let resolve!: () => void
     const promise = new Promise<void>((opened) => {
       resolve = opened
     })
     return { promise, resolve }
   }
-  return {
+  const state: Race = {
     /** absolute path whose unlink waits until `openUnlink` is resolved (empty = nothing held) */
     heldUnlink: '',
     unlinkReached: gate(),
@@ -36,7 +54,24 @@ const race = vi.hoisted(() => {
     watchedRead: '',
     readsToWait: 0,
     readsSeen: gate(),
+    /** absolute path whose read waits until `openRead` is resolved (empty = nothing held) */
+    heldRead: '',
+    readReached: gate(),
+    openRead: gate(),
+    /** fresh gates and cleared paths, so each test drives its own interleaving */
+    reset: () => {
+      state.heldUnlink = ''
+      state.watchedRead = ''
+      state.readsToWait = 0
+      state.heldRead = ''
+      state.unlinkReached = gate()
+      state.openUnlink = gate()
+      state.readsSeen = gate()
+      state.readReached = gate()
+      state.openRead = gate()
+    },
   }
+  return state
 })
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -58,6 +93,11 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       path: Parameters<typeof actual.readFile>[0],
       options?: Parameters<typeof actual.readFile>[1],
     ) => {
+      if (race.heldRead !== '' && String(path) === race.heldRead) {
+        race.heldRead = ''
+        race.readReached.resolve()
+        await race.openRead.promise
+      }
       const content = await actual.readFile(path, options)
       if (race.watchedRead !== '' && String(path) === race.watchedRead) {
         race.readsToWait -= 1
@@ -80,6 +120,7 @@ async function tempDir(): Promise<string> {
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })))
 })
+beforeEach(() => race.reset())
 const b64 = (text: string): string => Buffer.from(text).toString('base64')
 const sha = (text: string): string => createHash('sha256').update(text).digest('hex')
 
@@ -126,5 +167,83 @@ describe('a redo while the undo’s discard is still running', () => {
     const manifest = await readOwnedAssetManifest(doc)
     expect(manifest?.files).toContainEqual({ name: 'pic.png', sha256: sha('bytes-1') })
     expect(manifest?.pending).toMatchObject({ 'note.md': ['pic.png'] })
+  })
+})
+
+// RBG4-1: the renderer sends every picture of one redo as ONE restore call, so a discard of the
+// same document that is issued while that call runs must not land in the middle of it. The
+// restore's first manifest read is held, the discard is issued right there, and the restore's own
+// resolution is the signal: fixed, the whole call finishes first — and only then does the user's
+// discard delete what it was asked to delete.
+describe('a discard issued while a multi-picture restore is in flight', () => {
+  async function restoreOfTwoPicturesRacingDiscard(mode: 'named' | 'document') {
+    const dir = await tempDir()
+    const doc = join(dir, 'note.md')
+    const assetA = join(dir, 'assets', 'a.png')
+    const assetB = join(dir, 'assets', 'b.png')
+    await writeImageIntoOwnedAssets(doc, 'a.png', Buffer.from('bytes-a'))
+    await writeImageIntoOwnedAssets(doc, 'b.png', Buffer.from('bytes-b'))
+    // the undo's discard: both pictures leave the folder, so the redo has both to put back
+    expect((await discardPendingOwnedAssets(doc)).deleted).toEqual(['a.png', 'b.png'])
+
+    race.heldRead = join(dir, 'assets', ASSET_MANIFEST_FILENAME)
+    const restore = restoreOwnedAssetFiles(doc, [
+      { name: 'a.png', base64: b64('bytes-a') },
+      { name: 'b.png', base64: b64('bytes-b') },
+    ])
+    const onDiskWhenDone = restore.then(() => ({ a: existsSync(assetA), b: existsSync(assetB) }))
+    await race.readReached.promise
+
+    // the discard's own unlink is held too, so reaching it is observable before it takes effect
+    race.heldUnlink = assetA
+    const discard =
+      mode === 'named'
+        ? discardPendingOwnedAssetNames(doc, ['a.png'])
+        : discardPendingOwnedAssets(doc)
+    race.openRead.resolve()
+
+    // pre-fix the restore owns the manifest lock per picture, so the discard slips in between the
+    // two names and reaches its unlink while the restore still has a picture to write; fixed, the
+    // restore owns the lock for the whole call and resolves first
+    const first = await Promise.race([
+      restore.then(() => 'restore' as const),
+      race.unlinkReached.promise.then(() => 'discard-unlink' as const),
+    ])
+    race.openUnlink.resolve()
+    const [restored, discarded] = await Promise.all([restore, discard])
+    return {
+      first,
+      restored,
+      discarded,
+      onDiskWhenDone: await onDiskWhenDone,
+      manifest: await readOwnedAssetManifest(doc),
+    }
+  }
+
+  it('puts back both pictures before a named discard of the same run deletes one', async () => {
+    const run = await restoreOfTwoPicturesRacingDiscard('named')
+
+    expect(run.first).toBe('restore')
+    expect(run.restored).toEqual({ restored: ['a.png', 'b.png'], errors: [] })
+    // every name the call reported as restored was on disk with the run's bytes when it returned
+    expect(run.onDiskWhenDone).toEqual({ a: true, b: true })
+    // the discard still deletes the name it was asked to, after the restore, leaving no record
+    // behind for a file that is gone
+    expect(run.discarded.deleted).toEqual(['a.png'])
+    expect(run.manifest).toMatchObject({
+      files: [{ name: 'b.png' }],
+      pending: { 'note.md': ['b.png'] },
+    })
+  })
+
+  it('puts back both pictures before a full-document discard of the same run deletes them', async () => {
+    const run = await restoreOfTwoPicturesRacingDiscard('document')
+
+    expect(run.first).toBe('restore')
+    expect(run.restored).toEqual({ restored: ['a.png', 'b.png'], errors: [] })
+    expect(run.onDiskWhenDone).toEqual({ a: true, b: true })
+    expect(run.discarded.deleted).toEqual(['a.png', 'b.png'])
+    expect(run.manifest?.files).toEqual([])
+    expect(run.manifest?.pending).toEqual({})
   })
 })
