@@ -26,7 +26,7 @@ export const en = {
   uwPickNoResults: 'No documents match “{query}”.',
   uwPickNoWorkspaces: 'You don’t have any workspaces yet.',
   uwPickNoWorkspacesHint: 'Create or join a workspace in UniWork first.',
-  uwPickUnsupported: 'Not supported in UniWork Office',
+  uwPickHiddenFormats: 'Hidden because UniWork Office cannot open their format: {count}',
   uwPickOpening: 'Opening “{title}”…',
 
   uwErrNotSignedIn: 'Sign in to UniWork to continue.',

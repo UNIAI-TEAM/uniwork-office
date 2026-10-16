@@ -30,6 +30,7 @@ import {
   isDocNameError,
   isDocTitleTooLong,
   initialPickerState,
+  hiddenDocCount,
   isNavigable,
   isOpenable,
   pickerBodyOf,
@@ -42,6 +43,7 @@ import {
   workspaceLabel,
   type DocNameError,
   type LibraryDocRow,
+  type PickerBody,
   type PickerState,
 } from './uniwork-docs-model'
 import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspace'
@@ -116,6 +118,14 @@ function fetchPage(s: PickerState, cursor?: string): Promise<UniworkResult<Uniwo
  * cannot open are listed disabled with a reason, never hidden, so paging and
  * the "why isn't my file here" question stay simple.
  */
+/** the bodies that sit on a loaded list, where a count of hidden rows makes sense */
+const HIDDEN_HINT_BODIES: readonly PickerBody['kind'][] = [
+  'list',
+  'empty',
+  'shared-empty',
+  'no-results',
+]
+
 export function UniworkOpenDialog({
   onClose,
   accountView,
@@ -444,6 +454,7 @@ export function UniworkOpenDialog({
 
   const body = pickerBodyOf(state)
   const docs = visibleDocs(state)
+  const hiddenCount = hiddenDocCount(state)
   const activeIndex = docs.findIndex((d) => d.id === state.activeId)
   const optionId = (index: number) => `uw-doc-${index}`
 
@@ -559,6 +570,8 @@ export function UniworkOpenDialog({
           <div className="uw-pick-state">
             <p className="uw-pick-state-title">{t('uwPickEmpty')}</p>
             <p className="uw-pick-state-hint">{t('uwPickEmptyHint')}</p>
+            {/* every loaded row may be one that cannot open: a later page can still hold some */}
+            {renderLoadMore()}
           </div>
         )
       case 'shared-empty':
@@ -600,13 +613,11 @@ export function UniworkOpenDialog({
                 const active = doc.id === state.activeId
                 const archived = row.archived === true
                 const navigable = isNavigable(doc)
-                // an archived row is a supported document that is parked, not an unsupported one
+                // an archived row is a supported document that is parked; rows that cannot open are not listed
                 const updated = pickerRowMeta(doc, t, dateLocale)
                 const meta = archived
                   ? [t('uwDocArchived'), updated].filter(Boolean).join(' · ')
-                  : openable
-                    ? updated
-                    : t('uwPickUnsupported')
+                  : updated
                 // shared rows come from several workspaces: name the one each lives in
                 const where =
                   state.source === 'shared' ? (doc as SharedDocSummary).workspaceName?.trim() : ''
@@ -785,6 +796,9 @@ export function UniworkOpenDialog({
         <div className="uw-pick-main">
           <div className="uw-pick-body" aria-busy={body.kind === 'loading'}>
             {renderBody()}
+            {hiddenCount > 0 && HIDDEN_HINT_BODIES.includes(body.kind) && (
+              <p className="uw-pick-hidden">{t('uwPickHiddenFormats', { count: hiddenCount })}</p>
+            )}
           </div>
           {info && (
             <UniworkDocInfoPanel

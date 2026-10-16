@@ -26,7 +26,7 @@ export const nl = {
   uwPickNoResults: 'Geen documenten komen overeen met “{query}”.',
   uwPickNoWorkspaces: 'Je hebt nog geen werkruimten.',
   uwPickNoWorkspacesHint: 'Maak of word eerst lid van een werkruimte in UniWork.',
-  uwPickUnsupported: 'Niet ondersteund in UniWork Office',
+  uwPickHiddenFormats: 'Verborgen omdat UniWork Office hun indeling niet kan openen: {count}',
   uwPickOpening: '“{title}” openen…',
 
   uwErrNotSignedIn: 'Meld je aan bij UniWork om door te gaan.',

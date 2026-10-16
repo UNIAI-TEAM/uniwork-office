@@ -26,7 +26,7 @@ export const pt = {
   uwPickNoResults: 'Nenhum documento corresponde a “{query}”.',
   uwPickNoWorkspaces: 'Você ainda não tem espaços de trabalho.',
   uwPickNoWorkspacesHint: 'Crie ou entre em um espaço de trabalho no UniWork primeiro.',
-  uwPickUnsupported: 'Não compatível com o UniWork Office',
+  uwPickHiddenFormats: 'Ocultos porque o UniWork Office não consegue abrir o formato: {count}',
   uwPickOpening: 'Abrindo “{title}”…',
 
   uwErrNotSignedIn: 'Entre no UniWork para continuar.',

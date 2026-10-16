@@ -1019,16 +1019,27 @@ export function pickerBodyOf(state: PickerState): PickerBody {
   return { kind: 'list' }
 }
 
+/** the loaded rows that match the shared-list search (the server searches a workspace itself) */
+function matchingDocs(state: Pick<PickerState, 'source' | 'query' | 'list'>): UniworkDocSummary[] {
+  if (state.source !== 'shared' || !state.query) return state.list.docs
+  const needle = state.query.toLocaleLowerCase()
+  return state.list.docs.filter((d) => d.title.toLocaleLowerCase().includes(needle))
+}
+
 /**
  * the rows the list shows: the server searches a workspace, while the shared
- * list has no search on the server, so its loaded rows are filtered by title
+ * list has no search on the server, so its loaded rows are filtered by title.
+ * Rows UniWork Office cannot open (and that are not archived) are never listed.
  */
 export function visibleDocs(
   state: Pick<PickerState, 'source' | 'query' | 'list'>,
 ): UniworkDocSummary[] {
-  if (state.source !== 'shared' || !state.query) return state.list.docs
-  const needle = state.query.toLocaleLowerCase()
-  return state.list.docs.filter((d) => d.title.toLocaleLowerCase().includes(needle))
+  return matchingDocs(state).filter(isNavigable)
+}
+
+/** how many matching rows `visibleDocs` left out because their format does not open */
+export function hiddenDocCount(state: Pick<PickerState, 'source' | 'query' | 'list'>): number {
+  return matchingDocs(state).length - visibleDocs(state).length
 }
 
 /** retry what failed: the workspace list when that was it, else the document list */

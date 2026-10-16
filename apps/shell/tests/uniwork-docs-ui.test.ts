@@ -15,6 +15,7 @@ import {
   docExtension,
   errorActionOf,
   formatWhen,
+  hiddenDocCount,
   initialPickerState,
   isOpenable,
   launchNoticeOf,
@@ -29,6 +30,7 @@ import {
   recentRowModifiedMs,
   recentRowPolicy,
   retryActionOf,
+  visibleDocs,
   type PickerAction,
   type PickerState,
 } from '../src/renderer/src/uniwork-docs-model'
@@ -899,5 +901,74 @@ describe('recents refresh after a UniWork document opens', () => {
     expect(offMain).toHaveBeenCalledTimes(1)
     publishUniworkNotice({ phase: 'opened', path: 'p', title: 'Plan' })
     expect(refresh).not.toHaveBeenCalled()
+  })
+})
+
+describe('FD-14: the picker lists only what UniWork Office opens', () => {
+  const run = (actions: PickerAction[], from: PickerState = initialPickerState()) =>
+    actions.reduce(pickerReducer, from)
+  const loadedWorkspaces: PickerAction = {
+    type: 'workspaces-loaded',
+    result: { ok: true, value: [{ id: 'w1', name: 'Team', orgId: 'o1', myRole: null }] },
+  }
+  const page = (list: UniworkDocSummary[]) => ({
+    ok: true as const,
+    value: { documents: list, nextCursor: null },
+  })
+  const docs = [
+    doc('p', 'Photo.png', null),
+    doc('a', 'Plan.docx', 'docx'),
+    doc('n', 'Notes.zip', null),
+    { ...doc('o', 'Old.docx', 'docx'), archived: true } as UniworkDocSummary,
+    doc('c', 'Sheet.xlsx', 'xlsx'),
+  ]
+  const loaded = (list: UniworkDocSummary[]) =>
+    run([
+      loadedWorkspaces,
+      { type: 'list-loaded', requestId: 1, append: false, result: page(list) },
+    ])
+
+  it('drops non-openable rows but keeps archived ones, and counts what it hid', () => {
+    const s = loaded(docs)
+    expect(visibleDocs(s).map((d) => d.id)).toEqual(['a', 'o', 'c'])
+    expect(hiddenDocCount(s)).toBe(2)
+    expect(s.activeId).toBe('a')
+  })
+
+  it('walks the keyboard over the visible rows only', () => {
+    const s = loaded(docs)
+    const shown = visibleDocs(s)
+    expect(moveActive(shown, 'a', 'next')).toBe('o')
+    expect(moveActive(shown, 'o', 'next')).toBe('c')
+    expect(moveActive(shown, 'c', 'last')).toBe('c')
+    expect(moveActive(shown, 'c', 'first')).toBe('a')
+  })
+
+  it('counts nothing hidden when every row opens', () => {
+    expect(hiddenDocCount(loaded([doc('a', 'A.docx', 'docx')]))).toBe(0)
+    expect(hiddenDocCount(loaded([]))).toBe(0)
+  })
+
+  it('shows the empty state, with a hidden count, when every row is hidden', () => {
+    const s = loaded([doc('p', 'Photo.png', null), doc('n', 'Notes.zip', null)])
+    expect(visibleDocs(s)).toEqual([])
+    expect(hiddenDocCount(s)).toBe(2)
+    expect(pickerBodyOf(s)).toEqual({ kind: 'empty' })
+    expect(s.activeId).toBeNull()
+  })
+
+  it('counts only rows that match the shared-list search', () => {
+    let s = run([loadedWorkspaces, { type: 'select-shared' }])
+    s = run(
+      [
+        { type: 'list-loaded', requestId: s.list.requestId, append: false, result: page(docs) },
+        { type: 'set-query', query: 'photo' },
+      ],
+      s,
+    )
+    // the search narrows to the hidden png: nothing shows, one row is hidden
+    expect(visibleDocs(s)).toEqual([])
+    expect(hiddenDocCount(s)).toBe(1)
+    expect(pickerBodyOf(s)).toEqual({ kind: 'no-results', query: 'photo' })
   })
 })

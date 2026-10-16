@@ -665,16 +665,53 @@ describe('S18 archived row and archive confirm (FX4)', () => {
     const archived = rowOf('Old.docx')
     const meta = archived.querySelector('.uw-pick-row-meta')!.textContent!
     expect(meta).toContain(en.uwDocArchived)
-    expect(archived.textContent).not.toContain(en.uwPickUnsupported)
-    // a really unsupported format keeps its own reason
-    expect(rowOf('Notes.txt').textContent).toContain(en.uwPickUnsupported)
+    // an archived row is parked, not unsupported
+    expect(meta).not.toContain('Not supported')
+    // FD-14: a really unsupported format is not listed at all
+    expect(rowOf('Notes.txt')).toBeUndefined()
+  })
+
+  it('FD-14: an image row is absent and one muted line says how many were hidden', async () => {
+    await render([
+      row('a', 'Plan.docx'),
+      row('p1', 'Photo.png', { format: null }),
+      row('p2', 'Scan.jpg', { format: null }),
+      row('p3', 'Logo.svg', { format: null }),
+    ])
+    expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
+      'Plan.docx',
+    ])
+    expect(rowOf('Photo.png')).toBeUndefined()
+    const hint = host.querySelector<HTMLElement>('.uw-pick-hidden')!
+    expect(hint.textContent).toBe(en.uwPickHiddenFormats.replace('{count}', '3'))
+    expect(host.querySelectorAll('.uw-pick-hidden')).toHaveLength(1)
+  })
+
+  it('FD-14: no hint when nothing was hidden', async () => {
+    await render([row('a', 'Plan.docx')])
+    expect(host.querySelector('.uw-pick-hidden')).toBeNull()
+  })
+
+  it('FD-14: when every row is hidden the empty state shows with the reason', async () => {
+    await render([row('p1', 'Photo.png', { format: null })])
+    expect(rows()).toHaveLength(0)
+    expect(host.textContent).toContain(en.uwPickEmpty)
+    expect(host.querySelector('.uw-pick-hidden')!.textContent).toBe(
+      en.uwPickHiddenFormats.replace('{count}', '1'),
+    )
+  })
+
+  it('FD-14: the hint is muted by a semantic token, not a raw colour', () => {
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const block = css.match(/\.uw-pick-hidden\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(block).toMatch(/color:\s*var\(--text-muted\)/)
+    expect(block).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i)
   })
 
   it('V17-03: an archived row is not aria-disabled and Restore is reachable by keyboard', async () => {
     await render([archivedRow(), row('u', 'Notes.txt', { format: null })])
     const archived = rowOf('Old.docx')
     expect(archived.getAttribute('aria-disabled')).toBeNull()
-    expect(rowOf('Notes.txt').getAttribute('aria-disabled')).toBe('true')
     const button = menuButton(archived)!
     // in the tab order although the row is never the highlighted one
     expect(button.tabIndex).toBe(0)
