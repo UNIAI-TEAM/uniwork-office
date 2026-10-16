@@ -299,7 +299,7 @@ describe('size gate', () => {
         { name: 'xl/sharedStrings.xml', uncompressedSize: 99, compressedSize: 1, crc32: 0 },
       ]),
     ).toBe(15)
-    expect(MAX_WORKSHEET_XML_BYTES).toBe(80 * 1024 * 1024)
+    expect(MAX_WORKSHEET_XML_BYTES).toBe(512 * 1024 * 1024)
   })
 })
 
@@ -326,7 +326,8 @@ describe('with a mocked engine channel', () => {
     return { channel, calls, files }
   }
 
-  it('refuses a workbook above the worksheet XML gate with too_large, before opening it', async () => {
+  it('allows a workbook right at the 512 MiB worksheet XML gate and refuses one byte above', async () => {
+    let sheetXmlSize = 512 * 1024 * 1024
     const m = mockChannel({
       archive_manifest: () => ({
         ok: true,
@@ -334,22 +335,63 @@ describe('with a mocked engine channel', () => {
           entries: [
             {
               name: 'xl/worksheets/sheet1.xml',
-              uncompressedSize: 81 * 1024 * 1024,
+              uncompressedSize: sheetXmlSize,
               compressedSize: 1,
               crc32: 0,
             },
           ],
         },
       }),
+      open: () => ({
+        ok: true,
+        result: {
+          sessionId: '00000000-0000-4000-8000-000000000001',
+          name: 'Boundary.xlsx',
+          entryCount: 1,
+          styles: [],
+          dxfStyles: [],
+          visuals: [],
+          definedNames: [],
+          sheets: [
+            {
+              id: 'sheet-1',
+              name: 'Sheet1',
+              rowCount: 1,
+              columnCount: 1,
+              columnWidths: [],
+              defaultRowHeight: 20,
+              defaultColumnWidth: 72,
+              freeze: { frozenRows: 0, frozenColumns: 0 },
+              hidden: false,
+              tabColor: '',
+              showGridLines: true,
+              tables: [],
+              comments: [],
+              pivotRanges: [],
+            },
+          ],
+        },
+      }),
     })
     const transport = createWasmTransport({ connect: () => m.channel })
+    const opened = await transport.open({
+      name: 'Boundary.xlsx',
+      data: new ArrayBuffer(8),
+      locale: 'en',
+    })
+    expect(opened.sessionId).toBe('00000000-0000-4000-8000-000000000001')
+    expect(m.calls.map((c) => c.command)).toEqual(['archive_manifest', 'open'])
+
+    m.calls.length = 0
+    m.files.clear()
+    sheetXmlSize = 512 * 1024 * 1024 + 1
     const err = await transport
       .open({ name: 'Big.xlsx', data: new ArrayBuffer(8), locale: 'en' })
       .catch((e: unknown) => e)
     expect(err).toBeInstanceOf(SheetsTooLargeError)
     expect((err as SheetsTooLargeError).code).toBe('too_large')
-    expect((err as SheetsTooLargeError).worksheetXmlBytes).toBe(81 * 1024 * 1024)
-    expect((err as SheetsTooLargeError).limitBytes).toBe(80 * 1024 * 1024)
+    expect((err as SheetsTooLargeError).worksheetXmlBytes).toBe(512 * 1024 * 1024 + 1)
+    expect((err as SheetsTooLargeError).limitBytes).toBe(512 * 1024 * 1024)
     expect(m.calls.map((c) => c.command)).toEqual(['archive_manifest'])
     // the staged bytes are cleaned up
     expect(m.files.size).toBe(0)
