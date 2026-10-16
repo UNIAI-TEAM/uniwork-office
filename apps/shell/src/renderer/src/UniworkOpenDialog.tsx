@@ -45,6 +45,8 @@ import {
   type PickerState,
 } from './uniwork-docs-model'
 import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspace'
+import { UniworkBrowser } from './uniwork-folders/UniworkBrowser'
+import type { PathPart } from './uniwork-folders/uniwork-folders-model'
 import {
   archiveDocument,
   cancelUploadDocument,
@@ -115,6 +117,10 @@ function fetchPage(s: PickerState, cursor?: string): Promise<UniworkResult<Uniwo
  * the highlighted row, Enter opens it, Escape closes. Documents UniWork Office
  * cannot open are listed disabled with a reason, never hidden, so paging and
  * the "why isn't my file here" question stay simple.
+ *
+ * FD-11: the body is the UniWork browser - Recent and Shared with me stay as
+ * views above the folder tree; choosing the root or a folder shows its
+ * contents, and the search box then searches titles across the workspace.
  */
 export function UniworkOpenDialog({
   onClose,
@@ -159,6 +165,16 @@ export function UniworkOpenDialog({
   const [archiving, setArchiving] = useState<{ id: string; title: string } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
+  /** FD-11: the workspace's Recent list, or the folder browser's contents */
+  const [view, setView] = useState<'recent' | 'folder'>('recent')
+  /** the committed title search of the folder view (the recent list keeps state.query) */
+  const [folderQuery, setFolderQuery] = useState('')
+  /** the folder open in the browser: New / Upload default to it */
+  const browsed = useRef<{ folderId: string | null; path: PathPart[] }>({
+    folderId: null,
+    path: [],
+  })
+  const folderView = view === 'folder' && state.source === 'workspace'
 
   useEffect(() => {
     mounted.current = true
@@ -210,13 +226,33 @@ export function UniworkOpenDialog({
   // debounced search; IME composition waits for the committed text
   useEffect(() => {
     const next = draft.trim()
-    if (composing || next === state.query) return
+    const committed = folderView ? folderQuery : state.query
+    if (composing || next === committed) return
     const timer = window.setTimeout(
-      () => dispatch({ type: 'set-query', query: next }),
+      () => (folderView ? setFolderQuery(next) : dispatch({ type: 'set-query', query: next })),
       PICKER_SEARCH_DEBOUNCE_MS,
     )
     return () => window.clearTimeout(timer)
-  }, [draft, composing, state.query])
+  }, [draft, composing, state.query, folderQuery, folderView])
+
+  /** FD-11: leave one view for another; the search box starts empty in the new one */
+  const switchView = (next: 'recent' | 'shared' | 'folder') => {
+    const current = state.source === 'shared' ? 'shared' : view
+    if (next === current) return
+    setDraft('')
+    setFolderQuery('')
+    if (state.query) dispatch({ type: 'set-query', query: '' })
+    infoRequest.current++
+    setInfo(null)
+    if (next === 'shared') {
+      dispatch({ type: 'select-shared' })
+      return
+    }
+    if (state.source === 'shared' && state.workspaceId) {
+      dispatch({ type: 'select-workspace', id: state.workspaceId })
+    }
+    setView(next)
+  }
 
   const retry = useCallback(() => {
     const action = retryActionOf(stateRef.current)
@@ -291,9 +327,12 @@ export function UniworkOpenDialog({
 
   // ── S18: create, upload, rename, archive ──
 
-  /** where a new document goes by default: the workspace being browsed, top level */
+  /** where a new document goes by default: the folder open in the browser, else the top level */
   const defaultTarget = (): DocTarget => {
     const s = stateRef.current
+    if (folderView && s.workspaceId) {
+      return { workspaceId: s.workspaceId, folderId: browsed.current.folderId }
+    }
     return { workspaceId: s.workspaceId ?? s.workspaces.items[0]?.id ?? '', folderId: null }
   }
 
@@ -458,9 +497,12 @@ export function UniworkOpenDialog({
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
-      // the details panel closes first, then the dialog
+      // the details panel closes first, then a folder search (back to the open folder), then the dialog
       if (info) closeInfo()
-      else onClose()
+      else if (folderView && draft) {
+        setDraft('')
+        setFolderQuery('')
+      } else onClose()
       return
     }
     if (event.key === 'Tab') {
@@ -478,8 +520,12 @@ export function UniworkOpenDialog({
       return
     }
     if (event.nativeEvent.isComposing || target.tagName === 'SELECT') return
-    // keys inside the details panel are its own
-    if (target.closest('.uw-info, .uw-rename, .uw-row-menu')) return
+    // keys inside the details panel, the folder tree and the folder contents are their own
+    if (target.closest('.uw-info, .uw-rename, .uw-row-menu, .uwf-side, .uwf-bar, .uwf-contents')) {
+      return
+    }
+    // the folder view's search box only types: its hits are reached with Tab
+    if (folderView) return
     const inSearch = target.tagName === 'INPUT'
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
@@ -703,11 +749,40 @@ export function UniworkOpenDialog({
   }
 
   const openErrorAction = state.openError ? errorActionOf(state.openError) : 'none'
+  const showBrowser =
+    state.workspaces.status === 'ready' && state.workspaces.items.length > 0 && !!state.workspaceId
+  const sideView = state.source === 'shared' ? 'shared' : view
+  const pickBody = (
+    <div className="uw-pick-body" aria-busy={body.kind === 'loading'}>
+      {renderBody()}
+    </div>
+  )
+  const views = (
+    <>
+      <button
+        type="button"
+        className="uwf-view"
+        aria-pressed={sideView === 'recent'}
+        onClick={() => switchView('recent')}
+      >
+        {t('ufRecent')}
+      </button>
+      <button
+        type="button"
+        className="uwf-view"
+        aria-pressed={sideView === 'shared'}
+        onClick={() => switchView('shared')}
+      >
+        {t('ufShared')}
+      </button>
+      <div className="uwf-view-sep" role="separator" />
+    </>
+  )
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className={`modal uw-pick${info ? ' with-info' : ''}`}
+        className={`modal uw-pick${info ? ' with-info' : ''}${showBrowser ? ' with-browser' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="uw-pick-title"
@@ -770,10 +845,12 @@ export function UniworkOpenDialog({
             type="search"
             role="combobox"
             aria-label={t('uwPickSearch')}
-            aria-expanded={body.kind === 'list'}
-            aria-controls={body.kind === 'list' ? 'uw-pick-list' : undefined}
-            aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
-            placeholder={t('uwPickSearchPh')}
+            aria-expanded={!folderView && body.kind === 'list'}
+            aria-controls={!folderView && body.kind === 'list' ? 'uw-pick-list' : undefined}
+            aria-activedescendant={
+              !folderView && activeIndex >= 0 ? optionId(activeIndex) : undefined
+            }
+            placeholder={folderView ? t('ufSearchPh') : t('uwPickSearchPh')}
             value={draft}
             autoFocus
             spellCheck={false}
@@ -783,9 +860,29 @@ export function UniworkOpenDialog({
           />
         </div>
         <div className="uw-pick-main">
-          <div className="uw-pick-body" aria-busy={body.kind === 'loading'}>
-            {renderBody()}
-          </div>
+          {showBrowser ? (
+            <UniworkBrowser
+              key={state.workspaceId}
+              workspaceId={state.workspaceId!}
+              variant="dialog"
+              query={folderView ? folderQuery : ''}
+              onClearQuery={() => {
+                setDraft('')
+                setFolderQuery('')
+              }}
+              onOpenDocument={openById}
+              openingId={state.opening?.id ?? null}
+              onFolderChange={(folderId, path) => {
+                browsed.current = { folderId, path }
+              }}
+              folderSelected={folderView}
+              onSelectFolder={() => switchView('folder')}
+              sidebarTop={views}
+              mainOverride={folderView ? undefined : pickBody}
+            />
+          ) : (
+            pickBody
+          )}
           {info && (
             <UniworkDocInfoPanel
               key={info.id}
