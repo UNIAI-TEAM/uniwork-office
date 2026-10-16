@@ -283,7 +283,6 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
     if (opts.frame?.markerAttr) {
       bar.setAttribute(opts.frame.markerAttr, SIZE_WARN_MARKER)
     }
-    bar.setAttribute('role', 'status')
 
     const textSpan = doc.createElement('span')
     textSpan.className = 'uw-remote-bar-text'
