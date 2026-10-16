@@ -64,7 +64,7 @@ import {
 import { hideFatal, showFatal, text } from './notice'
 import { printHtmlDocument } from './print'
 import { bridgeDraftRecovery } from './recovery-prompt'
-import { bindLagDetectorPort, markDocumentLoaded } from './lag-detector'
+import { bindLagDetectorPort, documentMounted, queueDocumentLoaded } from './lag-detector'
 import {
   captureScroll,
   restoreScroll,
@@ -285,6 +285,7 @@ export function createTextWebApi(
       const live = textProvider?.()
       return typeof live === 'string' ? encodeText(live) : null
     },
+    persistDraft: () => drafts.flush(),
   })
 
   async function accept(open: OpenPayload): Promise<string> {
@@ -319,7 +320,7 @@ export function createTextWebApi(
     texts.set(path, decoded.text)
     port.setTitle(open.file.name)
     bindLagDetectorPort(port, { desktopOpen: desktopOpenGranted })
-    markDocumentLoaded(open.file.fileId, raw.byteLength)
+    queueDocumentLoaded(open.file.fileId, raw.byteLength)
     return path
   }
 
@@ -527,6 +528,7 @@ export function createTextWebApi(
     const file = { ...res.file }
     if (res.versionId && !file.versionId) file.versionId = res.versionId
     remember(file)
+    sizeGate.noteSaveSucceeded()
     void drafts.saved()
     port.reportSaved({
       file: files.get(file.fileId)!,
@@ -783,6 +785,10 @@ export function createTextWebApi(
         scrollBack = null
       }
       return path
+    },
+
+    noteDocumentMounted(): void {
+      documentMounted()
     },
 
     /**

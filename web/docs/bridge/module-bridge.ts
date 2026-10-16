@@ -75,6 +75,7 @@ export type ModuleBridgePort = Pick<
   | 'handleDownload'
   | 'reportSizeWarning'
   | 'reportSaveBlocked'
+  | 'reportLagDetected'
 >
 
 export interface ModuleBridgeSpec {

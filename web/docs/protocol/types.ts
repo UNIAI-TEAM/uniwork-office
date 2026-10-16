@@ -1886,6 +1886,13 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'event:save_blocked': (x) =>
     isObj(x) && isNonNegSafeInt(x.bytes) && isPositiveSafeInt(x.max_bytes),
   'event:open_refused': isOpenRefusedPayload,
+  'event:lag_detected': (x) =>
+    isObj(x) &&
+    (x.reason === 'interactions' || x.reason === 'longtask') &&
+    isNonNegSafeInt(x.worst_ms) &&
+    isPositiveSafeInt(x.count) &&
+    (x.window_ms === 0 || x.window_ms === 120_000) &&
+    isOpt(x.bytes, isNonNegSafeInt),
   // successful responses
   'response:init': isInitAck,
   'response:open': (x) => isObj(x) && x.opened === true && isOpt(x.title, isStr),

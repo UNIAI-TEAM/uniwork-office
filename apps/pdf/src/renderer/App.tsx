@@ -1389,6 +1389,8 @@ export default function App() {
         // A newly opened file starts outside the autosave gate
         savedOnceRef.current = false
         await loadDoc(path, null)
+        // LAG-F1 (web frame): the document is mounted; the lag detector's settle stamp starts now
+        window.pdfApi.noteDocumentMounted?.()
         setRecovered(window.pdfApi.consumeRecovered?.() === true)
         // Silently restore the last reading position (WPS-style). A saved custom
         // zoom (fitMode null) must be applied before 'ready', or the initial

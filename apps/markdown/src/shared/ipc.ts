@@ -237,6 +237,10 @@ import type { MarkdownTheme } from './markdown-theme'
 export interface MarkdownApi {
   /** Take the md path pending for this view (queued at tab creation); null = new untitled document */
   consumePending(): Promise<string | null>
+  /** Web frame only (UNI-1865): the renderer reports that the opened document finished
+   *  mounting, so the passive lag detector's settle stamp starts at first paint. Absent
+   *  on desktop. */
+  noteDocumentMounted?(): void
   /** open any shell-routed document path (an AI answer's filenav citation) */
   openSourcePath(path: string): Promise<void>
   /**

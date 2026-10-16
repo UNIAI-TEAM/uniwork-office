@@ -65,6 +65,7 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
   const api = {
     consumePending: web.consumePending,
     consumeRecovered: web.consumeRecovered,
+    noteDocumentMounted: web.noteDocumentMounted,
     provideText: web.provideText,
     consumeHeadlessExport: web.consumeHeadlessExport,
     headlessExportDone: web.headlessExportDone,

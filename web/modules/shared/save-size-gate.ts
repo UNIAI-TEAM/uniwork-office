@@ -26,6 +26,7 @@ import { openFrameDialog, type FrameDialogFrame, type FrameDialogHandle } from '
 import { webText } from './i18n/strings-web'
 import './remote-bar.css'
 import { ensureLiveNodes } from './remote-bar'
+import { noteSerializedBytes } from './lag-detector'
 
 export type SaveSizeBand = 'normal' | 'warn' | 'block'
 
@@ -180,8 +181,12 @@ export interface SaveSizeGate {
     openLimits?: Partial<DocumentSizeLimits> | null,
   ): void
   /**
-   * Run after serializing the document and BEFORE `port.request('api.save' | 'api.saveAs')`:
-   *   - `'normal'`: re-arms `warnedNearLimit`, hides fallback warn chip, returns `{ allowed: true }`.
+   * Run after serializing the document and BEFORE `port.request('api.save' | 'api.saveAs')`
+   * (also feeds the lag detector's `knownBytes` so `lag_detected.bytes` tracks the last
+   * serialized size, §4.1.2):
+   *   - `'normal'`: hides the fallback warn chip, returns `{ allowed: true }`; the warn latch
+   *     re-arms only once `noteSaveSucceeded()` reports this save landed (§3.2.2: a later save
+   *     succeeds with `bytes < warn_bytes`, not a merely attempted one).
    *   - `'warn'`: if not latched, sets `warnedNearLimit = true`, emits `size_warning` before save,
    *     shows fallback warn chip when `sizeUi !== true`, and returns `{ allowed: true }`.
    *   - `'block'`: caches `lastBlockedBytes`, emits `save_blocked` INSTEAD of `api.save` / `api.saveAs`,
@@ -189,6 +194,11 @@ export interface SaveSizeGate {
    *     and returns `{ allowed: false, error, message }`.
    */
   checkBeforeSave(data: ArrayBuffer | Uint8Array): Promise<SaveSizeGateCheckResult>
+  /**
+   * A save that passed `checkBeforeSave` landed on the host: when its evaluation was below the
+   * warn line, the warn latch re-arms for the next warn-band save (§3.2.2).
+   */
+  noteSaveSucceeded(): void
   /**
    * Defense-in-depth when `api.save` / `api.saveAs` returns `code === 'too_large'` (HTTP 413):
    * updates `limits.max_bytes` from `error.details.max_bytes` (when valid), caches `data`,
@@ -212,6 +222,8 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
   let limitsOverride: DocumentSizeLimits | null = null
   let warnedNearLimit = false
   let blockedBytes: ArrayBuffer | null = null
+  // the last checked evaluation: noteSaveSucceeded re-arms the latch only from a landed save
+  let lastCheck: SaveSizeEvaluation | null = null
   let warnChipEl: HTMLElement | null = null
   let activeBlockDialog: FrameDialogHandle<BlockChoice> | null = null
 
@@ -279,7 +291,6 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
     if (opts.frame?.markerAttr) {
       bar.setAttribute(opts.frame.markerAttr, SIZE_WARN_MARKER)
     }
-    bar.setAttribute('role', 'status')
 
     const textSpan = doc.createElement('span')
     textSpan.className = 'uw-remote-bar-text'
@@ -389,6 +400,7 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
       if (documentId && currentDocumentId !== null && documentId !== currentDocumentId) {
         warnedNearLimit = false
         blockedBytes = null
+        lastCheck = null
         limitsOverride = null
         hideWarnChip()
         closeBlockDialog()
@@ -404,9 +416,13 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
       await syncSession()
       const currentLimits = activeLimits()
       const evaluation = evaluateSaveSize(data.byteLength, currentLimits)
+      // lag_detected.bytes follows the last serialized size (§4.1.2)
+      noteSerializedBytes(evaluation.bytes)
+      lastCheck = evaluation
 
       if (evaluation.band === 'normal') {
-        warnedNearLimit = false
+        // the warn latch re-arms on noteSaveSucceeded(), not here: a failed save below the
+        // warn line must not silently re-enable warnings for the next warn-band save
         hideWarnChip()
         return { allowed: true, evaluation }
       }
@@ -463,6 +479,14 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
       }
     },
 
+    noteSaveSucceeded() {
+      // §3.2.2: the warn latch re-arms only after a save below warnBytes LANDS, so a failed
+      // save below the line can never suppress the next warn-band warning
+      const check = lastCheck
+      lastCheck = null
+      if (check?.band === 'normal') warnedNearLimit = false
+    },
+
     handleServerTooLarge(error, data) {
       const serverMax = error.details?.max_bytes
       const hasExplicitLimit =
@@ -505,6 +529,7 @@ export function createSaveSizeGate(opts: SaveSizeGateOptions): SaveSizeGate {
     reset() {
       warnedNearLimit = false
       blockedBytes = null
+      lastCheck = null
       limitsOverride = null
       hideWarnChip()
       closeBlockDialog()

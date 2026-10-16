@@ -50,6 +50,7 @@ import {
   type InitPayload,
   type InitRecovery,
   type InitUser,
+  type LagDetectedPayload,
   type OfficeModule,
   type OpenPayload,
   type OpenRefusedPayload,
@@ -192,6 +193,8 @@ export interface DocsFrameClient {
   reportSaveBlocked(payload: SaveBlockedPayload): void
   /** open_refused (additive, SIZE-F1 §3.1a): the bridges send it at most once per documentId */
   reportOpenRefused(payload: OpenRefusedPayload): void
+  /** passive main-thread lag detector tripped (additive, UNI-1865 §4.1; once per documentId) */
+  reportLagDetected(payload: LagDetectedPayload): void
   dispose(): void
 }
 
@@ -409,9 +412,17 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     const s = await initialized
     if (!isCommentsRequestType(type)) {
       const result = (await ep.request(type, payload, opts)) as FrameRequests[K]['result']
-      if (type === 'api.open' && session && (result as ApiOpenResult)?.limits !== undefined) {
-        session.limits = resolveDocumentSizeLimits((result as ApiOpenResult).limits, initLimits)
-        if (!hasExplicitDownloadMaxBytes) session.downloadMaxBytes = session.limits.max_bytes
+      if (type === 'api.open' && session) {
+        // a result without `limits` falls back to the init limits, like a host `open`
+        // without limits does in handleOpen (a previous document's limits must not leak)
+        const openResult = result as ApiOpenResult
+        session.limits =
+          openResult.limits !== undefined
+            ? resolveDocumentSizeLimits(openResult.limits, initLimits)
+            : { ...initLimits }
+        if (!hasExplicitDownloadMaxBytes && (hasInitLimits || openResult.limits !== undefined)) {
+          session.downloadMaxBytes = session.limits.max_bytes
+        }
       }
       return result
     }
@@ -580,6 +591,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     reportSizeWarning: (payload) => guarded(() => ep.emit('size_warning', { ...payload })),
     reportSaveBlocked: (payload) => guarded(() => ep.emit('save_blocked', { ...payload })),
     reportOpenRefused: (payload) => guarded(() => ep.emit('open_refused', payload)),
+    reportLagDetected: (payload) => guarded(() => ep.emit('lag_detected', { ...payload })),
     dispose() {
       stopReady()
       token = null

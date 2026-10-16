@@ -800,3 +800,36 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })
+
+describe('pdfApi: save size gate (SIZE-F1, UNI-1861)', () => {
+  it('blocks save and saveAs above limits.max_bytes without api.save / api.saveAs', async () => {
+    const mock = createMockPort()
+    const meta = mock.seed('Report.pdf', PDF('v1'))
+    const api = createPdfWebApi(mock.port, {
+      capabilities: { edit: true },
+      core: async () => fakeCore(),
+      ensureFonts: async () => {},
+      signatures: createSignatureStore({ idb: () => null, legacy: () => null }),
+    }).api
+    // init.open carries the limits like a real host (D §3.2)
+    mock.init({
+      documentId: meta.fileId,
+      open: {
+        ...mock.openPayload(meta.fileId),
+        limits: { max_bytes: 12, warn_ratio: 0.5 },
+      },
+    })
+    const path = (await api.consumePending())!
+
+    // '%PDF-1.7 v1+m0' is 14 bytes > 12 B max_bytes -> blocked before api.save
+    const res = await api.save(req(path))
+    expect(res.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(1)
+
+    const resAs = await api.save(req(path, { targetPath: 'uniwork://save-as/Copy.pdf' }))
+    expect(resAs.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(2)
+  })
+})

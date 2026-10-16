@@ -92,7 +92,7 @@ function fakeTransport(features: Partial<SheetsEngineTransport['features']> = {}
 
 function saveRequest(
   sessionId: string,
-  edits: Array<[number, number, number]>,
+  edits: Array<[number, number, number | string]>,
   mode: 'save' | 'save-as' = 'save',
 ) {
   return {
@@ -120,6 +120,8 @@ function setup(
     drafts?: (host: import('../../docs/bridge/draft-recovery').DraftHost) => DraftRecovery
     /** the revision the handshake open reports (G5-03w: an event must be newer than it) */
     revision?: string
+    /** SIZE-F1: `init.limits` the host advertises for the session */
+    limits?: { max_bytes: number; warn_ratio: number }
   } = {},
 ) {
   const mock = createMockPort({ documentId: 'pending' })
@@ -167,6 +169,7 @@ function setup(
     download,
     async boot(): Promise<WorkbookFile> {
       mock.init({
+        ...(opts.limits ? { limits: opts.limits } : {}),
         documentId: file.fileId,
         capabilities: opts.grants ?? ALL_GRANTS,
         ...(opts.revision !== undefined
@@ -1260,5 +1263,24 @@ describe('the comments version notifier (G8-12 §3.3)', () => {
     } finally {
       off()
     }
+  })
+})
+
+describe('save size gate (SIZE-F1, UNI-1861)', () => {
+  it('blocks save and save-as above limits.max_bytes without api.save / api.saveAs', async () => {
+    const t = setup({ limits: { max_bytes: 64, warn_ratio: 0.5 } })
+    const wb = await t.boot()
+    // 'v1|0:0=<80 chars>' ≈ 90 bytes > 64 B max_bytes -> blocked before api.save
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]])),
+    ).rejects.toThrow(/UniWork|1 MB|0 MB/)
+    expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(t.mock.saveBlocked).toHaveLength(1)
+
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]], 'save-as')),
+    ).rejects.toThrow()
+    expect(t.mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
+    expect(t.mock.saveBlocked).toHaveLength(2)
   })
 })

@@ -22,6 +22,7 @@ import {
   type SaveBlockedPayload,
   type SavedPayload,
   type SizeWarningPayload,
+  type LagDetectedPayload,
   type Theme,
 } from '../protocol/types'
 
@@ -100,6 +101,8 @@ export interface FramePort {
   reportSizeWarning?(payload: SizeWarningPayload): void
   /** protocol `save_blocked` event (SIZE-F1; optional for older clients and mocks) */
   reportSaveBlocked?(payload: SaveBlockedPayload): void
+  /** protocol `lag_detected` event (UNI-1865; optional for older clients and mocks) */
+  reportLagDetected?(payload: LagDetectedPayload): void
 }
 
 export function errorCode(err: unknown): ProtocolErrorCode {

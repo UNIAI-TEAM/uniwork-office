@@ -435,6 +435,58 @@ describe('lag-detector protocol & unit behavior (UNI-1865)', () => {
     expect(fake.instances).toHaveLength(0)
     expect(emitted).toHaveLength(0)
   })
+
+  it('prefers port.reportLagDetected over port.emit and emits no raw postMessage fallback (d1-1)', () => {
+    const fake = makeFakeObserver()
+    const emit = vi.fn()
+    const reportLagDetected = vi.fn()
+    const parentPost = vi.spyOn(window.parent, 'postMessage')
+    const detector = createLagDetector({
+      observer: fake.Observer,
+      now: () => 0,
+      requestAnimationFrame: (cb) => {
+        cb(0)
+        return 1
+      },
+      port: { emit, reportLagDetected },
+    })
+
+    detector.markDocumentLoaded('doc-port', 2_048)
+    fake.latest().push([{ entryType: 'longtask', startTime: 3_000, duration: 1_100 }])
+
+    expect(reportLagDetected).toHaveBeenCalledTimes(1)
+    expect(reportLagDetected).toHaveBeenCalledWith({
+      reason: 'longtask',
+      worst_ms: 1_100,
+      count: 1,
+      window_ms: 0,
+      bytes: 2_048,
+    })
+    expect(emit).not.toHaveBeenCalled()
+    expect(parentPost).not.toHaveBeenCalled()
+  })
+
+  it('noteBytes makes lag_detected.bytes follow the last serialized size (d1-10)', () => {
+    const fake = makeFakeObserver()
+    const emitted: LagDetectedPayload[] = []
+    const detector = createLagDetector({
+      observer: fake.Observer,
+      now: () => 0,
+      requestAnimationFrame: (cb) => {
+        cb(0)
+        return 1
+      },
+      onLagDetected: (p) => emitted.push(p),
+    })
+
+    detector.markDocumentLoaded('doc-bytes', 1_000)
+    // a save at 800 B, then edits serialized at 4_500 B: the event carries the last size
+    detector.noteBytes(800)
+    detector.noteBytes(4_500)
+    detector.noteBytes(-1) // invalid: ignored
+    fake.latest().push([{ entryType: 'longtask', startTime: 3_000, duration: 1_100 }])
+    expect(emitted[0]).toMatchObject({ bytes: 4_500 })
+  })
 })
 
 describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)', () => {
@@ -464,7 +516,7 @@ describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)
     vi.restoreAllMocks()
   })
 
-  it('wires markDocumentLoaded(documentId, bytes) after open in docs (web/docs/bridge/webapi.ts)', async () => {
+  it('wires markDocumentLoaded(documentId, bytes) on mount in docs (web/docs/bridge/webapi.ts)', async () => {
     const mock = createMockPort()
     const payloadBytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4, 5])
     const meta = mock.seed('Report.docx', payloadBytes)
@@ -473,10 +525,13 @@ describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)
 
     const opened = await api.consumePendingOpenDocx()
     expect(opened?.name).toBe('Report.docx')
+    // d1-2: the mark waits for the renderer's mount hook, not the open result
+    expect(calls).toHaveLength(0)
+    api.noteDocumentMounted()
     expect(calls).toContainEqual({ documentId: meta.fileId, bytes: payloadBytes.byteLength })
   })
 
-  it('wires markDocumentLoaded(documentId, bytes) after open in text modules (markdown/html via text-webapi.ts)', async () => {
+  it('wires markDocumentLoaded(documentId, bytes) on mount in text modules (markdown/html via text-webapi.ts)', async () => {
     const mock = createMockPort()
     const payloadBytes = new TextEncoder().encode('# Hello Markdown\n\nSome content.\n')
     const meta = mock.seed('Readme.md', payloadBytes)
@@ -494,10 +549,12 @@ describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)
 
     const path = await api.consumePending()
     expect(path).toContain(meta.fileId)
+    expect(calls).toHaveLength(0)
+    api.noteDocumentMounted()
     expect(calls).toContainEqual({ documentId: meta.fileId, bytes: payloadBytes.byteLength })
   })
 
-  it('wires markDocumentLoaded(documentId, bytes) after open in pdf (web/modules/pdf/webapi.ts)', async () => {
+  it('wires markDocumentLoaded(documentId, bytes) on mount in pdf (web/modules/pdf/webapi.ts)', async () => {
     const mock = createMockPort()
     const payloadBytes = new TextEncoder().encode('%PDF-1.7 sample pdf bytes')
     const meta = mock.seed('Manual.pdf', payloadBytes)
@@ -513,10 +570,12 @@ describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)
 
     const path = await api.consumePending()
     expect(path).toContain(meta.fileId)
+    expect(calls).toHaveLength(0)
+    api.noteDocumentMounted()
     expect(calls).toContainEqual({ documentId: meta.fileId, bytes: payloadBytes.byteLength })
   })
 
-  it('wires markDocumentLoaded(documentId, bytes) after open in sheets (web/modules/sheets/bridge.ts)', async () => {
+  it('wires markDocumentLoaded(documentId, bytes) on mount in sheets (web/modules/sheets/bridge.ts)', async () => {
     const mock = createMockPort()
     const payloadBytes = new Uint8Array([10, 20, 30, 40, 50, 60])
     const meta = mock.seed('Budget.xlsx', payloadBytes)
@@ -547,10 +606,12 @@ describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)
 
     const wb = await desktopApi.selectWorkbook()
     expect(wb?.name).toBe('Budget.xlsx')
+    expect(calls).toHaveLength(0)
+    desktopApi.noteDocumentMounted?.()
     expect(calls).toContainEqual({ documentId: meta.fileId, bytes: payloadBytes.byteLength })
   })
 
-  it('wires markDocumentLoaded(documentId, bytes) after open in slides (web/modules/slides/web-slides-api.ts)', async () => {
+  it('wires markDocumentLoaded(documentId, bytes) on mount in slides (web/modules/slides/web-slides-api.ts)', async () => {
     const mock = createMockPort()
     const meta = mock.seed('Deck.pptx', SAMPLE_PPTX)
     const { slidesApi } = createWebSlidesApi({
@@ -561,6 +622,8 @@ describe('lag-detector module open-path wiring (docs, text, pdf, sheets, slides)
 
     const opened = await slidesApi.consumePendingOpen(1280)
     expect(opened).not.toBeNull()
+    expect(calls).toHaveLength(0)
+    slidesApi.noteDocumentMounted?.()
     expect(calls).toContainEqual({ documentId: meta.fileId, bytes: SAMPLE_PPTX.byteLength })
   })
 })

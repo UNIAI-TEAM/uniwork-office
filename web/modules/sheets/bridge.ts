@@ -64,7 +64,7 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
-import { bindLagDetectorPort, markDocumentLoaded } from '../shared/lag-detector'
+import { bindLagDetectorPort, documentMounted, queueDocumentLoaded } from '../shared/lag-detector'
 import { createRemoteVersion, type RemoteVersion, type SaveFailure } from '../shared/remote-version'
 import { saveFailureDetail } from '../shared/save-failure'
 import { createSaveSizeGate } from '../shared/save-size-gate'
@@ -408,6 +408,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       const session = latest ? sessions.get(latest.sessionId) : undefined
       return latest && session && session.fileId === current ? latest.data : null
     },
+    persistDraft: () => drafts.flush(),
     frame: { markerAttr: 'data-sheets-web' },
   })
 
@@ -470,7 +471,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     port.setDirty(dirty)
     remote?.dirtyChanged(dirty)
     bindLagDetectorPort(port, effective)
-    markDocumentLoaded(payload.file.fileId, data.byteLength)
+    queueDocumentLoaded(payload.file.fileId, data.byteLength)
     return decorate(opened, payload.file, restored)
   }
 
@@ -878,6 +879,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       }
     },
 
+    noteDocumentMounted(): void {
+      documentMounted()
+    },
     // merge sources need multi-pick + extra sessions: hidden on the web (C11, mergeWorkbooks); the
     // AI's merge tool (chat attachments) is not offered either (renderer ai/skill-gate.ts)
     selectWorkbooksForMerge: async () => null,
@@ -938,6 +942,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       if ('canceled' in landed) return { canceled: true }
       const meta = landed.file
       remember(meta)
+      sizeGate.noteSaveSucceeded()
       const saved = files.get(meta.fileId)!
       frameDocVersion.noteSaved({ path: pathFor(saved), versionId: saved.versionId ?? null })
       port.reportSaved({

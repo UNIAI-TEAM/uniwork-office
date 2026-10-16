@@ -85,7 +85,11 @@ import {
 import { createSession, type SessionOptions } from './session'
 import type { DraftHost, DraftRecovery } from './draft-recovery'
 import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
-import { bindLagDetectorPort, markDocumentLoaded } from '../../modules/shared/lag-detector'
+import {
+  bindLagDetectorPort,
+  documentMounted,
+  queueDocumentLoaded,
+} from '../../modules/shared/lag-detector'
 import { saveFailureText } from '../../modules/shared/save-failure'
 import { createRemoteVersion, type RemoteVersion } from '../../modules/shared/remote-version'
 import { createSaveSizeGate } from '../../modules/shared/save-size-gate'
@@ -279,7 +283,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     fileSizes.set(open.file.fileId, data.byteLength)
     remember(open.file)
     bindLagDetectorPort(port, grants)
-    markDocumentLoaded(open.file.fileId, data.byteLength)
+    queueDocumentLoaded(open.file.fileId, data.byteLength)
     return {
       path: pathFor(open.file),
       name: open.file.name,
@@ -332,6 +336,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     remember(file)
     const meta = files.get(file.fileId)!
     frameDocVersion.noteSaved({ path: pathFor(meta), versionId: meta.versionId ?? null })
+    sizeGate.noteSaveSucceeded()
     void drafts.saved()
     port.reportSaved({
       file: files.get(file.fileId)!,
@@ -588,6 +593,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   const sizeGate = createSaveSizeGate({
     port,
     getLiveBytes: liveDocBytes,
+    persistDraft: () => drafts.flush(),
     frame: conflictFrame(),
   })
 
@@ -675,6 +681,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       const pending = pendingOpen
       pendingOpen = null
       return pending ? await pending : null
+    },
+
+    noteDocumentMounted(): void {
+      documentMounted()
     },
 
     onOpenDocx(handler: OpenHandler): () => void {

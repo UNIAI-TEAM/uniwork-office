@@ -1324,6 +1324,10 @@ export interface SlidesApi {
   /** The user font store changed (download/local install): re-sync private FontFaces */
   onFontsChanged: (handler: () => void) => () => void
   consumePendingOpen: (fitWidthPx: number) => Promise<OpenResult | null>
+  /** Web frame only (UNI-1865): the renderer reports that the opened deck finished
+   *  mounting, so the passive lag detector's settle stamp starts at first paint. Absent
+   *  on desktop. */
+  noteDocumentMounted?: () => void
   /** one-shot Teacher / Home AI preset for this slides tab */
   consumeAiPreset: () => Promise<{ text: string; autoRun?: boolean; displayText?: string } | null>
   /** Live push of an AI preset while the tab is already open */

@@ -1548,6 +1548,31 @@ describe('document size limits, size_warning, save_blocked, and doc.download (SI
     expect(session.downloadMaxBytes).toBe(4_000)
   })
 
+  it('an api.open result without limits resets session.limits to the init limits (no leak of the previous document)', async () => {
+    const { client, host } = setup({
+      getInit: async () => baseInit({ limits: { max_bytes: 10_000, warn_ratio: 0.85 } }),
+      api: {
+        'api.open': async ({ fileId }) => ({
+          file: { fileId, name: 'B.docx' },
+          source: { kind: 'bytes', data: new ArrayBuffer(2) },
+          // no limits: this document falls back to the init limits
+        }),
+      },
+    })
+    const session = await client.whenInitialized()
+    client.handleOpen(() => ({ opened: true }))
+    await host.open({
+      file: { fileId: 'doc-1', name: 'A.docx' },
+      source: { kind: 'bytes', data: new ArrayBuffer(1) },
+      limits: { max_bytes: 6_000, warn_ratio: 0.8 },
+    })
+    expect(session.limits).toEqual({ max_bytes: 6_000, warn_ratio: 0.8 })
+
+    await client.request('api.open', { fileId: 'doc-2' })
+    expect(session.limits).toEqual({ max_bytes: 10_000, warn_ratio: 0.85 })
+    expect(session.downloadMaxBytes).toBe(10_000)
+  })
+
   it('emits size_warning and save_blocked and answers doc.download', async () => {
     const { host, client, hostWin, frameWin } = setup()
     await host.whenReady()
@@ -1593,6 +1618,45 @@ describe('document size limits, size_warning, save_blocked, and doc.download (SI
       type: 'doc.download',
       payload: { delivered: true },
     })
+  })
+
+  it('emits lag_detected through the protocol endpoint (UNI-1865)', async () => {
+    const { client, frameWin } = setup()
+    await client.whenInitialized()
+
+    client.reportLagDetected({
+      reason: 'interactions',
+      worst_ms: 480,
+      count: 3,
+      window_ms: 120_000,
+      bytes: 68_157_440,
+    })
+    client.reportLagDetected({ reason: 'longtask', worst_ms: 1_200, count: 1, window_ms: 0 })
+    await flush()
+
+    const isLagEvent = (m: unknown): boolean =>
+      typeof m === 'object' && m !== null && 'type' in m && m.type === 'lag_detected'
+    const events = frameWin.sent.filter(isLagEvent)
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'event',
+        type: 'lag_detected',
+        payload: {
+          reason: 'interactions',
+          worst_ms: 480,
+          count: 3,
+          window_ms: 120_000,
+          bytes: 68_157_440,
+        },
+      }),
+      expect.objectContaining({
+        kind: 'event',
+        type: 'lag_detected',
+        payload: { reason: 'longtask', worst_ms: 1_200, count: 1, window_ms: 0 },
+      }),
+    ])
+    // both envelopes pass the receiving side's own validation
+    for (const m of events) expect(parseEnvelope(m).ok).toBe(true)
   })
 })
 
