@@ -119,6 +119,26 @@ describe('Roll back after a mid-run Save (docs)', () => {
     expect(notice()).toBeNull()
   })
 
+  it('an older run rolled back after saves: names what later runs changed and a save kept', async () => {
+    const f = await mountWired()
+    await h!.send('bold the title')
+    await h!.toolTurn([BOLD])
+    await h!.textTurn('Done.')
+    // an autosave between the runs
+    await save(f)
+    await h!.send('add a header')
+    await h!.toolTurn([HEADER])
+    // the user's Save in the middle of the second run
+    await save(f)
+    await h!.textTurn('Done.')
+
+    // the first run's Roll back (the oldest button) rewinds past the second run too
+    await rollBack()
+    expect(h!.editor.state.doc.child(0).firstChild?.marks ?? []).toEqual([])
+    expect(f.header.value).toEqual({ header: 'AI header' })
+    expect(notice()?.textContent).toBe(t('aiRollbackKept', { parts: t('aiSidePartHeaderFooter') }))
+  })
+
   it('no save: Roll back restores the header too and shows no notice', async () => {
     const f = await mountWired()
     await h!.send('add a header and bold the title')
