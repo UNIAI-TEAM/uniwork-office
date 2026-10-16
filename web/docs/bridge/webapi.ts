@@ -85,6 +85,7 @@ import {
 import { createSession, type SessionOptions } from './session'
 import type { DraftHost, DraftRecovery } from './draft-recovery'
 import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
+import { bindLagDetectorPort, markDocumentLoaded } from '../../modules/shared/lag-detector'
 import { saveFailureText } from '../../modules/shared/save-failure'
 import { createRemoteVersion, type RemoteVersion } from '../../modules/shared/remote-version'
 import { projectApi } from './project-memory'
@@ -265,6 +266,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     // another document: the pending version and the bar of the old one are gone
     if (current !== null && current !== open.file.fileId) remote?.reset()
     remember(open.file)
+    bindLagDetectorPort(port, grants)
+    markDocumentLoaded(open.file.fileId, data.byteLength)
     return {
       path: pathFor(open.file),
       name: open.file.name,

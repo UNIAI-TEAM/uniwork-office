@@ -69,6 +69,7 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { bridgeDownloadCap, downloadVia, revisionOf } from '../shared/conflict-dialog'
 import { createRemoteVersion, type RemoteVersion } from '../shared/remote-version'
+import { bindLagDetectorPort, markDocumentLoaded } from '../shared/lag-detector'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
 import { createFullscreenControl } from './fullscreen-hint'
@@ -481,6 +482,8 @@ export function createWebSlidesApi(
     hideFatal()
     port.setTitle(open.file.name)
     port.setDirty(!!draft)
+    bindLagDetectorPort(port, state.effective)
+    markDocumentLoaded(open.file.fileId, bytes.byteLength)
     // embedded faces registered while opening re-lay the text out with their real metrics
     return fontsRelaid ? openResultFor(session, fitWidthPx) : result
   }

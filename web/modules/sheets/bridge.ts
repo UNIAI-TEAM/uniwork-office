@@ -62,6 +62,7 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
+import { bindLagDetectorPort, markDocumentLoaded } from '../shared/lag-detector'
 import { createRemoteVersion, type RemoteVersion, type SaveFailure } from '../shared/remote-version'
 import { saveFailureDetail } from '../shared/save-failure'
 import {
@@ -379,6 +380,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     dirty = restored
     port.setDirty(dirty)
     remote?.dirtyChanged(dirty)
+    bindLagDetectorPort(port, effective)
+    markDocumentLoaded(payload.file.fileId, data.byteLength)
     return decorate(opened, payload.file, restored)
   }
 
