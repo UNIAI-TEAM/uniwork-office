@@ -222,7 +222,7 @@ describe('picker dialog', () => {
     await click(cardButton())
   }
 
-  it('lists the workspace documents; unsupported ones are disabled with a reason', async () => {
+  it('lists the workspace documents; unsupported ones are hidden and counted', async () => {
     await openPicker()
     expect(api.uniworkListDocuments).toHaveBeenCalledWith({
       workspaceId: 'w1',
@@ -230,25 +230,26 @@ describe('picker dialog', () => {
       limit: 50,
     })
     expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
-      'Photo.png',
       'Plan.docx',
       'Sheet.xlsx',
     ])
-    expect(rows()[0]!.getAttribute('aria-disabled')).toBe('true')
-    expect(rows()[0]!.textContent).toContain('Not supported in UniWork Office')
-    expect(rows()[1]!.getAttribute('aria-disabled')).toBe('false')
-    expect(rows()[1]!.textContent).toMatch(/Updated/)
+    expect(dialog()!.textContent).not.toContain('Photo.png')
+    expect(host.querySelector('.uw-pick-hidden')!.textContent).toBe(
+      'Hidden because UniWork Office cannot open their format: 1',
+    )
+    expect(rows()[0]!.getAttribute('aria-disabled')).toBe('false')
+    expect(rows()[0]!.textContent).toMatch(/Updated/)
     // the highlight starts on the first document that can be opened
-    expect(rows()[1]!.getAttribute('aria-selected')).toBe('true')
-    expect(search().getAttribute('aria-activedescendant')).toBe(rows()[1]!.id)
+    expect(rows()[0]!.getAttribute('aria-selected')).toBe('true')
+    expect(search().getAttribute('aria-activedescendant')).toBe(rows()[0]!.id)
   })
 
-  it('arrow keys move over openable rows and Enter opens the highlighted one, then closes', async () => {
+  it('arrow keys move over the listed rows and Enter opens the highlighted one, then closes', async () => {
     await openPicker()
     await key(search(), 'ArrowDown')
-    expect(rows()[2]!.getAttribute('aria-selected')).toBe('true')
-    await key(search(), 'ArrowUp')
     expect(rows()[1]!.getAttribute('aria-selected')).toBe('true')
+    await key(search(), 'ArrowUp')
+    expect(rows()[0]!.getAttribute('aria-selected')).toBe('true')
     await key(search(), 'Enter')
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('b')
     expect(dialog()).toBeNull()
@@ -281,8 +282,18 @@ describe('picker dialog', () => {
     expect(seen).toEqual([])
   })
 
-  it('clicking a disabled row opens nothing', async () => {
+  it('clicking a row that cannot open (an archived one) opens nothing', async () => {
+    api.uniworkListDocuments.mockResolvedValue(
+      page([
+        { ...doc('o', 'Old.docx', 'docx'), archived: true } as UniworkDocSummary,
+        doc('b', 'Plan.docx', 'docx'),
+      ]),
+    )
     await openPicker()
+    expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([
+      'Old.docx',
+      'Plan.docx',
+    ])
     await click(rows()[0])
     expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
     expect(dialog()).not.toBeNull()
@@ -303,7 +314,7 @@ describe('picker dialog', () => {
       () => new Promise((resolve) => (finish = resolve)),
     )
     await openPicker()
-    await click(rows()[1])
+    await click(rows()[0])
     expect(host.querySelector('.uw-pick-progress')!.textContent).toContain('Opening “Plan.docx”…')
     await act(async () => finish({ ok: false, error: 'forbidden' }))
     await flush()
@@ -317,7 +328,7 @@ describe('picker dialog', () => {
   it('an expired session while opening offers Sign in', async () => {
     api.uniworkOpenDocument.mockResolvedValueOnce({ ok: false, error: 'session_expired' })
     await openPicker()
-    await click(rows()[1])
+    await click(rows()[0])
     const signIn = host.querySelector<HTMLButtonElement>('.uw-pick-open-error button')!
     expect(signIn.textContent).toBe('Sign in')
     await click(signIn)
@@ -418,7 +429,8 @@ describe('picker dialog', () => {
     expect(rows()).toHaveLength(0)
     await click(buttonByText('Retry'))
     expect(api.uniworkListDocuments).toHaveBeenCalledTimes(2)
-    expect(rows()).toHaveLength(3)
+    // the two openable rows; the Photo.png row is hidden (counted in the hint)
+    expect(rows()).toHaveLength(2)
   })
 
   it('Retry after the workspace list failed loads the workspaces again', async () => {
@@ -427,7 +439,7 @@ describe('picker dialog', () => {
     expect(host.querySelector('.uw-pick-ws')).toBeNull()
     await click(buttonByText('Retry'))
     expect(api.uniworkListWorkspaces).toHaveBeenCalledTimes(2)
-    expect(rows()).toHaveLength(3)
+    expect(rows()).toHaveLength(2)
   })
 
   it('a rejected IPC call is shown as a network failure, not an unhandled error', async () => {
