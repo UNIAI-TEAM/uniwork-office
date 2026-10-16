@@ -558,6 +558,32 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
     expect(partsVi).not.toMatch(/zip rejected:|parts exceeds/i)
     expect(statusState).toEqual(refusedMessageState)
 
+    // d2-8: RangeError "Array buffer allocation failed" and "Invalid string length" -> engine_out_of_memory
+    for (const errMsg of ['Array buffer allocation failed', 'Invalid string length']) {
+      reported.length = 0
+      toasts.length = 0
+      setDocBytesResolver(() => {
+        throw new RangeError(errMsg)
+      })
+      expect(
+        await loadFile(ctx as never, {
+          path: 'uniwork://files/f3/Oom.docx',
+          name: 'Oom.docx',
+          dataUrl: 'in-memory://oom',
+          hash: 'h-oom',
+        }),
+      ).toBe('refused')
+      expect(toasts).toEqual([])
+      expect(reported).toEqual([
+        expect.objectContaining({
+          path: 'uniwork://files/f3/Oom.docx',
+          reason: 'engine_out_of_memory',
+        }),
+      ])
+      const oomVi = statusText(refusedMessageState as never, t)
+      expect(oomVi).not.toContain(errMsg)
+    }
+
     setDocBytesResolver(null)
     setToastEmitter(null)
   })

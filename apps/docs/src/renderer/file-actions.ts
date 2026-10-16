@@ -422,7 +422,9 @@ function classifyOpenRefusal(msg: string): {
       measure: { kind: 'zip_parts', value: Number(parts[1]), limit: Number(parts[2]) },
     }
   }
-  if (/out of memory/i.test(msg)) return { reason: 'engine_out_of_memory' }
+  if (/out of memory|Array buffer allocation failed|Invalid string length/i.test(msg)) {
+    return { reason: 'engine_out_of_memory' }
+  }
   if (
     /(?:zip|docx) rejected:.*(?:declares\s+\d+\s+uncompressed bytes|total uncompressed size)/i.test(
       msg,
