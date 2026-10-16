@@ -1,4 +1,5 @@
 import type { Node as PmNode } from '@tiptap/pm/model'
+import type { PmNode as PmJson } from './convert'
 
 /** per document: any block carries the AI marker (a PM doc is immutable, so the answer never changes) */
 const markedMemo = new WeakMap<PmNode, boolean>()
@@ -41,4 +42,50 @@ export function sameDocIgnoringAiMarks(a: PmNode, b: PmNode): boolean {
   if (a.eq(b)) return true
   if (!docHasAiMarks(a) && !docHasAiMarks(b)) return false
   return JSON.stringify(unmarkedJson(a)) === JSON.stringify(unmarkedJson(b))
+}
+
+/**
+ * The reloaded document with the live doc's AI marker carried over. A save that has to rewrite
+ * the editor from the written file (the file gives blocks new docxIndex anchors) would otherwise
+ * drop the marker, which is not file content: an autosave must leave it on screen, only a user
+ * Save or Accept clears it (a user Save clears it before writing, so nothing is carried then).
+ * Top-level blocks pair by index when the block count is unchanged, else by their text.
+ */
+export function carryAiMarks(live: PmNode, next: PmJson): PmJson {
+  if (!docHasAiMarks(live) || !next.content) return next
+  const marked = new Set<number>()
+  live.forEach((node, _offset, index) => {
+    let hit = Boolean(node.attrs?.aiChanged)
+    if (!hit)
+      node.descendants((child) => {
+        if (child.attrs?.aiChanged) hit = true
+        return !hit
+      })
+    if (hit) marked.add(index)
+  })
+  const targets = new Set<number>()
+  if (live.childCount === next.content.length) for (const i of marked) targets.add(i)
+  else {
+    const texts = next.content.map(jsonText)
+    let from = 0
+    for (const i of [...marked].sort((a, b) => a - b)) {
+      const at = texts.indexOf(live.child(i).textContent, from)
+      if (at < 0) continue
+      targets.add(at)
+      from = at + 1
+    }
+  }
+  if (targets.size === 0) return next
+  return {
+    ...next,
+    content: next.content.map((block, i) =>
+      targets.has(i) && block.attrs && 'aiChanged' in block.attrs
+        ? { ...block, attrs: { ...block.attrs, aiChanged: true } }
+        : block,
+    ),
+  }
+}
+
+function jsonText(node: PmJson): string {
+  return (node.text ?? '') + (node.content ?? []).map(jsonText).join('')
 }

@@ -95,7 +95,7 @@ import { showToast } from './components/toast-bus'
 import { cap } from './capabilities'
 import { isEncryptedPackage } from './encrypted-package'
 import { buildStandaloneHtml } from './html-export'
-import { sameDocIgnoringAiMarks } from './editor/ai-marker'
+import { carryAiMarks, sameDocIgnoringAiMarks } from './editor/ai-marker'
 import { aiPanelInitiallyOpen } from '@genoffice/ui'
 import { isNarrowViewport } from './narrow-viewport'
 
@@ -1152,7 +1152,8 @@ async function saveOnce(
     }
     // Equal doc: skip the rewrite so undo history, caret and scroll survive.
     if (!unchanged) {
-      editor.commands.setContent(rebasedPm as never)
+      // an autosave keeps the AI marker on screen (a user Save cleared it before writing)
+      editor.commands.setContent(carryAiMarks(editor.state.doc, rebasedPm) as never)
       resetEditorHistory(editor)
       const chain = editor
         .chain()
