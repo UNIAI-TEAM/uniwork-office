@@ -58,8 +58,8 @@ export function parseDocumentLimits(raw: unknown): DocumentLimits {
 
   const rawMax = obj.upload_max_bytes ?? obj.max_bytes
   const max_bytes =
-    typeof rawMax === 'number' && Number.isFinite(rawMax) && rawMax > 0
-      ? Math.floor(rawMax)
+    typeof rawMax === 'number' && Number.isSafeInteger(rawMax) && rawMax >= 1
+      ? rawMax
       : DEFAULT_MAX_DOCUMENT_BYTES
 
   const rawRatio = obj.save_warn_ratio ?? obj.warn_ratio
@@ -68,7 +68,11 @@ export function parseDocumentLimits(raw: unknown): DocumentLimits {
       ? rawRatio
       : DEFAULT_WARN_RATIO
 
-  return { max_bytes, warn_ratio, warn_bytes: Math.floor(max_bytes * warn_ratio) }
+  const rawWarnBytes = Math.floor(max_bytes * warn_ratio)
+  const warn_bytes =
+    Number.isSafeInteger(rawWarnBytes) && rawWarnBytes >= 0 ? rawWarnBytes : DEFAULT_WARN_BYTES
+
+  return { max_bytes, warn_ratio, warn_bytes }
 }
 
 export interface DocumentLimitsCacheDeps {

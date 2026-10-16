@@ -160,6 +160,29 @@ describe('SIZE-F1 desktop document size limits', () => {
       })
       // a non-config body is not a limits object
       expect(parseDocumentLimits('nope')).toEqual(DEFAULT_DOCUMENT_LIMITS)
+
+      // d1-6: fractional (0.5, 100.5), zero, or unsafe integer upload_max_bytes fall back
+      // to DEFAULT_DOCUMENT_LIMITS rather than flooring 0.5 to a zero cap
+      expect(
+        parseDocumentLimits({
+          documents: { limits: { upload_max_bytes: 0.5 } },
+        }),
+      ).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(
+        parseDocumentLimits({
+          documents: { limits: { upload_max_bytes: 100.5 } },
+        }),
+      ).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(
+        parseDocumentLimits({
+          documents: { limits: { upload_max_bytes: 0 } },
+        }),
+      ).toEqual(DEFAULT_DOCUMENT_LIMITS)
+      expect(
+        parseDocumentLimits({
+          documents: { limits: { upload_max_bytes: Number.MAX_SAFE_INTEGER + 1 } },
+        }),
+      ).toEqual(DEFAULT_DOCUMENT_LIMITS)
     })
 
     it('reads once per deployment origin, and again on a deployment switch', async () => {
