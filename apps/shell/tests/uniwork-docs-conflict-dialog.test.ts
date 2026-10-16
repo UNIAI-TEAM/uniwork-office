@@ -21,7 +21,10 @@ import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwor
 import { DRAFTS_STORE_REGISTRATION, createDraftStore } from '../src/main/uniwork-sync/queue/drafts'
 import { PARKED_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/parked'
 import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
-import { createTreeChangedCoalescer } from '../src/main/uniwork-docs/tree-changed'
+import {
+  TREE_CHANGED_WINDOW_MS,
+  createTreeChangedCoalescer,
+} from '../src/main/uniwork-docs/tree-changed'
 import { QUEUE_LIMITS } from '../src/main/uniwork-sync/queue/limits'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
@@ -2059,12 +2062,215 @@ describe('G5-12 Save as a copy (main)', () => {
     releaseLockStep2()
     await lockPromise
 
-    // Advance the 500 ms coalescer window: any live scheduled callback fires now.
+    // Advance the coalescer window: any live scheduled callback fires now.
     for (const timer of scheduled) {
-      if (!timer.cancelled && timer.ms >= 500) timer.run()
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
     }
     expect(emitted).toEqual([])
-    expect(ctx.treeChanged).toEqual([])
+  })
+
+  it('R3-01: suppresses treeChanged when lockSession runs while buildConflictView is frozen inside conflictAct', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.deps.pushTreeChanged = (event: { workspaceId: string }) =>
+      coalescer.notify(event.workspaceId)
+    ;(ctx.deps as Record<string, unknown>).stopRuntime = () => coalescer.cancel()
+
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    let capabilityReached!: () => void
+    const onCapabilityReached = new Promise<void>((resolve) => {
+      capabilityReached = resolve
+    })
+    let releaseCapability!: () => void
+    const capabilityGate = new Promise<void>((resolve) => {
+      releaseCapability = resolve
+    })
+    ctx.deps.capability.get = async () => {
+      capabilityReached()
+      await capabilityGate
+      return {
+        kind: 'ok' as const,
+        capabilities: { sync_write: true },
+        source: 'fresh' as const,
+      }
+    }
+
+    const saveCopyPromise = ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+    await onCapabilityReached
+
+    let lockStep2Reached!: () => void
+    const onLockStep2Reached = new Promise<void>((resolve) => {
+      lockStep2Reached = resolve
+    })
+    let releaseLockStep2!: () => void
+    const lockStep2Gate = new Promise<void>((resolve) => {
+      releaseLockStep2 = resolve
+    })
+    let firstEditorStateCall = true
+    vi.mocked(ctx.deps.isPathOpen).mockReturnValue(true)
+    vi.mocked(ctx.deps.editorStateOf).mockImplementation(async () => {
+      if (firstEditorStateCall) {
+        firstEditorStateCall = false
+        lockStep2Reached()
+        await lockStep2Gate
+      }
+      return { dirty: false, aiRunning: false, aiEpoch: 0 }
+    })
+
+    const lockPromise = ctx.service.lockSession(undefined, undefined, { switch: true })
+    await onLockStep2Reached
+
+    releaseCapability()
+    const reply = await saveCopyPromise
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(callsTo(server, `${COPY}/uploads`)).toHaveLength(1)
+    expect(
+      callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'POST'),
+    ).toHaveLength(1)
+
+    releaseLockStep2()
+    await lockPromise
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R3-01: suppresses treeChanged when noteSelectedOrg switches org while buildConflictView is frozen inside conflictAct', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.deps.pushTreeChanged = (event: { workspaceId: string }) =>
+      coalescer.notify(event.workspaceId)
+
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    let capabilityReached!: () => void
+    const onCapabilityReached = new Promise<void>((resolve) => {
+      capabilityReached = resolve
+    })
+    let releaseCapability!: () => void
+    const capabilityGate = new Promise<void>((resolve) => {
+      releaseCapability = resolve
+    })
+    ctx.deps.capability.get = async () => {
+      capabilityReached()
+      await capabilityGate
+      return {
+        kind: 'ok' as const,
+        capabilities: { sync_write: true },
+        source: 'fresh' as const,
+      }
+    }
+
+    const saveCopyPromise = ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+    await onCapabilityReached
+
+    ctx.service.noteSelectedOrg('org_b')
+    coalescer.cancel()
+
+    releaseCapability()
+    const reply = await saveCopyPromise
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(callsTo(server, `${COPY}/uploads`)).toHaveLength(1)
+    expect(
+      callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'POST'),
+    ).toHaveLength(1)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R3-02: answers a normal view/closed reply without rejecting when the session drops inside buildConflictView, and still runs stopAi', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { aiRunning: true })
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    ctx.deps.capability.get = async () => {
+      // The session drops inside buildConflictView after `online` was computed as true
+      ctx.setAccount(null)
+      return {
+        kind: 'ok' as const,
+        capabilities: { sync_write: true },
+        source: 'fresh' as const,
+      }
+    }
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: true,
+    })
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_failed', online: false },
+    })
+    expect(ctx.stopAiRun).toHaveBeenCalledWith(path)
+    expect(callsTo(server, `${DOC}/copies`)).toHaveLength(0)
+
+    // When the dialog is also torn down inside that window, conflictAct answers { kind: 'closed' }
+    ctx.setAccount('acc_1')
+    ctx.setAiRunning(true)
+    ctx.stopAiRun.mockClear()
+    ctx.deps.capability.get = async () => {
+      ctx.setAccount(null)
+      ctx.service.closeConflictPrompt()
+      return {
+        kind: 'ok' as const,
+        capabilities: { sync_write: true },
+        source: 'fresh' as const,
+      }
+    }
+    const closedReply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: true,
+    })
+    expect(closedReply).toEqual({ kind: 'closed' })
+    expect(ctx.stopAiRun).toHaveBeenCalledWith(path)
   })
 })
 
