@@ -105,7 +105,7 @@ export interface CommentsRevealPayload {
 }
 
 /** the caller's effective level on the document (contract-collab §10) */
-export type CommentsLevel = 'view' | 'edit' | 'manage'
+export type CommentsLevel = 'view' | 'comment' | 'edit' | 'manage'
 
 /**
  * G8-12 (UNI-1407): what `context` answers for a bound document. Main resolves

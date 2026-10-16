@@ -121,6 +121,7 @@ export const zhTW = {
   uwDocInfoByAt: '{name}，{time}',
   uwDocInfoVersionBy: '{version} · {name}',
   uwAccessView: '檢視',
+  uwAccessComment: '評論',
   uwAccessEdit: '編輯',
   uwAccessManage: '管理',
   uwRoleOwner: '擁有者',

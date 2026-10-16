@@ -8,4 +8,5 @@ export const ja = {
     'このドキュメントにアクセスできる人の中に「{query}」に一致する人はいません。',
   collabMentionNoCandidates: 'このドキュメントにアクセスできる他のユーザーはまだいません。',
   collabMentionError: 'ユーザー一覧を読み込めませんでした。',
+  collabMentionNoAccessBadge: '閲覧不可',
 } satisfies Record<keyof typeof zh, string>

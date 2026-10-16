@@ -77,10 +77,16 @@ export interface CollabPermissions {
 }
 
 export interface CollabActions {
-  /** a new root (comment: with the anchor of `startThread`; discussion: no anchor) */
-  create(body: string, p?: { anchor?: CollabAnchor; base_version_id?: string }): Promise<void>
-  reply(threadId: string, body: string): Promise<void>
-  edit(commentId: string, body: string): Promise<void>
+  /**
+   * a new root (comment: with the anchor of `startThread`; discussion: no anchor). The write actions
+   * resolve to the comment the server answered with (G8-18: it carries `mentions_without_access`).
+   */
+  create(
+    body: string,
+    p?: { anchor?: CollabAnchor; base_version_id?: string },
+  ): Promise<CollabComment>
+  reply(threadId: string, body: string): Promise<CollabComment>
+  edit(commentId: string, body: string): Promise<CollabComment>
   remove(commentId: string): Promise<'tombstoned' | 'removed'>
   resolve(threadId: string): Promise<void>
   reopen(threadId: string): Promise<void>
@@ -549,7 +555,7 @@ export function useCollabThreads(
     () => ({
       create: async (body, p) => {
         const anchor = p?.anchor
-        await write({}, () =>
+        const out = await write({}, () =>
           sourceRef.current.create({
             kind,
             body,
@@ -558,16 +564,19 @@ export function useCollabThreads(
           }),
         )
         setNewThread(null)
+        return out.comment
       },
       reply: async (threadId, body) => {
-        await write({ threadId, body }, () =>
+        const out = await write({ threadId, body }, () =>
           sourceRef.current.create({ kind, parent_id: threadId, body }),
         )
+        return out.comment
       },
       edit: async (commentId, body) => {
-        await write({ commentId, threadId: threadIdOf(commentId), body }, () =>
+        const out = await write({ commentId, threadId: threadIdOf(commentId), body }, () =>
           sourceRef.current.update({ comment_id: commentId, body }),
         )
+        return out.comment
       },
       remove: async (commentId) => {
         const r = await write({ commentId }, () =>

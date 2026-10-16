@@ -72,4 +72,28 @@ export const fr = {
   collabInFileSection: 'Commentaires dans le fichier',
   collabInFileHint:
     'Enregistrés dans le fichier, en lecture seule : vous ne pouvez ni les modifier ni y répondre ici.',
+  collabMentionWarnTitle: 'Les personnes mentionnées ne peuvent pas voir ce document',
+  collabMentionWarnBody:
+    '{names} ne peuvent pas voir ce document et ne recevront donc pas de notification.',
+  collabShareViewThenSend: 'Partager l’accès en lecture, puis envoyer',
+  collabSendWithoutNotify: 'Envoyer sans notifier',
+  collabMentionAskManager:
+    'Demandez à une personne qui gère ce document de partager l’accès en lecture avec {names}.',
+  collabMentionMixedUnshareable:
+    'Impossible de partager avec {unshareable} ; aucune notification ne leur sera envoyée.',
+  collabSharingView: 'Partage de l’accès en lecture…',
+  collabShareViewFailed:
+    'Impossible de partager l’accès en lecture avec {failedNames}. Vous pouvez réessayer ou envoyer sans notifier.',
+  collabShareViewPartial:
+    'Accès en lecture partagé avec {sharedNames}. Impossible de partager avec {failedNames} (aucune notification envoyée).',
+  collabSendComment: 'Envoyer le commentaire',
+  collabRetryShareFor: 'Réessayer pour {failedNames}',
+  collabSendFailedAfterShare:
+    'Accès en lecture partagé avec {sharedNames}, mais le commentaire n’a pas pu être envoyé. Votre texte est toujours dans la zone — réessayez d’envoyer.',
+  collabPostSendNoAccess:
+    '{names} ne peuvent pas voir ce document et n’ont donc pas reçu de notification.',
+  collabPostSendShareAction: 'Partager l’accès en lecture',
+  collabPostSendNoRetroNote:
+    'Partager maintenant n’enverra pas de notification pour ce commentaire ; mentionnez-les dans un nouveau commentaire pour les notifier.',
+  collabDismissNotice: 'Ignorer',
 } satisfies Record<keyof typeof zh, string>

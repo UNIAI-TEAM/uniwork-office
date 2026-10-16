@@ -77,4 +77,27 @@ export const en = {
   // comments stored in the file (read-only)
   collabInFileSection: 'Comments in the file',
   collabInFileHint: 'Saved in the file and read-only: you can’t edit or reply here.',
+
+  // mention access warning & post-send notice
+  collabMentionWarnTitle: "Mentioned people can't view this document",
+  collabMentionWarnBody: "{names} can't view this document, so they won't be notified.",
+  collabShareViewThenSend: 'Share view access, then send',
+  collabSendWithoutNotify: 'Send without notifying',
+  collabMentionAskManager:
+    'Ask someone who manages this document to share view access with {names}.',
+  collabMentionMixedUnshareable: "Can't share with {unshareable}; they won't be notified.",
+  collabSharingView: 'Sharing view access…',
+  collabShareViewFailed:
+    "Couldn't share view access with {failedNames}. You can try again or send without notifying.",
+  collabShareViewPartial:
+    "Shared view access with {sharedNames}. Couldn't share with {failedNames} (they won't be notified).",
+  collabSendComment: 'Send comment',
+  collabRetryShareFor: 'Try again for {failedNames}',
+  collabSendFailedAfterShare:
+    "Shared view access with {sharedNames}, but couldn't send the comment. Your text is still in the box — try sending again.",
+  collabPostSendNoAccess: "{names} can't view this document, so they weren't notified.",
+  collabPostSendShareAction: 'Share view access',
+  collabPostSendNoRetroNote:
+    "Sharing now won't notify them about this comment; mention them in a new comment to notify.",
+  collabDismissNotice: 'Dismiss',
 } satisfies Record<keyof typeof zh, string>

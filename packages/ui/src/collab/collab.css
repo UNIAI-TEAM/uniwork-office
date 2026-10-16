@@ -3,6 +3,7 @@
  * >= 44px under a coarse pointer. Layout mirrors the genoffice side panes (header bar, card threads). */
 @import './collab-body.css';
 @import './collab-composer.css';
+@import './collab-mention-access.css';
 
 /* ---------- base ---------- */
 
@@ -179,6 +180,13 @@
   border-bottom: 1px solid var(--border);
   background: var(--chrome-bg);
   flex: none;
+}
+
+/* the title is a programmatic focus target (tabindex -1) after Dismiss / removed threads; script focus
+   after a pointer click is not :focus-visible, so show the same ring on plain :focus */
+.collab-title:focus {
+  outline: 2px solid var(--accent, var(--color-brand-secondary));
+  outline-offset: 2px;
 }
 
 .collab-title {

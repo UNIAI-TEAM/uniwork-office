@@ -440,6 +440,16 @@ describe('server mode only for a bound document with the bridge', () => {
         false,
       ),
     ).toEqual({ documentId: 'doc-1', versionId: null })
+    // DOC5-W04: a comment-level caller keeps its level (it writes comments, never content)
+    expect(
+      (
+        await loadCommentsContext(
+          ctxOf(ok({ documentId: 'doc-1', versionId: 'v1', level: 'comment' })),
+          '/p.pptx',
+          false,
+        )
+      )?.level,
+    ).toBe('comment')
     // a read-only copy never writes, whatever the context says
     expect((await loadCommentsContext(bridge, '/p.pptx', true))?.level).toBe('view')
     // the web-frame flag is carried (RFE14c-02), only when it is exactly true

@@ -48,7 +48,7 @@ export interface PdfCommentsContext {
   level?: CollabLevel
 }
 
-const LEVELS: ReadonlySet<string> = new Set(['view', 'edit', 'manage'])
+const LEVELS: ReadonlySet<string> = new Set(['view', 'comment', 'edit', 'manage'])
 
 function boundedId(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 && v.length <= 128 ? v : undefined

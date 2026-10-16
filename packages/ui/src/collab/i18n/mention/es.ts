@@ -7,4 +7,5 @@ export const es = {
   collabMentionNoMatch: 'Nadie con acceso a este documento coincide con «{query}».',
   collabMentionNoCandidates: 'Todavía nadie más tiene acceso a este documento.',
   collabMentionError: 'No se pudo cargar la lista de personas.',
+  collabMentionNoAccessBadge: 'No puede ver',
 } satisfies Record<keyof typeof zh, string>

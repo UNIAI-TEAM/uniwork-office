@@ -8,4 +8,5 @@ export const hi = {
     'इस दस्तावेज़ तक पहुँच रखने वाला कोई भी व्यक्ति “{query}” से मेल नहीं खाता।',
   collabMentionNoCandidates: 'अभी तक किसी और की इस दस्तावेज़ तक पहुँच नहीं है।',
   collabMentionError: 'लोगों की सूची लोड नहीं हो सकी।',
+  collabMentionNoAccessBadge: 'देख नहीं सकते',
 } satisfies Record<keyof typeof zh, string>

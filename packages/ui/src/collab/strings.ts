@@ -4,12 +4,14 @@ import { collabPanelStrings } from '../strings-collab-panel'
 import type { AnchorLabelStrings } from './AnchorLabel'
 import type { CollabComposerStrings } from './CollabComposer'
 import type { CollabPickerStrings } from './MentionPicker'
+import type { CollabPostSendStrings } from './PostSendMentionNotice'
 import type { CollabStrings } from './use-collab-threads'
 
 /** the one record every collab component reads: it carries each component's key set */
 export type CollabAllStrings = CollabStrings &
   CollabComposerStrings &
   CollabPickerStrings &
+  CollabPostSendStrings &
   AnchorLabelStrings
 
 const merged = new Map<Lang, CollabAllStrings>()

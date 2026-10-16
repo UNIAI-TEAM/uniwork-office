@@ -1293,10 +1293,11 @@ export function moveOrgChoice(
 // ── Document details panel ──────────────────────────────
 
 /** what the server says I may do with a document (my_level) */
-export type UniworkAccessLevel = 'view' | 'edit' | 'manage'
+export type UniworkAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
 
 const ACCESS_KEYS: Record<UniworkAccessLevel, StringKey> = {
   view: 'uwAccessView',
+  comment: 'uwAccessComment',
   edit: 'uwAccessEdit',
   manage: 'uwAccessManage',
 }

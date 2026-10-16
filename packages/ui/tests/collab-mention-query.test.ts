@@ -4,6 +4,7 @@ import {
   MENTION_DEBOUNCE_MS,
   MENTION_MAX_ROWS,
   findMentionTrigger,
+  formatMentionNames,
   applyMentionEdit,
   insertMention,
   mentionDocFromBody,
@@ -201,5 +202,43 @@ describe('mention ranges (the composer shows @Name, the stored body keeps the to
     ])
     expect(out.caret).toBe(10)
     expect(mentionDocToBody(out.doc)).toBe(`${tok}  tail ${tok}`)
+  })
+
+  it('preserves canView on picked mentions across edits, while pasted tokens omit them (G8-18)', () => {
+    const base = mentionDocFromBody('@mi')
+    const trig = findMentionTrigger(base.text, 3)!
+    const picked = pickMention(base, trig, 3, {
+      id: AN,
+      label: 'Minh Anh',
+      raw: tok,
+      canView: false,
+    })
+    expect(picked.doc.ranges[0]).toMatchObject({
+      id: AN,
+      label: 'Minh Anh',
+      canView: false,
+    })
+    const editedPrefix = applyMentionEdit(picked.doc, 'Nhờ @Minh Anh ').doc
+    const edited = applyMentionEdit(editedPrefix, 'Nhờ @Minh Anh xem').doc
+    expect(edited.ranges[0]).toMatchObject({
+      start: 4,
+      end: 13,
+      canView: false,
+    })
+    const fromBody = mentionDocFromBody(`Nhờ ${tok} xem`)
+    expect(fromBody.ranges[0]?.canView).toBeUndefined()
+    // per-person can_share is a post-send fact: a range never carries it (F5)
+    expect(picked.doc.ranges[0]).not.toHaveProperty('canShare')
+  })
+})
+
+describe('formatMentionNames (G8-18 Intl.ListFormat)', () => {
+  it('lists 1, 2, and 3+ names in full without truncation', () => {
+    expect(formatMentionNames(['Nguyễn An'], 'vi')).toBe('Nguyễn An')
+    expect(formatMentionNames(['Nguyễn An', 'Trần Bình'], 'en')).toBe('Nguyễn An and Trần Bình')
+    const threeVi = formatMentionNames(['Nguyễn An', 'Trần Bình', 'Lê Cường'], 'vi')
+    expect(threeVi).toContain('Nguyễn An')
+    expect(threeVi).toContain('Trần Bình')
+    expect(threeVi).toContain('Lê Cường')
   })
 })

@@ -80,4 +80,25 @@ export const zh = {
   // comments stored in the file (read-only)
   collabInFileSection: '文件中的评论',
   collabInFileHint: '已保存在文件中，仅可查看：无法在此编辑或回复。',
+
+  // mention access warning & post-send notice
+  collabMentionWarnTitle: '被提及的人无权查看此文档',
+  collabMentionWarnBody: '{names}无法查看此文档，因此不会收到通知。',
+  collabShareViewThenSend: '共享查看权限并发送',
+  collabSendWithoutNotify: '直接发送，不通知',
+  collabMentionAskManager: '请让管理此文档的人与{names}共享查看权限。',
+  collabMentionMixedUnshareable: '无法与{unshareable}共享；他们不会收到通知。',
+  collabSharingView: '正在共享查看权限…',
+  collabShareViewFailed: '未能与{failedNames}共享查看权限。你可以重试，或直接发送而不通知。',
+  collabShareViewPartial:
+    '已与{sharedNames}共享查看权限。未能与{failedNames}共享（他们不会收到通知）。',
+  collabSendComment: '发送评论',
+  collabRetryShareFor: '为{failedNames}重试',
+  collabSendFailedAfterShare:
+    '已与{sharedNames}共享查看权限，但未能发送评论。你的内容仍保留在输入框中——请尝试重新发送。',
+  collabPostSendNoAccess: '{names}无法查看此文档，因此未收到通知。',
+  collabPostSendShareAction: '共享查看权限',
+  collabPostSendNoRetroNote:
+    '现在共享不会补发上面这条评论的通知；如需通知他们，请在新评论中再次提及。',
+  collabDismissNotice: '关闭通知',
 }
