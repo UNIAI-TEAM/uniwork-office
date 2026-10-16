@@ -1213,63 +1213,70 @@ export async function discardPendingOwnedAssetNames(
  *
  * Only this window's own assets are accepted (a name its discard dropped, or one the manifest
  * still owns) and only the picture types an AI run can save, so a stray renderer cannot make the
- * app adopt a file it never created. The whole write + record runs under the manifest lock the
- * discard holds for its whole body: an undo's discard that is still running is either finished
- * first (the file then really comes back) or still holding the lock (this restore waits) — the
- * half state that reported a restored picture while the discard deleted it cannot happen.
+ * app adopt a file it never created. The whole call — every name it carries — runs inside the
+ * manifest lock the discard holds for its whole body: an undo's discard that is still running is
+ * either finished first (the file then really comes back) or still holding the lock (this restore
+ * waits). Taking the lock per name would let a discard land between two names of one call, delete
+ * a picture it had already put back, and still be answered with that name in `restored`.
  */
 export async function restoreOwnedAssetFiles(
   documentPath: string,
   files: ReadonlyArray<{ name: string; base64: string }>,
 ): Promise<{ restored: string[]; errors: string[] }> {
   const result = { restored: [] as string[], errors: [] as string[] }
-  for (const { name, base64 } of files) {
-    if (!isSafeAssetName(name) || name.startsWith('.')) {
-      result.errors.push(`${name}: not a plain file name`)
-      continue
-    }
-    if (!AI_RUN_IMAGE_EXTS.has(extname(name).slice(1).toLowerCase())) {
-      result.errors.push(`${name}: not a picture an AI run can save`)
-      continue
-    }
-    try {
-      const bytes = Buffer.from(base64, 'base64')
-      const sha256 = createHash('sha256').update(bytes).digest('hex')
-      await withManifestLock(documentPath, async () => {
-        const manifest = await readManifestUnlocked(documentPath)
-        const own =
-          discardedAssetNamesFor(documentPath).has(name) ||
-          manifest.files.some((file) => file.name === name)
-        if (!own) throw new Error('not a file this document discarded or owns')
-        const assetsDir = await ensureAssetsDir(documentPath)
-        const target = join(assetsDir, name)
-        let created = false
-        try {
-          await writeFile(target, bytes, { flag: 'wx' })
-          created = true
-        } catch (error) {
-          if (errorCode(error) !== 'EEXIST') throw error
-          const info = await lstat(target)
-          if (!info.isFile() || info.isSymbolicLink()) {
-            throw new Error('not a plain file', { cause: error })
-          }
-          if ((await sha256File(target)) !== sha256) {
-            throw new Error('a different file has this name', { cause: error })
-          }
+  try {
+    await withManifestLock(documentPath, async () => {
+      for (const { name, base64 } of files) {
+        if (!isSafeAssetName(name) || name.startsWith('.')) {
+          result.errors.push(`${name}: not a plain file name`)
+          continue
+        }
+        if (!AI_RUN_IMAGE_EXTS.has(extname(name).slice(1).toLowerCase())) {
+          result.errors.push(`${name}: not a picture an AI run can save`)
+          continue
         }
         try {
-          mergeOwnedRecord(manifest, documentPath, { name, sha256 })
-          await writeManifestUnlocked(documentPath, manifest)
+          const bytes = Buffer.from(base64, 'base64')
+          const sha256 = createHash('sha256').update(bytes).digest('hex')
+          const manifest = await readManifestUnlocked(documentPath)
+          const own =
+            discardedAssetNamesFor(documentPath).has(name) ||
+            manifest.files.some((file) => file.name === name)
+          if (!own) throw new Error('not a file this document discarded or owns')
+          const assetsDir = await ensureAssetsDir(documentPath)
+          const target = join(assetsDir, name)
+          let created = false
+          try {
+            await writeFile(target, bytes, { flag: 'wx' })
+            created = true
+          } catch (error) {
+            if (errorCode(error) !== 'EEXIST') throw error
+            const info = await lstat(target)
+            if (!info.isFile() || info.isSymbolicLink()) {
+              throw new Error('not a plain file', { cause: error })
+            }
+            if ((await sha256File(target)) !== sha256) {
+              throw new Error('a different file has this name', { cause: error })
+            }
+          }
+          try {
+            mergeOwnedRecord(manifest, documentPath, { name, sha256 })
+            await writeManifestUnlocked(documentPath, manifest)
+          } catch (error) {
+            // a file this call created must not stay behind with no record owning it
+            if (created) await rm(target, { force: true }).catch(() => {})
+            throw error
+          }
+          result.restored.push(name)
         } catch (error) {
-          // a file this call created must not stay behind with no record owning it
-          if (created) await rm(target, { force: true }).catch(() => {})
-          throw error
+          result.errors.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
         }
-      })
-      result.restored.push(name)
-    } catch (error) {
-      result.errors.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
-    }
+      }
+    })
+  } catch (error) {
+    // only a name already handled above can throw inside the lock, so this keeps `restored`
+    // honest about what was written and still resolves rather than rejecting the IPC call
+    result.errors.push(error instanceof Error ? error.message : String(error))
   }
   return result
 }
