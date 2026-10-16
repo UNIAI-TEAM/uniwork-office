@@ -8673,7 +8673,7 @@ body.docs-crop-active
 
 .ai-result-chip[data-tone='ok'] {
   background: var(--docs-ok-bg);
-  color: var(--docs-ok-ink);
+  color: var(--docs-ins-ink);
 }
 
 .ai-result-chip[data-tone='error'] {

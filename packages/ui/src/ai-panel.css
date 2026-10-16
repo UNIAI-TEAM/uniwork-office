@@ -195,6 +195,15 @@
   letter-spacing: 0.01em;
 }
 
+:is(.ai-panel, .copilot) .ai-work-group-summary {
+  /* the summary is an interactive row: the tertiary token is 3.05:1 on white, below AA */
+  color: var(--color-text-secondary);
+}
+
+:is(.ai-panel, .copilot) .ai-work-group-summary:hover {
+  color: var(--color-text-primary);
+}
+
 :is(.ai-panel, .copilot) .ai-result-view-changes {
   padding: 4px 10px;
   border-radius: var(--radius-8);
