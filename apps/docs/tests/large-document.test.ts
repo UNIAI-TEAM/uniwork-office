@@ -558,8 +558,13 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
     expect(partsVi).not.toMatch(/zip rejected:|parts exceeds/i)
     expect(statusState).toEqual(refusedMessageState)
 
-    // d2-8: RangeError "Array buffer allocation failed" and "Invalid string length" -> engine_out_of_memory
-    for (const errMsg of ['Array buffer allocation failed', 'Invalid string length']) {
+    // d2-8, d3-4: RangeError allocation/length messages -> engine_out_of_memory
+    for (const errMsg of [
+      'Array buffer allocation failed',
+      'Invalid string length',
+      'Invalid array length',
+      'Invalid typed array length',
+    ]) {
       reported.length = 0
       toasts.length = 0
       setDocBytesResolver(() => {
