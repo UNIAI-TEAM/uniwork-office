@@ -425,6 +425,7 @@ describe('workErrorOfDocCode', () => {
       capability_off: 'server',
       intent_unknown: 'server',
       document_deleted: 'forbidden',
+      document_archived: 'forbidden',
       permission_revoked: 'forbidden',
       member_deactivated: 'forbidden',
       organization_suspended: 'forbidden',

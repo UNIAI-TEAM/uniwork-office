@@ -126,7 +126,17 @@ export function errorFromResponse(
   // never deleted; only a real tombstone ends a document.
   if (serverCode === 'office_capability_off') return new UniworkDocError('capability_off', at)
   if (serverCode === 'commit_intent_unknown') return new UniworkDocError('intent_unknown', at)
-  if (serverCode === 'document_deleted') return new UniworkDocError('document_deleted', at)
+  // a document in the trash answers every write refusal with its own code: the
+  // intent is parked `blocked` (a restore is what lifts it) instead of ending as
+  // a terminal refusal the queue would drop. A document in the archive is not a
+  // deleted one - the archive is reversible, and telling the user it was deleted
+  // would be a false fact - so it gets its own code and its own block
+  if (serverCode === 'document_deleted') {
+    return new UniworkDocError('document_deleted', at)
+  }
+  if (serverCode === 'document_archived') {
+    return new UniworkDocError('document_archived', at)
+  }
   if (serverCode === 'forbidden') return new UniworkDocError('permission_revoked', at)
   if (serverCode === 'member_deactivated') return new UniworkDocError('member_deactivated', at)
   if (serverCode === 'organization_suspended') {
@@ -157,6 +167,10 @@ export function isTerminalRefusal(error: UniworkDocError): boolean {
     error.code === 'not_found' ||
     error.code === 'deleted' ||
     error.code === 'document_deleted' ||
+    // `document_archived` is deliberately NOT here: the archive is reversible
+    // (the block lifts when the document is unarchived), so its intent record
+    // stays parked for the access probe / the sync center's re-check to free -
+    // unlike the terminal document_deleted, whose copy only a reopen answers
     error.code === 'too_large' ||
     error.code === 'engine_incompatible' ||
     // a 409 the pipeline cannot recover by replaying (upload claim gone, ...);

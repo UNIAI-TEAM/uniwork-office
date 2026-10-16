@@ -290,6 +290,9 @@ const CLOSE_CHOICES: Record<UnsavedCloseKind, readonly UnsavedCloseChoice[]> = {
 function blockedReasonKey(reason: string | undefined): Parameters<typeof tUniworkDocs>[1] {
   if (reason === 'not_found') return 'closeBlockedNotFound'
   if (reason === 'deleted') return 'closeBlockedDeleted'
+  // `document_archived` deliberately keeps the generic sentence: the block is an
+  // info-tone state the user can lift (unarchive, then reopen), not the loss the
+  // deleted/not-found copy describes, and no dedicated string is spent on it
   return 'closeBlockedOther'
 }
 
@@ -509,7 +512,7 @@ export function createSyncRuntime(
       void runtime.library?.refresh(documentId).catch(() => undefined)
     },
     targets,
-    capability: async (orgId) => {
+    capability: async (orgId, options) => {
       const found = clients()
       if (!found) {
         return {
@@ -518,7 +521,7 @@ export function createSyncRuntime(
           source: 'default' as const,
         }
       }
-      return found.capability.get(orgId)
+      return found.capability.get(orgId, options)
     },
     client: () => clients()?.feed ?? null,
     lease: {
@@ -709,9 +712,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // feed runtime does (see the SyncRuntimeSeam note), so `sync_write` is read
     // once per account and cleared on an account switch for both
     capability: {
-      get: (orgId) =>
+      get: (orgId, options) =>
         seamRef.runtime
-          ? seamRef.runtime.capabilityRead(orgId)
+          ? seamRef.runtime.capabilityRead(orgId, options)
           : Promise.resolve({ kind: 'ok', capabilities: { sync_write: true }, source: 'default' }),
     },
     pushLaunch: createLaunchPusher(() => wiring.shellContents(), UNIWORK_DOC_CHANNELS.launchEvent),
