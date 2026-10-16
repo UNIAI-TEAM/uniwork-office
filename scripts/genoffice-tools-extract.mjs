@@ -609,12 +609,15 @@ const ARROW_COMPARE = {
  * takes — the self-call in the dead branch of a base case must not recurse.
  * Anything else is left to the caller, which reports it unresolved.
  */
-function parseArrowTail(left, tokens, scope, depth) {
-  let cur = parseAddition(left, tokens, scope, depth)
+function parseArrowAddSub(left, tokens, scope, depth) {
+  let cur = left
   for (;;) {
     const op = tokens[cur.i]
-    if (!op || op.type !== 'punct' || op.value !== '-')
-      return parseArrowCompare(cur, tokens, scope, depth)
+    if (!op || op.type !== 'punct' || (op.value !== '+' && op.value !== '-')) return cur
+    if (op.value === '+') {
+      cur = parseAddition(cur, tokens, scope, depth)
+      continue
+    }
     const primary = parsePrimary(tokens, cur.i + 1, scope, depth)
     const right = parsePostfix(primary.value, tokens, primary.i, scope, depth)
     if (typeof cur.value !== 'number' || typeof right.value !== 'number')
@@ -623,12 +626,22 @@ function parseArrowTail(left, tokens, scope, depth) {
   }
 }
 
+function parseArrowTail(left, tokens, scope, depth) {
+  const cur = parseArrowAddSub(left, tokens, scope, depth)
+  return parseArrowCompare(cur, tokens, scope, depth)
+}
+
 function parseArrowCompare(cur, tokens, scope, depth) {
   const op = tokens[cur.i]
   if (!op || op.type !== 'punct' || !Object.prototype.hasOwnProperty.call(ARROW_COMPARE, op.value))
     return parseArrowTernary(cur, tokens, scope, depth)
   const primary = parsePrimary(tokens, cur.i + 1, scope, depth)
-  const right = parsePostfix(primary.value, tokens, primary.i, scope, depth)
+  const right = parseArrowAddSub(
+    parsePostfix(primary.value, tokens, primary.i, scope, depth),
+    tokens,
+    scope,
+    depth,
+  )
   const a = cur.value
   const b = right.value
   if (isU(a)) return parseArrowTernary({ value: a, i: cur.i }, tokens, scope, depth)
@@ -654,6 +667,12 @@ function parseArrowTernary(cur, tokens, scope, depth) {
   // the branch that is not taken is skipped structurally, never evaluated
   const end = skipValueAt(tokens, colon + 1)
   const branch = parseExpression(tokens, cur.value ? cur.i + 1 : colon + 1, scope, depth + 1)
+  const expectedEnd = cur.value ? colon : end
+  if (branch.i !== expectedEnd) {
+    const rem = tokens[branch.i]
+    const op = rem ? (rem.type === 'punct' ? rem.value : rem.type) : 'missing'
+    return { value: isU(branch.value) ? branch.value : U(`operator:${op}`), i: end }
+  }
   return { value: branch.value, i: end }
 }
 
@@ -827,6 +846,18 @@ function memberOf(value, key) {
 
 function parseCall(callee, methodName, tokens, i, scope, depth) {
   const name = methodName
+  if (isArrowFn(callee)) {
+    const close = skipBalanced(tokens, i)
+    if (name !== null) return { value: U(`call:${name}`), i: close }
+    if (tokens[i + 1] && tokens[i + 1].value === ')') {
+      return { value: applyArrowFn(callee, [], scope), i: close }
+    }
+    const r = parseExpression(tokens, i + 1, scope, depth + 1)
+    if (!tokens[r.i] || tokens[r.i].value !== ')') {
+      return { value: U(`call:${callee.name}`), i: close }
+    }
+    return { value: applyArrowFn(callee, [r.value], scope), i: r.i + 1 }
+  }
   const args = []
   let idx = i + 1
   for (;;) {
@@ -1124,6 +1155,11 @@ function parseTemplateToken(raw, scope, depth) {
 function parseSubExpression(text, scope, depth) {
   const tokens = tokenize(text)
   const r = parseExpression(tokens, 0, scope, depth + 1)
+  if (scope.ctx && (scope.ctx.strict || scope.ctx.arrow) && r.i < tokens.length) {
+    const rem = tokens[r.i]
+    const op = rem.type === 'punct' ? rem.value : rem.type
+    return isU(r.value) ? r.value : U(`operator:${op}`)
+  }
   const bad = isU(r.value) ? r.value : findUnresolved(r.value)
   if (bad) return isU(r.value) ? r.value : U(bad)
   return r.value
