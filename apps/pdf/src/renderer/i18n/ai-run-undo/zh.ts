@@ -4,5 +4,5 @@ export const zh = {
   aiRunUndoDone: '已撤销本次操作',
   aiRunUndoLater: '此后又有新的修改。请先撤销它们，再撤销本次操作。',
   aiRunUndoBusy: 'AI 助手完成后即可使用。',
-  aiEditsPaused: 'AI 助手正在编辑此文档，您的编辑已暂停；停止助手后即可继续。',
+  aiEditsPaused: 'AI 助手正在处理此文档，您的编辑已暂停；停止助手后即可继续。',
 }

@@ -7,5 +7,5 @@ export const pl = {
     'Po tym uruchomieniu wprowadzono kolejne zmiany. Najpierw cofnij je, a potem to uruchomienie.',
   aiRunUndoBusy: 'Dostępne, gdy asystent skończy.',
   aiEditsPaused:
-    'Asystent edytuje ten dokument. Twoje zmiany są wstrzymane; zatrzymaj asystenta, aby kontynuować.',
+    'Asystent pracuje nad tym dokumentem. Twoje zmiany są wstrzymane; zatrzymaj asystenta, aby kontynuować.',
 } satisfies Record<keyof typeof zh, string>

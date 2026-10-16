@@ -7,5 +7,5 @@ export const id = {
     'Ada perubahan setelah proses ini. Urungkan perubahan itu dulu, baru urungkan proses ini.',
   aiRunUndoBusy: 'Tersedia setelah asisten selesai.',
   aiEditsPaused:
-    'Asisten sedang mengedit dokumen ini. Suntingan Anda dijeda; hentikan asisten untuk melanjutkan.',
+    'Asisten sedang mengerjakan dokumen ini. Suntingan Anda dijeda; hentikan asisten untuk melanjutkan.',
 } satisfies Record<keyof typeof zh, string>
