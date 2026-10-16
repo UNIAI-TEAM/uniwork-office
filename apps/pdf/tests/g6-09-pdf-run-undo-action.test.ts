@@ -77,13 +77,13 @@ describe('pdf run undo pieces', () => {
     const en = mount(createElement(EditsPausedNotice, { active: true }))
     const note = en.querySelector('[role="status"]')
     expect(note?.textContent).toBe(
-      'The assistant is editing this document. Your edits are paused; stop the assistant to continue.',
+      'The assistant is working on this document. Your edits are paused; stop the assistant to continue.',
     )
     act(() => root!.unmount())
     container!.remove()
     const vi = mount(createElement(EditsPausedNotice, { active: true }), 'vi')
     expect(vi.querySelector('[role="status"]')?.textContent).toBe(
-      'Trợ lý đang chỉnh sửa tài liệu này. Bạn tạm thời không sửa được; hãy dừng trợ lý để tiếp tục.',
+      'Trợ lý đang làm việc với tài liệu này. Bạn tạm thời không sửa được; hãy dừng trợ lý để tiếp tục.',
     )
   })
 
