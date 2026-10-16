@@ -89,6 +89,12 @@ function makeApi() {
       ok: true,
       value: { path: 'C:\\x' },
     })),
+    // FD-11: the browser beside the list reads the folder tree and the root contents
+    uniworkFolderTree: vi.fn(async () => ({ ok: true as const, value: [] })),
+    uniworkListChildren: vi.fn(async () => ({
+      ok: true as const,
+      value: { items: [], nextCursor: null },
+    })),
     uniworkDocStatus: vi.fn(async (): Promise<UniworkDocStatus | null> => null),
     uniworkActiveDocStatus: vi.fn(async (): Promise<UniworkDocStatus | null> => null),
     onUniworkDocStatus: vi.fn((cb: (s: UniworkDocStatus) => void) => {

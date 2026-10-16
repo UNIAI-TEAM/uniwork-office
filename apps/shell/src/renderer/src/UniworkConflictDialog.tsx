@@ -24,6 +24,12 @@ import {
   type ConflictStep1ActionId,
 } from './uniwork-conflict-model'
 import './uniwork-conflict-dialog.css'
+import {
+  ConflictCopyLocation,
+  type ConflictViewPlace,
+  type CopyTargetFolder,
+} from './uniwork-folders/ConflictCopyLocation'
+import type { PickedFolder } from './uniwork-folders/UniworkFolderPicker'
 
 export interface UniworkConflictBridge {
   onUniworkConflict?: (cb: (view: UniworkConflictView) => void) => () => void
@@ -118,6 +124,8 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
   const [state, setState] = useState<ConflictDialogState>(() => createInitialConflictState(view))
   const [busy, setBusy] = useState(false)
   const [alertClearing, setAlertClearing] = useState(false)
+  /** FD-11 S5: the folder chosen for Save a copy; null = the source's own folder */
+  const [copyFolder, setCopyFolder] = useState<PickedFolder | null>(null)
 
   useEffect(() => {
     if (prevViewRef.current !== view) {
@@ -341,6 +349,13 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
     if (busyRef.current) return
     const payload = buildConfirmPayload(state, view)
     if (!payload) return
+    // FD-11 S5: a chosen folder rides on the save-copy action (absent = next to the source)
+    const workspaceId = (view as ConflictViewPlace).workspaceId
+    if (payload.kind === 'save-copy' && copyFolder && workspaceId) {
+      const targetFolder: CopyTargetFolder = { workspaceId, folderId: copyFolder.folderId }
+      void sendAction({ ...payload, targetFolder } as UniworkConflictAction)
+      return
+    }
     void sendAction(payload)
   }
 
@@ -473,6 +488,15 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
                 <p className="uw-conflict-note">{t(step1Model.noEditKey)}</p>
               )}
             </>
+          )}
+
+          {state.step === 'save-copy' && !saveCopyDownload && (
+            <ConflictCopyLocation
+              view={view as ConflictViewPlace}
+              chosen={copyFolder}
+              disabled={busy}
+              onChoose={setCopyFolder}
+            />
           )}
 
           {state.step === 'reload' && (
