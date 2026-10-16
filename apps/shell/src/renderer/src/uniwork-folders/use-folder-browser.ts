@@ -184,7 +184,6 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
       if (searchRef.current.query) runSearch(searchRef.current.query, searchRef.current.kind)
     })
     // runSearch is stable for a workspace
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, openFolder])
 
   const runSearch = useCallback(
@@ -254,7 +253,6 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     setResults(EMPTY_LIST)
     refresh()
     // initialFolderId only seeds the first view of a workspace
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId])
 
   // the server's tree changed (feed page or an own action elsewhere), or the window came back
