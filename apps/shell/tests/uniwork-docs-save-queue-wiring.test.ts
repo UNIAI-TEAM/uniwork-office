@@ -897,8 +897,9 @@ describe('G5-06 W4b save queue wiring', () => {
       const ctx = setup(server)
       const path = await openDoc(ctx)
       writeFileSync(path, 'v4')
-      // the inline Save meets the archive once: the commit is refused with the
-      // document's own code, and the server answers normally after
+      // the inline Save meets the archive: the commit is refused with the
+      // document's own code, and the document stays in the archive afterwards
+      server.state.archivedAt = '2026-10-01T00:00:00.000Z'
       server.faults.push({ route: 'commit', kind: 403, code: 'document_archived' })
       expect(await ctx.service.save(path)).toMatchObject({
         state: 'blocked',
@@ -909,30 +910,31 @@ describe('G5-06 W4b save queue wiring', () => {
       // sync-center row, the bounded probe and "Kiểm tra lại" exist for this copy
       const kept = await storedIntent(ctx, path)
       expect(kept, 'an archived refusal must keep its intent record').not.toBeNull()
-      // the inline path parks the CHIP; the record itself is still the minted
-      // one (no lastError yet) - the poll is what parks it blocked/archived
-      expect(kept?.intent).toMatchObject({ state: 'queued' })
-      // still archived: the poll's dispatch meets the refusal again and parks
-      // the record - the state a sync-center row and its probe are built from
-      server.faults.push({ route: 'commit', kind: 403, code: 'document_archived' })
+      // OQ-F12-be-d2-2: the refusal parks the RECORD in the same call as the
+      // chip, so the durable row reads blocked/document_archived at the refusal
+      // itself - never a queued pending row the pill already calls blocked
+      expect(kept?.intent).toMatchObject({ state: 'blocked', lastError: 'document_archived' })
+      expect(commits(server)).toHaveLength(1)
+      // and the next poll spends nothing on the bytes the server already
+      // refused: the record is blocked (not dispatchable), the probe still sees
+      // the archive, so no second upload or commit is sent
       await ctx.service.pollSaveQueue()
-      await vi.waitFor(async () =>
-        expect((await storedIntent(ctx, path))?.intent).toMatchObject({
-          state: 'blocked',
-          lastError: 'document_archived',
-        }),
-      )
+      expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+        state: 'blocked',
+        lastError: 'document_archived',
+      })
+      expect(commits(server)).toHaveLength(1)
       expect((await storedIntent(ctx, path))?.intent.intentId).toBe(kept?.intent.intentId)
-      // out of the archive: the probe reads the document writable and active,
-      // lifts that SAME record back to the queue and it commits under the SAME
-      // idempotency key it was refused with
+      // out of the archive: the probe ("Kiểm tra lại") reads the document
+      // writable and active, lifts that SAME record back to the queue and it
+      // commits under the SAME idempotency key it was refused with
+      server.state.archivedAt = null
       expect(await ctx.service.recheckBlockedSave(path)).toBe(true)
       await vi.waitFor(async () =>
         expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
       )
       expect(await storedIntent(ctx, path)).toBeNull()
       expect(committedKeys(server)).toEqual([
-        kept!.intent.idempotencyKey,
         kept!.intent.idempotencyKey,
         kept!.intent.idempotencyKey,
       ])
