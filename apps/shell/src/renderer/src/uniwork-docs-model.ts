@@ -14,6 +14,7 @@ import type {
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import { pathKey } from '../../shared/path-key'
+import { DEFAULT_MAX_DOCUMENT_BYTES, formatSizeMB } from '../../shared/size-format'
 import type { AccountView } from './account-model'
 import { pickActiveWorkspace } from './active-workspace'
 import type { StringKey, TFunc } from './locale'
@@ -166,6 +167,8 @@ export interface ChipModel {
   labelKey: StringKey
   /** filled into {reason} of the label (blocked) */
   reasonKey?: StringKey
+  /** filled into {max} of uwReasonTooLargeWithLimit */
+  maxBytes?: number
   tipKey: StringKey
   /** the error sentence the tooltip leads with (blocked / error) */
   errorKey?: StringKey
@@ -239,17 +242,31 @@ const VIEW_QUEUE = { kind: 'view-queue', labelKey: 'uwActViewQueue' } as const
  */
 export function chipModelOf(
   status: UniworkDocStatus,
-  ctx: { needsSignIn: boolean; queuedAt?: string; failedReasonKey?: StringKey } = {
+  ctx: {
+    needsSignIn: boolean
+    queuedAt?: string
+    failedReasonKey?: StringKey
+    maxBytes?: number
+  } = {
     needsSignIn: true,
   },
 ): ChipModel {
   const { state, access, error } = status
+  const limitBytes = ctx.maxBytes ?? status.maxBytes
   // 1 blocked
   if (state === 'blocked' || isStoreRefusal(status)) {
+    const baseReason = blockedReasonKey(error)
+    const reasonKey =
+      baseReason === 'uwReasonTooLarge' && limitBytes !== undefined
+        ? 'uwReasonTooLargeWithLimit'
+        : baseReason
     return {
       tone: 'error',
       labelKey: 'uwChipBlocked',
-      reasonKey: blockedReasonKey(error),
+      reasonKey,
+      ...(reasonKey === 'uwReasonTooLargeWithLimit' && limitBytes !== undefined
+        ? { maxBytes: limitBytes }
+        : {}),
       tipKey: 'uwTipBlocked',
       errorKey: error ? UNIWORK_ERROR_KEYS[error] : undefined,
       action: blockedAction(error),
@@ -265,16 +282,29 @@ export function chipModelOf(
           ? { kind: 'sign-in', labelKey: 'acctSignIn' }
           : { kind: 'retry', labelKey: 'uwActRetry' },
       }
-    case 'failed': // 3: no automatic retry; {reason} of the tooltip reuses the quota / too-large / other fragments
+    case 'failed': {
+      // 3: no automatic retry; {reason} of the tooltip reuses the quota / too-large / other fragments
+      const baseReason = ctx.failedReasonKey ?? blockedReasonKey(error)
+      const reasonKey =
+        (baseReason === 'uwReasonTooLarge' || baseReason === 'uwReasonTooLargeWithLimit') &&
+        limitBytes !== undefined
+          ? 'uwReasonTooLargeWithLimit'
+          : baseReason === 'uwReasonTooLargeWithLimit'
+            ? 'uwReasonTooLarge'
+            : baseReason
       return {
         tone: 'error',
         labelKey: 'uwChipError',
         // the sync-center row's reason when the shell has it (failedReasonKeyOf), the same one the
         // queue popover shows; else the status' error code
-        reasonKey: ctx.failedReasonKey ?? blockedReasonKey(error),
+        reasonKey,
+        ...(reasonKey === 'uwReasonTooLargeWithLimit' && limitBytes !== undefined
+          ? { maxBytes: limitBytes }
+          : {}),
         tipKey: 'uwTipFailed',
         action: { kind: 'details', labelKey: 'uwActDetails' },
       }
+    }
     case 'error': // 4
       return {
         tone: 'error',
@@ -434,16 +464,61 @@ export function chipCopy(
   dateLocale: string,
   now: Date = new Date(),
 ): { label: string; tip: string; title: string } {
-  const label = model.reasonKey
-    ? t(model.labelKey, { reason: t(model.reasonKey) })
-    : t(model.labelKey)
+  const reasonParams =
+    model.maxBytes !== undefined
+      ? { max: formatSizeMB(model.maxBytes, dateLocale, 'exact') }
+      : undefined
+  const reasonText = model.reasonKey ? t(model.reasonKey, reasonParams) : undefined
+  const label =
+    reasonText !== undefined ? t(model.labelKey, { reason: reasonText }) : t(model.labelKey)
   const tipParams: Record<string, string> = {}
   if (model.savedAt) tipParams.time = formatSaveTime(model.savedAt, dateLocale, now)
   else if (QUEUED_TIME_TIPS.has(model.tipKey)) tipParams.time = '—'
-  if (model.reasonKey) tipParams.reason = t(model.reasonKey)
+  if (reasonText !== undefined) tipParams.reason = reasonText
   const tip = t(model.tipKey, tipParams)
   const fullTip = model.errorKey ? `${t(model.errorKey)} ${tip}` : tip
   return { label, tip: fullTip, title: `${label}\n${fullTip}` }
+}
+
+/** SIZE-F1: formats the 90% warn chip sentence ("Sắp chạm giới hạn {max} (đang {size}).") */
+export function sizeWarnTextOf(
+  sizeWarn: { sizeBytes: number; maxBytes: number } | undefined,
+  t: TFunc,
+  dateLocale: string,
+): string | null {
+  if (!sizeWarn) return null
+  return t('uwSizeWarnChip', {
+    max: formatSizeMB(sizeWarn.maxBytes, dateLocale, 'exact'),
+    size: formatSizeMB(sizeWarn.sizeBytes, dateLocale, 'warn'),
+  })
+}
+
+/** SIZE-F1: formats the pre-upload too-large inline error sentence */
+export function uploadTooLargeTextOf(
+  input: { name: string; sizeBytes: number; maxBytes: number },
+  t: TFunc,
+  dateLocale: string,
+): string {
+  return t('uwErrUploadTooLarge', {
+    name: input.name,
+    size: formatSizeMB(input.sizeBytes, dateLocale, 'over'),
+    max: formatSizeMB(input.maxBytes, dateLocale, 'exact'),
+  })
+}
+
+/** SIZE-F1: formats the over-cap save-block dialog copy */
+export function saveBlockCopyOf(
+  maxBytes: number | undefined,
+  t: TFunc,
+  dateLocale: string,
+): { title: string; body: string; saveLocal: string; close: string } {
+  const max = formatSizeMB(maxBytes ?? DEFAULT_MAX_DOCUMENT_BYTES, dateLocale, 'exact')
+  return {
+    title: t('uwSaveBlockTitle'),
+    body: t('uwSaveBlockBody', { max }),
+    saveLocal: t('uwSaveBlockSaveCopyLocal'),
+    close: t('uwClose'),
+  }
 }
 
 /** the in-strip focus chip sits this far left of the pill (`right: calc(100% + 8px)` in tabbar.css) */

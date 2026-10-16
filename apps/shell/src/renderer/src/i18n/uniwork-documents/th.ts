@@ -151,4 +151,13 @@ export const th = {
   uwDocUploading: 'กำลังอัปโหลด “{name}”…',
   uwDocLocationTop: 'ระดับบนสุด',
   uwDocArchived: 'เก็บถาวรแล้ว',
+  uwSizeWarnChip: 'ใกล้ถึงขีดจำกัด {max} (ปัจจุบัน {size})',
+  uwSaveBlockTitle: 'ไม่สามารถบันทึกลงใน UniWork ได้',
+  uwSaveBlockBody:
+    'เอกสารนี้เกิน {max} การเปลี่ยนแปลงของคุณยังคงอยู่ที่นี่ ดาวน์โหลดสำเนาของคุณลงในคอมพิวเตอร์ แล้วลดขนาดรูปภาพหรือแบ่งเอกสาร',
+  uwSaveBlockSaveCopyLocal: 'บันทึกสำเนาลงในคอมพิวเตอร์',
+  uwClose: 'ปิด',
+  uwErrUploadTooLarge:
+    '{name} มีขนาด {size} ซึ่งเกินขีดจำกัด {max} ลดขนาดรูปภาพหรือแบ่งไฟล์ แล้วอัปโหลดอีกครั้ง',
+  uwReasonTooLargeWithLimit: 'เกินขีดจำกัด {max}',
 } satisfies Record<keyof typeof zh, string>

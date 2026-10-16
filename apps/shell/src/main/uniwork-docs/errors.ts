@@ -15,6 +15,12 @@ export class UniworkDocError extends Error {
   readonly currentRevision?: string
   /** a `Retry-After` the server sent (ms), honoured by the queue's backoff */
   readonly retryAfterMs?: number
+  /** SIZE-F1: file name when a local upload is refused as too_large */
+  readonly filename?: string
+  /** SIZE-F1: actual payload size in bytes when refused as too_large */
+  readonly sizeBytes?: number
+  /** SIZE-F1: server or preflight limit in bytes (`fields.max_bytes`) when refused as too_large */
+  readonly maxBytes?: number
 
   constructor(
     code: UniworkDocErrorCode,
@@ -23,6 +29,9 @@ export class UniworkDocError extends Error {
       status?: number
       currentRevision?: string
       retryAfterMs?: number
+      filename?: string
+      sizeBytes?: number
+      maxBytes?: number
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -32,6 +41,9 @@ export class UniworkDocError extends Error {
     this.status = extra.status
     this.currentRevision = extra.currentRevision
     this.retryAfterMs = extra.retryAfterMs
+    this.filename = extra.filename
+    this.sizeBytes = extra.sizeBytes
+    this.maxBytes = extra.maxBytes
   }
 }
 
@@ -146,8 +158,30 @@ export function errorFromResponse(
   if (status === 410 && serverCode) {
     return new UniworkDocError('deleted', at)
   }
-  if (status === 413 || serverCode === 'file_too_large' || serverCode === 'payload_too_large') {
-    return new UniworkDocError('too_large', at)
+  if (
+    status === 413 ||
+    serverCode === 'file_too_large' ||
+    serverCode === 'document_too_large' ||
+    serverCode === 'payload_too_large'
+  ) {
+    const rawMax =
+      envelope?.fields?.max_bytes ??
+      envelope?.fields?.upload_max_bytes ??
+      envelope?.fields?.maxBytes
+    const maxBytes =
+      typeof rawMax === 'number' && Number.isFinite(rawMax) && rawMax > 0
+        ? Math.floor(rawMax)
+        : undefined
+    const rawSize = envelope?.fields?.size_bytes ?? envelope?.fields?.sizeBytes
+    const sizeBytes =
+      typeof rawSize === 'number' && Number.isFinite(rawSize) && rawSize >= 0
+        ? Math.floor(rawSize)
+        : undefined
+    return new UniworkDocError('too_large', {
+      ...at,
+      ...(maxBytes !== undefined ? { maxBytes } : {}),
+      ...(sizeBytes !== undefined ? { sizeBytes } : {}),
+    })
   }
   if (status === 403 && serverCode) return new UniworkDocError('forbidden', at)
   if (status === 404 && serverCode) return new UniworkDocError('not_found', at)

@@ -154,4 +154,13 @@ export const nl = {
   uwDocUploading: '“{name}” wordt geüpload…',
   uwDocLocationTop: 'Hoogste niveau',
   uwDocArchived: 'Gearchiveerd',
+  uwSizeWarnChip: 'Nadert de limiet van {max} (momenteel {size}).',
+  uwSaveBlockTitle: 'Kon niet opslaan in UniWork',
+  uwSaveBlockBody:
+    'Dit document overschrijdt {max}. Je wijzigingen staan nog hier. Download je kopie naar je computer en verklein vervolgens de afbeeldingen of splits het document.',
+  uwSaveBlockSaveCopyLocal: 'Kopie op computer opslaan',
+  uwClose: 'Sluiten',
+  uwErrUploadTooLarge:
+    '{name} is {size}, wat groter is dan de limiet van {max}. Verklein de afbeeldingen of splits het bestand en upload het opnieuw.',
+  uwReasonTooLargeWithLimit: 'boven de limiet van {max}',
 } satisfies Record<keyof typeof zh, string>

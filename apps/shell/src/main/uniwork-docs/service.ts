@@ -71,6 +71,7 @@ import {
 } from './formats'
 import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
+import { createDocumentLimitsCache, type DocumentLimits, type DocumentLimitsCache } from './limits'
 import { tUniworkDocs } from './strings'
 import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
 import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
@@ -340,6 +341,8 @@ export interface UniworkDocsServiceDeps {
   notifySaved?(path: string, versionId: string): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
+  /** SIZE-F1: overrides `documents.limits` (`GET /api/v1/config`); a test seam */
+  limits?: () => Promise<DocumentLimits> | DocumentLimits
   sleep?(ms: number): Promise<void>
   now?(): number
   /**
@@ -373,6 +376,7 @@ const KEEP_LOCAL_STATES: ReadonlySet<string> = new Set([
   'blocked',
   'signed-out',
   'error',
+  'failed',
 ])
 
 /** states whose local bytes are not in UniWork (the close prompt) */
@@ -383,6 +387,7 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
   'error',
   'blocked',
   'conflict',
+  'failed',
 ])
 
 /**
@@ -427,13 +432,6 @@ async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
 /** one file (Windows paths compare case-insensitively) */
 /** the longest document name D accepts, counted in runes (code points) like D's own check */
 const MAX_DOC_NAME_RUNES = 500
-
-/**
- * D stages at most 50 MiB per upload part (`files/registry.go`), so a bigger
- * file is refused before it is read: main must not buffer a multi-GB pick only
- * to be told too_large. Exactly 50 MiB is still sent.
- */
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 /** the renderer's own id for one upload start; a Cancel names the upload through it */
 const MAX_UPLOAD_ID_LENGTH = 128
@@ -485,7 +483,17 @@ async function actionResult<T>(
   try {
     return { ok: true, value: await run() }
   } catch (error) {
-    return { ok: false, error: actionErrorOf(error, options.nameField === true) }
+    const code = actionErrorOf(error, options.nameField === true)
+    if (error instanceof UniworkDocError && code === 'too_large') {
+      return {
+        ok: false,
+        error: code,
+        ...(error.filename !== undefined ? { name: error.filename } : {}),
+        ...(error.sizeBytes !== undefined ? { sizeBytes: error.sizeBytes } : {}),
+        ...(error.maxBytes !== undefined ? { maxBytes: error.maxBytes } : {}),
+      }
+    }
+    return { ok: false, error: code }
   }
 }
 
@@ -633,12 +641,22 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   else if (state === 'paused_offline') patched.error = 'network'
   else if (state === 'blocked') patched.error = error ?? 'server_error'
   else if (state === 'reconciling-stuck') patched.error = error ?? 'intent_unknown'
-  else if (state === 'failed') patched.error = error ?? 'server_error'
+  else if (state === 'failed') {
+    patched.error = error ?? 'server_error'
+    if (record.maxBytes !== undefined) {
+      patched.maxBytes = record.maxBytes
+      patched.sizeBytes = record.length
+    }
+  }
   // the waiting states carry no refusal: a block that lifted (the `unblock`
   // event: `blocked -> queued`, or `paused_user` while the user's own pause
   // holds it) must not keep the code it was parked with. The explicit
   // `undefined` overwrites the stale code in the merge; the store's JSON drops it
-  else if (state === 'queued' || state === 'paused_user') patched.error = undefined
+  else if (state === 'queued' || state === 'paused_user') {
+    patched.error = undefined
+    patched.maxBytes = undefined
+    patched.sizeBytes = undefined
+  }
   // G8-12: a refused permission is a fact about the caller's level, as on the inline path
   if (patched.error === 'permission_revoked' || patched.error === 'forbidden') {
     patched.level = 'view'
@@ -696,6 +714,7 @@ export class UniworkDocsService {
   readonly store: BindingStore
   readonly coordinator: SaveCoordinator
   readonly launch: LaunchController
+  readonly limitsCache: DocumentLimitsCache
   private readonly deps: UniworkDocsServiceDeps
   /** the build's own version, stamped into bindings (see binding-store's minAppVersion) */
   private readonly appVersion: () => string
@@ -823,6 +842,17 @@ export class UniworkDocsService {
       this.heldByMigration(dir),
     )
     this.lastOwner = this.store.readLastOwner()
+    this.limitsCache = createDocumentLimitsCache({
+      origin: () => this.deps.profile()?.apiOrigin ?? null,
+      fetchLimits: async () => {
+        if (this.deps.limits) return await this.deps.limits()
+        // a session that is not signed in has no deployment to ask: the
+        // defaults hold until one is, and `noteSessionIdentity` refreshes
+        if (!this.deps.identity()) return null
+        const client = this.api()
+        return client.getDocumentLimits ? await client.getDocumentLimits() : null
+      },
+    })
     this.coordinator = new SaveCoordinator({
       store: this.store,
       client: {
@@ -836,6 +866,7 @@ export class UniworkDocsService {
       publish: (status) => this.publish(status),
       requestQueuePopover: (path) => this.deps.pushQueuePopover?.({ path }),
       onSaved: (doc, versionId) => this.deps.notifySaved?.(doc.path, versionId),
+      limits: () => this.limitsCache.get(),
       capability: {
         get: (orgId) =>
           deps.capability
@@ -1129,10 +1160,52 @@ export class UniworkDocsService {
 
   /** the session's account may have changed: remember it as the last owner */
   noteSessionIdentity(): void {
-    this.liveIdentity()
+    const identity = this.liveIdentity()
+    if (identity) {
+      // session boot / deployment switch: the new server's `documents.limits`
+      // replace whatever the previous one published
+      void this.limitsCache.refresh().catch(() => undefined)
+    } else {
+      this.limitsCache.reset()
+    }
     // a live session opens its store: the scope's migration and every later
     // intent write go through this one open
     void this.openSyncStore().catch(() => undefined)
+  }
+
+  /**
+   * SIZE-F1: "Lưu bản sao về máy" / "Save a copy to computer" from the save-block
+   * prompt. Opens the native Save-As dialog pointed at the local working copy and
+   * writes the current working copy bytes to the user-chosen path.
+   */
+  async saveLocalCopy(path: string): Promise<boolean> {
+    if (typeof path !== 'string' || !path) return false
+    const doc = this.store.lookup(path)
+    const sourcePath = doc ? doc.path : path
+    let localBytes: Uint8Array
+    try {
+      localBytes = new Uint8Array(await readFile(sourcePath))
+    } catch {
+      return false
+    }
+    const defaultName = doc ? doc.binding.filename : basename(sourcePath)
+    let target: string | null = null
+    try {
+      if (this.deps.pickDownloadPath) {
+        target = await this.deps.pickDownloadPath(defaultName)
+      } else if (this.deps.ui?.pickCopyPath && doc) {
+        target = await this.deps.ui.pickCopyPath(doc.binding.title, doc.binding.format)
+      }
+    } catch {
+      return false
+    }
+    if (!target) return false
+    try {
+      await writeFile(target, localBytes)
+      return true
+    } catch {
+      return false
+    }
   }
 
   /** this build's version, as stamped into bindings (display only, never a gate) */
@@ -1575,6 +1648,8 @@ export class UniworkDocsService {
       baseVersionId: record.receipt.versionId,
     }
     delete next.error
+    delete next.sizeBytes
+    delete next.maxBytes
     delete next.serverRevision
     delete next.serverVersion
     // the intent landed: nothing newer waits behind it (RBE6u-02)
@@ -2537,6 +2612,8 @@ export class UniworkDocsService {
     this.orgMemberNamesOrg = null
     this.orgMemberNamesInFlight = null
     this.migratedScopes.delete(scopeToken)
+    this.limitsCache.reset()
+    this.coordinator.resetSessionWarnings()
 
     // Step 6: lock the encrypted store for this scope
     await this.deps.syncStore?.lock({
@@ -2823,12 +2900,16 @@ export class UniworkDocsService {
    * renderer on the same status push; nothing else here caches a library).
    */
   noteSelectedOrg(orgId: string | null): void {
+    const changed = this.orgMemberNamesOrg !== orgId
     if (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId) {
       this.orgMemberNames = new Map()
       this.orgMemberNamesOrg = null
     }
     if (this.orgMemberNamesInFlight && this.orgMemberNamesInFlight.orgId !== orgId) {
       this.orgMemberNamesInFlight = null
+    }
+    if (changed && orgId && this.deps.identity()) {
+      void this.limitsCache.refresh().catch(() => undefined)
     }
   }
 
@@ -3294,8 +3375,9 @@ export class UniworkDocsService {
    * Upload one local file as a UniWork document. Main resolves the file name's
    * extension first (`unsupported_format` before any read when the formats table
    * does not know it - the picker's filter alone is not a contract), stats the
-   * file (a pick past the server's 50 MiB stage limit is refused unread with
-   * `too_large`), reads the bytes and sends them as the multipart `file` part
+   * file (a pick past the configured `documents.limits.upload_max_bytes`, 200 MiB
+   * by default, is refused unread with `too_large`), reads the bytes and sends them
+   * as the multipart `file` part
    * while reporting progress; the title is the file name (the server's own
    * default). Nothing is written locally: the working copy is the download the
    * open flow makes from the created document.
@@ -3335,7 +3417,15 @@ export class UniworkDocsService {
         }
         // a Cancel during the stat: answer it before the read and the POST
         if (controller.signal.aborted) throw cancelledUpload()
-        if (size > MAX_UPLOAD_BYTES) throw new UniworkDocError('too_large')
+        const limits = await this.limitsCache.get()
+        if (controller.signal.aborted) throw cancelledUpload()
+        if (size > limits.max_bytes) {
+          throw new UniworkDocError('too_large', {
+            filename,
+            sizeBytes: size,
+            maxBytes: limits.max_bytes,
+          })
+        }
         let bytes: Uint8Array
         try {
           bytes = new Uint8Array(await readFile(input.path, { signal: controller.signal }))
@@ -3346,6 +3436,13 @@ export class UniworkDocsService {
         // the read can also resolve just as the abort lands: no POST then
         if (controller.signal.aborted) throw cancelledUpload()
         const total = bytes.byteLength
+        if (total > limits.max_bytes) {
+          throw new UniworkDocError('too_large', {
+            filename,
+            sizeBytes: total,
+            maxBytes: limits.max_bytes,
+          })
+        }
         this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: 0, total })
         const created = await this.api()
           .createFile({
@@ -3361,6 +3458,15 @@ export class UniworkDocsService {
             // the person cancelled while the POST was in flight: that is the
             // answer, not the network failure the abort surfaced as
             if (controller.signal.aborted) throw cancelledUpload()
+            if (error instanceof UniworkDocError && error.code === 'too_large') {
+              throw new UniworkDocError('too_large', {
+                status: error.status,
+                serverCode: error.serverCode,
+                filename,
+                sizeBytes: error.sizeBytes ?? total,
+                maxBytes: error.maxBytes ?? limits.max_bytes,
+              })
+            }
             throw error
           })
         this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: total, total })

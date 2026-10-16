@@ -149,4 +149,13 @@ export const en = {
   uwDocUploading: 'Uploading “{name}”…',
   uwDocLocationTop: 'Top level',
   uwDocArchived: 'Archived',
+  uwSizeWarnChip: 'Approaching the {max} limit (currently {size}).',
+  uwSaveBlockTitle: 'Couldn’t save to UniWork',
+  uwSaveBlockBody:
+    'This document is over {max}. Your changes are still here. Download your copy to your computer, then reduce image sizes or split the document.',
+  uwSaveBlockSaveCopyLocal: 'Save a copy to computer',
+  uwClose: 'Close',
+  uwErrUploadTooLarge:
+    '{name} is {size}, which is over the {max} limit. Reduce image sizes or split the file, then upload again.',
+  uwReasonTooLargeWithLimit: 'over the {max} limit',
 } satisfies Record<keyof typeof zh, string>

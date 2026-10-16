@@ -146,4 +146,12 @@ export const zh = {
   uwDocUploading: '正在上传“{name}”…',
   uwDocLocationTop: '顶层',
   uwDocArchived: '已归档',
+  uwSizeWarnChip: '即将达到 {max} 上限（当前 {size}）。',
+  uwSaveBlockTitle: '无法保存到 UniWork',
+  uwSaveBlockBody:
+    '此文档已超过 {max}。你的更改仍保留在这里。请先将副本下载到电脑，然后压缩图片或拆分文档。',
+  uwSaveBlockSaveCopyLocal: '保存副本到电脑',
+  uwClose: '关闭',
+  uwErrUploadTooLarge: '{name} 大小为 {size}，超过 {max} 上限。请压缩图片或拆分文件后再重新上传。',
+  uwReasonTooLargeWithLimit: '超过 {max} 上限',
 }

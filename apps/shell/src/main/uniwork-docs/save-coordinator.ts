@@ -5,6 +5,7 @@ import type { Binding, BindingStore, BoundDocument } from './binding-store'
 import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
 import { sha256Hex } from './formats'
+import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits, type DocumentLimitsCache } from './limits'
 import type { CommitReceipt, DocumentDetail } from './parse'
 import type { IntentBindFacts, IntentRecordV2, IntentStore } from '../uniwork-sync/intent-store'
 import {
@@ -74,6 +75,14 @@ const UPLOAD_GONE_CODES: ReadonlySet<string> = new Set([
   'upload_checksum_mismatch',
 ])
 
+const IN_FLIGHT_QUEUE_STATES: ReadonlySet<IntentRecordV2['state']> = new Set([
+  'validating',
+  'uploading',
+  'committing',
+  'reconciling',
+  'reconciling-stuck',
+])
+
 /** a failure the document itself has to settle (did it commit? does it still exist?) */
 function needsRecheck(error: unknown): error is UniworkDocError {
   return (
@@ -130,6 +139,15 @@ export interface SaveCoordinatorDeps {
    * failed, conflicted or no-op Save.
    */
   onSaved?(doc: BoundDocument, versionId: string): void
+  /**
+   * Document size limits cache or getter (`SIZE-F1` §5.2 item 1, defaults to
+   * 200 MiB / 90%). A save above `max_bytes` refuses before `intents.put` and
+   * publishes `{ state: 'failed', error: 'too_large', sizeBytes, maxBytes,
+   * saveTooLargePrompt }`; a save in the warn band publishes `sizeWarn` once
+   * per bound document session. The published status is the only signal the
+   * shell needs: it is what opens the save-block dialog and the warn chip.
+   */
+  limits?: DocumentLimitsCache | (() => DocumentLimits | Promise<DocumentLimits>)
   now?(): Date
   uuid?(): string
   sleep?(ms: number): Promise<void>
@@ -176,6 +194,8 @@ export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocSta
     ...(b.level ? { commentsLevel: b.level } : {}),
     state: b.state,
     ...(b.error ? { error: b.error } : {}),
+    ...(b.sizeBytes !== undefined ? { sizeBytes: b.sizeBytes } : {}),
+    ...(b.maxBytes !== undefined ? { maxBytes: b.maxBytes } : {}),
     ...(b.lastSavedAt ? { lastSavedAt: b.lastSavedAt } : {}),
     ...(pendingNext ? { pendingNext } : {}),
   }
@@ -184,6 +204,8 @@ export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocSta
 function withoutError(binding: Binding): Binding {
   const next = { ...binding }
   delete next.error
+  delete next.sizeBytes
+  delete next.maxBytes
   return next
 }
 
@@ -235,6 +257,12 @@ export class SaveCoordinator {
    * chaining them per key keeps the last state in event order (G506-be-7).
    */
   private readonly bindingChains = new Map<string, Promise<unknown>>()
+  /** Document keys that have already emitted a 90% size warning in this bound session. */
+  private readonly warnedDocs = new Set<string>()
+  /** Active warn-band payload for the currently executing save of `path`. */
+  private readonly activeSizeWarns = new Map<string, { sizeBytes: number; maxBytes: number }>()
+  /** Paths whose current save just exceeded `maxBytes` and should trigger the save-block prompt. */
+  private readonly activeTooLargePrompt = new Set<string>()
   private readonly now: () => Date
   private readonly uuid: () => string
   private readonly sleep: (ms: number) => Promise<void>
@@ -246,6 +274,27 @@ export class SaveCoordinator {
     this.uuid = deps.uuid ?? randomUUID
     this.sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
     this.readBytes = deps.readBytes ?? (async (path) => new Uint8Array(await readFile(path)))
+  }
+
+  /** Reset the once-per-session size warning latch for a document key (or all keys when omitted). */
+  resetSessionWarnings(docKey?: string): void {
+    if (docKey !== undefined) {
+      this.warnedDocs.delete(docKey)
+    } else {
+      this.warnedDocs.clear()
+    }
+  }
+
+  private async resolveLimits(): Promise<DocumentLimits> {
+    if (!this.deps.limits) return DEFAULT_DOCUMENT_LIMITS
+    try {
+      if (typeof this.deps.limits === 'function') {
+        return await this.deps.limits()
+      }
+      return await this.deps.limits.get()
+    } catch {
+      return DEFAULT_DOCUMENT_LIMITS
+    }
   }
 
   isSaving(path: string): boolean {
@@ -459,115 +508,181 @@ export class SaveCoordinator {
     // a terminal record (cancelled / committed) is spent: the next Save mints a
     // fresh intent (the machine's own `save` rule)
     const pending = stored && !isTerminalQueueState(stored.intent.state) ? stored : null
-    let intent: IntentRecordV2 | null = pending?.intent ?? null
-    let payload: Uint8Array | null = pending?.payload ?? null
-    let binding = doc.binding
-    if (!intent) {
-      if (checksum === binding.baseChecksum) {
-        return this.commitState(doc, withoutError({ ...binding, state: 'saved' }))
+
+    // bytes identical to the base never touch the network, and an unchanged
+    // copy over the cap is already on the server: the no-op verdict comes first
+    // so a lowered limit never marks an unchanged document failed
+    if (!pending && checksum === doc.binding.baseChecksum) {
+      return await this.commitState(doc, withoutError({ ...doc.binding, state: 'saved' }))
+    }
+
+    const limits = await this.resolveLimits()
+    if (bytes.byteLength > limits.max_bytes) {
+      if (pending && !IN_FLIGHT_QUEUE_STATES.has(pending.intent.state)) {
+        await this.deps.dispatcher?.supersede({
+          key: doc.key,
+          path: doc.path,
+          filename: doc.binding.filename,
+          format: doc.binding.format,
+          orgId: doc.binding.orgId,
+          workspaceId: doc.binding.workspaceId,
+          baseVersion: doc.binding.baseVersion,
+          record: pending.intent,
+          payload: pending.payload,
+        })
+        await intents.delete(doc.key)
       }
-      // the Ctrl/Cmd+S decision table: the intent's first state (see the module doc)
-      const verdict = options?.forceOffline
-        ? 'offline'
-        : await laneVerdict(this.deps.capability, binding.orgId)
-      const pausedUser = (await this.deps.pause?.isPaused().catch(() => false)) === true
-      // the fresh intent is one past the record the store still holds (the
-      // same aging QueueDispatcher.mint applies): a second inline save of one
-      // document, or an N+1 minted while N commits, is never erased by N's
-      // generation-correct cleanup (G5-06 fix-C item 3)
-      const minted = this.mintIntent(
-        doc,
-        facts,
-        checksum,
-        nextIntentGeneration(parseStoredIntent((await intents.get(doc.key))?.intent ?? null)),
-      )
-      const state: IntentRecordV2['state'] =
-        verdict === 'offline'
-          ? 'paused_offline'
-          : verdict === 'sync_write_off'
-            ? 'paused_admin'
-            : pausedUser
-              ? 'paused_user'
-              : 'queued'
-      minted.state = state
-      const written = await intents.put(doc.key, minted, bytes)
-      if (written.kind === 'store_full') {
-        const refused = await this.commitState(doc, {
+      this.pendingNext.delete(doc.path)
+      this.activeSizeWarns.delete(doc.path)
+      this.activeTooLargePrompt.add(doc.path)
+      let failedDoc: BoundDocument
+      try {
+        failedDoc = await this.commitState(doc, {
+          ...doc.binding,
+          state: 'failed',
+          error: 'too_large',
+          sizeBytes: bytes.byteLength,
+          maxBytes: limits.max_bytes,
+        })
+      } finally {
+        this.activeTooLargePrompt.delete(doc.path)
+      }
+      return failedDoc
+    }
+
+    if (bytes.byteLength >= limits.warn_bytes) {
+      if (!this.warnedDocs.has(doc.key)) {
+        this.warnedDocs.add(doc.key)
+        this.activeSizeWarns.set(doc.path, {
+          sizeBytes: bytes.byteLength,
+          maxBytes: limits.max_bytes,
+        })
+      } else {
+        this.activeSizeWarns.delete(doc.path)
+      }
+    } else {
+      this.warnedDocs.delete(doc.key)
+      this.activeSizeWarns.delete(doc.path)
+    }
+
+    try {
+      let intent: IntentRecordV2 | null = pending?.intent ?? null
+      let payload: Uint8Array | null = pending?.payload ?? null
+      let binding = doc.binding
+      if (!intent) {
+        // the Ctrl/Cmd+S decision table: the intent's first state (see the module doc)
+        const verdict = options?.forceOffline
+          ? 'offline'
+          : await laneVerdict(this.deps.capability, binding.orgId)
+        const pausedUser = (await this.deps.pause?.isPaused().catch(() => false)) === true
+        // the fresh intent is one past the record the store still holds (the
+        // same aging QueueDispatcher.mint applies): a second inline save of one
+        // document, or an N+1 minted while N commits, is never erased by N's
+        // generation-correct cleanup (G5-06 fix-C item 3)
+        const minted = this.mintIntent(
+          doc,
+          facts,
+          checksum,
+          nextIntentGeneration(parseStoredIntent((await intents.get(doc.key))?.intent ?? null)),
+        )
+        const state: IntentRecordV2['state'] =
+          verdict === 'offline'
+            ? 'paused_offline'
+            : verdict === 'sync_write_off'
+              ? 'paused_admin'
+              : pausedUser
+                ? 'paused_user'
+                : 'queued'
+        minted.state = state
+        const written = await intents.put(doc.key, minted, bytes)
+        if (written.kind === 'store_full') {
+          const refused = await this.commitState(doc, {
+            ...doc.binding,
+            state: 'error',
+            error: 'store_full',
+          })
+          return await this.requestPopover(refused, options)
+        }
+        if (written.kind === 'interrupted') {
+          // the account boundary wiped the scope under this save
+          return await this.commitState(doc, {
+            ...doc.binding,
+            state: 'signed-out',
+            error: 'not_signed_in',
+          })
+        }
+        if (written.kind !== 'ok') {
+          return await this.commitState(doc, {
+            ...doc.binding,
+            state: 'error',
+            error: 'server_error',
+          })
+        }
+        intent = minted
+        payload = bytes
+        this.trace(minted, { type: 'minted' })
+        // a paused intent is recorded and shown, never dispatched
+        if (state !== 'queued') {
+          this.pendingNext.delete(doc.path)
+          return await this.commitState(doc, { ...doc.binding, state, error: errorForState(state) })
+        }
+      } else if (options?.userSave) {
+        // G5-06u: the user's Ctrl/Cmd+S with an intent pending: never a second
+        // intent and no inline replay (a paused_user / paused_admin intent stays
+        // paused); the N+1 is marked only when the copy moved past the intent
+        // (RBE6u-02) and the queue popover tells the user why
+        return await this.requestPopover(doc, options, checksum !== intent.checksum)
+      } else {
+        // an intent is already pending: never a second one. The status says so
+        // (pendingNext = an unsent N+1) and the SAME record and key are replayed
+        // below; a save that lands settles this very intent
+        this.pendingNext.add(doc.path)
+      }
+      binding = withoutError({ ...binding, state: 'saving' })
+      // the binding is persisted before the first network call: a crash or quit
+      // replays the stored intent, and an intent that could not be recorded is
+      // never sent
+      try {
+        // the sweep still owns this copy: no rewrite, no request, nothing sent
+        if (!(await store.write(doc.dir, binding))) return doc
+      } catch {
+        return await this.commitState(doc, {
           ...doc.binding,
           state: 'error',
-          error: 'store_full',
-        })
-        return this.requestPopover(refused, options)
-      }
-      if (written.kind === 'interrupted') {
-        // the account boundary wiped the scope under this save
-        return this.commitState(doc, {
-          ...doc.binding,
-          state: 'signed-out',
-          error: 'not_signed_in',
+          error: 'server_error',
         })
       }
-      if (written.kind !== 'ok') {
-        return this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' })
-      }
-      intent = minted
-      payload = bytes
-      this.trace(minted, { type: 'minted' })
-      // a paused intent is recorded and shown, never dispatched
-      if (state !== 'queued') {
-        this.pendingNext.delete(doc.path)
-        return this.commitState(doc, { ...doc.binding, state, error: errorForState(state) })
-      }
-    } else if (options?.userSave) {
-      // G5-06u: the user's Ctrl/Cmd+S with an intent pending: never a second
-      // intent and no inline replay (a paused_user / paused_admin intent stays
-      // paused); the N+1 is marked only when the copy moved past the intent
-      // (RBE6u-02) and the queue popover tells the user why
-      return this.requestPopover(doc, options, checksum !== intent.checksum)
-    } else {
-      // an intent is already pending: never a second one. The status says so
-      // (pendingNext = an unsent N+1) and the SAME record and key are replayed
-      // below; a save that lands settles this very intent
-      this.pendingNext.add(doc.path)
-    }
-    binding = withoutError({ ...binding, state: 'saving' })
-    // the binding is persisted before the first network call: a crash or quit
-    // replays the stored intent, and an intent that could not be recorded is
-    // never sent
-    try {
-      // the sweep still owns this copy: no rewrite, no request, nothing sent
-      if (!(await store.write(doc.dir, binding))) return doc
-    } catch {
-      return this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' })
-    }
-    const saving: BoundDocument = { ...doc, binding }
-    this.publish(saving)
+      const saving: BoundDocument = { ...doc, binding }
+      this.publish(saving)
 
-    let receipt: CommitReceipt
-    try {
-      receipt = await this.uploadAndCommit(saving, intent, payload as Uint8Array)
-    } catch (error) {
-      if (needsRecheck(error)) {
-        return this.recheckAgainstDocument(
+      let receipt: CommitReceipt
+      try {
+        receipt = await this.uploadAndCommit(saving, intent, payload as Uint8Array)
+      } catch (error) {
+        if (needsRecheck(error)) {
+          return await this.recheckAgainstDocument(
+            saving,
+            intent,
+            { state: 'dirty', error: 'server_error' },
+            intents,
+          )
+        }
+        return await this.fail(saving, intent, error, intents)
+      }
+      if (receipt.documentId !== intent.documentId || receipt.checksumSha256 !== intent.checksum) {
+        // not evidence of this commit (a replay keeps answering the same): the
+        // document says whether these bytes landed; otherwise a new key next time
+        return await this.recheckAgainstDocument(
           saving,
           intent,
-          { state: 'dirty', error: 'server_error' },
+          { state: 'error', error: 'malformed_response' },
           intents,
         )
       }
-      return this.fail(saving, intent, error, intents)
+      return await this.settle(saving, intent, receipt, intents)
+    } finally {
+      this.activeSizeWarns.delete(doc.path)
     }
-    if (receipt.documentId !== intent.documentId || receipt.checksumSha256 !== intent.checksum) {
-      // not evidence of this commit (a replay keeps answering the same): the
-      // document says whether these bytes landed; otherwise a new key next time
-      return this.recheckAgainstDocument(
-        saving,
-        intent,
-        { state: 'error', error: 'malformed_response' },
-        intents,
-      )
-    }
-    return this.settle(saving, intent, receipt, intents)
   }
 
   /**
@@ -845,6 +960,14 @@ export class SaveCoordinator {
       case 'ticket_expired':
         // the upload claim expired: look the intent up before touching bytes again
         return this.commitState(doc, { ...base, state: 'reconciling' })
+      case 'too_large':
+        return this.commitState(doc, {
+          ...base,
+          state: 'failed',
+          error: 'too_large',
+          sizeBytes: error.sizeBytes ?? intent.length,
+          ...(error.maxBytes !== undefined ? { maxBytes: error.maxBytes } : {}),
+        })
       case 'quota_exceeded':
       case 'not_found':
       case 'document_deleted':
@@ -1020,7 +1143,11 @@ export class SaveCoordinator {
   }
 
   private publish(doc: BoundDocument): void {
-    this.deps.publish(toStatus(doc, this.pendingNext.has(doc.path)))
+    const status = toStatus(doc, this.pendingNext.has(doc.path))
+    const sizeWarn = this.activeSizeWarns.get(doc.path)
+    if (sizeWarn) status.sizeWarn = sizeWarn
+    if (this.activeTooLargePrompt.has(doc.path)) status.saveTooLargePrompt = true
+    this.deps.publish(status)
   }
 
   private trace(

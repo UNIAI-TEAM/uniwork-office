@@ -50,6 +50,10 @@ export interface Binding {
   baseChecksum: string
   state: UniworkSaveState
   error?: UniworkDocErrorCode
+  /** Payload size in bytes when `error === 'too_large'`. */
+  sizeBytes?: number
+  /** Maximum allowed document size in bytes when `error === 'too_large'`. */
+  maxBytes?: number
   serverRevision?: string
   /**
    * G5-03a: the server's head version when it differs from this copy's base
@@ -283,6 +287,12 @@ export function parseBinding(raw: unknown): Binding | null {
     // from the durable store, so nothing is kept here
     state: r.state === 'saving' ? 'dirty' : (r.state as UniworkSaveState),
     ...(typeof r.error === 'string' ? { error: r.error as UniworkDocErrorCode } : {}),
+    ...(typeof r.sizeBytes === 'number' && Number.isSafeInteger(r.sizeBytes) && r.sizeBytes >= 0
+      ? { sizeBytes: r.sizeBytes }
+      : {}),
+    ...(typeof r.maxBytes === 'number' && Number.isSafeInteger(r.maxBytes) && r.maxBytes > 0
+      ? { maxBytes: r.maxBytes }
+      : {}),
     ...(isDecimalString(r.serverRevision) ? { serverRevision: r.serverRevision } : {}),
     ...(typeof r.serverVersion === 'number' ? { serverVersion: r.serverVersion } : {}),
     minStoreLevel,

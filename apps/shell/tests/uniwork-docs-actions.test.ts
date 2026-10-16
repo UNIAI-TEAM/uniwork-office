@@ -557,24 +557,36 @@ describe('upload a file', () => {
     expect(ctx.progress.at(-1)!.loaded).toBe(enc('uploaded bytes').byteLength)
   })
 
-  // R1-10: D stages at most 50 MiB, so a bigger pick is refused before main
-  // reads it (a multi-GB file must not be buffered only to be told too_large).
-  it('refuses a pick past the server 50 MiB stage limit without reading it', async () => {
+  // R1-10 / SIZE-F1: a pick past max_bytes (default 200 MiB) is refused before
+  // main reads it (a multi-GB file must not be buffered only to be told too_large).
+  it('refuses a pick past the document size limit without reading it', async () => {
     const server = fakeServer()
     const ctx = setup(server)
     // the name must resolve in the formats table, or the upload is refused as
     // unsupported_format even before the (unread) size check this test pins
     const huge = join(dir, 'huge.docx')
     writeFileSync(huge, '')
-    truncateSync(huge, 50 * 1024 * 1024 + 1)
+    truncateSync(huge, 200 * 1024 * 1024 + 1)
     const result = await ctx.service.uploadDocument({
       workspaceId: WS,
       folderId: null,
       path: huge,
       uploadId: 'up-big',
     })
-    expect(result).toEqual({ ok: false, error: 'too_large' })
-    expect(server.calls).toHaveLength(0)
+    expect(result).toEqual({
+      ok: false,
+      error: 'too_large',
+      name: 'huge.docx',
+      sizeBytes: 200 * 1024 * 1024 + 1,
+      maxBytes: 200 * 1024 * 1024,
+    })
+    // the pick itself is never read (its bytes never enter main): the refusal
+    // happens on the stat, before the read that would buffer it
+    expect(vi.mocked(readFile).mock.calls.map((call) => String(call[0]))).not.toContain(huge)
+    // and nothing is sent: the limits read (`GET /api/v1/config`) is the only
+    // request this call makes
+    expect(server.calls.every((call) => call.method === 'GET')).toBe(true)
+    expect(server.calls.filter((call) => call.path.endsWith('/documents/files'))).toHaveLength(0)
     expect(ctx.progress).toHaveLength(0)
   })
 

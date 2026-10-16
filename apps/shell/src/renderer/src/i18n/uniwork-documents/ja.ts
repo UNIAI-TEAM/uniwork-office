@@ -153,4 +153,13 @@ export const ja = {
   uwDocUploading: '「{name}」をアップロードしています…',
   uwDocLocationTop: '最上位',
   uwDocArchived: 'アーカイブ済み',
+  uwSizeWarnChip: '上限 {max} に近づいています（現在 {size}）。',
+  uwSaveBlockTitle: 'UniWork に保存できませんでした',
+  uwSaveBlockBody:
+    'このドキュメントは {max} を超えています。変更内容はここに残っています。コピーをパソコンにダウンロードしてから、画像を圧縮するかドキュメントを分割してください。',
+  uwSaveBlockSaveCopyLocal: 'コピーをパソコンに保存',
+  uwClose: '閉じる',
+  uwErrUploadTooLarge:
+    '{name} は {size} あり、上限 {max} を超えています。画像を圧縮するかファイルを分割してから、もう一度アップロードしてください。',
+  uwReasonTooLargeWithLimit: '上限 {max} を超過',
 } satisfies Record<keyof typeof zh, string>
