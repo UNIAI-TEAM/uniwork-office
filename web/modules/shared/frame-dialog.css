@@ -271,7 +271,7 @@
   border-radius: 4px;
 }
 
-/* the comparison step (Docs "View differences"): paragraph differences, mine struck / the head added */
+/* the comparison step (Docs "View differences"): paragraph differences, each side labelled (mine tinted danger / the head tinted success) */
 .ow-dlg-diff-meta,
 .ow-dlg-diff-same {
   margin: 0;
@@ -305,7 +305,14 @@
   border-color: var(--danger-border);
   background: var(--danger-bg);
   color: var(--danger-text);
-  text-decoration: line-through;
+}
+
+/* which side a card is, in words: the tints only reinforce it (forced colors drop them) */
+.ow-dlg-diff-side {
+  margin-bottom: 2px;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .ow-dlg-diff-right {
