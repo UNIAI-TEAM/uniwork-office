@@ -90,6 +90,9 @@ describe('error mapping rows (shared contract)', () => {
     ['member_deactivated', true],
     ['organization_suspended', true],
     ['document_deleted', true],
+    // an archived document's refusal is NOT terminal: the archive is reversible,
+    // so the intent record is kept for the probe to lift on unarchive (OQ-F12)
+    ['document_archived', false],
     ['deleted', true],
     ['forbidden', true],
     ['not_found', true],

@@ -373,6 +373,7 @@ describe('uniwork save queue machine', () => {
     for (const lastError of [
       'permission_revoked',
       'document_deleted',
+      'document_archived',
       'member_deactivated',
       'organization_suspended',
       'session_expired',
@@ -407,6 +408,121 @@ describe('uniwork save queue machine', () => {
     expect(
       transition(record({ state: 'committed' }), { type: 'tombstone' }, ctx()).record?.state,
     ).toBe('committed')
+  })
+
+  it('OQ-F12 Q1=b: a commit refused for an archived document parks document_archived, never document_deleted', () => {
+    const archived = transition(
+      record({ state: 'uploading' }),
+      { type: 'commitFailed', error: 'document_archived' },
+      ctx(),
+    )
+    expect(archived.record?.state).toBe('blocked')
+    expect(archived.record?.lastError).toBe('document_archived')
+    // the tombstone keeps its own reason: archiving is reversible, deleting is not
+    expect(
+      transition(archived.record, { type: 'unblock', reason: 'document_deleted' }, ctx()).record,
+    ).toEqual(archived.record)
+    expect(
+      transition(archived.record, { type: 'unblock', reason: 'document_archived' }, ctx()).record
+        ?.state,
+    ).toBe('queued')
+  })
+
+  it('unblock lifts exactly the reason the record waits on, back to queued with the SAME intent', () => {
+    for (const reason of [
+      'session_expired',
+      'permission_revoked',
+      'member_deactivated',
+      'organization_suspended',
+      'document_deleted',
+      'document_archived',
+    ] as const) {
+      const out = transition(
+        record({ state: 'blocked', lastError: reason, generation: 3, attempt: 2 }),
+        { type: 'unblock', reason },
+        ctx(),
+      )
+      expect(out.record, reason).toEqual({
+        ...record({ state: 'queued', generation: 3, attempt: 2 }),
+        updatedAt: iso(NOW),
+      })
+      expect(out.effects, reason).toEqual([])
+    }
+  })
+
+  it('an unblocked intent commits through the normal path with its own key and generation', () => {
+    const stored = record({
+      state: 'blocked',
+      lastError: 'session_expired',
+      generation: 2,
+      attempt: 1,
+      retryAt: iso(NOW + 1_000),
+    })
+    const lifted = transition(stored, { type: 'unblock', reason: 'session_expired' }, ctx()).record!
+    expect(lifted.state).toBe('queued')
+    expect(lifted.retryAt).toBeUndefined()
+    const validating = transition(lifted, { type: 'dispatch' }, ctx()).record!
+    const uploading = transition(validating, { type: 'uploaded' }, ctx()).record!
+    const committing = transition(uploading, { type: 'uploaded' }, ctx()).record!
+    const committed = transition(committing, { type: 'committed', receipt }, ctx())
+    expect(committed.record).toMatchObject({
+      state: 'committed',
+      intentId: stored.intentId,
+      idempotencyKey: stored.idempotencyKey,
+      baseRevision: stored.baseRevision,
+      baseVersion: stored.baseVersion,
+      generation: 2,
+      receipt,
+    })
+    expect(committed.effects).toEqual([{ kind: 'cleanup', generation: 2 }])
+  })
+
+  it('a lift of another reason, of a record nobody named, or of anything not blocked is a no-op', () => {
+    const blocked = record({ state: 'blocked', lastError: 'permission_revoked' })
+    expect(
+      transition(blocked, { type: 'unblock', reason: 'session_expired' }, ctx()).record,
+    ).toEqual(blocked)
+    // a record nobody named (no lastError) is never lifted by a guessed reason
+    const unnamed = record({ state: 'blocked' })
+    expect(
+      transition(unnamed, { type: 'unblock', reason: 'permission_revoked' }, ctx()).record,
+    ).toEqual(unnamed)
+    // every other state ignores the event, terminal ones included; and a second
+    // lift of the same record has nothing left to move
+    for (const state of QUEUE_STATES) {
+      if (state === 'blocked') continue
+      const before = record({ state })
+      const out = transition(before, { type: 'unblock', reason: 'permission_revoked' }, ctx())
+      expect(out.record, state).toEqual(before)
+      expect(out.effects, state).toEqual([])
+    }
+    const lifted = transition(
+      blocked,
+      { type: 'unblock', reason: 'permission_revoked' },
+      ctx(),
+    ).record!
+    expect(
+      transition(lifted, { type: 'unblock', reason: 'permission_revoked' }, ctx()).record,
+    ).toEqual(lifted)
+  })
+
+  it('an unblock never jumps the user pause or a known-offline pass', () => {
+    const blocked = record({ state: 'blocked', lastError: 'member_deactivated' })
+    expect(
+      transition(
+        blocked,
+        { type: 'unblock', reason: 'member_deactivated' },
+        ctx({ pausedUser: true }),
+      ).record?.state,
+    ).toBe('paused_user')
+    expect(
+      transition(blocked, { type: 'unblock', reason: 'member_deactivated' }, ctx({ online: false }))
+        .record?.state,
+    ).toBe('paused_offline')
+    expect(
+      transition(blocked, { type: 'unblock', reason: 'member_deactivated' }, ctx({ online: true }))
+        .record?.state,
+    ).toBe('queued')
   })
 
   it('401 → blocked(session_expired); 403 by code → blocked with that code; other 403 → blocked(permission_revoked)', () => {
@@ -522,6 +638,8 @@ describe('uniwork save queue machine', () => {
       { type: 'uploaded' },
       { type: 'cancel' },
       { type: 'discard' },
+      { type: 'abandon' },
+      { type: 'unblock', reason: 'permission_revoked' },
       { type: 'tombstone' },
       { type: 'tick', now: NOW },
     ]

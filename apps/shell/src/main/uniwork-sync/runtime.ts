@@ -265,7 +265,7 @@ export interface SyncRuntimeOptions {
   store: SyncStoreAccess
   targets: SyncRuntimeTargets
   /** the per-org capability cache read (see CapabilityCache.get) */
-  capability(orgId: string): Promise<CapabilityRead>
+  capability(orgId: string, options?: { force?: boolean }): Promise<CapabilityRead>
   /** the feed client of the active deployment, or null while none is usable */
   client(): FeedClient | null
   /** true while the document has local work (a stored intent or a dirty copy) */
@@ -452,8 +452,8 @@ export class SyncRuntime {
    * queue's lane verdicts share, so a `sync_write` flag is read once per
    * account and cleared on a switch for both callers).
    */
-  capabilityRead(orgId: string): Promise<CapabilityRead> {
-    return this.options.capability(orgId)
+  capabilityRead(orgId: string, options?: { force?: boolean }): Promise<CapabilityRead> {
+    return this.options.capability(orgId, options)
   }
 
   /**

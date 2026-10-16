@@ -82,6 +82,7 @@ describe('uniwork documents string shards', () => {
         'organization_suspended',
         'drafts_full',
         'other_window',
+        'document_archived',
       ].sort(),
     )
     // the G5-04 / G5-06 refusals reuse the sync shard's sentences

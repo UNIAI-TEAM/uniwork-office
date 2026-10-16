@@ -112,7 +112,11 @@ import {
   type QueueCapabilityRead,
   type QueueDoc,
 } from '../uniwork-sync/queue/dispatcher'
-import { isTerminalQueueState, type IntentRecordV2 } from '../uniwork-sync/queue/record'
+import {
+  isTerminalQueueState,
+  type IntentRecordV2,
+  type QueueState,
+} from '../uniwork-sync/queue/record'
 import { compareRevision } from '../uniwork-sync/feed/revision'
 import type { FeedChange } from '../uniwork-sync/feed/client'
 import { decideRemote, type RemoteLocal, type RemoteNotice } from './remote-newer'
@@ -312,7 +316,7 @@ export interface UniworkDocsServiceDeps {
    * save queue's lane verdicts. Absent = writes allowed (tests that never read
    * a capability); the production wiring passes the runtime's cache.
    */
-  capability?: { get(orgId: string): Promise<QueueCapabilityRead> }
+  capability?: { get(orgId: string, options?: { force?: boolean }): Promise<QueueCapabilityRead> }
   /** a working copy refused by the newer-store guard (S11 lock panel) */
   pushLock?(lock: UniworkDocLock): void
   /**
@@ -536,6 +540,25 @@ function refusalVerdict(code: UniworkDocErrorCode | undefined): 'revoked' | 'del
   return null
 }
 
+/** the first wait before a blocked intent's document is re-probed; doubles to recheckMs */
+const BLOCKED_PROBE_BASE_MS = 60_000
+
+/**
+ * The blocked reasons only the document itself can prove: a metadata read is
+ * what answers whether writing is allowed again - and, for a document in the
+ * trash or the archive, whether it is out of there too. The capability reasons
+ * are proved by the intent's own org lane instead, never by a document read.
+ */
+function isDocumentProbeReason(
+  reason: UniworkDocErrorCode | undefined,
+): reason is 'permission_revoked' | 'document_deleted' | 'document_archived' {
+  return (
+    reason === 'permission_revoked' ||
+    reason === 'document_deleted' ||
+    reason === 'document_archived'
+  )
+}
+
 /** no revision of this app's own has been seen for a document yet */
 const NO_ECHO: ReadonlySet<string> = new Set()
 
@@ -611,6 +634,11 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   else if (state === 'blocked') patched.error = error ?? 'server_error'
   else if (state === 'reconciling-stuck') patched.error = error ?? 'intent_unknown'
   else if (state === 'failed') patched.error = error ?? 'server_error'
+  // the waiting states carry no refusal: a block that lifted (the `unblock`
+  // event: `blocked -> queued`, or `paused_user` while the user's own pause
+  // holds it) must not keep the code it was parked with. The explicit
+  // `undefined` overwrites the stale code in the merge; the store's JSON drops it
+  else if (state === 'queued' || state === 'paused_user') patched.error = undefined
   // G8-12: a refused permission is a fact about the caller's level, as on the inline path
   if (patched.error === 'permission_revoked' || patched.error === 'forbidden') {
     patched.level = 'view'
@@ -1351,9 +1379,9 @@ export class UniworkDocsService {
         lookupCommit: (input) => this.api().lookupCommit(input),
       },
       capability: {
-        get: (orgId) =>
+        get: (orgId, options) =>
           this.deps.capability
-            ? this.deps.capability.get(orgId)
+            ? this.deps.capability.get(orgId, options)
             : Promise.resolve({
                 kind: 'ok',
                 capabilities: { sync_write: true },
@@ -1437,6 +1465,12 @@ export class UniworkDocsService {
     }
   }
 
+  /** the queue's last connectivity verdict; false keeps the blocked re-probe home */
+  private queueOnline: boolean | undefined = undefined
+  /** when a blocked intent's document may be re-probed next, by document key */
+  private readonly blockedProbeAt = new Map<string, number>()
+  /** how many re-probes one blocked intent already spent (the backoff's exponent) */
+  private readonly blockedProbeCount = new Map<string, number>()
   private readonly pendingApplyRecords = new Set<Promise<void>>()
 
   /**
@@ -1634,11 +1668,106 @@ export class UniworkDocsService {
     // its dispatch never race a Save of the same intent (G506-be-1, d1-3)
     for (const doc of docs) this.queueInFlight.add(doc.key)
     try {
+      await this.reprobeBlockedDocs(
+        access.dispatcher,
+        docs,
+        this.deps.now ? this.deps.now() : Date.now(),
+      )
       await access.dispatcher.tick(docs)
       await access.dispatcher.dispatchAll(docs)
     } finally {
       for (const doc of docs) this.queueInFlight.delete(doc.key)
     }
+  }
+
+  /**
+   * A blocked intent whose condition only the document itself can prove
+   * (`permission_revoked`, `document_deleted`, `document_archived`): one bounded
+   * metadata re-probe per intent, spaced by a backoff, so the SAME intent goes
+   * back to the queue once the document answers for writing again. This is the
+   * runtime's access check: a document listed by the feed only proves the
+   * account may READ it (a listed row is not evidence that writing returned),
+   * while a document read reports the level itself - and, for a block earned by
+   * an archived/deleted document, whether the document is still in the
+   * trash/archive. The pass only runs with a live session and store, and an
+   * offline verdict keeps every probe home, so a probe never leaves the account,
+   * deployment or org of the intent.
+   */
+  private async reprobeBlockedDocs(
+    dispatcher: QueueDispatcher,
+    docs: QueueDoc[],
+    now: number,
+  ): Promise<void> {
+    if (this.queueOnline === false) return
+    // one probe state per blocked intent: a key that is no longer blocked (it
+    // committed, was cancelled, or was abandoned) forgets its backoff
+    const blocked = new Set<string>()
+    for (const doc of docs) {
+      if (doc.record.state === 'blocked') blocked.add(doc.key)
+    }
+    for (const key of [...this.blockedProbeAt.keys()]) {
+      if (blocked.has(key)) continue
+      this.blockedProbeAt.delete(key)
+      this.blockedProbeCount.delete(key)
+    }
+    for (const doc of docs) {
+      const reason = doc.record.state === 'blocked' ? doc.record.lastError : undefined
+      if (!isDocumentProbeReason(reason)) continue
+      const due = this.blockedProbeAt.get(doc.key)
+      if (due !== undefined && now < due) continue
+      // the pass backs off a probe that did not lift; a refusal and a lift are
+      // both answered by the state the record was left in
+      if ((await this.probeBlockedDoc(dispatcher, doc, now)) !== 'blocked') {
+        this.blockedProbeAt.delete(doc.key)
+        this.blockedProbeCount.delete(doc.key)
+        continue
+      }
+      const count = (this.blockedProbeCount.get(doc.key) ?? 0) + 1
+      this.blockedProbeCount.set(doc.key, count)
+      this.blockedProbeAt.set(
+        doc.key,
+        now + Math.min(QUEUE_LIMITS.recheckMs, BLOCKED_PROBE_BASE_MS * 2 ** (count - 1)),
+      )
+    }
+  }
+
+  /**
+   * One blocked intent's document re-probe: a single metadata read, the only
+   * answer that proves write access came back. A refused/unreachable read
+   * leaves the block alone, and a block earned by an archived or deleted
+   * document lifts only when the document is out of the trash/archive too - an
+   * archived document keeps refusing the write, so waking the intent would only
+   * earn the same block again. Returns the state the record was left in, so
+   * both callers (the poll's bounded pass and "Kiểm tra lại") read a refusal and
+   * a lift apart.
+   */
+  private async probeBlockedDoc(
+    dispatcher: QueueDispatcher,
+    doc: QueueDoc,
+    now: number,
+  ): Promise<QueueState> {
+    const reason = doc.record.lastError
+    if (!isDocumentProbeReason(reason)) return doc.record.state
+    let flags: { canEdit: boolean; archived: boolean } | null = null
+    try {
+      const detail = await this.api().getDocument(doc.record.documentId)
+      flags = actionFlags(detail.myLevel, detail.archivedAt)
+    } catch {
+      // still refused (403/404/410) or unreachable: the block stays
+    }
+    // a document still in the trash or the archive cannot be written: the
+    // block lifts only once the read sees it active and writable again
+    const forWriting =
+      flags !== null && flags.canEdit && (reason === 'permission_revoked' || !flags.archived)
+    if (!forWriting) return doc.record.state
+    const states = await dispatcher.unblock([doc], reason, now)
+    const state = states[0] ?? doc.record.state
+    if (state !== 'blocked') {
+      // the server lets this copy be edited again: the session's lock verdict on
+      // it is spent, exactly as the reopen path spends it
+      this.clearRemoteLock(doc.record.documentId, doc.path)
+    }
+    return state
   }
 
   /**
@@ -1649,6 +1778,9 @@ export class UniworkDocsService {
    * is left alone - nothing may move without being persisted.
    */
   async setQueueOnline(online: boolean): Promise<void> {
+    // remembered for the blocked re-probe: a pass that reported offline never
+    // sends an access check either
+    this.queueOnline = online
     const access = await this.queueEngine()
     if (access.kind !== 'ok') return
     if (!this.isQueueSessionCurrent(access)) return
@@ -1711,6 +1843,46 @@ export class UniworkDocsService {
     const queueDoc = await this.queueDocFromStore(doc)
     if (!queueDoc) return
     await this.coordinator.recheck(queueDoc)
+  }
+
+  /**
+   * "Kiểm tra lại" on a BLOCKED row: the same access re-probe the poll runs
+   * (F1), now and for this one intent instead of at the next backoff. The
+   * document reasons (`permission_revoked`, `document_deleted`,
+   * `document_archived`) are proven by the document read; the capability reasons
+   * (`session_expired`, `member_deactivated`, `organization_suspended`) by a
+   * real read of the intent's own org lane, which the normal pass forces for a
+   * lane holding one of them. Only a condition that really lifted moves the
+   * record - the commit lookup, which can wake a blocked intent without proving
+   * anything, stays the reconciling rows' action. `false` = the re-probe could
+   * not run at all (no live session, no store, nothing blocked at this path).
+   */
+  async recheckBlockedSave(path: string): Promise<boolean> {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc)) return false
+    const queueDoc = await this.queueDocFromStore(doc)
+    if (!queueDoc || queueDoc.record.state !== 'blocked') return false
+    const access = await this.queueEngine()
+    if (access.kind !== 'ok' || !this.isQueueSessionCurrent(access)) return false
+    const now = this.deps.now ? this.deps.now() : Date.now()
+    const reason = queueDoc.record.lastError
+    if (isDocumentProbeReason(reason)) {
+      // the document itself proves this block: one read, right now
+      if ((await this.probeBlockedDoc(access.dispatcher, queueDoc, now)) === 'blocked') return true
+    } else if (
+      reason !== 'session_expired' &&
+      reason !== 'member_deactivated' &&
+      reason !== 'organization_suspended'
+    ) {
+      // a block this click cannot prove (a lease, a cause nobody named): the row
+      // keeps its block
+      return true
+    }
+    // the same pass the poll runs: the lane's capability is read for real and
+    // lifts its own reason only, and an intent a lift released goes back
+    // through the normal path - the SAME intent, never a new attempt
+    await access.dispatcher.dispatchAll([queueDoc], now)
+    return true
   }
 
   /** true while another window holds this document's lock (this one is read-only) */
@@ -5396,16 +5568,22 @@ export class UniworkDocsService {
             delete binding.error
           }
           // the document answers again (restored from the trash, a transient
-          // 404): its local work can be saved once more
+          // 404): its local work can be saved once more. An archived document
+          // answers again only when THIS read proves the archive lifted - while
+          // it holds, the write is still refused and clearing the block would
+          // only earn it again (the rule the queue's blocked re-probe reads:
+          // probeBlockedDoc lifts an archived block only past `!archived`)
           if (
             existing.state === 'blocked' &&
             (existing.error === 'not_found' ||
               existing.error === 'deleted' ||
-              existing.error === 'document_deleted')
+              existing.error === 'document_deleted' ||
+              (existing.error === 'document_archived' && detail.archivedAt === null))
           ) {
             binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
-            // the document answers again: the deleted verdict it earned is spent
+            // the document answers again: the verdict it earned is spent (an
+            // archived block raised no lock, so this is a no-op for it)
             this.clearRemoteLock(documentId, local)
           }
           // the sweep still owns this copy's pre-store intent: the rewrite is

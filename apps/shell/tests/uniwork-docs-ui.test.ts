@@ -386,6 +386,7 @@ describe('G5-06 error codes -> sentence and reason', () => {
     ['capability_off', 'uwTipPausedAdmin', 'uwReasonOther'],
     ['intent_unknown', 'uwChipReconcileStuck', 'uwReasonOther'],
     ['document_deleted', 'uwErrDeleted', 'uwReasonDeleted'],
+    ['document_archived', 'uwReasonArchived', 'uwReasonArchived'],
     ['permission_revoked', 'uwErrForbidden', 'uwReasonForbidden'],
     ['member_deactivated', 'uwLockDeactivated', 'uwReasonDeactivated'],
     ['organization_suspended', 'uwLockSuspended', 'uwReasonSuspended'],
@@ -411,6 +412,10 @@ describe('G5-06 error codes -> sentence and reason', () => {
     expect(labelOf('permission_revoked').tip).toContain(doc.uwErrForbidden)
     expect(labelOf('document_deleted').label).toContain(en.uwReasonDeleted)
     expect(labelOf('document_deleted').tip).toContain(doc.uwErrDeleted)
+    // an archived document is never shown as a deleted one
+    expect(labelOf('document_archived').label).toContain(en.uwReasonArchived)
+    expect(labelOf('document_archived').label).not.toContain(en.uwReasonDeleted)
+    expect(labelOf('document_archived').tip).not.toContain(doc.uwErrDeleted)
     expect(labelOf('organization_suspended').label).toContain(en.uwReasonSuspended)
     expect(labelOf('organization_suspended').tip).toContain(en.uwLockSuspended)
     expect(labelOf('member_deactivated').label).toContain(en.uwReasonDeactivated)

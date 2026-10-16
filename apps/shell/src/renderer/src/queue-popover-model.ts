@@ -135,6 +135,8 @@ function blockedReasonOf(
     case 'store_full':
     case 'session_expired':
       return status.error
+    case 'document_archived':
+      return 'document_archived'
     case 'not_signed_in':
       return 'signed_out'
     default:

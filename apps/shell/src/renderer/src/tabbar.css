@@ -62,10 +62,15 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 /* Windows/Linux caption buttons are drawn over the strip's right end
    (titleBarOverlay); the Window Controls Overlay env vars give their width,
-   and resolve to 0 where the overlay is absent */
+   and resolve to 0 where the overlay is absent. 100vw and the env() lengths
+   are window px, which the frame's zoom would multiply again (a 138px caption
+   reserved 172px at 125%): divided by the scale they are the caption's width
+   in the frame's CSS px (G5-06u-TS) */
 .tab-bar-caption-spacer {
   flex-shrink: 0;
-  width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+  width: calc(
+    (100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)) / var(--ui-scale, 1)
+  );
 }
 
 .tab-app-menu-btn {
@@ -75,6 +80,11 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 /* scrollable middle section; empty space stays part of the window drag region.
  * Horizontal padding keeps the edge tabs' feet inside the scroll clip. */
 .tab-strip {
+  /* a document tab's minimum, its close button and the gap between its parts: the compact strip
+   * below builds its narrower minimum from these, so it adds no number of its own */
+  --tab-min: 104px;
+  --tab-close-size: 16px;
+  --tab-gap: 8px;
   display: flex;
   align-items: stretch;
   flex: 1 1 auto;
@@ -93,7 +103,7 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tab-gap);
   /* tab body is 34px tall and sits flush with the bar bottom; the 6px
    * bottom padding centers content in the upper 28px band, on the same
    * line as the hover capsule — measured from Chrome, whose favicons sit
@@ -103,7 +113,7 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   padding: 0 8px 6px 12px;
   /* Chrome tabs shrink under pressure but never grow past 240px */
   flex: 0 1 240px;
-  min-width: 104px;
+  min-width: var(--tab-min);
   border-radius: 10px 10px 0 0;
   cursor: pointer;
   color: var(--tabstrip-text);
@@ -281,8 +291,8 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: var(--tab-close-size);
+  height: var(--tab-close-size);
   border: none;
   border-radius: 50%;
   background: transparent;
@@ -295,6 +305,37 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 .tab-close:hover {
   background: rgba(0, 0, 0, 0.1);
+}
+
+/* Compact strip (G5-06u-TS): TabBar sets data-strip below a 720 CSS px bar with two document
+ * tabs or more (a high UI scale, see tab-strip-compact.ts), so the last tab keeps a readable label.
+ * Home shows its icon only: the title stays in the DOM for assistive tech and the tab keeps its
+ * tooltip, and its padding is the 12px it has on the other side. */
+.tab-bar[data-strip='compact'] .tab-item.tab-home {
+  padding-right: 12px;
+}
+
+.tab-bar[data-strip='compact'] .tab-home .tab-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* inactive document tabs give up the close button and the gap before it (close stays in the
+ * right-click menu); the active tab keeps both, and its own minimum */
+.tab-bar[data-strip='compact'] .tab-item:not(.active):not(.tab-home) {
+  min-width: calc(var(--tab-min) - var(--tab-close-size) - var(--tab-gap));
+}
+
+/* a close button holding focus is never taken away (the minimum above does not depend on it) */
+.tab-bar[data-strip='compact'] .tab-item:not(.active):not(:focus-within) .tab-close {
+  display: none;
 }
 
 /* "+" new tab button: lives inside the strip so it hugs the last tab, Chrome-style */

@@ -139,6 +139,13 @@ describe('error envelope mapping', () => {
     [envelope(404, 'not_found'), 'not_found'],
     [new Response('', { status: 404 }), 'server_error'],
     [envelope(410, 'document_deleted'), 'document_deleted'],
+    // OQ-F6 / OQ-F12 Q1=b: a write refused for a document in the trash or the
+    // archive is a block the queue can lift, never a terminal refusal - and the
+    // archive is NOT read as the trash: archiving is reversible, so it keeps its
+    // own code (the row says archived, not deleted)
+    [envelope(403, 'document_deleted'), 'document_deleted'],
+    [envelope(403, 'document_archived'), 'document_archived'],
+    [envelope(410, 'document_archived'), 'document_archived'],
     // the change feed's cursor verdicts are about the cursor, never a document
     [envelope(410, 'change_cursor_expired'), 'server_error'],
     [envelope(400, 'change_cursor_invalid'), 'server_error'],
