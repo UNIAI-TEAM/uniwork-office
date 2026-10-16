@@ -89,7 +89,7 @@ import {
   writeImageIntoOwnedAssets,
 } from '../src/main/asset-lifecycle'
 import { createMarkdownView, requestMarkdownClose } from '../src/main/markdown-main'
-import { MARKDOWN_CHANNELS } from '../src/shared/ipc'
+import { MARKDOWN_CHANNELS, MAX_PASTED_IMAGE_BYTES } from '../src/shared/ipc'
 
 const temporaryDirectories: string[] = []
 
@@ -446,6 +446,58 @@ describe('discarding the assets one AI run created (Roll back)', () => {
     await expect(
       handlers.get(MARKDOWN_CHANNELS.discardPendingAssets)?.({ sender: contents }, 'a.png'),
     ).resolves.toMatchObject({ deleted: [] })
+  })
+})
+
+describe('restoring the assets of a redone AI run', () => {
+  it('drops a malformed or oversized entry and restores only the pictures that came through', async () => {
+    const documentPath = await createDocument()
+    const assetsDirectory = join(dirname(documentPath), 'assets')
+    const view = createMarkdownView(documentPath)
+    const contents = view.webContents as unknown as FakeWebContents
+    const bytes = Buffer.from('run bytes')
+    await writeImageIntoOwnedAssets(documentPath, 'image.png', bytes)
+    await handlers.get(MARKDOWN_CHANNELS.discardPendingAssets)?.({ sender: contents }, [
+      'image.png',
+    ])
+
+    const result = await handlers.get(MARKDOWN_CHANNELS.restorePendingAssets)?.(
+      { sender: contents },
+      [
+        { name: 'image.png', base64: bytes.toString('base64') },
+        { name: 'no-bytes.png' },
+        { base64: bytes.toString('base64') },
+        'image.png',
+        {
+          name: 'oversized.png',
+          base64: 'A'.repeat(Math.ceil(MAX_PASTED_IMAGE_BYTES / 3) * 4 + 1),
+        },
+      ],
+    )
+
+    // the four rejected entries never reach the file system, and the short `restored` list is the
+    // signal the panel uses to refuse the redo
+    expect(result).toEqual({ restored: ['image.png'], errors: [] })
+    expect(existsSync(join(assetsDirectory, 'image.png'))).toBe(true)
+    expect(existsSync(join(assetsDirectory, 'no-bytes.png'))).toBe(false)
+    expect(existsSync(join(assetsDirectory, 'oversized.png'))).toBe(false)
+  })
+
+  it('answers every name as an error for a window without a document path', async () => {
+    const view = createMarkdownView(null)
+    const contents = view.webContents as unknown as FakeWebContents
+    const files = [
+      { name: 'a.png', base64: Buffer.from('a').toString('base64') },
+      { name: 'b.png', base64: Buffer.from('b').toString('base64') },
+    ]
+
+    await expect(
+      handlers.get(MARKDOWN_CHANNELS.restorePendingAssets)?.({ sender: contents }, files),
+    ).resolves.toEqual({ restored: [], errors: ['a.png', 'b.png'] })
+    // a malformed argument is not a restore request: nothing to report, nothing written
+    await expect(
+      handlers.get(MARKDOWN_CHANNELS.restorePendingAssets)?.({ sender: contents }, 'a.png'),
+    ).resolves.toEqual({ restored: [], errors: [] })
   })
 })
 
