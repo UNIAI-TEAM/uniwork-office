@@ -13,7 +13,6 @@ import { createCapabilityReader, type CapabilityObject } from '@genoffice/ui/cap
  *   attachments          AI chat attachments + read_attachment (parsed in the desktop main process)
  *   saveStatus, viewOnlyChip                     the renderer's own save-state label (status bar) and "view only" chip;
  *                                                false on the web: the host header + one banner announce them
- *   htmlPreviewNetwork   false on the web: the preview blocks fetch/XHR and nested frames (a note says so)
  *   desktopOpen          the host's "Open in desktop app" action (web: off until granted)
  *   save                 false = view only (host withheld `save`)
  */
@@ -25,7 +24,6 @@ export type HtmlCapability =
   | 'autoSave'
   | 'htmlPreviewScripts'
   | 'htmlVisualEdit'
-  | 'htmlPreviewNetwork'
   | 'desktopOpen'
   | 'presentNewTab'
   | 'exportDocx'

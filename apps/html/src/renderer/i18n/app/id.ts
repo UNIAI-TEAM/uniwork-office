@@ -19,6 +19,8 @@ export const id = {
   exportHtmlEntry: 'Ekspor sebagai HTML satu file',
   previewLimitNote:
     'Halaman ini meminta data lewat jaringan atau menyematkan halaman lain, yang diblokir oleh pratinjau web.',
+  previewLimitNoteApp:
+    'Halaman ini meminta data lewat jaringan atau menyematkan halaman lain, yang diblokir oleh pratinjau.',
   useInAppMessage: 'Buka di aplikasi UniWork Office untuk menggunakan fitur ini',
   openInApp: 'Buka di aplikasi',
   printFailed: 'Gagal mencetak: {error}',

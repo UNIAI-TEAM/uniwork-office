@@ -270,11 +270,9 @@ export default function App() {
   // web frame (capabilities.ts): AI, autosave and visual edit off, view only without `save`
   const aiEnabled = cap('ai')
   const canEdit = cap('save')
-  // web preview: fetch/XHR and nested frames are blocked there, so a page using them gets one note
-  const previewLimited = useMemo(
-    () => !cap('htmlPreviewNetwork') && usesBlockedPreviewFeatures(text),
-    [text],
-  )
+  // both previews (the web bundle's preview.html and the desktop html-preview:// document) block
+  // fetch/XHR and nested frames, so a page using them gets one note
+  const previewLimited = useMemo(() => usesBlockedPreviewFeatures(text), [text])
   const visualEdit = cap('htmlVisualEdit')
 
   const getMap = useCallback((): ParseMap => {

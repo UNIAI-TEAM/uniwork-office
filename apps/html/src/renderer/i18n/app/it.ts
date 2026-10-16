@@ -19,6 +19,8 @@ export const it = {
   exportHtmlEntry: 'Esporta come HTML a file singolo',
   previewLimitNote:
     "Questa pagina richiede dati alla rete o incorpora altre pagine, cosa che l'anteprima web blocca.",
+  previewLimitNoteApp:
+    "Questa pagina richiede dati alla rete o incorpora altre pagine, cosa che l'anteprima blocca.",
   useInAppMessage: "Apri nell'app UniWork Office per usare questa funzione",
   openInApp: "Apri nell'app",
   printFailed: 'Stampa non riuscita: {error}',

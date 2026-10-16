@@ -19,6 +19,7 @@ export const pl = {
   exportHtmlEntry: 'Eksportuj jako pojedynczy plik HTML',
   previewLimitNote:
     'Ta strona pobiera dane z sieci lub osadza inne strony, co podgląd w przeglądarce blokuje.',
+  previewLimitNoteApp: 'Ta strona pobiera dane z sieci lub osadza inne strony, co podgląd blokuje.',
   useInAppMessage: 'Otwórz w aplikacji UniWork Office, aby użyć tej funkcji',
   openInApp: 'Otwórz w aplikacji',
   printFailed: 'Drukowanie nie powiodło się: {error}',

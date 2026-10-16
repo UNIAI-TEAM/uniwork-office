@@ -150,7 +150,7 @@ describe('web preview limits note', () => {
   })
 
   it('says why, in the UI language, with the use-the-app sentence and no action without the grant', () => {
-    stubApi({ capabilities: { desktopOpen: false } })
+    stubApi({ capabilities: { platform: 'web', desktopOpen: false } })
     const box = mount(createElement(PreviewLimitNote))
     const note = box.querySelector('[role="note"]')!
     expect(note.textContent).toContain(appStrings.en.previewLimitNote)
@@ -160,7 +160,7 @@ describe('web preview limits note', () => {
 
   it('offers Open in app when the host grants desktopOpen, and sends one app.open request', () => {
     const openInDesktopApp = vi.fn(async () => 'launched' as const)
-    stubApi({ capabilities: { desktopOpen: true }, openInDesktopApp })
+    stubApi({ capabilities: { platform: 'web', desktopOpen: true }, openInDesktopApp })
     const box = mount(createElement(PreviewLimitNote))
     const button = box.querySelector('button')!
     expect(button.textContent).toBe('Open in app')
@@ -169,10 +169,15 @@ describe('web preview limits note', () => {
     expect(openInDesktopApp).toHaveBeenCalledWith('html.preview')
   })
 
-  it('every locale has the three strings; the vi text is the agreed sentence', () => {
+  it('every locale has the four strings; the vi text is the agreed sentence', () => {
     const dicts = appStrings as unknown as Record<string, Record<string, string>>
     for (const [lang, dict] of Object.entries(dicts)) {
-      for (const key of ['previewLimitNote', 'useInAppMessage', 'openInApp']) {
+      for (const key of [
+        'previewLimitNote',
+        'previewLimitNoteApp',
+        'useInAppMessage',
+        'openInApp',
+      ]) {
         expect(dict[key], `${lang}.${key}`).toBeTruthy()
         expect(dict[key], `${lang}.${key}`).not.toMatch(/GO-\d|UNI-\d|github|git\b/i)
       }

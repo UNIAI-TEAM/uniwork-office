@@ -19,6 +19,8 @@ export const ja = {
   exportHtmlEntry: '単一ファイル HTML として書き出す',
   previewLimitNote:
     'このページはネットワークからデータを取得するか他のページを埋め込んでいますが、Web プレビューではブロックされます。',
+  previewLimitNoteApp:
+    'このページはネットワークからデータを取得するか他のページを埋め込んでいますが、プレビューではブロックされます。',
   useInAppMessage: 'この機能を使うには UniWork Office アプリで開いてください',
   openInApp: 'アプリで開く',
   printFailed: '印刷に失敗しました: {error}',
