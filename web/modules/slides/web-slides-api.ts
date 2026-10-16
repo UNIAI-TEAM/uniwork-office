@@ -1039,7 +1039,9 @@ export function createWebSlidesApi(
       state.lastFailure = null
       const r = (await invoke('slides:save')) as { ok: boolean; error?: string }
       noteResult(r)
-      if (!r.ok && state.lastFailure?.code === 'too_large') return { ok: false }
+      // invoke() sets lastFailure through the host IO, which narrowing cannot see
+      const failure = state.lastFailure as ProtocolErrorShape | null
+      if (!r.ok && failure?.code === 'too_large') return { ok: false }
       return r as Awaited<ReturnType<SlidesApi['save']>>
     },
     // the frame is the UniWork document: no desktop working-copy state. A frame without the
