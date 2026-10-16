@@ -167,6 +167,11 @@ export function isTerminalRefusal(error: UniworkDocError): boolean {
     error.code === 'not_found' ||
     error.code === 'deleted' ||
     error.code === 'document_deleted' ||
+    // an archived document refuses the write the same way its trash sibling
+    // does: the intent provably never committed, so a caller reading this
+    // predicate as "dropped" is right for it too (the queue keeps its own
+    // archived block liftable - a queue record is never dropped here)
+    error.code === 'document_archived' ||
     error.code === 'too_large' ||
     error.code === 'engine_incompatible' ||
     // a 409 the pipeline cannot recover by replaying (upload claim gone, ...);

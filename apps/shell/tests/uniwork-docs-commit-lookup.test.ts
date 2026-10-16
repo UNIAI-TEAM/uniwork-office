@@ -90,6 +90,9 @@ describe('error mapping rows (shared contract)', () => {
     ['member_deactivated', true],
     ['organization_suspended', true],
     ['document_deleted', true],
+    // an archived document refuses the write with its own code; the refusal is
+    // just as terminal for this predicate as the trash verdict (OQ-F12)
+    ['document_archived', true],
     ['deleted', true],
     ['forbidden', true],
     ['not_found', true],
