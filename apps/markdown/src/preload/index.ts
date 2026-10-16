@@ -62,6 +62,8 @@ const api: MarkdownApi = {
   saveImage: (data) => ipcRenderer.invoke(MARKDOWN_CHANNELS.saveImage, data),
   discardPendingAssets: (names) =>
     ipcRenderer.invoke(MARKDOWN_CHANNELS.discardPendingAssets, names),
+  restorePendingAssets: (files) =>
+    ipcRenderer.invoke(MARKDOWN_CHANNELS.restorePendingAssets, files),
   readImage: (src) => ipcRenderer.invoke(MARKDOWN_CHANNELS.readImage, src),
   saveImageAs: (src) => ipcRenderer.invoke(MARKDOWN_CHANNELS.saveImageAs, src),
   getMarkdownTheme: async () => {

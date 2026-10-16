@@ -64,6 +64,7 @@ import { cap, platform } from '../capabilities'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
+import { redoDepth, undoDepth } from '@tiptap/pm/history'
 import { clearAiHighlights } from '../editor/aiHighlight'
 import { onRunHistoryChange, runHistoryOf } from '../editor/aiRunHistory'
 import { setInactiveSelectionShown } from '../editor/inactiveSelection'
@@ -400,8 +401,12 @@ export function AiPanel({
   const runIdRef = useRef<string | null>(null)
   /** pictures each run saved, by run id: an undo of the run drops them like Roll back */
   const runAssetsByIdRef = useRef(new Map<string, string[]>())
-  /** runs whose pictures an undo discarded: their redo would bring back dead image links */
+  /** the bytes of those pictures (base64), by run id and file name: a redo writes them back */
+  const runAssetBytesRef = useRef(new Map<string, Map<string, string>>())
+  /** runs whose pictures an undo discarded: their redo waits until the files are written back */
   const discardedRunsRef = useRef(new Set<string>())
+  /** runs whose pictures are being written back right now */
+  const restoringRunsRef = useRef(new Set<string>())
   const undoWatchRef = useRef<{ editor: Editor; stop: () => void } | null>(null)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
@@ -569,10 +574,54 @@ export function AiPanel({
       if (ed) runHistoryOf(ed).end(runId, mutated)
     },
   }
+  /** a picture the run saved: its name (for Roll back / undo) and its bytes (for a redo) */
+  const rememberRunPicture = (rel: string, base64: string): void => {
+    const name = assetFileName(rel)
+    runAssetsRef.current.push(name)
+    const runId = runIdRef.current
+    if (!runId) return
+    const byRun = runAssetBytesRef.current
+    const files = byRun.get(runId) ?? new Map<string, string>()
+    files.set(name, base64)
+    byRun.delete(runId)
+    byRun.set(runId, files)
+    // the oldest runs let go of their bytes (their redo then stays refused)
+    while (byRun.size > MAX_SNAPSHOTS) byRun.delete(byRun.keys().next().value!)
+  }
+  /**
+   * A redo of a run whose pictures an undo discarded: the pictures are written back first (same
+   * names, same bytes), then the redo is retried. Until they are back the redo is refused, so the
+   * markup never points at nothing; when they cannot be written back it stays refused.
+   */
+  function restoreRunPictures(editor: Editor, runId: string): void {
+    if (restoringRunsRef.current.has(runId)) return
+    const names = [...new Set(runAssetsByIdRef.current.get(runId) ?? [])]
+    const bytes = runAssetBytesRef.current.get(runId)
+    const files = names.flatMap((name) => {
+      const base64 = bytes?.get(name)
+      return base64 ? [{ name, base64 }] : []
+    })
+    const restore = window.markdownApi?.restorePendingAssets
+    if (!restore || files.length === 0 || files.length < names.length) return
+    // the retry only runs while the history stands where the refused redo found it
+    const depths = [undoDepth(editor.state), redoDepth(editor.state)]
+    restoringRunsRef.current.add(runId)
+    void Promise.resolve(restore(files))
+      .then((result) => {
+        if (result.errors.length > 0 || result.restored.length < files.length) return
+        discardedRunsRef.current.delete(runId)
+        if (editor.isDestroyed) return
+        if (undoDepth(editor.state) === depths[0] && redoDepth(editor.state) === depths[1]) {
+          editor.commands.redo()
+        }
+      })
+      .catch(() => {})
+      .finally(() => restoringRunsRef.current.delete(runId))
+  }
   /**
    * Ctrl/Cmd+Z of a run's step (anywhere in the app) drops the pictures that run saved, exactly
-   * like Roll back; its Roll back entry goes with it. A redo of such a run is refused: the files
-   * are gone, and the markup would point at nothing.
+   * like Roll back; its Roll back entry goes with it. The redo of such a run puts the pictures
+   * back first (see restoreRunPictures).
    */
   function watchUndo(editor: Editor): void {
     if (undoWatchRef.current?.editor === editor) return
@@ -584,7 +633,11 @@ export function AiPanel({
       discardPictures(names)
       setSnapshots((prev) => prev.filter((s) => s.runId !== runId))
     })
-    runHistoryOf(editor).refuseRedo((runId) => discardedRunsRef.current.has(runId))
+    runHistoryOf(editor).refuseRedo((runId) => {
+      if (!discardedRunsRef.current.has(runId)) return false
+      restoreRunPictures(editor, runId)
+      return true
+    })
     undoWatchRef.current = {
       editor,
       stop: () => {
@@ -614,7 +667,7 @@ export function AiPanel({
           }),
           () => readOnlyRef.current,
           () => askClarification,
-          (rel) => runAssetsRef.current.push(assetFileName(rel)),
+          rememberRunPicture,
         ),
         createSearchSkill(),
       ]),

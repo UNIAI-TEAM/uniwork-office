@@ -32,6 +32,7 @@ export const MARKDOWN_CHANNELS = {
   pickImage: 'markdown:pick-image',
   saveImage: 'markdown:save-image',
   discardPendingAssets: 'markdown:discard-pending-assets',
+  restorePendingAssets: 'markdown:restore-pending-assets',
   readImage: 'markdown:read-image',
   saveImageAs: 'markdown:save-image-as',
   getImageHost: 'markdown:get-image-host',
@@ -314,6 +315,13 @@ export interface MarkdownApi {
   discardPendingAssets?(
     names: string[],
   ): Promise<{ deleted: string[]; preserved: string[]; errors: string[] }>
+  /**
+   * Redo of an AI run whose pictures an undo discarded: write them back under the same names
+   * (pending again). A name another file took is reported in `errors`. Desktop only.
+   */
+  restorePendingAssets?(
+    files: Array<{ name: string; base64: string }>,
+  ): Promise<{ restored: string[]; errors: string[] }>
   /**
    * The configured image host (genoffice#388), or null when none was ever
    * saved. Pasted/dropped images upload here first and fall back to the

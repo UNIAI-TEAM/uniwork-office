@@ -112,7 +112,7 @@ export function createMarkdownSkill(
   /** the panel's questionnaire card behind ask_clarification; none hides the tool */
   getAsk?: () => AskClarification | undefined,
   /** told the path of each picture file a run saves beside the document (the panel's Roll back drops them) */
-  onImageAsset?: (rel: string) => void,
+  onImageAsset?: (rel: string, base64: string) => void,
 ): AgentSkill {
   /** ask_clarification only exists while a panel hosts its card; it never edits, so view-only keeps it */
   const withAsk = (tools: AgentToolDef[], readOnly: boolean): AgentToolDef[] =>

@@ -1156,6 +1156,46 @@ export async function discardPendingOwnedAssetNames(
 }
 
 /**
+ * Redo of an AI run whose pictures an undo discarded: put each file back under the very name the
+ * run's markup points at. A file that is still there with the same bytes counts as restored; a
+ * different file under that name is never touched (the redo then stays refused). Restored files
+ * are pending again, so a later undo or Roll back can drop them like the first time.
+ */
+export async function restoreOwnedAssetFiles(
+  documentPath: string,
+  files: ReadonlyArray<{ name: string; base64: string }>,
+): Promise<{ restored: string[]; errors: string[] }> {
+  const result = { restored: [] as string[], errors: [] as string[] }
+  for (const { name, base64 } of files) {
+    if (name === '' || name !== basename(name) || name.includes('\0') || name.startsWith('.')) {
+      result.errors.push(`${name}: not a plain file name`)
+      continue
+    }
+    try {
+      const bytes = Buffer.from(base64, 'base64')
+      const assetsDir = await ensureAssetsDir(documentPath)
+      const target = join(assetsDir, name)
+      try {
+        await writeFile(target, bytes, { flag: 'wx' })
+      } catch (error) {
+        if (errorCode(error) !== 'EEXIST') throw error
+        const info = await lstat(target)
+        if (!info.isFile() || info.isSymbolicLink())
+          throw new Error('not a plain file', { cause: error })
+        if ((await sha256File(target)) !== createHash('sha256').update(bytes).digest('hex')) {
+          throw new Error('a different file has this name', { cause: error })
+        }
+      }
+      await addOwnedRecord(documentPath, { name, sha256: await sha256File(target) })
+      result.restored.push(name)
+    } catch (error) {
+      result.errors.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  return result
+}
+
+/**
  * Save As moved the editing session to a new path. Resolve only pending files
  * that existed when Save As started; later insertions remain undoable.
  */
