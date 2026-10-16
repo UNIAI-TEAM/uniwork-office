@@ -1547,6 +1547,31 @@ describe('document size limits, size_warning, save_blocked, and doc.download (SI
     expect(session.downloadMaxBytes).toBe(4_000)
   })
 
+  it('an api.open result without limits resets session.limits to the init limits (no leak of the previous document)', async () => {
+    const { client, host } = setup({
+      getInit: async () => baseInit({ limits: { max_bytes: 10_000, warn_ratio: 0.85 } }),
+      api: {
+        'api.open': async ({ fileId }) => ({
+          file: { fileId, name: 'B.docx' },
+          source: { kind: 'bytes', data: new ArrayBuffer(2) },
+          // no limits: this document falls back to the init limits
+        }),
+      },
+    })
+    const session = await client.whenInitialized()
+    client.handleOpen(() => ({ opened: true }))
+    await host.open({
+      file: { fileId: 'doc-1', name: 'A.docx' },
+      source: { kind: 'bytes', data: new ArrayBuffer(1) },
+      limits: { max_bytes: 6_000, warn_ratio: 0.8 },
+    })
+    expect(session.limits).toEqual({ max_bytes: 6_000, warn_ratio: 0.8 })
+
+    await client.request('api.open', { fileId: 'doc-2' })
+    expect(session.limits).toEqual({ max_bytes: 10_000, warn_ratio: 0.85 })
+    expect(session.downloadMaxBytes).toBe(10_000)
+  })
+
   it('emits size_warning and save_blocked and answers doc.download', async () => {
     const { host, client, hostWin, frameWin } = setup()
     await host.whenReady()
