@@ -1856,6 +1856,31 @@ describe('real repo', () => {
       assert.ok(!row.source.startsWith('/'))
     }
   })
+
+  it('resolves the recursive mind-map schema at the pin (G6-09d, REPIN-1)', () => {
+    const result = extract({ repo: REPO_ROOT, rev: 'HEAD' })
+    const file = extractor.buildSchemaFile(result)
+    for (const module of ['docs', 'markdown']) {
+      const row = result.rows.find((r) => r.module === module && r.tool === 'generate_mindmap')
+      assert.ok(row, `expected a ${module}/generate_mindmap row`)
+      assert.match(row.hash, /^[0-9a-f]{64}$/)
+      const tool = file[module].find((t) => t.function.name === 'generate_mindmap')
+      assert.ok(tool, `${module}/generate_mindmap is offered`)
+      const entry = file.catalogue.find((e) => e.module === module && e.name === 'generate_mindmap')
+      assert.equal(entry.schemaComplete, true)
+      assert.equal(entry.tableHash, row.hash)
+      // the tree is inlined: the root plus one nested `children` node per depth step
+      let node = tool.function.parameters.properties.root
+      let levels = 0
+      while (node) {
+        assert.deepEqual(Object.keys(node.properties).sort(), ['block', 'children', 'label'])
+        levels += 1
+        node = node.properties.children.items
+      }
+      assert.equal(levels, 6)
+      assert.deepEqual(tool.function.parameters.required, ['root'])
+    }
+  })
 })
 
 // ────────────────────────── --emit-schemas (G6-09 W10, R2) ──────────────────────────
@@ -2202,5 +2227,218 @@ describe('--emit-schemas', () => {
     const written = readFileSync(out, 'utf8')
     assert.ok(written.endsWith('}\n'))
     assert.deepEqual(JSON.parse(written), build(dir, sha))
+  })
+})
+
+// ────────────── parameterised recursive arrow (G6-09d, card REPIN-1) ──────────────
+//
+// apps/{docs,markdown}/src/renderer/ai/mind-map.ts builds its tree schema by
+// calling a local arrow `nodeSchema(depth)`: one numeric parameter, an
+// object-literal body, a `depth > 0` base case and a self-call one step down,
+// with the depth argument read from a same-file `LIMITS` const object. The
+// extractor has to fold exactly that shape into the schema the running code
+// builds; everything else stays `unresolved:...`.
+
+const AGENT_TOOL_DEF_FIXTURE = [
+  'export interface AgentToolDef {',
+  '  name: string',
+  '  description: string',
+  '  inputSchema: Record<string, unknown>',
+  '}',
+  '',
+].join('\n')
+
+/** the mind-map module, parameterised by its `LIMITS.maxDepth` */
+const recursiveMindMap = (maxDepth) =>
+  [
+    "import type { AgentToolDef } from '@genoffice/agent-core'",
+    '',
+    'export const LIMITS = {',
+    `  maxDepth: ${maxDepth},`,
+    '} as const',
+    '',
+    'const nodeSchema = (depth: number): Record<string, unknown> => ({',
+    "  type: 'object',",
+    '  properties: {',
+    "    label: { type: 'string' },",
+    '    children:',
+    '      depth > 0',
+    '        ? {',
+    "            type: 'array',",
+    "            description: 'sub-topics',",
+    '            items: nodeSchema(depth - 1),',
+    '          }',
+    '        : {',
+    "            type: 'array',",
+    "            description: 'sub-topics',",
+    '          },',
+    '  },',
+    "  required: ['label'],",
+    '})',
+    '',
+    'export const MIND_MAP_TOOL: AgentToolDef = {',
+    "  name: 'generate_mindmap',",
+    `  description: 'draws the ${maxDepth === 2 ? 'docs' : 'markdown'} tree',`,
+    '  inputSchema: {',
+    "    type: 'object',",
+    '    properties: {',
+    "      focus: { type: 'string' },",
+    "      root: { type: 'object', description: 'the tree', ...nodeSchema(LIMITS.maxDepth) },",
+    '    },',
+    "    required: ['root'],",
+    '  },',
+    '}',
+    '',
+  ].join('\n')
+
+const RECURSIVE_FN_FIXTURE = {
+  'packages/agent-core/src/types.ts': AGENT_TOOL_DEF_FIXTURE,
+  'apps/docs/src/renderer/ai/mind-map.ts': recursiveMindMap(2),
+  'apps/markdown/src/renderer/ai/mind-map.ts': recursiveMindMap(1),
+}
+
+/** hand-expanded `nodeSchema(2)`: the root plus two nested `children` levels */
+const RECURSIVE_DOCS_PARAMS = {
+  type: 'object',
+  properties: {
+    focus: { type: 'string' },
+    root: {
+      type: 'object',
+      description: 'the tree',
+      properties: {
+        label: { type: 'string' },
+        children: {
+          type: 'array',
+          description: 'sub-topics',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              children: {
+                type: 'array',
+                description: 'sub-topics',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string' },
+                    children: { type: 'array', description: 'sub-topics' },
+                  },
+                  required: ['label'],
+                },
+              },
+            },
+            required: ['label'],
+          },
+        },
+      },
+      required: ['label'],
+    },
+  },
+  required: ['root'],
+}
+
+/** hand-expanded `nodeSchema(1)`: the root plus one nested level, no `items` at the bottom */
+const RECURSIVE_MARKDOWN_PARAMS = {
+  type: 'object',
+  properties: {
+    focus: { type: 'string' },
+    root: {
+      type: 'object',
+      description: 'the tree',
+      properties: {
+        label: { type: 'string' },
+        children: {
+          type: 'array',
+          description: 'sub-topics',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              children: { type: 'array', description: 'sub-topics' },
+            },
+            required: ['label'],
+          },
+        },
+      },
+      required: ['label'],
+    },
+  },
+  required: ['root'],
+}
+
+const RECURSIVE_FN_REFUSED_FIXTURE = {
+  'packages/agent-core/src/types.ts': AGENT_TOOL_DEF_FIXTURE,
+  'apps/docs/src/renderer/ai/tools.ts': [
+    "import type { AgentToolDef } from '@genoffice/agent-core'",
+    '',
+    'const twoParams = (a: number, b: number) => ({',
+    "  type: 'object',",
+    '})',
+    'const blockBody = (n: number) => {',
+    "  return { type: 'object' }",
+    '}',
+    'const growing = (n: number) => ({',
+    "  type: 'object',",
+    "  properties: { x: { type: 'array', items: growing(n + 1) } },",
+    '})',
+    'const flat = (n: number) => ({',
+    "  type: 'object',",
+    "  properties: { y: { type: 'string' } },",
+    '})',
+    '',
+    'export const TOOLS: AgentToolDef[] = [',
+    "  { name: 'two_params', description: 'x', inputSchema: twoParams(1, 2) },",
+    "  { name: 'block_body', description: 'x', inputSchema: blockBody(1) },",
+    "  { name: 'growing', description: 'x', inputSchema: growing(0) },",
+    "  { name: 'no_args', description: 'x', inputSchema: flat() },",
+    "  { name: 'string_arg', description: 'x', inputSchema: flat('a') },",
+    "  { name: 'free_arg', description: 'x', inputSchema: flat(unknownDepth) },",
+    "  { name: 'huge_arg', description: 'x', inputSchema: flat(99) },",
+    ']',
+    '',
+  ].join('\n'),
+}
+
+describe('parameterised recursive arrow (G6-09d)', () => {
+  const build = (repo, rev) => extractor.buildSchemaFile(extract({ repo, rev }))
+
+  it('folds a self-recursive local arrow into the table hash', () => {
+    const { dir } = fixture(RECURSIVE_FN_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const hash = (module) =>
+      rows.find((r) => r.module === module && r.tool === 'generate_mindmap').hash
+    assert.equal(hash('docs'), hashOf(RECURSIVE_DOCS_PARAMS))
+    assert.equal(hash('markdown'), hashOf(RECURSIVE_MARKDOWN_PARAMS))
+    // the same body, two files: only the same-file `LIMITS.maxDepth` const differs
+    assert.notEqual(hash('docs'), hash('markdown'))
+  })
+
+  it('offers the folded schema in the emitted file, complete', () => {
+    const { dir, sha } = fixture(RECURSIVE_FN_FIXTURE)
+    const file = build(dir, sha)
+    const params = { docs: RECURSIVE_DOCS_PARAMS, markdown: RECURSIVE_MARKDOWN_PARAMS }
+    for (const module of ['docs', 'markdown']) {
+      const tool = file[module].find((t) => t.function.name === 'generate_mindmap')
+      assert.deepEqual(tool.function.parameters, params[module])
+      const entry = file.catalogue.find((e) => e.module === module && e.name === 'generate_mindmap')
+      assert.equal(entry.schemaComplete, true)
+      assert.equal(entry.offered, true)
+      assert.equal(entry.inputSchemaSha256, hashOf(params[module]))
+      // the table's own cell resolved too: no `unresolved:` left on this row
+      assert.equal(entry.tableHash, hashOf(params[module]))
+    }
+  })
+
+  it('refuses a call outside the bounded arrow shape', () => {
+    const { dir } = fixture(RECURSIVE_FN_REFUSED_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const hash = (tool) => rows.find((r) => r.tool === tool).hash
+    // a self-call that never comes down runs into the depth guard
+    assert.equal(hash('growing'), 'unresolved:recursion')
+    // the argument must be one resolved integer inside the bound
+    for (const tool of ['no_args', 'string_arg', 'free_arg', 'huge_arg'])
+      assert.equal(hash(tool), 'unresolved:call:flat')
+    // two parameters / a block body are not the folded shape
+    for (const tool of ['two_params', 'block_body']) assert.match(hash(tool), /^unresolved:identifier:/)
   })
 })
