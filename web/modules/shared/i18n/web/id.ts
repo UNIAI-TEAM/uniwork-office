@@ -68,6 +68,8 @@ export const id = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'Lihat perbedaan',
+  uwConflictDiffPending: 'Membandingkan…',
+  uwConflictDiffFailed: 'Versi tidak dapat dibandingkan saat ini. Coba lagi nanti.',
   uwConflictNoEdit: 'Anda tidak lagi memiliki akses edit ke dokumen ini.',
   uwConflictOverwriteTitle: 'Timpa dengan versi Anda?',
   uwConflictOverwriteConfirm:

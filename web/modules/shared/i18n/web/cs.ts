@@ -69,6 +69,8 @@ export const cs = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'Zobrazit rozdíly',
+  uwConflictDiffPending: 'Porovnávání…',
+  uwConflictDiffFailed: 'Verze se teď nepodařilo porovnat. Zkuste to znovu později.',
   uwConflictNoEdit: 'K tomuto dokumentu už nemáte oprávnění k úpravám.',
   uwConflictOverwriteTitle: 'Přepsat vaší verzí?',
   uwConflictOverwriteConfirm:

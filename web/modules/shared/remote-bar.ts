@@ -41,14 +41,28 @@ export const BAR_AUTO_HIDE_MS = 8000
 const ALERT_CLEAR_MS = 1000
 const ROOT_CLASS = 'uw-remote-bar-on'
 
-function liveNode(doc: Document, role: 'status' | 'alert'): HTMLElement {
-  const el = doc.createElement('div')
-  el.className = 'uw-live'
-  el.setAttribute('role', role)
-  el.setAttribute('aria-live', role === 'alert' ? 'assertive' : 'polite')
-  el.setAttribute('aria-atomic', 'true')
-  doc.body.append(el)
-  return el
+/**
+ * The window's two live nodes (polite `status`, assertive `alert`): exactly one pair per frame,
+ * created at frame start so a screen reader has registered them before the first announcement
+ * (a live region inserted together with its text is often not read). Idempotent: every announcer
+ * of the frame reuses the pair that is already there.
+ */
+export function ensureLiveNodes(doc: Document = document): {
+  polite: HTMLElement
+  alert: HTMLElement
+} {
+  const node = (role: 'status' | 'alert'): HTMLElement => {
+    const found = doc.querySelector<HTMLElement>(`.uw-live[role="${role}"]`)
+    if (found) return found
+    const el = doc.createElement('div')
+    el.className = 'uw-live'
+    el.setAttribute('role', role)
+    el.setAttribute('aria-live', role === 'alert' ? 'assertive' : 'polite')
+    el.setAttribute('aria-atomic', 'true')
+    doc.body.append(el)
+    return el
+  }
+  return { polite: node('status'), alert: node('alert') }
 }
 
 export function createRemoteBar(doc: Document = document): RemoteBar {
@@ -56,26 +70,26 @@ export function createRemoteBar(doc: Document = document): RemoteBar {
   let spec: BarSpec | null = null
   let hideTimer: ReturnType<typeof setTimeout> | null = null
   let alertTimer: ReturnType<typeof setTimeout> | null = null
-  let polite: HTMLElement | null = null
-  let alert: HTMLElement | null = null
   let hovered = false
+  // the frame's fixed pair exists before any bar or announcement
+  if (doc.body) ensureLiveNodes(doc)
 
   function announce(text: string, tone: BarTone): void {
     // a newer version is news, not an emergency: the information bar and the dirty / AI warnings
     // wait for a pause instead of cutting in while the user types; only the error bars interrupt
     if (tone !== 'error') {
-      polite ??= liveNode(doc, 'status')
+      const { polite } = ensureLiveNodes(doc)
       polite.textContent = ''
       polite.textContent = text
       return
     }
-    alert ??= liveNode(doc, 'alert')
+    const { alert } = ensureLiveNodes(doc)
     alert.textContent = text
     // written once, then cleared: the bar keeps the visible copy
     if (alertTimer !== null) clearTimeout(alertTimer)
     alertTimer = setTimeout(() => {
       alertTimer = null
-      if (alert) alert.textContent = ''
+      ensureLiveNodes(doc).alert.textContent = ''
     }, ALERT_CLEAR_MS)
   }
 

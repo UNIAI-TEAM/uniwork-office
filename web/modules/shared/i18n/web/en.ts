@@ -67,6 +67,8 @@ export const en = {
 
   // S5 conflict dialog: step 1 extras, confirmation step and results
   uwConflictViewDiff: 'View differences',
+  uwConflictDiffPending: 'Comparing…',
+  uwConflictDiffFailed: 'The versions could not be compared right now. Try again later.',
   uwConflictNoEdit: 'You no longer have edit access to this document.',
   uwConflictOverwriteTitle: 'Overwrite with your version?',
   uwConflictOverwriteConfirm:
