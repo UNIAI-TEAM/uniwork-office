@@ -168,6 +168,45 @@ describe('restoring the pictures of a redone AI run', () => {
   })
 })
 
+// RBG5-1/RBG5-2: one redo carries every picture of the run in a single call, and the whole call
+// shares one manifest lock — so the per-file handling inside it is the only thing that keeps the
+// rest of the batch going. A name that cannot come back (here a foreign file took it) must not
+// stop the pictures after it; an early abort would leave their markup pointing at nothing while
+// the redo still looked like it ran.
+describe('a restore call that cannot put back one picture of several', () => {
+  it('keeps going and restores the pictures after the failed name', async () => {
+    const dir = await tempDir()
+    const doc = join(dir, 'note.md')
+    const assets = join(dir, 'assets')
+    const runBytes = { 'a.png': 'run-a', 'b.png': 'run-b', 'c.png': 'run-c' }
+    for (const [name, bytes] of Object.entries(runBytes)) {
+      await writeImageIntoOwnedAssets(doc, name, Buffer.from(bytes))
+    }
+    // the undo's discard: every picture leaves the folder, so the redo has all three to put back
+    const discarded = await discardPendingOwnedAssets(doc)
+    expect([...discarded.deleted].sort()).toEqual(['a.png', 'b.png', 'c.png'])
+    // while they were gone a different file took the middle name
+    await writeFile(join(assets, 'b.png'), 'someone else')
+
+    const result = await restoreOwnedAssetFiles(
+      doc,
+      Object.entries(runBytes).map(([name, bytes]) => ({ name, base64: b64(bytes) })),
+    )
+
+    expect(result.restored).toEqual(['a.png', 'c.png'])
+    // the collision is the only complaint, and it names the picture it refused
+    expect(result.errors).toHaveLength(1)
+    expect(result.errors[0]).toMatch(/^b\.png: /)
+    expect(await readFile(join(assets, 'b.png'), 'utf8')).toBe('someone else')
+    // the pictures on both sides of the failed one are on disk with the run's own bytes
+    expect(await readFile(join(assets, 'a.png'), 'utf8')).toBe('run-a')
+    expect(await readFile(join(assets, 'c.png'), 'utf8')).toBe('run-c')
+    expect((await readOwnedAssetManifest(doc)).pending).toMatchObject({
+      'note.md': ['a.png', 'c.png'],
+    })
+  })
+})
+
 // RBG-MDb-2: the restore refuses a leading-dot name, so a named discard must refuse it too.
 // Otherwise a name that can never come back is deleted for good by that very run's Roll back.
 describe('names a named discard refuses', () => {
