@@ -756,6 +756,16 @@ describe('G5-06 W4b save queue wiring', () => {
         (status) => status.path === path && status.state === 'queued',
       )
       expect(queued.map((status) => status.error)).toEqual(queued.map(() => undefined))
+      // and it is published BEFORE the receipt: the pre-commit chip the user
+      // reads is that clean queued status, never one that lands after `saved`
+      const firstQueued = ctx.statuses.findIndex(
+        (status) => status.path === path && status.state === 'queued',
+      )
+      const firstSaved = ctx.statuses.findIndex(
+        (status) => status.path === path && status.state === 'saved',
+      )
+      expect(firstQueued).toBeGreaterThanOrEqual(0)
+      expect(firstSaved).toBeGreaterThan(firstQueued)
     })
 
     it.each(['member_deactivated', 'organization_suspended'] as const)(
