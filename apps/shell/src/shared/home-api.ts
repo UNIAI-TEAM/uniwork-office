@@ -390,9 +390,17 @@ export type UniworkDocNameError = 'name_empty' | 'name_too_long' | 'folder_name_
  * `upload_cancelled` is an upload the person aborted; none of them is part of
  * `UniworkDocErrorCode`, because that union is switched on exhaustively by the
  * renderer's error copy table.
+ * MYFOLDER-01 / SAVE-01: `my_folder_locked` (409, error_class "conflict") and
+ * `invalid_destination` (400) arrive on the error's `serverCode` and join here
+ * for the same reason - the renderer shows them verbatim, keyed by code.
  */
 export type UniworkDocActionError =
-  UniworkDocErrorCode | UniworkDocNameError | 'move_name_taken' | 'upload_cancelled'
+  | UniworkDocErrorCode
+  | UniworkDocNameError
+  | 'move_name_taken'
+  | 'upload_cancelled'
+  | 'my_folder_locked'
+  | 'invalid_destination'
 export type UniworkDocActionResult<T> =
   | { ok: true; value: T }
   | {

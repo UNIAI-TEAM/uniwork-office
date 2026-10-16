@@ -131,6 +131,13 @@ function fakeServer(
     deepMax?: number | string | null
     /** FD-11: a move whose target already holds the name renames the entry "Name (2)" */
     moveRenames?: boolean
+    /**
+     * SAVE-01 / MYFOLDER-01: D's 409 `my_folder_locked` (error_class
+     * "conflict") on rename/move/archive of the My Folder row itself
+     */
+    myFolderLocked?: boolean
+    /** SAVE-01: D's bare 400 `invalid_destination` on the create routes */
+    invalidDestination?: boolean
   } = {},
 ) {
   const state = {
@@ -190,6 +197,11 @@ function fakeServer(
       call.body = JSON.parse(String(init.body))
       if (options.nameTaken) return envelope(409, 'conflict')
       if (options.nameRefused) return envelope(400, 'invalid_request')
+      // MYFOLDER-01: a create that mixes destination and parent_id, or names an
+      // unknown destination, is refused before the document exists
+      if (options.invalidDestination) {
+        return json(400, { error: { code: 'invalid_destination', message: 'x' } })
+      }
       const id = `new_${++seq}`
       const title = (call.body as { title: string }).title
       state.documents.set(id, { title, bytes: enc('blank') })
@@ -225,8 +237,12 @@ function fakeServer(
       call.body = {
         title: form.get('title'),
         parent_id: form.get('parent_id'),
+        destination: form.get('destination'),
         name: file.name,
         bytes,
+      }
+      if (options.invalidDestination) {
+        return json(400, { error: { code: 'invalid_destination', message: 'x' } })
       }
       const id = `up_${++seq}`
       state.documents.set(id, { title: file.name, bytes })
@@ -261,6 +277,10 @@ function fakeServer(
         }
         call.body = body
         if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
+        // MYFOLDER-01: destination on a folder create is refused the same way
+        if (options.invalidDestination) {
+          return json(400, { error: { code: 'invalid_destination', message: 'x' } })
+        }
         if (options.deepMax !== undefined) {
           return json(422, {
             error: {
@@ -302,6 +322,11 @@ function fakeServer(
     // archive / restore
     if (u.pathname === `/api/v1/documents/${DOC}/archive`) {
       if (options.lifecycleConflict) return envelope(409, 'conflict')
+      if (options.myFolderLocked) {
+        return json(409, {
+          error: { code: 'my_folder_locked', message: 'x', error_class: 'conflict' },
+        })
+      }
       state.archived = true
       return json(200, { document: docJson(DOC), affected: [DOC] })
     }
@@ -315,6 +340,13 @@ function fakeServer(
       call.body = body
       if (options.nameTaken) return envelope(409, 'conflict')
       if (options.nameRefused) return envelope(400, 'invalid_request')
+      // MYFOLDER-01: D answers rename/move/archive of the My Folder row with
+      // 409 my_folder_locked and error_class "conflict"
+      if (options.myFolderLocked) {
+        return json(409, {
+          error: { code: 'my_folder_locked', message: 'x', error_class: 'conflict' },
+        })
+      }
       if (body.revision !== String(state.revision)) {
         return json(422, {
           error: {
@@ -336,6 +368,13 @@ function fakeServer(
       const body: { parent_id: string | null; revision: string } = JSON.parse(String(init.body))
       call.body = body
       if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
+      // MYFOLDER-01: a move into (or of) the locked My Folder row refuses
+      // before the move mutates anything
+      if (options.myFolderLocked) {
+        return json(409, {
+          error: { code: 'my_folder_locked', message: 'x', error_class: 'conflict' },
+        })
+      }
       const title = id === DOC ? state.title : (state.documents.get(id)?.title ?? 'new.docx')
       // a name already taken in the target folder is auto-renamed by the server
       const renamed = options.moveRenames ? `${title} (2)` : title
@@ -1947,5 +1986,50 @@ describe('the FD-11 tree-changed push', () => {
       }
     }
     expect(emitted).toEqual([])
+  })
+})
+
+// SAVE-01 / MYFOLDER-01: the folder server-codes `my_folder_locked` and
+// `invalid_destination` carry the action to the renderer as themselves, never
+// as the bare envelope error_class. `my_folder_locked` arrives as 409 with
+// error_class "conflict": if the client ever switches on the class first, the
+// move would be treated as a revision conflict - re-read, retried, and finally
+// reported as "conflict" while the file never moved. These tests pin the
+// code-first mapping end-to-end: exactly one move POST, no re-read past the
+// initial ref fetch, and the typed code on the result.
+describe('SAVE-01 my_folder_locked and invalid_destination', () => {
+  it('maps a 409 my_folder_locked move refusal by code, once, never as a conflict retry', async () => {
+    const server = fakeServer({ myFolderLocked: true })
+    const ctx = setup(server)
+    const moved = await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })
+    expect(moved).toEqual({ ok: false, error: 'my_folder_locked' })
+    // one GET /documents/{id} (the revision read) + one POST .../move: a
+    // conflict path would read and post again
+    expect(server.calls).toHaveLength(2)
+    expect(
+      server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/move')),
+    ).toHaveLength(1)
+  })
+
+  it('answers rename and archive of the locked row as my_folder_locked too', async () => {
+    const server = fakeServer({ myFolderLocked: true })
+    const ctx = setup(server)
+    expect(await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx')).toEqual({
+      ok: false,
+      error: 'my_folder_locked',
+    })
+    expect(await ctx.service.archiveDocument(DOC)).toEqual({
+      ok: false,
+      error: 'my_folder_locked',
+    })
+  })
+
+  it('answers a create refused 400 invalid_destination as the field error, once', async () => {
+    const server = fakeServer({ invalidDestination: true })
+    const ctx = setup(server)
+    expect(
+      await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'Contracts' }),
+    ).toEqual({ ok: false, error: 'invalid_destination' })
+    expect(server.calls).toHaveLength(1)
   })
 })

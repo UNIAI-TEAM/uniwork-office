@@ -528,6 +528,13 @@ function actionErrorOf(error: unknown, nameField: boolean): UniworkDocActionErro
     if (code === 'name_empty' || code === 'name_too_long' || code === 'upload_cancelled') {
       return code
     }
+    // MYFOLDER-01 / SAVE-01: the two folder server-codes are matched on `code`
+    // BEFORE any error_class-based switch - a 409 `my_folder_locked` carries
+    // error_class "conflict" and a class-first read would send the action down
+    // the revision-conflict path (re-read/retry/"conflict" state), which it is
+    // not. `invalid_destination` (400) is a destination field error.
+    if (error.serverCode === 'my_folder_locked') return 'my_folder_locked'
+    if (error.serverCode === 'invalid_destination') return 'invalid_destination'
     // B-R1-03 / B-R1-09: `folder_name_taken` stays off UniworkDocErrorCode;
     // create/rename (`nameField: true`) report `folder_name_taken` for the name
     // field, while a move exhausting "(n)" names reports `move_name_taken`
