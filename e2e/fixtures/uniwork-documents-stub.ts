@@ -59,6 +59,26 @@ export interface StubDocumentInit {
   workspaceId?: string
   myLevel?: StubAccessLevel
   id?: string
+  parentId?: string | null
+}
+
+export interface StubFolderInit {
+  title: string
+  parentId?: string | null
+  workspaceId?: string
+  myLevel?: StubAccessLevel
+  id?: string
+  position?: number
+}
+
+export interface StubFolderState {
+  id: string
+  workspaceId: string
+  title: string
+  parentId: string | null
+  revision: string
+  myLevel: StubAccessLevel
+  archived: boolean
 }
 
 interface StubVersion {
@@ -71,13 +91,15 @@ interface StubVersion {
 interface StubDocument {
   id: string
   workspaceId: string
+  kind: 'file' | 'folder'
   title: string
   filename: string
   myLevel: StubAccessLevel
   revision: number
+  position: number
   versions: StubVersion[]
   updatedAt: string
-  /** G5-12: the folder or page holding the document (null = root) */
+  /** G5-12 / FD-11: the folder or page holding the document (null = root) */
   parentId: string | null
   /** G5-12: the source of a copy made through `/copies` */
   copiedFrom?: string
@@ -120,7 +142,24 @@ export type CommitDrop = 'before' | 'after'
 
 export interface UniworkDocumentsStub extends UniworkAuthStub {
   addDocument(init: StubDocumentInit): StubDocumentState
+  addFolder(init: StubFolderInit): StubFolderState
   state(documentId: string): StubDocumentState
+  folderState(folderId: string): StubFolderState
+  folders(workspaceId?: string): StubFolderState[]
+  /** enables `/orgs/{org}/office/capabilities` (`sync_feed: true`) and `/workspaces/{ws}/documents/changes` */
+  enableFeed(enabled?: boolean): void
+  /** simulates a move on the web and appends an upsert to the change feed */
+  webMove(
+    id: string,
+    parentId: string | null,
+  ): { id: string; title: string; parentId: string | null; revision: string }
+  /** simulates a rename on the web and appends an upsert to the change feed */
+  webRename(
+    id: string,
+    title: string,
+  ): { id: string; title: string; parentId: string | null; revision: string }
+  /** simulates archiving on the web and appends an archived upsert to the change feed */
+  webArchive(id: string): { id: string; archived: boolean; revision: string }
   /** a save made elsewhere (the web editor): revision and version advance, bytes optionally change */
   bumpRevision(documentId: string, bytes?: Buffer): StubDocumentState
   /** the caller's access to a document, as the server reports it */
@@ -186,6 +225,16 @@ interface StoredCommit {
   body: unknown
 }
 
+interface FeedEvent {
+  change_kind: 'upsert' | 'removal'
+  document_id: string
+  kind: 'file' | 'folder'
+  revision: string
+  current_version: number
+  version_id: string | null
+  archived: boolean
+}
+
 const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
 const ulid = (prefix: string): string => `${prefix}_${randomBytes(9).toString('hex')}`
 
@@ -218,12 +267,17 @@ function multipartFile(body: Buffer, contentType: string): Buffer | null {
   return null
 }
 
-export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub> {
+export async function startUniworkDocumentsStub(
+  options: { feed?: boolean } = {},
+): Promise<UniworkDocumentsStub> {
   const documents = new Map<string, StubDocument>()
   const tickets = new Map<string, Ticket>()
   const uploads = new Map<string, StoredUpload>()
   const uploadByKey = new Map<string, StoredUpload>()
   const commitByKey = new Map<string, StoredCommit>()
+  const folderByKey = new Map<string, string>()
+  const feedLog: FeedEvent[] = []
+  let feedEnabled = Boolean(options.feed)
   const calls: StubCall[] = []
   /** the pending commit drops, one per commit, oldest first */
   let commitDrops: CommitDrop[] = []
@@ -246,6 +300,105 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
     myLevel: doc.myLevel,
   })
 
+  const folderStateOf = (doc: StubDocument): StubFolderState => ({
+    id: doc.id,
+    workspaceId: doc.workspaceId,
+    title: doc.title,
+    parentId: doc.parentId,
+    revision: String(doc.revision),
+    myLevel: doc.myLevel,
+    archived: Boolean(doc.archivedAt),
+  })
+
+  const recordFeedUpsert = (doc: StubDocument): void => {
+    feedLog.push({
+      change_kind: 'upsert',
+      document_id: doc.id,
+      kind: doc.kind,
+      revision: String(doc.revision),
+      current_version: doc.kind === 'file' ? latest(doc).version : 0,
+      version_id: doc.kind === 'file' ? `ver_${doc.id}_${latest(doc).version}` : null,
+      archived: Boolean(doc.archivedAt),
+    })
+  }
+
+  const ancestorsOf = (doc: StubDocument): Array<{ id: string; title: string }> => {
+    const chain: Array<{ id: string; title: string }> = []
+    const visited = new Set<string>([doc.id])
+    let curId = doc.parentId
+    while (curId) {
+      if (visited.has(curId)) break
+      visited.add(curId)
+      const parent = documents.get(curId)
+      if (!parent) break
+      chain.unshift({ id: parent.id, title: parent.title })
+      curId = parent.parentId
+    }
+    return chain
+  }
+
+  const isLiveInTree = (doc: StubDocument): boolean => {
+    if (doc.archivedAt) return false
+    const visited = new Set<string>([doc.id])
+    let curId = doc.parentId
+    while (curId) {
+      if (visited.has(curId)) return false
+      visited.add(curId)
+      const parent = documents.get(curId)
+      if (!parent || parent.archivedAt || parent.kind !== 'folder') return false
+      curId = parent.parentId
+    }
+    return true
+  }
+
+  const hasSiblingCollision = (
+    workspaceId: string,
+    parentId: string | null,
+    kind: 'file' | 'folder',
+    title: string,
+    excludeId?: string,
+  ): boolean => {
+    const key = title.normalize('NFC').trim().toLowerCase()
+    for (const d of documents.values()) {
+      if (
+        d.id !== excludeId &&
+        d.workspaceId === workspaceId &&
+        !d.archivedAt &&
+        d.parentId === parentId &&
+        d.kind === kind &&
+        d.title.normalize('NFC').trim().toLowerCase() === key
+      ) {
+        return true
+      }
+    }
+    return false
+  }
+
+  const resolveMoveTitle = (
+    doc: StubDocument,
+    targetParentId: string | null,
+  ): { ok: true; title: string } | { ok: false } => {
+    if (
+      targetParentId === doc.parentId ||
+      !hasSiblingCollision(doc.workspaceId, targetParentId, doc.kind, doc.title, doc.id)
+    ) {
+      return { ok: true, title: doc.title }
+    }
+    for (const n of [2, 3, 4]) {
+      let candidate = `${doc.title} (${n})`
+      if (doc.kind === 'file') {
+        const dot = doc.title.lastIndexOf('.')
+        if (dot > 0) {
+          candidate = `${doc.title.slice(0, dot)} (${n})${doc.title.slice(dot)}`
+        }
+      }
+      if (!hasSiblingCollision(doc.workspaceId, targetParentId, doc.kind, candidate, doc.id)) {
+        return { ok: true, title: candidate }
+      }
+    }
+    return { ok: false }
+  }
+
   const fileDto = (doc: StubDocument, version: StubVersion) => ({
     file_id: `file_${doc.id}_${version.version}`,
     version_id: `ver_${doc.id}_${version.version}`,
@@ -260,17 +413,22 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
     id: doc.id,
     organization_id: STUB_ORG.id,
     workspace_id: doc.workspaceId,
-    kind: 'file',
+    kind: doc.kind,
     title: doc.title,
     visibility: 'workspace',
     parent_id: doc.parentId,
+    path: ancestorsOf(doc),
     ...(doc.archivedAt ? { archived_at: doc.archivedAt } : {}),
     revision: String(doc.revision),
-    current_version: latest(doc).version,
-    position: 0,
+    ...(doc.kind === 'file'
+      ? {
+          current_version: latest(doc).version,
+          file: fileDto(doc, latest(doc)),
+        }
+      : {}),
+    position: doc.position,
     my_level: doc.myLevel,
     via: 'member',
-    file: fileDto(doc, latest(doc)),
     created_by: STUB_ACCOUNT.id,
     created_by_kind: 'human',
     updated_by: STUB_ACCOUNT.id,
@@ -279,9 +437,10 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
     updated_at: doc.updatedAt,
   })
 
-  const summaryDto = (doc: StubDocument) => {
-    const { file: _file, ...rest } = documentDto(doc)
-    return rest
+  const summaryDto = (doc: StubDocument, withPath = false) => {
+    const dto = documentDto(doc)
+    const { file: _file, path, ...rest } = dto as typeof dto & { file?: unknown }
+    return withPath ? { ...rest, path } : rest
   }
 
   const envelope = (code: string, fields?: Record<string, unknown>) => ({
@@ -308,7 +467,66 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
     const idem = req.headers['idempotency-key']
     const idempotencyKey = typeof idem === 'string' ? idem : undefined
 
-    let m = /^\/orgs\/([^/]+)\/workspaces$/.exec(route)
+    let m = /^\/orgs\/([^/]+)\/office\/capabilities$/.exec(route)
+    if (m && method === 'GET') {
+      if (!feedEnabled) return false
+      if (m[1] !== STUB_ORG.id) {
+        ctx.send(404, envelope('not_found'))
+        return true
+      }
+      ctx.send(200, {
+        sync_feed: true,
+        sync_write: true,
+        offline_library: false,
+        ai_uniwork: false,
+        ai_uniwork_formats: [],
+        ttl_seconds: 300,
+      })
+      return true
+    }
+
+    m = /^\/workspaces\/([^/]+)\/documents\/changes$/.exec(route)
+    if (m && method === 'GET') {
+      const wsId = m[1]!
+      if (wsId !== STUB_WORKSPACE.id) {
+        ctx.send(404, envelope('not_found'))
+        return true
+      }
+      const cursor = url.searchParams.get('cursor')
+      const expiresAt = new Date(Date.now() + 86_400_000).toISOString()
+      if (!cursor) {
+        const items = [...documents.values()].filter(
+          (d) => d.workspaceId === wsId && isLiveInTree(d),
+        )
+        ctx.send(200, {
+          phase: 'snapshot',
+          changes: items.map((d) => ({
+            document_id: d.id,
+            kind: d.kind,
+            revision: String(d.revision),
+            current_version: d.kind === 'file' ? latest(d).version : 0,
+            version_id: d.kind === 'file' ? `ver_${d.id}_${latest(d).version}` : null,
+          })),
+          has_more: false,
+          next_cursor: `cur_${feedLog.length}`,
+          expires_at: expiresAt,
+        })
+        return true
+      }
+      const idx = Number(cursor.replace(/^cur_/, '')) || 0
+      const events = feedLog.slice(idx)
+      ctx.send(200, {
+        phase: 'feed',
+        changes: [],
+        feed: events,
+        has_more: false,
+        next_cursor: `cur_${feedLog.length}`,
+        expires_at: expiresAt,
+      })
+      return true
+    }
+
+    m = /^\/orgs\/([^/]+)\/workspaces$/.exec(route)
     if (m && method === 'GET') {
       log(ctx, { status: 200 })
       if (m[1] !== STUB_ORG.id) {
@@ -329,28 +547,189 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
       return true
     }
 
+    m = /^\/workspaces\/([^/]+)\/documents\/tree$/.exec(route)
+    if (m && method === 'GET') {
+      const wsId = m[1]!
+      const foldersInWs = [...documents.values()].filter(
+        (d) => d.workspaceId === wsId && d.kind === 'folder' && isLiveInTree(d),
+      )
+      type TreeNodeDto = {
+        id: string
+        parent_id: string | null
+        title: string
+        kind: 'folder'
+        position: number
+        children: TreeNodeDto[]
+      }
+      const buildChildren = (parentId: string | null): TreeNodeDto[] =>
+        foldersInWs
+          .filter((f) => f.parentId === parentId)
+          .sort((a, b) => a.position - b.position || a.title.localeCompare(b.title))
+          .map((f) => ({
+            id: f.id,
+            parent_id: f.parentId,
+            title: f.title,
+            kind: 'folder',
+            position: f.position,
+            children: buildChildren(f.id),
+          }))
+      log(ctx, { status: 200 })
+      ctx.send(200, { documents: buildChildren(null) })
+      return true
+    }
+
+    m = /^\/workspaces\/([^/]+)\/documents$/.exec(route)
+    if (m && method === 'POST') {
+      const wsId = m[1]!
+      const raw = await ctx.readBody()
+      let body: { kind?: unknown; title?: unknown; parent_id?: unknown } = {}
+      try {
+        body = JSON.parse(raw.toString('utf8')) as typeof body
+      } catch {
+        body = {}
+      }
+      const base: Omit<StubCall, 'method' | 'route' | 'status'> = {
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+      }
+      const title = typeof body.title === 'string' ? body.title.normalize('NFC').trim() : ''
+      if (body.kind !== 'folder' || !title || title.length > 255) {
+        log(ctx, { ...base, status: 400 })
+        ctx.send(400, envelope('invalid_request'))
+        return true
+      }
+      if (idempotencyKey) {
+        const replayedId = folderByKey.get(`${wsId}:${idempotencyKey}`)
+        const replayed = replayedId ? documents.get(replayedId) : undefined
+        if (replayed) {
+          log(ctx, { ...base, status: 201 })
+          ctx.send(201, { document: documentDto(replayed) })
+          return true
+        }
+      }
+      const parentId =
+        typeof body.parent_id === 'string' && body.parent_id.length > 0 ? body.parent_id : null
+      if (parentId !== null) {
+        const parent = documents.get(parentId)
+        if (!parent || parent.workspaceId !== wsId || !isLiveInTree(parent)) {
+          log(ctx, { ...base, status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        if (parent.kind !== 'folder') {
+          log(ctx, { ...base, status: 422 })
+          ctx.send(422, envelope('document_parent_kind'))
+          return true
+        }
+        if (ancestorsOf(parent).length + 2 > 20) {
+          log(ctx, { ...base, status: 422 })
+          ctx.send(422, envelope('document_too_deep'))
+          return true
+        }
+      }
+      if (hasSiblingCollision(wsId, parentId, 'folder', title)) {
+        log(ctx, { ...base, status: 409 })
+        ctx.send(409, envelope('folder_name_taken'))
+        return true
+      }
+      const folder: StubDocument = {
+        id: ulid('fold'),
+        workspaceId: wsId,
+        kind: 'folder',
+        title,
+        filename: title,
+        myLevel: 'edit',
+        revision: 1,
+        position: 0,
+        versions: [],
+        updatedAt: new Date().toISOString(),
+        parentId,
+      }
+      documents.set(folder.id, folder)
+      recordFeedUpsert(folder)
+      if (idempotencyKey) folderByKey.set(`${wsId}:${idempotencyKey}`, folder.id)
+      log(ctx, { ...base, status: 201 })
+      ctx.send(201, { document: documentDto(folder) })
+      return true
+    }
+
     m = /^\/workspaces\/([^/]+)\/documents(\/recent)?$/.exec(route)
     if (m && method === 'GET') {
+      const wsId = m[1]!
+      const isRecent = Boolean(m[2])
       const query = (url.searchParams.get('q') ?? '').toLowerCase()
       const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit')) || 50))
       const offset = Number(url.searchParams.get('cursor')) || 0
+
+      if (!isRecent && url.searchParams.has('parent_id')) {
+        const rawParent = url.searchParams.get('parent_id') ?? ''
+        const targetParentId = rawParent === '' ? null : rawParent
+        if (targetParentId !== null) {
+          const parent = documents.get(targetParentId)
+          if (
+            !parent ||
+            parent.workspaceId !== wsId ||
+            parent.kind !== 'folder' ||
+            !isLiveInTree(parent)
+          ) {
+            log(ctx, { status: 404 })
+            ctx.send(404, envelope('not_found'))
+            return true
+          }
+        }
+        const rows = [...documents.values()]
+          .filter((d) => d.workspaceId === wsId && isLiveInTree(d) && d.parentId === targetParentId)
+          .sort((a, b) => {
+            if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1
+            return a.position - b.position || a.title.localeCompare(b.title)
+          })
+        const page = rows.slice(offset, offset + limit)
+        log(ctx, { status: 200 })
+        ctx.send(200, {
+          documents: page.map((d) => summaryDto(d)),
+          next_cursor: offset + limit < rows.length ? String(offset + limit) : null,
+        })
+        return true
+      }
+
+      if (!isRecent && url.searchParams.get('match') === 'title') {
+        const kindParam = url.searchParams.get('kind')
+        const rows = [...documents.values()].filter((d) => {
+          if (d.workspaceId !== wsId || !isLiveInTree(d)) return false
+          if (kindParam === 'folder' && d.kind !== 'folder') return false
+          if (kindParam === 'document' && d.kind === 'folder') return false
+          return d.title.toLowerCase().includes(query)
+        })
+        const page = rows.slice(offset, offset + limit)
+        log(ctx, { status: 200 })
+        ctx.send(200, {
+          documents: page.map((d) => summaryDto(d, true)),
+          next_cursor: offset + limit < rows.length ? String(offset + limit) : null,
+        })
+        return true
+      }
+
       const rows = [...documents.values()]
         .filter(
-          (d) => d.workspaceId === m![1] && !d.archivedAt && d.title.toLowerCase().includes(query),
+          (d) =>
+            d.workspaceId === wsId &&
+            d.kind === 'file' &&
+            !d.archivedAt &&
+            d.title.toLowerCase().includes(query),
         )
         .reverse()
       const page = rows.slice(offset, offset + limit)
       log(ctx, { status: 200 })
       ctx.send(200, {
-        documents: page.map(summaryDto),
+        documents: page.map((d) => summaryDto(d)),
         next_cursor: offset + limit < rows.length ? String(offset + limit) : null,
       })
       return true
     }
 
-    m = /^\/documents\/([^/]+)(\/download|\/uploads|\/versions\/commit|\/copies|\/archive)?$/.exec(
-      route,
-    )
+    m =
+      /^\/documents\/([^/]+)(\/download|\/uploads|\/versions\/commit|\/copies|\/archive|\/move)?$/.exec(
+        route,
+      )
     if (m) {
       const doc = documents.get(m[1]!)
       const tail = m[2] ?? ''
@@ -362,6 +741,127 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
           return true
         }
         log(ctx, { status: 200 })
+        ctx.send(200, { document: documentDto(doc) })
+        return true
+      }
+
+      if (method === 'PATCH' && tail === '') {
+        const raw = await ctx.readBody()
+        let body: { revision?: unknown; title?: unknown } = {}
+        try {
+          body = JSON.parse(raw.toString('utf8')) as typeof body
+        } catch {
+          body = {}
+        }
+        const base: Omit<StubCall, 'method' | 'route' | 'status'> = {
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+        }
+        if (!doc || !isLiveInTree(doc)) {
+          log(ctx, { ...base, status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        if (doc.myLevel !== 'edit' && doc.myLevel !== 'manage') {
+          log(ctx, { ...base, status: 403 })
+          ctx.send(403, envelope('forbidden'))
+          return true
+        }
+        const title = typeof body.title === 'string' ? body.title.normalize('NFC').trim() : ''
+        if (!title || title.length > 255 || typeof body.revision !== 'string') {
+          log(ctx, { ...base, status: 400 })
+          ctx.send(400, envelope('invalid_request'))
+          return true
+        }
+        if (String(doc.revision) !== body.revision) {
+          log(ctx, { ...base, status: 409 })
+          ctx.send(409, envelope('revision_conflict', { current_revision: String(doc.revision) }))
+          return true
+        }
+        if (
+          doc.kind === 'folder' &&
+          hasSiblingCollision(doc.workspaceId, doc.parentId, 'folder', title, doc.id)
+        ) {
+          log(ctx, { ...base, status: 409 })
+          ctx.send(409, envelope('folder_name_taken'))
+          return true
+        }
+        doc.title = title
+        if (doc.kind === 'file') doc.filename = title
+        doc.revision += 1
+        doc.updatedAt = new Date().toISOString()
+        recordFeedUpsert(doc)
+        log(ctx, { ...base, status: 200 })
+        ctx.send(200, { document: documentDto(doc) })
+        return true
+      }
+
+      if (method === 'POST' && tail === '/move') {
+        const raw = await ctx.readBody()
+        let body: { parent_id?: unknown; revision?: unknown } = {}
+        try {
+          body = JSON.parse(raw.toString('utf8')) as typeof body
+        } catch {
+          body = {}
+        }
+        const base: Omit<StubCall, 'method' | 'route' | 'status'> = {
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+        }
+        if (!doc || !isLiveInTree(doc)) {
+          log(ctx, { ...base, status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        if (doc.myLevel !== 'edit' && doc.myLevel !== 'manage') {
+          log(ctx, { ...base, status: 403 })
+          ctx.send(403, envelope('forbidden'))
+          return true
+        }
+        if (typeof body.revision !== 'string') {
+          log(ctx, { ...base, status: 400 })
+          ctx.send(400, envelope('invalid_request'))
+          return true
+        }
+        if (String(doc.revision) !== body.revision) {
+          log(ctx, { ...base, status: 409 })
+          ctx.send(409, envelope('revision_conflict', { current_revision: String(doc.revision) }))
+          return true
+        }
+        const targetParentId =
+          typeof body.parent_id === 'string' && body.parent_id.length > 0 ? body.parent_id : null
+        if (targetParentId !== null) {
+          const target = documents.get(targetParentId)
+          if (!target || target.workspaceId !== doc.workspaceId || !isLiveInTree(target)) {
+            log(ctx, { ...base, status: 404 })
+            ctx.send(404, envelope('not_found'))
+            return true
+          }
+          if (target.kind !== 'folder') {
+            log(ctx, { ...base, status: 422 })
+            ctx.send(422, envelope('document_parent_kind'))
+            return true
+          }
+          if (
+            doc.kind === 'folder' &&
+            (targetParentId === doc.id || ancestorsOf(target).some((a) => a.id === doc.id))
+          ) {
+            log(ctx, { ...base, status: 422 })
+            ctx.send(422, envelope('document_cycle'))
+            return true
+          }
+        }
+        const resolved = resolveMoveTitle(doc, targetParentId)
+        if (!resolved.ok) {
+          log(ctx, { ...base, status: 409 })
+          ctx.send(409, envelope('folder_name_taken'))
+          return true
+        }
+        doc.parentId = targetParentId
+        doc.title = resolved.title
+        if (doc.kind === 'file') doc.filename = resolved.title
+        doc.revision += 1
+        doc.updatedAt = new Date().toISOString()
+        recordFeedUpsert(doc)
+        log(ctx, { ...base, status: 200 })
         ctx.send(200, { document: documentDto(doc) })
         return true
       }
@@ -423,11 +923,13 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
         const copy: StubDocument = known ?? {
           id: ulid('doc'),
           workspaceId: doc.workspaceId,
+          kind: 'file',
           title,
           filename: title,
           myLevel: doc.myLevel,
           // the copy starts as the source's head bytes: version 1, revision 1
           revision: 1,
+          position: 0,
           versions: [
             { version: 1, revision: 1, bytes: latest(doc).bytes, checksum: latest(doc).checksum },
           ],
@@ -720,18 +1222,93 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
       const doc: StubDocument = {
         id,
         workspaceId: init.workspaceId ?? STUB_WORKSPACE.id,
+        kind: 'file',
         title: init.filename,
         filename: init.filename,
         myLevel: init.myLevel ?? 'edit',
         revision: 41,
+        position: 0,
         versions: [{ version: 3, revision: 41, bytes: init.bytes, checksum: sha256(init.bytes) }],
         updatedAt: '2026-10-08T09:00:00Z',
-        parentId: null,
+        parentId: init.parentId ?? null,
       }
       documents.set(id, doc)
+      recordFeedUpsert(doc)
       return stateOf(doc)
     },
+    addFolder(init) {
+      const id = init.id ?? ulid('fold')
+      const title = init.title.normalize('NFC').trim()
+      const folder: StubDocument = {
+        id,
+        workspaceId: init.workspaceId ?? STUB_WORKSPACE.id,
+        kind: 'folder',
+        title,
+        filename: title,
+        myLevel: init.myLevel ?? 'edit',
+        revision: 1,
+        position: init.position ?? 0,
+        versions: [],
+        updatedAt: '2026-10-08T09:00:00Z',
+        parentId: init.parentId ?? null,
+      }
+      documents.set(id, folder)
+      recordFeedUpsert(folder)
+      return folderStateOf(folder)
+    },
     state: (documentId) => stateOf(need(documentId)),
+    folderState: (folderId) => folderStateOf(need(folderId)),
+    folders: (workspaceId = STUB_WORKSPACE.id) =>
+      [...documents.values()]
+        .filter((d) => d.workspaceId === workspaceId && d.kind === 'folder')
+        .map(folderStateOf),
+    enableFeed(enabled = true) {
+      feedEnabled = enabled
+    },
+    webMove(id, parentId) {
+      const doc = need(id)
+      const resolved = resolveMoveTitle(doc, parentId)
+      if (!resolved.ok) throw new Error(`stub webMove collision exhausted for ${id}`)
+      doc.parentId = parentId
+      doc.title = resolved.title
+      if (doc.kind === 'file') doc.filename = resolved.title
+      doc.revision += 1
+      doc.updatedAt = new Date().toISOString()
+      recordFeedUpsert(doc)
+      return {
+        id: doc.id,
+        title: doc.title,
+        parentId: doc.parentId,
+        revision: String(doc.revision),
+      }
+    },
+    webRename(id, title) {
+      const doc = need(id)
+      const clean = title.normalize('NFC').trim()
+      doc.title = clean
+      if (doc.kind === 'file') doc.filename = clean
+      doc.revision += 1
+      doc.updatedAt = new Date().toISOString()
+      recordFeedUpsert(doc)
+      return {
+        id: doc.id,
+        title: doc.title,
+        parentId: doc.parentId,
+        revision: String(doc.revision),
+      }
+    },
+    webArchive(id) {
+      const doc = need(id)
+      doc.archivedAt = new Date().toISOString()
+      doc.revision += 1
+      doc.updatedAt = doc.archivedAt
+      recordFeedUpsert(doc)
+      return {
+        id: doc.id,
+        archived: true,
+        revision: String(doc.revision),
+      }
+    },
     bumpRevision(documentId, bytes) {
       const doc = need(documentId)
       const content = bytes ?? latest(doc).bytes
@@ -743,6 +1320,7 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
         checksum: sha256(content),
       })
       doc.updatedAt = new Date().toISOString()
+      recordFeedUpsert(doc)
       return stateOf(doc)
     },
     setAccess(documentId, level) {
