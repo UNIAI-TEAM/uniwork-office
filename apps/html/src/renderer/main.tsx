@@ -19,6 +19,8 @@ import '@genoffice/ui/ai-panel-prefs.css'
 import '@genoffice/ui/ai-scope-quote.css'
 import '@genoffice/ui/image-dialogs.css'
 import './styles.css'
+// after styles.css: the shared AI panel skin overrides the per-app panel look
+import '@genoffice/ui/ai-panel.css'
 
 installScreenTips()
 // this renderer's own provider list shows the UniWork AI entry only while the shell offers it

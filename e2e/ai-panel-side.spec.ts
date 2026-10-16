@@ -22,6 +22,7 @@ for (const app of ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']) {
         'packages/ui/src/tokens.css',
         'packages/ui/src/ai-panel-prefs.css',
         `apps/${app}/src/renderer/styles.css`,
+        'packages/ui/src/ai-panel.css',
       ]) {
         await page.addStyleTag({ content: await readFile(join(__dirname, '..', path), 'utf8') })
       }
