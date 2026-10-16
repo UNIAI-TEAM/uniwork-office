@@ -55,7 +55,6 @@ import type {
   UniworkCreateFolderInput,
   UniworkDocActionResult,
   UniworkDocErrorCode,
-  UniworkDocFolderRef,
   UniworkDocListPage,
   UniworkDocLock,
   UniworkDocProperties,
@@ -341,7 +340,6 @@ function asDocRenamed(raw: unknown): UniworkDocRenamedEvent | null {
   return { documentId: r.documentId, title: r.title }
 }
 
-/** an upload-progress push: the upload's own id, a local path and finite, non-negative byte counts */
 /** FD-11: a push whose payload is not a workspace id is ignored, never thrown */
 function asUniworkTreeChanged(raw: unknown): UniworkTreeChangedEvent | null {
   if (!raw || typeof raw !== 'object' || !('workspaceId' in raw)) return null
@@ -349,6 +347,7 @@ function asUniworkTreeChanged(raw: unknown): UniworkTreeChangedEvent | null {
   return typeof workspaceId === 'string' && workspaceId ? { workspaceId } : null
 }
 
+/** an upload-progress push: the upload's own id, a local path and finite, non-negative byte counts */
 function asUploadProgress(raw: unknown): UniworkUploadProgress | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Partial<UniworkUploadProgress>
@@ -1161,11 +1160,6 @@ const homeApi: HomeApi = {
   async uniworkRestoreDocument(documentId: string) {
     return asUniworkActionResult<UniworkDocSummary>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.restoreDocument, documentId),
-    )
-  },
-  async uniworkListFolders(workspaceId: string) {
-    return asUniworkResult<UniworkDocFolderRef[]>(
-      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listFolders, workspaceId),
     )
   },
   async uniworkFolderTree(workspaceId: string) {

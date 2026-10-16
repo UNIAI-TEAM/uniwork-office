@@ -79,7 +79,8 @@ function fakeServer(
     myLevel: initial.myLevel ?? 'edit',
     title: initial.title ?? 'Q4 plan.docx',
     updatedAt: '2026-10-10T10:00:00Z',
-    // G5-12: the source's parent folder (null = root) and the copy the fake made, if any
+    // G5-12: the source's workspace and parent folder (null = root) and the copy the fake made, if any
+    workspaceId: 'ws_1',
     parentId: null as string | null,
     copy: null as null | {
       title: string
@@ -105,7 +106,7 @@ function fakeServer(
   const docJson = () => ({
     id: DOC,
     organization_id: 'org_a',
-    workspace_id: 'ws_1',
+    workspace_id: state.workspaceId,
     title: state.title,
     kind: 'file',
     parent_id: state.parentId,
@@ -1478,6 +1479,41 @@ describe('G5-12 Save as a copy (main)', () => {
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
+  it('FD11-B-R1-04: refuses a targetFolder whose workspaceId differs from the source workspace before any copy POST', async () => {
+    const server = fakeServer()
+    server.state.parentId = FOLDER
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+      targetFolder: { workspaceId: 'ws_other', folderId: 'fold_other' },
+    })
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_folder_refused', locked: 'none', canEdit: true },
+    })
+    expect(callsTo(server, '/copies')).toHaveLength(0)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('FD11-B-R1-05: carries the fresh server read workspaceId on the conflict view when the document moved workspaces', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    // web moved the document to ws_2 behind the app's back
+    server.state.workspaceId = 'ws_2'
+    server.state.parentId = 'fold_ws2'
+    const { view } = await openDialog(ctx, path)
+
+    expect(view.workspaceId).toBe('ws_2')
+    expect(view.parentId).toBe('fold_ws2')
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
   it('AC1: a dirty module is flushed first (no upload of the source), and the flushed bytes are what the copy gets', async () => {
     const server = fakeServer()
     const ctx = setup(server, { editorDirty: true })
@@ -1572,6 +1608,8 @@ describe('G5-12 Save as a copy (main)', () => {
     })
     expect(callsTo(server, `${COPY}/archive`)).toHaveLength(1)
     expect(server.state.copy!.archived).toBe(true)
+    // FD11-C-R1-05: an uncommitted copy that was archived never announces a tree change
+    expect(ctx.treeChanged).toEqual([])
     expect(binding(path)).toMatchObject({ state: 'conflict' })
     expect(await storedIntent(ctx, path)).toEqual(intentBefore)
     expect(readFileSync(path, 'utf8')).toBe('mine v4')

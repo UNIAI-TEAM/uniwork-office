@@ -39,6 +39,11 @@ export interface FeedPage {
   phase: string
   /** the page's rows: a snapshot page's `changes`, or a feed page's upserts */
   changes: FeedChange[]
+  /**
+   * FD-11: true when the server page carried at least one valid row, including
+   * a G5-01b `change_kind: 'removal'` row that is omitted from `changes`.
+   */
+  hadRows?: boolean
   hasMore: boolean
   nextCursor: string
   expiresAt: string
@@ -128,13 +133,16 @@ export function parseFeedPage(text: string): FeedPage {
   // reading only `changes` would silently drop every committed change the
   // snapshot did not see (G5-03a live I1-I5)
   let rows: FeedChange[]
+  let hadRows: boolean
   if (phase === FEED_PHASE) {
     if (!Array.isArray(feed)) malformed()
     rows = feed.map(parseFeedChange).filter((change): change is FeedChange => change !== null)
+    hadRows = feed.length > 0
   } else {
     rows = changes.map(parseChange)
+    hadRows = rows.length > 0
   }
-  return { phase, changes: rows, hasMore, nextCursor, expiresAt }
+  return { phase, changes: rows, hadRows, hasMore, nextCursor, expiresAt }
 }
 
 export function createFeedClient(options: AuthorizedGetOptions): FeedClient {

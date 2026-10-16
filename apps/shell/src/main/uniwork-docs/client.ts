@@ -1,8 +1,8 @@
 import type {
-  UniworkDocFolderRef,
   UniworkDocFormat,
   UniworkDocNewFormat,
   UniworkDocSummary,
+  UniworkFolderNode,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'
@@ -18,7 +18,6 @@ import {
   parseDocumentSummary,
   parseExchange,
   parseFolderTree,
-  parseFolders,
   parseMembershipRole,
   parseOrgMembers,
   parseProperties,
@@ -61,14 +60,6 @@ export const TRANSFER_TIMEOUT_MS = 120_000
 export const STREAM_CEILING_MS = 60 * 60_000
 /** the server stages at most 50 MiB per upload; a download far past that is refused */
 const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
-/**
- * The folder list follows D's `next_cursor` for the "Location" field. D caps a
- * page at 100 rows; 10 pages bound one read at 1000 folders, so a pathological
- * workspace cannot make the dialog read for ever (residual: past the bound the
- * remaining folders are not offered).
- */
-const FOLDERS_PAGE_SIZE = 100
-const FOLDERS_MAX_PAGES = 10
 const ID = /^[A-Za-z0-9_-]{1,128}$/
 
 export interface UniworkDocsClientOptions {
@@ -115,12 +106,6 @@ export interface UniworkDocsClient {
   /** the properties panel of one document (ids/times/level/version, no names) */
   documentProperties(documentId: string): Promise<DocumentProperties>
   /**
-   * the workspace's folders (S18 location field): every `kind=folder` page,
-   * following `next_cursor` up to `FOLDERS_MAX_PAGES` (a bigger workspace's
-   * remaining folders are simply not offered - documented residual, no D change)
-   */
-  listFolders(workspaceId: string): Promise<UniworkDocFolderRef[]>
-  /**
    * FD-11: the workspace's whole folder tree (`folders_only=true`), root nodes
    * first, following no cursor (the route answers the tree in one body).
    */
@@ -165,6 +150,7 @@ export interface UniworkDocsClient {
   moveDocument(input: {
     documentId: string
     parentId: string | null
+    idempotencyKey: string
   }): Promise<{ summary: UniworkDocSummary; renamedTo: string | null }>
   /** create a blank document (S18); `format` must have a blank generator */
   createBlank(input: {
@@ -514,31 +500,6 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return properties
     },
 
-    async listFolders(workspaceId) {
-      const ws = id(workspaceId)
-      const folders: UniworkDocFolderRef[] = []
-      let cursor: string | undefined
-      let pages = 0
-      do {
-        const params = new URLSearchParams()
-        params.set('kind', 'folder')
-        params.set('limit', String(FOLDERS_PAGE_SIZE))
-        if (cursor) params.set('cursor', cursor.slice(0, 512))
-        const raw = await send({
-          method: 'GET',
-          route: `/workspaces/${ws}/documents`,
-          query: params,
-          timeoutMs: metadataTimeout,
-          read: json,
-        })
-        const page = parseFolders(raw)
-        folders.push(...page.folders)
-        cursor = page.nextCursor ?? undefined
-        pages += 1
-      } while (cursor && pages < FOLDERS_MAX_PAGES)
-      return folders
-    },
-
     async folderTree(workspaceId) {
       const params = new URLSearchParams()
       // the tree route answers folders only; without the flag it lists everything
@@ -626,6 +587,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
             // `parent_id` is always sent: null IS the root, while the absent
             // field would leave the document where it is
             json: { parent_id: target, revision: ref.revision },
+            idempotencyKey: input.idempotencyKey,
             timeoutMs: metadataTimeout,
             read: json,
           })

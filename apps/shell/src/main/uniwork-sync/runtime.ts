@@ -248,6 +248,7 @@ export function createStoreDocCache(options: StoreDocCacheOptions): DocCache {
       // only a committed reconcile drops for good: a refused one is replayed
       if (outcome.kind === 'ok') {
         for (const documentId of dropped) options.onDropped?.(documentId)
+        return { ...outcome, dropped }
       }
       return outcome
     },
@@ -618,6 +619,7 @@ export class SyncRuntime {
           }),
         ),
         scope.workspaceId,
+        live,
       ),
       clock: this.options.clock,
       // the flags of the capability read of this pass (off -> no request)
@@ -664,8 +666,8 @@ export class SyncRuntime {
     const generation = this.generation
     const live = () => this.generation === generation
     return {
-      async applyPage(changes) {
-        const commit = await cache.applyPage(changes)
+      async applyPage(changes, options) {
+        const commit = await cache.applyPage(changes, options)
         if (commit.kind === 'ok') {
           const flagged = changes.filter((change) => change.archived !== undefined)
           if (flagged.length > 0) {
@@ -697,8 +699,8 @@ export class SyncRuntime {
     const notify = this.options.onFeedChange
     if (!notify) return cache
     return {
-      async applyPage(changes) {
-        const commit = await cache.applyPage(changes)
+      async applyPage(changes, options) {
+        const commit = await cache.applyPage(changes, options)
         // only a document whose row this commit changed is announced: a replayed
         // page (a snapshot that lists documents the cache already holds) is inert
         if (commit.kind === 'ok' && commit.applied) {
@@ -720,18 +722,28 @@ export class SyncRuntime {
    * announces nothing - it is replayed on the next tick. One call per committed
    * page that carried at least one row, whatever its kind: a removal row (an
    * archiving on the web) moves an entry out of the tree exactly as an upsert
-   * moves one in.
+   * moves one in, and a full-resync reconcile that evicted cached entries
+   * announces the workspace too. Guarded by `live()` so a pass stopped by
+   * `runtime.stop()` never notifies after cancellation.
    */
-  private changedCache(cache: DocCache, workspaceId: string): DocCache {
+  private changedCache(cache: DocCache, workspaceId: string, live: () => boolean): DocCache {
     const notify = this.options.onWorkspaceChanged
     if (!notify) return cache
     return {
-      async applyPage(changes) {
-        const commit = await cache.applyPage(changes)
-        if (commit.kind === 'ok' && changes.length > 0) notify(workspaceId)
+      async applyPage(changes, options) {
+        const commit = await cache.applyPage(changes, options)
+        if (commit.kind === 'ok' && (changes.length > 0 || options?.hadRows === true) && live()) {
+          notify(workspaceId)
+        }
         return commit
       },
-      reconcile: (ids, options) => cache.reconcile(ids, options),
+      async reconcile(ids, options) {
+        const commit = await cache.reconcile(ids, options)
+        if (commit.kind === 'ok' && (commit.dropped?.length ?? 0) > 0 && live()) {
+          notify(workspaceId)
+        }
+        return commit
+      },
     }
   }
 }

@@ -1,5 +1,4 @@
 import type {
-  UniworkDocFolderRef,
   UniworkDocFormat,
   UniworkDocSummary,
   UniworkEntryKind,
@@ -586,31 +585,6 @@ export function parseDocumentSummary(raw: unknown): UniworkDocSummary {
     ...(kind ? { kind } : {}),
     ...(doc.parent_id === undefined ? {} : { parentId: parentIdOf(doc.parent_id) }),
   }
-}
-
-/**
- * `GET /workspaces/{ws}/documents?kind=folder` -> one page of folder choices
- * for the "Location" field, plus D's opaque `next_cursor` (null at the end). A
- * row without a usable id or title is skipped rather than failing the dialog.
- */
-export function parseFolders(raw: unknown): {
-  folders: UniworkDocFolderRef[]
-  nextCursor: string | null
-} {
-  const body = record(raw)
-  if (!Array.isArray(body.documents)) bad()
-  const next = body.next_cursor
-  if (next !== null && next !== undefined && typeof next !== 'string') bad()
-  const folders: UniworkDocFolderRef[] = []
-  for (const value of body.documents) {
-    if (!isRecord(value)) continue
-    if (value.kind !== 'folder') continue
-    const id = value.id
-    const title = value.title
-    if (typeof id !== 'string' || !id || typeof title !== 'string' || !title) continue
-    folders.push({ id, title })
-  }
-  return { folders, nextCursor: typeof next === 'string' && next ? next : null }
 }
 
 /**

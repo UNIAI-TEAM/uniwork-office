@@ -20,7 +20,7 @@ export const OPENABLE_DOC_RE = /\.(docx|xlsx|xlsm|xls|csv|tsv|pptx|pdf|md|markdo
 
 /** Recognized-but-unsupported formats: kept in the sent payload so the shell
  *  can show its "not supported" dialog instead of dropping them silently.
- *  Mirrors UNSUPPORTED_DOC_RE in apps/shell/src/main/index.ts. */
+ *  Mirrors KNOWN_UNSUPPORTED_DOC_RE in apps/shell/src/main/app-routing.ts. */
 export const KNOWN_UNSUPPORTED_DOC_RE = /\.(doc|rtf|odt|ppt|pps|odp|ods|xlsb|pages|key|numbers)$/i
 
 /** upper bound on how many files one drop may ask to open */

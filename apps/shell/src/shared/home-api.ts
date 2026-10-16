@@ -232,9 +232,8 @@ export interface UniworkDocSummary {
   /** the row is in the trash (`archived_at` present); it stays listed so it can be restored */
   archived?: boolean
   /**
-   * FD-11: what the row is. Absent on a row from a route the app reads as
-   * files only (`listDocuments`, shared-with-me), whose rows are all files
-   * anyway; `listChildren` and the title search carry it.
+   * FD-11: what the row is. Always present on `listChildren` and search rows;
+   * `'file'` on the library (`listDocuments`) and shared-with-me routes.
    */
   kind?: UniworkEntryKind
   /** FD-11: the folder/page holding the document; null = the workspace root */
@@ -370,14 +369,15 @@ export interface UniworkDocProperties {
  */
 export type UniworkDocNameError = 'name_empty' | 'name_too_long' | 'folder_name_taken'
 /**
- * What a create/rename/archive/upload call may fail with. `name_empty` /
- * `name_too_long` / `folder_name_taken` are field errors and `upload_cancelled`
- * is an upload the person aborted; none of them is part of
+ * What a create/rename/archive/upload/move call may fail with. `name_empty` /
+ * `name_too_long` / `folder_name_taken` are field errors, `move_name_taken` is
+ * a move whose destination exhausted all "(n)" auto-renames (FD11-B-R1-03), and
+ * `upload_cancelled` is an upload the person aborted; none of them is part of
  * `UniworkDocErrorCode`, because that union is switched on exhaustively by the
- * renderer's error copy table (a cancelled upload is not an error to show at
- * all).
+ * renderer's error copy table.
  */
-export type UniworkDocActionError = UniworkDocErrorCode | UniworkDocNameError | 'upload_cancelled'
+export type UniworkDocActionError =
+  UniworkDocErrorCode | UniworkDocNameError | 'move_name_taken' | 'upload_cancelled'
 export type UniworkDocActionResult<T> =
   | { ok: true; value: T }
   | {
@@ -412,13 +412,6 @@ export interface UniworkUploadDocInput {
    * names the upload it aborts through this id (never a path).
    */
   uploadId: string
-}
-
-/** one folder the "Location" field of the create/upload dialog offers */
-export interface UniworkDocFolderRef {
-  id: string
-  /** the folder's title (D `DocumentSummaryDTO.title`) */
-  title: string
 }
 
 /** upload progress: bytes sent of the total (0 when the total is not known yet) */
@@ -1060,8 +1053,6 @@ export interface HomeApi {
   uniworkArchiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: restore an archived document */
   uniworkRestoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
-  /** the folders of one workspace, for the create/upload "Location" field */
-  uniworkListFolders(workspaceId: string): Promise<UniworkResult<UniworkDocFolderRef[]>>
   /**
    * FD-11: the workspace's whole folder tree (`folders_only=true`), root nodes
    * first, to the server's depth 20.
@@ -1667,8 +1658,6 @@ export const UNIWORK_DOC_CHANNELS = {
   archiveDocument: 'uniwork-doc:archive-document',
   /** invoke(documentId) -> restore an archived document (S18) */
   restoreDocument: 'uniwork-doc:restore-document',
-  /** invoke(workspaceId) -> the workspace's folders (S18 location field) */
-  listFolders: 'uniwork-doc:list-folders',
   /** invoke(workspaceId) -> the workspace's folder tree, root nodes first (FD-11) */
   folderTree: 'uniwork-doc:folder-tree',
   /** invoke(q) -> one folder's contents: folders + files + pages (FD-11) */

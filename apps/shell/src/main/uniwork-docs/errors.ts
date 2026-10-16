@@ -42,23 +42,11 @@ export class UniworkDocError extends Error {
   }
 }
 
-/** FD-11: how deep D lets the document tree go (its own documented cap) */
-export const DEFAULT_TREE_MAX_DEPTH = 20
-
 /**
- * FD-11: the depth cap of a `document_too_deep` envelope - its `max` (a number
- * or a decimal string) when the server named one, else D's own default. A
- * malformed value is never guessed from.
+ * FD-11 / B-R1-08: how deep D lets the document tree go (its own documented
+ * cap; D's `errDocumentTooDeep` emits no `fields` map).
  */
-function maxDepthOf(envelope: { fields?: Record<string, unknown> } | null): number {
-  const fields = envelope?.fields ?? {}
-  for (const key of ['max', 'max_depth']) {
-    const value = fields[key]
-    if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return value
-    if (typeof value === 'string' && /^\d+$/.test(value) && Number(value) > 0) return Number(value)
-  }
-  return DEFAULT_TREE_MAX_DEPTH
-}
+const DEFAULT_TREE_MAX_DEPTH = 20
 
 /**
  * A `Retry-After` header (RFC 9110) as milliseconds from `now`: delta-seconds,
@@ -146,14 +134,12 @@ export function errorFromResponse(
   if (serverCode === 'quota_exceeded') return new UniworkDocError('quota_exceeded', at)
   if (serverCode === 'engine_incompatible') return new UniworkDocError('engine_incompatible', at)
   // FD-11: the folder tree's own refusals, each its own code - a 409/422 that
-  // fell through to `server_error` before. `folder_name_taken` is a name
-  // field error (only folders collide), and `document_too_deep` carries the
-  // server's depth cap.
-  if (serverCode === 'folder_name_taken') {
-    return new UniworkDocError('folder_name_taken' as UniworkDocErrorCode, at)
-  }
+  // fell through to `server_error` before. `folder_name_taken` stays off
+  // `UniworkDocErrorCode` (mapped in `actionErrorOf` from `serverCode` to
+  // `folder_name_taken` or `move_name_taken`), and `document_too_deep` carries
+  // the tree's depth cap (20).
   if (serverCode === 'document_too_deep') {
-    return new UniworkDocError('document_too_deep', { ...at, maxDepth: maxDepthOf(envelope) })
+    return new UniworkDocError('document_too_deep', { ...at, maxDepth: DEFAULT_TREE_MAX_DEPTH })
   }
   if (serverCode === 'document_cycle') return new UniworkDocError('document_cycle', at)
   if (serverCode === 'document_parent_kind') {

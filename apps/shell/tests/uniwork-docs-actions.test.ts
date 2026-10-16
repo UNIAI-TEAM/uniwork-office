@@ -116,8 +116,6 @@ function fakeServer(
      * request already in flight (the abort rejects it, as real fetch does)
      */
     uploadGate?: () => Promise<void>
-    /** the "Location" field's folder pages, served in cursor order (R1-8) */
-    folderPages?: Array<Array<{ id: string; title: string }>>
     /** FD-11: the kind the document rows answer with (a folder has no file block in spirit) */
     kind?: 'file' | 'folder' | 'page'
     /** FD-11: D's 409 `folder_name_taken` on create/rename of a folder */
@@ -279,20 +277,20 @@ function fakeServer(
           },
         })
       }
-      if (options.folderPages) {
-        // cursor `n` names page n; the page before the last one carries the next
-        const page = Number(u.searchParams.get('cursor') ?? '0')
-        const rows = options.folderPages[page] ?? []
-        const next = page + 1 < options.folderPages.length ? String(page + 1) : null
-        return json(200, {
-          documents: rows.map((row) => ({ ...row, kind: 'folder', workspace_id: WS })),
-          next_cursor: next,
-        })
-      }
       return json(200, {
         documents: [
-          { id: 'fold_1', kind: 'folder', title: 'Contracts' },
-          { id: 'doc_x', kind: 'file', title: 'ignored.docx' },
+          {
+            id: 'fold_1',
+            kind: 'folder',
+            title: 'Contracts',
+            updated_at: '2026-10-13T09:00:00Z',
+          },
+          {
+            id: 'doc_x',
+            kind: 'file',
+            title: 'ignored.docx',
+            updated_at: '2026-10-13T09:00:00Z',
+          },
         ],
         next_cursor: null,
       })
@@ -333,6 +331,7 @@ function fakeServer(
       // the fake trusts its own caller's body, like every other route here
       const body: { parent_id: string | null; revision: string } = JSON.parse(String(init.body))
       call.body = body
+      if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
       const title = id === DOC ? state.title : (state.documents.get(id)?.title ?? 'new.docx')
       // a name already taken in the target folder is auto-renamed by the server
       const renamed = options.moveRenames ? `${title} (2)` : title
@@ -420,17 +419,22 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     showCopyFailed: vi.fn(),
     chooseUnsavedClose: vi.fn(async () => 'cancel'),
   }
+  let currentIdentity: {
+    accountId: string
+    deviceSessionId: string
+    deploymentId: string
+  } | null = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
   const service = new UniworkDocsService({
     userDataDir: dir,
     appVersion: () => '0.0.0',
     profile: () => profile,
     channel: () => 'stable',
     applyProfile: async () => 'unchanged',
-    identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+    identity: () => currentIdentity,
     keystoreLocked: () => false,
     selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
-    fetch: server.fetch,
+    fetch: (url, init) => server.fetch(url, init),
     openPath: () => true,
     isPathOpen: () => options.pathOpen === true,
     requestModuleSave: () => false,
@@ -456,6 +460,9 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     titleRenames,
     uploadFile,
     treeChanged,
+    setIdentity: (next: typeof currentIdentity) => {
+      currentIdentity = next
+    },
   }
 }
 
@@ -854,52 +861,6 @@ describe('upload a file', () => {
 })
 
 describe('folders', () => {
-  it('lists only the folder rows of the workspace', async () => {
-    const server = fakeServer()
-    const ctx = setup(server)
-    const folders = await ctx.service.listFolders(WS)
-    expect(folders).toEqual({ ok: true, value: [{ id: 'fold_1', title: 'Contracts' }] })
-    const call = server.calls.find((c) => c.path === `/api/v1/workspaces/${WS}/documents`)!
-    expect(call.query).toContain('kind=folder')
-  })
-
-  // R1-8: a workspace with more than one page of folders ignored `next_cursor`,
-  // so a destination past the first page could not be chosen at all.
-  it('follows the folder next_cursor across pages', async () => {
-    const server = fakeServer({
-      folderPages: [[{ id: 'fold_1', title: 'Contracts' }], [{ id: 'fold_2', title: 'Archive' }]],
-    })
-    const ctx = setup(server)
-    const folders = await ctx.service.listFolders(WS)
-    expect(folders).toEqual({
-      ok: true,
-      value: [
-        { id: 'fold_1', title: 'Contracts' },
-        { id: 'fold_2', title: 'Archive' },
-      ],
-    })
-    const calls = server.calls.filter((c) => c.path === `/api/v1/workspaces/${WS}/documents`)
-    expect(calls).toHaveLength(2)
-    expect(calls[0]!.query).toContain('kind=folder')
-    expect(calls[1]!.query).toContain('cursor=1')
-  })
-
-  // the walk is bounded: 10 pages x D's 100-row cap. Past that the remaining
-  // folders are simply not offered (documented residual), never an endless read.
-  it('stops the folder walk at its page bound', async () => {
-    const server = fakeServer({
-      folderPages: Array.from({ length: 12 }, (_, i) => [{ id: `f_${i}`, title: `F${i}` }]),
-    })
-    const ctx = setup(server)
-    const folders = await ctx.service.listFolders(WS)
-    expect(folders.ok).toBe(true)
-    if (!folders.ok) return
-    expect(folders.value).toHaveLength(10)
-    expect(
-      server.calls.filter((c) => c.path === `/api/v1/workspaces/${WS}/documents`),
-    ).toHaveLength(10)
-  })
-
   // FD-11: a folder is created with the folder kind, in the chosen folder, and
   // follows the folder name rule (trim + NFC, 1..255 runes - tighter than the
   // 500 a document name gets)
@@ -943,30 +904,96 @@ describe('folders', () => {
 
   // FD-11: only folders collide on a name, so the server's 409 stays a field
   // error the renderer shows under the name (never a generic server_error)
-  it('answers a taken folder name as a field error', async () => {
+  it('answers a taken folder name as a field error on create, and as move_name_taken on move (B-R1-03)', async () => {
     const server = fakeServer({ folderNameTaken: true })
     const ctx = setup(server)
     expect(
       await ctx.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Contracts' }),
     ).toEqual({ ok: false, error: 'folder_name_taken' })
+    expect(await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })).toEqual({
+      ok: false,
+      error: 'move_name_taken',
+    })
   })
 
-  // FD-11: the tree's depth cap rides the failure, so the renderer can name it
-  it("carries the server's depth cap on a too-deep refusal, else the default 20", async () => {
-    const named = setup(fakeServer({ deepMax: 7 }))
-    expect(
-      await named.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
-    ).toEqual({ ok: false, error: 'document_too_deep', max: 7 })
-
+  // FD-11 / B-R1-08: the tree's depth cap (20) rides the failure
+  it('carries the depth cap 20 on a too-deep refusal', async () => {
     const unnamed = setup(fakeServer({ deepMax: null }))
     expect(
       await unnamed.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
     ).toEqual({ ok: false, error: 'document_too_deep', max: 20 })
+  })
 
-    const asText = setup(fakeServer({ deepMax: '12' }))
-    expect(
-      await asText.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
-    ).toEqual({ ok: false, error: 'document_too_deep', max: 12 })
+  // B-R1-07: service.moveDocument mints an Idempotency-Key and passes it to the move POST
+  it('sends an Idempotency-Key header on moveDocument', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const moved = await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })
+    expect(moved.ok).toBe(true)
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path === `/api/v1/documents/${DOC}/move`,
+    )!
+    expect(post.idempotencyKey).toBeTruthy()
+  })
+
+  // FD11-B-R1-06 / B-R1-01: service-level tests driving listChildren and
+  // searchDocuments through the fake server and asserting `{ items, nextCursor }`
+  it('lists root children with parent_id= and answers value.items', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const root = await ctx.service.listChildren({ workspaceId: WS, parentId: null })
+    expect(root.ok).toBe(true)
+    if (!root.ok) return
+    expect(root.value).toEqual({
+      items: [
+        {
+          id: 'fold_1',
+          kind: 'folder',
+          title: 'Contracts',
+          workspaceId: WS,
+          format: null,
+          updatedAt: '2026-10-13T09:00:00Z',
+          canEdit: false,
+          canManage: false,
+          archived: false,
+          parentId: null,
+        },
+        {
+          id: 'doc_x',
+          kind: 'file',
+          title: 'ignored.docx',
+          workspaceId: WS,
+          format: 'docx',
+          updatedAt: '2026-10-13T09:00:00Z',
+          canEdit: false,
+          canManage: false,
+          archived: false,
+          parentId: null,
+        },
+      ],
+      nextCursor: null,
+    })
+    const call = server.calls.find((c) => c.path === `/api/v1/workspaces/${WS}/documents`)!
+    expect(call.query).toContain('parent_id=')
+    expect(call.query).not.toContain('parent_id=null')
+  })
+
+  it('searches documents with match=title, maps unknown kind to all, and answers value.items', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const found = await ctx.service.searchDocuments({
+      workspaceId: WS,
+      query: 'Contracts',
+      kind: 'unknown' as 'all',
+    })
+    expect(found.ok).toBe(true)
+    if (!found.ok) return
+    expect(found.value.items.map((row) => row.id)).toEqual(['fold_1', 'doc_x'])
+    expect(found.value.nextCursor).toBeNull()
+    const call = server.calls.find((c) => c.path === `/api/v1/workspaces/${WS}/documents`)!
+    expect(call.query).toContain('match=title')
+    expect(call.query).toContain('q=Contracts')
+    expect(call.query).not.toContain('kind=')
   })
 })
 
@@ -1440,6 +1467,30 @@ describe('the FD-11 tree-changed push', () => {
     // service refuses itself: neither changed the tree
     await ctx.service.renameDocument(DOC, 'Q4 plan.docx')
     await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'a'.repeat(256) })
+    expect(ctx.treeChanged).toEqual([])
+  })
+
+  it('FD11-C-R1-04: suppresses pushTreeChanged when an own folder action resolves after sign-out or account switch', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    server.fetch = (async (url: string, init: RequestInit) => {
+      const response = await origFetch(url, init)
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        ctx.setIdentity(null)
+      }
+      return response
+    }) as typeof server.fetch
+
+    const created = await ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Late folder',
+    })
+    expect(created.ok).toBe(true)
     expect(ctx.treeChanged).toEqual([])
   })
 })
