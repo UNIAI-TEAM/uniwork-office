@@ -1427,6 +1427,51 @@ describe('G5-12 Save as a copy (main)', () => {
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
+  // FD-11: the dialog's Location control starts on the source's own folder and
+  // the chosen one is where the copy lands.
+  it('FD-11: the view names the source workspace and parent, and a chosen folder takes the copy there', async () => {
+    const server = fakeServer()
+    server.state.parentId = FOLDER
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    expect(view.workspaceId).toBe('ws_1')
+    expect(view.parentId).toBe(FOLDER)
+
+    const target = '01J8X4FLD1N1P2Q3R4S5T6U7'
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+      targetFolder: { workspaceId: 'ws_1', folderId: target },
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(callsTo(server, '/copies')).toMatchObject([
+      { method: 'POST', body: { parent_id: target } },
+    ])
+    expect(server.state.copy!.parentId).toBe(target)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('FD-11: a chosen root files the copy at the root, not next to the source', async () => {
+    const server = fakeServer()
+    server.state.parentId = FOLDER
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+      targetFolder: { workspaceId: 'ws_1', folderId: null },
+    })
+
+    expect((callsTo(server, '/copies')[0]!.body as Record<string, unknown>).parent_id).toBeFalsy()
+    expect(server.state.copy!.parentId).toBeNull()
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
   it('AC1: a dirty module is flushed first (no upload of the source), and the flushed bytes are what the copy gets', async () => {
     const server = fakeServer()
     const ctx = setup(server, { editorDirty: true })

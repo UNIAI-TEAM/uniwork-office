@@ -637,6 +637,12 @@ interface ConflictSession {
   knownServerVersion: number | null
   knownServerSavedAt: string | null
   knownServerBy: string | null
+  /**
+   * FD-11: the folder the source document sits in, as the view's own server
+   * read answered it; absent while no read has answered. Carried to the
+   * conflict view so the Save-as-a-copy Location starts there.
+   */
+  knownServerParentId?: string | null
   knownCanEdit: boolean | null
   serverOnline: boolean
   locked?: 'revoked' | 'deleted'
@@ -4464,6 +4470,9 @@ export class UniworkDocsService {
           session.knownServerVersion = detail.file.version
           session.knownServerSavedAt = props?.updatedAt ?? null
           session.knownServerBy = null
+          // FD-11: `parent_id` absent means the server did not say, so the
+          // remembered one (or nothing) stands rather than a guessed root
+          if (detail.parentId !== undefined) session.knownServerParentId = detail.parentId
           session.knownCanEdit = detail.myLevel === 'edit' || detail.myLevel === 'manage'
           session.serverOnline = true
         } catch (error) {
@@ -4533,6 +4542,12 @@ export class UniworkDocsService {
       path: session.path,
       documentId: b.documentId,
       title: b.title,
+      // FD-11: where the source sits, so the Save-as-a-copy Location can start
+      // there (absent parent = no read answered it yet)
+      ...(b.workspaceId ? { workspaceId: b.workspaceId } : {}),
+      ...(session.knownServerParentId === undefined
+        ? {}
+        : { parentId: session.knownServerParentId }),
       module: moduleKind,
       mine: { baseVersion: b.baseVersion ?? null },
       server: {
@@ -4833,8 +4848,12 @@ export class UniworkDocsService {
     )
     let parentId: string | null
     try {
-      // the copy is filed next to its source (a fresh read: the source may have moved)
-      parentId = (await api.getDocument(documentId)).parentId ?? null
+      // FD-11: the Location the dialog chose wins; without one the copy lands
+      // next to its source (today's behaviour). The source is read either way:
+      // the read is what proves the copy route is still open to this caller,
+      // and its answer is used when no folder was chosen.
+      const source = await api.getDocument(documentId)
+      parentId = action.targetFolder ? action.targetFolder.folderId : (source.parentId ?? null)
     } catch (error) {
       lockOn(error)
       return aborted() ? { kind: 'closed' } : failed()
