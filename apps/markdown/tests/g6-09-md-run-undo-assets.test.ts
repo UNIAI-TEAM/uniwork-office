@@ -292,6 +292,58 @@ describe('markdown AI run undo and the images the run saved', () => {
     expect(editor!.getText()).toBe('Saved document')
   })
 
+  // RF3O-2: a refused redo says so, in the panel, instead of doing nothing
+  const redoNotice = (): HTMLElement | null =>
+    container!.querySelector<HTMLElement>('.ai-redo-refused')
+
+  it('a redo refused because the picture could not be put back tells the user', async () => {
+    const panel = await mount()
+    await panel.run([insertImage()])
+    await undoRun()
+    expect(redoNotice()).toBeNull()
+    panel.store.restoreFails = true
+    await redo()
+    await flush()
+    expect(imageCount()).toBe(0)
+    const notice = redoNotice()
+    expect(notice).not.toBeNull()
+    expect(notice!.getAttribute('role')).toBe('status')
+    expect(notice!.textContent).toMatch(/picture/i)
+  })
+
+  it('the refusal notice goes when the next run starts', async () => {
+    const panel = await mount()
+    await panel.run([insertImage()])
+    await undoRun()
+    panel.store.restoreFails = true
+    await redo()
+    await flush()
+    expect(redoNotice()).not.toBeNull()
+    await panel.run([])
+    expect(redoNotice()).toBeNull()
+  })
+
+  it('a redo whose bytes are gone (no restore in this build) tells the user too', async () => {
+    const panel = await mount()
+    await panel.run([insertImage()])
+    await undoRun()
+    ;(window as any).markdownApi.restorePendingAssets = undefined
+    await redo()
+    await flush()
+    expect(imageCount()).toBe(0)
+    expect(redoNotice()).not.toBeNull()
+  })
+
+  it('a redo that works shows no notice', async () => {
+    const panel = await mount()
+    await panel.run([insertImage()])
+    await undoRun()
+    await redo()
+    await flush()
+    expect(imageCount()).toBe(1)
+    expect(redoNotice()).toBeNull()
+  })
+
   it('a run without pictures: undo and redo leave the store alone', async () => {
     const panel = await mount()
     await panel.run([
