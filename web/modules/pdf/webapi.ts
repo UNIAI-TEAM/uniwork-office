@@ -480,6 +480,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     const file: FileMeta = { ...(doc?.file ?? {}), ...res.file }
     if (res.versionId && !res.file.versionId) file.versionId = res.versionId
     adopt(file, bytes)
+    sizeGate.noteSaveSucceeded()
     restored = false
     recoveredFlag = false
     void drafts.saved()
@@ -588,6 +589,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     // the host learns the new file from its own request's result; this frame keeps the original
     pending?.settle(res)
     if (res.ok) {
+      sizeGate.noteSaveSucceeded()
       // the edits are in a saved file now; the writer keeps a fresh copy while still dirty
       void drafts.saved()
       return { ok: true, ...skips }

@@ -322,6 +322,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     remember(file)
     const meta = files.get(file.fileId)!
     frameDocVersion.noteSaved({ path: pathFor(meta), versionId: meta.versionId ?? null })
+    sizeGate.noteSaveSucceeded()
     void drafts.saved()
     port.reportSaved({
       file: files.get(file.fileId)!,

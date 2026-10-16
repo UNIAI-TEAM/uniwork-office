@@ -854,6 +854,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       if ('canceled' in landed) return { canceled: true }
       const meta = landed.file
       remember(meta)
+      sizeGate.noteSaveSucceeded()
       const saved = files.get(meta.fileId)!
       frameDocVersion.noteSaved({ path: pathFor(saved), versionId: saved.versionId ?? null })
       port.reportSaved({

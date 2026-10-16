@@ -527,6 +527,7 @@ export function createTextWebApi(
     const file = { ...res.file }
     if (res.versionId && !file.versionId) file.versionId = res.versionId
     remember(file)
+    sizeGate.noteSaveSucceeded()
     void drafts.saved()
     port.reportSaved({
       file: files.get(file.fileId)!,

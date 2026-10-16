@@ -281,6 +281,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     const file = { ...res.file }
     if (res.versionId && !file.versionId) file.versionId = res.versionId
     deps.state.remember(file)
+    sizeGate.noteSaveSucceeded()
     const meta = deps.state.files.get(file.fileId)!
     deps.port.reportSaved({
       file: meta,

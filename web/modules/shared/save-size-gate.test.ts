@@ -94,8 +94,9 @@ function createMockGateEnv(opts?: {
       const res = (await port.request('api.save', {
         fileId: session.documentId,
         data: copy,
-      })
-      return { ok: true }
+      })) as { ok?: boolean }
+      if (res?.ok === true) gate.noteSaveSucceeded()
+      return { ok: res?.ok === true }
     },
   }
 }
@@ -225,6 +226,29 @@ describe('createSaveSizeGate (warn latch, save_blocked, doc.download, fallback U
     })
   })
 
+  it('a FAILED save below warnBytes does not re-arm the warn latch (§3.2.2)', async () => {
+    const limits: DocumentSizeLimits = { max_bytes: 1000, warn_ratio: 0.9 }
+    const env = createMockGateEnv({
+      limits,
+      capabilities: { save: true, sizeUi: true },
+    })
+    const gate = createSaveSizeGate({ port: env.port, lang: () => 'vi' })
+
+    // warn-band save latches
+    await gate.checkBeforeSave(new Uint8Array(900))
+    gate.noteSaveSucceeded() // a landed WARN-band save must not re-arm either
+    expect(env.events).toHaveLength(1)
+
+    // a save below the warn line is attempted but FAILS -> no noteSaveSucceeded -> no re-arm
+    env.port.request = (async () => ({
+      ok: false,
+      error: { code: 'network' },
+    })) as SaveSizeGatePort['request']
+    const res = await env.saveWithGate(gate, new Uint8Array(899))
+    expect(res.ok).toBe(false)
+
+    // next warn-band save must NOT emit another size_warning
+    env.port.request = (async (type: string) =>
       type === 'api.save'
         ? { ok: true, file: { fileId: 'doc-1', name: 'R.docx' } }
         : {}) as SaveSizeGatePort['request']
