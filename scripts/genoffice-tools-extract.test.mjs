@@ -1857,27 +1857,106 @@ describe('real repo', () => {
     }
   })
 
-  it('resolves the recursive mind-map schema at the pin (G6-09d, REPIN-1)', () => {
+  it('resolves the recursive mind-map schema at the pin (G6-09d, REPIN-1, RBD9-6)', () => {
+    const EXPECTED_HASH = 'ad838ec1782297153a2f798b110c62ef30e050ee6656615f7d4ff6a7f9c925e0'
+    const expectedNode = (depth) => ({
+      type: 'object',
+      properties: {
+        label: {
+          type: 'string',
+          description:
+            "short node label (2-8 words) in the document's language, taken from its headings or key phrases",
+        },
+        block: {
+          type: 'integer',
+          description:
+            '0-based block index this node summarizes (from the current block list); omit when the node spans several blocks',
+        },
+        children:
+          depth > 0
+            ? {
+                type: 'array',
+                description: 'sub-topics; 2-5 per node reads best',
+                items: expectedNode(depth - 1),
+              }
+            : {
+                type: 'array',
+                description: 'sub-topics; 2-5 per node reads best',
+              },
+      },
+      required: ['label'],
+    })
+    const EXPECTED_SCHEMA = {
+      type: 'object',
+      properties: {
+        focus: {
+          type: 'string',
+          description:
+            'optional: the aspect the map should center on (e.g. "risk controls", "for beginners"); omit for a whole-document map',
+        },
+        root: {
+          type: 'object',
+          description: 'the mind map tree: root node with nested children',
+          ...expectedNode(5),
+        },
+      },
+      required: ['root'],
+    }
+    assert.equal(hashOf(EXPECTED_SCHEMA), EXPECTED_HASH)
+
+    const runtimeSchemas = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          '--experimental-strip-types',
+          '--no-warnings',
+          '-e',
+          [
+            "import { MIND_MAP_TOOL as docs } from './apps/docs/src/renderer/ai/mind-map.ts'",
+            "import { MIND_MAP_TOOL as markdown } from './apps/markdown/src/renderer/ai/mind-map.ts'",
+            'process.stdout.write(JSON.stringify({ docs: docs.inputSchema, markdown: markdown.inputSchema }))',
+          ].join('\n'),
+        ],
+        { cwd: REPO_ROOT, encoding: 'utf8' },
+      ),
+    )
+
     const result = extract({ repo: REPO_ROOT, rev: 'HEAD' })
     const file = extractor.buildSchemaFile(result)
     for (const module of ['docs', 'markdown']) {
       const row = result.rows.find((r) => r.module === module && r.tool === 'generate_mindmap')
       assert.ok(row, `expected a ${module}/generate_mindmap row`)
-      assert.match(row.hash, /^[0-9a-f]{64}$/)
+      assert.equal(row.hash, EXPECTED_HASH)
       const tool = file[module].find((t) => t.function.name === 'generate_mindmap')
       assert.ok(tool, `${module}/generate_mindmap is offered`)
       const entry = file.catalogue.find((e) => e.module === module && e.name === 'generate_mindmap')
       assert.equal(entry.schemaComplete, true)
-      assert.equal(entry.tableHash, row.hash)
-      // the tree is inlined: the root plus one nested `children` node per depth step
+      assert.equal(entry.offered, true)
+      assert.equal(entry.tableHash, EXPECTED_HASH)
+      assert.equal(entry.inputSchemaSha256, EXPECTED_HASH)
+      assert.equal(hashOf(runtimeSchemas[module]), EXPECTED_HASH)
+      assert.deepEqual(tool.function.parameters, runtimeSchemas[module])
+      assert.deepEqual(tool.function.parameters, EXPECTED_SCHEMA)
+
+      // explicit structural pins for focus, descriptions, block, and leaf shape across all 6 levels
+      assert.deepEqual(tool.function.parameters.properties.focus, EXPECTED_SCHEMA.properties.focus)
       let node = tool.function.parameters.properties.root
       let levels = 0
+      let leaf = null
       while (node) {
         assert.deepEqual(Object.keys(node.properties).sort(), ['block', 'children', 'label'])
+        assert.deepEqual(node.properties.label, EXPECTED_SCHEMA.properties.root.properties.label)
+        assert.deepEqual(node.properties.block, EXPECTED_SCHEMA.properties.root.properties.block)
+        assert.deepEqual(node.required, ['label'])
+        leaf = node
         levels += 1
         node = node.properties.children.items
       }
       assert.equal(levels, 6)
+      assert.deepEqual(leaf.properties.children, {
+        type: 'array',
+        description: 'sub-topics; 2-5 per node reads best',
+      })
       assert.deepEqual(tool.function.parameters.required, ['root'])
     }
   })
