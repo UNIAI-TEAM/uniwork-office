@@ -49,11 +49,15 @@ export function useFolderActions({
     return null
   }
 
+  const networkFailure: { ok: false; error: 'network'; max?: number } = {
+    ok: false,
+    error: 'network',
+  }
+
   const create = async (parentId: string | null, name: string): Promise<FolderNameOutcome> => {
-    const result = await createFolder({ workspaceId, parentId, title: name }).catch(() => ({
-      ok: false as const,
-      error: 'network' as const,
-    }))
+    const result = await createFolder({ workspaceId, parentId, title: name }).catch(
+      () => networkFailure,
+    )
     if (!result.ok) {
       const field = failed(result.error, result.max)
       if (!field) setNameDialog(null)
@@ -66,10 +70,7 @@ export function useFolderActions({
   }
 
   const rename = async (id: string, name: string): Promise<FolderNameOutcome> => {
-    const result = await renameDocument(id, name).catch(() => ({
-      ok: false as const,
-      error: 'network' as const,
-    }))
+    const result = await renameDocument(id, name).catch(() => networkFailure)
     if (!result.ok) {
       const field = failed(result.error, result.max)
       return { ok: false, field }
@@ -115,10 +116,7 @@ export function useFolderActions({
   const move = async (item: MoveRequest, picked: PickedFolder) => {
     setMoving(null)
     const result = await moveDocument({ documentId: item.id, parentId: picked.folderId }).catch(
-      () => ({
-        ok: false as const,
-        error: 'network' as const,
-      }),
+      () => networkFailure,
     )
     if (!result.ok) {
       const error = result.error === 'folder_name_taken' ? 'move_name_taken' : result.error
