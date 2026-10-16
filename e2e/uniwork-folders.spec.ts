@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import JSZip from 'jszip'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
@@ -108,6 +108,36 @@ async function openUniworkFolderBrowser(shell: Page) {
   ).toBeVisible()
   return dialog
 }
+
+/**
+ * Makes sure a tree folder is expanded. The tree is a flat list of treeitems, so
+ * a folder only has an `aria-expanded` attribute once it has children, and its
+ * children are the rows one level deeper that follow it.
+ */
+async function expandTreeFolder(tree: Locator, title: string): Promise<void> {
+  const item = tree.getByRole('treeitem', { name: title })
+  await expect(item).toHaveAttribute('aria-expanded', /^(true|false)$/)
+  if ((await item.getAttribute('aria-expanded')) === 'false') {
+    await item.locator('.uwf-twisty').click()
+  }
+  await expect(item).toHaveAttribute('aria-expanded', 'true')
+}
+
+/** the titles of a folder's direct children in the (expanded) tree, in order */
+const treeChildrenOf = (tree: Locator, title: string): Promise<string[]> =>
+  tree.getByRole('treeitem').evaluateAll((rows, parent) => {
+    const flat = rows.map((row) => ({
+      level: Number(row.getAttribute('aria-level')),
+      title: row.querySelector('.uwf-tree-title')?.textContent ?? '',
+    }))
+    const at = flat.findIndex((row) => row.title === parent)
+    if (at < 0) return []
+    const children: string[] = []
+    for (let i = at + 1; i < flat.length && flat[i]!.level > flat[at]!.level; i += 1) {
+      if (flat[i]!.level === flat[at]!.level + 1) children.push(flat[i]!.title)
+    }
+    return children
+  }, title)
 
 async function docsEditor(app: LaunchedApp['app']): Promise<Page> {
   const editor = await waitForPageWithUrl(app, '://docs/')
@@ -276,13 +306,21 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       stub.webMove(movingDoc.id, target.id)
       await triggerFeedTick(shell)
 
-      // Without closing or reloading the dialog, `Source Hub` contents drop the moved items
-      await expect(contents.getByRole('option', { name: /^Moving Subfolder/ })).toBeHidden({
+      // Without closing or reloading the dialog, `Source Hub` contents drop the moved items.
+      // `Vanishing Leaf` stays: the list must have refreshed to exactly it, so a loading,
+      // empty or error list cannot satisfy the `toBeHidden` checks.
+      await expect(contents.getByRole('option')).toHaveText([/^Vanishing Leaf/], {
         timeout: 15_000,
       })
-      await expect(contents.getByRole('option', { name: /^moving-roadmap\.docx/ })).toBeHidden({
-        timeout: 15_000,
-      })
+      await expect(contents.getByRole('option', { name: /^Vanishing Leaf/ })).toBeVisible()
+      await expect(contents.getByRole('option', { name: /^Moving Subfolder/ })).toBeHidden()
+      await expect(contents.getByRole('option', { name: /^moving-roadmap\.docx/ })).toBeHidden()
+
+      // The tree moved too: `Target Hub` now holds `Moving Subfolder`, `Source Hub` does not
+      await expandTreeFolder(tree, 'Target Hub')
+      await expandTreeFolder(tree, 'Source Hub')
+      await expect.poll(() => treeChildrenOf(tree, 'Target Hub')).toEqual(['Moving Subfolder'])
+      await expect.poll(() => treeChildrenOf(tree, 'Source Hub')).toEqual(['Vanishing Leaf'])
 
       // Selecting `Target Hub` in the tree shows the moved subfolder and document
       await tree.getByRole('treeitem', { name: 'Target Hub' }).click()
@@ -309,7 +347,9 @@ test.describe.serial('UniWork folders (FD-11)', () => {
         'page',
         { timeout: 15_000 },
       )
-      await expect(dialog.getByRole('status')).toContainText(uniworkFoldersEn.ufFolderGone)
+      await expect(
+        dialog.getByRole('status').filter({ hasText: uniworkFoldersEn.ufFolderGone }),
+      ).toBeVisible()
       await shell.screenshot({ path: screenshotPath('uniwork-folders-feed-fallback') })
     })
   })
@@ -391,7 +431,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       parentId: fy26.id,
     })
 
-    // 4-folder chain to verify middle-ellipsis path truncation (> 3 segments)
+    // 4-folder chain to verify the left-truncated path of a deep result
     const d1 = stub.addFolder({ title: 'Division' })
     const d2 = stub.addFolder({ title: 'Region', parentId: d1.id })
     const d3 = stub.addFolder({ title: 'Country', parentId: d2.id })
@@ -420,22 +460,30 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       const filterGroup = dialog.getByRole('radiogroup', { name: uniworkFoldersEn.ufSearchKind })
       await expect(filterGroup).toBeVisible()
 
-      // Full ancestor path (<= 3 segments): UniWork › Finance › FY2026
+      // A result's path is left-truncated to its direct parent ("… › Parent ›"); the full
+      // path is in the row `title` and in the screen-reader text
+      const expectPath = async (row: Locator, short: string, full: string) => {
+        await expect(row.locator('.uwf-path > [aria-hidden="true"]')).toHaveText(short)
+        await expect(row).toHaveAttribute('title', full)
+        await expect(row.locator('.uw-sr-only')).toHaveText(
+          uniworkFoldersEn.ufPathLabel.replace('{path}', full),
+        )
+      }
+      const root = uniworkFoldersEn.ufRoot
+
       const forecastRow = contents.getByRole('option', { name: /budget-forecast\.docx/ })
       await expect(forecastRow).toBeVisible()
-      await expect(forecastRow).toContainText('UniWork › Finance › FY2026')
-      await expect(forecastRow).toContainText('Path: UniWork › Finance › FY2026')
+      await expectPath(forecastRow, '… › FY2026 ›', `${root} › Finance › FY2026`)
 
-      // Truncated ancestor path (> 3 segments): short `UniWork › … › Country › Branch` + full sr-only path
+      // A deeper path keeps only the direct parent visible
       const deepRow = contents.getByRole('option', { name: /budget-deep-branch\.docx/ })
       await expect(deepRow).toBeVisible()
-      await expect(deepRow).toContainText('UniWork › … › Country › Branch')
-      await expect(deepRow).toContainText('Path: UniWork › Division › Region › Country › Branch')
+      await expectPath(deepRow, '… › Branch ›', `${root} › Division › Region › Country › Branch`)
 
       // Folder result is also shown under `All`
       const folderRow = contents.getByRole('option', { name: /Budget Ledger Folder/ })
       await expect(folderRow).toBeVisible()
-      await expect(folderRow).toContainText('Path: UniWork › Finance › FY2026')
+      await expectPath(folderRow, '… › FY2026 ›', `${root} › Finance › FY2026`)
 
       // Filter by `Folders`
       await filterGroup.getByRole('radio', { name: uniworkFoldersEn.ufSearchFolders }).click()

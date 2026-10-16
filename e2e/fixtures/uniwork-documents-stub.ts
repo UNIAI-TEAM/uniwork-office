@@ -233,6 +233,8 @@ interface FeedEvent {
   current_version: number
   version_id: string | null
   archived: boolean
+  /** the server's removal reason; always empty on an upsert (this stub sends upserts only) */
+  removal: ''
 }
 
 const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
@@ -319,6 +321,7 @@ export async function startUniworkDocumentsStub(
       current_version: doc.kind === 'file' ? latest(doc).version : 0,
       version_id: doc.kind === 'file' ? `ver_${doc.id}_${latest(doc).version}` : null,
       archived: Boolean(doc.archivedAt),
+      removal: '',
     })
   }
 
@@ -374,25 +377,21 @@ export async function startUniworkDocumentsStub(
     return false
   }
 
+  /** only folders collide on a name (FD-D10): a document may share its name with a sibling */
   const resolveMoveTitle = (
     doc: StubDocument,
     targetParentId: string | null,
   ): { ok: true; title: string } | { ok: false } => {
     if (
+      doc.kind !== 'folder' ||
       targetParentId === doc.parentId ||
-      !hasSiblingCollision(doc.workspaceId, targetParentId, doc.kind, doc.title, doc.id)
+      !hasSiblingCollision(doc.workspaceId, targetParentId, 'folder', doc.title, doc.id)
     ) {
       return { ok: true, title: doc.title }
     }
     for (const n of [2, 3, 4]) {
-      let candidate = `${doc.title} (${n})`
-      if (doc.kind === 'file') {
-        const dot = doc.title.lastIndexOf('.')
-        if (dot > 0) {
-          candidate = `${doc.title.slice(0, dot)} (${n})${doc.title.slice(dot)}`
-        }
-      }
-      if (!hasSiblingCollision(doc.workspaceId, targetParentId, doc.kind, candidate, doc.id)) {
+      const candidate = `${doc.title} (${n})`
+      if (!hasSiblingCollision(doc.workspaceId, targetParentId, 'folder', candidate, doc.id)) {
         return { ok: true, title: candidate }
       }
     }
@@ -487,6 +486,7 @@ export async function startUniworkDocumentsStub(
 
     m = /^\/workspaces\/([^/]+)\/documents\/changes$/.exec(route)
     if (m && method === 'GET') {
+      if (!feedEnabled) return false
       const wsId = m[1]!
       if (wsId !== STUB_WORKSPACE.id) {
         ctx.send(404, envelope('not_found'))
@@ -767,7 +767,9 @@ export async function startUniworkDocumentsStub(
           return true
         }
         const title = typeof body.title === 'string' ? body.title.normalize('NFC').trim() : ''
-        if (!title || title.length > 255 || typeof body.revision !== 'string') {
+        // folder 1-255, page/file 1-500 (contract section 2)
+        const maxTitle = doc.kind === 'folder' ? 255 : 500
+        if (!title || title.length > maxTitle || typeof body.revision !== 'string') {
           log(ctx, { ...base, status: 400 })
           ctx.send(400, envelope('invalid_request'))
           return true
