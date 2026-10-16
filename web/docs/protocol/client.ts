@@ -52,6 +52,7 @@ import {
   type InitUser,
   type OfficeModule,
   type OpenPayload,
+  type OpenRefusedPayload,
   type ProtocolErrorShape,
   type RemoteVersionPayload,
   type SaveBlockedPayload,
@@ -189,6 +190,8 @@ export interface DocsFrameClient {
   reportSizeWarning(payload: SizeWarningPayload): void
   /** save blocked because serialized document size exceeded max_bytes (additive, SIZE-F1) */
   reportSaveBlocked(payload: SaveBlockedPayload): void
+  /** open_refused (additive, SIZE-F1 §3.1a): the bridges send it at most once per documentId */
+  reportOpenRefused(payload: OpenRefusedPayload): void
   dispose(): void
 }
 
@@ -576,6 +579,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       ep.handle('doc.download', (p, ctx) => h(p as HostRequests['doc.download']['payload'], ctx)),
     reportSizeWarning: (payload) => guarded(() => ep.emit('size_warning', { ...payload })),
     reportSaveBlocked: (payload) => guarded(() => ep.emit('save_blocked', { ...payload })),
+    reportOpenRefused: (payload) => guarded(() => ep.emit('open_refused', payload)),
     dispose() {
       stopReady()
       token = null

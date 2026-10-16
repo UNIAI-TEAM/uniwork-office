@@ -16,6 +16,7 @@ import {
   type ProtocolErrorCode,
   type AiRunPayload,
   type DocBlockedPayload,
+  type OpenRefusedPayload,
   type ProtocolErrorShape,
   type RemoteVersionPayload,
   type SaveBlockedPayload,
@@ -84,6 +85,8 @@ export interface FramePort {
   reportSaved(payload: SavedPayload): void
   /** protocol `aiRun` event (X-02; optional for older clients, the headless port and mocks) */
   reportAiRun?(payload: AiRunPayload): void
+  /** protocol `open_refused` event (SIZE-F1 §3.1a; the bridges send it at most once per documentId) */
+  reportOpenRefused?(payload: OpenRefusedPayload): void
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
   /**
    * The frame token for the direct AI calls (C16; the real client has both). Absent on ports with

@@ -1365,7 +1365,7 @@ export function App() {
         if (bootHandledRef.current) return
         bootHandledRef.current = true
         if (r) applyOpen(r)
-        else await bootBlank()
+        else if (!isWeb()) await bootBlank()
         const preset = aiEnabled ? await window.slidesApi.consumeAiPreset() : null
         if (preset?.text) {
           setShowAi(() => {
@@ -1381,11 +1381,11 @@ export function App() {
           })
         }
       })
-      // Open failures (corrupt file etc.) also land on a blank deck, or it stays at "Opening…" forever
+      // Open failures (corrupt file etc.) also land on a blank deck on desktop, or it stays at "Opening…" forever
       .catch(() => {
         if (bootHandledRef.current) return
         bootHandledRef.current = true
-        void bootBlank()
+        if (!isWeb()) void bootBlank()
       })
     const offAiPreset = window.slidesApi.onAiPreset?.((preset) => {
       if (!preset?.text || !aiEnabled) return

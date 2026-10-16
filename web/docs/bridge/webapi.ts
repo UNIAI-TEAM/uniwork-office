@@ -190,6 +190,10 @@ export interface WebApiOptions {
 export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   /** fileId -> latest server metadata (etag = If-Match base of the next save) */
   const files = new Map<string, FileMeta>()
+  /** fileId -> last opened byte length (for open_refused reporting) */
+  const fileSizes = new Map<string, number>()
+  /** documentIds already reported through `open_refused` (once per documentId) */
+  const refusedIds = new Set<string>()
   /** the document this frame shows (save / export target) */
   let current: string | null = null
   /** the host's effective grants from `init` (undefined until the handshake, and in unit-test sessions) */
@@ -229,10 +233,13 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   let restoredDraft: ArrayBuffer | null = null
   const drafts = (opts.drafts ?? ((host) => bridgeDraftRecovery(port, 'docs', host)))({
     file: () => {
-      const file = current !== null && current === initDocumentId ? files.get(current) : undefined
+      const file =
+        fatal === null && current !== null && current === initDocumentId
+          ? files.get(current)
+          : undefined
       return file ? { etag: file.etag, name: file.name } : null
     },
-    isDirty: () => session.isDirty(),
+    isDirty: () => fatal === null && session.isDirty(),
     bytes: () => liveDocBytes(),
     restore: (bytes) => {
       restoredDraft = bytes
@@ -267,6 +274,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     // another document: the pending version and the bar of the old one are gone
     if (current !== null && current !== open.file.fileId) remote?.reset()
     sizeGate.noteDocumentOpened(open.file.fileId, open.limits)
+    fatal = null
+    hideFatal()
+    fileSizes.set(open.file.fileId, data.byteLength)
     remember(open.file)
     bindLagDetectorPort(port, grants)
     markDocumentLoaded(open.file.fileId, data.byteLength)
@@ -939,9 +949,35 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         const session = await port.whenInitialized()
         grants = session.capabilities
       } catch {
-        return { bound: false, readOnly: false }
+        return { bound: false, readOnly: fatal !== null }
       }
-      return { bound: false, readOnly: isViewOnly(idFromPath(path)) }
+      return { bound: false, readOnly: fatal !== null || isViewOnly(idFromPath(path)) }
+    },
+
+    reportOpenRefused(info) {
+      const fileId = idFromPath(info.path) ?? current ?? initDocumentId
+      const bytes =
+        typeof info.bytes === 'number' && info.bytes > 0
+          ? info.bytes
+          : fileId
+            ? fileSizes.get(fileId)
+            : undefined
+      // at most once per documentId per session (contract §3.1a)
+      if (fileId && !refusedIds.has(fileId)) {
+        refusedIds.add(fileId)
+        port.reportOpenRefused?.({
+          reason: info.reason,
+          ...(bytes !== undefined ? { bytes } : {}),
+          ...(info.measure ? { measure: info.measure } : {}),
+        })
+      }
+      const message = info.message ?? 'Document is too large to open.'
+      // the refused state: no save path of this documentId runs until a host `open` succeeds. No
+      // `error` event: the frame stays alive on its own refusal notice and `open_refused` lets the
+      // host offer another way to open the file
+      fatal = { code: 'too_large', message }
+      if (current === fileId) current = null
+      port.setDirty(false)
     },
   } satisfies Partial<DesktopApi>
 

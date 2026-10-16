@@ -13,6 +13,7 @@ import {
   type FrameRequests,
   type HostRequests,
   type OpenPayload,
+  type OpenRefusedPayload,
   type RemoteVersionPayload,
   type ProtocolErrorCode,
   type SaveBlockedPayload,
@@ -58,6 +59,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
   const saved: SavedPayload[] = []
   const sizeWarnings: SizeWarningPayload[] = []
   const saveBlocked: SaveBlockedPayload[] = []
+  const openRefused: OpenRefusedPayload[] = []
   const errors: Array<{ error: unknown; fatal?: boolean }> = []
   const renameListeners: Array<(file: FileMeta) => void> = []
   const themeListeners: Array<(theme: Theme) => void> = []
@@ -182,6 +184,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     reportSizeWarning: (p) => sizeWarnings.push(p),
     reportSaveBlocked: (p) => saveBlocked.push(p),
     reportError: (error, fatal) => errors.push({ error, fatal }),
+    reportOpenRefused: (p) => openRefused.push(p),
   }
 
   return {
@@ -236,6 +239,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     sizeWarnings,
     saveBlocked,
     errors,
+    openRefused,
   }
 }
 

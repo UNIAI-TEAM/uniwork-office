@@ -237,8 +237,19 @@ test.beforeAll(async () => {
   writeFileSync(resolve(fixtures, 'Kitchen-Sink.xlsx'), await buildKitchenSinkFixture())
   writeFileSync(resolve(fixtures, 'Structure.xlsx'), await buildStructureFixture())
   writeFileSync(resolve(fixtures, 'Synthetic-20k.xlsx'), await synthetic(20_000))
-  // 120k x 22 is ~85 MB of worksheet XML: above the frame's 80 MB gate
-  writeFileSync(resolve(fixtures, 'Too-Large.xlsx'), await synthetic(120_000))
+  // 65 worksheet parts x ~8.1 MiB = ~526.5 MiB of uncompressed worksheet XML: above the frame's 512 MiB gate
+  {
+    const zip = await JSZip.loadAsync(await synthetic(1))
+    const pad = 'x'.repeat(8_500_000)
+    const sheetXml = `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>${pad}</t></is></c></row></sheetData></worksheet>`
+    for (let i = 1; i <= 65; i += 1) {
+      zip.file(`xl/worksheets/sheet${i}.xml`, sheetXml)
+    }
+    writeFileSync(
+      resolve(fixtures, 'Too-Large.xlsx'),
+      await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }),
+    )
+  }
   writeFileSync(resolve(fixtures, 'Synthetic-50k.xlsx'), await synthetic(50_000))
   writeFileSync(resolve(fixtures, 'Synthetic-100k.xlsx'), await synthetic(100_000))
 })
@@ -532,8 +543,15 @@ for (const [lang, theme] of [
     expect(fatal[0]!.payload.fatal).toBe(true)
     // the sizes the host needs for its one sentence (visual r2 S-07)
     const details = (fatal[0]!.payload.error as { details?: Record<string, number> }).details
-    expect(details?.limitBytes).toBe(80 * 1024 * 1024)
-    expect(details?.worksheetXmlBytes).toBeGreaterThan(80 * 1024 * 1024)
+    expect(details?.limitBytes).toBe(512 * 1024 * 1024)
+    expect(details?.worksheetXmlBytes).toBeGreaterThan(512 * 1024 * 1024)
+    // the same refusal as one open_refused, sent once and before the fatal error (SIZE-F1)
+    const refused = (await hostEvents(page)).filter((e) => e.type === 'open_refused')
+    expect(refused).toHaveLength(1)
+    expect(refused[0]!.payload).toMatchObject({
+      reason: 'too_large_to_open',
+      measure: { kind: 'worksheet_xml_bytes', limit: 512 * 1024 * 1024 },
+    })
     await page.screenshot({ path: resolve(shots, `too-large-${lang}-${theme}.png`) })
     expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
       csp: [],

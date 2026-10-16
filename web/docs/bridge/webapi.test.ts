@@ -1581,5 +1581,65 @@ describe('save size gate (SIZE-F1, UNI-1861)', () => {
     await vi.waitFor(() =>
       expect(mock.calls.filter((c) => c.type === 'api.download')).toHaveLength(1),
     )
+describe('open_refused and refuse-tier guard (SIZE-F1)', () => {
+  it('reportOpenRefused emits one open_refused (no error event), marks uniworkState readOnly, blocks all saves, and resets on another documentId', async () => {
+    const opened = await bootWith('Huge.docx')
+    api.reportOpenRefused({
+      path: opened.path,
+      reason: 'too_large_to_open',
+      bytes: DOCX.byteLength,
+      measure: {
+        kind: 'characters',
+        value: 26_250_000,
+        limit: 25_300_000,
+      },
+      message: 'Document is too large to open in the editor',
+    })
+    // Duplicate report for the same documentId is deduplicated
+    api.reportOpenRefused({
+      path: opened.path,
+      reason: 'engine_out_of_memory',
+      bytes: DOCX.byteLength,
+      message: 'Out of memory',
+    })
+    expect(mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: DOCX.byteLength,
+        measure: {
+          kind: 'characters',
+          value: 26_250_000,
+          limit: 25_300_000,
+        },
+      },
+    ])
+    // no host `error` for a Docs refusal: open_refused is the signal
+    expect(mock.errors).toEqual([])
+    expect((await api.uniworkState(opened.path)).readOnly).toBe(true)
+    expect(await api.saveDocx(opened.path, buf([1]), false)).toMatchObject({ ok: false })
+    expect(await api.saveDocxAs('Copy.docx', buf([1]), opened.path)).toMatchObject({ ok: false })
+    expect(await api.saveDocxNew('Untitled.docx', buf([1]))).toMatchObject({ ok: false })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.docx' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toEqual([])
+
+    // Opening another documentId resets the fatal state and allows saving
+    const secondMeta = mock.seed('Valid.docx', DOCX)
+    let secondOpen!: OpenFileResult
+    const off = api.onOpenDocx((r) => {
+      if ('dataUrl' in r) secondOpen = r
+    })
+    await mock.host.open(mock.openPayload(secondMeta.fileId))
+    off()
+    expect(secondOpen.name).toBe('Valid.docx')
+    expect(mock.openRefused).toHaveLength(1)
+    expect((await api.uniworkState(secondOpen.path)).readOnly).toBe(false)
+    expect(await api.saveDocx(secondOpen.path, buf([7]), false)).toEqual({ ok: true })
   })
 })

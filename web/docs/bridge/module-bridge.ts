@@ -68,6 +68,7 @@ export type ModuleBridgePort = Pick<
   | 'onBlocked'
   | 'reportSaved'
   | 'reportAiRun'
+  | 'reportOpenRefused'
   | 'reportError'
   | 'getToken'
   | 'refreshToken'

@@ -13,6 +13,7 @@ import {
   errorFromHttpStatus,
   isDecimalRevision,
   isFileMeta,
+  isOpenRefusedPayload,
   openReplyRevision,
   parseEnvelope,
   type InitPayload,
@@ -1592,5 +1593,72 @@ describe('document size limits, size_warning, save_blocked, and doc.download (SI
       type: 'doc.download',
       payload: { delivered: true },
     })
+describe('open_refused (SIZE-F1, additive)', () => {
+  const env = (payload: unknown) =>
+    parseEnvelope({
+      ns: PROTOCOL_NS,
+      v: PROTOCOL_VERSION,
+      id: 'r1',
+      kind: 'event',
+      type: 'open_refused',
+      payload,
+    })
+
+  it('validates OpenRefusedPayload reasons and optional bytes / measure shapes', () => {
+    expect(FRAME_EVENT_TYPES).toContain('open_refused')
+    expect(
+      isOpenRefusedPayload({
+        reason: 'too_large_to_open',
+        bytes: 1024,
+        measure: {
+          kind: 'worksheet_xml_bytes',
+          value: 512 * 1024 * 1024 + 1,
+          limit: 512 * 1024 * 1024,
+        },
+      }),
+    ).toBe(true)
+    expect(env({ reason: 'engine_out_of_memory' }).ok).toBe(true)
+    expect(env({ reason: 'engine_out_of_memory', bytes: 4096 }).ok).toBe(true)
+    expect(
+      env({
+        reason: 'too_complex',
+        bytes: 2048,
+        measure: { kind: 'zip_parts', value: 10_001, limit: 10_000 },
+      }).ok,
+    ).toBe(true)
+    // the limit is optional, and `cells` is a known kind
+    expect(env({ reason: 'too_complex', measure: { kind: 'cells', value: 33_000_000 } }).ok).toBe(
+      true,
+    )
+    expect(env({ reason: 'unknown_reason', bytes: 100 }).ok).toBe(false)
+    expect(env({}).ok).toBe(false)
+    expect(env({ reason: 'too_large_to_open', bytes: -1 }).ok).toBe(false)
+    expect(
+      env({ reason: 'too_large_to_open', measure: { kind: 'invalid_kind', value: 10, limit: 5 } })
+        .ok,
+    ).toBe(false)
+    expect(
+      env({ reason: 'too_large_to_open', measure: { kind: 'paragraphs', value: 10, limit: 0 } }).ok,
+    ).toBe(false)
+  })
+
+  it('delivers open_refused to the host', async () => {
+    const { host, client } = setup()
+    await host.whenReady()
+    const seen: unknown[] = []
+    host.on('open_refused', (p) => seen.push(p))
+    client.reportOpenRefused({
+      reason: 'too_large_to_open',
+      bytes: 500,
+      measure: { kind: 'paragraphs', value: 230_001, limit: 230_000 },
+    })
+    await flush()
+    expect(seen).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: 500,
+        measure: { kind: 'paragraphs', value: 230_001, limit: 230_000 },
+      },
+    ])
   })
 })
