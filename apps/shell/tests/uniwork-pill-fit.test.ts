@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   PILL_STRIP_TABS,
   barLayoutOf,
+  captionReserveOf,
   miniSlackOf,
   nextPillVariantOf,
   pillFitStepOf,
@@ -912,5 +913,289 @@ describe('FXT6u2: the mini step needs the last tab only up to its readable label
         }
       }
     })
+  })
+})
+
+/**
+ * G5-06u-TS (V6u8-02): the compact strip at UI scale 1.25. Home is icon-only (12 + 16 + 12 = 40) and
+ * the inactive document tabs drop their close button (104 - 16 - 8 = 80), so the floor and the
+ * mini slack are read per tab: the floor sums the counted tabs' own minimums, the slack is what
+ * the LAST counted tab has after its label. The bar below is section 0 of the contract in CSS px x
+ * 1.25 (window px): drag spacer + menu 40, overflow 38 + the 138 win px caption (divided by the
+ * scale since the caption spacer fix), the holder's 22 of margins.
+ */
+describe('G5-06u-TS: the floor and the slack read each counted tab', () => {
+  const COMPACT = { home: 40, tabMin: 104, tabMins: [104, 80, 80], padding: 20, newButton: 32 }
+
+  it('stripFloorOf sums the per-tab minimums: Home 40 + 104 + 80 + 80 + 20 + 32 = 356', () => {
+    expect(stripFloorOf({ ...COMPACT, docTabs: 3 })).toBe(356)
+    expect(stripFloorOf({ ...COMPACT, docTabs: 2 })).toBe(40 + 184 + 52)
+    // the floor counts three tabs; a fourth one scrolls
+    expect(stripFloorOf({ ...COMPACT, tabMins: [104, 80, 80, 80], docTabs: 4 })).toBe(356)
+    expect(stripFloorOf({ ...COMPACT, docTabs: 0 })).toBe(40 + 52)
+  })
+
+  it('equal per-tab minimums are the floor of tabMin x n (the scale-1 strip is unchanged)', () => {
+    for (const n of [0, 1, 2, 3, 4]) {
+      const base = { home: 109, tabMin: 104, padding: 20, newButton: 32, docTabs: n }
+      expect(stripFloorOf({ ...base, tabMins: Array(n).fill(104) })).toBe(stripFloorOf(base))
+      expect(
+        miniSlackOf({ ...base, tabMins: Array(n).fill(104), labelStart: 36, labelMin: 36 }),
+      ).toBe(miniSlackOf({ ...base, labelStart: 36, labelMin: 36 }))
+    }
+  })
+
+  it('miniSlackOf reads the last counted tab: an inactive compact tab has 8 after its label (50), 12 in RTL (54)', () => {
+    expect(miniSlackOf({ ...COMPACT, docTabs: 3, labelStart: 36, labelMin: 36 })).toBe(8 + 32 + 10)
+    expect(miniSlackOf({ ...COMPACT, docTabs: 3, labelStart: 32, labelMin: 36 })).toBe(12 + 32 + 10)
+    // two tabs: the last counted one is the second
+    expect(
+      miniSlackOf({ ...COMPACT, tabMins: [104, 80], docTabs: 2, labelStart: 36, labelMin: 36 }),
+    ).toBe(50)
+  })
+
+  describe('barLayoutOf at UI scale 1.25, 722 / 800 x 3 tabs, toggle shown and none', () => {
+    const S = 1.25
+    const TS_PILL = { full: 309 * S, short: 190 * S, compact: 111 * S, mini: 28 * S }
+    const compactBar = (w: number, extra: Partial<BarLayoutInput> = {}) =>
+      barLayoutOf({
+        barWidth: w,
+        left: 40 * S,
+        right: 38 * S + 138,
+        margins: 22 * S,
+        home: 40 * S,
+        tabMin: 104 * S,
+        tabMins: [104 * S, 80 * S, 80 * S],
+        docTabs: 3,
+        padding: 20 * S,
+        newButton: 32 * S,
+        toggle: 108 * S,
+        toggleIcon: 32 * S,
+        labelStart: 36 * S,
+        labelMin: 36 * S,
+        pill: TS_PILL,
+        hasShort: true,
+        ...extra,
+      })
+    const none = { toggle: 0, toggleIcon: undefined }
+    /** the third tab's visible window px: the strip starts with 10 of padding, then Home 40, 104, 80 */
+    const lastPx = (l: ReturnType<typeof barLayoutOf>) =>
+      Math.max(0, Math.min(80 * S, l.strip.right - l.strip.left - (10 + 40 + 104 + 80) * S))
+
+    it('the cells: the step, the toggle form and the last tab px / label px (LTR needs 90 / 45)', () => {
+      const cells = [722, 800].flatMap((w) =>
+        [{}, none].map((extra) => {
+          const l = compactBar(w, extra)
+          const px = lastPx(l)
+          expect(l.strip.right, `${w}`).toBeLessThanOrEqual(l.chrome.left)
+          return `${w}${extra === none ? '' : '+t'} ${l.variant}${l.iconToggle ? '+icon' : ''} ${px}/${Math.min(36 * S, px - 36 * S)}`
+        }),
+      )
+      expect(cells).toEqual([
+        '722+t mini+icon 91.5/45',
+        '722 mini 100/45',
+        '800+t mini+icon 100/45',
+        '800 compact 100/45',
+      ])
+    })
+
+    it('RTL (label start 32, 12 after the label): the same steps, the last tab past 85 / 45', () => {
+      for (const w of [722, 800]) {
+        for (const extra of [{}, none]) {
+          const ltr = compactBar(w, extra)
+          const rtl = compactBar(w, { ...extra, labelStart: 32 * S, labelMin: 36 * S })
+          expect(rtl.variant, `${w}`).toBe(ltr.variant)
+          expect(rtl.iconToggle, `${w}`).toBe(ltr.iconToggle)
+          expect(lastPx(rtl) - 32 * S, `${w}`).toBeGreaterThanOrEqual(36 * S)
+        }
+      }
+    })
+
+    it('without the compact form (Home 144.8, three 104px tabs) the third tab is out of the strip', () => {
+      const full = compactBar(722, { home: 144.8 * S, tabMins: undefined })
+      const third = full.strip.right - full.strip.left - (10 + 144.8 + 208) * S
+      expect(third).toBeLessThan((36 + 36) * S)
+    })
+  })
+})
+
+/**
+ * VTS1-01 (Advisor option B, "tabs win over pill text"): at UI scale > 1 the caption spacer fix gave
+ * the bar back the caption x (scale - 1) window px the spacer used to over-reserve, and the pill-fit
+ * spent it on a wider pill or toggle form, so the last tab got narrower than on d8af19b01. The pill
+ * now takes its steps as if that over-reservation still stood (`captionReserve`), so the room goes to
+ * the strip. The pre-fix bar below is the d8af19b01 equivalent: the 138 win px caption reserved
+ * x 1.25 and no reserve; the fixed bar reserves the caption once and holds back the difference.
+ * Widths are window px: the stub's pill and the queued / failed / saved labels the visual run
+ * measured at 1.25 (en, ar), with the Discussion toggle's two forms.
+ */
+describe('VTS1-01: the pill steps hold back the old caption over-reservation at UI scale > 1', () => {
+  it('captionReserveOf is caption x (scale - 1) above scale 1, and nothing else', () => {
+    expect(captionReserveOf(138, 1.25)).toBe(34.5)
+    expect(captionReserveOf(137.2, 1.25)).toBeCloseTo(34.3, 5)
+    expect(captionReserveOf(138, 1)).toBe(0)
+    expect(captionReserveOf(138, 0.9)).toBe(0)
+    expect(captionReserveOf(0, 1.25)).toBe(0)
+    expect(captionReserveOf(Number.NaN, 1.25)).toBe(0)
+    expect(captionReserveOf(138, Number.NaN)).toBe(0)
+  })
+
+  const S = 1.25
+  const CAPTION = 138
+  const TOGGLE_EN = { toggle: 126.2, toggleIcon: 39.1 }
+  const TOGGLE_AR = { toggle: 110.5, toggleIcon: 39.1 }
+  const LABELS = {
+    stub: {
+      pill: { full: 309 * S, short: 190 * S, compact: 111 * S, mini: 28 * S },
+      hasShort: true,
+      toggle: 108 * S,
+      toggleIcon: 32 * S,
+    },
+    'en queued': {
+      pill: { full: 392.6, short: 239.9, compact: 147.3, mini: 35 },
+      hasShort: true,
+      ...TOGGLE_EN,
+    },
+    'en failed': { pill: { full: 210.8, compact: 114.1, mini: 35 }, hasShort: false, ...TOGGLE_EN },
+    'en saved': { pill: { full: 166.7, compact: 40.4, mini: 35 }, hasShort: false, ...TOGGLE_EN },
+    'ar queued': {
+      pill: { full: 510.7, short: 342.7, compact: 187.6, mini: 35 },
+      hasShort: true,
+      ...TOGGLE_AR,
+    },
+    'ar failed': { pill: { full: 199.7, compact: 123, mini: 35 }, hasShort: false, ...TOGGLE_AR },
+    'ar saved': { pill: { full: 188.9, compact: 40.4, mini: 35 }, hasShort: false, ...TOGGLE_AR },
+  }
+  type Label = (typeof LABELS)[keyof typeof LABELS]
+  type Caption = { right: number; reserve?: number }
+
+  /** the full (not compact) strip at 1.25: Home 144.8 (181 win px), every document tab 104 */
+  const fullBar = (w: number, n: number, label: Label, withToggle: boolean, caption: Caption) =>
+    barLayoutOf({
+      barWidth: w,
+      left: 40 * S,
+      right: 38 * S + caption.right,
+      margins: 22 * S,
+      home: 144.8 * S,
+      tabMin: 104 * S,
+      docTabs: n,
+      padding: 20 * S,
+      newButton: 32 * S,
+      toggle: withToggle ? label.toggle : 0,
+      toggleIcon: withToggle ? label.toggleIcon : undefined,
+      labelStart: 36 * S,
+      labelMin: 36 * S,
+      pill: label.pill,
+      hasShort: label.hasShort,
+      ...(caption.reserve === undefined ? {} : { captionReserve: caption.reserve }),
+    })
+  const preFix: Caption = { right: CAPTION * S }
+  const fixed = (): Caption => ({ right: CAPTION, reserve: captionReserveOf(CAPTION, S) })
+  const uncapped: Caption = { right: CAPTION }
+  const stripOf = (l: ReturnType<typeof barLayoutOf>) => l.strip.right - l.strip.left
+  /** what the strip leaves the last tab past its padding, Home and the tabs before it at their minimum */
+  const lastRoom = (l: ReturnType<typeof barLayoutOf>, n: number) =>
+    stripOf(l) - (10 + 144.8 + 104 * (n - 1)) * S
+
+  function eachCell(fn: (tag: string, w: number, n: number, label: Label, t: boolean) => void) {
+    for (const [name, label] of Object.entries(LABELS)) {
+      for (const w of [1024, 1280]) {
+        for (const n of [1, 2, 3]) {
+          for (const t of [false, true]) fn(`${name} ${w} x ${n}${t ? ' +t' : ''}`, w, n, label, t)
+        }
+      }
+    }
+  }
+
+  it('1.25 x 1024 / 1280 x 1-3 tabs x toggle none / shown, en + ar: the pre-fix step, a strip 34.5 wider, the last tab no narrower, 0 overlap', () => {
+    eachCell((tag, w, n, label, t) => {
+      const before = fullBar(w, n, label, t, preFix)
+      const after = fullBar(w, n, label, t, fixed())
+      expect(after.variant, tag).toBe(before.variant)
+      expect(after.iconToggle, tag).toBe(before.iconToggle)
+      expect(stripOf(after) - stripOf(before), tag).toBeCloseTo(CAPTION * (S - 1), 6)
+      expect(lastRoom(after, n), tag).toBeGreaterThanOrEqual(lastRoom(before, n))
+      expect(after.strip.right, tag).toBeLessThanOrEqual(after.chrome.left)
+    })
+  })
+
+  it('without the reserve the returned room goes to a wider pill and the last tab loses width (the VTS1-01 shape)', () => {
+    const lost: string[] = []
+    eachCell((tag, w, n, label, t) => {
+      const before = fullBar(w, n, label, t, preFix)
+      const after = fullBar(w, n, label, t, uncapped)
+      if (lastRoom(after, n) < lastRoom(before, n) - 0.01) lost.push(tag)
+    })
+    expect(lost.length).toBeGreaterThan(0)
+  })
+
+  it('at scale 1 the reserve is a no-op: the same layout with and without it, at every width', () => {
+    for (const label of Object.values(LABELS)) {
+      for (let w = 600; w <= 1600; w += 7) {
+        for (const n of [0, 1, 2, 3, 4]) {
+          const base: BarLayoutInput = {
+            barWidth: w,
+            left: 40,
+            right: 38 + CAPTION,
+            margins: 22,
+            home: 109,
+            tabMin: 104,
+            docTabs: n,
+            padding: 20,
+            newButton: 32,
+            toggle: label.toggle,
+            toggleIcon: label.toggleIcon,
+            pill: label.pill,
+            hasShort: label.hasShort,
+          }
+          expect(barLayoutOf({ ...base, captionReserve: captionReserveOf(CAPTION, 1) })).toEqual(
+            barLayoutOf(base),
+          )
+        }
+      }
+    }
+  })
+
+  it('the compact strip at 1.25 x 722 / 800 / 890 x 3 with the reserve: a pill no wider, the last tab past 90 (LTR) / 85 (RTL), label 45', () => {
+    const rank = ['mini', 'compact', 'short', 'full']
+    const compactBar = (w: number, label: Label, t: boolean, rtl: boolean, reserve?: number) =>
+      barLayoutOf({
+        barWidth: w,
+        left: 40 * S,
+        right: 38 * S + CAPTION,
+        margins: 22 * S,
+        home: 40 * S,
+        tabMin: 104 * S,
+        tabMins: [104 * S, 80 * S, 80 * S],
+        docTabs: 3,
+        padding: 20 * S,
+        newButton: 32 * S,
+        toggle: t ? label.toggle : 0,
+        toggleIcon: t ? label.toggleIcon : undefined,
+        labelStart: (rtl ? 32 : 36) * S,
+        labelMin: 36 * S,
+        pill: label.pill,
+        hasShort: label.hasShort,
+        ...(reserve === undefined ? {} : { captionReserve: reserve }),
+      })
+    const lastPx = (l: ReturnType<typeof barLayoutOf>) =>
+      Math.max(0, Math.min(80 * S, stripOf(l) - (10 + 40 + 104 + 80) * S))
+    for (const [name, label] of Object.entries(LABELS)) {
+      for (const w of [722, 800, 890]) {
+        for (const t of [false, true]) {
+          for (const rtl of [false, true]) {
+            const tag = `${name} ${w}${t ? ' +t' : ''}${rtl ? ' rtl' : ''}`
+            const was = compactBar(w, label, t, rtl)
+            const now = compactBar(w, label, t, rtl, captionReserveOf(CAPTION, S))
+            expect(rank.indexOf(now.variant), tag).toBeLessThanOrEqual(rank.indexOf(was.variant))
+            expect(Number(now.iconToggle), tag).toBeGreaterThanOrEqual(Number(was.iconToggle))
+            expect(stripOf(now), tag).toBeGreaterThanOrEqual(stripOf(was))
+            expect(lastPx(now), tag).toBeGreaterThanOrEqual(rtl ? 85 : 90)
+            expect(Math.min(36 * S, lastPx(now) - (rtl ? 32 : 36) * S), tag).toBe(45)
+            expect(now.strip.right, tag).toBeLessThanOrEqual(now.chrome.left)
+          }
+        }
+      }
+    }
   })
 })

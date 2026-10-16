@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import type { TabsApi, TabSummary } from '../../shared/tabs-api'
 import { TEAR_OFF_SLACK, insertionIndexForX, isBeyondBand } from '../../shared/tab-drag-geometry'
 import { notifyFilesChanged } from './file-events'
 import { useI18n } from './locale'
+import { compactStripOf } from './tab-strip-compact'
+import { uiScaleOf } from './uniwork-top-inset'
 import {
   DiscussionToggle,
   PillFitScope,
@@ -419,9 +421,34 @@ export function TabBar() {
     return () => strip.removeEventListener('wheel', onWheel)
   }, [])
 
-  // keep the active tab in view — new tabs open at the far end of the strip
-  const activeId = tabs.find((tab) => tab.active)?.id
+  // G5-06u-TS: a narrow bar (a high UI scale) draws the compact strip, see
+  // tab-strip-compact.ts. Read off the window, the scale and the tab count
+  // only, so no pill or toggle form can flip it back.
+  const barRef = useRef<HTMLDivElement>(null)
+  const [compactStrip, setCompactStrip] = useState(false)
+  const docTabCount = tabs.filter((tab) => tab.kind !== 'home').length
   useEffect(() => {
+    const bar = barRef.current
+    if (!bar) return
+    const update = () =>
+      setCompactStrip(
+        compactStripOf({ barCss: window.innerWidth / uiScaleOf(bar), docTabs: docTabCount }),
+      )
+    update()
+    window.addEventListener('resize', update)
+    // main writes the scale as an inline --ui-scale on <html>
+    const scale = typeof MutationObserver !== 'undefined' ? new MutationObserver(update) : null
+    scale?.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] })
+    return () => {
+      window.removeEventListener('resize', update)
+      scale?.disconnect()
+    }
+  }, [docTabCount])
+
+  // keep the active tab in view — new tabs open at the far end of the strip,
+  // and a narrower strip (window, scale or strip form) can push it out
+  const activeId = tabs.find((tab) => tab.active)?.id
+  const scrollActiveIntoView = useCallback(() => {
     // pointer-down activation runs while the user is pressing that tab — it is
     // already visible, and scrolling the strip mid-press would invalidate the
     // drag geometry sampled at pointer-down
@@ -429,10 +456,18 @@ export function TabBar() {
     stripRef.current
       ?.querySelector('.tab-item.active')
       ?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
-  }, [activeId])
+  }, [])
+  useEffect(() => scrollActiveIntoView(), [activeId, compactStrip, scrollActiveIntoView])
+  useEffect(() => {
+    const strip = stripRef.current
+    if (!strip || typeof ResizeObserver === 'undefined') return
+    const sizes = new ResizeObserver(scrollActiveIntoView)
+    sizes.observe(strip)
+    return () => sizes.disconnect()
+  }, [scrollActiveIntoView])
 
   return (
-    <div className="tab-bar">
+    <div className="tab-bar" ref={barRef} data-strip={compactStrip ? 'compact' : undefined}>
       <div className="tab-bar-drag-spacer" />
       {!IS_MAC && (
         <button

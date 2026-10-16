@@ -43,10 +43,15 @@ export function shortLabelOf(label: string): string {
 }
 
 export interface StripFloorInput {
-  /** the Home tab's width (it never shrinks) */
+  /** the Home tab's width (it does not shrink; the compact strip draws it as its icon) */
   home: number
   /** a document tab's minimum width */
   tabMin: number
+  /**
+   * each counted document tab's own minimum, in strip order (the compact strip gives the inactive
+   * tabs a narrower one, G5-06u-TS); a tab missing here has `tabMin`
+   */
+  tabMins?: readonly number[]
   docTabs: number
   /** the strip's horizontal padding */
   padding: number
@@ -54,13 +59,23 @@ export interface StripFloorInput {
   newButton: number
 }
 
-/** the room the tab strip keeps for its tabs: Home, up to three document tabs at their minimum, "+" */
-export function stripFloorOf(input: StripFloorInput): number {
-  const tabs = Math.min(Math.max(0, input.docTabs), PILL_STRIP_TABS)
-  return input.home + tabs * input.tabMin + input.padding + input.newButton
+function countedTabsOf(input: StripFloorInput): number {
+  return Math.min(Math.max(0, input.docTabs), PILL_STRIP_TABS)
 }
 
-/** where a document tab's title starts and how wide it is at the tab's minimum width */
+/** the minimum of the counted document tab at `index` */
+function tabMinAt(input: StripFloorInput, index: number): number {
+  return input.tabMins?.[index] ?? input.tabMin
+}
+
+/** the room the tab strip keeps for its tabs: Home, up to three document tabs at their minimum, "+" */
+export function stripFloorOf(input: StripFloorInput): number {
+  let tabs = 0
+  for (let i = 0; i < countedTabsOf(input); i++) tabs += tabMinAt(input, i)
+  return input.home + tabs + input.padding + input.newButton
+}
+
+/** where the last counted document tab's title starts and how wide it is at that tab's minimum width */
 export interface TabLabelInput {
   /** from the tab's leading edge to the title's start (padding, icon, gap) */
   labelStart: number
@@ -78,7 +93,8 @@ export interface TabLabelInput {
  */
 export function miniSlackOf(input: StripFloorInput & TabLabelInput): number {
   if (!(input.docTabs > 0)) return 0
-  const pastLabel = Math.max(0, input.tabMin - input.labelStart - input.labelMin)
+  const last = tabMinAt(input, countedTabsOf(input) - 1)
+  const pastLabel = Math.max(0, last - input.labelStart - input.labelMin)
   return pastLabel + input.newButton + input.padding / 2
 }
 
@@ -91,6 +107,19 @@ export function miniSlackOf(input: StripFloorInput & TabLabelInput): number {
 export function pillRoomOf(input: { shared: number; floor: number; others: number }): number {
   const room = input.shared - input.floor - input.others
   return Number.isFinite(room) ? room : 0
+}
+
+/**
+ * The room the pill's steps hold back for the tabs at UI scale > 1 (VTS1-01, tabs win over pill
+ * text). Before the caption spacer fix (G5-06u-TS) the spacer reserved the caption x scale, caption
+ * x (scale - 1) window px too much; the fix gave that room back to the bar, and the fit spent it on a
+ * wider pill or toggle form, so the last tab lost width. The pill now takes the step it took with
+ * the old reservation and the room goes to the strip. The caption is the spacer's own width, which
+ * the steps do not move. Scale 1 (or no caption): nothing.
+ */
+export function captionReserveOf(caption: number, scale: number): number {
+  if (!(caption > 0) || !(scale > 1)) return 0
+  return caption * (scale - 1)
 }
 
 /** The width the pill may take: the room, never negative. */
@@ -196,6 +225,8 @@ export interface BarLayoutInput {
   margins: number
   home: number
   tabMin: number
+  /** each counted tab's own minimum (`StripFloorInput.tabMins`); absent: `tabMin` each */
+  tabMins?: readonly number[]
   docTabs: number
   padding: number
   newButton: number
@@ -203,11 +234,13 @@ export interface BarLayoutInput {
   toggle: number
   /** the toggle's width without its label; absent: the holder has no toggle to shrink */
   toggleIcon?: number
-  /** the first tab's title start and minimum width; absent: the stylesheet's 36 and 36 */
+  /** the last counted tab's title start and minimum width; absent: the stylesheet's 36 and 36 */
   labelStart?: number
   labelMin?: number
   pill: PillWidths
   hasShort: boolean
+  /** room the steps hold back for the tabs (`captionReserveOf`); absent: none */
+  captionReserve?: number
 }
 
 export interface BarLayout {
@@ -226,7 +259,7 @@ export interface BarLayout {
 export function barLayoutOf(input: BarLayoutInput): BarLayout {
   const shared = input.barWidth - input.left - input.right - input.margins
   const floor = stripFloorOf(input)
-  const budget = pillRoomOf({ shared, floor, others: input.toggle })
+  const budget = pillRoomOf({ shared, floor, others: input.toggle }) - (input.captionReserve ?? 0)
   const hasToggle = input.toggleIcon !== undefined && input.toggle > 0
   const step = pillFitStepOf({
     budget,
@@ -284,15 +317,22 @@ export function measurePillFit(group: HTMLElement): {
 
   const home = strip.querySelector('.tab-home')?.getBoundingClientRect().width ?? 0
   const docTabs = strip.querySelectorAll('.tab-item:not(.tab-home)')
-  const firstDoc = docTabs.item(0)
+  // each counted tab's own minimum (the compact strip's inactive tabs have a narrower one); the
+  // stylesheet is the one source, the fallback only stands in where it is not computed
+  const counted = Array.from(docTabs).slice(0, PILL_STRIP_TABS)
+  const tabMins = counted.map((tab) => {
+    const min = px(getComputedStyle(tab).minWidth)
+    return (Number.isFinite(min) ? min : TAB_MIN_FALLBACK_PX) * scale
+  })
+  const lastCounted = counted[counted.length - 1] ?? null
   const stripStyle = getComputedStyle(strip)
   const padding = px(stripStyle.paddingLeft) + px(stripStyle.paddingRight)
   const newButton = strip.querySelector('.tab-new-btn')
   const newStyle = newButton ? getComputedStyle(newButton) : undefined
-  const tabMin = firstDoc ? px(getComputedStyle(firstDoc).minWidth) : Number.NaN
   const floorInput: StripFloorInput = {
     home,
-    tabMin: (Number.isFinite(tabMin) ? tabMin : TAB_MIN_FALLBACK_PX) * scale,
+    tabMin: tabMins[0] ?? TAB_MIN_FALLBACK_PX * scale,
+    tabMins,
     docTabs: docTabs.length,
     padding: (Number.isFinite(padding) ? padding : STRIP_PADDING_FALLBACK_PX) * scale,
     newButton:
@@ -303,12 +343,21 @@ export function measurePillFit(group: HTMLElement): {
         scale,
   }
   const floor = stripFloorOf(floorInput)
-  const miniSlack = miniSlackOf({ ...floorInput, ...labelOf(firstDoc, floorInput.tabMin, scale) })
-  const budget = pillRoomOf({
-    shared: stripWidth + chromeWidth,
-    floor,
-    others: chromeWidth - pillWidth,
+  const miniSlack = miniSlackOf({
+    ...floorInput,
+    ...labelOf(lastCounted, tabMins[tabMins.length - 1] ?? floorInput.tabMin, scale),
   })
+  // TabBar's caption spacer (G5-06u-TS): its width is the caption's, whatever the pill does
+  const spacer = Array.from(bar.children).find((child) =>
+    child.classList.contains('tab-bar-caption-spacer'),
+  )
+  const caption = spacer?.getBoundingClientRect().width ?? 0
+  const budget =
+    pillRoomOf({
+      shared: stripWidth + chromeWidth,
+      floor,
+      others: chromeWidth - pillWidth,
+    }) - captionReserveOf(caption, scale)
   // the label is the part that gives way (it ellipsizes): its hidden overflow is width the pill wants
   const label = group.querySelector<HTMLElement>('.uw-pill-label')
   const clipped = label ? Math.max(0, label.scrollWidth - label.clientWidth) : 0
@@ -325,7 +374,7 @@ export function measurePillFit(group: HTMLElement): {
 }
 
 /**
- * Where the first document tab's title starts and how wide it is at the tab's minimum width, read
+ * Where the last counted document tab's title starts and how wide it is at its own minimum width, read
  * off the DOM by the page's direction (the title starts on the right in right-to-left). The width at
  * the minimum is what the tab leaves after the start and after the title (the close button and the
  * padding), since the title is the part that flexes. A tab with no title yet (the rename input) or
