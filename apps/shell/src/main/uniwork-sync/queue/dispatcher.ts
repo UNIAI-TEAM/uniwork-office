@@ -18,6 +18,7 @@ import {
   type PendingIntentRecord,
   type QueueState,
 } from './record'
+import { traceQueueTransition } from '../test-hooks/trace'
 
 /**
  * The G5-06 durable save queue engine: it turns a stored `IntentRecordV2` into
@@ -256,6 +257,7 @@ export class QueueDispatcher {
     const written = await access.intents.put(doc.key, doc.record, doc.payload)
     this.deps.publish(doc.record)
     if (written.kind !== 'ok') return doc.record.state
+    traceQueueTransition(null, doc.record, { type: 'save' }, context.now)
     return doc.record.state
   }
 
@@ -440,6 +442,7 @@ export class QueueDispatcher {
         doc,
         { type: 'lookup', error: code, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) },
         now,
+        error,
       )
       return doc.record.state
     }
@@ -478,6 +481,7 @@ export class QueueDispatcher {
         doc,
         { type: 'lookup', error: code, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) },
         now,
+        error,
       )
       return doc.record.state
     }
@@ -797,6 +801,7 @@ export class QueueDispatcher {
         ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
       },
       now,
+      error,
     )
   }
 
@@ -908,7 +913,13 @@ export class QueueDispatcher {
    * record where it was, so nothing downstream acts on a lost state; a stored
    * record that is a NEWER intent (N+1 minted meanwhile) is never clobbered.
    */
-  private async apply(doc: QueueDoc, event: QueueEvent, now: number): Promise<TransitionResult> {
+  private async apply(
+    doc: QueueDoc,
+    event: QueueEvent,
+    now: number,
+    cause?: unknown,
+  ): Promise<TransitionResult> {
+    const from = doc.record.state
     const context = await this.context(now)
     const result = transition(doc.record, event, context)
     if (!result.record) {
@@ -938,6 +949,7 @@ export class QueueDispatcher {
       return { record: doc.record, effects: [] }
     }
     doc.record = result.record
+    traceQueueTransition(from, result.record, event, now, cause)
     this.deps.publish(doc.record)
     return result
   }
