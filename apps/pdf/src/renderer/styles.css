@@ -3149,8 +3149,8 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 
 .ai-work-group-summary:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--pdf-focus-ring);
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
   border-radius: 4px;
 }
 
@@ -3287,8 +3287,8 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 
 .ai-step-title.clickable:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--pdf-focus-ring);
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
   border-radius: 4px;
 }
 
