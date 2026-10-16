@@ -1175,6 +1175,7 @@ button {
   overflow: auto;
   padding: 0 24px;
   background: var(--canvas);
+  outline: none;
 }
 
 /* A narrow pane (phone width, = NARROW_FIT_PANE_PX): the 60 % floor page nearly fills it, so the

@@ -239,8 +239,25 @@ for (const { module, open } of MODULE_CASES) {
       expect(t).not.toMatch(ERROR_TEXT_RE)
     }
 
+    // SIZE-v1-2: closing via Escape or Close returns focus to the active control or canvas/editor root, never BODY
+    await page.keyboard.press('Escape')
+    await expect(dlg).toHaveCount(0)
+    const activeAfterEsc = await frameFallback.evaluate(() => {
+      const a = document.activeElement
+      return a ? `${a.tagName}.${String(a.className || '')}` : 'null'
+    })
+    expect(activeAfterEsc).not.toMatch(/^(BODY|HTML)\./)
+
+    // Re-open and close via Close button ("Đóng") and verify focus returns again
+    await triggerModuleSave(page, frameFallback, module)
+    await expect(dlg).toBeVisible({ timeout: 15_000 })
     await dlg.locator('[data-choice="close"]').click()
     await expect(dlg).toHaveCount(0)
+    const activeAfterClose = await frameFallback.evaluate(() => {
+      const a = document.activeElement
+      return a ? `${a.tagName}.${String(a.className || '')}` : 'null'
+    })
+    expect(activeAfterClose).not.toMatch(/^(BODY|HTML)\./)
 
     // 2. sizeUi=1: emits save_blocked, sends zero api.save, and shows nothing in the frame
     const frameHostUi = await openModule(page, module, {

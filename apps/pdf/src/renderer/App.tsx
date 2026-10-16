@@ -7814,6 +7814,7 @@ export default function App() {
             <div
               ref={scrollRef}
               className={`pdf-scroll${drawTool ? ' pdf-drawing' : ''}${nightMode ? ' pdf-night' : ''}`}
+              tabIndex={-1}
               onScroll={() => {
                 handleScroll()
                 setSelPopup(null)
