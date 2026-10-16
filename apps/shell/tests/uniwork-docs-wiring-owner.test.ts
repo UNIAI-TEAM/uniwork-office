@@ -2,7 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AccountStatus } from '../src/shared/home-api'
+import { UNIWORK_DOC_CHANNELS, type AccountStatus } from '../src/shared/home-api'
+import { TREE_CHANGED_WINDOW_MS } from '../src/main/uniwork-docs/tree-changed'
 
 /**
  * R2-5: the last-owner record follows the session itself. The account status
@@ -210,11 +211,11 @@ describe('G8-16 S16: the feed starts only for the chosen org (F-1)', () => {
     { id: 'org_b', name: 'Beta', slug: 'beta', role: 'member', membership: 'active' as const },
   ]
 
-  async function handle() {
+  async function handle(send?: (channel: string, payload: unknown) => void) {
     const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
     const created = createUniworkDocs({ handle: vi.fn() } as never, {
       shellWindow: () => null,
-      shellContents: () => null,
+      shellContents: () => (send ? ({ isDestroyed: () => false, send } as never) : null),
       openPath: () => true,
       refuseLockedPath: () => false,
       isPathOpen: () => false,
@@ -272,6 +273,105 @@ describe('G8-16 S16: the feed starts only for the chosen org (F-1)', () => {
     statusNow = { ...statusNow, org: ORGS[1] }
     statusListener?.(statusNow)
     await vi.waitFor(() => expect(fetched).toContain('/api/v1/orgs/org_b/office/capabilities'))
+  })
+
+  it('R3-05: forwards org changes through the status seam to suppress an in-flight own-action tree-changed push, while a same-org status push lets it through', async () => {
+    const treeChangedPushes: Array<{ workspaceId: string }> = []
+    const created = await handle((channel, payload) => {
+      if (channel === UNIWORK_DOC_CHANNELS.treeChanged) {
+        treeChangedPushes.push(payload as { workspaceId: string })
+      }
+    })
+    identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+    statusNow = {
+      loggedIn: true,
+      state: 'signed-in',
+      needsOrgChoice: false,
+      org: ORGS[0],
+      orgs: ORGS,
+    }
+    statusListener?.(statusNow)
+    await vi.waitFor(() => expect(fetched).toContain('/api/v1/orgs/org_a/office/capabilities'))
+
+    let postReached!: () => void
+    let onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    let postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname
+      fetched.push(path)
+      if (path === '/api/v1/workspaces/ws_1/documents' && init?.method === 'POST') {
+        postReached()
+        await postGate
+        return new Response(
+          JSON.stringify({
+            document: {
+              id: 'fold_1',
+              organization_id: 'org_a',
+              workspace_id: 'ws_1',
+              title: 'Folder',
+              kind: 'folder',
+              parent_id: null,
+              revision: '1',
+              current_version: 0,
+              my_level: 'edit',
+              updated_at: '2026-10-16T00:00:00Z',
+            },
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+      return new Response(
+        JSON.stringify({
+          sync_feed: false,
+          sync_write: false,
+          offline_library: false,
+          ai_uniwork: false,
+          ai_uniwork_formats: [],
+          ttl_seconds: 300,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    })
+
+    // 1. Positive control: a status push reporting the same org does not suppress the push
+    const firstCreate = created.service.createFolder({
+      workspaceId: 'ws_1',
+      parentId: null,
+      title: 'Same org',
+    })
+    await onPostReached
+    statusListener?.({ ...statusNow, org: ORGS[0] })
+    releasePost()
+    expect((await firstCreate).ok).toBe(true)
+    await vi.waitFor(() => expect(treeChangedPushes).toEqual([{ workspaceId: 'ws_1' }]), {
+      timeout: TREE_CHANGED_WINDOW_MS + 500,
+    })
+
+    // 2. Org switch via statusListener: suppresses the in-flight own-action push
+    treeChangedPushes.length = 0
+    onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    const secondCreate = created.service.createFolder({
+      workspaceId: 'ws_1',
+      parentId: null,
+      title: 'Switched org',
+    })
+    await onPostReached
+    statusNow = { ...statusNow, org: ORGS[1] }
+    statusListener?.(statusNow)
+    releasePost()
+    expect((await secondCreate).ok).toBe(true)
+    await new Promise((resolve) => setTimeout(resolve, TREE_CHANGED_WINDOW_MS + 50))
+    expect(treeChangedPushes).toEqual([])
   })
 
   it('sign-out stops the feed', async () => {

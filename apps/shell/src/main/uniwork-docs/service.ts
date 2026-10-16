@@ -3373,24 +3373,29 @@ export class UniworkDocsService {
    * response arriving after sign-out, account switch, organization change, or
    * `lockSession` must not reopen a coalescer window for the outgoing scope.
    */
-  private captureActionSession(): { identity: SessionIdentity; epoch: number } {
+  private captureActionSessionOrNull(): { identity: SessionIdentity; epoch: number } | null {
     const identity = this.liveIdentity()
-    if (!identity) throw new UniworkDocError('not_signed_in')
+    if (!identity) return null
     if (this.sessionOrgId === undefined) {
       this.sessionOrgId = this.deps.selectedOrg()?.id ?? null
     }
     return { identity, epoch: this.sessionEpoch }
   }
 
+  private captureActionSession(): { identity: SessionIdentity; epoch: number } {
+    const session = this.captureActionSessionOrNull()
+    if (!session) throw new UniworkDocError('not_signed_in')
+    return session
+  }
+
   private pushTreeChangedFor(
-    started: { identity: SessionIdentity | null; epoch: number },
+    started: { identity: SessionIdentity; epoch: number },
     workspaceId: string,
   ): void {
     if (this.sessionEpoch !== started.epoch) return
     const current = this.deps.identity()
     const owner = started.identity
     if (
-      !owner ||
       !current ||
       current.accountId !== owner.accountId ||
       current.deploymentId !== owner.deploymentId ||
@@ -4768,6 +4773,7 @@ export class UniworkDocsService {
     if (!open || open.sessionId !== sessionId || open.controller.signal.aborted) {
       return { kind: 'closed' }
     }
+    const actionSession = this.captureActionSessionOrNull()
     if (!action || typeof action !== 'object' || typeof action.kind !== 'string') {
       return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
     }
@@ -4791,7 +4797,7 @@ export class UniworkDocsService {
       return { kind: 'view', view: currentView }
     }
     if (action.kind === 'save-copy') {
-      return this.saveCopyInConflict(open, chosen, action, currentView)
+      return this.saveCopyInConflict(open, chosen, action, currentView, actionSession)
     }
     if (action.kind === 'download-mine') {
       return this.downloadMineInConflict(open, chosen, action)
@@ -5162,6 +5168,7 @@ export class UniworkDocsService {
     chosen: BoundDocument,
     action: Extract<UniworkConflictAction, { kind: 'save-copy' }>,
     currentView: UniworkConflictView,
+    copySession: { identity: SessionIdentity; epoch: number } | null,
   ): Promise<UniworkConflictReply> {
     if (!currentView.canEdit) {
       return { kind: 'view', view: { ...currentView, notice: null, noticeArg: null } }
@@ -5169,7 +5176,6 @@ export class UniworkDocsService {
     if (!currentView.online) {
       return { kind: 'view', view: currentView }
     }
-    const copySession = this.captureActionSession()
     if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
     const aborted = () => open.controller.signal.aborted
     const failed = async (): Promise<UniworkConflictReply> => ({
@@ -5179,6 +5185,9 @@ export class UniworkDocsService {
         notice: open.locked ? null : 'save_copy_failed',
       }),
     })
+    if (!copySession || !this.liveIdentity()) {
+      return aborted() ? { kind: 'closed' } : failed()
+    }
     const lockOn = (error: unknown) => {
       if (!(error instanceof UniworkDocError)) return
       if (error.code === 'permission_revoked' || error.code === 'forbidden') {
@@ -5297,10 +5306,11 @@ export class UniworkDocsService {
 
     // step 2: the local bytes become version 2 of the copy; one retry, same keys
     const commitKey = this.newIdempotencyKey()
-    // BE-12F-02 / FD11-C-R2-01: the account and session epoch that started the
-    // copy (captured before the first await); the cleanup below only talks to
-    // the server while it is still signed in (the new account has no access to
-    // this copy) and the final push uses the immutable copySession.
+    // BE-12F-02 / FD11-C-R2-01 / R3-01: the account and session epoch that
+    // started the conflict action (captured at conflictAct entry before the
+    // first await); the cleanup below only talks to the server while it is
+    // still signed in (the new account has no access to this copy) and the
+    // final push uses the immutable copySession.
     const owner = copySession.identity
     let committed = false
     for (let attempt = 0; attempt < 2 && !committed && !aborted(); attempt += 1) {
@@ -5335,14 +5345,13 @@ export class UniworkDocsService {
     if (!committed) {
       const current = this.deps.identity()
       if (
-        !owner ||
         !current ||
         current.accountId !== owner.accountId ||
         current.deploymentId !== owner.deploymentId
       ) {
         // BE-12F-02: nothing is sent under the other account; say what was left behind
         console.warn(
-          `uniwork docs: save-copy: copy ${copyId} of account ${owner?.accountId ?? 'unknown'} was left behind after an account switch`,
+          `uniwork docs: save-copy: copy ${copyId} of account ${owner.accountId} was left behind after an account switch`,
         )
         return aborted() ? { kind: 'closed' } : failed()
       }
