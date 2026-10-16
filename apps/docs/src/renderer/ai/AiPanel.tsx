@@ -1019,12 +1019,20 @@ export function AiPanel({
           )
         },
         onToolStart: (call) => {
-          // after a save, side changes are measured from the reloaded state
-          const snap = runSnapshotRef.current
+          // after a save, side changes are measured from the reloaded state: for every rollback
+          // point still offered, an older run's too (its Roll back rewinds past this run, so
+          // what this run changes and a later save writes is kept for it as well)
           const side = sideStateRef.current
-          if (snap?.side !== undefined && side) {
-            const k = keptOf(snap)
-            if (k.base === null) k.base = side.capture()
+          if (side) {
+            let now: unknown
+            for (const snap of [
+              runSnapshotRef.current,
+              ...chatRef.current.map((e) => e.snapshot),
+            ]) {
+              if (snap?.side === undefined) continue
+              const k = keptOf(snap)
+              if (k.base === null) k.base = now ??= side.capture()
+            }
           }
           // Live "running" chip: replaced in place by onToolExecuted
           patchLastAssistant((last) => ({
