@@ -1375,6 +1375,15 @@ export interface FrameRequests {
   'mentions.search': Rpc<MentionsSearchPayload, MentionsSearchResult>
 }
 
+/** additive (UNI-1865, §4.1): main-thread lag detected on a large document */
+export interface LagDetectedPayload {
+  reason: 'interactions' | 'longtask'
+  worst_ms: number
+  count: number
+  window_ms: number
+  bytes?: number
+}
+
 /** Events the frame sends to the host. */
 export interface FrameEvents {
   /** handshake: the frame booted and listens; the host answers with `init` */
@@ -1394,6 +1403,8 @@ export interface FrameEvents {
   size_warning: SizeWarningPayload
   /** additive (SIZE-F1): save blocked because serialized document size exceeded max_bytes */
   save_blocked: SaveBlockedPayload
+  /** additive (UNI-1865, §4.1): passive main-thread lag detector tripped (at most once per documentId) */
+  lag_detected: LagDetectedPayload
 }
 
 export type HostRequestType = keyof HostRequests
@@ -1474,6 +1485,7 @@ const FRAME_EVENTS: Record<FrameEventType, true> = {
   aiRun: true,
   size_warning: true,
   save_blocked: true,
+  lag_detected: true,
 }
 export const HOST_REQUEST_TYPES = Object.keys(HOST_REQUESTS) as readonly HostRequestType[]
 export const HOST_EVENT_TYPES = Object.keys(HOST_EVENTS) as readonly HostEventType[]

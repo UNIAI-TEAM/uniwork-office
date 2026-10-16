@@ -81,6 +81,7 @@ import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery, bridgeRecoveryGrant } from '../shared/recovery-prompt'
+import { bindLagDetectorPort, markDocumentLoaded } from '../shared/lag-detector'
 import { createRemoteVersion, type RemoteVersion } from '../shared/remote-version'
 import { saveFailureText } from '../shared/save-failure'
 import { createSaveSizeGate } from '../shared/save-size-gate'
@@ -316,7 +317,10 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     // a newly opened version replaces any restored draft
     restored = false
     recoveredFlag = false
-    return adopt(open.file, bytes)
+    const path = adopt(open.file, bytes)
+    bindLagDetectorPort(port, effective)
+    markDocumentLoaded(open.file.fileId, bytes.byteLength)
+    return path
   }
 
   function setFatal(err: unknown): void {

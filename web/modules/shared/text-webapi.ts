@@ -64,6 +64,7 @@ import {
 import { hideFatal, showFatal, text } from './notice'
 import { printHtmlDocument } from './print'
 import { bridgeDraftRecovery } from './recovery-prompt'
+import { bindLagDetectorPort, markDocumentLoaded } from './lag-detector'
 import {
   captureScroll,
   restoreScroll,
@@ -287,7 +288,8 @@ export function createTextWebApi(
   })
 
   async function accept(open: OpenPayload): Promise<string> {
-    const decoded = decodeText(await readSource(open.source))
+    const raw = await readSource(open.source)
+    const decoded = decodeText(raw)
     // another document: the pending version and the bar of the old one are gone
     if (current !== null && current !== open.file.fileId) remote?.reset()
     sizeGate.noteDocumentOpened(open.file.fileId, open.limits)
@@ -316,6 +318,8 @@ export function createTextWebApi(
     const path = pathFor(open.file)
     texts.set(path, decoded.text)
     port.setTitle(open.file.name)
+    bindLagDetectorPort(port, { desktopOpen: desktopOpenGranted })
+    markDocumentLoaded(open.file.fileId, raw.byteLength)
     return path
   }
 
