@@ -84,9 +84,11 @@ import { buildPreviewDocument } from './preview-document'
 import { inlineImagesForSingleFile, singleFileExportBaseName } from './single-file-html'
 import {
   assetBaseHref,
+  previewRefusal,
   previewUrlFor,
   registerPrivilegedSchemes,
   registerPreviewProtocol,
+  withPreviewPolicy,
 } from './preview-protocol'
 import { ATTACHMENT_IMAGE_EXTS, HTML_CHANNELS } from '../shared/ipc'
 import type {
@@ -1245,12 +1247,12 @@ function registerImageProtocol(): void {
     try {
       target = decodeURIComponent(new URL(request.url).pathname)
     } catch {
-      return new Response(null, { status: 400 })
+      return previewRefusal(400)
     }
     if (/^\/[a-zA-Z]:\//.test(target)) target = target.slice(1)
     target = resolve(target)
     const knownExt = PREVIEW_ASSET_EXTS.has(extname(target).toLowerCase())
-    if (!existsSync(target)) return new Response(null, { status: 404 })
+    if (!existsSync(target)) return previewRefusal(404)
     let inDocDir = false
     for (const doc of new Set([...openPathByWc.values(), ...savePathByWc.values()])) {
       const dir = resolve(dirname(doc))
@@ -1260,15 +1262,17 @@ function registerImageProtocol(): void {
         break
       }
     }
-    if (!inDocDir) return new Response(null, { status: 403 })
+    if (!inDocDir) return previewRefusal(403)
     let mime: string | null = null
     if (!knownExt) {
       mime = extensionlessAssetMime(target, await readHead(target), request.headers.get('accept'))
-      if (!mime) return new Response(null, { status: 404 })
+      if (!mime) return previewRefusal(404)
     }
     const res = await net.fetch(pathToFileURL(target).toString())
-    if (!mime || !res.ok) return res
-    return new Response(res.body, { status: 200, headers: { 'Content-Type': mime } })
+    if (!mime || !res.ok) return withPreviewPolicy(res)
+    return withPreviewPolicy(
+      new Response(res.body, { status: 200, headers: { 'Content-Type': mime } }),
+    )
   })
 }
 

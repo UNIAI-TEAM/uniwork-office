@@ -58,6 +58,26 @@ function previewHeaders(extra: Record<string, string> = {}): Record<string, stri
   }
 }
 
+/**
+ * The same policy on an html-asset:// response (the scheme the preview loads its pictures,
+ * styles and scripts from; an .svg or .js link can also be navigated to as a document). Body,
+ * status and the file's own headers are kept; only the policy is added.
+ */
+export function withPreviewPolicy(response: Response): Response {
+  const headers = new Headers(response.headers)
+  headers.set('Content-Security-Policy', PREVIEW_CONTENT_SECURITY_POLICY)
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
+
+/** An empty refusal (400/404/403) of a preview scheme, with the policy. */
+export function previewRefusal(status: number): Response {
+  return new Response(null, { status, headers: previewHeaders() })
+}
+
 export function registerPreviewProtocol(
   resolve: (webContentsId: number) => { text: string; baseHref: string | null } | null,
 ): void {
