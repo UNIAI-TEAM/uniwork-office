@@ -274,9 +274,18 @@ describe('feed client', () => {
     ])
   })
 
-  it('a feed removal never enters the change stream as a document state', () => {
+  it('a feed removal never enters the change stream as a document state, yet marks hadRows on the page (FD11-C-R1-01)', () => {
     const page = parseFeedPage(feedPage(`${removalRow('d1', '9')},${feedRow('d2', '10', 2, 'v2')}`))
     expect(page.changes.map((change) => change.documentId)).toEqual(['d2'])
+    expect(page.hadRows).toBe(true)
+
+    const removalOnly = parseFeedPage(feedPage(removalRow('d1', '9')))
+    expect(removalOnly.changes).toEqual([])
+    expect(removalOnly.hadRows).toBe(true)
+
+    const emptyFeed = parseFeedPage(feedPage(''))
+    expect(emptyFeed.changes).toEqual([])
+    expect(emptyFeed.hadRows).toBe(false)
   })
 
   it('a feed page without its `feed` array is malformed, never silently empty', () => {

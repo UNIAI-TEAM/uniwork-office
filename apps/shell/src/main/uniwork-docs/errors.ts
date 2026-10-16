@@ -21,6 +21,12 @@ export class UniworkDocError extends Error {
   readonly sizeBytes?: number
   /** SIZE-F1: server or preflight limit in bytes (`fields.max_bytes`) when refused as too_large */
   readonly maxBytes?: number
+  /**
+   * FD-11 / B-R2-01: the depth cap a `document_too_deep` answer carries so the
+   * renderer can name it. D's `document_too_deep` has no `fields` map and `max`
+   * is always the app constant 20 (matching the server's `maxDocumentDepth`).
+   */
+  readonly maxDepth?: number
 
   constructor(
     code: UniworkDocErrorCode,
@@ -32,6 +38,7 @@ export class UniworkDocError extends Error {
       filename?: string
       sizeBytes?: number
       maxBytes?: number
+      maxDepth?: number
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -44,8 +51,15 @@ export class UniworkDocError extends Error {
     this.filename = extra.filename
     this.sizeBytes = extra.sizeBytes
     this.maxBytes = extra.maxBytes
+    this.maxDepth = extra.maxDepth
   }
 }
+
+/**
+ * FD-11 / B-R1-08: how deep D lets the document tree go (its own documented
+ * cap; D's `errDocumentTooDeep` emits no `fields` map).
+ */
+const DEFAULT_TREE_MAX_DEPTH = 20
 
 /**
  * A `Retry-After` header (RFC 9110) as milliseconds from `now`: delta-seconds,
@@ -132,6 +146,18 @@ export function errorFromResponse(
   if (serverCode === 'idempotency_in_flight') return new UniworkDocError('network', retried)
   if (serverCode === 'quota_exceeded') return new UniworkDocError('quota_exceeded', at)
   if (serverCode === 'engine_incompatible') return new UniworkDocError('engine_incompatible', at)
+  // FD-11: the folder tree's own refusals, each its own code - a 409/422 that
+  // fell through to `server_error` before. `folder_name_taken` stays off
+  // `UniworkDocErrorCode` (mapped in `actionErrorOf` from `serverCode` to
+  // `folder_name_taken` or `move_name_taken`), and `document_too_deep` carries
+  // the tree's depth cap (20).
+  if (serverCode === 'document_too_deep') {
+    return new UniworkDocError('document_too_deep', { ...at, maxDepth: DEFAULT_TREE_MAX_DEPTH })
+  }
+  if (serverCode === 'document_cycle') return new UniworkDocError('document_cycle', at)
+  if (serverCode === 'document_parent_kind') {
+    return new UniworkDocError('document_parent_kind', at)
+  }
   // G5-06 (UNI-1352): the server's own verdicts, kept apart from the generic
   // forbidden/deleted a caller would otherwise act on. A capability kill
   // switch is a pause, not a permission denial; a swept intent is unknown,

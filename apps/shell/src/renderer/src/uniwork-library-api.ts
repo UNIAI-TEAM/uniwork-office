@@ -1,12 +1,20 @@
 import type {
+  UniworkCreateFolderInput,
   UniworkDocErrorCode,
   UniworkDocListPage,
   UniworkDocProperties,
   UniworkDocSummary,
+  UniworkFolderChildren,
+  UniworkFolderNode,
+  UniworkFolderQuery,
+  UniworkMoveDocumentInput,
+  UniworkMoveResult,
   UniworkResult,
+  UniworkSearchPage,
+  UniworkSearchQuery,
   UniworkSharedQuery,
+  UniworkTreeChangedEvent,
 } from '../../shared/home-api'
-import type { FolderChoice } from './UniworkDocActions'
 import type { DocNameError, NewDocFormat } from './uniwork-docs-model'
 
 /**
@@ -52,6 +60,7 @@ export type DocActionResult<T> =
       name?: string
       sizeBytes?: number
       maxBytes?: number
+      /** FD-11: the depth cap of a document_too_deep */ max?: number
     }
 
 export interface CreateDocInput {
@@ -96,7 +105,12 @@ interface ActionsBridge {
   ): Promise<DocActionResult<UniworkDocSummary>>
   uniworkArchiveDocument?(documentId: string): Promise<DocActionResult<unknown>>
   uniworkRestoreDocument?(documentId: string): Promise<DocActionResult<unknown>>
-  uniworkListFolders?(workspaceId: string): Promise<UniworkResult<FolderChoice[]>>
+  uniworkFolderTree?(workspaceId: string): Promise<UniworkResult<UniworkFolderNode[]>>
+  uniworkListChildren?(q: UniworkFolderQuery): Promise<UniworkResult<UniworkFolderChildren>>
+  uniworkSearchDocuments?(q: UniworkSearchQuery): Promise<UniworkResult<UniworkSearchPage>>
+  uniworkCreateFolder?(i: UniworkCreateFolderInput): Promise<DocActionResult<UniworkDocSummary>>
+  uniworkMoveDocument?(i: UniworkMoveDocumentInput): Promise<DocActionResult<UniworkMoveResult>>
+  onUniworkTreeChanged?(cb: (event: UniworkTreeChangedEvent) => void): () => void
   onUniworkDocRenamed?(cb: (event: DocRenamedEvent) => void): () => void
 }
 
@@ -142,11 +156,54 @@ export function restoreDocument(documentId: string): Promise<DocActionResult<unk
   return actions().uniworkRestoreDocument?.(documentId) ?? Promise.resolve(unavailable)
 }
 
-/** the workspace's folders for the location field; none when main cannot list them */
-export function listFolders(workspaceId: string): Promise<FolderChoice[]> {
-  const call = actions().uniworkListFolders?.(workspaceId)
-  if (!call) return Promise.resolve([])
-  return call.then((r) => (r.ok ? r.value : [])).catch(() => [])
+// ── Folder tree (FD-11) ─────────────────────────────────
+// A missing bridge (an older main) answers server_error and a rejected call
+// answers network, like every other read here: the UI shows its error state.
+
+const unavailableRead = { ok: false, error: 'server_error' } as const
+
+function settleRead<T>(call: Promise<UniworkResult<T>> | undefined): Promise<UniworkResult<T>> {
+  if (!call) return Promise.resolve(unavailableRead)
+  return call.catch((): UniworkResult<T> => ({ ok: false, error: 'network' }))
+}
+
+function settleAct<T>(call: Promise<DocActionResult<T>> | undefined): Promise<DocActionResult<T>> {
+  if (!call) return Promise.resolve(unavailable)
+  return call.catch((): DocActionResult<T> => ({ ok: false, error: 'network' }))
+}
+
+/** the workspace's whole folder tree, root nodes first */
+export function loadFolderTree(workspaceId: string): Promise<UniworkResult<UniworkFolderNode[]>> {
+  return settleRead(actions().uniworkFolderTree?.(workspaceId))
+}
+
+/** one folder's contents (folders + files + pages); parentId null = the root */
+export function listFolderChildren(
+  q: UniworkFolderQuery,
+): Promise<UniworkResult<UniworkFolderChildren>> {
+  return settleRead(actions().uniworkListChildren?.(q))
+}
+
+/** title search across a workspace; hits carry their path */
+export function searchDocuments(q: UniworkSearchQuery): Promise<UniworkResult<UniworkSearchPage>> {
+  return settleRead(actions().uniworkSearchDocuments?.(q))
+}
+
+export function createFolder(
+  input: UniworkCreateFolderInput,
+): Promise<DocActionResult<UniworkDocSummary>> {
+  return settleAct(actions().uniworkCreateFolder?.(input))
+}
+
+export function moveDocument(
+  input: UniworkMoveDocumentInput,
+): Promise<DocActionResult<UniworkMoveResult>> {
+  return settleAct(actions().uniworkMoveDocument?.(input))
+}
+
+/** a workspace's tree changed (feed page or an own action, coalesced in main) */
+export function onTreeChanged(cb: (event: UniworkTreeChangedEvent) => void): () => void {
+  return actions().onUniworkTreeChanged?.(cb) ?? (() => undefined)
 }
 
 /** a document was renamed (here or elsewhere): main's push to the window */

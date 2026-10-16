@@ -18,6 +18,10 @@ import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/se
 import { BINDING_FILE, LAST_OWNER_FILE } from '../src/main/uniwork-docs/binding-store'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
+import {
+  TREE_CHANGED_WINDOW_MS,
+  createTreeChangedCoalescer,
+} from '../src/main/uniwork-docs/tree-changed'
 
 /**
  * G8-17 S18: create a blank document, upload a file, rename, archive / restore
@@ -116,13 +120,23 @@ function fakeServer(
      * request already in flight (the abort rejects it, as real fetch does)
      */
     uploadGate?: () => Promise<void>
-    /** the "Location" field's folder pages, served in cursor order (R1-8) */
-    folderPages?: Array<Array<{ id: string; title: string }>>
+    /** FD-11: the kind the document rows answer with (a folder has no file block in spirit) */
+    kind?: 'file' | 'folder' | 'page'
+    /** FD-11: D's 409 `folder_name_taken` on create/rename of a folder */
+    folderNameTaken?: boolean
+    /**
+     * FD-11: D's 422 `document_too_deep` on a folder create; a number/string is
+     * the envelope's `max`, null omits it (the app then uses the server default)
+     */
+    deepMax?: number | string | null
+    /** FD-11: a move whose target already holds the name renames the entry "Name (2)" */
+    moveRenames?: boolean
   } = {},
 ) {
   const state = {
     id: DOC,
     title: options.title ?? 'Q4 plan.docx',
+    kind: options.kind ?? 'file',
     myLevel: options.myLevel ?? 'manage',
     bytes: options.bytes ?? enc('v1 bytes'),
     archived: false,
@@ -138,7 +152,7 @@ function fakeServer(
     organization_id: 'org_a',
     workspace_id: WS,
     title: id === DOC ? state.title : (state.documents.get(id)?.title ?? 'new.docx'),
-    kind: 'file',
+    kind: state.kind,
     revision: String(state.revision),
     current_version: 1,
     ...(options.omitMyLevel ? {} : { my_level: state.myLevel }),
@@ -238,20 +252,49 @@ function fakeServer(
     }
     // folders
     if (u.pathname === `/api/v1/workspaces/${WS}/documents`) {
-      if (options.folderPages) {
-        // cursor `n` names page n; the page before the last one carries the next
-        const page = Number(u.searchParams.get('cursor') ?? '0')
-        const rows = options.folderPages[page] ?? []
-        const next = page + 1 < options.folderPages.length ? String(page + 1) : null
-        return json(200, {
-          documents: rows.map((row) => ({ ...row, kind: 'folder', workspace_id: WS })),
-          next_cursor: next,
+      // FD-11: create one folder (or refuse it with the server's own code)
+      if (call.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as {
+          kind?: string
+          title?: string
+          parent_id?: string
+        }
+        call.body = body
+        if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
+        if (options.deepMax !== undefined) {
+          return json(422, {
+            error: {
+              code: 'document_too_deep',
+              message: 'x',
+              ...(options.deepMax === null ? {} : { fields: { max: options.deepMax } }),
+            },
+          })
+        }
+        const id = `fold_${++seq}`
+        state.documents.set(id, { title: body.title ?? 'folder', bytes: enc('') })
+        return json(201, {
+          document: {
+            ...docJson(id),
+            kind: 'folder',
+            title: body.title ?? 'folder',
+            parent_id: body.parent_id ?? null,
+          },
         })
       }
       return json(200, {
         documents: [
-          { id: 'fold_1', kind: 'folder', title: 'Contracts' },
-          { id: 'doc_x', kind: 'file', title: 'ignored.docx' },
+          {
+            id: 'fold_1',
+            kind: 'folder',
+            title: 'Contracts',
+            updated_at: '2026-10-13T09:00:00Z',
+          },
+          {
+            id: 'doc_x',
+            kind: 'file',
+            title: 'ignored.docx',
+            updated_at: '2026-10-13T09:00:00Z',
+          },
         ],
         next_cursor: null,
       })
@@ -284,6 +327,23 @@ function fakeServer(
       state.title = body.title
       state.revision += 1
       return json(200, { document: docJson(DOC) })
+    }
+    // FD-11: move a document or folder (the client reads its revision first)
+    const move = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)\/move$/.exec(u.pathname)
+    if (move) {
+      const id = move[1]!
+      // the fake trusts its own caller's body, like every other route here
+      const body: { parent_id: string | null; revision: string } = JSON.parse(String(init.body))
+      call.body = body
+      if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
+      const title = id === DOC ? state.title : (state.documents.get(id)?.title ?? 'new.docx')
+      // a name already taken in the target folder is auto-renamed by the server
+      const renamed = options.moveRenames ? `${title} (2)` : title
+      if (id === DOC) state.title = renamed
+      state.revision += 1
+      return json(200, {
+        document: { ...docJson(id), title: renamed, parent_id: body.parent_id },
+      })
     }
     // detail: any document the server holds. D's decideDocumentAccess hides an
     // archived row from anyone below manage (404), while a manager still reads
@@ -351,6 +411,8 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
   const progress: Array<{ path: string; loaded: number; total: number }> = []
   const pathRenames: Array<{ oldPath: string; newPath: string }> = []
   const titleRenames: Array<{ path: string; title: string }> = []
+  /** FD-11: the tree-changed notices main pushed while the test ran */
+  const treeChanged: Array<{ workspaceId: string }> = []
   const uploadFile = join(dir, 'Q3 report.docx')
   writeFileSync(uploadFile, 'uploaded bytes')
   const ui: ConflictUi = {
@@ -361,25 +423,36 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     showCopyFailed: vi.fn(),
     chooseUnsavedClose: vi.fn(async () => 'cancel'),
   }
+  let currentIdentity: {
+    accountId: string
+    deviceSessionId: string
+    deploymentId: string
+  } | null = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+  let currentOrg: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }
+  let onStopRuntime: (() => void) | undefined
+  let onPushTreeChanged: (event: { workspaceId: string }) => void = (event) =>
+    treeChanged.push(event)
   const service = new UniworkDocsService({
     userDataDir: dir,
     appVersion: () => '0.0.0',
     profile: () => profile,
     channel: () => 'stable',
     applyProfile: async () => 'unchanged',
-    identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+    identity: () => currentIdentity,
     keystoreLocked: () => false,
-    selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+    selectedOrg: () => currentOrg,
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
-    fetch: server.fetch,
+    fetch: (url, init) => server.fetch(url, init),
     openPath: () => true,
     isPathOpen: () => options.pathOpen === true,
     requestModuleSave: () => false,
     reloadPath: () => undefined,
     activePath: () => undefined,
+    stopRuntime: () => onStopRuntime?.(),
     pickUploadFile: async () => ({ path: uploadFile, name: basename(uploadFile) }),
     pushUploadProgress: (event) => progress.push(event),
     pushDocRenamed: (event) => renamed.push(event),
+    pushTreeChanged: (event) => onPushTreeChanged(event),
     notifyPathRenamed: (oldPath, newPath) => pathRenames.push({ oldPath, newPath }),
     notifyTitleRenamed: (path, title) => titleRenames.push({ path, title }),
     ui,
@@ -387,7 +460,28 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     pushLaunch: () => undefined,
     reveal: () => undefined,
   })
-  return { service, statuses, renamed, progress, pathRenames, titleRenames, uploadFile }
+  return {
+    service,
+    statuses,
+    renamed,
+    progress,
+    pathRenames,
+    titleRenames,
+    uploadFile,
+    treeChanged,
+    setIdentity: (next: typeof currentIdentity) => {
+      currentIdentity = next
+    },
+    setSelectedOrg: (next: typeof currentOrg) => {
+      currentOrg = next
+    },
+    setStopRuntime: (fn: () => void) => {
+      onStopRuntime = fn
+    },
+    setPushTreeChanged: (fn: (event: { workspaceId: string }) => void) => {
+      onPushTreeChanged = fn
+    },
+  }
 }
 
 const docDir = (documentId: string): string =>
@@ -797,50 +891,139 @@ describe('upload a file', () => {
 })
 
 describe('folders', () => {
-  it('lists only the folder rows of the workspace', async () => {
+  // FD-11: a folder is created with the folder kind, in the chosen folder, and
+  // follows the folder name rule (trim + NFC, 1..255 runes - tighter than the
+  // 500 a document name gets)
+  it('creates a folder in a folder with the folder name rule', async () => {
     const server = fakeServer()
     const ctx = setup(server)
-    const folders = await ctx.service.listFolders(WS)
-    expect(folders).toEqual({ ok: true, value: [{ id: 'fold_1', title: 'Contracts' }] })
-    const call = server.calls.find((c) => c.path === `/api/v1/workspaces/${WS}/documents`)!
-    expect(call.query).toContain('kind=folder')
-  })
-
-  // R1-8: a workspace with more than one page of folders ignored `next_cursor`,
-  // so a destination past the first page could not be chosen at all.
-  it('follows the folder next_cursor across pages', async () => {
-    const server = fakeServer({
-      folderPages: [[{ id: 'fold_1', title: 'Contracts' }], [{ id: 'fold_2', title: 'Archive' }]],
+    const created = await ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: 'fold_1',
+      title: '  Contracts  ',
     })
-    const ctx = setup(server)
-    const folders = await ctx.service.listFolders(WS)
-    expect(folders).toEqual({
+    expect(created).toMatchObject({
       ok: true,
-      value: [
-        { id: 'fold_1', title: 'Contracts' },
-        { id: 'fold_2', title: 'Archive' },
-      ],
+      value: { title: 'Contracts', kind: 'folder', parentId: 'fold_1' },
     })
-    const calls = server.calls.filter((c) => c.path === `/api/v1/workspaces/${WS}/documents`)
-    expect(calls).toHaveLength(2)
-    expect(calls[0]!.query).toContain('kind=folder')
-    expect(calls[1]!.query).toContain('cursor=1')
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents`,
+    )!
+    expect(post.body).toEqual({ kind: 'folder', title: 'Contracts', parent_id: 'fold_1' })
+    expect(post.idempotencyKey).toBeTruthy()
   })
 
-  // the walk is bounded: 10 pages x D's 100-row cap. Past that the remaining
-  // folders are simply not offered (documented residual), never an endless read.
-  it('stops the folder walk at its page bound', async () => {
-    const server = fakeServer({
-      folderPages: Array.from({ length: 12 }, (_, i) => [{ id: `f_${i}`, title: `F${i}` }]),
-    })
+  it('refuses an empty folder name and one over 255 runes before any request, and normalizes NFC', async () => {
+    const server = fakeServer()
     const ctx = setup(server)
-    const folders = await ctx.service.listFolders(WS)
-    expect(folders.ok).toBe(true)
-    if (!folders.ok) return
-    expect(folders.value).toHaveLength(10)
     expect(
-      server.calls.filter((c) => c.path === `/api/v1/workspaces/${WS}/documents`),
-    ).toHaveLength(10)
+      await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: '  ' }),
+    ).toEqual({ ok: false, error: 'name_empty' })
+    expect(
+      await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'a'.repeat(256) }),
+    ).toEqual({ ok: false, error: 'name_too_long' })
+    expect(server.calls).toHaveLength(0)
+    // 255 decomposed `é` (e + a combining accent) are 255 runes once normalized
+    const decomposed = 'e\u0301'.repeat(255)
+    expect(
+      await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: decomposed }),
+    ).toMatchObject({ ok: true })
+    const post = server.calls.find((c) => c.method === 'POST')!
+    expect((post.body as { title: string }).title).toBe('é'.repeat(255))
+  })
+
+  // FD-11: only folders collide on a name, so the server's 409 stays a field
+  // error the renderer shows under the name (never a generic server_error)
+  it('answers a taken folder name as a field error on create, and as move_name_taken on move (B-R1-03)', async () => {
+    const server = fakeServer({ folderNameTaken: true })
+    const ctx = setup(server)
+    expect(
+      await ctx.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Contracts' }),
+    ).toEqual({ ok: false, error: 'folder_name_taken' })
+    expect(await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })).toEqual({
+      ok: false,
+      error: 'move_name_taken',
+    })
+  })
+
+  // FD-11 / B-R1-08: the tree's depth cap (20) rides the failure
+  it('carries the depth cap 20 on a too-deep refusal', async () => {
+    const unnamed = setup(fakeServer({ deepMax: null }))
+    expect(
+      await unnamed.service.createFolder({ workspaceId: WS, parentId: 'fold_1', title: 'Deep' }),
+    ).toEqual({ ok: false, error: 'document_too_deep', max: 20 })
+  })
+
+  // B-R1-07: service.moveDocument mints an Idempotency-Key and passes it to the move POST
+  it('sends an Idempotency-Key header on moveDocument', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const moved = await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })
+    expect(moved.ok).toBe(true)
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path === `/api/v1/documents/${DOC}/move`,
+    )!
+    expect(post.idempotencyKey).toBeTruthy()
+  })
+
+  // FD11-B-R1-06 / B-R1-01: service-level tests driving listChildren and
+  // searchDocuments through the fake server and asserting `{ items, nextCursor }`
+  it('lists root children with parent_id= and answers value.items', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const root = await ctx.service.listChildren({ workspaceId: WS, parentId: null })
+    expect(root.ok).toBe(true)
+    if (!root.ok) return
+    expect(root.value).toEqual({
+      items: [
+        {
+          id: 'fold_1',
+          kind: 'folder',
+          title: 'Contracts',
+          workspaceId: WS,
+          format: null,
+          updatedAt: '2026-10-13T09:00:00Z',
+          canEdit: false,
+          canManage: false,
+          archived: false,
+          parentId: null,
+        },
+        {
+          id: 'doc_x',
+          kind: 'file',
+          title: 'ignored.docx',
+          workspaceId: WS,
+          format: 'docx',
+          updatedAt: '2026-10-13T09:00:00Z',
+          canEdit: false,
+          canManage: false,
+          archived: false,
+          parentId: null,
+        },
+      ],
+      nextCursor: null,
+    })
+    const call = server.calls.find((c) => c.path === `/api/v1/workspaces/${WS}/documents`)!
+    expect(call.query).toContain('parent_id=')
+    expect(call.query).not.toContain('parent_id=null')
+  })
+
+  it('searches documents with match=title, maps unknown kind to all, and answers value.items', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const found = await ctx.service.searchDocuments({
+      workspaceId: WS,
+      query: 'Contracts',
+      kind: 'unknown' as 'all',
+    })
+    expect(found.ok).toBe(true)
+    if (!found.ok) return
+    expect(found.value.items.map((row) => row.id)).toEqual(['fold_1', 'doc_x'])
+    expect(found.value.nextCursor).toBeNull()
+    const call = server.calls.find((c) => c.path === `/api/v1/workspaces/${WS}/documents`)!
+    expect(call.query).toContain('match=title')
+    expect(call.query).toContain('q=Contracts')
+    expect(call.query).not.toContain('kind=')
   })
 })
 
@@ -897,6 +1080,27 @@ describe('rename, archive and restore', () => {
     const ctx = setup(server)
     const result = await ctx.service.renameDocument(DOC, 'Other.docx')
     expect(result).toEqual({ ok: false, error: 'name_too_long' })
+  })
+
+  // FD-11: a folder's name cap is 255 runes, a page/file's 500. The tighter cap
+  // needs the document's own kind, so the read happens before the refusal.
+  it('caps a folder rename at 255 runes and leaves the 500 cap for a file', async () => {
+    const folderServer = fakeServer({ kind: 'folder' })
+    const folder = setup(folderServer)
+    expect(await folder.service.renameDocument(DOC, 'a'.repeat(256))).toEqual({
+      ok: false,
+      error: 'name_too_long',
+    })
+    expect(folderServer.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0)
+    expect(folderServer.calls.filter((c) => c.method === 'GET')).toHaveLength(1)
+
+    const fileServer = fakeServer()
+    const file = setup(fileServer)
+    const long = `${'a'.repeat(252)}.docx`
+    expect(await file.service.renameDocument(DOC, long)).toMatchObject({ ok: true })
+    expect(fileServer.calls.find((c) => c.method === 'PATCH')!.body).toMatchObject({
+      title: long,
+    })
   })
 
   it('treats a server 409 on rename as an ordinary failure, not a name error', async () => {
@@ -1252,5 +1456,508 @@ describe('renamed elsewhere', () => {
     expect(ctx.titleRenames[0]).toEqual({ path: before, title: 'Renamed on web.docx' })
     expect(copiesIn(DOC)).toEqual(['Q4 plan.docx'])
     expect(ctx.pathRenames).toHaveLength(0)
+  })
+})
+
+// FD-11: a folder action the app makes itself must reach the other views of the
+// workspace without waiting for the 60 s feed - main pushes the workspace id,
+// coalesced (see the coalescer's own test).
+describe('the FD-11 tree-changed push', () => {
+  it('names the workspace after a new document, an upload, a folder, a rename and a move', async () => {
+    const server = fakeServer({ moveRenames: true })
+    const ctx = setup(server)
+    const ws = { workspaceId: WS }
+
+    await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      name: 'Plan.docx',
+      format: 'docx',
+    })
+    await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: ctx.uploadFile,
+      uploadId: 'up_1',
+    })
+    await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'Contracts' })
+    await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx')
+    const moved = await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })
+
+    expect(ctx.treeChanged).toEqual([ws, ws, ws, ws, ws])
+    // the move's own answer still reports the server's auto-rename
+    expect(moved).toMatchObject({ ok: true, value: { renamedTo: 'Q4 plan v2.docx (2)' } })
+  })
+
+  it('says nothing when an action wrote nothing', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+
+    // a rename to the title the document already has, and a folder name the
+    // service refuses itself: neither changed the tree
+    await ctx.service.renameDocument(DOC, 'Q4 plan.docx')
+    await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'a'.repeat(256) })
+    expect(ctx.treeChanged).toEqual([])
+  })
+
+  it('FD11-C-R1-04 / FD11-C-R2-02: suppresses pushTreeChanged when an own folder action resolves after lockSession() boundary', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+    ctx.setStopRuntime(() => coalescer.cancel())
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Late folder',
+    })
+    await onPostReached
+
+    // Drive the real lockSession() boundary while identity is still the outgoing
+    // session (before afterSignOut clears it), so only sessionEpoch suppresses
+    // the late own-action push.
+    await ctx.service.lockSession(undefined, undefined, { switch: true })
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('FD11-C-R1-04: suppresses pushTreeChanged when an organization change occurs while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+    ctx.setStopRuntime(() => coalescer.cancel())
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Org boundary folder',
+    })
+    await onPostReached
+
+    // Switch organization on the same account (as wiring.ts does on status change)
+    ctx.setSelectedOrg({ id: 'org_b', slug: 'beta' })
+    ctx.service.noteSelectedOrg('org_b')
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R3-05: still emits pushTreeChanged when the same organization is reported again while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Unchanged org folder',
+    })
+    await onPostReached
+
+    // A status push reporting the same organization (e.g. token refresh) must not suppress the push
+    ctx.service.noteSelectedOrg('org_a')
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([{ workspaceId: WS }])
+  })
+
+  it('R4-01: suppresses pushTreeChanged when the live identity drops or switches to another account while an own folder action is gated with the organization unchanged', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+
+    let postReached!: () => void
+    let onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    let postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    // Case 1: live identity drops to null while sessionEpoch / org stay unchanged
+    const firstCreate = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Dropped identity folder',
+    })
+    await onPostReached
+    ctx.setIdentity(null)
+    releasePost()
+    expect((await firstCreate).ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+
+    // Case 2: live identity switches to another account while sessionEpoch / org stay unchanged
+    ctx.setIdentity({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' })
+    scheduled.length = 0
+    onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    const secondCreate = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Switched account folder',
+    })
+    await onPostReached
+    ctx.setIdentity({ accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' })
+    releasePost()
+    expect((await secondCreate).ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R4-02: still emits pushTreeChanged when noteSelectedOrg goes A -> null -> A during a transient org-less status push while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Transient org-less folder',
+    })
+    await onPostReached
+
+    // Transient /orgs failure reports null, then recovers with the same org_a
+    ctx.setSelectedOrg(null)
+    ctx.service.noteSelectedOrg(null)
+    ctx.setSelectedOrg({ id: 'org_a', slug: 'acme' })
+    ctx.service.noteSelectedOrg('org_a')
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([{ workspaceId: WS }])
+  })
+
+  it('R5-01: suppresses pushTreeChanged when a lasting org loss (org-less status push without orgsError) lands while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+    ctx.setStopRuntime(() => coalescer.cancel())
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Lasting org-less folder',
+    })
+    await onPostReached
+
+    // The selected org was deactivated / the picker came back: an org-less
+    // status push WITHOUT orgsError is a real session boundary, not the
+    // transient /orgs read failure R4-02 keeps.
+    ctx.setSelectedOrg(null)
+    ctx.service.noteSelectedOrg(null, true)
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R5-02: suppresses pushTreeChanged when noteSelectedOrg goes A -> null (transient) -> B while an own folder action is gated', async () => {
+    const server = fakeServer()
+    const origFetch = server.fetch
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.setPushTreeChanged((event) => coalescer.notify(event.workspaceId))
+    ctx.setStopRuntime(() => coalescer.cancel())
+
+    let postReached!: () => void
+    const onPostReached = new Promise<void>((resolve) => {
+      postReached = resolve
+    })
+    let releasePost!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve
+    })
+    server.fetch = (async (url: string, init: RequestInit) => {
+      if (
+        new URL(url).pathname === `/api/v1/workspaces/${WS}/documents` &&
+        init.method === 'POST'
+      ) {
+        postReached()
+        await postGate
+      }
+      return origFetch(url, init)
+    }) as typeof server.fetch
+
+    const createPromise = ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Transient null then org switch folder',
+    })
+    await onPostReached
+
+    // A transient /orgs failure reports null first; the session then lands on
+    // a DIFFERENT org (never back to A): the null must not eat the A -> B edge.
+    ctx.setSelectedOrg(null)
+    ctx.service.noteSelectedOrg(null)
+    ctx.setSelectedOrg({ id: 'org_b', slug: 'beta' })
+    ctx.service.noteSelectedOrg('org_b')
+
+    releasePost()
+    const created = await createPromise
+    expect(created.ok).toBe(true)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
   })
 })

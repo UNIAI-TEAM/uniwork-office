@@ -19,7 +19,12 @@ import {
 import { BINDING_FILE, type Binding } from '../src/main/uniwork-docs/binding-store'
 import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwork-sync/intent-store'
 import { DRAFTS_STORE_REGISTRATION, createDraftStore } from '../src/main/uniwork-sync/queue/drafts'
+import { PARKED_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/parked'
 import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
+import {
+  TREE_CHANGED_WINDOW_MS,
+  createTreeChangedCoalescer,
+} from '../src/main/uniwork-docs/tree-changed'
 import { QUEUE_LIMITS } from '../src/main/uniwork-sync/queue/limits'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
@@ -79,7 +84,8 @@ function fakeServer(
     myLevel: initial.myLevel ?? 'edit',
     title: initial.title ?? 'Q4 plan.docx',
     updatedAt: '2026-10-10T10:00:00Z',
-    // G5-12: the source's parent folder (null = root) and the copy the fake made, if any
+    // G5-12: the source's workspace and parent folder (null = root) and the copy the fake made, if any
+    workspaceId: 'ws_1',
     parentId: null as string | null,
     copy: null as null | {
       title: string
@@ -105,7 +111,7 @@ function fakeServer(
   const docJson = () => ({
     id: DOC,
     organization_id: 'org_a',
-    workspace_id: 'ws_1',
+    workspace_id: state.workspaceId,
     title: state.title,
     kind: 'file',
     parent_id: state.parentId,
@@ -349,6 +355,8 @@ function setup(
   const statuses: UniworkDocStatus[] = []
   const views: UniworkConflictView[] = []
   const closedSessions: string[] = []
+  /** FD-11: the tree-changed notices main pushed while the test ran */
+  const treeChanged: Array<{ workspaceId: string }> = []
   let account: string | null = 'acc_1'
   let capabilityOffline = false
   let keystoreLocked = opts.keystoreLocked ?? false
@@ -363,6 +371,7 @@ function setup(
   })
   layer.register(INTENT_STORE_REGISTRATION)
   layer.register(DRAFTS_STORE_REGISTRATION)
+  layer.register(PARKED_STORE_REGISTRATION)
   layer.register(PAUSE_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({
     layer,
@@ -398,6 +407,7 @@ function setup(
     lang: () => opts.lang ?? 'en',
     // G5-12 W-F2: the OS save dialog (null = the person cancelled)
     pickDownloadPath: vi.fn(async (_defaultName: string) => null as string | null),
+    pushTreeChanged: (event: { workspaceId: string }) => treeChanged.push(event),
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
     pushConflict: (v: UniworkConflictView) => views.push(v),
@@ -429,6 +439,7 @@ function setup(
     statuses,
     views,
     closedSessions,
+    treeChanged,
     layer,
     safeStorage,
     stopAiRun,
@@ -1427,6 +1438,88 @@ describe('G5-12 Save as a copy (main)', () => {
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
+  // FD-11: the dialog's Location control starts on the source's own folder and
+  // the chosen one is where the copy lands.
+  it('FD-11: the view names the source workspace and parent, and a chosen folder takes the copy there', async () => {
+    const server = fakeServer()
+    server.state.parentId = FOLDER
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    expect(view.workspaceId).toBe('ws_1')
+    expect(view.parentId).toBe(FOLDER)
+
+    const target = '01J8X4FLD1N1P2Q3R4S5T6U7'
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+      targetFolder: { workspaceId: 'ws_1', folderId: target },
+    })
+
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(callsTo(server, '/copies')).toMatchObject([
+      { method: 'POST', body: { parent_id: target } },
+    ])
+    expect(server.state.copy!.parentId).toBe(target)
+    // FD-11: other views of the workspace hear about the copy
+    expect(ctx.treeChanged).toEqual([{ workspaceId: 'ws_1' }])
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('FD-11: a chosen root files the copy at the root, not next to the source', async () => {
+    const server = fakeServer()
+    server.state.parentId = FOLDER
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+      targetFolder: { workspaceId: 'ws_1', folderId: null },
+    })
+
+    expect((callsTo(server, '/copies')[0]!.body as Record<string, unknown>).parent_id).toBeFalsy()
+    expect(server.state.copy!.parentId).toBeNull()
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('FD11-B-R1-04: refuses a targetFolder whose workspaceId differs from the source workspace before any copy POST', async () => {
+    const server = fakeServer()
+    server.state.parentId = FOLDER
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+      targetFolder: { workspaceId: 'ws_other', folderId: 'fold_other' },
+    })
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_folder_refused', locked: 'none', canEdit: true },
+    })
+    expect(callsTo(server, '/copies')).toHaveLength(0)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  it('FD11-B-R1-05: carries the fresh server read workspaceId on the conflict view when the document moved workspaces', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    // web moved the document to ws_2 behind the app's back
+    server.state.workspaceId = 'ws_2'
+    server.state.parentId = 'fold_ws2'
+    const { view } = await openDialog(ctx, path)
+
+    expect(view.workspaceId).toBe('ws_2')
+    expect(view.parentId).toBe('fold_ws2')
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
   it('AC1: a dirty module is flushed first (no upload of the source), and the flushed bytes are what the copy gets', async () => {
     const server = fakeServer()
     const ctx = setup(server, { editorDirty: true })
@@ -1521,6 +1614,8 @@ describe('G5-12 Save as a copy (main)', () => {
     })
     expect(callsTo(server, `${COPY}/archive`)).toHaveLength(1)
     expect(server.state.copy!.archived).toBe(true)
+    // FD11-C-R1-05: an uncommitted copy that was archived never announces a tree change
+    expect(ctx.treeChanged).toEqual([])
     expect(binding(path)).toMatchObject({ state: 'conflict' })
     expect(await storedIntent(ctx, path)).toEqual(intentBefore)
     expect(readFileSync(path, 'utf8')).toBe('mine v4')
@@ -1888,6 +1983,294 @@ describe('G5-12 Save as a copy (main)', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(COPY))
     expect(binding(path)).toMatchObject({ state: 'conflict' })
     warn.mockRestore()
+  })
+
+  it('FD11-C-R1-04 / FD11-C-R2-01: suppresses treeChanged when lockSession runs while copy is gated and copy/upload/commit complete before view closure', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.deps.pushTreeChanged = (event: { workspaceId: string }) =>
+      coalescer.notify(event.workspaceId)
+    ;(ctx.deps as Record<string, unknown>).stopRuntime = () => coalescer.cancel()
+
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    let copyReached!: () => void
+    const onCopyReached = new Promise<void>((resolve) => {
+      copyReached = resolve
+    })
+    let releaseCopy!: () => void
+    const copyGate = new Promise<void>((resolve) => {
+      releaseCopy = resolve
+    })
+    const origFetch = server.fetch.getMockImplementation()!
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      if (new URL(url).pathname === `/api/v1/documents/${DOC}/copies` && init.method === 'POST') {
+        copyReached()
+        await copyGate
+      }
+      return origFetch(url, init)
+    })
+
+    const saveCopyPromise = ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+    await onCopyReached
+
+    // Gate lockSession inside step 2 (after step 1 incremented sessionEpoch and
+    // cancelled the coalescer, before step 3 closes the conflict prompt) so the
+    // in-flight copy + upload + commit finish during the outgoing session teardown.
+    let lockStep2Reached!: () => void
+    const onLockStep2Reached = new Promise<void>((resolve) => {
+      lockStep2Reached = resolve
+    })
+    let releaseLockStep2!: () => void
+    const lockStep2Gate = new Promise<void>((resolve) => {
+      releaseLockStep2 = resolve
+    })
+    vi.mocked(ctx.deps.isPathOpen).mockReturnValue(true)
+    vi.mocked(ctx.deps.editorStateOf).mockImplementation(async () => {
+      lockStep2Reached()
+      await lockStep2Gate
+      return { dirty: false, aiRunning: false, aiEpoch: 0 }
+    })
+
+    const lockPromise = ctx.service.lockSession(undefined, undefined, { switch: true })
+    await onLockStep2Reached
+
+    releaseCopy()
+    const reply = await saveCopyPromise
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(callsTo(server, `${COPY}/uploads`)).toHaveLength(1)
+    expect(
+      callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'POST'),
+    ).toHaveLength(1)
+
+    releaseLockStep2()
+    await lockPromise
+
+    // Advance the coalescer window: any live scheduled callback fires now.
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R3-01: suppresses treeChanged when lockSession runs while buildConflictView is frozen inside conflictAct', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.deps.pushTreeChanged = (event: { workspaceId: string }) =>
+      coalescer.notify(event.workspaceId)
+    ;(ctx.deps as Record<string, unknown>).stopRuntime = () => coalescer.cancel()
+
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    let capabilityReached!: () => void
+    const onCapabilityReached = new Promise<void>((resolve) => {
+      capabilityReached = resolve
+    })
+    let releaseCapability!: () => void
+    const capabilityGate = new Promise<void>((resolve) => {
+      releaseCapability = resolve
+    })
+    ctx.deps.capability.get = async () => {
+      capabilityReached()
+      await capabilityGate
+      return {
+        kind: 'ok' as const,
+        capabilities: { sync_write: true },
+        source: 'fresh' as const,
+      }
+    }
+
+    const saveCopyPromise = ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+    await onCapabilityReached
+
+    let lockStep2Reached!: () => void
+    const onLockStep2Reached = new Promise<void>((resolve) => {
+      lockStep2Reached = resolve
+    })
+    let releaseLockStep2!: () => void
+    const lockStep2Gate = new Promise<void>((resolve) => {
+      releaseLockStep2 = resolve
+    })
+    let firstEditorStateCall = true
+    vi.mocked(ctx.deps.isPathOpen).mockReturnValue(true)
+    vi.mocked(ctx.deps.editorStateOf).mockImplementation(async () => {
+      if (firstEditorStateCall) {
+        firstEditorStateCall = false
+        lockStep2Reached()
+        await lockStep2Gate
+      }
+      return { dirty: false, aiRunning: false, aiEpoch: 0 }
+    })
+
+    const lockPromise = ctx.service.lockSession(undefined, undefined, { switch: true })
+    await onLockStep2Reached
+
+    releaseCapability()
+    const reply = await saveCopyPromise
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(callsTo(server, `${COPY}/uploads`)).toHaveLength(1)
+    expect(
+      callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'POST'),
+    ).toHaveLength(1)
+
+    releaseLockStep2()
+    await lockPromise
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R3-01: suppresses treeChanged when noteSelectedOrg switches org while buildConflictView is frozen inside conflictAct', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const emitted: Array<{ workspaceId: string }> = []
+    const scheduled: Array<{ run: () => void; ms: number; cancelled: boolean }> = []
+    const coalescer = createTreeChangedCoalescer({
+      emit: (workspaceId) => emitted.push({ workspaceId }),
+      schedule: (run, ms) => {
+        const entry = { run, ms, cancelled: false }
+        scheduled.push(entry)
+        return () => {
+          entry.cancelled = true
+        }
+      },
+    })
+    ctx.deps.pushTreeChanged = (event: { workspaceId: string }) =>
+      coalescer.notify(event.workspaceId)
+
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    let capabilityReached!: () => void
+    const onCapabilityReached = new Promise<void>((resolve) => {
+      capabilityReached = resolve
+    })
+    let releaseCapability!: () => void
+    const capabilityGate = new Promise<void>((resolve) => {
+      releaseCapability = resolve
+    })
+    ctx.deps.capability.get = async () => {
+      capabilityReached()
+      await capabilityGate
+      return {
+        kind: 'ok' as const,
+        capabilities: { sync_write: true },
+        source: 'fresh' as const,
+      }
+    }
+
+    const saveCopyPromise = ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: false,
+    })
+    await onCapabilityReached
+
+    ctx.service.noteSelectedOrg('org_b')
+    coalescer.cancel()
+
+    releaseCapability()
+    const reply = await saveCopyPromise
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    expect(callsTo(server, `${COPY}/uploads`)).toHaveLength(1)
+    expect(
+      callsTo(server, `${COPY}/versions/commit`).filter((c) => c.method === 'POST'),
+    ).toHaveLength(1)
+
+    for (const timer of scheduled) {
+      if (!timer.cancelled) {
+        expect(timer.ms).toBe(TREE_CHANGED_WINDOW_MS)
+        timer.run()
+      }
+    }
+    expect(emitted).toEqual([])
+  })
+
+  it('R3-02: answers a normal view/closed reply without rejecting when the session drops inside buildConflictView, and still runs stopAi', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { aiRunning: true })
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+
+    ctx.deps.capability.get = async () => {
+      // The session drops inside buildConflictView after `online` was computed as true
+      ctx.setAccount(null)
+      return {
+        kind: 'ok' as const,
+        capabilities: { sync_write: true },
+        source: 'fresh' as const,
+      }
+    }
+
+    const reply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: true,
+    })
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'save_copy_failed', online: false },
+    })
+    expect(ctx.stopAiRun).toHaveBeenCalledWith(path)
+    expect(callsTo(server, `${DOC}/copies`)).toHaveLength(0)
+
+    // When the dialog is also torn down inside that window, conflictAct answers { kind: 'closed' }
+    ctx.setAccount('acc_1')
+    ctx.setAiRunning(true)
+    ctx.stopAiRun.mockClear()
+    ctx.deps.capability.get = async () => {
+      ctx.setAccount(null)
+      ctx.service.closeConflictPrompt()
+      return {
+        kind: 'ok' as const,
+        capabilities: { sync_write: true },
+        source: 'fresh' as const,
+      }
+    }
+    const closedReply = await ctx.service.conflictAct(view.sessionId, {
+      kind: 'save-copy',
+      stopAi: true,
+    })
+    expect(closedReply).toEqual({ kind: 'closed' })
+    expect(ctx.stopAiRun).toHaveBeenCalledWith(path)
   })
 })
 
