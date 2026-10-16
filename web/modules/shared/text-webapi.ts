@@ -285,6 +285,7 @@ export function createTextWebApi(
       const live = textProvider?.()
       return typeof live === 'string' ? encodeText(live) : null
     },
+    persistDraft: () => drafts.flush(),
   })
 
   async function accept(open: OpenPayload): Promise<string> {

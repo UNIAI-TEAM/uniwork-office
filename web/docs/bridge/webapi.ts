@@ -583,6 +583,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   const sizeGate = createSaveSizeGate({
     port,
     getLiveBytes: liveDocBytes,
+    persistDraft: () => drafts.flush(),
     frame: conflictFrame(),
   })
 

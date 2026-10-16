@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenFileResult } from '../../../apps/docs/src/shared/ipc'
+import type { PortSession } from './frame-port'
 import { createWebApi, idFromPath, pathFor, WEB_PRINT_PART, type WebApi } from './webapi'
 import { createMockPort, protocolError, timeoutAfter, type MockPort } from './testing/mock-port'
 import { text } from './notice'
@@ -11,6 +12,7 @@ import { frameAiRun } from '../../modules/shared/ai-run'
 import { fetchDocBytes as bytesAt } from '../../../apps/docs/src/renderer/doc-bytes'
 import {
   createIdbDraftStore,
+  decryptDraft,
   type DraftChoice,
   type DraftInfo,
   type DraftRecovery,
@@ -1115,7 +1117,7 @@ describe('draft recovery (C18)', () => {
   let drafts: DraftRecovery
 
   /** a frame load: a fresh bridge on the same store, the init carrying the session's grant */
-  async function load(): Promise<OpenFileResult> {
+  async function load(extra: Partial<PortSession> = {}): Promise<OpenFileResult> {
     mock = createMockPort()
     api = createWebApi(mock.port, {
       session: { pollMs: 0 },
@@ -1127,7 +1129,7 @@ describe('draft recovery (C18)', () => {
         })),
     })
     const meta = mock.seed('Report.docx', DOCX)
-    mock.init({ documentId: meta.fileId, recovery: { key, scope: `u1:${meta.fileId}` } })
+    mock.init({ documentId: meta.fileId, recovery: { key, scope: `u1:${meta.fileId}` }, ...extra })
     return (await api.consumePendingOpenDocx()) as OpenFileResult
   }
 
@@ -1203,10 +1205,23 @@ describe('draft recovery (C18)', () => {
     await editAndKeep([1])
     expect(await store.list('u1:f1:')).toEqual([])
   })
+
+  it('a blocked save still writes the draft (SIZE-F1 persistDraft -> drafts.flush)', async () => {
+    const doc = await load({ limits: { max_bytes: 100, warn_ratio: 0.7 } })
+    api.onCloseCheck(() => api.reportCloseCheck({ dirty: true, autoSave: false }))
+    api.provideDocBytes(async () => buf([9, 9, 9]))
+
     // 120 B > 100 B max_bytes: the gate refuses api.save and persists the draft instead
     const blocked = await api.saveDocx(doc.path, buf(new Array(120).fill(7)))
+    expect(blocked.ok).toBe(false)
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
     expect(mock.saveBlocked).toHaveLength(1)
+
+    const draftsOnStore = await store.list('u1:f1:')
+    expect(draftsOnStore).toHaveLength(1)
+    const plaintext = await decryptDraft(key, draftsOnStore[0]!.key, draftsOnStore[0]!.record)
+    expect(plaintext ? Array.from(new Uint8Array(plaintext)) : null).toEqual([9, 9, 9])
+  })
 })
 
 describe('view-only (host withholds the save grant)', () => {

@@ -303,6 +303,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
       return doc.bytes
     },
+    persistDraft: () => drafts.flush(),
     frame: { markerAttr: 'data-pdf-web' },
   })
 

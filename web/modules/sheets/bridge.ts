@@ -346,6 +346,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       const session = latest ? sessions.get(latest.sessionId) : undefined
       return latest && session && session.fileId === current ? latest.data : null
     },
+    persistDraft: () => drafts.flush(),
     frame: { markerAttr: 'data-sheets-web' },
   })
 

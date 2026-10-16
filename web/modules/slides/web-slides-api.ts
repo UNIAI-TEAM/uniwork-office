@@ -392,6 +392,7 @@ export function createWebSlidesApi(
       if (!session || session.masterEdit) return null
       return savePptx(draftOpened(session.opened))
     },
+    persistDraft: () => drafts.flush(),
     frame: { markerAttr: 'data-slides-web' },
   })
 
