@@ -412,6 +412,39 @@ describe('S18 upload', () => {
     await flush()
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('up1')
   })
+
+  it('shows unsupported_format at the file field with no generic toast, and uploads after picking a supported file', async () => {
+    await render([])
+    api.uniworkPickUploadFile.mockResolvedValueOnce({
+      path: '/home/me/notes.txt',
+      name: 'notes.txt',
+    })
+    api.uniworkUploadDocument.mockResolvedValueOnce(fail('unsupported_format'))
+
+    await click(buttonByText(host, en.uwDocUpload))
+    const dialog = modal()!
+    const pickBtn = buttonByText(dialog, en.uwDocUploadPick)
+    await click(pickBtn)
+    expect(dialog.querySelector('.uw-act-file-name')?.textContent).toBe('notes.txt')
+
+    await click(dialog.querySelector('.btn-primary')!)
+    const fieldError = dialog.querySelector('.uw-act-error')!
+    expect(fieldError.getAttribute('role')).toBe('alert')
+    expect(fieldError.textContent).toBe(en.uwErrUnsupportedFormat)
+    expect(pickBtn.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(pickBtn)
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+    expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
+
+    await click(pickBtn)
+    expect(dialog.querySelector('.uw-act-file-name')?.textContent).toBe('Q3.xlsx')
+    expect(fieldError.textContent).toBe('')
+    expect(pickBtn.getAttribute('aria-invalid')).toBeNull()
+
+    await click(dialog.querySelector('.btn-primary')!)
+    expect(modal()).toBeNull()
+    expect(api.uniworkOpenDocument).toHaveBeenCalledWith('up1')
+  })
 })
 
 describe('S18 row menu', () => {

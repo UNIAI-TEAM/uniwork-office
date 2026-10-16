@@ -6,6 +6,7 @@ import { useI18n } from './locale'
 import {
   DOC_NAME_ERROR_KEYS,
   NEW_DOC_FORMATS,
+  UNIWORK_ERROR_KEYS,
   checkDocName,
   isDocTitleTooLong,
   nameWithExtension,
@@ -36,8 +37,11 @@ export interface DocTarget {
   folderId: string | null
 }
 
+/** errors a dialog field shows in place; every other failure is a toast */
+export type DocFieldError = DocNameError | 'unsupported_format'
+
 /** what an action answers: done, a field error shown in place, or anything else (toast) */
-export type ActionOutcome = { ok: true } | { ok: false; error: DocNameError | 'failed' }
+export type ActionOutcome = { ok: true } | { ok: false; error: DocFieldError | 'failed' }
 
 /** an upload under way: bytes sent of the total (total 0 = not known yet) */
 export interface UploadProgress {
@@ -206,12 +210,18 @@ function useFolders(
   return folders
 }
 
-function FieldError({ id, error }: { id: string; error: DocNameError | null }) {
+function FieldError({ id, error }: { id: string; error: DocFieldError | null }) {
   const { t } = useI18n()
+  const key =
+    error === 'unsupported_format'
+      ? UNIWORK_ERROR_KEYS.unsupported_format
+      : error
+        ? DOC_NAME_ERROR_KEYS[error]
+        : null
   // always in the DOM so aria-describedby points at something stable
   return (
     <p className="uw-act-error" id={id} role={error ? 'alert' : undefined}>
-      {error ? t(DOC_NAME_ERROR_KEYS[error]) : ''}
+      {key ? t(key) : ''}
     </p>
   )
 }
@@ -238,7 +248,7 @@ export function NewDocDialog({
   const [name, setName] = useState('')
   const [format, setFormat] = useState<NewDocFormat>('docx')
   const [target, setTarget] = useState(initialTarget)
-  const [error, setError] = useState<DocNameError | null>(null)
+  const [error, setError] = useState<DocFieldError | null>(null)
   const [busy, setBusy] = useState(false)
   const folders = useFolders(target.workspaceId, loadFolders)
   const nameRef = useRef<HTMLInputElement>(null)
@@ -367,7 +377,7 @@ export function UploadDocDialog({
   const id = useId()
   const [file, setFile] = useState<{ path: string; name: string } | null>(null)
   const [target, setTarget] = useState(initialTarget)
-  const [error, setError] = useState<DocNameError | null>(null)
+  const [error, setError] = useState<DocFieldError | null>(null)
   const [busy, setBusy] = useState(false)
   const folders = useFolders(target.workspaceId, loadFolders)
   const pickRef = useRef<HTMLButtonElement>(null)

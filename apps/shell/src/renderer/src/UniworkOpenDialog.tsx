@@ -310,9 +310,9 @@ export function UniworkOpenDialog({
     return { workspaceId: s.workspaceId ?? s.workspaces.items[0]?.id ?? '', folderId: null }
   }
 
-  /** a name error stays at the field; anything else is a toast and nothing applies */
+  /** a name or format error stays at the field; anything else is a toast and nothing applies */
   const outcomeOf = (error: string): ActionOutcome => {
-    if (isDocNameError(error)) return { ok: false, error }
+    if (isDocNameError(error) || error === 'unsupported_format') return { ok: false, error }
     setToast(t('uwDocActionFailed'))
     return { ok: false, error: 'failed' }
   }
