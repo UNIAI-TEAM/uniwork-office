@@ -111,7 +111,6 @@ describe('html AI panel: run hooks bracket the editor undo group', () => {
       },
       getSnapshot: () => ({ text }),
       restoreSnapshot: () => {},
-      onPrompt: () => {},
       onRunDone: () => null,
       onSaveOffer,
       clearHighlights: () => {},

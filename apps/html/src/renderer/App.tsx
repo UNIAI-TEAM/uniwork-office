@@ -77,7 +77,7 @@ import { compileOps, type HtmlOp, type OpError } from './document/ops'
 import { injectBrief, parseBrief, type Brief } from './document/brief'
 import { applyPatches } from './document/patch'
 import { adoptImageRewrites } from './document/image-rewrites'
-import { deriveAutoFileName, deriveNameFromPrompt, derivePageTitleName } from './document/auto-name'
+import { deriveDocumentName } from './document/auto-name'
 import { runGuardedPrint } from './print-guard'
 import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 
@@ -252,7 +252,7 @@ export default function App() {
   const queueSeqRef = useRef(0)
   /** brief confirmed on the AI card; pinned into the head of the next generated document */
   const briefRef = useRef<Brief | null>(null)
-  /** name taken from the first AI request of an untitled document: tab title now, file name at the first save */
+  /** name of an untitled document taken from its own page title or first heading after an AI run: tab title now, file name at the first save */
   const provisionalNameRef = useRef<string | null>(null)
   const pendingStylesRef = useRef<Record<string, string | null>>({})
   const styleTimerRef = useRef<number | null>(null)
@@ -1259,7 +1259,7 @@ export default function App() {
           imageSources: [],
           mode,
           suggestedName,
-          defaultName: provisionalNameRef.current ?? undefined,
+          defaultName: (!pathRef.current && deriveDocumentName(textAtSave)) || undefined,
           ...(origin ? { origin } : {}),
         })
         if (result.ok && 'path' in result) {
@@ -1324,7 +1324,7 @@ export default function App() {
       const html = textRef.current
       const suggestedName =
         pathRef.current?.replace(/^.*[/\\]/, '').replace(/\.html?$/i, '') ||
-        deriveAutoFileName(html) ||
+        deriveDocumentName(html) ||
         ''
       const request = { html, suggestedName, ...(outPath ? { outPath } : {}) }
       const result =
@@ -1563,22 +1563,17 @@ export default function App() {
     },
     getSnapshot: () => ({ text: textRef.current }),
     restoreSnapshot: (snapshot) => replaceAll(snapshot.text, false),
-    onPrompt: (text) => {
-      if (pathRef.current || provisionalNameRef.current) return
-      const name = deriveNameFromPrompt(text)
-      if (!name) return
-      provisionalNameRef.current = name
-      window.htmlApi.setProvisionalTitle(name)
-    },
     onRunDone: (mutated) => {
       // AI wrote into a never-saved document: the panel asks before anything is saved, offering
-      // the page's own title, else the name of the request that started it ('' = nothing to
-      // derive, the dialog starts with its usual name)
+      // the page's own title or first heading ('' = none, the dialog starts with its usual
+      // untitled name). The name never comes from the user's request.
       if (!mutated || pathRef.current) return null
-      const text = textRef.current
-      return (
-        derivePageTitleName(text) || provisionalNameRef.current || deriveAutoFileName(text) || ''
-      )
+      const name = deriveDocumentName(textRef.current)
+      if (name && name !== provisionalNameRef.current) {
+        provisionalNameRef.current = name
+        window.htmlApi.setProvisionalTitle(name)
+      }
+      return name
     },
     // the Save click on that offer: the normal first-save dialog, pre-filled with the name
     onSaveOffer: (name) => void doSave('save', name || undefined),

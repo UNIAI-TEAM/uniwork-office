@@ -73,7 +73,6 @@ describe('model picker keyboard (html panel)', () => {
     },
     getSnapshot: () => ({}),
     restoreSnapshot: () => {},
-    onPrompt: () => {},
     onRunDone: () => {},
     clearHighlights: () => {},
     navigateTo: () => {},

@@ -309,8 +309,6 @@ export interface HtmlAiDeps {
   access: HtmlDocAccess
   getSnapshot(): DocSnapshot
   restoreSnapshot(snapshot: DocSnapshot): void
-  /** the user sent a request (the text as shown in the bubble); names an untitled document */
-  onPrompt(text: string): void
   /**
    * fired when a run finishes. Returns the file name to offer saving under when the run changed a
    * never-saved page (the panel then asks, nothing is written), or null when no offer applies.
@@ -1082,7 +1080,6 @@ export function AiPanel({
     fenceRef.current = fence
     runMutatedRef.current = false
     setSaveOffer(null)
-    depsRef.current.onPrompt(displayText ?? instruction)
     runToolsRef.current = []
     runUsageRef.current = undefined
     setChat((prev) => [

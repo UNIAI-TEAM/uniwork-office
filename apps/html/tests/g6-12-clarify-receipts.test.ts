@@ -85,7 +85,6 @@ describe('answered clarify receipts (html)', () => {
     },
     getSnapshot: () => ({}),
     restoreSnapshot: () => {},
-    onPrompt: () => {},
     onRunDone: () => {},
     clearHighlights: () => {},
     navigateTo: () => {},

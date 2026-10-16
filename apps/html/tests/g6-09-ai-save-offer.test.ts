@@ -104,7 +104,6 @@ describe('html AI panel: ask before saving an untitled page', () => {
       },
       getSnapshot: () => ({ text }),
       restoreSnapshot: () => {},
-      onPrompt: () => {},
       onRunDone: vi.fn((mutated: boolean) => (mutated ? state.offer : null)),
       onSaveOffer,
       clearHighlights: () => {},

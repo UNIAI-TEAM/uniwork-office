@@ -134,7 +134,6 @@ describe('html panel send entry with an unavailable UniWork AI pick', () => {
       },
       getSnapshot: () => ({}),
       restoreSnapshot: () => {},
-      onPrompt: () => {},
       onRunDone: () => {},
       clearHighlights: () => {},
       navigateTo: () => {},
