@@ -4,7 +4,8 @@
  *
  * The authority is the shell's own routing and each editor's Save-As dialog:
  *   - open routing:      apps/shell/src/main/index.ts  (routeDocumentPath,
- *                        OPEN_DIALOG_EXTENSIONS, UNSUPPORTED_DOC_RE)
+ *                        UNSUPPORTED_DOC_RE) and the shared filter list
+ *                        apps/shell/src/shared/open-extensions.ts
  *   - save/export filters: apps/docs|sheets|slides|markdown|html/src/main/*
  *
  * `editor` mirrors that matrix exactly; `mcp` is the subset this server exposes

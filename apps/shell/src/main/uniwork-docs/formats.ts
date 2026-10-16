@@ -20,6 +20,9 @@ const BY_EXTENSION: Record<string, UniworkDocFormat> = {
   htm: 'html',
 }
 
+/** every extension the table resolves: the upload picker offers exactly these */
+export const UPLOAD_EXTENSIONS: readonly string[] = Object.keys(BY_EXTENSION)
+
 const MIME: Record<UniworkDocFormat, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

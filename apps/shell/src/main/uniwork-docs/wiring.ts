@@ -69,6 +69,7 @@ import {
   type UnsavedCloseChoice,
   type UnsavedCloseKind,
 } from './service'
+import { UPLOAD_EXTENSIONS } from './formats'
 import { tUniworkDocs } from './strings'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
@@ -200,9 +201,8 @@ async function pickUploadFile(
     filters: [
       {
         name: tUniworkDocs(wiring.lang(), 'uploadPickDocuments'),
-        extensions: ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'],
+        extensions: [...UPLOAD_EXTENSIONS],
       },
-      { name: tUniworkDocs(wiring.lang(), 'uploadPickAll'), extensions: ['*'] },
     ],
   }
   const picked = parent
