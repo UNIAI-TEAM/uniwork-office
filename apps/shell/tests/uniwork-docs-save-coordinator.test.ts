@@ -610,6 +610,118 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(h.server.state.keys.commit).toEqual([doc.record.idempotencyKey])
   })
 
+  it.each([
+    {
+      name: '409 conflict',
+      error: () =>
+        new UniworkDocError('conflict', {
+          serverCode: 'document_version_conflict',
+          currentRevision: '45',
+        }),
+    },
+    {
+      name: '403 document_archived',
+      error: () =>
+        new UniworkDocError('document_archived', {
+          status: 403,
+          serverCode: 'document_archived',
+        }),
+    },
+  ])(
+    'the settle of an inline failure ($name) parks the record this attempt owns',
+    async ({ error }) => {
+      const h = await harness()
+      const doc = h.makeDoc()
+      h.server.state.commitError = error()
+      const ended = await h.coordinator.save(doc.path)
+      expect(ended?.binding.state).toBe(error().code === 'conflict' ? 'conflict' : 'blocked')
+      // the guard compares the stored record with THIS attempt's intent: the
+      // record the attempt minted (generation 1, empty store) is the one the
+      // machine settles, so the normal park is unchanged (OQ-F12-be-d3-1)
+      const after = await stored(h.intents, doc)
+      expect(after?.intent.generation).toBe(1)
+      expect(after?.intent.state).toBe(error().code === 'conflict' ? 'conflict' : 'blocked')
+      expect(after?.intent.lastError).toBe(error().code)
+    },
+  )
+
+  it.each([
+    {
+      name: '409 conflict',
+      error: () =>
+        new UniworkDocError('conflict', {
+          serverCode: 'document_version_conflict',
+          currentRevision: '45',
+        }),
+      chip: 'conflict',
+    },
+    {
+      name: '403 document_archived',
+      error: () =>
+        new UniworkDocError('document_archived', {
+          status: 403,
+          serverCode: 'document_archived',
+        }),
+      chip: 'blocked',
+    },
+  ])(
+    'the settle of an inline failure ($name) never writes over a newer intent (N+1)',
+    async ({ error, chip }) => {
+      const h = await harness()
+      const doc = h.makeDoc()
+      // the commit is held open, so a second writer can take the document key
+      // while this attempt is in flight
+      let entered!: () => void
+      const atCommit = new Promise<void>((resolve) => (entered = resolve))
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      const coordinator = new SaveCoordinator({
+        store: h.store as never,
+        client: {
+          upload: (input) => h.server.client.upload(input),
+          commit: async (input) => {
+            entered()
+            await gate
+            return h.server.client.commit(input)
+          },
+          getDocument: async () => {
+            throw new UniworkDocError('not_found')
+          },
+        },
+        isSignedIn: () => true,
+        ownsBinding: () => true,
+        intents: async () => ({ kind: 'ok', intents: h.intents }),
+        publish: (status) => h.statuses.push(status),
+        now: () => new Date(h.clock.now),
+        uuid: () => 'u1',
+        readBytes: async () => enc('v4'),
+        capability: h.capability,
+        pause: h.pause,
+        drafts: h.drafts,
+        dispatcher: h.dispatcher,
+      })
+      h.server.state.commitError = error()
+      const saving = coordinator.save(doc.path)
+      await atCommit
+      // a second writer mints N+1 onto the same key and stores it before the
+      // refused attempt settles
+      const next = await h.dispatcher.mint(mintedFor(doc))
+      expect(next.generation).toBe(2)
+      await h.intents.put(doc.key, next, doc.payload)
+      release()
+      expect((await saving)?.binding.state).toBe(chip)
+      // N's settle wrote nothing: the newer record keeps its own state, so its
+      // save is not silently turned into this attempt's failure
+      const after = await stored(h.intents, doc)
+      expect(after?.intent).toMatchObject({
+        intentId: next.intentId,
+        generation: 2,
+        state: 'queued',
+      })
+      expect(after?.intent.lastError).toBeUndefined()
+    },
+  )
+
   it('expired upload -> reconciling, exactly one lookup, no byte re-upload', async () => {
     const h = await harness()
     const doc = h.makeDoc()
