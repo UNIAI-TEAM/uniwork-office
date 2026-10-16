@@ -1,17 +1,15 @@
 // G6-09 visual r1 F7 (html): the collapsed tool group says "Worked · 1 step", not "1 steps": the
 // count picks the plural form of the interface language (one / few / other).
-import { afterEach, describe, expect, it } from 'vitest'
-import type { Lang } from '@genoffice/i18n'
-import { getLang, setModuleLang, t } from '../src/renderer/i18n/locale'
+import { describe, expect, it } from 'vitest'
+import { createI18n, type Lang } from '@genoffice/i18n'
+import { strings } from '../src/renderer/i18n/strings'
+import type { TFunc } from '../src/renderer/i18n/locale'
 import { workedStepsLabel } from '../src/renderer/ai/worked-steps'
 
-const initial = getLang()
-afterEach(() => setModuleLang(initial))
+const translate = createI18n(strings)
 
-const label = (lang: Lang, n: number) => {
-  setModuleLang(lang)
-  return workedStepsLabel(t, lang, n)
-}
+const label = (lang: Lang, n: number) =>
+  workedStepsLabel(((key, params) => translate(lang, key, params)) as TFunc, lang, n)
 
 describe('Worked · N steps (html)', () => {
   it('English: singular for one step, plural otherwise', () => {

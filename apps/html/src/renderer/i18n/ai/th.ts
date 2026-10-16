@@ -54,6 +54,8 @@ export const th = {
   aiUndelivered: 'ส่งไม่สำเร็จ',
   aiUnknownError: 'คำขอ AI ล้มเหลว โปรดลองอีกครั้ง',
   aiWorkedSteps: 'เสร็จแล้ว · {n} ขั้นตอน',
+  aiWorkedStepsOne: 'เสร็จแล้ว · {n} ขั้นตอน',
+  aiWorkedStepsFew: 'เสร็จแล้ว · {n} ขั้นตอน',
   aiWorking: 'กำลังทำงาน',
   aiOpenAssistant: 'เปิดผู้ช่วย AI',
   aiToolOutline: 'อ่านโครงสร้างเอกสาร',

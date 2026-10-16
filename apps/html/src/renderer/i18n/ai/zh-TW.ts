@@ -48,6 +48,8 @@ export const zhTW = {
   aiUndelivered: '未傳送成功',
   aiUnknownError: 'AI 請求失敗，請重試',
   aiWorkedSteps: '已完成 · {n} 個步驟',
+  aiWorkedStepsOne: '已完成 · {n} 個步驟',
+  aiWorkedStepsFew: '已完成 · {n} 個步驟',
   aiWorking: '處理中',
   aiOpenAssistant: '開啟 AI 助手',
   aiToolOutline: '讀取文件結構',

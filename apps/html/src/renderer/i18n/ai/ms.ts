@@ -54,6 +54,8 @@ export const ms = {
   aiUndelivered: 'Tidak dihantar',
   aiUnknownError: 'Permintaan AI gagal, cuba lagi',
   aiWorkedSteps: 'Selesai · {n} langkah',
+  aiWorkedStepsOne: 'Selesai · {n} langkah',
+  aiWorkedStepsFew: 'Selesai · {n} langkah',
   aiWorking: 'Bekerja',
   aiOpenAssistant: 'Buka pembantu AI',
   aiToolOutline: 'Membaca struktur dokumen',
