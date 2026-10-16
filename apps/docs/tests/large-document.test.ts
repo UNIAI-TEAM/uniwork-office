@@ -79,7 +79,7 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
     async () => {
       const JSZip = (await import('jszip')).default
       const { buildBlankDocx } = await import('@genoffice/docx-engine')
-      const { loadFile } = await import('../src/renderer/file-actions')
+      const { loadFile, newFile } = await import('../src/renderer/file-actions')
       const { setDocBytesResolver } = await import('../src/renderer/doc-bytes')
       const { setToastEmitter } = await import('../src/renderer/components/toast-bus')
       const { setModuleLang, statusText, t } = await import('../src/renderer/i18n/locale')
@@ -334,6 +334,11 @@ describe('loadFile refuse tier (SIZE-F1)', () => {
           },
         }),
       ])
+      // d2-7: newFile in the web frame while refused/fatal is a no-op and never mounts a blank Untitled.docx
+      ;(ctx as Record<string, unknown>).refusedMessage = refusedMessageState
+      expect(await newFile(ctx as never)).toBe(false)
+      expect(docState).toBeNull()
+      expect(refusedMessageState).toBeTruthy()
     },
   )
 

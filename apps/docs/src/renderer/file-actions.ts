@@ -116,6 +116,7 @@ export interface FileActionContext {
   printAutoOpenedPreviewRef: { current: boolean }
   setShowPrintDialog: (show: boolean) => void
   setStatus: (status: StatusLine) => void
+  refusedMessage?: StatusLine
   setRefusedMessage?: (msg: StatusLine) => void
   setRecent: (paths: string[]) => void
   setShowAi: (show: boolean) => void
@@ -693,6 +694,12 @@ async function blankDocxBytes(): Promise<Uint8Array> {
 /** new document from the built-in blank template (AI can then generate into it) */
 export async function newFile(ctx: FileActionContext): Promise<boolean | undefined> {
   if (!ctx.editor) return
+  if (
+    isWebFrame() &&
+    (ctx.refusedMessage || (await window.desktop?.uniworkState?.(''))?.readOnly)
+  ) {
+    return false
+  }
   const generation = ++openGeneration
   try {
     const bytes = await blankDocxBytes()

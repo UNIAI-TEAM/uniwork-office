@@ -2080,6 +2080,7 @@ export function App() {
     printAutoOpenedPreviewRef,
     setShowPrintDialog,
     setStatus,
+    refusedMessage,
     setRefusedMessage,
     setRecent,
     setShowAi,
@@ -5715,6 +5716,11 @@ export function App() {
         editor && setSelectionAlign(editor, value)
       switch (command) {
         case 'new':
+          if (
+            fileCtxRef.current.refusedMessage &&
+            typeof window.desktop?.reportOpenRefused === 'function'
+          )
+            break
           void newFile()
           break
         case 'open':

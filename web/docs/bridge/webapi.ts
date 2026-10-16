@@ -708,6 +708,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
     },
 
+    async confirmDocumentReplace(): Promise<boolean> {
+      if (fatal !== null) return false
+      return mayReplace()
+    },
+
     async openDocx(): Promise<OpenDocxResult> {
       try {
         const res = await port.request(
