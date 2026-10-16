@@ -37,6 +37,7 @@ function setup(
   assets: Record<string, string> = { 'assets/p.png': '/files/p' },
   reload?: () => void,
   revision?: string,
+  limits?: { max_bytes: number; warn_ratio: number },
 ) {
   const mock = createMockPort()
   const file = mock.seed('Page.html', enc(PAGE))
@@ -59,6 +60,7 @@ function setup(
   mock.init({
     documentId: file.fileId,
     capabilities: caps,
+    ...(limits ? { limits } : {}),
     open: {
       ...mock.openPayload(file.fileId),
       assets,
@@ -399,5 +401,36 @@ describe('htmlApi: new version on UniWork', () => {
     expect(document.querySelector('.uw-remote-bar-text')!.textContent).toContain('12')
     expect(document.querySelector('.uw-remote-bar-text')!.textContent).toContain('Trần An')
     document.body.innerHTML = ''
+  })
+})
+
+describe('htmlApi: save size gate (SIZE-F1, UNI-1861)', () => {
+  it('blocks save and saveAs above limits.max_bytes without api.save / api.saveAs', async () => {
+    const { api, mock } = setup(FULL, undefined, undefined, undefined, undefined, {
+      max_bytes: 64,
+      warn_ratio: 0.5,
+    })
+    await api.consumePending()
+    api.provideText(() => '<html><body>live</body></html>')
+
+    // 107 bytes > 64 B max_bytes -> blocked before api.save
+    const res = await api.save({
+      text: `<p>${'x'.repeat(100)}</p>`,
+      imageSources: [],
+      mode: 'save',
+    })
+    expect(res.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(1)
+
+    const resAs = await api.save({
+      text: `<p>${'x'.repeat(100)}</p>`,
+      imageSources: [],
+      mode: 'saveAs',
+      defaultName: 'Copy',
+    })
+    expect(resAs.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(2)
   })
 })

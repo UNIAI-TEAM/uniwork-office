@@ -1203,6 +1203,10 @@ describe('draft recovery (C18)', () => {
     await editAndKeep([1])
     expect(await store.list('u1:f1:')).toEqual([])
   })
+    // 120 B > 100 B max_bytes: the gate refuses api.save and persists the draft instead
+    const blocked = await api.saveDocx(doc.path, buf(new Array(120).fill(7)))
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(1)
 })
 
 describe('view-only (host withholds the save grant)', () => {

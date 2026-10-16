@@ -66,6 +66,8 @@ async function setup(
     writable?: boolean
     /** the revision the handshake open reports (G5-03w: an event must be newer than it) */
     revision?: string
+    /** SIZE-F1: `init.limits` the host advertises for the session */
+    limits?: { max_bytes: number; warn_ratio: number }
   } = {},
 ): Promise<Setup> {
   const mock = createMockPort()
@@ -84,6 +86,7 @@ async function setup(
   )
   mock.init({
     documentId: file.fileId,
+    ...(opts.limits ? { limits: opts.limits } : {}),
     ...(opts.revision !== undefined
       ? { open: { ...mock.openPayload(file.fileId), file: { ...file, revision: opts.revision } } }
       : {}),
@@ -949,5 +952,24 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     )
     expect((await api.save()).ok).toBe(true)
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+  })
+})
+
+describe('save size gate (SIZE-F1, UNI-1861)', () => {
+  it('blocks save and saveAs above limits.max_bytes without api.save / api.saveAs', async () => {
+    // a serialized deck is a real pptx (~KB) — a 1-byte cap blocks any save
+    const { mock, api } = await setup({ limits: { max_bytes: 1, warn_ratio: 0.5 } })
+    await api.consumePendingOpen(FIT)
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    await flush()
+
+    expect((await api.save()).ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(1)
+
+    // the block error propagates out of the slides:save-as handler (no catch there)
+    await expect(api.saveAs('Copy')).rejects.toThrow()
+    expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(2)
   })
 })

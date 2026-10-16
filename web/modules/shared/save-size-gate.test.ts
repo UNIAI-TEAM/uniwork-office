@@ -91,7 +91,7 @@ function createMockGateEnv(opts?: {
       if (!check.allowed) return { ok: false }
       const copy = new ArrayBuffer(bytes.byteLength)
       new Uint8Array(copy).set(bytes)
-      await port.request('api.save', {
+      const res = (await port.request('api.save', {
         fileId: session.documentId,
         data: copy,
       })
@@ -223,6 +223,13 @@ describe('createSaveSizeGate (warn latch, save_blocked, doc.download, fallback U
       type: 'size_warning',
       payload: { bytes: 920, max_bytes: 1000, warn_ratio: 0.9 },
     })
+  })
+
+      type === 'api.save'
+        ? { ok: true, file: { fileId: 'doc-1', name: 'R.docx' } }
+        : {}) as SaveSizeGatePort['request']
+    await gate.checkBeforeSave(new Uint8Array(920))
+    expect(env.events.filter((e) => e.type === 'size_warning')).toHaveLength(1)
   })
 
   it('save_blocked emits save_blocked INSTEAD of api.save (zero api.save requests), keeps draft, and doc.download sends api.download with the blocked bytes', async () => {
