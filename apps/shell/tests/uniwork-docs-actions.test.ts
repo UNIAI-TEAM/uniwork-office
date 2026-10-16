@@ -16,6 +16,7 @@ import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
 import { BINDING_FILE, LAST_OWNER_FILE } from '../src/main/uniwork-docs/binding-store'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
+import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
 
 /**
  * G8-17 S18: create a blank document, upload a file, rename, archive / restore
@@ -557,7 +558,9 @@ describe('upload a file', () => {
   it('refuses a pick past the server 50 MiB stage limit without reading it', async () => {
     const server = fakeServer()
     const ctx = setup(server)
-    const huge = join(dir, 'huge.bin')
+    // the name must resolve in the formats table, or the upload is refused as
+    // unsupported_format even before the (unread) size check this test pins
+    const huge = join(dir, 'huge.docx')
     writeFileSync(huge, '')
     truncateSync(huge, 50 * 1024 * 1024 + 1)
     const result = await ctx.service.uploadDocument({
@@ -703,6 +706,50 @@ describe('upload a file', () => {
     // the document D created before the abort is real and was never deleted
     expect(server.state.documents.has('up_1')).toBe(true)
     expect(server.calls.some((c) => c.method === 'DELETE')).toBe(false)
+  })
+
+  // R1-1 / R1-2: the upload IPC carries a renderer-supplied path, so the native
+  // filter is not a contract. A basename the formats table does not resolve
+  // (photo.png here) must be refused with the existing unsupported_format
+  // error before the file is read and before any POST: otherwise the created
+  // document could never be opened again.
+  it('refuses a basename outside the formats table before any read or POST', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const photo = join(dir, 'photo.png')
+    writeFileSync(photo, 'not a document')
+    const result = await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: photo,
+      uploadId: 'up-png',
+    })
+    expect(result).toEqual({ ok: false, error: 'unsupported_format' })
+    expect(server.calls).toHaveLength(0)
+    expect(ctx.progress).toHaveLength(0)
+  })
+
+  // R1-2: every extension the picker offers is one the service accepts, so the
+  // offer and the resolver cannot drift apart unnoticed.
+  it('uploads one document per extension the picker offers', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    for (const [index, ext] of UPLOAD_EXTENSIONS.entries()) {
+      const file = join(dir, `report ${index}.${ext}`)
+      writeFileSync(file, `bytes of ${ext}`)
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: `up-${ext}`,
+      })
+      expect(uploaded.ok, ext).toBe(true)
+    }
+    const posts = server.calls.filter((c) => c.path.endsWith('/documents/files'))
+    expect(posts).toHaveLength(UPLOAD_EXTENSIONS.length)
+    expect(ctx.progress.filter((event) => event.loaded === 0)).toHaveLength(
+      UPLOAD_EXTENSIONS.length,
+    )
   })
 })
 

@@ -17,8 +17,14 @@ import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
 let dir: string
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
 
-/** the options of every showOpenDialog call (a parent-less call passes one argument) */
-const dialogs = vi.hoisted(() => ({ open: [] as unknown[] }))
+/**
+ * the options of every showOpenDialog call (a parent-less call passes one
+ * argument), plus the result the next call answers (cancelled by default)
+ */
+const dialogs = vi.hoisted(() => ({
+  open: [] as unknown[],
+  result: { canceled: true, filePaths: [] as string[] },
+}))
 
 vi.mock('electron', () => ({
   app: { getPath: () => dir },
@@ -26,7 +32,7 @@ vi.mock('electron', () => ({
   dialog: {
     showOpenDialog: vi.fn(async (...args: unknown[]) => {
       dialogs.open.push(args.at(-1))
-      return { canceled: true, filePaths: [] }
+      return dialogs.result
     }),
     showMessageBox: vi.fn(async () => ({ response: 1 })),
     showSaveDialog: vi.fn(async () => ({ canceled: true })),
@@ -59,6 +65,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-docs-actions-wiring-'))
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
   dialogs.open.length = 0
+  dialogs.result = { canceled: true, filePaths: [] }
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -146,6 +153,22 @@ describe('the S18 action IPC', () => {
     expect(UPLOAD_EXTENSIONS).toEqual(expect.arrayContaining(['markdown', 'htm']))
     // no "All files": an image picked by mistake would upload but never open here
     expect(options.filters!.some((filter) => filter.extensions.includes('*'))).toBe(false)
+  })
+
+  // R1-1: the native filter is a hint, not a contract - a typed path reaches
+  // the picker with any name. The picker drops a file the formats table cannot
+  // resolve (null, like a cancel) so the dialog never starts an upload whose
+  // document could not be opened afterwards; a resolvable pick still passes.
+  it('drops a pick the formats table cannot resolve, and keeps the others', async () => {
+    const { handlers } = await setup()
+    dialogs.result = { canceled: false, filePaths: [join(dir, 'photo.png')] }
+    expect(await handlers.get(UNIWORK_DOC_CHANNELS.pickUploadFile)!(null)).toBeNull()
+
+    dialogs.result = { canceled: false, filePaths: [join(dir, 'Q3 report.docx')] }
+    expect(await handlers.get(UNIWORK_DOC_CHANNELS.pickUploadFile)!(null)).toEqual({
+      path: join(dir, 'Q3 report.docx'),
+      name: 'Q3 report.docx',
+    })
   })
 
   it('refuses every action while signed out, before any request', async () => {
