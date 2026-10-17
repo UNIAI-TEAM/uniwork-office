@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
+  AccountStatus,
   HomeApi,
   UniworkDocActionResult,
   UniworkDocSummary,
@@ -24,6 +25,8 @@ import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-
 import { uniworkSaveStrings } from '../src/renderer/src/i18n/strings-uniwork-save'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
+import { setCurrentWorkbenchBucket } from '../src/renderer/src/workbench-bucket'
+import { writeActiveWorkspaceId } from '../src/renderer/src/active-workspace'
 
 /**
  * SAVE-01 §4 (AC-1, AC-3, AC-5): the first-save SaveDialog against a typed
@@ -90,7 +93,14 @@ let api: ReturnType<typeof makeApi>
 function makeApi() {
   let open: ((r: { path: string }) => void) | null = null
   let treeChanged: ((e: UniworkTreeChangedEvent) => void) | null = null
+  let accountStatus: ((s: AccountStatus) => void) | null = null
   const fns = {
+    onAccountStatus: vi.fn((cb: (s: AccountStatus) => void) => {
+      accountStatus = cb
+      return () => {
+        accountStatus = null
+      }
+    }),
     onUniworkFirstSaveOpen: vi.fn((cb: (r: { path: string }) => void) => {
       open = cb
       return () => {
@@ -147,6 +157,7 @@ function makeApi() {
   return Object.assign(fns, {
     push: (path: string) => open?.({ path }),
     pushTreeChanged: (e: UniworkTreeChangedEvent) => treeChanged?.(e),
+    pushAccountStatus: (st: AccountStatus) => accountStatus?.(st),
   })
 }
 
@@ -249,6 +260,7 @@ afterEach(async () => {
   document.body.innerHTML = ''
   resetLiveForTests()
   resetFirstSavesForTests()
+  setCurrentWorkbenchBucket('')
 })
 
 describe('SaveDialog host: the first-save-open push (S01-R1-6)', () => {
@@ -772,5 +784,151 @@ describe('SaveDialog while a first save runs (FE-S01-R1-1, -2, -6)', () => {
     await push()
     expect($$('.uws-dialog')).toHaveLength(1)
     expect(nameValue()).toBe('Đang gõ dở')
+  })
+
+  const liveAlert = () => $('#uw-live-host [role="alert"]')?.textContent ?? ''
+
+  /** a result kept while the host was away (said once through the live region) */
+  async function keepWhileAway(code: 'first_save_bind_failed' | 'first_save_orphaned') {
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    await dropHost()
+    await settle(named(code))
+  }
+
+  it('a run that settles between the reopened dialog’s render and its mount effect does not stick busy (FE-S01-R2-2)', async () => {
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    await dropHost()
+    await render('en')
+    // settles right after the commit that mounts the reopened dialog (a DOM
+    // mutation microtask), before the task that runs its passive effects
+    let armed = true
+    const observer = new MutationObserver(() => {
+      if (armed && document.querySelector('.uws-dialog')) {
+        armed = false
+        resolveSave(named('first_save_bind_failed'))
+      }
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    // outside act, React runs the passive effects in a later task than the commit
+    actEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+    try {
+      api.push(TAB_PATH)
+      await new Promise((r) => setTimeout(r, 50))
+    } finally {
+      observer.disconnect()
+      actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+    }
+    await flush()
+    expect(armed).toBe(false)
+    expect($$('.uws-dialog')).toHaveLength(1)
+    expect($('.uws-save')?.getAttribute('aria-busy')).toBeNull()
+    expect($('.uws-close')?.getAttribute('aria-disabled')).toBeNull()
+    expect(alertText()).toBe(namedText('usErrBindFailed'))
+    await click($('.uws-close'))
+    expect($('.uws-dialog')).toBeNull()
+  })
+
+  it('a kept result is never shown after the account changes (FE-S01-R2-3)', async () => {
+    setCurrentWorkbenchBucket('acct-a')
+    await keepWhileAway('first_save_bind_failed')
+    setCurrentWorkbenchBucket('acct-b')
+    await render('en')
+    expect($('.uws-dialog')).toBeNull()
+    await push()
+    expect($('.uws-dialog')).not.toBeNull()
+    expect(alertText()).toBe('')
+    expect($('.uws-dialog')?.textContent).not.toContain(DOC_ID)
+    expect($('.uws-dialog')?.textContent).not.toContain('Họp tuần 44')
+  })
+
+  it('a kept result is never shown in another workspace (FE-S01-R2-3)', async () => {
+    await keepWhileAway('first_save_orphaned')
+    writeActiveWorkspaceId('w2')
+    await render('en')
+    expect($('.uws-dialog')).toBeNull()
+    await push()
+    expect($('.uws-dialog')).not.toBeNull()
+    expect(alertText()).toBe('')
+    expect($('.uws-dialog')?.textContent).not.toContain(DOC_ID)
+  })
+
+  it('signing out clears a kept result before it is shown (FE-S01-R2-3)', async () => {
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    await dropHost()
+    await render('en')
+    // another tab's dialog is on screen, so the result is kept when it settles
+    await push(OTHER_PATH)
+    await settle(named('first_save_bind_failed'))
+    expect(nameValue()).toBe('Hợp đồng thuê')
+    await act(async () => {
+      api.pushAccountStatus({ loggedIn: false, state: 'signed-out' })
+    })
+    await flush()
+    await click($('.uws-close'))
+    expect($('.uws-dialog')).toBeNull()
+  })
+
+  it('a held push whose tab closed before it is dequeued is dropped (FE-S01-R2-4)', async () => {
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    await push(OTHER_PATH)
+    tabs = tabs.filter((tab) => tab.filePath !== OTHER_PATH)
+    await settle(ok(summary('d1', 'Biên bản họp tuần 43.docx')))
+    expect($('.uws-dialog')).toBeNull()
+  })
+
+  it('a kept result for a closed tab is dropped without a dialog, after its one live announce (FE-S01-R2-4)', async () => {
+    await keepWhileAway('first_save_bind_failed')
+    expect(liveAlert()).toBe(namedText('usErrBindFailed'))
+    tabs = tabs.filter((tab) => tab.filePath !== TAB_PATH)
+    await render('en')
+    expect($('.uws-dialog')).toBeNull()
+    // dropped, not deferred: the tab reopening later does not bring it back
+    tabs = [
+      ...tabs,
+      { id: 't1', kind: 'docs', title: 'x', closable: true, active: true, filePath: TAB_PATH },
+    ]
+    await push()
+    expect($('.uws-dialog')).not.toBeNull()
+    expect(alertText()).toBe('')
+  })
+
+  it('while saving, "Đổi" is disabled and does not open the picker (FE-S01-R2-6)', async () => {
+    await render()
+    await push()
+    await click($('.uws-save'))
+    const loc = $('.uws-loc')!
+    expect(loc.getAttribute('aria-disabled')).toBe('true')
+    expect($('.uws-close')?.getAttribute('aria-disabled')).toBe('true')
+    await click(loc)
+    expect($('.uws-pick')).toBeNull()
+    expect($('.uws-dialog')).not.toBeNull()
+  })
+
+  it('a non-naming refusal settling after the host unmounts is not kept, shown or announced (FE-S01-R2-8 a)', async () => {
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    await dropHost()
+    await settle({ ok: false, error: 'network' })
+    expect(liveAlert()).toBe('')
+    await render('en')
+    expect($('.uws-dialog')).toBeNull()
+  })
+
+  it('a naming refusal while a dialog watches its tab is not sent to the live region (FE-S01-R2-8 b)', async () => {
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    await settle(named('first_save_orphaned'))
+    expect(alertText()).toBe(namedText('usErrOrphaned'))
+    expect(liveAlert()).toBe('')
   })
 })
