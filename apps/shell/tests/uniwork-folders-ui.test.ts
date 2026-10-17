@@ -1158,7 +1158,7 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     expect(listboxes[1]!.getAttribute('aria-describedby')).toBe(hints[1]!.id)
   })
 
-  it('V2-2: row menu wrapper does not shift vertically between rows and stays opacity 0 when nothing is hovered in real bundle order', async () => {
+  it('V2-2, FE13-R1-2: row menu is opacity 0 on fine pointer without hover/focus (even on .uw-pick-row.active), and opacity 1 on :focus-within and @media (pointer: coarse) in real bundle order', async () => {
     const foldersCss = readFileSync(
       join(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
       'utf8',
@@ -1167,9 +1167,9 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     const bundleCss = `${foldersCss}\n${homeCss.replace(/@position-try[^{]*\{[^}]*\}/g, '')}`
 
     await render()
-    // Focus a tree row and select an active contents row while nothing is hovered and no menu is open
+    // Ensure nothing is hovered or focused while an active contents row is selected
     const alphaRow = treeItem('Alpha')
-    await act(async () => alphaRow.focus())
+    await act(async () => (document.activeElement as HTMLElement | null)?.blur())
     const activeOption = $<HTMLElement>('.uwf-contents .uw-pick-row.active')!
     expect(activeOption).toBeTruthy()
 
@@ -1178,17 +1178,69 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     const rowMenuWrap = $<HTMLElement>('.uwf-contents .uw-pick-item .uw-row-menu.uwf-menu')!
     const rowMenuBtn = $<HTMLElement>('.uwf-contents .uw-pick-item .uw-row-menu-btn')!
 
+    const docSym = Object.getOwnPropertySymbols(document)[0]!
+    const docImpl = (
+      document as unknown as Record<
+        symbol,
+        {
+          _domSelector: {
+            clear: () => void
+            check: (sel: string, el: unknown, opt?: unknown) => { match: boolean; ast: unknown }
+          }
+          _styleCache: WeakMap<object, unknown>
+        }
+      >
+    )[docSym]!
+    const origCheck = docImpl._domSelector.check
+    const astBySel = new Map<string, unknown>()
+    docImpl._domSelector.check = (sel, el, opt) => {
+      const res = origCheck(sel, el, opt)
+      if (res.match) {
+        if (!astBySel.has(sel)) {
+          astBySel.set(sel, origCheck(`${sel} `, el, opt).ast)
+        }
+        return { ...res, ast: astBySel.get(sel) }
+      }
+      return res
+    }
+    const computedOpacity = (el: HTMLElement) => {
+      docImpl._domSelector.clear()
+      docImpl._styleCache = new WeakMap()
+      return window.getComputedStyle(el).getPropertyValue('opacity').trim()
+    }
+
     const styleEl = document.createElement('style')
     styleEl.textContent = bundleCss
     document.head.appendChild(styleEl)
     try {
+      // (a) Fine pointer + no hover/focus -> opacity 0 and transform none (even on .uw-pick-row.active)
       expect(window.getComputedStyle(treeMenuWrap).getPropertyValue('transform').trim()).toBe(
         'none',
       )
       expect(window.getComputedStyle(rowMenuWrap).getPropertyValue('transform').trim()).toBe('none')
-      expect(window.getComputedStyle(treeMenuBtn).getPropertyValue('opacity').trim()).toBe('0')
-      expect(window.getComputedStyle(rowMenuBtn).getPropertyValue('opacity').trim()).toBe('0')
+      expect(computedOpacity(treeMenuBtn)).toBe('0')
+      expect(computedOpacity(rowMenuBtn)).toBe('0')
+
+      // (b) :focus-within -> opacity 1 on focused tree row and focused contents row
+      await act(async () => alphaRow.focus())
+      expect(computedOpacity(treeMenuBtn)).toBe('1')
+      expect(computedOpacity(rowMenuBtn)).toBe('0')
+
+      await act(async () => activeOption.focus())
+      expect(computedOpacity(treeMenuBtn)).toBe('0')
+      expect(computedOpacity(rowMenuBtn)).toBe('1')
+
+      // (c) @media (pointer: coarse) in real bundle order -> opacity 1 even without hover/focus
+      await act(async () => (document.activeElement as HTMLElement | null)?.blur())
+      const coarseBundleCss = bundleCss.replace(
+        /@media\s*\(pointer:\s*coarse\)\s*\{([\s\S]*?)\n\}/g,
+        '$1',
+      )
+      styleEl.textContent = coarseBundleCss
+      expect(computedOpacity(treeMenuBtn)).toBe('1')
+      expect(computedOpacity(rowMenuBtn)).toBe('1')
     } finally {
+      docImpl._domSelector.check = origCheck
       styleEl.remove()
     }
   })
@@ -1222,5 +1274,191 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     expect($('.uwf-crumb-current')?.textContent).toBe('UniWork')
     expect(optionTitles()).toEqual(['WorkspaceTwo.docx'])
   })
-})
 
+  it('FE13-R1-7: Load more from C1 overlapping a soft re-read that reaches C1-prime (or errors / ends early) neither duplicates, skips, nor loses rows and keeps the newest cursor', async () => {
+    // 1. Folder contents: page 1 initially returns [d1, d2] with nextCursor 'c1'
+    let serverShifted = false
+    let releaseLoadMoreC1: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    let releaseSoftC1Prime: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (!q.cursor) {
+        if (!serverShifted) {
+          return ok({
+            items: [entry('d1', 'Doc1.docx'), entry('d2', 'Doc2.docx')],
+            nextCursor: 'c1',
+          })
+        }
+        return ok({
+          items: [entry('d0', 'Doc0.docx'), entry('d1', 'Doc1.docx')],
+          nextCursor: 'c1-prime',
+        })
+      }
+      if (q.cursor === 'c1') {
+        return new Promise((resolve) => {
+          releaseLoadMoreC1 = resolve
+        })
+      }
+      if (q.cursor === 'c1-prime') {
+        return new Promise((resolve) => {
+          releaseSoftC1Prime = resolve
+        })
+      }
+      if (q.cursor === 'c2-prime') {
+        return ok({ items: [entry('d4', 'Doc4.docx')], nextCursor: null })
+      }
+      return ok({ items: [], nextCursor: null })
+    })
+
+    await render()
+    expect(optionTitles()).toEqual(['Doc1.docx', 'Doc2.docx'])
+
+    // Start Load more from cursor 'c1', then trigger a soft re-read where page 1 shifts to 'c1-prime'
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    serverShifted = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+
+    // Stale 'c1' resolves (would have skipped d2 and used stale cursor 'c2-stale')
+    await act(async () =>
+      releaseLoadMoreC1(ok({ items: [entry('d3', 'Doc3.docx')], nextCursor: 'c2-stale' })),
+    )
+    await flush()
+
+    // Soft re-read continues from 'c1-prime' and resolves with [d2, d3] and newest cursor 'c2-prime'
+    await act(async () =>
+      releaseSoftC1Prime(
+        ok({
+          items: [entry('d2', 'Doc2.docx'), entry('d3', 'Doc3.docx')],
+          nextCursor: 'c2-prime',
+        }),
+      ),
+    )
+    await flush()
+
+    expect(optionTitles()).toEqual(['Doc0.docx', 'Doc1.docx', 'Doc2.docx', 'Doc3.docx'])
+    // Clicking Load more must use newest cursor 'c2-prime', not 'c2-stale'
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(api.uniworkListChildren).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: 'c2-prime' }),
+    )
+    expect(optionTitles()).toEqual([
+      'Doc0.docx',
+      'Doc1.docx',
+      'Doc2.docx',
+      'Doc3.docx',
+      'Doc4.docx',
+    ])
+
+    // 2. Soft chain errors on page 2 after Load more resolved: no already-loaded row is lost
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (!q.cursor) {
+        return ok({
+          items: [entry('d0', 'Doc0.docx'), entry('d1', 'Doc1.docx')],
+          nextCursor: 'c1-prime',
+        })
+      }
+      return { ok: false, error: 'network' }
+    })
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    expect(optionTitles()).toEqual([
+      'Doc0.docx',
+      'Doc1.docx',
+      'Doc2.docx',
+      'Doc3.docx',
+      'Doc4.docx',
+    ])
+
+    // 3. Soft chain ends early (nextCursor: null) while Load more from C1 is still in flight:
+    // late C1 resolution must not append stale items or resurrect Load more
+    let releaseLateC1: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    let shrinkToOnePage = false
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (!q.cursor) {
+        if (shrinkToOnePage) {
+          return ok({ items: [entry('d1', 'Doc1.docx')], nextCursor: null })
+        }
+        return ok({ items: [entry('d1', 'Doc1.docx')], nextCursor: 'c-early' })
+      }
+      if (q.cursor === 'c-early') {
+        return new Promise((resolve) => {
+          releaseLateC1 = resolve
+        })
+      }
+      return ok({ items: [], nextCursor: null })
+    })
+    await click(treeItem('Alpha'))
+    expect(optionTitles()).toEqual(['Doc1.docx'])
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    shrinkToOnePage = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    expect($('.uw-pick-more')).toBeNull()
+
+    await act(async () =>
+      releaseLateC1(ok({ items: [entry('d-stale', 'Doc9.docx')], nextCursor: 'c-stale' })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['Doc1.docx'])
+    expect($('.uw-pick-more')).toBeNull()
+
+    // 4. Search results: Load more from 'sc1' overlapping a soft search re-read reaching 'sc1-prime'
+    let searchShifted = false
+    let releaseSearchC1: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkSearchDocuments.mockImplementation(async (q: UniworkSearchQuery) => {
+      if (!q.cursor) {
+        if (!searchShifted) {
+          return ok({
+            items: [entry('s1', 'Hit1.docx'), entry('s2', 'Hit2.docx')],
+            nextCursor: 'sc1',
+          })
+        }
+        return ok({
+          items: [entry('s0', 'Hit0.docx'), entry('s1', 'Hit1.docx')],
+          nextCursor: 'sc1-prime',
+        })
+      }
+      if (q.cursor === 'sc1') {
+        return new Promise((resolve) => {
+          releaseSearchC1 = resolve
+        })
+      }
+      if (q.cursor === 'sc1-prime') {
+        return ok({
+          items: [entry('s2', 'Hit2.docx'), entry('s3', 'Hit3.docx')],
+          nextCursor: 'sc2-prime',
+        })
+      }
+      if (q.cursor === 'sc2-prime') {
+        return ok({ items: [entry('s4', 'Hit4.docx')], nextCursor: null })
+      }
+      return ok({ items: [], nextCursor: null })
+    })
+
+    await type($<HTMLInputElement>('.uwf-own-search')!, 'Hit')
+    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx'])
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    searchShifted = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+
+    await act(async () =>
+      releaseSearchC1(ok({ items: [entry('s3', 'Hit3.docx')], nextCursor: 'sc2-stale' })),
+    )
+    await flush()
+
+    expect(optionTitles()).toEqual(['Hit0.docx', 'Hit1.docx', 'Hit2.docx', 'Hit3.docx'])
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(api.uniworkSearchDocuments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: 'sc2-prime' }),
+    )
+    expect(optionTitles()).toEqual([
+      'Hit0.docx',
+      'Hit1.docx',
+      'Hit2.docx',
+      'Hit3.docx',
+      'Hit4.docx',
+    ])
+  })
+})

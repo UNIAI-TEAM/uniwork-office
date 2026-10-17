@@ -89,14 +89,20 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
   const loadedContentsPages = useRef(1)
   const loadedResultsPages = useRef(1)
   const softMoreContents = useRef<{
-    items: UniworkDocSummary[]
-    nextCursor: string | null
-    pages: number
+    entries: Array<{ startCursor: string; items: UniworkDocSummary[]; nextCursor: string | null }>
   } | null>(null)
   const softMoreResults = useRef<{
-    items: UniworkDocSummary[]
-    nextCursor: string | null
-    pages: number
+    entries: Array<{ startCursor: string; items: UniworkDocSummary[]; nextCursor: string | null }>
+  } | null>(null)
+  const activeMoreContents = useRef<{
+    request: number
+    startCursor: string
+    resolved: UniworkFolderChildren | null
+  } | null>(null)
+  const activeMoreResults = useRef<{
+    request: number
+    startCursor: string
+    resolved: UniworkFolderChildren | null
   } | null>(null)
   const treeGate = useRef(createRequestGate())
   const contentsGate = useRef(createRequestGate())
@@ -142,11 +148,18 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
         contentsMoreGate.current.next()
         loadedContentsPages.current = 1
         softMoreContents.current = null
+        activeMoreContents.current = null
         setContents(LOADING_LIST)
       }
       const pagesToRead = loadedContentsPages.current
       const pendingMore = opts.soft
-        ? { items: [] as UniworkDocSummary[], nextCursor: null as string | null, pages: 0 }
+        ? {
+            entries: [] as Array<{
+              startCursor: string
+              items: UniworkDocSummary[]
+              nextCursor: string | null
+            }>,
+          }
         : null
       if (opts.soft) softMoreContents.current = pendingMore
       void (async () => {
@@ -154,6 +167,8 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
         if (!mounted.current || !contentsGate.current.isCurrent(request)) return
         if (!first.ok) {
           if (softMoreContents.current === pendingMore) softMoreContents.current = null
+          contentsMoreGate.current.next()
+          activeMoreContents.current = null
           if (target !== null && isGone(first.error)) {
             // the open folder is not there for me any more: its nearest live ancestor
             const path = openPath.current
@@ -187,23 +202,83 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
           nextCursor = page.value.nextCursor
           pagesLoaded++
         }
-        if (softMoreContents.current === pendingMore) softMoreContents.current = null
-        if (pendingMore && pendingMore.pages > 0 && !moreError && nextCursor !== null) {
-          for (const item of pendingMore.items) {
+        let consumedMore = 0
+        while (
+          opts.soft &&
+          pendingMore &&
+          !moreError &&
+          nextCursor !== null &&
+          (consumedMore < pendingMore.entries.length ||
+            (activeMoreContents.current !== null &&
+              !activeMoreContents.current.resolved &&
+              activeMoreContents.current.startCursor !== nextCursor))
+        ) {
+          if (consumedMore < pendingMore.entries.length) {
+            const entry = pendingMore.entries[consumedMore]!
+            consumedMore++
+            if (entry.startCursor === nextCursor) {
+              for (const item of entry.items) {
+                if (!seen.has(item.id)) {
+                  seen.add(item.id)
+                  items.push(item)
+                }
+              }
+              nextCursor = entry.nextCursor
+              pagesLoaded++
+              continue
+            }
+          } else {
+            contentsMoreGate.current.next()
+            activeMoreContents.current = null
+          }
+          const page = await readContents(target, nextCursor)
+          if (!mounted.current || !contentsGate.current.isCurrent(request)) return
+          if (!page.ok) {
+            moreError = page.error
+            break
+          }
+          for (const item of page.value.items) {
             if (!seen.has(item.id)) {
               seen.add(item.id)
               items.push(item)
             }
           }
-          nextCursor = pendingMore.nextCursor
-          pagesLoaded += pendingMore.pages
+          nextCursor = page.value.nextCursor
+          pagesLoaded++
+        }
+        if (softMoreContents.current === pendingMore) softMoreContents.current = null
+        if (opts.soft && (moreError || nextCursor === null)) {
+          if (activeMoreContents.current && !activeMoreContents.current.resolved) {
+            contentsMoreGate.current.next()
+            activeMoreContents.current = null
+          }
+        }
+        if (opts.soft && moreError) {
+          for (const item of contentsRef.current.items) {
+            if (!seen.has(item.id)) {
+              seen.add(item.id)
+              items.push(item)
+            }
+          }
+          for (const entry of pendingMore?.entries ?? []) {
+            for (const item of entry.items) {
+              if (!seen.has(item.id)) {
+                seen.add(item.id)
+                items.push(item)
+              }
+            }
+          }
         }
         loadedContentsPages.current = pagesLoaded
-        setContents((now) => ({
+        const stillLoadingMore =
+          Boolean(opts.soft) &&
+          activeMoreContents.current !== null &&
+          !activeMoreContents.current.resolved
+        setContents(() => ({
           status: 'ready',
           items,
           nextCursor,
-          loadingMore: opts.soft ? now.loadingMore : false,
+          loadingMore: stillLoadingMore,
           moreError,
         }))
       })()
@@ -214,16 +289,25 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
   const loadMore = useCallback(() => {
     const prev = contentsRef.current
     if (!prev.nextCursor || prev.loadingMore || prev.status !== 'ready') return
+    const startCursor = prev.nextCursor
     const request = contentsMoreGate.current.next()
+    activeMoreContents.current = { request, startCursor, resolved: null }
     setContents({ ...prev, loadingMore: true, moreError: undefined })
-    void readContents(folderRef.current, prev.nextCursor).then((result) => {
+    void readContents(folderRef.current, startCursor).then((result) => {
       if (!mounted.current || !contentsMoreGate.current.isCurrent(request)) return
+      if (activeMoreContents.current?.request === request) {
+        activeMoreContents.current = result.ok
+          ? { request, startCursor, resolved: result.value }
+          : null
+      }
       if (result.ok) {
         loadedContentsPages.current += 1
         if (softMoreContents.current) {
-          softMoreContents.current.items.push(...result.value.items)
-          softMoreContents.current.nextCursor = result.value.nextCursor
-          softMoreContents.current.pages += 1
+          softMoreContents.current.entries.push({
+            startCursor,
+            items: result.value.items,
+            nextCursor: result.value.nextCursor,
+          })
         }
       }
       setContents((now) => {
@@ -248,17 +332,25 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
         searchMoreGate.current.next()
         loadedResultsPages.current = 1
         softMoreResults.current = null
+        activeMoreResults.current = null
       }
       if (!query) {
         loadedResultsPages.current = 1
         softMoreResults.current = null
+        activeMoreResults.current = null
         setResults(EMPTY_LIST)
         return
       }
       if (!opts.soft) setResults(LOADING_LIST)
       const pagesToRead = loadedResultsPages.current
       const pendingMore = opts.soft
-        ? { items: [] as UniworkDocSummary[], nextCursor: null as string | null, pages: 0 }
+        ? {
+            entries: [] as Array<{
+              startCursor: string
+              items: UniworkDocSummary[]
+              nextCursor: string | null
+            }>,
+          }
         : null
       if (opts.soft) softMoreResults.current = pendingMore
       void (async () => {
@@ -266,6 +358,8 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
         if (!mounted.current || !searchGate.current.isCurrent(request)) return
         if (!first.ok) {
           if (softMoreResults.current === pendingMore) softMoreResults.current = null
+          searchMoreGate.current.next()
+          activeMoreResults.current = null
           loadedResultsPages.current = 1
           setResults({ ...EMPTY_LIST, status: 'error', error: first.error })
           return
@@ -297,23 +391,89 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
           nextCursor = page.value.nextCursor
           pagesLoaded++
         }
-        if (softMoreResults.current === pendingMore) softMoreResults.current = null
-        if (pendingMore && pendingMore.pages > 0 && !moreError && nextCursor !== null) {
-          for (const item of pendingMore.items) {
+        let consumedMore = 0
+        while (
+          opts.soft &&
+          pendingMore &&
+          !moreError &&
+          nextCursor !== null &&
+          (consumedMore < pendingMore.entries.length ||
+            (activeMoreResults.current !== null &&
+              !activeMoreResults.current.resolved &&
+              activeMoreResults.current.startCursor !== nextCursor))
+        ) {
+          if (consumedMore < pendingMore.entries.length) {
+            const entry = pendingMore.entries[consumedMore]!
+            consumedMore++
+            if (entry.startCursor === nextCursor) {
+              for (const item of entry.items) {
+                if (!seen.has(item.id)) {
+                  seen.add(item.id)
+                  items.push(item)
+                }
+              }
+              nextCursor = entry.nextCursor
+              pagesLoaded++
+              continue
+            }
+          } else {
+            searchMoreGate.current.next()
+            activeMoreResults.current = null
+          }
+          const page = await searchDocuments({
+            workspaceId,
+            query,
+            kind,
+            cursor: nextCursor,
+            limit: BROWSER_PAGE_SIZE,
+          })
+          if (!mounted.current || !searchGate.current.isCurrent(request)) return
+          if (!page.ok) {
+            moreError = page.error
+            break
+          }
+          for (const item of page.value.items) {
             if (!seen.has(item.id)) {
               seen.add(item.id)
               items.push(item)
             }
           }
-          nextCursor = pendingMore.nextCursor
-          pagesLoaded += pendingMore.pages
+          nextCursor = page.value.nextCursor
+          pagesLoaded++
+        }
+        if (softMoreResults.current === pendingMore) softMoreResults.current = null
+        if (opts.soft && (moreError || nextCursor === null)) {
+          if (activeMoreResults.current && !activeMoreResults.current.resolved) {
+            searchMoreGate.current.next()
+            activeMoreResults.current = null
+          }
+        }
+        if (opts.soft && moreError) {
+          for (const item of resultsRef.current.items) {
+            if (!seen.has(item.id)) {
+              seen.add(item.id)
+              items.push(item)
+            }
+          }
+          for (const entry of pendingMore?.entries ?? []) {
+            for (const item of entry.items) {
+              if (!seen.has(item.id)) {
+                seen.add(item.id)
+                items.push(item)
+              }
+            }
+          }
         }
         loadedResultsPages.current = pagesLoaded
-        setResults((now) => ({
+        const stillLoadingMore =
+          Boolean(opts.soft) &&
+          activeMoreResults.current !== null &&
+          !activeMoreResults.current.resolved
+        setResults(() => ({
           status: 'ready',
           items,
           nextCursor,
-          loadingMore: opts.soft ? now.loadingMore : false,
+          loadingMore: stillLoadingMore,
           moreError,
         }))
       })()
@@ -352,22 +512,31 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     const prev = resultsRef.current
     const { query, kind } = searchRef.current
     if (!query || !prev.nextCursor || prev.loadingMore || prev.status !== 'ready') return
+    const startCursor = prev.nextCursor
     const request = searchMoreGate.current.next()
+    activeMoreResults.current = { request, startCursor, resolved: null }
     setResults({ ...prev, loadingMore: true, moreError: undefined })
     void searchDocuments({
       workspaceId,
       query,
       kind,
-      cursor: prev.nextCursor,
+      cursor: startCursor,
       limit: BROWSER_PAGE_SIZE,
     }).then((result) => {
       if (!mounted.current || !searchMoreGate.current.isCurrent(request)) return
+      if (activeMoreResults.current?.request === request) {
+        activeMoreResults.current = result.ok
+          ? { request, startCursor, resolved: result.value }
+          : null
+      }
       if (result.ok) {
         loadedResultsPages.current += 1
         if (softMoreResults.current) {
-          softMoreResults.current.items.push(...result.value.items)
-          softMoreResults.current.nextCursor = result.value.nextCursor
-          softMoreResults.current.pages += 1
+          softMoreResults.current.entries.push({
+            startCursor,
+            items: result.value.items,
+            nextCursor: result.value.nextCursor,
+          })
         }
       }
       setResults((now) => {
@@ -401,6 +570,8 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     loadedResultsPages.current = 1
     softMoreContents.current = null
     softMoreResults.current = null
+    activeMoreContents.current = null
+    activeMoreResults.current = null
     setGone(false)
     setSearch({ query: '', kind: 'all' })
     setResults(EMPTY_LIST)
