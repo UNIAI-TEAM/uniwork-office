@@ -32,23 +32,24 @@ export type StringKey =
   | keyof typeof discussionStrings.zh
   | keyof typeof settingsStrings.zh
 
-// the home table plus the sharded domains (each shard type-checks its own key set)
+// the home table plus the sharded domains (each shard type-checks its own key set;
+// widening to Record<Lang, Record<string, string>> here avoids a 21 * 2^N union
+// explosion across chained object spreads)
+const shards: readonly Record<Lang, Record<string, string>>[] = [
+  strings,
+  accountStrings,
+  cloudStrings,
+  uniworkDocumentStrings,
+  uniworkFolderStrings,
+  uniworkSaveStrings,
+  syncStrings,
+  workbenchStrings,
+  discussionStrings,
+  settingsStrings,
+]
+
 const dicts = Object.fromEntries(
-  LANGS.map((l) => [
-    l,
-    {
-      ...strings[l],
-      ...accountStrings[l],
-      ...cloudStrings[l],
-      ...uniworkDocumentStrings[l],
-      ...uniworkFolderStrings[l],
-      ...uniworkSaveStrings[l],
-      ...syncStrings[l],
-      ...workbenchStrings[l],
-      ...discussionStrings[l],
-      ...settingsStrings[l],
-    },
-  ]),
+  LANGS.map((l) => [l, Object.assign({}, ...shards.map((s) => s[l]))]),
 ) as unknown as LangDicts<Record<StringKey, string>>
 
 const translate = createI18n(dicts)
