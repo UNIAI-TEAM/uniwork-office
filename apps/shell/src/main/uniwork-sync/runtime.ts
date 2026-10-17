@@ -343,6 +343,11 @@ export interface SyncRuntimeLibraryOptions {
   /** true while the document has drafts or intents (unpin confirms first) */
   hasLocalWork(documentId: string): Promise<boolean>
   fetchAsset?: FetchAssetPort
+  /**
+   * G5-05u (B3): a row changed (state, progress). Wired to the sync center's
+   * push, throttled per row by the caller so a download cannot flood it.
+   */
+  onChange?(documentId: string): void
 }
 
 export class SyncRuntime {
@@ -399,6 +404,7 @@ export class SyncRuntime {
       hasLocalWork: (documentId) => library.hasLocalWork(documentId),
       isOnline: () => this.online !== false,
       clock: this.options.clock,
+      ...(library.onChange ? { onChange: library.onChange } : {}),
     })
     // a revoke (renew lost permission, feed revoke) deletes the committed cache
     this.leases.onRevoked((notice) => {
@@ -669,12 +675,17 @@ export class SyncRuntime {
       async applyPage(changes, options) {
         const commit = await cache.applyPage(changes, options)
         if (commit.kind === 'ok') {
-          const flagged = changes.filter((change) => change.archived !== undefined)
-          if (flagged.length > 0) {
+          // RES-G505-6: a page may list one document twice - the library hears
+          // about it once; a stale pass reads nothing at all
+          const flagged = new Map<string, FeedChange>()
+          for (const change of changes) {
+            if (change.archived !== undefined) flagged.set(change.documentId, change)
+          }
+          if (flagged.size > 0 && live()) {
             // R6BE-1: one index read per page; only a pinned document is handed over
             const pinned = await library.pinnedIds().catch(() => new Set<string>())
-            for (const change of flagged) {
-              if (!pinned.has(change.documentId) || !live()) continue
+            for (const change of flagged.values()) {
+              if (!live() || !pinned.has(change.documentId)) continue
               void library
                 .noteArchived(change.documentId, change.archived === true)
                 .catch(() => undefined)

@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  safeStorage,
+  shell,
+  type IpcMain,
+  type WebContents,
+} from 'electron'
 import { randomUUID } from 'node:crypto'
 import { basename, extname, join } from 'node:path'
 import { showSaveDialogWithMemory } from '@genoffice/electron-utils'
@@ -69,6 +77,7 @@ import { createUniworkDocsClient, type FetchLike, type UniworkDocsClient } from 
 import {
   UniworkDocsService,
   type ConflictUi,
+  type OfflineCopyOpen,
   type SessionIdentity,
   type UnsavedCloseChoice,
   type UnsavedCloseKind,
@@ -78,6 +87,13 @@ import { tUniworkDocs } from './strings'
 import { createTreeChangedCoalescer } from './tree-changed'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
+import { createOfflineCopies } from '../uniwork-sync/offline-library/copies'
+import {
+  createOfflineLibraryApi,
+  registerOfflineLibraryIpc,
+  type OfflineLibraryApi,
+} from '../uniwork-sync/offline-library/api'
+import { offlineHeadIds } from '../uniwork-sync/offline-library/view'
 import { clipboard } from 'electron'
 
 /**
@@ -319,6 +335,8 @@ export interface UniworkDocsHandle {
   aiBinding(path: string): { documentId: string; orgId: string } | 'hidden' | null
   /** G6-05: the per-org capability read (shared cache, TTL rule) UniWork AI availability uses */
   capabilityRead(orgId: string): Promise<CapabilityRead>
+  /** G5-05u: the offline library (S3 tab, the tab menu's pin/unpin, S11 refusals) */
+  offline: OfflineLibraryApi
 }
 
 /** the binding of a path as UniWork AI sees it (see UniworkDocsHandle.aiBinding) */
@@ -415,6 +433,11 @@ export interface SyncRuntimeSeam {
    * views are stale. The wiring hands this to the push coalescer.
    */
   treeChanged?(workspaceId: string): void
+  /**
+   * G5-05u (B3): an offline library row changed (state, progress). The wiring
+   * hands this to the sync center's push, throttled per row.
+   */
+  libraryChanged?(documentId: string): void
 }
 
 /**
@@ -546,6 +569,8 @@ export function createSyncRuntime(
       layer: libraryLayerFor(),
       docs: () => clients()?.docs ?? null,
       hasLocalWork: (documentId) => service.hasLocalDraft(documentId),
+      // G5-05u (B3): every row change reaches the sync center's push
+      ...(seam.libraryChanged ? { onChange: seam.libraryChanged } : {}),
     },
     keepDraft: (documentId) => service.hasLocalDraft(documentId),
     clock: { now: () => Date.now() },
@@ -654,6 +679,25 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // only after `createSyncRuntime` assigned it, below)
   const seamRef: { runtime: SyncRuntime | null } = { runtime: null }
   /**
+   * G5-05u: the offline library is built after the service (it rides the runtime)
+   * but the service opens its cached copy: this holder breaks the cycle.
+   */
+  const offlineRef: { open: (documentId: string) => Promise<OfflineCopyOpen> } = {
+    open: async () => null,
+  }
+  /**
+   * The runtime is built before the sync center: these are its two late-bound
+   * callbacks - a row change and the debounced re-read the push runs.
+   */
+  let offlineRowChanged: (documentId: string) => void = () => undefined
+  let offlinePush: () => void = () => undefined
+  /**
+   * G5-09 R2 (B7): the documents whose HEAD is the committed offline copy, read
+   * off the rows of the last snapshot (the S5 "Tải lại" of a dirty working copy
+   * checks this synchronously, so it cannot await the library).
+   */
+  const offlineHead = new Set<string>()
+  /**
    * G5-11 be-3: true while the feed runtime is started. lockSession's step 1
    * stops it through `stopRuntime` on every path (including the account switch
    * that never reaches `lockStore`), and a same-org switch then re-runs the
@@ -753,6 +797,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       () => wiring.shellContents(),
       UNIWORK_DOC_CHANNELS.lock,
     ),
+    // G5-05u B5/B7: the pinned copy an offline open falls back to, and the S5
+    // "Tải lại" gate that asks whether the head is downloaded
+    openOfflineCopy: (documentId) => offlineRef.open(documentId),
+    hasOfflineHead: (documentId) => offlineHead.has(documentId),
     // the whole list when locks clear (a Retry that unlocked the keychain): the
     // shell replaces its list, so the S11 panel does not outlive the lock
     pushLocks: () => push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks()),
@@ -892,8 +940,51 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   setUniworkCloseGuard(service)
   const runtime = createSyncRuntime(service, {
     treeChanged: (workspaceId) => treeChanged.notify(workspaceId),
+    libraryChanged: (documentId) => offlineRowChanged(documentId),
   })
   seamRef.runtime = runtime
+  /**
+   * G5-05u B5: the read-only copies of pinned documents opened with no network.
+   * They live beside the working copies of the session (their own document key),
+   * go as soon as no tab shows them and at every account boundary.
+   */
+  const offlineCopies = createOfflineCopies({
+    library: () => runtime.library,
+    capabilityOn: async (orgId) =>
+      (await runtime.capabilityRead(orgId)).capabilities.offline_library,
+    store: service.store,
+    scope: () => {
+      const identity = uniworkSessionIdentity()
+      return identity
+        ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
+        : null
+    },
+    show: (path) => service.showOfflineCopy(path),
+    isPathOpen: (path) => wiring.isPathOpen(path),
+    appVersion: () => app.getVersion(),
+  })
+  // the service opens its cached copy through the same module (B5)
+  offlineRef.open = (documentId) =>
+    offlineCopies.open(documentId).then((outcome): OfflineCopyOpen => {
+      if (outcome.kind === 'opened')
+        return { kind: 'opened', path: outcome.path, title: outcome.title }
+      return outcome.kind === 'refused' ? { kind: 'locked', ...outcome.lock } : null
+    })
+  const offlineApi = createOfflineLibraryApi({
+    library: () => runtime.library,
+    activeOrgId: () => feedOrgId(uniworkAccount().status()),
+    capabilityOn: async (orgId) =>
+      (await runtime.capabilityRead(orgId)).capabilities.offline_library,
+    signedOut: () => uniworkAccount().status().state !== 'signed-in',
+    lastOwner: () => service.store.readLastOwner(),
+    libraryLayer: () => libraryLayerFor(),
+    openDocument: async (documentId) => (await service.openDocument(documentId)).ok,
+    openCopy: (documentId) => offlineCopies.open(documentId),
+    revealLibraryFolder: async () =>
+      (await shell.openPath(join(app.getPath('userData'), 'uniwork-sync', 'library'))) === '',
+    lockRefused: (lock) => service.recordOfflineLock(lock),
+    changed: () => offlinePush(),
+  })
   /** stops the feed pass and remembers it, so the next status push restarts it */
   const stopFeed = (): void => {
     runtime.stop()
@@ -956,8 +1047,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       // G5-08c: the leases lock at the account boundary itself (sign-out at
       // once; a switch never locks the incoming account), not on stop()
       runtime.leases.lockBoundary(owner)
-      // G5-05: every library download stops before the scope locks
+      // G5-05: every library download stops before the scope locks; the
+      // read-only offline copies of the account go with its plaintext working copies
       runtime.library?.lockBoundary()
+      await offlineCopies.dropAll()
       stopFeed()
       let captureFailed = 0
       try {
@@ -1018,7 +1111,19 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       return picked.canceled || !picked.filePath ? null : picked.filePath
     },
     pushChanged: (snapshot) => push(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, snapshot),
+    // G5-05u B1/B7: the S3 block, and the head-offline set the S5 gate reads
+    offline: async () => {
+      const block = await offlineApi.snapshot()
+      offlineHead.clear()
+      for (const documentId of offlineHeadIds(block.rows)) offlineHead.add(documentId)
+      return block
+    },
   })
+  offlinePush = () => syncCenter.controller.notifyChanged()
+  offlineRowChanged = (documentId) => offlineApi.rowChanged(documentId)
+  registerOfflineLibraryIpc(ipcMain, offlineApi)
+  // a copy no window shows any more goes at the next pass (the offline twin of the draft sweep)
+  runtime.onPollVerdict(() => void offlineCopies.sweep())
   changeListeners.push(() => syncCenter.controller.notifyChanged())
   // every feed pass's connectivity verdict: the offline header, its refusals and lastSyncAt
   runtime.onPollVerdict((online) => void syncCenter.notePoll(online))
@@ -1029,6 +1134,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     comments,
     aiBinding: (path) => uniworkAiBinding(service, path),
     capabilityRead: (orgId) => runtime.capabilityRead(orgId),
+    offline: offlineApi,
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
       /** the org the feed currently runs for; null = no pass may run */

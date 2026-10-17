@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import type { OfflineBlockedReason } from '../../../shared/offline-library'
 import { UniworkDocError } from '../../uniwork-docs/errors'
 import type { DocumentDetail } from '../../uniwork-docs/parse'
 import { ID } from '../feed/http'
@@ -101,6 +102,26 @@ export interface PinRow {
   archived: boolean
   open: boolean
   failure?: string
+  /**
+   * G5-05u (B2): the projections the S3 view needs and the record does not hold
+   * ready-made. Nothing persisted changes shape: these are read off the record
+   * and the document's lease in `view()`.
+   */
+  /** the manifest's file name (the committed copy's, else the asked snapshot's) */
+  filename: string | null
+  /** the committed bytes, else the declared bytes of the snapshot on its way */
+  sizeBytes: number | null
+  /** the head version the pin asks for (`update-available` / `update-kept` rows) */
+  headVersion: number | null
+  /** ISO expiry of the lease behind the copy */
+  leaseUntil: string | null
+  leaseLevel: 'view' | 'edit' | null
+  /** why an update was kept instead of applied (`too_large` / `corrupt` / `store_full`) */
+  updateKeptReason: string | null
+  /** bytes a `disk-full` (or `store_full` kept update) row still needs */
+  diskNeededBytes?: number
+  /** the blocked reason of a `lease-expired` / `locked` row (S3 / S11) */
+  lockReason: OfflineBlockedReason | null
 }
 
 export type PinResult = { kind: 'pinned'; row: PinRow } | LibraryRefusal
@@ -236,6 +257,43 @@ function withoutCopy(record: PinRecord): PinRecord {
     progress: null,
     updateAvailable: false,
     updateKept: false,
+  }
+}
+
+/**
+ * G5-05u (B2): the blocked reason of a row whose copy is held behind an
+ * unusable lease. The lease state names it; a boundary lock says which session
+ * reason it was. Read only for a `lease-expired` / `locked` row (S3 shows the
+ * row state itself for every other refusal).
+ */
+function lockReasonOf(record: PinRecord, lease: LeaseEffectiveState | null): OfflineBlockedReason {
+  const held = record.readyGeneration !== null
+  if (!lease) return held ? 'lease_expired' : 'keystore_locked'
+  switch (lease.state) {
+    case 'expired':
+      return 'lease_expired'
+    case 'clock_rollback':
+      return 'clock_rollback'
+    case 'revoked':
+      return 'permission_revoked'
+    case 'keystore_locked':
+    case 'keyring_unavailable':
+      return 'keystore_locked'
+    case 'locked':
+      switch (lease.reason) {
+        case 'session_expired':
+          return 'session_expired'
+        case 'keystore_locked':
+        case 'keyring_unavailable':
+          return 'keystore_locked'
+        default:
+          return 'signed_out'
+      }
+    case 'none':
+      // a committed copy with no lease behind it cannot be opened; reconnecting grants one
+      return 'lease_expired'
+    default:
+      return held ? 'lease_expired' : 'keystore_locked'
   }
 }
 
@@ -381,11 +439,16 @@ export class OfflineLibraryManager {
 
   private async view(record: PinRecord): Promise<PinRow> {
     const lease = await this.options.leases.effectiveState(record.documentId)
+    const state = rowStateOf(record, lease)
+    const declared = record.manifest ? manifestBytes(record.manifest) : null
+    const sizeBytes = record.bytes > 0 ? record.bytes : declared
+    const needed = declared !== null ? declared - record.bytes : 0
+    const keptUpdate = record.updateKept && record.failure === 'store_full'
     return {
       documentId: record.documentId,
       orgId: record.scope.orgId,
       workspaceId: record.scope.workspaceId,
-      state: rowStateOf(record, lease),
+      state,
       baseState: record.state,
       progress: this.progress.get(record.documentId) ?? record.progress,
       bytes: record.bytes,
@@ -397,6 +460,15 @@ export class OfflineLibraryManager {
       archived: record.archived,
       open: (this.openCounts.get(record.documentId) ?? 0) > 0,
       ...(record.failure !== undefined ? { failure: record.failure } : {}),
+      filename: record.readyManifest?.main.filename ?? record.manifest?.main.filename ?? null,
+      sizeBytes,
+      headVersion: record.manifest?.main.version ?? null,
+      leaseUntil: lease.record?.expires_at ?? null,
+      leaseLevel: lease.level,
+      updateKeptReason: record.updateKept ? (record.failure ?? null) : null,
+      ...((state === 'disk-full' || keptUpdate) && needed > 0 ? { diskNeededBytes: needed } : {}),
+      lockReason:
+        state === 'lease-expired' || state === 'locked' ? lockReasonOf(record, lease) : null,
     }
   }
 
