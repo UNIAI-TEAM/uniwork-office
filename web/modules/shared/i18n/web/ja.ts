@@ -137,9 +137,15 @@ export const ja = {
     'このドキュメントは {max} を超えています。変更内容はここに残っています。自分のコピーをパソコンにダウンロードしてから、画像サイズを縮小するかドキュメントを分割してください。',
   webSaveBlockDownload: '自分のコピーをダウンロード',
   uwConflictTooLargeWithLimit:
+    'あなたのバージョンは {max} を超えています（現在 {size}）。このダイアログを閉じてファイルサイズを縮小してください。',
+  uwConflictTooLargeWithLimitDownload:
     'あなたのバージョンは {max} を超えています（現在 {size}）。このダイアログを閉じてファイルサイズを縮小するか、「最新版を再読み込み」を選択して自分のバージョンをダウンロードしてください。',
   uwConflictSaveCopyTooLarge:
+    'あなたのバージョンは UniWork のサイズ上限を超えているため、コピーを作成できませんでした。このダイアログを閉じてファイルサイズを縮小してください。',
+  uwConflictSaveCopyTooLargeDownload:
     'あなたのバージョンは UniWork のサイズ上限を超えているため、コピーを作成できませんでした。このダイアログを閉じてファイルサイズを縮小するか、「最新版を再読み込み」を選択して自分のバージョンをダウンロードしてください。',
   uwConflictSaveCopyTooLargeWithLimit:
+    'あなたのバージョンは {max} を超えているため（現在 {size}）、コピーを作成できませんでした。このダイアログを閉じてファイルサイズを縮小してください。',
+  uwConflictSaveCopyTooLargeWithLimitDownload:
     'あなたのバージョンは {max} を超えているため（現在 {size}）、コピーを作成できませんでした。このダイアログを閉じてファイルサイズを縮小するか、「最新版を再読み込み」を選択して自分のバージョンをダウンロードしてください。',
 } satisfies Record<keyof typeof zh, string>

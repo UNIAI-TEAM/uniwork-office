@@ -145,9 +145,15 @@ export const de = {
     'Dieses Dokument überschreitet {max}. Ihre Änderungen sind noch vorhanden. Laden Sie Ihre Kopie herunter und reduzieren Sie dann die Bildgrößen oder teilen Sie das Dokument auf.',
   webSaveBlockDownload: 'Meine Kopie herunterladen',
   uwConflictTooLargeWithLimit:
+    'Ihre Version überschreitet {max} (aktuell {size}). Schließen Sie diesen Dialog, um die Dateigröße zu verringern.',
+  uwConflictTooLargeWithLimitDownload:
     'Ihre Version überschreitet {max} (aktuell {size}). Schließen Sie diesen Dialog, um die Dateigröße zu verringern, oder wählen Sie „Neueste Version laden“, um Ihre Version herunterzuladen.',
   uwConflictSaveCopyTooLarge:
+    'Ihre Version überschreitet die Größenbeschränkung von UniWork, daher konnte die Kopie nicht erstellt werden. Schließen Sie diesen Dialog, um die Dateigröße zu verringern.',
+  uwConflictSaveCopyTooLargeDownload:
     'Ihre Version überschreitet die Größenbeschränkung von UniWork, daher konnte die Kopie nicht erstellt werden. Schließen Sie diesen Dialog, um die Dateigröße zu verringern, oder wählen Sie „Neueste Version laden“, um Ihre Version herunterzuladen.',
   uwConflictSaveCopyTooLargeWithLimit:
+    'Ihre Version überschreitet {max} (aktuell {size}), daher konnte die Kopie nicht erstellt werden. Schließen Sie diesen Dialog, um die Dateigröße zu verringern.',
+  uwConflictSaveCopyTooLargeWithLimitDownload:
     'Ihre Version überschreitet {max} (aktuell {size}), daher konnte die Kopie nicht erstellt werden. Schließen Sie diesen Dialog, um die Dateigröße zu verringern, oder wählen Sie „Neueste Version laden“, um Ihre Version herunterzuladen.',
 } satisfies Record<keyof typeof zh, string>

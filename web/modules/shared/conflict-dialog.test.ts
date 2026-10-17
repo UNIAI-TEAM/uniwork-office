@@ -914,7 +914,7 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
     expect(overwrite).not.toHaveBeenCalled()
     expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
     expect(alertLine().textContent).toBe(
-      format(t('uwConflictTooLargeWithLimit'), { size: '200.1 MB', max: '200 MB' }),
+      format(t('uwConflictTooLargeWithLimitDownload'), { size: '200.1 MB', max: '200 MB' }),
     )
     expect(alertLine().textContent).not.toContain('Download my copy')
     expect(alertLine().textContent).toContain('Reload latest')
@@ -923,7 +923,7 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
     expect(saveCopy).not.toHaveBeenCalled()
     expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
     expect(alertLine().textContent).toBe(
-      format(t('uwConflictSaveCopyTooLargeWithLimit'), { size: '200.1 MB', max: '200 MB' }),
+      format(t('uwConflictSaveCopyTooLargeWithLimitDownload'), { size: '200.1 MB', max: '200 MB' }),
     )
     expect(alertLine().textContent).not.toContain('Download my copy')
 
@@ -957,7 +957,7 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
     await pick('overwrite')
     await pick('go')
     expect(alertLine().textContent).toBe(
-      format(t('uwConflictTooLargeWithLimit'), { size: '55 MB', max: '50 MB' }),
+      format(t('uwConflictTooLargeWithLimitDownload'), { size: '55 MB', max: '50 MB' }),
     )
     await pick('reload')
     expect(btn('download').getAttribute('aria-disabled')).toBeNull()
@@ -1132,6 +1132,24 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
         expect(dict[key], `${lang} ${key}`).not.toContain(dict.webSaveBlockDownload)
         // the base text is shown exactly when the download cannot run: it must not offer it
         expect(dict[key], `${lang} ${key}`).not.toContain(dict.uwConflictReloadTitle)
+      }
+    }
+    // the Download variants carry the same promise, so they too never name the block button and
+    // must name Reload latest where the quoted label matches the title wording
+    const downloadKeys = [
+      'uwConflictTooLargeWithLimitDownload',
+      'uwConflictSaveCopyTooLargeDownload',
+      'uwConflictSaveCopyTooLargeWithLimitDownload',
+    ] as const
+    for (const [lang, dict] of Object.entries(webStrings)) {
+      for (const key of downloadKeys) {
+        expect(dict[key], `${lang} ${key}`).not.toContain(dict.webSaveBlockDownload)
+      }
+    }
+    for (const lang of ['ar', 'he', 'hi', 'ko', 'th'] as const) {
+      const dict = webStrings[lang]
+      for (const key of downloadKeys) {
+        expect(dict[key], `${lang} ${key}`).toContain(dict.uwConflictReloadTitle)
       }
     }
   })

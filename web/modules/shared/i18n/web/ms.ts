@@ -138,9 +138,15 @@ export const ms = {
     'Dokumen ini melebihi {max}. Perubahan anda masih ada di sini. Muat turun salinan anda ke komputer, kemudian kurangkan saiz imej atau bahagikan dokumen.',
   webSaveBlockDownload: 'Muat turun salinan saya',
   uwConflictTooLargeWithLimit:
+    'Versi anda melebihi {max} (kini {size}). Tutup dialog ini untuk mengurangkan saiz fail.',
+  uwConflictTooLargeWithLimitDownload:
     'Versi anda melebihi {max} (kini {size}). Tutup dialog ini untuk mengurangkan saiz fail, atau pilih “Muat semula versi terkini” untuk memuat turun versi anda.',
   uwConflictSaveCopyTooLarge:
+    'Versi anda melebihi had saiz UniWork, jadi salinan tidak dapat dicipta. Tutup dialog ini untuk mengurangkan saiz fail.',
+  uwConflictSaveCopyTooLargeDownload:
     'Versi anda melebihi had saiz UniWork, jadi salinan tidak dapat dicipta. Tutup dialog ini untuk mengurangkan saiz fail, atau pilih “Muat semula versi terkini” untuk memuat turun versi anda.',
   uwConflictSaveCopyTooLargeWithLimit:
+    'Versi anda melebihi {max} (kini {size}), jadi salinan tidak dapat dicipta. Tutup dialog ini untuk mengurangkan saiz fail.',
+  uwConflictSaveCopyTooLargeWithLimitDownload:
     'Versi anda melebihi {max} (kini {size}), jadi salinan tidak dapat dicipta. Tutup dialog ini untuk mengurangkan saiz fail, atau pilih “Muat semula versi terkini” untuk memuat turun versi anda.',
 } satisfies Record<keyof typeof zh, string>
