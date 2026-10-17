@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { OfflineUnpinResult } from '../src/shared/offline-library'
+import { createOfflineLibraryApi } from '../src/main/uniwork-sync/offline-library/api'
 import { offlineTabMenuItem, unpinTabDocument } from '../src/main/uniwork-sync/offline-library/menu'
+import { ORG, SCOPE, WS, addDoc, createHarness } from './uniwork-sync-offline-library-fakes'
 
 /**
  * G5-05u B8: the native tab menu's "Dùng khi không có mạng" / "Bỏ dùng khi
@@ -106,5 +108,58 @@ describe('G5-05u B8 the tab menu unpin confirms before it unpins (BE-R1-3)', () 
     await unpinTabDocument({ unpin: engine_.unpin, documentId: 'doc_1', confirm })
     expect(confirm).not.toHaveBeenCalled()
     expect(engine_.calls).toEqual([{ documentId: 'doc_1' }])
+  })
+
+  it('an account switch while confirm is pending never unpins the incoming account pin (BE-R2-7)', async () => {
+    const h = createHarness({ hasLocalWork: () => true })
+    addDoc(h, 'doc_1', 1, 2048)
+    const api = createOfflineLibraryApi({
+      library: () => h.manager,
+      activeOrgId: () => ORG,
+      capabilityOn: async () => true,
+      signedOut: () => h.session.scope === null,
+      lastOwner: () => null,
+      libraryLayer: () => h.layer,
+      openDocument: async () => ({ ok: false, error: 'network' }),
+      openCopy: async () => ({ kind: 'none' }),
+      revealLibraryFolder: async () => true,
+      lockRefused: () => undefined,
+      changed: () => undefined,
+    })
+    const accountA = { deploymentId: SCOPE.deploymentId, accountId: 'user_1' }
+    const accountB = { deploymentId: SCOPE.deploymentId, accountId: 'user_2' }
+    h.session.scope = accountA
+    expect(await h.manager.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })).toMatchObject(
+      { kind: 'pinned' },
+    )
+    h.session.scope = accountB
+    expect(await h.manager.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })).toMatchObject(
+      { kind: 'pinned' },
+    )
+    const quotaBefore = await h.manager.quota()
+    expect(quotaBefore).toMatchObject({ pins: 1, usedBytes: 2048 })
+
+    h.session.scope = accountA
+    const asked = Promise.withResolvers<void>()
+    const gate = Promise.withResolvers<boolean>()
+    const pending = unpinTabDocument({
+      unpin: (id, options) => api.unpin(id, options),
+      documentId: 'doc_1',
+      account: () => h.session.scope,
+      confirm: async () => {
+        asked.resolve()
+        return await gate.promise
+      },
+    })
+    await asked.promise
+    // the active account switches to B while the native confirm dialog is still open
+    h.session.scope = accountB
+    gate.resolve(true)
+    await pending
+
+    expect(await h.manager.row('doc_1')).toMatchObject({ documentId: 'doc_1', state: 'ready' })
+    expect(await h.manager.quota()).toEqual(quotaBefore)
+    h.session.scope = accountA
+    expect(await h.manager.row('doc_1')).toMatchObject({ documentId: 'doc_1', state: 'ready' })
   })
 })

@@ -5734,6 +5734,7 @@ function registerTabsIpc(): void {
     await unpinTabDocument({
       unpin: (id, options) => offline.unpin(id, options),
       documentId,
+      account: () => uniworkSessionIdentity(),
       confirm: async () => {
         const options: Electron.MessageBoxOptions = {
           type: 'question',
