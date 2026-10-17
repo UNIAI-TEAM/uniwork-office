@@ -1,6 +1,7 @@
-import type { UniworkDocLock } from '../../../shared/home-api'
+import type { UniworkDocErrorCode, UniworkDocLock } from '../../../shared/home-api'
 import type {
   OfflineDocState,
+  OfflineFailure,
   OfflineLibrarySnapshot,
   OfflineResult,
   OfflineUnpinResult,
@@ -35,6 +36,43 @@ export const OFFLINE_ROW_PUSH_INTERVAL_MS = 250
 const FAILED = Symbol('offline-library-failed')
 type Failed = typeof FAILED
 
+/**
+ * BE-R2-6: the service's open verdict, carried intact into S3 `Mở` so only the
+ * network/timeout class falls back to the cached copy; a server refusal
+ * (401/403/404/410) is the server's own verdict and never opens stale plaintext.
+ */
+export type OfflineDocumentOpenOutcome = { ok: true } | { ok: false; error: UniworkDocErrorCode }
+
+function serverOpenFailureOf(error: UniworkDocErrorCode): OfflineFailure {
+  switch (error) {
+    case 'deleted':
+    case 'document_deleted':
+      return { ok: false, code: 'deleted', lockReason: 'document_deleted' }
+    case 'permission_revoked':
+    case 'forbidden':
+    case 'not_found':
+      return { ok: false, code: 'revoked', lockReason: 'permission_revoked' }
+    case 'member_deactivated':
+      return { ok: false, code: 'revoked', lockReason: 'member_deactivated' }
+    case 'organization_suspended':
+      return { ok: false, code: 'revoked', lockReason: 'organization_suspended' }
+    case 'session_expired':
+      return { ok: false, code: 'no_session', lockReason: 'session_expired' }
+    case 'not_signed_in':
+      return { ok: false, code: 'no_session', lockReason: 'signed_out' }
+    case 'capability_off':
+      return { ok: false, code: 'capability_off' }
+    case 'unsupported_format':
+      return { ok: false, code: 'not_a_file' }
+    case 'too_large':
+      return { ok: false, code: 'too_large' }
+    case 'keystore_locked':
+      return { ok: false, code: 'keystore_locked', lockReason: 'keystore_locked' }
+    default:
+      return { ok: false, code: 'unknown' }
+  }
+}
+
 export interface OfflineLibraryApiDeps {
   /** the live library (null while no session wired one) */
   library(): OfflineLibraryManager | null
@@ -49,7 +87,7 @@ export interface OfflineLibraryApiDeps {
   /** the library's own encrypted layer (the signed-out count reads it) */
   libraryLayer(): StoreLayer
   /** S3 `Mở`: the normal open flow of a document (the server path when it opens) */
-  openDocument(documentId: string): Promise<boolean>
+  openDocument(documentId: string): Promise<OfflineDocumentOpenOutcome>
   /** the verified cached copy, written read-only and opened (B5) */
   openCopy(documentId: string): Promise<OfflineCopyOutcome>
   /** `shell.openPath` of the library's folder */
@@ -276,8 +314,16 @@ export function createOfflineLibraryApi(deps: OfflineLibraryApiDeps): OfflineLib
 
     async open(documentId): Promise<OfflineResult> {
       if (!documentId) return { ok: false, code: 'invalid' }
-      // the normal open flow first: online it opens the server path (S3 `Mở`)
-      if (await deps.openDocument(documentId).catch(() => false)) return { ok: true }
+      // the normal open flow first: online it opens the server path (S3 `Mở`),
+      // and on a network/timeout error the service's own fallback already runs;
+      // a server refusal (401/403/404/410) is never overridden by the cache (BE-R2-6)
+      const server = await deps
+        .openDocument(documentId)
+        .catch((): OfflineDocumentOpenOutcome => ({ ok: false, error: 'network' }))
+      if (server.ok) return { ok: true }
+      if (server.error !== 'network' && server.error !== 'timeout') {
+        return serverOpenFailureOf(server.error)
+      }
       const outcome = await deps.openCopy(documentId)
       if (outcome.kind === 'opened') return { ok: true }
       if (outcome.kind === 'refused') {

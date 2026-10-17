@@ -44,7 +44,7 @@ function bridge(h: Harness, over: Partial<OfflineLibraryApiDeps> = {}): Bridge {
     signedOut: () => h.session.scope === null,
     lastOwner: () => null,
     libraryLayer: () => h.layer,
-    openDocument: async () => false,
+    openDocument: async () => ({ ok: false, error: 'network' }),
     openCopy: async () => ({ kind: 'none' }),
     revealLibraryFolder: async () => true,
     lockRefused: (lock) => locks.push(lock),
@@ -271,26 +271,40 @@ describe('G5-05u B4 offlineState / offlineOpenFolder', () => {
 })
 
 describe('G5-05u B4 offlineOpen', () => {
-  it('opens the normal path when it works, the cached copy otherwise', async () => {
+  it('opens the normal path when it works, the cached copy on network/timeout, and never falls back on a server refusal (BE-R2-6)', async () => {
     const h = createHarness()
     const opened: OfflineCopyOutcome = { kind: 'opened', path: '/store/copy.docx', title: 'C.docx' }
     const b = bridge(h, {
-      openDocument: async () => true,
+      openDocument: async () => ({ ok: true }),
       openCopy: async () => opened,
     })
     expect(await b.api.open('doc_1')).toEqual({ ok: true })
     const offline = bridge(h, {
-      openDocument: async () => false,
+      openDocument: async () => ({ ok: false, error: 'network' }),
       openCopy: async () => opened,
     })
     expect(await offline.api.open('doc_1')).toEqual({ ok: true })
     expect(offline.locks).toEqual([])
+    let copyAsked = 0
+    const forbidden = bridge(h, {
+      openDocument: async () => ({ ok: false, error: 'permission_revoked' }),
+      openCopy: async () => {
+        copyAsked += 1
+        return opened
+      },
+    })
+    expect(await forbidden.api.open('doc_1')).toEqual({
+      ok: false,
+      code: 'revoked',
+      lockReason: 'permission_revoked',
+    })
+    expect(copyAsked).toBe(0)
   })
 
   it('a refused cached copy names its S11 reason, pushes the lock and reports the failure', async () => {
     const h = createHarness()
     const b = bridge(h, {
-      openDocument: async () => false,
+      openDocument: async () => ({ ok: false, error: 'network' }),
       openCopy: async () => ({
         kind: 'refused',
         failure: {
@@ -326,7 +340,7 @@ describe('G5-05u B4 offlineOpen', () => {
   it('nothing pinned and no server path refuses offline', async () => {
     const h = createHarness()
     const b = bridge(h, {
-      openDocument: async () => false,
+      openDocument: async () => ({ ok: false, error: 'network' }),
       openCopy: async () => ({ kind: 'none' }),
     })
     expect(await b.api.open('doc_1')).toEqual({ ok: false, code: 'offline' })

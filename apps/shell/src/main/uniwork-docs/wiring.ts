@@ -997,7 +997,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     signedOut: () => uniworkAccount().status().state !== 'signed-in',
     lastOwner: () => service.store.readLastOwner(),
     libraryLayer: () => libraryLayerFor(),
-    openDocument: async (documentId) => (await service.openDocument(documentId)).ok,
+    openDocument: (documentId) => service.openDocument(documentId),
     openCopy: (documentId) => offlineCopies.open(documentId),
     revealLibraryFolder: async () =>
       (await shell.openPath(join(app.getPath('userData'), 'uniwork-sync', 'library'))) === '',

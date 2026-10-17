@@ -27,6 +27,10 @@ import {
   offlineCopyKey,
   type OfflineCopies,
 } from '../src/main/uniwork-sync/offline-library/copies'
+import {
+  createOfflineLibraryApi,
+  type OfflineLibraryApi,
+} from '../src/main/uniwork-sync/offline-library/api'
 import { offlineHeadIds, offlineRowView } from '../src/main/uniwork-sync/offline-library/view'
 import {
   ORG,
@@ -58,6 +62,7 @@ interface OpenHarness {
   h: Harness
   service: UniworkDocsService
   copies: OfflineCopies
+  api: OfflineLibraryApi
   opened: string[]
   locks: UniworkDocLock[]
   /** the open-path test seam: what `isPathOpen` answers */
@@ -151,10 +156,25 @@ function openHarness(): OpenHarness {
     appVersion: () => '0.0.0-test',
     now: () => clock.now,
   })
+  const api = createOfflineLibraryApi({
+    library: () => h.manager,
+    activeOrgId: () => ORG,
+    capabilityOn: async () => capability.on,
+    signedOut: () => h.session.scope === null,
+    lastOwner: () => service.store.readLastOwner(),
+    libraryLayer: () => h.layer,
+    openDocument: (documentId) => service.openDocument(documentId),
+    openCopy: (documentId) => copies.open(documentId),
+    revealLibraryFolder: async () => true,
+    lockRefused: (lock) => service.recordOfflineLock(lock),
+    changed: () => undefined,
+    now: () => clock.now,
+  })
   return {
     h,
     service,
     copies,
+    api,
     opened,
     locks,
     pathOpen,
@@ -532,7 +552,7 @@ describe('G5-05u B5 the copy is named and cleared like the normal open path (BE-
   })
 })
 
-describe('G5-05u B5 only the network class opens the cached copy (BE-R1-4)', () => {
+describe('G5-05u B5 only the network class opens the cached copy (BE-R1-4, BE-R2-6)', () => {
   it('a 403 while online never opens the ready copy', async () => {
     const o = openHarness()
     dirs.push(o.userDataDir)
@@ -560,6 +580,34 @@ describe('G5-05u B5 only the network class opens the cached copy (BE-R1-4)', () 
     await pin(o.h)
     const result = await o.service.openDocument('doc_1')
     expect(result.ok).toBe(true)
+    expect(o.opened).toHaveLength(1)
+    expect(o.opened[0]).toContain(offlineCopyKey('doc_1'))
+  })
+
+  it('S3 offlineOpen through service + copies + api never falls back on 403 or 410, and opens the copy on a network error (BE-R2-6)', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+
+    o.server.answer = () => answerOf(403, { error: { code: 'forbidden' } })
+    expect(await o.api.open('doc_1')).toEqual({
+      ok: false,
+      code: 'revoked',
+      lockReason: 'permission_revoked',
+    })
+    expect(o.opened).toEqual([])
+
+    o.server.answer = () => answerOf(410, { error: { code: 'document_deleted' } })
+    expect(await o.api.open('doc_1')).toEqual({
+      ok: false,
+      code: 'deleted',
+      lockReason: 'document_deleted',
+    })
+    expect(o.opened).toEqual([])
+
+    o.server.answer = null
+    expect(await o.api.open('doc_1')).toEqual({ ok: true })
     expect(o.opened).toHaveLength(1)
     expect(o.opened[0]).toContain(offlineCopyKey('doc_1'))
   })
