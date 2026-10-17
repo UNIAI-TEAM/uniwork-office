@@ -117,7 +117,7 @@ async function prepareN1StoreOnProfile({ n1, envRootDir, userDataDir }) {
   console.log(
     '[g7-05/t4] N+1 snapshot missing or incomplete; building N+1-written level-3 store via real edit+save in N+1...',
   )
-  let seeded = null
+  let seeded
   const fxScratchDir = mkdtempSync(join(tmpdir(), 'g7-05-t4-fx-'))
   try {
     const fixtures = materializeFixtures(fxScratchDir)
@@ -141,8 +141,8 @@ async function prepareN1StoreOnProfile({ n1, envRootDir, userDataDir }) {
     seedOnboardingSeen: true,
     scratchPrefix: 'g7-05-t4-n1-prep-',
   })
-  let accountAfterRetry = null
-  let editSaveRes = null
+  let accountAfterRetry
+  let editSaveRes
   try {
     const shellPage = await waitForShellReady(launchedN1.app)
     accountAfterRetry = await activateKeyringAndRestoreAccount(launchedN1.app, shellPage, 500)
