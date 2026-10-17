@@ -1,5 +1,5 @@
 import type { MenuItemConstructorOptions } from 'electron'
-import type { OfflineDocState } from '../../../shared/offline-library'
+import type { OfflineDocState, OfflineUnpinResult } from '../../../shared/offline-library'
 
 /**
  * G5-05u (B8): the "Dùng khi không có mạng" / "Bỏ dùng khi không có mạng" item
@@ -22,4 +22,24 @@ export function offlineTabMenuItem(input: {
   }
   if (!input.state.capabilityOn) return null
   return { label: input.labels.pin, click: () => input.pin() }
+}
+
+/**
+ * G5-05u (B8, BE-R1-3): the tab menu's unpin. The engine answers
+ * `needs_confirm` while the document still has drafts or intents. A native menu
+ * cannot host the renderer's confirm popover, so the caller's own confirm is
+ * asked and the call repeated with `confirmed: true`; anything but a confirmed
+ * answer leaves the pin, its drafts and its quota untouched - the item never
+ * unpins on its own.
+ */
+export async function unpinTabDocument(input: {
+  unpin(documentId: string, options?: { confirmed?: boolean }): Promise<OfflineUnpinResult>
+  documentId: string
+  /** the caller's confirm (a native message box): true = the user accepted */
+  confirm(): Promise<boolean>
+}): Promise<void> {
+  const asked = await input.unpin(input.documentId)
+  if (asked.ok || asked.code !== 'needs_confirm') return
+  if (!(await input.confirm())) return
+  await input.unpin(input.documentId, { confirmed: true })
 }
