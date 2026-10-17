@@ -1034,4 +1034,193 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     expect(rule('.uwf-row')).toMatch(/user-select:\s*none/)
     expect(rule('.uwf-list .uw-pick-state')).toMatch(/user-select:\s*none/)
   })
+
+  it('FE-R3-1: keeps a Load more page that finishes while a soft re-read is still running (folder contents and search)', async () => {
+    let releaseSoftPage2: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    let holdNextPage2 = false
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (q.cursor === 'c2') {
+        if (holdNextPage2) {
+          holdNextPage2 = false
+          return new Promise((resolve) => {
+            releaseSoftPage2 = resolve
+          })
+        }
+        return ok({ items: [entry('d2', 'Second.docx')], nextCursor: 'c3' })
+      }
+      return ok({ items: [entry('d1', 'First.docx')], nextCursor: 'c2' })
+    })
+    await render()
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(optionTitles()).toEqual(['First.docx', 'Second.docx'])
+
+    // Start an in-flight Load more for page 3 ('c3') mocked once, and start a soft refresh whose page-2 re-read stays in flight
+    let releaseLoadMore3: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkListChildren.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseLoadMore3 = resolve
+        }),
+    )
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    holdNextPage2 = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+
+    // Load more finishes WHILE the soft re-read is still running on page 2
+    await act(async () =>
+      releaseLoadMore3(ok({ items: [entry('d3', 'Third.docx')], nextCursor: null })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['First.docx', 'Second.docx', 'Third.docx'])
+
+    // Now the soft re-read's page 2 finishes; page 3 from Load more must be kept
+    await act(async () =>
+      releaseSoftPage2(ok({ items: [entry('d2', 'Second.docx')], nextCursor: 'c3' })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['First.docx', 'Second.docx', 'Third.docx'])
+    expect($('.uw-pick-more')).toBeNull()
+
+    // Same for search: Load more results finishing during a soft search re-read is kept
+    let releaseSoftSearchPage2: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    let holdNextSearchPage2 = false
+    api.uniworkSearchDocuments.mockImplementation(async (q: UniworkSearchQuery) => {
+      if (q.cursor === 'sc2') {
+        if (holdNextSearchPage2) {
+          holdNextSearchPage2 = false
+          return new Promise((resolve) => {
+            releaseSoftSearchPage2 = resolve
+          })
+        }
+        return ok({ items: [entry('s2', 'HitTwo.docx')], nextCursor: 'sc3' })
+      }
+      return ok({ items: [entry('s1', 'HitOne.docx')], nextCursor: 'sc2' })
+    })
+    await type($<HTMLInputElement>('.uwf-own-search')!, 'Hit')
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(optionTitles()).toEqual(['HitOne.docx', 'HitTwo.docx'])
+
+    let releaseSearchMore3: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkSearchDocuments.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseSearchMore3 = resolve
+        }),
+    )
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    holdNextSearchPage2 = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+
+    await act(async () =>
+      releaseSearchMore3(ok({ items: [entry('s3', 'HitThree.docx')], nextCursor: null })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['HitOne.docx', 'HitTwo.docx', 'HitThree.docx'])
+
+    await act(async () =>
+      releaseSoftSearchPage2(ok({ items: [entry('s2', 'HitTwo.docx')], nextCursor: 'sc3' })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['HitOne.docx', 'HitTwo.docx', 'HitThree.docx'])
+    expect($('.uw-pick-more')).toBeNull()
+  })
+
+  it('FE-R3-2: generates unique hidden-formats hint ids via useId() when multiple browsers mount', async () => {
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(UniworkLiveHost),
+          createElement(UniworkBrowser, {
+            workspaceId: 'w1',
+            variant: 'pane',
+            onOpenDocument: onOpen,
+          }),
+          createElement(UniworkBrowser, {
+            workspaceId: 'w1',
+            variant: 'dialog',
+            onOpenDocument: onOpen,
+          }),
+        ),
+      )
+    })
+    await flush()
+    const hints = $$('.uwf-hidden')
+    expect(hints.length).toBe(2)
+    expect(hints[0]!.id).toBeTruthy()
+    expect(hints[1]!.id).toBeTruthy()
+    expect(hints[0]!.id).not.toBe(hints[1]!.id)
+    const listboxes = $$('[role="listbox"]')
+    expect(listboxes[0]!.getAttribute('aria-describedby')).toBe(hints[0]!.id)
+    expect(listboxes[1]!.getAttribute('aria-describedby')).toBe(hints[1]!.id)
+  })
+
+  it('V2-2: row menu wrapper does not shift vertically between rows and stays opacity 0 when nothing is hovered in real bundle order', async () => {
+    const foldersCss = readFileSync(
+      join(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
+      'utf8',
+    )
+    const homeCss = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const bundleCss = `${foldersCss}\n${homeCss.replace(/@position-try[^{]*\{[^}]*\}/g, '')}`
+
+    await render()
+    // Focus a tree row and select an active contents row while nothing is hovered and no menu is open
+    const alphaRow = treeItem('Alpha')
+    await act(async () => alphaRow.focus())
+    const activeOption = $<HTMLElement>('.uwf-contents .uw-pick-row.active')!
+    expect(activeOption).toBeTruthy()
+
+    const treeMenuWrap = alphaRow.querySelector<HTMLElement>('.uw-row-menu.uwf-menu')!
+    const treeMenuBtn = alphaRow.querySelector<HTMLElement>('.uw-row-menu-btn')!
+    const rowMenuWrap = $<HTMLElement>('.uwf-contents .uw-pick-item .uw-row-menu.uwf-menu')!
+    const rowMenuBtn = $<HTMLElement>('.uwf-contents .uw-pick-item .uw-row-menu-btn')!
+
+    const styleEl = document.createElement('style')
+    styleEl.textContent = bundleCss
+    document.head.appendChild(styleEl)
+    try {
+      expect(window.getComputedStyle(treeMenuWrap).getPropertyValue('transform').trim()).toBe(
+        'none',
+      )
+      expect(window.getComputedStyle(rowMenuWrap).getPropertyValue('transform').trim()).toBe('none')
+      expect(window.getComputedStyle(treeMenuBtn).getPropertyValue('opacity').trim()).toBe('0')
+      expect(window.getComputedStyle(rowMenuBtn).getPropertyValue('opacity').trim()).toBe('0')
+    } finally {
+      styleEl.remove()
+    }
+  })
+
+  it('FE R1-9: switching workspaceId resets open folder to initialFolderId and drops in-flight replies from the previous workspace', async () => {
+    await render({ workspaceId: 'w1' })
+    await click(treeItem('Alpha'))
+    expect($('.uwf-crumb-current')?.textContent).toBe('Alpha')
+
+    // Start a slow folder read in w1 before switching to w2
+    let releaseStaleW1: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkListChildren.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseStaleW1 = resolve
+        }),
+    )
+    await click(treeItem('Beta'))
+
+    // Switch workspace to w2
+    children[''] = [entry('w2-doc', 'WorkspaceTwo.docx', { workspaceId: 'w2' })]
+    await render({ workspaceId: 'w2' })
+    expect($('.uwf-crumb-current')?.textContent).toBe('UniWork')
+    expect(optionTitles()).toEqual(['WorkspaceTwo.docx'])
+
+    // Late w1 reply resolves and must be ignored
+    await act(async () =>
+      releaseStaleW1(ok({ items: [entry('stale', 'StaleW1.docx')], nextCursor: null })),
+    )
+    await flush()
+    expect($('.uwf-crumb-current')?.textContent).toBe('UniWork')
+    expect(optionTitles()).toEqual(['WorkspaceTwo.docx'])
+  })
 })
+

@@ -165,6 +165,7 @@ export function UniworkBrowser({
   const list = searching ? browser.results : browser.contents
   const view = contentsView(list.items, searching ? null : sort, dateLocale)
   const showHiddenHint = !mainOverride && list.status === 'ready' && view.hiddenCount > 0
+  const hiddenHintId = onHiddenHintChange ? BROWSER_HIDDEN_HINT_ID : `${uid}-hidden`
 
   const onHiddenHintChangeRef = useRef(onHiddenHintChange)
   onHiddenHintChangeRef.current = onHiddenHintChange
@@ -299,6 +300,7 @@ export function UniworkBrowser({
           list={list}
           rows={view.rows}
           hiddenCount={view.hiddenCount}
+          hiddenHintId={hiddenHintId}
           emptyText={searching ? t('ufNoResults', { query }) : t('ufEmptyFolder')}
           search={searching}
           openingId={openingId}
@@ -322,7 +324,7 @@ export function UniworkBrowser({
             className="uw-pick-search uwf-own-search"
             type="search"
             aria-label={t('uwPickSearch')}
-            aria-describedby={showHiddenHint ? BROWSER_HIDDEN_HINT_ID : undefined}
+            aria-describedby={showHiddenHint ? hiddenHintId : undefined}
             placeholder={t('ufSearchPh')}
             value={ownDraft}
             spellCheck={false}
