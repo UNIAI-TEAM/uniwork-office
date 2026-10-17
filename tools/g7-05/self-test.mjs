@@ -9,9 +9,11 @@ import { join } from 'node:path'
 import { G7_06_FIXTURES, materializeFixtures } from './fixtures-data.mjs'
 import {
   REPO_ROOT,
+  classifyRequestUrl,
   collectBuildMetadata,
   createLaunchWrapper,
   findInstancePids,
+  isOutboundNetworkUrl,
   median,
   parseNetLog,
   parseStraceLog,
@@ -58,14 +60,59 @@ function testStraceParser() {
   assert.equal(dirtyRes.outboundCount, 3, '2 DNS + 1 external IP must equal 3 outbound events')
 }
 
-function testNetLogParser() {
+function testNetLogParserAndUrlClassifier() {
+  const internalSchemes = [
+    'genoffice-docx-media://handoff/621db8c6-a171-4b5d-b256-538939540847',
+    'genoffice-app://docs/assets/send-enter-off-B0IfWMyy.png',
+    'genoffice-renderer://docs/index.html',
+    'devtools://devtools/bundled/inspector.html',
+    'chrome://gpu/',
+    'chrome-extension://abcdef/index.html',
+    'file:///opt/UniWork%20Office/resources/app.asar/out/renderer/index.html',
+    'data:image/png;base64,iVBORw0KGgo=',
+    'blob:null/123456',
+    'about:blank',
+    'html-preview://local/frame.html',
+    'local-media://asset/1.png',
+  ]
+  for (const url of internalSchemes) {
+    assert.equal(classifyRequestUrl(url), 'internal', `${url} must be classified as internal`)
+    assert.equal(isOutboundNetworkUrl(url), false, `${url} must not be counted as outbound`)
+  }
+
+  const loopbackUrls = [
+    'http://127.0.0.1:41234/json/version',
+    'http://localhost:8080/health',
+    'ws://[::1]:9229/devtools/page/1',
+  ]
+  for (const url of loopbackUrls) {
+    assert.equal(classifyRequestUrl(url), 'loopback', `${url} must be classified as loopback`)
+    assert.equal(isOutboundNetworkUrl(url), false, `${url} must not be counted as outbound`)
+  }
+
+  const realOutboundUrls = [
+    'https://redirector.gvt1.com/edgedl/chrome/dict/en-us-10-1.bdic',
+    'http://example.com/resource',
+    'wss://realtime.uniwork.example/socket',
+    'ftp://ftp.example.com/pub/file.txt',
+  ]
+  for (const url of realOutboundUrls) {
+    assert.equal(classifyRequestUrl(url), 'outbound', `${url} must be classified as outbound`)
+    assert.equal(isOutboundNetworkUrl(url), true, `${url} must be counted as outbound`)
+  }
+
   const cleanNetLog = JSON.stringify({
     constants: {},
     events: [
       { type: 1, params: { url: 'devtools://devtools/bundled/inspector.html' } },
       { type: 2, params: { url: 'genoffice-renderer://docs/index.html' } },
-      { type: 3, params: { url: 'http://127.0.0.1:41234/json/version' } },
-      { type: 4, params: { host: 'localhost' } },
+      {
+        type: 3,
+        params: { url: 'genoffice-docx-media://handoff/621db8c6-a171-4b5d-b256-538939540847' },
+      },
+      { type: 4, params: { url: 'genoffice-app://docs/assets/send-enter-off-B0IfWMyy.png' } },
+      { type: 5, params: { url: 'http://127.0.0.1:41234/json/version' } },
+      { type: 6, params: { host: 'localhost' } },
     ],
   })
   const cleanRes = parseNetLog(cleanNetLog)
@@ -186,7 +233,7 @@ async function testPackagedShellAndEditorViewResolution() {
 
 testFixtureMaterialization()
 testStraceParser()
-testNetLogParser()
+testNetLogParserAndUrlClassifier()
 testRssAndMetadata()
 await testWrapperAndProcessTracking()
 await testPackagedShellAndEditorViewResolution()

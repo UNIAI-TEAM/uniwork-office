@@ -26,6 +26,7 @@ import {
   collectBuildMetadata,
   editAndSaveFixture,
   findLinuxArtifacts,
+  isOutboundNetworkUrl,
   launchPackagedApp,
   parseNetLog,
   parseStraceLog,
@@ -124,22 +125,13 @@ async function main() {
 
   try {
     // Install an additional in-process webRequest observer on defaultSession for URL visibility.
+    // Every non-network scheme (anything that is not http/https/ws/wss/ftp) is treated as internal.
     await launched.app.evaluate(({ session }) => {
       const g = globalThis
       g.__g705WebRequests = []
       session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
         const u = details.url || ''
-        if (
-          !u.startsWith('devtools://') &&
-          !u.startsWith('chrome-extension://') &&
-          !u.startsWith('chrome://') &&
-          !u.startsWith('data:') &&
-          !u.startsWith('blob:') &&
-          !u.startsWith('file:') &&
-          !u.startsWith('genoffice-renderer://') &&
-          !u.startsWith('html-preview://') &&
-          !u.startsWith('local-media://')
-        ) {
+        if (/^(https?|wss?|ftp):/i.test(u.trim())) {
           g.__g705WebRequests.push({
             url: u,
             method: details.method,
@@ -165,9 +157,10 @@ async function main() {
       )
     }
 
-    webRequestOutboundUrls = await launched.app.evaluate(() => {
+    const rawWebRequests = await launched.app.evaluate(() => {
       return globalThis.__g705WebRequests || []
     })
+    webRequestOutboundUrls = rawWebRequests.filter((req) => isOutboundNetworkUrl(req?.url))
   } finally {
     await closePackagedApp(launched)
     await sleep(500)
@@ -208,8 +201,8 @@ async function main() {
       countedAsOutbound: [
         'Any AF_INET or AF_INET6 connect/sendto to an IP other than 127.0.0.1 or ::1 (including 127.0.0.53)',
         'Any connect/sendto to port 53 (DNS), even on 127.0.0.1 or ::1',
-        'Any non-localhost http/https/ws/wss URL or non-localhost DNS host resolution in --log-net-log',
-        'Any non-local URL in session.defaultSession.webRequest.onBeforeRequest',
+        'Any non-localhost http/https/ws/wss/ftp URL or non-localhost DNS host resolution in --log-net-log',
+        'Any non-localhost http/https/ws/wss/ftp URL in session.defaultSession.webRequest.onBeforeRequest',
       ],
     },
     strace: {

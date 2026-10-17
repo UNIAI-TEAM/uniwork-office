@@ -285,6 +285,38 @@ export function parseStraceLog(straceText) {
   }
 }
 
+const NETWORK_SCHEMES = new Set(['http:', 'https:', 'ws:', 'wss:', 'ftp:'])
+
+/**
+ * Returns whether a URL uses an outbound network scheme (http/https/ws/wss/ftp)
+ * targeting a non-loopback host. Every non-network scheme (genoffice-app://,
+ * genoffice-docx-media://, genoffice-renderer://, devtools://, file://, data:, etc.)
+ * is treated as internal.
+ */
+export function classifyRequestUrl(urlStr) {
+  if (typeof urlStr !== 'string') return 'internal'
+  const trimmed = urlStr.trim()
+  if (!trimmed) return 'internal'
+  const schemeMatch = /^([a-z][a-z0-9+.-]*:)/i.exec(trimmed)
+  if (!schemeMatch) return 'internal'
+  const protocol = schemeMatch[1].toLowerCase()
+  if (!NETWORK_SCHEMES.has(protocol)) return 'internal'
+  try {
+    const u = new URL(trimmed)
+    const host = u.hostname.toLowerCase()
+    if (host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]') {
+      return 'loopback'
+    }
+    return 'outbound'
+  } catch {
+    return 'outbound'
+  }
+}
+
+export function isOutboundNetworkUrl(urlStr) {
+  return classifyRequestUrl(urlStr) === 'outbound'
+}
+
 export function parseNetLog(netLogText) {
   const raw = String(netLogText || '').trim()
   if (!raw) {
@@ -330,38 +362,16 @@ export function parseNetLog(netLogText) {
   const outboundUrls = new Set()
   const outboundDnsHosts = new Set()
 
-  const ignoredSchemes = [
-    'devtools:',
-    'chrome:',
-    'chrome-extension:',
-    'data:',
-    'blob:',
-    'file:',
-    'about:',
-    'genoffice-renderer:',
-    'html-preview:',
-    'local-media:',
-  ]
-
   for (const ev of events) {
     const params = ev?.params
     if (!params || typeof params !== 'object') continue
 
     if (typeof params.url === 'string') {
       const urlStr = params.url.trim()
-      const lower = urlStr.toLowerCase()
-      if (ignoredSchemes.some((scheme) => lower.startsWith(scheme))) {
-        continue
-      }
-      try {
-        const u = new URL(urlStr)
-        const host = u.hostname.toLowerCase()
-        if (host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]') {
-          loopbackUrls.add(urlStr)
-        } else {
-          outboundUrls.add(urlStr)
-        }
-      } catch {
+      const kind = classifyRequestUrl(urlStr)
+      if (kind === 'loopback') {
+        loopbackUrls.add(urlStr)
+      } else if (kind === 'outbound') {
         outboundUrls.add(urlStr)
       }
     }
