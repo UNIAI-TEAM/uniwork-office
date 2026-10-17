@@ -26,7 +26,7 @@ import { announce } from '../uniwork-live'
 import { currentWorkbenchBucket, isWorkbenchBucketCleared } from '../workbench-bucket'
 import { FolderNameDialog } from './FolderNameDialog'
 import { UniworkFolderPicker, type PickedFolder } from './UniworkFolderPicker'
-import { FolderGlyph } from './UniworkFolderTree'
+import { FolderGlyph, MyFolderGlyph } from './UniworkFolderTree'
 import {
   MY_FOLDER_LABEL_KEY,
   folderVisibilityTagOf,
@@ -581,7 +581,7 @@ export function SaveDialog({
             }}
           >
             <span className="uws-loc-icon" aria-hidden="true">
-              <FolderGlyph />
+              {target.kind === 'my_folder' ? <MyFolderGlyph /> : <FolderGlyph />}
             </span>
             <span className="uws-loc-text">
               <span className="uws-loc-value" id={`${id}-loc-value`}>
@@ -590,6 +590,20 @@ export function SaveDialog({
               <span className="uws-loc-sub">{sub}</span>
             </span>
             <span className="uws-loc-change">{t('usChange')}</span>
+            <svg
+              className="uws-loc-chev"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m9 18 6-6-6-6" />
+            </svg>
           </button>
         </div>
         <p className="uw-act-error" id={`${id}-error`} role={failure ? 'alert' : undefined}>

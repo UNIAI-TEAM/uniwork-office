@@ -61,7 +61,7 @@ import {
   splitEntriesByArea,
 } from './uniwork-docs-model'
 import { WorkErrorState, WorkNoWorkspace, WorkSkeleton } from './WorkErrorState'
-import { UniworkBrowser } from './uniwork-folders/UniworkBrowser'
+import { DocumentsHome } from './uniwork-home/DocumentsHome'
 
 export const HOME_AREA_KEY = 'uniwork.wb.homeArea'
 export type HomeArea = 'uniwork' | 'device'
@@ -1318,7 +1318,6 @@ export function Home() {
   const acctView: AccountView = accountStatus ? viewOf(accountStatus) : 'loading'
   const isSignedIn = showsProfile(acctView, accountStatus)
   const area: HomeArea = savedArea ?? (isSignedIn ? 'uniwork' : 'device')
-  const [uniworkSubView, setUniworkSubView] = useState<'folder' | 'recent' | 'starred'>('folder')
   const [uniworkFolderByWs, setUniworkFolderByWs] = useState<Record<string, string | null>>({})
   const [uniworkSidebarSlot, setUniworkSidebarSlot] = useState<HTMLDivElement | null>(null)
   const [openingDocId, setOpeningDocId] = useState<string | null>(null)
@@ -1388,8 +1387,8 @@ export function Home() {
   const fileSortRef = useRef<HTMLDivElement>(null)
   const [rowMenu, setRowMenu] = useState<string | null>(null)
   // actions cell (… button + menu) of the row whose menu is open — the dismissal guard root
-  const rowMenuWrapRef = useRef<HTMLSpanElement>(null)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const rowMenuWrapRef = useRef<HTMLSpanElement>(null)
   const [renaming, setRenaming] = useState<{ path: string; value: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string[] | null>(null)
   // unavailable recent entry (missing flag) the user clicked — offer list removal
@@ -1456,7 +1455,6 @@ export function Home() {
   const selectArea = (nextArea: HomeArea) => {
     setSavedArea(nextArea)
     wbStoreSetRaw(HOME_AREA_KEY, nextArea)
-    if (nextArea === 'uniwork') setUniworkSubView('folder')
     setChatMode(false)
     setEduMode(false)
     setSelectedProjectId(null)
@@ -1490,7 +1488,6 @@ export function Home() {
     writeActiveWorkspaceId(nextWsId)
     setUwWsState((prev) => ({ ...prev, workspaceId: nextWsId }))
     setUniworkFolderByWs((prev) => ({ ...prev, [nextWsId]: null }))
-    setUniworkSubView('folder')
     setChatMode(false)
     setEduMode(false)
     setSelectedProjectId(null)
@@ -1511,7 +1508,6 @@ export function Home() {
 
   const goHomeList = (next: 'recent' | 'starred' = 'recent') => {
     setView(next)
-    setUniworkSubView(next)
     setSelectedProjectId(null)
     if (area === 'device') setSelectedFolder(null)
     setEduMode(false)
@@ -3823,13 +3819,15 @@ export function Home() {
     !eduMode &&
     !chatMode &&
     view === 'recent' &&
-    (area === 'uniwork' ? uniworkSubView === 'recent' : !selectedFolder)
+    area === 'device' &&
+    !selectedFolder
   const activeStarredInArea =
     !selectedProjectId &&
     !eduMode &&
     !chatMode &&
     view === 'starred' &&
-    (area === 'uniwork' ? uniworkSubView === 'starred' : !selectedFolder)
+    area === 'device' &&
+    !selectedFolder
 
   const renderAreaNav = () => (
     <div className="home-area-nav">
@@ -3988,27 +3986,9 @@ export function Home() {
           className="home-area-panel"
         >
           {area === 'uniwork' ? (
-            <>
-              {isSignedIn && uwWsState.workspaces && uwWsState.workspaces.length > 0 && (
-                <select
-                  className="home-uw-ws"
-                  aria-label={t('wbTopWorkspace')}
-                  value={activeUwWorkspaceId ?? ''}
-                  onChange={(e) => selectUniworkWorkspace(e.target.value)}
-                >
-                  {uwWsState.workspaces.map((ws) => (
-                    <option key={ws.id} value={ws.id}>
-                      {ws.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {showUniworkPane && activeUwWorkspaceId ? (
-                <div className="home-uw-side-slot" ref={setUniworkSidebarSlot} />
-              ) : (
-                renderAreaNav()
-              )}
-            </>
+            showUniworkPane && activeUwWorkspaceId ? (
+              <div className="home-uw-side-slot" ref={setUniworkSidebarSlot} />
+            ) : null
           ) : (
             <>
               {renderAreaNav()}
@@ -4104,21 +4084,19 @@ export function Home() {
             />
           </main>
         ) : (
-          <main className={`content${uniworkSubView === 'folder' ? ' home-uw-pane' : ''}`}>
-            <UniworkBrowser
+          <main className="content home-uw-pane">
+            <DocumentsHome
               key={activeUwWorkspaceId}
-              variant="pane"
               workspaceId={activeUwWorkspaceId}
+              workspaces={uwWsState.workspaces}
+              onWorkspaceChange={selectUniworkWorkspace}
               initialFolderId={activeUwFolderId}
               onFolderChange={(folderId) => {
                 setUniworkFolderByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: folderId }))
-                setUniworkSubView('folder')
               }}
               onOpenDocument={openUniworkDocFromPane}
               openingId={openingDocId}
-              sidebarTop={renderAreaNav()}
               sidebarHost={uniworkSidebarSlot}
-              mainOverride={uniworkSubView === 'folder' ? null : renderGlobalSections()}
             />
           </main>
         )

@@ -479,20 +479,53 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     const starredEntries = [uwRec1, devRec1, devRec2]
     api.recents = vi.fn(async () => ({ entries: recentEntries, total: recentEntries.length }))
     api.starred = vi.fn(async () => ({ entries: starredEntries, total: starredEntries.length }))
+    api.uniworkListDocuments = vi.fn(async () =>
+      ok({
+        items: [
+          {
+            id: 'uw-doc-1',
+            workspaceId: 'ws-1',
+            title: 'Cloud Spec.docx',
+            format: 'docx',
+            updatedAt: '2026-10-01T10:00:00Z',
+            kind: 'file',
+            parentId: null,
+          },
+          {
+            id: 'uw-doc-2',
+            workspaceId: 'ws-1',
+            title: 'Cloud Roadmap.docx',
+            format: 'docx',
+            updatedAt: '2026-10-01T09:00:00Z',
+            kind: 'file',
+            parentId: null,
+          },
+        ],
+        nextCursor: null,
+      }),
+    )
 
     await mountHome()
 
-    // In UniWork area: UniworkBrowser variant="pane" is mounted at root by default
+    // In UniWork area: DocumentsHome is mounted at root by default
     expect(host.querySelector('.uwf-browser.uwf-pane')).not.toBeNull()
     const uwTree = host.querySelector<HTMLElement>('.uwf-tree[role="tree"]')
     expect(uwTree).not.toBeNull()
     expect(host.querySelector('.folder-panel')).toBeNull()
     expect(host.textContent).toContain('Root Cloud Doc.docx')
 
-    // Per-area nav counts in UniWork area: 2 recent, 1 starred
-    const uwNavItems = Array.from(host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item'))
-    expect(uwNavItems[0]?.querySelector('.nav-count')?.textContent).toBe('2')
-    expect(uwNavItems[1]?.querySelector('.nav-count')?.textContent).toBe('1')
+    // DocumentsHome sub-nav in UniWork area renders the 6 available entries and hides starred/archive
+    const uwNavIds = Array.from(host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item')).map(
+      (el) => el.getAttribute('data-nav'),
+    )
+    expect(uwNavIds).toEqual([
+      'workspace',
+      'my-folder',
+      'recent',
+      'shared-with-me',
+      'shared-by-me',
+      'trash',
+    ])
 
     // Open "Alpha Folder" in the UniWork tree
     const alphaNode = Array.from(uwTree!.querySelectorAll<HTMLElement>('[role="treeitem"]')).find(
@@ -505,16 +538,18 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     await flush()
     expect(host.textContent).toContain('Alpha Spec.docx')
 
-    // Click Recent in UniWork area -> shows only UniWork recent rows and count 2
+    // Click Recent in UniWork area -> shows only UniWork recent rows via uniworkListDocuments
     const recentBtnUw = host.querySelector<HTMLButtonElement>('.nav-item[data-nav="recent"]')!
     await act(async () => {
       recentBtnUw.click()
     })
     await flush()
+    expect(api.uniworkListDocuments).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'ws-1' }),
+    )
     expect(host.textContent).toContain('Cloud Spec.docx')
     expect(host.textContent).toContain('Cloud Roadmap.docx')
     expect(host.textContent).not.toContain('Local Report.docx')
-    expect(host.querySelector('.recents-heading .file-count')?.textContent).toContain('2')
 
     // Switch to "On this device" area -> shows local folder tree, only local recent rows, and per-area counts (3 recent, 2 starred)
     const tablist = host.querySelector<HTMLElement>('[role="tablist"][aria-label="Area"]')!
@@ -1272,7 +1307,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.querySelector('.load-more')).toBeNull()
   })
 
-  it('does not re-list already-cached folder roots when roots refreshes without invalidation, but re-lists roots whose listing rejected or was missing (FE13-R2-7, FE13-R3-1)', async () => {
+  it('does not re-list already-cached folder roots when roots refreshes without invalidation, but re-lists roots whose listing rejected or resolved with missing: true (FE13-R2-7, FE13-R3-1, FE13-R4-1)', async () => {
     wbStoreSetRaw('uniwork.wb.homeArea', 'device')
     recentEntries = []
     folderRoots = [
@@ -1285,9 +1320,18 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       },
     ]
     let docsShouldReject = true
+    let desktopMissing = false
     api.listFolder = vi.fn(async (dir: string) => {
       if (dir === '/Users/linh/Documents' && docsShouldReject) {
         throw new Error('transient listFolder error')
+      }
+      if (dir === '/Users/linh/Desktop' && desktopMissing) {
+        return {
+          dir,
+          folders: [],
+          files: [],
+          missing: true,
+        }
       }
       return {
         dir,
@@ -1298,6 +1342,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       }
     })
     api.addFolderRoot = vi.fn(async () => {
+      desktopMissing = true
       folderRoots = [
         ...folderRoots,
         {
@@ -1342,7 +1387,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.textContent).toContain('No recent files — create or open a file to get started.')
 
     // Step 3 (FE13-R2-7): now that /Users/linh/Documents is cached and not missing, adding a second root refreshes roots
-    // without re-listing /Users/linh/Documents
+    // without re-listing /Users/linh/Documents; /Users/linh/Desktop resolves with { missing: true } (so cached.current has it)
     const docsCallsBeforeAdd = api.listFolder.mock.calls.filter(
       (c) => c[0] === '/Users/linh/Documents',
     ).length
@@ -1361,6 +1406,37 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     ).length
     expect(docsCallsAfterAdd).toBe(docsCallsBeforeAdd)
     expect(desktopCallsAfterAdd).toBe(1)
+
+    // Step 4 (FE13-R4-1): /Users/linh/Desktop resolved with { missing: true } (cached in cached.current).
+    // When roots refreshes via loadRoot() (e.g. adding a third root), cur.missing triggers loadFolder(r.path, true)
+    // to force re-listing /Users/linh/Desktop while keeping non-missing /Users/linh/Documents untouched.
+    desktopMissing = false
+    api.addFolderRoot = vi.fn(async () => {
+      folderRoots = [
+        ...folderRoots,
+        {
+          path: '/Users/linh/Downloads',
+          name: 'Downloads',
+          readable: true,
+          usable: true,
+          removable: true,
+        },
+      ]
+      return folderRoots[2]!
+    })
+    await act(async () => {
+      addRootBtn!.click()
+    })
+    await flush()
+
+    const docsCallsAfterRecovery = api.listFolder.mock.calls.filter(
+      (c) => c[0] === '/Users/linh/Documents',
+    ).length
+    const desktopCallsAfterRecovery = api.listFolder.mock.calls.filter(
+      (c) => c[0] === '/Users/linh/Desktop',
+    ).length
+    expect(docsCallsAfterRecovery).toBe(docsCallsAfterAdd)
+    expect(desktopCallsAfterRecovery).toBe(2)
   })
 
   it('catches folderRoots rejections in loadRoot, keeps previous roots without unhandled rejection, and settles rootsLoaded (FE13-R3-3)', async () => {

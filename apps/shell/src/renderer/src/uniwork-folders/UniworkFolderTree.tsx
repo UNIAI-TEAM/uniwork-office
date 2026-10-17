@@ -10,6 +10,7 @@ import {
   MOVE_BLOCK_KEYS,
   MY_FOLDER_LABEL_KEY,
   ROOT_KEY,
+  isMyFolder,
   treeKey,
   treeRows,
   withMyFolderLabel,
@@ -36,6 +37,29 @@ export function FolderGlyph({ open = false }: { open?: boolean }) {
         }
         fill="currentColor"
       />
+    </svg>
+  )
+}
+
+export function MyFolderGlyph() {
+  return (
+    <svg
+      className="uwf-glyph uwf-glyph-my-folder"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.85"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2" />
+      <path d="M3 10h8" />
+      <path d="M3 7v11a2 2 0 0 0 2 2h6" />
+      <rect x="14" y="14" width="7" height="6" rx="1.2" />
+      <path d="M16 14v-1.5a1.5 1.5 0 0 1 3 0V14" />
     </svg>
   )
 }
@@ -233,6 +257,8 @@ export function UniworkFolderTree({
                   fill="currentColor"
                 />
               </svg>
+            ) : isMyFolder(row) ? (
+              <MyFolderGlyph />
             ) : (
               <FolderGlyph open={row.expanded} />
             )}
