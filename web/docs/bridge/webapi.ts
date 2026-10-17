@@ -496,7 +496,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         deliver(await openById(fileId))
         return true
       },
-      saveCopy: saveCopyVia(port, !isViewOnly(fileId), data, () => files.get(fileId)?.name),
+      saveCopy: saveCopyVia(port, grants, !isViewOnly(fileId), data, () => files.get(fileId)?.name),
       canEdit: () => !isViewOnly(fileId),
       // "View differences": my bytes against the head's, read now; the head is not adopted
       // (no `remember`): the etag the next save uses stays the one the user is resolving

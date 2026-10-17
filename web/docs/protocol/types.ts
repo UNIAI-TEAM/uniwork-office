@@ -242,6 +242,12 @@ export function checkFrameModule(
 export type Capability =
   | 'save'
   | 'saveAs'
+  /**
+   * additive (UNI-1872): the host installed `api.saveCopy` (conflict-dialog "Save as a copy").
+   * Advertise it in `init` only then; the frame offers "Save as a copy…" only when the effective
+   * capabilities have it and the document is editable.
+   */
+  | 'saveCopy'
   | 'recents'
   /** `file.pick` (File > Open / Ctrl+O): the host has a document picker */
   | 'filePick'
@@ -304,6 +310,7 @@ export type Capabilities = Partial<Record<Capability, boolean>>
 export const CAPABILITY_KEYS: readonly Capability[] = [
   'save',
   'saveAs',
+  'saveCopy',
   'recents',
   'filePick',
   'print',

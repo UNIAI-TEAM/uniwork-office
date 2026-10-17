@@ -240,18 +240,19 @@ export function copyNameFor(
 
 /**
  * Save as a copy (`api.saveCopy`, UNI-1872): sends the open bytes from the 409'd save and the
- * localized copy title (`uwConflictSaveCopyName`). Offered only while `canEdit` is true. Never
- * re-points or reloads the open document; maps a reply to `{ ok: true, title }` and any thrown or
- * protocol error to `{ ok: false, error }` (preserving `too_large` + `details.max_bytes` and host
- * refusal `details.apiCode`).
+ * localized copy title (`uwConflictSaveCopyName`). Offered only when the effective capabilities
+ * include `saveCopy` and `canEdit` is true. Never re-points or reloads the open document; maps a
+ * reply to `{ ok: true, title }` and any thrown or protocol error to `{ ok: false, error }`
+ * (preserving `too_large` + `details.max_bytes` and host refusal `details.apiCode`).
  */
 export function saveCopyVia(
   port: RequestPort,
+  caps: Capabilities | undefined,
   canEdit: boolean,
   data: ArrayBuffer | Uint8Array,
   fileName: () => string | null | undefined,
 ): ConflictIo['saveCopy'] {
-  if (!canEdit) return undefined
+  if (caps?.saveCopy !== true || !canEdit) return undefined
   return async (): Promise<SaveCopyAttempt> => {
     const payload = {
       data: copyBuffer(data),
