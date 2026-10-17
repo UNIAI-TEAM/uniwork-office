@@ -185,6 +185,21 @@ describe('Open dialog pin mode (Q2)', () => {
     await choose('Recent.docx')
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('r1')
   })
+
+  it('a pin pick with no workspaceId shows the failure toast instead of silence', async () => {
+    setup()
+    api.uniworkListDocuments = vi.fn(async () =>
+      ok<UniworkDocListPage>({
+        documents: [doc('s1', 'NoWorkspace.docx', { workspaceId: '' })],
+        nextCursor: null,
+      }),
+    )
+    const onPick = vi.fn(async () => null)
+    await mount({ onPick })
+    await choose('NoWorkspace.docx')
+    expect(onPick).not.toHaveBeenCalled()
+    expect(document.querySelector('.uw-act-toast')).not.toBeNull()
+  })
 })
 
 describe('Open dialog RowMenu offline item', () => {
@@ -226,5 +241,24 @@ describe('Open dialog RowMenu offline item', () => {
     setup({ capabilityOn: false })
     await mount()
     expect($$('[data-menu-for="r1"]')).toHaveLength(0)
+  })
+
+  it('pin mode (onPick) has no offline row-menu item', async () => {
+    setup({ rows: [pinned('r1')] })
+    api.uniworkListDocuments = vi.fn(async () =>
+      ok<UniworkDocListPage>({
+        documents: [doc('r1', 'Recent.docx', { canEdit: true })],
+        nextCursor: null,
+      }),
+    )
+    await mount({ onPick: vi.fn(async () => null) })
+    const button = $$<HTMLButtonElement>('[data-menu-for="r1"]')[0]!
+    await act(async () => button.click())
+    await flush()
+    const labels = $$<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]').map(
+      (b) => b.textContent,
+    )
+    expect(labels).not.toContain(EN.uwOfflinePin)
+    expect(labels).not.toContain(EN.uwOfflineUnpin)
   })
 })

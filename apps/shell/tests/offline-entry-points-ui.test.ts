@@ -274,10 +274,47 @@ describe('In progress UniWork rows', () => {
       cap: 2 * 1024 ** 3,
       maxDocs: 200,
     } as never)
-    await click((await mount())!)
+    const btn = (await mount())!
+    await click(btn)
     expect(document.querySelector('.uw-act-toast')!.textContent).toContain(
       EN.uwOfflineCapReached!.replace('{cap}', '2 GB').replace('{maxDocs}', '200'),
     )
+    expect(btn.getAttribute('aria-label')).toBe(EN.uwOfflinePin)
+  })
+
+  it('a rejected or undefined pin/unpin result shows uwSyncActionFailed', async () => {
+    const api = syncCenter(library())
+    api.offlinePin.mockRejectedValueOnce(new Error('ipc'))
+    const btn = (await mount())!
+    await click(btn)
+    expect(document.querySelector('.uw-act-toast')!.textContent).toContain(EN.uwSyncActionFailed)
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    const api2 = syncCenter(library({ rows: [pinnedRow('d-1')] }))
+    api2.offlineUnpin.mockResolvedValueOnce(undefined as never)
+    await click((await mount())!)
+    expect(document.querySelector('.uw-act-toast')!.textContent).toContain(EN.uwSyncActionFailed)
+  })
+
+  it('ignores a second click while a pin or unpin is in flight', async () => {
+    const api = syncCenter(library())
+    let resolvePin!: (v: { ok: true }) => void
+    api.offlinePin.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolvePin = r
+        }),
+    )
+    const btn = (await mount())!
+    await act(async () => {
+      btn.click()
+      btn.click()
+    })
+    expect(api.offlinePin).toHaveBeenCalledTimes(1)
+    await act(async () => resolvePin({ ok: true }))
+    await flush()
+    await click(btn)
+    expect(api.offlinePin).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -323,6 +360,20 @@ describe('UniworkOpenCard offline', () => {
     expect((onOpen.mock.calls[0]![0] as CustomEvent).detail).toEqual({ section: 'sync' })
     expect(takeRequestedSyncTab()).toBe('offline')
     expect(document.querySelector('.modal.uw-pick')).toBeNull()
+  })
+
+  it('signed-in online with library rows: opens the picker', async () => {
+    account('signed-in')
+    syncCenter(library({ rows: [pinnedRow('d-1')] }))
+    const onOpen = vi.fn()
+    window.addEventListener('uniwork:open-settings', onOpen)
+    const card = await mountCard()
+    expect(card.getAttribute('aria-haspopup')).toBe('dialog')
+    await click(card)
+    window.removeEventListener('uniwork:open-settings', onOpen)
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(takeRequestedSyncTab()).toBeNull()
+    expect(document.querySelector('.modal.uw-pick')).not.toBeNull()
   })
 
   it('offline with an empty library: the picker as before', async () => {

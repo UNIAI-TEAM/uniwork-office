@@ -507,6 +507,65 @@ describe('S3 progress', () => {
     expect(status().textContent).toBe(said)
     expect(status().querySelectorAll('span')).toHaveLength(1)
   })
+
+  it('first snapshot with a row already ready is not announced', async () => {
+    await openS3(library({ rows: [offRow('r', 'ready')] }))
+    expect(status().textContent).toBe('')
+  })
+
+  it('a new row that arrives already ready is not announced', async () => {
+    const api = await openS3(library({ rows: [offRow('a', 'ready')] }))
+    await act(async () =>
+      api.push(snapshot(library({ rows: [offRow('a', 'ready'), offRow('b', 'ready')] }))),
+    )
+    expect(status().textContent).toBe('')
+  })
+
+  it('two rows downloading->ready in one push are both announced', async () => {
+    const api = await openS3(
+      library({
+        rows: [
+          offRow('a', 'downloading', { progress: { done: 1, total: 2 } }),
+          offRow('b', 'downloading', { progress: { done: 1, total: 2 } }),
+        ],
+      }),
+    )
+    await act(async () =>
+      api.push(snapshot(library({ rows: [offRow('a', 'ready'), offRow('b', 'ready')] }))),
+    )
+    expect(status().textContent).toContain(vi_('uwOfflineReadyAnnounce', { doc: 'Tệp a.docx' }))
+    expect(status().textContent).toContain(vi_('uwOfflineReadyAnnounce', { doc: 'Tệp b.docx' }))
+  })
+
+  it('lease-expiring->ready and update-available->ready are silent', async () => {
+    const api = await openS3(
+      library({
+        rows: [
+          offRow('s', 'lease-expiring'),
+          offRow('u', 'update-available', { version: 1, headVersion: 2 }),
+        ],
+      }),
+    )
+    await act(async () =>
+      api.push(snapshot(library({ rows: [offRow('s', 'ready'), offRow('u', 'ready')] }))),
+    )
+    expect(status().textContent).toBe('')
+  })
+
+  it('total <= 0 or unknown renders an indeterminate progressbar without aria-valuenow/max', async () => {
+    await openS3(
+      library({ rows: [offRow('d', 'downloading', { progress: null, sizeBytes: null })] }),
+    )
+    const bar = rowEl('d').querySelector<HTMLElement>('[role="progressbar"]')!
+    const nameId = bar.getAttribute('aria-labelledby')!
+    expect(host.querySelector(`[id="${nameId}"]`)!.textContent).toBe('Tệp d.docx')
+    expect(bar.getAttribute('aria-valuemin')).toBeNull()
+    expect(bar.getAttribute('aria-valuenow')).toBeNull()
+    expect(bar.getAttribute('aria-valuemax')).toBeNull()
+    expect(bar.getAttribute('aria-valuetext')).toBe(
+      vi_('uwOfflineRowProgressAria', { done: '0 B', total: '0 B' }),
+    )
+  })
 })
 
 describe('S3 tab in the tablist', () => {
@@ -581,6 +640,17 @@ describe('S3 tab in the tablist', () => {
     await render(fakeApi(snapshot(library())))
     expect(tabNamed(VI.uwSyncTabOffline!).getAttribute('aria-selected')).toBe('true')
   })
+
+  it('a mounted pane switches to S3 on the event and clears requestedTab so the next mount opens on its default tab', async () => {
+    await render(fakeApi(snapshot(library())))
+    expect(tabNamed(VI.uwSyncTabAttention!).getAttribute('aria-selected')).toBe('true')
+    await act(async () => openSyncCenter('offline'))
+    expect(tabNamed(VI.uwSyncTabOffline!).getAttribute('aria-selected')).toBe('true')
+    act(() => root.unmount())
+    root = createRoot(host)
+    await render(fakeApi(snapshot(library())))
+    expect(tabNamed(VI.uwSyncTabAttention!).getAttribute('aria-selected')).toBe('true')
+  })
 })
 
 describe('S3 capability off, signed out, empty', () => {
@@ -592,7 +662,7 @@ describe('S3 capability off, signed out, empty', () => {
           offRow('r', 'ready'),
           offRow('u', 'update-available', { headVersion: 5 }),
           offRow('i', 'interrupted'),
-          offRow('c', 'corrupt'),
+          offRow('v', 'verifying'),
         ],
       }),
     )
@@ -600,7 +670,20 @@ describe('S3 capability off, signed out, empty', () => {
     expect(actionsOf('r')).toEqual([VI.uwActOpen, VI.uwOfflineUnpinShort])
     expect(actionsOf('u')).toEqual([VI.uwActOpen, VI.uwOfflineUnpinShort])
     expect(actionsOf('i')).toEqual([VI.uwOfflineUnpinShort])
-    expect(actionsOf('c')).toEqual([])
+    expect(actionsOf('v')).toEqual([])
+  })
+
+  it.each([
+    { name: 'disk-full', row: offRow('f', 'disk-full') },
+    { name: 'corrupt', row: offRow('c', 'corrupt') },
+    {
+      name: 'permission_revoked',
+      row: offRow('p', 'locked', { lockReason: 'permission_revoked' }),
+    },
+    { name: 'clock_rollback', row: offRow('k', 'locked', { lockReason: 'clock_rollback' }) },
+  ])('capability off keeps Bỏ ghim on $name when no other action survives', async ({ row }) => {
+    await openS3(library({ capabilityOn: false, rows: [row] }))
+    expect(actionsOf(row.documentId)).toEqual([VI.uwOfflineUnpinShort])
   })
 
   it('signed out: the S3 tab alone, its count is the kept items, and no name is in the DOM', async () => {
