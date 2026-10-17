@@ -534,6 +534,31 @@ describe('R5BE-1b an archived pinned document reaches the library (handleArchive
       expect(noted).not.toHaveBeenCalled()
     })
 
+    it('RES-G505-6: a page listing one pinned document twice hands it to the library once', async () => {
+      const duplicate = {
+        document_id: 'doc_1',
+        revision: '1',
+        current_version: 1,
+        archived: true,
+      }
+      const h = harness({
+        feed: new FakeFeedClient([
+          snapshot,
+          { phase: 'feed', rows: [duplicate, { ...duplicate }], next_cursor: 'f1' },
+        ]),
+        onFeedGone: wiringFeedGone,
+      })
+      addDoc(h, 'doc_1', 1)
+      await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
+      const noted = vi.spyOn(h.runtime.library!, 'noteArchived')
+      await h.runtime.tick()
+      await h.runtime.tick()
+      await vi.waitFor(async () => {
+        expect(await h.runtime.library!.row('doc_1')).toMatchObject({ archived: true })
+      })
+      expect(noted).toHaveBeenCalledTimes(1)
+    })
+
     it('an archived:true row of a pinned doc is handed over once; unpinned rows of the same page (true or false) are not', async () => {
       const h = harness({
         feed: new FakeFeedClient([
