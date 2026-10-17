@@ -300,6 +300,40 @@ describe('T1: Save pill state table', () => {
       tone: 'ok',
       tip: 'uwTipSavedAt',
     },
+    {
+      name: 'EL-1(a) edit_locked (someone else is editing)',
+      input: {
+        state: 'edit_locked',
+        error: 'edit_locked',
+        editLock: {
+          holderName: 'Minh Trần',
+          since: '2026-05-01T10:00:00Z',
+          expiresAt: '2026-05-01T10:02:00Z',
+          heldByMe: false,
+        },
+      },
+      label: 'uwChipEditLocked',
+      tone: 'info',
+      action: ['retry', 'uwActRetry'],
+      tip: 'uwTipEditLocked',
+    },
+    {
+      name: 'EL-1(a) edit_locked (heldByMe in another window)',
+      input: {
+        state: 'edit_locked',
+        error: 'edit_locked',
+        editLock: {
+          holderName: 'Minh Trần',
+          since: '2026-05-01T10:00:00Z',
+          expiresAt: '2026-05-01T10:02:00Z',
+          heldByMe: true,
+        },
+      },
+      label: 'uwChipEditLocked',
+      tone: 'info',
+      action: ['retry', 'uwActRetry'],
+      tip: 'uwTipEditLockedSelf',
+    },
   ]
 
   it.each(rows)('$name', ({ input, label, tone, action, tip }) => {
@@ -587,5 +621,67 @@ describe('V6u2-01: the in-strip focus chip fits left of the pill', () => {
   it('a minimum below which the chip is not drawn at all', () => {
     expect(FOCUS_TIP_MIN_PX).toBeGreaterThan(0)
     expect(focusTipRoomOf(216, 1)).toBeGreaterThanOrEqual(FOCUS_TIP_MIN_PX)
+  })
+})
+
+describe('EL-1(a): edit_locked Save pill & i18n copy', () => {
+  const copyVi = {
+    ...accountStrings.vi,
+    ...syncStrings.vi,
+    ...uniworkDocumentStrings.vi,
+  } as Record<string, string>
+  const tVi: TFunc = (key: StringKey, params) =>
+    (copyVi[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) => String(params?.[name] ?? ''))
+
+  it('renders "{name} đang sửa" / "{name} is editing" when holderName is present, and falls back to "Người khác đang sửa" / "Someone is editing" when missing', () => {
+    const named = chip({
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock: {
+        holderName: 'Minh Trần',
+        since: '2026-05-01T10:00:00Z',
+        expiresAt: '2026-05-01T10:02:00Z',
+        heldByMe: false,
+      },
+    })
+    expect(named.tone).toBe('info')
+    expect(named.labelKey).not.toBe('uwChipConflict')
+    expect(chipCopy(named, tVi, 'vi-VN').label).toBe('Minh Trần đang sửa')
+    expect(chipCopy(named, t, 'en-US').label).toBe('Minh Trần is editing')
+
+    const unnamed = chip({
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock: {
+        holderName: null,
+        since: null,
+        expiresAt: null,
+        heldByMe: false,
+      },
+    })
+    expect(chipCopy(unnamed, tVi, 'vi-VN').label).toBe('Người khác đang sửa')
+    expect(chipCopy(unnamed, t, 'en-US').label).toBe('Someone is editing')
+    expect(chipCopy(unnamed, tVi, 'vi-VN').tip).toContain('—')
+    expect(chipCopy(unnamed, tVi, 'vi-VN').tip).not.toMatch(/\{|\}/)
+  })
+
+  it('defines edit_locked i18n keys in all locale shards and never uses "khóa" in vi', () => {
+    const keys = [
+      'uwChipEditLocked',
+      'uwEditLockSomeone',
+      'uwTipEditLocked',
+      'uwTipEditLockedSelf',
+    ] as const
+    for (const [locale, dict] of Object.entries(uniworkDocumentStrings)) {
+      const record = dict as Record<string, string>
+      for (const k of keys) {
+        expect(record[k], `${locale}.${k}`).toBeTruthy()
+      }
+    }
+    const viDict = uniworkDocumentStrings.vi as Record<string, string>
+    for (const k of keys) {
+      expect(viDict[k]?.toLowerCase()).not.toContain('khóa')
+      expect(viDict[k]?.toLowerCase()).not.toContain('khoá')
+    }
   })
 })

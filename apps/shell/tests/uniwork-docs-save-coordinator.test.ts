@@ -1,4 +1,4 @@
-﻿import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -1637,5 +1637,88 @@ describe('DOC5-W04: toStatus carries the server level', () => {
   it('a comment level is on the status next to access view; no level adds no field', () => {
     expect(toStatus(doc('comment'))).toMatchObject({ access: 'view', commentsLevel: 'comment' })
     expect(toStatus(doc())).not.toHaveProperty('commentsLevel')
+  })
+})
+
+describe('EL-1(a): 423 document_locked -> edit_locked state, recovery preserved, manual-only retry', () => {
+  const lockPayload = {
+    holderName: 'Minh Trần',
+    since: '2026-04-17T03:00:00Z',
+    expiresAt: '2026-04-17T03:02:00Z',
+    heldByMe: false,
+    offlineHoldUntil: '2026-04-17T03:15:00Z',
+  }
+
+  it('commit 423 document_locked sets state edit_locked with editLock metadata, never conflict, and keeps recovery copy', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    h.server.state.commitError = new UniworkDocError('edit_locked', {
+      status: 423,
+      serverCode: 'document_locked',
+      holderId: 'usr_minh',
+      editLock: lockPayload,
+    })
+
+    const ended = await h.coordinator.save(doc.path, { userSave: true })
+    expect(ended?.binding.state).toBe('edit_locked')
+    expect(ended?.binding.state).not.toBe('conflict')
+    expect(ended?.binding.error).toBe('edit_locked')
+    expect(ended?.binding.editLock).toEqual(lockPayload)
+
+    const lastStatus = h.statuses.at(-1)
+    expect(lastStatus).toMatchObject({
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock: lockPayload,
+    })
+
+    // Local edit + recovery snapshot are preserved in the intent store, parked in failed/edit_locked without retryAt
+    const parked = await stored(h.intents, doc)
+    expect(parked).not.toBeNull()
+    expect(parked?.intent.state).toBe('failed')
+    expect(parked?.intent.lastError).toBe('edit_locked')
+    expect(parked?.intent.retryAt).toBeUndefined()
+    expect(Buffer.from(parked?.payload ?? [])).toEqual(Buffer.from(doc.payload))
+  })
+
+  it('never auto-retries on a timer/poll, and makes exactly one commit attempt when the user explicitly saves again', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    h.server.state.commitError = new UniworkDocError('edit_locked', {
+      status: 423,
+      serverCode: 'document_locked',
+      holderId: 'usr_minh',
+      editLock: lockPayload,
+    })
+
+    await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.counts.commit).toBe(1)
+    const parked = await stored(h.intents, doc)
+    expect(parked?.intent.generation).toBe(1)
+
+    // Background poll / timer passes never auto-retry a parked edit_locked record
+    h.clock.advance(120_000)
+    await h.dispatcher.dispatchAll([{ ...doc, record: parked!.intent }])
+    expect(h.server.state.counts.commit).toBe(1)
+    expect(h.server.state.counts.lookup).toBe(0)
+
+    // Explicit user Save while still locked makes exactly ONE new commit attempt (never opens queue popover instead)
+    await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.counts.commit).toBe(2)
+    expect(h.statuses.at(-1)?.state).toBe('edit_locked')
+    const parked2 = await stored(h.intents, doc)
+    expect(parked2?.intent.generation).toBe(2)
+    expect(parked2?.intent.state).toBe('failed')
+    expect(parked2?.intent.lastError).toBe('edit_locked')
+
+    // Once the other user releases the lock, an explicit user Save commits and clears editLock
+    h.server.state.commitError = null
+    const saved = await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.counts.commit).toBe(3)
+    expect(saved?.binding.state).toBe('saved')
+    expect(saved?.binding.editLock).toBeUndefined()
+    expect(h.statuses.at(-1)?.state).toBe('saved')
+    expect(h.statuses.at(-1)?.editLock).toBeUndefined()
+    expect(await stored(h.intents, doc)).toBeNull()
   })
 })
