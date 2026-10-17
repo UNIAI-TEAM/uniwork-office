@@ -422,17 +422,17 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       stub.webArchive(vanishingLeaf.id)
       await triggerFeedTick(shell)
 
-      // DocumentsHome reports the archived open folder with the not_found alert and drops it from the tree
-      await expect(contents.getByRole('alert')).toContainText(uniworkDocsEn.uwErrNotFound, {
-        timeout: 15_000,
-      })
-      await expect(contents.locator('.dh-folder-open', { hasText: 'Vanishing Leaf' })).toBeHidden()
-      await expect.poll(() => treeChildrenOf(tree, 'Source Hub')).toEqual([])
-      await tree.getByRole('treeitem', { name: 'Source Hub' }).click()
+      // The open folder falls back to its nearest live ancestor (`Source Hub`) with the status notice
       await expect(crumbs.getByText('Source Hub', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
+        { timeout: 15_000 },
       )
+      await expect(
+        dialog.getByRole('status').filter({ hasText: uniworkFoldersEn.ufFolderGone }),
+      ).toBeVisible()
+      await expect(contents.locator('.dh-folder-open', { hasText: 'Vanishing Leaf' })).toBeHidden()
+      await expect.poll(() => treeChildrenOf(tree, 'Source Hub')).toEqual([])
       await shell.screenshot({ path: screenshotPath('uniwork-folders-feed-fallback') })
 
       // Restore `Vanishing Leaf` on the web and advance the feed: it reappears in `Source Hub`
@@ -559,26 +559,31 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       })
       await searchBox.fill('budget')
 
-      // A document result's path is left-truncated to its direct parent ("… › Parent ›");
-      // the full ancestor path is in `.dh-doc-subpath`'s `title`
+      // A result's path is left-truncated to its direct parent ("… › Parent ›");
+      // the full ancestor path is in `.dh-doc-subpath`'s `title` and in `.uw-sr-only`
       const expectPath = async (row: Locator, short: string, full: string) => {
         const subpath = row.locator('.dh-doc-subpath')
-        await expect(subpath).toHaveText(short)
+        await expect(subpath.locator('[aria-hidden="true"]')).toHaveText(short)
         await expect(subpath).toHaveAttribute('title', full)
+        await expect(subpath.locator('.uw-sr-only')).toHaveText(
+          uniworkFoldersEn.ufPathLabel.replace('{path}', full),
+        )
       }
+      const root = uniworkFoldersEn.ufRoot
 
       const forecastRow = contents.locator('.dh-doc-row', { hasText: 'budget-forecast.docx' })
       await expect(forecastRow).toBeVisible()
-      await expectPath(forecastRow, '… › FY2026 ›', 'Finance › FY2026')
+      await expectPath(forecastRow, '… › FY2026 ›', `${root} › Finance › FY2026`)
 
       // A deeper path keeps only the direct parent visible
       const deepRow = contents.locator('.dh-doc-row', { hasText: 'budget-deep-branch.docx' })
       await expect(deepRow).toBeVisible()
-      await expectPath(deepRow, '… › Branch ›', 'Division › Region › Country › Branch')
+      await expectPath(deepRow, '… › Branch ›', `${root} › Division › Region › Country › Branch`)
 
       // Folder result is shown in the Folders section alongside the Documents table
       const folderCard = contents.locator('.dh-folder-open', { hasText: 'Budget Ledger Folder' })
       await expect(folderCard).toBeVisible()
+      await expectPath(folderCard, '… › FY2026 ›', `${root} › Finance › FY2026`)
       await shell.screenshot({ path: screenshotPath('uniwork-folders-search-paths') })
 
       // Pressing Escape in the search box clears search and returns to `Finance`

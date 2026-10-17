@@ -399,6 +399,30 @@ test.describe.serial('UniWork documents', () => {
     })
   })
 
+  // a2 ──────────────────────────────────────────────────────────────────────
+  test('a2. open a document from the Open from UniWork dialog (.uw-open-card -> .uw-pick): document opens and dialog closes', async () => {
+    test.setTimeout(150_000)
+    const name = 'open-from-uniwork-dialog.docx'
+    const doc = stub.addDocument({ filename: name, bytes: await docxBytes() })
+    await withApp('uniwork-docs-open-dialog', async ({ launched, shell }) => {
+      // UniworkOpenCard (.uw-open-card) lives in Home.tsx's device-area quick cards
+      await shell.locator('#home-area-tab-device').click()
+      await shell.locator('.uw-open-card').click()
+      const dialog = shell.locator('.uw-pick')
+      await expect(dialog).toBeVisible()
+      await dialog.locator('.uw-pick-row', { hasText: name }).click()
+      await expect(dialog).toBeHidden({ timeout: 30_000 })
+
+      await docsEditor(launched.app)
+      expect(await activeStatus(shell)).toMatchObject({
+        documentId: doc.id,
+        title: name,
+        access: 'edit',
+        state: 'ready',
+      })
+    })
+  })
+
   // b ───────────────────────────────────────────────────────────────────────
   test('b. launch from the web: the link opens the right document once, a reused link does nothing', async () => {
     test.setTimeout(150_000)
