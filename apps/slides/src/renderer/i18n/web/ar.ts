@@ -13,6 +13,10 @@ export const ar = {
   webOk: 'موافق',
   webFatalTitle: 'تعذر فتح العرض التقديمي',
   webFatalBody: 'تعذر تحميل الملف من UniWork. أغلق علامة التبويب هذه وحاول مرة أخرى.',
+  webRefusedTooLarge: 'هذا العرض التقديمي كبير جدًا أو معقد جدًا بحيث يتعذر فتحه على الويب.',
+  webRefusedTooComplex:
+    'هذا العرض التقديمي معقد جدًا بحيث يتعذر فتحه على الويب ({parts} جزءًا، الحد {limit}).',
+  webRefusedOutOfMemory: 'هذا العرض التقديمي كبير جدًا ونفدت ذاكرة المتصفح أثناء فتحه.',
   webNoHost: 'يعمل هذا المحرر داخل UniWork. افتح العرض التقديمي من UniWork.',
   webLegacyPpt:
     'هذا ملف .ppt قديم ولا يمكن فتحه في المتصفح. احفظه أولاً بتنسيق .pptx في PowerPoint.',

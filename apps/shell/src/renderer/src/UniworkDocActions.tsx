@@ -10,6 +10,7 @@ import {
   checkDocName,
   isDocTitleTooLong,
   nameWithExtension,
+  uploadTooLargeTextOf,
   workspaceLabel,
   type DocNameError,
   type NewDocFormat,
@@ -40,7 +41,11 @@ export interface DocTarget {
 export type LoadFolderTree = (workspaceId: string) => Promise<UniworkResult<UniworkFolderNode[]>>
 
 /** errors a dialog field shows in place; every other failure is a toast */
-export type DocFieldError = DocNameError | 'unsupported_format'
+export type DocFieldError =
+  | DocNameError
+  | 'unsupported_format'
+  | 'too_large'
+  | { kind: 'too_large'; name: string; sizeBytes: number; maxBytes: number }
 
 /** what an action answers: done, a field error shown in place, or anything else (toast) */
 export type ActionOutcome = { ok: true } | { ok: false; error: DocFieldError | 'failed' }
@@ -59,15 +64,20 @@ export interface UploadProgress {
  */
 export function ActionModal({
   labelledBy,
+  describedBy,
   className,
   onCancel,
   initialFocus,
+  restoreFocus = true,
   children,
 }: {
   labelledBy: string
+  /** the id of the modal's body sentence, when it has one */
+  describedBy?: string
   className?: string
   onCancel: () => void
   initialFocus?: string
+  restoreFocus?: boolean
   children: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -79,6 +89,7 @@ export function ActionModal({
       ref.current?.querySelector<HTMLElement>(FOCUSABLE)
     first?.focus()
     return () => {
+      if (!restoreFocus) return
       // the opener may have been re-rendered away: then the library keeps focus
       if (opener?.isConnected) opener.focus()
     }
@@ -125,6 +136,7 @@ export function ActionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
+        aria-describedby={describedBy}
         ref={ref}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
@@ -235,17 +247,23 @@ export function FieldError({
   /** the copy per error (a folder name has its own 255 wording) */
   keys?: Record<DocNameError, StringKey>
 }) {
-  const { t } = useI18n()
-  const key =
-    error === 'unsupported_format'
-      ? UNIWORK_ERROR_KEYS.unsupported_format
-      : error
-        ? keys[error]
-        : null
+  const { t, dateLocale } = useI18n()
+  let text = ''
+  if (typeof error === 'string') {
+    text =
+      error === 'unsupported_format'
+        ? t(UNIWORK_ERROR_KEYS.unsupported_format)
+        : error === 'too_large'
+          ? t(UNIWORK_ERROR_KEYS.too_large)
+          : t(keys[error])
+  } else if (error) {
+    // a refusal that names the file and the limit (SIZE-F1 §6.2)
+    text = uploadTooLargeTextOf(error, t, dateLocale)
+  }
   // always in the DOM so aria-describedby points at something stable
   return (
     <p className="uw-act-error" id={id} role={error ? 'alert' : undefined}>
-      {key ? t(key) : ''}
+      {text}
     </p>
   )
 }

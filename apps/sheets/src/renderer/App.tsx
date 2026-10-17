@@ -4794,6 +4794,9 @@ export function App({
         setMessage(t('appOpenFailed'))
         return
       }
+      setEngineUnavailable(null)
+      // LAG-F1 (web frame): the workbook is mounted; the lag detector's settle stamp starts now
+      window.desktopApi.noteDocumentMounted?.()
       setEmptyCsvNotice(selected.emptyCsv === true)
       setMessage(selected.emptyCsv ? '' : t('appOpened', { name: selected.name }))
     } catch (error: unknown) {
@@ -4814,6 +4817,7 @@ export function App({
     // Manual and AI saves take the same gate as the timers: a recovery copy
     // written beside a real save would outlive it as a phantom Restore prompt.
     const gate = saveGateRef.current
+    if (engineUnavailable !== null) return { ok: false }
     if (mode === 'recovery' && gate.busy) return { ok: false }
     // View-only UniWork document: Save is unavailable (Save As stays open).
     if (mode === 'save' && lazyWorkbookRef.current?.file.readOnly === true) return { ok: false }
@@ -5320,6 +5324,7 @@ export function App({
         statusBarFuncs={statusBarFuncs}
         onToggleStatusBarFunc={toggleStatusBarStat}
         canSave={
+          engineUnavailable === null &&
           workbookFile?.readOnly !== true &&
           (pendingEdits > 0 ||
             workbookFile?.unsavedNew === true ||
@@ -5327,7 +5332,7 @@ export function App({
             workbookFile?.uniworkBound === true)
         }
         onSave={() => void handleSave('save')}
-        canSaveAs={workbookFile !== null}
+        canSaveAs={engineUnavailable === null && workbookFile !== null}
         onSaveAs={() => void handleSave('save-as')}
         onRedo={handleRedo}
         autoSave={autoSaveOn}

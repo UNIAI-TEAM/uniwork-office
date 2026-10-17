@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenFileResult } from '../../../apps/docs/src/shared/ipc'
+import type { PortSession } from './frame-port'
 import { createWebApi, idFromPath, pathFor, WEB_PRINT_PART, type WebApi } from './webapi'
 import { createMockPort, protocolError, timeoutAfter, type MockPort } from './testing/mock-port'
 import { text } from './notice'
@@ -11,6 +12,7 @@ import { frameAiRun } from '../../modules/shared/ai-run'
 import { fetchDocBytes as bytesAt } from '../../../apps/docs/src/renderer/doc-bytes'
 import {
   createIdbDraftStore,
+  decryptDraft,
   type DraftChoice,
   type DraftInfo,
   type DraftRecovery,
@@ -448,9 +450,12 @@ describe('saveDocxAs / saveDocxNew', () => {
 
   it('saveDocxAs error / timeout', async () => {
     mock.override('api.saveAs', () => Promise.reject(protocolError('too_large', 'HTTP 413')))
+    expect(await api.saveDocxAs('Copy', buf([7]))).toEqual({ ok: false })
+    expect(document.querySelector('[data-office-web="save-blocked"]')).not.toBeNull()
+    mock.override('api.saveAs', () => Promise.reject(protocolError('internal', 'HTTP 500')))
     expect(await api.saveDocxAs('Copy', buf([7]))).toEqual({
       ok: false,
-      error: 'The document is too large to save.',
+      error: 'The document could not be saved. Try again.',
     })
     mock.override('api.saveAs', timeoutAfter)
     expect((await api.saveDocxAs('Copy', buf([7]))).ok).toBe(false)
@@ -1115,7 +1120,7 @@ describe('draft recovery (C18)', () => {
   let drafts: DraftRecovery
 
   /** a frame load: a fresh bridge on the same store, the init carrying the session's grant */
-  async function load(): Promise<OpenFileResult> {
+  async function load(extra: Partial<PortSession> = {}): Promise<OpenFileResult> {
     mock = createMockPort()
     api = createWebApi(mock.port, {
       session: { pollMs: 0 },
@@ -1127,7 +1132,7 @@ describe('draft recovery (C18)', () => {
         })),
     })
     const meta = mock.seed('Report.docx', DOCX)
-    mock.init({ documentId: meta.fileId, recovery: { key, scope: `u1:${meta.fileId}` } })
+    mock.init({ documentId: meta.fileId, recovery: { key, scope: `u1:${meta.fileId}` }, ...extra })
     return (await api.consumePendingOpenDocx()) as OpenFileResult
   }
 
@@ -1202,6 +1207,23 @@ describe('draft recovery (C18)', () => {
     await api.openDocxPath(pathFor(other))
     await editAndKeep([1])
     expect(await store.list('u1:f1:')).toEqual([])
+  })
+
+  it('a blocked save still writes the draft (SIZE-F1 persistDraft -> drafts.flush)', async () => {
+    const doc = await load({ limits: { max_bytes: 100, warn_ratio: 0.7 } })
+    api.onCloseCheck(() => api.reportCloseCheck({ dirty: true, autoSave: false }))
+    api.provideDocBytes(async () => buf([9, 9, 9]))
+
+    // 120 B > 100 B max_bytes: the gate refuses api.save and persists the draft instead
+    const blocked = await api.saveDocx(doc.path, buf(new Array(120).fill(7)))
+    expect(blocked.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(1)
+
+    const draftsOnStore = await store.list('u1:f1:')
+    expect(draftsOnStore).toHaveLength(1)
+    const plaintext = await decryptDraft(key, draftsOnStore[0]!.key, draftsOnStore[0]!.record)
+    expect(plaintext ? Array.from(new Uint8Array(plaintext)) : null).toEqual([9, 9, 9])
   })
 })
 
@@ -1544,5 +1566,127 @@ describe('the comments version notifier (G8-12 §3.3)', () => {
     } finally {
       off()
     }
+  })
+})
+
+describe('save size gate (SIZE-F1, UNI-1861)', () => {
+  it('warns at warn_ratio and blocks above limits.max_bytes before any api.save request', async () => {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({
+      documentId: meta.fileId,
+      capabilities: { save: true, download: true },
+      open: {
+        ...mock.openPayload(meta.fileId),
+        limits: { max_bytes: 100, warn_ratio: 0.7 },
+      },
+    })
+    const doc = (await api.consumePendingOpenDocx()) as OpenFileResult
+
+    // 75 B >= 70 B warn threshold: emits size_warning once, renders fallback chip, still saves
+    expect(await api.saveDocx(doc.path, new Uint8Array(75).buffer)).toEqual({ ok: true })
+    expect(mock.sizeWarnings).toEqual([{ bytes: 75, max_bytes: 100, warn_ratio: 0.7 }])
+    expect(document.querySelector('[data-office-web="size-warning"]')).not.toBeNull()
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+
+    // 120 B > 100 B max_bytes: blocks before api.save, emits save_blocked, fallback dialog downloads
+    const blocked = await api.saveDocx(doc.path, new Uint8Array(120).buffer)
+    expect(blocked).toEqual({ ok: false, reason: 'external-modified' })
+    expect(document.querySelector('[data-office-web="save-blocked"]')).not.toBeNull()
+    expect(mock.saveBlocked).toEqual([{ bytes: 120, max_bytes: 100 }])
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+
+    document
+      .querySelector<HTMLButtonElement>(
+        '[data-office-web="save-blocked"] [data-choice="download"]',
+      )!
+      .click()
+    await vi.waitFor(() =>
+      expect(mock.calls.filter((c) => c.type === 'api.download')).toHaveLength(1),
+    )
+
+    // Save As and Save New also return handled { ok: false } without an error string
+    expect(await api.saveDocxAs('Copy.docx', new Uint8Array(120).buffer, doc.path)).toEqual({
+      ok: false,
+    })
+    expect(await api.saveDocxNew('New.docx', new Uint8Array(120).buffer)).toEqual({
+      ok: false,
+    })
+
+    // Host-initiated save settles with too_large error while renderer receives handled result
+    api.onCloseSaveRequest(() => {
+      void api
+        .saveDocx(doc.path, new Uint8Array(120).buffer)
+        .then((r) => api.reportCloseSaveResult(r.ok))
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+  })
+})
+
+describe('open_refused and refuse-tier guard (SIZE-F1)', () => {
+  it('reportOpenRefused emits one open_refused (no error event), marks uniworkState readOnly, blocks all saves, and resets on another documentId', async () => {
+    const opened = await bootWith('Huge.docx')
+    api.reportOpenRefused({
+      path: opened.path,
+      reason: 'too_large_to_open',
+      bytes: DOCX.byteLength,
+      measure: {
+        kind: 'characters',
+        value: 26_250_000,
+        limit: 25_300_000,
+      },
+      message: 'Document is too large to open in the editor',
+    })
+    // Duplicate report for the same documentId is deduplicated
+    api.reportOpenRefused({
+      path: opened.path,
+      reason: 'engine_out_of_memory',
+      bytes: DOCX.byteLength,
+      message: 'Out of memory',
+    })
+    expect(mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: DOCX.byteLength,
+        measure: {
+          kind: 'characters',
+          value: 26_250_000,
+          limit: 25_300_000,
+        },
+      },
+    ])
+    // no host `error` for a Docs refusal: open_refused is the signal
+    expect(mock.errors).toEqual([])
+    expect((await api.uniworkState(opened.path)).readOnly).toBe(true)
+    expect(await api.saveDocx(opened.path, buf([1]), false)).toMatchObject({ ok: false })
+    expect(await api.saveDocxAs('Copy.docx', buf([1]), opened.path)).toMatchObject({ ok: false })
+    expect(await api.saveDocxNew('Untitled.docx', buf([1]))).toMatchObject({ ok: false })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.docx' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toEqual([])
+    // d2-7: while fatal is set, File > New is blocked (confirmDocumentReplace is false)
+    expect(await api.confirmDocumentReplace()).toBe(false)
+
+    // Opening another documentId resets the fatal state and allows saving
+    const secondMeta = mock.seed('Valid.docx', DOCX)
+    let secondOpen!: OpenFileResult
+    const off = api.onOpenDocx((r) => {
+      if ('dataUrl' in r) secondOpen = r
+    })
+    await mock.host.open(mock.openPayload(secondMeta.fileId))
+    off()
+    expect(secondOpen.name).toBe('Valid.docx')
+    expect(mock.openRefused).toHaveLength(1)
+    expect((await api.uniworkState(secondOpen.path)).readOnly).toBe(false)
+    expect(await api.confirmDocumentReplace()).toBe(true)
+    expect(await api.saveDocx(secondOpen.path, buf([7]), false)).toEqual({ ok: true })
   })
 })

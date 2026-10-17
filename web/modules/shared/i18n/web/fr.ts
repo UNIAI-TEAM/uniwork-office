@@ -135,4 +135,12 @@ export const fr = {
   uwReasonArchived: 'document archivé',
   uwReasonSuspended: 'organisation suspendue',
   uwReasonDeactivated: 'votre compte est désactivé dans cette organisation',
+
+  webSizeWarnChip: 'Approche de la limite de {max} (actuellement {size}).',
+  webSaveBlockTitle: 'Impossible d’enregistrer sur UniWork',
+  webSaveBlockBody:
+    'Ce document dépasse {max}. Vos modifications sont toujours là. Téléchargez votre copie sur votre ordinateur, puis réduisez la taille des images ou divisez le document.',
+  webSaveBlockDownload: 'Télécharger ma copie',
+  uwConflictTooLargeWithLimit:
+    'Votre version dépasse {max} (actuellement {size}). Choisissez « Télécharger ma copie » ou fermez cette boîte de dialogue pour réduire la taille du fichier.',
 } satisfies Record<keyof typeof zh, string>

@@ -124,4 +124,12 @@ export const vi = {
   uwReasonArchived: 'tài liệu đã được lưu trữ',
   uwReasonSuspended: 'tổ chức đang bị tạm ngưng',
   uwReasonDeactivated: 'tài khoản của bạn đã bị vô hiệu hóa trong tổ chức',
+
+  webSizeWarnChip: 'Sắp chạm giới hạn {max} (đang {size}).',
+  webSaveBlockTitle: 'Chưa lưu được lên UniWork',
+  webSaveBlockBody:
+    'Tài liệu đã vượt {max}. Thay đổi của bạn vẫn ở đây. Tải bản của bạn về máy rồi giảm dung lượng ảnh hoặc chia nhỏ tài liệu.',
+  webSaveBlockDownload: 'Tải bản của tôi',
+  uwConflictTooLargeWithLimit:
+    'Tài liệu đã vượt {max} (đang {size}) nên chưa thực hiện được. Hãy bấm “Tải bản của tôi” hoặc đóng hộp thoại để giảm dung lượng.',
 } satisfies Record<keyof typeof zh, string>

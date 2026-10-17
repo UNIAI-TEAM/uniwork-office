@@ -880,3 +880,82 @@ describe('save answers and heads', () => {
     expect(headFromFile({ fileId: 'd', name: 'x', etag: '"d-v2"' })).toEqual({})
   })
 })
+
+describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
+  const MB = 1024 * 1024
+
+  it('stays on step 1 with uwConflictTooLargeWithLimit when sizeBytes > maxBytes on Overwrite or Save as a copy, while keeping download active', async () => {
+    const send = vi.fn(async () => {})
+    const overwrite = vi.fn(async (): Promise<OverwriteAttempt> => ({ ok: true }))
+    const saveCopy = vi.fn(async () => ({ ok: true as const, title: 'Copy.docx' }))
+    const maxBytes = 200 * MB
+    const sizeBytes = 200 * MB + 1
+    const fake = io({
+      overwrite,
+      saveCopy,
+      sizeBytes,
+      maxBytes,
+      download: {
+        bytes: async () => new ArrayBuffer(4),
+        send,
+        size: sizeBytes,
+        maxBytes,
+      },
+    })
+    const done = runConflictDialog(fake)
+
+    // Overwrite stays on step 1 without calling io.overwrite
+    await pick('overwrite')
+    expect(overwrite).not.toHaveBeenCalled()
+    expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
+    expect(alertLine().textContent).toBe(
+      format(t('uwConflictTooLargeWithLimit'), { size: '200.1 MB', max: '200 MB' }),
+    )
+
+    // Save as a copy also stays on step 1 without calling io.saveCopy
+    await pick('save-copy')
+    expect(saveCopy).not.toHaveBeenCalled()
+    expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
+    expect(alertLine().textContent).toBe(
+      format(t('uwConflictTooLargeWithLimit'), { size: '200.1 MB', max: '200 MB' }),
+    )
+
+    // Reload -> "Download my copy, then reload" stays active (not aria-disabled)
+    await pick('reload')
+    expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+    await pick('download')
+    expect(send).toHaveBeenCalledTimes(1)
+    await pick('go')
+    expect(await done).toEqual({ kind: 'reloaded' })
+  })
+
+  it('server 413 too_large with details.max_bytes on Overwrite shows uwConflictTooLargeWithLimit and keeps download active', async () => {
+    const send = vi.fn(async () => {})
+    const fake = io({
+      sizeBytes: 55 * MB,
+      overwrite: vi.fn(async (): Promise<OverwriteAttempt> => ({
+        ok: false,
+        error: {
+          code: 'too_large',
+          message: 'HTTP 413',
+          details: { max_bytes: 50 * MB },
+        },
+      })),
+      download: {
+        bytes: async () => new ArrayBuffer(4),
+        send,
+      },
+    })
+    const done = runConflictDialog(fake)
+    await pick('overwrite')
+    await pick('go')
+    expect(alertLine().textContent).toBe(
+      format(t('uwConflictTooLargeWithLimit'), { size: '55 MB', max: '50 MB' }),
+    )
+    await pick('reload')
+    expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+    await pick('back')
+    await pick('cancel')
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
+})

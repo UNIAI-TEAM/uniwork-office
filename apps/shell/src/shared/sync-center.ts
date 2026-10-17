@@ -178,6 +178,8 @@ export interface SyncCenterRow {
   base?: number
   /** Payload size in bytes when known. */
   sizeBytes?: number
+  /** Maximum allowed document size in bytes when `failedReason === 'too_large'`. */
+  maxBytes?: number
   /** Number of reconcile attempts for `reconciling_stuck` rows. */
   reconcileAttempts?: number
   /** Server version metadata when `state === 'conflict'`. */

@@ -12,6 +12,10 @@ export const zh = {
   webOk: '确定',
   webFatalTitle: '无法打开此演示文稿',
   webFatalBody: '文件无法从 UniWork 加载。请关闭此标签页后重试。',
+  webRefusedTooLarge: '此演示文稿过大或过于复杂，无法在网页中打开。',
+  webRefusedTooComplex:
+    '此演示文稿过于复杂（包含 {parts} 个部件，上限为 {limit} 个），无法在网页中打开。',
+  webRefusedOutOfMemory: '此演示文稿过大，浏览器内存不足，无法打开。',
   webNoHost: '此编辑器在 UniWork 中运行。请从 UniWork 打开演示文稿。',
   webLegacyPpt: '这是旧版 .ppt 文件，无法在浏览器中打开。请先在 PowerPoint 中另存为 .pptx。',
   webEncryptedPptx: '此演示文稿受密码保护，无法在浏览器中打开。',

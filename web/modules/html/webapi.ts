@@ -77,6 +77,7 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
 
   const api = {
     consumePending: web.consumePending,
+    noteDocumentMounted: web.noteDocumentMounted,
     consumeRecovered: web.consumeRecovered,
     provideText: web.provideText,
     async consumeHeadlessExport() {

@@ -51,6 +51,8 @@ import {
   type FileMeta,
   type FileSource,
   type OpenPayload,
+  type OpenRefusedMeasure,
+  type OpenRefusedReason,
   type ProtocolErrorShape,
   type SaveResult,
 } from '../../docs/protocol/types'
@@ -62,8 +64,10 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
+import { bindLagDetectorPort, documentMounted, queueDocumentLoaded } from '../shared/lag-detector'
 import { createRemoteVersion, type RemoteVersion, type SaveFailure } from '../shared/remote-version'
 import { saveFailureDetail } from '../shared/save-failure'
+import { createSaveSizeGate } from '../shared/save-size-gate'
 import {
   conflictSaveResult,
   bridgeDownloadCap,
@@ -120,6 +124,70 @@ async function readSource(source: FileSource): Promise<ArrayBuffer> {
 
 function describe(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
+}
+
+function classifyOpenRefusal(err: unknown): {
+  reason: OpenRefusedReason
+  measure?: OpenRefusedMeasure
+  details?: Record<string, unknown>
+} | null {
+  const code = (err as { code?: unknown } | null)?.code
+  if (code === 'too_large') {
+    const { worksheetXmlBytes, limitBytes } = err as {
+      worksheetXmlBytes?: unknown
+      limitBytes?: unknown
+    }
+    const hasMeasure =
+      typeof worksheetXmlBytes === 'number' &&
+      Number.isFinite(worksheetXmlBytes) &&
+      typeof limitBytes === 'number' &&
+      Number.isFinite(limitBytes)
+    return {
+      reason: 'too_large_to_open',
+      ...(hasMeasure
+        ? {
+            measure: {
+              kind: 'worksheet_xml_bytes',
+              value: worksheetXmlBytes,
+              limit: limitBytes,
+            },
+            details: { worksheetXmlBytes, limitBytes },
+          }
+        : {}),
+    }
+  }
+  const msg = describe(err)
+  if (
+    code === 'engine_out_of_memory' ||
+    /out of memory|memory allocation of \d+ bytes failed|Cannot allocate Wasm memory|Array buffer allocation failed/i.test(
+      msg,
+    )
+  ) {
+    return { reason: 'engine_out_of_memory' }
+  }
+  const zipParts = /(?:zip|xlsx) rejected:\s*(\d+)\s*parts exceeds the\s*(\d+)\s*limit/i.exec(msg)
+  if (zipParts) {
+    return {
+      reason: 'too_complex',
+      measure: {
+        kind: 'zip_parts',
+        value: Number(zipParts[1]),
+        limit: Number(zipParts[2]),
+      },
+    }
+  }
+  if (/Workbook contains too many ZIP entries/i.test(msg)) {
+    return { reason: 'too_complex' }
+  }
+  if (
+    /(?:zip|xlsx) rejected:.*(?:declares\s+\d+\s+uncompressed bytes|total uncompressed size)/i.test(
+      msg,
+    )
+  ) {
+    // declared / inflated size gates of the zip reader (no part count measure)
+    return { reason: 'too_large_to_open' }
+  }
+  return null
 }
 
 /**
@@ -196,9 +264,14 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   const editorStartMs = opts.editorStartMs ?? TIMEOUTS.editorStart
   const saveTimeoutMs = opts.saveTimeoutMs ?? 180_000
 
+  /** set while the current document open was refused for size/complexity/OOM (cleared when another document opens) */
+  let refusedError: ProtocolErrorShape | null = null
+  /** documentIds already reported through `open_refused` */
+  const refusedIds = new Set<string>()
+
   /** renderer-level keys the host grants switch on (./capabilities.ts sheetsHostGrants) */
   const granted = (key: 'open' | 'save' | 'saveAs') => capabilities[key] === true
-  const canSave = () => granted('save')
+  const canSave = () => granted('save') && refusedError === null
 
   /** fileId -> latest server metadata (etag = If-Match base of the next save) */
   const files = new Map<string, FileMeta>()
@@ -338,6 +411,16 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     return shown
   }
 
+  const sizeGate = createSaveSizeGate({
+    port,
+    getLiveBytes: () => {
+      const session = latest ? sessions.get(latest.sessionId) : undefined
+      return latest && session && session.fileId === current ? latest.data : null
+    },
+    persistDraft: () => drafts.flush(),
+    frame: { markerAttr: 'data-sheets-web' },
+  })
+
   /** `offer`: false for the conflict "Reload latest" (the user just discarded the edits) */
   async function openPayload(payload: OpenPayload, offer = true): Promise<WorkbookFile> {
     const server = await readSource(payload.source)
@@ -349,29 +432,46 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       opened = await transport.open({ name: payload.file.name, data, locale: locale() })
     } catch (err) {
       if (isEngineUnavailable(err)) reportEngineUnavailable()
-      // above the frame's size gate: fatal, so the host opens the G3 editor instead (C11)
-      else if ((err as { code?: unknown })?.code === 'too_large') {
-        // `details` lets the host say why in one sentence ("this workbook holds about N MB of
-        // sheet data, above the N MB the web editor opens"): sizes in bytes, JSON-safe numbers
-        const { worksheetXmlBytes, limitBytes } = err as {
-          worksheetXmlBytes?: unknown
-          limitBytes?: unknown
-        }
-        port.reportError(
-          {
+      else {
+        const refusal = classifyOpenRefusal(err)
+        if (refusal) {
+          const message = describe(err)
+          // at most once per documentId per session (contract §3.1a)
+          if (!refusedIds.has(payload.file.fileId)) {
+            refusedIds.add(payload.file.fileId)
+            port.reportOpenRefused?.({
+              reason: refusal.reason,
+              bytes: server.byteLength,
+              ...(refusal.measure ? { measure: refusal.measure } : {}),
+            })
+          }
+          // `details` lets the host say why in one sentence ("this workbook holds about N MB of
+          // sheet data, above the N MB the web editor opens"): sizes in bytes, JSON-safe numbers
+          const fatalError: ProtocolErrorShape = {
             code: 'too_large',
-            message: describe(err),
-            ...(typeof worksheetXmlBytes === 'number' && typeof limitBytes === 'number'
-              ? { details: { worksheetXmlBytes, limitBytes } }
-              : {}),
-          },
-          true,
-        )
+            message,
+            ...(refusal.details ? { details: refusal.details } : {}),
+          }
+          refusedError = fatalError
+          current = null
+          sessions.clear()
+          shown = null
+          latest = null
+          restored = false
+          dirty = false
+          port.setDirty(false)
+          port.reportError(fatalError, true)
+          if (err && typeof err === 'object' && !('code' in err)) {
+            Object.assign(err, { code: 'too_large' })
+          }
+        }
       }
       throw err
     }
+    refusedError = null
     // another workbook: the pending version and the bar of the old one are gone
     if (current !== null && current !== payload.file.fileId) remote?.reset()
+    sizeGate.noteDocumentOpened(payload.file.fileId, payload.limits)
     remember(payload.file)
     sessions.set(opened.sessionId, { fileId: payload.file.fileId, name: payload.file.name })
     restored = draft !== null
@@ -379,6 +479,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     dirty = restored
     port.setDirty(dirty)
     remote?.dirtyChanged(dirty)
+    bindLagDetectorPort(port, effective)
+    queueDocumentLoaded(payload.file.fileId, data.byteLength)
     return decorate(opened, payload.file, restored)
   }
 
@@ -410,7 +512,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         const action: MenuAction | null =
           key === 's'
             ? event.shiftKey
-              ? granted('saveAs')
+              ? granted('saveAs') && refusedError === null
                 ? 'save-as'
                 : null
               : canSave()
@@ -482,6 +584,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   }
 
   port.handleSave(async () => {
+    if (refusedError) return { ok: false, error: refusedError }
     const locked = lockedSave()
     if (locked) return locked
     if (!canSave()) return { ok: false, error: { code: 'forbidden', message: 'view-only' } }
@@ -505,6 +608,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   })
 
   port.handleSaveAs(async (payload) => {
+    if (refusedError) return { ok: false, error: refusedError }
     const locked = lockedSave()
     if (locked) return locked
     if (!granted('saveAs'))
@@ -608,6 +712,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         size: data.byteLength,
         maxBytes: downloadCap(),
       }),
+      sizeBytes: data.byteLength,
+      maxBytes: sizeGate.limits().max_bytes,
       markerAttr: 'data-sheets-web',
     })
     const file = files.get(fileId)
@@ -626,9 +732,18 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
   /** api.save of the current file, conflicts resolved */
   async function saveInPlace(fileId: string, data: ArrayBuffer): Promise<Landed> {
+    const gate = await sizeGate.checkBeforeSave(data)
+    if (!gate.allowed) {
+      if (hostSave) hostSave.error = gate.error
+      return { canceled: true }
+    }
     const res = await putSave(fileId, data)
     if (res.ok) return { file: res.file }
     if (hostSave) hostSave.error = res.error
+    if (res.error.code === 'too_large') {
+      sizeGate.handleServerTooLarge(res.error, data)
+      return { canceled: true }
+    }
     if (res.error.code === 'conflict') {
       // the host's own `save` waits for the dialog's answer instead of an error event
       if (!hostSave) port.reportError(res.error, false)
@@ -669,6 +784,12 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   ): Promise<Landed> {
     const pending = hostSaveAs
     pending?.started()
+    const gate = await sizeGate.checkBeforeSave(data)
+    if (!gate.allowed) {
+      if (hostSave) hostSave.error = gate.error
+      pending?.settle({ ok: false, error: gate.error })
+      return { canceled: true }
+    }
     const payload = {
       name: pending?.name ?? name,
       data: copyBuffer(data),
@@ -680,6 +801,11 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     pending?.settle(res)
     if (res.ok) return { file: res.file }
     if (res.error.code === 'cancelled') return { canceled: true }
+    if (res.error.code === 'too_large') {
+      if (hostSave) hostSave.error = res.error
+      sizeGate.handleServerTooLarge(res.error, data)
+      return { canceled: true }
+    }
     return failSave(res.error)
   }
 
@@ -766,6 +892,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       }
     },
 
+    noteDocumentMounted(): void {
+      documentMounted()
+    },
     // merge sources need multi-pick + extra sessions: hidden on the web (C11, mergeWorkbooks); the
     // AI's merge tool (chat attachments) is not offered either (renderer ai/skill-gate.ts)
     selectWorkbooksForMerge: async () => null,
@@ -800,6 +929,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
     // ---- save --------------------------------------------------------------
     async saveWorkbookEdits(input: WorkbookSaveRequest): Promise<WorkbookSaveResult> {
+      if (refusedError) {
+        hostSaveAs?.settle({ ok: false, error: refusedError })
+        throw new Error(refusedError.message)
+      }
       if (remote?.locked()) throw new Error(remote.lockText())
       if (!canSave() || (input.mode === 'save-as' && !granted('saveAs'))) {
         hostSaveAs?.settle({ ok: false, error: { code: 'forbidden', message: 'view-only' } })
@@ -822,6 +955,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       if ('canceled' in landed) return { canceled: true }
       const meta = landed.file
       remember(meta)
+      sizeGate.noteSaveSucceeded()
       const saved = files.get(meta.fileId)!
       frameDocVersion.noteSaved({ path: pathFor(saved), versionId: saved.versionId ?? null })
       port.reportSaved({

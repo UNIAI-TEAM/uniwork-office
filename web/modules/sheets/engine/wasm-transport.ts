@@ -52,12 +52,11 @@ import {
 import type { EngineOpenInput, SheetsEngineTransport } from './transport'
 
 /**
- * Uncompressed xl/worksheets/*.xml above this opens in G3 instead (C11; lead-confirmed
- * 2026-10-09). Measured with the incremental index: 2.2M dense cells = 70.8 MB of worksheet XML
- * open + first viewport in ~2.3 s, renderer peak ~0.8 GB; at 4.4M cells (145 MB) the first paint
- * is ~4 s and the renderer passes 1.3 GB. Host-side counterpart: 10 MB stored file size.
+ * Uncompressed xl/worksheets/*.xml above this is refused (hard guard; `open_refused` tells the
+ * host). SIZE-F1 raised it from 80 MiB to 512 MiB: BENCH-01 measured the engine running out of
+ * memory only at ~1 GiB of worksheet XML (~30 M cells), and 700 MiB opens in 24 s on 2.7 GB.
  */
-export const MAX_WORKSHEET_XML_BYTES = 80 * 1024 * 1024
+export const MAX_WORKSHEET_XML_BYTES = 512 * 1024 * 1024
 
 export const TOO_LARGE = 'too_large'
 
@@ -65,12 +64,16 @@ export const TOO_LARGE = 'too_large'
 export class SheetsTooLargeError extends Error {
   readonly code = TOO_LARGE
   /** the gate the workbook is above, for the host's explanation */
-  readonly limitBytes = MAX_WORKSHEET_XML_BYTES
-  constructor(readonly worksheetXmlBytes: number) {
+  readonly limitBytes: number
+  constructor(
+    readonly worksheetXmlBytes: number,
+    limitBytes = MAX_WORKSHEET_XML_BYTES,
+  ) {
     super(
       `${TOO_LARGE}: ${Math.round(worksheetXmlBytes / 1048576)} MB of worksheet XML is above the web limit of ` +
-        `${MAX_WORKSHEET_XML_BYTES / 1048576} MB`,
+        `${Math.round(limitBytes / 1048576)} MB`,
     )
+    this.limitBytes = limitBytes
     this.name = 'SheetsTooLargeError'
   }
 }
@@ -274,7 +277,7 @@ export function createWasmTransport(options: WasmTransportOptions): SheetsEngine
     }
     try {
       const xml = worksheetXmlBytes(await archive.manifest(path))
-      if (xml > maxXml) throw new SheetsTooLargeError(xml)
+      if (xml > maxXml) throw new SheetsTooLargeError(xml, maxXml)
       const opened = sidecarOpenResultSchema.parse(
         await call('open', {
           path,

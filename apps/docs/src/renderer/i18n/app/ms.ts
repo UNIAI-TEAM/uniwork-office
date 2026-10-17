@@ -46,6 +46,12 @@ export const ms = {
   appOpenFailed: 'Gagal membuka: {error}',
   appDocTooLargeBlocks:
     '{name}: dokumen terlalu besar untuk dibuka ({blocks} perenggan, {chars} aksara)',
+  appDocTooLargeUncompressed:
+    '{name}: dokumen terlalu besar atau terlalu kompleks untuk dibuka di web.',
+  appDocTooComplexParts:
+    '{name}: dokumen terlalu kompleks untuk dibuka di web ({parts} bahagian, had {limit}).',
+  appDocOpenOutOfMemory:
+    '{name}: dokumen terlalu besar dan kehabisan memori pelayar semasa dibuka.',
   appDocLargeReadOnly:
     'Dokumen besar ({blocks} perenggan): dibuka dalam mod baca — tekan Esc untuk mengedit',
   appDocLargeSpellOff:

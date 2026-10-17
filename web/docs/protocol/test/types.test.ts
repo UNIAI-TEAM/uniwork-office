@@ -255,3 +255,148 @@ describe('api.assets.resolve (A1b contract, additive)', () => {
     expect(res({})).toMatchObject({ ok: false, reason: 'malformed' })
   })
 })
+
+import {
+  CAPABILITY_KEYS,
+  DEFAULT_DOCUMENT_LIMITS,
+  DEFAULT_DOCUMENT_MAX_BYTES,
+  DEFAULT_DOCUMENT_WARN_RATIO,
+  commentsErrorFromHttp,
+  isOpenPayload,
+  resolveDocumentLimits,
+  resolveDocumentSizeLimits,
+} from '../types'
+
+describe('document size limits and events (SIZE-F1, additive)', () => {
+  it('exports default limits (200 MiB and 0.9 warn_ratio) and includes sizeUi in CAPABILITY_KEYS', () => {
+    expect(DEFAULT_DOCUMENT_MAX_BYTES).toBe(200 * 1024 * 1024)
+    expect(DEFAULT_DOCUMENT_WARN_RATIO).toBe(0.9)
+    expect(DEFAULT_DOCUMENT_LIMITS).toEqual({
+      max_bytes: 209_715_200,
+      warn_ratio: 0.9,
+    })
+    expect(CAPABILITY_KEYS).toContain('sizeUi')
+    expect(resolveDocumentLimits).toBe(resolveDocumentSizeLimits)
+  })
+
+  it('resolveDocumentSizeLimits falls back field-by-field for missing or invalid inputs', () => {
+    expect(resolveDocumentSizeLimits()).toEqual(DEFAULT_DOCUMENT_LIMITS)
+    expect(resolveDocumentSizeLimits(null)).toEqual(DEFAULT_DOCUMENT_LIMITS)
+    expect(resolveDocumentSizeLimits('bad')).toEqual(DEFAULT_DOCUMENT_LIMITS)
+    expect(resolveDocumentSizeLimits({ max_bytes: 1024, warn_ratio: 0.8 })).toEqual({
+      max_bytes: 1024,
+      warn_ratio: 0.8,
+    })
+    expect(resolveDocumentSizeLimits({ max_bytes: 0, warn_ratio: 0.75 })).toEqual({
+      max_bytes: DEFAULT_DOCUMENT_MAX_BYTES,
+      warn_ratio: 0.75,
+    })
+    expect(resolveDocumentSizeLimits({ max_bytes: -5, warn_ratio: 0.5 })).toEqual({
+      max_bytes: DEFAULT_DOCUMENT_MAX_BYTES,
+      warn_ratio: 0.5,
+    })
+    expect(resolveDocumentSizeLimits({ max_bytes: 1.5, warn_ratio: 0.5 })).toEqual({
+      max_bytes: DEFAULT_DOCUMENT_MAX_BYTES,
+      warn_ratio: 0.5,
+    })
+    expect(resolveDocumentSizeLimits({ max_bytes: 4096, warn_ratio: 0 })).toEqual({
+      max_bytes: 4096,
+      warn_ratio: DEFAULT_DOCUMENT_WARN_RATIO,
+    })
+    expect(resolveDocumentSizeLimits({ max_bytes: 4096, warn_ratio: 1 })).toEqual({
+      max_bytes: 4096,
+      warn_ratio: DEFAULT_DOCUMENT_WARN_RATIO,
+    })
+    expect(resolveDocumentSizeLimits({ max_bytes: 4096, warn_ratio: Number.NaN })).toEqual({
+      max_bytes: 4096,
+      warn_ratio: DEFAULT_DOCUMENT_WARN_RATIO,
+    })
+  })
+
+  it('invalid or missing limits never reject init or open envelopes', () => {
+    expect(isInitPayload({ ...init, limits: { max_bytes: -1, warn_ratio: 2 } as never })).toBe(true)
+    expect(
+      isOpenPayload({
+        file: { fileId: 'f1', name: 'a.docx' },
+        source: { kind: 'bytes', data: new ArrayBuffer(1) },
+        limits: { max_bytes: 0, warn_ratio: 0 } as never,
+      }),
+    ).toBe(true)
+  })
+
+  it('validates size_warning, save_blocked, and doc.download envelopes', () => {
+    expect(
+      parseEnvelope(
+        env({
+          kind: 'event',
+          type: 'size_warning',
+          payload: { bytes: 1800, max_bytes: 2000, warn_ratio: 0.9 },
+        }),
+      ).ok,
+    ).toBe(true)
+    expect(
+      parseEnvelope(
+        env({
+          kind: 'event',
+          type: 'size_warning',
+          payload: { bytes: 1800, max_bytes: 2000, warn_ratio: 1 },
+        }),
+      ).ok,
+    ).toBe(false)
+    expect(
+      parseEnvelope(
+        env({
+          kind: 'event',
+          type: 'save_blocked',
+          payload: { bytes: 2500, max_bytes: 2000 },
+        }),
+      ).ok,
+    ).toBe(true)
+    expect(
+      parseEnvelope(
+        env({
+          kind: 'event',
+          type: 'save_blocked',
+          payload: { bytes: -1, max_bytes: 2000 },
+        }),
+      ).ok,
+    ).toBe(false)
+    expect(parseEnvelope(env({ kind: 'request', type: 'doc.download', payload: {} })).ok).toBe(true)
+    expect(
+      parseEnvelope(env({ kind: 'response', type: 'doc.download', payload: { delivered: true } }))
+        .ok,
+    ).toBe(true)
+  })
+
+  it('validates the lag_detected event payload (UNI-1865)', () => {
+    const lag = (payload: unknown) =>
+      parseEnvelope(env({ kind: 'event', type: 'lag_detected', payload }))
+    // both reasons, full and minimal shapes
+    expect(
+      lag({ reason: 'interactions', worst_ms: 480, count: 3, window_ms: 120_000, bytes: 4096 }).ok,
+    ).toBe(true)
+    expect(lag({ reason: 'longtask', worst_ms: 1200, count: 1, window_ms: 0 }).ok).toBe(true)
+    // a bad payload is rejected: reason enum, non-negative ints, window_ms 0 | 120000
+    expect(lag({ reason: 'scroll', worst_ms: 480, count: 3, window_ms: 120_000 }).ok).toBe(false)
+    expect(lag({ reason: 'longtask', worst_ms: -1, count: 1, window_ms: 0 }).ok).toBe(false)
+    expect(lag({ reason: 'interactions', worst_ms: 480, count: 0, window_ms: 120_000 }).ok).toBe(
+      false,
+    )
+    expect(lag({ reason: 'interactions', worst_ms: 480, count: 3, window_ms: 60_000 }).ok).toBe(
+      false,
+    )
+    expect(
+      lag({ reason: 'interactions', worst_ms: 480, count: 3, window_ms: 120_000, bytes: -5 }).ok,
+    ).toBe(false)
+    expect(lag('interactions')).toMatchObject({ ok: false, reason: 'malformed' })
+  })
+
+  it('commentsErrorFromHttp copies fields.max_bytes into error.details.max_bytes on HTTP 413', () => {
+    const err = commentsErrorFromHttp(413, {
+      error: { code: 'payload_too_large', fields: { max_bytes: 52_428_800 } },
+    })
+    expect(err.code).toBe('too_large')
+    expect(err.status).toBe(413)
+    expect(err.details).toEqual({ code: 'payload_too_large', max_bytes: 52_428_800 })
+  })
+})

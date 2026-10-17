@@ -45,6 +45,10 @@ export const ar = {
   appOpenedFile: 'تم فتح {name}',
   appOpenFailed: 'فشل الفتح: {error}',
   appDocTooLargeBlocks: '{name}: المستند أكبر من أن يُفتح ({blocks} فقرة، {chars} حرفًا)',
+  appDocTooLargeUncompressed: '{name}: المستند كبير جدًا أو معقد جدًا بحيث يتعذر فتحه على الويب.',
+  appDocTooComplexParts:
+    '{name}: المستند معقد جدًا بحيث يتعذر فتحه على الويب ({parts} جزءًا، الحد {limit}).',
+  appDocOpenOutOfMemory: '{name}: المستند كبير جدًا ونفدت ذاكرة المتصفح أثناء فتحه.',
   appDocLargeReadOnly: 'مستند كبير ({blocks} فقرة): تم فتحه في وضع القراءة — اضغط Esc للتحرير',
   appDocLargeSpellOff:
     'مستند كبير ({blocks} فقرة): تم إيقاف التدقيق الإملائي أثناء الكتابة — يمكن تشغيله من مراجعة › الإملاء',

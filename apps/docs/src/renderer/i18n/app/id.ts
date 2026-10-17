@@ -46,6 +46,11 @@ export const id = {
   appOpenFailed: 'Gagal membuka: {error}',
   appDocTooLargeBlocks:
     '{name}: dokumen terlalu besar untuk dibuka ({blocks} paragraf, {chars} karakter)',
+  appDocTooLargeUncompressed:
+    '{name}: dokumen terlalu besar atau terlalu kompleks untuk dibuka di web.',
+  appDocTooComplexParts:
+    '{name}: dokumen terlalu kompleks untuk dibuka di web ({parts} bagian, batas {limit}).',
+  appDocOpenOutOfMemory: '{name}: dokumen terlalu besar dan kehabisan memori browser saat dibuka.',
   appDocLargeReadOnly:
     'Dokumen besar ({blocks} paragraf): dibuka dalam mode baca — tekan Esc untuk mengedit',
   appDocLargeSpellOff:

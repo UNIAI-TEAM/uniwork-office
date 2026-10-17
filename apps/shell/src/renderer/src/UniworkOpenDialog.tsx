@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { UniworkDocErrorCode, UniworkDocListPage, UniworkResult } from '../../shared/home-api'
+import { DEFAULT_MAX_DOCUMENT_BYTES } from '../../shared/size-format'
 import { FileBadge } from './FileBadge'
 import { UniworkDocInfoPanel, type DocInfoLoad } from './UniworkDocInfoPanel'
 import {
@@ -360,16 +361,36 @@ export function UniworkOpenDialog({
   }
 
   /** a new or uploaded document opens by its id: the server's document, no local copy first */
-  const created = (result: DocActionResult<{ id: string; title: string }>): ActionOutcome => {
+  const created = (
+    result: DocActionResult<{ id: string; title: string }>,
+    fallbackName?: string,
+  ): ActionOutcome => {
     if (!mounted.current) return { ok: true }
-    if (!result.ok) return outcomeOf(result.error)
+    if (!result.ok) {
+      if (result.error === 'too_large') {
+        const name = result.name ?? fallbackName
+        if (name && typeof result.sizeBytes === 'number') {
+          return {
+            ok: false,
+            error: {
+              kind: 'too_large',
+              name,
+              sizeBytes: result.sizeBytes,
+              maxBytes: result.maxBytes ?? DEFAULT_MAX_DOCUMENT_BYTES,
+            },
+          }
+        }
+        return { ok: false, error: 'too_large' }
+      }
+      return outcomeOf(result.error)
+    }
     setForm(null)
     openById(result.value)
     return { ok: true }
   }
 
   const createDoc = (input: Parameters<typeof createDocument>[0]) =>
-    settleAction(createDocument(input)).then(created)
+    settleAction(createDocument(input)).then((r) => created(r, input.name))
 
   /**
    * Cancel / Esc / overlay on the Upload dialog. Main aborts the upload by its
@@ -402,7 +423,7 @@ export function UniworkOpenDialog({
       if (mounted.current) setUpload(null)
       // a cancelled upload is never an error to show
       if (!result.ok && result.error === 'upload_cancelled') return { ok: true }
-      return created(result)
+      return created(result, input.name)
     })
   }
 

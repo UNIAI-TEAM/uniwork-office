@@ -868,6 +868,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // SAVE-01 r2 (S01-R1-6): the renderer's "dialog is open" ack that releases a
   // File > Save's pending firstSaveOpen; a stale or foreign ack is a no-op
   registerFirstSaveOpenAck(ipcMain)
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.saveLocalCopy, (_event, path: unknown) =>
+    service.saveLocalCopy(path as string),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
   )

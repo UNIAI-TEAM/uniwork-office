@@ -96,8 +96,18 @@ function variantOf(el: Element | null): keyof typeof PILL {
 }
 
 function currentPillWidth(): number {
-  const group = chrome.querySelector('.uw-pill')
+  const group = chrome.querySelector('.uw-pill[role="group"]')
   return group ? pillSet[variantOf(group)] : 0
+}
+
+let warnNaturalCss = 275.2
+
+function currentWarnWidth(): number {
+  const warn = chrome.querySelector<HTMLElement>('.uw-size-warn')
+  if (!warn) return 0
+  const rawMax = Number.parseFloat(warn.style.getPropertyValue('--uw-warn-max'))
+  const cap = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : warnNaturalCss
+  return Math.min(warnNaturalCss, cap) + 6
 }
 
 /** the toggle's width as drawn now: full, or icon-only; a holder with no toggle models the full one */
@@ -108,7 +118,7 @@ function currentToggleWidth(): number {
 }
 
 function chromeWidth(): number {
-  return currentPillWidth() + currentToggleWidth()
+  return currentPillWidth() + currentWarnWidth() + currentToggleWidth()
 }
 
 function docTabCount(): number {
@@ -165,11 +175,20 @@ function stubLayout(): void {
     if (this.classList.contains('uw-chrome')) {
       return at(FIXED_LEFT_K + stripWidth + 6, chromeWidth() * k)
     }
+    if (this.classList.contains('uw-size-warn')) {
+      const rawMax = Number.parseFloat(this.style.getPropertyValue('--uw-warn-max'))
+      const cap = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : warnNaturalCss
+      const width = Math.min(warnNaturalCss, cap) * k
+      return at(FIXED_LEFT_K + stripWidth + 6 + currentToggleWidth() * k, width)
+    }
     if (this.classList.contains('uw-pill')) {
       const width = currentPillWidth() * k
       if (pillLeftOverride !== null) return rectOf(pillLeftOverride, width)
       if (pillRightOverride !== null) return rectOf(pillRightOverride - width, width)
-      return at(FIXED_LEFT_K + stripWidth + 6 + currentToggleWidth() * k, width)
+      return at(
+        FIXED_LEFT_K + stripWidth + 6 + (currentToggleWidth() + currentWarnWidth()) * k,
+        width,
+      )
     }
     if (this.classList.contains('uw-discussion-toggle')) {
       return at(FIXED_LEFT_K + stripWidth + 6, currentToggleWidth() * k)
@@ -266,7 +285,7 @@ async function resizeTo(width: number): Promise<void> {
   await flush()
 }
 
-const pill = () => chrome.querySelector<HTMLElement>('.uw-pill')!
+const pill = () => chrome.querySelector<HTMLElement>('.uw-pill[role="group"]')!
 const variant = () => pill().getAttribute('data-variant')
 const action = () => pill().querySelector<HTMLButtonElement>('.uw-pill-action')
 /** the button that opens the queue popover: the action button, or the dot itself in the mini pill */
@@ -329,6 +348,7 @@ beforeEach(() => {
   pillSet = PILL
   toggleSet = { full: TOGGLE, icon: TOGGLE_ICON }
   homeCss = HOME
+  warnNaturalCss = 275.2
   document.documentElement.removeAttribute('dir')
   makeApi()
   ;(window as unknown as { aiOfficeTabs?: unknown }).aiOfficeTabs = { focusActive: vi.fn() }
@@ -1698,5 +1718,55 @@ describe('VTS1-01: at UI scale 1.25 the returned caption room goes to the tabs',
         }
       }
     }
+  })
+})
+
+describe('SIZE-v1-4: the warn chip shrinks via --uw-warn-max before the save pill degrades', () => {
+  it('1280px at 1.25 UI scale (vi-dark-s125): showing .uw-size-warn caps its width and keeps the save pill in its full variant', async () => {
+    const S = 1.25
+    uiScale = S
+    document.documentElement.style.setProperty('--ui-scale', String(S))
+    captionSpacer = true
+    homeCss = 144.8
+    pillSet = { full: 189 / S, short: 189 / S, compact: 41 / S, mini: 28 }
+    toggleSet = { full: 123 / S, icon: 39.1 / S }
+    warnNaturalCss = 344 / S
+    buildBar(1)
+    stubLayout()
+    barWidth = 1280
+    ;(window as unknown as Record<string, unknown>)[DISCUSSION_BRIDGE_KEY] = {}
+
+    const s = status({
+      state: 'dirty',
+      sizeWarn: { sizeBytes: 860_000, maxBytes: 1_048_576 },
+    })
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(UniworkLiveHost),
+          createElement(
+            PillFitScope,
+            null,
+            createElement(DiscussionToggle, { status: s }),
+            createElement(UniworkStatusChip, { key: s.path, status: s, onStatus: () => undefined }),
+          ),
+        ),
+      )
+    })
+    await flush()
+
+    const warnChip = chrome.querySelector<HTMLElement>('.uw-size-warn')
+    expect(warnChip).not.toBeNull()
+    expect(variant()).toBe('full')
+    expect(visibleLabel()).toBe('Có thay đổi chưa lưu')
+    const warnMax = Number.parseFloat(warnChip!.style.getPropertyValue('--uw-warn-max'))
+    expect(Number.isFinite(warnMax)).toBe(true)
+    expect(warnMax).toBeLessThanOrEqual(340)
+    expect(warnMax).toBeGreaterThanOrEqual(88)
+    expect(strip.getBoundingClientRect().right).toBeLessThanOrEqual(
+      chrome.getBoundingClientRect().left,
+    )
   })
 })

@@ -151,4 +151,14 @@ export const ms = {
   uwDocUploading: 'Memuat naik “{name}”…',
   uwDocLocationTop: 'Peringkat teratas',
   uwDocArchived: 'Diarkibkan',
+  uwSizeWarnChip: 'Menghampiri had {max} (kini {size}).',
+  uwSizeWarnDismiss: 'Tutup amaran saiz',
+  uwSaveBlockTitle: 'Tidak dapat menyimpan ke UniWork',
+  uwSaveBlockBody:
+    'Dokumen ini melebihi {max}. Perubahan anda masih ada di sini. Muat turun salinan anda ke komputer, kemudian kecilkan saiz imej atau bahagikan dokumen.',
+  uwSaveBlockSaveCopyLocal: 'Simpan salinan ke komputer',
+  uwClose: 'Tutup',
+  uwErrUploadTooLarge:
+    '{name} bersaiz {size}, melebihi had {max}. Kecilkan saiz imej atau bahagikan fail, kemudian muat naik semula.',
+  uwReasonTooLargeWithLimit: 'melebihi had {max}',
 } satisfies Record<keyof typeof zh, string>

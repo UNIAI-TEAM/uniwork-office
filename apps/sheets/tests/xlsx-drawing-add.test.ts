@@ -247,6 +247,46 @@ describe('visual additions: pictures', () => {
     const contentTypes = plan.replaced.get('[Content_Types].xml')
     expect(contentTypes?.match(/Extension="png"/g)).toHaveLength(1)
   })
+
+  it('decodes picture base64 without Node Buffer (browser save path)', async () => {
+    const base = await createBufferEntrySource(await buildEditFixture())
+    const entries = new Map<string, string>()
+    for (const path of await base.paths()) entries.set(path, await base.readText(path))
+    const source = {
+      paths: async () => [...entries.keys()],
+      has: async (path: string) => entries.has(path),
+      readText: async (path: string) => entries.get(path) ?? '',
+    }
+    const realBuffer = globalThis.Buffer
+    Reflect.deleteProperty(globalThis, 'Buffer')
+    try {
+      const plan = await planCellEditsToXlsx(
+        source,
+        [],
+        [],
+        [],
+        undefined,
+        [],
+        [],
+        [],
+        [],
+        [],
+        null,
+        [
+          {
+            sheetName: 'Data',
+            anchor: ANCHOR,
+            image: { mediaType: 'image/png', base64: PNG_BASE64 },
+          },
+        ],
+      )
+      expect(plan.addedBinary.get('xl/media/image1.png')).toEqual(
+        new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      )
+    } finally {
+      globalThis.Buffer = realBuffer
+    }
+  })
 })
 
 describe('visual additions: sheet with an existing drawing', () => {

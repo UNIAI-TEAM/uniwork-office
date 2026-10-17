@@ -47,6 +47,10 @@ export const ko = {
   appOpenedFile: '{name}을(를) 열었습니다',
   appOpenFailed: '열기 실패: {error}',
   appDocTooLargeBlocks: '{name}: 문서가 너무 커서 열 수 없습니다 ({blocks}개 단락, {chars}자)',
+  appDocTooLargeUncompressed: '{name}: 문서가 너무 크거나 복잡하여 웹에서 열 수 없습니다.',
+  appDocTooComplexParts:
+    '{name}: 문서가 너무 복잡하여 웹에서 열 수 없습니다({parts}개 파트, 제한 {limit}개).',
+  appDocOpenOutOfMemory: '{name}: 문서가 너무 커서 여는 중 브라우저 메모리가 부족합니다.',
   appDocLargeReadOnly:
     '큰 문서({blocks}개 단락)이므로 읽기 모드로 열었습니다. Esc를 누르면 편집할 수 있습니다',
   appDocLargeSpellOff:

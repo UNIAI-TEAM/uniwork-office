@@ -149,4 +149,14 @@ export const hi = {
   uwDocUploading: '“{name}” अपलोड हो रहा है…',
   uwDocLocationTop: 'सबसे ऊपर का स्तर',
   uwDocArchived: 'संग्रहित',
+  uwSizeWarnChip: '{max} सीमा के करीब (अभी {size})।',
+  uwSizeWarnDismiss: 'आकार चेतावनी बंद करें',
+  uwSaveBlockTitle: 'UniWork में सहेजा नहीं जा सका',
+  uwSaveBlockBody:
+    'यह दस्तावेज़ {max} से अधिक है। आपके बदलाव अभी भी यहीं हैं। अपनी प्रति कंप्यूटर पर डाउनलोड करें, फिर छवियों का आकार घटाएँ या दस्तावेज़ को विभाजित करें।',
+  uwSaveBlockSaveCopyLocal: 'कंप्यूटर पर प्रति सहेजें',
+  uwClose: 'बंद करें',
+  uwErrUploadTooLarge:
+    '{name} का आकार {size} है, जो {max} सीमा से अधिक है। छवियों का आकार घटाएँ या फ़ाइल को विभाजित करें, फिर दोबारा अपलोड करें।',
+  uwReasonTooLargeWithLimit: '{max} सीमा से अधिक',
 } satisfies Record<keyof typeof zh, string>

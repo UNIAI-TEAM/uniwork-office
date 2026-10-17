@@ -15,6 +15,11 @@ export const es = {
   webFatalTitle: 'No se pudo abrir la presentación',
   webFatalBody:
     'No se pudo cargar el archivo desde UniWork. Cierra esta pestaña e inténtalo de nuevo.',
+  webRefusedTooLarge: 'Esta presentación es demasiado grande o compleja para abrirse en la web.',
+  webRefusedTooComplex:
+    'Esta presentación es demasiado compleja para abrirse en la web ({parts} partes, límite {limit}).',
+  webRefusedOutOfMemory:
+    'Esta presentación es demasiado grande y se agotó la memoria del navegador al abrirla.',
   webNoHost: 'Este editor se ejecuta dentro de UniWork. Abre la presentación desde UniWork.',
   webLegacyPpt:
     'Es un archivo .ppt antiguo y no se puede abrir en el navegador. Guárdalo primero como .pptx en PowerPoint.',

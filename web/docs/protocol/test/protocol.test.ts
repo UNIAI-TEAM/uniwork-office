@@ -13,6 +13,7 @@ import {
   errorFromHttpStatus,
   isDecimalRevision,
   isFileMeta,
+  isOpenRefusedPayload,
   openReplyRevision,
   parseEnvelope,
   type InitPayload,
@@ -114,6 +115,7 @@ describe('handshake', () => {
         uniworkAi: false,
         comments: false,
         commentsShareView: false,
+        sizeUi: false,
       },
     })
     expect(session).toMatchObject({
@@ -1498,5 +1500,232 @@ describe('doc.blocked (G5-03w, additive)', () => {
     await client.whenInitialized()
     await flush()
     expect(heard).toEqual([])
+  })
+})
+
+import { DEFAULT_DOCUMENT_LIMITS } from '../types'
+
+describe('document size limits, size_warning, save_blocked, and doc.download (SIZE-F1, additive)', () => {
+  it('resolves session.limits with precedence open.limits ?? init.limits ?? DEFAULT_DOCUMENT_LIMITS and defaults downloadMaxBytes to limits.max_bytes when omitted', async () => {
+    const { client: defaultClient } = setup()
+    const defaultSession = await defaultClient.whenInitialized()
+    expect(defaultSession.limits).toEqual(DEFAULT_DOCUMENT_LIMITS)
+    expect(defaultSession.downloadMaxBytes).toBeUndefined()
+
+    const { client: initClient, host } = setup(
+      {
+        getInit: async () =>
+          baseInit({
+            capabilities: { save: true, download: true, sizeUi: true },
+            limits: { max_bytes: 10_000, warn_ratio: 0.85 },
+          }),
+        api: {
+          'api.open': async ({ fileId }) => ({
+            file: { fileId, name: 'A.docx' },
+            source: { kind: 'bytes', data: new ArrayBuffer(2) },
+            limits: { max_bytes: 4_000, warn_ratio: 0.75 },
+          }),
+        },
+      },
+      { capabilities: { save: true, download: true, sizeUi: true } },
+    )
+    const session = await initClient.whenInitialized()
+    expect(session.capabilities.sizeUi).toBe(true)
+    expect(session.limits).toEqual({ max_bytes: 10_000, warn_ratio: 0.85 })
+    expect(session.downloadMaxBytes).toBe(10_000)
+
+    initClient.handleOpen(() => ({ opened: true }))
+    await host.open({
+      file: { fileId: 'doc-1', name: 'A.docx' },
+      source: { kind: 'bytes', data: new ArrayBuffer(1) },
+      limits: { max_bytes: 6_000, warn_ratio: 0.8 },
+    })
+    expect(session.limits).toEqual({ max_bytes: 6_000, warn_ratio: 0.8 })
+    expect(session.downloadMaxBytes).toBe(6_000)
+
+    await initClient.request('api.open', { fileId: 'doc-1' })
+    expect(session.limits).toEqual({ max_bytes: 4_000, warn_ratio: 0.75 })
+    expect(session.downloadMaxBytes).toBe(4_000)
+  })
+
+  it('an api.open result without limits resets session.limits to the init limits (no leak of the previous document)', async () => {
+    const { client, host } = setup({
+      getInit: async () => baseInit({ limits: { max_bytes: 10_000, warn_ratio: 0.85 } }),
+      api: {
+        'api.open': async ({ fileId }) => ({
+          file: { fileId, name: 'B.docx' },
+          source: { kind: 'bytes', data: new ArrayBuffer(2) },
+          // no limits: this document falls back to the init limits
+        }),
+      },
+    })
+    const session = await client.whenInitialized()
+    client.handleOpen(() => ({ opened: true }))
+    await host.open({
+      file: { fileId: 'doc-1', name: 'A.docx' },
+      source: { kind: 'bytes', data: new ArrayBuffer(1) },
+      limits: { max_bytes: 6_000, warn_ratio: 0.8 },
+    })
+    expect(session.limits).toEqual({ max_bytes: 6_000, warn_ratio: 0.8 })
+
+    await client.request('api.open', { fileId: 'doc-2' })
+    expect(session.limits).toEqual({ max_bytes: 10_000, warn_ratio: 0.85 })
+    expect(session.downloadMaxBytes).toBe(10_000)
+  })
+
+  it('emits size_warning and save_blocked and answers doc.download', async () => {
+    const { host, client, hostWin, frameWin } = setup()
+    await host.whenReady()
+    await client.whenInitialized()
+
+    client.reportSizeWarning({ bytes: 1800, max_bytes: 2000, warn_ratio: 0.9 })
+    client.reportSaveBlocked({ bytes: 2500, max_bytes: 2000 })
+    await flush()
+
+    const events = frameWin.sent.filter((m) => (m as { kind?: string }).kind === 'event')
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'size_warning',
+          payload: { bytes: 1800, max_bytes: 2000, warn_ratio: 0.9 },
+        }),
+        expect.objectContaining({
+          type: 'save_blocked',
+          payload: { bytes: 2500, max_bytes: 2000 },
+        }),
+      ]),
+    )
+
+    const onDownload = vi.fn(async () => ({ delivered: true as const }))
+    client.handleDownload(onDownload)
+    frameWin.deliver(
+      {
+        ns: PROTOCOL_NS,
+        v: PROTOCOL_VERSION,
+        id: 'h-dl-1',
+        kind: 'request',
+        type: 'doc.download',
+        payload: {},
+      },
+      ORIGIN,
+      hostWin,
+    )
+    await flush()
+    expect(onDownload).toHaveBeenCalledTimes(1)
+    expect(frameWin.sent.at(-1)).toMatchObject({
+      id: 'h-dl-1',
+      kind: 'response',
+      type: 'doc.download',
+      payload: { delivered: true },
+    })
+  })
+
+  it('emits lag_detected through the protocol endpoint (UNI-1865)', async () => {
+    const { client, frameWin } = setup()
+    await client.whenInitialized()
+
+    client.reportLagDetected({
+      reason: 'interactions',
+      worst_ms: 480,
+      count: 3,
+      window_ms: 120_000,
+      bytes: 68_157_440,
+    })
+    client.reportLagDetected({ reason: 'longtask', worst_ms: 1_200, count: 1, window_ms: 0 })
+    await flush()
+
+    const isLagEvent = (m: unknown): boolean =>
+      typeof m === 'object' && m !== null && 'type' in m && m.type === 'lag_detected'
+    const events = frameWin.sent.filter(isLagEvent)
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'event',
+        type: 'lag_detected',
+        payload: {
+          reason: 'interactions',
+          worst_ms: 480,
+          count: 3,
+          window_ms: 120_000,
+          bytes: 68_157_440,
+        },
+      }),
+      expect.objectContaining({
+        kind: 'event',
+        type: 'lag_detected',
+        payload: { reason: 'longtask', worst_ms: 1_200, count: 1, window_ms: 0 },
+      }),
+    ])
+    // both envelopes pass the receiving side's own validation
+    for (const m of events) expect(parseEnvelope(m).ok).toBe(true)
+  })
+})
+
+describe('open_refused (SIZE-F1, additive)', () => {
+  const env = (payload: unknown) =>
+    parseEnvelope({
+      ns: PROTOCOL_NS,
+      v: PROTOCOL_VERSION,
+      id: 'r1',
+      kind: 'event',
+      type: 'open_refused',
+      payload,
+    })
+
+  it('validates OpenRefusedPayload reasons and optional bytes / measure shapes', () => {
+    expect(FRAME_EVENT_TYPES).toContain('open_refused')
+    expect(
+      isOpenRefusedPayload({
+        reason: 'too_large_to_open',
+        bytes: 1024,
+        measure: {
+          kind: 'worksheet_xml_bytes',
+          value: 512 * 1024 * 1024 + 1,
+          limit: 512 * 1024 * 1024,
+        },
+      }),
+    ).toBe(true)
+    expect(env({ reason: 'engine_out_of_memory' }).ok).toBe(true)
+    expect(env({ reason: 'engine_out_of_memory', bytes: 4096 }).ok).toBe(true)
+    expect(
+      env({
+        reason: 'too_complex',
+        bytes: 2048,
+        measure: { kind: 'zip_parts', value: 10_001, limit: 10_000 },
+      }).ok,
+    ).toBe(true)
+    // the limit is optional, and `cells` is a known kind
+    expect(env({ reason: 'too_complex', measure: { kind: 'cells', value: 33_000_000 } }).ok).toBe(
+      true,
+    )
+    expect(env({ reason: 'unknown_reason', bytes: 100 }).ok).toBe(false)
+    expect(env({}).ok).toBe(false)
+    expect(env({ reason: 'too_large_to_open', bytes: -1 }).ok).toBe(false)
+    expect(
+      env({ reason: 'too_large_to_open', measure: { kind: 'invalid_kind', value: 10, limit: 5 } })
+        .ok,
+    ).toBe(false)
+    expect(
+      env({ reason: 'too_large_to_open', measure: { kind: 'paragraphs', value: 10, limit: 0 } }).ok,
+    ).toBe(false)
+  })
+
+  it('delivers open_refused to the host', async () => {
+    const { host, client } = setup()
+    await host.whenReady()
+    const seen: unknown[] = []
+    host.on('open_refused', (p) => seen.push(p))
+    client.reportOpenRefused({
+      reason: 'too_large_to_open',
+      bytes: 500,
+      measure: { kind: 'paragraphs', value: 230_001, limit: 230_000 },
+    })
+    await flush()
+    expect(seen).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: 500,
+        measure: { kind: 'paragraphs', value: 230_001, limit: 230_000 },
+      },
+    ])
   })
 })

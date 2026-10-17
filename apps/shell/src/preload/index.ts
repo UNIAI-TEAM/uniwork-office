@@ -1227,6 +1227,10 @@ const homeApi: HomeApi = {
   async uniworkSave(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.save, path))
   },
+  async uniworkSaveLocalCopy(path) {
+    if (typeof path !== 'string' || !path) return false
+    return (await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.saveLocalCopy, path)) === true
+  },
   async uniworkResolveConflict(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.resolveConflict, path))
   },

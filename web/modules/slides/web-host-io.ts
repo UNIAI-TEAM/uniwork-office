@@ -29,6 +29,7 @@ import type {
 } from '../../../apps/slides/src/session/host-io'
 import { sessions } from '../../../apps/slides/src/session/state'
 import {
+  DEFAULT_DOCUMENT_LIMITS,
   toProtocolError,
   type Capabilities,
   type FileMeta,
@@ -42,6 +43,7 @@ import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { tm } from '../../../apps/slides/src/main/i18n-main'
 import { choose, text } from './dialogs'
 import { saveFailureText } from '../shared/save-failure'
+import { createSaveSizeGate, type SaveSizeGate } from '../shared/save-size-gate'
 import type { RemoteVersion } from '../shared/remote-version'
 import {
   conflictSaveResult,
@@ -118,7 +120,17 @@ export class WebSaveError extends Error {
 }
 
 export interface WebHostDeps {
-  port: Pick<FramePort, 'request' | 'reportSaved' | 'reportError'>
+  port: Pick<FramePort, 'request' | 'reportSaved' | 'reportError'> &
+    Partial<
+      Pick<
+        FramePort,
+        | 'whenInitialized'
+        | 'reportSizeWarning'
+        | 'reportSaveBlocked'
+        | 'handleDownload'
+        | 'setDirty'
+      >
+    >
   clientId: number
   state: WebDocState
   /** host grants in force (capability object) */
@@ -129,6 +141,8 @@ export interface WebHostDeps {
   reload(fileId: string): Promise<void>
   /** the new-version bar (G5-03w): learns 401 / 403 / 410 save failures, locks saves (created after the host IO) */
   remote?(): RemoteVersion | undefined
+  /** SIZE-F1 document size gate */
+  sizeGate?: SaveSizeGate
   /** after every landed save (dirty, title, rename listeners) */
   onSaved(event: { file: FileMeta; previousPath: string; kind: SaveEvent['kind'] }): void
   /** test seams */
@@ -192,6 +206,26 @@ async function videoPoster(file: File): Promise<{ bytes: Uint8Array; ext: string
 
 export function createWebHostIO(deps: WebHostDeps): HostIO {
   const pick = deps.pickFiles ?? pickFiles
+  const sizeGate =
+    deps.sizeGate ??
+    createSaveSizeGate({
+      port: {
+        whenInitialized:
+          deps.port.whenInitialized ??
+          (() =>
+            Promise.resolve({
+              documentId: 'slides',
+              capabilities: deps.state.effective ?? {},
+              limits: { ...DEFAULT_DOCUMENT_LIMITS },
+            })),
+        request: deps.port.request,
+        ...(deps.port.reportSizeWarning ? { reportSizeWarning: deps.port.reportSizeWarning } : {}),
+        ...(deps.port.reportSaveBlocked ? { reportSaveBlocked: deps.port.reportSaveBlocked } : {}),
+        ...(deps.port.handleDownload ? { handleDownload: deps.port.handleDownload } : {}),
+        ...(deps.port.setDirty ? { setDirty: deps.port.setDirty } : {}),
+      },
+      frame: { markerAttr: 'data-slides-web' },
+    })
   const origin = new WeakMap<PickedFile, File>()
   /** format -> value (the element clipboard writes its token as the value) */
   const markers = new Map<string, string>()
@@ -247,6 +281,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     const file = { ...res.file }
     if (res.versionId && !file.versionId) file.versionId = res.versionId
     deps.state.remember(file)
+    sizeGate.noteSaveSucceeded()
     const meta = deps.state.files.get(file.fileId)!
     deps.port.reportSaved({
       file: meta,
@@ -259,6 +294,11 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
 
   /** api.save of the current bytes; a conflict opens the shared conflict dialog */
   async function saveExisting(fileId: string, path: string, bytes: Uint8Array): Promise<void> {
+    const gate = await sizeGate.checkBeforeSave(bytes)
+    if (!gate.allowed) {
+      deps.state.lastFailure = gate.error
+      throw new WebSaveError(gate.message, 'cancelled')
+    }
     const etag = deps.state.files.get(fileId)?.etag
     const payload = { fileId, data: copyBuffer(bytes), ...(etag ? { etag } : {}) }
     const res = await send('api.save', () =>
@@ -270,6 +310,10 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     if (res.ok) {
       landed(res, path, 'save')
       return
+    }
+    if (res.error.code === 'too_large') {
+      deps.state.lastFailure = res.error
+      throw new WebSaveError(sizeGate.handleServerTooLarge(res.error, bytes), 'cancelled')
     }
     if (res.error.code !== 'conflict') {
       if (res.error.code === 'timeout' || res.error.code === 'network') {
@@ -314,6 +358,8 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
         size: bytes.byteLength,
         maxBytes: deps.state.downloadCap(),
       }),
+      sizeBytes: bytes.byteLength,
+      maxBytes: sizeGate.limits().max_bytes,
       markerAttr: 'data-slides-web',
     })
     const file = deps.state.files.get(fileId)
@@ -341,6 +387,11 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     previousPath: string,
     kind: SaveEvent['kind'],
   ): Promise<FileMeta | null> {
+    const gate = await sizeGate.checkBeforeSave(bytes)
+    if (!gate.allowed) {
+      deps.state.lastFailure = gate.error
+      return null
+    }
     const payload = { name: pptxName(name), data: copyBuffer(bytes), ...extra }
     const res = await send('api.saveAs', () =>
       deps.port.request('api.saveAs', payload, {
@@ -350,6 +401,11 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     )
     if (res.ok) return landed(res, previousPath, kind)
     if (res.error.code === 'cancelled') return null
+    if (res.error.code === 'too_large') {
+      deps.state.lastFailure = res.error
+      sizeGate.handleServerTooLarge(res.error, bytes)
+      return null
+    }
     throw saveFailure(res)
   }
 

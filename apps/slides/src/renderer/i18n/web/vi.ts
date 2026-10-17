@@ -14,6 +14,10 @@ export const vi = {
   webOk: 'OK',
   webFatalTitle: 'Không thể mở bản trình bày',
   webFatalBody: 'Không tải được tệp từ UniWork. Hãy đóng thẻ này và thử lại.',
+  webRefusedTooLarge: 'Bản trình bày này quá lớn hoặc quá phức tạp để mở trên web.',
+  webRefusedTooComplex:
+    'Bản trình bày này quá phức tạp để mở trên web ({parts} phần, giới hạn {limit}).',
+  webRefusedOutOfMemory: 'Bản trình bày này quá lớn, trình duyệt không đủ bộ nhớ để mở.',
   webNoHost: 'Trình soạn thảo này chạy bên trong UniWork. Hãy mở bản trình bày từ UniWork.',
   webLegacyPpt:
     'Đây là tệp .ppt cũ và không thể mở trong trình duyệt. Hãy lưu thành .pptx trong PowerPoint trước.',

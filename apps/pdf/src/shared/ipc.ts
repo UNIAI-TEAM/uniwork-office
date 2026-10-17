@@ -865,6 +865,10 @@ export interface ImageSearchResponse {
 export interface PdfApi {
   /** Take the pdf path pending for this view (queued at tab creation); null if none */
   consumePending(): Promise<string | null>
+  /** Web frame only (UNI-1865): the renderer reports that the opened document finished
+   *  mounting, so the passive lag detector's settle stamp starts at first paint. Absent
+   *  on desktop. */
+  noteDocumentMounted?(): void
   /** One-shot AI panel preset queued by Home / My AI */
   consumeAiPreset(): Promise<{ text: string; autoRun?: boolean; displayText?: string } | null>
   /** Live push of an AI preset while the tab is already open */

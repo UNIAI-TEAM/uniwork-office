@@ -121,4 +121,12 @@ export const th = {
   uwReasonArchived: 'เอกสารถูกเก็บถาวร',
   uwReasonSuspended: 'องค์กรถูกระงับ',
   uwReasonDeactivated: 'บัญชีของคุณถูกปิดใช้งานในองค์กรนี้',
+
+  webSizeWarnChip: 'ใกล้ถึงขีดจำกัด {max} (ปัจจุบัน {size})',
+  webSaveBlockTitle: 'ไม่สามารถบันทึกลงใน UniWork ได้',
+  webSaveBlockBody:
+    'เอกสารนี้มีขนาดเกิน {max} การเปลี่ยนแปลงของคุณยังอยู่ที่นี่ ดาวน์โหลดสำเนาของคุณลงในคอมพิวเตอร์ จากนั้นลดขนาดรูปภาพหรือแบ่งเอกสาร',
+  webSaveBlockDownload: 'ดาวน์โหลดสำเนาของฉัน',
+  uwConflictTooLargeWithLimit:
+    'เวอร์ชันของคุณมีขนาดเกิน {max} (ปัจจุบัน {size}) เลือก “ดาวน์โหลดสำเนาของฉัน” หรือปิดหน้าต่างนี้เพื่อลดขนาดไฟล์',
 } satisfies Record<keyof typeof zh, string>

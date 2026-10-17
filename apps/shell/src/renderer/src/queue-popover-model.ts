@@ -33,6 +33,8 @@ export interface PopoverLine {
   base?: number | string
   /** `{reason}`: the key of the short reason fragment (translated by the component) */
   reasonKey?: StringKey
+  /** `{max}` in bytes when `reasonKey` is `uwReasonTooLargeWithLimit` */
+  maxBytes?: number
 }
 
 export interface QueuePopoverModel {
@@ -120,8 +122,14 @@ export function failedReasonKeyOf(
   status: UniworkDocStatus,
   row: SyncCenterRow | undefined,
 ): StringKey {
-  if (row?.failedReason) return FAILED_REASON_KEY[row.failedReason] ?? 'uwReasonOther'
-  return blockedReasonKey(status.error)
+  const base = row?.failedReason
+    ? (FAILED_REASON_KEY[row.failedReason] ?? 'uwReasonOther')
+    : blockedReasonKey(status.error)
+  const maxBytes = row?.maxBytes ?? status.maxBytes
+  if (base === 'uwReasonTooLarge' && maxBytes !== undefined) {
+    return 'uwReasonTooLargeWithLimit'
+  }
+  return base
 }
 
 /** the blocked reason of this save: the row's, else what the status' error code says */
@@ -144,8 +152,16 @@ function blockedReasonOf(
   }
 }
 
-function reasonKeyOf(reason: SyncCenterBlockedReason | undefined, status: UniworkDocStatus) {
-  return reason ? blockedCopy(reason).reasonKey : blockedReasonKey(status.error)
+function reasonKeyOf(
+  reason: SyncCenterBlockedReason | undefined,
+  status: UniworkDocStatus,
+  maxBytes?: number,
+): StringKey {
+  const base = reason ? blockedCopy(reason).reasonKey : blockedReasonKey(status.error)
+  if (base === 'uwReasonTooLarge' && maxBytes !== undefined) {
+    return 'uwReasonTooLargeWithLimit'
+  }
+  return base
 }
 
 export function queuePopoverModelOf(
@@ -154,15 +170,23 @@ export function queuePopoverModelOf(
   opener: QueuePopoverOpener,
 ): QueuePopoverModel {
   const openCenter: PopoverAction = { id: 'open-center', labelKey: 'uwQueueOpenCenter' }
+  const maxBytes = row?.maxBytes ?? status.maxBytes
 
   // refused before anything was queued: the reason is the whole message
   if (isStoreRefusal(status)) {
     const reason = blockedReasonOf(status, row)
+    const reasonKey = reasonKeyOf(reason, status, maxBytes)
     return {
       line1:
         reason === 'store_full'
           ? { key: 'uwQueueFull' }
-          : { key: 'uwRowBlocked', reasonKey: reasonKeyOf(reason, status) },
+          : {
+              key: 'uwRowBlocked',
+              reasonKey,
+              ...(reasonKey === 'uwReasonTooLargeWithLimit' && maxBytes !== undefined
+                ? { maxBytes }
+                : {}),
+            },
       actions: [openCenter],
     }
   }
@@ -171,7 +195,12 @@ export function queuePopoverModelOf(
   const blocked = status.state === 'blocked'
   let line1: PopoverLine
   if (failed) {
-    line1 = { key: 'uwTipFailed', reasonKey: failedReasonKeyOf(status, row) }
+    const reasonKey = failedReasonKeyOf(status, row)
+    line1 = {
+      key: 'uwTipFailed',
+      reasonKey,
+      ...(reasonKey === 'uwReasonTooLargeWithLimit' && maxBytes !== undefined ? { maxBytes } : {}),
+    }
   } else if (opener === 'ctrl-s' || !row) {
     line1 = { key: 'uwQueueBlockedSave' }
   } else {
@@ -179,6 +208,7 @@ export function queuePopoverModelOf(
   }
 
   const reason = blocked ? blockedReasonOf(status, row) : undefined
+  const blockedReason = blocked ? reasonKeyOf(reason, status, maxBytes) : undefined
   const actions: PopoverAction[] = []
   const reasonAction = reason ? REASON_ACTION[reason] : undefined
   // a re-check needs the row id
@@ -192,8 +222,16 @@ export function queuePopoverModelOf(
   return {
     line1,
     ...(status.pendingNext ? { line2: { key: 'uwQueuePopNewer' as const } } : {}),
-    ...(blocked
-      ? { line3: { key: 'uwRowBlocked' as const, reasonKey: reasonKeyOf(reason, status) } }
+    ...(blocked && blockedReason
+      ? {
+          line3: {
+            key: 'uwRowBlocked' as const,
+            reasonKey: blockedReason,
+            ...(blockedReason === 'uwReasonTooLargeWithLimit' && maxBytes !== undefined
+              ? { maxBytes }
+              : {}),
+          },
+        }
       : {}),
     actions,
   }

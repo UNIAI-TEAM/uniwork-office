@@ -130,4 +130,12 @@ export const ms = {
   uwReasonArchived: 'dokumen diarkibkan',
   uwReasonSuspended: 'organisasi digantung',
   uwReasonDeactivated: 'akaun anda dinyahaktifkan dalam organisasi ini',
+
+  webSizeWarnChip: 'Menghampiri had {max} (kini {size}).',
+  webSaveBlockTitle: 'Tidak dapat menyimpan ke UniWork',
+  webSaveBlockBody:
+    'Dokumen ini melebihi {max}. Perubahan anda masih ada di sini. Muat turun salinan anda ke komputer, kemudian kurangkan saiz imej atau bahagikan dokumen.',
+  webSaveBlockDownload: 'Muat turun salinan saya',
+  uwConflictTooLargeWithLimit:
+    'Versi anda melebihi {max} (kini {size}). Pilih “Muat turun salinan saya” atau tutup dialog ini untuk mengurangkan saiz fail.',
 } satisfies Record<keyof typeof zh, string>
