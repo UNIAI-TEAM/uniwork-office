@@ -1,6 +1,6 @@
 import type { UniworkDocsClient } from '../uniwork-docs/client'
 import { UniworkDocError } from '../uniwork-docs/errors'
-import type { UniworkDocFormat } from '../uniwork-docs/formats'
+import type { UniworkDocFormat } from '../../shared/home-api'
 import type { DocumentLimits } from '../uniwork-docs/limits'
 import {
   abortUploadSession,

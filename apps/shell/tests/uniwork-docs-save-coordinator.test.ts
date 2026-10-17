@@ -1,13 +1,16 @@
 ﻿import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { deflateRawSync } from 'node:zlib'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { UniworkDocStatus } from '../src/shared/home-api'
 import type { Binding, BoundDocument } from '../src/main/uniwork-docs/binding-store'
 import { SaveCoordinator, toStatus } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { sha256Hex } from '../src/main/uniwork-docs/formats'
-import type { CommitLookup } from '../src/main/uniwork-docs/parse'
+import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits } from '../src/main/uniwork-docs/limits'
+import type { CommitLookup, UploadSessionState } from '../src/main/uniwork-docs/parse'
+import type { DocumentUploadSessionClient } from '../src/main/uniwork-sync/version-upload'
 import {
   createIntentStore,
   INTENT_STORE_REGISTRATION,
@@ -1637,5 +1640,647 @@ describe('DOC5-W04: toStatus carries the server level', () => {
   it('a comment level is on the status next to access view; no level adds no field', () => {
     expect(toStatus(doc('comment'))).toMatchObject({ access: 'view', commentsLevel: 'comment' })
     expect(toStatus(doc())).not.toHaveProperty('commentsLevel')
+  })
+})
+
+const KB_BYTES = 1024
+const MB_BYTES = 1024 * 1024
+const CHUNK_PART_SIZE = 8 * MB_BYTES
+const BIG_VERSION_BYTES = 45 * MB_BYTES
+const FAST_PART_SIZE = 16 * KB_BYTES
+const FAST_VERSION_BYTES = 90 * KB_BYTES
+const CHUNKED_LIMITS: DocumentLimits = {
+  ...DEFAULT_DOCUMENT_LIMITS,
+  chunked_upload_threshold_bytes: 20 * KB_BYTES,
+}
+
+function buildDocxPayload(totalBytes: number): Uint8Array {
+  const makeZip = (imageSize: number): Uint8Array => {
+    const entries: Array<{ name: string; data?: Buffer; storedSize?: number }> = [
+      { name: 'word/media/image1.png', storedSize: imageSize },
+      { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+      { name: 'word/document.xml', data: Buffer.from('<w:document/>') },
+    ]
+    const chunks: Buffer[] = []
+    const central: Buffer[] = []
+    let offset = 0
+    for (const entry of entries) {
+      const name = Buffer.from(entry.name, 'utf8')
+      const stored = entry.storedSize !== undefined
+      const data = entry.data ?? Buffer.alloc(0)
+      const body = stored ? null : deflateRawSync(data)
+      const size = stored ? entry.storedSize! : data.length
+      const header = Buffer.alloc(30)
+      header.writeUInt32LE(0x04034b50, 0)
+      header.writeUInt16LE(20, 4)
+      header.writeUInt16LE(stored ? 0 : 8, 8)
+      header.writeUInt32LE(0, 14)
+      header.writeUInt32LE(body?.length ?? size, 18)
+      header.writeUInt32LE(size, 22)
+      header.writeUInt16LE(name.length, 26)
+      const localOffset = offset
+      chunks.push(header, name, ...(body ? [body] : []))
+      offset += header.length + name.length + (body?.length ?? 0)
+      if (!body) {
+        chunks.push(Buffer.alloc(size))
+        offset += size
+      }
+      const cd = Buffer.alloc(46)
+      cd.writeUInt32LE(0x02014b50, 0)
+      cd.writeUInt16LE(20, 4)
+      cd.writeUInt16LE(20, 6)
+      cd.writeUInt16LE(stored ? 0 : 8, 10)
+      cd.writeUInt32LE(0, 16)
+      cd.writeUInt32LE(body?.length ?? size, 20)
+      cd.writeUInt32LE(size, 24)
+      cd.writeUInt16LE(name.length, 28)
+      cd.writeUInt32LE(localOffset, 42)
+      central.push(cd, name)
+    }
+    const cdBuffer = Buffer.concat(central)
+    const eocd = Buffer.alloc(22)
+    eocd.writeUInt32LE(0x06054b50, 0)
+    eocd.writeUInt16LE(entries.length, 8)
+    eocd.writeUInt16LE(entries.length, 10)
+    eocd.writeUInt32LE(cdBuffer.length, 12)
+    eocd.writeUInt32LE(offset, 16)
+    return new Uint8Array(Buffer.concat([...chunks, cdBuffer, eocd]))
+  }
+  const overhead = makeZip(0).byteLength
+  return makeZip(Math.max(0, totalBytes - overhead))
+}
+
+interface FakeVersionSessionOptions {
+  size?: number
+  partSize?: number
+  checksumSha256: string
+  createFaults?: UniworkDocError[]
+  getFault?: UniworkDocError | null
+  putFaults?: Record<number, { error: UniworkDocError; times: number }>
+  partGate?: (partNumber: number, signal?: AbortSignal) => Promise<void>
+}
+
+function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
+  const size = options.size ?? FAST_VERSION_BYTES
+  const partSize = options.partSize ?? FAST_PART_SIZE
+  const totalParts = Math.ceil(size / partSize)
+  const completed = new Map<number, string>()
+  const createFaults = [...(options.createFaults ?? [])]
+  const putFaults: Record<number, { error: UniworkDocError; times: number }> = {}
+  for (const [k, v] of Object.entries(options.putFaults ?? {})) {
+    putFaults[Number(k)] = { ...v }
+  }
+  const calls = {
+    creates: [] as Array<{
+      documentId: string
+      filename: string
+      sizeBytes: number
+      idempotencyKey: string
+      headB64Length: number
+      cdSize: number | null
+    }>,
+    gets: [] as string[],
+    partPuts: [] as Array<{ partNumber: number; byteLength: number }>,
+    completes: [] as Array<{
+      sessionId: string
+      parts: Array<{ partNumber: number; etag: string }>
+    }>,
+    deletes: [] as string[],
+  }
+  let sessionSeq = 0
+  let sessionId = 'ups_v1'
+
+  const buildState = (): UploadSessionState => {
+    const parts: UploadSessionState['parts'] = []
+    for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+      if (completed.has(partNumber)) continue
+      parts.push({
+        partNumber,
+        method: 'PUT',
+        url: `https://storage.example/version-part/${partNumber}`,
+        headers: {},
+        expiresAt: '2026-10-19T00:00:00.000Z',
+      })
+    }
+    return {
+      sessionId,
+      status: 'open',
+      partSize,
+      totalParts,
+      completedParts: [...completed].map(([partNumber, etag]) => ({
+        partNumber,
+        etag,
+        size: Math.min(partSize, size - (partNumber - 1) * partSize),
+      })),
+      parts,
+      expiresAt: '2026-10-19T00:00:00.000Z',
+    }
+  }
+
+  const uploadSession: DocumentUploadSessionClient = {
+    async createDocumentUploadSession(input) {
+      calls.creates.push({
+        documentId: input.documentId,
+        filename: input.filename,
+        sizeBytes: input.sizeBytes,
+        idempotencyKey: input.idempotencyKey,
+        headB64Length: Buffer.from(input.probe.head_b64, 'base64').byteLength,
+        cdSize: input.probe.cd_size,
+      })
+      const fault = createFaults.shift()
+      if (fault) throw fault
+      sessionSeq += 1
+      sessionId = `ups_v${sessionSeq}`
+      completed.clear()
+      return buildState()
+    },
+    async getUploadSession(id) {
+      calls.gets.push(id)
+      if (options.getFault) throw options.getFault
+      if (id !== sessionId) {
+        throw new UniworkDocError('not_found', { status: 404, serverCode: 'not_found' })
+      }
+      return buildState()
+    },
+    async completeUploadSession(input) {
+      calls.completes.push({ sessionId: input.sessionId, parts: input.parts })
+      return {
+        kind: 'upload',
+        upload: {
+          uploadId: `upl_${input.sessionId}`,
+          checksumSha256: options.checksumSha256,
+          sizeBytes: size,
+          claimExpiresAt: '2026-10-19T00:00:00.000Z',
+        },
+      }
+    },
+    async deleteUploadSession(id) {
+      calls.deletes.push(id)
+    },
+    async putUploadPart(input) {
+      if (options.partGate) {
+        await options.partGate(input.partNumber, input.signal)
+      }
+      const fault = putFaults[input.partNumber]
+      if (fault && fault.times > 0) {
+        fault.times -= 1
+        throw fault.error
+      }
+      calls.partPuts.push({ partNumber: input.partNumber, byteLength: input.bytes.byteLength })
+      const etag = `"etag-v-${input.partNumber}"`
+      completed.set(input.partNumber, etag)
+      return { etag }
+    },
+  }
+
+  return {
+    uploadSession,
+    calls,
+    completed,
+    setGetFault(fault: UniworkDocError | null): void {
+      options.getFault = fault
+    },
+    setChecksum(checksum: string): void {
+      options.checksumSha256 = checksum
+    },
+  }
+}
+
+describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', () => {
+  const fastPayload = buildDocxPayload(FAST_VERSION_BYTES)
+  const fastChecksum = sha256Hex(fastPayload)
+  let cachedBigPayload: Uint8Array | null = null
+  let cachedBigChecksum: string | null = null
+  const getBigPayload = () => {
+    if (!cachedBigPayload) {
+      cachedBigPayload = buildDocxPayload(BIG_VERSION_BYTES)
+      cachedBigChecksum = sha256Hex(cachedBigPayload)
+    }
+    return { bytes: cachedBigPayload, checksum: cachedBigChecksum! }
+  }
+
+  async function chunkedHarness(
+    sessionOpts?: Partial<FakeVersionSessionOptions> & { inMemoryIntents?: boolean },
+  ) {
+    const clock = new FakeClock()
+    const safeStorage = createLockableSafeStorage()
+    const layer = createStoreLayer({
+      root: join(base, 'records-bigup'),
+      keys: createSafeStorageKeyProvider({ safeStorage, dir: join(base, 'keys-bigup') }),
+      budgetBytes: 16 * MB_BYTES,
+      clock: () => clock.now,
+    })
+    layer.register(INTENT_STORE_REGISTRATION)
+    layer.register(DRAFTS_STORE_REGISTRATION)
+    layer.register(PAUSE_STORE_REGISTRATION)
+    const opened = await layer.open(SCOPE)
+    if (opened.kind !== 'ok') throw new Error(`store did not open: ${opened.kind}`)
+    const diskIntents = createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+    const memMap = new Map<string, { intent: IntentRecordV2; payload: Uint8Array }>()
+    const memIntents: IntentStore = {
+      async read(key) {
+        const entry = memMap.get(key)
+        return entry ? { intent: structuredClone(entry.intent), payload: entry.payload } : null
+      },
+      async get(key) {
+        const entry = memMap.get(key)
+        return entry ? { intent: structuredClone(entry.intent), payload: entry.payload } : null
+      },
+      async list() {
+        return [...memMap.entries()].map(([key, v]) => ({
+          key,
+          intent: structuredClone(v.intent),
+          payload: v.payload,
+        }))
+      },
+      async put(key, intent, payload) {
+        memMap.set(key, { intent: structuredClone(intent), payload })
+        return { kind: 'ok' }
+      },
+      async delete(key) {
+        memMap.delete(key)
+      },
+    }
+    const intents: IntentStore = sessionOpts?.inMemoryIntents ? memIntents : diskIntents
+    const drafts = createDraftStore(opened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    const pause = createPauseStore(opened.store.records(PAUSE_STORE_REGISTRATION.name))
+    const capability = new FakeCapability()
+    const server = fakeServer()
+    const defaultChecksum = sessionOpts?.checksumSha256 ?? fastChecksum
+    server.state.uploadReceipt.checksumSha256 = defaultChecksum
+    const sessions = fakeVersionUploadSessions({
+      checksumSha256: defaultChecksum,
+      ...sessionOpts,
+    })
+    const client: QueueClient = {
+      ...server.client,
+      uploadSession: sessions.uploadSession,
+    }
+    const store = new FakeBindingStore()
+    const lockTable = new FakeLockTable()
+    const statuses: UniworkDocStatus[] = []
+    const published: IntentRecordV2[] = []
+    let activeLimits: DocumentLimits = CHUNKED_LIMITS
+    let activeBytes: Uint8Array = fastPayload
+    const makeDispatcher = (owner = 'win1'): QueueDispatcher =>
+      new QueueDispatcher({
+        intents: async () => ({ kind: 'ok', intents }),
+        client,
+        documentLimits: () => activeLimits,
+        capability,
+        lock: fakeLock(lockTable, owner, () => clock.now),
+        pause,
+        drafts,
+        clock: () => clock.now,
+        random: () => 0.5,
+        limits: QUEUE_LIMITS,
+        publish: (record) => published.push(record),
+        uuid: () => 'u1',
+      })
+    const dispatcher = makeDispatcher('win1')
+
+    const coordinator = new SaveCoordinator({
+      store: store as never,
+      client: {
+        upload: (input) => client.upload(input),
+        commit: (input) => client.commit(input),
+        getDocument: async () => {
+          throw new UniworkDocError('not_found')
+        },
+        uploadSession: sessions.uploadSession,
+      },
+      isSignedIn: () => true,
+      ownsBinding: () => true,
+      intents: async () => ({ kind: 'ok', intents }),
+      publish: (status) => statuses.push(status),
+      limits: () => activeLimits,
+      now: () => new Date(clock.now),
+      uuid: () => 'u1',
+      readBytes: async () => activeBytes,
+      capability,
+      pause,
+      drafts,
+      dispatcher,
+    })
+
+    const makeBigDoc = (
+      key = 'doc_big',
+      bytes: Uint8Array = fastPayload,
+      knownChecksum?: string,
+    ): QueueDoc => {
+      const checksum = knownChecksum ?? (bytes === fastPayload ? fastChecksum : sha256Hex(bytes))
+      const path = join(base, 'wc', key, 'Plan.docx')
+      const binding: Binding = {
+        schema: 2,
+        documentId: `d_${key}`,
+        workspaceId: 'ws_1',
+        orgId: 'org_1',
+        title: 'Plan.docx',
+        filename: 'Plan.docx',
+        format: 'docx',
+        access: 'edit',
+        baseRevision: '41',
+        baseVersion: 3,
+        baseChecksum: sha256Hex(enc('v3')),
+        state: 'dirty',
+        minStoreLevel: 2,
+        minAppVersion: '0.0.0',
+      }
+      store.docs.set(path, {
+        path,
+        dir: join(base, 'wc', key),
+        deploymentId: 'default',
+        userId: 'acc_1',
+        key,
+        binding,
+      })
+      const record: IntentRecordV2 = {
+        v: 2,
+        intentId: `intent_${key}`,
+        idempotencyKey: `key_${key}`,
+        documentId: `d_${key}`,
+        orgId: 'org_1',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum,
+        length: bytes.byteLength,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: ISO,
+        updatedAt: ISO,
+      }
+      return {
+        key,
+        path,
+        filename: 'Plan.docx',
+        format: 'docx',
+        orgId: 'org_1',
+        workspaceId: 'ws_1',
+        baseVersion: 3,
+        record,
+        payload: bytes,
+      }
+    }
+
+    return {
+      clock,
+      server,
+      sessions,
+      dispatcher,
+      makeDispatcher,
+      coordinator,
+      intents,
+      statuses,
+      published,
+      makeBigDoc,
+      setLimits(limits: DocumentLimits) {
+        activeLimits = limits
+      },
+      setActiveBytes(bytes: Uint8Array) {
+        activeBytes = bytes
+      },
+    }
+  }
+
+  it('uploads a 45 MiB version payload through an upload session in 6 parts and commits (queue + coordinator)', async () => {
+    const { bytes: bigBytes, checksum: bigHash } = getBigPayload()
+    const h = await chunkedHarness({
+      size: BIG_VERSION_BYTES,
+      partSize: CHUNK_PART_SIZE,
+      checksumSha256: bigHash,
+      inMemoryIntents: true,
+    })
+    h.setLimits({
+      ...DEFAULT_DOCUMENT_LIMITS,
+      chunked_upload_threshold_bytes: 20 * MB_BYTES,
+    })
+    h.setActiveBytes(bigBytes)
+    const doc = h.makeBigDoc('doc_big_q', bigBytes, bigHash)
+    expect(doc.payload.byteLength).toBe(BIG_VERSION_BYTES)
+    await h.dispatcher.enqueue(doc)
+    await h.dispatcher.dispatchAll([doc])
+
+    expect(doc.record.state).toBe('committed')
+    expect(doc.record.uploadSession).toBeUndefined()
+    expect(h.server.state.counts.upload).toBe(0)
+    expect(h.server.state.counts.commit).toBe(1)
+    expect(h.sessions.calls.creates).toEqual([
+      expect.objectContaining({
+        documentId: 'd_doc_big_q',
+        filename: 'Plan.docx',
+        sizeBytes: BIG_VERSION_BYTES,
+        idempotencyKey: 'key_doc_big_q:s0',
+        headB64Length: 64 * 1024,
+      }),
+    ])
+    expect(h.sessions.calls.partPuts.map((p) => p.partNumber).sort((a, b) => a - b)).toEqual([
+      1, 2, 3, 4, 5, 6,
+    ])
+    expect(h.sessions.calls.completes).toHaveLength(1)
+    expect(h.sessions.calls.completes[0]?.parts).toHaveLength(6)
+    expect(await stored(h.intents, doc)).toBeNull()
+
+    // SaveCoordinator inline path also takes the 45 MiB payload through a session and commits
+    const inlineDoc = h.makeBigDoc('doc_big_inline', bigBytes, bigHash)
+    const saved = await h.coordinator.save(inlineDoc.path)
+    expect(saved?.binding.state).toBe('saved')
+    expect(h.server.state.counts.upload).toBe(0)
+    expect(h.server.state.counts.commit).toBe(2)
+    expect(h.sessions.calls.creates).toHaveLength(2)
+    expect(h.sessions.calls.creates[1]?.idempotencyKey).toBe('office-key-u1:s0')
+    expect(await stored(h.intents, inlineDoc)).toBeNull()
+  })
+
+  it('refuses a chunked version upload when the completed checksum mismatches the intent', async () => {
+    const h = await chunkedHarness({ checksumSha256: 'b'.repeat(64) })
+    const doc = h.makeBigDoc('doc_mismatch')
+    await h.dispatcher.enqueue(doc)
+    await h.dispatcher.dispatchAll([doc])
+
+    expect(h.sessions.calls.completes).toHaveLength(1)
+    expect(h.server.state.counts.commit).toBe(0)
+    expect(doc.record.state).toBe('queued')
+    expect(doc.record.lastError).toBe('malformed_response')
+  })
+
+  it('persists uploadSession after part 3 of 6 and resumes at part 4 after a restart', async () => {
+    const partErr = new UniworkDocError('malformed_response', {
+      serverCode: 'part_etag_missing',
+    })
+    const h = await chunkedHarness({
+      putFaults: {
+        4: { error: partErr, times: 1 },
+      },
+    })
+    const doc = h.makeBigDoc('doc_resume')
+    await h.dispatcher.enqueue(doc)
+    await h.dispatcher.dispatchAll([doc])
+
+    // Crash after parts 1..3: the intent record in the store holds the saved session with 3 parts
+    const persisted = await stored(h.intents, doc)
+    expect(persisted).not.toBeNull()
+    expect(persisted?.intent.uploadSession?.sessionId).toBe('ups_v1')
+    expect(
+      persisted?.intent.uploadSession?.completedParts
+        .map((p) => p.partNumber)
+        .sort((a, b) => a - b),
+    ).toEqual([1, 2, 3])
+    expect(h.server.state.counts.commit).toBe(0)
+
+    // Restart: a fresh QueueDispatcher reads the persisted record and uploads only parts 4..6
+    h.sessions.calls.partPuts.length = 0
+    h.clock.advance(60_000)
+    const restarted = h.makeDispatcher('win2')
+    const restartedDoc: QueueDoc = {
+      ...doc,
+      record: persisted!.intent,
+      payload: persisted!.payload,
+    }
+    await restarted.dispatchAll([restartedDoc])
+    expect(restartedDoc.record.state).toBe('committed')
+    expect(h.sessions.calls.creates).toHaveLength(1)
+    expect(h.sessions.calls.gets).toEqual(['ups_v1'])
+    expect(h.sessions.calls.partPuts.map((p) => p.partNumber).sort((a, b) => a - b)).toEqual([
+      4, 5, 6,
+    ])
+    expect(h.server.state.counts.commit).toBe(1)
+    expect(await stored(h.intents, doc)).toBeNull()
+  })
+
+  it('starts a fresh session from part 1 on 410 upload_session_expired and bumps the create key on 409 idempotency_payload_mismatch', async () => {
+    const h = await chunkedHarness({
+      getFault: new UniworkDocError('not_found', {
+        status: 410,
+        serverCode: 'upload_session_expired',
+      }),
+      createFaults: [
+        new UniworkDocError('idempotency_mismatch', {
+          status: 409,
+          serverCode: 'idempotency_payload_mismatch',
+        }),
+      ],
+    })
+    const doc = h.makeBigDoc('doc_expired')
+    doc.record.uploadSession = {
+      sessionId: 'ups_old',
+      partSize: CHUNK_PART_SIZE,
+      totalParts: 6,
+      completedParts: [
+        { partNumber: 1, etag: '"e1"' },
+        { partNumber: 2, etag: '"e2"' },
+        { partNumber: 3, etag: '"e3"' },
+      ],
+      expiresAt: '2026-10-19T00:00:00.000Z',
+    }
+    await h.intents.put(doc.key, doc.record, doc.payload)
+    await h.dispatcher.dispatchAll([doc])
+
+    expect(doc.record.state).toBe('committed')
+    expect(h.sessions.calls.gets).toEqual(['ups_old'])
+    expect(h.sessions.calls.creates.map((c) => c.idempotencyKey)).toEqual([
+      'key_doc_expired:s0',
+      'key_doc_expired:s1',
+    ])
+    expect(h.sessions.calls.partPuts.map((p) => p.partNumber).sort((a, b) => a - b)).toEqual([
+      1, 2, 3, 4, 5, 6,
+    ])
+    expect(h.server.state.counts.commit).toBe(1)
+  })
+
+  it('cancels and supersedes an intent with a saved uploadSession by sending DELETE', async () => {
+    const h = await chunkedHarness()
+    const doc = h.makeBigDoc('doc_cancel')
+    doc.record.uploadSession = {
+      sessionId: 'ups_to_cancel',
+      partSize: CHUNK_PART_SIZE,
+      totalParts: 6,
+      completedParts: [{ partNumber: 1, etag: '"e1"' }],
+      expiresAt: '2026-10-19T00:00:00.000Z',
+    }
+    await h.intents.put(doc.key, doc.record, doc.payload)
+
+    const cancelled = await h.dispatcher.cancel(doc, { documentClosed: false })
+    expect(cancelled).toBe('cancelled')
+    expect(h.sessions.calls.deletes).toEqual(['ups_to_cancel'])
+    expect(doc.record.uploadSession).toBeUndefined()
+    expect(await stored(h.intents, doc)).toBeNull()
+
+    const doc2 = h.makeBigDoc('doc_supersede')
+    doc2.record.uploadSession = {
+      sessionId: 'ups_to_supersede',
+      partSize: CHUNK_PART_SIZE,
+      totalParts: 6,
+      completedParts: [{ partNumber: 1, etag: '"e1"' }],
+      expiresAt: '2026-10-19T00:00:00.000Z',
+    }
+    await h.intents.put(doc2.key, doc2.record, doc2.payload)
+    await h.coordinator.supersede(doc2)
+    expect(h.sessions.calls.deletes).toEqual(['ups_to_cancel', 'ups_to_supersede'])
+    expect(doc2.record.uploadSession).toBeUndefined()
+  })
+
+  it('parks the intent with retryAt when session creation answers 429 upload_sessions_exhausted', async () => {
+    const h = await chunkedHarness({
+      createFaults: [
+        new UniworkDocError('server_error', {
+          status: 429,
+          serverCode: 'upload_sessions_exhausted',
+          retryAfterMs: 60_000,
+        }),
+      ],
+    })
+    const doc = h.makeBigDoc('doc_429')
+    await h.dispatcher.enqueue(doc)
+    await h.dispatcher.dispatchAll([doc])
+
+    expect(doc.record.state).toBe('queued')
+    expect(doc.record.retryAt).toBe(new Date(h.clock.now + 60_000).toISOString())
+    expect(h.server.state.counts.commit).toBe(0)
+
+    // Before retryAt elapses, dispatchAll parks the intent without another request
+    const beforeRetry = await h.dispatcher.dispatchAll([doc])
+    expect(beforeRetry.parked).toBe(1)
+    expect(h.sessions.calls.creates).toHaveLength(1)
+
+    // After retryAt elapses, the next pass opens the session and commits
+    h.clock.advance(60_000)
+    await h.dispatcher.dispatchAll([doc])
+    expect(doc.record.state).toBe('committed')
+    expect(h.sessions.calls.creates).toHaveLength(2)
+    expect(h.server.state.counts.commit).toBe(1)
+  })
+
+  it('keeps small payloads and upload_session_too_small on the single-request client.upload path', async () => {
+    const h = await chunkedHarness()
+    const smallBytes = buildDocxPayload(12 * KB_BYTES)
+    const smallChecksum = sha256Hex(smallBytes)
+    h.server.state.uploadReceipt.checksumSha256 = smallChecksum
+    const smallDoc = h.makeBigDoc('doc_small', smallBytes, smallChecksum)
+    await h.dispatcher.enqueue(smallDoc)
+    await h.dispatcher.dispatchAll([smallDoc])
+
+    expect(smallDoc.record.state).toBe('committed')
+    expect(h.sessions.calls.creates).toHaveLength(0)
+    expect(h.server.state.counts.upload).toBe(1)
+    expect(h.server.state.counts.commit).toBe(1)
+
+    // Threshold drift: 422 upload_session_too_small falls back to client.upload
+    const drift = await chunkedHarness({
+      createFaults: [
+        new UniworkDocError('server_error', {
+          status: 422,
+          serverCode: 'upload_session_too_small',
+        }),
+      ],
+    })
+    const driftDoc = drift.makeBigDoc('doc_drift')
+    await drift.dispatcher.enqueue(driftDoc)
+    await drift.dispatcher.dispatchAll([driftDoc])
+    expect(driftDoc.record.state).toBe('committed')
+    expect(drift.sessions.calls.creates).toHaveLength(1)
+    expect(drift.server.state.counts.upload).toBe(1)
+    expect(drift.server.state.counts.commit).toBe(1)
   })
 })

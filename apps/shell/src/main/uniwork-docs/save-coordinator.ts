@@ -7,6 +7,12 @@ import { UniworkDocError, isTerminalRefusal } from './errors'
 import { sha256Hex } from './formats'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits, type DocumentLimitsCache } from './limits'
 import type { CommitReceipt, DocumentDetail } from './parse'
+import type { SavedUploadSession } from './upload-session'
+import {
+  abortVersionUploadSession,
+  uploadVersionBytes,
+  type DocumentUploadSessionClient,
+} from '../uniwork-sync/version-upload'
 import type { IntentBindFacts, IntentRecordV2, IntentStore } from '../uniwork-sync/intent-store'
 import {
   isTerminalQueueState,
@@ -120,7 +126,10 @@ export type SaveQueueEngine = Pick<
 
 export interface SaveCoordinatorDeps {
   store: BindingStore
-  client: Pick<UniworkDocsClient, 'upload' | 'commit' | 'getDocument'>
+  client: Pick<UniworkDocsClient, 'upload' | 'commit' | 'getDocument'> & {
+    /** BIGUP-A1: the upload-session routes for a version payload above the chunked threshold */
+    uploadSession?: DocumentUploadSessionClient
+  }
   isSignedIn(): boolean
   /** the binding belongs to the signed-in account and the active deployment */
   ownsBinding(doc: BoundDocument): boolean
@@ -267,6 +276,8 @@ export class SaveCoordinator {
   private readonly now: () => Date
   private readonly uuid: () => string
   private readonly sleep: (ms: number) => Promise<void>
+  /** in-flight inline version-upload abort controllers, keyed by document key */
+  private readonly uploadAborts = new Map<string, AbortController>()
   private readonly readBytes: (path: string) => Promise<Uint8Array>
 
   constructor(deps: SaveCoordinatorDeps) {
@@ -522,6 +533,7 @@ export class SaveCoordinator {
       const limits = await this.resolveLimits()
       if (bytes.byteLength > limits.max_bytes) {
         if (pending && !IN_FLIGHT_QUEUE_STATES.has(pending.intent.state)) {
+          const priorSession = pending.intent.uploadSession
           await this.deps.dispatcher?.supersede({
             key: doc.key,
             path: doc.path,
@@ -533,6 +545,9 @@ export class SaveCoordinator {
             record: pending.intent,
             payload: pending.payload,
           })
+          if (!this.deps.dispatcher) {
+            await this.releaseUploadSession(doc.key, priorSession)
+          }
           await this.cleanupIntent(intents, doc, pending.intent)
         }
         this.pendingNext.delete(doc.path)
@@ -572,6 +587,7 @@ export class SaveCoordinator {
       if (pending && !IN_FLIGHT_QUEUE_STATES.has(pending.intent.state)) {
         const limits = await this.resolveLimits()
         if (pending.payload.byteLength > limits.max_bytes) {
+          const priorSession = pending.intent.uploadSession
           await this.deps.dispatcher?.supersede({
             key: doc.key,
             path: doc.path,
@@ -583,8 +599,10 @@ export class SaveCoordinator {
             record: pending.intent,
             payload: pending.payload,
           })
+          if (!this.deps.dispatcher) {
+            await this.releaseUploadSession(doc.key, priorSession)
+          }
           await this.cleanupIntent(intents, doc, pending.intent)
-          this.pendingNext.delete(doc.path)
           return await this.commitState(doc, withoutError({ ...doc.binding, state: 'saved' }))
         }
       }
@@ -686,7 +704,7 @@ export class SaveCoordinator {
 
       let receipt: CommitReceipt
       try {
-        receipt = await this.uploadAndCommit(saving, intent, payload as Uint8Array)
+        receipt = await this.uploadAndCommit(saving, intent, payload as Uint8Array, intents)
       } catch (error) {
         if (needsRecheck(error)) {
           return await this.recheckAgainstDocument(
@@ -887,15 +905,26 @@ export class SaveCoordinator {
     doc: BoundDocument,
     intent: IntentRecordV2,
     payload: Uint8Array,
+    intents: IntentStore,
   ): Promise<CommitReceipt> {
+    const limits = await this.resolveLimits()
     for (let attempt = 0; ; attempt += 1) {
+      const controller = new AbortController()
+      this.uploadAborts.set(doc.key, controller)
       try {
-        const upload = await this.deps.client.upload({
+        const upload = await uploadVersionBytes(this.deps.client, {
           documentId: intent.documentId,
-          bytes: payload,
           filename: doc.binding.filename,
           format: doc.binding.format,
+          bytes: payload,
           idempotencyKey: intent.idempotencyKey,
+          limits,
+          ...(intent.uploadSession ? { resume: intent.uploadSession } : {}),
+          signal: controller.signal,
+          onSessionState: async (state) => {
+            intent.uploadSession = state
+            await this.persistUploadSession(intents, doc, intent, state)
+          },
         })
         if (upload.checksumSha256 !== intent.checksum) {
           // the server staged other bytes than ours: nothing committed
@@ -920,7 +949,54 @@ export class SaveCoordinator {
         const delay = IN_FLIGHT_BACKOFF_MS[attempt]
         if (!inFlight || delay === undefined) throw error
         await this.sleep(delay)
+      } finally {
+        if (this.uploadAborts.get(doc.key) === controller) {
+          this.uploadAborts.delete(doc.key)
+        }
       }
+    }
+  }
+
+  private async persistUploadSession(
+    intents: IntentStore,
+    doc: BoundDocument,
+    owner: IntentRecordV2,
+    session: SavedUploadSession,
+  ): Promise<void> {
+    const stored = await intents.read(doc.key, factsOf(doc, owner.length))
+    if (
+      !stored ||
+      stored.intent.intentId !== owner.intentId ||
+      stored.intent.generation !== owner.generation
+    ) {
+      return
+    }
+    await intents.put(
+      doc.key,
+      {
+        ...stored.intent,
+        uploadSession: session,
+        updatedAt: this.now().toISOString(),
+      },
+      stored.payload,
+    )
+  }
+
+  private async releaseUploadSession(
+    docKey: string,
+    session: SavedUploadSession | undefined,
+  ): Promise<void> {
+    const controller = this.uploadAborts.get(docKey)
+    if (controller) {
+      controller.abort()
+      this.uploadAborts.delete(docKey)
+    }
+    const client = this.deps.client.uploadSession
+    if (!session || !client) return
+    try {
+      await abortVersionUploadSession(client, session.sessionId)
+    } catch (error) {
+      console.warn('uniwork docs: the upload session could not be aborted', error)
     }
   }
 
@@ -1071,15 +1147,37 @@ export class SaveCoordinator {
     doc: QueueDoc,
     options: { documentClosed: boolean; title?: string } = { documentClosed: false },
   ): Promise<void> {
-    if (!this.deps.dispatcher) return
+    const priorSession = doc.record.uploadSession
+    if (!this.deps.dispatcher) {
+      await this.releaseUploadSession(doc.key, priorSession)
+      return
+    }
     const state = await this.deps.dispatcher.cancel(doc, options)
+    if (state === 'cancelled') {
+      const controller = this.uploadAborts.get(doc.key)
+      if (controller) {
+        controller.abort()
+        this.uploadAborts.delete(doc.key)
+      }
+    }
     this.publishQueueState(doc, state)
   }
 
   /** "Bo lan luu..." (discard a stuck save): the snapshot becomes a kept draft */
   async discard(doc: QueueDoc, options: { title?: string } = {}): Promise<void> {
-    if (!this.deps.dispatcher) return
+    const priorSession = doc.record.uploadSession
+    if (!this.deps.dispatcher) {
+      await this.releaseUploadSession(doc.key, priorSession)
+      return
+    }
     const state = await this.deps.dispatcher.discard(doc, options)
+    if (state === 'cancelled') {
+      const controller = this.uploadAborts.get(doc.key)
+      if (controller) {
+        controller.abort()
+        this.uploadAborts.delete(doc.key)
+      }
+    }
     this.publishQueueState(doc, state)
   }
 
@@ -1092,7 +1190,19 @@ export class SaveCoordinator {
     // a superseded record is always terminal: the machine never moves it to a
     // chip state, and the caller's Overwrite / Reload is what the binding shows
     // next. So this never publishes (publishQueueState would drop it anyway).
-    await this.deps.dispatcher?.supersede(doc)
+    const priorSession = doc.record.uploadSession
+    if (!this.deps.dispatcher) {
+      await this.releaseUploadSession(doc.key, priorSession)
+      return
+    }
+    const state = await this.deps.dispatcher.supersede(doc)
+    if (state === 'cancelled') {
+      const controller = this.uploadAborts.get(doc.key)
+      if (controller) {
+        controller.abort()
+        this.uploadAborts.delete(doc.key)
+      }
+    }
   }
 
   /** "Kiem tra lai" (check again): a lookup of the intent only, never a new attempt */
