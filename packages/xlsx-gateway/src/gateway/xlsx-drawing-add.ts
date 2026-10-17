@@ -183,7 +183,7 @@ export async function applyVisualAdditions(
       const image = addition.image
       const extension = IMAGE_EXTENSIONS[image.mediaType]
       const mediaPath = await allocatePartPath(pkg, 'xl/media/image', `.${extension}`)
-      pkg.addBinary(mediaPath, Uint8Array.from(Buffer.from(image.base64, 'base64')))
+      pkg.addBinary(mediaPath, base64ToBytes(image.base64))
       touchedEntries.add(mediaPath)
       await registerContentTypeDefault(pkg, extension, image.mediaType, touchedEntries)
       const imageRelId = await appendRelationship(
@@ -206,6 +206,13 @@ export async function applyVisualAdditions(
     }
     touchedEntries.add(drawing.path)
   }
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  return bytes
 }
 
 /// Finds the sheet's drawing part, creating (and wiring) one if absent.
