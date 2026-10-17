@@ -91,12 +91,21 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-async function activateWiring() {
-  const { configureStartupHostResolver, createUniworkDocs, resetStartupHostResolverForTest } =
-    await import('../src/main/uniwork-docs/wiring')
+async function runStartupWhenReady() {
+  const {
+    applySpellcheckDictionaryDownloadGate,
+    configureStartupHostResolver,
+    resetStartupHostResolverForTest,
+  } = await import('../src/main/uniwork-docs/wiring')
   resetStartupHostResolverForTest()
-  // Simulate index.ts app.whenReady() calling configureStartupHostResolver() before activate()
+  // The first two lines of app.whenReady().then(...) in apps/shell/src/main/index.ts:
   configureStartupHostResolver()
+  applySpellcheckDictionaryDownloadGate(false)
+}
+
+async function activateWiring() {
+  await runStartupWhenReady()
+  const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
   const created = createUniworkDocs({ handle: vi.fn() } as never, {
     shellWindow: () => null,
     shellContents: () => null,
@@ -123,13 +132,30 @@ async function activateWiring() {
 }
 
 describe('NET-OFF-01: signed-out network suppression (secure DNS + spellcheck dictionary download)', () => {
+  it('blocks spellcheck dictionary downloads and disables secure DNS at startup even when activate never runs', async () => {
+    const { readFileSync } = await import('node:fs')
+    const indexSrc = readFileSync(join(__dirname, '..', 'src/main/index.ts'), 'utf8')
+    expect(indexSrc).toMatch(
+      /app\.whenReady\(\)\.then\(async \(\) => \{\s*configureStartupHostResolver\(\)\s*applySpellcheckDictionaryDownloadGate\(false\)/,
+    )
+
+    await runStartupWhenReady()
+
+    expect(electronMocks.configureHostResolver).toHaveBeenCalledTimes(1)
+    expect(electronMocks.configureHostResolver).toHaveBeenCalledWith({ secureDnsMode: 'off' })
+    expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenCalledTimes(1)
+    expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenLastCalledWith(
+      'file:///nonexistent/',
+    )
+  })
+
   it('disables secure DNS once at startup and gates spellcheck dictionary downloads on signedIn transitions', async () => {
     await activateWiring()
 
     expect(electronMocks.configureHostResolver).toHaveBeenCalledTimes(1)
     expect(electronMocks.configureHostResolver).toHaveBeenCalledWith({ secureDnsMode: 'off' })
 
-    // Initially signed out -> dictionary download URL set to local unreachable URL
+    // Initially signed out -> dictionary download URL set to local unreachable URL at whenReady
     expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenCalledTimes(1)
     expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenLastCalledWith(
       'file:///nonexistent/',

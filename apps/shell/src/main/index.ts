@@ -112,6 +112,7 @@ import {
   uniworkDeploymentProfile,
 } from './uniwork-auth'
 import {
+  applySpellcheckDictionaryDownloadGate,
   configureStartupHostResolver,
   createUniworkDocs,
   type UniworkDocsHandle,
@@ -6548,6 +6549,7 @@ async function runHeadlessExportEntry(
 
 app.whenReady().then(async () => {
   configureStartupHostResolver()
+  applySpellcheckDictionaryDownloadGate(false)
   // a dev run has no bundle icns; packaged macOS builds take the Dock icon from the bundle
   if (!app.isPackaged && process.platform === 'darwin') {
     const dockIcon = join(app.getAppPath(), 'build', 'icon-mac.png')

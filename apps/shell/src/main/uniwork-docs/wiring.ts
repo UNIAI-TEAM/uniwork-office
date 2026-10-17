@@ -1,5 +1,12 @@
-import * as electron from 'electron'
-import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  safeStorage,
+  session,
+  type IpcMain,
+  type WebContents,
+} from 'electron'
 import { randomUUID } from 'node:crypto'
 import { basename, extname, join } from 'node:path'
 import { showSaveDialogWithMemory } from '@genoffice/electron-utils'
@@ -1043,8 +1050,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     capabilityRead: (orgId) => runtime.capabilityRead(orgId),
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
-      configureStartupHostResolver()
-      applySpellcheckDictionaryDownloadGate(signedIn)
+      if (signedIn) applySpellcheckDictionaryDownloadGate(true)
       /** the org the feed currently runs for; null = no pass may run */
       let feedOrg: string | null = null
       /**
@@ -1108,18 +1114,14 @@ let hostResolverConfigured = false
 export function configureStartupHostResolver(): void {
   if (hostResolverConfigured) return
   hostResolverConfigured = true
-  app.configureHostResolver?.({ secureDnsMode: 'off' })
+  app.configureHostResolver({ secureDnsMode: 'off' })
 }
 
 export function resetStartupHostResolverForTest(): void {
   hostResolverConfigured = false
 }
 
-function applySpellcheckDictionaryDownloadGate(signedIn: boolean): void {
+export function applySpellcheckDictionaryDownloadGate(signedIn: boolean): void {
   const url = signedIn ? SPELLCHECK_DOWNLOAD_DEFAULT_URL : SPELLCHECK_DOWNLOAD_BLOCKED_URL
-  try {
-    electron.session?.defaultSession?.setSpellCheckerDictionaryDownloadURL?.(url)
-  } catch {
-    // Vitest partial electron mocks without a `session` export throw on property access
-  }
+  session.defaultSession.setSpellCheckerDictionaryDownloadURL(url)
 }
