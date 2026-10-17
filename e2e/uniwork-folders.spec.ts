@@ -1085,7 +1085,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       expect(contentTitles).toContain('Alpha Folder')
 
       // Contents row menu for My Folder offers New subfolder only (no rename/move/archive/share)
-      await dialog
+      await contents
         .getByRole('button', {
           name: uniworkFoldersEn.ufActionsFor.replace('{name}', uniworkSaveEn.usMyFolder),
           exact: true,
