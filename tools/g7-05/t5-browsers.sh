@@ -35,21 +35,37 @@ if [[ "$CHANNEL" != "chrome" && "$CHANNEL" != "msedge" ]]; then
 fi
 
 cd "$REPO_ROOT"
-mkdir -p "$OUT_DIR"
+
+if [[ "$CHANNEL" == "chrome" && ! -x "/opt/google/chrome/chrome" ]]; then
+  echo "[g7-05/t5:chrome] /opt/google/chrome/chrome not found; installing via playwright..."
+  npx playwright install --with-deps chrome
+fi
+
+if [[ "$CHANNEL" == "msedge" && ! -x "/opt/microsoft/msedge/msedge" ]]; then
+  echo "[g7-05/t5:msedge] /opt/microsoft/msedge/msedge not found; installing via playwright..."
+  npx playwright install --with-deps msedge || npx playwright install --with-deps --force msedge
+fi
 
 LOG_FILE="$OUT_DIR/t5-${CHANNEL}.log"
 JSON_FILE="$OUT_DIR/t5-${CHANNEL}.json"
+# Playwright wipes its outputDir (web/e2e/.results) when `npx playwright test` starts.
+# Tee to a temporary file outside web/e2e/.results first, then copy into $OUT_DIR after Playwright exits.
+TMP_LOG="$(mktemp "${TMPDIR:-/tmp}/g7-05-t5-${CHANNEL}-XXXXXX.log")"
 
 echo "[g7-05/t5:${CHANNEL}] Running web/e2e suite (modules-smoke docs-web size-gate open-refused) with WEB_E2E_REQUIRE_BUILD=1 WEB_E2E_CHANNEL=${CHANNEL}..."
 
 set +e
 WEB_E2E_REQUIRE_BUILD=1 WEB_E2E_CHANNEL="$CHANNEL" \
-  npx playwright test -c web/e2e modules-smoke docs-web size-gate open-refused 2>&1 | tee "$LOG_FILE"
+  npx playwright test -c web/e2e modules-smoke docs-web size-gate open-refused 2>&1 | tee "$TMP_LOG"
 PW_EXIT=${PIPESTATUS[0]}
 set -e
 
+mkdir -p "$OUT_DIR"
+cp "$TMP_LOG" "$LOG_FILE"
+rm -f "$TMP_LOG"
+
 node - "$CHANNEL" "$PW_EXIT" "$LOG_FILE" "$JSON_FILE" <<'EOF'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { collectBuildMetadata, REPO_ROOT } from './tools/g7-05/lib.mjs'
 
 const channel = process.argv[2]
@@ -57,7 +73,9 @@ const pwExit = Number(process.argv[3])
 const logFile = process.argv[4]
 const jsonFile = process.argv[5]
 
-const logText = readFileSync(logFile, 'utf8')
+const rawLogText = existsSync(logFile) ? readFileSync(logFile, 'utf8') : ''
+// Strip ANSI color escape sequences (e.g. when FORCE_COLOR is set in cloud runner).
+const logText = rawLogText.replace(/\u001b\[[0-9;]*m/g, '')
 const passedMatch = /(\d+)\s+passed/.exec(logText)
 const skippedMatch = /(\d+)\s+skipped/.exec(logText)
 const failedMatch = /(\d+)\s+failed/.exec(logText)
@@ -77,6 +95,7 @@ const report = {
   specs: ['modules-smoke', 'docs-web', 'size-gate', 'open-refused'],
   status: ok ? 'passed' : 'failed',
   playwrightExitCode: pwExit,
+  logFile,
   counts: {
     passed,
     skipped,

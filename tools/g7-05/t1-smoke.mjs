@@ -164,38 +164,44 @@ async function runDebSmoke({ artifactPath, keepInstalled, outputDir, metadata })
     `[g7-05/t1:deb] Installed size of "${installDir}": ${installedSizeBytes} bytes (${installedSizeMib} MiB)`,
   )
 
-  const smokeResult = await runSixFixturesSmoke({
-    binaryPath: symlinkBin,
-    isAppImage: false,
-    label: 'deb',
-  })
-
+  let smokeResult
   let uninstalledCleanly = false
-  if (!keepInstalled) {
-    console.log('[g7-05/t1:deb] Uninstalling uniwork-office...')
-    let rmRes = runCmd('sudo', [
-      'DEBIAN_FRONTEND=noninteractive',
-      'apt-get',
-      'remove',
-      '-y',
-      'uniwork-office',
-    ])
-    if (rmRes.status !== 0) {
-      rmRes = runCmd('sudo', ['dpkg', '-r', 'uniwork-office'])
+  let uninstallError = null
+
+  try {
+    smokeResult = await runSixFixturesSmoke({
+      binaryPath: symlinkBin,
+      isAppImage: false,
+      label: 'deb',
+    })
+  } finally {
+    if (!keepInstalled) {
+      console.log('[g7-05/t1:deb] Uninstalling uniwork-office...')
+      let rmRes = runCmd('sudo', [
+        'DEBIAN_FRONTEND=noninteractive',
+        'apt-get',
+        'remove',
+        '-y',
+        'uniwork-office',
+      ])
       if (rmRes.status !== 0) {
-        throw new Error(`Failed to uninstall uniwork-office:\n${rmRes.stderr}`)
+        rmRes = runCmd('sudo', ['dpkg', '-r', 'uniwork-office'])
+      }
+      const installDirGone = !existsSync(installDir)
+      const symlinkGone = !existsSync(symlinkBin)
+      if (rmRes.status !== 0 || !installDirGone || !symlinkGone) {
+        uninstallError = new Error(
+          `Uninstall failed or left files behind: status=${rmRes.status}, installDirGone=${installDirGone} ("${installDir}"), symlinkGone=${symlinkGone} ("${symlinkBin}")\n${rmRes.stderr}`,
+        )
+      } else {
+        uninstalledCleanly = true
+        console.log(`[g7-05/t1:deb] Verified "${installDir}" and "${symlinkBin}" are removed.`)
       }
     }
+  }
 
-    const installDirGone = !existsSync(installDir)
-    const symlinkGone = !existsSync(symlinkBin)
-    if (!installDirGone || !symlinkGone) {
-      throw new Error(
-        `Uninstall left files behind: installDirGone=${installDirGone} ("${installDir}"), symlinkGone=${symlinkGone} ("${symlinkBin}")`,
-      )
-    }
-    uninstalledCleanly = true
-    console.log(`[g7-05/t1:deb] Verified "${installDir}" and "${symlinkBin}" are removed.`)
+  if (uninstallError) {
+    throw uninstallError
   }
 
   const report = {

@@ -2,17 +2,22 @@
 // Local lightweight self-test for tools/g7-05 (safe to run on bro: no Electron, no Playwright launch).
 // Verifies G7-06 fixture materialization + SHA-256 integrity, strace parser, netlog parser, /proc RSS sampler, and metadata collection.
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { G7_06_FIXTURES, materializeFixtures } from './fixtures-data.mjs'
 import {
   REPO_ROOT,
   collectBuildMetadata,
+  createLaunchWrapper,
+  findInstancePids,
   median,
   parseNetLog,
   parseStraceLog,
   sampleProcessTreeRssKb,
+  waitForEditorViewPage,
+  waitForShellReady,
 } from './lib.mjs'
 
 function testFixtureMaterialization() {
@@ -92,8 +97,97 @@ function testRssAndMetadata() {
   assert.equal(median([30, 10, 20]), 20)
 }
 
+async function testWrapperAndProcessTracking() {
+  const dir = mkdtempSync(join(tmpdir(), 'g7-05-selftest-wrap-'))
+  try {
+    const wDeb = createLaunchWrapper({
+      scratchDir: dir,
+      binaryPath: '/usr/bin/uniwork-office',
+      isAppImage: false,
+    })
+    const debScript = readFileSync(wDeb, 'utf8')
+    assert.ok(debScript.includes('--no-sandbox --disable-gpu "$@"'))
+
+    const wAppImage = createLaunchWrapper({
+      scratchDir: dir,
+      binaryPath: '/tmp/UniWork.AppImage',
+      isAppImage: true,
+    })
+    const appImageScript = readFileSync(wAppImage, 'utf8')
+    assert.ok(appImageScript.includes('--appimage-extract-and-run --no-sandbox --disable-gpu "$@"'))
+
+    const instanceId = `selftest-${Date.now()}`
+    const child = spawn('node', ['-e', 'setTimeout(() => {}, 10000)'], {
+      env: { ...process.env, G7_05_INSTANCE_ID: instanceId },
+      stdio: 'ignore',
+    })
+    try {
+      const pids = findInstancePids(child.pid, instanceId)
+      assert.ok(pids.includes(child.pid), 'findInstancePids must locate child by PID/environ')
+    } finally {
+      child.kill('SIGKILL')
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+async function testPackagedShellAndEditorViewResolution() {
+  const packagedUrls = [
+    'file:///opt/UniWork%20Office/resources/app.asar/out/renderer/index.html',
+    'file:///tmp/appimage_extracted_e6ca4b0088ce781a7e5209fa98ecde9d/resources/app.asar/out/renderer/index.html',
+  ]
+
+  for (const shellUrl of packagedUrls) {
+    const fakeShellPage = {
+      url: () => shellUrl,
+      evaluate: async () => 'complete',
+      locator: (sel) => ({
+        waitFor: async () => {
+          assert.equal(sel, '.tab-bar')
+        },
+      }),
+    }
+    const fakeEditorPage = {
+      url: () => 'genoffice-renderer://docs/index.html',
+      evaluate: async () => 'complete',
+    }
+    const fakeApp = {
+      windows: () => [fakeShellPage, fakeEditorPage],
+      waitForEvent: async () => {},
+      evaluate: async () => ({
+        shellUrl,
+        views: [
+          {
+            id: 2,
+            url: 'genoffice-renderer://docs/index.html',
+            bounds: { x: 0, y: 40, width: 1280, height: 760 },
+            focused: true,
+          },
+        ],
+        allWebContents: [
+          { id: 1, url: shellUrl, destroyed: false },
+          { id: 2, url: 'genoffice-renderer://docs/index.html', destroyed: false },
+        ],
+      }),
+    }
+
+    const resolvedShell = await waitForShellReady(fakeApp, 2_000)
+    assert.equal(resolvedShell, fakeShellPage, `waitForShellReady must match ${shellUrl}`)
+
+    const resolvedEditor = await waitForEditorViewPage(fakeApp, '://docs/', 2_000)
+    assert.equal(
+      resolvedEditor,
+      fakeEditorPage,
+      'waitForEditorViewPage must return the editor WebContentsView page',
+    )
+  }
+}
+
 testFixtureMaterialization()
 testStraceParser()
 testNetLogParser()
 testRssAndMetadata()
+await testWrapperAndProcessTracking()
+await testPackagedShellAndEditorViewResolution()
 console.log('[g7-05/self-test] All unit assertions passed.')
