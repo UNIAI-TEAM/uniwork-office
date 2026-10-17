@@ -459,12 +459,14 @@ export function DocumentsHome({
             nextCursor: result.value.nextCursor,
             loadingMore: false,
           })
-          setKnownAuthors((prev) => {
-            const merged = new Map<string, string>()
-            for (const opt of prev) merged.set(opt.id, opt.name)
-            for (const opt of collectUpdatedByOptions(items)) merged.set(opt.id, opt.name)
-            return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
-          })
+          if (subView !== 'shared-with-me') {
+            setKnownAuthors((prev) => {
+              const merged = new Map<string, string>()
+              for (const opt of prev) merged.set(opt.id, opt.name)
+              for (const opt of collectUpdatedByOptions(items)) merged.set(opt.id, opt.name)
+              return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
+            })
+          }
         } else {
           setPage({
             status: 'error',
@@ -542,12 +544,14 @@ export function DocumentsHome({
             nextCursor: result.value.nextCursor,
             loadingMore: false,
           }))
-          setKnownAuthors((prev) => {
-            const merged = new Map<string, string>()
-            for (const opt of prev) merged.set(opt.id, opt.name)
-            for (const opt of collectUpdatedByOptions(nextItems)) merged.set(opt.id, opt.name)
-            return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
-          })
+          if (subView !== 'shared-with-me') {
+            setKnownAuthors((prev) => {
+              const merged = new Map<string, string>()
+              for (const opt of prev) merged.set(opt.id, opt.name)
+              for (const opt of collectUpdatedByOptions(nextItems)) merged.set(opt.id, opt.name)
+              return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
+            })
+          }
         } else {
           setPage((prev) => ({
             ...prev,
@@ -1414,11 +1418,7 @@ export function DocumentsHome({
                           </span>
                         </button>
                         {menuItems.length > 0 && (
-                          <span
-                            className="dh-folder-actions"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
-                          >
+                          <span className="dh-folder-actions" onClick={(e) => e.stopPropagation()}>
                             <FolderMenu
                               label={t('ufActionsFor', { name: title })}
                               items={menuItems}

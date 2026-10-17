@@ -483,11 +483,12 @@
 }
 
 .dh-folder-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   height: 52px;
-  padding: 0 12px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
@@ -499,15 +500,15 @@
 }
 
 .dh-folder-open {
+  position: absolute;
+  inset: 0;
   display: flex;
-  flex: 1;
   align-items: center;
   gap: 10px;
   min-width: 0;
-  height: 100%;
-  padding: 0;
+  padding: 0 48px 0 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -517,13 +518,18 @@
 
 .dh-folder-open:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .dh-folder-actions {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   flex: none;
   align-items: center;
+  margin-left: auto;
+  height: 100%;
+  padding-right: 12px;
 }
 
 .dh-folder-icon {
