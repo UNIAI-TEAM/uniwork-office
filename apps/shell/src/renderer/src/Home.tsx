@@ -50,6 +50,7 @@ import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
 import { UniworkOpenCard } from './UniworkOpenCard'
+import { publishUniworkNotice } from './uniwork-notice-bus'
 import { openRecentEntry, openUniworkDocument } from './uniwork-open'
 import { subscribeUniworkOpened } from './uniwork-recents-refresh'
 import {
@@ -1288,6 +1289,10 @@ export function Home() {
   const [otherEntries, setOtherEntries] = useState<RecentEntry[]>([])
   /** total count under the current view + filter (not just the loaded rows) */
   const [listTotal, setListTotal] = useState(0)
+  const [otherTotal, setOtherTotal] = useState(0)
+  const [listLoaded, setListLoaded] = useState(false)
+  const [otherLoaded, setOtherLoaded] = useState(false)
+  const [lastPageLen, setLastPageLen] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [view, setView] = useState<'recent' | 'starred'>('recent')
   // FD-13 persisted area preference ('uniwork' | 'device')
@@ -1409,6 +1414,7 @@ export function Home() {
   }, [])
 
   useEffect(() => {
+    if (acctView === 'loading') return
     if (!isSignedIn) {
       setUwWsState({ workspaces: null, workspaceId: null, workspaceError: null })
       return
@@ -1425,7 +1431,7 @@ export function Home() {
     return () => {
       live = false
     }
-  }, [isSignedIn, recentsAccount, orgName, uwWsTick])
+  }, [acctView, isSignedIn, recentsAccount, orgName, uwWsTick])
 
   useEffect(() => {
     if (uwWsState.workspaceId && uwWsState.workspaceId !== readActiveWorkspaceId()) {
@@ -1479,11 +1485,14 @@ export function Home() {
   const openUniworkDocFromPane = (doc: UniworkDocSummary) => {
     if (openingDocId) return
     setOpeningDocId(doc.id)
-    void openUniworkDocument({ documentId: doc.id, title: doc.title }, window.aiOffice).finally(
-      () => {
+    void Promise.resolve()
+      .then(() => openUniworkDocument({ documentId: doc.id, title: doc.title }, window.aiOffice))
+      .catch(() => {
+        publishUniworkNotice({ phase: 'failed', error: 'network' })
+      })
+      .finally(() => {
         setOpeningDocId(null)
-      },
-    )
+      })
   }
 
   const goHomeList = (next: 'recent' | 'starred' = 'recent') => {
@@ -1605,6 +1614,12 @@ export function Home() {
   }, [expanded, root])
 
   useEffect(() => {
+    for (const r of roots) {
+      if (r.readable) loadFolder(r.path)
+    }
+  }, [roots, loadFolder])
+
+  useEffect(() => {
     if (!root?.usable) return
     if (seededRoot.current !== root.path) {
       seededRoot.current = root.path
@@ -1649,6 +1664,9 @@ export function Home() {
   /** reload the list; keepCount keeps the loaded row count (refresh), otherwise back to page one */
   const reload = (keepCount: boolean) => {
     const seq = ++requestSeq.current
+    setLoadingMore(false)
+    setListLoaded(false)
+    setOtherLoaded(false)
     const ext = filter === 'all' ? undefined : filter
     // the group pills only scope the Starred view's own list; the sidebar
     // counters and the other view stay group-agnostic
@@ -1660,11 +1678,15 @@ export function Home() {
       if (seq !== requestSeq.current) return
       setEntries(page.entries)
       setListTotal(page.total)
+      setLastPageLen(page.entries.length)
+      setListLoaded(true)
     })
     // The other view fetches its page under the same active filter so splitEntriesByArea can count per area.
     void secondary({ offset: 0, limit: PAGE_SIZE, ext }).then((page) => {
       if (seq !== requestSeq.current) return
       setOtherEntries(page.entries)
+      setOtherTotal(page.total)
+      setOtherLoaded(true)
     })
     if (projectMode) {
       void window.aiOfficeProject!.listProjects().then(setProjects)
@@ -1774,7 +1796,7 @@ export function Home() {
     refreshRef.current()
   }, [recentsAccount])
 
-  const hasMore = entries.length < listTotal
+  const hasMore = listLoaded && entries.length < listTotal
 
   // unified dismissal: outside press, window blur, chrome press (tab strip / window drag)
   useDismissablePopover(fileSortMenuOpen, () => setFileSortMenuOpen(false), {
@@ -1786,22 +1808,22 @@ export function Home() {
     setLoadingMore(true)
     const seq = requestSeq.current
     const ext = filter === 'all' ? undefined : filter
+    const group = view === 'starred' && groupFilter ? groupFilter : undefined
     const api = view === 'recent' ? window.aiOffice.recents : window.aiOffice.starred
-    void api({ offset: entriesLen.current, limit: PAGE_SIZE, ext }).then((page) => {
-      setLoadingMore(false)
+    void api({ offset: entriesLen.current, limit: PAGE_SIZE, ext, group }).then((page) => {
       if (seq !== requestSeq.current) return
+      setLoadingMore(false)
+      setLastPageLen(page.entries.length)
+      if (page.entries.length === 0) {
+        setListTotal(entriesLen.current)
+        return
+      }
       setEntries((prev) => [...prev, ...page.entries])
       setListTotal(page.total)
     })
   }
   const loadMoreRef = useRef(loadMore)
   loadMoreRef.current = loadMore
-
-  // oldest-first over a partially loaded list would miss the tail pages —
-  // keep pulling until the list is complete (backend caps recents at 100)
-  useEffect(() => {
-    if (fileSort === 'oldest' && hasMore) loadMoreRef.current()
-  }, [fileSort, hasMore, entries.length])
 
   // Load the next page once the bottom sentinel enters the viewport (240px early);
   // depending on entries.length rebuilds the observer after each page — observe fires an immediate
@@ -1933,12 +1955,28 @@ export function Home() {
   const splitOther = splitEntriesByArea(otherEntries)
   const areaEntries = area === 'uniwork' ? splitCurrent.uniwork : splitCurrent.device
   const otherAreaEntries = area === 'uniwork' ? splitOther.uniwork : splitOther.device
-  const currentAreaCount = areaEntries.filter((e) => !e.missing).length
-  const otherAreaCount = otherAreaEntries.filter((e) => !e.missing).length
+  const primaryExhausted = listLoaded && !hasMore
+  const otherExhausted = otherLoaded && otherEntries.length >= otherTotal
+  const currentAreaCount = primaryExhausted ? areaEntries.filter((e) => !e.missing).length : 0
+  const otherAreaCount = otherExhausted ? otherAreaEntries.filter((e) => !e.missing).length : 0
   const navCounts =
     view === 'recent'
       ? { recent: currentAreaCount, starred: otherAreaCount }
       : { recent: otherAreaCount, starred: currentAreaCount }
+
+  // Keep pulling pages when the active area has no rows yet (or fewer than a full page when PAGE_SIZE
+  // pages are returned) or when sorting oldest-first over a partially loaded list
+  useEffect(() => {
+    if (!hasMore || loadingMore) return
+    if (
+      fileSort === 'oldest' ||
+      areaEntries.length === 0 ||
+      (lastPageLen >= PAGE_SIZE && areaEntries.length < PAGE_SIZE)
+    ) {
+      loadMoreRef.current()
+    }
+  }, [fileSort, hasMore, loadingMore, areaEntries.length, lastPageLen])
+
   const selectedPaths = areaEntries.filter((e) => selected.has(e.path)).map((e) => e.path)
   // UniWork documents have no local file to move or delete: they are never selectable
   const selectableEntries = areaEntries.filter((e) => recentRowPolicy(e).selectable)
@@ -2697,18 +2735,7 @@ export function Home() {
             )}
           </div>
         </div>
-        {roots.length === 0 ? (
-          <div className="folder-empty-state" role="status">
-            <p className="folder-empty-text">{t('ufNoDeviceFolders')}</p>
-            <button
-              type="button"
-              className="btn btn-secondary folder-empty-cta"
-              onClick={addFolderRoot}
-            >
-              {t('addFolderRoot')}
-            </button>
-          </div>
-        ) : (
+        {roots.length > 0 && (
           <ul className="tree" role="tree">
             {root && !root.usable ? (
               <li className="folder-unusable">
@@ -3327,26 +3354,6 @@ export function Home() {
   }
 
   function renderFolderContent() {
-    if (roots.length === 0) {
-      return (
-        <main className="content">
-          <section className="quick-start" aria-label={t('secQuickStart')}>
-            <div className="section-head">
-              <span className="section-label">{t('secQuickStart')}</span>
-            </div>
-            {renderQuickCards()}
-          </section>
-          <section className="recents" aria-label={t('folders')}>
-            <div className="folder-empty-state">
-              <p className="folder-empty-text">{t('ufNoDeviceFolders')}</p>
-              <button type="button" className="folder-empty-cta" onClick={addFolderRoot}>
-                {t('addFolderRoot')}
-              </button>
-            </div>
-          </section>
-        </main>
-      )
-    }
     const total = folderSubfolders.length + folderFiles.length
     const sortedFiles = fileSort === 'oldest' ? [...folderFiles].reverse() : folderFiles
     return (
@@ -3464,6 +3471,9 @@ export function Home() {
             : 'greetEvening'
     const cjk = lang === 'zh' || lang === 'zh-TW' || lang === 'ja'
     const greeting = `${t(greetKey)}${accountName ? (cjk ? '，' : ', ') + accountName : ''}${cjk ? '。' : '. '}`
+    const noUsableDeviceRoots =
+      roots.length === 0 ||
+      roots.every((r) => !r.readable || !r.usable || listings.get(r.path)?.missing === true)
     return (
       <>
         <section className="quick-start" aria-label={t('secQuickStart')}>
@@ -3563,7 +3573,9 @@ export function Home() {
                 <span className="section-label">
                   {view === 'recent' ? t('secRecent') : t('secStarred')}
                 </span>
-                <span className="file-count">{fileCountLabel(areaEntries.length, lang, t)}</span>
+                {primaryExhausted && (
+                  <span className="file-count">{fileCountLabel(areaEntries.length, lang, t)}</span>
+                )}
               </div>
             )}
           </div>
@@ -3571,12 +3583,29 @@ export function Home() {
           {searchActive ? (
             renderSearchResults()
           ) : areaEntries.length === 0 ? (
-            renderEmpty(
-              view === 'starred'
-                ? t('emptyStarred')
-                : navCounts.recent === 0
-                  ? t('emptyRecent')
-                  : t('emptyFiltered'),
+            !listLoaded || hasMore ? (
+              <div ref={sentinelRef} className="load-more" aria-hidden="true">
+                <span className="load-more-spinner" />
+              </div>
+            ) : area === 'device' && noUsableDeviceRoots ? (
+              <div className="folder-empty-state" role="status">
+                <p className="folder-empty-text">{t('ufNoDeviceFolders')}</p>
+                <button
+                  type="button"
+                  className="btn btn-secondary folder-empty-cta"
+                  onClick={addFolderRoot}
+                >
+                  {t('addFolderRoot')}
+                </button>
+              </div>
+            ) : (
+              renderEmpty(
+                view === 'starred'
+                  ? t('emptyStarred')
+                  : navCounts.recent === 0
+                    ? t('emptyRecent')
+                    : t('emptyFiltered'),
+              )
             )
           ) : (
             <div className={`recent-table${selectedPaths.length > 0 ? ' has-selection' : ''}`}>
@@ -3866,11 +3895,12 @@ export function Home() {
             aria-selected={area === 'uniwork'}
             aria-controls="home-area-panel"
             tabIndex={area === 'uniwork' ? 0 : -1}
+            title={t('ufAreaUniwork')}
             className={`home-area-tab${area === 'uniwork' ? ' active' : ''}`}
             onClick={() => selectArea('uniwork')}
             onKeyDown={(e) => onAreaTabKeyDown(e, 'uniwork')}
           >
-            {t('wbDeskSubCloud')}
+            {t('ufAreaUniwork')}
           </button>
           <button
             type="button"
@@ -3879,6 +3909,7 @@ export function Home() {
             aria-selected={area === 'device'}
             aria-controls="home-area-panel"
             tabIndex={area === 'device' ? 0 : -1}
+            title={t('wbOnThisDevice')}
             className={`home-area-tab${area === 'device' ? ' active' : ''}`}
             onClick={() => selectArea('device')}
             onKeyDown={(e) => onAreaTabKeyDown(e, 'device')}
@@ -3980,7 +4011,11 @@ export function Home() {
           }}
         />
       ) : area === 'uniwork' ? (
-        !isSignedIn ? (
+        acctView === 'loading' ? (
+          <main className="content">
+            <WorkSkeleton />
+          </main>
+        ) : !isSignedIn ? (
           <main className="content">
             <WorkErrorState
               state="signed-out"
