@@ -83,6 +83,7 @@ import {
   type UnsavedCloseKind,
 } from './service'
 import { UPLOAD_EXTENSIONS } from './formats'
+import { scopeWorkingCopyDirs } from './binding-store'
 import { tUniworkDocs } from './strings'
 import { createTreeChangedCoalescer } from './tree-changed'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
@@ -798,7 +799,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       UNIWORK_DOC_CHANNELS.lock,
     ),
     // G5-05u B5/B7: the pinned copy an offline open falls back to, and the S5
-    // "Tải lại" gate that asks whether the head is downloaded
+    // "Tải lại" gate that asks whether the head is downloaded. The gate's
+    // optional revision is not compared: the offline projection keeps no server
+    // revision (a row's committed copy is the head by version), so BE-R1-6
+    // answers from the row's openable state + version, never from a revision
+    // the offline library cannot name.
     openOfflineCopy: (documentId) => offlineRef.open(documentId),
     hasOfflineHead: (documentId) => offlineHead.has(documentId),
     // the whole list when locks clear (a Retry that unlocked the keychain): the
@@ -953,6 +958,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     capabilityOn: async (orgId) =>
       (await runtime.capabilityRead(orgId)).capabilities.offline_library,
     store: service.store,
+    // BE-R1-2: the leftover sweep walks the account's own working-copy folders
+    scopeDirs: (deploymentId, accountId) =>
+      scopeWorkingCopyDirs(service.store.root, { deploymentId, accountId }),
     scope: () => {
       const identity = uniworkSessionIdentity()
       return identity
@@ -1159,6 +1167,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       onUniworkAccountStatus((status) => {
         // the session's account may have changed: it becomes the last owner
         service.noteSessionIdentity()
+        // BE-R1-2: an account activation is the startup sweep - the last
+        // session's read-only `@offline` plaintext goes before anything opens one
+        void offlineCopies.recover().catch(() => undefined)
         // G8-16 S16: changing the organization reloads the library data. An
         // org-less push carrying orgsError is a transient /orgs failure; an
         // org-less push without it (deactivation, the picker) is a lasting

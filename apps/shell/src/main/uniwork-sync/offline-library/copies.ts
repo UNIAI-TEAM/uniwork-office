@@ -1,9 +1,11 @@
-import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { createHash } from 'node:crypto'
+import type { Dirent } from 'node:fs'
+import { chmod, readdir, rm, stat } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import type { UniworkDocLock } from '../../../shared/home-api'
 import type { OfflineFailure } from '../../../shared/offline-library'
 import type { Binding } from '../../uniwork-docs/binding-store'
-import { formatForMime, formatForName } from '../../uniwork-docs/formats'
+import { formatForMime, formatForName, sanitizeFilename } from '../../uniwork-docs/formats'
 import { APP_STORE_LEVEL } from '../store-level'
 import type { OfflineLibraryManager } from './manager'
 import { offlineFailureOf } from './view'
@@ -23,6 +25,47 @@ export const OFFLINE_COPY_CLOSE_GRACE_MS = 30_000
 
 /** the document-key suffix of the offline copy of a document (never its own working copy) */
 export const OFFLINE_COPY_KEY_SUFFIX = '@offline'
+
+/** the cap of one binding path segment (`SEGMENT`, binding-store.ts: the 128-char feed id plus a suffix does not fit) */
+export const OFFLINE_COPY_KEY_MAX = 128
+
+/**
+ * Every entry of `dir` made writable: a copy left by an earlier session is
+ * 0o444 (the kept-draft pattern), and neither `unlink` nor a rewrite may
+ * touch it before that is undone. Unreadable folders are left alone.
+ */
+async function makeWritable(dir: string): Promise<void> {
+  let entries: Dirent[]
+  try {
+    entries = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  await chmod(dir, 0o700).catch(() => undefined)
+  for (const entry of entries) {
+    const target = join(dir, entry.name)
+    if (entry.isDirectory()) await makeWritable(target)
+    else await chmod(target, 0o600).catch(() => undefined)
+  }
+}
+
+/**
+ * Delete a copy folder, undoing the read-only mode first (BE-R1-2). `false`
+ * only when the folder is still there: the caller keeps its own record of the
+ * copy, so a later sweep retries instead of forgetting a plaintext leftover.
+ */
+async function removeDir(dir: string): Promise<boolean> {
+  await makeWritable(dir)
+  try {
+    await rm(dir, { recursive: true, force: true, maxRetries: 2 })
+    return true
+  } catch {
+    return !(await stat(dir).then(
+      () => true,
+      () => false,
+    ))
+  }
+}
 
 export interface OfflineCopyRefusal {
   kind: 'refused'
@@ -47,7 +90,11 @@ export interface OfflineCopiesDeps {
   store: {
     dirFor(deploymentId: string, accountId: string, key: string): string
     write(dir: string, binding: Binding): Promise<boolean>
+    /** the normal open path's own writer: the bytes go under `basename(filename)` */
+    writeWorkingCopy(dir: string, filename: string, bytes: Uint8Array): Promise<string>
   }
+  /** every working-copy folder of the account boundary: the leftover sweep walks them */
+  scopeDirs(deploymentId: string, accountId: string): string[]
   scope(): { deploymentId: string; accountId: string } | null
   /** show the copy as a tab (`show`, the lock check, the open and the status push) */
   show(path: string): { path: string; title: string } | null
@@ -61,13 +108,28 @@ export interface OfflineCopies {
   open(documentId: string): Promise<OfflineCopyOutcome>
   /** delete every copy no window shows any more (a poll and each account change run it) */
   sweep(): Promise<void>
+  /** startup / account activation: every leftover `<id>@offline` folder of the account goes */
+  recover(): Promise<void>
   /** sign-out / account switch: every copy goes, the engine is not called */
   dropAll(): Promise<void>
 }
 
-/** the one copy key of a document: its own folder, so no real working copy is touched */
+/**
+ * The one copy key of a document: its own folder, so no real working copy is
+ * touched. A 128-char document id (the feed's own cap) does not fit the
+ * binding path segment with the suffix (BE-R1-5), so a longer id keeps its head
+ * and a fixed-length digest of the whole id: still one accepted segment, still
+ * the same key for the same document.
+ */
 export function offlineCopyKey(documentId: string): string {
-  return `${documentId}${OFFLINE_COPY_KEY_SUFFIX}`
+  const raw = `${documentId}${OFFLINE_COPY_KEY_SUFFIX}`
+  if (raw.length <= OFFLINE_COPY_KEY_MAX) return raw
+  const digest = createHash('sha256').update(documentId).digest('hex').slice(0, 16)
+  const head = documentId.slice(
+    0,
+    OFFLINE_COPY_KEY_MAX - OFFLINE_COPY_KEY_SUFFIX.length - digest.length - 1,
+  )
+  return `${head}-${digest}${OFFLINE_COPY_KEY_SUFFIX}`
 }
 
 export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
@@ -75,17 +137,20 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
   /** documentId -> the copy on screen (one per document, however many tabs read it) */
   const copies = new Map<string, { dir: string; path: string; title: string; openedAt: number }>()
 
-  const drop = async (documentId: string, closed: boolean): Promise<void> => {
+  const drop = async (documentId: string, closed: boolean): Promise<boolean> => {
     const copy = copies.get(documentId)
-    if (!copy) return
+    if (!copy) return true
+    // a folder that would not go stays on the record: the next sweep retries
+    // instead of forgetting a plaintext leftover (BE-R1-2)
+    if (!(await removeDir(copy.dir))) return false
     copies.delete(documentId)
-    await rm(copy.dir, { recursive: true, force: true, maxRetries: 2 }).catch(() => undefined)
     // the pin's deferred cleanup waits for the last reader: tell the library the tab is gone
     if (closed)
       await deps
         .library()
         ?.markClosed(documentId)
         .catch(() => undefined)
+    return true
   }
 
   const open = async (documentId: string): Promise<OfflineCopyOutcome> => {
@@ -111,12 +176,15 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
         leaseLock: row?.lockReason ?? null,
       })
       if (failure.code === 'not_pinned' || failure.code === 'not_ready') return { kind: 'none' }
+      // never a raw server name in a path (BE-R1-1): the lock names one safe segment
+      const name = row?.filename ?? documentId
+      const safeName = sanitizeFilename(name, formatForName(name) ?? 'docx')
       return {
         kind: 'refused',
         failure,
         lock: {
-          path: join(dir, row?.filename ?? documentId),
-          name: row?.filename ?? documentId,
+          path: join(dir, safeName),
+          name: safeName,
           reason: failure.lockReason ?? 'lease_expired',
           ...(failure.libraryOff ? { libraryOff: true } : {}),
         },
@@ -125,11 +193,14 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     const format =
       formatForMime(cached.manifest.main.mimeType) ?? formatForName(cached.manifest.main.filename)
     if (!format || !row) return { kind: 'none' }
-    const filename = cached.manifest.main.filename
-    const path = join(dir, filename)
-    await drop(documentId, false)
-    await mkdir(dir, { recursive: true })
-    await writeFile(path, cached.bytes)
+    // whatever an earlier session (a crash, a remove that failed) left under this
+    // key goes before the new bytes land, whether this session knows the copy or not
+    if (!(await removeDir(dir))) return { kind: 'none' }
+    copies.delete(documentId)
+    // the copy is named exactly as the normal open path names it: the manifest's
+    // file name made one safe segment (BE-R1-1) - never the raw server string
+    const filename = sanitizeFilename(cached.manifest.main.filename, format)
+    const path = await deps.store.writeWorkingCopy(dir, filename, cached.bytes)
     // read-only on disk too: nothing may write this plaintext copy (the binding already says view)
     await chmod(path, 0o444).catch(() => undefined)
     const binding: Binding = {
@@ -176,13 +247,29 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     }
   }
 
-  const dropAll = async (): Promise<void> => {
-    const dirs = [...copies.values()].map((copy) => copy.dir)
-    copies.clear()
-    for (const dir of dirs) {
-      await rm(dir, { recursive: true, force: true, maxRetries: 2 }).catch(() => undefined)
+  /**
+   * Startup / account activation (BE-R1-2): a crash leaves the last session's
+   * `<id>@offline` plaintext behind - nothing tracks it, so nothing would ever
+   * delete it. Every `@offline` folder of the account goes here; a copy this
+   * process still shows is left to its own sweep (`drop`).
+   */
+  const recover = async (): Promise<void> => {
+    const scope = deps.scope()
+    if (!scope) return
+    const shown = new Set([...copies.values()].map((copy) => copy.dir))
+    for (const dir of deps.scopeDirs(scope.deploymentId, scope.accountId)) {
+      if (!basename(dir).endsWith(OFFLINE_COPY_KEY_SUFFIX)) continue
+      if (shown.has(dir)) continue
+      await removeDir(dir)
     }
   }
 
-  return { open, sweep, dropAll }
+  const dropAll = async (): Promise<void> => {
+    for (const [documentId, copy] of [...copies]) {
+      // a folder that would not go is still a copy: it stays on the record
+      if (await removeDir(copy.dir)) copies.delete(documentId)
+    }
+  }
+
+  return { open, sweep, recover, dropAll }
 }
