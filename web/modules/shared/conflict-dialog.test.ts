@@ -966,6 +966,78 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
     expect(await done).toEqual({ kind: 'cancelled' })
   })
 
+  it('over the limit without the download capability: the alert names only closing and reducing the size', async () => {
+    const maxBytes = 200 * MB
+    const sizeBytes = 200 * MB + 1
+    const done = runConflictDialog(io({ sizeBytes, maxBytes }))
+
+    // Overwrite is refused up front; the alert must not promise a download the step cannot run
+    await pick('overwrite')
+    expect(alertLine().textContent).toBe(
+      format(t('uwConflictTooLargeWithLimit'), { size: '200.1 MB', max: '200 MB' }),
+    )
+    expect(alertLine().textContent).not.toContain('Reload latest')
+    expect(alertLine().textContent).not.toContain('Download my copy')
+
+    // without `io.download` the Reload confirm can only discard: nothing to download with
+    await pick('reload')
+    expect(choices()).toEqual(['discard', 'back'])
+    await pick('back')
+    await pick('cancel')
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
+
+  it('Save as a copy 413 without a limit disables the download, so the alert does not promise it', async () => {
+    const saveCopy = vi.fn(async (): Promise<SaveCopyAttempt> => ({
+      ok: false,
+      error: { code: 'too_large', status: 413, message: 'HTTP 413' },
+    }))
+    const send = vi.fn(async () => {})
+    const done = runConflictDialog(
+      io({
+        saveCopy,
+        sizeBytes: 55 * MB,
+        download: { bytes: async () => new ArrayBuffer(4), send },
+      }),
+    )
+    await pick('save-copy')
+    await pick('go')
+    expect(alertLine().textContent).toBe(t('uwConflictSaveCopyTooLarge'))
+    expect(alertLine().textContent).not.toContain('Reload latest')
+    expect(alertLine().textContent).not.toContain('Download my copy')
+    // the download choice on the Reload confirm is disabled now: the text must not offer it
+    await pick('reload')
+    expect(btn('download').getAttribute('aria-disabled')).toBe('true')
+    await pick('back')
+    await pick('cancel')
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
+
+  it('Overwrite 413 without a limit: the download is disabled and the alert does not promise it', async () => {
+    const overwrite = vi.fn(async (): Promise<OverwriteAttempt> => ({
+      ok: false,
+      error: { code: 'too_large', status: 413, message: 'HTTP 413' },
+    }))
+    const send = vi.fn(async () => {})
+    const done = runConflictDialog(
+      io({
+        overwrite,
+        sizeBytes: 55 * MB,
+        download: { bytes: async () => new ArrayBuffer(4), send },
+      }),
+    )
+    await pick('overwrite')
+    await pick('go')
+    expect(alertLine().textContent).toBe(t('uwConflictTooLarge'))
+    expect(alertLine().textContent).not.toContain('Reload latest')
+    expect(alertLine().textContent).not.toContain('Download my copy')
+    await pick('reload')
+    expect(btn('download').getAttribute('aria-disabled')).toBe('true')
+    await pick('back')
+    await pick('cancel')
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
+
   it('Save as a copy too-large (SVC-3): names actions that exist on step 1 in both vi and en, and maps file_too_large / too_large', async () => {
     const prevLang = webLanguage()
     try {
@@ -998,7 +1070,7 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
         }),
       )
       expect(alertLine().textContent).not.toContain('Tải bản của tôi')
-      expect(alertLine().textContent).toContain('Tải lại bản mới nhất')
+      expect(alertLine().textContent).not.toContain('Tải lại bản mới nhất')
       await pick('cancel')
       expect(await doneVi).toEqual({ kind: 'cancelled' })
 
@@ -1040,7 +1112,7 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
         }),
       )
       expect(alertLine().textContent).not.toContain('Download my copy')
-      expect(alertLine().textContent).toContain('Reload latest')
+      expect(alertLine().textContent).not.toContain('Reload latest')
       await pick('cancel')
       expect(await doneEn).toEqual({ kind: 'cancelled' })
     } finally {
@@ -1048,24 +1120,19 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
     }
   })
 
-  it('SVF-7 / RFR2-1 / RFR2-2: step-1 too-large messages in all 19 locales never name the non-existent webSaveBlockDownload button and explain that Reload latest downloads the version', () => {
+  it('SVF-7 / RFR2-1 / RFR2-2: step-1 too-large messages in all 19 locales never name the non-existent webSaveBlockDownload button, and the base variants do not name Reload latest', () => {
+    const baseKeys = [
+      'uwConflictTooLarge',
+      'uwConflictTooLargeWithLimit',
+      'uwConflictSaveCopyTooLarge',
+      'uwConflictSaveCopyTooLargeWithLimit',
+    ] as const
     for (const [lang, dict] of Object.entries(webStrings)) {
-      expect(dict.uwConflictTooLargeWithLimit, `${lang} uwConflictTooLargeWithLimit`).not.toContain(
-        dict.webSaveBlockDownload,
-      )
-      expect(dict.uwConflictSaveCopyTooLarge, `${lang} uwConflictSaveCopyTooLarge`).not.toContain(
-        dict.webSaveBlockDownload,
-      )
-      expect(
-        dict.uwConflictSaveCopyTooLargeWithLimit,
-        `${lang} uwConflictSaveCopyTooLargeWithLimit`,
-      ).not.toContain(dict.webSaveBlockDownload)
-    }
-    for (const lang of ['ar', 'he', 'hi', 'ko', 'th'] as const) {
-      const dict = webStrings[lang]
-      expect(dict.uwConflictTooLargeWithLimit).toContain(dict.uwConflictReloadTitle)
-      expect(dict.uwConflictSaveCopyTooLarge).toContain(dict.uwConflictReloadTitle)
-      expect(dict.uwConflictSaveCopyTooLargeWithLimit).toContain(dict.uwConflictReloadTitle)
+      for (const key of baseKeys) {
+        expect(dict[key], `${lang} ${key}`).not.toContain(dict.webSaveBlockDownload)
+        // the base text is shown exactly when the download cannot run: it must not offer it
+        expect(dict[key], `${lang} ${key}`).not.toContain(dict.uwConflictReloadTitle)
+      }
     }
   })
 })
