@@ -225,6 +225,8 @@ function fakeServer(
     sessionPartSize?: number
     /** BIGUP-A1: holds a part PUT open until it settles, so a test can cancel it */
     partGate?: () => Promise<void>
+    /** BIGUP-A1: this part PUT is refused once with a non-retryable 415 */
+    partFailsOnceAt?: number
   } = {},
 ) {
   const state = {
@@ -253,6 +255,8 @@ function fakeServer(
     } | null,
     sessionSeq: 0,
     completedParts: [] as Array<{ part_number: number; etag: string }>,
+    /** BIGUP-A1: the parts a `partFailsOnceAt` run has already refused */
+    failedParts: new Set<number>(),
   }
   let seq = 0
   /** every request the fake saw, in order */
@@ -681,6 +685,11 @@ function fakeServer(
         })
       }
       call.body = { partNumber: Number(u.pathname.split('/').pop()) }
+      const partNumber = Number(u.pathname.split('/').pop())
+      if (options.partFailsOnceAt === partNumber && !state.failedParts.has(partNumber)) {
+        state.failedParts.add(partNumber)
+        return envelope(415, 'unsupported_media_type')
+      }
       return new Response(null, {
         status: 200,
         headers: { ETag: `"etag-${u.pathname.split('/').pop()}"` },
@@ -2954,6 +2963,96 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
       const deleted = server.calls.find((call) => call.method === 'DELETE')!
       expect(deleted.path).toMatch(/^\/api\/v1\/upload-sessions\//)
       expect(server.calls.filter((call) => call.path.endsWith('/complete'))).toHaveLength(0)
+    })
+
+    it('keeps its resume record when an attempt fails, and the next upload re-reads the session', async () => {
+      const first = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionPartSize: 8 * 1024 * 1024,
+        partFailsOnceAt: 2,
+      })
+      const ctxA = setup(first, { syncStore: true })
+      const file = join(dir, 'Resume.docx')
+      writeFileSync(file, buildDocxBytes(20 * 1024 * 1024))
+      // part 2 is refused for good: the run reports the server's format error.
+      // A part failure is not a cancel, so the session is NOT aborted and the
+      // saved record survives - that is what a crash mid-upload leaves too.
+      const failed = await ctxA.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-resume',
+      })
+      expect(failed).toEqual({ ok: false, error: 'unsupported_format' })
+      expect(first.calls.filter((call) => call.method === 'DELETE')).toHaveLength(0)
+
+      // restart: a fresh service over the same store dir, and the server still
+      // holds part 1 with the session open
+      const second = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionPartSize: 8 * 1024 * 1024,
+      })
+      second.state.session = {
+        sessionId: 'ups_1',
+        sizeBytes: 20 * 1024 * 1024,
+        filename: 'Resume.docx',
+        parentId: null,
+        title: null,
+      }
+      second.state.completedParts = [{ part_number: 1, etag: 'etag-1' }]
+      const ctxB = setup(second, { syncStore: true })
+      const resumed = await ctxB.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-resume-2',
+      })
+
+      expect(resumed.ok).toBe(true)
+      // the saved session was looked up, not created, and only parts 2 and 3
+      // went again
+      const refresh = second.calls.find(
+        (call) => call.method === 'GET' && call.path.startsWith('/api/v1/upload-sessions/'),
+      )!
+      expect(refresh.path).toBe('/api/v1/upload-sessions/ups_1')
+      expect(
+        second.calls.filter(
+          (call) => call.path === '/api/v1/workspaces/ws_a/documents/upload-sessions',
+        ),
+      ).toHaveLength(0)
+      const putParts = second.calls
+        .filter((call) => call.path.startsWith('/part/'))
+        .map((call) => (call.body as { partNumber: number }).partNumber)
+      expect(putParts).toEqual([2, 3])
+      const complete = second.calls.find((call) => call.path.endsWith('/complete'))!
+      expect((complete.body as { parts: Array<{ part_number: number }> }).parts).toHaveLength(3)
+    })
+
+    it('reports a part refused for good as the server format error and never completes', async () => {
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionPartSize: 8 * 1024 * 1024,
+        partFailsOnceAt: 1,
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'Abort.docx')
+      writeFileSync(file, buildDocxBytes(20 * 1024 * 1024))
+
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-abort',
+      })
+
+      // the contract maps a 415 to `unsupported_format`; `complete` never runs,
+      // and the session stays for the retry the resume record enables
+      expect(uploaded).toEqual({ ok: false, error: 'unsupported_format' })
+      expect(server.calls.filter((call) => call.path.endsWith('/complete'))).toHaveLength(0)
+      expect(server.calls.filter((call) => call.method === 'DELETE')).toHaveLength(0)
     })
   })
 
