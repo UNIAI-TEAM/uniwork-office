@@ -592,18 +592,21 @@ export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-late
  * `keyring_unavailable` is deliberately absent: a machine without a usable OS
  * keystore refuses sign-in, so no UniWork session (and no panel) exists there.
  */
-export type UniworkLockReason =
-  | 'store_newer'
-  | 'keystore_locked'
-  | 'signed_out'
-  | 'session_expired'
-  | 'foreign_account'
-  | 'permission_revoked'
-  | 'document_deleted'
-  | 'organization_suspended'
-  | 'member_deactivated'
-  | 'lease_expired'
-  | 'clock_rollback'
+export const UNIWORK_LOCK_REASONS = [
+  'store_newer',
+  'keystore_locked',
+  'signed_out',
+  'session_expired',
+  'foreign_account',
+  'permission_revoked',
+  'document_deleted',
+  'organization_suspended',
+  'member_deactivated',
+  'lease_expired',
+  'clock_rollback',
+] as const
+
+export type UniworkLockReason = (typeof UNIWORK_LOCK_REASONS)[number]
 
 /**
  * G5-11: what the sign-out / account-switch / deployment-switch prompt needs;

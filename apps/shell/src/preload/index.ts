@@ -66,6 +66,7 @@ import type {
   UniworkFolderNode,
   UniworkFolderQuery,
   UniworkLaunchEvent,
+  UniworkLockReason,
   UniworkMoveDocumentInput,
   UniworkMoveResult,
   UniworkQueuePopoverRequest,
@@ -84,7 +85,12 @@ import type {
   SignOutProgress,
   SignOutPromptRequest,
 } from '../shared/home-api'
-import { HOME_CHANNELS, PROJECT_CHANNELS, UNIWORK_DOC_CHANNELS } from '../shared/home-api'
+import {
+  HOME_CHANNELS,
+  PROJECT_CHANNELS,
+  UNIWORK_DOC_CHANNELS,
+  UNIWORK_LOCK_REASONS,
+} from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
 import type {
   IntegrationsApi,
@@ -284,18 +290,29 @@ function asUniworkActionResult<T>(result: unknown): UniworkDocActionResult<T> {
   return { ok: false, error: 'malformed_response' }
 }
 
-/** a lock from main: path, reason and name only; anything else is dropped */
-function asUniworkLock(result: unknown): UniworkDocLock | null {
+const UNIWORK_LOCK_REASON_SET: ReadonlySet<string> = new Set<string>(UNIWORK_LOCK_REASONS)
+
+function isUniworkLockReason(value: unknown): value is UniworkLockReason {
+  return typeof value === 'string' && UNIWORK_LOCK_REASON_SET.has(value)
+}
+
+/** a lock from main: path, reason, name and optional libraryOff; anything else is dropped */
+export function asUniworkLock(result: unknown): UniworkDocLock | null {
   if (!result || typeof result !== 'object') return null
   const r = result as Partial<UniworkDocLock>
   if (typeof r.path !== 'string' || !r.path) return null
-  if (r.reason !== 'store_newer' && r.reason !== 'keystore_locked' && r.reason !== 'signed_out') {
+  if (!isUniworkLockReason(r.reason)) {
     return null
   }
-  return { path: r.path, reason: r.reason, name: typeof r.name === 'string' ? r.name : '' }
+  return {
+    path: r.path,
+    reason: r.reason,
+    name: typeof r.name === 'string' ? r.name : '',
+    ...(r.libraryOff === true ? { libraryOff: true } : {}),
+  }
 }
 
-function asUniworkLocks(result: unknown): UniworkDocLock[] {
+export function asUniworkLocks(result: unknown): UniworkDocLock[] {
   if (!Array.isArray(result)) return []
   return result.map(asUniworkLock).filter((lock): lock is UniworkDocLock => lock !== null)
 }
