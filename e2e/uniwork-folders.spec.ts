@@ -133,15 +133,16 @@ async function triggerSaveToUniWork(app: LaunchedApp['app']): Promise<void> {
 }
 
 /**
- * Selects the workspace root (`UniWork`) in the DocumentsHome sidebar folder tree
- * so the UniWork area switches from the initial Recent sub-view to the workspace
- * root folder view (`Workspace documents`).
+ * Selects the UniWork area tab and the `Workspace documents` sub-nav entry so
+ * `DocumentsHome` switches deterministically to the workspace root folder view.
  */
 async function openUniworkFolderBrowser(shell: Page) {
-  const browser = shell.locator('.home-root')
-  const tree = browser.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
-  await expect(tree).toBeVisible()
-  await tree.getByRole('treeitem', { name: uniworkFoldersEn.ufRoot }).click()
+  const browser = shell.locator('.home')
+  const uwTab = browser.locator('#home-area-tab-uniwork')
+  if ((await uwTab.getAttribute('aria-selected')) === 'false') {
+    await uwTab.click()
+  }
+  await browser.locator('.dh-subnav .nav-item[data-nav="workspace"]').click({ timeout: 30_000 })
   const home = browser.locator('.dh-home')
   await expect(home.locator('.dh-title')).toHaveText(uniworkHomeEn.uhNavWorkspace)
   await expect(home.locator('.uw-pick-skeleton')).toHaveCount(0, { timeout: 15_000 })
@@ -297,6 +298,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       // The new folder is visible in both the contents list and the folder tree
       await expect(contents.locator('.dh-folder-open', { hasText: 'Q4 Specs' })).toBeVisible()
+      await expect(tree).toBeVisible()
       await expect(tree.getByRole('treeitem', { name: 'Q4 Specs' })).toBeVisible()
       // The stub holds `Q4 Specs` with `parentId: projects.id`
       const created = stub.folders().find((f) => f.title === 'Q4 Specs')
@@ -376,6 +378,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       ).toBeHidden()
 
       // The tree moved too: `Target Hub` now holds `Moving Subfolder`, `Source Hub` does not
+      await expect(tree).toBeVisible()
       await expandTreeFolder(tree, 'Target Hub')
       await expandTreeFolder(tree, 'Source Hub')
       await expect.poll(() => treeChildrenOf(tree, 'Target Hub')).toEqual(['Moving Subfolder'])
@@ -761,6 +764,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
         contents.locator('.dh-doc-open', { hasText: 'new-in-chosen-folder.docx' }),
       ).toBeVisible()
       // 2. Navigate to `Start Folder`, then Upload `uploaded-handbook.docx` into `Chosen Target`
+      await expect(tree).toBeVisible()
       await tree.getByRole('treeitem', { name: 'Start Folder' }).click()
       await expect(crumbs.getByText('Start Folder', { exact: true })).toHaveAttribute(
         'aria-current',
@@ -1072,7 +1076,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       const dialog = await openUniworkFolderBrowser(shell)
       const tree = dialog.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
       const contents = dialog.locator('.dh-home')
-
+      await expect(tree).toBeVisible()
       await expect(tree.getByRole('treeitem', { name: uniworkSaveEn.usMyFolder })).toBeVisible()
       await expect(
         contents.locator('.dh-folder-open', { hasText: uniworkSaveEn.usMyFolder }),

@@ -161,6 +161,10 @@ const callsFor = (stub: UniworkDocumentsStub, id: string): StubCall[] =>
   stub.calls().filter((c) => c.route.startsWith(`/documents/${id}`))
 
 async function openFromPicker(shell: Page, title: string): Promise<void> {
+  const uwTab = shell.locator('#home-area-tab-uniwork')
+  if ((await uwTab.getAttribute('aria-selected')) === 'false') {
+    await uwTab.click()
+  }
   const home = shell.locator('.dh-home')
   await expect(home).toBeVisible()
   await expect(home.locator('.uw-pick-skeleton')).toHaveCount(0, { timeout: 15_000 })
@@ -420,6 +424,10 @@ test.describe.serial('UniWork documents', () => {
         access: 'edit',
         state: 'ready',
       })
+      // Switch Home back to the UniWork area so the persisted HOME_AREA_KEY stays on 'uniwork'
+      await shell.locator('.tab-item.tab-home').click()
+      await shell.locator('#home-area-tab-uniwork').click()
+      await expect(shell.locator('#home-area-tab-uniwork')).toHaveAttribute('aria-selected', 'true')
     })
   })
 
