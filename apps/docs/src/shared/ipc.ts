@@ -316,6 +316,9 @@ export interface DesktopCapabilities {
   exportPdf?: boolean
   /** File > Export as HTML (web: only when the host grants `exportHtml` and not in `readOnly` profile) */
   exportHtml?: boolean
+  /** web only: the host set the `readOnly` profile; hides the document's own comments panel (a view-only
+   *  user without the profile keeps it) */
+  readOnlyProfile?: boolean
 }
 
 /**

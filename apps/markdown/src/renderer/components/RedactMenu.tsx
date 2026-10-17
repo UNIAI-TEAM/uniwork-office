@@ -81,7 +81,7 @@ export function RedactMenu({ editor, enabled }: Props) {
       {point && (
         <div
           className="redact-menu"
-          role="menu"
+          data-esc-local=""
           style={{ left: point.x, top: point.y }}
           // stopPropagation as well as preventDefault: this listener is on
           // window in the bubble phase, and preventDefault does not stop the

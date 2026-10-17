@@ -23,6 +23,7 @@ describe('webCapabilities (the single web capability source)', () => {
         'imageSearch',
         'open',
         'print',
+        'readOnlyProfile',
         'recents',
         'save',
         'saveAs',

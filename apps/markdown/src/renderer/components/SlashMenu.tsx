@@ -59,7 +59,7 @@ export const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   return (
     <div
       className="slash-menu"
-      role="menu"
+      data-esc-local=""
       style={{ position: 'fixed', top: rect.bottom + 4, left: rect.left }}
       onMouseDown={(e) => e.preventDefault()}
     >

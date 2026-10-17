@@ -127,7 +127,8 @@ import { hfFooterLine, hfLayoutResolved, hfPhantomSpec, hfWithPhantom } from './
 import { textColorValue } from './editor/text-color'
 import { textOutlineCssValue } from './editor/text-outline'
 import { AiAskPopover } from './components/AiAskPopover'
-import { cap } from './capabilities'
+import { cap, isReadOnlyProfile } from './capabilities'
+import { installReadModeEscape } from './read-mode-escape'
 import { isNarrowViewport, widthFitZoom } from './narrow-viewport'
 import { EDIT_QUEUE_MAX, selectionForAnchor, type DocsEditQueueItem } from './ai/edit-queue'
 import { addQueueAnchor, clearQueueAnchors, removeQueueAnchors } from './editor/ai-queue-anchors'
@@ -1950,14 +1951,7 @@ export function App() {
     setEditorEditable(editor, !readMode && !isProtected && !refusedMessage)
     scheduleUiRefresh()
     if (!readMode) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setReadMode(false)
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
+    return installReadModeEscape(() => setReadMode(false))
   }, [editor, readMode, isProtected, refusedMessage, scheduleUiRefresh])
 
   // Track Changes: the recorder plugin reads its toggle from extension storage
@@ -5974,7 +5968,7 @@ export function App() {
   const onDocClick = useCallback(
     (e: ReactMouseEvent) => {
       const commentSpan = (e.target as HTMLElement).closest('.doc-comment') as HTMLElement | null
-      if (commentSpan && (!uniwork.readOnly || serverMode !== null)) {
+      if (commentSpan && (!isReadOnlyProfile() || serverMode !== null)) {
         const ids = (commentSpan.dataset.commentIds ?? '').split(' ')
         if (comments.some((c) => !c.done && ids.includes(c.id))) setShowComments(true)
       }
@@ -5991,7 +5985,7 @@ export function App() {
       const line = (e.target as HTMLElement).closest('.doc-toc-line') as HTMLElement | null
       if (line) jumpToAnchor(line.dataset.tocAnchor ?? '', line.dataset.tocTitle ?? '')
     },
-    [comments, openLink, jumpToAnchor],
+    [comments, openLink, jumpToAnchor, serverMode],
   )
 
   /** Editor right-click menu, only inside the document body */
@@ -7007,7 +7001,7 @@ export function App() {
       editor.view.dispatch(tr.setSelection(TextSelection.near($pos, 1)).setMeta(TRACK_IGNORE, true))
     },
     onCommentBalloon: (id) => {
-      if (uniwork.readOnly && serverMode === null) return
+      if (isReadOnlyProfile() && serverMode === null) return
       setShowComments(true)
       setCommentFocus({ id, nonce: Date.now() })
     },
@@ -7649,7 +7643,7 @@ export function App() {
                 codec={serverCodec}
               />
             )}
-            {doc && !serverMode && !uniwork.readOnly && showComments && (
+            {doc && !serverMode && !isReadOnlyProfile() && showComments && (
               <CommentsPanel
                 comments={comments}
                 docNode={editor.state.doc}

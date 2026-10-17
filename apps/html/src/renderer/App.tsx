@@ -1323,7 +1323,9 @@ export default function App() {
   const runExport = useCallback(async (format: ExportFormat, outPath?: string) => {
     const allowed =
       format === 'pdf'
-        ? cap('exportPdf')
+        ? // host Print renders its PDF through this same export; the bridge still refuses a
+          // plain Export PDF without the `exportPdf` grant
+          cap('exportPdf') || cap('print')
         : format === 'html'
           ? cap('exportHtml')
           : cap('exportDocx') && cap('saveAs')

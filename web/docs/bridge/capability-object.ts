@@ -28,6 +28,9 @@ export function createCapabilityObject<C extends object>(
         for (const key of READ_ONLY_DISABLED_CAPS) {
           if (key in record) record[key] = false
         }
+        // the one flag that says "profile" itself (a view-only user without it keeps the document's
+        // own comments); only objects that declare the key carry it
+        if ('readOnlyProfile' in record) record.readOnlyProfile = true
       }
     })
     .catch(() => {}) // a failed handshake is reported elsewhere (bridge open flow / host)

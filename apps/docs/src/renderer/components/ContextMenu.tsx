@@ -346,7 +346,7 @@ export function EditorContextMenu({
   return (
     <div
       ref={ref}
-      role="menu"
+      data-esc-local=""
       className="ctx-menu"
       style={{ left: pos.left, top: pos.top, minWidth: MENU_WIDTH }}
       onContextMenu={(e) => e.preventDefault()}

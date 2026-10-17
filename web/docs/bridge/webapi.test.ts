@@ -1906,6 +1906,17 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     expect(mock.calls.some((c) => c.type === 'api.export')).toBe(false)
   })
 
+  it('host Print runs on the print grant alone: no exportPdf grant needed (RFW2-1)', async () => {
+    await bootWith('Report.docx', { save: true, print: true, exportPdf: false })
+    expect(await mock.host.print({})).toEqual({ printed: true })
+    expect(window.print).toHaveBeenCalledTimes(1)
+    // the Export PDF entry stays refused without its own grant
+    expect(await api.exportPdf('Report.docx', 12240, 15840, undefined, 1)).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+  })
+
   it('readOnly profile forces view-only, refuses save/saveAs/exportHtml even when granted, and keeps granted print and exportPdf', async () => {
     const meta = mock.seed('Report.docx', DOCX)
     mock.init({

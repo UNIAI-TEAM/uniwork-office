@@ -763,7 +763,9 @@ export default function App() {
     async (format: ExportFormat, outPath?: string) => {
       // a source file has no rendered document to export
       if (sourceMode) return false
-      if (format === 'pdf' ? !cap('exportPdf') : !cap('saveAs')) return false
+      // host Print renders its PDF through this same export, so `print` alone passes it; the
+      // bridge still refuses a plain Export PDF without the `exportPdf` grant
+      if (format === 'pdf' ? !(cap('exportPdf') || cap('print')) : !cap('saveAs')) return false
       const current = editorRef.current
       if (!current || statusRef.current !== 'ready') return false
       const suggestedName =
