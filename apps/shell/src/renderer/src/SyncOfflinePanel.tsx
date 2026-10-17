@@ -332,10 +332,14 @@ export function SyncOfflinePanel({
               aria-valuemin={determinate ? 0 : undefined}
               aria-valuemax={determinate ? model.progress.total : undefined}
               aria-valuenow={determinate ? model.progress.done : undefined}
-              aria-valuetext={t('uwOfflineRowProgressAria', {
-                done: formatBytes(model.progress.done, dateLocale),
-                total: formatBytes(model.progress.total, dateLocale),
-              })}
+              aria-valuetext={
+                determinate
+                  ? t('uwOfflineRowProgressAria', {
+                      done: formatBytes(model.progress.done, dateLocale),
+                      total: formatBytes(model.progress.total, dateLocale),
+                    })
+                  : undefined
+              }
             >
               <span
                 className="sc-progress-fill"

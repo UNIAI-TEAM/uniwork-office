@@ -554,17 +554,22 @@ describe('S3 progress', () => {
 
   it('total <= 0 or unknown renders an indeterminate progressbar without aria-valuenow/max', async () => {
     await openS3(
-      library({ rows: [offRow('d', 'downloading', { progress: null, sizeBytes: null })] }),
+      library({
+        rows: [
+          offRow('d', 'downloading', { progress: null, sizeBytes: null }),
+          offRow('z', 'downloading', { progress: { done: 512, total: 0 } }),
+        ],
+      }),
     )
-    const bar = rowEl('d').querySelector<HTMLElement>('[role="progressbar"]')!
-    const nameId = bar.getAttribute('aria-labelledby')!
-    expect(host.querySelector(`[id="${nameId}"]`)!.textContent).toBe('Tệp d.docx')
-    expect(bar.getAttribute('aria-valuemin')).toBeNull()
-    expect(bar.getAttribute('aria-valuenow')).toBeNull()
-    expect(bar.getAttribute('aria-valuemax')).toBeNull()
-    expect(bar.getAttribute('aria-valuetext')).toBe(
-      vi_('uwOfflineRowProgressAria', { done: '0 B', total: '0 B' }),
-    )
+    for (const id of ['d', 'z']) {
+      const bar = rowEl(id).querySelector<HTMLElement>('[role="progressbar"]')!
+      const nameId = bar.getAttribute('aria-labelledby')!
+      expect(host.querySelector(`[id="${nameId}"]`)!.textContent).toBe(`Tệp ${id}.docx`)
+      expect(bar.getAttribute('aria-valuemin')).toBeNull()
+      expect(bar.getAttribute('aria-valuenow')).toBeNull()
+      expect(bar.getAttribute('aria-valuemax')).toBeNull()
+      expect(bar.getAttribute('aria-valuetext')).toBeNull()
+    }
   })
 })
 
