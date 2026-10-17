@@ -1133,6 +1133,15 @@ export class UniworkDocsService {
         upload: (input) => this.api().upload(input),
         commit: (input) => this.api().commit(input),
         getDocument: (documentId) => this.api().getDocument(documentId),
+        // BIGUP-A1: a version payload above `chunked_upload_threshold_bytes`
+        // goes through an upload session instead of one multipart POST
+        uploadSession: {
+          createDocumentUploadSession: (input) => this.api().createDocumentUploadSession(input),
+          getUploadSession: (sessionId) => this.api().getUploadSession(sessionId),
+          completeUploadSession: (input) => this.api().completeUploadSession(input),
+          deleteUploadSession: (sessionId) => this.api().deleteUploadSession(sessionId),
+          putUploadPart: (input) => this.api().putUploadPart(input),
+        },
       },
       isSignedIn: () => deps.identity() !== null,
       ownsBinding: (doc) => this.owns(doc),
@@ -1757,7 +1766,19 @@ export class UniworkDocsService {
           this.api().upload({ ...input, format: input.format as UniworkDocFormat }),
         commit: (input) => this.api().commit(input),
         lookupCommit: (input) => this.api().lookupCommit(input),
+        // BIGUP-A1: the same session routes the inline pipeline uses, so a
+        // replayed intent above the threshold takes the chunked path too
+        uploadSession: {
+          createDocumentUploadSession: (input) => this.api().createDocumentUploadSession(input),
+          getUploadSession: (sessionId) => this.api().getUploadSession(sessionId),
+          completeUploadSession: (input) => this.api().completeUploadSession(input),
+          deleteUploadSession: (sessionId) => this.api().deleteUploadSession(sessionId),
+          putUploadPart: (input) => this.api().putUploadPart(input),
+        },
       },
+      // BIGUP-A1: the deployment's `chunked_upload_threshold_bytes`, read from
+      // the same cache the coordinator uses
+      documentLimits: () => this.limitsCache.get(),
       capability: {
         get: (orgId, options) =>
           this.deps.capability

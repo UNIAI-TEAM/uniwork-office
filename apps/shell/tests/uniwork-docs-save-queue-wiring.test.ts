@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } fro
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
+import { deflateRawSync } from 'node:zlib'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkConflictView, UniworkDocStatus } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
@@ -18,6 +19,7 @@ import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import { createDocLock } from '../src/main/uniwork-sync/doc-lock'
+import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits } from '../src/main/uniwork-docs/limits'
 import type { CapabilitySource } from '../src/main/uniwork-sync/capability/cache'
 import { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
@@ -77,6 +79,14 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string }) {
   const uploads = new Map<string, { id: string; checksum: string; bytes: Uint8Array }>()
   const commits = new Map<string, unknown>()
   let seq = 0
+  /** BIGUP-A1: the new-version upload sessions this server opened */
+  const sessions = new Map<
+    string,
+    { partSize: number; totalParts: number; size: number; parts: Map<number, Uint8Array> }
+  >()
+  let sessionSeq = 0
+  /** the part size the session advertises (BIGUP-A1; 128 KiB keeps tests cheap) */
+  const sessionPartSize = 128 * 1024
 
   const docJson = () => ({
     id: DOC,
@@ -191,10 +201,93 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string }) {
       }
       return json(200, { outcome: 'not_committed' })
     }
+    // ---- BIGUP-A1: the new-version upload session (create / status / complete / abort)
+    const missingParts = (id: string): unknown[] => {
+      const s = sessions.get(id)!
+      const out: unknown[] = []
+      for (let n = 1; n <= s.totalParts; n += 1) {
+        if (s.parts.has(n)) continue
+        out.push({
+          part_number: n,
+          method: 'PUT',
+          url: `${ORIGIN}/storage/part/${id}/${n}`,
+          headers: {},
+          expires_at: '2026-10-19T00:00:00Z',
+        })
+      }
+      return out
+    }
+    if (
+      u.pathname === `/api/v1/documents/${DOC}/upload-sessions` &&
+      (init.method ?? 'POST') === 'POST'
+    ) {
+      const body = JSON.parse(String(init.body)) as { size_bytes: number }
+      const id = `us_${++sessionSeq}`
+      sessions.set(id, {
+        partSize: sessionPartSize,
+        totalParts: Math.max(1, Math.ceil(body.size_bytes / sessionPartSize)),
+        size: body.size_bytes,
+        parts: new Map(),
+      })
+      return json(201, {
+        session_id: id,
+        part_size: sessionPartSize,
+        total_parts: sessions.get(id)!.totalParts,
+        expires_at: '2026-10-19T00:00:00Z',
+        parts: missingParts(id),
+      })
+    }
+    const sessionId = u.pathname.match(/^\/api\/v1\/upload-sessions\/([^/]+)$/)?.[1]
+    if (sessionId && (init.method ?? 'GET') === 'GET') {
+      const s = sessions.get(sessionId)
+      if (!s) return error(404, 'not_found')
+      return json(200, {
+        session_id: sessionId,
+        status: 'open',
+        part_size: s.partSize,
+        total_parts: s.totalParts,
+        completed_parts: [...s.parts.keys()].map((n) => ({
+          part_number: n,
+          etag: `"e${n}"`,
+          size: s.parts.get(n)!.byteLength,
+        })),
+        parts: missingParts(sessionId),
+        expires_at: '2026-10-19T00:00:00Z',
+      })
+    }
+    if (sessionId && init.method === 'DELETE') {
+      if (!sessions.delete(sessionId)) return error(404, 'not_found')
+      return new Response(null, { status: 204 })
+    }
+    const completeId = u.pathname.match(/^\/api\/v1\/upload-sessions\/([^/]+)\/complete$/)?.[1]
+    if (completeId && (init.method ?? 'POST') === 'POST') {
+      const s = sessions.get(completeId)
+      if (!s) return error(404, 'not_found')
+      const assembled = Buffer.concat(
+        [...s.parts.entries()].sort((a, b) => a[0] - b[0]).map(([, part]) => Buffer.from(part)),
+      )
+      const bytes = new Uint8Array(assembled)
+      const upload = { id: `up_sess_${completeId}`, checksum: hex(bytes), bytes }
+      uploads.set(`session:${completeId}`, upload)
+      return json(200, {
+        upload_id: upload.id,
+        checksum_sha256: upload.checksum,
+        size_bytes: bytes.byteLength,
+        claim_expires_at: '2026-10-19T00:00:00Z',
+      })
+    }
+    const partId = u.pathname.match(/^\/storage\/part\/([^/]+)\/(\d+)$/)
+    if (partId && init.method === 'PUT') {
+      const s = sessions.get(partId[1]!)
+      if (!s) return error(404, 'not_found')
+      const raw = init.body as Uint8Array
+      s.parts.set(Number(partId[2]), raw.slice ? raw.slice() : new Uint8Array(raw))
+      return new Response(null, { status: 200, headers: { ETag: `"e${partId[2]}"` } })
+    }
     return error(404, 'not_found')
   })
 
-  return { state, calls, faults, fetch, uploads, commits }
+  return { state, calls, faults, fetch, uploads, commits, sessions, sessionPartSize }
 }
 
 let dir: string
@@ -233,6 +326,10 @@ function setup(
     capability?: Record<string, boolean>
     /** true = the store cannot be built (the queue's registrations are absent) */
     bareLayer?: boolean
+    /** SIZE-F1/BIGUP-A1: the `documents.limits` the service reads (defaults when absent) */
+    limits?: () => DocumentLimits | Promise<DocumentLimits>
+    /** the per-account store budget (default 1 MiB; a chunked test needs more) */
+    budgetBytes?: number
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -249,7 +346,7 @@ function setup(
   const layer: StoreLayer = createStoreLayer({
     root: join(dir, 'uniwork-sync', 'store'),
     keys: createSafeStorageKeyProvider({ safeStorage, dir: join(dir, 'uniwork-sync', 'keys') }),
-    budgetBytes: 1 << 20,
+    budgetBytes: opts.budgetBytes ?? 1 << 20,
     clock: () => 1_700_000_000_000,
   })
   layer.register(INTENT_STORE_REGISTRATION)
@@ -269,6 +366,7 @@ function setup(
     syncStore,
     appVersion: () => '0.0.0',
     now: () => clock,
+    ...(opts.limits ? { limits: opts.limits } : {}),
     profile: () => profile,
     identity: () =>
       account ? { accountId: account, deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
@@ -1768,5 +1866,143 @@ describe('G8-12 comments seam on queue-settled saves', () => {
     expect(binding(path).level).toBe('view')
     expect(binding(path).baseVersionId).toBe('v3')
     expect(notifySaved).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * BIGUP-A1: the production wiring of the chunked new-version path. The service
+ * builds both the SaveCoordinator and the QueueDispatcher over the REAL client
+ * (the same `api()` the rest of the service uses), so this suite drives a real
+ * Ctrl/Cmd+S of a payload above `documents.limits.chunked_upload_threshold_bytes`
+ * through the fake server's session routes: create -> part PUTs -> complete ->
+ * versions/commit, never the one-shot multipart POST.
+ */
+describe('BIGUP-A1: the service wires the chunked version path', () => {
+  /** a valid DOCX of `totalBytes`, built in memory (real ZIP local + central + EOCD) */
+  function docxBytes(totalBytes: number): Uint8Array {
+    const entries = (
+      imageSize: number,
+    ): Array<{ name: string; storedSize?: number; data?: Buffer }> => [
+      { name: 'word/media/image1.png', storedSize: imageSize },
+      { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+      { name: 'word/document.xml', data: Buffer.from('<w:document/>') },
+    ]
+    const build = (list: ReturnType<typeof entries>): Uint8Array => {
+      const chunks: Buffer[] = []
+      const central: Buffer[] = []
+      let offset = 0
+      for (const entry of list) {
+        const name = Buffer.from(entry.name, 'utf8')
+        const stored = entry.storedSize !== undefined
+        const data = entry.data ?? Buffer.alloc(0)
+        const body = stored ? null : deflateRawSync(data)
+        const size = stored ? entry.storedSize! : data.length
+        const header = Buffer.alloc(30)
+        header.writeUInt32LE(0x04034b50, 0)
+        header.writeUInt16LE(20, 4)
+        header.writeUInt16LE(stored ? 0 : 8, 8)
+        header.writeUInt32LE(body?.length ?? size, 18)
+        header.writeUInt32LE(size, 22)
+        header.writeUInt16LE(name.length, 26)
+        const localOffset = offset
+        chunks.push(header, name)
+        offset += header.length + name.length
+        if (body) {
+          chunks.push(body)
+          offset += body.length
+        } else {
+          chunks.push(Buffer.alloc(size))
+          offset += size
+        }
+        const cd = Buffer.alloc(46)
+        cd.writeUInt32LE(0x02014b50, 0)
+        cd.writeUInt16LE(20, 4)
+        cd.writeUInt16LE(20, 6)
+        cd.writeUInt16LE(stored ? 0 : 8, 10)
+        cd.writeUInt32LE(body?.length ?? size, 20)
+        cd.writeUInt32LE(size, 24)
+        cd.writeUInt16LE(name.length, 28)
+        cd.writeUInt32LE(localOffset, 42)
+        central.push(cd, name)
+      }
+      const cdBuffer = Buffer.concat(central)
+      const eocd = Buffer.alloc(22)
+      eocd.writeUInt32LE(0x06054b50, 0)
+      eocd.writeUInt16LE(list.length, 8)
+      eocd.writeUInt16LE(list.length, 10)
+      eocd.writeUInt32LE(cdBuffer.length, 12)
+      eocd.writeUInt32LE(offset, 16)
+      return new Uint8Array(Buffer.concat([...chunks, cdBuffer, eocd]))
+    }
+    const overhead = build(entries(0)).byteLength
+    return build(entries(totalBytes - overhead))
+  }
+
+  const MB = 1024 * 1024
+  const THRESHOLD = 64 * 1024
+  const BIG = 512 * 1024
+  const limits = (): DocumentLimits => ({
+    ...DEFAULT_DOCUMENT_LIMITS,
+    max_bytes: 200 * MB,
+    warn_bytes: 180 * MB,
+    chunked_upload_threshold_bytes: THRESHOLD,
+  })
+  /** the store budget the layer needs to hold a `BIG` intent snapshot */
+  const budgetBytes = 8 * MB
+  const sessionCalls = (server: ReturnType<typeof fakeServer>, suffix: string) =>
+    server.calls.filter((c) => c.path.endsWith(suffix))
+  const sessionCreates = (server: ReturnType<typeof fakeServer>) =>
+    server.calls.filter((c) => c.path.endsWith('/upload-sessions') && c.method === 'POST')
+  const partPuts = (server: ReturnType<typeof fakeServer>) =>
+    server.calls.filter((c) => c.path.startsWith('/storage/part/') && c.method === 'PUT')
+
+  it('an inline Save above the threshold goes create -> parts -> complete -> commit (no one-shot POST)', async () => {
+    const big = docxBytes(BIG)
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { limits, budgetBytes })
+    const path = await openDoc(ctx)
+    writeFileSync(path, big)
+
+    const status = await ctx.service.save(path)
+    expect(status).toMatchObject({ state: 'saved' })
+
+    // the session path ran, and the single-request upload POST never did
+    expect(sessionCreates(server)).toHaveLength(1)
+    expect(sessionCalls(server, '/complete')).toHaveLength(1)
+    expect(partPuts(server).length).toBeGreaterThan(1)
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(1)
+    // every part landed under the session the create answered, and the bytes
+    // the server assembled are exactly the file's
+    const assembled = server.uploads.get(`session:${[...server.sessions.keys()][0]}`)
+    expect(assembled?.bytes).toEqual(big)
+    expect(commits(server)[0]!.headers['idempotency-key']).toBeTruthy()
+    expect(binding(path).state).toBe('saved')
+  })
+
+  it('a replayed (dispatched) intent above the threshold takes the same session path', async () => {
+    const big = docxBytes(BIG)
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { limits, budgetBytes })
+    const path = await openDoc(ctx)
+    writeFileSync(path, big)
+    // park the intent offline: the coordinator writes it but sends nothing
+    ctx.setCapabilityOffline(true)
+    await ctx.service.save(path)
+    expect(await storedIntent(ctx, path)).not.toBeNull()
+    expect(sessionCreates(server)).toHaveLength(0)
+
+    // the poll dispatches it through the QueueDispatcher, whose deps carry the
+    // same session routes and the limits cache
+    ctx.setCapabilityOffline(false)
+    await ctx.service.pollSaveQueue()
+    await vi.waitFor(async () =>
+      expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+    )
+    expect(sessionCreates(server)).toHaveLength(1)
+    expect(sessionCalls(server, '/complete')).toHaveLength(1)
+    expect(partPuts(server).length).toBeGreaterThan(1)
+    expect(uploads(server)).toHaveLength(0)
+    expect(await storedIntent(ctx, path)).toBeNull()
   })
 })
