@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenFileResult } from '../../../apps/docs/src/shared/ipc'
 import type { PortSession } from './frame-port'
 import { createWebApi, idFromPath, pathFor, WEB_PRINT_PART, type WebApi } from './webapi'
+import { hostGrants, webCapabilities } from './hide'
 import { createMockPort, protocolError, timeoutAfter, type MockPort } from './testing/mock-port'
 import { text } from './notice'
 import { webText, type WebStringKey } from '../../modules/shared/i18n/strings-web'
@@ -1839,3 +1840,121 @@ describe('open_refused and refuse-tier guard (SIZE-F1)', () => {
     expect(await api.saveDocx(secondOpen.path, buf([7]), false)).toEqual({ ok: true })
   })
 })
+
+describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => {
+  it('webCapabilities defaults save/saveAs/exportPdf/exportHtml to false and hostGrants maps them from init.capabilities', () => {
+    expect(webCapabilities).toMatchObject({
+      save: false,
+      saveAs: false,
+      exportPdf: false,
+      exportHtml: false,
+    })
+    expect(
+      hostGrants({
+        save: true,
+        saveAs: true,
+        exportPdf: true,
+        exportHtml: true,
+      }),
+    ).toMatchObject({
+      save: true,
+      saveAs: true,
+      exportPdf: true,
+      exportHtml: true,
+    })
+    expect(hostGrants({})).toMatchObject({
+      save: false,
+      saveAs: false,
+      exportPdf: false,
+      exportHtml: false,
+    })
+  })
+
+  it('refuses saveAs without the saveAs grant even when save is granted', async () => {
+    const doc = await bootWith('Report.docx', { save: true, saveAs: false })
+    expect(await mock.host.saveAs({ name: 'Copy.docx' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(await api.saveDocxAs('Copy.docx', buf([5]), doc.path)).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(mock.calls.some((c) => c.type === 'api.saveAs')).toBe(false)
+  })
+
+  it('refuses exportPdf without the exportPdf grant and exportHtml without the exportHtml grant', async () => {
+    await bootWith('Report.docx', {
+      save: true,
+      saveAs: true,
+      exportPdf: false,
+      exportHtml: false,
+    })
+    expect(await api.exportPdf('Report.docx', '<p>x</p>')).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(await api.exportCurrentPdf()).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(await api.saveMergedPdf('Merged.pdf', [buf([1])])).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(await api.exportHtml('Report.docx', '<p>x</p>')).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(await mock.host.print({ mode: 'pdf' })).toEqual({ printed: false })
+    expect(mock.calls.some((c) => c.type === 'api.export')).toBe(false)
+  })
+
+  it('readOnly profile forces view-only, refuses save/saveAs/exportHtml even when granted, and keeps granted print and exportPdf', async () => {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({
+      documentId: meta.fileId,
+      profile: 'readOnly',
+      capabilities: {
+        save: true,
+        saveAs: true,
+        print: true,
+        exportPdf: true,
+        exportHtml: true,
+      },
+    })
+    const doc = (await api.consumePendingOpenDocx()) as OpenFileResult
+    expect(await api.uniworkState(doc.path)).toEqual({ bound: false, readOnly: true })
+    expect(await api.saveDocx(doc.path, buf([1]), false)).toEqual({
+      ok: false,
+      error: 'read-only document',
+    })
+    expect(await api.saveDocxAs('Copy.docx', buf([1]), doc.path)).toEqual({
+      ok: false,
+      error: 'read-only document',
+    })
+    expect(await api.saveDocxNew('New.docx', buf([1]))).toEqual({
+      ok: false,
+      error: 'read-only document',
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.docx' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(await api.exportHtml('Report.docx', '<p>x</p>')).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    // D3: granted print and exportPdf stay available in readOnly profile
+    expect(await api.exportPdf('Report.docx', '<p>x</p>')).toEqual({
+      ok: true,
+      path: WEB_PRINT_PART,
+    })
+    expect(await mock.host.print({ mode: 'browser' })).toEqual({ printed: true })
+  })
+})
+

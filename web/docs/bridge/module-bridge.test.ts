@@ -160,3 +160,68 @@ describe('C10: no autosave on the web', () => {
     expect(capabilities).toMatchObject({ autoSave: false, autoSaveToDisk: false, ai: false })
   })
 })
+
+describe('FRAME-RO-01: readOnly profile & Escape forwarder in installModuleBridge', () => {
+  it('createCapabilityObject forces save/saveAs/edit/htmlVisualEdit off in readOnly profile while keeping print and exportPdf', async () => {
+    const mock = createMockPort()
+    const caps = createCapabilityObject(
+      {
+        save: false,
+        saveAs: false,
+        edit: false,
+        htmlVisualEdit: false,
+        print: false,
+        exportPdf: false,
+      },
+      mock.port,
+      (g) => ({
+        save: g?.save === true,
+        saveAs: g?.saveAs === true,
+        edit: g?.save === true,
+        htmlVisualEdit: g?.save === true,
+        print: g?.print === true,
+        exportPdf: g?.exportPdf === true,
+      }),
+    )
+    mock.init({
+      profile: 'readOnly',
+      capabilities: { save: true, saveAs: true, print: true, exportPdf: true },
+    })
+    await flush()
+    expect(caps).toEqual({
+      save: false,
+      saveAs: false,
+      edit: false,
+      htmlVisualEdit: false,
+      print: true,
+      exportPdf: true,
+    })
+  })
+
+  it('installModuleBridge forwards unhandled Escape on target to reportCloseRequested("escape") and skips [data-esc-local]', () => {
+    const mock = createMockPort()
+    installModuleBridge({
+      module: 'markdown',
+      frameCapabilities: {},
+      client: mock.port,
+      target: window as unknown as Record<string, unknown>,
+      globals: { markdownApi: () => ({}) },
+    })
+
+    const local = document.createElement('div')
+    local.setAttribute('data-esc-local', '')
+    const btn = document.createElement('button')
+    local.appendChild(btn)
+    document.body.appendChild(local)
+
+    btn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(mock.closeRequested).toEqual([])
+
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    )
+    expect(mock.closeRequested).toEqual(['escape'])
+    local.remove()
+  })
+})
+

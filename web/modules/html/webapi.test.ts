@@ -38,6 +38,7 @@ function setup(
   reload?: () => void,
   revision?: string,
   limits?: { max_bytes: number; warn_ratio: number },
+  profile?: 'readOnly',
 ) {
   const mock = createMockPort()
   const file = mock.seed('Page.html', enc(PAGE))
@@ -60,6 +61,7 @@ function setup(
   mock.init({
     documentId: file.fileId,
     capabilities: caps,
+    ...(profile ? { profile } : {}),
     ...(limits ? { limits } : {}),
     open: {
       ...mock.openPayload(file.fileId),
@@ -434,3 +436,84 @@ describe('htmlApi: save size gate (SIZE-F1, UNI-1861)', () => {
     expect(mock.saveBlocked).toHaveLength(2)
   })
 })
+
+describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => {
+  it('refuses saveAs without saveAs grant, exportHtml without exportHtml grant, and exportPdf without exportPdf grant', async () => {
+    const { api, mock, print } = setup({
+      save: true,
+      saveAs: false,
+      print: true,
+      exportPdf: false,
+      exportHtml: false,
+      images: true,
+    })
+    const path = (await api.consumePending())!
+    const text = await api.readFile(path)
+    api.provideText(() => text)
+    expect(api.capabilities).toMatchObject({
+      save: true,
+      saveAs: false,
+      exportPdf: false,
+      exportHtml: false,
+      htmlVisualEdit: true,
+    })
+    expect(await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.html' })).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.html' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(await api.exportHtml({ html: '<p>x</p>', defaultName: 'Page' })).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(await api.exportPdf({ html: '<p>x</p>' })).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(print).not.toHaveBeenCalled()
+    expect(mock.calls.filter((c) => c.type === 'api.saveAs' || c.type === 'api.export')).toHaveLength(0)
+  })
+
+  it('readOnly profile forces viewOnly, save:false, saveAs:false, htmlVisualEdit:false, and keeps print and exportPdf', async () => {
+    const { api, mock, print } = setup(
+      FULL,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'readOnly',
+    )
+    const path = (await api.consumePending())!
+    const text = await api.readFile(path)
+    api.provideText(() => text)
+    expect(await api.uniworkState()).toEqual({ bound: false, readOnly: true })
+    expect(api.capabilities).toMatchObject({
+      save: false,
+      saveAs: false,
+      htmlVisualEdit: false,
+      print: true,
+      exportPdf: true,
+    })
+    expect(await api.save({ text, imageSources: [], mode: 'save' })).toEqual({
+      ok: false,
+      error: 'read-only document',
+    })
+    expect(await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.html' })).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.html' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    // D3: granted print and exportPdf stay available in readOnly profile
+    expect(await api.exportPdf({ html: '<p>x</p>' })).toEqual({ ok: true, path: '' })
+    expect(await api.print({ html: '<p>x</p>' })).toEqual({ ok: true })
+    expect(print).toHaveBeenCalledTimes(2)
+  })
+})
+

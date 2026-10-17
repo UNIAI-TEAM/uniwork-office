@@ -53,13 +53,19 @@ function listOf(comments: DocumentComment[], token = 'lt1'): CommentsListResult 
 
 /** the mock port plus the two comment hooks of the real client (changed event, reveal handler) */
 function discussionPort(
-  session: { comments?: boolean; level?: 'view' | 'edit' | 'manage' } = {},
+  session: {
+    comments?: boolean
+    level?: 'view' | 'comment' | 'edit' | 'manage'
+    profile?: 'readOnly'
+    save?: boolean
+  } = {},
   first: CommentsListResult = listOf([post({ id: 'p1' })]),
 ) {
   const mock = createMockPort({
     documentId: 'doc-1',
-    capabilities: { save: true, comments: session.comments ?? true },
+    capabilities: { save: session.save ?? true, comments: session.comments ?? true },
     user: { displayName: 'An', id: ME },
+    ...(session.profile ? { profile: session.profile } : {}),
     ...(session.level ? { commentsLevel: session.level } : { commentsLevel: 'edit' }),
   } as never)
   mock.override('comments.list', () => first)
@@ -698,3 +704,22 @@ describe("the editor's panel opening closes Discussion without moving focus", ()
     expect(document.activeElement).toBe(toggle())
   })
 })
+
+describe('FRAME-RO-01: readOnly profile vs save:false in Discussion (D4, UNI-1876)', () => {
+  it('readOnly profile forces Discussion into view-only mode (no composer) even when commentsLevel is edit', async () => {
+    const p = discussionPort({ level: 'edit', profile: 'readOnly' })
+    await mount(p)
+    await act(async () => toggle()!.click())
+    await flush()
+    expect(panel()!.querySelector('textarea')).toBeNull()
+  })
+
+  it('save:false without readOnly profile preserves commentsLevel:comment so comment-only users can still post', async () => {
+    const p = discussionPort({ level: 'comment', save: false })
+    await mount(p)
+    await act(async () => toggle()!.click())
+    await flush()
+    expect(panel()!.querySelector('textarea')).not.toBeNull()
+  })
+})
+
