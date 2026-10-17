@@ -73,6 +73,7 @@ const client =
       ...FRAME_BASE_CAPABILITIES,
       save: true,
       saveAs: true,
+      saveCopy: true,
       recents: true,
       print: true,
       exportPdf: true,

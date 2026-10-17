@@ -72,6 +72,7 @@ export const he = {
   uwConflictReloadTitle: 'טעינה מחדש של הגרסה האחרונה',
   uwConflictReloadGo: 'טעינה מחדש',
   uwConflictSaveCopy: 'שמירה כעותק…',
+  uwConflictSaveCopyName: '{name} (עותק)',
   uwConflictSaveCopyTitle: 'לשמור כעותק?',
   uwConflictSaveCopyConfirm:
     'UniWork ייצור מסמך חדש מהגרסה שלך, עם אותו בעלים ואותה גישה כמו המסמך הזה. המסמך הנוכחי וגרסה {server} של {author} נשארים כפי שהם.',

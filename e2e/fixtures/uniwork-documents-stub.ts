@@ -83,6 +83,7 @@ export interface StubFolderState {
   revision: string
   myLevel: StubAccessLevel
   archived: boolean
+  systemKind?: 'my_folder'
 }
 
 interface StubVersion {
@@ -105,6 +106,8 @@ interface StubDocument {
   updatedAt: string
   /** G5-12 / FD-11: the folder or page holding the document (null = root) */
   parentId: string | null
+  /** SAVE-01 / MYFOLDER-01: system folder marker (stored title differs from localized UI label) */
+  systemKind?: 'my_folder'
   /** G5-12: the source of a copy made through `/copies` */
   copiedFrom?: string
   /** G5-12: set by `/archive` */
@@ -149,6 +152,8 @@ export type CommitDrop = 'before' | 'after'
 export interface UniworkDocumentsStub extends UniworkAuthStub {
   addDocument(init: StubDocumentInit): StubDocumentState
   addFolder(init: StubFolderInit): StubFolderState
+  /** SAVE-01 / MYFOLDER-01: ensures the workspace My Folder row exists (stored title `my-folder-raw`) and returns it */
+  ensureMyFolder(workspaceId?: string): StubFolderState
   state(documentId: string): StubDocumentState
   documents(workspaceId?: string): StubDocumentState[]
   folderState(folderId: string): StubFolderState
@@ -317,6 +322,7 @@ export async function startUniworkDocumentsStub(
   const folderByKey = new Map<string, string>()
   const blankByKey = new Map<string, string>()
   const fileByKey = new Map<string, string>()
+  const myFolderByWs = new Map<string, string>()
   const feedLog: FeedEvent[] = []
   let feedEnabled = Boolean(options.feed)
   const calls: StubCall[] = []
@@ -351,6 +357,7 @@ export async function startUniworkDocumentsStub(
     revision: String(doc.revision),
     myLevel: doc.myLevel,
     archived: Boolean(doc.archivedAt),
+    ...(doc.systemKind ? { systemKind: doc.systemKind } : {}),
   })
 
   const recordFeedUpsert = (doc: StubDocument): void => {
@@ -364,6 +371,35 @@ export async function startUniworkDocumentsStub(
       archived: Boolean(doc.archivedAt),
       removal: '',
     })
+  }
+
+  /**
+   * SAVE-01 / MYFOLDER-01: creates the caller's personal root folder once per workspace.
+   * Stored title is intentionally `"my-folder-raw"` (differs from localized UI labels) so
+   * tests prove the UI renders from `system_kind === "my_folder"` rather than `title`.
+   */
+  const ensureMyFolderInWs = (wsId: string): StubDocument => {
+    const existingId = myFolderByWs.get(wsId)
+    const existing = existingId ? documents.get(existingId) : undefined
+    if (existing) return existing
+    const folder: StubDocument = {
+      id: ulid('fold'),
+      workspaceId: wsId,
+      kind: 'folder',
+      title: 'my-folder-raw',
+      filename: 'my-folder-raw',
+      myLevel: 'edit',
+      revision: 1,
+      position: 0,
+      versions: [],
+      updatedAt: '2026-10-08T09:00:00Z',
+      parentId: null,
+      systemKind: 'my_folder',
+    }
+    documents.set(folder.id, folder)
+    myFolderByWs.set(wsId, folder.id)
+    recordFeedUpsert(folder)
+    return folder
   }
 
   const ancestorsOf = (doc: StubDocument): Array<{ id: string; title: string }> => {
@@ -455,8 +491,9 @@ export async function startUniworkDocumentsStub(
     workspace_id: doc.workspaceId,
     kind: doc.kind,
     title: doc.title,
-    visibility: 'workspace',
+    visibility: doc.systemKind === 'my_folder' ? 'private' : 'workspace',
     parent_id: doc.parentId,
+    ...(doc.systemKind ? { system_kind: doc.systemKind } : {}),
     path: ancestorsOf(doc),
     ...(doc.archivedAt ? { archived_at: doc.archivedAt } : {}),
     revision: String(doc.revision),
@@ -483,8 +520,13 @@ export async function startUniworkDocumentsStub(
     return withPath ? { ...rest, path } : rest
   }
 
-  const envelope = (code: string, fields?: Record<string, unknown>) => ({
-    error: { code, message: code, ...(fields ? { fields } : {}) },
+  const envelope = (code: string, fields?: Record<string, unknown>, errorClass?: string) => ({
+    error: {
+      code,
+      message: code,
+      ...(errorClass ? { error_class: errorClass } : {}),
+      ...(fields ? { fields } : {}),
+    },
   })
 
   const log = (ctx: StubRouteContext, call: Omit<StubCall, 'method' | 'route'>): void => {
@@ -588,6 +630,15 @@ export async function startUniworkDocumentsStub(
       return true
     }
 
+    m = /^\/workspaces\/([^/]+)\/documents\/my-folder$/.exec(route)
+    if (m && method === 'POST') {
+      const wsId = m[1]!
+      const folder = ensureMyFolderInWs(wsId)
+      log(ctx, { ...(idempotencyKey ? { idempotencyKey } : {}), status: 200 })
+      ctx.send(200, { document: documentDto(folder) })
+      return true
+    }
+
     m = /^\/workspaces\/([^/]+)\/documents\/tree$/.exec(route)
     if (m && method === 'GET') {
       const wsId = m[1]!
@@ -600,6 +651,7 @@ export async function startUniworkDocumentsStub(
         title: string
         kind: 'folder'
         position: number
+        system_kind?: 'my_folder'
         children: TreeNodeDto[]
       }
       const buildChildren = (parentId: string | null): TreeNodeDto[] =>
@@ -612,6 +664,7 @@ export async function startUniworkDocumentsStub(
             title: f.title,
             kind: 'folder',
             position: f.position,
+            ...(f.systemKind ? { system_kind: f.systemKind } : {}),
             children: buildChildren(f.id),
           }))
       log(ctx, { status: 200 })
@@ -697,7 +750,8 @@ export async function startUniworkDocumentsStub(
     if (m && method === 'POST') {
       const wsId = m[1]!
       const raw = await ctx.readBody()
-      let body: { format?: unknown; title?: unknown; parent_id?: unknown } = {}
+      let body: { format?: unknown; title?: unknown; parent_id?: unknown; destination?: unknown } =
+        {}
       try {
         body = JSON.parse(raw.toString('utf8')) as typeof body
       } catch {
@@ -705,6 +759,23 @@ export async function startUniworkDocumentsStub(
       }
       const base: Omit<StubCall, 'method' | 'route' | 'status'> = {
         ...(idempotencyKey ? { idempotencyKey } : {}),
+      }
+      const rawParent =
+        body.parent_id === undefined || body.parent_id === null
+          ? ''
+          : typeof body.parent_id === 'string'
+            ? body.parent_id
+            : null
+      const rawDest =
+        body.destination === undefined || body.destination === null
+          ? ''
+          : typeof body.destination === 'string'
+            ? body.destination
+            : null
+      if (rawDest === null || (rawDest !== '' && (rawDest !== 'my_folder' || rawParent !== ''))) {
+        log(ctx, { ...base, status: 400 })
+        ctx.send(400, envelope('invalid_destination'))
+        return true
       }
       const format =
         body.format === 'docx' || body.format === 'xlsx' || body.format === 'pptx'
@@ -724,7 +795,11 @@ export async function startUniworkDocumentsStub(
         return true
       }
       const parentId =
-        typeof body.parent_id === 'string' && body.parent_id.length > 0 ? body.parent_id : null
+        rawDest === 'my_folder'
+          ? ensureMyFolderInWs(wsId).id
+          : rawParent && rawParent.length > 0
+            ? rawParent
+            : null
       if (parentId !== null) {
         const parent = documents.get(parentId)
         if (!parent || parent.workspaceId !== wsId || !isLiveInTree(parent)) {
@@ -771,6 +846,13 @@ export async function startUniworkDocumentsStub(
         ...(idempotencyKey ? { idempotencyKey } : {}),
         ...(file ? { checksum: sha256(file.bytes) } : {}),
       }
+      const rawParent = parsed?.fields.parent_id ?? ''
+      const rawDest = parsed?.fields.destination ?? ''
+      if (rawDest !== '' && (rawDest !== 'my_folder' || rawParent !== '')) {
+        log(ctx, { ...base, status: 400 })
+        ctx.send(400, envelope('invalid_destination'))
+        return true
+      }
       const rawTitle = parsed?.fields.title ?? file?.filename ?? ''
       const title = rawTitle.normalize('NFC').trim()
       if (!file || !title || title.length > 500 || !idempotencyKey) {
@@ -785,8 +867,12 @@ export async function startUniworkDocumentsStub(
         ctx.send(201, { document: documentDto(replayed) })
         return true
       }
-      const rawParent = parsed?.fields.parent_id ?? ''
-      const parentId = rawParent.length > 0 ? rawParent : null
+      const parentId =
+        rawDest === 'my_folder'
+          ? ensureMyFolderInWs(wsId).id
+          : rawParent.length > 0
+            ? rawParent
+            : null
       if (parentId !== null) {
         const parent = documents.get(parentId)
         if (!parent || parent.workspaceId !== wsId || !isLiveInTree(parent)) {
@@ -936,6 +1022,11 @@ export async function startUniworkDocumentsStub(
           ctx.send(403, envelope('forbidden'))
           return true
         }
+        if (doc.systemKind === 'my_folder') {
+          log(ctx, { ...base, status: 409 })
+          ctx.send(409, envelope('my_folder_locked', undefined, 'conflict'))
+          return true
+        }
         const title = typeof body.title === 'string' ? body.title.normalize('NFC').trim() : ''
         // folder 1-255, page/file 1-500 (contract section 2)
         const maxTitle = doc.kind === 'folder' ? 255 : 500
@@ -986,6 +1077,11 @@ export async function startUniworkDocumentsStub(
         if (doc.myLevel !== 'edit' && doc.myLevel !== 'manage') {
           log(ctx, { ...base, status: 403 })
           ctx.send(403, envelope('forbidden'))
+          return true
+        }
+        if (doc.systemKind === 'my_folder') {
+          log(ctx, { ...base, status: 409 })
+          ctx.send(409, envelope('my_folder_locked', undefined, 'conflict'))
           return true
         }
         if (typeof body.revision !== 'string') {
@@ -1120,6 +1216,11 @@ export async function startUniworkDocumentsStub(
         if (!doc) {
           log(ctx, { status: 404 })
           ctx.send(404, envelope('not_found'))
+          return true
+        }
+        if (doc.systemKind === 'my_folder') {
+          log(ctx, { ...(idempotencyKey ? { idempotencyKey } : {}), status: 409 })
+          ctx.send(409, envelope('my_folder_locked', undefined, 'conflict'))
           return true
         }
         // the server's pristineCopyCleanup: a creator with edit may only archive a copy that
@@ -1428,6 +1529,8 @@ export async function startUniworkDocumentsStub(
       recordFeedUpsert(folder)
       return folderStateOf(folder)
     },
+    ensureMyFolder: (workspaceId = STUB_WORKSPACE.id) =>
+      folderStateOf(ensureMyFolderInWs(workspaceId)),
     state: (documentId) => stateOf(need(documentId)),
     documents: (workspaceId = STUB_WORKSPACE.id) =>
       [...documents.values()]

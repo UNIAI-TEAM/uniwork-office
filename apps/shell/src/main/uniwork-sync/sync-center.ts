@@ -28,6 +28,8 @@ import type {
   UniworkDocFormat,
   UniworkLockReason,
 } from '../../shared/home-api'
+import type { OfflineLibrarySnapshot } from '../../shared/offline-library'
+import { OFFLINE_LIBRARY_MAX_PINS, OFFLINE_LIBRARY_QUOTA_BYTES } from './offline-library/store'
 import {
   bindingCanEdit,
   scopeWorkingCopyDirs,
@@ -127,6 +129,11 @@ export interface SyncCenterFacts {
   storeBudget?: SyncCenterStoreBudget
   storeError?: boolean
   signedOutLockedCount?: number
+  /**
+   * G5-05u: the offline library block (S3 tab "Dùng khi không có mạng"). Absent
+   * = an empty library (the tab stays out of the tablist).
+   */
+  offline?: OfflineLibrarySnapshot
   intents?: readonly SyncCenterIntentFact[]
   drafts?: readonly SyncCenterDraftFact[]
   recentCommits?: readonly SyncCenterRecentFact[]
@@ -282,6 +289,17 @@ function isWithinRecentWindow(savedAtIso: string, nowMs: number): boolean {
 export function buildSyncCenterSnapshot(facts: SyncCenterFacts): SyncCenterSnapshot {
   const nowMs = facts.nowMs ?? Date.now()
   const status = resolveHeaderStatus(facts)
+  const offline: OfflineLibrarySnapshot = facts.offline ?? {
+    visible: false,
+    capabilityOn: false,
+    quota: {
+      usedBytes: 0,
+      maxBytes: OFFLINE_LIBRARY_QUOTA_BYTES,
+      pins: 0,
+      maxPins: OFFLINE_LIBRARY_MAX_PINS,
+    },
+    rows: [],
+  }
   const activeOrgId = facts.activeOrgId ?? facts.org?.id ?? ''
   const intents = facts.intents ?? []
   const drafts = facts.drafts ?? []
@@ -332,6 +350,7 @@ export function buildSyncCenterSnapshot(facts: SyncCenterFacts): SyncCenterSnaps
       signedOut: { lockedCount },
       storeError: facts.storeError === true,
       tabs: { attention: [], pending: [], recent: [] },
+      offline,
       defaultTab: 'pending',
     }
   }
@@ -342,6 +361,7 @@ export function buildSyncCenterSnapshot(facts: SyncCenterFacts): SyncCenterSnaps
       header,
       storeError: true,
       tabs: { attention: [], pending: [], recent: [] },
+      offline,
       defaultTab: 'pending',
     }
   }
@@ -447,6 +467,7 @@ export function buildSyncCenterSnapshot(facts: SyncCenterFacts): SyncCenterSnaps
     header,
     storeError: false,
     tabs: { attention, pending, recent },
+    offline,
     defaultTab,
   }
 }
@@ -1101,6 +1122,11 @@ export interface WiredSyncCenterDeps {
   tickRuntime(): Promise<void>
   openPath(path: string): boolean
   isPathOpen(path: string): boolean
+  /**
+   * G5-05u: the offline library block of every snapshot (the S3 tab). Absent =
+   * an empty library, so the tab stays out of the tablist.
+   */
+  offline?(): Promise<OfflineLibrarySnapshot>
   defaultSaveDir(): string
   writeClipboard(text: string): void
   pickSaveDialog(options: {
@@ -1202,6 +1228,8 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
     resetFeedResync: () => deps.resetFeedResync(),
     getFacts: async (): Promise<SyncCenterFacts> => {
       const status = deps.accountStatus()
+      // G5-05u (S3): the offline library block rides every snapshot, session or not
+      const offlineFacts = deps.offline ? { offline: await deps.offline() } : {}
       const storeNewer = deps.service.currentLocks().some((lock) => lock.reason === STORE_NEWER)
       const sessionState: SyncCenterFacts['sessionState'] =
         status.state === 'session-expired'
@@ -1229,6 +1257,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
           paused: false,
           adminPaused: false,
           signedOutLockedCount: lockedCount,
+          ...offlineFacts,
         }
       }
 
@@ -1250,6 +1279,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
           ...(account ? { account } : {}),
           ...(org ? { org } : {}),
           storeError: engine?.kind === 'keystore_locked',
+          ...offlineFacts,
         }
       }
 
@@ -1380,6 +1410,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
         intents,
         drafts,
         recentCommits,
+        ...offlineFacts,
       }
     },
 

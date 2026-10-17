@@ -22,13 +22,18 @@ let fetched: string[] = []
 let fetchedCalls: { url: string; path: string; headers: Record<string, string> }[] = []
 
 vi.mock('electron', () => ({
-  app: { getPath: () => dir },
+  app: { getPath: () => dir, configureHostResolver: () => undefined },
   BrowserWindow: { getFocusedWindow: () => null },
   dialog: {},
   safeStorage: {
     isEncryptionAvailable: () => true,
     encryptString: (text: string) => Buffer.from(`ENC1${text}`),
     decryptString: (buf: Buffer) => buf.toString().slice(4),
+  },
+  session: {
+    defaultSession: {
+      setSpellCheckerDictionaryDownloadURL: () => undefined,
+    },
   },
 }))
 
@@ -134,6 +139,65 @@ describe('last owner follows the session identity (R2-5)', () => {
     expect(handle.service.ownsLocally({ deploymentId: 'default', userId: 'acc_1' } as never)).toBe(
       false,
     )
+  })
+
+  it('the real wiring activation hook sweeps @offline leftovers and keeps ordinary and foreign-account folders (BE-R2-10)', async () => {
+    const { chmodSync, existsSync, mkdirSync, writeFileSync } = await import('node:fs')
+    const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
+    const { offlineCopyKey } = await import('../src/main/uniwork-sync/offline-library/copies')
+    const handle = createUniworkDocs({ handle: vi.fn() } as never, {
+      shellWindow: () => null,
+      shellContents: () => null,
+      openPath: () => true,
+      refuseLockedPath: () => false,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      reveal: () => undefined,
+      lang: () => 'en',
+      defaultSaveDir: () => dir,
+      openPaths: () => [],
+      closePath: async () => true,
+      confirmClosePath: async () => true,
+      closePathNow: () => undefined,
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+    })
+    const seedOffline = (deploymentId: string, accountId: string, documentId: string) => {
+      const folder = handle.service.store.dirFor(
+        deploymentId,
+        accountId,
+        offlineCopyKey(documentId),
+      )
+      mkdirSync(folder, { recursive: true })
+      const file = join(folder, `${documentId}.docx`)
+      writeFileSync(file, 'leftover')
+      chmodSync(file, 0o444)
+      return folder
+    }
+    const startupLeftover = seedOffline('default', 'acc_1', 'doc_startup')
+    const statusLeftover = seedOffline('default', 'acc_2', 'doc_status')
+    const otherAccountLeftover = seedOffline('default', 'acc_other', 'doc_other')
+    const otherDeploymentLeftover = seedOffline('dep_other', 'acc_2', 'doc_dep')
+    const workingCopy = handle.service.store.dirFor('default', 'acc_2', 'doc_working')
+    mkdirSync(workingCopy, { recursive: true })
+    writeFileSync(join(workingCopy, 'Plan.docx'), 'working')
+
+    // 1. Cold-start activation while already signed in removes the active account's leftover
+    identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+    statusNow = { loggedIn: true, state: 'signed-in' }
+    handle.activate(() => undefined)
+    await vi.waitFor(() => expect(existsSync(startupLeftover)).toBe(false))
+    expect(existsSync(statusLeftover)).toBe(true)
+
+    // 2. Account-status callback sweeps the newly active account's @offline leftover
+    identity = { accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' }
+    statusListener?.({ state: 'signed-in' })
+    await vi.waitFor(() => expect(existsSync(statusLeftover)).toBe(false))
+    expect(existsSync(workingCopy)).toBe(true)
+    expect(existsSync(otherAccountLeftover)).toBe(true)
+    expect(existsSync(otherDeploymentLeftover)).toBe(true)
   })
 })
 

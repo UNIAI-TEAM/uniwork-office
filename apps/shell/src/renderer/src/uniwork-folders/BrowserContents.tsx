@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { UniworkDocSummary } from '../../../shared/home-api'
 import { FileBadge } from '../FileBadge'
@@ -11,7 +11,13 @@ import {
 } from '../uniwork-docs-model'
 import { FolderMenu, type FolderMenuItem } from './FolderMenu'
 import { FolderGlyph } from './UniworkFolderTree'
-import { isFolderEntry, shortPath } from './uniwork-folders-model'
+import {
+  MY_FOLDER_LABEL_KEY,
+  entryTitleOf,
+  isFolderEntry,
+  labelMyFolderPath,
+  shortPath,
+} from './uniwork-folders-model'
 import type { ListState } from './use-folder-browser'
 
 /** id of the muted hidden-formats count line referenced by aria-describedby (R2-3) */
@@ -29,8 +35,10 @@ export function BrowserContents({
   list,
   rows,
   hiddenCount,
+  hiddenHintId,
   emptyText,
   search,
+  myFolderId = null,
   openingId,
   menuFor,
   onOpenFolder,
@@ -41,9 +49,12 @@ export function BrowserContents({
   list: ListState
   rows: UniworkDocSummary[]
   hiddenCount: number
+  hiddenHintId?: string
   emptyText: string
   /** search hits: show each row's path */
   search: boolean
+  /** MYFOLDER-01: names My Folder by its label inside a search hit's path */
+  myFolderId?: string | null
   openingId?: string | null
   menuFor: (doc: UniworkDocSummary) => FolderMenuItem[]
   onOpenFolder: (doc: UniworkDocSummary) => void
@@ -52,6 +63,8 @@ export function BrowserContents({
   onRetry: () => void
 }) {
   const { t, dateLocale } = useI18n()
+  const ownHiddenId = useId()
+  const resolvedHiddenId = hiddenHintId ?? ownHiddenId
   const [activeId, setActiveId] = useState<string | null>(null)
   const [menuId, setMenuId] = useState<string | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -128,7 +141,7 @@ export function BrowserContents({
 
   const hiddenLine =
     hiddenCount > 0 ? (
-      <p className="uwf-hidden" id={BROWSER_HIDDEN_HINT_ID} role="status">
+      <p className="uwf-hidden" id={resolvedHiddenId} role="status">
         {t('uwPickHiddenFormats', { count: hiddenCount })}
       </p>
     ) : null
@@ -169,12 +182,19 @@ export function BrowserContents({
         className="uw-pick-list uwf-contents"
         role="listbox"
         aria-label={t('ufContentsLabel')}
-        aria-describedby={hiddenCount > 0 ? BROWSER_HIDDEN_HINT_ID : undefined}
+        aria-describedby={hiddenCount > 0 ? resolvedHiddenId : undefined}
         ref={listRef}
       >
         {rows.map((doc) => {
           const folder = isFolderEntry(doc)
-          const path = search && doc.path ? shortPath(doc.path, t('ufRoot')) : null
+          const title = entryTitleOf(doc, t(MY_FOLDER_LABEL_KEY))
+          const path =
+            search && doc.path
+              ? shortPath(
+                  labelMyFolderPath(doc.path, myFolderId, t(MY_FOLDER_LABEL_KEY)),
+                  t('ufRoot'),
+                )
+              : null
           const items = menuFor(doc)
           const meta = folder ? '' : pickerRowMeta(doc, t, dateLocale)
           return (
@@ -207,7 +227,7 @@ export function BrowserContents({
                   <FileBadge ext={docExtension(doc)} size={24} />
                 )}
                 <span className="uw-pick-row-text">
-                  <span className="uw-pick-row-title">{doc.title}</span>
+                  <span className="uw-pick-row-title">{title}</span>
                   {path && (
                     <span className="uw-pick-row-meta uwf-path">
                       <span aria-hidden="true">{path.short}</span>
@@ -219,7 +239,7 @@ export function BrowserContents({
               </div>
               {items.length > 0 && (
                 <FolderMenu
-                  label={t('ufActionsFor', { name: doc.title })}
+                  label={t('ufActionsFor', { name: title })}
                   items={items}
                   dataFor={doc.id}
                   open={menuId === doc.id}

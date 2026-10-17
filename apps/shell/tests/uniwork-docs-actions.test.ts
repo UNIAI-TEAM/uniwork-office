@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   truncateSync,
   writeFileSync,
 } from 'node:fs'
@@ -15,13 +17,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkDocSummary, UniworkDocStatus } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
-import { BINDING_FILE, LAST_OWNER_FILE } from '../src/main/uniwork-docs/binding-store'
+import {
+  BINDING_FILE,
+  INTENT_PAYLOAD_FILE,
+  LAST_OWNER_FILE,
+} from '../src/main/uniwork-docs/binding-store'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
 import {
   TREE_CHANGED_WINDOW_MS,
   createTreeChangedCoalescer,
 } from '../src/main/uniwork-docs/tree-changed'
+import {
+  createSyncStoreAccess,
+  SYNC_STORE_REGISTRATIONS,
+  type SyncStoreAccess,
+} from '../src/main/uniwork-sync/session-store'
+import { createStoreLayer } from '../src/main/uniwork-sync/store'
+import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
+import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/compliance'
 
 /**
  * G8-17 S18: create a blank document, upload a file, rename, archive / restore
@@ -58,6 +72,19 @@ const statGate = vi.hoisted(() => ({
   entered: null as (() => void) | null,
 }))
 
+/**
+ * S01-R4-1: size can also change between the stat and the read, and the buffer
+ * is what actually leaves. A test names the one path whose read is held open -
+ * the gate matches on the path, so a binding or working-copy read is never
+ * held - and grows the file inside that window. With no path set this mock is
+ * the real module.
+ */
+const readGate = vi.hoisted(() => ({
+  path: null as string | null,
+  held: null as Promise<void> | null,
+  entered: null as (() => void) | null,
+}))
+
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
@@ -67,9 +94,13 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       if (statGate.held) await statGate.held
       return actual.stat(...args)
     }),
-    readFile: vi.fn(async (...args: Parameters<typeof actual.readFile>) =>
-      actual.readFile(...args),
-    ),
+    readFile: vi.fn(async (...args: Parameters<typeof actual.readFile>) => {
+      if (readGate.path !== null && String(args[0]) === readGate.path) {
+        readGate.entered?.()
+        if (readGate.held) await readGate.held
+      }
+      return actual.readFile(...args)
+    }),
   }
 })
 
@@ -89,6 +120,9 @@ function latch() {
 afterEach(() => {
   statGate.held = null
   statGate.entered = null
+  readGate.path = null
+  readGate.held = null
+  readGate.entered = null
 })
 
 interface Call {
@@ -131,6 +165,55 @@ function fakeServer(
     deepMax?: number | string | null
     /** FD-11: a move whose target already holds the name renames the entry "Name (2)" */
     moveRenames?: boolean
+    /**
+     * SAVE-01 / MYFOLDER-01: D's 409 `my_folder_locked` (error_class
+     * "conflict") on rename/move/archive of the My Folder row itself
+     */
+    myFolderLocked?: boolean
+    /** SAVE-01: D's bare 400 `invalid_destination` on the create routes */
+    invalidDestination?: boolean
+    /**
+     * SAVE-01 r2 (S01-R1-4): the create POST waits on this latch, so a second
+     * submit can be issued while the first is still in flight
+     */
+    createGate?: () => Promise<void>
+    /**
+     * SAVE-01 r2 (S01-R1-4): the create lands (the document exists) but its
+     * answer is lost once - D's idempotent retry then serves the same row to
+     * the retried key
+     */
+    createAnswerLost?: boolean
+    /** SAVE-01 r2 (S01-R1-2): these document ids answer a detail GET with a 5xx */
+    getDocumentFailsFor?: string[]
+    /** SAVE-01 r2 (S01-R1-2): these document ids refuse archive with a 409 */
+    archiveFailsFor?: string[]
+    /**
+     * SAVE-01 r3 (S01-R2-3): the FIRST non-deduped create answers D's
+     * fingerprint refusal `idempotency_payload_mismatch` (the key was replayed
+     * against a different body); the flag is consumed once
+     */
+    createMismatch?: boolean
+    /**
+     * SAVE-01 r3 (S01-R3-3): the FIRST non-deduped create answers 409
+     * `idempotency_in_flight` (D's "this key already has a request running"
+     * verdict after the row was seeded); the flag is consumed once, so an
+     * unchanged-body retry replays the retained key and dedupes to that row
+     */
+    createInFlight?: boolean
+    /**
+     * SAVE-01 merge M-2 (D-S1): the `documents.limits` the `GET /api/v1/config`
+     * answers with. Unset keeps D's 404, which the client turns into the
+     * default caps (209,715,200 bytes) - the upload tests' own preflight.
+     */
+    limits?: unknown
+    /**
+     * SAVE-01 r4 (S01-R4-3): D's own 413 `document_too_large` on the
+     * upload/first-save create - the server refusing bytes the local preflight
+     * let through (a stale limits cache, or a cap lowered after the read). The
+     * envelope carries no `fields`, so the only size detail a caller can hand
+     * the renderer is its own; no row is created.
+     */
+    createTooLarge?: boolean
   } = {},
 ) {
   const state = {
@@ -142,10 +225,17 @@ function fakeServer(
     archived: false,
     revision: 41,
     /** every document the server now holds, by id */
-    documents: new Map<string, { title: string; bytes: Uint8Array }>(),
+    documents: new Map<string, { title: string; bytes: Uint8Array; archived?: boolean }>(),
+    /** D's create dedupe: the row id a create Idempotency-Key produced */
+    createdByKey: new Map<string, string>(),
+    /** checksum_sha256 the upload POST answered, keyed by its upload_id */
+    uploadChecksums: new Map<string, string>(),
+    /** the upload POSTs still running (upload_id order) */
+    uploadSeq: 0,
   }
-  const calls: Call[] = []
   let seq = 0
+  /** every request the fake saw, in order */
+  const calls: Call[] = []
 
   const docJson = (id: string) => ({
     id,
@@ -185,11 +275,23 @@ function fakeServer(
     }
     calls.push(call)
 
+    // SAVE-01 merge M-2 (D-S1): SIZE-F1's `documents.limits` read, the one the
+    // upload path makes and the first save now shares
+    if (u.pathname === '/api/v1/config') {
+      if (options.limits === undefined) return envelope(404, 'not_found')
+      return json(200, { limits: options.limits })
+    }
+
     // create blank
     if (u.pathname === `/api/v1/workspaces/${WS}/documents/files/blank`) {
       call.body = JSON.parse(String(init.body))
       if (options.nameTaken) return envelope(409, 'conflict')
       if (options.nameRefused) return envelope(400, 'invalid_request')
+      // MYFOLDER-01: a create that mixes destination and parent_id, or names an
+      // unknown destination, is refused before the document exists
+      if (options.invalidDestination) {
+        return json(400, { error: { code: 'invalid_destination', message: 'x' } })
+      }
       const id = `new_${++seq}`
       const title = (call.body as { title: string }).title
       state.documents.set(id, { title, bytes: enc('blank') })
@@ -203,7 +305,7 @@ function fakeServer(
         },
       })
     }
-    // upload (multipart)
+    // upload / first-save create (multipart)
     if (u.pathname === `/api/v1/workspaces/${WS}/documents/files`) {
       // an in-flight request a test cancels mid-POST: fetch rejects an aborted
       // signal, the body never being read here
@@ -219,17 +321,58 @@ function fakeServer(
           options.uploadGate!().then(resolve, reject)
         })
       }
+      // SAVE-01 r2: a held create keeps both submit windows open
+      if (options.createGate) await options.createGate()
       const form = init.body as FormData
       const file = form.get('file') as File
       const bytes = new Uint8Array(await file.arrayBuffer())
       call.body = {
         title: form.get('title'),
         parent_id: form.get('parent_id'),
+        destination: form.get('destination'),
         name: file.name,
         bytes,
       }
+      if (options.invalidDestination) {
+        return json(400, { error: { code: 'invalid_destination', message: 'x' } })
+      }
+      // SAVE-01 r4 (S01-R4-3): D refuses the bytes itself - after the caller's
+      // preflight passed - and no row is created. The envelope names only the
+      // code, so the filename and the payload length can come from the caller.
+      if (options.createTooLarge) {
+        return json(413, { error: { code: 'document_too_large', message: 'x' } })
+      }
+      // SAVE-01 r2 (S01-R1-4): D dedupes a retried create by its
+      // Idempotency-Key - the same row answers again, never a second document
+      const keyed = state.createdByKey.get(call.idempotencyKey)
+      if (keyed) {
+        const held = state.documents.get(keyed)
+        return json(201, { document: { ...docJson(keyed), title: held?.title ?? file.name } })
+      }
       const id = `up_${++seq}`
       state.documents.set(id, { title: file.name, bytes })
+      state.createdByKey.set(call.idempotencyKey, id)
+      // SAVE-01 r3 (S01-R2-3): D refuses a key whose fingerprint does not match
+      // this body's checksum (fileCreateFingerprint, document_files.go:315) -
+      // one refusal only, so a retry with a fresh key proceeds
+      if (options.createMismatch) {
+        options.createMismatch = false
+        return envelope(409, 'idempotency_payload_mismatch')
+      }
+      // SAVE-01 r3 (S01-R3-3): the row is seeded under this key but the create
+      // answers D's in-flight verdict once - an unchanged-body retry replays
+      // the retained key and dedupes to the seeded row above
+      if (options.createInFlight) {
+        options.createInFlight = false
+        return envelope(409, 'idempotency_in_flight')
+      }
+      // the row exists; only the answer was lost (S01-R1-4): the retry of the
+      // same key replays the create instead of minting a twin. One-shot: a
+      // retry under a NEW key (edited bytes, S01-R2-3) proceeds normally
+      if (options.createAnswerLost) {
+        options.createAnswerLost = false
+        return envelope(503, 'unavailable')
+      }
       return json(201, { document: { ...docJson(id), title: file.name } })
     }
     // recent (the flat library list without a search query)
@@ -250,6 +393,21 @@ function fakeServer(
         next_cursor: null,
       })
     }
+    // SAVE-01 / MYFOLDER-01: ensure the caller's personal folder (idempotent:
+    // the same DocumentSDO row answers on every call, system_kind marks it)
+    if (u.pathname === `/api/v1/workspaces/${WS}/documents/my-folder`) {
+      if (!state.documents.has('fold_my')) {
+        state.documents.set('fold_my', { title: 'My Folder', bytes: enc('') })
+      }
+      return json(200, {
+        document: {
+          ...docJson('fold_my'),
+          kind: 'folder',
+          title: 'My Folder',
+          system_kind: 'my_folder',
+        },
+      })
+    }
     // folders
     if (u.pathname === `/api/v1/workspaces/${WS}/documents`) {
       // FD-11: create one folder (or refuse it with the server's own code)
@@ -261,6 +419,10 @@ function fakeServer(
         }
         call.body = body
         if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
+        // MYFOLDER-01: destination on a folder create is refused the same way
+        if (options.invalidDestination) {
+          return json(400, { error: { code: 'invalid_destination', message: 'x' } })
+        }
         if (options.deepMax !== undefined) {
           return json(422, {
             error: {
@@ -300,10 +462,26 @@ function fakeServer(
       })
     }
     // archive / restore
-    if (u.pathname === `/api/v1/documents/${DOC}/archive`) {
+    const archive = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)\/archive$/.exec(u.pathname)
+    if (archive) {
+      const id = archive[1]!
       if (options.lifecycleConflict) return envelope(409, 'conflict')
-      state.archived = true
-      return json(200, { document: docJson(DOC), affected: [DOC] })
+      if (options.myFolderLocked) {
+        return json(409, {
+          error: { code: 'my_folder_locked', message: 'x', error_class: 'conflict' },
+        })
+      }
+      // SAVE-01 r2 (S01-R1-2): the archive that compensates a bind failure can
+      // fail itself - the created row then stays where the create put it
+      if (options.archiveFailsFor?.includes(id)) return envelope(409, 'conflict')
+      if (id === DOC) {
+        state.archived = true
+        return json(200, { document: docJson(DOC), affected: [DOC] })
+      }
+      const entry = state.documents.get(id)
+      if (!entry) return envelope(404, 'not_found')
+      entry.archived = true
+      return json(200, { document: docJson(id), affected: [id] })
     }
     if (u.pathname === `/api/v1/documents/${DOC}/restore`) {
       state.archived = false
@@ -315,6 +493,13 @@ function fakeServer(
       call.body = body
       if (options.nameTaken) return envelope(409, 'conflict')
       if (options.nameRefused) return envelope(400, 'invalid_request')
+      // MYFOLDER-01: D answers rename/move/archive of the My Folder row with
+      // 409 my_folder_locked and error_class "conflict"
+      if (options.myFolderLocked) {
+        return json(409, {
+          error: { code: 'my_folder_locked', message: 'x', error_class: 'conflict' },
+        })
+      }
       if (body.revision !== String(state.revision)) {
         return json(422, {
           error: {
@@ -336,6 +521,13 @@ function fakeServer(
       const body: { parent_id: string | null; revision: string } = JSON.parse(String(init.body))
       call.body = body
       if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
+      // MYFOLDER-01: a move into (or of) the locked My Folder row refuses
+      // before the move mutates anything
+      if (options.myFolderLocked) {
+        return json(409, {
+          error: { code: 'my_folder_locked', message: 'x', error_class: 'conflict' },
+        })
+      }
       const title = id === DOC ? state.title : (state.documents.get(id)?.title ?? 'new.docx')
       // a name already taken in the target folder is auto-renamed by the server
       const renamed = options.moveRenames ? `${title} (2)` : title
@@ -351,11 +543,58 @@ function fakeServer(
     const detail = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)$/.exec(u.pathname)
     if (detail && call.method === 'GET') {
       const id = detail[1]!
+      // SAVE-01 r2 (S01-R1-2): the bind read can fail after the create landed
+      if (options.getDocumentFailsFor?.includes(id)) return envelope(500, 'unavailable')
       if (id !== DOC && !state.documents.has(id)) return envelope(404, 'not_found')
       if (state.archived && id === DOC && state.myLevel !== 'manage') {
         return envelope(404, 'not_found')
       }
       return json(200, { document: docJson(id) })
+    }
+    // SAVE-01 r2 (S01-R1-8): the bound save's upload + commit pair, mirrored
+    // from the save-coordinator fake so a first-saved document can be saved
+    // for real in this suite
+    const upload = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)\/uploads$/.exec(u.pathname)
+    if (upload && call.method === 'POST') {
+      const form = init.body as FormData
+      const file = form.get('file') as File
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const uploadId = `upl_${++state.uploadSeq}`
+      state.uploadChecksums.set(uploadId, hex(bytes))
+      call.body = { name: file.name, bytes }
+      // the canonical receipt (uniwork-docs-save.test.ts): claim_expires_at
+      // is mandatory on the real D shape
+      return json(200, {
+        upload_id: uploadId,
+        checksum_sha256: hex(bytes),
+        size_bytes: bytes.byteLength,
+        claim_expires_at: '2026-10-17T00:00:00Z',
+      })
+    }
+    const commit = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)\/versions\/commit$/.exec(u.pathname)
+    // the coordinator's intent reconcile reads it too: no intent = not_committed
+    if (commit && call.method === 'GET') {
+      return json(200, { outcome: 'not_committed' })
+    }
+    if (commit && call.method === 'POST') {
+      const body = JSON.parse(String(init.body)) as { upload_id: string; base_revision: string }
+      call.body = body
+      const id = commit[1]!
+      if (body.base_revision !== String(state.revision)) {
+        return envelope(409, 'document_version_conflict')
+      }
+      state.revision += 1
+      return json(200, {
+        document: { ...docJson(id), revision: String(state.revision) },
+        version: {
+          id: `ver_${id}`,
+          document_id: id,
+          version: 2,
+          kind: 'file',
+          checksum_sha256: state.uploadChecksums.get(body.upload_id) ?? null,
+          size_bytes: 0,
+        },
+      })
     }
     // download (the open flow): the bytes of the requested document
     const download = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)\/download$/.exec(u.pathname)
@@ -405,7 +644,29 @@ afterEach(async () => {
   }
 })
 
-function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: boolean } = {}) {
+/** the fake UniWork documents server a setup() wires the service's client to */
+type FakeServer = ReturnType<typeof fakeServer>
+
+function setup(
+  server: FakeServer,
+  options: {
+    pathOpen?: boolean
+    /** SAVE-01: a module Save writes these bytes to the path, then fires onUserSave */
+    moduleSaveWrites?: string
+    /** SAVE-01 r2: the module answers the Save request with this (default true) */
+    moduleSaveResult?: boolean
+    /** SAVE-01 r2: the module accepts the Save but its hook never fires (flush timeout) */
+    moduleSaveSilent?: boolean
+    /** SAVE-01 r2: shrink the first-save flush wait (ms), for the timeout case */
+    firstSaveFlushTimeoutMs?: number
+    /** SAVE-01 r2: notifyPathRenamed / pushStatus / pushTreeChanged throw */
+    callbacksThrow?: boolean
+    /** SAVE-01 r2 (S01-R1-8): a real durable sync store under dir (intent saves) */
+    syncStore?: boolean
+    /** SAVE-01: runs inside notifyPathRenamed, between the bind and its push */
+    onPathMoved?: () => void
+  } = {},
+) {
   const statuses: UniworkDocStatus[] = []
   const renamed: Array<{ documentId: string; title: string }> = []
   const progress: Array<{ path: string; loaded: number; total: number }> = []
@@ -413,6 +674,8 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
   const titleRenames: Array<{ path: string; title: string }> = []
   /** FD-11: the tree-changed notices main pushed while the test ran */
   const treeChanged: Array<{ workspaceId: string }> = []
+  /** SAVE-01 r2: every path the module's Save was asked to write */
+  const moduleSaveCalls: string[] = []
   const uploadFile = join(dir, 'Q3 report.docx')
   writeFileSync(uploadFile, 'uploaded bytes')
   const ui: ConflictUi = {
@@ -432,6 +695,28 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
   let onStopRuntime: (() => void) | undefined
   let onPushTreeChanged: (event: { workspaceId: string }) => void = (event) =>
     treeChanged.push(event)
+  // SAVE-01 r2 (S01-R1-8): the durable save queue needs the real store layer -
+  // intents, drafts and pause behind a lockable fake keychain under dir
+  let syncStore: SyncStoreAccess | undefined
+  if (options.syncStore) {
+    const layer = createStoreLayer({
+      root: join(dir, 'sync-store'),
+      keys: createSafeStorageKeyProvider({
+        safeStorage: createLockableSafeStorage(),
+        dir: join(dir, 'sync-store-keys'),
+      }),
+      budgetBytes: 64 * 1024 * 1024,
+      clock: () => Date.now(),
+    })
+    for (const registration of SYNC_STORE_REGISTRATIONS) layer.register(registration)
+    syncStore = createSyncStoreAccess({
+      layer,
+      scope: () =>
+        currentIdentity
+          ? { deploymentId: currentIdentity.deploymentId, accountId: currentIdentity.accountId }
+          : null,
+    })
+  }
   const service = new UniworkDocsService({
     userDataDir: dir,
     appVersion: () => '0.0.0',
@@ -445,18 +730,44 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     fetch: (url, init) => server.fetch(url, init),
     openPath: () => true,
     isPathOpen: () => options.pathOpen === true,
-    requestModuleSave: () => false,
+    firstSaveFlushTimeoutMs: options.firstSaveFlushTimeoutMs,
+    syncStore,
+    requestModuleSave: (path) => {
+      moduleSaveCalls.push(path)
+      if (options.moduleSaveResult === false) return false
+      if (!options.moduleSaveSilent) {
+        // the module's own Save writes the file, then its user-save hook
+        // fires; the queueMicrotask is the renderer round-trip that lands it
+        if (options.moduleSaveWrites !== undefined) {
+          writeFileSync(path, options.moduleSaveWrites)
+        }
+        queueMicrotask(() => service.onUserSave(path))
+      }
+      return true
+    },
     reloadPath: () => undefined,
     activePath: () => undefined,
     stopRuntime: () => onStopRuntime?.(),
     pickUploadFile: async () => ({ path: uploadFile, name: basename(uploadFile) }),
     pushUploadProgress: (event) => progress.push(event),
     pushDocRenamed: (event) => renamed.push(event),
-    pushTreeChanged: (event) => onPushTreeChanged(event),
-    notifyPathRenamed: (oldPath, newPath) => pathRenames.push({ oldPath, newPath }),
+    pushTreeChanged: (event) => {
+      // SAVE-01 r2 (S01-R1-3): a post-bind callback may throw; the save is
+      // already done, so it must not turn the result into a failure
+      if (options.callbacksThrow) throw new Error('pushTreeChanged exploded')
+      onPushTreeChanged(event)
+    },
+    notifyPathRenamed: (oldPath, newPath) => {
+      if (options.callbacksThrow) throw new Error('notifyPathRenamed exploded')
+      pathRenames.push({ oldPath, newPath })
+      options.onPathMoved?.()
+    },
     notifyTitleRenamed: (path, title) => titleRenames.push({ path, title }),
     ui,
-    pushStatus: (s) => statuses.push(s),
+    pushStatus: (s) => {
+      if (options.callbacksThrow) throw new Error('pushStatus exploded')
+      statuses.push(s)
+    },
     pushLaunch: () => undefined,
     reveal: () => undefined,
   })
@@ -469,6 +780,7 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     titleRenames,
     uploadFile,
     treeChanged,
+    moduleSaveCalls,
     setIdentity: (next: typeof currentIdentity) => {
       currentIdentity = next
     },
@@ -1959,5 +2271,1189 @@ describe('the FD-11 tree-changed push', () => {
       }
     }
     expect(emitted).toEqual([])
+  })
+})
+
+// SAVE-01 / MYFOLDER-01: the folder server-codes `my_folder_locked` and
+// `invalid_destination` carry the action to the renderer as themselves, never
+// as the bare envelope error_class. `my_folder_locked` arrives as 409 with
+// error_class "conflict": if the client ever switches on the class first, the
+// move would be treated as a revision conflict - re-read, retried, and finally
+// reported as "conflict" while the file never moved. These tests pin the
+// code-first mapping end-to-end: exactly one move POST, no re-read past the
+// initial ref fetch, and the typed code on the result.
+describe('SAVE-01 my_folder_locked and invalid_destination', () => {
+  it('maps a 409 my_folder_locked move refusal by code, once, never as a conflict retry', async () => {
+    const server = fakeServer({ myFolderLocked: true })
+    const ctx = setup(server)
+    const moved = await ctx.service.moveDocument({ documentId: DOC, parentId: 'fold_1' })
+    expect(moved).toEqual({ ok: false, error: 'my_folder_locked' })
+    // one GET /documents/{id} (the revision read) + one POST .../move: a
+    // conflict path would read and post again
+    expect(server.calls).toHaveLength(2)
+    expect(
+      server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/move')),
+    ).toHaveLength(1)
+  })
+
+  it('answers rename and archive of the locked row as my_folder_locked too', async () => {
+    const server = fakeServer({ myFolderLocked: true })
+    const ctx = setup(server)
+    expect(await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx')).toEqual({
+      ok: false,
+      error: 'my_folder_locked',
+    })
+    expect(await ctx.service.archiveDocument(DOC)).toEqual({
+      ok: false,
+      error: 'my_folder_locked',
+    })
+  })
+
+  it('answers a create refused 400 invalid_destination as the field error, once', async () => {
+    const server = fakeServer({ invalidDestination: true })
+    const ctx = setup(server)
+    expect(
+      await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'Contracts' }),
+    ).toEqual({ ok: false, error: 'invalid_destination' })
+    expect(server.calls).toHaveLength(1)
+  })
+})
+
+// SAVE-01: the first Save to UniWork of an unbound tab - the editor flushes,
+// the document is created (My Folder by default, or the picked folder), and
+// the tab binds to it so the next Ctrl+S is a plain bound save.
+describe('SAVE-01 first save', () => {
+  it('flushes the editor, creates with destination my_folder and binds the tab', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { pathOpen: true, moduleSaveWrites: 'fresh editor bytes' })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'stale disk bytes')
+
+    const saved = await ctx.service.firstSave({
+      tabPath: file,
+      title: 'Draft.docx',
+      workspaceId: WS,
+      target: { kind: 'my_folder' },
+    })
+
+    expect(saved.ok).toBe(true)
+    // ONE POST to the create route carrying the destination and the title in
+    // the fields before the file part (Advisor Q6: title on create, no PATCH)
+    const posts = server.calls.filter(
+      (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents/files`,
+    )
+    expect(posts).toHaveLength(1)
+    const body = posts[0]!.body as { destination?: unknown; parent_id?: unknown; title?: unknown }
+    expect(body.destination).toBe('my_folder')
+    expect(body.parent_id).toBeNull()
+    expect(body.title).toBe('Draft.docx')
+    // the bytes the editor wrote win over the stale disk copy
+    expect(Buffer.from((posts[0]!.body as { bytes: Uint8Array }).bytes).toString('utf8')).toBe(
+      'fresh editor bytes',
+    )
+    // the tab followed its file into the document's store folder
+    expect(ctx.pathRenames).toHaveLength(1)
+    const moved = ctx.pathRenames[0]!.newPath
+    expect(ctx.service.isBound(moved)).toBe(true)
+    const status = await ctx.service.docStatus(moved)
+    expect(status?.state).toBe('ready')
+    // the user's original file is left alone: still on disk, now unbound
+    // (S01-W1-1); the store copy is the only bound file
+    expect(existsSync(file)).toBe(true)
+    expect(readFileSync(file, 'utf8')).toBe('fresh editor bytes')
+    expect(ctx.service.isBound(file)).toBe(false)
+    expect(ctx.treeChanged).toEqual([{ workspaceId: WS }])
+  })
+
+  it('creates under the picked folder with parent_id and no destination', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const file = join(dir, 'Local.docx')
+    writeFileSync(file, 'bytes')
+
+    const saved = await ctx.service.firstSave({
+      tabPath: file,
+      title: 'Local.docx',
+      workspaceId: WS,
+      target: { kind: 'folder', folderId: 'fold_1' },
+    })
+
+    expect(saved.ok).toBe(true)
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents/files`,
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.parent_id).toBe('fold_1')
+    expect(body.destination).toBeNull()
+  })
+
+  it('refuses a path that is already bound (a second Lưu never double-creates)', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    // an open-by-id open leaves the tab bound to DOC's working copy
+    const opened = await ctx.service.openDocument(DOC)
+    expect(opened.ok).toBe(true)
+    const boundPath = opened.ok ? opened.value.path : ''
+    const callsBefore = server.calls.length
+
+    const again = await ctx.service.firstSave({
+      tabPath: boundPath,
+      title: 'Draft.docx',
+      workspaceId: WS,
+      target: { kind: 'my_folder' },
+    })
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(server.calls).toHaveLength(callsBefore)
+  })
+
+  it('suppresses the tree push when the session is lost while the create is in flight', async () => {
+    const server = fakeServer()
+    // the drop lands inside notifyPathRenamed: the document is created and the
+    // working copy bound, only the FD-11 own-action push must never arrive
+    const ctx = setup(server, { onPathMoved: () => ctx.setIdentity(null) })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    const saved = await ctx.service.firstSave({
+      tabPath: file,
+      title: 'Draft.docx',
+      workspaceId: WS,
+      target: { kind: 'my_folder' },
+    })
+
+    expect(saved.ok).toBe(true)
+    expect(ctx.treeChanged).toEqual([])
+  })
+
+  it('ensureMyFolder posts once to the my-folder route and parses systemKind', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const ensured = await ctx.service.ensureMyFolder(WS)
+    expect(ensured.ok).toBe(true)
+    if (!ensured.ok) return
+    expect(ensured.value.id).toBe('fold_my')
+    expect(ensured.value.systemKind).toBe('my_folder')
+    const post = server.calls.find(
+      (c) => c.path === `/api/v1/workspaces/${WS}/documents/my-folder`,
+    )!
+    expect(post.method).toBe('POST')
+    // a second ensure is idempotent on the server: same row id answers again
+    const again = await ctx.service.ensureMyFolder(WS)
+    expect(again.ok && again.value.id === 'fold_my').toBe(true)
+  })
+  // S01-W1-1: a first save binds the tab to a copy inside the store. The file
+  // the user opened is theirs - it stays where it is, byte for byte, and the
+  // old path simply stops being the tab's file.
+  it('never touches the original file while re-keying the tab to the store copy', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const file = join(dir, 'Report.docx')
+    writeFileSync(file, 'original bytes keep me')
+    const before = statSync(file)
+
+    const saved = await ctx.service.firstSave({
+      tabPath: file,
+      title: 'Report.docx',
+      workspaceId: WS,
+      target: { kind: 'my_folder' },
+    })
+
+    expect(saved.ok).toBe(true)
+    // the original: still there, identical bytes, untouched mtime, unbound
+    expect(existsSync(file)).toBe(true)
+    expect(readFileSync(file, 'utf8')).toBe('original bytes keep me')
+    expect(statSync(file).mtimeMs).toBe(before.mtimeMs)
+    expect(ctx.service.isBound(file)).toBe(false)
+    // the tab now lives at a bound working copy of the new document
+    const [moved] = ctx.pathRenames
+    expect(moved?.oldPath).toBe(file)
+    expect(moved?.newPath).not.toBe(file)
+    expect(ctx.service.isBound(moved!.newPath)).toBe(true)
+    // the next save is a bound save (module-save path, never another create)
+    const status = await ctx.service.save(moved!.newPath)
+    expect(status).not.toBeNull()
+    expect(status!.path).toBe(moved!.newPath)
+    expect(status!.documentId).toBe(saved.ok ? saved.value.id : '')
+    expect(
+      server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/documents/files')),
+    ).toHaveLength(1)
+  })
+})
+
+describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
+  const input = (file: string, target?: unknown) => ({
+    tabPath: file,
+    title: 'Draft.docx',
+    workspaceId: WS,
+    target: (target ?? { kind: 'my_folder' }) as never,
+  })
+
+  // S01-R1-1: a flush the module refused (or timed out on) must fail the save
+  // BEFORE anything leaves - no POST, no binding, no re-key, original file
+  // untouched. Uploading the stale disk bytes would silently replace what the
+  // editor holds.
+  it('a refused module flush fails the save with no request at all', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { pathOpen: true, moduleSaveResult: false })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'stale disk bytes')
+
+    const saved = await ctx.service.firstSave(input(file))
+
+    expect(saved).toEqual({ ok: false, error: 'first_save_flush_failed' })
+    expect(server.calls).toHaveLength(0)
+    expect(ctx.moduleSaveCalls).toEqual([file])
+    expect(ctx.pathRenames).toEqual([])
+    expect(ctx.service.isBound(file)).toBe(false)
+    expect(readFileSync(file, 'utf8')).toBe('stale disk bytes')
+  })
+
+  it('a module flush that never answers fails the save after the wait, no request', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, {
+      pathOpen: true,
+      moduleSaveSilent: true,
+      firstSaveFlushTimeoutMs: 25,
+    })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'stale disk bytes')
+
+    const saved = await ctx.service.firstSave(input(file))
+
+    expect(saved).toEqual({ ok: false, error: 'first_save_flush_failed' })
+    expect(server.calls).toHaveLength(0)
+    expect(ctx.service.isBound(file)).toBe(false)
+    expect(readFileSync(file, 'utf8')).toBe('stale disk bytes')
+  })
+
+  // S01-R1-5: the Advisor pin - anything outside the exact target union is
+  // invalid_destination and NEVER reaches stat/read/POST, so an empty parent
+  // can never land the document at the workspace root.
+  it('refuses empty, blank or unknown targets as invalid_destination with zero requests', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { pathOpen: true })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    for (const target of [
+      { kind: 'folder', folderId: '' },
+      { kind: 'folder', folderId: '   ' },
+      { kind: 'folder' },
+      { kind: 'folder', folderId: 7 },
+      { kind: 'everywhere' },
+      'my_folder',
+    ]) {
+      const saved = await ctx.service.firstSave(input(file, target))
+      expect(saved).toEqual({ ok: false, error: 'invalid_destination' })
+    }
+    // zero requests AND zero flushes: validation precedes the editor round-trip
+    expect(server.calls).toHaveLength(0)
+    expect(ctx.moduleSaveCalls).toEqual([])
+    expect(ctx.service.isBound(file)).toBe(false)
+  })
+
+  // S01-R1-9 / merge M-2 (D-S1): first-save runs the upload's own preflight
+  // before buffering: stat + regular-file + the ONE size guard. Under D's
+  // default 200 MiB cap the effective limit is the 50 MiB staging cap.
+  it('refuses a file over the 50 MiB cap unread', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const file = join(dir, 'Huge.docx')
+    writeFileSync(file, 'x')
+    // extend with sparse zeros: 50 MiB + 1 byte, without writing 50 MiB
+    truncateSync(file, 50 * 1024 * 1024 + 1)
+
+    const saved = await ctx.service.firstSave(input(file, undefined))
+
+    expect(saved).toEqual({
+      ok: false,
+      error: 'too_large',
+      name: 'Huge.docx',
+      sizeBytes: 50 * 1024 * 1024 + 1,
+      maxBytes: 50 * 1024 * 1024,
+    })
+    // refused unread, and nothing created, bound or moved; the limits read
+    // (`GET /api/v1/config`) is the only request the call makes
+    expect(vi.mocked(readFile).mock.calls.map((call) => String(call[0]))).not.toContain(file)
+    expect(server.calls.filter((call) => call.method === 'GET').map((call) => call.path)).toEqual([
+      '/api/v1/config',
+    ])
+    expect(server.calls.filter((call) => call.method !== 'GET')).toEqual([])
+    expect(ctx.pathRenames).toEqual([])
+    expect(ctx.service.isBound(file)).toBe(false)
+  })
+
+  // merge M-2 (D-S1, BINDING): upload AND first save share ONE size preflight.
+  // The limits read is the upload path's own, so a server `upload_max_bytes`
+  // below D's 50 MiB staging cap now refuses a first save too - typed, naming
+  // the file, its size and the effective limit, before anything is read or
+  // created.
+  describe('merge M-2: the one upload+save size preflight', () => {
+    /** the `file` part's bytes of a multipart POST the fake recorded */
+    const postedBytes = (body: unknown): Uint8Array | null =>
+      typeof body === 'object' &&
+      body !== null &&
+      'bytes' in body &&
+      body.bytes instanceof Uint8Array
+        ? body.bytes
+        : null
+
+    it('refuses a file above a lower server cap with the limit named, zero creates, no bind', async () => {
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Big.docx')
+      writeFileSync(file, 'x')
+      truncateSync(file, 2 * 1024 * 1024)
+
+      const saved = await ctx.service.firstSave(input(file))
+
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Big.docx',
+        sizeBytes: 2 * 1024 * 1024,
+        maxBytes: 1024 * 1024,
+      })
+      // refused before the read: the file's bytes never enter main
+      expect(vi.mocked(readFile).mock.calls.map((call) => String(call[0]))).not.toContain(file)
+      // zero create/upload requests: the limits read is the only request
+      expect(server.calls.filter((call) => call.path.endsWith('/documents/files'))).toHaveLength(0)
+      expect(server.calls.filter((call) => call.method !== 'GET')).toEqual([])
+      // no working-copy/binding change, and the file is byte-identical
+      expect(ctx.pathRenames).toEqual([])
+      expect(ctx.service.isBound(file)).toBe(false)
+      expect(readFileSync(file).byteLength).toBe(2 * 1024 * 1024)
+    })
+
+    it('still sends a file exactly at the server cap', async () => {
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'AtCap.docx')
+      writeFileSync(file, 'x')
+      truncateSync(file, 1024 * 1024)
+
+      const saved = await ctx.service.firstSave(input(file))
+
+      expect(saved.ok).toBe(true)
+      // the cap that let it through is the server's own, read once by this call
+      expect(server.calls.filter((call) => call.path === '/api/v1/config')).toHaveLength(1)
+      const posts = server.calls.filter(
+        (call) =>
+          call.method === 'POST' && call.path === `/api/v1/workspaces/${WS}/documents/files`,
+      )
+      expect(posts).toHaveLength(1)
+      expect(postedBytes(posts[0]?.body)?.byteLength).toBe(1024 * 1024)
+      expect(ctx.service.isBound(ctx.pathRenames[0]!.newPath)).toBe(true)
+    })
+
+    it('answers the renderer the same too_large fields the upload path answers', async () => {
+      // one cap, two entry points: the same file, refused by the save and by
+      // the upload, carries the identical renderer shape (the shared mapper)
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Twin.docx')
+      writeFileSync(file, 'x')
+      truncateSync(file, 3 * 1024 * 1024)
+
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-merge-2',
+      })
+
+      const saved = await ctx.service.firstSave(input(file))
+
+      expect(saved).toEqual(uploaded)
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Twin.docx',
+        sizeBytes: 3 * 1024 * 1024,
+        maxBytes: 1024 * 1024,
+      })
+    })
+
+    // S01-R4-3: D can refuse the bytes itself after the local preflight passed
+    // (a stale limits cache, or a cap lowered since the read). The upload path
+    // re-wraps that answer with its own basename and payload length because
+    // `errorFromResponse` fills the size fields but never the filename; the
+    // first save must answer the renderer the same shape.
+    it("adopts a server 413 too_large with the call's own basename, size and cap", async () => {
+      // the cached cap is higher than the one D enforces, so only the server
+      // refuses this file - and it refuses it after the bytes were read
+      const server = fakeServer({
+        limits: { upload_max_bytes: 8 * 1024 * 1024 },
+        createTooLarge: true,
+      })
+      const ctx = setup(server)
+      const file = join(dir, 'Adopted.docx')
+      writeFileSync(file, 'x')
+      truncateSync(file, 1024 * 1024)
+
+      const saved = await ctx.service.firstSave(input(file))
+
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Adopted.docx',
+        sizeBytes: 1024 * 1024,
+        maxBytes: 8 * 1024 * 1024,
+      })
+      // one create attempt, and it left nothing behind: no bind, no move, no
+      // compensation (the refusal precedes the row), original file intact
+      expect(
+        server.calls.filter(
+          (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+        ),
+      ).toHaveLength(1)
+      expect(server.calls.filter((call) => call.path.endsWith('/archive'))).toHaveLength(0)
+      expect(ctx.pathRenames).toEqual([])
+      expect(ctx.service.isBound(file)).toBe(false)
+      expect(readFileSync(file).byteLength).toBe(1024 * 1024)
+    })
+
+    // S01-R4-1: the stat and the read are two moments - a file that grows
+    // between them is refused on what was actually buffered, exactly like the
+    // upload path, and nothing of it leaves.
+    it('refuses a first save whose file grew past the server cap between the stat and the read', async () => {
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Grown.docx')
+      writeFileSync(file, 'x')
+      const gate = latch()
+      readGate.path = file
+      readGate.entered = gate.entered
+      readGate.held = gate.held
+
+      const pending = ctx.service.firstSave(input(file))
+      await gate.reached
+      // the stat already saw 1 byte: only the post-read guard can refuse this
+      truncateSync(file, 1024 * 1024 + 1)
+      gate.release()
+      const saved = await pending
+
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Grown.docx',
+        sizeBytes: 1024 * 1024 + 1,
+        maxBytes: 1024 * 1024,
+      })
+      expect(
+        server.calls.filter(
+          (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+        ),
+      ).toHaveLength(0)
+      expect(ctx.pathRenames).toEqual([])
+      expect(ctx.service.isBound(file)).toBe(false)
+    })
+
+    it('refuses a first save whose file grew past the 50 MiB staging cap between the stat and the read', async () => {
+      // the server cap is above the staging cap, so the second branch names
+      // `min(max_bytes, 50 MiB)` as the effective limit
+      const server = fakeServer({ limits: { upload_max_bytes: 200 * 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Grown big.docx')
+      writeFileSync(file, 'x')
+      const gate = latch()
+      readGate.path = file
+      readGate.entered = gate.entered
+      readGate.held = gate.held
+
+      const pending = ctx.service.firstSave(input(file))
+      await gate.reached
+      truncateSync(file, 50 * 1024 * 1024 + 1)
+      gate.release()
+      const saved = await pending
+
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Grown big.docx',
+        sizeBytes: 50 * 1024 * 1024 + 1,
+        maxBytes: 50 * 1024 * 1024,
+      })
+      expect(
+        server.calls.filter(
+          (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+        ),
+      ).toHaveLength(0)
+      expect(ctx.service.isBound(file)).toBe(false)
+    })
+
+    it('refuses an upload whose file grew past the server cap between the stat and the read', async () => {
+      // the upload path's own post-read guard, the one first save shares
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Grown upload.docx')
+      writeFileSync(file, 'x')
+      const gate = latch()
+      readGate.path = file
+      readGate.entered = gate.entered
+      readGate.held = gate.held
+
+      const pending = ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-grown',
+      })
+      await gate.reached
+      truncateSync(file, 1024 * 1024 + 1)
+      gate.release()
+      const uploaded = await pending
+
+      expect(uploaded).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Grown upload.docx',
+        sizeBytes: 1024 * 1024 + 1,
+        maxBytes: 1024 * 1024,
+      })
+      expect(
+        server.calls.filter(
+          (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+        ),
+      ).toHaveLength(0)
+    })
+  })
+
+  // S01-R4-2: a settled refusal must release the path. The join map is the
+  // single-flight's whole memory, so a leaked entry would keep answering the
+  // old too_large - not `conflict` - after the user shrank the file and saved
+  // again, and no request would ever be made.
+  it('a second first save succeeds and binds once the too_large file is under the cap', async () => {
+    const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+    const ctx = setup(server)
+    const file = join(dir, 'Shrink.docx')
+    writeFileSync(file, 'x')
+    truncateSync(file, 2 * 1024 * 1024)
+
+    const refused = await ctx.service.firstSave(input(file))
+    expect(refused).toEqual({
+      ok: false,
+      error: 'too_large',
+      name: 'Shrink.docx',
+      sizeBytes: 2 * 1024 * 1024,
+      maxBytes: 1024 * 1024,
+    })
+
+    truncateSync(file, 1024 * 1024)
+    const saved = await ctx.service.firstSave(input(file))
+
+    expect(saved.ok).toBe(true)
+    expect(ctx.pathRenames).toHaveLength(1)
+    expect(ctx.service.isBound(ctx.pathRenames[0]!.newPath)).toBe(true)
+    // the retry is the call that created: the refusal created nothing
+    expect(
+      server.calls.filter(
+        (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('refuses a directory path before any read', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const folder = join(dir, 'Folder.docx')
+    mkdirSync(folder)
+
+    const saved = await ctx.service.firstSave(input(folder))
+
+    expect(saved).toEqual({ ok: false, error: 'not_found' })
+    expect(server.calls).toHaveLength(0)
+  })
+
+  // S01-R1-4: the single-flight joins a second submit of the same path onto
+  // the running attempt - one create total.
+  it('joins a concurrent second submit onto the one running attempt', async () => {
+    const gate = latch()
+    const server = fakeServer({
+      createGate: async () => {
+        gate.entered()
+        await gate.held
+      },
+    })
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    const first = ctx.service.firstSave(input(file))
+    await gate.reached
+    const second = ctx.service.firstSave(input(file))
+    gate.release()
+
+    const [one, two] = await Promise.all([first, second])
+    expect(one).toEqual(two)
+    expect(one.ok).toBe(true)
+    expect(
+      server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/documents/files')),
+    ).toHaveLength(1)
+    // the document count on the server is the real invariant: one row
+    expect([...server.state.documents.keys()].filter((id) => id.startsWith('up_'))).toHaveLength(1)
+  })
+
+  // S01-R1-4: the create landed but its answer was lost; the retry of the same
+  // attempt replays the SAME Idempotency-Key and the server dedupes to the one
+  // row. A fresh key here would mint a twin.
+  it('retries a lost create answer with the same Idempotency-Key, one server document', async () => {
+    const server = fakeServer({ createAnswerLost: true })
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    const lost = await ctx.service.firstSave(input(file))
+    expect(lost.ok).toBe(false)
+
+    const retried = await ctx.service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+
+    const creates = server.calls.filter(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )
+    expect(creates).toHaveLength(2)
+    expect(creates[0]!.idempotencyKey).toBeTruthy()
+    expect(creates[0]!.idempotencyKey).toBe(creates[1]!.idempotencyKey)
+    // one server document total, and the tab bound to it
+    const created = [...server.state.documents.keys()].filter((id) => id.startsWith('up_'))
+    expect(created).toHaveLength(1)
+    expect(retried.ok ? retried.value.id : '').toBe(created[0])
+    expect(ctx.pathRenames).toHaveLength(1)
+  })
+
+  // S01-R1-2: create landed, then the local bind fails. The created document
+  // is compensated exactly like the FD-11 conflict copy: archive to the trash
+  // (restorable), and the typed answer names the document.
+  it.each([
+    ['the bind read (getDocument)', { getDocumentFailsFor: true } as const, 'get'],
+    ['the working-copy write', { writeWorkingCopy: true } as const, 'copy'],
+    ['the binding.json write', { storeWrite: true } as const, 'binding'],
+  ])(
+    'when %s fails the created document is archived and the failure names it',
+    async (_label, mode) => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const file = join(dir, 'Draft.docx')
+      writeFileSync(file, 'bytes')
+
+      if ('getDocumentFailsFor' in mode) {
+        // the created id is up_1: refuse its detail read
+        const orig = server.fetch
+        server.fetch = ((url: string, init: RequestInit) => {
+          const m = /^.*\/documents\/(up_\d+)$/.exec(new URL(url).pathname)
+          if (m && init.method === 'GET') {
+            return Promise.resolve(
+              new Response(JSON.stringify({ error: { code: 'unavailable' } }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+              }),
+            )
+          }
+          return orig(url, init)
+        }) as never
+      } else if ('writeWorkingCopy' in mode) {
+        vi.spyOn(ctx.service.store, 'writeWorkingCopy').mockRejectedValue(new Error('disk full'))
+      } else {
+        // the migration sweep holds the document's folder: a schema-1 binding
+        // with pending-upload.bin in the dir the bind will use
+        const docDirPath = docDir('up_1')
+        mkdirSync(docDirPath, { recursive: true })
+        writeFileSync(
+          join(docDirPath, BINDING_FILE),
+          JSON.stringify({ schema: 1, pendingIntent: {} }),
+        )
+        writeFileSync(join(docDirPath, INTENT_PAYLOAD_FILE), 'x')
+      }
+
+      const saved = await ctx.service.firstSave(input(file))
+
+      expect(saved.ok).toBe(false)
+      if (!saved.ok) {
+        expect(saved.error).toBe('first_save_bind_failed')
+        expect(saved.documentId).toBe('up_1')
+        expect(saved.documentTitle).toBeTruthy()
+      }
+      // the compensating archive went out for the created document (trash,
+      // restorable - never a delete)
+      const archives = server.calls.filter(
+        (c) => c.method === 'POST' && c.path === '/api/v1/documents/up_1/archive',
+      )
+      expect(archives).toHaveLength(1)
+      expect(server.state.documents.get('up_1')?.archived).toBe(true)
+      // the user's original file is untouched and stays unbound
+      expect(readFileSync(file, 'utf8')).toBe('bytes')
+      expect(ctx.service.isBound(file)).toBe(false)
+      expect(ctx.pathRenames).toEqual([])
+      expect(ctx.moduleSaveCalls).toEqual([])
+    },
+  )
+
+  it('when the compensation archive also fails, the answer still names the document', async () => {
+    const server = fakeServer({ archiveFailsFor: ['up_1'] })
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    // force the bind failure at the binding write (migration-hold fixture)
+    const docDirPath = docDir('up_1')
+    mkdirSync(docDirPath, { recursive: true })
+    writeFileSync(join(docDirPath, BINDING_FILE), JSON.stringify({ schema: 1, pendingIntent: {} }))
+    writeFileSync(join(docDirPath, INTENT_PAYLOAD_FILE), 'x')
+
+    const saved = await ctx.service.firstSave(input(file))
+
+    expect(saved.ok).toBe(false)
+    if (!saved.ok) {
+      expect(saved.error).toBe('first_save_orphaned')
+      expect(saved.documentId).toBe('up_1')
+      expect(saved.documentTitle).toBe('Draft.docx')
+    }
+    expect(server.state.documents.get('up_1')?.archived).toBeUndefined()
+  })
+
+  // S01-R1-3: the written binding.json is the save - everything after it
+  // (tab re-key, chip push, tree push) is a notification whose failure is
+  // logged, never a retryable failure. And a retry from the original path is
+  // refused: the document already exists.
+  it('a throwing post-bind callback still answers ok, and a retry is refused', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { callbacksThrow: true })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    const saved = await ctx.service.firstSave(input(file))
+    expect(saved.ok).toBe(true)
+
+    // one create only; the binding landed (the save IS done)
+    const bindingRaw = JSON.parse(readFileSync(join(docDir('up_1'), BINDING_FILE), 'utf8')) as {
+      documentId?: string
+    }
+    expect(bindingRaw.documentId).toBe('up_1')
+
+    // a retry from the old path does not create a twin
+    const again = await ctx.service.firstSave(input(file))
+    expect(again).toEqual(expect.objectContaining({ ok: false, error: 'conflict' }))
+    expect(
+      server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/documents/files')),
+    ).toHaveLength(1)
+  })
+
+  // S01-R1-8: after the first save, binding.json holds the real base
+  // (revision / version / checksum of the created version) and ONE bound save
+  // runs the genuine upload+commit path - no create, no dialog.
+  it('binds a real base and the next save is one upload + one commit', async () => {
+    const server = fakeServer()
+    // moduleSaveResult:false = no tab claims the save, so save() falls through
+    // to the durable coordinator (the upload + commit pair is the real bound save)
+    const ctx = setup(server, { syncStore: true, moduleSaveResult: false })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes v1')
+
+    const saved = await ctx.service.firstSave(input(file))
+    expect(saved.ok).toBe(true)
+    if (!saved.ok) return
+    const boundPath = ctx.pathRenames[0]!.newPath
+
+    // the binding the open flow writes: base = the created row's revision and
+    // version 1, checksum = the uploaded bytes
+    const bound = JSON.parse(readFileSync(join(docDir('up_1'), BINDING_FILE), 'utf8')) as {
+      documentId?: string
+      baseRevision?: string
+      baseVersion?: number
+      baseChecksum?: string
+      schema?: number
+    }
+    expect(bound.schema).toBe(2)
+    expect(bound.documentId).toBe('up_1')
+    expect(bound.baseRevision).toBe('41')
+    expect(bound.baseVersion).toBe(1)
+    expect(bound.baseChecksum).toBe(hex(enc('bytes v1')))
+
+    // the tab's next Ctrl+S with edited bytes: a REAL bound save through the
+    // coordinator (the module answers "no tab" so the queue runs inline)
+    writeFileSync(boundPath, 'bytes v2')
+    const status = await ctx.service.save(boundPath)
+    expect(status?.state).toBe('saved')
+    const uploads = server.calls.filter(
+      (c) => c.method === 'POST' && c.path === '/api/v1/documents/up_1/uploads',
+    )
+    const commits = server.calls.filter(
+      (c) => c.method === 'POST' && c.path === '/api/v1/documents/up_1/versions/commit',
+    )
+    expect(uploads).toHaveLength(1)
+    expect(commits).toHaveLength(1)
+    // still exactly one create (no second document, no dialog)
+    expect(
+      server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/documents/files')),
+    ).toHaveLength(1)
+    expect(server.calls.filter((c) => c.path.endsWith('/documents/files/blank'))).toHaveLength(0)
+  })
+})
+
+describe('SAVE-01 first save r3 (S01-R2 fixes)', () => {
+  const input = (file: string, target?: unknown) => ({
+    tabPath: file,
+    title: 'Draft.docx',
+    workspaceId: WS,
+    target: (target ?? { kind: 'my_folder' }) as never,
+  })
+
+  // S01-R2-1: the Advisor pin orders the target union BEFORE the claimed-path
+  // classification - a malformed target on a store-owned or done path is
+  // invalid_destination, never a conflict, and never reaches binding.json, the
+  // flush or a request.
+  it('a malformed target on a path inside the working-copy store is invalid_destination, not conflict', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { pathOpen: true })
+    // a path under the store's scope directory with a real binding.json:
+    // store.classify would report it bound (the binding read itself) - the
+    // target union must run before any of that
+    const docDirPath = ctx.service.store.dirFor('default', 'acc_1', 'doc_x')
+    mkdirSync(docDirPath, { recursive: true })
+    await ctx.service.store.write(docDirPath, {
+      schema: 2,
+      documentId: 'doc_x',
+      workspaceId: WS,
+      orgId: 'org_a',
+      title: 'Held.docx',
+      filename: 'Held.docx',
+      format: 'docx',
+      access: 'edit',
+      baseRevision: '1',
+      baseVersion: 1,
+      baseChecksum: 'x',
+      state: 'ready',
+      minStoreLevel: 2,
+      minAppVersion: '0.0.0',
+    })
+    const storePath = join(docDirPath, 'Held.docx')
+    writeFileSync(storePath, 'bytes')
+    const classify = vi.spyOn(ctx.service.store, 'classify')
+
+    const saved = await ctx.service.firstSave(input(storePath, { kind: 'folder', folderId: '  ' }))
+
+    expect(saved).toEqual({ ok: false, error: 'invalid_destination' })
+    // no binding.json read, no flush, no request - validation precedes all of it
+    expect(classify).not.toHaveBeenCalled()
+    expect(server.calls).toHaveLength(0)
+    expect(ctx.moduleSaveCalls).toEqual([])
+  })
+
+  it('a malformed target on an already-claimed path is invalid_destination, not conflict', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    const saved = await ctx.service.firstSave(input(file))
+    expect(saved.ok).toBe(true)
+
+    // the path is claimed (firstSaveDone) - a malformed retry must still be
+    // refused on the target, not silently re-classified as a conflict
+    const again = await ctx.service.firstSave(input(file, { kind: 'everywhere' }))
+    expect(again).toEqual({ ok: false, error: 'invalid_destination' })
+    // still exactly the one create of the good save
+    expect(
+      server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/documents/files')),
+    ).toHaveLength(1)
+  })
+
+  // S01-R2-3: the retry key belongs to the exact attempt BODY - the bytes go
+  // into the key fingerprint, so edited bytes mint a new attempt (D's own
+  // fingerprint includes the checksum; replaying a spent key against different
+  // bytes is refused there and must never be sent).
+  it('a retry after the create answer was lost with CHANGED bytes uses a new Idempotency-Key', async () => {
+    const server = fakeServer({ createAnswerLost: true })
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes v1')
+
+    const lost = await ctx.service.firstSave(input(file))
+    expect(lost.ok).toBe(false)
+
+    // the user edited the file between the lost answer and the retry: this is
+    // a different body, so the spent key must not be replayed against it
+    writeFileSync(file, 'bytes v2 edited')
+    const retried = await ctx.service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+
+    const creates = server.calls.filter(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )
+    expect(creates).toHaveLength(2)
+    expect(creates[0]!.idempotencyKey).toBeTruthy()
+    expect(creates[1]!.idempotencyKey).toBeTruthy()
+    expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    // S01-R3-4: the second create's multipart bytes and the row D stored ARE
+    // the edited bytes - a stale-body replay would keep 'bytes v1' on both
+    const secondBody = creates[1]!.body as { bytes?: Uint8Array }
+    expect(secondBody.bytes).toEqual(enc('bytes v2 edited'))
+    expect(retried.ok ? retried.value.id : '').toBe('up_2')
+    expect(server.state.documents.get('up_2')?.bytes).toEqual(enc('bytes v2 edited'))
+    // the lost-answer row is the orphan the mismatch guard exists to avoid
+    // uploading stale bytes against: it keeps the FIRST attempt's body
+    expect(server.state.documents.get('up_1')?.bytes).toEqual(enc('bytes v1'))
+  })
+
+  // S01-R2-3: when D answers idempotency_payload_mismatch for a first-save
+  // create, the spent key is dropped and a typed idempotency_mismatch answers -
+  // the next retry mints a fresh key, never stuck on the refused one.
+  it('an idempotency mismatch answer clears the retained key; the retry sends a new one', async () => {
+    const server = fakeServer({ createMismatch: true })
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    const refused = await ctx.service.firstSave(input(file))
+    expect(refused).toEqual({ ok: false, error: 'idempotency_mismatch' })
+
+    // retry unchanged: the cleared map mints a fresh key (a stuck map would
+    // replay the refused key and be refused again)
+    const retried = await ctx.service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+
+    const creates = server.calls.filter(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )
+    expect(creates).toHaveLength(2)
+    expect(creates[1]!.idempotencyKey).toBeTruthy()
+    expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    // S01-R3-3: the retry bound a fresh row - D owns the refused row it seeded
+    // under the refused key, so two rows exist and the second is the bound one
+    const created = [...server.state.documents.keys()].filter((id) => id.startsWith('up_'))
+    expect(created.sort()).toEqual(['up_1', 'up_2'])
+    expect(retried.ok ? retried.value.id : '').toBe('up_2')
+    const bound = JSON.parse(readFileSync(join(docDir('up_2'), BINDING_FILE), 'utf8')) as {
+      documentId?: string
+    }
+    expect(bound.documentId).toBe('up_2')
+  })
+
+  // S01-R3-3: D's 409 `idempotency_in_flight` answers a key whose request is
+  // still running server-side (errors.ts maps it to the retryable `network`).
+  // The attempt's key is RETAINED - the in-flight verdict never clears it - so
+  // an unchanged-body retry replays the SAME key and dedupes to the one row
+  // the first create seeded instead of minting a twin.
+  it('a 409 idempotency_in_flight keeps the key; an unchanged retry dedupes to one row', async () => {
+    const server = fakeServer({ createInFlight: true })
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    const refused = await ctx.service.firstSave(input(file))
+    expect(refused).toEqual({ ok: false, error: 'network' })
+
+    const retried = await ctx.service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+
+    const creates = server.calls.filter(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )
+    expect(creates).toHaveLength(2)
+    expect(creates[0]!.idempotencyKey).toBeTruthy()
+    expect(creates[0]!.idempotencyKey).toBe(creates[1]!.idempotencyKey)
+    // one server document total (the seeded row), bound to up_1
+    const created = [...server.state.documents.keys()].filter((id) => id.startsWith('up_'))
+    expect(created).toEqual(['up_1'])
+    expect(retried.ok ? retried.value.id : '').toBe('up_1')
+    const bound = JSON.parse(readFileSync(join(docDir('up_1'), BINDING_FILE), 'utf8')) as {
+      documentId?: string
+    }
+    expect(bound.documentId).toBe('up_1')
+  })
+
+  // S01-R2-5: after a compensated bind failure the attempt boundary is real -
+  // the next retry is a NEW create under a different key (one trashed row plus
+  // one bound row on the server).
+  it('a retry after archive compensation sends a different Idempotency-Key and binds a fresh row', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    // fail the first bind at the binding.json write (migration-hold fixture)
+    const docDirPath = docDir('up_1')
+    mkdirSync(docDirPath, { recursive: true })
+    writeFileSync(join(docDirPath, BINDING_FILE), JSON.stringify({ schema: 1, pendingIntent: {} }))
+    writeFileSync(join(docDirPath, INTENT_PAYLOAD_FILE), 'x')
+
+    const failed = await ctx.service.firstSave(input(file))
+    expect(failed.ok).toBe(false)
+    if (!failed.ok) expect(failed.error).toBe('first_save_bind_failed')
+    expect(server.state.documents.get('up_1')?.archived).toBe(true)
+
+    // clear the migration hold so the retry binds cleanly
+    rmSync(docDirPath, { recursive: true, force: true })
+    const retried = await ctx.service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+
+    const creates = server.calls.filter(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )
+    expect(creates).toHaveLength(2)
+    expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    // one archived row (the compensated first create) + one bound row (up_2)
+    const created = [...server.state.documents.keys()].filter((id) => id.startsWith('up_'))
+    expect(created.sort()).toEqual(['up_1', 'up_2'])
+    expect(server.state.documents.get('up_1')?.archived).toBe(true)
+    expect(server.state.documents.get('up_2')?.archived).toBeUndefined()
+    const bound = JSON.parse(readFileSync(join(docDir('up_2'), BINDING_FILE), 'utf8')) as {
+      documentId?: string
+    }
+    expect(bound.documentId).toBe('up_2')
+  })
+
+  // S01-R2-6: store.write THROWING (not only resolving false) leaves the
+  // working copy behind today - the compensation path must still remove it.
+  it('a thrown store.write still archives the row and removes the working copy', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const write = vi.spyOn(ctx.service.store, 'write').mockRejectedValue(new Error('disk full'))
+    // S01-R3-1: the compensation calls removeWorkingCopy for THIS attempt's
+    // copy - the (dir, name) it just wrote, nothing else
+    const remove = vi.spyOn(ctx.service.store, 'removeWorkingCopy')
+
+    const saved = await ctx.service.firstSave(input(file))
+
+    expect(saved.ok).toBe(false)
+    if (!saved.ok) expect(saved.error).toBe('first_save_bind_failed')
+    // archive went out and the stranded working copy is gone
+    const archives = server.calls.filter(
+      (c) => c.method === 'POST' && c.path === '/api/v1/documents/up_1/archive',
+    )
+    expect(archives).toHaveLength(1)
+    expect(server.state.documents.get('up_1')?.archived).toBe(true)
+    expect(remove).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledWith(docDir('up_1'), 'Draft.docx')
+    const dirEntries = existsSync(docDir('up_1')) ? readdirSync(docDir('up_1')) : []
+    expect(dirEntries.filter((name) => name !== BINDING_FILE)).toEqual([])
+
+    // S01-R3-5: the compensated attempt's key is spent - a retry creates and
+    // binds a FRESH row under a different key (replaying the compensated key
+    // would answer the trashed row)
+    write.mockRestore()
+    const retried = await ctx.service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+
+    const creates = server.calls.filter(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )
+    expect(creates).toHaveLength(2)
+    expect(creates[1]!.idempotencyKey).toBeTruthy()
+    expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    // one archived first row + one newly bound row
+    const created = [...server.state.documents.keys()].filter((id) => id.startsWith('up_'))
+    expect(created.sort()).toEqual(['up_1', 'up_2'])
+    expect(server.state.documents.get('up_1')?.archived).toBe(true)
+    expect(server.state.documents.get('up_2')?.archived).toBeUndefined()
+    expect(retried.ok ? retried.value.id : '').toBe('up_2')
+    const bound = JSON.parse(readFileSync(join(docDir('up_2'), BINDING_FILE), 'utf8')) as {
+      documentId?: string
+    }
+    expect(bound.documentId).toBe('up_2')
+  })
+
+  // S01-R2-6: a cleanup failure is logged and never masks the typed failure.
+  it('a failing working-copy cleanup still answers the typed bind failure', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    vi.spyOn(ctx.service.store, 'write').mockRejectedValue(new Error('disk full'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const cleanupError = new Error('unlink denied')
+    const remove = vi.spyOn(ctx.service.store, 'removeWorkingCopy').mockRejectedValue(cleanupError)
+
+    const saved = await ctx.service.firstSave(input(file))
+
+    expect(saved.ok).toBe(false)
+    if (!saved.ok) expect(saved.error).toBe('first_save_bind_failed')
+    expect(server.state.documents.get('up_1')?.archived).toBe(true)
+    // S01-R3-1+2: cleanup ran against this attempt's (dir, name), and its
+    // rejection is logged with the stranded-copy message and the cleanup
+    // error itself - a silent skip or a missing diagnostic would hide the
+    // copy the user could otherwise recover
+    expect(remove).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledWith(docDir('up_1'), 'Draft.docx')
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('stranded working copy Draft.docx could not be removed'),
+      cleanupError,
+    )
+    warn.mockRestore()
+  })
+})
+
+// SAVE-01 (Q1): New / Upload from Home or the workspace root land in the
+// caller's My Folder - the wire carries `destination`, never a bare root
+// parent. Folder and copy creates keep the FD-11 `parent_id` only.
+describe('SAVE-01 create destinations', () => {
+  it('sends destination my_folder for a blank create with no folder', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name: 'Plan.docx',
+      format: 'docx',
+    })
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files/blank'),
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.destination).toBe('my_folder')
+    expect(body.parent_id).toBeUndefined()
+  })
+
+  it('still sends parent_id (and no destination) when a folder is open', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      name: 'Plan.docx',
+      format: 'docx',
+    })
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files/blank'),
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.parent_id).toBe('fold_1')
+    expect(body.destination).toBeUndefined()
+  })
+
+  it('sends destination my_folder for an upload with no folder', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: ctx.uploadFile,
+      uploadId: 'up_1',
+    })
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.destination).toBe('my_folder')
+    expect(body.parent_id).toBeNull()
+  })
+
+  it('sends parent_id (and no destination) for an upload into a folder', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      path: ctx.uploadFile,
+      uploadId: 'up_1',
+    })
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.parent_id).toBe('fold_1')
+    expect(body.destination).toBeNull()
   })
 })

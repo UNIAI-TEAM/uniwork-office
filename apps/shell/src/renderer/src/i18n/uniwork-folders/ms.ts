@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const ms = {
   ufRoot: 'UniWork',
+  ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Folder',
   ufContentsLabel: 'Kandungan folder',
   ufRecent: 'Terkini',
@@ -51,4 +52,6 @@ export const ms = {
   ufDisabledDeep: 'Terlalu dalam',
   ufTreeError: 'Tidak dapat memuatkan folder.',
   ufActionsFor: 'Tindakan untuk {name}',
+  ufAreaLabel: 'Kawasan',
+  ufNoDeviceFolders: 'Belum ada folder pada peranti ini.',
 } satisfies Record<keyof typeof zh, string>

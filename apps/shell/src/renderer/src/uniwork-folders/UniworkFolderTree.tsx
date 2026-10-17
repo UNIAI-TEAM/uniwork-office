@@ -8,9 +8,11 @@ import { FolderMenu, type FolderMenuItem } from './FolderMenu'
 import {
   FOLDER_NAME_ERROR_KEYS,
   MOVE_BLOCK_KEYS,
+  MY_FOLDER_LABEL_KEY,
   ROOT_KEY,
   treeKey,
   treeRows,
+  withMyFolderLabel,
   type MoveBlock,
   type TreeRow,
 } from './uniwork-folders-model'
@@ -65,7 +67,8 @@ function Chevron({ expanded }: { expanded: boolean }) {
  * F2 renames in place, Shift+F10 / the context-menu key / a right click open
  * the row menu. Expand state lives in the host (in memory only). In the
  * picker, rows that cannot take the item stay visible but aria-disabled with
- * their reason shown on the row.
+ * their reason shown on the row. My Folder shows its localized label (from
+ * `systemKind`, never the stored title) and sits first among its siblings.
  */
 export function UniworkFolderTree({
   nodes,
@@ -80,6 +83,8 @@ export function UniworkFolderTree({
   onRenameSave,
   onRenameCancel,
   onRenameEdit,
+  tagOf,
+  checkLabel,
   idPrefix = 'uwf-tree',
 }: {
   nodes: UniworkFolderNode[]
@@ -96,12 +101,20 @@ export function UniworkFolderTree({
   onRenameSave?: (id: string, value: string) => void
   onRenameCancel?: (id: string) => void
   onRenameEdit?: () => void
+  /** SAVE-01 State 2: a short tag at the row's end (its visibility), null = none */
+  tagOf?: (row: TreeRow) => string | null
+  /** SAVE-01 State 2: the selected row carries a check with this accessible name */
+  checkLabel?: string
   idPrefix?: string
 }) {
   const { t } = useI18n()
   // `t` is not referentially stable: the memo keys on the translated string
   const rootTitle = t('ufRoot')
-  const rows = useMemo(() => treeRows(nodes, expanded, rootTitle), [nodes, expanded, rootTitle])
+  const myFolderLabel = t(MY_FOLDER_LABEL_KEY)
+  const rows = useMemo(
+    () => treeRows(withMyFolderLabel(nodes, myFolderLabel), expanded, rootTitle),
+    [nodes, expanded, rootTitle, myFolderLabel],
+  )
   const [focusKey, setFocusKey] = useState(selectedKey)
   const [menuKey, setMenuKey] = useState<string | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -165,6 +178,7 @@ export function UniworkFolderTree({
         const editing = rename && row.id === rename.id ? rename : null
         const reasonId = `${idPrefix}-reason-${row.key || 'root'}`
         const items = menuFor?.(row) ?? []
+        const tag = tagOf?.(row) ?? null
         return (
           <li
             key={row.key || 'root'}
@@ -243,6 +257,26 @@ export function UniworkFolderTree({
                   </span>
                 )}
               </span>
+            )}
+            {tag && <span className="uwf-tree-tag">{tag}</span>}
+            {checkLabel && selected && (
+              <svg
+                className="uwf-tree-check"
+                role="img"
+                aria-label={checkLabel}
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+              >
+                <path
+                  d="M13.25 4.5 6.5 11.25 2.75 7.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             )}
             {items.length > 0 && !editing && (
               <FolderMenu

@@ -1,0 +1,252 @@
+/* SAVE-01 SaveDialog (board SaveDialog.dc.html): chrome tokens only, both themes */
+
+.modal.uw-act.uws-dialog {
+  width: min(560px, calc(var(--ui-vw) * 92));
+}
+
+.uws-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.uws-head .uw-act-heading {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.uws-close,
+.uwf-picker-back {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.uws-close:hover,
+.uwf-picker-back:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* a sent save cannot be cancelled: the × waits for its answer (FE-S01-R2-6) */
+.uws-close[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.uws-close[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.uws-close:focus-visible,
+.uwf-picker-back:focus-visible,
+.uws-loc:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uws-hint {
+  margin: 4px 0 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* the name field with its fixed extension inside the same box */
+.uws-name-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.uws-name-box:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uws-name-box .uws-name-input {
+  flex: 1;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.uws-name-box .uws-name-input:focus-visible {
+  outline: none;
+}
+
+.uws-name-box:has(.uws-name-input[aria-invalid='true']) {
+  border-color: var(--danger-text);
+}
+
+/* while the save runs the name stays put (FE-S01-R1-6) */
+.uws-name-box:has(.uws-name-input[readonly]) {
+  background: var(--hover);
+}
+
+.uws-name-box .uws-name-input[readonly] {
+  color: var(--text-secondary);
+}
+
+/* Lưu with its spinner while the save runs */
+.uws-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.uws-save[aria-busy='true'] {
+  cursor: progress;
+}
+
+.uws-ext {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* "Đang lưu trong: …" row: opens "Chọn nơi lưu" */
+.uws-loc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.uws-loc:hover {
+  background: var(--hover);
+}
+
+.uws-loc[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.uws-loc[aria-disabled='true']:hover {
+  background: var(--surface);
+}
+
+.uws-loc-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--tint-yellow);
+  color: var(--tint-yellow-fg);
+}
+
+.uws-loc-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.uws-loc-value {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uws-loc-sub {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uws-loc-change {
+  flex: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* State 2 "Chọn nơi lưu": the FD-11 picker with its save parts */
+.modal.uw-act.uwf-picker.uws-pick {
+  width: min(560px, calc(var(--ui-vw) * 92));
+}
+
+.uwf-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.uwf-picker-head .uw-act-heading {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.uwf-picker-new {
+  flex: none;
+}
+
+.uwf-picker-search {
+  width: 100%;
+  margin: 8px 0 4px;
+}
+
+.uwf-tree-tag {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.uwf-tree-check {
+  flex: none;
+  margin-inline-start: 6px;
+  color: var(--accent);
+}
+
+.uwf-tree-tag + .uwf-tree-check {
+  margin-inline-start: 6px;
+}
+
+.uwf-picker-note {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (pointer: coarse) {
+  .uws-close,
+  .uwf-picker-back {
+    width: 44px;
+    height: 44px;
+  }
+}

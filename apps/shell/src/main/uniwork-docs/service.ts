@@ -21,6 +21,7 @@ import type {
   UniworkDocRenamedEvent,
   UniworkDocSummary,
   UniworkDocStatus,
+  UniworkFirstSaveInput,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
@@ -67,7 +68,12 @@ import {
   type PathBinding,
   scopeWorkingCopyDirs,
 } from './binding-store'
-import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
+import {
+  type FetchLike,
+  type UniworkCreateTarget,
+  type UniworkDocsClient,
+  createUniworkDocsClient,
+} from './client'
 import { UniworkDocError } from './errors'
 import {
   copyTitleFor,
@@ -185,7 +191,6 @@ export interface ConflictUi {
 
 /** which close prompt: Save to UniWork, the conflict dialog, or the reason a save is not possible */
 export type UnsavedCloseKind = 'unsent' | 'conflict' | 'blocked'
-
 /** 'save' (unsent) and 'resolve' (conflict) are each kind's default button */
 export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
 
@@ -197,6 +202,23 @@ export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
  * captured), so the copy stays as the owner's own locked folder until the owner
  * signs in again.
  */
+/**
+ * G5-05u (B5): what the offline library did with a document whose server open
+ * failed. `opened` = the read-only cached copy is on screen; `locked` = it
+ * refused and the shell shows the S11 panel named by `reason`; null = nothing is
+ * pinned.
+ */
+export type OfflineCopyOpen =
+  | { kind: 'opened'; path: string; title: string }
+  | {
+      kind: 'locked'
+      path: string
+      name: string
+      reason: UniworkLockReason
+      libraryOff?: boolean
+    }
+  | null
+
 export interface SignOutLockResult {
   ok: boolean
   captureFailed: string[]
@@ -329,6 +351,13 @@ export interface UniworkDocsServiceDeps {
   /** G5-09 S5: seam for G5-05 offline head availability (default false until G5-05 lands) */
   hasOfflineHead?(documentId: string, revision?: string): boolean
   /**
+   * G5-05u (B5): the verified cached copy of a pinned document, for an open
+   * whose server read failed (no network). `opened` = the read-only copy is on
+   * screen; `locked` = the library refused and the S11 panel names `reason`;
+   * null = nothing is pinned (the open fails as it did before).
+   */
+  openOfflineCopy?(documentId: string): Promise<OfflineCopyOpen>
+  /**
    * The org capability cache (the same one the sync runtime reads), for the
    * save queue's lane verdicts. Absent = writes allowed (tests that never read
    * a capability); the production wiring passes the runtime's cache.
@@ -361,6 +390,12 @@ export interface UniworkDocsServiceDeps {
   limits?: () => Promise<DocumentLimits> | DocumentLimits
   sleep?(ms: number): Promise<void>
   now?(): number
+  /**
+   * SAVE-01 r2 (S01-R1-1): how long a first save waits for the editor's own
+   * Save before failing the attempt (never reading stale disk bytes). Tests
+   * shrink it; production leaves the shared CLOSE_SAVE_WAIT_MS default.
+   */
+  firstSaveFlushTimeoutMs?: number
   /**
    * ADVISOR D4 (a): this build's packaging flag (the wiring passes
    * app.isPackaged), read only by the dev-only S6 display fixture. Absent reads
@@ -465,6 +500,57 @@ const MAX_FOLDER_NAME_RUNES = 255
  */
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
+/**
+ * SIZE-F1 / SAVE-01 merge M-2 (D-S1): the ONE size preflight upload and first
+ * save share. The server's `max_bytes` comes first and is named as itself, then
+ * the interim 50 MiB staging cap, whose refusal names `min(max_bytes, 50 MiB)`
+ * as the effective limit so the copy stays truthful. `filename` is the basename
+ * sent as the upload `file` part; `size` is the payload's byte length at this
+ * call's point - the stat's size before the read, the buffer's after it. Both
+ * callers run it on both, so a file that grew between the two is refused too.
+ * The refusal carries filename/sizeBytes/maxBytes to the renderer unchanged.
+ */
+function assertUploadSize(filename: string, size: number, limits: DocumentLimits): void {
+  if (size > limits.max_bytes) {
+    throw new UniworkDocError('too_large', {
+      filename,
+      sizeBytes: size,
+      maxBytes: limits.max_bytes,
+    })
+  }
+  if (size > MAX_UPLOAD_BYTES) {
+    throw new UniworkDocError('too_large', {
+      filename,
+      sizeBytes: size,
+      maxBytes: Math.min(limits.max_bytes, MAX_UPLOAD_BYTES),
+    })
+  }
+}
+
+/**
+ * SAVE-01 r4 (S01-R4-3): the ONE re-wrap both POST paths answer a server
+ * `too_large` with. D can refuse the bytes after the local preflight passed (a
+ * stale limits cache, or a cap lowered between the read and the POST);
+ * `errorFromResponse` fills `sizeBytes`/`maxBytes` from the envelope's fields
+ * but never the filename, so the caller supplies its own basename and its own
+ * payload length - the bytes it handed the client - as the fallbacks. Upload
+ * and first save therefore answer the renderer the identical shape.
+ */
+function rethrowServerTooLarge(
+  error: UniworkDocError,
+  filename: string,
+  sizeBytes: number,
+  limits: DocumentLimits,
+): never {
+  throw new UniworkDocError('too_large', {
+    status: error.status,
+    serverCode: error.serverCode,
+    filename,
+    sizeBytes: error.sizeBytes ?? sizeBytes,
+    maxBytes: error.maxBytes ?? limits.max_bytes,
+  })
+}
+
 /** the renderer's own id for one upload start; a Cancel names the upload through it */
 const MAX_UPLOAD_ID_LENGTH = 128
 
@@ -531,7 +617,17 @@ async function actionResult<T>(
     // FD-11: a `document_too_deep` refusal names the server's own depth cap, so
     // the renderer can show it instead of a hardcoded number
     const max = error instanceof UniworkDocError ? error.maxDepth : undefined
-    return max === undefined ? { ok: false, error: code } : { ok: false, error: code, max }
+    // SAVE-01 r2 (S01-R1-2): a first save that created then failed to bind
+    // names the server document it left (compensated or not)
+    const documentId = error instanceof UniworkDocError ? error.documentId : undefined
+    const documentTitle = error instanceof UniworkDocError ? error.documentTitle : undefined
+    return {
+      ok: false,
+      error: code,
+      ...(max === undefined ? {} : { max }),
+      ...(documentId === undefined ? {} : { documentId }),
+      ...(documentTitle === undefined ? {} : { documentTitle }),
+    }
   }
 }
 
@@ -541,9 +637,26 @@ function actionErrorOf(error: unknown, nameField: boolean): UniworkDocActionErro
     // even though they are not part of UniworkDocErrorCode; the cast is the one
     // place that bridges them
     const code = error.code as string
-    if (code === 'name_empty' || code === 'name_too_long' || code === 'upload_cancelled') {
+    if (
+      code === 'name_empty' ||
+      code === 'name_too_long' ||
+      code === 'upload_cancelled' ||
+      // SAVE-01 r2: the first-save boundary's own verdicts are carried on the
+      // error's `code` like the name errors (never part of UniworkDocErrorCode,
+      // which the renderer switches exhaustively)
+      code === 'first_save_flush_failed' ||
+      code === 'first_save_bind_failed' ||
+      code === 'first_save_orphaned'
+    ) {
       return code
     }
+    // MYFOLDER-01 / SAVE-01: the two folder server-codes are matched on `code`
+    // BEFORE any error_class-based switch - a 409 `my_folder_locked` carries
+    // error_class "conflict" and a class-first read would send the action down
+    // the revision-conflict path (re-read/retry/"conflict" state), which it is
+    // not. `invalid_destination` (400) is a destination field error.
+    if (error.serverCode === 'my_folder_locked') return 'my_folder_locked'
+    if (error.serverCode === 'invalid_destination') return 'invalid_destination'
     // B-R1-03 / B-R1-09: `folder_name_taken` stays off UniworkDocErrorCode;
     // create/rename (`nameField: true`) report `folder_name_taken` for the name
     // field, while a move exhausting "(n)" names reports `move_name_taken`
@@ -562,6 +675,28 @@ function samePath(a: string, b: string): boolean {
   const ra = resolve(a)
   const rb = resolve(b)
   return process.platform === 'win32' ? ra.toLowerCase() === rb.toLowerCase() : ra === rb
+}
+/**
+ * SAVE-01 r2 (S01-R1-5): the IPC target of a first save as the exact runtime
+ * union - `{ kind: 'my_folder' }` or `{ kind: 'folder', folderId: <a non-empty,
+ * non-blank string> }`. Anything else (missing target, an unknown kind, an
+ * empty or blank folderId, a non-object) is refused `invalid_destination`
+ * BEFORE any flush, read or request: a malformed target must never fall
+ * through to a silent My Folder create, and an empty parent_id must never
+ * land the document at the workspace root.
+ */
+function firstSaveTargetOf(target: unknown): UniworkCreateTarget {
+  if (target && typeof target === 'object' && 'kind' in target) {
+    const kind = target.kind
+    if (kind === 'my_folder') return { destination: 'my_folder' }
+    if (kind === 'folder' && 'folderId' in target) {
+      const folderId = target.folderId
+      if (typeof folderId === 'string' && folderId.trim()) {
+        return { parentId: folderId.trim() }
+      }
+    }
+  }
+  throw new UniworkDocError('invalid_destination' as UniworkDocErrorCode)
 }
 
 /**
@@ -886,6 +1021,29 @@ export class UniworkDocsService {
    * An entry lives exactly as long as its upload call.
    */
   private readonly uploads = new Map<string, AbortController>()
+  /**
+   * SAVE-01 r2 (S01-R1-4): one in-flight first save per unbound path, keyed by
+   * pathKey. A second call for the same path JOINS the running attempt (same
+   * result object), so a double-submit can never race two creates.
+   */
+  private readonly firstSaveInFlight = new Map<
+    string,
+    Promise<UniworkDocActionResult<UniworkDocSummary>>
+  >()
+  /**
+   * SAVE-01 r2 (S01-R1-4): the Idempotency-Key of one first-save ATTEMPT, keyed
+   * by account + workspace + path + title + target. A retry of the same save
+   * after a lost create answer reuses it, so the server dedups to the one
+   * document (D fingerprints destination too). Dropped only when the attempt
+   * is bound, compensated, or failed before the POST existed.
+   */
+  private readonly firstSaveKeys = new Map<string, string>()
+  /**
+   * SAVE-01 r2 (S01-R1-3): paths whose first save already bound this session
+   * (the user's original file stays where it was, still plain): a retry from
+   * the old path is refused `conflict` instead of creating a second document.
+   */
+  private readonly firstSaveDone = new Set<string>()
   /**
    * bumped on lockSession and on an organization change so an own action
    * started before sign-out/switch/org-change never pushes treeChanged after
@@ -3206,10 +3364,33 @@ export class UniworkDocsService {
     }
   }
 
-  private recordLock(store: NewerStore, reason: UniworkLockReason = 'store_newer'): void {
-    const lock: UniworkDocLock = { path: store.path, reason, name: store.name }
+  private recordLock(
+    store: NewerStore,
+    reason: UniworkLockReason = 'store_newer',
+    libraryOff?: boolean,
+  ): void {
+    const lock: UniworkDocLock = {
+      path: store.path,
+      reason,
+      name: store.name,
+      ...(libraryOff ? { libraryOff: true } : {}),
+    }
     this.locks.set(pathKey(lock.path), lock)
     this.deps.pushLock?.(lock)
+  }
+
+  /**
+   * G5-05u (B5): the offline library refused to open a pinned document's copy.
+   * The reason is an S11 row ("Lý do bị chặn"); `libraryOff` says the org turned
+   * offline documents off, so the lease cannot be renewed (`uwLockLibraryOff`).
+   */
+  recordOfflineLock(lock: {
+    path: string
+    name: string
+    reason: UniworkLockReason
+    libraryOff?: boolean
+  }): void {
+    this.recordLock({ path: lock.path, name: lock.name }, lock.reason, lock.libraryOff)
   }
 
   /** a lock named by the working-copy path itself */
@@ -3317,7 +3498,12 @@ export class UniworkDocsService {
   /** a module's successful explicit user Save of `path` */
   onUserSave(path: string): void {
     const doc = this.store.lookup(path)
-    if (!doc || !this.ownsLocally(doc)) return
+    // SAVE-01: a first-save flush waits on this hook even for a path that is
+    // not bound yet (no binding before the first upload); release it anyway
+    if (!doc || !this.ownsLocally(doc)) {
+      this.draftFlushWaiters.get(pathKey(path))?.(true)
+      return
+    }
     this.lastUserSave.set(doc.path, ++this.saveCounter)
     // the module just wrote what its editor held
     this.editorDirty.delete(doc.path)
@@ -3368,6 +3554,23 @@ export class UniworkDocsService {
         ),
       )
       return workspaces.map((ws, index) => ({ ...ws, myRole: roles[index] ?? null }))
+    })
+  }
+
+  /**
+   * MYFOLDER-01 / SAVE-01 (Q3): the Save dialog opens on this call, which lazily
+   * creates and returns the caller's personal "My Folder" row (systemKind
+   * `'my_folder'`); the "Đang lưu trong" row and the folder picker read it.
+   */
+  ensureMyFolder(workspaceId: string): Promise<UniworkResult<UniworkDocSummary>> {
+    return result(async () => {
+      const session = this.captureActionSession()
+      const ws = typeof workspaceId === 'string' ? workspaceId : ''
+      if (!ws) throw new UniworkDocError('not_found')
+      const folder = await this.api().ensureMyFolder(ws)
+      // a first ensure may have created the folder: its workspace's tree changed
+      this.pushTreeChangedFor(session, folder.workspaceId)
+      return folder
     })
   }
 
@@ -3621,7 +3824,7 @@ export class UniworkDocsService {
           workspaceId: target.workspaceId,
           format: input.format,
           title: name,
-          parentId: target.folderId,
+          ...target.create,
           idempotencyKey: this.newIdempotencyKey(),
         })
         // FD-11: a new document changes the folder's contents for every view
@@ -3680,22 +3883,7 @@ export class UniworkDocsService {
         if (controller.signal.aborted) throw cancelledUpload()
         const limits = await this.limitsCache.get()
         if (controller.signal.aborted) throw cancelledUpload()
-        if (size > limits.max_bytes) {
-          throw new UniworkDocError('too_large', {
-            filename,
-            sizeBytes: size,
-            maxBytes: limits.max_bytes,
-          })
-        }
-        // under the document cap but over what D stages per upload part: still
-        // refused unread, naming the part limit as the effective one
-        if (size > MAX_UPLOAD_BYTES) {
-          throw new UniworkDocError('too_large', {
-            filename,
-            sizeBytes: size,
-            maxBytes: Math.min(limits.max_bytes, MAX_UPLOAD_BYTES),
-          })
-        }
+        assertUploadSize(filename, size, limits)
         let bytes: Uint8Array
         try {
           bytes = new Uint8Array(await readFile(input.path, { signal: controller.signal }))
@@ -3706,13 +3894,7 @@ export class UniworkDocsService {
         // the read can also resolve just as the abort lands: no POST then
         if (controller.signal.aborted) throw cancelledUpload()
         const total = bytes.byteLength
-        if (total > limits.max_bytes) {
-          throw new UniworkDocError('too_large', {
-            filename,
-            sizeBytes: total,
-            maxBytes: limits.max_bytes,
-          })
-        }
+        assertUploadSize(filename, total, limits)
         this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: 0, total })
         const created = await this.api()
           .createFile({
@@ -3720,7 +3902,7 @@ export class UniworkDocsService {
             bytes,
             filename,
             title: filename,
-            parentId: target.folderId,
+            ...target.create,
             idempotencyKey: this.newIdempotencyKey(),
             signal: controller.signal,
           })
@@ -3729,13 +3911,7 @@ export class UniworkDocsService {
             // answer, not the network failure the abort surfaced as
             if (controller.signal.aborted) throw cancelledUpload()
             if (error instanceof UniworkDocError && error.code === 'too_large') {
-              throw new UniworkDocError('too_large', {
-                status: error.status,
-                serverCode: error.serverCode,
-                filename,
-                sizeBytes: error.sizeBytes ?? total,
-                maxBytes: error.maxBytes ?? limits.max_bytes,
-              })
+              rethrowServerTooLarge(error, filename, total, limits)
             }
             throw error
           })
@@ -3746,6 +3922,322 @@ export class UniworkDocsService {
       } finally {
         // a newer upload with the same id (never minted twice) keeps its controller
         if (this.uploads.get(uploadId) === controller) this.uploads.delete(uploadId)
+      }
+    })
+  }
+
+  /**
+   * SAVE-01: the first Save to UniWork of a tab that is not bound yet. The
+   * editor is flushed to disk (its own module Save, so unwritten state lands),
+   * then `createFile` creates the document with the dialog's title and target -
+   * `destination: 'my_folder'` (Advisor Q1/Q3) or the picked `parent_id` - and
+   * the tab is bound exactly as the open-by-id flow binds: the working copy
+   * moves into the document's store folder and a binding.json names it, so the
+   * next Ctrl+S is a normal bound save with no dialog. The session is captured
+   * at entry like every own action, so a sign-out mid-flight pushes nothing.
+   *
+   * `conflict` answers a path that is already bound (a double-submit or a
+   * second Lưu racing the first): the document exists already, so creating
+   * again would duplicate it.
+   *
+   * S01-R1-4: single-flight per path - a second call while an attempt of this
+   * path runs JOINS it (the same promise answers both), so two submits can
+   * never race two creates.
+   */
+  firstSave(input: UniworkFirstSaveInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    const key =
+      typeof input.tabPath === 'string' && input.tabPath ? pathKey(resolve(input.tabPath)) : ''
+    if (!key) {
+      return actionResult(() => this.runFirstSave(input), { nameField: true })
+    }
+    const running = this.firstSaveInFlight.get(key)
+    if (running) return running
+    const attempt = actionResult(() => this.runFirstSave(input), { nameField: true })
+    this.firstSaveInFlight.set(key, attempt)
+    void attempt.finally(() => {
+      if (this.firstSaveInFlight.get(key) === attempt) this.firstSaveInFlight.delete(key)
+    })
+    return attempt
+  }
+
+  /**
+   * The body of `firstSave` (the single-flight wrapper holds the join). Every
+   * await that could observe a claim is followed by a fresh re-check: the path
+   * may have been bound by another caller while this one flushed, read or
+   * created (S01-R1-4).
+   */
+  private async runFirstSave(input: UniworkFirstSaveInput): Promise<UniworkDocSummary> {
+    const session = this.captureActionSession()
+    const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
+    if (!workspaceId) throw new UniworkDocError('not_found')
+    const tabPath = typeof input.tabPath === 'string' && input.tabPath ? resolve(input.tabPath) : ''
+    if (!tabPath) throw new UniworkDocError('not_found')
+    const key = pathKey(tabPath)
+    const owner = `${session.identity.deploymentId}${session.identity.accountId}`
+    // S01-R2-1: the IPC target is the exact runtime union, validated FIRST -
+    // before the claimed-path classification (its binding.json read), the
+    // flush, the stat, any file read or a request. A malformed target on a
+    // store-owned or already-claimed path is invalid_destination, never a
+    // conflict, and never touches the disk (S01-R1-5 pin stands)
+    const createTarget = firstSaveTargetOf(input.target)
+    // an already-bound path is never re-created, and neither is the original
+    // of a first save this account already bound: its tab moved to the store
+    // copy, so a retry from the old path finds a plain file and would create
+    // a twin (S01-R1-3)
+    if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
+    const title = requireName(input.title)
+    const filename = basename(tabPath)
+    if (!filename || !formatForName(filename)) {
+      throw new UniworkDocError('unsupported_format')
+    }
+    // the editor's own Save writes the bytes; unbound paths resolve the
+    // flush waiter through the branch onUserSave keeps for them. A refused or
+    // timed-out flush FAILS the save (S01-R1-1): uploading the stale disk
+    // bytes would silently replace what the editor holds, so nothing is read
+    // or sent.
+    if (this.deps.isPathOpen(tabPath)) {
+      const flushed = await this.flushEditorToDisk(tabPath)
+      if (!flushed) {
+        throw new UniworkDocError('first_save_flush_failed' as UniworkDocErrorCode)
+      }
+      if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
+    }
+    // S01-R1-9: a real regular file, stat'ed before anything is read - the
+    // path that is a directory (or is gone) is `not_found`, never an upload
+    let size: number
+    try {
+      const info = await stat(tabPath)
+      if (!info.isFile()) throw new UniworkDocError('not_found')
+      size = info.size
+    } catch (error) {
+      throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
+    }
+    // S01-R1-9 / merge M-2 (D-S1): the upload path's OWN preflight, one shared
+    // guard - the server cap first, then the 50 MiB staging cap - so a first
+    // save is refused typed and unread exactly like an upload, details included
+    const limits = await this.limitsCache.get()
+    assertUploadSize(filename, size, limits)
+    let bytes: Uint8Array
+    try {
+      bytes = new Uint8Array(await readFile(tabPath))
+    } catch {
+      throw new UniworkDocError('not_found')
+    }
+    // the same re-check the upload runs on what it actually buffered: a file
+    // that grew past the cap between the stat and the read is refused too
+    assertUploadSize(filename, bytes.byteLength, limits)
+    // the path may have been bound (another first save, an open) while the
+    // flush, the stat or the read ran: its document wins, this attempt never
+    // creates
+    if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
+    // S01-R1-4: one Idempotency-Key per attempt, kept while the create's fate
+    // is unknown: a retry after a lost answer replays it, so the server dedups
+    // to one document.
+    //
+    // S01-R2-3: the key belongs to the exact attempt BODY. D fingerprints the
+    // create by its checksum (fileCreateFingerprint, server
+    // document_files.go), so the local fingerprint carries the bytes' sha256
+    // too: edited bytes mint a NEW attempt under a NEW key - replaying a spent
+    // key against different bytes is refused there and must never be sent.
+    const destination =
+      'parentId' in createTarget && createTarget.parentId
+        ? `parent:${createTarget.parentId}`
+        : 'my_folder'
+    const bytesChecksum = sha256Hex(bytes)
+    const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
+    const idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
+    this.firstSaveKeys.set(keyFp, idempotencyKey)
+    // one client per save: the create + the bind read share it, so a
+    // session landing mid-flight does not turn the second call into a
+    // fresh not_signed_in on the same action
+    const api = this.api()
+    const created = await api
+      .createFile({
+        workspaceId,
+        bytes,
+        filename,
+        title,
+        idempotencyKey,
+        ...createTarget,
+      })
+      .catch((error: unknown) => {
+        // S01-R2-3: D answered the fingerprint mismatch verdict for this
+        // create - the retained key is wrong for this body and must not pin
+        // the path until restart; drop it so the next retry mints a fresh key,
+        // then answer with the typed (retryable) verdict
+        if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
+          this.firstSaveKeys.delete(keyFp)
+        }
+        // S01-R4-3: the server's own size refusal, after the local preflight
+        // passed - re-wrapped exactly as the upload path does, so the renderer
+        // gets the basename, the size and the cap, never a bare too_large
+        if (error instanceof UniworkDocError && error.code === 'too_large') {
+          rethrowServerTooLarge(error, filename, bytes.byteLength, limits)
+        }
+        throw error
+      })
+    const createdTitle = created.title || title
+    // S01-R2-6: the written working copy is tracked so the compensation catch
+    // can remove it on EVERY bind failure - a store.write that throws strands
+    // it just like the sweep-refusal branch below did
+    let workingCopy: { dir: string; name: string } | null = null
+    try {
+      // a binder that won the race while the create was in flight: this row
+      // is a duplicate, compensated below like any other bind failure
+      if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
+      // the create summary carries no revision: the read binds the same
+      // fields the open flow binds (revision, version, checksum, level)
+      const detail = await api.getDocument(created.id)
+      const dir = this.store.dirFor(
+        session.identity.deploymentId,
+        session.identity.accountId,
+        created.id,
+      )
+      const name = workingCopyName(title, detail.file.filename, formatForName(filename)!)
+      const path = await this.store.writeWorkingCopy(dir, name, bytes)
+      workingCopy = { dir, name }
+      const binding = withServerContext(
+        {
+          schema: 2,
+          documentId: created.id,
+          workspaceId: detail.workspaceId || created.workspaceId,
+          orgId: detail.organizationId,
+          title: detail.title,
+          filename: name,
+          format: formatForName(filename)!,
+          access: accessFor(detail.myLevel),
+          baseRevision: detail.revision,
+          baseVersion: detail.file.version,
+          baseChecksum: bytesChecksum,
+          state: 'ready',
+          minStoreLevel: APP_STORE_LEVEL,
+          minAppVersion: this.buildVersion(),
+          lastSavedAt: new Date().toISOString(),
+        },
+        detail,
+      )
+      const written = await this.store.write(dir, binding)
+      if (!written) {
+        // the migration sweep holds this folder: the bound copy cannot land
+        throw new UniworkDocError('server_error')
+      }
+      // the tab follows its file into the store: from here the path is a
+      // bound working copy, so the next save is one upload + commit. The
+      // user's original file stays where it is, byte for byte and
+      // unbound - a first save never deletes or moves it (S01-W1-1).
+      //
+      // S01-R1-3: the written binding.json IS the save. Everything below is a
+      // notification whose failure is logged, never a retryable answer - a
+      // retry of this path is refused by firstSaveDone above.
+      this.firstSaveDone.add(`${owner}${key}`)
+      this.firstSaveKeys.delete(keyFp)
+      try {
+        this.deps.notifyPathRenamed?.(tabPath, path)
+      } catch (error) {
+        console.warn('uniwork docs: first-save: the tab re-key failed:', error)
+      }
+      try {
+        const doc = this.store.lookup(path)
+        if (doc) this.publish(toStatus(doc))
+      } catch (error) {
+        console.warn('uniwork docs: first-save: the status push failed:', error)
+      }
+      try {
+        this.pushTreeChangedFor(session, created.workspaceId)
+      } catch (error) {
+        console.warn('uniwork docs: first-save: the tree push failed:', error)
+      }
+      return created
+    } catch (error) {
+      // anything between the create and the written binding left a server
+      // document with no local binding: compensate it the way the FD-11
+      // save-copy flow does when its step 2 fails - archive moves the created
+      // document to the trash (restorable), never a delete (no such route)
+      // (S01-R1-2)
+      //
+      // S01-R2-6: the written working copy (a thrown store.write strands it
+      // as much as the refused write did) goes first, so the folder never
+      // keeps a partial document the store would scan back. Its failure is
+      // logged and never replaces the typed result below.
+      if (workingCopy) {
+        try {
+          await this.store.removeWorkingCopy(workingCopy.dir, workingCopy.name)
+        } catch (cleanupError) {
+          console.warn(
+            `uniwork docs: first-save: the stranded working copy ${workingCopy.name} could not be removed`,
+            cleanupError,
+          )
+        }
+      }
+      console.warn(
+        `uniwork docs: first-save: binding ${created.id} failed; archiving the created document`,
+        error instanceof UniworkDocError ? error.code : 'unknown',
+      )
+      try {
+        await api.archive(created.id, this.newIdempotencyKey())
+      } catch (archiveError) {
+        console.warn(
+          `uniwork docs: first-save: created document ${created.id} could not be archived`,
+          archiveError instanceof UniworkDocError ? archiveError.code : 'unknown',
+        )
+        throw new UniworkDocError('first_save_orphaned' as UniworkDocErrorCode, {
+          documentId: created.id,
+          documentTitle: createdTitle,
+        })
+      }
+      // compensated: the attempt's key is spent - a retry re-creates (binding
+      // the trashed row would resurrect it without its own save)
+      this.firstSaveKeys.delete(keyFp)
+      const raced = error instanceof UniworkDocError && error.code === 'conflict'
+      throw new UniworkDocError(
+        (raced ? 'conflict' : 'first_save_bind_failed') as UniworkDocErrorCode,
+        { documentId: created.id, documentTitle: createdTitle },
+      )
+    }
+  }
+
+  /** `tabPath` is already spoken for: this account bound it, or a binding names it */
+  private claimedFirstSave(owner: string, tabPath: string): boolean {
+    return (
+      this.firstSaveDone.has(`${owner}${pathKey(tabPath)}`) ||
+      this.store.classify(tabPath).kind !== 'plain'
+    )
+  }
+
+  /**
+   * SAVE-01: flushes the open editor of an unbound `path` to disk and awaits
+   * the module's user-save hook, without ever starting a save upload (the
+   * binding does not exist yet). No tab answer within the wait = the save
+   * FAILS (S01-R1-1): the disk copy is never uploaded in place of the edits
+   * the editor could not write.
+   */
+  private flushEditorToDisk(path: string): Promise<boolean> {
+    const key = pathKey(path)
+    this.draftFlushWaiters.get(key)?.(false)
+    // S01-R1-1: the wait is finite by contract; a test shrinks it through the dep
+    const waitMs = this.deps.firstSaveFlushTimeoutMs ?? CLOSE_SAVE_WAIT_MS
+    return new Promise<boolean>((resolveFlush) => {
+      let settled = false
+      const finish = (wrote: boolean) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        if (this.draftFlushWaiters.get(key) === finish) {
+          this.draftFlushWaiters.delete(key)
+        }
+        resolveFlush(wrote)
+      }
+      const timer = setTimeout(() => finish(false), waitMs)
+      ;(timer as { unref?: () => void }).unref?.()
+      this.draftFlushWaiters.set(key, finish)
+      let requested: boolean
+      try {
+        requested = this.deps.requestModuleSave(path, () => finish(false))
+      } catch {
+        requested = false
+      }
+      if (!requested) {
+        finish(false)
       }
     })
   }
@@ -3827,15 +4319,20 @@ export class UniworkDocsService {
     })
   }
 
-  /** the workspace/folder a create or upload targets, validated before any call */
+  /** the workspace + create target of a create or upload, validated before any call */
   private docTarget(input: { workspaceId?: unknown; folderId?: unknown }): {
     workspaceId: string
-    folderId: string | null
+    create: UniworkCreateTarget
   } {
     const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
     if (!workspaceId) throw new UniworkDocError('not_found')
     const folderId = typeof input.folderId === 'string' && input.folderId ? input.folderId : null
-    return { workspaceId, folderId }
+    // MYFOLDER-01 / SAVE-01 (Q1): a create/upload with no folder lands in the
+    // caller's My Folder, never at the workspace root
+    const create: UniworkCreateTarget = folderId
+      ? { parentId: folderId }
+      : { destination: 'my_folder' }
+    return { workspaceId, create }
   }
 
   /** archive/restore need manage; a view row (and an edit row) is refused without a call */
@@ -5934,7 +6431,26 @@ export class UniworkDocsService {
     for (const dir of dirs) {
       if (await this.refuseLockedDir(dir)) throw new UniworkDocError('engine_incompatible')
     }
-    const detail = await this.api().getDocument(documentId)
+    let detail: DocumentDetail
+    try {
+      detail = await this.api().getDocument(documentId)
+    } catch (error) {
+      // G5-05u (B5): with no network a pinned document opens its verified cached
+      // copy, read-only - the offline edit hold is G5-08d (UNI-1645). Only the
+      // network/timeout class falls back (BE-R1-4): 401/403/404/410 are the
+      // server's own verdict about this document (a revoke, a delete), and a
+      // stale ready copy must never reopen over them.
+      const offline =
+        error instanceof UniworkDocError && (error.code === 'network' || error.code === 'timeout')
+      if (offline) {
+        const copy: OfflineCopyOpen =
+          (await this.deps.openOfflineCopy?.(documentId).catch(() => null as OfflineCopyOpen)) ??
+          null
+        if (copy?.kind === 'opened') return { path: copy.path, title: copy.title }
+        if (copy?.kind === 'locked') this.recordOfflineLock(copy)
+      }
+      throw error
+    }
     const format =
       formatForMime(detail.file.mimeType) ??
       formatForName(detail.file.filename) ??
@@ -6114,11 +6630,24 @@ export class UniworkDocsService {
     return { path, title }
   }
 
-  private show(path: string, binding: Binding): { path: string; title: string } {
+  /**
+   * G5-05u B5: show a file of this session's working-copy store that no open
+   * flow produced - the read-only offline copy of a pinned document. Null when
+   * the shell did not open it.
+   */
+  showOfflineCopy(path: string): { path: string; title: string } | null {
+    try {
+      return this.show(path, null)
+    } catch {
+      return null
+    }
+  }
+
+  private show(path: string, binding: Binding | null): { path: string; title: string } {
     this.refuseOpen(path)
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     const doc = this.store.lookup(path)
     if (doc) this.publish(toStatus(doc))
-    return { path, title: binding.title }
+    return { path, title: binding?.title ?? doc?.binding.title ?? basename(path) }
   }
 }

@@ -1153,24 +1153,31 @@ export interface RowActions {
   rename: boolean
   archive: boolean
   restore: boolean
+  /** G5-05u: "Dùng khi không có mạng" / "Bỏ dùng khi không có mạng" (null: not offered) */
+  offline: 'pin' | 'unpin' | null
 }
 
 /**
  * The row menu's items. A view-only row has none, so its "…" button is not
  * rendered at all (the person has no such action; not a disabled control).
  */
-export function rowActionsOf(doc: LibraryDocRow): RowActions {
+export function rowActionsOf(
+  doc: LibraryDocRow,
+  offline: 'pin' | 'unpin' | null = null,
+): RowActions {
   const archived = doc.archived === true
   return {
     rename: doc.canEdit === true && !archived,
     archive: doc.canManage === true && !archived,
     restore: doc.canManage === true && archived,
+    // an archived row is not pinned anew (its unpin stays)
+    offline: archived && offline === 'pin' ? null : offline,
   }
 }
 
-export function hasRowActions(doc: LibraryDocRow): boolean {
-  const a = rowActionsOf(doc)
-  return a.rename || a.archive || a.restore
+export function hasRowActions(doc: LibraryDocRow, offline: 'pin' | 'unpin' | null = null): boolean {
+  const a = rowActionsOf(doc, offline)
+  return a.rename || a.archive || a.restore || a.offline !== null
 }
 
 /**
@@ -1482,4 +1489,22 @@ export function workspaceLabel(ws: UniworkWorkspaceRef, t: TFunc): string {
   const role = myRole ? roleLabel(myRole, t) : ''
   if (!role) return ws.name
   return t('uwLibWsRole', { workspace: ws.name, role })
+}
+
+// ── FD-13: Home area split (UniWork vs On this device) ──
+
+/**
+ * FD-13: split Recent / Starred rows into UniWork rows (`entry.uniwork` present)
+ * vs device rows (`!entry.uniwork`). Every row goes to exactly one bucket.
+ */
+export function splitEntriesByArea<T extends Pick<RecentEntry, 'uniwork'>>(
+  entries: readonly T[],
+): { uniwork: T[]; device: T[] } {
+  const uniwork: T[] = []
+  const device: T[] = []
+  for (const entry of entries) {
+    if (entry.uniwork) uniwork.push(entry)
+    else device.push(entry)
+  }
+  return { uniwork, device }
 }

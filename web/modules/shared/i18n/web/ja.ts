@@ -82,6 +82,7 @@ export const ja = {
   uwConflictReloadTitle: '最新版を再読み込み',
   uwConflictReloadGo: '再読み込み',
   uwConflictSaveCopy: 'コピーとして保存…',
+  uwConflictSaveCopyName: '{name}（コピー）',
   uwConflictSaveCopyTitle: 'コピーとして保存しますか？',
   uwConflictSaveCopyConfirm:
     'UniWork はあなたのバージョンから、このドキュメントと同じ所有者とアクセス権を持つ新しいドキュメントを作成します。現在のドキュメントと {author} のバージョン {server} はそのまま残ります。',

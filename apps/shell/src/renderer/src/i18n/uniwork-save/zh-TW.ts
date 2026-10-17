@@ -1,0 +1,31 @@
+import type { zh } from './zh'
+
+export const zhTW = {
+  usMyFolder: '我的資料夾',
+  usPrivateTag: '私人',
+  usDialogTitle: '為文件命名',
+  usHint: '首次儲存。之後儲存會保留此名稱；如需改名，請使用「另存新檔」。',
+  usName: '名稱',
+  usLocation: '儲存位置',
+  usSavingIn: '儲存在：{folder}',
+  usMyFolderPrivate: '私人，僅你可見',
+  usChange: '變更',
+  usSave: '儲存',
+  usClose: '關閉',
+  usPickTitle: '選擇儲存位置',
+  usBack: '返回命名',
+  usSearchFolders: '搜尋資料夾',
+  usSharedNote: '儲存到共用資料夾後，文件會沿用該資料夾的權限。',
+  usChooseFolder: '選擇「{folder}」',
+  usSelected: '已選取',
+  usRootBlocked: '請選擇一個資料夾',
+  usErrInvalidDestination: '無法儲存到此位置。請選擇其他資料夾。',
+  usErrMyFolderLocked: '「我的資料夾」是個人系統資料夾，無法重新命名、共用、移動或封存。',
+  usErrFlushFailed: '文件尚未寫入本機。請先儲存文件，然後再試一次。',
+  usErrBindFailed:
+    '已建立「{title}」（ID {id}），但無法連結到此分頁。該文件已移至垃圾桶，可以還原。',
+  usErrOrphaned:
+    '已在 UniWork 建立「{title}」（ID {id}），但無法連結到此分頁，也無法移至垃圾桶。請在 UniWork 刪除或使用該文件。',
+  usErrAlreadyBound: '此分頁已連結到一份 UniWork 文件。請照常儲存。',
+  usErrNotFound: '找不到要儲存的檔案或所選資料夾。請重新選擇儲存位置後再試一次。',
+} satisfies Record<keyof typeof zh, string>

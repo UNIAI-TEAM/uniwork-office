@@ -50,4 +50,7 @@ export const vi = {
   ufDisabledDeep: 'Quá sâu',
   ufTreeError: 'Không tải được cây thư mục.',
   ufActionsFor: 'Thao tác cho {name}',
+  ufAreaLabel: 'Khu vực',
+  ufAreaUniwork: 'UniWork',
+  ufNoDeviceFolders: 'Chưa có thư mục nào trên máy này.',
 } satisfies Record<keyof typeof zh, string>

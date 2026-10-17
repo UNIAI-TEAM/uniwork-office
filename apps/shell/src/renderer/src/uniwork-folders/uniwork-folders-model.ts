@@ -3,6 +3,7 @@ import type {
   UniworkDocSummary,
   UniworkEntryKind,
   UniworkFolderNode,
+  UniworkSystemKind,
 } from '../../../shared/home-api'
 import type { StringKey } from '../locale'
 import { isOpenable, type DocNameError } from '../uniwork-docs-model'
@@ -103,6 +104,8 @@ export interface TreeRow {
   setSize: number
   posInSet: number
   parentKey: string | null
+  /** MYFOLDER-01: the server's marker (My Folder hides its rename / move) */
+  systemKind?: UniworkSystemKind
 }
 
 /** the visible rows, depth-first; a collapsed folder hides its subtree */
@@ -138,6 +141,7 @@ export function treeRows(
         setSize: list.length,
         posInSet: i + 1,
         parentKey,
+        ...(node.systemKind ? { systemKind: node.systemKind } : {}),
       })
       if (open) walk(node.children, level + 1, node.id)
     })
@@ -195,8 +199,12 @@ export function treeKey(
 
 // ── Move / placement targets ────────────────────────────
 
-/** why a folder cannot take the item: visible but aria-disabled, with this reason */
-export type MoveBlock = 'current' | 'inside' | 'deep' | null
+/**
+ * why a folder cannot take the item: visible but aria-disabled, with this
+ * reason. `root` is a picker that places into folders only (SAVE-01 first
+ * save, New / Upload whose top level is My Folder).
+ */
+export type MoveBlock = 'current' | 'inside' | 'deep' | 'root' | null
 
 export interface MovingItem {
   id: string
@@ -208,6 +216,7 @@ export const MOVE_BLOCK_KEYS: Record<Exclude<MoveBlock, null>, StringKey> = {
   current: 'ufDisabledCurrent',
   inside: 'ufDisabledInside',
   deep: 'ufDisabledDeep',
+  root: 'usRootBlocked',
 }
 
 /**
@@ -268,7 +277,7 @@ export function isShownEntry(doc: UniworkDocSummary): boolean {
 }
 
 /**
- * The rows of a folder or a search: shown entries, folders first, then sorted
+ * The rows of a folder or a search: shown entries, My Folder first, folders, then sorted
  * by name (UI collator) or newest update; `mode` null keeps the server order.
  */
 export function contentsView(
@@ -278,9 +287,9 @@ export function contentsView(
 ): { rows: UniworkDocSummary[]; hiddenCount: number } {
   const shown = items.filter(isShownEntry)
   const hiddenCount = items.length - shown.length
-  if (mode === null) return { rows: shown, hiddenCount }
+  if (mode === null) return { rows: myFolderFirst(shown), hiddenCount }
   const collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' })
-  const byKind = (d: UniworkDocSummary) => (isFolderEntry(d) ? 0 : 1)
+  const byKind = (d: UniworkDocSummary) => (isMyFolder(d) ? -1 : isFolderEntry(d) ? 0 : 1)
   const rows = [...shown].sort((a, b) => {
     const kind = byKind(a) - byKind(b)
     if (kind !== 0) return kind
@@ -402,4 +411,101 @@ export function folderActionFailure(
     default:
       return { key: 'uwDocActionFailed' }
   }
+}
+
+// ── My Folder (MYFOLDER-01 / SAVE-01 §4) ────────────────
+
+/** the localized My Folder label; the stored title is never shown (ADD:12) */
+export const MY_FOLDER_LABEL_KEY = 'usMyFolder' satisfies StringKey
+
+/** the caller's personal folder: the server's `system_kind`, never its title (ADD:13) */
+export function isMyFolder(entry: { systemKind?: UniworkSystemKind } | null | undefined): boolean {
+  return entry?.systemKind === 'my_folder'
+}
+
+/** My Folder rows first, every other row in its given order */
+export function myFolderFirst<T extends { systemKind?: UniworkSystemKind }>(rows: T[]): T[] {
+  if (!rows.some(isMyFolder)) return rows
+  return [...rows.filter(isMyFolder), ...rows.filter((r) => !isMyFolder(r))]
+}
+
+/** the tree with My Folder under `label` and first among its siblings (input untouched) */
+export function withMyFolderLabel(nodes: UniworkFolderNode[], label: string): UniworkFolderNode[] {
+  const visit = (list: UniworkFolderNode[]): UniworkFolderNode[] =>
+    myFolderFirst(
+      list.map((n) => ({
+        ...n,
+        title: isMyFolder(n) ? label : n.title,
+        children: visit(n.children),
+      })),
+    )
+  return visit(nodes)
+}
+
+/** the id of My Folder in a tree, at any depth; null when the tree has none */
+export function myFolderIdOf(nodes: UniworkFolderNode[]): string | null {
+  for (const n of nodes) {
+    if (isMyFolder(n)) return n.id
+    const inner = myFolderIdOf(n.children)
+    if (inner) return inner
+  }
+  return null
+}
+
+/** a root-first path with My Folder (known by id) under its label */
+export function labelMyFolderPath(
+  path: PathPart[],
+  myFolderId: string | null,
+  label: string,
+): PathPart[] {
+  if (!myFolderId || !path.some((p) => p.id === myFolderId)) return path
+  return path.map((p) => (p.id === myFolderId ? { ...p, title: label } : p))
+}
+
+/** a contents / search row's shown title */
+export function entryTitleOf(doc: UniworkDocSummary, label: string): string {
+  return isMyFolder(doc) ? label : doc.title
+}
+
+/** rename / move / archive / share are offered on every row but My Folder (Q2) */
+export function folderEditActionsOffered(entry: { systemKind?: UniworkSystemKind }): boolean {
+  return !isMyFolder(entry)
+}
+
+/**
+ * The visibility tag of a tree row. The tree carries no visibility (only
+ * `system_kind`), so only My Folder's is known; every other row has none
+ * rather than a guess.
+ */
+export function folderVisibilityTagOf(row: { systemKind?: UniworkSystemKind }): StringKey | null {
+  return isMyFolder(row) ? 'usPrivateTag' : null
+}
+
+const foldText = (s: string) =>
+  s.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+
+/**
+ * "Find folder": the folders whose title holds the query (case and accents
+ * ignored) with their ancestors; a matching folder keeps its subtree.
+ * `expand` opens the ancestors so every match is visible.
+ */
+export function filterFolderTree(
+  nodes: UniworkFolderNode[],
+  query: string,
+): { nodes: UniworkFolderNode[]; expand: string[] } {
+  const q = foldText(query.trim())
+  if (!q) return { nodes, expand: [] }
+  const expand = new Set<string>()
+  const visit = (list: UniworkFolderNode[], parentKey: string): UniworkFolderNode[] =>
+    list.flatMap((n) => {
+      if (foldText(n.title).includes(q)) {
+        expand.add(parentKey)
+        return [n]
+      }
+      const kept = visit(n.children, n.id)
+      if (kept.length === 0) return []
+      expand.add(parentKey)
+      return [{ ...n, children: kept }]
+    })
+  return { nodes: visit(nodes, ROOT_KEY), expand: [...expand] }
 }

@@ -61,10 +61,12 @@ import type {
   UniworkDocRenamedEvent,
   UniworkDocStatus,
   UniworkDocSummary,
+  UniworkFirstSaveInput,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
   UniworkLaunchEvent,
+  UniworkLockReason,
   UniworkMoveDocumentInput,
   UniworkMoveResult,
   UniworkQueuePopoverRequest,
@@ -83,7 +85,12 @@ import type {
   SignOutProgress,
   SignOutPromptRequest,
 } from '../shared/home-api'
-import { HOME_CHANNELS, PROJECT_CHANNELS, UNIWORK_DOC_CHANNELS } from '../shared/home-api'
+import {
+  HOME_CHANNELS,
+  PROJECT_CHANNELS,
+  UNIWORK_DOC_CHANNELS,
+  UNIWORK_LOCK_REASONS,
+} from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
 import type {
   IntegrationsApi,
@@ -104,6 +111,12 @@ import type {
 } from '../shared/uniwork-work-api'
 import { asSyncCenterSnapshot, UNIWORK_SYNC_CENTER_CHANNELS } from '../shared/sync-center'
 import type { SyncCenterActionResult, UniworkSyncCenterApi } from '../shared/sync-center'
+import type {
+  OfflineDocState,
+  OfflineResult,
+  OfflineUnpinResult,
+  UniworkOfflineLibraryApi,
+} from '../shared/offline-library'
 import { createLaunchReplay } from './launch-replay'
 
 // subscribed at preload time: a cold-start launch event can arrive before the
@@ -277,18 +290,29 @@ function asUniworkActionResult<T>(result: unknown): UniworkDocActionResult<T> {
   return { ok: false, error: 'malformed_response' }
 }
 
-/** a lock from main: path, reason and name only; anything else is dropped */
-function asUniworkLock(result: unknown): UniworkDocLock | null {
+const UNIWORK_LOCK_REASON_SET: ReadonlySet<string> = new Set<string>(UNIWORK_LOCK_REASONS)
+
+function isUniworkLockReason(value: unknown): value is UniworkLockReason {
+  return typeof value === 'string' && UNIWORK_LOCK_REASON_SET.has(value)
+}
+
+/** a lock from main: path, reason, name and optional libraryOff; anything else is dropped */
+export function asUniworkLock(result: unknown): UniworkDocLock | null {
   if (!result || typeof result !== 'object') return null
   const r = result as Partial<UniworkDocLock>
   if (typeof r.path !== 'string' || !r.path) return null
-  if (r.reason !== 'store_newer' && r.reason !== 'keystore_locked' && r.reason !== 'signed_out') {
+  if (!isUniworkLockReason(r.reason)) {
     return null
   }
-  return { path: r.path, reason: r.reason, name: typeof r.name === 'string' ? r.name : '' }
+  return {
+    path: r.path,
+    reason: r.reason,
+    name: typeof r.name === 'string' ? r.name : '',
+    ...(r.libraryOff === true ? { libraryOff: true } : {}),
+  }
 }
 
-function asUniworkLocks(result: unknown): UniworkDocLock[] {
+export function asUniworkLocks(result: unknown): UniworkDocLock[] {
   if (!Array.isArray(result)) return []
   return result.map(asUniworkLock).filter((lock): lock is UniworkDocLock => lock !== null)
 }
@@ -1233,6 +1257,29 @@ const homeApi: HomeApi = {
   async uniworkResolveConflict(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.resolveConflict, path))
   },
+  onUniworkFirstSaveOpen(cb: (request: { path: string }) => void) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const path = raw && typeof raw === 'object' ? (raw as { path?: unknown }).path : undefined
+      if (typeof path === 'string' && path) cb({ path })
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.firstSaveOpen, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.firstSaveOpen, listener)
+  },
+  async uniworkFirstSave(input: UniworkFirstSaveInput) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.firstSave, input),
+    )
+  },
+  // SAVE-01 r2 (S01-R1-6): the SaveDialog tells main it opened, releasing the
+  // pending File > Save answer; a missing path names nothing to release
+  uniworkFirstSaveOpenAck(path: string) {
+    return ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.firstSaveOpenAck, path)
+  },
+  async uniworkEnsureMyFolder(workspaceId: string) {
+    return asUniworkResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.ensureMyFolder, workspaceId),
+    )
+  },
   onUniworkConflict(cb) {
     const listener = (_event: IpcRendererEvent, raw: unknown) => {
       const view = asUniworkConflictView(raw)
@@ -1553,7 +1600,20 @@ function asSyncCenterActionResult(result: unknown): SyncCenterActionResult {
   return { ok: false, code: 'other' }
 }
 
-const syncCenterApi: UniworkSyncCenterApi = {
+/**
+ * G5-05u: every offline library action answers `{ ok: true }` or a refusal
+ * (`{ ok: false, code, ... }`); anything else is a refusal main never meant to
+ * send, so the renderer treats it as one.
+ */
+function asOfflineResult<T extends { ok: boolean }>(result: unknown, fallback: T): T {
+  if (result && typeof result === 'object' && 'ok' in result && typeof result.ok === 'boolean') {
+    // main's own answer, validated by its one required field
+    return result as T
+  }
+  return fallback
+}
+
+const syncCenterApi: UniworkSyncCenterApi & UniworkOfflineLibraryApi = {
   async getSnapshot() {
     const snapshot = asSyncCenterSnapshot(
       await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot),
@@ -1623,6 +1683,52 @@ const syncCenterApi: UniworkSyncCenterApi = {
     return asSyncCenterActionResult(
       await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.retryStore),
     )
+  },
+  async offlinePin(input) {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlinePin, input),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineUnpin(documentId, options) {
+    return asOfflineResult<OfflineUnpinResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineUnpin, documentId, options),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineCancel(documentId) {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineCancel, documentId),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineDownloadNow(documentId) {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineDownloadNow, documentId),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineOpen(documentId) {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineOpen, documentId),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineOpenFolder() {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineOpenFolder),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineState(documentId) {
+    const result: unknown = await ipcRenderer.invoke(
+      UNIWORK_SYNC_CENTER_CHANNELS.offlineState,
+      documentId,
+    )
+    if (result && typeof result === 'object' && 'pinned' in result) {
+      return result as OfflineDocState
+    }
+    return { pinned: false, state: null, capabilityOn: false }
   },
   subscribe(cb) {
     const listener = (_event: IpcRendererEvent, value: unknown) => {
