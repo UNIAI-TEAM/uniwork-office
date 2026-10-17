@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { UniworkDocSummary } from '../../../shared/home-api'
@@ -13,9 +13,13 @@ import { FolderNameDialog } from './FolderNameDialog'
 import { UniworkFolderPicker } from './UniworkFolderPicker'
 import { UniworkFolderTree } from './UniworkFolderTree'
 import {
+  MY_FOLDER_LABEL_KEY,
   ROOT_KEY,
   contentsView,
+  folderEditActionsOffered,
   isFolderEntry,
+  labelMyFolderPath,
+  myFolderIdOf,
   readSortMode,
   writeSortMode,
   type PathPart,
@@ -99,6 +103,10 @@ export function UniworkBrowser({
   })
   const query = (hostQuery ?? ownDraft).trim()
   const { runSearch } = browser
+  // My Folder is named by its label wherever a path shows (crumbs, the host's Location)
+  const myFolderLabel = t(MY_FOLDER_LABEL_KEY)
+  const myFolderId = useMemo(() => myFolderIdOf(browser.tree.nodes), [browser.tree.nodes])
+  const shownPath = labelMyFolderPath(browser.path, myFolderId, myFolderLabel)
 
   // the committed search text (host debounced; the own box on each change) drives the title search
   useEffect(() => {
@@ -111,10 +119,10 @@ export function UniworkBrowser({
   onFolderChangeRef.current = onFolderChange
   const pathKey = browser.path.map((p) => p.id).join('/')
   useEffect(() => {
-    onFolderChangeRef.current?.(browser.folderId, browser.path)
+    onFolderChangeRef.current?.(browser.folderId, shownPath)
     // keyed on the path ids: the same folder re-read is not a change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [browser.folderId, pathKey])
+  }, [browser.folderId, pathKey, myFolderId, myFolderLabel])
 
   const openFolder = (id: string | null) => {
     onSelectFolder?.()
@@ -133,7 +141,8 @@ export function UniworkBrowser({
         onSelect: () => actions.openCreate(row.id, row.id !== null),
       },
     ]
-    if (!row.id) return items
+    // My Folder: still a place to create in, never renamed or moved (Q2)
+    if (!row.id || !folderEditActionsOffered(row)) return items
     const id = row.id
     const parentId = browser.index.get(id)?.parentId ?? null
     items.push(
@@ -158,6 +167,11 @@ export function UniworkBrowser({
         actions.startMove({ id: doc.id, kind: doc.kind ?? 'file', parentId, title: doc.title }),
     }
     if (!isFolderEntry(doc)) return [move]
+    if (!folderEditActionsOffered(doc)) {
+      return [
+        { id: 'new', label: t('ufNewSubfolder'), onSelect: () => actions.openCreate(doc.id, true) },
+      ]
+    }
     return [
       { id: 'new', label: t('ufNewSubfolder'), onSelect: () => actions.openCreate(doc.id, true) },
       { id: 'rename', label: t('ufRename'), onSelect: () => actions.openRename(doc) },
@@ -266,7 +280,7 @@ export function UniworkBrowser({
             })}
           </div>
         ) : (
-          <BrowserCrumbs path={browser.path} onOpen={openFolder} />
+          <BrowserCrumbs path={shownPath} onOpen={openFolder} />
         )}
         {!searching && (
           <div className="uwf-bar-tools">
@@ -307,6 +321,7 @@ export function UniworkBrowser({
           hiddenHintId={hiddenHintId}
           emptyText={searching ? t('ufNoResults', { query }) : t('ufEmptyFolder')}
           search={searching}
+          myFolderId={myFolderId}
           openingId={openingId}
           menuFor={rowMenu}
           onOpenFolder={(doc) => openFolder(doc.id)}

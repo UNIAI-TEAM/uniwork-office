@@ -17,7 +17,7 @@ import {
   type RowActions,
 } from './uniwork-docs-model'
 import { UniworkFolderPicker } from './uniwork-folders/UniworkFolderPicker'
-import type { PathPart } from './uniwork-folders/uniwork-folders-model'
+import { MY_FOLDER_LABEL_KEY, type PathPart } from './uniwork-folders/uniwork-folders-model'
 
 /**
  * S18 pieces of the UniWork library: the New document / Upload dialog, the
@@ -174,7 +174,9 @@ export function LocationFields({
   const [picking, setPicking] = useState(false)
   const path = target.folderId ? (target.folderPath ?? []) : []
   const label =
-    path.length > 0 ? [t('ufRoot'), ...path.map((p) => p.title)].join(' › ') : t('ufLocationRoot')
+    path.length > 0
+      ? [t('ufRoot'), ...path.map((p) => p.title)].join(' › ')
+      : t(MY_FOLDER_LABEL_KEY)
   return (
     <fieldset className="uw-act-field uw-act-location">
       <legend className="uw-act-label">{t('ufLocation')}</legend>
@@ -221,6 +223,7 @@ export function LocationFields({
           confirmLabel={t('ufChoose')}
           workspaceId={target.workspaceId}
           loadTree={loadTree}
+          rootBlocked
           initialFolderId={target.folderId}
           onPick={(picked) => {
             setPicking(false)
