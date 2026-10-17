@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { applyN1BuildTimePatch } from './apply-n1-patch.mjs'
+import { N1_PATCHED_FILES, applyN1BuildTimePatch } from './apply-n1-patch.mjs'
 import { G7_06_FIXTURES, materializeFixtures } from './fixtures-data.mjs'
 import {
   REPO_ROOT,
@@ -23,6 +23,7 @@ import {
   parseStraceConnectsToTarget,
   parseStraceLog,
   readUws1Header,
+  runCmd,
   sampleProcessTreeRssKb,
   seedUpgradeMatrixStore,
   szv1Decode,
@@ -289,22 +290,20 @@ function testUpgradeMatrixHelpersAndN1Patch() {
     assert.equal(parseStraceConnectsToTarget(traceWithPort1, '127.0.0.1', 443).count, 0)
 
     // 5. applyN1BuildTimePatch against an isolated temp copy of the 6 target files
+    const patchSource = readFileSync(join(REPO_ROOT, 'tools/g7-05/apply-n1-patch.mjs'), 'utf8')
+    assert.equal(
+      patchSource.includes('./lib.mjs') || patchSource.includes('playwright'),
+      false,
+      'apply-n1-patch.mjs must remain free of lib.mjs and playwright imports',
+    )
     const fakeRepo = join(dir, 'fake-repo')
-    const relFiles = [
-      'apps/shell/src/main/uniwork-sync/store-level.ts',
-      'apps/shell/src/main/uniwork-docs/binding-store.ts',
-      'apps/shell/src/main/uniwork-sync/store/layer.ts',
-      'apps/shell/src/main/uniwork-sync/migration.ts',
-      'package.json',
-      'apps/shell/package.json',
-    ]
-    for (const rel of relFiles) {
+    for (const rel of N1_PATCHED_FILES) {
       const dest = join(fakeRepo, rel)
       mkdirSync(dirname(dest), { recursive: true })
       copyFileSync(join(REPO_ROOT, rel), dest)
     }
     const patchRes = applyN1BuildTimePatch(fakeRepo, { version: '1.0.0-g705n1', storeLevel: 3 })
-    assert.equal(patchRes.patchedFiles.length, 6)
+    assert.deepEqual(patchRes.patchedFiles, N1_PATCHED_FILES)
     assert.ok(
       readFileSync(
         join(fakeRepo, 'apps/shell/src/main/uniwork-sync/store-level.ts'),
@@ -315,6 +314,24 @@ function testUpgradeMatrixHelpersAndN1Patch() {
       JSON.parse(readFileSync(join(fakeRepo, 'apps/shell/package.json'), 'utf8')).version,
       '1.0.0-g705n1',
     )
+
+    // Verify CLI invocation directly from tools/g7-05/apply-n1-patch.mjs
+    const fakeRepoCli = join(dir, 'fake-repo-cli')
+    for (const rel of N1_PATCHED_FILES) {
+      const dest = join(fakeRepoCli, rel)
+      mkdirSync(dirname(dest), { recursive: true })
+      copyFileSync(join(REPO_ROOT, rel), dest)
+    }
+    const cliRes = runCmd(process.execPath, [
+      join(REPO_ROOT, 'tools/g7-05/apply-n1-patch.mjs'),
+      '--repo-root',
+      fakeRepoCli,
+      '--version',
+      '1.0.0-g705n1',
+      '--store-level',
+      '3',
+    ])
+    assert.equal(cliRes.status, 0, `apply-n1-patch CLI failed: ${cliRes.stderr}`)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

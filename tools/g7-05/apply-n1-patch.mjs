@@ -2,9 +2,20 @@
 // Build-time-only patch helper for G7-05 T3/T4 synthetic N+1 test build (1.0.0-g705n1, APP_STORE_LEVEL = 3).
 // Must NEVER be committed to product code; applied in an ephemeral git worktree during build-upgrade-matrix.sh.
 import { readFileSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { REPO_ROOT } from './lib.mjs'
+
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
+const DEFAULT_REPO_ROOT = resolve(SCRIPT_DIR, '../..')
+
+export const N1_PATCHED_FILES = [
+  'apps/shell/src/main/uniwork-sync/store-level.ts',
+  'apps/shell/src/main/uniwork-docs/binding-store.ts',
+  'apps/shell/src/main/uniwork-sync/store/layer.ts',
+  'apps/shell/src/main/uniwork-sync/migration.ts',
+  'package.json',
+  'apps/shell/package.json',
+]
 
 function replaceExactOnce(filePath, target, replacement, label) {
   const before = readFileSync(filePath, 'utf8')
@@ -22,7 +33,7 @@ function replaceExactOnce(filePath, target, replacement, label) {
 }
 
 export function applyN1BuildTimePatch(
-  repoRoot = REPO_ROOT,
+  repoRoot = DEFAULT_REPO_ROOT,
   { version = '1.0.0-g705n1', storeLevel = 3 } = {},
 ) {
   const absRoot = resolve(repoRoot)
@@ -94,20 +105,13 @@ export function applyN1BuildTimePatch(
     repoRoot: absRoot,
     version,
     storeLevel: Number(storeLevel),
-    patchedFiles: [
-      'apps/shell/src/main/uniwork-sync/store-level.ts',
-      'apps/shell/src/main/uniwork-docs/binding-store.ts',
-      'apps/shell/src/main/uniwork-sync/store/layer.ts',
-      'apps/shell/src/main/uniwork-sync/migration.ts',
-      'package.json',
-      'apps/shell/package.json',
-    ],
+    patchedFiles: [...N1_PATCHED_FILES],
   }
 }
 
 function parseCliArgs(argv) {
   const out = {
-    repoRoot: REPO_ROOT,
+    repoRoot: DEFAULT_REPO_ROOT,
     version: '1.0.0-g705n1',
     storeLevel: 3,
   }
