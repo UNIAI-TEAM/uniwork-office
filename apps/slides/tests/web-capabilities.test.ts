@@ -59,7 +59,7 @@ const WEB_DEFAULTS = {
 let root: Root | null = null
 let container: HTMLElement | null = null
 
-function mountRibbon(): HTMLElement {
+function mountRibbon(extra: Record<string, unknown> = {}): HTMLElement {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -68,7 +68,13 @@ function mountRibbon(): HTMLElement {
     root!.render(
       createElement(LocaleProvider, {
         initial: 'en',
-        children: createElement(Ribbon as never, ribbonProps() as never),
+        children: createElement(
+          Ribbon as never,
+          {
+            ...ribbonProps(),
+            ...extra,
+          } as never,
+        ),
       }),
     ),
   )
@@ -191,6 +197,46 @@ describe('Ribbon gating', () => {
     })
     expect(event.defaultPrevented).toBe(true)
     expect(el.querySelector('.file-menu')).toBeNull()
+  })
+
+  it('pen flyout survives presses inside it and the held pen toggles it off (UNI-1876 RFW4-1)', () => {
+    setCaps(WEB_DEFAULTS)
+    const onInkPen = vi.fn()
+    const el = mountRibbon({ inkTool: 'pen', onInkPen })
+    clickTab(el, 'Draw')
+    // the held pen opens its colour/width flyout
+    const pen = el.querySelector('.pen-btn') as HTMLButtonElement
+    act(() => pen.click())
+    expect(el.querySelector('.pen-flyout')).not.toBeNull()
+    // a press+click on a swatch keeps the flyout open and still applies the colour
+    const swatch = el.querySelector('.pen-flyout .ink-swatch[data-tip="#C00000"]') as HTMLElement
+    act(() => {
+      swatch.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      swatch.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(el.querySelector('.pen-flyout')).not.toBeNull()
+    expect(onInkPen).toHaveBeenCalledWith(expect.objectContaining({ color: 'C00000' }))
+    // clicking the held pen again toggles the flyout off instead of reopening it
+    const penAgain = el.querySelector('.pen-btn') as HTMLButtonElement
+    act(() => {
+      penAgain.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      penAgain.click()
+    })
+    expect(el.querySelector('.pen-flyout')).toBeNull()
+  })
+
+  it('Escape closes the pen flyout and is defaultPrevented (UNI-1876 RFW4-1)', () => {
+    setCaps(WEB_DEFAULTS)
+    const el = mountRibbon({ inkTool: 'pen' })
+    clickTab(el, 'Draw')
+    act(() => (el.querySelector('.pen-btn') as HTMLButtonElement).click())
+    expect(el.querySelector('.pen-flyout')).not.toBeNull()
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    act(() => {
+      window.dispatchEvent(event)
+    })
+    expect(event.defaultPrevented).toBe(true)
+    expect(el.querySelector('.pen-flyout')).toBeNull()
   })
 })
 

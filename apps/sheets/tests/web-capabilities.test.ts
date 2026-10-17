@@ -77,7 +77,7 @@ describe('ExcelShell view-only ribbon (UNI-1876 SVF-1)', () => {
   })
 
   const noop = () => {}
-  const shellProps = (aiViewOnly: boolean) => ({
+  const shellProps = (aiViewOnly: boolean, onCommand: (command: string) => void = noop) => ({
     openingWorkbook: false,
     prompt: '',
     preview: null,
@@ -104,7 +104,7 @@ describe('ExcelShell view-only ribbon (UNI-1876 SVF-1)', () => {
     onAiSelectionAskDismiss: noop,
     onAiScopeDismiss: noop,
     onAiCitation: noop,
-    onCommand: noop,
+    onCommand,
     onIsCellEditing: () => false,
     statusMessage: 'Ready',
     emptyCsvNotice: false,
@@ -195,6 +195,7 @@ describe('ExcelShell view-only ribbon (UNI-1876 SVF-1)', () => {
   async function renderShell(
     caps: Record<string, unknown>,
     aiViewOnly = false,
+    onCommand?: (command: string) => void,
   ): Promise<HTMLElement> {
     installDesktopApi(caps)
     container = document.createElement('div')
@@ -204,7 +205,7 @@ describe('ExcelShell view-only ribbon (UNI-1876 SVF-1)', () => {
       root!.render(
         createElement(LocaleProvider, {
           initial: 'en',
-          children: createElement(ExcelShell, shellProps(aiViewOnly)),
+          children: createElement(ExcelShell, shellProps(aiViewOnly, onCommand)),
         }),
       )
     })
@@ -224,5 +225,24 @@ describe('ExcelShell view-only ribbon (UNI-1876 SVF-1)', () => {
     const tabs = [...el.querySelectorAll('.ribbon-tab')].map((b) => b.textContent)
     expect(tabs).toEqual(['View'])
     expect(el.textContent).not.toContain('Paste')
+  })
+
+  it('view-only View tab keeps Find and it opens the find panel (UNI-1876 RFW4-3)', async () => {
+    const commands: string[] = []
+    const el = await renderShell(
+      { platform: 'web', ai: false, save: false, saveAs: true },
+      false,
+      (c) => commands.push(c),
+    )
+    expect([...el.querySelectorAll('.ribbon-tab')].map((b) => b.textContent)).toEqual(['View'])
+    const editing = [...el.querySelectorAll('.ribbon-group')].find(
+      (g) => g.getAttribute('aria-label') === 'Editing',
+    )
+    const find = editing?.querySelector('button.labeled') as HTMLButtonElement | null
+    expect(find?.textContent).toContain('Find')
+    await act(async () => {
+      find!.click()
+    })
+    expect(commands).toEqual(['find'])
   })
 })
