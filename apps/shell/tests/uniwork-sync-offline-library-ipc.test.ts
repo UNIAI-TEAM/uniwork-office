@@ -10,7 +10,14 @@ import {
 } from '../src/main/uniwork-sync/offline-library/api'
 import type { OfflineCopyOutcome } from '../src/main/uniwork-sync/offline-library/copies'
 import type { OfflineLibraryManagerOptions } from '../src/main/uniwork-sync/offline-library'
-import { ORG, WS, addDoc, createHarness, type Harness } from './uniwork-sync-offline-library-fakes'
+import {
+  ORG,
+  SCOPE,
+  WS,
+  addDoc,
+  createHarness,
+  type Harness,
+} from './uniwork-sync-offline-library-fakes'
 
 /**
  * G5-05u B3/B4: the offline library IPC of the sync center object - pin returns
@@ -200,18 +207,32 @@ describe('G5-05u B4 offlineUnpin / offlineCancel / offlineDownloadNow', () => {
   })
 
   it('downloadNow returns at once and retries the interrupted download', async () => {
-    const h = createHarness()
-    const b = bridge(h)
+    const b = wiredBridge()
+    const h = b.h
     addDoc(h, 'doc_1', 1, 4096)
     h.docs.chunkSize = 1024
     const slow = slowDownload(h, 'doc_1', 2)
-    const pinned = pin(b)
+    // the engine's own promise: this one does wait for the transfer to end
+    const pinned = h.manager.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
     await slow.waiting
     await b.api.cancel('doc_1')
     slow.release()
     await pinned
     expect(await h.manager.row('doc_1')).toMatchObject({ state: 'interrupted' })
-    expect(await b.api.downloadNow('doc_1')).toEqual({ ok: true })
+    // the retry is gated the same way: the call must answer while it still runs,
+    // so an awaited handler would show here (BE-R1-7)
+    const gate = slowDownload(h, 'doc_1', 2)
+    const order: string[] = []
+    void gate.waiting.then(() => order.push('chunk-2'))
+    const retried = b.api.downloadNow('doc_1')
+    void retried.then(() => order.push('answered'))
+    await gate.waiting
+    await flushTasks()
+    // answered while the transfer is still gated at chunk 2 (BE-R1-7)
+    expect(order).toContain('answered')
+    gate.release()
+    await retried
+    await flushTasks()
     expect(await h.manager.row('doc_1')).toMatchObject({ state: 'ready', readyVersion: 1 })
   })
 
@@ -370,6 +391,29 @@ describe('G5-05u B3 pushes are throttled per row', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('G5-05u B1 signed out the api snapshot counts and never names (BE-R1-10)', () => {
+  it('reports rows: [] and the last owner count, with no file name in the JSON', async () => {
+    const h = createHarness()
+    let signedOut = false
+    const b = bridge(h, {
+      signedOut: () => signedOut,
+      lastOwner: () => ({ deploymentId: SCOPE.deploymentId, accountId: SCOPE.accountId }),
+    })
+    addDoc(h, 'doc_1', 1)
+    addDoc(h, 'doc_2', 1)
+    expect(await pin(b, 'doc_1')).toEqual({ ok: true })
+    expect(await pin(b, 'doc_2')).toEqual({ ok: true })
+    expect((await b.api.snapshot()).rows).toHaveLength(2)
+    signedOut = true
+    const snapshot = await b.api.snapshot()
+    // the count of what the last account kept, never a row and never a name
+    expect(snapshot.rows).toEqual([])
+    expect(snapshot.signedOutLockedCount).toBe(2)
+    expect(JSON.stringify(snapshot)).not.toContain('doc_1.docx')
+    expect(JSON.stringify(snapshot)).not.toContain('doc_1')
   })
 })
 

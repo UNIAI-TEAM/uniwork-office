@@ -173,6 +173,8 @@ export interface FakeDoc {
   bytes: Uint8Array
   version: number
   archivedAt?: string | null
+  /** the file name the server declares (default `${documentId}.docx`) */
+  filename?: string
   /** the checksum/size the server declares (default: of `bytes`) */
   declaredSha?: string
   declaredSize?: number
@@ -192,13 +194,13 @@ export function detailOf(documentId: string, doc: FakeDoc): DocumentDetail {
     id: documentId,
     organizationId: ORG,
     workspaceId: WS,
-    title: `${documentId}.docx`,
+    title: doc.filename ?? `${documentId}.docx`,
     revision: '7',
     currentVersion: doc.version,
     myLevel: 'edit',
     archivedAt: doc.archivedAt ?? null,
     file: {
-      filename: `${documentId}.docx`,
+      filename: doc.filename ?? `${documentId}.docx`,
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       version: doc.version,
       versionId: `ver_${doc.version}`,

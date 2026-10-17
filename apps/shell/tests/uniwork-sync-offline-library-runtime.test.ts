@@ -559,6 +559,34 @@ describe('R5BE-1b an archived pinned document reaches the library (handleArchive
       expect(noted).toHaveBeenCalledTimes(1)
     })
 
+    it('RES-G505-6: a pass stopped while the library is asked hands nothing over', async () => {
+      const h = harness({
+        feed: new FakeFeedClient([
+          snapshot,
+          {
+            phase: 'feed',
+            rows: [{ document_id: 'doc_1', revision: '1', current_version: 1, archived: true }],
+            next_cursor: 'f1',
+          },
+        ]),
+      })
+      addDoc(h, 'doc_1', 1)
+      await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
+      const noted = vi.spyOn(h.runtime.library!, 'noteArchived')
+      // the pass is stopped exactly between the `flagged` check and the per-row
+      // read: the rows this pass collected must no longer reach the library.
+      // The loop that would hand them over runs inside the awaited second tick,
+      // so no timer is needed to observe it.
+      const pinned = vi.spyOn(h.runtime.library!, 'pinnedIds').mockImplementation(async () => {
+        h.runtime.stop()
+        return new Set(['doc_1'])
+      })
+      await h.runtime.tick().catch(() => undefined)
+      await h.runtime.tick().catch(() => undefined)
+      expect(pinned).toHaveBeenCalled()
+      expect(noted).not.toHaveBeenCalled()
+    })
+
     it('an archived:true row of a pinned doc is handed over once; unpinned rows of the same page (true or false) are not', async () => {
       const h = harness({
         feed: new FakeFeedClient([

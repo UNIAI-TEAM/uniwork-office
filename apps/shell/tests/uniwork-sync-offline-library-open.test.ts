@@ -1,7 +1,15 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { UniworkDocLock } from '../src/shared/home-api'
 import {
@@ -9,7 +17,10 @@ import {
   type ConflictUi,
   type OfflineCopyOpen,
 } from '../src/main/uniwork-docs/service'
+import { BINDING_FILE, scopeWorkingCopyDirs } from '../src/main/uniwork-docs/binding-store'
+import { ID } from '../src/main/uniwork-sync/feed/http'
 import {
+  OFFLINE_COPY_KEY_MAX,
   createOfflineCopies,
   offlineCopyKey,
   type OfflineCopies,
@@ -51,8 +62,21 @@ interface OpenHarness {
   pathOpen: { value: boolean }
   clock: { now: number }
   capability: { on: boolean }
+  /** the server read: every URL asked, and an optional answer (default: no network) */
+  server: { answer: ((url: string) => Response) | null; calls: string[] }
   userDataDir: string
 }
+
+/** a server answer for one status + UniWork envelope (BE-R1-4) */
+const answerOf = (status: number, body: unknown): Response =>
+  ({
+    ok: false,
+    status,
+    redirected: false,
+    url: '',
+    headers: { get: () => null },
+    json: async () => body,
+  }) as unknown as Response
 
 function openHarness(): OpenHarness {
   const h = createHarness()
@@ -62,6 +86,7 @@ function openHarness(): OpenHarness {
   const pathOpen = { value: true }
   const clock = { now: 1_000 }
   const capability = { on: true }
+  const server: OpenHarness['server'] = { answer: null, calls: [] }
   /** what the wiring passes the service: the module's outcome as the service's seam */
   const openOfflineCopy = async (documentId: string): Promise<OfflineCopyOpen> => {
     const outcome = await copies.open(documentId)
@@ -88,8 +113,13 @@ function openHarness(): OpenHarness {
     keystoreLocked: () => false,
     selectedOrg: () => ({ id: ORG, slug: 'acme' }),
     authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
-    // no network at all: every server read is the offline case
-    fetch: (() => Promise.reject(new TypeError('fetch failed'))) as never,
+    // no network at all by default: every server read is the offline case. A
+    // test may answer one status instead (BE-R1-4)
+    fetch: ((url: string) => {
+      server.calls.push(url)
+      const answer = server.answer?.(url)
+      return answer ? Promise.resolve(answer) : Promise.reject(new TypeError('fetch failed'))
+    }) as never,
     openPath: (path) => {
       opened.push(path)
       return true
@@ -109,14 +139,31 @@ function openHarness(): OpenHarness {
     library: () => h.manager,
     capabilityOn: async () => capability.on,
     store: service.store,
+    // the account's own working-copy folders: what the startup sweep walks
+    scopeDirs: (deploymentId, accountId) =>
+      scopeWorkingCopyDirs(service.store.root, { deploymentId, accountId }),
     scope: () => ({ deploymentId: SCOPE.deploymentId, accountId: SCOPE.accountId }),
     show: (path) => service.showOfflineCopy(path),
     isPathOpen: () => pathOpen.value,
     appVersion: () => '0.0.0-test',
     now: () => clock.now,
   })
-  return { h, service, copies, opened, locks, pathOpen, clock, capability, userDataDir }
+  return {
+    h,
+    service,
+    copies,
+    opened,
+    locks,
+    pathOpen,
+    clock,
+    capability,
+    server,
+    userDataDir,
+  }
 }
+
+/** the binding path segment rule the key must satisfy (`SEGMENT`, binding-store.ts) */
+const SANITIZED_KEY = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$/
 
 const pin = (h: Harness, documentId = 'doc_1') =>
   h.manager.pin({ documentId, orgId: ORG, workspaceId: WS })
@@ -303,6 +350,174 @@ describe('G5-05u B5 every refusal names its S11 lock', () => {
   })
 })
 
+describe('G5-05u B5 the copy is named and cleared like the normal open path (BE-R1-1, BE-R1-2)', () => {
+  it('names the copy as the normal open path does, inside its own folder, for every hostile server name', async () => {
+    const cases: Array<[string, string]> = [
+      ['../escape.docx', '_escape.docx'],
+      ['foo/bar.docx', 'foo_bar.docx'],
+      ['a:b.docx', 'a_b.docx'],
+      ['CON.docx', '_CON.docx'],
+    ]
+    for (const [sent, expected] of cases) {
+      const o = openHarness()
+      dirs.push(o.userDataDir)
+      const doc = addDoc(o.h, 'doc_1', 1)
+      doc.filename = sent
+      expect((await pin(o.h)).kind).toBe('pinned')
+      expect((await o.service.openDocument('doc_1')).ok).toBe(true)
+      const dir = o.service.store.dirFor(
+        SCOPE.deploymentId,
+        SCOPE.accountId,
+        offlineCopyKey('doc_1'),
+      )
+      const openedPath = o.opened[0]!
+      // one segment, under the copy folder: no `../`, no separator, no drive
+      expect(dirname(openedPath)).toBe(dir)
+      expect(basename(openedPath)).toBe(expected)
+      expect(openedPath.includes('..')).toBe(false)
+      // the binding the shell reads back is the read-only one, never a plain file
+      expect(o.service.store.lookup(openedPath)?.binding).toMatchObject({
+        documentId: 'doc_1',
+        access: 'view',
+        level: 'view',
+        filename: expected,
+      })
+      expect(o.service.isReadOnly(openedPath)).toBe(true)
+      expect(readdirSync(dir).sort()).toEqual([BINDING_FILE, expected].sort())
+      expect(new Uint8Array(await readFile(openedPath))).toEqual(doc.bytes)
+      // read-only on disk too (Windows reports the POSIX bits chmod set; host probe: 0o444)
+      expect(((await stat(openedPath)).mode & 0o777).toString(8)).toBe('444')
+      rmSync(o.userDataDir, { recursive: true, force: true })
+    }
+  })
+
+  it('a refusal names its S11 lock with the same safe segment, never the raw server name (BE-R1-1)', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    addDoc(o.h, 'doc_1', 1).filename = '../escape.docx'
+    await pin(o.h)
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    const outcome = await o.copies.open('doc_1')
+    if (outcome.kind !== 'refused') throw new Error(`expected a refusal, got ${outcome.kind}`)
+    expect(outcome.lock.name).toBe('_escape.docx')
+    expect(dirname(outcome.lock.path)).toBe(
+      o.service.store.dirFor(SCOPE.deploymentId, SCOPE.accountId, offlineCopyKey('doc_1')),
+    )
+    expect(outcome.lock.reason).toBe('lease_expired')
+  })
+
+  it('a read-only leftover of an earlier session goes before the new bytes land', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const doc = addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    const dir = o.service.store.dirFor(SCOPE.deploymentId, SCOPE.accountId, offlineCopyKey('doc_1'))
+    // what a crash (or a remove that failed) leaves: the copy, view-only, plus a stray
+    mkdirSync(dir, { recursive: true })
+    const leftover = join(dir, 'doc_1.docx')
+    writeFileSync(leftover, new Uint8Array([1, 2, 3]))
+    chmodSync(leftover, 0o444)
+    writeFileSync(join(dir, 'stale.bin'), new Uint8Array([4]))
+    const outcome = await o.copies.open('doc_1')
+    expect(outcome.kind).toBe('opened')
+    expect(new Uint8Array(await readFile(leftover))).toEqual(doc.bytes)
+    expect(existsSync(join(dir, 'stale.bin'))).toBe(false)
+    expect(readdirSync(dir).sort()).toEqual([BINDING_FILE, 'doc_1.docx'].sort())
+  })
+
+  it('a 128-char document id still opens its copy: the key fits one binding segment (BE-R1-5)', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const id = 'a'.repeat(128)
+    const doc = addDoc(o.h, id, 1)
+    expect((await o.h.manager.pin({ documentId: id, orgId: ORG, workspaceId: WS })).kind).toBe(
+      'pinned',
+    )
+    const outcome = await o.copies.open(id)
+    expect(outcome.kind).toBe('opened')
+    const key = offlineCopyKey(id)
+    // one accepted segment, and the same key for the same document every time
+    expect(ID.test(id)).toBe(true)
+    expect(key.length).toBeLessThanOrEqual(OFFLINE_COPY_KEY_MAX)
+    expect(offlineCopyKey(id)).toBe(key)
+    expect(SANITIZED_KEY.test(key)).toBe(true)
+    expect(offlineCopyKey(`${'a'.repeat(127)}b`)).not.toBe(key)
+    expect(dirname(o.opened[0]!)).toBe(
+      o.service.store.dirFor(SCOPE.deploymentId, SCOPE.accountId, key),
+    )
+    expect(new Uint8Array(await readFile(o.opened[0]!))).toEqual(doc.bytes)
+  })
+
+  it('the account activation sweep deletes a leftover copy folder and keeps a real working copy', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const leftover = o.service.store.dirFor(
+      SCOPE.deploymentId,
+      SCOPE.accountId,
+      offlineCopyKey('doc_9'),
+    )
+    mkdirSync(leftover, { recursive: true })
+    const file = join(leftover, 'doc_9.docx')
+    writeFileSync(file, new Uint8Array([9]))
+    chmodSync(file, 0o444)
+    const workingCopy = o.service.store.dirFor(SCOPE.deploymentId, SCOPE.accountId, 'doc_8')
+    mkdirSync(workingCopy, { recursive: true })
+    await o.copies.recover()
+    expect(existsSync(leftover)).toBe(false)
+    expect(existsSync(workingCopy)).toBe(true)
+  })
+
+  it('a save of the offline copy is refused as view-only, and mints no intent', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    const outcome = await o.copies.open('doc_1')
+    if (outcome.kind !== 'opened') throw new Error(`expected an open, got ${outcome.kind}`)
+    const dir = o.service.store.dirFor(SCOPE.deploymentId, SCOPE.accountId, offlineCopyKey('doc_1'))
+    const before = await readFile(join(dir, BINDING_FILE))
+    const ended = await o.service.coordinator.save(outcome.path, { userSave: true })
+    expect(ended?.binding.access).toBe('view')
+    // nothing was minted: the binding on disk is byte for byte the one the open wrote
+    expect(await readFile(join(dir, BINDING_FILE))).toEqual(before)
+    expect(existsSync(join(dir, 'pending-upload.bin'))).toBe(false)
+    expect(o.server.calls).toEqual([])
+  })
+})
+
+describe('G5-05u B5 only the network class opens the cached copy (BE-R1-4)', () => {
+  it('a 403 while online never opens the ready copy', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    o.server.answer = () => answerOf(403, { error: { code: 'forbidden' } })
+    expect((await o.service.openDocument('doc_1')).ok).toBe(false)
+    expect(o.opened).toEqual([])
+  })
+
+  it('a 410 (revoked/deleted) never opens the ready copy', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    o.server.answer = () => answerOf(410, { error: { code: 'document_deleted' } })
+    expect((await o.service.openDocument('doc_1')).ok).toBe(false)
+    expect(o.opened).toEqual([])
+  })
+
+  it('a network failure still opens the copy', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    const result = await o.service.openDocument('doc_1')
+    expect(result.ok).toBe(true)
+    expect(o.opened).toHaveLength(1)
+    expect(o.opened[0]).toContain('doc_1@offline')
+  })
+})
+
 describe('G5-05u B7 hasOfflineHead', () => {
   it('is true only for a document whose committed copy is the head the pin saw', () => {
     const base = {
@@ -343,6 +558,40 @@ describe('G5-05u B7 hasOfflineHead', () => {
       row: { state: 'ready' },
     })
     expect((await projected()).has('doc_1')).toBe(true)
+  })
+
+  it('a lease-expired row whose committed version is the head is not offline (BE-R1-6)', () => {
+    const base = {
+      workspaceId: WS,
+      name: 'doc_1.docx',
+      progress: null,
+      sizeBytes: 4096,
+      leaseUntil: null,
+      leaseLevel: 'view' as const,
+      updateKeptReason: null,
+      open: false,
+      version: 2,
+      headVersion: 2,
+    }
+    const head = offlineHeadIds([
+      {
+        ...base,
+        documentId: 'doc_1',
+        state: 'lease-expired',
+        lockReason: 'lease_expired',
+      },
+      {
+        ...base,
+        documentId: 'doc_2',
+        state: 'locked',
+        lockReason: 'keystore_locked',
+      },
+      { ...base, documentId: 'doc_3', state: 'corrupt' },
+      { ...base, documentId: 'doc_4', state: 'revoked' },
+      { ...base, documentId: 'doc_5', state: 'waiting-network' },
+      { ...base, documentId: 'doc_6', state: 'view-only' },
+    ])
+    expect([...head]).toEqual(['doc_6'])
   })
 
   it('no rows, no heads', () => {
