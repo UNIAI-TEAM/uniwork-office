@@ -184,4 +184,18 @@ describe('saveTabToUniWork (the File > Save routing, S01-R1-6)', () => {
     expect(bridged).toEqual(['/tmp/Draft.docx'])
     expect(calls.warn).toBe(0)
   })
+
+  // S01-R2-2: the module renderer died AFTER the requester's isDestroyed
+  // check - webContents.send throws through requestModuleSave. That must warn
+  // and answer false, never reject into the void'ed menu caller.
+  it('a module save whose send throws warns and answers false, never rejects', async () => {
+    const { calls, deps: d } = deps({
+      isBound: () => true,
+      requestModuleSave: () => {
+        throw new Error('renderer frame gone')
+      },
+    })
+    await expect(saveTabToUniWork(d)).resolves.toBe(false)
+    expect(calls.warn).toBe(1)
+  })
 })
