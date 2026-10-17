@@ -31,6 +31,7 @@ import {
   szv1Encode,
   waitForEditorViewPage,
   waitForShellReady,
+  waitForUpgradeMatrixStoreLevel,
 } from './lib.mjs'
 
 function testFixtureMaterialization() {
@@ -400,6 +401,134 @@ function testUpgradeMatrixHelpersAndN1Patch() {
   }
 }
 
+async function testWaitForUpgradeMatrixStoreLevel() {
+  const dir = mkdtempSync(join(tmpdir(), 'g7-05-selftest-wait-level-'))
+  try {
+    const fxDir = join(dir, 'fx')
+    const fixtures = materializeFixtures(fxDir)
+    const docx = fixtures.find((f) => f.id === 'fx-docx-report-vi')
+    const userDataDir = join(dir, 'userData')
+    const seeded = seedUpgradeMatrixStore({ userDataDir, fixtureSourcePath: docx.path })
+
+    const writeUws1IntentFile = (targetPath, minStoreLevel, payloadByte = 0x55) => {
+      mkdirSync(dirname(targetPath), { recursive: true })
+      const headerBuf = Buffer.from(
+        JSON.stringify({ schema: 1, min_store_level: minStoreLevel }),
+        'utf8',
+      )
+      const lenBuf = Buffer.alloc(2)
+      lenBuf.writeUInt16LE(headerBuf.byteLength, 0)
+      writeFileSync(
+        targetPath,
+        Buffer.concat([
+          Buffer.from('UWS1', 'latin1'),
+          lenBuf,
+          headerBuf,
+          Buffer.alloc(12 + 16 + 128, payloadByte),
+        ]),
+      )
+    }
+
+    // Simulate Step 1 state on disk: schema-2 binding with min_store_level=2 and UWS1 intent with min_store_level=2.
+    rmSync(seeded.legacyPendingUploadPath, { force: true })
+    writeUws1IntentFile(seeded.intentRecordPath, 2, 0x22)
+    writeFileSync(
+      seeded.bindingPath,
+      `${JSON.stringify(
+        {
+          schema: 2,
+          min_store_level: 2,
+          min_app_version: '1.0.0',
+          documentId: UPGRADE_MATRIX_IDS.documentId,
+          workspaceId: UPGRADE_MATRIX_IDS.workspaceId,
+          orgId: UPGRADE_MATRIX_IDS.orgId,
+          title: UPGRADE_MATRIX_IDS.title,
+          filename: UPGRADE_MATRIX_IDS.filename,
+          format: 'docx',
+          access: 'edit',
+          baseRevision: '1',
+          baseVersion: 1,
+          baseChecksum: '0'.repeat(64),
+          state: 'queued',
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    )
+
+    // 1. Waiting for level 3 when store stays at level 2 must throw a clear timeout error with on-disk state.
+    let timeoutErr = null
+    try {
+      await waitForUpgradeMatrixStoreLevel(userDataDir, 3, 120, { pollIntervalMs: 20 })
+    } catch (err) {
+      timeoutErr = err
+    }
+    assert.ok(timeoutErr instanceof Error, 'waitForUpgradeMatrixStoreLevel must throw on timeout')
+    assert.match(timeoutErr.message, /min_store_level=3/)
+    assert.match(timeoutErr.message, /On-disk state:/)
+    assert.equal(timeoutErr.storeSnapshot?.binding?.min_store_level, 2)
+    assert.equal(timeoutErr.storeSnapshot?.intentRecord?.header?.min_store_level, 2)
+
+    // 2. Simulate an asynchronous N+1 editor edit+save that updates docPath bytes, intent .rec (level 3),
+    //    and binding.json (level 3), and verify waitForUpgradeMatrixStoreLevel resolves with the level-3 store.
+    setTimeout(() => {
+      const editedBytes = Buffer.concat([
+        readFileSync(seeded.docPath),
+        Buffer.from(' UNIWORK_DOCX_SMOKE', 'utf8'),
+      ])
+      writeFileSync(seeded.docPath, editedBytes)
+      writeUws1IntentFile(seeded.intentRecordPath, 3, 0x33)
+      writeFileSync(
+        seeded.bindingPath,
+        `${JSON.stringify(
+          {
+            schema: 2,
+            min_store_level: 3,
+            min_app_version: '1.0.0',
+            documentId: UPGRADE_MATRIX_IDS.documentId,
+            workspaceId: UPGRADE_MATRIX_IDS.workspaceId,
+            orgId: UPGRADE_MATRIX_IDS.orgId,
+            title: UPGRADE_MATRIX_IDS.title,
+            filename: UPGRADE_MATRIX_IDS.filename,
+            format: 'docx',
+            access: 'edit',
+            baseRevision: '1',
+            baseVersion: 1,
+            baseChecksum: '0'.repeat(64),
+            state: 'paused_offline',
+            error: 'network',
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      )
+    }, 50)
+
+    const level3Snap = await waitForUpgradeMatrixStoreLevel(userDataDir, 3, 1_500, {
+      notDocSha256: seeded.docSha256,
+      pollIntervalMs: 20,
+    })
+    assert.equal(level3Snap.binding?.schema, 2)
+    assert.equal(level3Snap.binding?.min_store_level, 3)
+    assert.equal(level3Snap.intentRecord?.header?.min_store_level, 3)
+    assert.notEqual(level3Snap.docSha256, seeded.docSha256)
+
+    // 3. If notDocSha256 matches the current docSha256 (i.e. doc was not edited), it must time out and report the digest.
+    await assert.rejects(
+      () =>
+        waitForUpgradeMatrixStoreLevel(userDataDir, 3, 100, {
+          notDocSha256: level3Snap.docSha256,
+          pollIntervalMs: 20,
+        }),
+      /Timed out after 100ms waiting for upgrade-matrix store/,
+    )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
 function extractPreloadApiKeys(preloadSource, startMarker, endMarker) {
   const startIdx = preloadSource.indexOf(startMarker)
   const endIdx = preloadSource.indexOf(endMarker, startIdx)
@@ -417,8 +546,10 @@ function extractPreloadApiKeys(preloadSource, startMarker, endMarker) {
 function findAiOfficeReferences(sourceText) {
   const aiOfficeRefs = new Set()
   const aiOfficeTabsRefs = new Set()
+  const syncCenterRefs = new Set()
   const officeRe = /\baiOffice(?:\?\.)?\.([A-Za-z_][A-Za-z0-9_]*)/g
   const tabsRe = /\baiOfficeTabs(?:\?\.)?\.([A-Za-z_][A-Za-z0-9_]*)/g
+  const syncCenterRe = /\buniworkSyncCenter(?:\?\.)?\.([A-Za-z_][A-Za-z0-9_]*)/g
   let m
   while ((m = officeRe.exec(sourceText)) !== null) {
     aiOfficeRefs.add(m[1])
@@ -426,7 +557,14 @@ function findAiOfficeReferences(sourceText) {
   while ((m = tabsRe.exec(sourceText)) !== null) {
     aiOfficeTabsRefs.add(m[1])
   }
-  return { aiOfficeRefs: [...aiOfficeRefs], aiOfficeTabsRefs: [...aiOfficeTabsRefs] }
+  while ((m = syncCenterRe.exec(sourceText)) !== null) {
+    syncCenterRefs.add(m[1])
+  }
+  return {
+    aiOfficeRefs: [...aiOfficeRefs],
+    aiOfficeTabsRefs: [...aiOfficeTabsRefs],
+    syncCenterRefs: [...syncCenterRefs],
+  }
 }
 
 function testPreloadApiReferencesAndUiSelectors() {
@@ -442,6 +580,11 @@ function testPreloadApiReferencesAndUiSelectors() {
     preloadSource,
     'const tabsApi: TabsApi = {',
     "contextBridge.exposeInMainWorld('aiOfficeTabs', tabsApi)",
+  )
+  const syncCenterApiKeys = extractPreloadApiKeys(
+    preloadSource,
+    'const syncCenterApi: UniworkSyncCenterApi = {',
+    "contextBridge.exposeInMainWorld('uniworkSyncCenter', syncCenterApi)",
   )
 
   // Negative check: tabsList does NOT exist on window.aiOffice and must be rejected if referenced.
@@ -465,7 +608,7 @@ function testPreloadApiReferencesAndUiSelectors() {
 
   for (const relPath of targetScripts) {
     const src = readFileSync(join(REPO_ROOT, relPath), 'utf8')
-    const { aiOfficeRefs, aiOfficeTabsRefs } = findAiOfficeReferences(src)
+    const { aiOfficeRefs, aiOfficeTabsRefs, syncCenterRefs } = findAiOfficeReferences(src)
     if (relPath.includes('t3-upgrade-rollback') || relPath.includes('t4-pre-guard')) {
       assert.ok(
         aiOfficeRefs.length > 0,
@@ -482,6 +625,12 @@ function testPreloadApiReferencesAndUiSelectors() {
       assert.ok(
         tabsApiKeys.has(refName),
         `${relPath} references window.aiOfficeTabs.${refName}, which does not exist in apps/shell/src/preload/index.ts`,
+      )
+    }
+    for (const refName of syncCenterRefs) {
+      assert.ok(
+        syncCenterApiKeys.has(refName),
+        `${relPath} references window.uniworkSyncCenter.${refName}, which does not exist in apps/shell/src/preload/index.ts`,
       )
     }
   }
@@ -512,5 +661,6 @@ testRssAndMetadata()
 await testWrapperAndProcessTracking()
 await testPackagedShellAndEditorViewResolution()
 testUpgradeMatrixHelpersAndN1Patch()
+await testWaitForUpgradeMatrixStoreLevel()
 testPreloadApiReferencesAndUiSelectors()
 console.log('[g7-05/self-test] All unit assertions passed.')

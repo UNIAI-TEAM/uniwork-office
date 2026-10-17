@@ -30,7 +30,6 @@ PATCHED_FILES=(
   "apps/shell/src/main/uniwork-sync/store-level.ts"
   "apps/shell/src/main/uniwork-docs/binding-store.ts"
   "apps/shell/src/main/uniwork-sync/store/layer.ts"
-  "apps/shell/src/main/uniwork-sync/migration.ts"
   "package.json"
   "apps/shell/package.json"
 )

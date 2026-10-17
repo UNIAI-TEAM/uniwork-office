@@ -21,13 +21,14 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { materializeFixtures } from './fixtures-data.mjs'
+import { G7_06_FIXTURES, materializeFixtures } from './fixtures-data.mjs'
 import {
   REPO_ROOT,
   UPGRADE_MATRIX_IDS,
   activateKeyringAndRestoreAccount,
   closePackagedApp,
   diffTreeDigests,
+  editAndSaveBoundDocInN1,
   getUpgradeMatrixPaths,
   inspectUpgradeMatrixStore,
   launchPackagedApp,
@@ -42,8 +43,10 @@ import {
   sleep,
   waitForFixtureFirstPaint,
   waitForShellReady,
-  waitForUpgradeMatrixStoreLevel,
 } from './lib.mjs'
+
+const UNEDITED_DOCX_FIXTURE_SHA256 =
+  G7_06_FIXTURES.find((f) => f.id === 'fx-docx-report-vi')?.sha256 || null
 
 function parseArgs(argv) {
   const out = {
@@ -97,20 +100,24 @@ function installDebPackage(debPath, expectedVersion) {
   }
 }
 
-function isValidN1Store(storeSnap) {
+function isValidN1Store(storeSnap, uneditedDocSha256 = UNEDITED_DOCX_FIXTURE_SHA256) {
   return (
     storeSnap?.binding?.schema === 2 &&
     storeSnap?.binding?.min_store_level === 3 &&
+    storeSnap?.binding?.state !== 'saving' &&
     storeSnap?.hasLegacyPendingUpload === false &&
     storeSnap?.hasEncryptedIntentRecord === true &&
-    storeSnap?.intentRecord?.header?.min_store_level === 3
+    storeSnap?.intentRecord?.header?.min_store_level === 3 &&
+    Boolean(storeSnap?.docSha256) &&
+    (!uneditedDocSha256 || storeSnap.docSha256 !== uneditedDocSha256)
   )
 }
 
 async function prepareN1StoreOnProfile({ n1, envRootDir, userDataDir }) {
   console.log(
-    '[g7-05/t4] N+1 snapshot missing or incomplete; building N+1-written store directly...',
+    '[g7-05/t4] N+1 snapshot missing or incomplete; building N+1-written level-3 store via real edit+save in N+1...',
   )
+  let seeded = null
   const fxScratchDir = mkdtempSync(join(tmpdir(), 'g7-05-t4-fx-'))
   try {
     const fixtures = materializeFixtures(fxScratchDir)
@@ -118,7 +125,7 @@ async function prepareN1StoreOnProfile({ n1, envRootDir, userDataDir }) {
     if (!docxFixture) {
       throw new Error('Could not find fx-docx-report-vi in G7-06 fixtures')
     }
-    seedUpgradeMatrixStore({
+    seeded = seedUpgradeMatrixStore({
       userDataDir,
       fixtureSourcePath: docxFixture.path,
     })
@@ -134,15 +141,44 @@ async function prepareN1StoreOnProfile({ n1, envRootDir, userDataDir }) {
     seedOnboardingSeen: true,
     scratchPrefix: 'g7-05-t4-n1-prep-',
   })
+  let accountAfterRetry = null
+  let editSaveRes = null
   try {
     const shellPage = await waitForShellReady(launchedN1.app)
-    await activateKeyringAndRestoreAccount(launchedN1.app, shellPage, 500)
-    await waitForUpgradeMatrixStoreLevel(userDataDir, 3, 15_000)
+    accountAfterRetry = await activateKeyringAndRestoreAccount(launchedN1.app, shellPage, 500)
+    editSaveRes = await editAndSaveBoundDocInN1({
+      app: launchedN1.app,
+      shellPage,
+      userDataDir,
+      docPath: seeded.docPath,
+      preEditDocSha256: seeded.docSha256,
+      expectedLevel: 3,
+      timeoutMs: 30_000,
+    })
   } finally {
     await closePackagedApp(launchedN1)
     launchedN1.cleanup()
   }
-  return n1Install
+
+  const postPrepStore = inspectUpgradeMatrixStore(userDataDir)
+  if (!isValidN1Store(postPrepStore, seeded.docSha256)) {
+    throw new Error(
+      `[g7-05/t4] prepareN1StoreOnProfile failed to produce a valid level-3 N+1 store after edit+save: ${JSON.stringify(postPrepStore)}`,
+    )
+  }
+
+  return {
+    install: n1Install,
+    accountAfterRetry,
+    preEditDocSha256: seeded.docSha256,
+    postEditDocSha256: postPrepStore.docSha256,
+    saveMs: editSaveRes?.saveMs ?? null,
+    cancelBeforeEdit: editSaveRes?.cancelBeforeEdit ?? null,
+    fallbackSaveTriggered: editSaveRes?.fallbackSaveTriggered ?? false,
+    editorState: editSaveRes?.editorState ?? null,
+    bindingMinStoreLevel: postPrepStore.binding?.min_store_level ?? null,
+    intentRecordMinStoreLevel: postPrepStore.intentRecord?.header?.min_store_level ?? null,
+  }
 }
 
 async function main() {
@@ -189,16 +225,32 @@ async function main() {
     }
 
     if (!snapshotUsed) {
-      report.n1PrepInstall = await prepareN1StoreOnProfile({ n1, envRootDir, userDataDir })
+      const n1Prep = await prepareN1StoreOnProfile({ n1, envRootDir, userDataDir })
+      report.n1PrepInstall = n1Prep.install
+      report.n1Prep = n1Prep
       report.snapshotSource = 'self-generated-by-n1'
       rmSync(snapshotDir, { recursive: true, force: true })
       cpSync(envRootDir, snapshotDir, { recursive: true })
     }
 
     const beforeStore = inspectUpgradeMatrixStore(userDataDir)
+    report.preNPrimeStoreLevelAssertion = {
+      verifiedBeforePreNPrimeInstall: isValidN1Store(beforeStore),
+      snapshotSource: report.snapshotSource,
+      bindingSchema: beforeStore.binding?.schema ?? null,
+      bindingMinStoreLevel: beforeStore.binding?.min_store_level ?? null,
+      bindingMinAppVersion: beforeStore.binding?.min_app_version ?? null,
+      intentRecordSchema: beforeStore.intentRecord?.header?.schema ?? null,
+      intentRecordMinStoreLevel: beforeStore.intentRecord?.header?.min_store_level ?? null,
+      uneditedFixtureDocSha256: UNEDITED_DOCX_FIXTURE_SHA256,
+      n1EditedDocSha256: beforeStore.docSha256,
+      editedInN1: Boolean(
+        beforeStore.docSha256 && beforeStore.docSha256 !== UNEDITED_DOCX_FIXTURE_SHA256,
+      ),
+    }
     if (!isValidN1Store(beforeStore)) {
       throw new Error(
-        `Expected N+1 store with schema=2, min_store_level=3 and encrypted level-3 intent before T4; got ${JSON.stringify(beforeStore)}`,
+        `Expected N+1 store with schema=2, min_store_level=3, encrypted level-3 intent, and edited docSha256 before T4; got ${JSON.stringify(beforeStore)}`,
       )
     }
 

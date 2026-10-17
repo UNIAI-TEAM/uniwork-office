@@ -12,7 +12,6 @@ export const N1_PATCHED_FILES = [
   'apps/shell/src/main/uniwork-sync/store-level.ts',
   'apps/shell/src/main/uniwork-docs/binding-store.ts',
   'apps/shell/src/main/uniwork-sync/store/layer.ts',
-  'apps/shell/src/main/uniwork-sync/migration.ts',
   'package.json',
   'apps/shell/package.json',
 ]
@@ -47,7 +46,7 @@ export function applyN1BuildTimePatch(
     'APP_STORE_LEVEL',
   )
 
-  // 2. Ensure binding-store.ts promotes schema-2 bindings to at least APP_STORE_LEVEL when read/written by N+1.
+  // 2. Ensure binding-store.ts promotes schema-2 bindings to at least APP_STORE_LEVEL when written by N+1.
   const bindingStorePath = join(absRoot, 'apps/shell/src/main/uniwork-docs/binding-store.ts')
   replaceExactOnce(
     bindingStorePath,
@@ -71,29 +70,7 @@ export function applyN1BuildTimePatch(
     'encrypted store backward-read compatibility for level-2 records',
   )
 
-  // 4. Upgrade already-migrated level-2 bindings and intent records to APP_STORE_LEVEL (3) when N+1 opens the sync store.
-  const migrationPath = join(absRoot, 'apps/shell/src/main/uniwork-sync/migration.ts')
-  replaceExactOnce(
-    migrationPath,
-    '    if (!existsSync(payloadPath)) continue',
-    [
-      '    if (!existsSync(payloadPath)) {',
-      '      const binding = parseBinding(raw)',
-      '      if (binding && (raw.schema === 1 || raw.min_store_level !== APP_STORE_LEVEL)) {',
-      '        const stored = await intents.get(basename(dir))',
-      '        if (stored) {',
-      '          await intents.put(basename(dir), stored.intent, stored.payload)',
-      '        }',
-      '        await rewriteBinding(dir, { ...binding, minStoreLevel: APP_STORE_LEVEL }, deps.appVersion)',
-      '        report.migrated += 1',
-      '      }',
-      '      continue',
-      '    }',
-    ].join('\n'),
-    'migration.ts level-2 -> level-3 store promotion',
-  )
-
-  // 5. Set synthetic version (1.0.0-g705n1) in root package.json and apps/shell/package.json.
+  // 4. Set synthetic version (1.0.0-g705n1) in root package.json and apps/shell/package.json.
   for (const relPkg of ['package.json', 'apps/shell/package.json']) {
     const pkgPath = join(absRoot, relPkg)
     const pkgJson = JSON.parse(readFileSync(pkgPath, 'utf8'))

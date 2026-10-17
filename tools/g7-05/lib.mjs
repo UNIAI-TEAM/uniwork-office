@@ -1490,25 +1490,157 @@ export function inspectUpgradeMatrixStore(userDataDir) {
   }
 }
 
+function matchesUpgradeMatrixStoreLevel(snap, expectedLevel, options = {}) {
+  if (!snap || typeof snap !== 'object') return false
+  if (snap.binding?.schema !== 2) return false
+  if (snap.binding?.min_store_level !== expectedLevel) return false
+  if (snap.binding?.state === 'saving') return false
+  if (snap.hasLegacyPendingUpload !== false) return false
+  if (snap.hasEncryptedIntentRecord !== true) return false
+  if (snap.intentRecord?.header?.min_store_level !== expectedLevel) return false
+  if (options.expectedDocSha256 && snap.docSha256 !== options.expectedDocSha256) return false
+  if (options.notDocSha256 && (!snap.docSha256 || snap.docSha256 === options.notDocSha256)) {
+    return false
+  }
+  return true
+}
+
 export async function waitForUpgradeMatrixStoreLevel(
   userDataDir,
   expectedLevel,
   timeoutMs = 15_000,
+  options = {},
 ) {
-  const deadline = Date.now() + timeoutMs
+  const pollIntervalMs = Number.isFinite(options.pollIntervalMs)
+    ? Math.max(10, Number(options.pollIntervalMs))
+    : 50
+  const startedAt = Date.now()
+  const deadline = startedAt + timeoutMs
   let lastSnap = inspectUpgradeMatrixStore(userDataDir)
   while (Date.now() < deadline) {
-    if (
-      lastSnap.binding?.schema === 2 &&
-      lastSnap.binding?.min_store_level === expectedLevel &&
-      lastSnap.hasLegacyPendingUpload === false &&
-      lastSnap.hasEncryptedIntentRecord === true &&
-      lastSnap.intentRecord?.header?.min_store_level === expectedLevel
-    ) {
+    if (matchesUpgradeMatrixStoreLevel(lastSnap, expectedLevel, options)) {
       return lastSnap
     }
-    await sleep(100)
+    if (typeof options.onPoll === 'function') {
+      await options.onPoll(lastSnap, Date.now() - startedAt)
+    }
+    await sleep(pollIntervalMs)
     lastSnap = inspectUpgradeMatrixStore(userDataDir)
   }
-  return lastSnap
+  if (matchesUpgradeMatrixStoreLevel(lastSnap, expectedLevel, options)) {
+    return lastSnap
+  }
+  const onDiskSummary = {
+    binding: lastSnap.binding,
+    bindingSha256: lastSnap.bindingSha256,
+    hasLegacyPendingUpload: lastSnap.hasLegacyPendingUpload,
+    hasEncryptedIntentRecord: lastSnap.hasEncryptedIntentRecord,
+    intentRecord: lastSnap.intentRecord,
+    docSha256: lastSnap.docSha256,
+    docBytes: lastSnap.docBytes,
+    docsTree: lastSnap.docsTree,
+    syncTree: lastSnap.syncTree,
+  }
+  const err = new Error(
+    `Timed out after ${timeoutMs}ms waiting for upgrade-matrix store at ${resolve(userDataDir)} to reach min_store_level=${expectedLevel} ` +
+      `(expectedDocSha256=${options.expectedDocSha256 ?? 'any'}, notDocSha256=${options.notDocSha256 ?? 'none'}). ` +
+      `On-disk state: ${JSON.stringify(onDiskSummary)}`,
+  )
+  err.storeSnapshot = lastSnap
+  throw err
+}
+
+/**
+ * Opens the bound document in N+1, clears any pre-existing queued seed intent while the
+ * document is open (so SaveCoordinator.save mints & writes a new v2 intent record rather
+ * than short-circuiting into requestPopover), performs a real local edit + Save in the
+ * editor (same pattern as T2), and waits until both binding.json and intents/<docIdHash>.rec
+ * carry min_store_level = expectedLevel (3) on disk with the updated docSha256.
+ */
+export async function editAndSaveBoundDocInN1({
+  app,
+  shellPage,
+  userDataDir,
+  docPath,
+  preEditDocSha256,
+  expectedLevel = 3,
+  timeoutMs = 30_000,
+}) {
+  const baselineSha = preEditDocSha256 || sha256File(resolve(docPath))
+
+  // If the profile started with a schema-1 pending-upload.bin (e.g. T4 standalone prep),
+  // wait briefly for migrateLegacyIntents() to finish moving it before opening & editing.
+  const migrationDeadline = Date.now() + 10_000
+  while (Date.now() < migrationDeadline) {
+    const snap = inspectUpgradeMatrixStore(userDataDir)
+    if (!snap.hasLegacyPendingUpload) break
+    await sleep(50)
+  }
+
+  await openFixtureViaShell(shellPage, docPath)
+  const editorPage = await waitForFixtureFirstPaint(app, { ext: 'docx', path: docPath }, timeoutMs)
+
+  // Cancel any pre-existing queued seed intent while the document tab is open in the shell
+  // (openWindowHasNewer === true -> documentClosed === false) so that the user's Save in the
+  // editor mints a fresh intent via intents.put() and writes both intents/<docIdHash>.rec and
+  // binding.json at APP_STORE_LEVEL (3).
+  const cancelBeforeEdit = await shellPage.evaluate(async (documentId) => {
+    if (typeof globalThis.window?.uniworkSyncCenter?.cancelSave === 'function') {
+      await globalThis.window.uniworkSyncCenter.cancelSave(documentId)
+      return 'cancelled-via-sync-center'
+    }
+    return 'sync-center-unavailable'
+  }, UPGRADE_MATRIX_IDS.documentId)
+
+  const { saveMs } = await editAndSaveFixture(
+    app,
+    editorPage,
+    { ext: 'docx', path: docPath },
+    timeoutMs,
+  )
+
+  let fallbackSaveTriggered = false
+  const store = await waitForUpgradeMatrixStoreLevel(userDataDir, expectedLevel, timeoutMs, {
+    notDocSha256: baselineSha,
+    onPoll: async (snap, elapsedMs) => {
+      if (
+        !fallbackSaveTriggered &&
+        elapsedMs >= 2_500 &&
+        (!snap.hasEncryptedIntentRecord ||
+          snap.intentRecord?.header?.min_store_level !== expectedLevel ||
+          snap.binding?.min_store_level !== expectedLevel)
+      ) {
+        fallbackSaveTriggered = true
+        await shellPage
+          .evaluate(async (targetPath) => {
+            if (typeof globalThis.window?.aiOffice?.uniworkSave === 'function') {
+              await globalThis.window.aiOffice.uniworkSave(targetPath)
+            }
+          }, resolve(docPath))
+          .catch(() => {})
+      }
+    },
+  })
+
+  const editorState = await editorPage.evaluate(() => {
+    const pm = globalThis.document.querySelector('.ProseMirror')
+    const text = (pm?.textContent || '').trim()
+    return {
+      hasProseMirror: Boolean(pm),
+      textLength: text.length,
+      textPreview: text.slice(0, 120),
+      textIncludesEditMarker: text.includes('UNIWORK_DOCX_SMOKE'),
+    }
+  })
+
+  return {
+    editorPage,
+    editorState,
+    saveMs,
+    cancelBeforeEdit,
+    fallbackSaveTriggered,
+    preEditDocSha256: baselineSha,
+    postEditDocSha256: store.docSha256,
+    store,
+  }
 }

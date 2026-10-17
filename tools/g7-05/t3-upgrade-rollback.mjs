@@ -27,6 +27,7 @@ import {
   activateKeyringAndRestoreAccount,
   closePackagedApp,
   diffTreeDigests,
+  editAndSaveBoundDocInN1,
   inspectUpgradeMatrixStore,
   launchPackagedApp,
   listShellAndEditorViews,
@@ -279,24 +280,24 @@ async function main() {
     try {
       const shellPage = await waitForShellReady(launched.app)
       const accountAfterRetry = await activateKeyringAndRestoreAccount(launched.app, shellPage, 500)
-      await waitForUpgradeMatrixStoreLevel(userDataDir, 3, 15_000)
-      await openFixtureViaShell(shellPage, seeded.docPath)
-      const editorPage = await waitForFixtureFirstPaint(launched.app, {
-        ext: 'docx',
-        path: seeded.docPath,
-      })
-      const editorState = await editorPage.evaluate(() => {
-        const pm = globalThis.document.querySelector('.ProseMirror')
-        return {
-          hasProseMirror: Boolean(pm),
-          textLength: (pm?.textContent || '').trim().length,
-          textPreview: (pm?.textContent || '').trim().slice(0, 120),
-        }
+      const editSaveRes = await editAndSaveBoundDocInN1({
+        app: launched.app,
+        shellPage,
+        userDataDir,
+        docPath: seeded.docPath,
+        preEditDocSha256: step1Store.docSha256,
+        expectedLevel: 3,
+        timeoutMs: 30_000,
       })
       const shellState = await evaluateShellState(shellPage, seeded.docPath)
       step2Runtime = {
         accountAfterRetry,
-        editorState,
+        cancelBeforeEdit: editSaveRes.cancelBeforeEdit,
+        fallbackSaveTriggered: editSaveRes.fallbackSaveTriggered,
+        saveMs: editSaveRes.saveMs,
+        preEditDocSha256: editSaveRes.preEditDocSha256,
+        postEditDocSha256: editSaveRes.postEditDocSha256,
+        editorState: editSaveRes.editorState,
         shellState,
       }
     } finally {
@@ -314,7 +315,9 @@ async function main() {
       step2Store.hasLegacyPendingUpload === false &&
       step2Store.hasEncryptedIntentRecord === true &&
       step2Store.intentRecord?.header?.min_store_level === 3 &&
-      step2Store.docSha256 === step1Store.docSha256 &&
+      Boolean(step2Store.docSha256) &&
+      step2Store.docSha256 !== step1Store.docSha256 &&
+      step2Runtime?.editorState?.textIncludesEditMarker === true &&
       Array.isArray(step2Runtime?.shellState?.locks) &&
       step2Runtime.shellState.locks.length === 0 &&
       step2Runtime?.shellState?.docStatus?.documentId === UPGRADE_MATRIX_IDS.documentId
@@ -323,6 +326,8 @@ async function main() {
     report.steps.step2UpgradeN1 = {
       pass: step2Pass,
       install: step2Install,
+      preEditDocSha256: step1Store.docSha256,
+      step2BaselineDocSha256: step2Store.docSha256,
       runtime: step2Runtime,
       store: step2Store,
     }
@@ -442,6 +447,7 @@ async function main() {
       step3AfterDebStore.binding?.min_store_level === 3 &&
       step3AfterDebStore.hasEncryptedIntentRecord === true &&
       step3AfterDebStore.intentRecord?.header?.min_store_level === 3 &&
+      step3AfterDebStore.docSha256 === step2Store.docSha256 &&
       step3DebDiff.identical === true &&
       step3StraceSummary.outboundCount === 0 &&
       step3ServerConnects.count === 0 &&
@@ -450,6 +456,7 @@ async function main() {
       step3AppImageRuntime.locks.length === 1 &&
       step3AppImageRuntime.locks[0].reason === 'store_newer' &&
       Boolean(step3AppImageRuntime?.lockPanelDom?.title) &&
+      step3AfterAppImageStore.docSha256 === step2Store.docSha256 &&
       step3AppImageDiff.identical === true
 
     rollbackExit = step3Pass ? 0 : 1
@@ -500,7 +507,9 @@ async function main() {
     try {
       const shellPage = await waitForShellReady(launched.app)
       const accountAfterRetry = await activateKeyringAndRestoreAccount(launched.app, shellPage, 500)
-      await waitForUpgradeMatrixStoreLevel(userDataDir, 3, 15_000)
+      await waitForUpgradeMatrixStoreLevel(userDataDir, 3, 15_000, {
+        expectedDocSha256: step2Store.docSha256,
+      })
       await openFixtureViaShell(shellPage, seeded.docPath)
       const editorPage = await waitForFixtureFirstPaint(launched.app, {
         ext: 'docx',
@@ -508,10 +517,12 @@ async function main() {
       })
       const editorState = await editorPage.evaluate(() => {
         const pm = globalThis.document.querySelector('.ProseMirror')
+        const text = (pm?.textContent || '').trim()
         return {
           hasProseMirror: Boolean(pm),
-          textLength: (pm?.textContent || '').trim().length,
-          textPreview: (pm?.textContent || '').trim().slice(0, 120),
+          textLength: text.length,
+          textPreview: text.slice(0, 120),
+          textIncludesEditMarker: text.includes('UNIWORK_DOCX_SMOKE'),
         }
       })
       const shellState = await evaluateShellState(shellPage, seeded.docPath)
@@ -535,6 +546,7 @@ async function main() {
       step4Store.intentRecord?.header?.min_store_level === 3 &&
       step4Store.docSha256 === step2Store.docSha256 &&
       step4DiffFromStep2.identical === true &&
+      step4Runtime?.editorState?.textIncludesEditMarker === true &&
       Array.isArray(step4Runtime?.shellState?.locks) &&
       step4Runtime.shellState.locks.length === 0 &&
       step4Runtime?.shellState?.docStatus?.documentId === UPGRADE_MATRIX_IDS.documentId
