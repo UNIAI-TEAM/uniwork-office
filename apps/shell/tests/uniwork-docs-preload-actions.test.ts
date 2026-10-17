@@ -23,6 +23,10 @@ interface ActionsBridge {
   uniworkCreateFolder(i: unknown): Promise<unknown>
   uniworkMoveDocument(i: unknown): Promise<unknown>
   onUniworkTreeChanged(cb: (event: unknown) => void): () => void
+  uniworkEnsureMyFolder(workspaceId: string): Promise<unknown>
+  uniworkFirstSave(input: unknown): Promise<unknown>
+  uniworkFirstSaveOpenAck(path: string): Promise<unknown>
+  onUniworkFirstSaveOpen(cb: (request: { path: string }) => void): () => void
 }
 
 /**
@@ -189,5 +193,90 @@ describe('the FD-11 folder bridge members (FD11-A-R1-03)', () => {
     off()
     push({}, { workspaceId: 'ws_2' })
     expect(seen).toEqual([{ workspaceId: 'ws_1' }])
+  })
+})
+
+describe('the SAVE-01 first-save bridge members (S01-R1-7)', () => {
+  it('invokes the first-save, ensure-my-folder and ack channels with their args', async () => {
+    const okReply = { ok: true, value: { id: 'doc_9' } }
+    const { bridge, invoked } = await loadBridge(okReply)
+    invoked.length = 0
+
+    expect(
+      await bridge.uniworkFirstSave({
+        tabPath: 'C:/tmp/Draft.docx',
+        title: 'Draft.docx',
+        workspaceId: 'ws_1',
+        target: { kind: 'my_folder' },
+      }),
+    ).toEqual(okReply)
+    expect(await bridge.uniworkEnsureMyFolder('ws_1')).toEqual(okReply)
+    await bridge.uniworkFirstSaveOpenAck('C:/tmp/Draft.docx')
+
+    expect(invoked).toEqual([
+      {
+        channel: UNIWORK_DOC_CHANNELS.firstSave,
+        args: [
+          {
+            tabPath: 'C:/tmp/Draft.docx',
+            title: 'Draft.docx',
+            workspaceId: 'ws_1',
+            target: { kind: 'my_folder' },
+          },
+        ],
+      },
+      { channel: UNIWORK_DOC_CHANNELS.ensureMyFolder, args: ['ws_1'] },
+      { channel: UNIWORK_DOC_CHANNELS.firstSaveOpenAck, args: ['C:/tmp/Draft.docx'] },
+    ])
+  })
+
+  it('delivers first-save-open pushes with a non-empty path and drops the rest', async () => {
+    const { bridge, handlers } = await loadBridge(undefined)
+    const seen: unknown[] = []
+    const off = bridge.onUniworkFirstSaveOpen((request) => seen.push(request))
+    const push = handlers.get(UNIWORK_DOC_CHANNELS.firstSaveOpen)!
+
+    push({}, null)
+    push({}, {})
+    push({}, { path: '' })
+    push({}, { path: 42 })
+    push({}, 'C:/tmp/Draft.docx')
+    push({}, { path: 'C:/tmp/Draft.docx', extra: 'ignored' })
+    expect(seen).toEqual([{ path: 'C:/tmp/Draft.docx' }])
+    // unsubscribing removes the listener itself: nothing remains to push to
+    off()
+    expect(handlers.get(UNIWORK_DOC_CHANNELS.firstSaveOpen)).toBeUndefined()
+  })
+
+  it('guards firstSave answers like every action reply', async () => {
+    // a reply of neither branch becomes malformed_response; the first-save
+    // error codes pass through verbatim for the dialog to key off
+    const bad = await loadBridge({ ok: 'yes' })
+    expect(
+      await bad.bridge.uniworkFirstSave({
+        tabPath: 'C:/tmp/D.docx',
+        title: 'D.docx',
+        workspaceId: 'ws_1',
+        target: { kind: 'my_folder' },
+      }),
+    ).toEqual({ ok: false, error: 'malformed_response' })
+
+    for (const error of [
+      'first_save_flush_failed',
+      'first_save_bind_failed',
+      'first_save_orphaned',
+      'invalid_destination',
+    ]) {
+      const denied = await loadBridge({ ok: false, error })
+      expect(await denied.bridge.uniworkEnsureMyFolder('ws_1')).toEqual({ ok: false, error })
+      expect(
+        await denied.bridge.uniworkFirstSave({
+          tabPath: 'C:/tmp/D.docx',
+          title: 'D.docx',
+          workspaceId: 'ws_1',
+          target: { kind: 'my_folder' },
+        }),
+      ).toEqual({ ok: false, error })
+    }
   })
 })
