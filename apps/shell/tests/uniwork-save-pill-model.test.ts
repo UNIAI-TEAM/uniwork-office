@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { UniworkDocErrorCode, UniworkDocStatus } from '../src/shared/home-api'
 import {
   FOCUS_TIP_MIN_PX,
+  UNIWORK_ERROR_KEYS,
   chipCopy,
   chipModelOf,
   focusTipRoomOf,
+  miniGlyphOf,
   type ChipModel,
 } from '../src/renderer/src/uniwork-docs-model'
 import { formatQueueTime } from '../src/renderer/src/queue-popover-model'
@@ -329,7 +331,7 @@ describe('T1: Save pill state table', () => {
           heldByMe: true,
         },
       },
-      label: 'uwChipEditLocked',
+      label: 'uwChipEditLockedSelf',
       tone: 'info',
       action: ['retry', 'uwActRetry'],
       tip: 'uwTipEditLockedSelf',
@@ -445,6 +447,34 @@ describe('T2: Save pill priority (the higher row wins)', () => {
       'uwChipReconciling',
     ],
     [
+      'EL-1(a) edit_locked beats remote-newer (the pill names the holder)',
+      {
+        state: 'edit_locked',
+        error: 'edit_locked',
+        editLock: {
+          holderName: 'Minh Trần',
+          since: '2026-05-01T10:00:00Z',
+          expiresAt: '2026-05-01T10:02:00Z',
+          heldByMe: false,
+        },
+        remote: newerDirty,
+      },
+      { state: 'dirty', remote: newerDirty },
+      'uwChipEditLocked',
+    ],
+    [
+      'EL-1(a) edit_locked beats paused_admin',
+      { state: 'edit_locked', error: 'edit_locked' },
+      { state: 'paused_admin' },
+      'uwChipEditLocked',
+    ],
+    [
+      'EL-1(a) edit_locked beats a save waiting for AI',
+      { state: 'edit_locked', error: 'edit_locked', saveWait: 'ai' },
+      { state: 'dirty', saveWait: 'ai' },
+      'uwChipEditLocked',
+    ],
+    [
       'reconciling-stuck beats remote-newer',
       { state: 'reconciling-stuck', remote: newerDirty },
       { state: 'dirty', remote: newerDirty },
@@ -534,6 +564,17 @@ describe('T2: Save pill priority (the higher row wins)', () => {
       { state: 'error', error: 'keystore_locked' },
       { state: 'error', error: 'store_full' },
       { state: 'conflict' },
+      // EL-1(a): a 423 lock names the holder instead of yielding to the newer-version bar
+      {
+        state: 'edit_locked',
+        error: 'edit_locked',
+        editLock: {
+          holderName: 'Minh Trần',
+          since: '2026-05-01T10:00:00Z',
+          expiresAt: '2026-05-01T10:02:00Z',
+          heldByMe: false,
+        },
+      },
       { state: 'reconciling-stuck' },
       { state: 'reconciling' },
     ]
@@ -668,9 +709,12 @@ describe('EL-1(a): edit_locked Save pill & i18n copy', () => {
   it('defines edit_locked i18n keys in all locale shards and never uses "khóa" in vi', () => {
     const keys = [
       'uwChipEditLocked',
+      'uwChipEditLockedSelf',
       'uwEditLockSomeone',
       'uwTipEditLocked',
       'uwTipEditLockedSelf',
+      'uwErrEditLocked',
+      'uwReasonEditLocked',
     ] as const
     for (const [locale, dict] of Object.entries(uniworkDocumentStrings)) {
       const record = dict as Record<string, string>
@@ -683,5 +727,120 @@ describe('EL-1(a): edit_locked Save pill & i18n copy', () => {
       expect(viDict[k]?.toLowerCase()).not.toContain('khóa')
       expect(viDict[k]?.toLowerCase()).not.toContain('khoá')
     }
+  })
+
+  it('EL1A-FE-1: every non-en shard translates the edit-lock keys, keeping {name}/{time}', () => {
+    // a documented exception list: a value that is genuinely identical to en in that language
+    const identical: Array<[string, string]> = []
+    const keys = [
+      'uwChipEditLocked',
+      'uwChipEditLockedSelf',
+      'uwEditLockSomeone',
+      'uwTipEditLocked',
+      'uwTipEditLockedSelf',
+      'uwErrEditLocked',
+      'uwReasonEditLocked',
+    ] as const
+    const en = uniworkDocumentStrings.en as Record<string, string>
+    for (const [locale, dict] of Object.entries(uniworkDocumentStrings)) {
+      if (locale === 'en') continue
+      const record = dict as Record<string, string>
+      for (const k of keys) {
+        if (identical.some(([l, key]) => l === locale && key === k)) continue
+        expect(record[k], `${locale}.${k} is an untranslated copy of en`).not.toBe(en[k])
+      }
+      // the placeholders the tip and the label fill must survive translation
+      expect(record.uwChipEditLocked, `${locale}.uwChipEditLocked`).toContain('{name}')
+      expect(record.uwTipEditLocked, `${locale}.uwTipEditLocked`).toContain('{name}')
+      expect(record.uwTipEditLocked, `${locale}.uwTipEditLocked`).toContain('{time}')
+      // the read-only sentence is gone (EL1A-TIP): the doc stays editable in EL-1(a)
+      expect(record.uwTipEditLocked, `${locale}.uwTipEditLocked`).not.toMatch(/read|chỉ đọc/i)
+    }
+  })
+
+  it('EL1A-FE-2: UNIWORK_ERROR_KEYS renders every value with no "{" left', () => {
+    // the launch notice and chipCopy's errorKey prefix call t(key) with NO params, so a key that
+    // needs one ({name}) would leak a raw placeholder; edit_locked maps to the param-free key
+    for (const [code, key] of Object.entries(UNIWORK_ERROR_KEYS)) {
+      expect(t(key as StringKey), `UNIWORK_ERROR_KEYS.${code} -> ${key}`).not.toMatch(/\{|\}/)
+    }
+    expect(UNIWORK_ERROR_KEYS.edit_locked).toBe('uwErrEditLocked')
+    expect(t('uwErrEditLocked')).toBe('Someone else is editing this document.')
+  })
+
+  it('EL1A-FE-7: the tip names the holder (the time is filled from lock.since)', () => {
+    const named = chip({
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock: {
+        holderName: 'Minh Trần',
+        since: '2026-05-01T10:00:00Z',
+        expiresAt: '2026-05-01T10:02:00Z',
+        heldByMe: false,
+      },
+    })
+    // a `t` that leaves missing params alone: dropping tipParams.name would leave a "{name}" hole
+    const strict: TFunc = (key: StringKey, params) => {
+      const text = copy[key] ?? key
+      return params === undefined
+        ? text
+        : text.replace(/\{(\w+)\}/g, (match, name: string) =>
+            Object.hasOwn(params, name) ? String(params[name]) : match,
+          )
+    }
+    const tip = chipCopy(named, strict, 'en-US').tip
+    expect(tip).toContain('Minh Trần has been editing since')
+    expect(tip).not.toMatch(/\{|\}/)
+    expect(chipCopy(named, strict, 'en-US').title).toContain('Minh Trần')
+  })
+
+  it('EL1A-FE-3: heldByMe reads as the self label and the self tip, Retry kept', () => {
+    const self = chip({
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock: {
+        holderName: 'Minh Trần',
+        since: '2026-05-01T10:00:00Z',
+        expiresAt: '2026-05-01T10:02:00Z',
+        heldByMe: true,
+      },
+    })
+    expect(self.labelKey).toBe('uwChipEditLockedSelf')
+    expect(self.tipKey).toBe('uwTipEditLockedSelf')
+    expect(self.action).toEqual({ kind: 'retry', labelKey: 'uwActRetry' })
+    const copySelf = chipCopy(self, t, 'en-US')
+    expect(copySelf.label).toBe('Editing in another window')
+    expect(copySelf.label).not.toContain('Minh Trần')
+    expect(copySelf.tip).toBe('You’re editing this document in another window.')
+
+    const copyViSelf = chipCopy(self, tVi, 'vi-VN')
+    expect(copyViSelf.label).toBe('Đang sửa ở cửa sổ khác')
+    expect(copyViSelf.label).not.toContain('Minh Trần')
+    expect(copyViSelf.tip).toBe('Bạn đang sửa tài liệu này ở cửa sổ khác.')
+
+    const other = chip({
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock: {
+        holderName: 'Minh Trần',
+        since: '2026-05-01T10:00:00Z',
+        expiresAt: '2026-05-01T10:02:00Z',
+        heldByMe: false,
+      },
+    })
+    expect(other.labelKey).toBe('uwChipEditLocked')
+    expect(other.tipKey).toBe('uwTipEditLocked')
+    expect(chipCopy(other, t, 'en-US').label).toBe('Minh Trần is editing')
+  })
+
+  it('EL1A-FE-6: the mini pill wears the ring, never the queued clock or the view-only lock', () => {
+    const locked = chip({
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock: { holderName: 'Minh Trần', since: null, expiresAt: null, heldByMe: false },
+    })
+    expect(miniGlyphOf(locked, 'edit_locked')).toBe('ring')
+    expect(miniGlyphOf(chip({ state: 'queued' }), 'queued')).toBe('clock')
+    expect(miniGlyphOf(chip({ access: 'view', state: 'saved' }), 'saved')).toBe('lock')
   })
 })

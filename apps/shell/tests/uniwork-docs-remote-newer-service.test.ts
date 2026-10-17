@@ -732,6 +732,38 @@ describe('G5-03a S6 service: hold, later and the persisted rebuild', () => {
     expect((await h2.service.docStatus(docPath()))?.remote).toBeUndefined()
   })
 
+  it('EL1A-BE-1: an edit_locked copy never rebuilds a newer-* bar from a revision it carries', async () => {
+    // the pair a 423 would have left behind (holder head 10 > base 9) must not
+    // become an S6 bar while the copy is still edit_locked: the pill names the holder
+    seedCopy({
+      state: 'edit_locked',
+      error: 'edit_locked',
+      serverRevision: '10',
+      serverVersion: 4,
+      editLock: {
+        holderName: 'Minh Trần',
+        since: '2026-04-17T03:00:00Z',
+        expiresAt: '2026-04-17T03:02:00Z',
+        heldByMe: false,
+      },
+    })
+    const h = setup()
+    const status = await h.service.docStatus(docPath())
+    expect(status?.remote).toBeUndefined()
+    expect(status).toMatchObject({ state: 'edit_locked', error: 'edit_locked' })
+  })
+
+  it('EL1A-BE-1: a feed notice does not raise a newer bar over an edit_locked copy', async () => {
+    seedCopy({ state: 'edit_locked', error: 'edit_locked' })
+    const h = setup()
+    notice(h, '10', 4)
+    await drain()
+    // the copy is locked by someone else: the notice never rebuilds a bar or reloads
+    expect(await barOf(h)).toBeUndefined()
+    expect(h.client.calls.download).toBe(0)
+    expect(bindingOf()).toMatchObject({ state: 'edit_locked' })
+  })
+
   it('close hides the info bar for this session', async () => {
     seedCopy()
     const h = setup()

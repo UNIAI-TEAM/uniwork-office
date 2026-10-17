@@ -1322,6 +1322,55 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(await storedIntent(ctx, path)).toBeNull()
   })
 
+  it('EL1A-BE-4: a queue-settled save drops the editLock the 423 left on the binding', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    await ctx.service.save(path)
+    await vi.waitFor(async () =>
+      expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' }),
+    )
+    const doneKey = commits(server)[0]!.headers['idempotency-key']!
+    await seed(ctx, 'committing', path, doneKey)
+    // a 423 left the holder on the binding; the queue-settled commit clears it
+    const lock = {
+      holderName: 'Minh Trần',
+      since: '2026-04-17T03:00:00Z',
+      expiresAt: '2026-04-17T03:02:00Z',
+      heldByMe: false,
+    }
+    const file = join(dirname(path), BINDING_FILE)
+    writeFileSync(
+      file,
+      `${JSON.stringify({ ...binding(path), state: 'edit_locked', error: 'edit_locked', editLock: lock })}\n`,
+    )
+    await ctx.service.pollSaveQueue()
+    // the record publish is fire-and-forget: the settle's binding write lands a beat later
+    await vi.waitFor(() => expect(binding(path).state).toBe('saved'))
+    const after = binding(path)
+    expect(after).not.toHaveProperty('editLock')
+    expect(after).not.toHaveProperty('error')
+    expect(await storedIntent(ctx, path)).toBeNull()
+  })
+
+  it('EL1A-BE-4: a cancelled save drops the editLock too', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    // the commit is refused by someone else's lock: the binding parks edit_locked
+    server.faults.push({ route: 'commit', kind: 423, code: 'document_locked' })
+    await ctx.service.save(path)
+    expect(binding(path)).toMatchObject({ state: 'edit_locked', error: 'edit_locked' })
+    expect(binding(path)).toHaveProperty('editLock')
+    await ctx.service.cancelSave(path)
+    const after = binding(path)
+    expect(after.state).toBe('dirty')
+    expect(after).not.toHaveProperty('error')
+    expect(after).not.toHaveProperty('editLock')
+  })
+
   it('G506-be-4: teardownSaveQueue awaits the in-flight poll and nothing lands after it resolves', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)

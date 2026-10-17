@@ -567,9 +567,11 @@ describe('uniwork save queue machine', () => {
   })
 
   it('EL-1(a): 423 edit_locked → failed (lastError edit_locked, no retryAt, never queued or reconciling)', () => {
-    for (const state of ['uploading', 'committing'] as const) {
+    // EL1A-BE-5: reconciling is the weakest case - the FAILED_CODES check runs BEFORE the
+    // lost-response branch, so a 423 from a reconcile parks failed and never reconciles again
+    for (const state of ['uploading', 'committing', 'reconciling'] as const) {
       const out = transition(
-        record({ state, retryAt: iso(NOW + 5_000) }),
+        record({ state, retryAt: iso(NOW + 5_000), reconcileSince: iso(NOW - 1_000) }),
         { type: 'commitFailed', error: 'edit_locked' },
         ctx({ online: true }),
       )
@@ -579,6 +581,7 @@ describe('uniwork save queue machine', () => {
       expect(out.record?.state).not.toBe('reconciling')
       expect(out.record?.lastError).toBe('edit_locked')
       expect(out.record?.retryAt).toBeUndefined()
+      expect(out.record?.reconcileSince).toBeUndefined()
       expect(out.effects).toEqual([])
     }
   })

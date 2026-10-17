@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { UniworkDocStatus } from '../src/shared/home-api'
 import type { Binding, BoundDocument } from '../src/main/uniwork-docs/binding-store'
 import { SaveCoordinator, toStatus } from '../src/main/uniwork-docs/save-coordinator'
+import { queueBindingPatch } from '../src/main/uniwork-docs/service'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { sha256Hex } from '../src/main/uniwork-docs/formats'
 import type { CommitLookup } from '../src/main/uniwork-docs/parse'
@@ -1720,5 +1721,89 @@ describe('EL-1(a): 423 document_locked -> edit_locked state, recovery preserved,
     expect(h.statuses.at(-1)?.state).toBe('saved')
     expect(h.statuses.at(-1)?.editLock).toBeUndefined()
     expect(await stored(h.intents, doc)).toBeNull()
+  })
+
+  it('EL1A-BE-1: the 423’s current_revision never lands on binding.serverRevision', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    h.server.state.commitError = new UniworkDocError('edit_locked', {
+      status: 423,
+      serverCode: 'document_locked',
+      holderId: 'usr_minh',
+      editLock: lockPayload,
+      currentRevision: '77',
+    })
+
+    const ended = await h.coordinator.save(doc.path, { userSave: true })
+    expect(ended?.binding.state).toBe('edit_locked')
+    // the holder's head is not this copy's base: a feed notice that later fills
+    // serverVersion must not rebuild an S6 newer-dirty bar while edit_locked
+    expect(ended?.binding.serverRevision).toBeUndefined()
+    expect(ended?.binding.serverVersion).toBeUndefined()
+    expect(h.statuses.at(-1)).not.toHaveProperty('serverRevision')
+    expect(h.statuses.at(-1)?.editLock).toEqual(lockPayload)
+  })
+})
+
+describe('EL1A-BE-2 / EL1A-BE-5: queueBindingPatch (the record -> binding projection)', () => {
+  const failedRecord = (over: Partial<IntentRecordV2> = {}): IntentRecordV2 => ({
+    v: 2,
+    intentId: 'intent_1',
+    idempotencyKey: 'key_1',
+    documentId: 'd_1',
+    orgId: 'org_1',
+    workspaceId: 'ws_1',
+    baseRevision: '41',
+    baseVersion: 3,
+    checksum: 'a'.repeat(64),
+    length: 2048,
+    generation: 1,
+    state: 'failed',
+    attempt: 1,
+    createdAt: '2026-10-13T00:00:00.000Z',
+    updatedAt: '2026-10-13T00:00:00.000Z',
+    ...over,
+  })
+  const bindingWith = (editLock?: Binding['editLock']): Binding =>
+    ({ state: 'edit_locked', ...(editLock ? { editLock } : {}) }) as unknown as Binding
+
+  it('a parked edit_locked record keeps the holder the binding already carries', () => {
+    const editLock = {
+      holderName: 'Minh Trần',
+      since: '2026-04-17T03:00:00Z',
+      expiresAt: '2026-04-17T03:02:00Z',
+      heldByMe: false,
+    }
+    const patch = queueBindingPatch(
+      failedRecord({ lastError: 'edit_locked' }),
+      bindingWith(editLock),
+    )
+    expect(patch).toMatchObject({ state: 'edit_locked', error: 'edit_locked' })
+    expect(patch?.editLock).toEqual(editLock)
+  })
+
+  it('a parked edit_locked record with no holder on the binding adds none (never a bogus one)', () => {
+    const patch = queueBindingPatch(failedRecord({ lastError: 'edit_locked' }), bindingWith())
+    expect(patch).toMatchObject({ state: 'edit_locked', error: 'edit_locked' })
+    expect(patch).not.toHaveProperty('editLock')
+  })
+
+  it('a failed too_large record still writes maxBytes/sizeBytes (the else branch is untouched)', () => {
+    const patch = queueBindingPatch(failedRecord({ lastError: 'too_large', maxBytes: 5_000 }))
+    expect(patch).toMatchObject({
+      state: 'failed',
+      error: 'too_large',
+      maxBytes: 5_000,
+      sizeBytes: 2048,
+    })
+  })
+
+  it('a queued record drops a stale refusal code and holder; a committed record moves nothing', () => {
+    const patch = queueBindingPatch(failedRecord({ state: 'queued' }))
+    expect(patch).toMatchObject({ state: 'queued' })
+    expect(patch?.error).toBeUndefined()
+    expect(patch?.editLock).toBeUndefined()
+    expect(queueBindingPatch(failedRecord({ state: 'committed' }))).toBeNull()
+    expect(queueBindingPatch(failedRecord({ state: 'cancelled' }))).toBeNull()
   })
 })

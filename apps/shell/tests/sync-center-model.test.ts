@@ -228,6 +228,27 @@ describe('queue rows (badge, sub-line, actions)', () => {
     expect(rowView(row('failed'), ctx).sub.keyParams).toEqual({ reason: 'uwReasonOther' })
   })
 
+  it('EL1A-FE-5: a failed save refused by someone else’s edit lock names that reason, not uwReasonOther', () => {
+    // the queue parked the intent `failed` with lastError edit_locked (a 423 document_locked):
+    // the row must say "someone else is editing" instead of the generic "unavailable"
+    const v = rowView(row('failed', { failedReason: 'edit_locked' }), ctx)
+    expect(v.badge).toEqual({ tone: 'error', key: 'uwBadgeFailed' })
+    expect(v.sub).toMatchObject({
+      key: 'uwRowFailed',
+      keyParams: { reason: 'uwReasonEditLocked' },
+    })
+    expect(v.sub.keyParams?.reason).not.toBe('uwReasonOther')
+    expect(v.actions.map((a) => a.id)).toEqual(['details', 'saveAgain', 'cancelSave'])
+    // never the conflict affordance, and never "khóa" in the vi fragment
+    expect(v.actions.map((a) => a.id)).not.toContain('openToResolve')
+    for (const lang of ['vi', 'en'] as const) {
+      const fragment = table(lang)[v.sub.keyParams!.reason as string]
+      expect(fragment, `${lang}.uwReasonEditLocked`).toBeTruthy()
+    }
+    expect(table('vi').uwReasonEditLocked?.toLowerCase()).not.toContain('khóa')
+    expect(table('vi').uwReasonEditLocked?.toLowerCase()).not.toContain('khoá')
+  })
+
   it('committed / moved / archived: Mở', () => {
     const c = rowView(row('committed', { committedVersion: 12 }), ctx)
     expect(c.badge).toEqual({ tone: 'ok', key: 'uwBadgeSaved' })
