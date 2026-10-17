@@ -76,6 +76,7 @@ export const th = {
   uwConflictReloadTitle: 'โหลดเวอร์ชันล่าสุดใหม่',
   uwConflictReloadGo: 'โหลดใหม่',
   uwConflictSaveCopy: 'บันทึกเป็นสำเนา…',
+  uwConflictSaveCopyName: '{name} (สำเนา)',
   uwConflictSaveCopyTitle: 'บันทึกเป็นสำเนาหรือไม่',
   uwConflictSaveCopyConfirm:
     'UniWork จะสร้างเอกสารใหม่จากเวอร์ชันของคุณ โดยมีเจ้าของและสิทธิ์เข้าถึงเหมือนเอกสารนี้ เอกสารปัจจุบันและเวอร์ชัน {server} ของ {author} ยังคงเดิม',

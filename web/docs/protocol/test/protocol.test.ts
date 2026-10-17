@@ -99,6 +99,7 @@ describe('handshake', () => {
       capabilities: {
         save: true,
         saveAs: true,
+        saveCopy: false,
         recents: false,
         filePick: false,
         print: false, // granted by host, not supported by frame

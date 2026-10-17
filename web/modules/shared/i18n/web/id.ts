@@ -81,6 +81,7 @@ export const id = {
   uwConflictReloadTitle: 'Muat ulang versi terbaru',
   uwConflictReloadGo: 'Muat ulang',
   uwConflictSaveCopy: 'Simpan sebagai salinan…',
+  uwConflictSaveCopyName: '{name} (salinan)',
   uwConflictSaveCopyTitle: 'Simpan sebagai salinan?',
   uwConflictSaveCopyConfirm:
     'UniWork akan membuat dokumen baru dari versi Anda, dengan pemilik dan akses yang sama seperti dokumen ini. Dokumen saat ini dan versi {server} oleh {author} tetap seperti semula.',

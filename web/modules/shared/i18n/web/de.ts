@@ -86,6 +86,7 @@ export const de = {
   uwConflictReloadTitle: 'Neueste Version laden',
   uwConflictReloadGo: 'Neu laden',
   uwConflictSaveCopy: 'Als Kopie speichern…',
+  uwConflictSaveCopyName: '{name} (Kopie)',
   uwConflictSaveCopyTitle: 'Als Kopie speichern?',
   uwConflictSaveCopyConfirm:
     'UniWork erstellt aus Ihrer Version ein neues Dokument mit demselben Eigentümer und denselben Zugriffsrechten wie dieses Dokument. Das aktuelle Dokument und Version {server} von {author} bleiben unverändert.',

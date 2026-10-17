@@ -83,6 +83,7 @@ export const ru = {
   uwConflictReloadTitle: 'Загрузить последнюю версию',
   uwConflictReloadGo: 'Перезагрузить',
   uwConflictSaveCopy: 'Сохранить как копию…',
+  uwConflictSaveCopyName: '{name} (копия)',
   uwConflictSaveCopyTitle: 'Сохранить как копию?',
   uwConflictSaveCopyConfirm:
     'UniWork создаст новый документ из вашей версии с тем же владельцем и доступом, что и у этого документа. Текущий документ и версия {server} от {author} останутся без изменений.',

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DocsProtocolError,
+  FRAME_REQUEST_TYPES,
   PROTOCOL_NS,
   PROTOCOL_VERSION,
   errorFromHttpStatus,
@@ -398,5 +399,25 @@ describe('document size limits and events (SIZE-F1, additive)', () => {
     expect(err.code).toBe('too_large')
     expect(err.status).toBe(413)
     expect(err.details).toEqual({ code: 'payload_too_large', max_bytes: 52_428_800 })
+  })
+
+  it('validates api.saveCopy request and response payloads and saveCopy capability (UNI-1872)', () => {
+    expect(CAPABILITY_KEYS).toContain('saveCopy')
+    expect(FRAME_REQUEST_TYPES).toContain('api.saveCopy')
+    const req = (payload: unknown) =>
+      parseEnvelope(env({ kind: 'request', type: 'api.saveCopy', payload }))
+    const res = (payload: unknown) =>
+      parseEnvelope(env({ kind: 'response', type: 'api.saveCopy', payload }))
+
+    expect(req({ data: new ArrayBuffer(8), name: 'Report (copy)' }).ok).toBe(true)
+    expect(req({ data: new Uint8Array([1, 2, 3]).buffer, name: 'Báo cáo (bản sao)' }).ok).toBe(true)
+    expect(req({ data: new ArrayBuffer(8), name: '' }).ok).toBe(false)
+    expect(req({ data: 'not-bytes', name: 'Report (copy)' }).ok).toBe(false)
+    expect(req(null).ok).toBe(false)
+
+    expect(res({ documentId: 'doc-copy-1', title: 'Report (copy)' }).ok).toBe(true)
+    expect(res({ documentId: '', title: 'Report (copy)' }).ok).toBe(false)
+    expect(res({ documentId: 'doc-copy-1', title: '' }).ok).toBe(false)
+    expect(res({ documentId: 'doc-copy-1' }).ok).toBe(false)
   })
 })

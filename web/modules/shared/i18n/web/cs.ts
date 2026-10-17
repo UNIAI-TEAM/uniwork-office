@@ -81,6 +81,7 @@ export const cs = {
   uwConflictReloadTitle: 'Načíst nejnovější',
   uwConflictReloadGo: 'Znovu načíst',
   uwConflictSaveCopy: 'Uložit jako kopii…',
+  uwConflictSaveCopyName: '{name} (kopie)',
   uwConflictSaveCopyTitle: 'Uložit jako kopii?',
   uwConflictSaveCopyConfirm:
     'UniWork vytvoří z vaší verze nový dokument se stejným vlastníkem a přístupem jako tento dokument. Aktuální dokument a verze {server} od {author} zůstanou beze změny.',

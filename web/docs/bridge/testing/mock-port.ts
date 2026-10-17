@@ -32,8 +32,12 @@ interface StoredFile {
   bytes: Uint8Array
 }
 
-export function protocolError(code: ProtocolErrorCode, message: string = code): DocsProtocolError {
-  return new DocsProtocolError({ code, message })
+export function protocolError(
+  code: ProtocolErrorCode,
+  message: string = code,
+  opts?: { retryable?: boolean; status?: number; details?: Record<string, unknown> },
+): DocsProtocolError {
+  return new DocsProtocolError({ code, message, ...opts })
 }
 
 /** a request that never answers until `timeoutMs`, then rejects like the client does */
@@ -106,6 +110,10 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     'api.saveAs': ({ name, data }) => {
       const meta = put(name, new Uint8Array(data))
       return { ok: true, file: meta, versionId: meta.versionId }
+    },
+    'api.saveCopy': ({ name, data }) => {
+      const meta = put(name, new Uint8Array(data))
+      return { documentId: meta.fileId, title: meta.name }
     },
     'api.recents': ({ limit }) => ({
       files: [...store.values()]
@@ -213,9 +221,9 @@ export function createMockPort(session: Partial<PortSession> = {}) {
       return api['api.open']({ fileId })
     },
     /** host event file.renamed */
-    rename(fileId: string, name: string) {
+    rename(fileId: string, name: string, extra?: Partial<FileMeta>) {
       const f = store.get(fileId)!
-      f.meta = { ...f.meta, name }
+      f.meta = { ...f.meta, ...extra, name }
       for (const l of renameListeners) l({ ...f.meta })
     },
     /** host event `doc.remoteVersion` (a newer version was saved elsewhere) */
