@@ -701,3 +701,60 @@ describe('My Folder ensure and the create destination (SAVE-01)', () => {
     expect([...form.keys()]).toEqual(['destination', 'title', 'file'])
   })
 })
+
+// SAVE-01 / MYFOLDER-01: `destination` never leaves the copy route (D's
+// validateDocumentDestination exists only on the create routes - /copies
+// refuses it), and createFolder stays parent_id-only.
+describe('SAVE-01 destination exclusions', () => {
+  it('copyDocument sends consent + parent_id only, never destination', async () => {
+    const seen: { url: string; body: unknown }[] = []
+    const fetch = vi.fn<FetchLike>(async (url, init) => {
+      seen.push({ url, body: JSON.parse(String(init.body)) })
+      return json(200, {
+        document: {
+          id: 'doc_copy',
+          kind: 'file',
+          title: 'x',
+          workspace_id: WS,
+          revision: '2',
+          file: { filename: 'x.docx', version: 1 },
+        },
+      })
+    })
+    const api = client(fetch)
+    await api.copyDocument({
+      documentId: DOC,
+      title: 'x',
+      parentId: 'fold_1',
+      idempotencyKey: 'k',
+    })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]!.url).toContain(`/api/v1/documents/${DOC}/copies`)
+    expect(seen[0]!.body).toEqual({ consent: 'copy', title: 'x', parent_id: 'fold_1' })
+  })
+
+  it('copyDocument without a parent sends no parent_id and no destination', async () => {
+    const seen: { body: unknown }[] = []
+    const fetch = vi.fn<FetchLike>(async (_url, init) => {
+      seen.push({ body: JSON.parse(String(init.body)) })
+      return json(200, {
+        document: {
+          id: 'doc_copy',
+          kind: 'file',
+          title: 'x',
+          workspace_id: WS,
+          revision: '2',
+          file: { filename: 'x.docx', version: 1 },
+        },
+      })
+    })
+    const api = client(fetch)
+    await api.copyDocument({
+      documentId: DOC,
+      title: 'x',
+      parentId: null,
+      idempotencyKey: 'k',
+    })
+    expect(seen[0]!.body).toEqual({ consent: 'copy', title: 'x' })
+  })
+})
