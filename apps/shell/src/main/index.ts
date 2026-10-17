@@ -121,6 +121,7 @@ import {
   watchCommentAuthorChanges,
 } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
+import { saveTabToUniWork } from './uniwork-docs/first-save-open'
 import { mergeEditorStates, startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
@@ -3883,29 +3884,12 @@ async function openOfficeBridgeUrl(raw: string): Promise<boolean> {
   return openUniWorkUrl(raw)
 }
 
-async function saveActiveTabToUniWork(): Promise<boolean> {
-  const filePath = tabManager?.activeFilePath()
-  if (!filePath) {
-    showAppWarning(tm('uwSaveFailed'))
-    return false
-  }
-  // a bound UniWork working copy saves through its module hook (the usual
-  // Ctrl+S path: write to disk, then the save queue uploads + commits)
-  if (uniworkDocs?.service.isBound(filePath)) {
-    requestUniworkModuleSave(filePath)
-    return true
-  }
-  // SAVE-01: an unbound tab asks the renderer for a name and a destination
-  // (default My Folder); the dialog answers through uniwork-doc:first-save
-  if (!liveBridgeSessionForPath(filePath)) {
-    const shellWc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
-    if (!shellWc) {
-      showAppWarning(tm('uwSaveFailed'))
-      return false
-    }
-    shellWc.send(UNIWORK_DOC_CHANNELS.firstSaveOpen, { path: filePath })
-    return true
-  }
+/**
+ * The office-bridge session's own save path: the module flushes, then the
+ * bridge host saves the path. Unchanged behaviour; the routing decision that
+ * calls it lives in uniwork-docs/first-save-open (saveTabToUniWork, S01-R1-6).
+ */
+async function saveViaOfficeBridge(filePath: string): Promise<boolean> {
   const wc =
     tabManager?.activePdfTab()?.webContents ??
     tabManager?.activeMarkdownTab()?.webContents ??
@@ -3928,6 +3912,19 @@ async function saveActiveTabToUniWork(): Promise<boolean> {
     await new Promise((r) => setTimeout(r, 400))
   }
   return saveActivePathToUniWork(filePath, officeBridgeDeps())
+}
+
+async function saveActiveTabToUniWork(): Promise<boolean> {
+  return saveTabToUniWork({
+    activeFilePath: () => tabManager?.activeFilePath(),
+    isBound: (path) => uniworkDocs?.service.isBound(path) === true,
+    requestModuleSave: (path) => requestUniworkModuleSave(path),
+    liveBridgeSession: (path) => liveBridgeSessionForPath(path) !== undefined,
+    shellContents: () =>
+      shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null,
+    warn: () => showAppWarning(tm('uwSaveFailed')),
+    saveViaBridge: (path) => saveViaOfficeBridge(path),
+  })
 }
 
 ;(globalThis as { __uniworkSaveToOffice?: () => Promise<boolean> }).__uniworkSaveToOffice =

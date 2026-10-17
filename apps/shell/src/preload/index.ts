@@ -1243,6 +1243,11 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.firstSave, input),
     )
   },
+  // SAVE-01 r2 (S01-R1-6): the SaveDialog tells main it opened, releasing the
+  // pending File > Save answer; a missing path names nothing to release
+  uniworkFirstSaveOpenAck(path: string) {
+    return ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.firstSaveOpenAck, path)
+  },
   async uniworkEnsureMyFolder(workspaceId: string) {
     return asUniworkResult<UniworkDocSummary>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.ensureMyFolder, workspaceId),

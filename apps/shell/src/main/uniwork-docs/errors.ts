@@ -21,6 +21,13 @@ export class UniworkDocError extends Error {
    * is always the app constant 20 (matching the server's `maxDocumentDepth`).
    */
   readonly maxDepth?: number
+  /**
+   * SAVE-01 r2 (S01-R1-2): on a first-save failure AFTER the create landed,
+   * the server document that exists, so the action result can name it for the
+   * user (archived to the trash, or orphaned when the archive failed too).
+   */
+  readonly documentId?: string
+  readonly documentTitle?: string
 
   constructor(
     code: UniworkDocErrorCode,
@@ -30,6 +37,8 @@ export class UniworkDocError extends Error {
       currentRevision?: string
       retryAfterMs?: number
       maxDepth?: number
+      documentId?: string
+      documentTitle?: string
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -40,6 +49,8 @@ export class UniworkDocError extends Error {
     this.currentRevision = extra.currentRevision
     this.retryAfterMs = extra.retryAfterMs
     this.maxDepth = extra.maxDepth
+    this.documentId = extra.documentId
+    this.documentTitle = extra.documentTitle
   }
 }
 

@@ -1,4 +1,5 @@
 import type {
+  UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkDocNewFormat,
   UniworkDocSummary,
@@ -272,6 +273,21 @@ export function uniworkId(value: string): string {
   return encodeURIComponent(value)
 }
 const id = uniworkId
+/**
+ * SAVE-01 r2 (S01-R1-5): a `parent_id` that reaches the wire. Absent/null is
+ * the caller's "no folder" (the field is then omitted - the absence IS the
+ * root); a non-empty string passes through. An EMPTY or blank string is a
+ * malformed target: refused `invalid_destination`, never silently omitted -
+ * omitting it would create the document at the workspace root instead of the
+ * intended destination.
+ */
+function parentOf(parentId: string | null | undefined): string | null {
+  if (parentId === undefined || parentId === null) return null
+  if (typeof parentId !== 'string' || !parentId.trim()) {
+    throw new UniworkDocError('invalid_destination' as UniworkDocErrorCode)
+  }
+  return parentId
+}
 
 /** a refused redirect surfaces as a fetch TypeError whose cause names it */
 function isRedirectRefusal(error: unknown): boolean {
@@ -596,8 +612,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         json: {
           kind: 'folder',
           title: input.title,
-          // the root is the field's absence, never an empty string
-          ...(input.parentId ? { parent_id: id(input.parentId) } : {}),
+          // the root is the field's absence, never an empty string; an
+          // empty/blank parent_id is refused outright (S01-R1-5)
+          ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,
@@ -648,9 +665,10 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         json: {
           format: input.format,
           title: input.title,
-          ...(input.parentId ? { parent_id: input.parentId } : {}),
-          // MYFOLDER-01: mutually exclusive with parent_id (the input type
-          // cannot carry both); absent = the workspace root
+          // MYFOLDER-01: mutually exclusive with destination (the input type
+          // cannot carry both); an empty/blank parent_id is refused outright,
+          // never silently demoted to a root create (S01-R1-5)
+          ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
           ...(input.destination ? { destination: input.destination } : {}),
         },
         idempotencyKey: input.idempotencyKey,
@@ -664,7 +682,8 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const form = new FormData()
       // the text fields precede the file part: the server streams the file part
       // and a title that trails it would fall back to the file name
-      if (input.parentId) form.set('parent_id', input.parentId)
+      const parent = parentOf(input.parentId)
+      if (parent) form.set('parent_id', parent)
       // MYFOLDER-01: `destination` is a form field too, exclusive with
       // parent_id (the input type cannot carry both)
       if (input.destination) form.set('destination', input.destination)
@@ -705,7 +724,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         json: {
           consent: 'copy',
           title: input.title,
-          ...(input.parentId ? { parent_id: input.parentId } : {}),
+          ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,

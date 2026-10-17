@@ -77,6 +77,7 @@ import {
 import { UPLOAD_EXTENSIONS } from './formats'
 import { tUniworkDocs } from './strings'
 import { createTreeChangedCoalescer } from './tree-changed'
+import { registerFirstSaveOpenAck } from './first-save-open'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
 import { clipboard } from 'electron'
@@ -864,6 +865,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.firstSave, (_event, input: unknown) =>
     service.firstSave((input ?? {}) as UniworkFirstSaveInput),
   )
+  // SAVE-01 r2 (S01-R1-6): the renderer's "dialog is open" ack that releases a
+  // File > Save's pending firstSaveOpen; a stale or foreign ack is a no-op
+  registerFirstSaveOpenAck(ipcMain)
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
   )

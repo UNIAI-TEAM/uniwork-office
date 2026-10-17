@@ -393,6 +393,12 @@ export type UniworkDocNameError = 'name_empty' | 'name_too_long' | 'folder_name_
  * MYFOLDER-01 / SAVE-01: `my_folder_locked` (409, error_class "conflict") and
  * `invalid_destination` (400) arrive on the error's `serverCode` and join here
  * for the same reason - the renderer shows them verbatim, keyed by code.
+ * SAVE-01 r2: `first_save_flush_failed` = the editor could not be written to
+ * disk (refused or timed out), so nothing was created. `first_save_bind_failed`
+ * = the document was created but the local bind failed; the created document
+ * was archived to the trash (restorable). `first_save_orphaned` = the create
+ * landed and the compensating archive failed too; both carry `documentId` /
+ * `documentTitle` so the dialog can tell the person where the document is.
  */
 export type UniworkDocActionError =
   | UniworkDocErrorCode
@@ -401,6 +407,9 @@ export type UniworkDocActionError =
   | 'upload_cancelled'
   | 'my_folder_locked'
   | 'invalid_destination'
+  | 'first_save_flush_failed'
+  | 'first_save_bind_failed'
+  | 'first_save_orphaned'
 export type UniworkDocActionResult<T> =
   | { ok: true; value: T }
   | {
@@ -413,6 +422,13 @@ export type UniworkDocActionResult<T> =
        * `maxDocumentDepth`). Absent for every other failure.
        */
       max?: number
+      /**
+       * SAVE-01 r2 (S01-R1-2): on `first_save_bind_failed` /
+       * `first_save_orphaned` the document that was created, so the dialog can
+       * name it (trash, or the folder it landed in). Absent everywhere else.
+       */
+      documentId?: string
+      documentTitle?: string
     }
 
 /** the formats the New document dialog offers (D accepts more; these three are the Office ones) */
@@ -1136,6 +1152,12 @@ export interface HomeApi {
    * My Folder (or the picked folder) and bind the tab to it in one call.
    */
   uniworkFirstSave(input: UniworkFirstSaveInput): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /**
+   * SAVE-01 r2 (S01-R1-6): acknowledge a firstSaveOpen push the moment the
+   * SaveDialog opens. Without it File > Save on an unbound tab cannot tell a
+   * live dialog from a dead renderer and would warn every time.
+   */
+  uniworkFirstSaveOpenAck(path: string): Promise<void>
   /** MYFOLDER-01 (Q3): ensure the caller's personal My Folder (dialog open) */
   uniworkEnsureMyFolder(workspaceId: string): Promise<UniworkResult<UniworkDocSummary>>
   /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
@@ -1744,6 +1766,12 @@ export const UNIWORK_DOC_CHANNELS = {
    * UniworkDocActionResult<UniworkDocSummary>
    */
   firstSave: 'uniwork-doc:first-save',
+  /**
+   * SAVE-01 r2 (S01-R1-6): invoke(path) — the renderer acknowledges it opened
+   * the SaveDialog for a firstSaveOpen push. No ack within main's window means
+   * no dialog is up and File > Save warns instead of reporting a phantom save.
+   */
+  firstSaveOpenAck: 'uniwork-doc:first-save-open-ack',
   /** MYFOLDER-01 (Q3): invoke(workspaceId) -> the ensured My Folder row (DocumentSDO) */
   ensureMyFolder: 'uniwork-doc:ensure-my-folder',
   /** invoke(sessionId, action) -> UniworkConflictReply (G5-09) */
