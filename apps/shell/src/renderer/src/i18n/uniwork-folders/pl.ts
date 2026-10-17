@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const pl = {
   ufRoot: 'UniWork',
+  ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Foldery',
   ufContentsLabel: 'Zawartość folderu',
   ufRecent: 'Ostatnie',
@@ -51,4 +52,6 @@ export const pl = {
   ufDisabledDeep: 'Za głęboko',
   ufTreeError: 'Nie udało się wczytać folderów.',
   ufActionsFor: 'Działania dla {name}',
+  ufAreaLabel: 'Obszar',
+  ufNoDeviceFolders: 'Brak folderów na tym urządzeniu.',
 } satisfies Record<keyof typeof zh, string>

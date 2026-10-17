@@ -24,6 +24,16 @@
   background: var(--surface);
 }
 
+.uwf-browser.has-sidebar-host {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.uwf-browser.uwf-pane.has-main-override {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .uwf-side {
   display: flex;
   flex-direction: column;
@@ -184,24 +194,29 @@
   padding: 2px 0;
 }
 
-/* the row "…" sits at the end of a tree or contents row; shown on hover / focus / open */
-.uwf-menu {
+/* the row "…" sits at the end of a tree or contents row; shown on hover / keyboard focus / open (V2-2, FE13-R1-2, V13-6) */
+.uw-row-menu.uwf-menu {
   position: absolute;
-  top: 50%;
+  top: 0;
+  right: auto;
+  bottom: 0;
   inset-inline-end: 4px;
-  transform: translateY(-50%);
+  width: 28px;
+  transform: none;
 }
 
-.uwf-tree-row .uw-row-menu-btn,
-.uwf-contents .uwf-menu .uw-row-menu-btn {
+.uwf-tree .uwf-tree-row .uw-row-menu.uwf-menu .uw-row-menu-btn,
+.uwf-contents .uw-pick-item .uw-row-menu.uwf-menu .uw-row-menu-btn {
   opacity: 0;
 }
 
-.uwf-tree-row:hover .uw-row-menu-btn,
-.uwf-tree-row:focus-within .uw-row-menu-btn,
-.uwf-contents .uw-pick-item:hover .uw-row-menu-btn,
-.uwf-contents .uw-pick-item:focus-within .uw-row-menu-btn,
-.uwf-menu .uw-row-menu-btn.on {
+.uwf-tree .uwf-tree-row:hover .uw-row-menu.uwf-menu .uw-row-menu-btn,
+.uwf-tree .uwf-tree-row:focus-visible .uw-row-menu.uwf-menu .uw-row-menu-btn,
+.uwf-tree .uwf-tree-row:has(:focus-visible) .uw-row-menu.uwf-menu .uw-row-menu-btn,
+.uwf-contents .uw-pick-item:hover .uw-row-menu.uwf-menu .uw-row-menu-btn,
+.uwf-contents .uw-pick-item:has(:focus-visible) .uw-row-menu.uwf-menu .uw-row-menu-btn,
+.uwf-tree .uwf-tree-row .uw-row-menu.uwf-menu .uw-row-menu-btn.on,
+.uwf-contents .uw-pick-item .uw-row-menu.uwf-menu .uw-row-menu-btn.on {
   opacity: 1;
 }
 
@@ -332,8 +347,11 @@
   min-width: 0;
 }
 
-.uwf-crumb .uwf-menu {
-  position: static;
+.uwf-crumb .uw-row-menu.uwf-menu {
+  position: relative;
+  inset-inline-end: auto;
+  width: 28px;
+  height: 28px;
   transform: none;
 }
 
@@ -505,8 +523,8 @@
     min-height: 44px;
   }
 
-  .uwf-tree-row .uw-row-menu-btn,
-  .uwf-contents .uwf-menu .uw-row-menu-btn {
+  .uwf-tree .uwf-tree-row .uw-row-menu.uwf-menu .uw-row-menu-btn,
+  .uwf-contents .uw-pick-item .uw-row-menu.uwf-menu .uw-row-menu-btn {
     opacity: 1;
   }
 }

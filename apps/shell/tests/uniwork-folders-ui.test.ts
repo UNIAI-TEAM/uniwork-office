@@ -1034,4 +1034,622 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     expect(rule('.uwf-row')).toMatch(/user-select:\s*none/)
     expect(rule('.uwf-list .uw-pick-state')).toMatch(/user-select:\s*none/)
   })
+
+  it('FE-R3-1: keeps a Load more page that finishes while a soft re-read is still running (folder contents and search)', async () => {
+    let releaseSoftPage2: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    let holdNextPage2 = false
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (q.cursor === 'c2') {
+        if (holdNextPage2) {
+          holdNextPage2 = false
+          return new Promise((resolve) => {
+            releaseSoftPage2 = resolve
+          })
+        }
+        return ok({ items: [entry('d2', 'Second.docx')], nextCursor: 'c3' })
+      }
+      return ok({ items: [entry('d1', 'First.docx')], nextCursor: 'c2' })
+    })
+    await render()
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(optionTitles()).toEqual(['First.docx', 'Second.docx'])
+
+    // Start an in-flight Load more for page 3 ('c3') mocked once, and start a soft refresh whose page-2 re-read stays in flight
+    let releaseLoadMore3: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkListChildren.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseLoadMore3 = resolve
+        }),
+    )
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    holdNextPage2 = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+
+    // Load more finishes WHILE the soft re-read is still running on page 2
+    await act(async () =>
+      releaseLoadMore3(ok({ items: [entry('d3', 'Third.docx')], nextCursor: null })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['First.docx', 'Second.docx', 'Third.docx'])
+
+    // Now the soft re-read's page 2 finishes; page 3 from Load more must be kept
+    await act(async () =>
+      releaseSoftPage2(ok({ items: [entry('d2', 'Second.docx')], nextCursor: 'c3' })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['First.docx', 'Second.docx', 'Third.docx'])
+    expect($('.uw-pick-more')).toBeNull()
+
+    // Same for search: Load more results finishing during a soft search re-read is kept
+    let releaseSoftSearchPage2: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    let holdNextSearchPage2 = false
+    api.uniworkSearchDocuments.mockImplementation(async (q: UniworkSearchQuery) => {
+      if (q.cursor === 'sc2') {
+        if (holdNextSearchPage2) {
+          holdNextSearchPage2 = false
+          return new Promise((resolve) => {
+            releaseSoftSearchPage2 = resolve
+          })
+        }
+        return ok({ items: [entry('s2', 'HitTwo.docx')], nextCursor: 'sc3' })
+      }
+      return ok({ items: [entry('s1', 'HitOne.docx')], nextCursor: 'sc2' })
+    })
+    await type($<HTMLInputElement>('.uwf-own-search')!, 'Hit')
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(optionTitles()).toEqual(['HitOne.docx', 'HitTwo.docx'])
+
+    let releaseSearchMore3: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkSearchDocuments.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseSearchMore3 = resolve
+        }),
+    )
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    holdNextSearchPage2 = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+
+    await act(async () =>
+      releaseSearchMore3(ok({ items: [entry('s3', 'HitThree.docx')], nextCursor: null })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['HitOne.docx', 'HitTwo.docx', 'HitThree.docx'])
+
+    await act(async () =>
+      releaseSoftSearchPage2(ok({ items: [entry('s2', 'HitTwo.docx')], nextCursor: 'sc3' })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['HitOne.docx', 'HitTwo.docx', 'HitThree.docx'])
+    expect($('.uw-pick-more')).toBeNull()
+  })
+
+  it('FE-R3-2: generates unique hidden-formats hint ids via useId() when multiple browsers mount', async () => {
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(UniworkLiveHost),
+          createElement(UniworkBrowser, {
+            workspaceId: 'w1',
+            variant: 'pane',
+            onOpenDocument: onOpen,
+          }),
+          createElement(UniworkBrowser, {
+            workspaceId: 'w1',
+            variant: 'dialog',
+            onOpenDocument: onOpen,
+          }),
+        ),
+      )
+    })
+    await flush()
+    const hints = $$('.uwf-hidden')
+    expect(hints.length).toBe(2)
+    expect(hints[0]!.id).toBeTruthy()
+    expect(hints[1]!.id).toBeTruthy()
+    expect(hints[0]!.id).not.toBe(hints[1]!.id)
+    const listboxes = $$('[role="listbox"]')
+    expect(listboxes[0]!.getAttribute('aria-describedby')).toBe(hints[0]!.id)
+    expect(listboxes[1]!.getAttribute('aria-describedby')).toBe(hints[1]!.id)
+  })
+
+  it('V2-2, FE13-R1-2, FE13-R2-6, V13-6: row menu is opacity 0 on fine pointer without hover/focus and on mouse-focused rows, and opacity 1 on keyboard focus (:focus-visible) and @media (pointer: coarse) in real bundle order', async () => {
+    const foldersCss = readFileSync(
+      join(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
+      'utf8',
+    )
+    const homeCss = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const bundleCss = `${foldersCss}\n${homeCss.replace(/@position-try[^{]*\{[^}]*\}/g, '')}`
+
+    await render()
+    // Ensure nothing is hovered or focused while an active contents row is selected
+    const alphaRow = treeItem('Alpha')
+    await act(async () => (document.activeElement as HTMLElement | null)?.blur())
+    const activeOption = $<HTMLElement>('.uwf-contents .uw-pick-row.active')!
+    const activeItem = activeOption.closest<HTMLElement>('.uw-pick-item')!
+    expect(activeOption).toBeTruthy()
+    expect(activeItem).toBeTruthy()
+
+    const treeMenuWrap = alphaRow.querySelector<HTMLElement>('.uw-row-menu.uwf-menu')!
+    const treeMenuBtn = alphaRow.querySelector<HTMLElement>('.uw-row-menu-btn')!
+    const rowMenuWrap = $<HTMLElement>('.uwf-contents .uw-pick-item .uw-row-menu.uwf-menu')!
+    const rowMenuBtn = $<HTMLElement>('.uwf-contents .uw-pick-item .uw-row-menu-btn')!
+
+    const docSym = Object.getOwnPropertySymbols(document)[0]
+    expect(docSym).toBeDefined()
+    const docImpl = (
+      document as unknown as Record<
+        symbol,
+        {
+          _domSelector: {
+            clear: () => void
+            check: (sel: string, el: unknown, opt?: unknown) => { match: boolean; ast: unknown }
+          }
+          _styleCache: WeakMap<object, unknown>
+        }
+      >
+    )[docSym!]
+    expect(typeof docImpl?._domSelector?.check).toBe('function')
+    const origCheck = docImpl._domSelector.check
+    const astBySel = new Map<string, unknown>()
+    let patchInvocations = 0
+    docImpl._domSelector.check = (sel, el, opt) => {
+      patchInvocations++
+      const res = origCheck(sel, el, opt)
+      if (res.match) {
+        if (!astBySel.has(sel)) {
+          astBySel.set(sel, origCheck(`${sel} `, el, opt).ast)
+        }
+        return { ...res, ast: astBySel.get(sel) }
+      }
+      return res
+    }
+    const computedOpacity = (el: HTMLElement) => {
+      docImpl._domSelector.clear()
+      docImpl._styleCache = new WeakMap()
+      return window.getComputedStyle(el).getPropertyValue('opacity').trim()
+    }
+
+    const focusWithKeyboard = async (el: HTMLElement) => {
+      await act(async () => {
+        ;(document.activeElement as HTMLElement | null)?.blur()
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+        el.focus()
+      })
+    }
+
+    const focusWithMouseAndLeave = async (el: HTMLElement) => {
+      await act(async () => {
+        ;(document.activeElement as HTMLElement | null)?.blur()
+        el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, buttons: 1 }))
+        el.focus()
+        el.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))
+      })
+    }
+
+    const styleEl = document.createElement('style')
+    styleEl.textContent = bundleCss
+    document.head.appendChild(styleEl)
+    try {
+      // (a) Fine pointer + no hover/focus -> opacity 0 and transform none (even on .uw-pick-row.active)
+      expect(window.getComputedStyle(treeMenuWrap).getPropertyValue('transform').trim()).toBe(
+        'none',
+      )
+      expect(window.getComputedStyle(rowMenuWrap).getPropertyValue('transform').trim()).toBe('none')
+      expect(computedOpacity(treeMenuBtn)).toBe('0')
+      expect(computedOpacity(rowMenuBtn)).toBe('0')
+
+      // FE13-R2-6 sanity check: patched selector matcher actually ran and populated specificity ASTs
+      expect(patchInvocations).toBeGreaterThan(0)
+      expect(astBySel.size).toBeGreaterThan(0)
+
+      // (b) V13-6: keyboard-focused row (:focus-visible) -> opacity 1 on tree row and contents row
+      await focusWithKeyboard(alphaRow)
+      expect(alphaRow.matches(':focus-visible')).toBe(true)
+      expect(computedOpacity(treeMenuBtn)).toBe('1')
+      expect(computedOpacity(rowMenuBtn)).toBe('0')
+
+      await focusWithKeyboard(activeOption)
+      expect(activeOption.matches(':focus-visible')).toBe(true)
+      expect(activeItem.matches(':has(:focus-visible)')).toBe(true)
+      expect(computedOpacity(treeMenuBtn)).toBe('0')
+      expect(computedOpacity(rowMenuBtn)).toBe('1')
+
+      // (c) V13-6: mouse-focused row with nothing hovered (:focus / :focus-within true, :focus-visible false) -> opacity 0
+      await focusWithMouseAndLeave(alphaRow)
+      expect(alphaRow.matches(':focus')).toBe(true)
+      expect(alphaRow.matches(':focus-within')).toBe(true)
+      expect(alphaRow.matches(':focus-visible')).toBe(false)
+      expect(alphaRow.matches(':hover')).toBe(false)
+      expect(computedOpacity(treeMenuBtn)).toBe('0')
+      expect(computedOpacity(rowMenuBtn)).toBe('0')
+
+      await focusWithMouseAndLeave(activeOption)
+      expect(activeOption.matches(':focus')).toBe(true)
+      expect(activeItem.matches(':focus-within')).toBe(true)
+      expect(activeOption.matches(':focus-visible')).toBe(false)
+      expect(activeItem.matches(':has(:focus-visible)')).toBe(false)
+      expect(activeItem.matches(':hover')).toBe(false)
+      expect(computedOpacity(treeMenuBtn)).toBe('0')
+      expect(computedOpacity(rowMenuBtn)).toBe('0')
+
+      // (d) @media (pointer: coarse) in real bundle order -> opacity 1 even without hover/focus
+      await act(async () => (document.activeElement as HTMLElement | null)?.blur())
+      const coarseBundleCss = bundleCss.replace(
+        /@media\s*\(pointer:\s*coarse\)\s*\{([\s\S]*?)\n\}/g,
+        '$1',
+      )
+      // FE13-R2-6 sanity check: coarse media query regex actually stripped @media (pointer: coarse)
+      expect(coarseBundleCss).not.toBe(bundleCss)
+      expect(coarseBundleCss).not.toContain('@media (pointer: coarse)')
+      styleEl.textContent = coarseBundleCss
+      expect(computedOpacity(treeMenuBtn)).toBe('1')
+      expect(computedOpacity(rowMenuBtn)).toBe('1')
+    } finally {
+      docImpl._domSelector.check = origCheck
+      styleEl.remove()
+    }
+  })
+
+  it('FE R1-9: switching workspaceId resets open folder to initialFolderId and drops in-flight replies from the previous workspace', async () => {
+    await render({ workspaceId: 'w1' })
+    await click(treeItem('Alpha'))
+    expect($('.uwf-crumb-current')?.textContent).toBe('Alpha')
+
+    // Start a slow folder read in w1 before switching to w2
+    let releaseStaleW1: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkListChildren.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseStaleW1 = resolve
+        }),
+    )
+    await click(treeItem('Beta'))
+
+    // Switch workspace to w2
+    children[''] = [entry('w2-doc', 'WorkspaceTwo.docx', { workspaceId: 'w2' })]
+    await render({ workspaceId: 'w2' })
+    expect($('.uwf-crumb-current')?.textContent).toBe('UniWork')
+    expect(optionTitles()).toEqual(['WorkspaceTwo.docx'])
+
+    // Late w1 reply resolves and must be ignored
+    await act(async () =>
+      releaseStaleW1(ok({ items: [entry('stale', 'StaleW1.docx')], nextCursor: null })),
+    )
+    await flush()
+    expect($('.uwf-crumb-current')?.textContent).toBe('UniWork')
+    expect(optionTitles()).toEqual(['WorkspaceTwo.docx'])
+  })
+
+  it('FE13-R1-7: Load more from C1 overlapping a soft re-read that reaches C1-prime (or errors / ends early) neither duplicates, skips, nor loses rows and keeps the newest cursor', async () => {
+    // 1. Folder contents: page 1 initially returns [d1, d2] with nextCursor 'c1'
+    let serverShifted = false
+    let releaseLoadMoreC1: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    let releaseSoftC1Prime: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (!q.cursor) {
+        if (!serverShifted) {
+          return ok({
+            items: [entry('d1', 'Doc1.docx'), entry('d2', 'Doc2.docx')],
+            nextCursor: 'c1',
+          })
+        }
+        return ok({
+          items: [entry('d0', 'Doc0.docx'), entry('d1', 'Doc1.docx')],
+          nextCursor: 'c1-prime',
+        })
+      }
+      if (q.cursor === 'c1') {
+        return new Promise((resolve) => {
+          releaseLoadMoreC1 = resolve
+        })
+      }
+      if (q.cursor === 'c1-prime') {
+        return new Promise((resolve) => {
+          releaseSoftC1Prime = resolve
+        })
+      }
+      if (q.cursor === 'c2-prime') {
+        return ok({ items: [entry('d4', 'Doc4.docx')], nextCursor: null })
+      }
+      return ok({ items: [], nextCursor: null })
+    })
+
+    await render()
+    expect(optionTitles()).toEqual(['Doc1.docx', 'Doc2.docx'])
+
+    // Start Load more from cursor 'c1', then trigger a soft re-read where page 1 shifts to 'c1-prime'
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    serverShifted = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+
+    // Stale 'c1' resolves (would have skipped d2 and used stale cursor 'c2-stale')
+    await act(async () =>
+      releaseLoadMoreC1(ok({ items: [entry('d3', 'Doc3.docx')], nextCursor: 'c2-stale' })),
+    )
+    await flush()
+
+    // Soft re-read continues from 'c1-prime' and resolves with [d2, d3] and newest cursor 'c2-prime'
+    await act(async () =>
+      releaseSoftC1Prime(
+        ok({
+          items: [entry('d2', 'Doc2.docx'), entry('d3', 'Doc3.docx')],
+          nextCursor: 'c2-prime',
+        }),
+      ),
+    )
+    await flush()
+
+    expect(optionTitles()).toEqual(['Doc0.docx', 'Doc1.docx', 'Doc2.docx', 'Doc3.docx'])
+    // Clicking Load more must use newest cursor 'c2-prime', not 'c2-stale'
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(api.uniworkListChildren).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: 'c2-prime' }),
+    )
+    expect(optionTitles()).toEqual([
+      'Doc0.docx',
+      'Doc1.docx',
+      'Doc2.docx',
+      'Doc3.docx',
+      'Doc4.docx',
+    ])
+
+    // 2. Soft chain errors on page 2: keeps fresh page 1 + nextCursor + moreError without re-merging stale rows (FE13-R2-8)
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (!q.cursor) {
+        return ok({
+          items: [entry('d0', 'Doc0.docx'), entry('d1', 'Doc1.docx')],
+          nextCursor: 'c1-prime',
+        })
+      }
+      return { ok: false, error: 'network' }
+    })
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    expect(optionTitles()).toEqual(['Doc0.docx', 'Doc1.docx'])
+    expect($('.uw-pick-more-error')).not.toBeNull()
+    expect($('.uw-pick-more')).not.toBeNull()
+
+    // 3. Soft chain ends early (nextCursor: null) while Load more from C1 is still in flight:
+    // late C1 resolution must not append stale items or resurrect Load more
+    let releaseLateC1: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    let shrinkToOnePage = false
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (!q.cursor) {
+        if (shrinkToOnePage) {
+          return ok({ items: [entry('d1', 'Doc1.docx')], nextCursor: null })
+        }
+        return ok({ items: [entry('d1', 'Doc1.docx')], nextCursor: 'c-early' })
+      }
+      if (q.cursor === 'c-early') {
+        return new Promise((resolve) => {
+          releaseLateC1 = resolve
+        })
+      }
+      return ok({ items: [], nextCursor: null })
+    })
+    await click(treeItem('Alpha'))
+    expect(optionTitles()).toEqual(['Doc1.docx'])
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    shrinkToOnePage = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    expect($('.uw-pick-more')).toBeNull()
+
+    await act(async () =>
+      releaseLateC1(ok({ items: [entry('d-stale', 'Doc9.docx')], nextCursor: 'c-stale' })),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['Doc1.docx'])
+    expect($('.uw-pick-more')).toBeNull()
+
+    // 4. Search results: Load more from 'sc1' overlapping a soft search re-read reaching 'sc1-prime'
+    let searchShifted = false
+    let releaseSearchC1: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkSearchDocuments.mockImplementation(async (q: UniworkSearchQuery) => {
+      if (!q.cursor) {
+        if (!searchShifted) {
+          return ok({
+            items: [entry('s1', 'Hit1.docx'), entry('s2', 'Hit2.docx')],
+            nextCursor: 'sc1',
+          })
+        }
+        return ok({
+          items: [entry('s0', 'Hit0.docx'), entry('s1', 'Hit1.docx')],
+          nextCursor: 'sc1-prime',
+        })
+      }
+      if (q.cursor === 'sc1') {
+        return new Promise((resolve) => {
+          releaseSearchC1 = resolve
+        })
+      }
+      if (q.cursor === 'sc1-prime') {
+        return ok({
+          items: [entry('s2', 'Hit2.docx'), entry('s3', 'Hit3.docx')],
+          nextCursor: 'sc2-prime',
+        })
+      }
+      if (q.cursor === 'sc2-prime') {
+        return ok({ items: [entry('s4', 'Hit4.docx')], nextCursor: null })
+      }
+      return ok({ items: [], nextCursor: null })
+    })
+
+    await type($<HTMLInputElement>('.uwf-own-search')!, 'Hit')
+    expect(optionTitles()).toEqual(['Hit1.docx', 'Hit2.docx'])
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    searchShifted = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+
+    await act(async () =>
+      releaseSearchC1(ok({ items: [entry('s3', 'Hit3.docx')], nextCursor: 'sc2-stale' })),
+    )
+    await flush()
+
+    expect(optionTitles()).toEqual(['Hit0.docx', 'Hit1.docx', 'Hit2.docx', 'Hit3.docx'])
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(api.uniworkSearchDocuments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: 'sc2-prime' }),
+    )
+    expect(optionTitles()).toEqual([
+      'Hit0.docx',
+      'Hit1.docx',
+      'Hit2.docx',
+      'Hit3.docx',
+      'Hit4.docx',
+    ])
+  })
+
+  it('FE13-R2-8: deferred-promise cases for (1) moreError mid soft chain, (2) rejected loadMore promise, and (3) clearing search query while results Load more is in flight', async () => {
+    // (1a) Contents moreError mid soft chain: deleted page-1 row and stale page-2 row are NOT re-merged
+    let deletedD1 = false
+    let releaseSoftPage2Err: (v: UniworkResult<UniworkFolderChildren>) => void = () => undefined
+    api.uniworkListChildren.mockImplementation(async (q: UniworkFolderQuery) => {
+      if (!q.cursor) {
+        if (!deletedD1) {
+          return ok({
+            items: [entry('d1', 'DeletedOnServer.docx'), entry('d2', 'KeptOnServer.docx')],
+            nextCursor: 'c2',
+          })
+        }
+        return ok({
+          items: [entry('d2', 'KeptOnServer.docx')],
+          nextCursor: 'c2',
+        })
+      }
+      if (q.cursor === 'c2') {
+        if (!deletedD1) {
+          return ok({ items: [entry('d3', 'Page2Row.docx')], nextCursor: null })
+        }
+        return new Promise((resolve) => {
+          releaseSoftPage2Err = resolve
+        })
+      }
+      return ok({ items: [], nextCursor: null })
+    })
+
+    await render()
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(optionTitles()).toEqual(['DeletedOnServer.docx', 'KeptOnServer.docx', 'Page2Row.docx'])
+
+    deletedD1 = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    await act(async () => releaseSoftPage2Err({ ok: false, error: 'network' }))
+    await flush()
+
+    expect(optionTitles()).toEqual(['KeptOnServer.docx'])
+    expect($('.uw-pick-more-error')).not.toBeNull()
+    expect($('.uw-pick-more')).not.toBeNull()
+
+    // (2a) Rejected readContents promise in loadMore resets loadingMore
+    let rejectContentsMore: (err: Error) => void = () => undefined
+    api.uniworkListChildren.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectContentsMore = reject
+        }),
+    )
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect($<HTMLButtonElement>('.uw-pick-more')?.disabled).toBe(true)
+
+    await act(async () => rejectContentsMore(new Error('ipc rejected')))
+    await flush()
+    expect($<HTMLButtonElement>('.uw-pick-more')?.disabled).toBe(false)
+    expect($('.uw-pick-more-error')).not.toBeNull()
+
+    // (1b) Search results moreError mid soft chain: deleted page-1 hit and stale page-2 hit are NOT re-merged
+    let deletedS1 = false
+    let releaseSoftSearchPage2Err: (v: UniworkResult<UniworkFolderChildren>) => void = () =>
+      undefined
+    api.uniworkSearchDocuments.mockImplementation(async (q: UniworkSearchQuery) => {
+      if (!q.cursor) {
+        if (!deletedS1) {
+          return ok({
+            items: [entry('s1', 'DeletedHit.docx'), entry('s2', 'KeptHit.docx')],
+            nextCursor: 'sc2',
+          })
+        }
+        return ok({
+          items: [entry('s2', 'KeptHit.docx')],
+          nextCursor: 'sc2',
+        })
+      }
+      if (q.cursor === 'sc2') {
+        if (!deletedS1) {
+          return ok({ items: [entry('s3', 'Page2Hit.docx')], nextCursor: null })
+        }
+        return new Promise((resolve) => {
+          releaseSoftSearchPage2Err = resolve
+        })
+      }
+      return ok({ items: [], nextCursor: null })
+    })
+
+    const searchInput = $<HTMLInputElement>('.uwf-own-search')!
+    await type(searchInput, 'Hit')
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect(optionTitles()).toEqual(['DeletedHit.docx', 'KeptHit.docx', 'Page2Hit.docx'])
+
+    deletedS1 = true
+    await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
+    await flush()
+    await act(async () => releaseSoftSearchPage2Err({ ok: false, error: 'network' }))
+    await flush()
+
+    expect(optionTitles()).toEqual(['KeptHit.docx'])
+    expect($('.uw-pick-more-error')).not.toBeNull()
+    expect($('.uw-pick-more')).not.toBeNull()
+
+    // (2b) Rejected searchDocuments promise in loadMoreResults resets loadingMore
+    let rejectSearchMore: (err: Error) => void = () => undefined
+    api.uniworkSearchDocuments.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectSearchMore = reject
+        }),
+    )
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect($<HTMLButtonElement>('.uw-pick-more')?.disabled).toBe(true)
+
+    await act(async () => rejectSearchMore(new Error('search ipc rejected')))
+    await flush()
+    expect($<HTMLButtonElement>('.uw-pick-more')?.disabled).toBe(false)
+    expect($('.uw-pick-more-error')).not.toBeNull()
+
+    // (3) Clearing the search query while a results Load more is in flight does not append the old page
+    let releaseInFlightSearchMore: (v: UniworkResult<UniworkFolderChildren>) => void = () =>
+      undefined
+    api.uniworkSearchDocuments.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseInFlightSearchMore = resolve
+        }),
+    )
+    await click($<HTMLButtonElement>('.uw-pick-more'))
+    expect($<HTMLButtonElement>('.uw-pick-more')?.disabled).toBe(true)
+
+    // Clear search query while Load more is in flight
+    await type(searchInput, '')
+    expect(optionTitles()).toEqual(['KeptOnServer.docx'])
+
+    // Late search Load more resolves -> must be dropped and never appended
+    await act(async () =>
+      releaseInFlightSearchMore(
+        ok({ items: [entry('s-late', 'LateSearchMore.docx')], nextCursor: null }),
+      ),
+    )
+    await flush()
+    expect(optionTitles()).toEqual(['KeptOnServer.docx'])
+    expect(host.textContent).not.toContain('LateSearchMore.docx')
+  })
 })

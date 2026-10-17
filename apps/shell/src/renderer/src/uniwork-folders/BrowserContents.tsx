@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { UniworkDocSummary } from '../../../shared/home-api'
 import { FileBadge } from '../FileBadge'
@@ -29,6 +29,7 @@ export function BrowserContents({
   list,
   rows,
   hiddenCount,
+  hiddenHintId,
   emptyText,
   search,
   openingId,
@@ -41,6 +42,7 @@ export function BrowserContents({
   list: ListState
   rows: UniworkDocSummary[]
   hiddenCount: number
+  hiddenHintId?: string
   emptyText: string
   /** search hits: show each row's path */
   search: boolean
@@ -52,6 +54,8 @@ export function BrowserContents({
   onRetry: () => void
 }) {
   const { t, dateLocale } = useI18n()
+  const ownHiddenId = useId()
+  const resolvedHiddenId = hiddenHintId ?? ownHiddenId
   const [activeId, setActiveId] = useState<string | null>(null)
   const [menuId, setMenuId] = useState<string | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -128,7 +132,7 @@ export function BrowserContents({
 
   const hiddenLine =
     hiddenCount > 0 ? (
-      <p className="uwf-hidden" id={BROWSER_HIDDEN_HINT_ID} role="status">
+      <p className="uwf-hidden" id={resolvedHiddenId} role="status">
         {t('uwPickHiddenFormats', { count: hiddenCount })}
       </p>
     ) : null
@@ -169,7 +173,7 @@ export function BrowserContents({
         className="uw-pick-list uwf-contents"
         role="listbox"
         aria-label={t('ufContentsLabel')}
-        aria-describedby={hiddenCount > 0 ? BROWSER_HIDDEN_HINT_ID : undefined}
+        aria-describedby={hiddenCount > 0 ? resolvedHiddenId : undefined}
         ref={listRef}
       >
         {rows.map((doc) => {

@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const th = {
   ufRoot: 'UniWork',
+  ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'โฟลเดอร์',
   ufContentsLabel: 'เนื้อหาโฟลเดอร์',
   ufRecent: 'ล่าสุด',
@@ -50,4 +51,6 @@ export const th = {
   ufDisabledDeep: 'ลึกเกินไป',
   ufTreeError: 'โหลดโฟลเดอร์ไม่ได้',
   ufActionsFor: 'การทำงานสำหรับ {name}',
+  ufAreaLabel: 'พื้นที่',
+  ufNoDeviceFolders: 'ยังไม่มีโฟลเดอร์ในเครื่องนี้',
 } satisfies Record<keyof typeof zh, string>
