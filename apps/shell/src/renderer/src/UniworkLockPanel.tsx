@@ -11,6 +11,7 @@ import type { UniworkDocLock } from '../../shared/home-api'
 import { useI18n } from './locale'
 import { pathKey } from './uniwork-docs-model'
 import { lockCopyOf, mergeLocks, shownLock, withoutLock } from './uniwork-lock-model'
+import { openSyncCenter } from './offline-library-model'
 
 type LockApi = Pick<
   Window['aiOffice'],
@@ -186,6 +187,8 @@ export function UniworkLockPanel({
   onDismiss,
   onRetry,
   onSignIn,
+  onSwitchAccount,
+  onOpenSyncCenter,
   retrying = false,
 }: {
   lock: UniworkDocLock
@@ -193,6 +196,10 @@ export function UniworkLockPanel({
   onDismiss: (path: string) => void
   onRetry?: () => void
   onSignIn?: () => void
+  /** "Chuyển tài khoản" (foreign_account) */
+  onSwitchAccount?: () => void
+  /** "Mở trung tâm đồng bộ" (lease_expired while offline_library is off) */
+  onOpenSyncCenter?: () => void
   /** the retry is in flight: its button is aria-disabled, not disabled (focus stays on it) and ignores activation */
   retrying?: boolean
 }) {
@@ -229,6 +236,11 @@ export function UniworkLockPanel({
               if (!retrying) onRetry?.()
             } else if (copy.action === 'sign-in') {
               onSignIn?.()
+            } else if (copy.action === 'switch-account' || copy.action === 'sync-center') {
+              // Home behind the panel is inert: the panel closes first, then Settings opens
+              onDismiss(lock.path)
+              if (copy.action === 'switch-account') onSwitchAccount?.()
+              else onOpenSyncCenter?.()
             } else {
               onDismiss(lock.path)
             }
@@ -284,6 +296,12 @@ export function UniworkLockHost({
   const signIn = useCallback(() => {
     void window.aiOffice.accountLogin?.()
   }, [])
+  const switchAccount = useCallback(() => {
+    window.dispatchEvent(
+      new CustomEvent('uniwork:open-settings', { detail: { section: 'account' } }),
+    )
+  }, [])
+  const openCenter = useCallback(() => openSyncCenter(), [])
   const shownKey = lock ? pathKey(lock.path) : null
   const titleRef = useRef<HTMLHeadingElement>(null)
   const regionRef = useRef<HTMLDivElement>(null)
@@ -368,6 +386,8 @@ export function UniworkLockHost({
           onDismiss={dismiss}
           onRetry={retry}
           onSignIn={signIn}
+          onSwitchAccount={switchAccount}
+          onOpenSyncCenter={openCenter}
           retrying={retrying}
         />
       )}
