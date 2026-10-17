@@ -111,10 +111,11 @@ describe('header status priority (Đầu trang S2)', () => {
 })
 
 describe('tabs', () => {
-  it('lists attention, pending, recent in order with their empty lines', () => {
+  it('lists attention, pending, offline, recent in order with their empty lines', () => {
     expect(SYNC_TABS.map((tab) => [tab.id, tab.labelKey, tab.emptyKey])).toEqual([
       ['attention', 'uwSyncTabAttention', 'uwSyncEmptyAttention'],
       ['pending', 'uwSyncTabQueue', 'uwSyncEmptyQueue'],
+      ['offline', 'uwSyncTabOffline', 'uwOfflineEmpty'],
       ['recent', 'uwSyncTabRecent', 'uwSyncEmptyRecent'],
     ])
   })

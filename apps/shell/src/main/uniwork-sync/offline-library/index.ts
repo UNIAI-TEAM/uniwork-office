@@ -8,3 +8,7 @@ export * from './record'
 export * from './store'
 export * from './downloader'
 export * from './manager'
+// G5-05u (UNI-1360): the renderer's projection and the sync center's half
+export * from './view'
+export * from './copies'
+export * from './menu'

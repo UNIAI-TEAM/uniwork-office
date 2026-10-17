@@ -10,6 +10,7 @@ import {
   type SyncCenterHeaderStatus,
   type SyncCenterRow,
   type SyncCenterSignedOutSummary,
+  type SyncCenterRowTabId,
   type SyncCenterTabId,
 } from '../../shared/sync-center'
 import type { StringKey } from './locale'
@@ -484,18 +485,33 @@ export function headerLine(
 }
 
 export interface SyncTabDef {
+  /** G5-05u: the offline (S3) tab carries its own rows (`snapshot.offline`), not `snapshot.tabs` */
   id: SyncCenterTabId
   labelKey: StringKey
   emptyKey: StringKey
 }
 
-/** Sync tab order. G5-05u inserts the "Dùng khi không có mạng" (S3) tab between pending and recent. */
+/** Sync tab order: attention, pending, the "Dùng khi không có mạng" (S3) tab (G5-05u), recent. */
 export const SYNC_TABS: readonly SyncTabDef[] = [
   { id: 'attention', labelKey: 'uwSyncTabAttention', emptyKey: 'uwSyncEmptyAttention' },
   { id: 'pending', labelKey: 'uwSyncTabQueue', emptyKey: 'uwSyncEmptyQueue' },
-  // G5-05u: { id: 'offline', labelKey: 'uwSyncTabOffline', ... }
+  { id: 'offline', labelKey: 'uwSyncTabOffline', emptyKey: 'uwOfflineEmpty' },
   { id: 'recent', labelKey: 'uwSyncTabRecent', emptyKey: 'uwSyncEmptyRecent' },
 ]
+
+/**
+ * The tabs in the tablist. The S3 tab shows while `offline.visible` (the
+ * capability is on, or copies are kept: OQ-UX11); signed out it is the only
+ * one (its count is the number of kept items, never a name).
+ */
+export function syncTabsOf(offlineVisible: boolean, signedOut = false): readonly SyncTabDef[] {
+  if (signedOut) return offlineVisible ? SYNC_TABS.filter((d) => d.id === 'offline') : []
+  return offlineVisible ? SYNC_TABS : SYNC_TABS.filter((d) => d.id !== 'offline')
+}
+
+export function isRowTab(id: SyncCenterTabId): id is SyncCenterRowTabId {
+  return id !== 'offline'
+}
 
 /** kept drafts per document (OQ-UX2, U-15): the `{cap}` of `uwConflictDraftCapReached` */
 export const DRAFT_CAP = 3

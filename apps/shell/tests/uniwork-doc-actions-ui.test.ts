@@ -202,19 +202,22 @@ afterEach(() => {
 
 describe('S18 model', () => {
   it('gives a view-only row no actions, an edit row rename, a manage row archive', () => {
+    // G5-05u: `offline` (the pin/unpin item) is null unless the caller passes the library's state
     expect(rowActionsOf(row('a', 'A', { canEdit: false, canManage: false }))).toEqual({
       rename: false,
       archive: false,
       restore: false,
+      offline: null,
     })
     expect(hasRowActions(row('a', 'A'))).toBe(false) // no flags (older main): nothing offered
     expect(rowActionsOf(row('a', 'A', { canEdit: true }))).toEqual({
       rename: true,
       archive: false,
       restore: false,
+      offline: null,
     })
     expect(rowActionsOf(row('a', 'A', { canEdit: true, canManage: true, archived: true }))).toEqual(
-      { rename: false, archive: false, restore: true },
+      { rename: false, archive: false, restore: true, offline: null },
     )
   })
 

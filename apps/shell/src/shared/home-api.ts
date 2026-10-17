@@ -603,8 +603,28 @@ export interface UniworkQueuePopoverRequest {
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
 
-/** why a working copy was refused before anything opened (S11 lock panel) */
-export type UniworkLockReason = 'store_newer' | 'keystore_locked' | 'signed_out'
+/**
+ * Why a working copy was refused before anything opened, or why an offline copy
+ * could not be opened (S11 lock panel). The reasons are the "Lý do bị chặn"
+ * table of EXPERIENCE.md; G5-05u widened them from the original three.
+ * `keyring_unavailable` is deliberately absent: a machine without a usable OS
+ * keystore refuses sign-in, so no UniWork session (and no panel) exists there.
+ */
+export const UNIWORK_LOCK_REASONS = [
+  'store_newer',
+  'keystore_locked',
+  'signed_out',
+  'session_expired',
+  'foreign_account',
+  'permission_revoked',
+  'document_deleted',
+  'organization_suspended',
+  'member_deactivated',
+  'lease_expired',
+  'clock_rollback',
+] as const
+
+export type UniworkLockReason = (typeof UNIWORK_LOCK_REASONS)[number]
 
 /**
  * G5-11: what the sign-out / account-switch / deployment-switch prompt needs;
@@ -661,6 +681,12 @@ export interface UniworkDocLock {
   reason: UniworkLockReason
   /** basename of the working copy (a schema >= 2 binding is not parsed, so no title) */
   name: string
+  /**
+   * G5-05u: `reason === 'lease_expired'` while the org capability
+   * `offline_library` is off: the lease cannot be renewed, so the panel shows
+   * `uwLockLibraryOff` and offers the sync center instead of "Kết nối lại".
+   */
+  libraryOff?: boolean
 }
 
 export type UniworkLaunchEvent =

@@ -3,6 +3,8 @@ import { useI18n } from './locale'
 import { useAccount } from './account-model'
 import { UniworkOpenDialog } from './UniworkOpenDialog'
 import { openCardOf } from './uniwork-docs-model'
+import { openSyncCenter } from './offline-library-model'
+import { useOfflineLibrary } from './use-offline-library'
 
 function CloudIcon() {
   return (
@@ -21,15 +23,23 @@ function CloudIcon() {
  * "Open from UniWork" quick card, always visible next to "Open local". Signed
  * in it opens the picker; signed out or expired it is the sign-in call to
  * action; when sign-in is unavailable here it leads to Settings → Account.
+ * G5-05u (Q3): offline with documents in the offline library, it opens the sync
+ * center on the "Dùng khi không có mạng" tab instead of a picker that cannot load.
  */
 export function UniworkOpenCard({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { t } = useI18n()
   const account = useAccount()
   const [open, setOpen] = useState(false)
   const card = openCardOf(account.view)
+  const offline = useOfflineLibrary()
+  const toLibrary =
+    card.action === 'picker' &&
+    account.view === 'server-unreachable' &&
+    (offline?.rows.length ?? 0) > 0
 
   const handleClick = () => {
-    if (card.action === 'picker') setOpen(true)
+    if (toLibrary) openSyncCenter('offline')
+    else if (card.action === 'picker') setOpen(true)
     else if (card.action === 'sign-in') account.signIn()
     else if (card.action === 'settings') onOpenSettings()
   }
@@ -42,7 +52,7 @@ export function UniworkOpenCard({ onOpenSettings }: { onOpenSettings: () => void
         data-state={account.view}
         disabled={card.action === 'none'}
         onClick={handleClick}
-        aria-haspopup={card.action === 'picker' ? 'dialog' : undefined}
+        aria-haspopup={card.action === 'picker' && !toLibrary ? 'dialog' : undefined}
       >
         <span className="quick-folder">
           <CloudIcon />

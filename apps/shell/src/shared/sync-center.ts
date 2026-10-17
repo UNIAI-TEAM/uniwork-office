@@ -7,6 +7,13 @@
  * and session state.
  */
 
+import {
+  EMPTY_OFFLINE_LIBRARY_SNAPSHOT,
+  type OfflineLibraryQuota,
+  type OfflineLibrarySnapshot,
+  type UniworkOfflineLibraryApi,
+} from './offline-library'
+
 export const UNIWORK_SYNC_CENTER_CHANNELS = {
   snapshot: 'uniwork-sync-center:snapshot',
   syncNow: 'uniwork-sync-center:sync-now',
@@ -22,6 +29,14 @@ export const UNIWORK_SYNC_CENTER_CHANNELS = {
   saveAgain: 'uniwork-sync-center:save-again',
   saveMyCopy: 'uniwork-sync-center:save-my-copy',
   retryStore: 'uniwork-sync-center:retry-store',
+  /** G5-05u (UNI-1360): the offline library of the S3 tab, same object */
+  offlinePin: 'uniwork-sync-center:offline-pin',
+  offlineUnpin: 'uniwork-sync-center:offline-unpin',
+  offlineCancel: 'uniwork-sync-center:offline-cancel',
+  offlineDownloadNow: 'uniwork-sync-center:offline-download-now',
+  offlineOpen: 'uniwork-sync-center:offline-open',
+  offlineOpenFolder: 'uniwork-sync-center:offline-open-folder',
+  offlineState: 'uniwork-sync-center:offline-state',
   changedEvent: 'uniwork-sync-center:changed',
 } as const
 
@@ -200,7 +215,10 @@ export interface SyncCenterRow {
   draftId?: string
 }
 
-export type SyncCenterTabId = 'attention' | 'pending' | 'recent'
+/** the three tabs whose rows live in `SyncCenterTabs` */
+export type SyncCenterRowTabId = 'attention' | 'pending' | 'recent'
+/** the S2 tablist: attention, pending, offline (G5-05u, its own rows), recent */
+export type SyncCenterTabId = SyncCenterRowTabId | 'offline'
 export type SyncCenterDefaultTab = 'attention' | 'pending'
 
 export interface SyncCenterTabs {
@@ -222,23 +240,42 @@ export interface SyncCenterSnapshot {
   storeError: boolean
   /** Rows filtered by the active organization (empty arrays when signed out or `storeError`). */
   tabs: SyncCenterTabs
+  /**
+   * G5-05u: the offline library (S3 tab "Dùng khi không có mạng"). Present on
+   * every snapshot; `visible` false keeps the tab out of the tablist.
+   */
+  offline: OfflineLibrarySnapshot
   /** `'attention'` when `tabs.attention.length > 0`, otherwise `'pending'`. */
   defaultTab: SyncCenterDefaultTab
 }
 
+function isOfflineLibrarySnapshot(value: unknown): value is OfflineLibrarySnapshot {
+  if (!value || typeof value !== 'object') return false
+  const offline = value as Partial<OfflineLibrarySnapshot>
+  if (typeof offline.visible !== 'boolean' || typeof offline.capabilityOn !== 'boolean')
+    return false
+  const quota = offline.quota as Partial<OfflineLibraryQuota> | null | undefined
+  if (!quota || typeof quota !== 'object' || !Array.isArray(offline.rows)) return false
+  return ['usedBytes', 'maxBytes', 'pins', 'maxPins'].every(
+    (k) => typeof quota[k as never] === 'number',
+  )
+}
+
 /**
  * A snapshot the renderer's model can read without crashing: a header with a status
- * and the three tab arrays. Anything else (an older main, a malformed push) is null.
+ * and the three tab arrays; when `offline` is missing or malformed, it is replaced
+ * with the hidden empty offline library block without dropping the snapshot.
  */
 export function asSyncCenterSnapshot(value: unknown): SyncCenterSnapshot | null {
   if (!value || typeof value !== 'object') return null
-  const snap = value as { header?: unknown; tabs?: unknown }
+  const snap = value as { header?: unknown; tabs?: unknown; offline?: unknown }
   const header = snap.header as { status?: unknown } | null | undefined
   const tabs = snap.tabs as Record<string, unknown> | null | undefined
   if (!header || typeof header !== 'object' || typeof header.status !== 'string') return null
   if (!tabs || typeof tabs !== 'object') return null
   if (!['attention', 'pending', 'recent'].every((tab) => Array.isArray(tabs[tab]))) return null
-  return value as SyncCenterSnapshot
+  if (isOfflineLibrarySnapshot(snap.offline)) return value as SyncCenterSnapshot
+  return { ...(value as SyncCenterSnapshot), offline: EMPTY_OFFLINE_LIBRARY_SNAPSHOT }
 }
 
 export type SyncCenterActionErrorCode =
@@ -306,6 +343,7 @@ export interface UniworkSyncCenterApi {
 
 declare global {
   interface Window {
-    uniworkSyncCenter?: UniworkSyncCenterApi
+    /** G5-05u: one object, the S2 half (`UniworkSyncCenterApi`) and the offline library half */
+    uniworkSyncCenter?: UniworkSyncCenterApi & UniworkOfflineLibraryApi
   }
 }
