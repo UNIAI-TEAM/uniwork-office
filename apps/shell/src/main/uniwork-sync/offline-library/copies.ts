@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Dirent } from 'node:fs'
-import { chmod, readdir, rm, stat } from 'node:fs/promises'
+import { chmod, lstat, readdir, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { UniworkDocLock } from '../../../shared/home-api'
 import type { OfflineFailure } from '../../../shared/offline-library'
@@ -50,9 +50,22 @@ async function makeWritable(dir: string): Promise<void> {
 }
 
 /**
- * Delete a copy folder, undoing the read-only mode first (BE-R1-2). `false`
- * only when the folder is still there: the caller keeps its own record of the
- * copy, so a later sweep retries instead of forgetting a plaintext leftover.
+ * Only definite absence (`ENOENT`) counts as gone (BE-R2-8): any other
+ * inspection failure (`EACCES`, `EIO`, `EBUSY`) leaves the folder in doubt, so
+ * the caller keeps it on its retry list instead of forgetting plaintext.
+ */
+async function absent(dir: string): Promise<boolean> {
+  try {
+    await lstat(dir)
+    return false
+  } catch (error) {
+    return (error as NodeJS.ErrnoException)?.code === 'ENOENT'
+  }
+}
+
+/**
+ * Delete a copy folder, undoing the read-only mode first (BE-R1-2). `true`
+ * only when `rm` succeeded or `lstat` confirmed `ENOENT` (BE-R2-8).
  */
 async function removeDir(dir: string): Promise<boolean> {
   await makeWritable(dir)
@@ -60,10 +73,7 @@ async function removeDir(dir: string): Promise<boolean> {
     await rm(dir, { recursive: true, force: true, maxRetries: 2 })
     return true
   } catch {
-    return !(await stat(dir).then(
-      () => true,
-      () => false,
-    ))
+    return await absent(dir)
   }
 }
 
@@ -132,13 +142,41 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
   const now = () => deps.now?.() ?? Date.now()
   /** documentId -> the copy on screen (one per document, however many tabs read it) */
   const copies = new Map<string, { dir: string; path: string; title: string; openedAt: number }>()
+  /** every folder whose deletion failed (tracked or crash leftover) until a retry confirms it gone (BE-R2-3, BE-R2-8, BE-R2-11) */
+  const pendingRemoval = new Set<string>()
+  /** one queue across open, sweep, recover and dropAll so recovery or sign-out never races an open (BE-R2-2, BE-R2-5) */
+  let queue: Promise<unknown> = Promise.resolve()
+  const serial = <T>(work: () => Promise<T>): Promise<T> => {
+    const run = queue.then(work, work)
+    queue = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
+
+  const dropDir = async (dir: string): Promise<boolean> => {
+    if (await removeDir(dir)) {
+      pendingRemoval.delete(dir)
+      return true
+    }
+    pendingRemoval.add(dir)
+    return false
+  }
+
+  const retryPending = async (keepDirs: ReadonlySet<string>): Promise<void> => {
+    for (const dir of [...pendingRemoval]) {
+      if (keepDirs.has(dir)) continue
+      await dropDir(dir)
+    }
+  }
 
   const drop = async (documentId: string, closed: boolean): Promise<boolean> => {
     const copy = copies.get(documentId)
     if (!copy) return true
     // a folder that would not go stays on the record: the next sweep retries
-    // instead of forgetting a plaintext leftover (BE-R1-2)
-    if (!(await removeDir(copy.dir))) return false
+    // instead of forgetting a plaintext leftover (BE-R1-2, BE-R2-8, BE-R2-11)
+    if (!(await dropDir(copy.dir))) return false
     copies.delete(documentId)
     // the pin's deferred cleanup waits for the last reader: tell the library the tab is gone
     if (closed)
@@ -149,7 +187,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     return true
   }
 
-  const open = async (documentId: string): Promise<OfflineCopyOutcome> => {
+  const openOne = async (documentId: string): Promise<OfflineCopyOutcome> => {
     const library = deps.library()
     const scope = deps.scope()
     if (!library || !scope) return { kind: 'none' }
@@ -189,9 +227,10 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     const format =
       formatForMime(cached.manifest.main.mimeType) ?? formatForName(cached.manifest.main.filename)
     if (!format || !row) return { kind: 'none' }
+    if (shownBefore && shownBefore.dir !== dir) pendingRemoval.add(shownBefore.dir)
     // whatever an earlier session (a crash, a remove that failed) left under this
     // key goes before the new bytes land, whether this session knows the copy or not
-    if (!(await removeDir(dir))) return { kind: 'none' }
+    if (!(await dropDir(dir))) return { kind: 'none' }
     copies.delete(documentId)
     // the copy is named exactly as the normal open path names it: the manifest's
     // file name made one safe segment (BE-R1-1) - never the raw server string
@@ -220,12 +259,12 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       ...(cached.manifest.main.versionId ? { baseVersionId: cached.manifest.main.versionId } : {}),
     }
     if (!(await deps.store.write(dir, binding))) {
-      await rm(dir, { recursive: true, force: true, maxRetries: 2 }).catch(() => undefined)
+      await dropDir(dir)
       return { kind: 'none' }
     }
     const shown = deps.show(path)
     if (!shown) {
-      await rm(dir, { recursive: true, force: true, maxRetries: 2 }).catch(() => undefined)
+      await dropDir(dir)
       return { kind: 'none' }
     }
     // the pin's cleanup defers while a tab reads the copy (markClosed at its close)
@@ -234,38 +273,49 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     return { kind: 'opened', path, title: shown.title }
   }
 
-  const sweep = async (): Promise<void> => {
+  const sweepOne = async (): Promise<void> => {
     const at = now()
     for (const [documentId, copy] of [...copies]) {
       if (deps.isPathOpen(copy.path)) continue
       if (at - copy.openedAt < OFFLINE_COPY_CLOSE_GRACE_MS) continue
       await drop(documentId, true)
     }
+    const tracked = new Set([...copies.values()].map((copy) => copy.dir))
+    await retryPending(tracked)
   }
 
   /**
    * Startup / account activation (BE-R1-2): a crash leaves the last session's
    * `<id>@offline` plaintext behind - nothing tracks it, so nothing would ever
    * delete it. Every `@offline` folder of the account goes here; a copy this
-   * process still shows is left to its own sweep (`drop`).
+   * process still shows is left to its own sweep (`drop`), and any folder whose
+   * removal fails stays in `pendingRemoval` for later sweeps (BE-R2-3).
    */
-  const recover = async (): Promise<void> => {
+  const recoverOne = async (): Promise<void> => {
     const scope = deps.scope()
     if (!scope) return
     const shown = new Set([...copies.values()].map((copy) => copy.dir))
+    await retryPending(shown)
     for (const dir of deps.scopeDirs(scope.deploymentId, scope.accountId)) {
       if (!basename(dir).endsWith(OFFLINE_COPY_KEY_SUFFIX)) continue
       if (shown.has(dir)) continue
-      await removeDir(dir)
+      await dropDir(dir)
     }
   }
 
-  const dropAll = async (): Promise<void> => {
+  const dropAllOne = async (): Promise<void> => {
     for (const [documentId, copy] of [...copies]) {
-      // a folder that would not go is still a copy: it stays on the record
-      if (await removeDir(copy.dir)) copies.delete(documentId)
+      // a folder that would not go is still a copy: it stays on the record and in pendingRemoval
+      if (await dropDir(copy.dir)) copies.delete(documentId)
     }
+    const remaining = new Set([...copies.values()].map((copy) => copy.dir))
+    await retryPending(remaining)
   }
 
-  return { open, sweep, recover, dropAll }
+  return {
+    open: (documentId) => serial(() => openOne(documentId)),
+    sweep: () => serial(sweepOne),
+    recover: () => serial(recoverOne),
+    dropAll: () => serial(dropAllOne),
+  }
 }

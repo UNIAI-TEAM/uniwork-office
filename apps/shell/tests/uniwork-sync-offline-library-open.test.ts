@@ -9,9 +9,10 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
+import type * as NodeFsPromises from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkDocLock } from '../src/shared/home-api'
 import {
   UniworkDocsService,
@@ -42,6 +43,36 @@ import {
   type Harness,
 } from './uniwork-sync-offline-library-fakes'
 
+const fsFault = vi.hoisted(() => ({
+  rmGate: null as null | ((path: string) => Promise<void> | void),
+  rmFault: null as null | ((path: string) => boolean),
+  probeFault: null as null | ((path: string) => boolean),
+}))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof NodeFsPromises>()
+  const fail = (code: string): never => {
+    throw Object.assign(new Error(code), { code })
+  }
+  return {
+    ...actual,
+    rm: async (...args: Parameters<typeof actual.rm>) => {
+      const path = String(args[0])
+      await fsFault.rmGate?.(path)
+      if (fsFault.rmFault?.(path)) fail('EBUSY')
+      return actual.rm(...args)
+    },
+    stat: async (...args: Parameters<typeof actual.stat>) => {
+      if (fsFault.probeFault?.(String(args[0]))) fail('EACCES')
+      return actual.stat(...args)
+    },
+    lstat: async (...args: Parameters<typeof actual.lstat>) => {
+      if (fsFault.probeFault?.(String(args[0]))) fail('EACCES')
+      return actual.lstat(...args)
+    },
+  }
+})
+
 /**
  * G5-05u B5: a pinned document opened with no network is served from its
  * verified cached copy - a read-only bound working copy (access `view`, 0o444)
@@ -69,6 +100,7 @@ interface OpenHarness {
   pathOpen: { value: boolean; closed: Set<string> }
   clock: { now: number }
   capability: { on: boolean }
+  scope: { value: { deploymentId: string; accountId: string } }
   /** the server read: every URL asked, and an optional answer (default: no network) */
   server: { answer: ((url: string) => Response) | null; calls: string[] }
   userDataDir: string
@@ -94,6 +126,7 @@ function openHarness(): OpenHarness {
   const isPathOpen = (path: string) => !pathOpen.closed.has(path) && pathOpen.value
   const clock = { now: 1_000 }
   const capability = { on: true }
+  const scope = { value: { deploymentId: SCOPE.deploymentId, accountId: SCOPE.accountId } }
   const server: OpenHarness['server'] = { answer: null, calls: [] }
   /** what the wiring passes the service: the module's outcome as the service's seam */
   const openOfflineCopy = async (documentId: string): Promise<OfflineCopyOpen> => {
@@ -150,7 +183,7 @@ function openHarness(): OpenHarness {
     // the account's own working-copy folders: what the startup sweep walks
     scopeDirs: (deploymentId, accountId) =>
       scopeWorkingCopyDirs(service.store.root, { deploymentId, accountId }),
-    scope: () => ({ deploymentId: SCOPE.deploymentId, accountId: SCOPE.accountId }),
+    scope: () => scope.value,
     show: (path) => service.showOfflineCopy(path),
     isPathOpen,
     appVersion: () => '0.0.0-test',
@@ -180,6 +213,7 @@ function openHarness(): OpenHarness {
     pathOpen,
     clock,
     capability,
+    scope,
     server,
     userDataDir,
   }
@@ -194,8 +228,14 @@ const pin = (h: Harness, documentId = 'doc_1') =>
 let dirs: string[] = []
 beforeEach(() => {
   dirs = []
+  fsFault.rmGate = null
+  fsFault.rmFault = null
+  fsFault.probeFault = null
 })
 afterEach(() => {
+  fsFault.rmGate = null
+  fsFault.rmFault = null
+  fsFault.probeFault = null
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true })
 })
 
@@ -532,6 +572,177 @@ describe('G5-05u B5 the copy is named and cleared like the normal open path (BE-
     await o.copies.recover()
     expect(existsSync(leftover)).toBe(false)
     expect(existsSync(workingCopy)).toBe(true)
+  })
+
+  it('a crash leftover whose first removal fails is retried by the next sweep, recover and dropAll (BE-R2-3)', async () => {
+    for (const retry of ['sweep', 'recover', 'dropAll'] as const) {
+      const o = openHarness()
+      dirs.push(o.userDataDir)
+      const leftover = o.service.store.dirFor(
+        SCOPE.deploymentId,
+        SCOPE.accountId,
+        offlineCopyKey('doc_9'),
+      )
+      mkdirSync(leftover, { recursive: true })
+      const file = join(leftover, 'doc_9.docx')
+      writeFileSync(file, new Uint8Array([9]))
+      chmodSync(file, 0o444)
+      fsFault.rmFault = (path) => path === leftover
+      fsFault.probeFault = (path) => path === leftover
+      await o.copies.recover()
+      expect(existsSync(leftover)).toBe(true)
+      fsFault.rmFault = null
+      fsFault.probeFault = null
+      await o.copies[retry]()
+      expect(existsSync(leftover)).toBe(false)
+    }
+  })
+
+  it('a removal that fails with an inspection error keeps the copy on the record for sweep, recover and dropAll (BE-R2-8)', async () => {
+    for (const first of ['sweep', 'dropAll'] as const) {
+      const o = openHarness()
+      dirs.push(o.userDataDir)
+      addDoc(o.h, 'doc_1', 1)
+      await pin(o.h)
+      const dir = o.service.store.dirFor(
+        SCOPE.deploymentId,
+        SCOPE.accountId,
+        offlineCopyKey('doc_1'),
+      )
+      expect((await o.copies.open('doc_1')).kind).toBe('opened')
+      o.pathOpen.value = false
+      o.clock.now += 31_000
+      fsFault.rmFault = (path) => path === dir
+      fsFault.probeFault = (path) => path === dir
+      await o.copies[first]()
+      expect(existsSync(dir)).toBe(true)
+      fsFault.rmFault = null
+      fsFault.probeFault = null
+      await o.copies.sweep()
+      expect(existsSync(dir)).toBe(false)
+    }
+  })
+
+  it('a tracked copy that could not be deleted is retried by the next sweep and dropAll (BE-R2-11)', async () => {
+    for (const mode of ['sweep', 'dropAll'] as const) {
+      const o = openHarness()
+      dirs.push(o.userDataDir)
+      addDoc(o.h, 'doc_1', 1)
+      await pin(o.h)
+      const dir = o.service.store.dirFor(
+        SCOPE.deploymentId,
+        SCOPE.accountId,
+        offlineCopyKey('doc_1'),
+      )
+      expect((await o.copies.open('doc_1')).kind).toBe('opened')
+      o.pathOpen.value = false
+      o.clock.now += 31_000
+      fsFault.rmFault = (path) => path === dir
+      await o.copies[mode]()
+      expect(existsSync(dir)).toBe(true)
+      if (mode === 'sweep') {
+        expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
+      } else {
+        // even if a new account opens the same document id before the retry, the failed dir stays tracked
+        o.scope.value = { deploymentId: SCOPE.deploymentId, accountId: 'user_2' }
+        expect((await o.copies.open('doc_1')).kind).toBe('opened')
+      }
+      fsFault.rmFault = null
+      await o.copies[mode]()
+      expect(existsSync(dir)).toBe(false)
+      if (mode === 'sweep') {
+        expect(await o.h.manager.row('doc_1')).toMatchObject({ open: false })
+      }
+    }
+  })
+
+  it('a recovery that runs while a second copy is opening does not delete it (BE-R2-2)', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const docOne = addDoc(o.h, 'doc_1', 1)
+    const docTwo = addDoc(o.h, 'doc_2', 1)
+    await pin(o.h, 'doc_1')
+    await pin(o.h, 'doc_2')
+    const dirOne = o.service.store.dirFor(
+      SCOPE.deploymentId,
+      SCOPE.accountId,
+      offlineCopyKey('doc_1'),
+    )
+    const dirTwo = o.service.store.dirFor(
+      SCOPE.deploymentId,
+      SCOPE.accountId,
+      offlineCopyKey('doc_2'),
+    )
+    mkdirSync(dirOne, { recursive: true })
+    writeFileSync(join(dirOne, 'doc_1.docx'), new Uint8Array([1]))
+    mkdirSync(dirTwo, { recursive: true })
+    writeFileSync(join(dirTwo, 'doc_2.docx'), new Uint8Array([2]))
+    // gate whichever directory `scopeDirs` enumerates first, and open the second
+    const [firstDir, secondId, secondDir, secondFile, secondBytes] =
+      basename(dirOne) < basename(dirTwo)
+        ? [dirOne, 'doc_2', dirTwo, 'doc_2.docx', docTwo.bytes]
+        : [dirTwo, 'doc_1', dirOne, 'doc_1.docx', docOne.bytes]
+    const gate = Promise.withResolvers<void>()
+    const reached = Promise.withResolvers<void>()
+    fsFault.rmGate = async (path) => {
+      if (path !== firstDir) return
+      reached.resolve()
+      await gate.promise
+    }
+    const recovering = o.copies.recover()
+    await reached.promise
+    // the second copy opens while recovery is parked on the first removal
+    const opening = o.copies.open(secondId)
+    await new Promise<void>((resolve) => setTimeout(resolve, 20))
+    gate.resolve()
+    const [opened] = await Promise.all([opening, recovering])
+    fsFault.rmGate = null
+    expect(opened.kind).toBe('opened')
+    expect(existsSync(secondDir)).toBe(true)
+    expect(new Uint8Array(await readFile(join(secondDir, secondFile)))).toEqual(secondBytes)
+    expect(o.service.store.lookup(join(secondDir, secondFile))?.binding.documentId).toBe(secondId)
+  })
+
+  it('a dropAll of the outgoing account never loses the incoming account copy (BE-R2-5)', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const docOne = addDoc(o.h, 'doc_1', 1)
+    await pin(o.h, 'doc_1')
+    const dirA = o.service.store.dirFor(
+      SCOPE.deploymentId,
+      SCOPE.accountId,
+      offlineCopyKey('doc_1'),
+    )
+    const first = await o.copies.open('doc_1')
+    if (first.kind !== 'opened') throw new Error('expected A open')
+    expect(new Uint8Array(await readFile(join(dirA, 'doc_1.docx')))).toEqual(docOne.bytes)
+    // A's tab closes before the boundary dropAll
+    o.pathOpen.closed.add(first.path)
+    const gate = Promise.withResolvers<void>()
+    const reached = Promise.withResolvers<void>()
+    fsFault.rmGate = async (path) => {
+      if (path !== dirA) return
+      reached.resolve()
+      await gate.promise
+    }
+    const dropping = o.copies.dropAll()
+    await reached.promise
+    // the account switches while A's removal is parked: B opens the same document
+    o.scope.value = { deploymentId: SCOPE.deploymentId, accountId: 'user_2' }
+    const dirB = o.service.store.dirFor(SCOPE.deploymentId, 'user_2', offlineCopyKey('doc_1'))
+    const opening = o.copies.open('doc_1')
+    await new Promise<void>((resolve) => setTimeout(resolve, 20))
+    gate.resolve()
+    const [opened] = await Promise.all([opening, dropping])
+    fsFault.rmGate = null
+    expect(opened.kind).toBe('opened')
+    expect(dirname(opened.kind === 'opened' ? opened.path : '')).toBe(dirB)
+    expect(existsSync(dirA)).toBe(false)
+    expect(new Uint8Array(await readFile(join(dirB, 'doc_1.docx')))).toEqual(docOne.bytes)
+    o.pathOpen.value = false
+    o.clock.now += 31_000
+    await o.copies.sweep()
+    expect(existsSync(dirB)).toBe(false)
   })
 
   it('a save of the offline copy is refused as view-only, and mints no intent', async () => {
