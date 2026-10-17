@@ -127,8 +127,18 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   return { app, page, userDataDir }
 }
 
-/** Switches Home from the My AI chat to the Recent files view (hero + quick cards). */
+/**
+ * Switches Home from the My AI chat to the active area's files view:
+ * `.home-hero` on the device area, or `.dh-home .dh-title` on the signed-in UniWork area.
+ */
 export async function openHomeFiles(page: Page): Promise<void> {
+  await page.locator('.account-btn:not([data-state="loading"])').waitFor({ timeout: 30_000 })
+  const state = await page.locator('.account-btn').getAttribute('data-state')
+  if (state === 'signed-in' || state === 'refreshing') {
+    await page.locator('.dh-subnav .nav-item[data-nav="recent"]').click({ timeout: 30_000 })
+    await page.locator('.dh-home .dh-title').waitFor({ timeout: 15_000 })
+    return
+  }
   await page.locator('.nav-item[data-nav="recent"]').click({ timeout: 30_000 })
   await page.locator('.home-hero').waitFor({ timeout: 15_000 })
 }
