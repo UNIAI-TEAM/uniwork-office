@@ -46,6 +46,12 @@ export const pt = {
   appOpenFailed: 'Falha ao abrir: {error}',
   appDocTooLargeBlocks:
     '{name}: o documento é grande demais para ser aberto ({blocks} parágrafos, {chars} caracteres)',
+  appDocTooLargeUncompressed:
+    '{name}: o documento é grande demais ou complexo demais para abrir na web.',
+  appDocTooComplexParts:
+    '{name}: o documento é complexo demais para abrir na web ({parts} partes, limite {limit}).',
+  appDocOpenOutOfMemory:
+    '{name}: o documento é grande demais e ficou sem memória no navegador ao abrir.',
   appDocLargeReadOnly:
     'Documento grande ({blocks} parágrafos): aberto no modo de leitura — pressione Esc para editar',
   appDocLargeSpellOff:

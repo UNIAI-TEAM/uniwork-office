@@ -115,4 +115,12 @@ export const ar = {
   uwReasonArchived: 'تمت أرشفة المستند',
   uwReasonSuspended: 'المؤسسة معلّقة',
   uwReasonDeactivated: 'حسابك معطّل في هذه المؤسسة',
+
+  webSizeWarnChip: 'اقتراب من الحد الأقصى {max} (الحجم الحالي {size}).',
+  webSaveBlockTitle: 'تعذّر الحفظ في UniWork',
+  webSaveBlockBody:
+    'تجاوز هذا المستند الحد الأقصى {max}. تغييراتك لا تزال هنا. قم بتنزيل نسختك إلى جهازك، ثم قلّل حجم الصور أو قسّم المستند.',
+  webSaveBlockDownload: 'تنزيل نسختي',
+  uwConflictTooLargeWithLimit:
+    'تجاوزت نسختك الحد الأقصى {max} (الحجم الحالي {size}). اختر "تنزيل نسختي" أو أغلق مربع الحوار هذا لتقليل حجم الملف.',
 } satisfies Record<keyof typeof zh, string>

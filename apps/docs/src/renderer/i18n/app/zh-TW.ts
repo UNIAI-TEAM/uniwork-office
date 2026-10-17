@@ -45,6 +45,10 @@ export const zhTW = {
   appOpenedFile: '已開啟 {name}',
   appOpenFailed: '開啟失敗: {error}',
   appDocTooLargeBlocks: '{name}：文件過大（{blocks} 個段落、{chars} 個字元），無法開啟',
+  appDocTooLargeUncompressed: '{name}：文件過大或過於複雜，無法在網頁中開啟。',
+  appDocTooComplexParts:
+    '{name}：文件過於複雜（包含 {parts} 個組件，上限為 {limit} 個），無法在網頁中開啟。',
+  appDocOpenOutOfMemory: '{name}：文件過大，瀏覽器記憶體不足，無法開啟。',
   appDocLargeReadOnly: '文件很大（{blocks} 個段落），已以唯讀模式開啟；按 Esc 可開始編輯',
   appDocLargeSpellOff:
     '文件很大（{blocks} 個段落），已關閉輸入時拼字檢查；可在「校閱 › 拼字」重新開啟',

@@ -66,6 +66,8 @@ async function setup(
     writable?: boolean
     /** the revision the handshake open reports (G5-03w: an event must be newer than it) */
     revision?: string
+    /** SIZE-F1: `init.limits` the host advertises for the session */
+    limits?: { max_bytes: number; warn_ratio: number }
   } = {},
 ): Promise<Setup> {
   const mock = createMockPort()
@@ -84,6 +86,7 @@ async function setup(
   )
   mock.init({
     documentId: file.fileId,
+    ...(opts.limits ? { limits: opts.limits } : {}),
     ...(opts.revision !== undefined
       ? { open: { ...mock.openPayload(file.fileId), file: { ...file, revision: opts.revision } } }
       : {}),
@@ -145,6 +148,7 @@ describe('slidesApi contract', () => {
     expect(keys.filter((k) => !(k in api))).toEqual([])
     // the web-only optional members (SlidesApi: the desktop never sets them)
     expect(Object.keys(api).filter((k) => !keys.includes(k))).toEqual([
+      'noteDocumentMounted',
       'openInDesktopApp',
       'presenterOpenAudience',
       'presenterCloseAudience',
@@ -949,5 +953,129 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     )
     expect((await api.save()).ok).toBe(true)
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+  })
+})
+
+describe('open_refused and zip part-count refusal (SIZE-F1)', () => {
+  it('refuses a pptx exceeding the 10 000 zip-parts limit with open_refused + localized fatal copy, blocks newBlank and saves, and resets on another documentId (d2-5)', async () => {
+    const zip = new JSZip()
+    for (let i = 0; i < 10_001; i++) {
+      zip.file(`p/${i}.xml`, '')
+    }
+    const manyPartsBytes = await zip.generateAsync({ type: 'uint8array' })
+    const { mock, api } = await setup({ bytes: manyPartsBytes })
+
+    expect(await api.consumePendingOpen(FIT)).toBeNull()
+    const fatalEl = document.querySelector('[data-slides-web="fatal"]')
+    expect(fatalEl).not.toBeNull()
+    expect(fatalEl?.textContent ?? '').toContain('10001')
+    expect(fatalEl?.textContent ?? '').toContain('10000')
+    expect(fatalEl?.textContent ?? '').not.toMatch(/pptx rejected:|zip rejected:/i)
+    expect(mock.openRefused).toEqual([
+      {
+        reason: 'too_complex',
+        bytes: manyPartsBytes.byteLength,
+        measure: {
+          kind: 'zip_parts',
+          value: 10_001,
+          limit: 10_000,
+        },
+      },
+    ])
+    expect(mock.errors.at(-1)).toMatchObject({ fatal: true })
+    expect((await api.uniworkState()).readOnly).toBe(true)
+    const blankErr = await api.newBlank(FIT).catch((e: unknown) => e)
+    expect(blankErr).toBeInstanceOf(Error)
+    expect((blankErr as Error).message).toContain('10001')
+    expect((blankErr as Error).message).not.toMatch(/pptx rejected:|zip rejected:/i)
+    const saveRes = (await api.save()) as { ok: boolean; error?: string }
+    expect(saveRes.ok).toBe(false)
+    expect(saveRes.error ?? '').toContain('10001')
+    expect(saveRes.error ?? '').not.toMatch(/pptx rejected:|zip rejected:/i)
+    expect(await api.saveAs('Copy.pptx')).toMatchObject({ ok: false })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({ ok: false })
+    expect(await mock.host.saveAs({ name: 'Copy.pptx' })).toMatchObject({ ok: false })
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toEqual([])
+
+    // Opening another documentId resets the refused state and allows saving
+    const other = mock.seed('valid.pptx', FIXTURE)
+    await mock.host.open(mock.openPayload(other.fileId))
+    expect((await api.uniworkState()).readOnly).toBe(false)
+    await api.setNotes({ slideIndex: 0, text: 'recovered' })
+    await flush()
+    expect((await api.save()).ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+  })
+
+  it('does not emit open_refused for a corrupt zip entry ("cannot be inflated") and keeps declared uncompressed size gate as too_large_to_open (d2-4, d2-5)', async () => {
+    const corruptZip = await JSZip.loadAsync(FIXTURE)
+    corruptZip.file('ppt/presentation.xml', 'x'.repeat(2_000), { compression: 'DEFLATE' })
+    const rawZip = await corruptZip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+    const nameLen = rawZip[26]! | (rawZip[27]! << 8)
+    const extraLen = rawZip[28]! | (rawZip[29]! << 8)
+    const dataOffset = 30 + nameLen + extraLen
+    for (let i = 0; i < 16 && dataOffset + i < rawZip.length; i++) {
+      rawZip[dataOffset + i] = 0xff
+    }
+    const corrupt = await setup({ bytes: rawZip })
+    expect(await corrupt.api.consumePendingOpen(FIT)).toBeNull()
+    expect(corrupt.mock.openRefused).toEqual([])
+
+    const hugeHeaderZip = new Uint8Array(FIXTURE)
+    const view = new DataView(
+      hugeHeaderZip.buffer,
+      hugeHeaderZip.byteOffset,
+      hugeHeaderZip.byteLength,
+    )
+    for (let p = 0; p + 46 <= hugeHeaderZip.length; p++) {
+      if (view.getUint32(p, true) === 0x02014b50) {
+        view.setUint32(p + 24, 600 * 1024 * 1024, true)
+        break
+      }
+    }
+    const oversize = await setup({ bytes: hugeHeaderZip })
+    expect(await oversize.api.consumePendingOpen(FIT)).toBeNull()
+    expect(oversize.mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: hugeHeaderZip.byteLength,
+      },
+    ])
+    const saveRes = (await oversize.api.save()) as { ok: boolean; error?: string }
+    expect(saveRes.ok).toBe(false)
+    expect(saveRes.error ?? '').not.toMatch(/pptx rejected:|zip rejected:/i)
+  })
+})
+
+describe('save size gate (SIZE-F1, UNI-1861)', () => {
+  it('blocks save and saveAs above limits.max_bytes without api.save / api.saveAs and returns handled { ok: false }', async () => {
+    // a serialized deck is a real pptx (~KB) — a 1-byte cap blocks any save
+    const { mock, api } = await setup({ limits: { max_bytes: 1, warn_ratio: 0.5 } })
+    await api.consumePendingOpen(FIT)
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    await flush()
+
+    expect(await api.save()).toEqual({ ok: false })
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(1)
+
+    // saveAs resolves cleanly as handled cancellation ({ ok: false }) so renderer shows no toast
+    expect(await api.saveAs('Copy')).toEqual({ ok: false })
+    expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
+    expect(mock.saveBlocked).toHaveLength(2)
+
+    // Host-initiated save and saveAs still receive the protocol too_large error
+    const off = api.onMenuCommand((c) => {
+      if (c === 'save-as') void api.saveAs('Copy')
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.pptx' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    off()
   })
 })

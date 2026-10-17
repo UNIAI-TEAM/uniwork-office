@@ -15,6 +15,10 @@ export const cs = {
   webOk: 'OK',
   webFatalTitle: 'Prezentaci nelze otevřít',
   webFatalBody: 'Soubor se nepodařilo načíst z UniWork. Zavřete tuto kartu a zkuste to znovu.',
+  webRefusedTooLarge: 'Tato prezentace je příliš velká nebo příliš složitá pro otevření na webu.',
+  webRefusedTooComplex:
+    'Tato prezentace je příliš složitá pro otevření na webu ({parts} částí, limit {limit}).',
+  webRefusedOutOfMemory: 'Tato prezentace je příliš velká a při otevírání došla paměť prohlížeče.',
   webNoHost: 'Tento editor běží v UniWork. Otevřete prezentaci z UniWork.',
   webLegacyPpt:
     'Jde o starší soubor .ppt, který nelze otevřít v prohlížeči. Nejprve jej v PowerPointu uložte jako .pptx.',

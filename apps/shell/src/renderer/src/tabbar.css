@@ -601,6 +601,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   color: var(--warning-text);
 }
 
+/* the size warning yields to the save pill (see uniwork-pill-fit.ts): it caps at 340px and
+   shrinks down to its minimum (--uw-warn-max) before the save pill gives up its label */
+.uw-size-warn {
+  max-width: var(--uw-warn-max, 340px);
+}
+
 .uw-pill[data-tone='error'] {
   border-color: var(--danger-border);
   background: var(--danger-bg);
@@ -632,8 +638,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 .uw-pill-close {
   display: grid;
   place-items: center;
-  width: 22px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
   padding: 0;
+  border-radius: 12px;
 }
 
 /* a trailing button sits closer to the border than the label does on the left,
@@ -1020,4 +1030,36 @@ body.overlay-title-bar .tab-bar-drag-spacer {
     min-width: 44px;
     min-height: 44px;
   }
+}
+
+/* ── SIZE-F1 save-block band: reserves top-inset height so the modal sits above the editor view ── */
+
+.uw-save-block-band {
+  box-sizing: border-box;
+  position: fixed;
+  top: var(--tab-bar-height, 40px);
+  left: 0;
+  right: 0;
+  z-index: 35;
+  max-height: var(--uw-save-block-room, 400px);
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+}
+
+.uw-save-block-band > .modal-overlay {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.modal.uw-act.uw-save-block-modal {
+  box-sizing: border-box;
+  max-height: calc(var(--uw-save-block-room, 400px) - 19px);
+  padding: 14px 18px;
+  overflow-y: auto;
 }

@@ -46,6 +46,12 @@ export const en = {
   appOpenFailed: 'Open failed: {error}',
   appDocTooLargeBlocks:
     '{name}: the document is too large to open ({blocks} paragraphs, {chars} characters)',
+  appDocTooLargeUncompressed:
+    '{name}: the document is too large or too complex to open on the web.',
+  appDocTooComplexParts:
+    '{name}: the document is too complex to open on the web ({parts} parts, limit {limit}).',
+  appDocOpenOutOfMemory:
+    '{name}: the document is too large and ran out of browser memory while opening.',
   appDocLargeReadOnly:
     'Large document ({blocks} paragraphs): opened in Read Mode — press Esc to edit',
   appDocLargeSpellOff:

@@ -2,14 +2,14 @@ import { useSyncExternalStore } from 'react'
 
 /**
  * The one owner of the band reserved under the tab strip. Main has a single top inset for the
- * active editor view (`uniworkSetBarInset` -> `TabManager.setTopInset`); two shell surfaces hang
- * below the strip in that band: the new-version bar (S6) and the open queue popover (S4). Each
- * reports its own unscaled CSS-px height here and main always gets the SUM, so one never
- * overwrites the other. Shell DOM below the strip is only visible inside this band: the editor
- * view covers the rest of the window.
+ * active editor view (`uniworkSetBarInset` -> `TabManager.setTopInset`); three shell surfaces hang
+ * below the strip in that band: the new-version bar (S6), the open queue popover (S4) and the
+ * over-cap save-block dialog (SIZE-F1). Each reports its own unscaled CSS-px height here and main
+ * always gets the SUM, so one never overwrites another. Shell DOM below the strip is only visible
+ * inside this band: the editor view covers the rest of the window.
  */
 
-export type TopInsetPart = 'bar' | 'popover'
+export type TopInsetPart = 'bar' | 'popover' | 'saveBlock'
 
 /**
  * The most main accepts as the top inset (unscaled CSS px; `TOP_INSET_MAX` in
@@ -18,7 +18,7 @@ export type TopInsetPart = 'bar' | 'popover'
  */
 export const TOP_INSET_MAX = 400
 
-const parts: Record<TopInsetPart, number> = { bar: 0, popover: 0 }
+const parts: Record<TopInsetPart, number> = { bar: 0, popover: 0, saveBlock: 0 }
 const listeners = new Set<() => void>()
 
 function send(total: number): void {
@@ -29,9 +29,9 @@ function send(total: number): void {
   }
 }
 
-/** the total main is asked for: the bar first, the popover band right below it, never past the cap */
+/** the total main is asked for: the bar first, then the popover/save-block bands below it, never past the cap */
 export function topInsetTotal(): number {
-  return Math.min(TOP_INSET_MAX, parts.bar + parts.popover)
+  return Math.min(TOP_INSET_MAX, parts.bar + parts.popover + parts.saveBlock)
 }
 
 /** the height the popover band may take: what the S6 bar leaves of the cap */

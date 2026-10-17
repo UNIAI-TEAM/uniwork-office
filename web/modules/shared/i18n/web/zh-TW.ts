@@ -112,4 +112,12 @@ export const zhTW = {
   uwReasonArchived: '文件已封存',
   uwReasonSuspended: '組織已被停權',
   uwReasonDeactivated: '你在此組織中的帳號已被停用',
+
+  webSizeWarnChip: '即將達到 {max} 限制（目前 {size}）。',
+  webSaveBlockTitle: '無法儲存到 UniWork',
+  webSaveBlockBody:
+    '此文件已超過 {max}。你的變更仍在目前頁面。請先將副本下載到電腦，再壓縮圖片或拆分文件。',
+  webSaveBlockDownload: '下載我的副本',
+  uwConflictTooLargeWithLimit:
+    '你的版本已超過 {max}（目前 {size}）。請選擇「下載我的副本」或關閉此對話方塊以縮小檔案大小。',
 } satisfies Record<keyof typeof zh, string>

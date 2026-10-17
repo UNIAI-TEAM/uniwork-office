@@ -6,6 +6,7 @@
 import {
   toProtocolError,
   type Capabilities,
+  type DocumentSizeLimits,
   type FileMeta,
   type FrameRequestType,
   type FrameRequests,
@@ -15,9 +16,13 @@ import {
   type ProtocolErrorCode,
   type AiRunPayload,
   type DocBlockedPayload,
+  type OpenRefusedPayload,
   type ProtocolErrorShape,
   type RemoteVersionPayload,
+  type SaveBlockedPayload,
   type SavedPayload,
+  type SizeWarningPayload,
+  type LagDetectedPayload,
   type Theme,
 } from '../protocol/types'
 
@@ -44,6 +49,8 @@ export interface PortSession {
   downloadMaxBytes?: number
   /** `init.apiBase` (additive, C16: the frame-token AI routes live under it); absent in tests */
   apiBase?: string
+  /** `session.limits` (additive, SIZE-F1): active document size limits; absent in unit-test sessions */
+  limits?: DocumentSizeLimits
 }
 
 type HostHandler<K extends keyof HostRequests> = (
@@ -79,6 +86,8 @@ export interface FramePort {
   reportSaved(payload: SavedPayload): void
   /** protocol `aiRun` event (X-02; optional for older clients, the headless port and mocks) */
   reportAiRun?(payload: AiRunPayload): void
+  /** protocol `open_refused` event (SIZE-F1 §3.1a; the bridges send it at most once per documentId) */
+  reportOpenRefused?(payload: OpenRefusedPayload): void
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
   /**
    * The frame token for the direct AI calls (C16; the real client has both). Absent on ports with
@@ -86,6 +95,14 @@ export interface FramePort {
    */
   getToken?(): Promise<string>
   refreshToken?(reason: 'expiring' | 'unauthorized'): Promise<string>
+  /** answer the host's `doc.download` request (SIZE-F1; optional for older clients and mocks) */
+  handleDownload?(handler: HostHandler<'doc.download'>): () => void
+  /** protocol `size_warning` event (SIZE-F1; optional for older clients and mocks) */
+  reportSizeWarning?(payload: SizeWarningPayload): void
+  /** protocol `save_blocked` event (SIZE-F1; optional for older clients and mocks) */
+  reportSaveBlocked?(payload: SaveBlockedPayload): void
+  /** protocol `lag_detected` event (UNI-1865; optional for older clients and mocks) */
+  reportLagDetected?(payload: LagDetectedPayload): void
 }
 
 export function errorCode(err: unknown): ProtocolErrorCode {

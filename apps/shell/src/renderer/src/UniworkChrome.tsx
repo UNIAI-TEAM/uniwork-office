@@ -18,7 +18,8 @@ import { asSyncCenterSnapshot } from '../../shared/sync-center'
 import { useI18n, type StringKey } from './locale'
 import { useAccount } from './account-model'
 import { onLocalRename, onUniworkNotice } from './uniwork-notice-bus'
-import { onDocRenamed } from './uniwork-library-api'
+import { onDocRenamed, saveLocalCopy } from './uniwork-library-api'
+import { ActionModal } from './UniworkDocActions'
 import {
   DISCUSSION_PANEL_ID,
   DISCUSSION_TOGGLE_ID,
@@ -39,6 +40,8 @@ import {
   type MiniGlyph,
   pathKey,
   remoteBarModelOf,
+  saveBlockCopyOf,
+  sizeWarnTextOf,
   type ChipActionKind,
   type LaunchNotice,
   type RemoteBarAction,
@@ -56,11 +59,18 @@ import {
   measurePillFit,
   pillFitStepOf,
   shortLabelOf,
+  warnChipMaxOf,
   type PillVariant,
   type PillWidths,
   type ToggleWidths,
 } from './uniwork-pill-fit'
-import { setTopInsetPart, uiScaleOf } from './uniwork-top-inset'
+import {
+  popoverRoomOf,
+  setTopInsetPart,
+  uiScaleOf,
+  unscaledHeightOf,
+  useTopInsetPart,
+} from './uniwork-top-inset'
 import type { SyncCenterRow } from '../../shared/sync-center'
 
 /**
@@ -323,10 +333,12 @@ function usePillFit(
   groupRef: RefObject<HTMLDivElement | null>,
   key: string,
   hasShort: boolean,
-): PillVariant {
+  hasWarn = false,
+): { variant: PillVariant; warnMax: number | null } {
   const { iconOnly: drawnIconOnly, setIconOnly: publish } = useContext(ToggleFitContext)
   const [variant, setVariant] = useState<PillVariant>('full')
   const [iconToggle, setIconToggle] = useState(false)
+  const [warnMax, setWarnMax] = useState<number | null>(null)
   // bumped by whatever changes the room (a resize, a tab, the holder's size): measure again
   const [pass, setPass] = useState(0)
   const widths = useRef<PillWidths>({})
@@ -355,6 +367,7 @@ ${uiScaleOf(el)}`
       toggleWidths.current = {}
       if (variant !== 'full') setVariant('full')
       if (iconToggle) setIconToggle(false)
+      if (warnMax !== null) setWarnMax(null)
       return
     }
     widths.current[variant] = fit.natural
@@ -371,8 +384,17 @@ ${uiScaleOf(el)}`
     })
     if (next.variant !== variant) setVariant(next.variant)
     if (next.iconToggle !== iconToggle) setIconToggle(next.iconToggle)
+    const nextWarnMax =
+      fit.warnRoom === null
+        ? null
+        : warnChipMaxOf({
+            room: fit.warnRoom,
+            pillWidth: widths.current[next.variant] ?? fit.natural,
+            scale: fit.scale,
+          })
+    if (nextWarnMax !== warnMax) setWarnMax(nextWarnMax)
     // drawnIconOnly: the toggle took its new form (the sibling re-rendered), measure it as drawn
-  }, [groupRef, key, variant, iconToggle, drawnIconOnly, hasShort, pass])
+  }, [groupRef, key, variant, iconToggle, drawnIconOnly, hasShort, hasWarn, warnMax, pass])
 
   // the toggle (a sibling) reads it; it goes back to its full form with this pill
   useLayoutEffect(() => {
@@ -419,7 +441,7 @@ ${uiScaleOf(el)}`
     }
   }, [groupRef])
 
-  return variant
+  return { variant, warnMax }
 }
 
 /** the states whose arrival is said to a screen reader at once (EXPERIENCE: blocked, failed, conflict) */
@@ -467,17 +489,149 @@ export function UniworkStatusChip({
   const row = useQueueRowOf(status)
   const queuedAt = QUEUED_STATES.has(status.state) ? row?.savedAt : undefined
   const failedReasonKey = status.state === 'failed' ? failedReasonKeyOf(status, row) : undefined
-  const model = chipModelOf(status, { needsSignIn: !accountOk, queuedAt, failedReasonKey })
+  const maxBytes = row?.maxBytes ?? status.maxBytes
+  const model = chipModelOf(status, {
+    needsSignIn: !accountOk,
+    queuedAt,
+    failedReasonKey,
+    maxBytes,
+  })
   const { label, tip, title } = chipCopy(model, t, dateLocale)
   const action = model.action
   const shortLabel = shortLabelOf(label)
   const glyph = miniGlyphOf(model, status.state)
-  const variant = usePillFit(
+  const [warnDismissedFor, setWarnDismissedFor] = useState<string | null>(null)
+  const [, setBlockTick] = useState(0)
+  const blockLatchRef = useRef<{
+    path: string
+    open: boolean
+    lastToken: string | null
+    wasPrompting: boolean
+    maxBytes?: number
+  }>({
+    path: '',
+    open: false,
+    lastToken: null,
+    wasPrompting: false,
+  })
+  const [savingLocal, setSavingLocal] = useState(false)
+  const blockTitleId = useId()
+  const blockBodyId = useId()
+
+  // Latch the save-block dialog in the renderer (SIZE-fe-d2-2): open on the
+  // rising edge of a new prompt (keyed by monotonic saveTooLargePromptSeq, or
+  // size/rising-edge when seq is absent), keep open across status publishes
+  // that omit the one-shot flag, and close only on Close, a successful local
+  // copy, a document switch, or a later `saved` state.
+  const currentPath = pathKey(status.path)
+  const hasPrompt = Boolean(status.saveTooLargePrompt)
+  const hasExplicitSeq = typeof status.saveTooLargePromptSeq === 'number'
+  const promptToken = hasPrompt
+    ? `${currentPath}#${
+        hasExplicitSeq
+          ? `seq:${status.saveTooLargePromptSeq}`
+          : `size:${status.sizeBytes ?? 0}:${status.maxBytes ?? 0}`
+      }`
+    : null
+  if (blockLatchRef.current.path !== currentPath) {
+    blockLatchRef.current = {
+      path: currentPath,
+      open: false,
+      lastToken: null,
+      wasPrompting: false,
+      maxBytes: undefined,
+    }
+  }
+  if (status.state === 'saved') {
+    blockLatchRef.current.open = false
+    blockLatchRef.current.lastToken = null
+    blockLatchRef.current.wasPrompting = false
+  } else if (promptToken !== null) {
+    if (promptToken !== blockLatchRef.current.lastToken) {
+      blockLatchRef.current.lastToken = promptToken
+      blockLatchRef.current.open = true
+    }
+    blockLatchRef.current.wasPrompting = true
+  } else {
+    if (blockLatchRef.current.wasPrompting && blockLatchRef.current.lastToken?.includes('#size:')) {
+      blockLatchRef.current.lastToken = null
+    }
+    blockLatchRef.current.wasPrompting = false
+  }
+  if (maxBytes !== undefined) {
+    blockLatchRef.current.maxBytes = maxBytes
+  }
+  const closeSaveBlock = useCallback(() => {
+    if (!blockLatchRef.current.open) return
+    blockLatchRef.current.open = false
+    setBlockTick((n) => n + 1)
+    if (popoverRef.current) {
+      const popEl = document.querySelector<HTMLElement>('.uw-queue-pop')
+      const target = popEl?.isConnected
+        ? popEl
+        : buttonRef.current?.isConnected
+          ? buttonRef.current
+          : groupRef.current
+      target?.focus()
+      return
+    }
+    window.aiOfficeTabs?.focusActive()
+  }, [])
+
+  useEffect(() => {
+    if (!status.sizeWarn && status.state === 'saved') {
+      setWarnDismissedFor(null)
+    }
+  }, [status.path, status.sizeWarn, status.state])
+
+  const warnKey = status.sizeWarn ? `${currentPath}:${status.sizeWarn.maxBytes}` : null
+  const showSizeWarn = Boolean(status.sizeWarn && warnKey && warnDismissedFor !== warnKey)
+  const sizeWarnText = showSizeWarn ? sizeWarnTextOf(status.sizeWarn, t, dateLocale) : null
+  const { variant, warnMax } = usePillFit(
     groupRef,
     `${label}
 ${action ? t(action.labelKey) : ''}`,
     shortLabel !== label,
+    Boolean(sizeWarnText && warnKey),
   )
+  const showSaveBlock = blockLatchRef.current.open
+  const saveBlockCopy = showSaveBlock
+    ? saveBlockCopyOf(blockLatchRef.current.maxBytes, t, dateLocale)
+    : null
+  const blockBandRef = useRef<HTMLDivElement>(null)
+  const barPx = useTopInsetPart('bar')
+  const popoverPx = useTopInsetPart('popover')
+  const blockAbovePx = barPx + popoverPx
+  const blockRoom = popoverRoomOf(blockAbovePx)
+  const blockRoomRef = useRef(blockRoom)
+  useLayoutEffect(() => {
+    blockRoomRef.current = blockRoom
+  })
+  useLayoutEffect(() => {
+    const band = blockBandRef.current
+    if (!showSaveBlock || !band) {
+      setTopInsetPart('saveBlock', 0)
+      return
+    }
+    const measure = () => {
+      setTopInsetPart('saveBlock', Math.min(unscaledHeightOf(band), blockRoomRef.current))
+    }
+    measure()
+    let observer: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measure)
+      observer.observe(band)
+    }
+    return () => {
+      observer?.disconnect()
+      setTopInsetPart('saveBlock', 0)
+    }
+  }, [showSaveBlock])
+  useLayoutEffect(() => {
+    const band = blockBandRef.current
+    if (!showSaveBlock || !band) return
+    setTopInsetPart('saveBlock', Math.min(unscaledHeightOf(band), blockRoom))
+  }, [showSaveBlock, blockRoom])
 
   // the button never leaves while focus is on it without the pill taking the focus first (a
   // callback ref runs before the node is removed; focus dropped to <body> would lose the place).
@@ -530,6 +684,21 @@ ${action ? t(action.labelKey) : ''}`,
     // t is not referentially stable (CLAUDE.md): the key is the dependency, the text is made now
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, status.pendingNext])
+
+  const sizeWarnTextRef = useRef(sizeWarnText)
+  sizeWarnTextRef.current = sizeWarnText
+  const lastAnnouncedWarnKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!showSizeWarn || !warnKey) {
+      if (!warnKey) lastAnnouncedWarnKeyRef.current = null
+      return
+    }
+    if (lastAnnouncedWarnKeyRef.current === warnKey) return
+    lastAnnouncedWarnKeyRef.current = warnKey
+    if (sizeWarnTextRef.current) {
+      announce(sizeWarnTextRef.current)
+    }
+  }, [showSizeWarn, warnKey])
 
   // Ctrl/Cmd+S on a document with a waiting save: main asks for the popover (a conflict opens the
   // resolve choice instead). This chip only exists for the active tab, so another path is ignored.
@@ -614,11 +783,41 @@ ${action ? t(action.labelKey) : ''}`,
   }, [focusWithin, measureTip])
   const tipStyle =
     tipRoom === null ? undefined : ({ '--uw-tip-room': `${tipRoom}px` } as CSSProperties)
+  const warnStyle =
+    warnMax === null ? undefined : ({ '--uw-warn-max': `${warnMax}px` } as CSSProperties)
 
   // the pill group is the keyboard stop only when it has no button to carry the description
   const describedHere = !action
   return (
     <>
+      {sizeWarnText && warnKey && (
+        <div
+          className="uw-pill uw-size-warn"
+          data-tone="warn"
+          title={sizeWarnText}
+          style={warnStyle}
+        >
+          <span className="uw-pill-status">
+            <span className="uw-pill-dot" aria-hidden="true" />
+            <span className="uw-pill-label">{sizeWarnText}</span>
+          </span>
+          <button
+            type="button"
+            className="uw-pill-close"
+            aria-label={t('uwSizeWarnDismiss')}
+            onClick={() => setWarnDismissedFor(warnKey)}
+          >
+            <svg width="10" height="10" viewBox="0 0 14 14" aria-hidden="true">
+              <path
+                d="M3 3l8 8M11 3l-8 8"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
       <div
         ref={groupRef}
         className="uw-pill"
@@ -738,6 +937,54 @@ ${action ? t(action.labelKey) : ''}`,
           onSignIn={() => account.signIn()}
           onFocusEditor={() => window.aiOfficeTabs?.focusActive()}
         />
+      )}
+      {saveBlockCopy && (
+        <div
+          ref={blockBandRef}
+          className="uw-save-block-band"
+          data-uw-save-block-band=""
+          style={
+            {
+              top: `calc(var(--tab-bar-height, 40px) + ${blockAbovePx}px)`,
+              '--uw-save-block-room': `${blockRoom}px`,
+            } as CSSProperties
+          }
+        >
+          <ActionModal
+            labelledBy={blockTitleId}
+            describedBy={blockBodyId}
+            className="uw-save-block-modal"
+            initialFocus=".btn-primary"
+            restoreFocus={false}
+            onCancel={closeSaveBlock}
+          >
+            <h3 id={blockTitleId}>{saveBlockCopy.title}</h3>
+            <p id={blockBodyId}>{saveBlockCopy.body}</p>
+            <div className="modal-buttons">
+              <button type="button" className="btn btn-secondary" onClick={closeSaveBlock}>
+                {saveBlockCopy.close}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                aria-disabled={savingLocal ? 'true' : undefined}
+                aria-busy={savingLocal ? 'true' : undefined}
+                onClick={() => {
+                  if (savingLocal) return
+                  setSavingLocal(true)
+                  void saveLocalCopy(status.path)
+                    .then((saved) => {
+                      if (saved) closeSaveBlock()
+                    })
+                    .catch(() => undefined)
+                    .finally(() => setSavingLocal(false))
+                }}
+              >
+                {saveBlockCopy.saveLocal}
+              </button>
+            </div>
+          </ActionModal>
+        </div>
       )}
     </>
   )

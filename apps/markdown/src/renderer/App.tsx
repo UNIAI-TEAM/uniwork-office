@@ -475,6 +475,8 @@ export default function App() {
           if (cancelled) return
           loadFromPath(path, raw)
           jumpToWikiFragment(path)
+          // LAG-F1 (web frame): the document is mounted; the lag detector's settle stamp starts now
+          window.markdownApi.noteDocumentMounted?.()
         } else {
           envelopeRef.current = { ...EMPTY_ENVELOPE }
         }

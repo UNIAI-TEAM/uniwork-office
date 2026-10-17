@@ -154,4 +154,14 @@ export const ru = {
   uwDocUploading: 'Загрузка «{name}»…',
   uwDocLocationTop: 'Верхний уровень',
   uwDocArchived: 'В архиве',
+  uwSizeWarnChip: 'Приближается к лимиту {max} (сейчас {size}).',
+  uwSizeWarnDismiss: 'Закрыть предупреждение о размере',
+  uwSaveBlockTitle: 'Не удалось сохранить в UniWork',
+  uwSaveBlockBody:
+    'Этот документ превышает {max}. Ваши изменения по-прежнему здесь. Скачайте копию на компьютер, а затем уменьшите размер изображений или разделите документ.',
+  uwSaveBlockSaveCopyLocal: 'Сохранить копию на компьютер',
+  uwClose: 'Закрыть',
+  uwErrUploadTooLarge:
+    'Размер {name} — {size}, что превышает лимит {max}. Уменьшите размер изображений или разделите файл, затем загрузите снова.',
+  uwReasonTooLargeWithLimit: 'превышает лимит {max}',
 } satisfies Record<keyof typeof zh, string>

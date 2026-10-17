@@ -46,6 +46,11 @@ export const cs = {
   appOpenFailed: 'Otevření se nezdařilo: {error}',
   appDocTooLargeBlocks:
     '{name}: dokument je příliš velký k otevření ({blocks} odstavců, {chars} znaků)',
+  appDocTooLargeUncompressed:
+    '{name}: dokument je příliš velký nebo příliš složitý pro otevření na webu.',
+  appDocTooComplexParts:
+    '{name}: dokument je příliš složitý pro otevření na webu ({parts} částí, limit {limit}).',
+  appDocOpenOutOfMemory: '{name}: dokument je příliš velký a při otevírání došla paměť prohlížeče.',
   appDocLargeReadOnly:
     'Velký dokument ({blocks} odstavců): otevřen v režimu čtení — stiskněte Esc pro úpravy',
   appDocLargeSpellOff:

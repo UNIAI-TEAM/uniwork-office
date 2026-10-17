@@ -793,12 +793,14 @@ export class QueueDispatcher {
   private async failCommit(doc: QueueDoc, error: unknown, now: number): Promise<void> {
     const code = error instanceof UniworkDocError ? error.code : 'server_error'
     const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+    const maxBytes = error instanceof UniworkDocError ? error.maxBytes : undefined
     await this.apply(
       doc,
       {
         type: 'commitFailed',
         error: code,
         ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+        ...(maxBytes === undefined ? {} : { maxBytes }),
       },
       now,
       error,

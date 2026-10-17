@@ -92,7 +92,7 @@ function fakeTransport(features: Partial<SheetsEngineTransport['features']> = {}
 
 function saveRequest(
   sessionId: string,
-  edits: Array<[number, number, number]>,
+  edits: Array<[number, number, number | string]>,
   mode: 'save' | 'save-as' = 'save',
 ) {
   return {
@@ -120,6 +120,8 @@ function setup(
     drafts?: (host: import('../../docs/bridge/draft-recovery').DraftHost) => DraftRecovery
     /** the revision the handshake open reports (G5-03w: an event must be newer than it) */
     revision?: string
+    /** SIZE-F1: `init.limits` the host advertises for the session */
+    limits?: { max_bytes: number; warn_ratio: number }
   } = {},
 ) {
   const mock = createMockPort({ documentId: 'pending' })
@@ -167,6 +169,7 @@ function setup(
     download,
     async boot(): Promise<WorkbookFile> {
       mock.init({
+        ...(opts.limits ? { limits: opts.limits } : {}),
         documentId: file.fileId,
         capabilities: opts.grants ?? ALL_GRANTS,
         ...(opts.revision !== undefined
@@ -733,16 +736,16 @@ describe('view-only (no save grant)', () => {
   })
 })
 
-describe('too large (frame size gate)', () => {
-  it('the open fails with too_large and the host hears a fatal too_large (it opens G3)', async () => {
+describe('too large and open refusal (SIZE-F1)', () => {
+  it('the open fails with too_large and the host hears open_refused + fatal too_large; saves are refused', async () => {
     const fake = fakeTransport()
     const tooLarge = {
       ...fake.transport,
       open: async () => {
-        throw Object.assign(new Error('too_large: 42 MB of worksheet XML'), {
+        throw Object.assign(new Error('too_large: 513 MB of worksheet XML'), {
           code: 'too_large',
-          worksheetXmlBytes: 42 * 1048576,
-          limitBytes: 80 * 1048576,
+          worksheetXmlBytes: 513 * 1048576,
+          limitBytes: 512 * 1048576,
         })
       },
     }
@@ -751,13 +754,208 @@ describe('too large (frame size gate)', () => {
     await flush()
     const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
     expect((err as { code?: string }).code).toBe('too_large')
+    expect(t.mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: 2,
+        measure: {
+          kind: 'worksheet_xml_bytes',
+          value: 513 * 1048576,
+          limit: 512 * 1048576,
+        },
+      },
+    ])
     const fatal = t.mock.errors.filter((e) => (e.error as { code?: string }).code === 'too_large')
     expect(fatal).toHaveLength(1)
     expect(fatal[0]!.fatal).toBe(true)
     // the sizes the host needs for its one-sentence reason (visual round 2, S-07)
     expect(fatal[0]!.error).toMatchObject({
-      details: { worksheetXmlBytes: 42 * 1048576, limitBytes: 80 * 1048576 },
+      details: { worksheetXmlBytes: 513 * 1048576, limitBytes: 512 * 1048576 },
     })
+    await expect(t.desktop.saveWorkbookEdits(saveRequest('s1', [[0, 0, 1]]))).rejects.toThrow(
+      /513 MB/,
+    )
+    expect(await t.desktop.writeWorkbookRecovery(saveRequest('s1', [[0, 0, 1]]))).toEqual({
+      ok: false,
+    })
+    expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(await t.mock.host.saveAs({ name: 'Copy.xlsx' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(t.mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toEqual([])
+  })
+
+  it('engine out of memory emits one open_refused + fatal too_large, blocks saves, and resets when another documentId opens', async () => {
+    const fake = fakeTransport()
+    let failOom = true
+    const oomTransport: SheetsEngineTransport = {
+      ...fake.transport,
+      async open(input) {
+        if (failOom) {
+          throw new Error(
+            'open_workbook failed: memory allocation of 67108864 bytes failed (out of memory)',
+          )
+        }
+        return fake.transport.open(input)
+      },
+    }
+    const t = setup({ transport: oomTransport })
+    t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((err as { code?: string }).code).toBe('too_large')
+    expect(t.mock.openRefused).toEqual([
+      {
+        reason: 'engine_out_of_memory',
+        bytes: 2,
+      },
+    ])
+    const fatal = t.mock.errors.filter((e) => (e.error as { code?: string }).code === 'too_large')
+    expect(fatal).toHaveLength(1)
+    expect(fatal[0]!.fatal).toBe(true)
+    expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(t.mock.calls.filter((c) => c.type === 'api.save')).toEqual([])
+
+    // Opening another documentId resets the refused state and allows saving
+    failOom = false
+    const other = t.mock.seed('Small.xlsx', enc('small-v1'))
+    await t.mock.host.open(t.mock.openPayload(other.fileId))
+    const wb = await t.desktop.selectWorkbook()
+    expect(wb?.name).toBe('Small.xlsx')
+    await t.desktop.saveWorkbookEdits(saveRequest(wb!.sessionId, [[0, 0, 99]]))
+    expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+  })
+
+  it.each([
+    [
+      // Rust std::alloc::default_alloc_error_hook (library/std/src/alloc.rs)
+      'Rust alloc error without "out of memory" suffix',
+      () => new Error('memory allocation of 67108864 bytes failed'),
+      'too_large',
+    ],
+    [
+      // Rust alloc error wrapped by EngineCrashedError (web/modules/sheets/engine/host.ts:41-52)
+      'EngineCrashedError wrapping Rust alloc failure',
+      () =>
+        Object.assign(
+          new Error(
+            'engine_crashed: the workbook engine stopped (unreachable): memory allocation of 67108864 bytes failed',
+          ),
+          { code: 'engine_crashed' },
+        ),
+      'engine_crashed',
+    ],
+    [
+      // V8 WebAssembly memory instantiate/grow failure (v8/src/wasm/wasm-js.cc)
+      'V8 Cannot allocate Wasm memory',
+      () => new RangeError('Cannot allocate Wasm memory'),
+      'too_large',
+    ],
+    [
+      // V8 ArrayBuffer allocation failure (v8/src/builtins/builtins-arraybuffer.cc)
+      'V8 Array buffer allocation failed',
+      () => new RangeError('Array buffer allocation failed'),
+      'too_large',
+    ],
+  ])(
+    'classifies real OOM form (%s) as engine_out_of_memory + fatal too_large without overwriting an existing err.code (d2-3, d3-1)',
+    async (_label, makeError, expectedCode) => {
+      const fake = fakeTransport()
+      const transport: SheetsEngineTransport = {
+        ...fake.transport,
+        async open() {
+          throw makeError()
+        },
+      }
+      const t = setup({ transport })
+      t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
+      await flush()
+      const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
+      expect((err as { code?: string }).code).toBe(expectedCode)
+      expect(t.mock.openRefused).toEqual([
+        {
+          reason: 'engine_out_of_memory',
+          bytes: 2,
+        },
+      ])
+      const fatal = t.mock.errors.filter((e) => (e.error as { code?: string }).code === 'too_large')
+      expect(fatal).toHaveLength(1)
+      expect(fatal[0]!.fatal).toBe(true)
+    },
+  )
+
+  it('does not classify bare engine_crashed "(unreachable)" with no memory text as open_refused and preserves its own code (d3-1)', async () => {
+    const fake = fakeTransport()
+    const transport: SheetsEngineTransport = {
+      ...fake.transport,
+      async open() {
+        throw Object.assign(
+          new Error('engine_crashed: the workbook engine stopped (unreachable)'),
+          {
+            code: 'engine_crashed',
+          },
+        )
+      },
+    }
+    const t = setup({ transport })
+    t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((err as { code?: string }).code).toBe('engine_crashed')
+    expect(t.mock.openRefused).toEqual([])
+    expect(t.mock.errors).toEqual([])
+  })
+
+  it('treats zip "cannot be inflated" as a corrupt file (not open_refused) and keeps declared/total uncompressed size gates as too_large_to_open (d2-4)', async () => {
+    const fake = fakeTransport()
+    let failureMsg =
+      'zip rejected: part xl/worksheets/sheet1.xml cannot be inflated: invalid block type'
+    const transport: SheetsEngineTransport = {
+      ...fake.transport,
+      async open() {
+        throw new Error(failureMsg)
+      },
+    }
+    const corrupt = setup({ transport })
+    corrupt.mock.init({ documentId: corrupt.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const corruptErr = await corrupt.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((corruptErr as { code?: string }).code).not.toBe('too_large')
+    expect(corrupt.mock.openRefused).toEqual([])
+
+    failureMsg =
+      'zip rejected: part xl/worksheets/sheet1.xml declares 300000000 uncompressed bytes (over the 268435456 per-part limit)'
+    const declared = setup({ transport })
+    declared.mock.init({ documentId: declared.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const declaredErr = await declared.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((declaredErr as { code?: string }).code).toBe('too_large')
+    expect(declared.mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: 2,
+      },
+    ])
+
+    failureMsg = 'zip rejected: total uncompressed size 600000000 exceeds the 536870912 limit'
+    const total = setup({ transport })
+    total.mock.init({ documentId: total.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const totalErr = await total.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((totalErr as { code?: string }).code).toBe('too_large')
+    expect(total.mock.openRefused).toEqual([
+      {
+        reason: 'too_large_to_open',
+        bytes: 2,
+      },
+    ])
   })
 })
 
@@ -1190,5 +1388,47 @@ describe('the comments version notifier (G8-12 §3.3)', () => {
     } finally {
       off()
     }
+  })
+})
+
+describe('save size gate (SIZE-F1, UNI-1861)', () => {
+  it('blocks save and save-as above limits.max_bytes without api.save / api.saveAs and resolves canceled so the editor raises no error toast', async () => {
+    const t = setup({ limits: { max_bytes: 64, warn_ratio: 0.5 } })
+    const wb = await t.boot()
+    // 'v1|0:0=<80 chars>' ≈ 90 bytes > 64 B max_bytes -> blocked before api.save
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]])),
+    ).resolves.toEqual({ canceled: true })
+    expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(t.mock.saveBlocked).toHaveLength(1)
+
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]], 'save-as')),
+    ).resolves.toEqual({ canceled: true })
+    expect(t.mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
+    expect(t.mock.saveBlocked).toHaveLength(2)
+
+    // Host-initiated save and saveAs still receive the protocol too_large error
+    const offClose = t.desktop.onCloseSaveRequest(() => {
+      void t.desktop
+        .saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]]))
+        .then((r) => t.desktop.reportCloseSaveResult(!r.canceled))
+    })
+    const offMenu = t.desktop.onMenuAction((a) => {
+      if (a === 'save-as')
+        void t.desktop.saveWorkbookEdits(
+          saveRequest(wb.sessionId, [[0, 0, 'x'.repeat(80)]], 'save-as'),
+        )
+    })
+    expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(await t.mock.host.saveAs({ name: 'Copy.xlsx' })).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    offClose()
+    offMenu()
   })
 })

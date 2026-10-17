@@ -12,7 +12,7 @@ import { renderSlidesToPdfPages } from './export-pages'
 import { renderSlidesToPngBase64 } from './export-render'
 import { t } from './i18n/locale'
 import { showToast } from './components/toast-bus'
-import { cap, isViewOnly } from './capabilities'
+import { cap, isViewOnly, isWeb } from './capabilities'
 
 /**
  * If a text box/table is still being edited on ⌘S/close-save, blur first so the
@@ -113,7 +113,7 @@ export async function save(
       const saved = t('appStatusSaved')
       ctx.setStatus(saved)
       if (!quiet) showToast(saved)
-    } else {
+    } else if (!isWeb() || r.error) {
       const failed = t('appStatusSaveFailed', { error: r.error ?? t('appErrorCanceled') })
       ctx.setStatus(failed)
       // quiet suppresses the success toast only — a failed save (incl. the 30s

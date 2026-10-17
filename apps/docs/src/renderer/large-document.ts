@@ -16,6 +16,7 @@ import type { Block, TableModel } from '@genoffice/docx-engine'
 export const CHARS_PER_BLOCK = 110
 export const LARGE_DOC_READ_ONLY_WEIGHT = 115_000
 export const HUGE_DOC_REFUSE_WEIGHT = 230_000
+export const HUGE_DOC_REFUSE_CHARS = HUGE_DOC_REFUSE_WEIGHT * CHARS_PER_BLOCK
 /**
  * Above this the document opens with check-as-you-type spelling off: Chromium
  * re-checks whole paragraphs on every edit, which was 40% of the main-thread
@@ -35,6 +36,23 @@ export function openTierFor(weight: number): OpenTier {
 
 export function docWeight(blocks: Block[]): number {
   return blocks.length + Math.round(docTextLength(blocks) / CHARS_PER_BLOCK)
+}
+
+/**
+ * Structured measure for `open_refused` when a document exceeds HUGE_DOC_REFUSE_WEIGHT:
+ * reports `paragraphs` when block count tripped or dominates, otherwise `characters`.
+ */
+export function refusalMeasureFor(blocks: Block[]): {
+  kind: 'paragraphs' | 'characters'
+  value: number
+  limit: number
+} {
+  const chars = docTextLength(blocks)
+  const charWeight = Math.round(chars / CHARS_PER_BLOCK)
+  if (blocks.length > HUGE_DOC_REFUSE_WEIGHT || blocks.length >= charWeight) {
+    return { kind: 'paragraphs', value: blocks.length, limit: HUGE_DOC_REFUSE_WEIGHT }
+  }
+  return { kind: 'characters', value: chars, limit: HUGE_DOC_REFUSE_CHARS }
 }
 
 /** characters of body text: paragraph runs and table cell text (nested tables included) */

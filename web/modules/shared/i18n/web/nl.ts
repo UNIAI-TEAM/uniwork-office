@@ -131,4 +131,12 @@ export const nl = {
   uwReasonArchived: 'document gearchiveerd',
   uwReasonSuspended: 'organisatie opgeschort',
   uwReasonDeactivated: 'je account is gedeactiveerd in deze organisatie',
+
+  webSizeWarnChip: 'Nadert de limiet van {max} (momenteel {size}).',
+  webSaveBlockTitle: 'Kan niet opslaan in UniWork',
+  webSaveBlockBody:
+    'Dit document is groter dan {max}. Je wijzigingen staan nog hier. Download je kopie naar je computer en verklein daarna de afbeeldingen of splits het document.',
+  webSaveBlockDownload: 'Mijn kopie downloaden',
+  uwConflictTooLargeWithLimit:
+    'Je versie is groter dan {max} (momenteel {size}). Kies “Mijn kopie downloaden” of sluit dit venster om de bestandsgrootte te verkleinen.',
 } satisfies Record<keyof typeof zh, string>

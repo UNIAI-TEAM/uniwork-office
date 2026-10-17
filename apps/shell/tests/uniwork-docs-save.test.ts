@@ -603,9 +603,15 @@ describe('save pipeline', () => {
     const path = await openDoc(ctx)
     writeFileSync(path, 'v4')
     let seen: unknown
-    server.fetch.mockImplementationOnce(async () => {
-      seen = await intentOf(ctx, path)
-      throw new TypeError('fetch failed')
+    const baseFetch = server.fetch.getMockImplementation()!
+    let intercepted = false
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      if (!intercepted && new URL(url).pathname !== '/api/v1/config') {
+        intercepted = true
+        seen = await intentOf(ctx, path)
+        throw new TypeError('fetch failed')
+      }
+      return baseFetch(url, init)
     })
     await ctx.service.save(path)
     expect((seen as PendingIntentValue | null)?.intent).toMatchObject({
@@ -858,7 +864,17 @@ describe('secrets and egress', () => {
       await ctx.service.listWorkspaces(),
     ])
     expect(payloads).not.toContain(TOKEN)
-    for (const call of server.calls) {
+    const configCalls = server.calls.filter((call) => call.path === '/api/v1/config')
+    const authCalls = server.calls.filter((call) => call.path !== '/api/v1/config')
+    expect(configCalls.length).toBeGreaterThan(0)
+    expect(authCalls.length).toBeGreaterThan(0)
+    for (const call of configCalls) {
+      expect(call.headers.authorization).toBeUndefined()
+      expect(JSON.stringify(call.headers)).not.toContain(TOKEN)
+      expect(call.url).toBe(`${ORIGIN}/api/v1/config`)
+      expect(call.url).not.toContain(TOKEN)
+    }
+    for (const call of authCalls) {
       expect(call.headers.authorization).toBe(`Bearer ${TOKEN}`)
       expect(call.url.startsWith(`${ORIGIN}/api/v1/`)).toBe(true)
       expect(call.url).not.toContain(TOKEN)

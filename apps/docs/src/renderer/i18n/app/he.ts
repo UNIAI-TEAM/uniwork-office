@@ -45,6 +45,9 @@ export const he = {
   appOpenedFile: '{name} נפתח',
   appOpenFailed: 'הפתיחה נכשלה: {error}',
   appDocTooLargeBlocks: '{name}: המסמך גדול מדי לפתיחה ({blocks} פסקאות, {chars} תווים)',
+  appDocTooLargeUncompressed: '{name}: המסמך גדול מדי או מורכב מדי לפתיחה באינטרנט.',
+  appDocTooComplexParts: '{name}: המסמך מורכב מדי לפתיחה באינטרנט ({parts} חלקים, מגבלה {limit}).',
+  appDocOpenOutOfMemory: '{name}: המסמך גדול מדי וזיכרון הדפדפן אזל בעת הפתיחה.',
   appDocLargeReadOnly: 'מסמך גדול ({blocks} פסקאות): נפתח במצב קריאה — הקש Esc לעריכה',
   appDocLargeSpellOff:
     'מסמך גדול ({blocks} פסקאות): בדיקת האיות בזמן ההקלדה כבויה — ניתן להפעיל אותה תחת סקירה › איות',

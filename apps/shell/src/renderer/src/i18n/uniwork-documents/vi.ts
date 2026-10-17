@@ -148,4 +148,14 @@ export const vi = {
   uwDocUploading: 'Đang tải lên “{name}”…',
   uwDocLocationTop: 'Cấp trên cùng',
   uwDocArchived: 'Đã lưu trữ',
+  uwSizeWarnChip: 'Sắp chạm giới hạn {max} (đang {size}).',
+  uwSizeWarnDismiss: 'Đóng cảnh báo dung lượng',
+  uwSaveBlockTitle: 'Chưa lưu được lên UniWork',
+  uwSaveBlockBody:
+    'Tài liệu đã vượt {max}. Thay đổi của bạn vẫn ở đây. Tải bản của bạn về máy rồi giảm dung lượng ảnh hoặc chia nhỏ tài liệu.',
+  uwSaveBlockSaveCopyLocal: 'Lưu bản sao về máy',
+  uwClose: 'Đóng',
+  uwErrUploadTooLarge:
+    '{name} nặng {size}, vượt giới hạn {max}. Giảm dung lượng ảnh hoặc chia nhỏ tệp rồi tải lên lại.',
+  uwReasonTooLargeWithLimit: 'vượt giới hạn {max}',
 } satisfies Record<keyof typeof zh, string>

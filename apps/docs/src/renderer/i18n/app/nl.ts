@@ -46,6 +46,12 @@ export const nl = {
   appOpenFailed: 'Openen mislukt: {error}',
   appDocTooLargeBlocks:
     "{name}: het document is te groot om te openen ({blocks} alinea's, {chars} tekens)",
+  appDocTooLargeUncompressed:
+    '{name}: het document is te groot of te complex om op het web te openen.',
+  appDocTooComplexParts:
+    '{name}: het document is te complex om op het web te openen ({parts} onderdelen, limiet {limit}).',
+  appDocOpenOutOfMemory:
+    '{name}: het document is te groot en het browsergeheugen raakte vol tijdens het openen.',
   appDocLargeReadOnly:
     "Groot document ({blocks} alinea's): geopend in leesmodus — druk op Esc om te bewerken",
   appDocLargeSpellOff:

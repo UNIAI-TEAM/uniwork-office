@@ -55,13 +55,13 @@ export type QueueEvent =
   | { type: 'dispatch' }
   | { type: 'uploaded' }
   | { type: 'committed'; receipt: IntentReceipt }
-  | { type: 'commitFailed'; error: UniworkDocErrorCode; retryAfterMs?: number }
+  | { type: 'commitFailed'; error: UniworkDocErrorCode; retryAfterMs?: number; maxBytes?: number }
   | (
       | { type: 'lookup'; outcome: 'committed'; receipt: IntentReceipt }
       | { type: 'lookup'; outcome: 'not_committed' }
       | { type: 'lookup'; outcome: 'in_flight'; retryAfterMs?: number }
       | { type: 'lookup'; outcome: 'unknown' }
-      | { type: 'lookup'; error: UniworkDocErrorCode; retryAfterMs?: number }
+      | { type: 'lookup'; error: UniworkDocErrorCode; retryAfterMs?: number; maxBytes?: number }
     )
   | { type: 'pause' }
   | { type: 'resume' }
@@ -195,7 +195,14 @@ const SUPERSEDABLE = new Set<QueueState>([
   'conflict',
 ])
 
-const OPTIONAL_KEYS = ['retryAt', 'reconcileSince', 'receipt', 'lastError', 'cancelReason'] as const
+const OPTIONAL_KEYS = [
+  'retryAt',
+  'reconcileSince',
+  'receipt',
+  'lastError',
+  'maxBytes',
+  'cancelReason',
+] as const
 
 function withState(
   record: IntentRecordV2,
@@ -231,6 +238,7 @@ function enterReconciling(record: IntentRecordV2, ctx: QueueContext): IntentReco
     reconcileSince: record.reconcileSince ?? iso(ctx.now),
     retryAt: undefined,
     lastError: undefined,
+    maxBytes: undefined,
   })
 }
 
@@ -313,6 +321,7 @@ function onCommitted(
       retryAt: undefined,
       reconcileSince: undefined,
       lastError: undefined,
+      maxBytes: undefined,
     }),
     effects: [{ kind: 'cleanup', generation: record.generation }],
   }
@@ -320,7 +329,12 @@ function onCommitted(
 
 function onCommitFailed(
   record: IntentRecordV2,
-  event: { type: 'commitFailed'; error: UniworkDocErrorCode; retryAfterMs?: number },
+  event: {
+    type: 'commitFailed'
+    error: UniworkDocErrorCode
+    retryAfterMs?: number
+    maxBytes?: number
+  },
   ctx: QueueContext,
 ): TransitionResult {
   // a settled intent has nothing left to fail
@@ -333,6 +347,7 @@ function onCommitFailed(
         lastError: 'conflict',
         retryAt: undefined,
         reconcileSince: undefined,
+        maxBytes: undefined,
       }),
       effects: [],
     }
@@ -343,6 +358,7 @@ function onCommitFailed(
       record: withState(record, ctx, 'paused_admin', {
         lastError: 'capability_off',
         retryAt: undefined,
+        maxBytes: undefined,
       }),
       effects: [],
     }
@@ -354,16 +370,25 @@ function onCommitFailed(
         lastError: blocked,
         retryAt: undefined,
         reconcileSince: undefined,
+        maxBytes: undefined,
       }),
       effects: [],
     }
   }
   if (FAILED_CODES.has(error)) {
+    const maxBytes =
+      error === 'too_large' &&
+      typeof event.maxBytes === 'number' &&
+      Number.isSafeInteger(event.maxBytes) &&
+      event.maxBytes > 0
+        ? event.maxBytes
+        : undefined
     return {
       record: withState(record, ctx, 'failed', {
         lastError: error,
         retryAt: undefined,
         reconcileSince: undefined,
+        maxBytes,
       }),
       effects: [],
     }

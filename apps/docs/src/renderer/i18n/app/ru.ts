@@ -46,6 +46,11 @@ export const ru = {
   appOpenFailed: 'Не удалось открыть: {error}',
   appDocTooLargeBlocks:
     '{name}: документ слишком большой, чтобы его открыть ({blocks} абзацев, {chars} символов)',
+  appDocTooLargeUncompressed:
+    '{name}: документ слишком велик или слишком сложен для открытия в браузере.',
+  appDocTooComplexParts:
+    '{name}: документ слишком сложен для открытия в браузере ({parts} частей, лимит {limit}).',
+  appDocOpenOutOfMemory: '{name}: документ слишком велик, при открытии не хватило памяти браузера.',
   appDocLargeReadOnly:
     'Большой документ ({blocks} абзацев): открыт в режиме чтения — нажмите Esc для редактирования',
   appDocLargeSpellOff:

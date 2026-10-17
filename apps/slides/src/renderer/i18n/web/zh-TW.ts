@@ -13,6 +13,10 @@ export const zhTW = {
   webOk: '確定',
   webFatalTitle: '無法開啟此簡報',
   webFatalBody: '無法從 UniWork 載入檔案。請關閉此分頁後再試一次。',
+  webRefusedTooLarge: '此簡報過大或過於複雜，無法在網頁中開啟。',
+  webRefusedTooComplex:
+    '此簡報過於複雜（包含 {parts} 個組件，上限為 {limit} 個），無法在網頁中開啟。',
+  webRefusedOutOfMemory: '此簡報過大，瀏覽器記憶體不足，無法開啟。',
   webNoHost: '此編輯器在 UniWork 中執行。請從 UniWork 開啟簡報。',
   webLegacyPpt: '這是舊版 .ppt 檔案，無法在瀏覽器中開啟。請先在 PowerPoint 中另存為 .pptx。',
   webEncryptedPptx: '此簡報受密碼保護，無法在瀏覽器中開啟。',

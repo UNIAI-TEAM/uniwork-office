@@ -313,6 +313,8 @@ export default function App() {
         setSavedText(recoveredBase === null ? doc.text : parseDocText(recoveredBase).text)
         setPreviewUrl(info.url)
         setStatus('ready')
+        // LAG-F1 (web frame): the document is mounted; the lag detector's settle stamp starts now
+        if (pending) window.htmlApi.noteDocumentMounted?.()
       } catch (err) {
         console.error('[html] open failed:', err)
         if (!cancelled) setStatus('error')

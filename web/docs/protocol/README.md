@@ -56,6 +56,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `cancel`            | event   | {id} — abort a host→frame request                                                                                                                                                                                                                          |
 | `comments.changed`  | event   | {document_id} — reload the comment list (additive, G8-08; see "Server comments")                                                                                                                                                                           |
 | `comments.reveal`   | request | {comment_id} → {revealed} (additive, G8-08; only after an InitAck with `comments`)                                                                                                                                                                         |
+| `doc.download`      | request | {} → {delivered: true} (additive, SIZE-F1; asks the frame to send `api.download` with its last-blocked or live serialized bytes)                                                                                                                           |
 
 ### Frame → host
 
@@ -84,15 +85,23 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `error`                         | event   | {error: ProtocolErrorShape, fatal}                                                      |
 | `cancel`                        | event   | {id} — abort a frame→host request                                                       |
 | `aiRun`                         | event   | {state: 'running' \| 'idle', run_id?} — an AI turn started / ended (additive, X-02)     |
+| `open_refused`                  | event   | {reason, bytes?, measure?} — the frame cannot show the document (additive, SIZE-F1)     |
 | `comments.*`, `mentions.search` | request | server comments (additive, G8-08, cap `comments`); see "Server comments" below          |
+| `size_warning`                  | event   | {bytes, max_bytes, warn_ratio} — serialized save size reached warn threshold (SIZE-F1)  |
+| `save_blocked`                  | event   | {bytes, max_bytes} — save blocked because serialized bytes exceeded max_bytes (SIZE-F1) |
 
 `api.*`, `file.pick`, `image.fetch` and `convert.altChunkHtml` are proxied by the host's `api` handlers; a type
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
 Capabilities: `save`, `saveAs`, `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
-`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`. The effective set is the frame's ∩
+`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`, and (additive, SIZE-F1) `sizeUi`. The effective set is the frame's ∩
 the host's grant. `desktopOpen` (additive, default false) is the "Open in desktop app" grant, see "Open in desktop app (`app.open`)" below. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
+`InitPayload.limits?: DocumentSizeLimits` and `OpenPayload.limits?: DocumentSizeLimits` (`{ max_bytes, warn_ratio }`,
+defaults `200 * 1024 * 1024` and `0.9`, resolved leniently field-by-field via `resolveDocumentSizeLimits` with
+precedence `open.limits ?? init.limits ?? DEFAULT_DOCUMENT_LIMITS`; `session.downloadMaxBytes` defaults to
+`limits.max_bytes` when `init.downloadMaxBytes` is omitted and `limits` is present) configure the frame's save-size
+gate. When `capabilities.sizeUi !== true`, the frame renders its own fallback warning chip and save-blocked dialog.
 
 `FileSource {kind:'url'}` (in `init.open`, `open`, `api.open`, `file.pick`) must be **same-origin** with the frame,
 or the host must send `{kind:'bytes'}`: the frame bundle's CSP is `connect-src 'self'` (baked in at build time,
@@ -131,6 +140,13 @@ URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
 - `aiRun {state, run_id?}` (frame → host): `running` when an AI turn starts, exactly one `idle` on every end path
   (rules: UX spine EXPERIENCE.md › Foundation). A host treats the turn as idle when the frame unloads. A host before
   X-02 drops it silently.
+- `open_refused {reason, bytes?, measure?}` (frame → host, additive SIZE-F1): the module cannot show the document.
+  `reason` is `engine_out_of_memory` | `too_large_to_open` | `too_complex`; `bytes` is the stored size when known;
+  `measure` (`worksheet_xml_bytes` | `paragraphs` | `characters` | `zip_parts` | `cells`, `value`, optional `limit`)
+  names what tripped. At most once per documentId; Docs Read Mode is not a refusal. The frame then keeps a read-only
+  refused state for that document (never a blank editable one) and sends no `api.save` / `api.saveAs`; a host `open`
+  of another document resets it. A sheets out-of-memory also sends a fatal `error` (`too_large`), as the XML guard
+  does. A host before SIZE-F1 drops the event.
 - `uniworkAi`: UniWork AI in the AI panel. The frame claims it (`AI_FRAME_CAPABILITIES`) once the adapter exists
   (G6-05); until then it is `false` whatever the host grants.
 - `save` answers keep the existing codes and `SaveResult`; `PROTOCOL_VERSION` stays 1.

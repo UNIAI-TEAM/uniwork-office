@@ -15,6 +15,12 @@ export const fr = {
   webOk: 'OK',
   webFatalTitle: "Impossible d'ouvrir la présentation",
   webFatalBody: 'Le fichier n’a pas pu être chargé depuis UniWork. Fermez cet onglet et réessayez.',
+  webRefusedTooLarge:
+    'Cette présentation est trop volumineuse ou trop complexe pour être ouverte sur le Web.',
+  webRefusedTooComplex:
+    'Cette présentation est trop complexe pour être ouverte sur le Web ({parts} parties, limite {limit}).',
+  webRefusedOutOfMemory:
+    'Cette présentation est trop volumineuse et la mémoire du navigateur a été épuisée lors de l’ouverture.',
   webNoHost: 'Cet éditeur fonctionne dans UniWork. Ouvrez la présentation depuis UniWork.',
   webLegacyPpt:
     'Ceci est un ancien fichier .ppt qui ne peut pas être ouvert dans le navigateur. Enregistrez-le d’abord au format .pptx dans PowerPoint.',

@@ -63,6 +63,8 @@ export interface SyncCenterIntentFact {
   stateOverride?: SyncCenterRowState
   blockedReason?: SyncCenterBlockedReason
   failedReason?: SyncCenterFailedReason
+  /** Maximum allowed document size in bytes when `failedReason === 'too_large'`. */
+  maxBytes?: number
   progress?: SyncCenterRowProgress
   conflict?: SyncCenterConflictInfo
   lockedBy?: string
@@ -362,6 +364,7 @@ export function buildSyncCenterSnapshot(facts: SyncCenterFacts): SyncCenterSnaps
       continue
     }
 
+    const maxBytes = item.maxBytes ?? item.record.maxBytes
     const row: SyncCenterRow = {
       id: item.id ?? item.record.intentId,
       documentId: item.documentId ?? item.record.documentId,
@@ -372,6 +375,7 @@ export function buildSyncCenterSnapshot(facts: SyncCenterFacts): SyncCenterSnaps
       savedAt,
       base: item.record.baseVersion,
       sizeBytes: item.record.length,
+      ...(typeof maxBytes === 'number' && maxBytes > 0 ? { maxBytes } : {}),
       canEdit: item.canEdit,
       ...(item.workspaceName ? { workspaceName: item.workspaceName } : {}),
       ...(item.progress ? { progress: item.progress } : {}),
@@ -1280,6 +1284,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
             stored.intent.state === 'blocked' && !mapBlockedReason(stored.intent.lastError)
               ? await leaseBlockedReason(binding.documentId)
               : undefined
+          const maxBytes = stored.intent.maxBytes ?? binding.maxBytes
           intents.push({
             id: stored.intent.intentId,
             documentKey: key,
@@ -1290,10 +1295,43 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
             ext: binding.format,
             record: stored.intent,
             canEdit,
+            ...(typeof maxBytes === 'number' && maxBytes > 0 ? { maxBytes } : {}),
             ...(leaseReason ? { blockedReason: leaseReason } : {}),
             ...(binding.serverVersion !== undefined
               ? { conflict: { version: binding.serverVersion } }
               : {}),
+          })
+        } else if (binding.state === 'failed') {
+          const stamp = binding.lastSavedAt ?? new Date(now()).toISOString()
+          intents.push({
+            id: `failed:${key}`,
+            documentKey: key,
+            documentId: binding.documentId,
+            orgId: binding.orgId,
+            workspaceId: binding.workspaceId,
+            title: binding.title,
+            ext: binding.format,
+            record: {
+              v: 2,
+              intentId: `failed:${key}`,
+              idempotencyKey: `failed:${key}`,
+              documentId: binding.documentId,
+              orgId: binding.orgId,
+              workspaceId: binding.workspaceId,
+              baseRevision: binding.baseRevision,
+              baseVersion: binding.baseVersion,
+              checksum: binding.baseChecksum,
+              length: binding.sizeBytes ?? 0,
+              generation: 1,
+              state: 'failed',
+              attempt: 0,
+              createdAt: stamp,
+              updatedAt: stamp,
+              ...(binding.error ? { lastError: binding.error } : {}),
+              ...(binding.maxBytes ? { maxBytes: binding.maxBytes } : {}),
+            },
+            canEdit,
+            ...(binding.maxBytes ? { maxBytes: binding.maxBytes } : {}),
           })
         } else if (binding.state === 'saved' && binding.lastSavedAt) {
           recentCommits.push({

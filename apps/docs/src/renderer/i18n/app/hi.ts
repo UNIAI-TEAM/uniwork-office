@@ -46,6 +46,11 @@ export const hi = {
   appOpenFailed: 'खोलने में विफल: {error}',
   appDocTooLargeBlocks:
     '{name}: दस्तावेज़ खोलने के लिए बहुत बड़ा है ({blocks} अनुच्छेद, {chars} वर्ण)',
+  appDocTooLargeUncompressed: '{name}: दस्तावेज़ वेब पर खोलने के लिए बहुत बड़ा या बहुत जटिल है।',
+  appDocTooComplexParts:
+    '{name}: दस्तावेज़ वेब पर खोलने के लिए बहुत जटिल है ({parts} भाग, सीमा {limit})।',
+  appDocOpenOutOfMemory:
+    '{name}: दस्तावेज़ बहुत बड़ा है और खोलते समय ब्राउज़र की मेमोरी समाप्त हो गई।',
   appDocLargeReadOnly:
     'बड़ा दस्तावेज़ ({blocks} अनुच्छेद): पठन मोड में खोला गया — संपादन के लिए Esc दबाएँ',
   appDocLargeSpellOff:

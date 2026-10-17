@@ -26,7 +26,7 @@ import {
   toSaveVisualAdds,
   toSaveVisualEdits,
 } from './edit-journal'
-import { cap, isViewOnly } from './capabilities'
+import { cap, isViewOnly, platform } from './capabilities'
 import { activeCsvSheet, handleExportCsv, serializeActiveSheetCsv } from './csv-export'
 import type { CellState } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { verifiedFormulaValues } from './formula-values'
@@ -508,7 +508,7 @@ export async function handleSave(
         )
         return { ok: false }
       }
-      ctx.setMessage(t('appSaveCanceled'))
+      ctx.setMessage(platform() === 'web' ? '' : t('appSaveCanceled'))
       return { ok: false }
     }
     if (!splitSave) {
@@ -576,7 +576,7 @@ export async function handleSave(
         if (!(await reopenCarryingLateEdits(ctx, state, cellsAtSave, result.file))) {
           return { ok: false }
         }
-        ctx.setMessage(t('appSaveSecondCanceled'))
+        ctx.setMessage(platform() === 'web' ? '' : t('appSaveSecondCanceled'))
         return { ok: false }
       }
       ctx.stashViewRestore(viewAtSave)

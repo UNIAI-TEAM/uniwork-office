@@ -419,6 +419,10 @@ export interface DesktopApi {
   discardDocPasswordIntents(throughRevision: number): Promise<{ ok: boolean }>
   /** mark the renderer ready and consume a file passed by Finder/Explorer at launch */
   consumePendingOpenDocx(): Promise<OpenDocxResult>
+  /** Web frame only (UNI-1865): the renderer reports that the opened document finished
+   *  mounting, so the passive lag detector's settle stamp starts at first paint, not at the
+   *  api.open result. Absent on desktop. */
+  noteDocumentMounted?(): void
   /** returns true when this tab was created via "New Document" and should start blank */
   consumeNewBlankDoc(): Promise<boolean>
   /** AI-authored content queued for this tab by create_document; one-shot, null when none */
@@ -657,6 +661,18 @@ export interface DesktopApi {
   reportCloseSaveResult(ok: boolean): void
   /** keep the native View menu's checkbox items in sync with renderer state */
   reportViewMenuState(state: { aiSidebar: boolean; darkCanvas: boolean }): void
+  /** web frame only (SIZE-F1): notify the host that the document was refused on open */
+  reportOpenRefused?(info: {
+    path?: string | null
+    reason: 'too_large_to_open' | 'too_complex' | 'engine_out_of_memory'
+    bytes?: number
+    measure?: {
+      kind: 'worksheet_xml_bytes' | 'paragraphs' | 'characters' | 'zip_parts' | 'cells'
+      value: number
+      limit?: number
+    }
+    message?: string
+  }): void
 }
 
 /** mirrors VIEW_IMAGE_CHANNEL in @genoffice/electron-utils (kept literal so the preload stays free of main-only deps) */

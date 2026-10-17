@@ -46,6 +46,10 @@ export const zh = {
   appOpenedFile: '已打开 {name}',
   appOpenFailed: '打开失败: {error}',
   appDocTooLargeBlocks: '{name}：文档过大（{blocks} 个段落、{chars} 个字符），无法打开',
+  appDocTooLargeUncompressed: '{name}：文档过大或过于复杂，无法在网页中打开。',
+  appDocTooComplexParts:
+    '{name}：文档过于复杂（包含 {parts} 个部件，上限为 {limit} 个），无法在网页中打开。',
+  appDocOpenOutOfMemory: '{name}：文档过大，浏览器内存不足，无法打开。',
   appDocLargeReadOnly: '文档很大（{blocks} 个段落），已以只读模式打开；按 Esc 可开始编辑',
   appDocLargeSpellOff:
     '文档很大（{blocks} 个段落），已关闭输入时拼写检查；可在「审阅 › 拼写」重新开启',

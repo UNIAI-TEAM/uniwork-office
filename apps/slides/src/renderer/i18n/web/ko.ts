@@ -14,6 +14,10 @@ export const ko = {
   webOk: '확인',
   webFatalTitle: '프레젠테이션을 열 수 없습니다',
   webFatalBody: 'UniWork에서 파일을 불러오지 못했습니다. 이 탭을 닫고 다시 시도하세요.',
+  webRefusedTooLarge: '이 프레젠테이션은 너무 크거나 복잡하여 웹에서 열 수 없습니다.',
+  webRefusedTooComplex:
+    '이 프레젠테이션은 너무 복잡하여 웹에서 열 수 없습니다({parts}개 파트, 제한 {limit}개).',
+  webRefusedOutOfMemory: '이 프레젠테이션은 너무 커서 여는 중 브라우저 메모리가 부족합니다.',
   webNoHost: '이 편집기는 UniWork 안에서 실행됩니다. UniWork에서 프레젠테이션을 여세요.',
   webLegacyPpt:
     '이전 .ppt 파일이라 브라우저에서 열 수 없습니다. 먼저 PowerPoint에서 .pptx로 저장하세요.',

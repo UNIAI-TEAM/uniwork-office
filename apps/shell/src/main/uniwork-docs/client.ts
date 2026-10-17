@@ -8,6 +8,7 @@ import type {
 import { TransportError } from '../uniwork-auth/transport'
 import { UniworkDocError, errorFromResponse, parseRetryAfter } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
+import { DEFAULT_DOCUMENT_LIMITS, parseDocumentLimits, type DocumentLimits } from './limits'
 import {
   documentRevisionOf,
   parseCommit,
@@ -243,6 +244,8 @@ export interface UniworkDocsClient {
     clientId: string
     deviceSessionId: string
   }): Promise<LaunchDescriptor>
+  /** SIZE-F1: reads `documents.limits` from `GET /api/v1/config` with fallback defaults */
+  getDocumentLimits?(): Promise<DocumentLimits>
 }
 
 /** a route segment: an id the server issued, never a path (the work client uses it too) */
@@ -915,6 +918,28 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         throw failure
       }
       return parseExchange(raw)
+    },
+
+    async getDocumentLimits() {
+      const fetchImpl: FetchLike = options.fetch ?? fetch
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), metadataTimeout)
+      try {
+        const response = await fetchImpl(`${options.apiOrigin}/api/v1/config`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+          redirect: 'error',
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        if (!response.ok) return DEFAULT_DOCUMENT_LIMITS
+        const body = await response.json()
+        return parseDocumentLimits(body)
+      } catch {
+        return DEFAULT_DOCUMENT_LIMITS
+      } finally {
+        clearTimeout(timer)
+      }
     },
   }
 }
