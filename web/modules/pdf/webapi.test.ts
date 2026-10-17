@@ -842,3 +842,186 @@ describe('pdfApi: save size gate (SIZE-F1, UNI-1861)', () => {
     })
   })
 })
+
+describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => {
+  it('save: false with saveAs: true refuses in-place save and allows Save As and new-file exports', async () => {
+    const s = await setup({ caps: { edit: false, save: false, saveAs: true } })
+    const path = (await s.api.consumePending())!
+    expect(await s.api.uniworkState(path)).toEqual({ bound: false, readOnly: true })
+    expect((await s.api.save(req(path))).ok).toBe(false)
+    expect(await s.mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(s.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+
+    s.api.onSaveAsRequest((target) => {
+      void s.api
+        .save(req(path, { targetPath: target, markups: [{} as never] }))
+        .then((r) => s.api.sendSaveAsResult(r.ok))
+    })
+    const res = (await s.mock.host.saveAs({ name: 'Copy' })) as {
+      ok: boolean
+      file?: { name: string }
+    }
+    expect(res).toMatchObject({ ok: true, file: { name: 'Copy.pdf' } })
+    expect(s.mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(1)
+
+    expect(await s.api.extractPages({ path, pages: [0], suggestedName: 'Report-p1.pdf' })).toEqual({
+      ok: true,
+      savedPath: 'Report-p1.pdf',
+    })
+  })
+
+  it('save: true with saveAs: false allows in-place save and refuses Save As and new-file exports (D2)', async () => {
+    const s = await setup({ caps: { edit: true, save: true, saveAs: false } })
+    const path = (await s.api.consumePending())!
+    expect(await s.api.uniworkState(path)).toEqual({ bound: false, readOnly: false })
+
+    expect(await s.api.save(req(path, { markups: [{} as never] }))).toEqual({ ok: true })
+    expect(s.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+
+    expect(await s.api.save(req(path, { targetPath: 'uniwork://save-as/Copy.pdf' }))).toEqual({
+      ok: false,
+      error: 'unsupported: saveAs is not granted',
+    })
+    expect(await s.mock.host.saveAs({ name: 'Copy' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(await s.api.extractPages({ path, pages: [0], suggestedName: 'Report-p1.pdf' })).toEqual({
+      ok: false,
+      error: 'unsupported: saveAs is not granted',
+    })
+    expect(await s.api.splitPdf({ path, chunkSize: 1, baseName: 'Report' })).toEqual({
+      ok: false,
+      error: 'unsupported: saveAs is not granted',
+    })
+    expect(await s.api.mergePdf({ path, suggestedName: 'Report-merged.pdf' })).toEqual({
+      ok: false,
+      error: 'unsupported: saveAs is not granted',
+    })
+    expect(
+      await s.api.mergePages({
+        path,
+        perSheet: 2,
+        direction: 'vertical',
+        separator: false,
+        suggestedName: 'Report-2in1.pdf',
+      }),
+    ).toEqual({
+      ok: false,
+      error: 'unsupported: saveAs is not granted',
+    })
+    expect(await s.api.splitPages({ path, perPage: 2, suggestedName: 'Report-split.pdf' })).toEqual(
+      {
+        ok: false,
+        error: 'unsupported: saveAs is not granted',
+      },
+    )
+    expect(
+      await s.api.exportImages({ images: [btoa('png')], pageNumbers: [1], baseName: 'Report' }),
+    ).toEqual({
+      ok: false,
+      error: 'unsupported: saveAs is not granted',
+    })
+    expect(s.downloads).toHaveLength(0)
+    expect(s.mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
+  })
+
+  it('print and exportPdf capabilities gate host print dialog vs pdf download independently', async () => {
+    const noPrint = await setup({ caps: { print: false, exportPdf: true } })
+    await noPrint.api.consumePending()
+    const openedNoPrint = vi.fn()
+    noPrint.api.onPrintRequest(openedNoPrint)
+    expect(await noPrint.mock.host.print({ mode: 'dialog' })).toEqual({ printed: false })
+    expect(openedNoPrint).not.toHaveBeenCalled()
+    expect(await noPrint.mock.host.print({ mode: 'pdf' })).toEqual({ printed: true })
+    expect(noPrint.downloads.map((d) => d.name)).toEqual(['Report.pdf'])
+
+    const noPdf = await setup({ caps: { print: true, exportPdf: false } })
+    await noPdf.api.consumePending()
+    const openedNoPdf = vi.fn()
+    noPdf.api.onPrintRequest(openedNoPdf)
+    expect(await noPdf.mock.host.print({ mode: 'pdf' })).toEqual({ printed: false })
+    expect(noPdf.downloads).toHaveLength(0)
+    expect(await noPdf.mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
+    expect(openedNoPdf).toHaveBeenCalledOnce()
+  })
+
+  it('readOnly profile clamps edit/save/saveAs/exportHtml off, refuses writes and Save As, and keeps granted print and exportPdf (D3)', async () => {
+    const mock = createMockPort()
+    const meta = mock.seed('Report.pdf', PDF('v1'))
+    const caps: Record<string, unknown> = {
+      edit: true,
+      save: true,
+      saveAs: true,
+      insertPages: true,
+      print: true,
+      exportPdf: true,
+      exportHtml: true,
+    }
+    const downloads: Array<{ name: string; data: Blob }> = []
+    const { api } = createPdfWebApi(mock.port, {
+      capabilities: caps,
+      core: async () => fakeCore(),
+      ensureFonts: async () => {},
+      signatures: createSignatureStore({ idb: () => null, legacy: () => null }),
+      download: (name, data) => downloads.push({ name, data }),
+      saveTimeoutMs: 2000,
+    })
+    mock.init({
+      profile: 'readOnly',
+      documentId: meta.fileId,
+      capabilities: {
+        save: true,
+        saveAs: true,
+        print: true,
+        exportPdf: true,
+        exportHtml: true,
+      },
+    })
+    const path = (await api.consumePending())!
+
+    expect(await api.uniworkState(path)).toEqual({ bound: false, readOnly: true })
+    expect(caps).toMatchObject({
+      edit: false,
+      save: false,
+      saveAs: false,
+      insertPages: false,
+      exportHtml: false,
+      print: true,
+      exportPdf: true,
+    })
+
+    expect((await api.save(req(path))).ok).toBe(false)
+    expect(await api.save(req(path, { targetPath: 'uniwork://save-as/Copy.pdf' }))).toEqual({
+      ok: false,
+      error: 'unsupported: saveAs is not granted',
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(await mock.host.saveAs({ name: 'Copy' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect((await api.insertBlankPage({ path, afterPageIndex: 0 })).ok).toBe(false)
+    expect(await api.extractPages({ path, pages: [0], suggestedName: 'Report-p1.pdf' })).toEqual({
+      ok: false,
+      error: 'unsupported: saveAs is not granted',
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toHaveLength(
+      0,
+    )
+
+    // D3: granted print and exportPdf stay available in readOnly profile
+    const opened = vi.fn()
+    api.onPrintRequest(opened)
+    expect(await mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
+    expect(opened).toHaveBeenCalledOnce()
+    expect(await mock.host.print({ mode: 'pdf' })).toEqual({ printed: true })
+    expect(downloads.map((d) => d.name)).toEqual(['Report.pdf'])
+  })
+})

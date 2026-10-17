@@ -1404,6 +1404,62 @@ describe('local pane', () => {
     expect(host.querySelector('.comment-new textarea')).not.toBeNull()
     expect(host.querySelector('.collab-panel')).toBeNull()
   })
+
+  it('FRAME-RO-01 (D4): loadCommentsContext forces level: view on profile: readOnly or desktop readOnly, while web save: false alone keeps commentsLevel', async () => {
+    const roProfile = fakeBridge([], {
+      context: () =>
+        Promise.resolve({
+          ok: true,
+          value: {
+            documentId: 'doc-1',
+            versionId: 'v1',
+            level: 'edit',
+            frame: true,
+            profile: 'readOnly',
+          },
+        }),
+    })
+    expect(await loadCommentsContext(roProfile.bridge, '/p.pptx', false)).toMatchObject({
+      documentId: 'doc-1',
+      versionId: 'v1',
+      level: 'view',
+    })
+
+    const commenterFrame = fakeBridge([], {
+      context: () =>
+        Promise.resolve({
+          ok: true,
+          value: {
+            documentId: 'doc-1',
+            versionId: 'v1',
+            level: 'comment',
+            frame: true,
+          },
+        }),
+    })
+    expect(await loadCommentsContext(commenterFrame.bridge, '/p.pptx', true)).toMatchObject({
+      documentId: 'doc-1',
+      versionId: 'v1',
+      level: 'comment',
+    })
+
+    const desktopRo = fakeBridge([], {
+      context: () =>
+        Promise.resolve({
+          ok: true,
+          value: {
+            documentId: 'doc-1',
+            versionId: 'v1',
+            level: 'edit',
+          },
+        }),
+    })
+    expect(await loadCommentsContext(desktopRo.bridge, '/p.pptx', true)).toMatchObject({
+      documentId: 'doc-1',
+      versionId: 'v1',
+      level: 'view',
+    })
+  })
 })
 
 describe('21-locale parity', () => {

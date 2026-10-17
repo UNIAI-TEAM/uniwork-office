@@ -55,6 +55,26 @@ describe('resolveServerMode tells the frame when there is no editor owner', () =
     )
   })
 
+  it('FRAME-RO-01 (D4): profile: readOnly forces level: view while save: false alone keeps commentsLevel', () => {
+    expect(
+      readContext({
+        documentId: 'd1',
+        versionId: 'v1',
+        level: 'edit',
+        frame: true,
+        profile: 'readOnly',
+      })?.level,
+    ).toBe('view')
+    expect(
+      readContext({
+        documentId: 'd1',
+        versionId: 'v1',
+        level: 'comment',
+        frame: true,
+      })?.level,
+    ).toBe('comment')
+  })
+
   it('desktop (no noEditor member) is unchanged', async () => {
     const api = {
       context: () => Promise.resolve({ ok: false, error: { code: 'not_found' } }),
