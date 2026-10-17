@@ -157,8 +157,11 @@ export const he = {
   uwErrUploadTooLarge:
     'גודלו של {name} הוא {size}, מעבר למגבלת {max}. הקטן את גודל התמונות או פצל את הקובץ והעלה שוב.',
   uwReasonTooLargeWithLimit: 'מעבר למגבלת {max}',
-  uwChipEditLocked: '{name} is editing',
-  uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
-  uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwChipEditLocked: '{name} עורך',
+  uwChipEditLockedSelf: 'נערך בחלון אחר',
+  uwEditLockSomeone: 'מישהו אחר',
+  uwTipEditLocked: '{name} עורך מאז {time}.',
+  uwTipEditLockedSelf: 'אתה עורך את המסמך הזה בחלון אחר.',
+  uwErrEditLocked: 'מישהו אחר עורך את המסמך הזה.',
+  uwReasonEditLocked: 'מישהו אחר עורך',
 } satisfies Record<keyof typeof zh, string>

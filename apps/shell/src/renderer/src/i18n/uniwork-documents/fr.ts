@@ -168,8 +168,11 @@ export const fr = {
   uwErrUploadTooLarge:
     '{name} fait {size}, ce qui dépasse la limite de {max}. Réduisez la taille des images ou divisez le fichier, puis importez-le à nouveau.',
   uwReasonTooLargeWithLimit: 'dépasse la limite de {max}',
-  uwChipEditLocked: '{name} is editing',
-  uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
-  uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwChipEditLocked: '{name} modifie',
+  uwChipEditLockedSelf: 'Modification dans une autre fenêtre',
+  uwEditLockSomeone: 'Quelqu’un',
+  uwTipEditLocked: '{name} modifie depuis {time}.',
+  uwTipEditLockedSelf: 'Vous modifiez ce document dans une autre fenêtre.',
+  uwErrEditLocked: 'Une autre personne modifie ce document.',
+  uwReasonEditLocked: 'une autre personne modifie',
 } satisfies Record<keyof typeof zh, string>

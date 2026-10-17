@@ -164,8 +164,11 @@ export const es = {
   uwErrUploadTooLarge:
     '{name} pesa {size}, lo que supera el límite de {max}. Reduce el tamaño de las imágenes o divide el archivo y vuelve a subirlo.',
   uwReasonTooLargeWithLimit: 'supera el límite de {max}',
-  uwChipEditLocked: '{name} is editing',
-  uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
-  uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwChipEditLocked: '{name} está editando',
+  uwChipEditLockedSelf: 'Editando en otra ventana',
+  uwEditLockSomeone: 'Alguien',
+  uwTipEditLocked: '{name} está editando desde {time}.',
+  uwTipEditLockedSelf: 'Estás editando este documento en otra ventana.',
+  uwErrEditLocked: 'Otra persona está editando este documento.',
+  uwReasonEditLocked: 'otra persona está editando',
 } satisfies Record<keyof typeof zh, string>

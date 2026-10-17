@@ -159,8 +159,11 @@ export const ko = {
   uwErrUploadTooLarge:
     '{name}의 크기는 {size}로, {max} 한도를 초과했습니다. 이미지 크기를 줄이거나 파일을 분할한 후 다시 업로드하세요.',
   uwReasonTooLargeWithLimit: '{max} 한도 초과',
-  uwChipEditLocked: '{name} is editing',
-  uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
-  uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwChipEditLocked: '{name} 님이 편집 중',
+  uwChipEditLockedSelf: '다른 창에서 편집 중',
+  uwEditLockSomeone: '다른 사용자',
+  uwTipEditLocked: '{name} 님이 {time}부터 편집 중입니다.',
+  uwTipEditLockedSelf: '다른 창에서 이 문서를 편집 중입니다.',
+  uwErrEditLocked: '다른 사용자가 이 문서를 편집 중입니다.',
+  uwReasonEditLocked: '다른 사용자가 편집 중',
 } satisfies Record<keyof typeof zh, string>

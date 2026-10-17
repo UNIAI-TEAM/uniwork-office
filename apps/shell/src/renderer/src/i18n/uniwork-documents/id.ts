@@ -161,8 +161,11 @@ export const id = {
   uwErrUploadTooLarge:
     '{name} berukuran {size}, melebihi batas {max}. Perkecil ukuran gambar atau bagi file, lalu unggah lagi.',
   uwReasonTooLargeWithLimit: 'melebihi batas {max}',
-  uwChipEditLocked: '{name} is editing',
-  uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
-  uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwChipEditLocked: '{name} sedang mengedit',
+  uwChipEditLockedSelf: 'Mengedit di jendela lain',
+  uwEditLockSomeone: 'Orang lain',
+  uwTipEditLocked: '{name} mengedit sejak {time}.',
+  uwTipEditLockedSelf: 'Anda mengedit dokumen ini di jendela lain.',
+  uwErrEditLocked: 'Orang lain sedang mengedit dokumen ini.',
+  uwReasonEditLocked: 'orang lain sedang mengedit',
 } satisfies Record<keyof typeof zh, string>

@@ -164,8 +164,11 @@ export const ru = {
   uwErrUploadTooLarge:
     'Размер {name} — {size}, что превышает лимит {max}. Уменьшите размер изображений или разделите файл, затем загрузите снова.',
   uwReasonTooLargeWithLimit: 'превышает лимит {max}',
-  uwChipEditLocked: '{name} is editing',
-  uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
-  uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwChipEditLocked: '{name} редактирует',
+  uwChipEditLockedSelf: 'Редактирование в другом окне',
+  uwEditLockSomeone: 'Кто-то другой',
+  uwTipEditLocked: '{name} редактирует с {time}.',
+  uwTipEditLockedSelf: 'Вы редактируете этот документ в другом окне.',
+  uwErrEditLocked: 'Кто-то другой редактирует этот документ.',
+  uwReasonEditLocked: 'кто-то другой редактирует',
 } satisfies Record<keyof typeof zh, string>

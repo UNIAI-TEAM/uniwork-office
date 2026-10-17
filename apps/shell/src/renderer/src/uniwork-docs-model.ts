@@ -67,7 +67,9 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   organization_suspended: 'uwLockSuspended',
   drafts_full: 'uwConflictDraftCapReached',
   other_window: 'uwLockOtherWindow',
-  edit_locked: 'uwChipEditLocked',
+  // EL-1(a) (UNI-1645c): the sentence shown where an error code is rendered without params
+  // (launchNoticeOf, chipCopy's errorKey prefix): a param-free key, never uwChipEditLocked ({name})
+  edit_locked: 'uwErrEditLocked',
 }
 
 /** chip label for every save state (ready and saved read the same: nothing is waiting to upload) */
@@ -130,6 +132,10 @@ export function blockedReasonKey(
       return 'uwReasonQuota'
     case 'too_large':
       return 'uwReasonTooLarge'
+    // EL1A-FE-5: a save refused by someone else's edit lock (423) says so in the failed row's
+    // reason, never the generic "unavailable"
+    case 'edit_locked':
+      return 'uwReasonEditLocked'
     default:
       return 'uwReasonOther'
   }
@@ -204,6 +210,9 @@ const OUTRANKS_REMOTE_NEWER: ReadonlySet<UniworkSaveState> = new Set([
   'failed',
   'error',
   'conflict',
+  // EL-1(a) (UNI-1645c): a 423 document_locked outranks a newer-version bar: the pill must
+  // name the holder and offer Retry, never hide behind "newer version on UniWork"
+  'edit_locked',
   'reconciling-stuck',
   'reconciling',
 ])
@@ -260,6 +269,7 @@ export function chipModelOf(
   },
 ): ChipModel {
   const { state, access, error } = status
+  const lock = status.editLock
   const limitBytes = ctx.maxBytes ?? status.maxBytes
   // 1 blocked
   if (state === 'blocked' || isStoreRefusal(status)) {
@@ -328,6 +338,18 @@ export function chipModelOf(
         tipKey: 'uwTipConflict',
         action: { kind: 'resolve', labelKey: 'uwActResolve' },
       }
+    case 'edit_locked': // EL-1(a) (UNI-1645c): outranks remote-newer / paused_admin / saveWait
+      // HTTP 423 document_locked: someone else holds the server edit lock. Info tone, one
+      // manual Retry; heldByMe (the user's own other window) reads as a self label, not a
+      // third party editing. Never conflict, never auto-retried (see OUTRANKS_REMOTE_NEWER).
+      return {
+        tone: 'info',
+        labelKey: lock?.heldByMe ? 'uwChipEditLockedSelf' : 'uwChipEditLocked',
+        holderName: lock?.holderName ?? null,
+        tipKey: lock?.heldByMe ? 'uwTipEditLockedSelf' : 'uwTipEditLocked',
+        savedAt: lock?.since ?? undefined,
+        action: { kind: 'retry', labelKey: 'uwActRetry' },
+      }
     case 'reconciling-stuck': // 6: the tooltip stays the reconciling one (EXPERIENCE l.190)
       return {
         tone: 'warn',
@@ -394,18 +416,6 @@ export function chipModelOf(
       savedAt: ctx.queuedAt,
     }
   }
-  // EL-1(a) (UNI-1645c): HTTP 423 document_locked — someone else is editing (info tone, manual retry)
-  if (state === 'edit_locked') {
-    const lock = status.editLock
-    return {
-      tone: 'info',
-      labelKey: 'uwChipEditLocked',
-      holderName: lock?.holderName ?? null,
-      tipKey: lock?.heldByMe ? 'uwTipEditLockedSelf' : 'uwTipEditLocked',
-      savedAt: lock?.since ?? undefined,
-      action: { kind: 'retry', labelKey: 'uwActRetry' },
-    }
-  }
   // 14 view-only
   if (access === 'view' && QUIET_STATES.has(state)) {
     return { tone: 'neutral', labelKey: 'uwChipViewOnly', tipKey: 'uwTipViewOnly' }
@@ -455,6 +465,8 @@ export function miniGlyphOf(model: ChipModel, state: UniworkSaveState): MiniGlyp
     case 'warn':
       return 'warn'
     case 'info':
+      // EL-1(a) (UNI-1645c): a locked save is not waiting to upload: a ring, not the queued clock
+      if (state === 'edit_locked') return 'ring'
       return state === 'paused_user' ? 'pause' : 'clock'
     default:
       if (model.labelKey === 'uwChipPausedAdmin') return 'pause'
@@ -491,7 +503,9 @@ export function chipCopy(
       : undefined
   const reasonText = model.reasonKey ? t(model.reasonKey, reasonParams) : undefined
   const holderName =
-    model.holderName !== undefined || model.labelKey === 'uwChipEditLocked'
+    model.holderName !== undefined ||
+    model.labelKey === 'uwChipEditLocked' ||
+    model.labelKey === 'uwChipEditLockedSelf'
       ? model.holderName && model.holderName.trim().length > 0
         ? model.holderName
         : t('uwEditLockSomeone')

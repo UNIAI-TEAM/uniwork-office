@@ -239,6 +239,8 @@ const action = (id: SyncRowActionId, over: Partial<SyncRowAction> = {}): SyncRow
 const FAILED_REASON: Record<string, StringKey> = {
   quota: 'uwReasonQuota',
   too_large: 'uwReasonTooLarge',
+  // EL-1(a) (UNI-1645c): a commit refused by someone else's edit lock
+  edit_locked: 'uwReasonEditLocked',
   other: 'uwReasonOther',
 }
 

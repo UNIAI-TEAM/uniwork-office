@@ -233,6 +233,9 @@ function mapFailedReason(
   if (explicit) return explicit
   if (error === 'quota_exceeded') return 'quota'
   if (error === 'too_large') return 'too_large'
+  // EL-1(a) (UNI-1645c): the queue parked the intent with lastError edit_locked; the row must
+  // say "someone else is editing", not the generic "unavailable"
+  if (error === 'edit_locked') return 'edit_locked'
   return 'other'
 }
 

@@ -161,8 +161,11 @@ export const th = {
   uwErrUploadTooLarge:
     '{name} มีขนาด {size} ซึ่งเกินขีดจำกัด {max} ลดขนาดรูปภาพหรือแบ่งไฟล์ แล้วอัปโหลดอีกครั้ง',
   uwReasonTooLargeWithLimit: 'เกินขีดจำกัด {max}',
-  uwChipEditLocked: '{name} is editing',
-  uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
-  uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwChipEditLocked: '{name} กำลังแก้ไข',
+  uwChipEditLockedSelf: 'กำลังแก้ไขในหน้าต่างอื่น',
+  uwEditLockSomeone: 'คนอื่น',
+  uwTipEditLocked: '{name} กำลังแก้ไขตั้งแต่ {time}',
+  uwTipEditLockedSelf: 'คุณกำลังแก้ไขเอกสารนี้ในหน้าต่างอื่น',
+  uwErrEditLocked: 'มีคนอื่นกำลังแก้ไขเอกสารนี้',
+  uwReasonEditLocked: 'มีคนอื่นกำลังแก้ไข',
 } satisfies Record<keyof typeof zh, string>

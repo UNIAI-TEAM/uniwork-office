@@ -159,8 +159,11 @@ export const cs = {
   uwErrUploadTooLarge:
     '{name} má {size}, což překračuje limit {max}. Zmenšete obrázky nebo soubor rozdělte a nahrajte jej znovu.',
   uwReasonTooLargeWithLimit: 'přes limit {max}',
-  uwChipEditLocked: '{name} is editing',
-  uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
-  uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwChipEditLocked: '{name} upravuje',
+  uwChipEditLockedSelf: 'Úprava v jiném okně',
+  uwEditLockSomeone: 'Někdo',
+  uwTipEditLocked: '{name} upravuje od {time}.',
+  uwTipEditLockedSelf: 'Tento dokument upravujete v jiném okně.',
+  uwErrEditLocked: 'Tento dokument právě upravuje někdo jiný.',
+  uwReasonEditLocked: 'upravuje někdo jiný',
 } satisfies Record<keyof typeof zh, string>

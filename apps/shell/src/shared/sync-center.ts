@@ -143,7 +143,7 @@ export const SYNC_CENTER_DISCARDABLE_BLOCKED_REASONS: readonly SyncCenterBlocked
   'member_deactivated',
 ]
 
-export type SyncCenterFailedReason = 'quota' | 'too_large' | 'other'
+export type SyncCenterFailedReason = 'quota' | 'too_large' | 'edit_locked' | 'other'
 
 export interface SyncCenterRowProgress {
   done: number

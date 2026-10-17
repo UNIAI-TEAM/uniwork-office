@@ -979,6 +979,10 @@ export class SaveCoordinator {
           type: 'commitFailed',
           error: 'edit_locked',
         })
+        // EL1A-BE-1: `current_revision` of a 423 is NOT the copy's new base — it is the
+        // holder's head. Writing it to `serverRevision` would let a later feed notice that
+        // fills `serverVersion` rebuild an S6 newer-dirty bar / Reload affordance while the
+        // copy is still edit_locked. It is dropped: the pill's Retry is the only way forward.
         return this.commitState(doc, {
           ...base,
           state: 'edit_locked',
@@ -989,7 +993,6 @@ export class SaveCoordinator {
             expiresAt: null,
             heldByMe: false,
           },
-          ...(error.currentRevision ? { serverRevision: error.currentRevision } : {}),
         })
       case 'conflict':
         // the working copy and the base stay; the user chooses what happens next.

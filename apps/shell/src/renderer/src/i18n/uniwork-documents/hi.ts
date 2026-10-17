@@ -159,8 +159,11 @@ export const hi = {
   uwErrUploadTooLarge:
     '{name} का आकार {size} है, जो {max} सीमा से अधिक है। छवियों का आकार घटाएँ या फ़ाइल को विभाजित करें, फिर दोबारा अपलोड करें।',
   uwReasonTooLargeWithLimit: '{max} सीमा से अधिक',
-  uwChipEditLocked: '{name} is editing',
-  uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
-  uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwChipEditLocked: '{name} संपादन कर रहे हैं',
+  uwChipEditLockedSelf: 'किसी अन्य विंडो में संपादन',
+  uwEditLockSomeone: 'कोई और',
+  uwTipEditLocked: '{name} {time} से संपादन कर रहे हैं।',
+  uwTipEditLockedSelf: 'आप इस दस्तावेज़ को किसी अन्य विंडो में संपादित कर रहे हैं।',
+  uwErrEditLocked: 'कोई और इस दस्तावेज़ को संपादित कर रहा है।',
+  uwReasonEditLocked: 'कोई और संपादित कर रहा है',
 } satisfies Record<keyof typeof zh, string>

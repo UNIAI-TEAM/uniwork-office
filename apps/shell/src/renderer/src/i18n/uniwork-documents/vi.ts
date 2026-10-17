@@ -159,7 +159,10 @@ export const vi = {
     '{name} nặng {size}, vượt giới hạn {max}. Giảm dung lượng ảnh hoặc chia nhỏ tệp rồi tải lên lại.',
   uwReasonTooLargeWithLimit: 'vượt giới hạn {max}',
   uwChipEditLocked: '{name} đang sửa',
+  uwChipEditLockedSelf: 'Đang sửa ở cửa sổ khác',
   uwEditLockSomeone: 'Người khác',
-  uwTipEditLocked: '{name} đang sửa từ {time}. Bạn đang xem ở chế độ chỉ đọc.',
+  uwTipEditLocked: '{name} đang sửa từ {time}.',
   uwTipEditLockedSelf: 'Bạn đang sửa tài liệu này ở cửa sổ khác.',
+  uwErrEditLocked: 'Người khác đang sửa tài liệu này.',
+  uwReasonEditLocked: 'người khác đang sửa',
 } satisfies Record<keyof typeof zh, string>

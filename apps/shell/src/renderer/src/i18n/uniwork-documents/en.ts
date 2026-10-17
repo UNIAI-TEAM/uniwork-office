@@ -160,7 +160,10 @@ export const en = {
     '{name} is {size}, which is over the {max} limit. Reduce image sizes or split the file, then upload again.',
   uwReasonTooLargeWithLimit: 'over the {max} limit',
   uwChipEditLocked: '{name} is editing',
+  uwChipEditLockedSelf: 'Editing in another window',
   uwEditLockSomeone: 'Someone',
-  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
+  uwTipEditLocked: '{name} has been editing since {time}.',
   uwTipEditLockedSelf: 'You’re editing this document in another window.',
+  uwErrEditLocked: 'Someone else is editing this document.',
+  uwReasonEditLocked: 'someone else is editing',
 } satisfies Record<keyof typeof zh, string>

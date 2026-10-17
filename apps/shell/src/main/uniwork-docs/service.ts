@@ -789,8 +789,16 @@ const EMPTY_DISPATCH = { dispatched: 0, parked: 0, outcomes: new Map() }
  * where it is (a committed/cancelled record is spent; the front's own settle or
  * cancel already moved the binding). This is the ONE mapping from a durable
  * queue state to the binding a restart reads back.
+ *
+ * `current` is the binding as it is right now: a parked `edit_locked` record
+ * carries no holder metadata of its own (IntentRecordV2 has no editLock), so the
+ * mapping keeps the one the binding already has (EL1A-BE-2). Exported for its
+ * unit test.
  */
-function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
+export function queueBindingPatch(
+  record: IntentRecordV2,
+  current?: Binding,
+): Partial<Binding> | null {
   const state = queueChipState(record.state)
   if (!state) return null
   const error = record.lastError
@@ -803,6 +811,10 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
     if (error === 'edit_locked') {
       patched.state = 'edit_locked'
       patched.error = 'edit_locked'
+      // EL1A-BE-2: a queue rewrite of a parked edit_locked intent keeps the holder metadata the
+      // binding already carries; dropping it would make the chip fall back to the null holder
+      // and lose the name it names in AC-1
+      if (current?.editLock) patched.editLock = current.editLock
     } else {
       patched.error = error ?? 'server_error'
       if (record.maxBytes !== undefined) {
@@ -1262,6 +1274,9 @@ export class UniworkDocsService {
       if (binding.error === 'permission_revoked') return { kind: 'revoked' }
       if (binding.error === 'document_deleted') return { kind: 'deleted' }
     }
+    // EL1A-BE-1: an edit_locked copy never rebuilds a newer-* bar from a revision the 423
+    // handed back: the chip's edit_locked pill outranks it and names the holder instead
+    if (binding.state === 'edit_locked') return null
     if (
       binding.serverRevision !== undefined &&
       binding.serverVersion !== undefined &&
@@ -1852,7 +1867,7 @@ export class UniworkDocsService {
       await this.settleFromRecord(doc, record)
       return
     }
-    const patch = queueBindingPatch(record)
+    const patch = queueBindingPatch(record, doc.binding)
     if (patch) await this.coordinator.commitState(doc, { ...doc.binding, ...patch })
   }
 
@@ -1886,6 +1901,7 @@ export class UniworkDocsService {
       baseVersionId: record.receipt.versionId,
     }
     delete next.error
+    delete next.editLock
     delete next.sizeBytes
     delete next.maxBytes
     delete next.serverRevision
@@ -2134,6 +2150,9 @@ export class UniworkDocsService {
       if (fresh) {
         const next: Binding = { ...fresh.binding, state: 'dirty' }
         delete next.error
+        // EL1A-BE-4: like withoutError on the inline settle: a cancelled save drops the 423's
+        // holder metadata, so a later writer spreading the binding cannot resurrect it
+        delete next.editLock
         await this.coordinator.commitState(fresh, next)
       }
     }
@@ -4734,7 +4753,11 @@ export class UniworkDocsService {
       queue: record && !isTerminalQueueState(record.state) ? record.state : null,
       ...(record?.receipt ? { receiptRevision: record.receipt.revision } : {}),
       ownEcho: this.echoSet(doc.binding.documentId),
-      locked: this.lockedFor(doc.binding),
+      // EL1A-BE-1: an edit_locked copy takes no notice either - the holder's own
+      // commits are the newer versions, and reloading over a copy someone else is
+      // editing would fight the lock (the pill names the holder instead)
+      locked:
+        this.lockedFor(doc.binding) ?? (doc.binding.state === 'edit_locked' ? 'edit_locked' : null),
     }
   }
 
