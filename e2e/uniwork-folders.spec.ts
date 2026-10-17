@@ -2,11 +2,13 @@ import { test, expect, type Locator, type Page } from '@playwright/test'
 import JSZip from 'jszip'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { copyFile, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { en as syncEn } from '../apps/shell/src/renderer/src/i18n/sync/en'
 import { en as uniworkDocsEn } from '../apps/shell/src/renderer/src/i18n/uniwork-documents/en'
 import { en as uniworkFoldersEn } from '../apps/shell/src/renderer/src/i18n/uniwork-folders/en'
+import { en as uniworkSaveEn } from '../apps/shell/src/renderer/src/i18n/uniwork-save/en'
 import {
   closeAndSaveVideo,
   launchShell,
@@ -28,11 +30,13 @@ import {
 } from './fixtures/uniwork-signin-steps'
 
 /**
- * FD-11 UniWork folders end to end: folder creation, live tree/contents refresh
- * on web-side moves, archives, and restores via the change feed, 3-level
- * breadcrumb navigation, title search with ancestor paths and kind filtering,
- * conflict Save-as-a-copy into a chosen folder, and New document + Upload into
- * a chosen folder via the Location picker.
+ * FD-11 UniWork folders & SAVE-01 first-save end to end: folder creation, live
+ * tree/contents refresh on web-side moves, archives, and restores via the
+ * change feed, 3-level breadcrumb navigation, title search with ancestor paths
+ * and kind filtering, conflict Save-as-a-copy into a chosen folder, New
+ * document + Upload into a chosen folder via the Location picker, and first
+ * save of an unbound local document into My Folder or a chosen folder plus My
+ * Folder localization and lock in the folder tree/browser.
  *
  * The account is signed in once in `beforeAll`; each scenario launches a fresh
  * shell on the shared `userDataDir`.
@@ -69,6 +73,7 @@ interface AppContext {
 type ShellWindowApis = {
   aiOffice: {
     uniworkActiveDocStatus(): Promise<DocStatus | null>
+    uniworkDocStatusForPath(filePath: string): Promise<DocStatus | null>
   }
   uniworkSyncCenter: {
     syncNow(): Promise<void>
@@ -88,10 +93,43 @@ interface AidocsWindow {
 const activeStatus = (shell: Page): Promise<DocStatus | null> =>
   shell.evaluate(() => (window as unknown as ShellWindowApis).aiOffice.uniworkActiveDocStatus())
 
+const statusOf = (shell: Page, filePath: string): Promise<DocStatus | null> =>
+  shell.evaluate(
+    (p) => (window as unknown as ShellWindowApis).aiOffice.uniworkDocStatusForPath(p),
+    filePath,
+  )
+
 const triggerFeedTick = (shell: Page): Promise<void> =>
   shell.evaluate(() => (window as unknown as ShellWindowApis).uniworkSyncCenter.syncNow())
 
 const chip = (shell: Page) => shell.locator('.uw-pill:not(.uw-notice)')
+
+/**
+ * Triggers the application menu item `File > Save to UniWork` (`Lưu vào UniWork`).
+ */
+async function triggerSaveToUniWork(app: LaunchedApp['app']): Promise<void> {
+  const triggered = await app.evaluate(({ Menu }) => {
+    const walk = (items: Electron.MenuItem[]): Electron.MenuItem | null => {
+      for (const it of items) {
+        if (it.submenu) {
+          const found = walk(it.submenu.items)
+          if (found) return found
+        } else if (/uniwork/i.test(it.label ?? '') && /(save|lưu)/i.test(it.label ?? '')) {
+          return it
+        }
+      }
+      return null
+    }
+    const m = Menu.getApplicationMenu()
+    const target = m ? walk(m.items) : null
+    if (target) {
+      target.click()
+      return true
+    }
+    return false
+  })
+  expect(triggered).toBe(true)
+}
 
 /**
  * Opens the "Open from UniWork" dialog and selects the workspace root (`UniWork`)
@@ -196,15 +234,22 @@ test.describe.serial('UniWork folders (FD-11)', () => {
     test.skip(!keyring, NO_KEYRING_SKIP)
   })
 
-  async function withApp(name: string, run: (ctx: AppContext) => Promise<void>): Promise<void> {
+  async function withApp(
+    name: string,
+    run: (ctx: AppContext) => Promise<void>,
+    options: { openFile?: string } = {},
+  ): Promise<void> {
     const launched = await launchShell({
       userDataDir,
       onboardingSeen: true,
       videoDir: name,
+      openFile: options.openFile,
       env: shellEnv(stub),
     })
     try {
-      const shell = launched.page
+      const shell = options.openFile
+        ? await waitForPageWithUrl(launched.app, 'shell/out')
+        : launched.page
       await expect(accountButton(shell)).toHaveAttribute('data-state', 'signed-in', {
         timeout: 45_000,
       })
@@ -776,6 +821,296 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       ).toBeVisible()
       await expect(contents.getByRole('option', { name: /^uploaded-handbook\.docx/ })).toBeVisible()
       await shell.screenshot({ path: screenshotPath('uniwork-folders-new-upload') })
+    })
+  })
+
+  // g ───────────────────────────────────────────────────────────────────────
+  test('g. first save of a new local document defaults to My Folder, binds the tab, and a second save via menu or Ctrl+S uploads + commits once without reopening the dialog', async () => {
+    test.setTimeout(180_000)
+    const dir = await mkdtemp(join(tmpdir(), 'uniwork-save01-g-'))
+    const local = join(dir, 'draft-my-folder.docx')
+    await copyFile(join(ROOT, 'fixtures/generated/simple.docx'), local)
+
+    await withApp(
+      'uniwork-folders-first-save-my-folder',
+      async ({ launched, shell }) => {
+        const editor = await docsEditor(launched.app)
+        expect(await activeStatus(shell)).toBeNull()
+        expect(await statusOf(shell, local)).toBeNull()
+        await expect(chip(shell)).toHaveCount(0)
+
+        // Wait for signed-in launch reads to settle before recording stub calls
+        let settled = stub.callCount()
+        await expect
+          .poll(
+            async () => {
+              await new Promise((r) => setTimeout(r, 400))
+              const now = stub.callCount()
+              const quiet = now === settled
+              settled = now
+              return quiet
+            },
+            { timeout: 10_000 },
+          )
+          .toBe(true)
+        const before = stub.callCount()
+
+        // Trigger File > Save to UniWork -> SaveDialog (State 1) opens defaulting to My Folder
+        await triggerSaveToUniWork(launched.app)
+        const saveDialog = shell.getByRole('dialog', { name: uniworkSaveEn.usDialogTitle })
+        await expect(saveDialog).toBeVisible()
+        await expect(saveDialog.locator('.uws-loc-value')).toHaveText(
+          uniworkSaveEn.usSavingIn.replace('{folder}', uniworkSaveEn.usMyFolder),
+        )
+
+        const nameInput = saveDialog.getByRole('textbox', { name: uniworkSaveEn.usName })
+        await expect(nameInput).toBeFocused()
+        await nameInput.fill('first-saved-to-my-folder')
+        await saveDialog.getByRole('button', { name: uniworkSaveEn.usSave, exact: true }).click()
+        await expect(saveDialog).toBeHidden({ timeout: 30_000 })
+        await expectState(shell, 'ready')
+
+        const callsMade = stub
+          .calls()
+          .slice(before)
+          .map((c) => `${c.method} ${c.route}`)
+        console.log('case g stub calls:', callsMade)
+
+        const myFolder = stub.ensureMyFolder()
+        const createdDocs = stub
+          .documents()
+          .filter((d) => d.title === 'first-saved-to-my-folder.docx')
+        expect(createdDocs).toHaveLength(1)
+        const created = createdDocs[0]!
+        expect(created.parentId).toBe(myFolder.id)
+
+        // Tab is now bound to the created UniWork document; the original local path stays unbound
+        await expect
+          .poll(() => activeStatus(shell))
+          .toMatchObject({
+            documentId: created.id,
+            title: 'first-saved-to-my-folder.docx',
+            access: 'edit',
+            state: 'ready',
+          })
+        await expect(chip(shell)).toBeVisible()
+        expect(await statusOf(shell, local)).toBeNull()
+        expect(existsSync(join(dir, 'binding.json'))).toBe(false)
+
+        // Second save via application menu: ONE upload + ONE commit, NO SaveDialog, no second create
+        await typeInDocs(editor, `${MARKER}_MENU`)
+        const uploadsBeforeMenu = stub.uploads(created.id).length
+        const commitsBeforeMenu = stub.commits(created.id).length
+        await triggerSaveToUniWork(launched.app)
+        await expect(saveDialog).toBeHidden()
+        await expect
+          .poll(() => stub.commits(created.id).length, { timeout: 30_000 })
+          .toBe(commitsBeforeMenu + 1)
+        expect(stub.uploads(created.id)).toHaveLength(uploadsBeforeMenu + 1)
+        await expectState(shell, 'ready')
+        expect(
+          stub.documents().filter((d) => d.title === 'first-saved-to-my-folder.docx'),
+        ).toHaveLength(1)
+
+        // Third save via real Ctrl+S: ONE upload + ONE commit, NO SaveDialog, no second create
+        await typeInDocs(editor, `${MARKER}_CTRL_S`)
+        const uploadsBeforeCtrlS = stub.uploads(created.id).length
+        const commitsBeforeCtrlS = stub.commits(created.id).length
+        await saveShortcut(editor)
+        await expect(saveDialog).toBeHidden()
+        await expect
+          .poll(() => stub.commits(created.id).length, { timeout: 30_000 })
+          .toBe(commitsBeforeCtrlS + 1)
+        expect(stub.uploads(created.id)).toHaveLength(uploadsBeforeCtrlS + 1)
+        await expectState(shell, 'ready')
+        expect(
+          stub.documents().filter((d) => d.title === 'first-saved-to-my-folder.docx'),
+        ).toHaveLength(1)
+
+        const latestXml = await zipEntry(stub.state(created.id).bytes, 'word/document.xml')
+        expect(latestXml).toContain(`${MARKER}_MENU`)
+        expect(latestXml).toContain(`${MARKER}_CTRL_S`)
+        await shell.screenshot({ path: screenshotPath('uniwork-folders-first-save-my-folder') })
+      },
+      { openFile: local },
+    )
+  })
+
+  // h ───────────────────────────────────────────────────────────────────────
+  test('h. first save with Change folder lands in the picked folder, and Esc or Close before Save sends zero create requests', async () => {
+    test.setTimeout(180_000)
+    const pickedFolder = stub.addFolder({ title: 'Picked Save Folder' })
+    const dir = await mkdtemp(join(tmpdir(), 'uniwork-save01-h-'))
+    const local = join(dir, 'draft-picked-folder.docx')
+    await copyFile(join(ROOT, 'fixtures/generated/simple.docx'), local)
+
+    await withApp(
+      'uniwork-folders-first-save-picked-folder',
+      async ({ launched, shell }) => {
+        const editor = await docsEditor(launched.app)
+        expect(editor).toBeTruthy()
+        expect(await activeStatus(shell)).toBeNull()
+
+        let settled = stub.callCount()
+        await expect
+          .poll(
+            async () => {
+              await new Promise((r) => setTimeout(r, 400))
+              const now = stub.callCount()
+              const quiet = now === settled
+              settled = now
+              return quiet
+            },
+            { timeout: 10_000 },
+          )
+          .toBe(true)
+        const before = stub.callCount()
+        const docsBefore = stub.documents().length
+        const createCallsSince = (start: number) =>
+          stub
+            .calls()
+            .slice(start)
+            .filter(
+              (c) =>
+                c.method === 'POST' &&
+                /^\/workspaces\/[^/]+\/documents\/files(\/blank)?$/.test(c.route),
+            )
+
+        const saveDialog = shell.getByRole('dialog', { name: uniworkSaveEn.usDialogTitle })
+
+        // 1. Escape before clicking Save sends zero create requests
+        await triggerSaveToUniWork(launched.app)
+        await expect(saveDialog).toBeVisible()
+        await shell.keyboard.press('Escape')
+        await expect(saveDialog).toBeHidden()
+        expect(createCallsSince(before)).toHaveLength(0)
+        expect(stub.documents()).toHaveLength(docsBefore)
+
+        // 2. Close button before clicking Save sends zero create requests
+        await triggerSaveToUniWork(launched.app)
+        await expect(saveDialog).toBeVisible()
+        await saveDialog.getByRole('button', { name: uniworkSaveEn.usClose, exact: true }).click()
+        await expect(saveDialog).toBeHidden()
+        expect(createCallsSince(before)).toHaveLength(0)
+        expect(stub.documents()).toHaveLength(docsBefore)
+
+        // 3. Reopen SaveDialog -> click Change -> pick `Picked Save Folder` -> Choose -> Save
+        await triggerSaveToUniWork(launched.app)
+        await expect(saveDialog).toBeVisible()
+        await saveDialog.locator('.uws-loc').click()
+
+        const pickDialog = shell.getByRole('dialog', { name: uniworkSaveEn.usPickTitle })
+        await expect(pickDialog).toBeVisible()
+        const tree = pickDialog.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
+        await tree.getByRole('treeitem', { name: 'Picked Save Folder' }).click()
+        await pickDialog
+          .getByRole('button', {
+            name: uniworkSaveEn.usChooseFolder.replace('{folder}', 'Picked Save Folder'),
+            exact: true,
+          })
+          .click()
+
+        await expect(saveDialog).toBeVisible()
+        await expect(saveDialog.locator('.uws-loc-value')).toHaveText(
+          uniworkSaveEn.usSavingIn.replace('{folder}', 'Picked Save Folder'),
+        )
+        expect(createCallsSince(before)).toHaveLength(0)
+
+        await saveDialog
+          .getByRole('textbox', { name: uniworkSaveEn.usName })
+          .fill('saved-into-picked-folder')
+        await saveDialog.getByRole('button', { name: uniworkSaveEn.usSave, exact: true }).click()
+        await expect(saveDialog).toBeHidden({ timeout: 30_000 })
+        await expectState(shell, 'ready')
+
+        const callsMade = stub
+          .calls()
+          .slice(before)
+          .map((c) => `${c.method} ${c.route}`)
+        console.log('case h stub calls:', callsMade)
+
+        const createdDocs = stub
+          .documents()
+          .filter((d) => d.title === 'saved-into-picked-folder.docx')
+        expect(createdDocs).toHaveLength(1)
+        const created = createdDocs[0]!
+        expect(created).toMatchObject({
+          title: 'saved-into-picked-folder.docx',
+          parentId: pickedFolder.id,
+        })
+        expect(created.parentId).not.toBe(stub.ensureMyFolder().id)
+        await shell.screenshot({ path: screenshotPath('uniwork-folders-first-save-picked-folder') })
+      },
+      { openFile: local },
+    )
+  })
+
+  // i ───────────────────────────────────────────────────────────────────────
+  test('i. My Folder in the tree and browser shows the localized label instead of the stored raw title, is listed first, and offers no rename, move, archive, or share actions', async () => {
+    test.setTimeout(150_000)
+    const myFolder = stub.ensureMyFolder()
+    expect(myFolder.title).toBe('my-folder-raw')
+    expect(myFolder.systemKind).toBe('my_folder')
+    stub.addFolder({ title: 'Alpha Folder' })
+
+    await withApp('uniwork-folders-my-folder-ui', async ({ shell }) => {
+      const before = stub.callCount()
+      const dialog = await openUniworkFolderBrowser(shell)
+      const tree = dialog.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
+      const contents = dialog.getByRole('listbox', { name: uniworkFoldersEn.ufContentsLabel })
+
+      await expect(tree.getByRole('treeitem', { name: uniworkSaveEn.usMyFolder })).toBeVisible()
+      await expect(
+        contents.getByRole('option', { name: new RegExp(`^${uniworkSaveEn.usMyFolder}`) }),
+      ).toBeVisible()
+
+      const callsMade = stub
+        .calls()
+        .slice(before)
+        .map((c) => `${c.method} ${c.route}`)
+      console.log('case i stub calls:', callsMade)
+
+      // Stored title `my-folder-raw` never appears in the tree or browser
+      await expect(dialog).not.toContainText('my-folder-raw')
+
+      // Listed first in both the folder tree and the root contents list (before `Alpha Folder`)
+      const rootTreeChildren = await treeChildrenOf(tree, uniworkFoldersEn.ufRoot)
+      expect(rootTreeChildren[0]).toBe(uniworkSaveEn.usMyFolder)
+      expect(rootTreeChildren).toContain('Alpha Folder')
+
+      const contentTitles = await contents
+        .locator('.uw-pick-row-title')
+        .evaluateAll((nodes) => nodes.map((n) => n.textContent ?? ''))
+      expect(contentTitles[0]).toBe(uniworkSaveEn.usMyFolder)
+      expect(contentTitles).toContain('Alpha Folder')
+
+      // Contents row menu for My Folder offers New subfolder only (no rename/move/archive/share)
+      await dialog
+        .getByRole('button', {
+          name: uniworkFoldersEn.ufActionsFor.replace('{name}', uniworkSaveEn.usMyFolder),
+          exact: true,
+        })
+        .click()
+      const rowMenu = shell.getByRole('menu')
+      await expect(rowMenu).toBeVisible()
+      await expect(rowMenu.getByRole('menuitem')).toHaveText([uniworkFoldersEn.ufNewSubfolder])
+      await shell.keyboard.press('Escape')
+      await expect(rowMenu).toBeHidden()
+
+      // Tree context menu for My Folder offers New subfolder only (no rename/move/archive/share), and F2 does not open inline rename
+      const myFolderTreeItem = tree.getByRole('treeitem', { name: uniworkSaveEn.usMyFolder })
+      await myFolderTreeItem.click({ button: 'right' })
+      const treeContextMenu = shell.getByRole('menu')
+      await expect(treeContextMenu).toBeVisible()
+      await expect(treeContextMenu.getByRole('menuitem')).toHaveText([
+        uniworkFoldersEn.ufNewSubfolder,
+      ])
+      await shell.keyboard.press('Escape')
+      await expect(treeContextMenu).toBeHidden()
+
+      await myFolderTreeItem.press('F2')
+      await expect(tree.locator('input')).toHaveCount(0)
+      await shell.screenshot({ path: screenshotPath('uniwork-folders-my-folder-ui') })
     })
   })
 })
