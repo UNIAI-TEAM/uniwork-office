@@ -13,6 +13,7 @@ import {
 import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
+import { deflateRawSync } from 'node:zlib'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkDocSummary, UniworkDocStatus } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
@@ -214,6 +215,16 @@ function fakeServer(
      * the renderer is its own; no row is created.
      */
     createTooLarge?: boolean
+    /** BIGUP-A1: the server's chunked threshold, answered by `GET /api/v1/config` */
+    chunkedThreshold?: number
+    /** BIGUP-A1: the session create refuses with 422 `upload_session_too_small` */
+    sessionTooSmall?: boolean
+    /** BIGUP-A1: the session create refuses with 415 `unsupported_media_type` */
+    sessionRefused?: boolean
+    /** BIGUP-A1: the part size the session answers with */
+    sessionPartSize?: number
+    /** BIGUP-A1: holds a part PUT open until it settles, so a test can cancel it */
+    partGate?: () => Promise<void>
   } = {},
 ) {
   const state = {
@@ -232,6 +243,16 @@ function fakeServer(
     uploadChecksums: new Map<string, string>(),
     /** the upload POSTs still running (upload_id order) */
     uploadSeq: 0,
+    /** BIGUP-A1: the open upload session, and the parts `complete` named */
+    session: null as {
+      sessionId: string
+      filename: string
+      sizeBytes: number
+      parentId: string | null
+      title: string | null
+    } | null,
+    sessionSeq: 0,
+    completedParts: [] as Array<{ part_number: number; etag: string }>,
   }
   let seq = 0
   /** every request the fake saw, in order */
@@ -278,8 +299,16 @@ function fakeServer(
     // SAVE-01 merge M-2 (D-S1): SIZE-F1's `documents.limits` read, the one the
     // upload path makes and the first save now shares
     if (u.pathname === '/api/v1/config') {
-      if (options.limits === undefined) return envelope(404, 'not_found')
-      return json(200, { limits: options.limits })
+      if (options.limits === undefined && options.chunkedThreshold === undefined) {
+        return envelope(404, 'not_found')
+      }
+      const limits =
+        typeof options.limits === 'object' && options.limits !== null ? { ...options.limits } : {}
+      if (options.chunkedThreshold !== undefined) {
+        ;(limits as Record<string, unknown>).chunked_upload_threshold_bytes =
+          options.chunkedThreshold
+      }
+      return json(200, { limits })
     }
 
     // create blank
@@ -603,8 +632,127 @@ function fakeServer(
       const bytes = id === DOC ? state.bytes : (state.documents.get(id)?.bytes ?? enc('x'))
       return new Response(bytes as BodyInit, { status: 200 })
     }
+    // BIGUP-A1: the chunked-upload session routes a file above the server's
+    // threshold uses. The part PUTs go to the presigned URLs the answer
+    // carries, which this same fake serves below (the client sends them with
+    // no auth header and reads the ETag back).
+    if (u.pathname === `/api/v1/workspaces/${WS}/documents/upload-sessions`) {
+      const body = JSON.parse(String(init.body)) as {
+        filename: string
+        size_bytes: number
+        parent_id?: string | null
+        title?: string
+      }
+      call.body = body
+      if (options.sessionTooSmall) {
+        return json(422, { error: { code: 'upload_session_too_small', message: 'x' } })
+      }
+      if (options.sessionRefused) {
+        return json(415, {
+          error: {
+            code: 'unsupported_media_type',
+            message: 'x',
+            fields: { reason: 'zip_macro_part' },
+          },
+        })
+      }
+      state.session = {
+        filename: body.filename,
+        sizeBytes: body.size_bytes,
+        parentId: body.parent_id ?? null,
+        title: body.title ?? null,
+        sessionId: `ups_${++state.sessionSeq}`,
+      }
+      state.completedParts = []
+      return json(201, sessionJson())
+    }
+    if (u.hostname === 'storage.example' && call.method === 'PUT') {
+      // a real presigned PUT: an aborted request rejects, exactly as fetch does
+      if (options.partGate) {
+        await new Promise<void>((resolve, reject) => {
+          const abort = () => {
+            const error = new Error('The operation was aborted.')
+            error.name = 'AbortError'
+            reject(error)
+          }
+          if (init.signal?.aborted) abort()
+          else init.signal?.addEventListener('abort', abort, { once: true })
+          options.partGate!().then(resolve, reject)
+        })
+      }
+      call.body = { partNumber: Number(u.pathname.split('/').pop()) }
+      return new Response(null, {
+        status: 200,
+        headers: { ETag: `"etag-${u.pathname.split('/').pop()}"` },
+      })
+    }
+    const sessionRoute = /^\/api\/v1\/upload-sessions\/([A-Za-z0-9_-]+)(\/complete)?$/.exec(
+      u.pathname,
+    )
+    if (sessionRoute) {
+      const session = state.session
+      if (!session || session.sessionId !== sessionRoute[1]) {
+        return json(404, { error: { code: 'not_found', message: 'x' } })
+      }
+      if (call.method === 'DELETE') {
+        state.session = null
+        return new Response(null, { status: 204 })
+      }
+      if (sessionRoute[2]) {
+        const body = JSON.parse(String(init.body)) as {
+          parts: Array<{ part_number: number; etag: string }>
+        }
+        call.body = body
+        state.completedParts = body.parts
+        const id = `new_${++seq}`
+        state.documents.set(id, {
+          title: session.title ?? session.filename,
+          bytes: enc('big bytes'),
+        })
+        return json(200, {
+          document: {
+            ...docJson(id),
+            title: session.title ?? session.filename,
+            file: { ...docJson(id).file, filename: session.filename },
+          },
+        })
+      }
+      call.body = undefined
+      return json(200, sessionJson())
+    }
     return envelope(404, 'not_found')
   })
+
+  const sessionJson = () => {
+    const session = state.session!
+    const partSize = options.sessionPartSize ?? 8 * 1024 * 1024
+    const totalParts = Math.ceil(session.sizeBytes / partSize)
+    const held = new Set(state.completedParts.map((part) => part.part_number))
+    const parts = []
+    for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+      if (held.has(partNumber)) continue
+      parts.push({
+        part_number: partNumber,
+        method: 'PUT',
+        url: `https://storage.example/part/${partNumber}`,
+        headers: {},
+        expires_at: '2026-10-19T00:00:00Z',
+      })
+    }
+    return {
+      session_id: session.sessionId,
+      status: 'open',
+      part_size: partSize,
+      total_parts: totalParts,
+      completed_parts: state.completedParts.map((part) => ({
+        part_number: part.part_number,
+        etag: part.etag,
+        size: partSize,
+      })),
+      parts,
+      expires_at: '2026-10-19T00:00:00Z',
+    }
+  }
 
   return { state, calls, fetch: fetch as unknown as FetchLike }
 }
@@ -612,6 +760,66 @@ function fakeServer(
 /** the server reports sha256 hex; the client compares it against the bytes it downloaded */
 function hex(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex')
+}
+
+/**
+ * BIGUP-A1: a real, minimal DOCX whose bulk is one stored entry, so a test can
+ * make a > 20 MiB package without writing 20 MiB of real data. `macro` adds the
+ * `vbaProject.bin` part the local probe must refuse.
+ */
+function buildDocxBytes(bulkBytes: number, options: { macro?: boolean } = {}): Uint8Array {
+  const entries: Array<{ name: string; data?: Buffer; storedSize?: number }> = [
+    { name: 'word/media/image1.png', storedSize: bulkBytes },
+    { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+    { name: 'word/document.xml', data: Buffer.from('<w:document/>') },
+  ]
+  if (options.macro) entries.push({ name: 'word/vbaProject.bin', data: Buffer.from('macro') })
+  const chunks: Buffer[] = []
+  const central: Buffer[] = []
+  let offset = 0
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name, 'utf8')
+    const stored = entry.storedSize !== undefined
+    const data = entry.data ?? Buffer.alloc(0)
+    const body = stored ? null : deflateRawSync(data)
+    const size = stored ? entry.storedSize! : data.length
+    const header = Buffer.alloc(30)
+    header.writeUInt32LE(0x04034b50, 0)
+    header.writeUInt16LE(20, 4)
+    header.writeUInt16LE(stored ? 0 : 8, 8)
+    header.writeUInt32LE(0, 14)
+    header.writeUInt32LE(body?.length ?? size, 18)
+    header.writeUInt32LE(size, 22)
+    header.writeUInt16LE(name.length, 26)
+    const localOffset = offset
+    chunks.push(header, name, ...(body ? [body] : []))
+    offset += header.length + name.length + (body?.length ?? 0)
+    if (!body) {
+      // the bulk entry's own bytes are zeros, left implicit: the ZIP reader
+      // only needs the central directory, which the probe checks
+      chunks.push(Buffer.alloc(size))
+      offset += size
+    }
+    const cd = Buffer.alloc(46)
+    cd.writeUInt32LE(0x02014b50, 0)
+    cd.writeUInt16LE(20, 4)
+    cd.writeUInt16LE(20, 6)
+    cd.writeUInt16LE(stored ? 0 : 8, 10)
+    cd.writeUInt32LE(0, 16)
+    cd.writeUInt32LE(body?.length ?? size, 20)
+    cd.writeUInt32LE(size, 24)
+    cd.writeUInt16LE(name.length, 28)
+    cd.writeUInt32LE(localOffset, 42)
+    central.push(cd, name)
+  }
+  const cdBuffer = Buffer.concat(central)
+  const eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0)
+  eocd.writeUInt16LE(entries.length, 8)
+  eocd.writeUInt16LE(entries.length, 10)
+  eocd.writeUInt32LE(cdBuffer.length, 12)
+  eocd.writeUInt32LE(offset, 16)
+  return new Uint8Array(Buffer.concat([...chunks, cdBuffer, eocd]))
 }
 
 let dir: string
@@ -669,7 +877,12 @@ function setup(
 ) {
   const statuses: UniworkDocStatus[] = []
   const renamed: Array<{ documentId: string; title: string }> = []
-  const progress: Array<{ path: string; loaded: number; total: number }> = []
+  const progress: Array<{
+    path: string
+    loaded: number
+    total: number
+    phase?: 'uploading' | 'checking'
+  }> = []
   const pathRenames: Array<{ oldPath: string; newPath: string }> = []
   const titleRenames: Array<{ path: string; title: string }> = []
   /** FD-11: the tree-changed notices main pushed while the test ran */
@@ -2582,6 +2795,166 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
     expect(server.calls.filter((call) => call.method !== 'GET')).toEqual([])
     expect(ctx.pathRenames).toEqual([])
     expect(ctx.service.isBound(file)).toBe(false)
+  })
+
+  // BIGUP-A1 (UNI-1864): the same ONE preflight, but the 50 MiB branch applies
+  // only to a deployment with NO chunked threshold. With a threshold present a
+  // bigger file goes through an upload session instead, so the staging cap must
+  // NOT refuse it.
+  describe('BIGUP-A1: the single-request staging cap', () => {
+    it('refuses a sparse file over 50 MiB unread when the server has no chunked threshold', async () => {
+      // no threshold in `documents.limits`: a `local` storage that cannot
+      // presign parts, so the 50 MiB staging cap is still the effective limit
+      const server = fakeServer({ limits: { upload_max_bytes: 200 * 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'NoThreshold.docx')
+      writeFileSync(file, 'x')
+      truncateSync(file, 50 * 1024 * 1024 + 1)
+
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-no-threshold',
+      })
+
+      expect(uploaded).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'NoThreshold.docx',
+        sizeBytes: 50 * 1024 * 1024 + 1,
+        maxBytes: 50 * 1024 * 1024,
+      })
+      // refused unread: the file's bytes never enter main
+      expect(vi.mocked(readFile).mock.calls.map((call) => String(call[0]))).not.toContain(file)
+      // and no upload request was made: the limits read is the only one
+      expect(server.calls.filter((call) => call.method !== 'GET')).toEqual([])
+      expect(ctx.progress).toHaveLength(0)
+    })
+
+    it('takes the same file through an upload session when the threshold is present', async () => {
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'Chunked.docx')
+      // a real ZIP: the probe refuses a package without its main folder
+      const bytes = buildDocxBytes(30 * 1024 * 1024)
+      writeFileSync(file, bytes)
+
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: 'fold_1',
+        path: file,
+        uploadId: 'up-chunked',
+      })
+
+      expect(uploaded.ok).toBe(true)
+      if (!uploaded.ok) return
+      // the whole file never entered main: it was read in parts off the handle
+      expect(vi.mocked(readFile).mock.calls.map((call) => String(call[0]))).not.toContain(file)
+      const created = server.calls.find(
+        (call) => call.path === `/api/v1/workspaces/${WS}/documents/upload-sessions`,
+      )!
+      expect(created.method).toBe('POST')
+      expect(created.body).toMatchObject({
+        filename: 'Chunked.docx',
+        size_bytes: bytes.byteLength,
+        parent_id: 'fold_1',
+        title: 'Chunked.docx',
+      })
+      // 30 MiB in 8 MiB parts = 4 parts, all PUT, then one complete
+      const parts = server.calls.filter((call) => call.path.startsWith('/part/'))
+      expect(parts).toHaveLength(4)
+      for (const part of parts) expect(part.method).toBe('PUT')
+      const complete = server.calls.find((call) => call.path.endsWith('/complete'))!
+      expect((complete.body as { parts: unknown[] }).parts).toHaveLength(4)
+      // progress: uploading first, then the checking phase, then done
+      expect(ctx.progress.some((event) => event.phase === 'checking')).toBe(true)
+      expect(ctx.progress.at(-1)).toMatchObject({
+        loaded: bytes.byteLength,
+        total: bytes.byteLength,
+      })
+    })
+
+    it('refuses a macro package locally, before any session is opened', async () => {
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'Macro.docx')
+      writeFileSync(file, buildDocxBytes(30 * 1024 * 1024, { macro: true }))
+
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-macro',
+      })
+
+      expect(uploaded).toEqual({ ok: false, error: 'unsupported_format' })
+      expect(server.calls.filter((call) => call.path.includes('upload-sessions'))).toHaveLength(0)
+    })
+
+    it('falls back to the one-request path when the server answers upload_session_too_small', async () => {
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionTooSmall: true,
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'Drifted.docx')
+      // the session route refuses it, so it must fit one request (< 50 MiB)
+      writeFileSync(file, 'small enough for one request')
+
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-drift',
+      })
+
+      expect(uploaded.ok).toBe(true)
+      const oneRequest = server.calls.find((call) => call.path.endsWith('/documents/files'))!
+      expect(oneRequest.method).toBe('POST')
+      expect((oneRequest.body as { bytes: Uint8Array }).bytes.byteLength).toBe(
+        enc('small enough for one request').byteLength,
+      )
+    })
+
+    it('cancels a chunked upload: the in-flight PUTs stop and the session is deleted', async () => {
+      const gate = latch()
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        partGate: () => {
+          gate.entered()
+          return gate.held
+        },
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'Cancel.docx')
+      writeFileSync(file, buildDocxBytes(30 * 1024 * 1024))
+
+      const pending = ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-cancel',
+      })
+      // the first part PUT is held open: cancel while it is genuinely in flight
+      await gate.reached
+      ctx.service.cancelUpload('up-cancel')
+      gate.release()
+      const uploaded = await pending
+
+      expect(uploaded).toEqual({ ok: false, error: 'upload_cancelled' })
+      const deleted = server.calls.find((call) => call.method === 'DELETE')!
+      expect(deleted.path).toMatch(/^\/api\/v1\/upload-sessions\//)
+      expect(server.calls.filter((call) => call.path.endsWith('/complete'))).toHaveLength(0)
+    })
   })
 
   // merge M-2 (D-S1, BINDING): upload AND first save share ONE size preflight.

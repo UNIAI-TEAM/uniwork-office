@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import { open, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -87,6 +87,22 @@ import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
 import { createDocumentLimitsCache, type DocumentLimits, type DocumentLimitsCache } from './limits'
 import { tUniworkDocs } from './strings'
+import {
+  abortUploadSession,
+  readLocalFileProbe,
+  runChunkedUpload,
+  sha256File,
+  shouldUseChunkedUpload,
+  type ChunkedUploadResult,
+  type SavedUploadSession,
+  type UploadSessionTarget,
+} from './upload-session'
+import {
+  createUploadSessionStore,
+  uploadSessionKey,
+  UPLOAD_SESSIONS_STORE_REGISTRATION,
+  type UploadSessionStore,
+} from '../uniwork-sync/upload-sessions'
 import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
 import { actionFlags, type DocumentDetail, type DocumentRef, type LaunchDescriptor } from './parse'
 import {
@@ -492,23 +508,27 @@ const MAX_DOC_NAME_RUNES = 500
 const MAX_FOLDER_NAME_RUNES = 255
 
 /**
- * D stages at most 50 MiB per upload part (`files/registry.go`), so a bigger
- * file is refused before it is read: main must not buffer a multi-GB pick only
- * to be told too_large. Exactly 50 MiB is still sent. This guard runs after the
- * `documents.limits` cap until chunked upload lifts it; its refusal names
- * min(max_bytes, 50 MiB) as the limit so the copy stays truthful.
+ * The interim single-request staging cap: D stages at most 50 MiB per upload
+ * part (`files/registry.go`), so one multipart POST cannot carry more. Since
+ * BIGUP-A1 this is the cap of the SINGLE-REQUEST path only: a file above the
+ * server's `chunked_upload_threshold_bytes` goes through an upload session
+ * instead and is bounded by `limits.max_bytes` alone. A deployment with no
+ * threshold (a `local` backend that cannot presign parts) keeps the old rule -
+ * refuse above 50 MiB before reading - and names `min(max_bytes, 50 MiB)`.
  */
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 /**
- * SIZE-F1 / SAVE-01 merge M-2 (D-S1): the ONE size preflight upload and first
- * save share. The server's `max_bytes` comes first and is named as itself, then
- * the interim 50 MiB staging cap, whose refusal names `min(max_bytes, 50 MiB)`
- * as the effective limit so the copy stays truthful. `filename` is the basename
- * sent as the upload `file` part; `size` is the payload's byte length at this
- * call's point - the stat's size before the read, the buffer's after it. Both
- * callers run it on both, so a file that grew between the two is refused too.
- * The refusal carries filename/sizeBytes/maxBytes to the renderer unchanged.
+ * SIZE-F1 / SAVE-01 merge M-2 (D-S1) / BIGUP-A1: the ONE size preflight upload
+ * and first save share. The server's `max_bytes` comes first and is named as
+ * itself; then the single-request staging cap, which applies only to a file the
+ * chunked path will not take (no threshold, or one above this size) and whose
+ * refusal names `min(max_bytes, 50 MiB)` so the copy stays truthful.
+ * `filename` is the basename sent as the upload `file` part; `size` is the
+ * payload's byte length at this call's point - the stat's size before the read,
+ * the buffer's after it. Both callers run it on both, so a file that grew
+ * between the two is refused too. The refusal carries
+ * filename/sizeBytes/maxBytes to the renderer unchanged.
  */
 function assertUploadSize(filename: string, size: number, limits: DocumentLimits): void {
   if (size > limits.max_bytes) {
@@ -518,7 +538,7 @@ function assertUploadSize(filename: string, size: number, limits: DocumentLimits
       maxBytes: limits.max_bytes,
     })
   }
-  if (size > MAX_UPLOAD_BYTES) {
+  if (size > MAX_UPLOAD_BYTES && !shouldUseChunkedUpload(size, limits)) {
     throw new UniworkDocError('too_large', {
       filename,
       sizeBytes: size,
@@ -569,6 +589,40 @@ function requireUploadId(raw: unknown): string {
 /** the upload a Cancel aborted: never part of UniworkDocErrorCode (see its action union) */
 function cancelledUpload(): UniworkDocError {
   return new UniworkDocError('upload_cancelled' as UniworkDocErrorCode)
+}
+
+/**
+ * BIGUP-A1: one part of a large file, read straight off the disk. A chunked
+ * upload never buffers the whole file: `runChunkedUpload` asks for
+ * `[offset, offset+length)` and the handle is opened and closed for that read,
+ * so peak memory is the parts in flight (4 x 8 MiB) whatever the file's size.
+ * A short read means the file changed under us - refused as `malformed_response`
+ * rather than uploaded as a part of the wrong length.
+ */
+async function readFileRange(
+  path: string,
+  offset: number,
+  length: number,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  if (signal?.aborted) throw cancelledUpload()
+  const handle = await open(path, 'r')
+  try {
+    const buffer = new Uint8Array(length)
+    let done = 0
+    while (done < length) {
+      if (signal?.aborted) throw cancelledUpload()
+      const step = await handle.read(buffer, done, length - done, offset + done)
+      if (step.bytesRead <= 0) break
+      done += step.bytesRead
+    }
+    if (done !== length) {
+      throw new UniworkDocError('malformed_response', { serverCode: 'upload_size_mismatch' })
+    }
+    return buffer
+  } finally {
+    await handle.close().catch(() => undefined)
+  }
 }
 
 /**
@@ -3840,16 +3894,20 @@ export class UniworkDocsService {
    * extension first (`unsupported_format` before any read when the formats table
    * does not know it - the picker's filter alone is not a contract), stats the
    * file (a pick past the configured `documents.limits.upload_max_bytes`, 200 MiB
-   * by default, is refused unread with `too_large`), reads the bytes and sends them
-   * as the multipart `file` part
-   * while reporting progress; the title is the file name (the server's own
-   * default). Nothing is written locally: the working copy is the download the
-   * open flow makes from the created document.
+   * by default, is refused unread with `too_large`), then sends it: a file above
+   * the server's `chunked_upload_threshold_bytes` (BIGUP-A1) goes through an
+   * upload session - parts straight to the storage's presigned URLs, never the
+   * whole file in RAM - and anything smaller through the one multipart POST.
+   * Progress is pushed with the bytes actually sent, and `phase: 'checking'`
+   * while the server validates a chunked upload; the title is the file name
+   * (the server's own default). Nothing is written locally: the working copy is
+   * the download the open flow makes from the created document.
    *
    * The upload is reachable for the dialog's Cancel through its own `uploadId`:
-   * `cancelUpload` aborts the read and the POST, and this call then answers
-   * `upload_cancelled`. An abort that lands after D already answered 2xx is
-   * ignored - the created document is returned as usual (never a hidden delete).
+   * `cancelUpload` aborts the read and the POST (or the in-flight part PUTs) and
+   * aborts the upload session, and this call then answers `upload_cancelled`. An
+   * abort that lands after D already answered 2xx is ignored - the created
+   * document is returned as usual (never a hidden delete).
    */
   uploadDocument(input: UniworkUploadDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(async () => {
@@ -3872,10 +3930,12 @@ export class UniworkDocsService {
       this.uploads.set(uploadId, controller)
       try {
         let size: number
+        let mtimeMs: number
         try {
           const info = await stat(input.path)
           if (!info.isFile()) throw new UniworkDocError('not_found')
           size = info.size
+          mtimeMs = info.mtimeMs
         } catch (error) {
           throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
         }
@@ -3884,38 +3944,39 @@ export class UniworkDocsService {
         const limits = await this.limitsCache.get()
         if (controller.signal.aborted) throw cancelledUpload()
         assertUploadSize(filename, size, limits)
-        let bytes: Uint8Array
-        try {
-          bytes = new Uint8Array(await readFile(input.path, { signal: controller.signal }))
-        } catch {
-          if (controller.signal.aborted) throw cancelledUpload()
-          throw new UniworkDocError('not_found')
-        }
-        // the read can also resolve just as the abort lands: no POST then
-        if (controller.signal.aborted) throw cancelledUpload()
-        const total = bytes.byteLength
-        assertUploadSize(filename, total, limits)
-        this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: 0, total })
-        const created = await this.api()
-          .createFile({
-            workspaceId: target.workspaceId,
-            bytes,
+        const singleRequest = (): Promise<UniworkDocSummary> =>
+          this.uploadSingleRequestDocument({
+            uploadId,
+            path: input.path,
             filename,
-            title: filename,
-            ...target.create,
-            idempotencyKey: this.newIdempotencyKey(),
-            signal: controller.signal,
+            size,
+            target,
+            limits,
+            controller,
           })
-          .catch((error: unknown) => {
-            // the person cancelled while the POST was in flight: that is the
-            // answer, not the network failure the abort surfaced as
-            if (controller.signal.aborted) throw cancelledUpload()
-            if (error instanceof UniworkDocError && error.code === 'too_large') {
-              rethrowServerTooLarge(error, filename, total, limits)
-            }
-            throw error
-          })
-        this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: total, total })
+        const created = shouldUseChunkedUpload(size, limits)
+          ? await this.uploadChunkedDocument({
+              uploadId,
+              path: input.path,
+              filename,
+              size,
+              mtimeMs,
+              target,
+              limits,
+              controller,
+            }).catch(async (error: unknown) => {
+              // BIGUP-A1: the server refused the session because the file is at
+              // or under its own threshold - the limits cache was stale. The
+              // file fits one request, so that is the path to take.
+              if (
+                error instanceof UniworkDocError &&
+                error.serverCode === 'upload_session_too_small'
+              ) {
+                return await singleRequest()
+              }
+              throw error
+            })
+          : await singleRequest()
         // FD-11: the uploaded document is a new row in its folder
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
@@ -3924,6 +3985,202 @@ export class UniworkDocsService {
         if (this.uploads.get(uploadId) === controller) this.uploads.delete(uploadId)
       }
     })
+  }
+
+  /**
+   * The one-request upload: main buffers the file and sends it as the multipart
+   * `file` part. Bounded by the 50 MiB staging cap, so the buffer is small; a
+   * file the server answers `too_large` for (a stale limits cache) is re-wrapped
+   * with the basename and the size main actually sent.
+   */
+  private async uploadSingleRequestDocument(input: {
+    uploadId: string
+    path: string
+    filename: string
+    size: number
+    target: { workspaceId: string; create: UniworkCreateTarget }
+    limits: DocumentLimits
+    controller: AbortController
+  }): Promise<UniworkDocSummary> {
+    const { uploadId, path, filename, target, limits, controller } = input
+    let bytes: Uint8Array
+    try {
+      bytes = new Uint8Array(await readFile(path, { signal: controller.signal }))
+    } catch {
+      if (controller.signal.aborted) throw cancelledUpload()
+      throw new UniworkDocError('not_found')
+    }
+    // the read can also resolve just as the abort lands: no POST then
+    if (controller.signal.aborted) throw cancelledUpload()
+    const total = bytes.byteLength
+    assertUploadSize(filename, total, limits)
+    this.deps.pushUploadProgress?.({ uploadId, path, loaded: 0, total })
+    const created = await this.api()
+      .createFile({
+        workspaceId: target.workspaceId,
+        bytes,
+        filename,
+        title: filename,
+        ...target.create,
+        idempotencyKey: this.newIdempotencyKey(),
+        signal: controller.signal,
+      })
+      .catch((error: unknown) => {
+        // the person cancelled while the POST was in flight: that is the
+        // answer, not the network failure the abort surfaced as
+        if (controller.signal.aborted) throw cancelledUpload()
+        if (error instanceof UniworkDocError && error.code === 'too_large') {
+          rethrowServerTooLarge(error, filename, total, limits)
+        }
+        throw error
+      })
+    this.deps.pushUploadProgress?.({ uploadId, path, loaded: total, total })
+    return created
+  }
+
+  /**
+   * BIGUP-A1: the chunked upload of one new document. The probe is read from
+   * the file's head and ZIP tail (bounded, never the whole file), a session is
+   * opened for the workspace, the parts go to the storage's presigned URLs four
+   * at a time, and `complete` creates the document. The session id and the
+   * finished parts are persisted in the `upload-sessions` store, so a restart
+   * (or a re-pick of the same, unmodified file) resumes instead of re-sending
+   * everything; the record is removed once the document exists or the person
+   * cancelled.
+   *
+   * A `422 upload_session_too_small` is the threshold having drifted under us
+   * (a cached limit, a server changed between the stat and the call): the file
+   * is small enough for one request, so the single-request path runs instead.
+   */
+  private async uploadChunkedDocument(input: {
+    uploadId: string
+    path: string
+    filename: string
+    size: number
+    mtimeMs: number
+    target: { workspaceId: string; create: UniworkCreateTarget }
+    limits: DocumentLimits
+    controller: AbortController
+  }): Promise<UniworkDocSummary> {
+    const { uploadId, path, filename, size, mtimeMs, target, limits, controller } = input
+    const format = formatForName(filename)!
+    // the probe refuses a file the server would refuse anyway (a macro package,
+    // a broken container) before one byte is sent
+    const probe = await readLocalFileProbe({ path }, size, filename)
+    const api = this.api()
+    const resumeKey = uploadSessionKey(path, size, mtimeMs)
+    const store = await this.uploadSessionStore()
+    const saved = (await store?.get(resumeKey)) ?? null
+    const resume: SavedUploadSession | undefined =
+      saved && saved.sessionId && saved.workspaceId === target.workspaceId
+        ? {
+            sessionId: saved.sessionId,
+            partSize: saved.partSize,
+            totalParts: saved.totalParts,
+            completedParts: saved.completedParts,
+            expiresAt: saved.expiresAt,
+          }
+        : undefined
+    const idempotencyKey = this.newIdempotencyKey()
+    // the session route names its folder by id only (there is no `destination`
+    // field), so a `my_folder` target is resolved to the caller's personal
+    // folder first - the same row `POST .../documents/files` would land in
+    const parentId = await this.uploadSessionParentId(api, target)
+    const targetForSession: UploadSessionTarget = {
+      kind: 'workspace',
+      workspaceId: target.workspaceId,
+      parentId,
+      title: filename,
+    }
+    const pushProgress = (loaded: number, total: number, phase?: 'checking'): void => {
+      this.deps.pushUploadProgress?.({
+        uploadId,
+        path,
+        loaded,
+        total,
+        ...(phase ? { phase } : {}),
+      })
+    }
+    const result = await runChunkedUpload(api, {
+      target: targetForSession,
+      filename,
+      size,
+      readRange: (offset, length) => readFileRange(path, offset, length, controller.signal),
+      probe,
+      idempotencyKey,
+      ...(resume ? { resume } : {}),
+      signal: controller.signal,
+      onProgress: (loaded, total) => pushProgress(loaded, total),
+      onPhase: (phase) => pushProgress(size, size, phase === 'checking' ? 'checking' : undefined),
+      onSessionState: async (state) => {
+        await store?.put(resumeKey, {
+          sessionId: state.sessionId,
+          workspaceId: target.workspaceId,
+          folderId: 'parentId' in target.create ? (target.create.parentId ?? null) : null,
+          path,
+          size,
+          mtimeMs,
+          partSize: state.partSize,
+          totalParts: state.totalParts,
+          completedParts: state.completedParts,
+          expiresAt: state.expiresAt,
+          updatedAt: new Date().toISOString(),
+        })
+      },
+    }).catch(async (error: unknown) => {
+      if (controller.signal.aborted) {
+        await this.abortChunkedUpload(api, resumeKey)
+        throw cancelledUpload()
+      }
+      if (error instanceof UniworkDocError && error.code === 'too_large') {
+        rethrowServerTooLarge(error, filename, size, limits)
+      }
+      throw error
+    })
+    await store?.remove(resumeKey)
+    if (result.kind === 'upload') {
+      // the workspace route answers the created document; a staged upload here
+      // would mean the server routed a create through the version shape
+      throw new UniworkDocError('malformed_response')
+    }
+    // the create answer may omit the format; the extension main already
+    // resolved is the same authority the open flow uses
+    const created = result.document
+    return created.format ? created : { ...created, format }
+  }
+
+  /** the resume store of the new-document chunked upload, or null without a store */
+  private async uploadSessionStore(): Promise<UploadSessionStore | null> {
+    const open = await this.openSyncStore()
+    if (open.kind !== 'ok') return null
+    return createUploadSessionStore(open.records(UPLOAD_SESSIONS_STORE_REGISTRATION.name))
+  }
+
+  /**
+   * The folder id an upload session creates its document in. The session route
+   * takes `parent_id` only (never the one-request route's `destination`), so a
+   * `my_folder` target is resolved through the same idempotent `my-folder`
+   * route the save dialog already calls - never left to the server's default,
+   * which would put the document at the workspace root instead.
+   */
+  private async uploadSessionParentId(
+    api: UniworkDocsClient,
+    target: { workspaceId: string; create: UniworkCreateTarget },
+  ): Promise<string | null> {
+    if ('parentId' in target.create && target.create.parentId) return target.create.parentId
+    return (await api.ensureMyFolder(target.workspaceId)).id
+  }
+
+  /** cancel a chunked upload: the session goes, and so does its saved record */
+  private async abortChunkedUpload(api: UniworkDocsClient, resumeKey: string): Promise<void> {
+    try {
+      const store = await this.uploadSessionStore()
+      const saved = await store?.get(resumeKey)
+      if (saved) await abortUploadSession(api, saved.sessionId)
+      await store?.remove(resumeKey)
+    } catch (error) {
+      console.warn('uniwork docs: the upload session could not be aborted', error)
+    }
   }
 
   /**
@@ -4005,18 +4262,86 @@ export class UniworkDocsService {
     // S01-R1-9: a real regular file, stat'ed before anything is read - the
     // path that is a directory (or is gone) is `not_found`, never an upload
     let size: number
+    let mtimeMs: number
     try {
       const info = await stat(tabPath)
       if (!info.isFile()) throw new UniworkDocError('not_found')
       size = info.size
+      mtimeMs = info.mtimeMs
     } catch (error) {
       throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
     }
-    // S01-R1-9 / merge M-2 (D-S1): the upload path's OWN preflight, one shared
-    // guard - the server cap first, then the 50 MiB staging cap - so a first
-    // save is refused typed and unread exactly like an upload, details included
+    // S01-R1-9 / merge M-2 (D-S1) / BIGUP-A1: the upload path's OWN preflight,
+    // one shared guard - the server cap first, then the single-request staging
+    // cap for a file the chunked path will not take - so a first save is refused
+    // typed and unread exactly like an upload, details included
     const limits = await this.limitsCache.get()
     assertUploadSize(filename, size, limits)
+    // BIGUP-A1: above the server's threshold the file goes up in parts through
+    // an upload session. It is never buffered whole, so a 200 MiB first save no
+    // longer needs 200 MiB of RAM; the working copy is the file itself, written
+    // into the document's store folder below.
+    if (shouldUseChunkedUpload(size, limits)) {
+      return await this.runChunkedFirstSave({
+        session,
+        owner,
+        tabPath,
+        key,
+        title,
+        filename,
+        size,
+        mtimeMs,
+        workspaceId,
+        createTarget,
+        limits,
+        // the server may answer `upload_session_too_small` (a stale limits
+        // cache): the file then fits one request, which is the path below
+        onThresholdDrift: () =>
+          this.runBufferedFirstSave({
+            session,
+            owner,
+            tabPath,
+            key,
+            title,
+            filename,
+            workspaceId,
+            createTarget,
+            limits,
+          }),
+      })
+    }
+    return await this.runBufferedFirstSave({
+      session,
+      owner,
+      tabPath,
+      key,
+      title,
+      filename,
+      workspaceId,
+      createTarget,
+      limits,
+    })
+  }
+
+  /**
+   * SAVE-01's original first save: main buffers the file and sends it as the
+   * multipart `file` part (bounded by the 50 MiB staging cap), then binds the
+   * created document. BIGUP-A1 keeps it as the path for a small file and as the
+   * fallback when the server refuses a session as too small.
+   */
+  private async runBufferedFirstSave(input: {
+    session: { identity: SessionIdentity; epoch: number }
+    owner: string
+    tabPath: string
+    key: string
+    title: string
+    filename: string
+    workspaceId: string
+    createTarget: UniworkCreateTarget
+    limits: DocumentLimits
+  }): Promise<UniworkDocSummary> {
+    const { session, owner, tabPath, key, title, filename, workspaceId, createTarget, limits } =
+      input
     let bytes: Uint8Array
     try {
       bytes = new Uint8Array(await readFile(tabPath))
@@ -4076,6 +4401,167 @@ export class UniworkDocsService {
         }
         throw error
       })
+    return await this.bindFirstSaveDocument({
+      session,
+      owner,
+      tabPath,
+      key,
+      title,
+      filename,
+      limits,
+      api,
+      created,
+      bytesChecksum,
+      onBindFailure: () => this.firstSaveKeys.delete(keyFp),
+      writeWorkingCopy: (dir, name) => this.store.writeWorkingCopy(dir, name, bytes),
+    })
+  }
+
+  /**
+   * BIGUP-A1: the first save of a file above the server's chunked threshold. The
+   * same flow as the one-request path - one Idempotency-Key per attempt body, a
+   * create, then the bind - but the bytes never enter main: the probe reads the
+   * head and the ZIP tail, the parts go straight to the storage, and the working
+   * copy is written from the file itself. The attempt's fingerprint still names
+   * the file's sha256 (streamed once, 1 MiB at a time), so a retry after an
+   * edit mints a new key exactly as the buffered path does.
+   */
+  private async runChunkedFirstSave(input: {
+    session: { identity: SessionIdentity; epoch: number }
+    owner: string
+    tabPath: string
+    key: string
+    title: string
+    filename: string
+    size: number
+    mtimeMs: number
+    workspaceId: string
+    createTarget: UniworkCreateTarget
+    limits: DocumentLimits
+    /** the server refused the session as too small: the file fits one request */
+    onThresholdDrift(): Promise<UniworkDocSummary>
+  }): Promise<UniworkDocSummary> {
+    const {
+      session,
+      owner,
+      tabPath,
+      key,
+      title,
+      filename,
+      size,
+      mtimeMs,
+      workspaceId,
+      createTarget,
+    } = input
+    const destination =
+      'parentId' in createTarget && createTarget.parentId
+        ? `parent:${createTarget.parentId}`
+        : 'my_folder'
+    const bytesChecksum = await sha256File(tabPath)
+    // the path may have been bound while the checksum streamed
+    if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
+    const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
+    const idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
+    this.firstSaveKeys.set(keyFp, idempotencyKey)
+    const api = this.api()
+    const probe = await readLocalFileProbe({ path: tabPath }, size, filename)
+    const parentId = await this.uploadSessionParentId(api, {
+      workspaceId,
+      create: createTarget,
+    })
+    const resumeKey = uploadSessionKey(tabPath, size, mtimeMs)
+    const store = await this.uploadSessionStore()
+    const saved = (await store?.get(resumeKey)) ?? null
+    const resume: SavedUploadSession | undefined =
+      saved && saved.workspaceId === workspaceId
+        ? {
+            sessionId: saved.sessionId,
+            partSize: saved.partSize,
+            totalParts: saved.totalParts,
+            completedParts: saved.completedParts,
+            expiresAt: saved.expiresAt,
+          }
+        : undefined
+    let result: ChunkedUploadResult
+    try {
+      result = await runChunkedUpload(api, {
+        target: { kind: 'workspace', workspaceId, parentId, title },
+        filename,
+        size,
+        readRange: (offset, length) => readFileRange(tabPath, offset, length),
+        probe,
+        idempotencyKey,
+        ...(resume ? { resume } : {}),
+        onSessionState: async (state) => {
+          await store?.put(resumeKey, {
+            sessionId: state.sessionId,
+            workspaceId,
+            folderId: parentId,
+            path: tabPath,
+            size,
+            mtimeMs,
+            partSize: state.partSize,
+            totalParts: state.totalParts,
+            completedParts: state.completedParts,
+            expiresAt: state.expiresAt,
+            updatedAt: new Date().toISOString(),
+          })
+        },
+      })
+    } catch (error) {
+      if (error instanceof UniworkDocError && error.serverCode === 'upload_session_too_small') {
+        // the limits cache was stale and the file fits one request
+        await store?.remove(resumeKey)
+        return await input.onThresholdDrift()
+      }
+      if (error instanceof UniworkDocError && error.code === 'too_large') {
+        rethrowServerTooLarge(error, filename, size, input.limits)
+      }
+      throw error
+    }
+    await store?.remove(resumeKey)
+    if (result.kind === 'upload') throw new UniworkDocError('malformed_response')
+    const created = result.document
+    return await this.bindFirstSaveDocument({
+      session,
+      owner,
+      tabPath,
+      key,
+      title,
+      filename,
+      limits: input.limits,
+      api,
+      created,
+      bytesChecksum,
+      onBindFailure: () => this.firstSaveKeys.delete(keyFp),
+      writeWorkingCopy: (dir, name) => this.store.copyIntoWorkingCopy(dir, name, tabPath),
+    })
+  }
+
+  /**
+   * The bind half of a first save, shared by both upload shapes: the document
+   * exists on the server and the local copy must become its working copy. Every
+   * failure after the create compensates the created row (archive, never a
+   * delete - no such route) so no server document is left without a binding.
+   * `writeWorkingCopy` is the only difference between the two callers: the
+   * buffered path writes the bytes it already holds, the chunked path copies
+   * the file it never read whole.
+   */
+  private async bindFirstSaveDocument(input: {
+    session: { identity: SessionIdentity; epoch: number }
+    owner: string
+    tabPath: string
+    key: string
+    title: string
+    filename: string
+    limits: DocumentLimits
+    api: UniworkDocsClient
+    created: UniworkDocSummary
+    bytesChecksum: string
+    writeWorkingCopy(dir: string, name: string): Promise<string>
+    onBindFailure(): void
+  }): Promise<UniworkDocSummary> {
+    const { session, owner, tabPath, key, title, filename, api, created, bytesChecksum } = input
     const createdTitle = created.title || title
     // S01-R2-6: the written working copy is tracked so the compensation catch
     // can remove it on EVERY bind failure - a store.write that throws strands
@@ -4094,7 +4580,7 @@ export class UniworkDocsService {
         created.id,
       )
       const name = workingCopyName(title, detail.file.filename, formatForName(filename)!)
-      const path = await this.store.writeWorkingCopy(dir, name, bytes)
+      const path = await input.writeWorkingCopy(dir, name)
       workingCopy = { dir, name }
       const binding = withServerContext(
         {
@@ -4130,7 +4616,7 @@ export class UniworkDocsService {
       // notification whose failure is logged, never a retryable answer - a
       // retry of this path is refused by firstSaveDone above.
       this.firstSaveDone.add(`${owner}${key}`)
-      this.firstSaveKeys.delete(keyFp)
+      input.onBindFailure()
       try {
         this.deps.notifyPathRenamed?.(tabPath, path)
       } catch (error) {
@@ -4187,7 +4673,7 @@ export class UniworkDocsService {
       }
       // compensated: the attempt's key is spent - a retry re-creates (binding
       // the trashed row would resurrect it without its own save)
-      this.firstSaveKeys.delete(keyFp)
+      input.onBindFailure()
       const raced = error instanceof UniworkDocError && error.code === 'conflict'
       throw new UniworkDocError(
         (raced ? 'conflict' : 'first_save_bind_failed') as UniworkDocErrorCode,

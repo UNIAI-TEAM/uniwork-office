@@ -7,7 +7,7 @@ import type {
   UniworkDocFormat,
   UniworkSaveState,
 } from '../../shared/home-api'
-import { atomicWriteFile } from '../atomic-write'
+import { atomicCopyFile, atomicWriteFile } from '../atomic-write'
 import { APP_STORE_LEVEL, readStoreGate } from '../uniwork-sync/store-level'
 import { formatForName, isDecimalString } from './formats'
 
@@ -475,6 +475,19 @@ export class BindingStore {
     await mkdir(dir, { recursive: true })
     const path = join(dir, basename(filename))
     await atomicWriteFile(path, bytes)
+    return path
+  }
+
+  /**
+   * BIGUP-A1: the same working copy, taken from a file on disk instead of from
+   * bytes main holds. A first save of a 200 MiB document never buffers it, so
+   * the copy is streamed (`atomicCopyFile` copies to a temp file and renames,
+   * exactly like `atomicWriteFile` does for a buffer).
+   */
+  async copyIntoWorkingCopy(dir: string, filename: string, source: string): Promise<string> {
+    await mkdir(dir, { recursive: true })
+    const path = join(dir, basename(filename))
+    await atomicCopyFile(source, path)
     return path
   }
 
