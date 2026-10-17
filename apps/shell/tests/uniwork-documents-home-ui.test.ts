@@ -1316,7 +1316,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
 
     // 2. Navigating to another folder clears the ufFolderGone notice; if that root-level folder's
     // children read answers not_found directly, it falls back to workspace root with ufFolderGone
-    const rootCrumb = host.querySelector<HTMLButtonElement>('.uwf-crumbs button.uwf-crumb')!
+    const rootCrumb = host.querySelector<HTMLButtonElement>('.uwf-crumbs button.uwf-crumb-btn')!
     await act(async () => {
       rootCrumb.click()
     })

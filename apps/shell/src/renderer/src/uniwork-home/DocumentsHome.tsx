@@ -49,8 +49,10 @@ import {
   isFolderEntry,
   isMyFolder,
   labelMyFolderPath,
+  liveFallback,
   myFolderIdOf,
   shortPath,
+  type FolderIndex,
   type PathPart,
   type TreeRow,
 } from '../uniwork-folders/uniwork-folders-model'
@@ -246,6 +248,13 @@ export function DocumentsHome({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY]))
   const [tree, setTree] = useState<TreeState>({ status: 'loading', nodes: [] })
   const [treeTick, setTreeTick] = useState(0)
+  const [folderGone, setFolderGone] = useState(false)
+  const subViewRef = useRef(subView)
+  subViewRef.current = subView
+  const folderIdRef = useRef(folderId)
+  folderIdRef.current = folderId
+  const openPathRef = useRef<string[]>(initialFolderId ? [initialFolderId] : [])
+  const treeLoadingRef = useRef(false)
 
   const [filters, setFilters] = useState<DocumentsHomeFilterState>(DEFAULT_DOCUMENTS_HOME_FILTERS)
   const [sort, setSort] = useState<DocumentsHomeSort>('recent')
@@ -280,6 +289,8 @@ export function DocumentsHome({
     [tree.nodes, myFolderLabel],
   )
   const index = useMemo(() => buildFolderIndex(labeledNodes), [labeledNodes])
+  const indexRef = useRef<FolderIndex>(index)
+  indexRef.current = index
   const resolvedMyFolderId = myFolderId ?? myFolderIdOf(tree.nodes)
   const rawPath = useMemo(() => folderPath(index, folderId), [index, folderId])
   const shownPath = useMemo(
@@ -310,8 +321,12 @@ export function DocumentsHome({
   const prevWsRef = useRef(workspaceId)
   if (prevWsRef.current !== workspaceId) {
     prevWsRef.current = workspaceId
+    subViewRef.current = 'workspace'
+    folderIdRef.current = null
+    openPathRef.current = []
     setSubView('workspace')
     setFolderId(null)
+    setFolderGone(false)
     setMyFolderId(null)
     setExpanded(new Set([ROOT_KEY]))
     setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)
@@ -344,14 +359,37 @@ export function DocumentsHome({
   const treeSeqRef = useRef(0)
   useEffect(() => {
     const seq = ++treeSeqRef.current
+    treeLoadingRef.current = true
     setTree((prev) => (prev.nodes.length > 0 ? prev : { status: 'loading', nodes: [] }))
     void loadFolderTree(workspaceId)
       .then((res) => {
         if (treeSeqRef.current !== seq) return
+        treeLoadingRef.current = false
         if (res.ok) {
+          const nextIndex = buildFolderIndex(res.value)
+          indexRef.current = nextIndex
           setTree({ status: 'ready', nodes: res.value })
           const foundMine = myFolderIdOf(res.value)
           if (foundMine) setMyFolderId(foundMine)
+          if (subViewRef.current === 'workspace' && folderIdRef.current !== null) {
+            const currentId = folderIdRef.current
+            const known = folderPath(nextIndex, currentId).map((p) => p.id)
+            if (known.length > 0) {
+              openPathRef.current = known
+            } else {
+              const chain = openPathRef.current.length > 0 ? openPathRef.current : [currentId]
+              const fallback = liveFallback(nextIndex, chain)
+              if (fallback.gone) {
+                ++listSeqRef.current
+                openPathRef.current = fallback.folderId
+                  ? folderPath(nextIndex, fallback.folderId).map((p) => p.id)
+                  : []
+                folderIdRef.current = fallback.folderId
+                setFolderGone(true)
+                setFolderId(fallback.folderId)
+              }
+            }
+          }
         } else {
           setTree((prev) => ({
             status: 'error',
@@ -362,6 +400,7 @@ export function DocumentsHome({
       })
       .catch(() => {
         if (treeSeqRef.current !== seq) return
+        treeLoadingRef.current = false
         setTree((prev) => ({
           status: 'error',
           nodes: prev.nodes,
@@ -438,6 +477,17 @@ export function DocumentsHome({
       return
     }
 
+    const knownChain =
+      folderId !== null ? folderPath(indexRef.current, folderId).map((p) => p.id) : []
+    const chainForFolder =
+      folderId === null
+        ? []
+        : knownChain.length > 0
+          ? knownChain
+          : openPathRef.current.includes(folderId)
+            ? openPathRef.current.slice(0, openPathRef.current.indexOf(folderId) + 1)
+            : [...openPathRef.current, folderId]
+
     const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
     void fetchDocumentsHomePage(api, {
       workspaceId,
@@ -468,6 +518,30 @@ export function DocumentsHome({
             })
           }
         } else {
+          if (
+            subView === 'workspace' &&
+            folderId !== null &&
+            (result.error === 'not_found' ||
+              result.error === 'forbidden' ||
+              result.error === 'deleted')
+          ) {
+            const ancestors = chainForFolder.slice(0, -1)
+            const fallbackId =
+              indexRef.current.size > 0
+                ? liveFallback(indexRef.current, ancestors).folderId
+                : (ancestors[ancestors.length - 1] ?? null)
+            ++listSeqRef.current
+            openPathRef.current = fallbackId
+              ? ancestors.slice(0, ancestors.indexOf(fallbackId) + 1)
+              : []
+            folderIdRef.current = fallbackId
+            setFolderGone(true)
+            setFolderId(fallbackId)
+            if (!treeLoadingRef.current) {
+              setTreeTick((n) => n + 1)
+            }
+            return
+          }
           setPage({
             status: 'error',
             items: [],
@@ -597,19 +671,41 @@ export function DocumentsHome({
 
   const selectSubView = (next: DocumentsHomeSubViewId) => {
     setSearchDraft('')
+    setFolderGone(false)
+    subViewRef.current = next
     setSubView(next)
     if (next === 'workspace') {
+      openPathRef.current = []
+      folderIdRef.current = null
       setFolderId(null)
     }
   }
 
   const openFolderInWorkspace = (id: string | null) => {
     setSearchDraft('')
+    setFolderGone(false)
     if (id !== null && id === resolvedMyFolderId) {
+      openPathRef.current = [id]
+      folderIdRef.current = id
+      subViewRef.current = 'my-folder'
       setSubView('my-folder')
       setFolderId(id)
       return
     }
+    if (id === null) {
+      openPathRef.current = []
+    } else {
+      const known = folderPath(indexRef.current, id).map((p) => p.id)
+      if (known.length > 0) {
+        openPathRef.current = known
+      } else {
+        const at = openPathRef.current.indexOf(id)
+        openPathRef.current =
+          at >= 0 ? openPathRef.current.slice(0, at + 1) : [...openPathRef.current, id]
+      }
+    }
+    folderIdRef.current = id
+    subViewRef.current = 'workspace'
     setSubView('workspace')
     setFolderId(id)
   }
@@ -1202,6 +1298,11 @@ export function DocumentsHome({
 
         {subView === 'my-folder' && <p className="dh-subview-banner">{t('uhMyFolderNote')}</p>}
         {subView === 'trash' && <p className="dh-subview-banner">{t('uhTrashNote')}</p>}
+        {folderGone && (
+          <p className="uwf-notice" role="status">
+            {t('ufFolderGone')}
+          </p>
+        )}
 
         <div className="dh-filter-bar">
           {subView !== 'shared-with-me' && (
@@ -1403,6 +1504,13 @@ export function DocumentsHome({
                     const title = entryTitleOf(folder, myFolderLabel)
                     const menuItems = folderCardMenuFor(folder)
                     const mine = isMyFolder(folder)
+                    const folderSearchPath =
+                      query.length > 0 && folder.path
+                        ? shortPath(
+                            labelMyFolderPath(folder.path, resolvedMyFolderId, myFolderLabel),
+                            t('ufRoot'),
+                          )
+                        : null
                     return (
                       <div key={folder.id} className="dh-folder-card" data-folder-id={folder.id}>
                         <button
@@ -1413,9 +1521,30 @@ export function DocumentsHome({
                           <span className="dh-folder-icon" aria-hidden="true">
                             {mine ? <MyFolderGlyph /> : <FolderGlyph />}
                           </span>
-                          <span className="dh-folder-name" title={title}>
-                            {title}
-                          </span>
+                          {folderSearchPath ? (
+                            <span style={{ minWidth: 0, flex: 1 }}>
+                              <span
+                                className="dh-folder-name"
+                                title={title}
+                                style={{ display: 'block' }}
+                              >
+                                {title}
+                              </span>
+                              <span
+                                className="dh-doc-subpath uwf-path"
+                                title={folderSearchPath.full}
+                              >
+                                <span aria-hidden="true">{folderSearchPath.short}</span>
+                                <span className="uw-sr-only">
+                                  {t('ufPathLabel', { path: folderSearchPath.full })}
+                                </span>
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="dh-folder-name" title={title}>
+                              {title}
+                            </span>
+                          )}
                         </button>
                         {menuItems.length > 0 && (
                           <span className="dh-folder-actions" onClick={(e) => e.stopPropagation()}>
@@ -1479,15 +1608,15 @@ export function DocumentsHome({
                     const person = formatUpdatedByCell(doc)
                     const menuItems = docMenuFor(doc)
                     const renaming = docRename?.doc.id === doc.id ? docRename : null
-                    const searchPath =
-                      query.length > 0 && doc.path
-                        ? shortPath(
-                            labelMyFolderPath(doc.path, resolvedMyFolderId, myFolderLabel),
-                            t('ufRoot'),
-                          )
-                        : subView === 'shared-with-me' && doc.workspaceName?.trim()
-                          ? { short: doc.workspaceName.trim(), full: doc.workspaceName.trim() }
-                          : null
+                    const isSearchHitPath = query.length > 0 && Boolean(doc.path)
+                    const searchPath = isSearchHitPath
+                      ? shortPath(
+                          labelMyFolderPath(doc.path!, resolvedMyFolderId, myFolderLabel),
+                          t('ufRoot'),
+                        )
+                      : subView === 'shared-with-me' && doc.workspaceName?.trim()
+                        ? { short: doc.workspaceName.trim(), full: doc.workspaceName.trim() }
+                        : null
                     const isOpening = openingId === doc.id
 
                     return (
@@ -1527,8 +1656,20 @@ export function DocumentsHome({
                                 {doc.title}
                               </button>
                               {searchPath && (
-                                <span className="dh-doc-subpath" title={searchPath.full}>
-                                  {searchPath.short}
+                                <span
+                                  className={`dh-doc-subpath${isSearchHitPath ? ' uwf-path' : ''}`}
+                                  title={searchPath.full}
+                                >
+                                  {isSearchHitPath ? (
+                                    <>
+                                      <span aria-hidden="true">{searchPath.short}</span>
+                                      <span className="uw-sr-only">
+                                        {t('ufPathLabel', { path: searchPath.full })}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    searchPath.short
+                                  )}
                                 </span>
                               )}
                             </div>
