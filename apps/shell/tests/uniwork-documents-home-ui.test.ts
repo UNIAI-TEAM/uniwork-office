@@ -678,14 +678,74 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     await flush()
     expect(api.uniworkListChildren).not.toHaveBeenCalled()
 
-    // Clicking the real .dh-folder-open button opens the folder
+    // Clicking the card area outside the name (icon / open-button padding) opens the folder
+    api.uniworkListChildren.mockClear()
     await act(async () => {
-      openBtn!.click()
+      openBtn!.querySelector<HTMLElement>('.dh-folder-icon')!.click()
     })
     await flush()
     expect(api.uniworkListChildren).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: 'ws-1', parentId: 'f-board' }),
     )
+
+    // Clicking the sibling menu button must not open the folder
+    api.uniworkListChildren.mockClear()
+    await act(async () => {
+      menuTrigger!.click()
+    })
+    await flush()
+    expect(api.uniworkListChildren).not.toHaveBeenCalled()
+
+    // Open button fills the card so padding / gap clicks hit .dh-folder-open, not the card chrome
+    const docsHomeCss = readFileSync(
+      resolve(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
+      'utf8',
+    )
+    const cardBlock = docsHomeCss.match(/\.dh-folder-card\s*\{[^}]*\}/)?.[0] ?? ''
+    const openBlock = docsHomeCss.match(/\.dh-folder-open\s*\{[^}]*\}/)?.[0] ?? ''
+    expect(cardBlock).toMatch(/padding:\s*0;/)
+    expect(openBlock).toMatch(/position:\s*absolute/)
+    expect(openBlock).toMatch(/inset:\s*0/)
+  })
+
+  it('does not feed shared-with-me authors into Người sửa on workspace views (DH1-R2-4)', async () => {
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const clickNav = async (id: string) => {
+      const btn = sidebarSlot.querySelector<HTMLButtonElement>(`.nav-item[data-nav="${id}"]`)
+      expect(btn).not.toBeNull()
+      await act(async () => {
+        btn!.click()
+      })
+      await flush()
+    }
+
+    await clickNav('shared-with-me')
+    expect(host.textContent).toContain('Đề xuất đối tác.docx')
+    expect(host.textContent).toContain('Hải Lê')
+
+    await clickNav('workspace')
+    const authorSelect = host.querySelector<HTMLSelectElement>(
+      'select.dh-filter-select[data-filter="updatedBy"]',
+    )
+    expect(authorSelect).not.toBeNull()
+    const optionLabels = Array.from(authorSelect!.options).map((opt) => opt.textContent?.trim())
+    expect(optionLabels).toContain('Minh Trần')
+    expect(optionLabels).not.toContain('Hải Lê')
   })
 
   it('drops out-of-order responses when sub-view or workspace switches while a request is in flight (DH1-R1-11b)', async () => {
@@ -977,12 +1037,51 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.querySelector('.uw-pick-more-error[role="alert"]')).not.toBeNull()
   })
 
-  it('does not include t in any hook dependency array in DocumentsHome.tsx (DH1-R1-8)', () => {
-    const src = readFileSync(
-      resolve(__dirname, '../src/renderer/src/uniwork-home/DocumentsHome.tsx'),
-      'utf8',
+  it('does not include t in any hook dependency array in DocumentsHome.tsx (DH1-R1-8)', async () => {
+    const ts = await import('typescript')
+    const file = resolve(__dirname, '../src/renderer/src/uniwork-home/DocumentsHome.tsx')
+    const src = readFileSync(file, 'utf8')
+    const sourceFile = ts.createSourceFile(
+      file,
+      src,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
     )
-    expect(src.match(/\[[^\]]*\bt\b[^\]]*\]\s*\)/g) ?? []).toEqual([])
+    const hooks = new Set(['useMemo', 'useCallback', 'useEffect', 'useLayoutEffect'])
+    const hits: string[] = []
+
+    const hookNameOf = (node: ts.CallExpression): string | null => {
+      const expr = node.expression
+      if (ts.isIdentifier(expr)) return expr.text
+      if (ts.isPropertyAccessExpression(expr) && ts.isIdentifier(expr.name)) return expr.name.text
+      return null
+    }
+
+    const identifierTIn = (node: ts.Node): boolean => {
+      if (ts.isIdentifier(node) && node.text === 't') {
+        const parent = node.parent
+        if (parent && ts.isPropertyAccessExpression(parent) && parent.name === node) return false
+        return true
+      }
+      return ts.forEachChild(node, identifierTIn) === true
+    }
+
+    const walk = (node: ts.Node): void => {
+      if (ts.isCallExpression(node)) {
+        const name = hookNameOf(node)
+        if (name && hooks.has(name) && node.arguments.length >= 2) {
+          const deps = node.arguments[1]!
+          if (identifierTIn(deps)) {
+            const { line } = sourceFile.getLineAndCharacterOfPosition(deps.getStart(sourceFile))
+            hits.push(`${name}:${line + 1}`)
+          }
+        }
+      }
+      ts.forEachChild(node, walk)
+    }
+    walk(sourceFile)
+    expect(hits).toEqual([])
   })
 
   it('renders VS01-1 / VS01-2 / VS01-3 SaveDialog and UniworkFolderPicker glyph + search-icon + token rules', async () => {

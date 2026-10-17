@@ -917,15 +917,20 @@ describe('member-name cache and org switch (S16)', () => {
     }
     expect(wsMembersCalls).toBe(2)
 
-    // Resolve org_a's stale reply first, then org_b's reply
-    pendingMembers[0]!.resolve([{ user_id: 'u_1', display_name: 'Stale Org A Name' }])
-    await callOrgA
+    // Fresh org_b settles first. A late org_a reply must not poison org_b's cache
+    // (the workspaceMemberNamesOrg === orgId write guard). Resolving stale first
+    // would let org_b overwrite and hide a missing guard.
     pendingMembers[1]!.resolve([{ user_id: 'u_1', display_name: 'Fresh Org B Name' }])
     const resOrgB = await callOrgB
     expect(resOrgB.ok && resOrgB.value.documents[0]!.updatedByName).toBe('Fresh Org B Name')
 
-    // Subsequent call in org_b uses org_b's cached name, not org_a's late reply
+    pendingMembers[0]!.resolve([{ user_id: 'u_1', display_name: 'Stale Org A Name' }])
+    await callOrgA
+
     const cachedOrgB = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(cachedOrgB.ok && cachedOrgB.value.documents[0]!.updatedByName).not.toBe(
+      'Stale Org A Name',
+    )
     expect(cachedOrgB.ok && cachedOrgB.value.documents[0]!.updatedByName).toBe('Fresh Org B Name')
     expect(wsMembersCalls).toBe(2)
 
