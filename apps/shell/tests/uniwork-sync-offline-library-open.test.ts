@@ -641,6 +641,31 @@ describe('G5-05u B7 hasOfflineHead', () => {
     expect([...head]).toEqual(['doc_6'])
   })
 
+  it('a lease-expiring or archived head whose cached open succeeds is offline, while a blocked head is not (BE-R2-4)', async () => {
+    const h = createHarness()
+    addDoc(h, 'doc_1', 1)
+    await pin(h)
+    const projected = async () => {
+      const rows = (await h.manager.list()).map((row) => offlineRowView(row, true))
+      return { rows, heads: offlineHeadIds(rows) }
+    }
+    h.leases.states.set('doc_1', leaseState('expiring_soon'))
+    expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+    expect((await projected()).rows[0]?.state).toBe('lease-expiring')
+    expect((await projected()).heads.has('doc_1')).toBe(true)
+
+    h.leases.states.set('doc_1', leaseState('valid'))
+    await h.manager.noteArchived('doc_1', true)
+    expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+    expect((await projected()).rows[0]?.state).toBe('archived')
+    expect((await projected()).heads.has('doc_1')).toBe(true)
+
+    h.leases.states.set('doc_1', leaseState('expired'))
+    expect((await h.manager.openCached('doc_1')).kind).toBe('refused')
+    expect((await projected()).rows[0]?.state).toBe('lease-expired')
+    expect((await projected()).heads.has('doc_1')).toBe(false)
+  })
+
   it('no rows, no heads', () => {
     expect(offlineHeadIds([]).size).toBe(0)
   })

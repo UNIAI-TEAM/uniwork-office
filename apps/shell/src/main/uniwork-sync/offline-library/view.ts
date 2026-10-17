@@ -140,14 +140,17 @@ export function offlineRowView(row: PinRow, capabilityOn: boolean): OfflineRowVi
  * cannot await the library), so it is derived once per snapshot - a copy
  * that is behind its head is not offline, and a document with no copy never is.
  *
- * Only a row whose committed copy can actually be opened counts (BE-R1-6): the
- * ready / view-only states (or an update row that is still the head) with a
- * usable lease, never a lease-expired / locked / revoked / deleted / corrupt
- * one - S5 must not offer a reload the open path would then refuse.
+ * Only a row whose committed copy can actually be opened counts (BE-R1-6,
+ * BE-R2-4): the states where `openCached` serves the committed copy (`ready`,
+ * `view-only`, `lease-expiring`, `archived`, or an update row that is still the
+ * head) with a usable lease, never a `lease-expired` / `locked` / `revoked` /
+ * `deleted` / `corrupt` / not-ready one - S5 must agree with `openCached`.
  */
 const OPENABLE_HEAD_STATES: ReadonlySet<OfflineRowState> = new Set([
   'ready',
   'view-only',
+  'lease-expiring',
+  'archived',
   'update-available',
   'update-kept',
 ])
