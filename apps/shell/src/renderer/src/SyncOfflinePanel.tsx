@@ -323,7 +323,13 @@ export function SyncOfflinePanel({
           </span>
         </td>
         <td className="sc-detail">
-          <span className="sc-sub">{fmt(model.sub)}</span>
+          <span className="sc-sub">
+            {model.progress && !determinate
+              ? model.progress.done > 0
+                ? formatBytes(model.progress.done, dateLocale)
+                : ''
+              : fmt(model.sub)}
+          </span>
           {model.progress && (
             <span
               className="sc-progress"

@@ -569,7 +569,9 @@ describe('S3 progress', () => {
       expect(bar.getAttribute('aria-valuenow')).toBeNull()
       expect(bar.getAttribute('aria-valuemax')).toBeNull()
       expect(bar.getAttribute('aria-valuetext')).toBeNull()
+      expect(rowEl(id).textContent).not.toContain('0 B')
     }
+    expect(rowEl('z').querySelector('.sc-sub')!.textContent).toBe('512 B')
   })
 })
 
