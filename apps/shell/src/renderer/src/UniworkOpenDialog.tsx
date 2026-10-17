@@ -337,12 +337,17 @@ export function UniworkOpenDialog({
   /** open a document by its id (a listed row, or the one just created / uploaded) */
   const openById = (doc: { id: string; title: string; workspaceId?: string }) => {
     if (onPick) {
-      const workspaceId = doc.workspaceId ?? stateRef.current.workspaceId
-      if (workspaceId) {
-        void onPick({ id: doc.id, title: doc.title, workspaceId }).then((refused) => {
-          if (refused && mounted.current) setToast(refused)
-        })
+      const workspaceId = (
+        doc.workspaceId ??
+        (stateRef.current.source === 'workspace' ? stateRef.current.workspaceId : null)
+      )?.trim()
+      if (!workspaceId) {
+        setToast(t('uwDocActionFailed'))
+        return
       }
+      void onPick({ id: doc.id, title: doc.title, workspaceId }).then((refused) => {
+        if (refused && mounted.current) setToast(refused)
+      })
       return
     }
     if (stateRef.current.opening) return

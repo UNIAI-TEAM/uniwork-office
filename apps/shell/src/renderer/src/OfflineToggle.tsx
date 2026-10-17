@@ -1,6 +1,10 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import type { OfflineFailure } from '../../shared/offline-library'
+import type {
+  OfflineFailure,
+  OfflineResult,
+  OfflineUnpinResult,
+} from '../../shared/offline-library'
 import { useI18n } from './locale'
 import { OFFLINE_MENU_LABEL, offlineFailureCopy, offlineMenuOf } from './offline-library-model'
 import { ActionToast } from './UniworkDocActions'
@@ -29,6 +33,7 @@ export function useOfflineToggle(api = window.uniworkSyncCenter): {
 } {
   const { t, dateLocale } = useI18n()
   const offline = useOfflineLibrary(api)
+  const inFlight = useRef(new Set<string>())
   const [confirming, setConfirming] = useState<OfflineToggleDoc | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const clearMessage = useCallback(() => setMessage(null), [])
@@ -41,15 +46,26 @@ export function useOfflineToggle(api = window.uniworkSyncCenter): {
   }
 
   const unpin = async (doc: OfflineToggleDoc, confirmed: boolean) => {
-    const result = await Promise.resolve(
-      api?.offlineUnpin(doc.documentId, confirmed ? { confirmed: true } : undefined),
-    ).catch(() => undefined)
-    if (!result || result.ok) return
+    if (inFlight.current.has(doc.documentId)) return
+    inFlight.current.add(doc.documentId)
+    let result: OfflineUnpinResult
+    try {
+      result = (await api?.offlineUnpin(
+        doc.documentId,
+        confirmed ? { confirmed: true } : undefined,
+      )) ?? { ok: false, code: 'unknown' }
+    } catch {
+      result = { ok: false, code: 'unknown' }
+    } finally {
+      inFlight.current.delete(doc.documentId)
+    }
+    if (result.ok) return
     if (result.code === 'needs_confirm' && !confirmed) setConfirming(doc)
     else refused(result)
   }
 
   const toggle = (doc: OfflineToggleDoc) => {
+    if (inFlight.current.has(doc.documentId)) return
     setMessage(null)
     const kind = menuOf(doc.documentId)
     if (kind === 'unpin') {
@@ -57,12 +73,15 @@ export function useOfflineToggle(api = window.uniworkSyncCenter): {
       return
     }
     if (kind !== 'pin') return
+    inFlight.current.add(doc.documentId)
     void Promise.resolve(
       api?.offlinePin({ documentId: doc.documentId, workspaceId: doc.workspaceId }),
     )
-      .catch(() => undefined)
+      .then((res): OfflineResult => res ?? { ok: false, code: 'unknown' })
+      .catch((): OfflineResult => ({ ok: false, code: 'unknown' }))
       .then((result) => {
-        if (result && !result.ok) refused(result)
+        inFlight.current.delete(doc.documentId)
+        if (!result.ok) refused(result)
       })
   }
 
