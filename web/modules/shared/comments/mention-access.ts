@@ -12,7 +12,12 @@
  *   list members, so a wrong "no" only hides the pre-send badge (the post-send notice still covers
  *   it) and a wrong "yes" is harmless.
  */
-import type { Capabilities, CommentsLevel } from '../../../docs/protocol/types'
+import {
+  isReadOnlyProfile,
+  type Capabilities,
+  type CommentsLevel,
+  type FrameProfile,
+} from '../../../docs/protocol/types'
 
 export interface FrameMentionAccess {
   commentsShareView: boolean
@@ -22,7 +27,11 @@ export interface FrameMentionAccess {
 export function frameMentionAccess(session: {
   capabilities?: Capabilities
   commentsLevel?: CommentsLevel
+  profile?: FrameProfile
 }): FrameMentionAccess {
+  if (isReadOnlyProfile(session)) {
+    return { commentsShareView: false, canListMembers: false }
+  }
   const commentsShareView =
     session.capabilities?.comments === true && session.capabilities.commentsShareView === true
   return {

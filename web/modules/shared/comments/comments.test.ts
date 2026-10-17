@@ -699,15 +699,13 @@ describe('FRAME-RO-01: readOnly profile in comments (UNI-1876)', () => {
     expect(api).not.toBeNull()
     expect(api.shareView).toBeUndefined()
     expect(api.canListMembers).toBe(false)
-    expect(await api.context('ignored')).toMatchObject({
+    expect(await api.context({ path: 'ignored' })).toMatchObject({
       ok: true,
       value: {
-        bound: true,
-        signedIn: true,
         documentId: 'doc-1',
         level: 'view',
+        frame: true,
       },
     })
   })
 })
-

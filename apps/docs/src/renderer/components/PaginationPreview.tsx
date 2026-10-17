@@ -1335,6 +1335,7 @@ export function PaginationPreview({
     if (suppressEscape) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault()
         e.stopPropagation()
         onClose()
       }

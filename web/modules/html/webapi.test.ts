@@ -457,7 +457,9 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       exportHtml: false,
       htmlVisualEdit: true,
     })
-    expect(await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.html' })).toEqual({
+    expect(
+      await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.html' }),
+    ).toEqual({
       ok: false,
       error: 'unsupported',
     })
@@ -465,16 +467,18 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       ok: false,
       error: { code: 'unsupported' },
     })
-    expect(await api.exportHtml({ html: '<p>x</p>', defaultName: 'Page' })).toEqual({
+    expect(await api.exportHtml({ html: '<p>x</p>', suggestedName: 'Page' })).toEqual({
       ok: false,
       error: 'unsupported',
     })
-    expect(await api.exportPdf({ html: '<p>x</p>' })).toEqual({
+    expect(await api.exportPdf({ html: '<p>x</p>', suggestedName: 'Page' })).toEqual({
       ok: false,
       error: 'unsupported',
     })
     expect(print).not.toHaveBeenCalled()
-    expect(mock.calls.filter((c) => c.type === 'api.saveAs' || c.type === 'api.export')).toHaveLength(0)
+    expect(
+      mock.calls.filter((c) => c.type === 'api.saveAs' || c.type === 'api.export'),
+    ).toHaveLength(0)
   })
 
   it('readOnly profile forces viewOnly, save:false, saveAs:false, htmlVisualEdit:false, and keeps print and exportPdf', async () => {
@@ -502,7 +506,9 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       ok: false,
       error: 'read-only document',
     })
-    expect(await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.html' })).toEqual({
+    expect(
+      await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.html' }),
+    ).toEqual({
       ok: false,
       error: 'unsupported',
     })
@@ -511,9 +517,12 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       error: { code: 'unsupported' },
     })
     // D3: granted print and exportPdf stay available in readOnly profile
-    expect(await api.exportPdf({ html: '<p>x</p>' })).toEqual({ ok: true, path: '' })
-    expect(await api.print({ html: '<p>x</p>' })).toEqual({ ok: true })
+    expect(await api.exportPdf({ html: '<p>x</p>', suggestedName: 'Page' })).toEqual({
+      ok: true,
+      path: 'Page.pdf',
+    })
+    api.onExportRequest(() => void api.exportPdf({ html: '<p>x</p>', suggestedName: 'Page' }))
+    expect(await mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
     expect(print).toHaveBeenCalledTimes(2)
   })
 })
-

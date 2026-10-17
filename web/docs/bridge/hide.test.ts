@@ -17,13 +17,18 @@ describe('webCapabilities (the single web capability source)', () => {
         'createDocument',
         'desktopOpen',
         'docPassword',
+        'exportHtml',
+        'exportPdf',
         'imageGeneration',
         'imageSearch',
+        'open',
+        'print',
+        'recents',
+        'save',
+        'saveAs',
         'tabs',
         'webSearch',
         'zotero',
-        'open',
-        'recents',
       ].sort(),
     )
     for (const [, value] of flags) expect(value).toBe(false)
@@ -41,24 +46,57 @@ describe('webCapabilities (the single web capability source)', () => {
     expect(hide.capabilities).toBe(webCapabilities)
   })
 
-  it('File > Open and recents turn on only with the negotiated host grants', () => {
-    expect(hostGrants(undefined)).toEqual({ open: false, recents: false, desktopOpen: false })
+  it('File > Open, recents, save, saveAs, print, exportPdf, and exportHtml turn on only with the negotiated host grants', () => {
+    expect(hostGrants(undefined)).toEqual({
+      open: false,
+      recents: false,
+      desktopOpen: false,
+      save: false,
+      saveAs: false,
+      print: false,
+      exportPdf: false,
+      exportHtml: false,
+    })
     // the dev-uniwork host: no document picker (file.pick answers unsupported)
     expect(hostGrants({ save: true, recents: true, filePick: false })).toEqual({
       open: false,
       recents: true,
       desktopOpen: false,
+      save: true,
+      saveAs: false,
+      print: false,
+      exportPdf: false,
+      exportHtml: false,
     })
-    expect(hostGrants({ filePick: true, recents: false })).toEqual({
+    expect(
+      hostGrants({
+        filePick: true,
+        recents: false,
+        saveAs: true,
+        print: true,
+        exportPdf: true,
+        exportHtml: true,
+      }),
+    ).toEqual({
       open: true,
       recents: false,
       desktopOpen: false,
+      save: false,
+      saveAs: true,
+      print: true,
+      exportPdf: true,
+      exportHtml: true,
     })
     // "Open in the app" is an explicit host grant, never implied by the others
     expect(hostGrants({ desktopOpen: true })).toEqual({
       open: false,
       recents: false,
       desktopOpen: true,
+      save: false,
+      saveAs: false,
+      print: false,
+      exportPdf: false,
+      exportHtml: false,
     })
   })
 })

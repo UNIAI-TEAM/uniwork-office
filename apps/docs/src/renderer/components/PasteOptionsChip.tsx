@@ -160,6 +160,7 @@ export function PasteOptionsChip({ editor }: { editor: Editor }) {
     if (!chip) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      event.preventDefault()
       if (open) setOpen(false)
       else {
         setChip(null)
@@ -171,10 +172,10 @@ export function PasteOptionsChip({ editor }: { editor: Editor }) {
     const onPointerDown = (event: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
     }
-    window.addEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
     window.addEventListener('mousedown', onPointerDown)
     return () => {
-      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('mousedown', onPointerDown)
     }
   }, [editor, chip, open])

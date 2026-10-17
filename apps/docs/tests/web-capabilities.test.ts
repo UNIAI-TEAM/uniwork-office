@@ -164,6 +164,37 @@ describe('Ribbon entries', () => {
     expect(hasOpen(fileMenu())).toBe(true)
   })
 
+  it('File: Save, Save As, Export PDF and Print follow their own capability flags', () => {
+    const fileMenu = (): string[] => {
+      openTab(t('ribbonTabFile'))
+      return [...container.querySelectorAll('.file-menu button')].map((b) => b.textContent ?? '')
+    }
+    useCapabilities({
+      ...WEB,
+      save: false,
+      saveAs: false,
+      exportPdf: false,
+      print: false,
+    })
+    const labels = fileMenu()
+    expect(labels.some((l) => l.startsWith(t('ribbonSave')))).toBe(false)
+    expect(labels.some((l) => l.startsWith(t('ribbonSaveAs')))).toBe(false)
+    expect(labels.some((l) => l.startsWith(t('appFileExportPdf')))).toBe(false)
+    expect(labels.some((l) => l.startsWith(t('appFilePrint')))).toBe(false)
+  })
+
+  it('dropdown Escape closes the menu and calls preventDefault for the Escape forwarder', () => {
+    useCapabilities(WEB)
+    openTab(t('ribbonTabFile'))
+    expect(container.querySelector('.file-menu')).not.toBeNull()
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    act(() => {
+      window.dispatchEvent(event)
+    })
+    expect(event.defaultPrevented).toBe(true)
+    expect(container.querySelector('.file-menu')).toBeNull()
+  })
+
   it('References: the Zotero group stays on the web as a "use the app" entry', () => {
     useCapabilities(undefined)
     expect(openTab(t('ribbonTabReferences')).groups).toContain(t('zoteroGroup'))

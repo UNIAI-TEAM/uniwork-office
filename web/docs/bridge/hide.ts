@@ -78,6 +78,11 @@ export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.f
   open: false,
   recents: false,
   desktopOpen: false,
+  save: false,
+  saveAs: false,
+  print: false,
+  exportPdf: false,
+  exportHtml: false,
 })
 
 /**
@@ -87,11 +92,21 @@ export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.f
  */
 export function hostGrants(
   granted: Capabilities | undefined,
-): Required<Pick<DesktopCapabilities, 'open' | 'recents' | 'desktopOpen'>> {
+): Required<
+  Pick<
+    DesktopCapabilities,
+    'open' | 'recents' | 'desktopOpen' | 'save' | 'saveAs' | 'print' | 'exportPdf' | 'exportHtml'
+  >
+> {
   return {
     open: granted?.filePick === true,
     recents: granted?.recents === true,
     desktopOpen: granted?.desktopOpen === true,
+    save: granted?.save === true,
+    saveAs: granted?.saveAs === true,
+    print: granted?.print === true,
+    exportPdf: granted?.exportPdf === true,
+    exportHtml: granted?.exportHtml === true,
   }
 }
 

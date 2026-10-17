@@ -1724,7 +1724,7 @@ describe('save size gate (SIZE-F1, UNI-1861)', () => {
     const meta = mock.seed('Report.docx', DOCX)
     mock.init({
       documentId: meta.fileId,
-      capabilities: { save: true, download: true },
+      capabilities: { save: true, saveAs: true, download: true },
       open: {
         ...mock.openPayload(meta.fileId),
         limits: { max_bytes: 100, warn_ratio: 0.7 },
@@ -1890,15 +1890,11 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       exportPdf: false,
       exportHtml: false,
     })
-    expect(await api.exportPdf('Report.docx', '<p>x</p>')).toEqual({
+    expect(await api.exportPdf('Report.docx', 12240, 15840, undefined, 1)).toEqual({
       ok: false,
       error: 'unsupported',
     })
-    expect(await api.exportCurrentPdf()).toEqual({
-      ok: false,
-      error: 'unsupported',
-    })
-    expect(await api.saveMergedPdf('Merged.pdf', [buf([1])])).toEqual({
+    expect(await api.saveMergedPdf('Merged.pdf', [WEB_PRINT_PART])).toEqual({
       ok: false,
       error: 'unsupported',
     })
@@ -1950,11 +1946,10 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       error: 'unsupported',
     })
     // D3: granted print and exportPdf stay available in readOnly profile
-    expect(await api.exportPdf('Report.docx', '<p>x</p>')).toEqual({
+    expect(await api.exportPdf('Report.docx', 12240, 15840, undefined, 1)).toEqual({
       ok: true,
-      path: WEB_PRINT_PART,
+      path: 'Report.pdf',
     })
-    expect(await mock.host.print({ mode: 'browser' })).toEqual({ printed: true })
+    expect(await mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
   })
 })
-

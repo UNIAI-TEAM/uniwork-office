@@ -214,7 +214,9 @@ describe('FRAME-RO-01: readOnly profile & Escape forwarder in installModuleBridg
     local.appendChild(btn)
     document.body.appendChild(local)
 
-    btn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    btn.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    )
     expect(mock.closeRequested).toEqual([])
 
     document.body.dispatchEvent(
@@ -224,4 +226,3 @@ describe('FRAME-RO-01: readOnly profile & Escape forwarder in installModuleBridg
     local.remove()
   })
 })
-

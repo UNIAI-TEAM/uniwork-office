@@ -37,6 +37,7 @@
  * the newest version.
  */
 import {
+  isReadOnlyProfile,
   toProtocolError,
   type FileMeta,
   type FileSource,
@@ -222,10 +223,17 @@ export function createTextWebApi(
   let imagesGranted = false
   let desktopOpenGranted = false
   let downloadGranted = false
+  let saveAsGranted = false
+  let printGranted = false
+  let exportPdfGranted = false
+  let exportHtmlGranted = false
+  let readOnlyProfile = false
   /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
   const downloadCap = bridgeDownloadCap(port)
 
-  const viewOnly = (): boolean => !saveGranted || inexact
+  const viewOnly = (): boolean => readOnlyProfile || !saveGranted || inexact
+  const canSaveAs = (): boolean => !readOnlyProfile && saveAsGranted && !inexact
+  const canPrint = (): boolean => printGranted
 
   // ------------------------------------------------------------ draft recovery (C18)
 
@@ -314,7 +322,10 @@ export function createTextWebApi(
     inexact = !decoded.exact
     if (inexact) {
       console.warn(`[office-web] ${open.file.name} is not valid UTF-8: opened view only`)
-      if (opts.capabilities) opts.capabilities.save = false
+      if (opts.capabilities) {
+        opts.capabilities.save = false
+        opts.capabilities.saveAs = false
+      }
     }
     const path = pathFor(open.file)
     texts.set(path, decoded.text)
@@ -336,8 +347,13 @@ export function createTextWebApi(
   let pendingOpen: Promise<string | null> | null = port
     .whenInitialized()
     .then((s) => {
-      saveGranted = s.capabilities?.save === true
-      imagesGranted = s.capabilities?.images === true
+      readOnlyProfile = isReadOnlyProfile(s)
+      saveGranted = s.capabilities?.save === true && !readOnlyProfile
+      saveAsGranted = s.capabilities?.saveAs === true && !readOnlyProfile
+      printGranted = s.capabilities?.print === true
+      exportPdfGranted = s.capabilities?.exportPdf === true
+      exportHtmlGranted = s.capabilities?.exportHtml === true && !readOnlyProfile
+      imagesGranted = s.capabilities?.images === true && !readOnlyProfile
       desktopOpenGranted = s.capabilities?.desktopOpen === true
       downloadGranted = s.capabilities?.download === true
       initDocumentId = s.documentId
@@ -448,7 +464,7 @@ export function createTextWebApi(
     if (fatal) return { ok: false, error: fatal }
     const locked = lockedSave()
     if (locked) return locked
-    if (viewOnly()) return failure('forbidden', text('webViewOnlyNotSaved'))
+    if (!canSaveAs()) return failure('unsupported', text('webViewOnlyNotSaved'))
     if (hostSave || hostSaveAs) return failure('busy', 'a save is already running')
     return runHostFlow<SaveResult>(
       () => {
@@ -468,7 +484,8 @@ export function createTextWebApi(
     )
   })
 
-  port.handlePrint(async () => {
+  port.handlePrint(async (payload) => {
+    if (payload?.mode === 'pdf' ? !exportPdfGranted : !printGranted) return { printed: false }
     // both modes print the renderer's print HTML in the browser dialog (no server PDF route)
     if (hostPrint) return { printed: false }
     return runHostFlow<{ printed: boolean }>(
@@ -771,8 +788,10 @@ export function createTextWebApi(
   // ------------------------------------------------------------ preload members
 
   return {
-    /** false = the host withheld `save` or the file is not UTF-8 (renderer: cap('save')) */
+    /** false = the host withheld `save`, set `profile: 'readOnly'`, or the file is not UTF-8 (renderer: cap('save')) */
     isViewOnly: viewOnly,
+    canSaveAs,
+    canPrint,
 
     async consumePending(): Promise<string | null> {
       booted = true
@@ -836,14 +855,21 @@ export function createTextWebApi(
       if (fatal) return refuse(fatal, text('webFatalTitle'))
       const locked = lockedSave()
       if (locked && !locked.ok) return refuse(locked.error, locked.error.message)
-      if (viewOnly()) {
-        const message = text('webViewOnlyNotSaved')
+      const isSaveAs = request?.mode === 'saveAs' || pendingAs !== null || !current
+      if (isSaveAs) {
+        if (!canSaveAs()) {
+          return refuse({ code: 'unsupported', message: 'unsupported' }, 'unsupported')
+        }
+      } else if (viewOnly()) {
+        const message = readOnlyProfile ? 'read-only document' : text('webViewOnlyNotSaved')
         return refuse({ code: 'forbidden', message }, message)
       }
       if (typeof request?.text !== 'string') {
         return refuse({ code: 'malformed', message: 'no text' }, 'no text')
       }
-      if (request.mode === 'saveAs' || pendingAs || !current) return saveNew(request, pendingAs)
+      if (request?.mode === 'saveAs' || pendingAs !== null || !current) {
+        return saveNew(request, pendingAs)
+      }
       return saveExisting(current, request.text)
     },
 
@@ -906,6 +932,7 @@ export function createTextWebApi(
     },
 
     async exportPdf(request: { html: string; suggestedName: string }): Promise<ExportResult> {
+      if (!hostPrint && !exportPdfGranted) return { ok: false, error: 'unsupported' }
       if (typeof request?.html !== 'string' || !request.html) {
         hostPrint?.settle({ printed: false })
         return { ok: false, error: 'empty document' }
@@ -914,6 +941,7 @@ export function createTextWebApi(
     },
 
     async exportHtml(request: { html: string; suggestedName: string }): Promise<ExportResult> {
+      if (!exportHtmlGranted) return { ok: false, error: 'unsupported' }
       if (typeof request?.html !== 'string') return { ok: false, error: 'empty document' }
       const name = `${(request.suggestedName || 'document').replace(/\.html?$/i, '')}.html`
       const html = await inlineAssets(request.html)
@@ -922,6 +950,7 @@ export function createTextWebApi(
     },
 
     async exportDocxBytes(name: string, bytes: Uint8Array): Promise<ExportResult> {
+      if (!canSaveAs()) return { ok: false, error: 'unsupported' }
       const file = `${(name || 'document').replace(/\.docx$/i, '')}.docx`
       downloadBlob(
         file,

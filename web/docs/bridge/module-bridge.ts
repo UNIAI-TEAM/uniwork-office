@@ -226,6 +226,11 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   }
   if (!('projectApi' in spec.globals)) target.projectApi = projectApi
   target.__officeWebModule = spec.module
+  if (typeof (target as unknown as Window).addEventListener === 'function') {
+    installEscapeForwarder(target as unknown as Window, (reason) =>
+      client.reportCloseRequested?.(reason),
+    )
+  }
   // the Discussion panel: mounted once the session is known, only for a bound, signed-in document
   if (spec.frameComments ?? FRAME_COMMENTS[spec.module]) {
     void mountFrameDiscussion(

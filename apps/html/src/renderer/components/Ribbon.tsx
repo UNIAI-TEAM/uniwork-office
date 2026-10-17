@@ -7,6 +7,7 @@ import {
   UniAiMark,
 } from '@genoffice/ui'
 import { useI18n } from '../i18n/locale'
+import { cap } from '../capabilities'
 import { useRibbonFit } from './ribbon-fit'
 import type { StringKey } from '../i18n/locale'
 import type { InsertKind, InsertOptions } from '../document/insert-presets'
@@ -167,10 +168,13 @@ export function Ribbon(p: Props) {
   useEffect(() => {
     if (!themeOpen) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setThemeOpen(false)
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setThemeOpen(false)
+      }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [themeOpen])
   const [presentOpen, setPresentOpen] = useState(false)
   const presentRef = useRef<HTMLDivElement>(null)
@@ -180,10 +184,13 @@ export function Ribbon(p: Props) {
   useEffect(() => {
     if (!presentOpen) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPresentOpen(false)
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setPresentOpen(false)
+      }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [presentOpen])
 
   const [insertPop, setInsertPop] = useState<InsertPopover | null>(null)
@@ -206,10 +213,13 @@ export function Ribbon(p: Props) {
   useEffect(() => {
     if (insertPop === null) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeInsert()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeInsert()
+      }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [insertPop])
   const submitImageUrl = () => {
     const url = imageUrl.trim()
@@ -233,29 +243,33 @@ export function Ribbon(p: Props) {
   return (
     <div className={`ribbon ${collapse.rootClass}`} ref={collapse.rootRef}>
       <div className="ribbon-tabs">
-        <button
-          type="button"
-          className="qa-btn"
-          data-tip={t('save')}
-          aria-label={t('save')}
-          disabled={off || (!p.dirty && !p.uniworkBound)}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={p.onSave}
-        >
-          <IconSave size={16} />
-        </button>
-        <button
-          type="button"
-          className="qa-btn qa-save-as"
-          data-tip={t('saveAs')}
-          aria-label={t('saveAs')}
-          disabled={notReady}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={p.onSaveAs}
-        >
-          {t('saveAs')}
-        </button>
-        {p.onExport && (
+        {cap('save') && (
+          <button
+            type="button"
+            className="qa-btn"
+            data-tip={t('save')}
+            aria-label={t('save')}
+            disabled={off || (!p.dirty && !p.uniworkBound)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={p.onSave}
+          >
+            <IconSave size={16} />
+          </button>
+        )}
+        {cap('saveAs') && (
+          <button
+            type="button"
+            className="qa-btn qa-save-as"
+            data-tip={t('saveAs')}
+            aria-label={t('saveAs')}
+            disabled={notReady}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={p.onSaveAs}
+          >
+            {t('saveAs')}
+          </button>
+        )}
+        {cap('exportHtml') && p.onExport && (
           <button
             type="button"
             className="qa-btn qa-save-as qa-export"

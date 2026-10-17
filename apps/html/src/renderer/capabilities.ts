@@ -29,6 +29,10 @@ export type HtmlCapability =
   | 'exportDocx'
   | 'attachments'
   | 'save'
+  | 'saveAs'
+  | 'print'
+  | 'exportPdf'
+  | 'exportHtml'
   | 'saveStatus'
   | 'viewOnlyChip'
 

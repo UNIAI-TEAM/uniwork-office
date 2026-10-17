@@ -642,6 +642,7 @@ describe('markdownApi: pictures and exports', () => {
 
   it('exportDocx downloads the renderer-built bytes; open-in-Docs is refused', async () => {
     const { api } = setup()
+    await open(api)
     const create = vi.fn(() => 'blob:x')
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: () => {} })
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
@@ -993,7 +994,9 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       saveAs: false,
       exportPdf: true,
     })
-    expect(await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.md' })).toEqual({
+    expect(
+      await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.md' }),
+    ).toEqual({
       ok: false,
       error: 'unsupported',
     })
@@ -1001,11 +1004,9 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       ok: false,
       error: { code: 'unsupported' },
     })
-    expect(await api.exportDocx({ text, defaultName: 'Notes' })).toEqual({
-      ok: false,
-      error: 'unsupported',
-    })
-    expect(await api.exportDocxBytes({ data: new Uint8Array([1, 2]), defaultName: 'Notes' })).toEqual({
+    expect(
+      await api.exportDocx({ base64: 'UEsDBA==', suggestedName: 'Notes', mode: 'dialog' }),
+    ).toEqual({
       ok: false,
       error: 'unsupported',
     })
@@ -1018,11 +1019,16 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     })
     const { text } = await open(api)
     api.provideText(() => text)
+    api.onSaveRequest((mode) => {
+      void api.save({ text, imageSources: [], mode, defaultName: 'Copy2.md' })
+    })
     expect(api.capabilities).toMatchObject({
       save: false,
       saveAs: true,
     })
-    expect(await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.md' })).toMatchObject({
+    expect(
+      await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.md' }),
+    ).toMatchObject({
       ok: true,
     })
     expect(await mock.host.saveAs({ name: 'Copy2.md' })).toMatchObject({
@@ -1037,7 +1043,7 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     })
     await open(api)
     expect(api.capabilities.exportPdf).toBe(false)
-    expect(await api.exportPdf({ html: '<p>x</p>' })).toEqual({
+    expect(await api.exportPdf({ html: '<p>x</p>', suggestedName: 'Notes' })).toEqual({
       ok: false,
       error: 'unsupported',
     })
@@ -1062,7 +1068,9 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       ok: false,
       error: 'read-only document',
     })
-    expect(await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.md' })).toEqual({
+    expect(
+      await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.md' }),
+    ).toEqual({
       ok: false,
       error: 'unsupported',
     })
@@ -1070,14 +1078,19 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       ok: false,
       error: { code: 'unsupported' },
     })
-    expect(await api.exportDocx({ text, defaultName: 'Notes' })).toEqual({
+    expect(
+      await api.exportDocx({ base64: 'UEsDBA==', suggestedName: 'Notes', mode: 'dialog' }),
+    ).toEqual({
       ok: false,
       error: 'unsupported',
     })
     // D3: granted print and exportPdf stay available in readOnly profile
-    expect(await api.exportPdf({ html: '<p>x</p>' })).toEqual({ ok: true, path: '' })
-    expect(await api.print({ html: '<p>x</p>' })).toEqual({ ok: true })
+    expect(await api.exportPdf({ html: '<p>x</p>', suggestedName: 'Notes' })).toEqual({
+      ok: true,
+      path: 'Notes.pdf',
+    })
+    api.onExportRequest(() => void api.exportPdf({ html: '<p>x</p>', suggestedName: 'Notes' }))
+    expect(await mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
     expect(print).toHaveBeenCalledTimes(2)
   })
 })
-

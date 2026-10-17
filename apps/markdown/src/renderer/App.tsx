@@ -514,7 +514,8 @@ export default function App() {
    * serialization, no image extraction, no trailing-newline fixups.
    */
   const doSaveSource = useCallback(async (mode: SaveMode, origin?: 'auto'): Promise<boolean> => {
-    if (statusRef.current !== 'ready' || savingRef.current || !cap('save')) return false
+    const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
+    if (statusRef.current !== 'ready' || savingRef.current || !allowed) return false
     savingRef.current = true
     setSaveState('saving')
     const textAtSave = sourceTextRef.current
@@ -661,8 +662,8 @@ export default function App() {
       if (sourceMode) return doSaveSource(mode, origin)
       flushSource()
       const current = editorRef.current
-      if (!current || statusRef.current !== 'ready' || savingRef.current || !cap('save'))
-        return false
+      const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
+      if (!current || statusRef.current !== 'ready' || savingRef.current || !allowed) return false
       savingRef.current = true
       setSaveState('saving')
       try {
@@ -762,6 +763,7 @@ export default function App() {
     async (format: ExportFormat, outPath?: string) => {
       // a source file has no rendered document to export
       if (sourceMode) return false
+      if (format === 'pdf' ? !cap('exportPdf') : !cap('saveAs')) return false
       const current = editorRef.current
       if (!current || statusRef.current !== 'ready') return false
       const suggestedName =
@@ -901,7 +903,7 @@ export default function App() {
   const printingRef = useRef(false)
   const printDoc = useCallback(async () => {
     const current = editorRef.current
-    if (!current || statusRef.current !== 'ready' || printingRef.current) return
+    if (!current || statusRef.current !== 'ready' || printingRef.current || !cap('print')) return
     printingRef.current = true
     const title =
       (filePathRef.current
@@ -1267,17 +1269,19 @@ export default function App() {
     <div className="app">
       <Ribbon
         editor={editor}
-        disabled={status !== 'ready' || !canEdit}
+        disabled={status !== 'ready'}
         dirty={dirty}
         onSave={() => void doSave('save')}
         onSaveAs={() => void doSave('saveAs')}
-        onExport={platform() === 'web' ? () => void exportWordFromRibbon() : undefined}
+        onExport={
+          platform() === 'web' && cap('saveAs') ? () => void exportWordFromRibbon() : undefined
+        }
         exportDisabled={status !== 'ready'}
         onFind={() => openFind(false)}
         autoSave={autoSave}
         onToggleAutoSave={setAutoSave}
         uniworkBound={uniwork.bound}
-        readOnly={uniwork.readOnly}
+        readOnly={uniwork.readOnly || !canEdit}
         imageEnabled={Boolean(filePath)}
         mdTheme={mdTheme}
         onMarkdownTheme={pickMarkdownTheme}

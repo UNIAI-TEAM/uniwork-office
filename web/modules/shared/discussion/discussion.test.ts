@@ -722,4 +722,3 @@ describe('FRAME-RO-01: readOnly profile vs save:false in Discussion (D4, UNI-187
     expect(panel()!.querySelector('textarea')).not.toBeNull()
   })
 })
-
