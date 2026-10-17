@@ -51,4 +51,6 @@ export const ja = {
   ufDisabledDeep: '階層が深すぎます',
   ufTreeError: 'フォルダーを読み込めませんでした。',
   ufActionsFor: '{name} の操作',
+  ufAreaLabel: 'エリア',
+  ufNoDeviceFolders: 'この端末にはまだフォルダがありません。',
 } satisfies Record<keyof typeof zh, string>

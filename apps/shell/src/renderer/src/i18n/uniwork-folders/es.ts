@@ -51,4 +51,6 @@ export const es = {
   ufDisabledDeep: 'Demasiado profundo',
   ufTreeError: 'No se pudieron cargar las carpetas.',
   ufActionsFor: 'Acciones para {name}',
+  ufAreaLabel: 'Área',
+  ufNoDeviceFolders: 'Aún no hay carpetas en este dispositivo.',
 } satisfies Record<keyof typeof zh, string>

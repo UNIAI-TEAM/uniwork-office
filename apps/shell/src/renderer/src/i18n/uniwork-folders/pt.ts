@@ -50,4 +50,6 @@ export const pt = {
   ufDisabledDeep: 'Profundo demais',
   ufTreeError: 'Não foi possível carregar as pastas.',
   ufActionsFor: 'Ações para {name}',
+  ufAreaLabel: 'Área',
+  ufNoDeviceFolders: 'Ainda não há pastas neste dispositivo.',
 } satisfies Record<keyof typeof zh, string>

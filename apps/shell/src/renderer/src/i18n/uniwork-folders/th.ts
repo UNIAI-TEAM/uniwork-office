@@ -50,4 +50,6 @@ export const th = {
   ufDisabledDeep: 'ลึกเกินไป',
   ufTreeError: 'โหลดโฟลเดอร์ไม่ได้',
   ufActionsFor: 'การทำงานสำหรับ {name}',
+  ufAreaLabel: 'พื้นที่',
+  ufNoDeviceFolders: 'ยังไม่มีโฟลเดอร์ในเครื่องนี้',
 } satisfies Record<keyof typeof zh, string>

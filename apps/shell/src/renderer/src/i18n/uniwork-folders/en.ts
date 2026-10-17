@@ -50,4 +50,6 @@ export const en = {
   ufDisabledDeep: 'Too deep',
   ufTreeError: "Couldn't load the folders.",
   ufActionsFor: 'Actions for {name}',
+  ufAreaLabel: 'Area',
+  ufNoDeviceFolders: 'No folders on this device yet.',
 } satisfies Record<keyof typeof zh, string>

@@ -50,4 +50,6 @@ export const zhTW = {
   ufDisabledDeep: '層級過深',
   ufTreeError: '無法載入資料夾樹。',
   ufActionsFor: '{name} 的動作',
+  ufAreaLabel: '區域',
+  ufNoDeviceFolders: '本機尚無資料夾。',
 } satisfies Record<keyof typeof zh, string>

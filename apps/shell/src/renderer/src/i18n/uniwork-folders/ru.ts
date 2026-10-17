@@ -51,4 +51,6 @@ export const ru = {
   ufDisabledDeep: 'Слишком глубоко',
   ufTreeError: 'Не удалось загрузить папки.',
   ufActionsFor: 'Действия для {name}',
+  ufAreaLabel: 'Область',
+  ufNoDeviceFolders: 'На этом устройстве пока нет папок.',
 } satisfies Record<keyof typeof zh, string>

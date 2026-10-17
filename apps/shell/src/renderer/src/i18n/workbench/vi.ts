@@ -256,7 +256,7 @@ export const vi = {
   wbDeskRestore: 'Khôi phục',
   wbDeskSubOpenTab: 'Đang mở trong trình soạn thảo',
   wbDeskSubRecovery: 'Phiên trước bị đóng đột ngột',
-  wbDeskSubCloud: 'Trên UniWork',
+  wbDeskSubCloud: 'UniWork',
   wbDeskDrawerInto: 'soạn vào gói',
   wbDeskDrawerPack: 'Gói nhận bản soạn',
   wbDeskDefaultPack: 'Dự án mặc định',

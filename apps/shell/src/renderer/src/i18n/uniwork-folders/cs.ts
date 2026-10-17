@@ -51,4 +51,6 @@ export const cs = {
   ufDisabledDeep: 'Příliš hluboko',
   ufTreeError: 'Složky se nepodařilo načíst.',
   ufActionsFor: 'Akce pro {name}',
+  ufAreaLabel: 'Oblast',
+  ufNoDeviceFolders: 'V tomto zařízení zatím nejsou žádné složky.',
 } satisfies Record<keyof typeof zh, string>

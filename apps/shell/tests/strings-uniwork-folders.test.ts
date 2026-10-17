@@ -95,4 +95,65 @@ describe('uniwork folders string shards', () => {
       expect(corrupted).toEqual([])
     },
   )
+
+  it('FD-13: scans every vi value across all shell renderer string tables (NFC, case-insensitive) and finds no "cục bộ"', () => {
+    const rendererViTables: Record<string, Record<string, string>> = {
+      strings: strings.vi,
+      accountStrings: accountStrings.vi,
+      cloudStrings: cloudStrings.vi,
+      uniworkDocumentStrings: uniworkDocumentStrings.vi,
+      uniworkFolderStrings: uniworkFolderStrings.vi,
+      syncStrings: syncStrings.vi,
+      workbenchStrings: workbenchStrings.vi,
+      discussionStrings: discussionStrings.vi,
+      settingsStrings: settingsStrings.vi,
+    }
+    const needle = 'cục bộ'.normalize('NFC').toLowerCase()
+    const hits: string[] = []
+    for (const [tableName, dict] of Object.entries(rendererViTables)) {
+      for (const [key, value] of Object.entries(dict)) {
+        if (value.normalize('NFC').toLowerCase().includes(needle)) {
+          hits.push(`${tableName}.vi.${key}: ${value}`)
+        }
+      }
+    }
+    expect(hits).toEqual([])
+  })
+
+  it('FD-13: updates openLocal across all 21 locales to "on this device" wording and provides area toggle keys', () => {
+    expect(strings.vi.openLocal).toBe('Mở tệp trên máy')
+    expect(strings.en.openLocal).toBe('Open file on this device')
+    expect(strings.vi.setMcp).toBe('Máy chủ MCP trên máy này')
+    expect(strings.vi.setAiCapFileSearch).toBe('Tìm kiếm tệp trên máy')
+    expect(strings.zh.openLocal).toBe('打开本机文件')
+    expect(strings['zh-TW'].openLocal).toBe('開啟本機檔案')
+    expect(strings.ja.openLocal).toBe('この端末のファイルを開く')
+    expect(strings.ko.openLocal).toBe('이 기기의 파일 열기')
+    expect(strings.fr.openLocal).toBe('Ouvrir un fichier sur cet appareil')
+    expect(strings.de.openLocal).toBe('Datei auf diesem Gerät öffnen')
+    expect(strings.es.openLocal).toBe('Abrir archivo en este dispositivo')
+    expect(strings.th.openLocal).toBe('เปิดไฟล์ในเครื่องนี้')
+    expect(strings.id.openLocal).toBe('Buka file di perangkat ini')
+    expect(strings.ru.openLocal).toBe('Открыть файл на этом устройстве')
+    expect(strings.ar.openLocal).toBe('فتح ملف على هذا الجهاز')
+    expect(strings.pt.openLocal).toBe('Abrir arquivo neste dispositivo')
+    expect(strings.it.openLocal).toBe('Apri file su questo dispositivo')
+    expect(strings.pl.openLocal).toBe('Otwórz plik na tym urządzeniu')
+    expect(strings.cs.openLocal).toBe('Otevřít soubor v tomto zařízení')
+    expect(strings.nl.openLocal).toBe('Bestand op dit apparaat openen')
+    expect(strings.ms.openLocal).toBe('Buka fail pada peranti ini')
+    expect(strings.he.openLocal).toBe('פתיחת קובץ במכשיר זה')
+    expect(strings.hi.openLocal).toBe('इस डिवाइस पर फ़ाइल खोलें')
+
+    expect(workbenchStrings.vi.wbDeskSubCloud).toBe('UniWork')
+    expect(workbenchStrings.en.wbDeskSubCloud).toBe('UniWork')
+    expect(workbenchStrings.vi.wbOnThisDevice).toBe('Trên máy này')
+    expect(workbenchStrings.en.wbOnThisDevice).toBe('On this device')
+
+    expect(table('vi').ufAreaLabel).toBe('Khu vực')
+    expect(table('en').ufAreaLabel).toBe('Area')
+    expect(table('vi').ufNoDeviceFolders).toBe('Chưa có thư mục nào trên máy này.')
+    expect(table('en').ufNoDeviceFolders).toBe('No folders on this device yet.')
+  })
 })
+

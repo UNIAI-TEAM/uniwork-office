@@ -50,4 +50,6 @@ export const he = {
   ufDisabledDeep: 'עמוק מדי',
   ufTreeError: 'לא ניתן לטעון את התיקיות.',
   ufActionsFor: 'פעולות עבור {name}',
+  ufAreaLabel: 'אזור',
+  ufNoDeviceFolders: 'אין עדיין תיקיות במכשיר זה.',
 } satisfies Record<keyof typeof zh, string>

@@ -51,4 +51,6 @@ export const nl = {
   ufDisabledDeep: 'Te diep',
   ufTreeError: 'De mappen konden niet worden geladen.',
   ufActionsFor: 'Acties voor {name}',
+  ufAreaLabel: 'Gebied',
+  ufNoDeviceFolders: 'Nog geen mappen op dit apparaat.',
 } satisfies Record<keyof typeof zh, string>

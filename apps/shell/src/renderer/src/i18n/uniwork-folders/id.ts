@@ -51,4 +51,6 @@ export const id = {
   ufDisabledDeep: 'Terlalu dalam',
   ufTreeError: 'Tidak dapat memuat folder.',
   ufActionsFor: 'Tindakan untuk {name}',
+  ufAreaLabel: 'Area',
+  ufNoDeviceFolders: 'Belum ada folder di perangkat ini.',
 } satisfies Record<keyof typeof zh, string>
