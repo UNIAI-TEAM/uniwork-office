@@ -1,7 +1,9 @@
-// Shared utilities for G7-05 Linux desktop packaging, T1 smoke, T2 zero-network, and T6 performance measurements.
+// Shared utilities for G7-05 Linux desktop packaging, T1 smoke, T2 zero-network, T3/T4 upgrade-rollback, and T6 performance measurements.
 import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -12,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
@@ -509,12 +511,14 @@ export async function launchPackagedApp({
   seedOnboardingSeen = false,
   straceLogPath = '',
   netLogPath = '',
+  envRootDir = '',
 }) {
   const scratchDir = mkdtempSync(join(tmpdir(), scratchPrefix))
-  const homeDir = join(scratchDir, 'home')
-  const xdgConfigHome = join(scratchDir, 'xdg-config')
-  const xdgCacheHome = join(scratchDir, 'xdg-cache')
-  const xdgDataHome = join(scratchDir, 'xdg-data')
+  const baseDir = envRootDir ? resolve(envRootDir) : scratchDir
+  const homeDir = join(baseDir, 'home')
+  const xdgConfigHome = join(baseDir, 'xdg-config')
+  const xdgCacheHome = join(baseDir, 'xdg-cache')
+  const xdgDataHome = join(baseDir, 'xdg-data')
   mkdirSync(homeDir, { recursive: true })
   mkdirSync(xdgConfigHome, { recursive: true })
   mkdirSync(xdgCacheHome, { recursive: true })
@@ -525,12 +529,14 @@ export async function launchPackagedApp({
 
   if (seedOnboardingSeen) {
     mkdirSync(userDataDir, { recursive: true })
-    writeFileSync(join(userDataDir, 'onboarding-seen.json'), JSON.stringify({ seen: true }), 'utf8')
-    writeFileSync(
-      join(userDataDir, 'app-settings.json'),
-      JSON.stringify({ onboardingSeen: true, language: 'en' }),
-      'utf8',
-    )
+    const onboardingPath = join(userDataDir, 'onboarding-seen.json')
+    if (!existsSync(onboardingPath)) {
+      writeFileSync(onboardingPath, JSON.stringify({ seen: true }), 'utf8')
+    }
+    const settingsPath = join(userDataDir, 'app-settings.json')
+    if (!existsSync(settingsPath)) {
+      writeFileSync(settingsPath, JSON.stringify({ onboardingSeen: true, language: 'en' }), 'utf8')
+    }
   }
 
   const wrapperPath = createLaunchWrapper({
@@ -575,6 +581,7 @@ export async function launchPackagedApp({
     app,
     instanceId,
     scratchDir,
+    envRootDir: baseDir,
     userDataDir,
     xdgConfigHome,
     launchStartMs,
@@ -1074,5 +1081,371 @@ export function runCmd(cmd, args, opts = {}) {
     status: res.status ?? 1,
     stdout: res.stdout || '',
     stderr: res.stderr || '',
+  }
+}
+
+export const UPGRADE_MATRIX_IDS = Object.freeze({
+  deploymentId: 'dep-g705-matrix',
+  accountId: 'acct-g705-user',
+  deviceSessionId: 'dev-g705-1',
+  sessionId: 'sess-g705-1',
+  documentId: 'doc-g705-bound-1',
+  workspaceId: 'ws-g705-1',
+  orgId: 'org-g705-1',
+  filename: 'fx-docx-report-vi.docx',
+  title: 'fx-docx-report-vi',
+  apiOrigin: 'https://127.0.0.1:1',
+  intentKey: 'office-save-seed-1',
+})
+
+export function szv1Encode(plainText) {
+  return Buffer.from(`SZV1${Buffer.from(String(plainText), 'utf8').toString('base64')}`, 'utf8')
+}
+
+export function szv1Decode(buf) {
+  const text = Buffer.from(buf).toString('utf8')
+  if (!text.startsWith('SZV1')) {
+    throw new Error('Buffer does not carry SZV1 prefix')
+  }
+  return Buffer.from(text.slice(4), 'base64').toString('utf8')
+}
+
+/**
+ * Installs the deterministic SZV1 safeStorage shim into the running Electron main process
+ * (same contract as visual-SIZE-2/keyring-shim.cjs) so headless Linux VMs without a desktop
+ * keyring can unwrap session.bin and uniwork-sync/<accountId>.key.
+ */
+export async function installKeyringShim(app) {
+  await app.evaluate(({ safeStorage }) => {
+    const enc = (s) => Buffer.from(`SZV1${Buffer.from(String(s), 'utf8').toString('base64')}`)
+    safeStorage.isEncryptionAvailable = () => true
+    safeStorage.getSelectedStorageBackend = () => 'gnome_libsecret'
+    safeStorage.encryptString = (s) => enc(s)
+    safeStorage.decryptString = (b) => {
+      const t = Buffer.from(b).toString('utf8')
+      if (!t.startsWith('SZV1')) throw new Error('undecryptable')
+      return Buffer.from(t.slice(4), 'base64').toString('utf8')
+    }
+  })
+}
+
+/**
+ * Installs the SZV1 keyring shim and triggers AccountManager.retry() via the shell renderer
+ * preload (`window.aiOffice.accountRetry()`), which restores `session.bin`, emits the active
+ * `uniworkSessionIdentity`, and opens the encrypted sync store + runs `migrateLegacyIntents()`.
+ */
+export async function activateKeyringAndRestoreAccount(app, shellPage, settleMs = 400) {
+  await installKeyringShim(app)
+  const status = await shellPage.evaluate(async () => {
+    if (typeof globalThis.window?.aiOffice?.accountRetry === 'function') {
+      return globalThis.window.aiOffice.accountRetry()
+    }
+    if (typeof globalThis.window?.aiOffice?.accountStatus === 'function') {
+      return globalThis.window.aiOffice.accountStatus()
+    }
+    return null
+  })
+  if (settleMs > 0) {
+    await sleep(settleMs)
+  }
+  return status
+}
+
+export function readUws1Header(filePath) {
+  const raw = readFileSync(filePath)
+  if (raw.byteLength < 8 + 12 + 16) {
+    throw new Error(`UWS1 record too short (${raw.byteLength} bytes): ${filePath}`)
+  }
+  const magic = raw.subarray(0, 4).toString('ascii')
+  if (magic !== 'UWS1') {
+    throw new Error(`Invalid UWS1 magic "${magic}" in ${filePath}`)
+  }
+  const headerLength = raw.readUInt32BE(4)
+  if (8 + headerLength + 12 + 16 > raw.byteLength) {
+    throw new Error(`Truncated UWS1 header (${headerLength} bytes) in ${filePath}`)
+  }
+  const headerJson = raw.subarray(8, 8 + headerLength).toString('utf8')
+  const header = JSON.parse(headerJson)
+  return {
+    magic,
+    headerLength,
+    header,
+    totalBytes: raw.byteLength,
+    sha256: createHash('sha256').update(raw).digest('hex'),
+  }
+}
+
+export function snapshotTreeDigests(rootDir) {
+  const absRoot = resolve(rootDir)
+  if (!existsSync(absRoot)) return []
+  const items = []
+  const walk = (dir) => {
+    const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walk(fullPath)
+      } else if (entry.isFile()) {
+        const st = statSync(fullPath)
+        items.push({
+          relPath: relative(absRoot, fullPath),
+          bytes: st.size,
+          sha256: sha256File(fullPath),
+        })
+      }
+    }
+  }
+  walk(absRoot)
+  return items
+}
+
+export function diffTreeDigests(beforeList, afterList) {
+  const beforeMap = new Map(beforeList.map((item) => [item.relPath, item]))
+  const afterMap = new Map(afterList.map((item) => [item.relPath, item]))
+  const added = []
+  const removed = []
+  const modified = []
+
+  for (const [relPath, afterItem] of afterMap.entries()) {
+    const beforeItem = beforeMap.get(relPath)
+    if (!beforeItem) {
+      added.push(relPath)
+    } else if (beforeItem.sha256 !== afterItem.sha256 || beforeItem.bytes !== afterItem.bytes) {
+      modified.push({
+        relPath,
+        beforeBytes: beforeItem.bytes,
+        afterBytes: afterItem.bytes,
+        beforeSha256: beforeItem.sha256,
+        afterSha256: afterItem.sha256,
+      })
+    }
+  }
+
+  for (const relPath of beforeMap.keys()) {
+    if (!afterMap.has(relPath)) {
+      removed.push(relPath)
+    }
+  }
+
+  return {
+    identical: added.length === 0 && removed.length === 0 && modified.length === 0,
+    added,
+    removed,
+    modified,
+  }
+}
+
+export function parseStraceConnectsToTarget(rawText, targetIp = '127.0.0.1', targetPort = 1) {
+  const lines = String(rawText || '').split(/\r?\n/)
+  const matches = []
+  const ipEsc = targetIp.replace(/\./g, '\\.')
+  const ipRe = new RegExp(`inet_addr\\("${ipEsc}"\\)|inet_pton\\(AF_INET6,\\s*"${ipEsc}"`)
+  const portRe = new RegExp(`sin6?_port=htons\\(${Number(targetPort)}\\)`)
+  for (const line of lines) {
+    if (!/\b(?:connect|sendto)\s*\(/.test(line)) continue
+    if (ipRe.test(line) && portRe.test(line)) {
+      matches.push(line.trim())
+    }
+  }
+  return {
+    targetIp,
+    targetPort,
+    count: matches.length,
+    matches,
+  }
+}
+
+export function getUpgradeMatrixPaths(userDataDir) {
+  const absUserData = resolve(userDataDir)
+  const { deploymentId, accountId, documentId, filename } = UPGRADE_MATRIX_IDS
+  const docIdHash = createHash('sha256').update(documentId, 'utf8').digest('hex')
+  const docsRoot = join(absUserData, 'uniwork-documents')
+  const syncRoot = join(absUserData, 'uniwork-sync')
+  const authRoot = join(absUserData, 'uniwork-auth')
+  const docDir = join(docsRoot, deploymentId, accountId, documentId)
+  const docPath = join(docDir, filename)
+  const bindingPath = join(docDir, 'binding.json')
+  const legacyPendingUploadPath = join(docDir, 'pending-upload.bin')
+  const lastAccountPath = join(docsRoot, 'last-account.json')
+  const keyFilePath = join(syncRoot, 'keys', deploymentId, `${accountId}.key`)
+  const intentRecordPath = join(
+    syncRoot,
+    'store',
+    deploymentId,
+    accountId,
+    'intents',
+    `${docIdHash}.rec`,
+  )
+  const sessionBinPath = join(authRoot, 'session.bin')
+  const deploymentProfilePath = join(absUserData, 'deployment-profile.json')
+
+  return {
+    userDataDir: absUserData,
+    docsRoot,
+    syncRoot,
+    authRoot,
+    docDir,
+    docPath,
+    bindingPath,
+    legacyPendingUploadPath,
+    lastAccountPath,
+    keyFilePath,
+    intentRecordPath,
+    sessionBinPath,
+    deploymentProfilePath,
+    docIdHash,
+  }
+}
+
+export function seedUpgradeMatrixStore({ userDataDir, fixtureSourcePath }) {
+  const paths = getUpgradeMatrixPaths(userDataDir)
+  mkdirSync(paths.docDir, { recursive: true })
+  mkdirSync(dirname(paths.keyFilePath), { recursive: true })
+  mkdirSync(paths.authRoot, { recursive: true })
+
+  // 1. Copy working document into bound document folder and legacy pending-upload.bin.
+  copyFileSync(resolve(fixtureSourcePath), paths.docPath)
+  copyFileSync(resolve(fixtureSourcePath), paths.legacyPendingUploadPath)
+  const docSha256 = sha256File(paths.docPath)
+
+  // 2. Write onboarding + app settings so first launch goes straight to shell.
+  writeFileSync(
+    join(paths.userDataDir, 'onboarding-seen.json'),
+    JSON.stringify({ seen: true }),
+    'utf8',
+  )
+  writeFileSync(
+    join(paths.userDataDir, 'app-settings.json'),
+    JSON.stringify({ onboardingSeen: true, language: 'en' }),
+    'utf8',
+  )
+
+  // 3. Write deployment-profile.json pointing at dead loopback port 1.
+  writeFileSync(
+    paths.deploymentProfilePath,
+    JSON.stringify(
+      {
+        deploymentId: UPGRADE_MATRIX_IDS.deploymentId,
+        apiOrigin: UPGRADE_MATRIX_IDS.apiOrigin,
+        clientId: 'uniwork-office',
+        channel: 'stable',
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  )
+
+  // 4. Write SZV1-encrypted uniwork-auth/session.bin.
+  const sessionEnvelope = {
+    version: 1,
+    credential: {
+      deploymentId: UPGRADE_MATRIX_IDS.deploymentId,
+      apiOrigin: UPGRADE_MATRIX_IDS.apiOrigin,
+      clientId: 'uniwork-office',
+      accountId: UPGRADE_MATRIX_IDS.accountId,
+      deviceSessionId: UPGRADE_MATRIX_IDS.deviceSessionId,
+      sessionId: UPGRADE_MATRIX_IDS.sessionId,
+      refreshToken: 'rt-g705-matrix-offline-token',
+      refreshExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      profile: {
+        accountId: UPGRADE_MATRIX_IDS.accountId,
+        email: 'matrix@uniwork.test',
+        displayName: 'G7-05 Matrix User',
+      },
+      org: {
+        id: UPGRADE_MATRIX_IDS.orgId,
+        name: 'G7-05 Matrix Org',
+        slug: 'g705-matrix-org',
+        role: 'admin',
+        status: 'active',
+      },
+    },
+  }
+  writeFileSync(paths.sessionBinPath, szv1Encode(JSON.stringify(sessionEnvelope)))
+
+  // 5. Write deterministic 32-byte AES-256 key wrapped with SZV1 for uniwork-sync.
+  const deterministicKeyBase64 = Buffer.alloc(32, 0x42).toString('base64')
+  writeFileSync(paths.keyFilePath, szv1Encode(deterministicKeyBase64))
+
+  // 6. Write last-account.json so cold offline boot also knows the active account bucket.
+  writeFileSync(
+    paths.lastAccountPath,
+    `${JSON.stringify(
+      {
+        accountId: UPGRADE_MATRIX_IDS.accountId,
+        deploymentId: UPGRADE_MATRIX_IDS.deploymentId,
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  )
+
+  // 7. Write schema-1 binding.json with pendingIntent so N' (v1.0.0-beta.3) migrates it on first boot
+  // to schema: 2, min_store_level: 2 and encrypts pending-upload.bin into intents/<sha256>.rec.
+  const seededBinding = {
+    schema: 1,
+    documentId: UPGRADE_MATRIX_IDS.documentId,
+    workspaceId: UPGRADE_MATRIX_IDS.workspaceId,
+    orgId: UPGRADE_MATRIX_IDS.orgId,
+    title: UPGRADE_MATRIX_IDS.title,
+    filename: UPGRADE_MATRIX_IDS.filename,
+    format: 'docx',
+    access: 'edit',
+    baseRevision: '1',
+    baseVersion: 1,
+    baseChecksum: '0'.repeat(64),
+    state: 'dirty',
+    lastSyncedAt: '2026-10-17T00:00:00.000Z',
+    pendingIntent: {
+      kind: 'save',
+      key: UPGRADE_MATRIX_IDS.intentKey,
+      baseRevision: '1',
+      checksum: docSha256,
+      createdAt: '2026-10-17T00:00:00.000Z',
+    },
+  }
+  writeFileSync(paths.bindingPath, `${JSON.stringify(seededBinding, null, 2)}\n`, 'utf8')
+
+  return {
+    ...paths,
+    docSha256,
+    seededBinding,
+  }
+}
+
+export function inspectUpgradeMatrixStore(userDataDir) {
+  const paths = getUpgradeMatrixPaths(userDataDir)
+  const bindingRaw = existsSync(paths.bindingPath)
+    ? JSON.parse(readFileSync(paths.bindingPath, 'utf8'))
+    : null
+  const bindingSha256 = existsSync(paths.bindingPath) ? sha256File(paths.bindingPath) : null
+  const docSha256 = existsSync(paths.docPath) ? sha256File(paths.docPath) : null
+  const docBytes = existsSync(paths.docPath) ? statSync(paths.docPath).size : 0
+  const hasLegacyPendingUpload = existsSync(paths.legacyPendingUploadPath)
+  const hasEncryptedIntentRecord = existsSync(paths.intentRecordPath)
+  const intentRecord = hasEncryptedIntentRecord ? readUws1Header(paths.intentRecordPath) : null
+
+  const docsTree = snapshotTreeDigests(paths.docsRoot)
+  const syncTree = snapshotTreeDigests(paths.syncRoot)
+  const combinedTree = [
+    ...docsTree.map((item) => ({ ...item, relPath: `uniwork-documents/${item.relPath}` })),
+    ...syncTree.map((item) => ({ ...item, relPath: `uniwork-sync/${item.relPath}` })),
+  ]
+
+  return {
+    binding: bindingRaw,
+    bindingSha256,
+    docSha256,
+    docBytes,
+    hasLegacyPendingUpload,
+    hasEncryptedIntentRecord,
+    intentRecord,
+    docsTree,
+    syncTree,
+    combinedTree,
   }
 }

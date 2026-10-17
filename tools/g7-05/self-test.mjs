@@ -3,21 +3,30 @@
 // Verifies G7-06 fixture materialization + SHA-256 integrity, strace parser, netlog parser, /proc RSS sampler, and metadata collection.
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { applyN1BuildTimePatch } from './apply-n1-patch.mjs'
 import { G7_06_FIXTURES, materializeFixtures } from './fixtures-data.mjs'
 import {
   REPO_ROOT,
+  UPGRADE_MATRIX_IDS,
   classifyRequestUrl,
   collectBuildMetadata,
   createLaunchWrapper,
+  diffTreeDigests,
   findInstancePids,
+  inspectUpgradeMatrixStore,
   isOutboundNetworkUrl,
   median,
   parseNetLog,
+  parseStraceConnectsToTarget,
   parseStraceLog,
+  readUws1Header,
   sampleProcessTreeRssKb,
+  seedUpgradeMatrixStore,
+  szv1Decode,
+  szv1Encode,
   waitForEditorViewPage,
   waitForShellReady,
 } from './lib.mjs'
@@ -231,10 +240,91 @@ async function testPackagedShellAndEditorViewResolution() {
   }
 }
 
+function testUpgradeMatrixHelpersAndN1Patch() {
+  const dir = mkdtempSync(join(tmpdir(), 'g7-05-selftest-matrix-'))
+  try {
+    // 1. SZV1 round-trip
+    const plain = JSON.stringify({ hello: 'uniwork', level: 3 })
+    const encoded = szv1Encode(plain)
+    assert.ok(encoded.toString('utf8').startsWith('SZV1'))
+    assert.equal(szv1Decode(encoded), plain)
+
+    // 2. UWS1 header parser
+    const headerBuf = Buffer.from(JSON.stringify({ schema: 1, min_store_level: 3 }), 'utf8')
+    const lenBuf = Buffer.alloc(4)
+    lenBuf.writeUInt32BE(headerBuf.byteLength, 0)
+    const uws1Path = join(dir, 'sample.rec')
+    writeFileSync(
+      uws1Path,
+      Buffer.concat([
+        Buffer.from('UWS1', 'ascii'),
+        lenBuf,
+        headerBuf,
+        Buffer.alloc(12 + 16 + 8, 0xaa),
+      ]),
+    )
+    const uws1 = readUws1Header(uws1Path)
+    assert.equal(uws1.magic, 'UWS1')
+    assert.equal(uws1.header.schema, 1)
+    assert.equal(uws1.header.min_store_level, 3)
+
+    // 3. Seed & inspect upgrade matrix store + tree diff
+    const fxDir = join(dir, 'fx')
+    const fixtures = materializeFixtures(fxDir)
+    const docx = fixtures.find((f) => f.id === 'fx-docx-report-vi')
+    const userDataDir = join(dir, 'userData')
+    const seeded = seedUpgradeMatrixStore({ userDataDir, fixtureSourcePath: docx.path })
+    const snap1 = inspectUpgradeMatrixStore(userDataDir)
+    assert.equal(snap1.binding.schema, 1)
+    assert.equal(snap1.binding.documentId, UPGRADE_MATRIX_IDS.documentId)
+    assert.equal(snap1.hasLegacyPendingUpload, true)
+    assert.equal(snap1.docSha256, seeded.docSha256)
+    const snap2 = inspectUpgradeMatrixStore(userDataDir)
+    assert.equal(diffTreeDigests(snap1.combinedTree, snap2.combinedTree).identical, true)
+
+    // 4. Target connect parser for apiOrigin 127.0.0.1:1
+    const traceWithPort1 =
+      '2001 connect(22, {sa_family=AF_INET, sin_port=htons(1), sin_addr=inet_addr("127.0.0.1")}, 16) = -1 ECONNREFUSED'
+    assert.equal(parseStraceConnectsToTarget(traceWithPort1, '127.0.0.1', 1).count, 1)
+    assert.equal(parseStraceConnectsToTarget(traceWithPort1, '127.0.0.1', 443).count, 0)
+
+    // 5. applyN1BuildTimePatch against an isolated temp copy of the 6 target files
+    const fakeRepo = join(dir, 'fake-repo')
+    const relFiles = [
+      'apps/shell/src/main/uniwork-sync/store-level.ts',
+      'apps/shell/src/main/uniwork-docs/binding-store.ts',
+      'apps/shell/src/main/uniwork-sync/store/layer.ts',
+      'apps/shell/src/main/uniwork-sync/migration.ts',
+      'package.json',
+      'apps/shell/package.json',
+    ]
+    for (const rel of relFiles) {
+      const dest = join(fakeRepo, rel)
+      mkdirSync(dirname(dest), { recursive: true })
+      copyFileSync(join(REPO_ROOT, rel), dest)
+    }
+    const patchRes = applyN1BuildTimePatch(fakeRepo, { version: '1.0.0-g705n1', storeLevel: 3 })
+    assert.equal(patchRes.patchedFiles.length, 6)
+    assert.ok(
+      readFileSync(
+        join(fakeRepo, 'apps/shell/src/main/uniwork-sync/store-level.ts'),
+        'utf8',
+      ).includes('export const APP_STORE_LEVEL = 3'),
+    )
+    assert.equal(
+      JSON.parse(readFileSync(join(fakeRepo, 'apps/shell/package.json'), 'utf8')).version,
+      '1.0.0-g705n1',
+    )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
 testFixtureMaterialization()
 testStraceParser()
 testNetLogParserAndUrlClassifier()
 testRssAndMetadata()
 await testWrapperAndProcessTracking()
 await testPackagedShellAndEditorViewResolution()
+testUpgradeMatrixHelpersAndN1Patch()
 console.log('[g7-05/self-test] All unit assertions passed.')
