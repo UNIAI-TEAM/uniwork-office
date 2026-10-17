@@ -19,6 +19,7 @@ import {
   inspectUpgradeMatrixStore,
   isOutboundNetworkUrl,
   median,
+  normalizeDebVersion,
   parseNetLog,
   parseStraceConnectsToTarget,
   parseStraceLog,
@@ -250,26 +251,61 @@ function testUpgradeMatrixHelpersAndN1Patch() {
     assert.ok(encoded.toString('utf8').startsWith('SZV1'))
     assert.equal(szv1Decode(encoded), plain)
 
-    // 2. UWS1 header parser
-    const headerBuf = Buffer.from(JSON.stringify({ schema: 1, min_store_level: 3 }), 'utf8')
-    const lenBuf = Buffer.alloc(4)
-    lenBuf.writeUInt32BE(headerBuf.byteLength, 0)
-    const uws1Path = join(dir, 'sample.rec')
+    // 2. UWS1 header parser in the real codec.ts format:
+    //    4-byte 'UWS1' magic + 2-byte UInt16LE header length + UTF-8 JSON header + 12B IV + 16B tag + ciphertext
+    const codecSrc = readFileSync(
+      join(REPO_ROOT, 'apps/shell/src/main/uniwork-sync/store/codec.ts'),
+      'utf8',
+    )
+    assert.ok(
+      codecSrc.includes('const LENGTH_BYTES = 2') && codecSrc.includes('writeUInt16LE'),
+      'codec.ts must use 2-byte UInt16LE header length',
+    )
+    for (const expectedLevel of [2, 3]) {
+      const headerObj = { schema: 1, min_store_level: expectedLevel }
+      const headerBuf = Buffer.from(JSON.stringify(headerObj), 'utf8')
+      const lenBuf = Buffer.alloc(2)
+      lenBuf.writeUInt16LE(headerBuf.byteLength, 0)
+      const uws1Path = join(dir, `sample-level-${expectedLevel}.rec`)
+      writeFileSync(
+        uws1Path,
+        Buffer.concat([
+          Buffer.from('UWS1', 'latin1'),
+          lenBuf,
+          headerBuf,
+          Buffer.alloc(12, 0x11), // 12-byte GCM IV
+          Buffer.alloc(16, 0x22), // 16-byte GCM auth tag
+          Buffer.alloc(64, 0xaa), // ciphertext payload
+        ]),
+      )
+      const uws1 = readUws1Header(uws1Path)
+      assert.equal(uws1.magic, 'UWS1')
+      assert.equal(uws1.headerLength, headerBuf.byteLength)
+      assert.equal(uws1.header.schema, 1)
+      assert.equal(uws1.header.min_store_level, expectedLevel)
+    }
+    // Verify a 4-byte BE header length is rejected as corrupt/truncated (since bytes 4..5 are 0x0000 -> headerLength === 0)
+    const bad4ByteLenBuf = Buffer.alloc(4)
+    bad4ByteLenBuf.writeUInt32BE(34, 0)
+    const badUws1Path = join(dir, 'bad-4byte-be.rec')
     writeFileSync(
-      uws1Path,
+      badUws1Path,
       Buffer.concat([
-        Buffer.from('UWS1', 'ascii'),
-        lenBuf,
-        headerBuf,
+        Buffer.from('UWS1', 'latin1'),
+        bad4ByteLenBuf,
+        Buffer.from(JSON.stringify({ schema: 1, min_store_level: 2 }), 'utf8'),
         Buffer.alloc(12 + 16 + 8, 0xaa),
       ]),
     )
-    const uws1 = readUws1Header(uws1Path)
-    assert.equal(uws1.magic, 'UWS1')
-    assert.equal(uws1.header.schema, 1)
-    assert.equal(uws1.header.min_store_level, 3)
+    assert.throws(() => readUws1Header(badUws1Path), /Truncated UWS1 header/)
 
-    // 3. Seed & inspect upgrade matrix store + tree diff
+    // 2b. Debian version normalizer (electron-builder converts '-' to '~' in .deb control Version)
+    assert.equal(normalizeDebVersion('1.0.0-g705n1'), '1.0.0~g705n1')
+    assert.equal(normalizeDebVersion('1.0.0-beta.3'), '1.0.0~beta.3')
+    assert.equal(normalizeDebVersion('1.0.0'), '1.0.0')
+    assert.equal(normalizeDebVersion('0.11.0'), '0.11.0')
+
+    // 3. Seed & inspect upgrade matrix store + tree diff (including migrated intent record inspection)
     const fxDir = join(dir, 'fx')
     const fixtures = materializeFixtures(fxDir)
     const docx = fixtures.find((f) => f.id === 'fx-docx-report-vi')
@@ -284,9 +320,31 @@ function testUpgradeMatrixHelpersAndN1Patch() {
     assert.equal(snap1.binding.pendingIntent?.baseRevision, '1')
     assert.equal(snap1.binding.pendingIntent?.checksum, seeded.docSha256)
     assert.equal(snap1.hasLegacyPendingUpload, true)
+    assert.equal(snap1.hasEncryptedIntentRecord, false)
+    assert.equal(snap1.intentRecord, null)
     assert.equal(snap1.docSha256, seeded.docSha256)
     const snap2 = inspectUpgradeMatrixStore(userDataDir)
     assert.equal(diffTreeDigests(snap1.combinedTree, snap2.combinedTree).identical, true)
+
+    // Write a simulated migrated UWS1 intent record at seeded.intentRecordPath and verify inspectUpgradeMatrixStore reads it
+    mkdirSync(dirname(seeded.intentRecordPath), { recursive: true })
+    const migratedHeaderBuf = Buffer.from(JSON.stringify({ schema: 1, min_store_level: 2 }), 'utf8')
+    const migratedLenBuf = Buffer.alloc(2)
+    migratedLenBuf.writeUInt16LE(migratedHeaderBuf.byteLength, 0)
+    writeFileSync(
+      seeded.intentRecordPath,
+      Buffer.concat([
+        Buffer.from('UWS1', 'latin1'),
+        migratedLenBuf,
+        migratedHeaderBuf,
+        Buffer.alloc(12 + 16 + 11430, 0x55),
+      ]),
+    )
+    const snapMigrated = inspectUpgradeMatrixStore(userDataDir)
+    assert.equal(snapMigrated.hasEncryptedIntentRecord, true)
+    assert.equal(snapMigrated.intentRecord?.header?.schema, 1)
+    assert.equal(snapMigrated.intentRecord?.header?.min_store_level, 2)
+    assert.equal(snapMigrated.intentRecord?.totalBytes, 11496)
 
     // 4. Target connect parser for apiOrigin 127.0.0.1:1
     const traceWithPort1 =

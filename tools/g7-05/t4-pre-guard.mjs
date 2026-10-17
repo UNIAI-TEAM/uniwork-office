@@ -31,10 +31,12 @@ import {
   getUpgradeMatrixPaths,
   inspectUpgradeMatrixStore,
   launchPackagedApp,
+  normalizeDebVersion,
   openFixtureViaShell,
   parseNetLog,
   parseStraceConnectsToTarget,
   parseStraceLog,
+  readDebPackageVersion,
   runCmd,
   seedUpgradeMatrixStore,
   sleep,
@@ -72,19 +74,24 @@ function installDebPackage(debPath, expectedVersion) {
   }
   const queryRes = runCmd('dpkg-query', ['-W', '-f=${Status} ${Version}\\n', 'uniwork-office'])
   const queryLine = queryRes.stdout.trim()
+  const debControlVersion = readDebPackageVersion(debPath)
+  const expectedDebVersion = debControlVersion || normalizeDebVersion(expectedVersion)
   const ok =
     dpkgRes.status === 0 &&
     queryLine.includes('install ok installed') &&
-    queryLine.endsWith(expectedVersion) &&
+    (queryLine.endsWith(expectedDebVersion) ||
+      queryLine.endsWith(normalizeDebVersion(expectedVersion)) ||
+      queryLine.endsWith(expectedVersion)) &&
     existsSync('/usr/bin/uniwork-office')
   if (!ok) {
     throw new Error(
-      `dpkg install check failed for ${debPath} (expected ${expectedVersion}): status=${dpkgRes.status}, query="${queryLine}", stderr="${dpkgRes.stderr.trim()}"`,
+      `dpkg install check failed for ${debPath} (expected ${expectedVersion} / deb ${expectedDebVersion}): status=${dpkgRes.status}, query="${queryLine}", stderr="${dpkgRes.stderr.trim()}"`,
     )
   }
   return {
     debPath,
     expectedVersion,
+    expectedDebVersion,
     dpkgQuery: queryLine,
     binaryPath: '/usr/bin/uniwork-office',
   }

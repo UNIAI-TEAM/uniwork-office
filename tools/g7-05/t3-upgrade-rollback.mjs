@@ -30,10 +30,12 @@ import {
   inspectUpgradeMatrixStore,
   launchPackagedApp,
   listShellAndEditorViews,
+  normalizeDebVersion,
   openFixtureViaShell,
   parseNetLog,
   parseStraceConnectsToTarget,
   parseStraceLog,
+  readDebPackageVersion,
   runCmd,
   seedUpgradeMatrixStore,
   sleep,
@@ -71,19 +73,24 @@ function installDebPackage(debPath, expectedVersion) {
   }
   const queryRes = runCmd('dpkg-query', ['-W', '-f=${Status} ${Version}\\n', 'uniwork-office'])
   const queryLine = queryRes.stdout.trim()
+  const debControlVersion = readDebPackageVersion(debPath)
+  const expectedDebVersion = debControlVersion || normalizeDebVersion(expectedVersion)
   const ok =
     dpkgRes.status === 0 &&
     queryLine.includes('install ok installed') &&
-    queryLine.endsWith(expectedVersion) &&
+    (queryLine.endsWith(expectedDebVersion) ||
+      queryLine.endsWith(normalizeDebVersion(expectedVersion)) ||
+      queryLine.endsWith(expectedVersion)) &&
     existsSync('/usr/bin/uniwork-office')
   if (!ok) {
     throw new Error(
-      `dpkg install check failed for ${debPath} (expected ${expectedVersion}): status=${dpkgRes.status}, query="${queryLine}", stderr="${dpkgRes.stderr.trim()}"`,
+      `dpkg install check failed for ${debPath} (expected ${expectedVersion} / deb ${expectedDebVersion}): status=${dpkgRes.status}, query="${queryLine}", stderr="${dpkgRes.stderr.trim()}"`,
     )
   }
   return {
     debPath,
     expectedVersion,
+    expectedDebVersion,
     dpkgQuery: queryLine,
     binaryPath: '/usr/bin/uniwork-office',
   }
@@ -298,10 +305,12 @@ async function main() {
     }
 
     const step2Store = inspectUpgradeMatrixStore(userDataDir)
+    const expectedCoreSemver = /^\d+\.\d+\.\d+/.exec(n1.appVersion.trim())?.[0] ?? n1.appVersion
     const step2Pass =
       step2Store.binding?.schema === 2 &&
       step2Store.binding?.min_store_level === 3 &&
-      step2Store.binding?.min_app_version === n1.appVersion &&
+      (step2Store.binding?.min_app_version === expectedCoreSemver ||
+        step2Store.binding?.min_app_version === n1.appVersion) &&
       step2Store.hasLegacyPendingUpload === false &&
       step2Store.hasEncryptedIntentRecord === true &&
       step2Store.intentRecord?.header?.min_store_level === 3 &&

@@ -1152,20 +1152,46 @@ export async function activateKeyringAndRestoreAccount(app, shellPage, settleMs 
   return status
 }
 
+export function normalizeDebVersion(version) {
+  return String(version || '')
+    .trim()
+    .replace(/-/g, '~')
+}
+
+export function readDebPackageVersion(debPath) {
+  if (!debPath || !existsSync(debPath)) return null
+  const res = runCmd('dpkg-deb', ['-f', debPath, 'Version'])
+  if (res.status !== 0) return null
+  return res.stdout.trim() || null
+}
+
+/**
+ * Parses the plaintext header of an encrypted `UWS1` record file on disk
+ * (`apps/shell/src/main/uniwork-sync/store/codec.ts`):
+ *   - 4-byte ASCII magic: `"UWS1"`
+ *   - 2-byte little-endian unsigned header length (`UInt16LE`)
+ *   - UTF-8 JSON header (`{"schema":1,"min_store_level":2|3}`)
+ *   - 12-byte GCM IV + 16-byte GCM auth tag + AES-256-GCM ciphertext
+ */
 export function readUws1Header(filePath) {
   const raw = readFileSync(filePath)
-  if (raw.byteLength < 8 + 12 + 16) {
+  const magicLength = 4
+  const lengthBytes = 2
+  const ivBytes = 12
+  const tagBytes = 16
+  if (raw.byteLength < magicLength + lengthBytes + ivBytes + tagBytes) {
     throw new Error(`UWS1 record too short (${raw.byteLength} bytes): ${filePath}`)
   }
-  const magic = raw.subarray(0, 4).toString('ascii')
+  const magic = raw.subarray(0, magicLength).toString('latin1')
   if (magic !== 'UWS1') {
     throw new Error(`Invalid UWS1 magic "${magic}" in ${filePath}`)
   }
-  const headerLength = raw.readUInt32BE(4)
-  if (8 + headerLength + 12 + 16 > raw.byteLength) {
+  const headerLength = raw.readUInt16LE(magicLength)
+  const headEnd = magicLength + lengthBytes + headerLength
+  if (headerLength === 0 || headEnd + ivBytes + tagBytes > raw.byteLength) {
     throw new Error(`Truncated UWS1 header (${headerLength} bytes) in ${filePath}`)
   }
-  const headerJson = raw.subarray(8, 8 + headerLength).toString('utf8')
+  const headerJson = raw.subarray(magicLength + lengthBytes, headEnd).toString('utf8')
   const header = JSON.parse(headerJson)
   return {
     magic,
