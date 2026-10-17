@@ -44,7 +44,7 @@ export const de = {
   uhColUpdatedAt: 'Aktualisiert',
   uhColActions: 'Aktionen',
   uhVisPrivate: 'Privat',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: 'Arbeitsbereich',
   uhVisRestricted: 'Eingeschränkt',
   uhLevelPrefix: 'Sie: {level}',
   uhLevelManage: 'Verwalten',

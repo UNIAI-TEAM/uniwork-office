@@ -43,7 +43,7 @@ export const ko = {
   uhColUpdatedAt: '수정일',
   uhColActions: '작업',
   uhVisPrivate: '비공개',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: '워크스페이스',
   uhVisRestricted: '제한됨',
   uhLevelPrefix: '나: {level}',
   uhLevelManage: '관리',

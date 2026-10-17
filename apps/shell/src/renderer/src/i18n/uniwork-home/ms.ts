@@ -43,7 +43,7 @@ export const ms = {
   uhColUpdatedAt: 'Dikemas kini',
   uhColActions: 'Tindakan',
   uhVisPrivate: 'Peribadi',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: 'Ruang kerja',
   uhVisRestricted: 'Terhad',
   uhLevelPrefix: 'Anda: {level}',
   uhLevelManage: 'Urus',

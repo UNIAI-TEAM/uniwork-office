@@ -43,7 +43,7 @@ export const cs = {
   uhColUpdatedAt: 'Aktualizováno',
   uhColActions: 'Akce',
   uhVisPrivate: 'Soukromé',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: 'Pracovní prostor',
   uhVisRestricted: 'Omezené',
   uhLevelPrefix: 'Vy: {level}',
   uhLevelManage: 'Správa',

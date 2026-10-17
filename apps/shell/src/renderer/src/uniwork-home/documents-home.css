@@ -485,13 +485,12 @@
 .dh-folder-card {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   height: 52px;
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
-  cursor: pointer;
 }
 
 .dh-folder-card:hover {
@@ -499,9 +498,32 @@
   background: var(--hover);
 }
 
-.dh-folder-card:focus-visible {
+.dh-folder-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dh-folder-open:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
+}
+
+.dh-folder-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
 }
 
 .dh-folder-icon {

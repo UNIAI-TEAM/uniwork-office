@@ -210,7 +210,7 @@ export interface UpdatedByOption {
 
 /**
  * Extracts distinct `(updatedById, updatedByName)` pairs seen on loaded document rows.
- * Never guesses or fabricates names for unknown ids.
+ * Skips rows without `updatedById` so option values are always user IDs, never display names.
  */
 export function collectUpdatedByOptions(
   docs: readonly DocumentsHomeDoc[],
@@ -218,9 +218,9 @@ export function collectUpdatedByOptions(
   const seen = new Map<string, string>()
   for (const doc of docs) {
     if (doc.kind === 'folder') continue
-    const name = doc.updatedByName?.trim()
-    if (!name) continue
-    const id = doc.updatedById?.trim() || name
+    const id = doc.updatedById?.trim()
+    if (!id) continue
+    const name = doc.updatedByName?.trim() || id
     if (!seen.has(id)) {
       seen.set(id, name)
     }
@@ -340,15 +340,29 @@ export interface DocumentsHomeApiAdapter {
   uniworkListDocuments?: (
     q: UniworkDocListQuery & UniworkListFilters,
   ) => Promise<UniworkResult<UniworkDocListPage>>
-  uniworkListSharedWithMe?: (
-    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
-  ) => Promise<UniworkResult<UniworkDocListPage>>
+  uniworkListSharedWithMe?: (q?: {
+    cursor?: string
+    limit?: number
+  }) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSharedByMe?: (
     q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
   ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListTrash?: (
     q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
   ) => Promise<UniworkResult<UniworkDocListPage>>
+}
+
+function mapDocListPageResult(
+  res: UniworkResult<UniworkDocListPage>,
+): UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }> {
+  if (!res.ok) return res
+  return {
+    ok: true,
+    value: {
+      items: res.value.documents,
+      nextCursor: res.value.nextCursor,
+    },
+  }
 }
 
 /**
@@ -381,7 +395,7 @@ export async function fetchDocumentsHomePage(
       ...filters,
     })
     return {
-      result: res as UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>,
+      result: res,
     }
   }
 
@@ -409,7 +423,7 @@ export async function fetchDocumentsHomePage(
       ...filters,
     })
     return {
-      result: res as UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>,
+      result: res,
       ensuredMyFolder: ensuredNode,
     }
   }
@@ -424,7 +438,7 @@ export async function fetchDocumentsHomePage(
       ...filters,
     })
     return {
-      result: res as UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>,
+      result: mapDocListPageResult(res),
     }
   }
 
@@ -432,13 +446,9 @@ export async function fetchDocumentsHomePage(
     if (typeof api.uniworkListSharedWithMe !== 'function') {
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
-    const res = await api.uniworkListSharedWithMe({
-      workspaceId,
-      cursor,
-      ...filters,
-    })
+    const res = await api.uniworkListSharedWithMe(cursor ? { cursor } : {})
     return {
-      result: res as UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>,
+      result: mapDocListPageResult(res),
     }
   }
 
@@ -452,7 +462,7 @@ export async function fetchDocumentsHomePage(
       ...filters,
     })
     return {
-      result: res as UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>,
+      result: mapDocListPageResult(res),
     }
   }
 
@@ -466,7 +476,7 @@ export async function fetchDocumentsHomePage(
       ...filters,
     })
     return {
-      result: res as UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>,
+      result: mapDocListPageResult(res),
     }
   }
 

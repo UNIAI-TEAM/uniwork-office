@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const hi = {
-  uhNavWorkspace: 'फ़ोल्डर और कार्यस्थान दस्तावेज़',
+  uhNavWorkspace: 'कार्यस्थान दस्तावेज़',
   uhNavMyFolder: 'मेरा फ़ोल्डर',
   uhNavRecent: 'हाल ही में',
   uhNavStarred: 'तारांकित',
@@ -44,7 +44,7 @@ export const hi = {
   uhColUpdatedAt: 'अपडेट किया गया',
   uhColActions: 'कार्रवाइयाँ',
   uhVisPrivate: 'निजी',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: 'कार्यस्थान',
   uhVisRestricted: 'प्रतिबंधित',
   uhLevelPrefix: 'आप: {level}',
   uhLevelManage: 'प्रबंधन',

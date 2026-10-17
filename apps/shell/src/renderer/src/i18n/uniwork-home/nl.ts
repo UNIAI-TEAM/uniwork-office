@@ -43,7 +43,7 @@ export const nl = {
   uhColUpdatedAt: 'Bijgewerkt',
   uhColActions: 'Acties',
   uhVisPrivate: 'Privé',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: 'Werkruimte',
   uhVisRestricted: 'Beperkt',
   uhLevelPrefix: 'Jij: {level}',
   uhLevelManage: 'Beheren',

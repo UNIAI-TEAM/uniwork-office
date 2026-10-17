@@ -43,7 +43,7 @@ export const fr = {
   uhColUpdatedAt: 'Mis à jour',
   uhColActions: 'Actions',
   uhVisPrivate: 'Privé',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: 'Espace de travail',
   uhVisRestricted: 'Restreint',
   uhLevelPrefix: 'Vous : {level}',
   uhLevelManage: 'Gérer',

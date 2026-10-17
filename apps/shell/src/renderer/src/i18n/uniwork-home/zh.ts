@@ -42,7 +42,7 @@ export const zh = {
   uhColUpdatedAt: '更新时间',
   uhColActions: '操作',
   uhVisPrivate: '私有',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: '工作区',
   uhVisRestricted: '受限',
   uhLevelPrefix: '你：{level}',
   uhLevelManage: '管理',

@@ -43,7 +43,7 @@ export const ar = {
   uhColUpdatedAt: 'التحديث',
   uhColActions: 'الإجراءات',
   uhVisPrivate: 'خاص',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: 'مساحة العمل',
   uhVisRestricted: 'مقيد',
   uhLevelPrefix: 'أنت: {level}',
   uhLevelManage: 'إدارة',

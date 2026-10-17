@@ -43,7 +43,7 @@ export const th = {
   uhColUpdatedAt: 'อัปเดตเมื่อ',
   uhColActions: 'การทำงาน',
   uhVisPrivate: 'ส่วนตัว',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: 'เวิร์กสเปซ',
   uhVisRestricted: 'จำกัด',
   uhLevelPrefix: 'คุณ: {level}',
   uhLevelManage: 'จัดการ',

@@ -7,7 +7,7 @@ import type {
   UniworkWorkspaceRef,
 } from '../../../shared/home-api'
 import { FileBadge } from '../FileBadge'
-import { useI18n } from '../locale'
+import { useI18n, type StringKey } from '../locale'
 import {
   ActionToast,
   ArchiveConfirm,
@@ -345,20 +345,29 @@ export function DocumentsHome({
   useEffect(() => {
     const seq = ++treeSeqRef.current
     setTree((prev) => (prev.nodes.length > 0 ? prev : { status: 'loading', nodes: [] }))
-    void loadFolderTree(workspaceId).then((res) => {
-      if (treeSeqRef.current !== seq) return
-      if (res.ok) {
-        setTree({ status: 'ready', nodes: res.value })
-        const foundMine = myFolderIdOf(res.value)
-        if (foundMine) setMyFolderId(foundMine)
-      } else {
+    void loadFolderTree(workspaceId)
+      .then((res) => {
+        if (treeSeqRef.current !== seq) return
+        if (res.ok) {
+          setTree({ status: 'ready', nodes: res.value })
+          const foundMine = myFolderIdOf(res.value)
+          if (foundMine) setMyFolderId(foundMine)
+        } else {
+          setTree((prev) => ({
+            status: 'error',
+            nodes: prev.nodes,
+            error: res.error,
+          }))
+        }
+      })
+      .catch(() => {
+        if (treeSeqRef.current !== seq) return
         setTree((prev) => ({
           status: 'error',
           nodes: prev.nodes,
-          error: res.error,
+          error: 'network',
         }))
-      }
-    })
+      })
   }, [workspaceId, treeTick])
 
   // Expand ancestors when initialFolderId or folderId is set
@@ -395,26 +404,37 @@ export function DocumentsHome({
     }))
 
     if (query.length > 0) {
-      void searchDocuments({ workspaceId, query, kind: 'all' }).then((res) => {
-        if (listSeqRef.current !== seq) return
-        if (res.ok) {
-          const items = res.value.items as DocumentsHomeDoc[]
-          setPage({
-            status: 'ready',
-            items,
-            nextCursor: res.value.nextCursor,
-            loadingMore: false,
-          })
-        } else {
+      void searchDocuments({ workspaceId, query, kind: 'all' })
+        .then((res) => {
+          if (listSeqRef.current !== seq) return
+          if (res.ok) {
+            const items = res.value.items as DocumentsHomeDoc[]
+            setPage({
+              status: 'ready',
+              items,
+              nextCursor: res.value.nextCursor,
+              loadingMore: false,
+            })
+          } else {
+            setPage({
+              status: 'error',
+              items: [],
+              nextCursor: null,
+              loadingMore: false,
+              error: res.error,
+            })
+          }
+        })
+        .catch(() => {
+          if (listSeqRef.current !== seq) return
           setPage({
             status: 'error',
             items: [],
             nextCursor: null,
             loadingMore: false,
-            error: res.error,
+            error: 'network',
           })
-        }
-      })
+        })
       return
     }
 
@@ -474,23 +494,32 @@ export function DocumentsHome({
     setPage((prev) => ({ ...prev, loadingMore: true, moreError: undefined }))
 
     if (query.length > 0) {
-      void searchDocuments({ workspaceId, query, cursor, kind: 'all' }).then((res) => {
-        if (listSeqRef.current !== seq) return
-        if (res.ok) {
+      void searchDocuments({ workspaceId, query, cursor, kind: 'all' })
+        .then((res) => {
+          if (listSeqRef.current !== seq) return
+          if (res.ok) {
+            setPage((prev) => ({
+              ...prev,
+              items: [...prev.items, ...(res.value.items as DocumentsHomeDoc[])],
+              nextCursor: res.value.nextCursor,
+              loadingMore: false,
+            }))
+          } else {
+            setPage((prev) => ({
+              ...prev,
+              loadingMore: false,
+              moreError: res.error,
+            }))
+          }
+        })
+        .catch(() => {
+          if (listSeqRef.current !== seq) return
           setPage((prev) => ({
             ...prev,
-            items: [...prev.items, ...(res.value.items as DocumentsHomeDoc[])],
-            nextCursor: res.value.nextCursor,
             loadingMore: false,
+            moreError: 'network',
           }))
-        } else {
-          setPage((prev) => ({
-            ...prev,
-            loadingMore: false,
-            moreError: res.error,
-          }))
-        }
-      })
+        })
       return
     }
 
@@ -502,30 +531,39 @@ export function DocumentsHome({
       myFolderId: resolvedMyFolderId,
       cursor,
       filters: wireFilters,
-    }).then(({ result }) => {
-      if (listSeqRef.current !== seq) return
-      if (result.ok) {
-        const nextItems = result.value.items
-        setPage((prev) => ({
-          ...prev,
-          items: [...prev.items, ...nextItems],
-          nextCursor: result.value.nextCursor,
-          loadingMore: false,
-        }))
-        setKnownAuthors((prev) => {
-          const merged = new Map<string, string>()
-          for (const opt of prev) merged.set(opt.id, opt.name)
-          for (const opt of collectUpdatedByOptions(nextItems)) merged.set(opt.id, opt.name)
-          return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
-        })
-      } else {
-        setPage((prev) => ({
-          ...prev,
-          loadingMore: false,
-          moreError: result.error,
-        }))
-      }
     })
+      .then(({ result }) => {
+        if (listSeqRef.current !== seq) return
+        if (result.ok) {
+          const nextItems = result.value.items
+          setPage((prev) => ({
+            ...prev,
+            items: [...prev.items, ...nextItems],
+            nextCursor: result.value.nextCursor,
+            loadingMore: false,
+          }))
+          setKnownAuthors((prev) => {
+            const merged = new Map<string, string>()
+            for (const opt of prev) merged.set(opt.id, opt.name)
+            for (const opt of collectUpdatedByOptions(nextItems)) merged.set(opt.id, opt.name)
+            return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
+          })
+        } else {
+          setPage((prev) => ({
+            ...prev,
+            loadingMore: false,
+            moreError: result.error,
+          }))
+        }
+      })
+      .catch(() => {
+        if (listSeqRef.current !== seq) return
+        setPage((prev) => ({
+          ...prev,
+          loadingMore: false,
+          moreError: 'network',
+        }))
+      })
   }
 
   // Pre-select the requested format when NewDocDialog opens from a quick-create pill
@@ -844,37 +882,45 @@ export function DocumentsHome({
 
   const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
 
-  const currentHeading = useMemo(() => {
+  const currentHeadingSpec = useMemo<
+    { kind: 'literal'; text: string } | { kind: 'key'; key: StringKey }
+  >(() => {
     if (subView === 'workspace' && folderId) {
       const node = index.get(folderId)
       if (node) {
-        return folderId === resolvedMyFolderId ? myFolderLabel : node.title
+        return {
+          kind: 'literal',
+          text: folderId === resolvedMyFolderId ? myFolderLabel : node.title,
+        }
       }
       const lastCrumb = shownPath[shownPath.length - 1]
-      if (lastCrumb) return lastCrumb.title
+      if (lastCrumb) return { kind: 'literal', text: lastCrumb.title }
     }
-    return t(getDocumentsHomeNavEntry(subView).labelKey)
-  }, [subView, folderId, index, resolvedMyFolderId, myFolderLabel, shownPath, t])
+    return { kind: 'key', key: getDocumentsHomeNavEntry(subView).labelKey }
+  }, [subView, folderId, index, resolvedMyFolderId, myFolderLabel, shownPath])
+  const currentHeading =
+    currentHeadingSpec.kind === 'literal' ? currentHeadingSpec.text : t(currentHeadingSpec.key)
 
-  const emptyMessage = useMemo(() => {
-    if (query.length > 0) return t('ufNoResults', { query })
-    if (hasActiveFilters(filters)) return t('uhEmptyFiltered')
+  const emptyMessageKey = useMemo<StringKey | null>(() => {
+    if (query.length > 0) return null
+    if (subView !== 'shared-with-me' && hasActiveFilters(filters)) return 'uhEmptyFiltered'
     switch (subView) {
       case 'my-folder':
-        return t('uhEmptyMyFolder')
+        return 'uhEmptyMyFolder'
       case 'recent':
-        return t('uhEmptyRecent')
+        return 'uhEmptyRecent'
       case 'shared-with-me':
-        return t('uhEmptySharedWithMe')
+        return 'uhEmptySharedWithMe'
       case 'shared-by-me':
-        return t('uhEmptySharedByMe')
+        return 'uhEmptySharedByMe'
       case 'trash':
-        return t('uhEmptyTrash')
+        return 'uhEmptyTrash'
       case 'workspace':
       default:
-        return folderId ? t('uhEmptyFolder') : t('uhEmptyWorkspace')
+        return folderId ? 'uhEmptyFolder' : 'uhEmptyWorkspace'
     }
-  }, [query, filters, subView, folderId, t])
+  }, [query, filters, subView, folderId])
+  const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : t('ufNoResults', { query })
 
   const treeSelectedKey = useMemo(() => {
     if (subView === 'my-folder' && resolvedMyFolderId) return resolvedMyFolderId
@@ -1154,81 +1200,85 @@ export function DocumentsHome({
         {subView === 'trash' && <p className="dh-subview-banner">{t('uhTrashNote')}</p>}
 
         <div className="dh-filter-bar">
-          <label className="dh-filter-chip">
-            <span className="dh-filter-k">{t('uhFilterType')}</span>
-            <select
-              className="dh-filter-select"
-              data-filter="format"
-              aria-label={t('uhFilterType')}
-              value={filters.format}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  format: e.target.value as DocumentsHomeTypeFilter,
-                }))
-              }
-            >
-              {DOCUMENTS_HOME_FORMAT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.labelKey ? t(opt.labelKey) : opt.literal}
-                </option>
-              ))}
-            </select>
-          </label>
+          {subView !== 'shared-with-me' && (
+            <>
+              <label className="dh-filter-chip">
+                <span className="dh-filter-k">{t('uhFilterType')}</span>
+                <select
+                  className="dh-filter-select"
+                  data-filter="format"
+                  aria-label={t('uhFilterType')}
+                  value={filters.format}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      format: e.target.value as DocumentsHomeTypeFilter,
+                    }))
+                  }
+                >
+                  {DOCUMENTS_HOME_FORMAT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.labelKey ? t(opt.labelKey) : opt.literal}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          <label className="dh-filter-chip">
-            <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
-            <select
-              className="dh-filter-select"
-              data-filter="updatedBy"
-              aria-label={t('uhFilterModifiedBy')}
-              value={filters.updatedBy}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  updatedBy: e.target.value,
-                }))
-              }
-            >
-              <option value="">{t('uhFilterAnyPerson')}</option>
-              {knownAuthors.map((author) => (
-                <option key={author.id} value={author.id}>
-                  {author.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              <label className="dh-filter-chip">
+                <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
+                <select
+                  className="dh-filter-select"
+                  data-filter="updatedBy"
+                  aria-label={t('uhFilterModifiedBy')}
+                  value={filters.updatedBy}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      updatedBy: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="">{t('uhFilterAnyPerson')}</option>
+                  {knownAuthors.map((author) => (
+                    <option key={author.id} value={author.id}>
+                      {author.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          <label className="dh-filter-chip">
-            <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
-            <select
-              className="dh-filter-select"
-              data-filter="updatedFrom"
-              aria-label={t('uhFilterUpdated')}
-              value={filters.updatedPreset}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  updatedPreset: e.target.value as DocumentsHomeUpdatedPreset,
-                }))
-              }
-            >
-              {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {t(opt.labelKey)}
-                </option>
-              ))}
-            </select>
-          </label>
+              <label className="dh-filter-chip">
+                <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
+                <select
+                  className="dh-filter-select"
+                  data-filter="updatedFrom"
+                  aria-label={t('uhFilterUpdated')}
+                  value={filters.updatedPreset}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      updatedPreset: e.target.value as DocumentsHomeUpdatedPreset,
+                    }))
+                  }
+                >
+                  {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {t(opt.labelKey)}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          {hasActiveFilters(filters) && (
-            <button
-              type="button"
-              className="dh-filter-clear"
-              onClick={() => setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)}
-            >
-              {t('uhFilterClear')}
-            </button>
+              {hasActiveFilters(filters) && (
+                <button
+                  type="button"
+                  className="dh-filter-clear"
+                  onClick={() => setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)}
+                >
+                  {t('uhFilterClear')}
+                </button>
+              )}
+            </>
           )}
 
           <div className="dh-view-tools">
@@ -1350,28 +1400,25 @@ export function DocumentsHome({
                     const menuItems = folderCardMenuFor(folder)
                     const mine = isMyFolder(folder)
                     return (
-                      <div
-                        key={folder.id}
-                        role="button"
-                        tabIndex={0}
-                        className="dh-folder-card"
-                        data-folder-id={folder.id}
-                        onClick={() => openFolderInWorkspace(folder.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            openFolderInWorkspace(folder.id)
-                          }
-                        }}
-                      >
-                        <span className="dh-folder-icon" aria-hidden="true">
-                          {mine ? <MyFolderGlyph /> : <FolderGlyph />}
-                        </span>
-                        <span className="dh-folder-name" title={title}>
-                          {title}
-                        </span>
+                      <div key={folder.id} className="dh-folder-card" data-folder-id={folder.id}>
+                        <button
+                          type="button"
+                          className="dh-folder-open"
+                          onClick={() => openFolderInWorkspace(folder.id)}
+                        >
+                          <span className="dh-folder-icon" aria-hidden="true">
+                            {mine ? <MyFolderGlyph /> : <FolderGlyph />}
+                          </span>
+                          <span className="dh-folder-name" title={title}>
+                            {title}
+                          </span>
+                        </button>
                         {menuItems.length > 0 && (
-                          <span onClick={(e) => e.stopPropagation()}>
+                          <span
+                            className="dh-folder-actions"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
                             <FolderMenu
                               label={t('ufActionsFor', { name: title })}
                               items={menuItems}
@@ -1438,7 +1485,9 @@ export function DocumentsHome({
                             labelMyFolderPath(doc.path, resolvedMyFolderId, myFolderLabel),
                             t('ufRoot'),
                           )
-                        : null
+                        : subView === 'shared-with-me' && doc.workspaceName?.trim()
+                          ? { short: doc.workspaceName.trim(), full: doc.workspaceName.trim() }
+                          : null
                     const isOpening = openingId === doc.id
 
                     return (

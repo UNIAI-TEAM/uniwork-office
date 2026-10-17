@@ -43,7 +43,7 @@ export const id = {
   uhColUpdatedAt: 'Diperbarui',
   uhColActions: 'Tindakan',
   uhVisPrivate: 'Pribadi',
-  uhVisWorkspace: 'Workspace',
+  uhVisWorkspace: 'Ruang kerja',
   uhVisRestricted: 'Terbatas',
   uhLevelPrefix: 'Anda: {level}',
   uhLevelManage: 'Kelola',
