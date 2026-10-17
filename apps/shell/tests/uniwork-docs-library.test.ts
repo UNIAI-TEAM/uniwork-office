@@ -831,4 +831,128 @@ describe('member-name cache and org switch (S16)', () => {
     await service.listDocuments({ workspaceId: 'ws_1' })
     expect(wsMembersCalls).toBe(4)
   })
+
+  it('drops in-flight workspace members replies when org or account switches before the read settles (DH1-R1-11d)', async () => {
+    let wsMembersCalls = 0
+    let accountId = 'acc_1'
+    let currentOrg: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }
+
+    const pendingMembers: Array<{
+      resolve: (members: Array<{ user_id: string; display_name: string }>) => void
+    }> = []
+
+    const fetch: FetchLike = async (url) => {
+      const parsed = new URL(url)
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/members') {
+        wsMembersCalls += 1
+        const members = await new Promise<Array<{ user_id: string; display_name: string }>>(
+          (resolve) => {
+            pendingMembers.push({ resolve })
+          },
+        )
+        return json(200, { members })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/documents/recent') {
+        return json(200, {
+          documents: [
+            {
+              id: 'doc_1',
+              workspace_id: 'ws_1',
+              title: 'Plan.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by: 'u_1',
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return envelope(404, 'not_found')
+    }
+
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-inflight-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => ({ accountId, deviceSessionId: 'dev_1', deploymentId: 'default' }),
+      keystoreLocked: () => false,
+      selectedOrg: () => currentOrg,
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+
+    // 1. Start a listDocuments call in org_a; wait until /members is in flight
+    const callOrgA = service.listDocuments({ workspaceId: 'ws_1' })
+    while (pendingMembers.length < 1) {
+      await new Promise((r) => setTimeout(r, 1))
+    }
+    expect(wsMembersCalls).toBe(1)
+
+    // Switch org while org_a's /members read is still in flight
+    currentOrg = { id: 'org_b', slug: 'beta' }
+    service.noteSelectedOrg('org_b')
+
+    // Now start org_b's listDocuments before org_a's late reply even settles
+    const callOrgB = service.listDocuments({ workspaceId: 'ws_1' })
+    while (pendingMembers.length < 2) {
+      await new Promise((r) => setTimeout(r, 1))
+    }
+    expect(wsMembersCalls).toBe(2)
+
+    // Resolve org_a's stale reply first, then org_b's reply
+    pendingMembers[0]!.resolve([{ user_id: 'u_1', display_name: 'Stale Org A Name' }])
+    await callOrgA
+    pendingMembers[1]!.resolve([{ user_id: 'u_1', display_name: 'Fresh Org B Name' }])
+    const resOrgB = await callOrgB
+    expect(resOrgB.ok && resOrgB.value.documents[0]!.updatedByName).toBe('Fresh Org B Name')
+
+    // Subsequent call in org_b uses org_b's cached name, not org_a's late reply
+    const cachedOrgB = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(cachedOrgB.ok && cachedOrgB.value.documents[0]!.updatedByName).toBe('Fresh Org B Name')
+    expect(wsMembersCalls).toBe(2)
+
+    // 2. Account switch while a members read is in flight
+    service.noteLibraryReload()
+    const callAcc1 = service.listDocuments({ workspaceId: 'ws_1' })
+    while (pendingMembers.length < 3) {
+      await new Promise((r) => setTimeout(r, 1))
+    }
+    expect(wsMembersCalls).toBe(3)
+
+    // Switch account while acc_1's /members read is in flight
+    accountId = 'acc_2'
+    service.noteSessionIdentity()
+
+    // Late reply from acc_1 resolves after account switch
+    pendingMembers[2]!.resolve([{ user_id: 'u_1', display_name: 'Stale Acc 1 Name' }])
+    await callAcc1
+
+    // New call under acc_2 must not see Stale Acc 1 Name; it fetches fresh members for acc_2
+    const callAcc2 = service.listDocuments({ workspaceId: 'ws_1' })
+    while (pendingMembers.length < 4) {
+      await new Promise((r) => setTimeout(r, 1))
+    }
+    expect(wsMembersCalls).toBe(4)
+    pendingMembers[3]!.resolve([{ user_id: 'u_1', display_name: 'Fresh Acc 2 Name' }])
+    const resAcc2 = await callAcc2
+    expect(resAcc2.ok && resAcc2.value.documents[0]!.updatedByName).toBe('Fresh Acc 2 Name')
+  })
 })

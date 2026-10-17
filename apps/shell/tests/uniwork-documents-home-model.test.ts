@@ -16,8 +16,26 @@ import {
   type DocumentsHomeDoc,
 } from '../src/renderer/src/uniwork-home/documents-home-model'
 import { zh } from '../src/renderer/src/i18n/uniwork-home/zh'
+import { zhTW } from '../src/renderer/src/i18n/uniwork-home/zh-TW'
 import { vi as viLocale } from '../src/renderer/src/i18n/uniwork-home/vi'
 import { en } from '../src/renderer/src/i18n/uniwork-home/en'
+import { ja } from '../src/renderer/src/i18n/uniwork-home/ja'
+import { ko } from '../src/renderer/src/i18n/uniwork-home/ko'
+import { fr } from '../src/renderer/src/i18n/uniwork-home/fr'
+import { de } from '../src/renderer/src/i18n/uniwork-home/de'
+import { es } from '../src/renderer/src/i18n/uniwork-home/es'
+import { pt } from '../src/renderer/src/i18n/uniwork-home/pt'
+import { cs } from '../src/renderer/src/i18n/uniwork-home/cs'
+import { it as itLocale } from '../src/renderer/src/i18n/uniwork-home/it'
+import { ru } from '../src/renderer/src/i18n/uniwork-home/ru'
+import { ar } from '../src/renderer/src/i18n/uniwork-home/ar'
+import { hi } from '../src/renderer/src/i18n/uniwork-home/hi'
+import { th } from '../src/renderer/src/i18n/uniwork-home/th'
+import { id as idLocale } from '../src/renderer/src/i18n/uniwork-home/id'
+import { ms } from '../src/renderer/src/i18n/uniwork-home/ms'
+import { pl } from '../src/renderer/src/i18n/uniwork-home/pl'
+import { nl } from '../src/renderer/src/i18n/uniwork-home/nl'
+import { he } from '../src/renderer/src/i18n/uniwork-home/he'
 import type { TFunc } from '../src/renderer/src/locale'
 
 const tVi: TFunc = ((key: string, vars?: Record<string, string | number>) => {
@@ -97,18 +115,20 @@ describe('DH1-W2 documents-home-model', () => {
     })
   })
 
-  it('collects deduplicated Modified-by options from loaded document items', () => {
+  it('collects deduplicated Modified-by options only from rows with updatedById (DH1-R1-4)', () => {
     const docs: DocumentsHomeDoc[] = [
       makeDoc({ id: 'd1', updatedById: 'u-1', updatedByName: 'Minh Trần' }),
       makeDoc({ id: 'd2', updatedById: 'u-2', updatedByName: 'Lan Nguyễn' }),
       makeDoc({ id: 'd3', updatedById: 'u-1', updatedByName: 'Minh Trần' }),
       makeDoc({ id: 'd4', updatedByName: 'Hải Lê' }),
-      makeDoc({ id: 'd5' }),
+      makeDoc({ id: 'd5', updatedById: '   ', updatedByName: 'Blank Id' }),
+      makeDoc({ id: 'd6', updatedById: 'u-3' }),
+      makeDoc({ id: 'd7' }),
     ]
     expect(collectUpdatedByOptions(docs)).toEqual([
       { id: 'u-1', name: 'Minh Trần' },
       { id: 'u-2', name: 'Lan Nguyễn' },
-      { id: 'Hải Lê', name: 'Hải Lê' },
+      { id: 'u-3', name: 'u-3' },
     ])
   })
 
@@ -209,13 +229,19 @@ describe('DH1-W2 documents-home-model', () => {
     expect(byName.files.map((f) => f.id)).toEqual(['d-a', 'd-b'])
   })
 
-  it('routes fetchDocumentsHomePage to the right IPC method for each sub-view and forwards filters', async () => {
-    const pageOk = {
+  it('routes fetchDocumentsHomePage to the right IPC method, maps UniworkDocListPage.documents -> items, and keeps shared-with-me org-wide (DH1-R1-1, DH1-R1-2)', async () => {
+    const childDoc = makeDoc({ id: 'child-doc' })
+    const listDoc = makeDoc({ id: 'list-doc' })
+    const childrenOk = {
       ok: true as const,
-      value: { items: [makeDoc()], nextCursor: null },
+      value: { items: [childDoc], nextCursor: 'child-next' },
+    }
+    const listPageOk = {
+      ok: true as const,
+      value: { documents: [listDoc], nextCursor: 'list-next' },
     }
     const api: DocumentsHomeApiAdapter = {
-      uniworkListChildren: vi.fn(async () => pageOk),
+      uniworkListChildren: vi.fn(async () => childrenOk),
       uniworkEnsureMyFolder: vi.fn(async () => ({
         ok: true as const,
         value: {
@@ -228,14 +254,14 @@ describe('DH1-W2 documents-home-model', () => {
           children: [],
         },
       })),
-      uniworkListDocuments: vi.fn(async () => pageOk),
-      uniworkListSharedWithMe: vi.fn(async () => pageOk),
-      uniworkListSharedByMe: vi.fn(async () => pageOk),
-      uniworkListTrash: vi.fn(async () => pageOk),
+      uniworkListDocuments: vi.fn(async () => listPageOk),
+      uniworkListSharedWithMe: vi.fn(async () => listPageOk),
+      uniworkListSharedByMe: vi.fn(async () => listPageOk),
+      uniworkListTrash: vi.fn(async () => listPageOk),
     }
     const filters = { format: 'docx' as const, updatedBy: 'u-1' }
 
-    await fetchDocumentsHomePage(api, {
+    const wsRes = await fetchDocumentsHomePage(api, {
       subView: 'workspace',
       workspaceId: 'ws-1',
       folderId: 'f-10',
@@ -248,6 +274,10 @@ describe('DH1-W2 documents-home-model', () => {
       cursor: undefined,
       format: 'docx',
       updatedBy: 'u-1',
+    })
+    expect(wsRes.result).toEqual({
+      ok: true,
+      value: { items: [childDoc], nextCursor: 'child-next' },
     })
 
     await fetchDocumentsHomePage(api, {
@@ -283,7 +313,7 @@ describe('DH1-W2 documents-home-model', () => {
       updatedBy: 'u-1',
     })
 
-    await fetchDocumentsHomePage(api, {
+    const recentRes = await fetchDocumentsHomePage(api, {
       subView: 'recent',
       workspaceId: 'ws-1',
       folderId: null,
@@ -296,22 +326,36 @@ describe('DH1-W2 documents-home-model', () => {
       format: 'docx',
       updatedBy: 'u-1',
     })
+    expect(recentRes.result).toEqual({
+      ok: true,
+      value: { items: [listDoc], nextCursor: 'list-next' },
+    })
 
-    await fetchDocumentsHomePage(api, {
+    // shared-with-me is org-wide: sends {} when no cursor and { cursor } when paging, never workspaceId or filters
+    const swmRes = await fetchDocumentsHomePage(api, {
       subView: 'shared-with-me',
       workspaceId: 'ws-1',
       folderId: null,
       myFolderId: null,
       filters,
     })
-    expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith({
-      workspaceId: 'ws-1',
-      cursor: undefined,
-      format: 'docx',
-      updatedBy: 'u-1',
+    expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith({})
+    expect(swmRes.result).toEqual({
+      ok: true,
+      value: { items: [listDoc], nextCursor: 'list-next' },
     })
 
     await fetchDocumentsHomePage(api, {
+      subView: 'shared-with-me',
+      workspaceId: 'ws-1',
+      folderId: null,
+      myFolderId: null,
+      cursor: 'swm-cur-2',
+      filters,
+    })
+    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ cursor: 'swm-cur-2' })
+
+    const sbmRes = await fetchDocumentsHomePage(api, {
       subView: 'shared-by-me',
       workspaceId: 'ws-1',
       folderId: null,
@@ -324,8 +368,12 @@ describe('DH1-W2 documents-home-model', () => {
       format: 'docx',
       updatedBy: 'u-1',
     })
+    expect(sbmRes.result).toEqual({
+      ok: true,
+      value: { items: [listDoc], nextCursor: 'list-next' },
+    })
 
-    await fetchDocumentsHomePage(api, {
+    const trashRes = await fetchDocumentsHomePage(api, {
       subView: 'trash',
       workspaceId: 'ws-1',
       folderId: null,
@@ -337,6 +385,10 @@ describe('DH1-W2 documents-home-model', () => {
       cursor: undefined,
       format: 'docx',
       updatedBy: 'u-1',
+    })
+    expect(trashRes.result).toEqual({
+      ok: true,
+      value: { items: [listDoc], nextCursor: 'list-next' },
     })
   })
 
@@ -361,6 +413,52 @@ describe('DH1-W2 documents-home-model', () => {
 
     for (const [key, val] of Object.entries(viLocale)) {
       expect(val.toLowerCase(), `vi.${key} must not contain "cục bộ"`).not.toContain('cục bộ')
+    }
+  })
+
+  it('fixes Hebrew mixed Arabic script, Hindi workspace nav, and translates uhVisWorkspace in all 19 non-en/non-vi shards (DH1-R1-10)', () => {
+    expect(he.uhFilterTypeAll).toBe('הכל')
+    for (const [key, val] of Object.entries(he)) {
+      expect(val, `he.${key} must not contain Arabic script`).not.toMatch(/[\u0600-\u06FF]/)
+    }
+
+    expect(hi.uhNavWorkspace).toBe('कार्यस्थान दस्तावेज़')
+
+    // en and vi deliberately keep "Workspace" (board copy); the other 19 shards translate uhVisWorkspace
+    expect(en.uhVisWorkspace).toBe('Workspace')
+    expect(viLocale.uhVisWorkspace).toBe('Workspace')
+
+    const nonEnViShards: Array<[string, Record<string, string>]> = [
+      ['zh', zh],
+      ['zh-TW', zhTW],
+      ['ja', ja],
+      ['ko', ko],
+      ['fr', fr],
+      ['de', de],
+      ['es', es],
+      ['pt', pt],
+      ['cs', cs],
+      ['it', itLocale],
+      ['ru', ru],
+      ['ar', ar],
+      ['hi', hi],
+      ['th', th],
+      ['id', idLocale],
+      ['ms', ms],
+      ['pl', pl],
+      ['nl', nl],
+      ['he', he],
+    ]
+    for (const [code, shard] of nonEnViShards) {
+      expect(Object.keys(shard).sort(), `${code} keys`).toEqual(Object.keys(zh).sort())
+      expect(
+        shard.uhVisWorkspace,
+        `${code}.uhVisWorkspace should be translated, not raw English "Workspace"`,
+      ).not.toBe('Workspace')
+      expect(
+        shard.uhVisWorkspace.trim().length,
+        `${code}.uhVisWorkspace non-empty`,
+      ).toBeGreaterThan(0)
     }
   })
 })

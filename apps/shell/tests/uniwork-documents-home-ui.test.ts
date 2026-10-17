@@ -185,16 +185,17 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       ),
       uniworkListDocuments: vi.fn(async () =>
         ok({
-          items: [rootItems[2]!, rootItems[3]!],
+          documents: [rootItems[2]!, rootItems[3]!],
           nextCursor: null,
         }),
       ),
       uniworkListSharedWithMe: vi.fn(async () =>
         ok({
-          items: [
+          documents: [
             {
               id: 'doc-shared-in',
-              workspaceId: 'ws-1',
+              workspaceId: 'ws-2',
+              workspaceName: 'Phòng Tài chính',
               title: 'Đề xuất đối tác.docx',
               format: 'docx',
               updatedAt: '2026-10-17T07:00:00.000Z',
@@ -211,7 +212,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       ),
       uniworkListSharedByMe: vi.fn(async () =>
         ok({
-          items: [
+          documents: [
             {
               id: 'doc-shared-out',
               workspaceId: 'ws-1',
@@ -231,7 +232,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       ),
       uniworkListTrash: vi.fn(async () =>
         ok({
-          items: [
+          documents: [
             {
               id: 'doc-trashed',
               workspaceId: 'ws-1',
@@ -388,7 +389,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.textContent).toContain('Ghi chú cá nhân.docx')
   })
 
-  it('switches across all 6 available sub-views, forwards Loại/Người sửa/Cập nhật filters, and restores documents from Thùng rác', async () => {
+  it('switches across all 6 available sub-views, renders Recent & Trash rows from UniworkDocListPage.documents, keeps shared-with-me org-wide without filter bar, and restores documents from Thùng rác (DH1-R1-1, R1-2, R1-11e)', async () => {
     await act(async () => {
       root.render(
         createElement(
@@ -414,11 +415,13 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       await flush()
     }
 
-    // Recent -> uniworkListDocuments
+    // Recent -> uniworkListDocuments (returns { documents, nextCursor }) and renders rows
     await clickNav('recent')
     expect(api.uniworkListDocuments).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: 'ws-1' }),
     )
+    expect(host.textContent).toContain('Báo cáo kết quả kinh doanh Q3-2026.docx')
+    expect(host.textContent).toContain('Kế hoạch ngân sách 2027.xlsx')
 
     // Filter by Loại = XLSX -> forwards format: 'xlsx' to uniworkListDocuments
     const filterSelects = host.querySelectorAll<HTMLSelectElement>('.dh-filter-select')
@@ -457,23 +460,82 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       }),
     )
 
-    // Shared with me -> uniworkListSharedWithMe
-    await clickNav('shared-with-me')
-    expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', format: 'xlsx', updatedBy: 'u-minh' }),
+    // Shared with me -> org-wide: hides filter selects, sends {} (no workspaceId, no filters), and shows workspaceName in .dh-doc-subpath
+    api.uniworkListSharedWithMe.mockResolvedValueOnce(
+      ok({
+        documents: [
+          {
+            id: 'doc-shared-in',
+            workspaceId: 'ws-2',
+            workspaceName: 'Phòng Tài chính',
+            title: 'Đề xuất đối tác.docx',
+            format: 'docx',
+            updatedAt: '2026-10-17T07:00:00.000Z',
+            kind: 'file',
+            parentId: null,
+            visibility: 'restricted',
+            myLevel: 'edit',
+            updatedById: 'u-hai',
+            updatedByName: 'Hải Lê',
+          } satisfies DocumentsHomeDoc,
+        ],
+        nextCursor: 'swm-cur-2',
+      }),
     )
+    await clickNav('shared-with-me')
+    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({})
+    expect(host.querySelectorAll('.dh-filter-select')).toHaveLength(0)
+    expect(host.querySelector('.dh-filter-clear')).toBeNull()
     expect(host.textContent).toContain('Đề xuất đối tác.docx')
+    expect(host.querySelector('.dh-cell-name .dh-doc-subpath')?.textContent?.trim()).toBe(
+      'Phòng Tài chính',
+    )
     expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Hạn chế')
     expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Chỉnh sửa')
 
-    // Shared by me -> uniworkListSharedByMe
+    // Paging on shared-with-me forwards only { cursor } and appends documents
+    api.uniworkListSharedWithMe.mockResolvedValueOnce(
+      ok({
+        documents: [
+          {
+            id: 'doc-shared-in-2',
+            workspaceId: 'ws-1',
+            workspaceName: 'Công ty Cổ phần UniWork',
+            title: 'Biên bản họp.docx',
+            format: 'docx',
+            updatedAt: '2026-10-16T07:00:00.000Z',
+            kind: 'file',
+            parentId: null,
+          } satisfies DocumentsHomeDoc,
+        ],
+        nextCursor: null,
+      }),
+    )
+    const loadMoreBtn = host.querySelector<HTMLButtonElement>('button.uw-pick-more')
+    expect(loadMoreBtn).not.toBeNull()
+    await act(async () => {
+      loadMoreBtn!.click()
+    })
+    await flush()
+    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ cursor: 'swm-cur-2' })
+    expect(host.textContent).toContain('Biên bản họp.docx')
+
+    // Shared by me -> uniworkListSharedByMe (filter bar visible again and forwards active filters)
     await clickNav('shared-by-me')
+    expect(host.querySelectorAll('.dh-filter-select')).toHaveLength(3)
     expect(api.uniworkListSharedByMe).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: 'ws-1', format: 'xlsx', updatedBy: 'u-minh' }),
     )
     expect(host.textContent).toContain('Bản thảo hợp đồng.docx')
     expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Hạn chế')
     expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Nhận xét')
+
+    // If shared-with-me is empty while filters are active from another sub-view, it shows uhEmptySharedWithMe (not uhEmptyFiltered)
+    api.uniworkListSharedWithMe.mockResolvedValueOnce(ok({ documents: [], nextCursor: null }))
+    await clickNav('shared-with-me')
+    expect(host.querySelector('.dh-empty')?.textContent?.trim()).toBe(
+      'Chưa có tài liệu nào được chia sẻ với bạn.',
+    )
 
     // Trash -> uniworkListTrash + restore action ("Khôi phục")
     await clickNav('trash')
@@ -497,6 +559,430 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
     expect(api.uniworkRestoreDocument).toHaveBeenCalledWith('doc-trashed')
+  })
+
+  it('offers Restore in Trash only when canManage is true and hides it when canManage is false (DH1-R1-11a)', async () => {
+    api.uniworkListTrash.mockResolvedValueOnce(
+      ok({
+        documents: [
+          {
+            id: 'trash-no-manage',
+            workspaceId: 'ws-1',
+            title: 'Không có quyền khôi phục.docx',
+            format: 'docx',
+            updatedAt: '2026-10-10T07:00:00.000Z',
+            kind: 'file',
+            parentId: null,
+            canManage: false,
+          } satisfies DocumentsHomeDoc,
+          {
+            id: 'trash-can-manage',
+            workspaceId: 'ws-1',
+            title: 'Có quyền khôi phục.docx',
+            format: 'docx',
+            updatedAt: '2026-10-10T06:00:00.000Z',
+            kind: 'file',
+            parentId: null,
+            canManage: true,
+          } satisfies DocumentsHomeDoc,
+        ],
+        nextCursor: null,
+      }),
+    )
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const trashBtn = sidebarSlot.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!
+    await act(async () => {
+      trashBtn.click()
+    })
+    await flush()
+
+    const noManageRow = host.querySelector<HTMLElement>(
+      '.dh-doc-row[data-doc-id="trash-no-manage"]',
+    )
+    const canManageRow = host.querySelector<HTMLElement>(
+      '.dh-doc-row[data-doc-id="trash-can-manage"]',
+    )
+    expect(noManageRow).not.toBeNull()
+    expect(canManageRow).not.toBeNull()
+
+    // Row with canManage: false has no action menu trigger at all
+    expect(noManageRow!.querySelector('.uw-row-menu-btn')).toBeNull()
+
+    // Row with canManage: true has the action menu trigger with "Khôi phục"
+    const manageKebab = canManageRow!.querySelector<HTMLButtonElement>('.uw-row-menu-btn')
+    expect(manageKebab).not.toBeNull()
+    await act(async () => {
+      manageKebab!.click()
+    })
+    await flush()
+    const restoreItem = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
+    ).find((el) => el.textContent?.includes('Khôi phục'))
+    expect(restoreItem).toBeDefined()
+  })
+
+  it('renders folder cards with a real <button class="dh-folder-open">, sibling FolderMenu, and stops Enter/Space on the menu wrapper from opening the folder (DH1-R1-9)', async () => {
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const card = host.querySelector<HTMLElement>('.dh-folder-card[data-folder-id="f-board"]')
+    expect(card).not.toBeNull()
+
+    const openBtn = card!.querySelector<HTMLButtonElement>('button.dh-folder-open')
+    expect(openBtn).not.toBeNull()
+    expect(openBtn!.getAttribute('type')).toBe('button')
+    expect(openBtn!.querySelector('.dh-folder-icon')).not.toBeNull()
+    expect(openBtn!.querySelector('.dh-folder-name')?.textContent).toBe('Báo cáo HĐQT Q4')
+
+    // FolderMenu must be a sibling of .dh-folder-open, not nested inside it
+    expect(openBtn!.querySelector('.uw-row-menu')).toBeNull()
+    const menuTrigger = card!.querySelector<HTMLButtonElement>('.uw-row-menu-btn')
+    expect(menuTrigger).not.toBeNull()
+
+    api.uniworkListChildren.mockClear()
+
+    // Pressing Enter or Space on the menu trigger must NOT bubble/trigger folder open
+    await act(async () => {
+      menuTrigger!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      menuTrigger!.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }))
+    })
+    await flush()
+    expect(api.uniworkListChildren).not.toHaveBeenCalled()
+
+    // Clicking the real .dh-folder-open button opens the folder
+    await act(async () => {
+      openBtn!.click()
+    })
+    await flush()
+    expect(api.uniworkListChildren).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'ws-1', parentId: 'f-board' }),
+    )
+  })
+
+  it('drops out-of-order responses when sub-view or workspace switches while a request is in flight (DH1-R1-11b)', async () => {
+    let resolveStaleRecent!: (val: unknown) => void
+    api.uniworkListDocuments.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStaleRecent = resolve
+        }),
+    )
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    // Switch to Recent (in-flight deferred)
+    const recentBtn = sidebarSlot.querySelector<HTMLButtonElement>('.nav-item[data-nav="recent"]')!
+    await act(async () => {
+      recentBtn.click()
+    })
+
+    // Before Recent resolves, switch to Trash (resolves immediately with 'Tài liệu đã xóa.docx')
+    const trashBtn = sidebarSlot.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!
+    await act(async () => {
+      trashBtn.click()
+    })
+    await flush()
+    expect(host.textContent).toContain('Tài liệu đã xóa.docx')
+
+    // Now resolve the stale Recent promise -> must be ignored
+    await act(async () => {
+      resolveStaleRecent(
+        ok({
+          documents: [
+            {
+              id: 'stale-recent-doc',
+              workspaceId: 'ws-1',
+              title: 'Tài liệu cũ bị trễ.docx',
+              format: 'docx',
+              updatedAt: '2026-10-17T08:00:00.000Z',
+              kind: 'file',
+              parentId: null,
+            } satisfies DocumentsHomeDoc,
+          ],
+          nextCursor: null,
+        }),
+      )
+    })
+    await flush()
+    expect(host.textContent).toContain('Tài liệu đã xóa.docx')
+    expect(host.textContent).not.toContain('Tài liệu cũ bị trễ.docx')
+
+    // Also test out-of-order workspace switch while a ws-1 request is in flight
+    let resolveStaleWs1Trash!: (val: unknown) => void
+    api.uniworkListTrash.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStaleWs1Trash = resolve
+        }),
+    )
+    api.uniworkListChildren.mockResolvedValueOnce(
+      ok({
+        items: [
+          {
+            id: 'ws2-root-doc',
+            workspaceId: 'ws-2',
+            title: 'Tài liệu của WS2.docx',
+            format: 'docx',
+            updatedAt: '2026-10-17T08:00:00.000Z',
+            kind: 'file',
+            parentId: null,
+          } satisfies DocumentsHomeDoc,
+        ],
+        nextCursor: null,
+      }),
+    )
+
+    // Trigger ws-1 Recent then ws-1 Trash (deferred), then switch workspaceId prop to ws-2
+    await act(async () => {
+      sidebarSlot.querySelector<HTMLButtonElement>('.nav-item[data-nav="recent"]')!.click()
+    })
+    await flush()
+    await act(async () => {
+      trashBtn.click()
+    })
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-2',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+    expect(host.textContent).toContain('Tài liệu của WS2.docx')
+
+    await act(async () => {
+      resolveStaleWs1Trash(
+        ok({
+          documents: [
+            {
+              id: 'stale-ws1-trash',
+              workspaceId: 'ws-1',
+              title: 'Tài liệu WS1 trễ.docx',
+              format: 'docx',
+              updatedAt: '2026-10-17T08:00:00.000Z',
+              kind: 'file',
+              parentId: null,
+            } satisfies DocumentsHomeDoc,
+          ],
+          nextCursor: null,
+        }),
+      )
+    })
+    await flush()
+    expect(host.textContent).toContain('Tài liệu của WS2.docx')
+    expect(host.textContent).not.toContain('Tài liệu WS1 trễ.docx')
+  })
+
+  it('renders loading, error, and empty states for workspace, recent, and trash, and catches rejected promises in load/search/loadMore chains (DH1-R1-3, DH1-R1-11c)', async () => {
+    // 1. Workspace loading -> error -> empty
+    let resolveWsLoad!: (val: unknown) => void
+    api.uniworkListChildren.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveWsLoad = resolve
+        }),
+    )
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    // Loading skeleton visible while in-flight
+    expect(host.querySelector('.uw-pick-skeleton[aria-busy="true"]')).not.toBeNull()
+
+    // Resolve with error -> error alert visible
+    await act(async () => {
+      resolveWsLoad({ ok: false, error: 'server_error' })
+    })
+    await flush()
+    expect(host.querySelector('.uw-pick-state[role="alert"]')).not.toBeNull()
+
+    // Click Retry -> resolve with empty items -> empty state visible
+    api.uniworkListChildren.mockResolvedValueOnce(ok({ items: [], nextCursor: null }))
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.uw-pick-state button')!.click()
+    })
+    await flush()
+    expect(host.querySelector('.dh-empty')?.textContent?.trim()).toBe(
+      'Chưa có thư mục hoặc tài liệu nào trong workspace này.',
+    )
+
+    // 2. Recent loading -> rejected promise (DH1-R1-3) -> error -> empty
+    let rejectRecent!: (err: Error) => void
+    api.uniworkListDocuments.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectRecent = reject
+        }),
+    )
+    const recentBtn = sidebarSlot.querySelector<HTMLButtonElement>('.nav-item[data-nav="recent"]')!
+    await act(async () => {
+      recentBtn.click()
+    })
+    expect(host.querySelector('.uw-pick-skeleton[aria-busy="true"]')).not.toBeNull()
+
+    await act(async () => {
+      rejectRecent(new Error('IPC failed'))
+    })
+    await flush()
+    expect(host.querySelector('.uw-pick-state[role="alert"]')).not.toBeNull()
+
+    api.uniworkListDocuments.mockResolvedValueOnce(ok({ documents: [], nextCursor: null }))
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.uw-pick-state button')!.click()
+    })
+    await flush()
+    expect(host.querySelector('.dh-empty')?.textContent?.trim()).toBe('Chưa có tài liệu gần đây.')
+
+    // 3. Trash loading -> error -> empty
+    let resolveTrash!: (val: unknown) => void
+    api.uniworkListTrash.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveTrash = resolve
+        }),
+    )
+    const trashBtn = sidebarSlot.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!
+    await act(async () => {
+      trashBtn.click()
+    })
+    expect(host.querySelector('.uw-pick-skeleton[aria-busy="true"]')).not.toBeNull()
+
+    await act(async () => {
+      resolveTrash({ ok: false, error: 'network' })
+    })
+    await flush()
+    expect(host.querySelector('.uw-pick-state[role="alert"]')).not.toBeNull()
+
+    api.uniworkListTrash.mockResolvedValueOnce(ok({ documents: [], nextCursor: null }))
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.uw-pick-state button')!.click()
+    })
+    await flush()
+    expect(host.querySelector('.dh-empty')?.textContent?.trim()).toBe('Thùng rác trống.')
+
+    // 4. loadMore rejection on sub-view resets loadingMore: false so "Tải thêm" is usable again (DH1-R1-3)
+    api.uniworkListDocuments.mockResolvedValueOnce(
+      ok({
+        documents: [rootItems[2]!],
+        nextCursor: 'page-2',
+      }),
+    )
+    await act(async () => {
+      recentBtn.click()
+    })
+    await flush()
+
+    const moreBtn = host.querySelector<HTMLButtonElement>('button.uw-pick-more')!
+    expect(moreBtn).not.toBeNull()
+    expect(moreBtn.disabled).toBe(false)
+
+    api.uniworkListDocuments.mockRejectedValueOnce(new Error('loadMore network boom'))
+    await act(async () => {
+      moreBtn.click()
+    })
+    await flush()
+    expect(moreBtn.disabled).toBe(false)
+    expect(host.querySelector('.uw-pick-more-error[role="alert"]')).not.toBeNull()
+
+    // 5. Search initial-load rejection & search loadMore rejection (DH1-R1-3)
+    const searchInput = host.querySelector<HTMLInputElement>('input.uwf-own-search')!
+    api.uniworkSearchDocuments.mockRejectedValueOnce(new Error('search boom'))
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(searchInput, 'Kế hoạch')
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+    expect(host.querySelector('.uw-pick-state[role="alert"]')).not.toBeNull()
+
+    // Retry search -> returns page 1 with cursor -> reject search loadMore -> resets loadingMore: false
+    api.uniworkSearchDocuments.mockResolvedValueOnce(
+      ok({ items: [rootItems[2]!], nextCursor: 'search-p2' }),
+    )
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.uw-pick-state button')!.click()
+    })
+    await flush()
+    const searchMoreBtn = host.querySelector<HTMLButtonElement>('button.uw-pick-more')!
+    expect(searchMoreBtn.disabled).toBe(false)
+
+    api.uniworkSearchDocuments.mockRejectedValueOnce(new Error('search loadMore boom'))
+    await act(async () => {
+      searchMoreBtn.click()
+    })
+    await flush()
+    expect(searchMoreBtn.disabled).toBe(false)
+    expect(host.querySelector('.uw-pick-more-error[role="alert"]')).not.toBeNull()
+  })
+
+  it('does not include t in any hook dependency array in DocumentsHome.tsx (DH1-R1-8)', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../src/renderer/src/uniwork-home/DocumentsHome.tsx'),
+      'utf8',
+    )
+    expect(src.match(/\[[^\]]*\bt\b[^\]]*\]\s*\)/g) ?? []).toEqual([])
   })
 
   it('renders VS01-1 / VS01-2 / VS01-3 SaveDialog and UniworkFolderPicker glyph + search-icon + token rules', async () => {
