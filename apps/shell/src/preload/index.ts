@@ -104,6 +104,12 @@ import type {
 } from '../shared/uniwork-work-api'
 import { asSyncCenterSnapshot, UNIWORK_SYNC_CENTER_CHANNELS } from '../shared/sync-center'
 import type { SyncCenterActionResult, UniworkSyncCenterApi } from '../shared/sync-center'
+import type {
+  OfflineDocState,
+  OfflineResult,
+  OfflineUnpinResult,
+  UniworkOfflineLibraryApi,
+} from '../shared/offline-library'
 import { createLaunchReplay } from './launch-replay'
 
 // subscribed at preload time: a cold-start launch event can arrive before the
@@ -1553,7 +1559,20 @@ function asSyncCenterActionResult(result: unknown): SyncCenterActionResult {
   return { ok: false, code: 'other' }
 }
 
-const syncCenterApi: UniworkSyncCenterApi = {
+/**
+ * G5-05u: every offline library action answers `{ ok: true }` or a refusal
+ * (`{ ok: false, code, ... }`); anything else is a refusal main never meant to
+ * send, so the renderer treats it as one.
+ */
+function asOfflineResult<T extends { ok: boolean }>(result: unknown, fallback: T): T {
+  if (result && typeof result === 'object' && 'ok' in result && typeof result.ok === 'boolean') {
+    // main's own answer, validated by its one required field
+    return result as T
+  }
+  return fallback
+}
+
+const syncCenterApi: UniworkSyncCenterApi & UniworkOfflineLibraryApi = {
   async getSnapshot() {
     const snapshot = asSyncCenterSnapshot(
       await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot),
@@ -1623,6 +1642,52 @@ const syncCenterApi: UniworkSyncCenterApi = {
     return asSyncCenterActionResult(
       await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.retryStore),
     )
+  },
+  async offlinePin(input) {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlinePin, input),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineUnpin(documentId, options) {
+    return asOfflineResult<OfflineUnpinResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineUnpin, documentId, options),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineCancel(documentId) {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineCancel, documentId),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineDownloadNow(documentId) {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineDownloadNow, documentId),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineOpen(documentId) {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineOpen, documentId),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineOpenFolder() {
+    return asOfflineResult<OfflineResult>(
+      await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.offlineOpenFolder),
+      { ok: false, code: 'unknown' },
+    )
+  },
+  async offlineState(documentId) {
+    const result: unknown = await ipcRenderer.invoke(
+      UNIWORK_SYNC_CENTER_CHANNELS.offlineState,
+      documentId,
+    )
+    if (result && typeof result === 'object' && 'pinned' in result) {
+      return result as OfflineDocState
+    }
+    return { pinned: false, state: null, capabilityOn: false }
   },
   subscribe(cb) {
     const listener = (_event: IpcRendererEvent, value: unknown) => {

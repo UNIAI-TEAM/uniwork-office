@@ -10,7 +10,7 @@ import {
   type SyncCenterHeaderStatus,
   type SyncCenterRow,
   type SyncCenterSignedOutSummary,
-  type SyncCenterTabId,
+  type SyncCenterRowTabId,
 } from '../../shared/sync-center'
 import type { StringKey } from './locale'
 
@@ -482,7 +482,8 @@ export function headerLine(
 }
 
 export interface SyncTabDef {
-  id: SyncCenterTabId
+  /** G5-05u: the offline (S3) tab carries its own rows (`snapshot.offline`), not `snapshot.tabs` */
+  id: SyncCenterRowTabId
   labelKey: StringKey
   emptyKey: StringKey
 }
