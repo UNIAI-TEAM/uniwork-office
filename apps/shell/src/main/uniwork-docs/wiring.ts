@@ -1158,6 +1158,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       let signedIn = uniworkAccount().status().state === 'signed-in'
       /** the org the feed currently runs for; null = no pass may run */
       let feedOrg: string | null = null
+      // BE-R1-2 / BE-R2-10: recover crash leftovers at activation as well as on
+      // every subsequent account-status push
+      void offlineCopies.recover().catch(() => undefined)
       /**
        * The feed runs only for the chosen org of a live session: while the
        * picker is up nothing starts, and the choice's own status push starts it
