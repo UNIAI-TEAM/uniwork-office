@@ -566,4 +566,74 @@ describe('BE-10: the preload boundary validates the snapshot shape', () => {
       expect(asSyncCenterSnapshot(bad), JSON.stringify(bad)).toBeNull()
     }
   })
+
+  it('fills a hidden empty offline block when offline is missing or malformed without mutating the input (FIX3-1)', async () => {
+    const { asSyncCenterSnapshot } = await import('../src/shared/sync-center')
+    const good = buildSyncCenterSnapshot(baseFacts())
+    const hiddenOffline = {
+      visible: false,
+      capabilityOn: false,
+      quota: { usedBytes: 0, maxBytes: 0, pins: 0, maxPins: 0 },
+      rows: [],
+    }
+
+    const { offline: _omitted, ...withoutOffline } = good
+    const parsedMissing = asSyncCenterSnapshot(withoutOffline)
+    expect(parsedMissing).toEqual({ ...withoutOffline, offline: hiddenOffline })
+    expect('offline' in withoutOffline).toBe(false)
+
+    const rawMalformed = {
+      visible: true,
+      capabilityOn: true,
+      quota: good.offline.quota,
+      rows: 'not-an-array',
+    }
+    const withMalformedRows = { ...withoutOffline, offline: rawMalformed }
+    expect(asSyncCenterSnapshot(withMalformedRows)).toEqual({
+      ...withoutOffline,
+      offline: hiddenOffline,
+    })
+    expect(withMalformedRows.offline).toBe(rawMalformed)
+
+    for (const badOffline of [
+      null,
+      'offline',
+      {},
+      { visible: true, capabilityOn: true, quota: null, rows: [] },
+      {
+        visible: true,
+        capabilityOn: true,
+        quota: { usedBytes: '0', maxBytes: 0, pins: 0, maxPins: 0 },
+        rows: [],
+      },
+    ]) {
+      expect(asSyncCenterSnapshot({ ...withoutOffline, offline: badOffline })).toEqual({
+        ...withoutOffline,
+        offline: hiddenOffline,
+      })
+    }
+
+    const wellFormed = {
+      ...withoutOffline,
+      offline: {
+        visible: true,
+        capabilityOn: true,
+        quota: { usedBytes: 1024, maxBytes: 4096, pins: 1, maxPins: 200 },
+        rows: [],
+      },
+    }
+    expect(asSyncCenterSnapshot(wellFormed)).toBe(wellFormed)
+    expect(asSyncCenterSnapshot(wellFormed)?.offline).toBe(wellFormed.offline)
+
+    expect(
+      asSyncCenterSnapshot({ header: {}, tabs: good.tabs, offline: wellFormed.offline }),
+    ).toBeNull()
+    expect(
+      asSyncCenterSnapshot({
+        header: good.header,
+        tabs: { attention: [], pending: [] },
+        offline: wellFormed.offline,
+      }),
+    ).toBeNull()
+  })
 })

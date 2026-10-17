@@ -7,10 +7,11 @@
  * and session state.
  */
 
-import type {
-  OfflineLibraryQuota,
-  OfflineLibrarySnapshot,
-  UniworkOfflineLibraryApi,
+import {
+  EMPTY_OFFLINE_LIBRARY_SNAPSHOT,
+  type OfflineLibraryQuota,
+  type OfflineLibrarySnapshot,
+  type UniworkOfflineLibraryApi,
 } from './offline-library'
 
 export const UNIWORK_SYNC_CENTER_CHANNELS = {
@@ -248,10 +249,22 @@ export interface SyncCenterSnapshot {
   defaultTab: SyncCenterDefaultTab
 }
 
+function isOfflineLibrarySnapshot(value: unknown): value is OfflineLibrarySnapshot {
+  if (!value || typeof value !== 'object') return false
+  const offline = value as Partial<OfflineLibrarySnapshot>
+  if (typeof offline.visible !== 'boolean' || typeof offline.capabilityOn !== 'boolean')
+    return false
+  const quota = offline.quota as Partial<OfflineLibraryQuota> | null | undefined
+  if (!quota || typeof quota !== 'object' || !Array.isArray(offline.rows)) return false
+  return ['usedBytes', 'maxBytes', 'pins', 'maxPins'].every(
+    (k) => typeof quota[k as never] === 'number',
+  )
+}
+
 /**
- * A snapshot the renderer's model can read without crashing: a header with a status,
- * the three tab arrays and the offline library block. Anything else (an older main,
- * a malformed push) is null.
+ * A snapshot the renderer's model can read without crashing: a header with a status
+ * and the three tab arrays; when `offline` is missing or malformed, it is replaced
+ * with the hidden empty offline library block without dropping the snapshot.
  */
 export function asSyncCenterSnapshot(value: unknown): SyncCenterSnapshot | null {
   if (!value || typeof value !== 'object') return null
@@ -261,18 +274,8 @@ export function asSyncCenterSnapshot(value: unknown): SyncCenterSnapshot | null 
   if (!header || typeof header !== 'object' || typeof header.status !== 'string') return null
   if (!tabs || typeof tabs !== 'object') return null
   if (!['attention', 'pending', 'recent'].every((tab) => Array.isArray(tabs[tab]))) return null
-  const offline = snap.offline as Partial<OfflineLibrarySnapshot> | null | undefined
-  if (!offline || typeof offline !== 'object') return null
-  if (typeof offline.visible !== 'boolean' || typeof offline.capabilityOn !== 'boolean') return null
-  const quota = offline.quota as Partial<OfflineLibraryQuota> | null | undefined
-  if (!quota || typeof quota !== 'object' || !Array.isArray(offline.rows)) return null
-  if (
-    !['usedBytes', 'maxBytes', 'pins', 'maxPins'].every(
-      (k) => typeof quota[k as never] === 'number',
-    )
-  )
-    return null
-  return value as SyncCenterSnapshot
+  if (isOfflineLibrarySnapshot(snap.offline)) return value as SyncCenterSnapshot
+  return { ...(value as SyncCenterSnapshot), offline: EMPTY_OFFLINE_LIBRARY_SNAPSHOT }
 }
 
 export type SyncCenterActionErrorCode =

@@ -112,6 +112,17 @@ export interface OfflineLibrarySnapshot {
 }
 
 /**
+ * Hidden, empty offline library block used when a snapshot lacks or has a
+ * malformed `offline` slice so the rest of the snapshot is never dropped.
+ */
+export const EMPTY_OFFLINE_LIBRARY_SNAPSHOT: OfflineLibrarySnapshot = {
+  visible: false,
+  capabilityOn: false,
+  quota: { usedBytes: 0, maxBytes: 0, pins: 0, maxPins: 0 },
+  rows: [],
+}
+
+/**
  * A refusal of any offline library action. `lockReason` is what the S11 panel
  * names; the rest are the engine's refusal codes (its own vocabulary, checked
  * one way at the projection).
