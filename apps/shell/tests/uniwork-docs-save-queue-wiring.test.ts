@@ -1371,6 +1371,55 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(after).not.toHaveProperty('editLock')
   })
 
+  it('EL1A-R2-3: a real queue publish of a parked edit_locked intent keeps the holder the binding carries', async () => {
+    // EL1A-R2-3 (reviewer_fe r2): BE-2 was pinned only by direct `queueBindingPatch` calls, so a
+    // revert of the call site's `doc.binding` argument stayed green. This drives the SAME record
+    // through the REAL path - the store, the poll, the dispatcher's publish and applyRecordToChip -
+    // and asserts the holder the binding carries is still there after the chip is rewritten.
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    // someone else holds the server edit lock: the commit is refused 423 and the intent parks
+    // `failed` with `lastError: 'edit_locked'` (the chip parks `edit_locked` beside it)
+    server.faults.push({ route: 'commit', kind: 423, code: 'document_locked' })
+    await ctx.service.save(path)
+    expect(binding(path)).toMatchObject({ state: 'edit_locked', error: 'edit_locked' })
+    expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+      state: 'failed',
+      lastError: 'edit_locked',
+    })
+    // the 423 carried no holder fields here, so write a real holder onto the parked binding: the
+    // record itself has no editLock (IntentRecordV2 has none), so it can only come from the binding.
+    // A stale `error` proves the publish really rewrote the chip: the patch must overwrite it.
+    const lock = {
+      holderName: 'Minh Trần',
+      since: '2026-04-17T03:00:00Z',
+      expiresAt: '2026-04-17T03:02:00Z',
+      heldByMe: false,
+    }
+    const file = join(dirname(path), BINDING_FILE)
+    writeFileSync(
+      file,
+      `${JSON.stringify({ ...binding(path), error: 'server_error', editLock: lock })}\n`,
+    )
+    // an offline lane makes the poll publish the stored record (a no-op on the record's state, but
+    // the real publish still rewrites the chip from it: dispatcher apply -> service.publishRecord)
+    ctx.setCapabilityOffline(true)
+    await ctx.service.pollSaveQueue()
+    ctx.setCapabilityOffline(false)
+    // the publish is fire-and-forget: the chip rewrite lands a beat later. The stale error is gone
+    // (the record's `edit_locked` won), which proves the binding really was rewritten from the record
+    await vi.waitFor(() => expect(binding(path).error).toBe('edit_locked'))
+    expect(binding(path)).toMatchObject({ state: 'edit_locked', error: 'edit_locked' })
+    expect(binding(path).editLock).toEqual(lock)
+    // the record is still parked: a publish never re-dispatches a failed intent
+    expect((await storedIntent(ctx, path))?.intent).toMatchObject({
+      state: 'failed',
+      lastError: 'edit_locked',
+    })
+  })
+
   it('G506-be-4: teardownSaveQueue awaits the in-flight poll and nothing lands after it resolves', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)

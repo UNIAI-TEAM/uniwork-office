@@ -1802,7 +1802,9 @@ describe('EL1A-BE-2 / EL1A-BE-5: queueBindingPatch (the record -> binding projec
     const patch = queueBindingPatch(failedRecord({ state: 'queued' }))
     expect(patch).toMatchObject({ state: 'queued' })
     expect(patch?.error).toBeUndefined()
-    expect(patch?.editLock).toBeUndefined()
+    // EL1A-R2-5: the patch must CARRY the key as `undefined` (service.ts:832), not
+    // merely lack it - `toBeUndefined()` passed either way, so a dropped line stayed green
+    expect(patch).toHaveProperty('editLock', undefined)
     expect(queueBindingPatch(failedRecord({ state: 'committed' }))).toBeNull()
     expect(queueBindingPatch(failedRecord({ state: 'cancelled' }))).toBeNull()
   })

@@ -463,9 +463,14 @@ describe('T2: Save pill priority (the higher row wins)', () => {
       'uwChipEditLocked',
     ],
     [
-      'EL-1(a) edit_locked beats paused_admin',
-      { state: 'edit_locked', error: 'edit_locked' },
-      { state: 'paused_admin' },
+      // EL1A-R2-4: this row was a state-only pair ({edit_locked} vs {paused_admin}), which could
+      // never fail: with the edit_locked branch reverted to its old seat (below the queued rows)
+      // the higher input still matched it, because no other branch reads a lone edit_locked state.
+      // It now combines the signals that really compete with that branch - a newer-version bar and
+      // a save waiting for an AI run - so the pair fails the moment the branch loses its seat
+      'EL-1(a) edit_locked beats a paused_admin row carrying a newer bar and a wait',
+      { state: 'edit_locked', error: 'edit_locked', saveWait: 'ai', remote: newerDirty },
+      { state: 'paused_admin', saveWait: 'ai', remote: newerDirty },
       'uwChipEditLocked',
     ],
     [
