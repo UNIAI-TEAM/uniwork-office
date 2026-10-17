@@ -202,6 +202,7 @@ const OPTIONAL_KEYS = [
   'lastError',
   'maxBytes',
   'cancelReason',
+  'uploadSession',
 ] as const
 
 function withState(
@@ -322,6 +323,7 @@ function onCommitted(
       reconcileSince: undefined,
       lastError: undefined,
       maxBytes: undefined,
+      uploadSession: undefined,
     }),
     effects: [{ kind: 'cleanup', generation: record.generation }],
   }
@@ -639,6 +641,7 @@ export function transition(
           cancelReason: 'user',
           retryAt: undefined,
           reconcileSince: undefined,
+          uploadSession: undefined,
         }),
         // the snapshot of a cancelled intent becomes a kept draft when the
         // document is closed; the caller knows whether that applies
@@ -652,6 +655,7 @@ export function transition(
           cancelReason: 'user',
           retryAt: undefined,
           reconcileSince: undefined,
+          uploadSession: undefined,
         }),
         effects: [{ kind: 'keepDraft' }],
       }
@@ -663,6 +667,7 @@ export function transition(
           cancelReason: 'superseded',
           retryAt: undefined,
           reconcileSince: undefined,
+          uploadSession: undefined,
         }),
         effects: [],
       }
@@ -676,6 +681,7 @@ export function transition(
           cancelReason: 'user',
           retryAt: undefined,
           reconcileSince: undefined,
+          uploadSession: undefined,
         }),
         effects: [],
       }

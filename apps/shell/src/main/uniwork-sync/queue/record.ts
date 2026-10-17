@@ -1,5 +1,6 @@
 import { isDecimalString } from '../../uniwork-docs/formats'
 import type { UniworkDocErrorCode } from '../../../shared/home-api'
+import type { SavedUploadSession } from '../../uniwork-docs/upload-session'
 
 /**
  * The durable save-queue record, version 2. The G5-04 record
@@ -82,6 +83,11 @@ export interface IntentRecordV2 {
   maxBytes?: number
   /** why the intent ended in `cancelled` */
   cancelReason?: 'user' | 'superseded'
+  /**
+   * BIGUP-A1: the upload session of a chunked version upload, written as each
+   * part completes so a restart resumes at the next missing part.
+   */
+  uploadSession?: SavedUploadSession
 }
 
 /** what a caller knows about a legacy record's binding, used to upgrade v1 -> v2 */
@@ -165,6 +171,28 @@ function readReceipt(raw: unknown): IntentReceipt | null | undefined {
   return { versionId: r.versionId, version: r.version, revision: r.revision }
 }
 
+function readUploadSession(raw: unknown): SavedUploadSession | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const r = raw as Record<string, unknown>
+  if (!isStr(r.sessionId) || !isStr(r.expiresAt)) return undefined
+  if (!isCount(r.partSize, 1) || !isCount(r.totalParts, 1)) return undefined
+  if (!Array.isArray(r.completedParts)) return undefined
+  const completedParts: Array<{ partNumber: number; etag: string }> = []
+  for (const entry of r.completedParts) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return undefined
+    const row = entry as Record<string, unknown>
+    if (!isCount(row.partNumber, 1) || !isStr(row.etag)) return undefined
+    completedParts.push({ partNumber: row.partNumber, etag: row.etag })
+  }
+  return {
+    sessionId: r.sessionId,
+    partSize: r.partSize,
+    totalParts: r.totalParts,
+    completedParts,
+    expiresAt: r.expiresAt,
+  }
+}
+
 function readV2(r: Record<string, unknown>): IntentRecordV2 | null {
   if (!isStr(r.intentId) || !isStr(r.idempotencyKey) || !isStr(r.documentId)) return null
   if (!isStrOrEmpty(r.orgId) || !isStrOrEmpty(r.workspaceId)) return null
@@ -185,6 +213,7 @@ function readV2(r: Record<string, unknown>): IntentRecordV2 | null {
   ) {
     return null
   }
+  const uploadSession = readUploadSession(r.uploadSession)
   return {
     v: 2,
     intentId: r.intentId,
@@ -207,6 +236,7 @@ function readV2(r: Record<string, unknown>): IntentRecordV2 | null {
     ...(r.lastError === undefined ? {} : { lastError: r.lastError as UniworkDocErrorCode }),
     ...(isCount(r.maxBytes, 1) ? { maxBytes: r.maxBytes } : {}),
     ...(r.cancelReason === undefined ? {} : { cancelReason: r.cancelReason }),
+    ...(uploadSession === undefined ? {} : { uploadSession }),
   }
 }
 

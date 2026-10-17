@@ -273,6 +273,32 @@ describe('uniwork sync intent store', () => {
     expect(await layer.open(SCOPE)).toEqual({ kind: 'keystore_locked' })
   })
 
+  it('round-trips a v2 record carrying uploadSession through the intent store', async () => {
+    const { layer } = makeIntentLayer()
+    const store = await openIntentStore(layer)
+    const saved = record({
+      state: 'uploading',
+      uploadSession: {
+        sessionId: 'ups_resume_1',
+        partSize: 8 * 1024 * 1024,
+        totalParts: 6,
+        completedParts: [
+          { partNumber: 1, etag: '"etag-1"' },
+          { partNumber: 2, etag: '"etag-2"' },
+          { partNumber: 3, etag: '"etag-3"' },
+        ],
+        expiresAt: '2026-10-19T00:00:00.000Z',
+      },
+    })
+    const payload = new Uint8Array([1, 2, 3, 4])
+    expect(await store.put('doc-key-ups', saved, payload)).toEqual({ kind: 'ok' })
+    const readBack = await store.read('doc-key-ups', FACTS)
+    expect(readBack?.intent).toEqual(saved)
+    expect(readBack?.payload).toEqual(payload)
+    const rawBack = await store.get('doc-key-ups')
+    expect(rawBack?.intent).toEqual(saved)
+  })
+
   runStoreCompliance('uniwork-sync intent store', async (env: ComplianceEnv) => {
     const layer = createStoreLayer({
       root: env.root,
