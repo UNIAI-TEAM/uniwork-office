@@ -47,6 +47,7 @@ import {
   type PickerState,
 } from './uniwork-docs-model'
 import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspace'
+import { useOfflineToggle } from './OfflineToggle'
 import { BROWSER_HIDDEN_HINT_ID } from './uniwork-folders/BrowserContents'
 import { UniworkBrowser } from './uniwork-folders/UniworkBrowser'
 import type { PathPart } from './uniwork-folders/uniwork-folders-model'
@@ -141,10 +142,17 @@ export function UniworkOpenDialog({
   onClose,
   accountView,
   onSignIn,
+  onPick,
 }: {
   onClose: () => void
   accountView: AccountView
   onSignIn: () => void
+  /**
+   * G5-05u pin mode ("Thêm tài liệu…" of the S3 tab): choosing a document hands
+   * it here instead of opening it, and the dialog stays. A returned text is a
+   * refusal (cap reached) shown as the dialog's toast.
+   */
+  onPick?: (doc: { id: string; title: string; workspaceId: string }) => Promise<string | null>
 }) {
   const { t, dateLocale } = useI18n()
   const [state, dispatch] = useReducer(pickerReducer, undefined, () =>
@@ -180,6 +188,10 @@ export function UniworkOpenDialog({
   const [archiving, setArchiving] = useState<{ id: string; title: string } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
+  /** G5-05u: the row menu's offline item (not in pin mode, where choosing already pins) */
+  const offline = useOfflineToggle()
+  const offlineOf = (doc: LibraryDocRow) =>
+    onPick || !isOpenable(doc) ? null : offline.menuOf(doc.id)
   /** FD-11: the workspace's Recent list, or the folder browser's contents */
   const [view, setView] = useState<'recent' | 'folder'>('recent')
   /** the committed title search of the folder view (the recent list keeps state.query) */
@@ -323,7 +335,16 @@ export function UniworkOpenDialog({
   }
 
   /** open a document by its id (a listed row, or the one just created / uploaded) */
-  const openById = (doc: { id: string; title: string }) => {
+  const openById = (doc: { id: string; title: string; workspaceId?: string }) => {
+    if (onPick) {
+      const workspaceId = doc.workspaceId ?? stateRef.current.workspaceId
+      if (workspaceId) {
+        void onPick({ id: doc.id, title: doc.title, workspaceId }).then((refused) => {
+          if (refused && mounted.current) setToast(refused)
+        })
+      }
+      return
+    }
     if (stateRef.current.opening) return
     lastOpen.current = { id: doc.id, title: doc.title }
     dispatch({ type: 'open-start', id: doc.id, title: doc.title })
@@ -499,6 +520,8 @@ export function UniworkOpenDialog({
     setToast(null)
     if (action === 'rename') setRenaming({ id: doc.id, error: null, busy: false })
     else if (action === 'archive') setArchiving({ id: doc.id, title: doc.title })
+    else if (action === 'offline')
+      offline.toggle({ documentId: doc.id, workspaceId: doc.workspaceId, name: doc.title })
     else setArchived(doc.id, false)
   }
 
@@ -772,11 +795,11 @@ export function UniworkOpenDialog({
                         <circle cx="8" cy="5" r="0.9" fill="currentColor" />
                       </svg>
                     </button>
-                    {hasRowActions(row) && (
+                    {hasRowActions(row, offlineOf(row)) && (
                       <RowMenu
                         docId={doc.id}
                         title={doc.title}
-                        actions={rowActionsOf(row)}
+                        actions={rowActionsOf(row, offlineOf(row))}
                         tabbable={active}
                         onAction={(action) => onRowAction(row, action)}
                       />
@@ -1007,6 +1030,7 @@ export function UniworkOpenDialog({
           />
         )}
         {toast && <ActionToast message={toast} onDone={clearToast} />}
+        {offline.node}
       </div>
     </div>
   )

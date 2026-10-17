@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, RefObject } from 'react'
 import { formatSizeMB } from '../../shared/size-format'
+import type { UniworkOfflineLibraryApi } from '../../shared/offline-library'
 import type {
   SyncCenterActionResult,
   SyncCenterRow,
@@ -10,15 +11,18 @@ import type {
 } from '../../shared/sync-center'
 import { useI18n } from './locale'
 import { WbMenuButton } from './WbMenu'
+import { offlineTabCount, onSyncTabRequest, takeRequestedSyncTab } from './offline-library-model'
+import { SyncOfflinePanel } from './SyncOfflinePanel'
 import {
   DRAFT_CAP,
-  SYNC_TABS,
   actionErrorKey,
   formatBytes,
   formatTime,
   headerLine,
   resolveHeaderStatus,
+  isRowTab,
   rowView,
+  syncTabsOf,
   type SyncLine,
   type SyncRowAction,
   type SyncRowActionId,
@@ -88,7 +92,8 @@ export function SyncCenterPane({
   onSignOut,
   onSwitchAccount,
 }: {
-  api?: UniworkSyncCenterApi
+  /** the S2 api plus the offline library's half (G5-05u; absent on an older main) */
+  api?: UniworkSyncCenterApi & Partial<UniworkOfflineLibraryApi>
   /** "Đăng nhập" / "Đăng nhập lại" */
   onSignIn?: () => void
   /** "Đăng xuất" on the account line */
@@ -108,7 +113,8 @@ export function SyncCenterPane({
     setSnapState(next)
   }, [])
   const [loadFailed, setLoadFailed] = useState(false)
-  const [tab, setTab] = useState<SyncCenterTabId | null>(null)
+  // a tab asked for by the opener (the Open card offline -> S3) wins over the default once
+  const [tab, setTab] = useState<SyncCenterTabId | null>(takeRequestedSyncTab)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   /** `${rowId}:${guide|details}` whose explanation line is open */
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -170,6 +176,9 @@ export function SyncCenterPane({
   useEffect(() => {
     if (snap && tab === null) setTab(snap.defaultTab)
   }, [snap, tab])
+
+  // the sync center was asked again for a tab while it is open
+  useEffect(() => onSyncTabRequest(setTab), [])
 
   const fmt = (line: SyncLine): string => {
     const params: Record<string, string | number> = { ...line.params }
@@ -415,20 +424,27 @@ export function SyncCenterPane({
       .finally(() => setRetrying(false))
   }
 
-  const tabIndexOf = (id: SyncCenterTabId) => SYNC_TABS.findIndex((d) => d.id === id)
+  const busyRows = busyRowIds(busy)
+  const signedOut = status === 'signed_out'
+  const offlineLib = snap?.offline
+  const tabs = syncTabsOf(offlineLib?.visible === true, signedOut)
+  const current = tabs.find((d) => d.id === tab) ?? tabs[0]
   const selectTab = (i: number) => {
-    const n = SYNC_TABS.length
-    const next = SYNC_TABS[(i + n) % n]!
+    const n = tabs.length
+    const next = tabs[(i + n) % n]!
     setTab(next.id)
     setConfirm(null)
     tabRefs.current[(i + n) % n]?.focus()
   }
   const onTabKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    const at = tabIndexOf(tab ?? 'attention')
+    const at = Math.max(
+      0,
+      tabs.findIndex((d) => d.id === current?.id),
+    )
     if (e.key === 'ArrowRight') selectTab(at + 1)
     else if (e.key === 'ArrowLeft') selectTab(at - 1)
     else if (e.key === 'Home') selectTab(0)
-    else if (e.key === 'End') selectTab(SYNC_TABS.length - 1)
+    else if (e.key === 'End') selectTab(tabs.length - 1)
     else return
     e.preventDefault()
   }
@@ -460,8 +476,6 @@ export function SyncCenterPane({
     )
   }
 
-  const busyRows = busyRowIds(busy)
-  const signedOut = status === 'signed_out'
   // "Đồng bộ ngay" is the only way out of a stopped feed (header 7), so it never reads as offline then
   const offline = header ? !header.online && !header.resyncFailed : false
   const nowReason = `${base}-now-reason`
@@ -658,17 +672,19 @@ export function SyncCenterPane({
         </div>
       )
     }
-    // signed out: only the locked count (in the status line), never a document name
-    if (signedOut) return null
-    const current = SYNC_TABS.find((d) => d.id === tab) ?? SYNC_TABS[0]!
-    const rows = snap.tabs[current.id]
+    // signed out: only the locked count (in the status line, and the S3 tab's), never a document name
+    if (!current) return null
     const panelId = `${base}-panel-${current.id}`
     return (
       <>
         <div className="sc-tabs" role="tablist" aria-label={t('uwSyncTitle')} onKeyDown={onTabKey}>
-          {SYNC_TABS.map((d, i) => {
+          {tabs.map((d, i) => {
             const selected = d.id === current.id
-            const count = snap.tabs[d.id].length
+            const count = isRowTab(d.id)
+              ? snap.tabs[d.id].length
+              : offlineLib
+                ? offlineTabCount(offlineLib, signedOut)
+                : 0
             return (
               <button
                 key={d.id}
@@ -701,7 +717,22 @@ export function SyncCenterPane({
           tabIndex={-1}
           ref={panelRef}
         >
-          {rows.length === 0 ? (
+          {!isRowTab(current.id) ? (
+            offlineLib && (
+              <SyncOfflinePanel
+                base={base}
+                offline={offlineLib}
+                signedOut={signedOut}
+                narrow={narrow}
+                api={api}
+                fmt={fmt}
+                setLive={setLive}
+                onSignIn={onSignIn}
+                onSwitchAccount={onSwitchAccount}
+                accountView={status === 'session_expired' ? 'session-expired' : 'signed-in'}
+              />
+            )
+          ) : snap.tabs[current.id].length === 0 ? (
             <p className="sc-empty">{t(current.emptyKey)}</p>
           ) : (
             <table className="sc-table">
@@ -722,7 +753,7 @@ export function SyncCenterPane({
                   </th>
                 </tr>
               </thead>
-              <tbody>{rows.map(renderRow)}</tbody>
+              <tbody>{snap.tabs[current.id].map(renderRow)}</tbody>
             </table>
           )}
         </div>
