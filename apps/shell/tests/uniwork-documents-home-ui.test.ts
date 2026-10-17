@@ -1624,4 +1624,166 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'Đường dẫn: UniWork › Finance › FY2026',
     )
   })
+
+  it('opens the uploaded document via onOpenDocument after a successful upload (DH1-E2E-6)', async () => {
+    const uploadedSummary: DocumentsHomeDoc = {
+      id: 'doc-uploaded-1',
+      workspaceId: 'ws-1',
+      title: 'uploaded-handbook.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T10:00:00.000Z',
+      kind: 'file',
+      parentId: 'f-mine',
+    }
+    api.uniworkPickUploadFile = vi.fn(async () => ({
+      path: 'C:\\Users\\minh\\Documents\\uploaded-handbook.docx',
+      name: 'uploaded-handbook.docx',
+    }))
+    api.uniworkUploadDocument = vi.fn(async () => ok(uploadedSummary))
+    const onOpenDocument = vi.fn()
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument,
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const uploadBtn = host.querySelector<HTMLButtonElement>('button.dh-btn-upload')!
+    expect(uploadBtn).not.toBeNull()
+    await act(async () => {
+      uploadBtn.click()
+    })
+    await flush()
+
+    const dialog = host.querySelector<HTMLElement>('.modal[role="dialog"]')!
+    expect(dialog).not.toBeNull()
+    const pickBtn = dialog.querySelector<HTMLButtonElement>('.uw-act-file button')!
+    await act(async () => {
+      pickBtn.click()
+    })
+    await flush()
+
+    const submitBtn = dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-primary')!
+    await act(async () => {
+      submitBtn.click()
+    })
+    await flush()
+
+    expect(api.uniworkUploadDocument).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('.modal[role="dialog"]')).toBeNull()
+    expect(onOpenDocument).toHaveBeenCalledTimes(1)
+    expect(onOpenDocument).toHaveBeenCalledWith(uploadedSummary)
+  })
+
+  it('does not open or toast when an upload is cancelled or resolves late after cancel (DH1-E2E-6)', async () => {
+    const uploadedSummary: DocumentsHomeDoc = {
+      id: 'doc-uploaded-late',
+      workspaceId: 'ws-1',
+      title: 'uploaded-handbook.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T10:00:00.000Z',
+      kind: 'file',
+      parentId: 'f-mine',
+    }
+    api.uniworkPickUploadFile = vi.fn(async () => ({
+      path: 'C:\\Users\\minh\\Documents\\uploaded-handbook.docx',
+      name: 'uploaded-handbook.docx',
+    }))
+    api.uniworkCancelUploadDocument = vi.fn(async () => undefined)
+    type UploadTestResult =
+      | { ok: true; value: DocumentsHomeDoc }
+      | { ok: false; error: 'upload_cancelled' | 'server_error' }
+    let finishUpload: (res: UploadTestResult) => void = () => undefined
+    api.uniworkUploadDocument = vi.fn(() => {
+      const { promise, resolve } = Promise.withResolvers<UploadTestResult>()
+      finishUpload = resolve
+      return promise
+    })
+    const onOpenDocument = vi.fn()
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument,
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const startAndCancelUpload = async () => {
+      const uploadBtn = host.querySelector<HTMLButtonElement>('button.dh-btn-upload')!
+      await act(async () => {
+        uploadBtn.click()
+      })
+      await flush()
+
+      const dialog = host.querySelector<HTMLElement>('.modal[role="dialog"]')!
+      const pickBtn = dialog.querySelector<HTMLButtonElement>('.uw-act-file button')!
+      await act(async () => {
+        pickBtn.click()
+      })
+      await flush()
+
+      const submitBtn = dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-primary')!
+      await act(async () => {
+        submitBtn.click()
+      })
+      await flush()
+
+      const cancelBtn = dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-secondary')!
+      await act(async () => {
+        cancelBtn.click()
+      })
+      await flush()
+    }
+
+    // 1. Cancel -> upload_cancelled: not opened, no toast
+    await startAndCancelUpload()
+    expect(api.uniworkCancelUploadDocument).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      finishUpload({ ok: false, error: 'upload_cancelled' })
+    })
+    await flush()
+    expect(onOpenDocument).not.toHaveBeenCalled()
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+
+    // 2. Late success result after cancel -> neither opens nor toasts
+    await startAndCancelUpload()
+    expect(api.uniworkCancelUploadDocument).toHaveBeenCalledTimes(2)
+    await act(async () => {
+      finishUpload(ok(uploadedSummary))
+    })
+    await flush()
+    expect(onOpenDocument).not.toHaveBeenCalled()
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+
+    // 3. Late error result after cancel -> neither opens nor toasts
+    await startAndCancelUpload()
+    expect(api.uniworkCancelUploadDocument).toHaveBeenCalledTimes(3)
+    await act(async () => {
+      finishUpload({ ok: false, error: 'server_error' })
+    })
+    await flush()
+    expect(onOpenDocument).not.toHaveBeenCalled()
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+  })
 })
