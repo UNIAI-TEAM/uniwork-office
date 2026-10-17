@@ -180,6 +180,12 @@ function fakeServer(
      * unchanged-body retry replays the retained key and dedupes to that row
      */
     createInFlight?: boolean
+    /**
+     * SAVE-01 merge M-2 (D-S1): the `documents.limits` the `GET /api/v1/config`
+     * answers with. Unset keeps D's 404, which the client turns into the
+     * default caps (209,715,200 bytes) - the upload tests' own preflight.
+     */
+    limits?: unknown
   } = {},
 ) {
   const state = {
@@ -240,6 +246,13 @@ function fakeServer(
       idempotencyKey: headers['idempotency-key'] ?? '',
     }
     calls.push(call)
+
+    // SAVE-01 merge M-2 (D-S1): SIZE-F1's `documents.limits` read, the one the
+    // upload path makes and the first save now shares
+    if (u.pathname === '/api/v1/config') {
+      if (options.limits === undefined) return envelope(404, 'not_found')
+      return json(200, { limits: options.limits })
+    }
 
     // create blank
     if (u.pathname === `/api/v1/workspaces/${WS}/documents/files/blank`) {
@@ -2506,8 +2519,9 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
     expect(ctx.service.isBound(file)).toBe(false)
   })
 
-  // S01-R1-9: first-save runs the upload's own preflight before buffering:
-  // stat + regular-file + the 50 MiB stage cap.
+  // S01-R1-9 / merge M-2 (D-S1): first-save runs the upload's own preflight
+  // before buffering: stat + regular-file + the ONE size guard. Under D's
+  // default 200 MiB cap the effective limit is the 50 MiB staging cap.
   it('refuses a file over the 50 MiB cap unread', async () => {
     const server = fakeServer()
     const ctx = setup(server)
@@ -2518,9 +2532,114 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
 
     const saved = await ctx.service.firstSave(input(file, undefined))
 
-    expect(saved).toEqual({ ok: false, error: 'too_large' })
-    expect(server.calls).toHaveLength(0)
+    expect(saved).toEqual({
+      ok: false,
+      error: 'too_large',
+      name: 'Huge.docx',
+      sizeBytes: 50 * 1024 * 1024 + 1,
+      maxBytes: 50 * 1024 * 1024,
+    })
+    // refused unread, and nothing created, bound or moved; the limits read
+    // (`GET /api/v1/config`) is the only request the call makes
+    expect(vi.mocked(readFile).mock.calls.map((call) => String(call[0]))).not.toContain(file)
+    expect(server.calls.filter((call) => call.method === 'GET').map((call) => call.path)).toEqual([
+      '/api/v1/config',
+    ])
+    expect(server.calls.filter((call) => call.method !== 'GET')).toEqual([])
+    expect(ctx.pathRenames).toEqual([])
     expect(ctx.service.isBound(file)).toBe(false)
+  })
+
+  // merge M-2 (D-S1, BINDING): upload AND first save share ONE size preflight.
+  // The limits read is the upload path's own, so a server `upload_max_bytes`
+  // below D's 50 MiB staging cap now refuses a first save too - typed, naming
+  // the file, its size and the effective limit, before anything is read or
+  // created.
+  describe('merge M-2: the one upload+save size preflight', () => {
+    /** the `file` part's bytes of a multipart POST the fake recorded */
+    const postedBytes = (body: unknown): Uint8Array | null =>
+      typeof body === 'object' &&
+      body !== null &&
+      'bytes' in body &&
+      body.bytes instanceof Uint8Array
+        ? body.bytes
+        : null
+
+    it('refuses a file above a lower server cap with the limit named, zero creates, no bind', async () => {
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Big.docx')
+      writeFileSync(file, 'x')
+      truncateSync(file, 2 * 1024 * 1024)
+
+      const saved = await ctx.service.firstSave(input(file))
+
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Big.docx',
+        sizeBytes: 2 * 1024 * 1024,
+        maxBytes: 1024 * 1024,
+      })
+      // refused before the read: the file's bytes never enter main
+      expect(vi.mocked(readFile).mock.calls.map((call) => String(call[0]))).not.toContain(file)
+      // zero create/upload requests: the limits read is the only request
+      expect(server.calls.filter((call) => call.path.endsWith('/documents/files'))).toHaveLength(0)
+      expect(server.calls.filter((call) => call.method !== 'GET')).toEqual([])
+      // no working-copy/binding change, and the file is byte-identical
+      expect(ctx.pathRenames).toEqual([])
+      expect(ctx.service.isBound(file)).toBe(false)
+      expect(readFileSync(file).byteLength).toBe(2 * 1024 * 1024)
+    })
+
+    it('still sends a file exactly at the server cap', async () => {
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'AtCap.docx')
+      writeFileSync(file, 'x')
+      truncateSync(file, 1024 * 1024)
+
+      const saved = await ctx.service.firstSave(input(file))
+
+      expect(saved.ok).toBe(true)
+      // the cap that let it through is the server's own, read once by this call
+      expect(server.calls.filter((call) => call.path === '/api/v1/config')).toHaveLength(1)
+      const posts = server.calls.filter(
+        (call) =>
+          call.method === 'POST' && call.path === `/api/v1/workspaces/${WS}/documents/files`,
+      )
+      expect(posts).toHaveLength(1)
+      expect(postedBytes(posts[0]?.body)?.byteLength).toBe(1024 * 1024)
+      expect(ctx.service.isBound(ctx.pathRenames[0]!.newPath)).toBe(true)
+    })
+
+    it('answers the renderer the same too_large fields the upload path answers', async () => {
+      // one cap, two entry points: the same file, refused by the save and by
+      // the upload, carries the identical renderer shape (the shared mapper)
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Twin.docx')
+      writeFileSync(file, 'x')
+      truncateSync(file, 3 * 1024 * 1024)
+
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-merge-2',
+      })
+
+      const saved = await ctx.service.firstSave(input(file))
+
+      expect(saved).toEqual(uploaded)
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Twin.docx',
+        sizeBytes: 3 * 1024 * 1024,
+        maxBytes: 1024 * 1024,
+      })
+    })
   })
 
   it('refuses a directory path before any read', async () => {
