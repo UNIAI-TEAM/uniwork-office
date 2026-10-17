@@ -79,6 +79,7 @@ export const en = {
   uwConflictReloadTitle: 'Reload latest',
   uwConflictReloadGo: 'Reload',
   uwConflictSaveCopy: 'Save as a copy…',
+  uwConflictSaveCopyName: '{name} (copy)',
   uwConflictSaveCopyTitle: 'Save as a copy?',
   uwConflictSaveCopyConfirm:
     'UniWork will create a new document from your version, with the same owner and access as this document. The current document and version {server} by {author} stay as they are.',

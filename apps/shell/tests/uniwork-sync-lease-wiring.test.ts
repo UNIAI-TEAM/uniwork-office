@@ -31,13 +31,22 @@ const ORGS = [
 ]
 
 vi.mock('electron', () => ({
-  app: { getPath: () => dir, getVersion: () => '0.0.0-test' },
+  app: {
+    getPath: () => dir,
+    getVersion: () => '0.0.0-test',
+    configureHostResolver: () => undefined,
+  },
   BrowserWindow: { getFocusedWindow: () => null },
   dialog: {},
   safeStorage: {
     isEncryptionAvailable: () => true,
     encryptString: (text: string) => Buffer.from(`ENC1${text}`),
     decryptString: (buf: Buffer) => buf.toString().slice(4),
+  },
+  session: {
+    defaultSession: {
+      setSpellCheckerDictionaryDownloadURL: () => undefined,
+    },
   },
 }))
 

@@ -68,6 +68,7 @@ export const zh = {
   uwConflictReloadTitle: '重新加载最新版本',
   uwConflictReloadGo: '重新加载',
   uwConflictSaveCopy: '另存为副本…',
+  uwConflictSaveCopyName: '{name}（副本）',
   uwConflictSaveCopyTitle: '另存为副本？',
   uwConflictSaveCopyConfirm:
     'UniWork 将根据你的版本创建一个新文档，所有者和访问权限与此文档相同。当前文档和 {author} 的版本 {server} 保持不变。',

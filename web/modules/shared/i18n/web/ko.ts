@@ -79,6 +79,7 @@ export const ko = {
   uwConflictReloadTitle: '최신 버전 다시 불러오기',
   uwConflictReloadGo: '다시 불러오기',
   uwConflictSaveCopy: '사본으로 저장…',
+  uwConflictSaveCopyName: '{name} (사본)',
   uwConflictSaveCopyTitle: '사본으로 저장할까요?',
   uwConflictSaveCopyConfirm:
     'UniWork가 내 버전으로 이 문서와 소유자 및 액세스 권한이 같은 새 문서를 만듭니다. 현재 문서와 {author}님의 버전 {server}은(는) 그대로 유지됩니다.',

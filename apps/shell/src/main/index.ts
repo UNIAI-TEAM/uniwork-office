@@ -111,7 +111,12 @@ import {
   uniworkCloud,
   uniworkDeploymentProfile,
 } from './uniwork-auth'
-import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
+import {
+  applySpellcheckDictionaryDownloadGate,
+  configureStartupHostResolver,
+  createUniworkDocs,
+  type UniworkDocsHandle,
+} from './uniwork-docs/wiring'
 import { offlineTabMenuItem, unpinTabDocument } from './uniwork-sync/offline-library/menu'
 import type { OfflineLibraryApi } from './uniwork-sync/offline-library/api'
 import { registerUniworkWork } from './uniwork-work/wiring'
@@ -6711,6 +6716,8 @@ async function runHeadlessExportEntry(
 }
 
 app.whenReady().then(async () => {
+  configureStartupHostResolver()
+  applySpellcheckDictionaryDownloadGate(false)
   // a dev run has no bundle icns; packaged macOS builds take the Dock icon from the bundle
   if (!app.isPackaged && process.platform === 'darwin') {
     const dockIcon = join(app.getAppPath(), 'build', 'icon-mac.png')
