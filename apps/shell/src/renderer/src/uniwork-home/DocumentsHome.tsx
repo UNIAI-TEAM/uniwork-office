@@ -50,6 +50,7 @@ import {
   isMyFolder,
   labelMyFolderPath,
   liveFallback,
+  myFolderFirst,
   myFolderIdOf,
   shortPath,
   type FolderIndex,
@@ -980,10 +981,10 @@ export function DocumentsHome({
     return items
   }
 
-  const { folders, files } = useMemo(
-    () => splitAndSortItems(page.items, sort, dateLocale),
-    [page.items, sort, dateLocale],
-  )
+  const { folders, files } = useMemo(() => {
+    const split = splitAndSortItems(page.items, sort, dateLocale)
+    return { folders: myFolderFirst(split.folders), files: split.files }
+  }, [page.items, sort, dateLocale])
 
   const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
 
