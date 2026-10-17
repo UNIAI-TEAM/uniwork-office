@@ -173,6 +173,13 @@ function fakeServer(
      * against a different body); the flag is consumed once
      */
     createMismatch?: boolean
+    /**
+     * SAVE-01 r3 (S01-R3-3): the FIRST non-deduped create answers 409
+     * `idempotency_in_flight` (D's "this key already has a request running"
+     * verdict after the row was seeded); the flag is consumed once, so an
+     * unchanged-body retry replays the retained key and dedupes to that row
+     */
+    createInFlight?: boolean
   } = {},
 ) {
   const state = {
@@ -304,6 +311,13 @@ function fakeServer(
       if (options.createMismatch) {
         options.createMismatch = false
         return envelope(409, 'idempotency_payload_mismatch')
+      }
+      // SAVE-01 r3 (S01-R3-3): the row is seeded under this key but the create
+      // answers D's in-flight verdict once - an unchanged-body retry replays
+      // the retained key and dedupes to the seeded row above
+      if (options.createInFlight) {
+        options.createInFlight = false
+        return envelope(409, 'idempotency_in_flight')
       }
       // the row exists; only the answer was lost (S01-R1-4): the retry of the
       // same key replays the create instead of minting a twin. One-shot: a
@@ -2828,10 +2842,15 @@ describe('SAVE-01 first save r3 (S01-R2 fixes)', () => {
     expect(creates[0]!.idempotencyKey).toBeTruthy()
     expect(creates[1]!.idempotencyKey).toBeTruthy()
     expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
-    // the retried create sent the NEW bytes, and both rows exist server-side
-    // (the lost-answer row is the orhpan the mismatch guard exists to avoid
-    // uploading stale bytes against)
-    expect(retried.ok ? retried.value.id : '').not.toBe('')
+    // S01-R3-4: the second create's multipart bytes and the row D stored ARE
+    // the edited bytes - a stale-body replay would keep 'bytes v1' on both
+    const secondBody = creates[1]!.body as { bytes?: Uint8Array }
+    expect(secondBody.bytes).toEqual(enc('bytes v2 edited'))
+    expect(retried.ok ? retried.value.id : '').toBe('up_2')
+    expect(server.state.documents.get('up_2')?.bytes).toEqual(enc('bytes v2 edited'))
+    // the lost-answer row is the orphan the mismatch guard exists to avoid
+    // uploading stale bytes against: it keeps the FIRST attempt's body
+    expect(server.state.documents.get('up_1')?.bytes).toEqual(enc('bytes v1'))
   })
 
   // S01-R2-3: when D answers idempotency_payload_mismatch for a first-save
@@ -2855,7 +2874,50 @@ describe('SAVE-01 first save r3 (S01-R2 fixes)', () => {
       (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
     )
     expect(creates).toHaveLength(2)
+    expect(creates[1]!.idempotencyKey).toBeTruthy()
     expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    // S01-R3-3: the retry bound a fresh row - D owns the refused row it seeded
+    // under the refused key, so two rows exist and the second is the bound one
+    const created = [...server.state.documents.keys()].filter((id) => id.startsWith('up_'))
+    expect(created.sort()).toEqual(['up_1', 'up_2'])
+    expect(retried.ok ? retried.value.id : '').toBe('up_2')
+    const bound = JSON.parse(readFileSync(join(docDir('up_2'), BINDING_FILE), 'utf8')) as {
+      documentId?: string
+    }
+    expect(bound.documentId).toBe('up_2')
+  })
+
+  // S01-R3-3: D's 409 `idempotency_in_flight` answers a key whose request is
+  // still running server-side (errors.ts maps it to the retryable `network`).
+  // The attempt's key is RETAINED - the in-flight verdict never clears it - so
+  // an unchanged-body retry replays the SAME key and dedupes to the one row
+  // the first create seeded instead of minting a twin.
+  it('a 409 idempotency_in_flight keeps the key; an unchanged retry dedupes to one row', async () => {
+    const server = fakeServer({ createInFlight: true })
+    const ctx = setup(server)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    const refused = await ctx.service.firstSave(input(file))
+    expect(refused).toEqual({ ok: false, error: 'network' })
+
+    const retried = await ctx.service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+
+    const creates = server.calls.filter(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )
+    expect(creates).toHaveLength(2)
+    expect(creates[0]!.idempotencyKey).toBeTruthy()
+    expect(creates[0]!.idempotencyKey).toBe(creates[1]!.idempotencyKey)
+    // one server document total (the seeded row), bound to up_1
+    const created = [...server.state.documents.keys()].filter((id) => id.startsWith('up_'))
+    expect(created).toEqual(['up_1'])
+    expect(retried.ok ? retried.value.id : '').toBe('up_1')
+    const bound = JSON.parse(readFileSync(join(docDir('up_1'), BINDING_FILE), 'utf8')) as {
+      documentId?: string
+    }
+    expect(bound.documentId).toBe('up_1')
   })
 
   // S01-R2-5: after a compensated bind failure the attempt boundary is real -
@@ -2905,7 +2967,10 @@ describe('SAVE-01 first save r3 (S01-R2 fixes)', () => {
     const ctx = setup(server)
     const file = join(dir, 'Draft.docx')
     writeFileSync(file, 'bytes')
-    vi.spyOn(ctx.service.store, 'write').mockRejectedValue(new Error('disk full'))
+    const write = vi.spyOn(ctx.service.store, 'write').mockRejectedValue(new Error('disk full'))
+    // S01-R3-1: the compensation calls removeWorkingCopy for THIS attempt's
+    // copy - the (dir, name) it just wrote, nothing else
+    const remove = vi.spyOn(ctx.service.store, 'removeWorkingCopy')
 
     const saved = await ctx.service.firstSave(input(file))
 
@@ -2917,8 +2982,34 @@ describe('SAVE-01 first save r3 (S01-R2 fixes)', () => {
     )
     expect(archives).toHaveLength(1)
     expect(server.state.documents.get('up_1')?.archived).toBe(true)
+    expect(remove).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledWith(docDir('up_1'), 'Draft.docx')
     const dirEntries = existsSync(docDir('up_1')) ? readdirSync(docDir('up_1')) : []
     expect(dirEntries.filter((name) => name !== BINDING_FILE)).toEqual([])
+
+    // S01-R3-5: the compensated attempt's key is spent - a retry creates and
+    // binds a FRESH row under a different key (replaying the compensated key
+    // would answer the trashed row)
+    write.mockRestore()
+    const retried = await ctx.service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+
+    const creates = server.calls.filter(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )
+    expect(creates).toHaveLength(2)
+    expect(creates[1]!.idempotencyKey).toBeTruthy()
+    expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    // one archived first row + one newly bound row
+    const created = [...server.state.documents.keys()].filter((id) => id.startsWith('up_'))
+    expect(created.sort()).toEqual(['up_1', 'up_2'])
+    expect(server.state.documents.get('up_1')?.archived).toBe(true)
+    expect(server.state.documents.get('up_2')?.archived).toBeUndefined()
+    expect(retried.ok ? retried.value.id : '').toBe('up_2')
+    const bound = JSON.parse(readFileSync(join(docDir('up_2'), BINDING_FILE), 'utf8')) as {
+      documentId?: string
+    }
+    expect(bound.documentId).toBe('up_2')
   })
 
   // S01-R2-6: a cleanup failure is logged and never masks the typed failure.
@@ -2929,13 +3020,24 @@ describe('SAVE-01 first save r3 (S01-R2 fixes)', () => {
     writeFileSync(file, 'bytes')
     vi.spyOn(ctx.service.store, 'write').mockRejectedValue(new Error('disk full'))
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    vi.spyOn(ctx.service.store, 'removeWorkingCopy').mockRejectedValue(new Error('unlink denied'))
+    const cleanupError = new Error('unlink denied')
+    const remove = vi.spyOn(ctx.service.store, 'removeWorkingCopy').mockRejectedValue(cleanupError)
 
     const saved = await ctx.service.firstSave(input(file))
 
     expect(saved.ok).toBe(false)
     if (!saved.ok) expect(saved.error).toBe('first_save_bind_failed')
     expect(server.state.documents.get('up_1')?.archived).toBe(true)
+    // S01-R3-1+2: cleanup ran against this attempt's (dir, name), and its
+    // rejection is logged with the stranded-copy message and the cleanup
+    // error itself - a silent skip or a missing diagnostic would hide the
+    // copy the user could otherwise recover
+    expect(remove).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledWith(docDir('up_1'), 'Draft.docx')
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('stranded working copy Draft.docx could not be removed'),
+      cleanupError,
+    )
     warn.mockRestore()
   })
 })
