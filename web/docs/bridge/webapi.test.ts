@@ -35,9 +35,12 @@ function setup(): void {
 }
 
 /** boot with one seeded document open, like the host's init would */
-async function bootWith(name = 'Report.docx'): Promise<OpenFileResult> {
+async function bootWith(
+  name = 'Report.docx',
+  capabilities?: PortSession['capabilities'],
+): Promise<OpenFileResult> {
   const meta = mock.seed(name, DOCX)
-  mock.init({ documentId: meta.fileId })
+  mock.init({ documentId: meta.fileId, ...(capabilities ? { capabilities } : {}) })
   return (await api.consumePendingOpenDocx()) as OpenFileResult
 }
 
@@ -263,8 +266,8 @@ describe('saveDocx', () => {
     )
     // the host learns that a frame modal is open (protocol `modal`)
     expect(mock.modals).toEqual([true])
-    // Tab cycles inside the dialog (View differences, reload, save-copy, overwrite, the way out,
-    // then the close X), starting from Cancel: cancel -> X -> diff -> reload -> save-copy -> overwrite; Shift+Tab goes back
+    // Tab cycles inside the dialog (View differences, reload, overwrite, the way out, then the
+    // close X), starting from Cancel: cancel -> X -> diff -> reload -> overwrite; Shift+Tab goes back
     const tab = (shiftKey = false) =>
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true }))
     tab()
@@ -274,11 +277,7 @@ describe('saveDocx', () => {
     tab()
     expect(document.activeElement).toBe(btn('reload'))
     tab()
-    expect(document.activeElement).toBe(btn('save-copy'))
-    tab()
     expect(document.activeElement).toBe(btn('overwrite'))
-    tab(true)
-    expect(document.activeElement).toBe(btn('save-copy'))
     tab(true)
     expect(document.activeElement).toBe(btn('reload'))
     tab(true)
@@ -292,8 +291,19 @@ describe('saveDocx', () => {
     expect(mock.modals).toEqual([true, false])
   })
 
-  it('conflict -> Save as a copy…: present when editable, absent when view-only (UNI-1872)', async () => {
-    const doc = await bootWith()
+  it('conflict -> Save as a copy…: absent without saveCopy capability, present when saveCopy granted and editable, absent when view-only (UNI-1872)', async () => {
+    // 1. Capability absent (default host without saveCopy) -> no hook even when editable
+    const doc0 = await bootWith('Report.docx', { save: true })
+    mock.bumpRemote('f1')
+    const pending0 = api.saveDocx(doc0.path, buf([6]))
+    const dlg0 = await dialogShown('conflict')
+    expect(dlg0.querySelector('[data-choice="save-copy"]')).toBeNull()
+    await choose('conflict', 'cancel')
+    await pending0
+
+    // 2. Capability present + editable -> hook offered
+    setup()
+    const doc = await bootWith('Report.docx', { save: true, saveCopy: true })
     mock.bumpRemote('f1')
     const pending1 = api.saveDocx(doc.path, buf([7, 8]))
     const dlg1 = await dialogShown('conflict')
@@ -301,7 +311,7 @@ describe('saveDocx', () => {
     await choose('conflict', 'cancel')
     await pending1
 
-    // If the file becomes view-only while a save hits 409, save-copy and overwrite are omitted
+    // 3. Capability present + view-only -> no hook (and no overwrite)
     mock.override('api.save', () => {
       mock.rename('f1', 'Report-ro.docx', { writable: false })
       return Promise.reject(protocolError('conflict', 'HTTP 409'))
@@ -315,7 +325,7 @@ describe('saveDocx', () => {
   })
 
   it('conflict -> Save as a copy… -> confirm: sends api.saveCopy with open bytes and localized copy name, shows Done alert without re-pointing open document (UNI-1872)', async () => {
-    const doc = await bootWith('Report.docx')
+    const doc = await bootWith('Report.docx', { save: true, saveCopy: true })
     const seenOpens: OpenFileResult[] = []
     api.onOpenDocx((r) => seenOpens.push(r as OpenFileResult))
     const remote = mock.bumpRemote('f1')
@@ -351,7 +361,7 @@ describe('saveDocx', () => {
   })
 
   it('conflict -> Save as a copy…: unsupported and generic/refusal errors show failed alert and keep edits safe (UNI-1872)', async () => {
-    const doc = await bootWith('Báo cáo.docx')
+    const doc = await bootWith('Báo cáo.docx', { save: true, saveCopy: true })
     setWebLanguage('vi', { host: true })
     mock.bumpRemote('f1')
     mock.override('api.saveCopy', () =>
@@ -396,7 +406,7 @@ describe('saveDocx', () => {
   })
 
   it('conflict -> Save as a copy…: too_large with details.max_bytes returns to step 1 with limit alert (UNI-1872)', async () => {
-    const doc = await bootWith()
+    const doc = await bootWith('Report.docx', { save: true, saveCopy: true })
     mock.bumpRemote('f1')
     mock.override('api.saveCopy', () =>
       Promise.reject(

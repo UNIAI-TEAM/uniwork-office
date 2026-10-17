@@ -401,7 +401,8 @@ describe('document size limits and events (SIZE-F1, additive)', () => {
     expect(err.details).toEqual({ code: 'payload_too_large', max_bytes: 52_428_800 })
   })
 
-  it('validates api.saveCopy request and response payloads (UNI-1872)', () => {
+  it('validates api.saveCopy request and response payloads and saveCopy capability (UNI-1872)', () => {
+    expect(CAPABILITY_KEYS).toContain('saveCopy')
     expect(FRAME_REQUEST_TYPES).toContain('api.saveCopy')
     const req = (payload: unknown) =>
       parseEnvelope(env({ kind: 'request', type: 'api.saveCopy', payload }))
