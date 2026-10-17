@@ -16,6 +16,9 @@ const PORT =
 const requireBuild =
   !!process.env.WEB_E2E_REQUIRE_BUILD && process.env.WEB_E2E_REQUIRE_BUILD !== '0'
 
+// Optional browser channel override (e.g. WEB_E2E_CHANNEL=chrome|msedge for G7-05 T5); default is bundled chromium.
+const channel = process.env.WEB_E2E_CHANNEL?.trim() || undefined
+
 export default defineConfig({
   testDir: __dirname,
   globalSetup: requireBuild ? resolve(__dirname, 'require-builds.ts') : undefined,
@@ -45,5 +48,10 @@ export default defineConfig({
     acceptDownloads: true,
     launchOptions: { args: ['--no-sandbox'] },
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [
+    {
+      name: channel ?? 'chromium',
+      use: { browserName: 'chromium', ...(channel ? { channel } : {}) },
+    },
+  ],
 })
