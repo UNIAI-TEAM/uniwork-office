@@ -17,7 +17,10 @@ export function useEscOverlay(open: boolean, onEscape?: () => void): void {
     openCount++
     notify()
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') cb.current?.()
+      if (e.key === 'Escape' && cb.current) {
+        e.preventDefault()
+        cb.current()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => {

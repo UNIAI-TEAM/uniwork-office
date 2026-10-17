@@ -1227,6 +1227,17 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     ).toEqual({ ok: false, error: 'unsupported: exportPdf is not granted' })
     expect(await noPdf.mock.host.print({ mode: 'pdf' })).toEqual({ printed: false })
     expect(noPdf.downloads).toHaveLength(0)
+    const offPrint = noPdf.api.onMenuCommand((cmd) => {
+      if (cmd === 'print')
+        void noPdf.api.printSlides({
+          pngsBase64: [btoa('p')],
+          widthPx: 960,
+          heightPx: 540,
+        })
+    })
+    expect(await noPdf.mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
+    offPrint()
+    expect(printFn).toHaveBeenCalledTimes(1)
   })
 
   it('readOnly profile forces readOnly state, clamps save/saveAs/exportHtml off, refuses writes, and keeps granted print and exportPdf (D3)', async () => {

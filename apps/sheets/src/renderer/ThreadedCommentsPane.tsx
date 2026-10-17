@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 
+import { isViewOnly } from './capabilities'
 import { displayCommentAuthor } from './comment-author'
 import { useI18n } from './i18n/locale'
 import type { ThreadHover } from './threaded-comment-marker'
@@ -163,11 +164,13 @@ function ThreadCard({
   sheetId,
   thread,
   focused,
+  viewOnly,
   onJump,
 }: {
   readonly sheetId: string
   readonly thread: CellThread
   readonly focused: boolean
+  readonly viewOnly: boolean
   readonly onJump: () => void
 }): React.JSX.Element {
   const { t } = useI18n()
@@ -176,6 +179,7 @@ function ThreadCard({
     if (focused) ref.current?.scrollIntoView({ block: 'nearest' })
   }, [focused])
   const { row, column } = thread
+  const readOnly = thread.done || viewOnly
   return (
     <article
       ref={ref}
@@ -187,26 +191,30 @@ function ThreadCard({
         </button>
         {thread.done && <span className="tc-badge">{t('appThreadResolved')}</span>}
         <span className="tc-spacer" />
-        <button
-          type="button"
-          className="tc-link"
-          onClick={() => threadStore.setDone(sheetId, row, column, !thread.done)}
-        >
-          {t(thread.done ? 'appThreadReopen' : 'appThreadResolve')}
-        </button>
-        <button
-          type="button"
-          className="tc-link danger"
-          onClick={() => threadStore.remove(sheetId, row, column)}
-        >
-          {t('appThreadDeleteThread')}
-        </button>
+        {!viewOnly && (
+          <>
+            <button
+              type="button"
+              className="tc-link"
+              onClick={() => threadStore.setDone(sheetId, row, column, !thread.done)}
+            >
+              {t(thread.done ? 'appThreadReopen' : 'appThreadResolve')}
+            </button>
+            <button
+              type="button"
+              className="tc-link danger"
+              onClick={() => threadStore.remove(sheetId, row, column)}
+            >
+              {t('appThreadDeleteThread')}
+            </button>
+          </>
+        )}
       </header>
       <Entry
         author={thread.author}
         dT={thread.dT}
         text={thread.text}
-        readOnly={thread.done}
+        readOnly={readOnly}
         onEdit={(text) => threadStore.editText(sheetId, row, column, thread.id, text)}
         onDelete={() => threadStore.remove(sheetId, row, column)}
       />
@@ -216,12 +224,12 @@ function ThreadCard({
           author={reply.author}
           dT={reply.dT}
           text={reply.text}
-          readOnly={thread.done}
+          readOnly={readOnly}
           onEdit={(text) => threadStore.editText(sheetId, row, column, reply.id, text)}
           onDelete={() => threadStore.deleteReply(sheetId, row, column, reply.id)}
         />
       ))}
-      {!thread.done && (
+      {!readOnly && (
         <Composer
           placeholder={t('appThreadReplyPlaceholder')}
           autoFocus={focused}
@@ -243,8 +251,9 @@ export function ThreadedCommentsPane({
   useSyncExternalStore(threadStore.subscribe, threadStore.getVersion)
   const sheetId = useActiveSheetId(getRuntime)
   if (!pane.open) return null
+  const viewOnly = isViewOnly()
   const threads = threadStore.sheetThreads(sheetId)
-  const draft = pane.draft && pane.draft.sheetId === sheetId ? pane.draft : null
+  const draft = !viewOnly && pane.draft && pane.draft.sheetId === sheetId ? pane.draft : null
   const jump = (row: number, column: number): void => {
     const sheet = getRuntime()?.univerAPI.getActiveWorkbook()?.getActiveSheet()
     if (!sheet) return
@@ -295,6 +304,7 @@ export function ThreadedCommentsPane({
                 pane.focus.row === thread.row &&
                 pane.focus.column === thread.column
               }
+              viewOnly={viewOnly}
               onJump={() => jump(thread.row, thread.column)}
             />
           ))}

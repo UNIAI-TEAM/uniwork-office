@@ -1800,16 +1800,18 @@ export function Ribbon({
                     {t('ribbonFileSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
                   </button>
                 )}
-                <button
-                  disabled={!hasDoc}
-                  onClick={() => {
-                    setFileOpen(false)
-                    onExportPdf()
-                  }}
-                >
-                  {t('ribbonFileExportPdf')}
-                </button>
-                {isWeb() && (
+                {cap('exportPdf') && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setFileOpen(false)
+                      onExportPdf()
+                    }}
+                  >
+                    {t('ribbonFileExportPdf')}
+                  </button>
+                )}
+                {isWeb() && cap('exportPdf') && (
                   <button
                     disabled={!hasDoc}
                     data-use-app="print-pdf"
@@ -1821,24 +1823,28 @@ export function Ribbon({
                     {t('ribbonFileExportPdfPrint')}
                   </button>
                 )}
-                <button
-                  disabled={!hasDoc}
-                  onClick={() => {
-                    setFileOpen(false)
-                    onPrint()
-                  }}
-                >
-                  {t('ribbonFilePrint')} <span className="file-menu-key">Ctrl+P</span>
-                </button>
-                <button
-                  disabled={!hasDoc}
-                  onClick={() => {
-                    setFileOpen(false)
-                    onExportImages()
-                  }}
-                >
-                  {t('ribbonFileExportImages')}
-                </button>
+                {cap('print') && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setFileOpen(false)
+                      onPrint()
+                    }}
+                  >
+                    {t('ribbonFilePrint')} <span className="file-menu-key">Ctrl+P</span>
+                  </button>
+                )}
+                {cap('saveAs') && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setFileOpen(false)
+                      onExportImages()
+                    }}
+                  >
+                    {t('ribbonFileExportImages')}
+                  </button>
+                )}
               </div>
             )}
           </div>

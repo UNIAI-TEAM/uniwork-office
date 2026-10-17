@@ -212,6 +212,7 @@ function NoteCard({
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                       if (editingText.trim()) onEditSubmit(item)
                     } else if (e.key === 'Escape') {
+                      e.preventDefault()
                       e.stopPropagation()
                       onEditCancel()
                     }
@@ -247,6 +248,7 @@ function NoteCard({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
               else if (e.key === 'Escape') {
+                e.preventDefault()
                 e.stopPropagation()
                 onClose()
               }
@@ -323,6 +325,7 @@ function NoteDraftCard({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
             else if (e.key === 'Escape') {
+              e.preventDefault()
               e.stopPropagation()
               onCancel()
             }

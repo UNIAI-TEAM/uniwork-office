@@ -82,11 +82,13 @@ export async function loadPdfCommentsContext(
   const myUserId = boundedId(raw.myUserId)
   const level =
     typeof raw.level === 'string' && LEVELS.has(raw.level) ? raw.level : ('edit' as const)
+  const v = raw as CommentsContextResult & { frame?: unknown; profile?: unknown }
+  const forceView = v.profile === 'readOnly' || (readOnly && v.frame !== true)
   return {
     documentId,
     versionId: boundedId(raw.versionId) ?? null,
     ...(myUserId ? { myUserId } : {}),
-    level: readOnly ? 'view' : level,
+    level: forceView ? 'view' : level,
   }
 }
 

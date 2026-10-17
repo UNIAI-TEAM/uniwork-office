@@ -46,6 +46,7 @@
  * non-fatal: the frame shows its own styled screen) and the renderer shows that screen.
  */
 import {
+  isReadOnlyProfile,
   toProtocolError,
   type Capabilities,
   type FileMeta,
@@ -84,6 +85,8 @@ import type {
   DesktopApi,
   MenuAction,
   WorkbookCellEdit,
+  WorkbookExportCsvResult,
+  WorkbookExportPdfResult,
   WorkbookFile,
   WorkbookSaveEditsAbort,
   WorkbookSaveEditsBegin,
@@ -270,8 +273,13 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   const refusedIds = new Set<string>()
 
   /** renderer-level keys the host grants switch on (./capabilities.ts sheetsHostGrants) */
-  const granted = (key: 'open' | 'save' | 'saveAs') => capabilities[key] === true
-  const canSave = () => granted('save') && refusedError === null
+  let readOnlyProfile = false
+  const granted = (key: 'open' | 'save' | 'saveAs' | 'print' | 'exportPdf' | 'exportHtml') =>
+    capabilities[key] === true
+  const canSave = () => !readOnlyProfile && granted('save') && refusedError === null
+  const canSaveAs = () => !readOnlyProfile && granted('saveAs') && refusedError === null
+  const canPrint = () => granted('print')
+  const canExportPdf = () => granted('exportPdf')
 
   /** fileId -> latest server metadata (etag = If-Match base of the next save) */
   const files = new Map<string, FileMeta>()
@@ -294,6 +302,14 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     .then((s) => {
       initDocumentId = s.documentId
       effective = s.capabilities
+      readOnlyProfile = isReadOnlyProfile(s)
+      if (readOnlyProfile) {
+        Object.assign(capabilities as Record<string, unknown>, {
+          save: false,
+          saveAs: false,
+          exportHtml: false,
+        })
+      }
     })
     .catch(() => {})
   /** the document whose draft is being offered (before it is opened) */
@@ -512,7 +528,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         const action: MenuAction | null =
           key === 's'
             ? event.shiftKey
-              ? granted('saveAs') && refusedError === null
+              ? canSaveAs()
                 ? 'save-as'
                 : null
               : canSave()
@@ -520,7 +536,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
                 : null
             : key === 'o' && !event.shiftKey && granted('open')
               ? 'open'
-              : key === 'p' && !event.shiftKey
+              : key === 'p' && !event.shiftKey && canPrint()
                 ? 'print'
                 : null
         if (key === 's' || key === 'o' || key === 'p') event.preventDefault()
@@ -587,7 +603,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (refusedError) return { ok: false, error: refusedError }
     const locked = lockedSave()
     if (locked) return locked
-    if (!canSave()) return { ok: false, error: { code: 'forbidden', message: 'view-only' } }
+    if (!canSave()) {
+      const code = readOnlyProfile || capabilities.saveAs === true ? 'unsupported' : 'forbidden'
+      return { ok: false, error: { code, message: 'view-only' } }
+    }
     if (!current) return { ok: false, error: { code: 'not_ready', message: 'no workbook is open' } }
     if (hostSave)
       return { ok: false, error: { code: 'busy', message: 'a save is already running' } }
@@ -611,8 +630,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (refusedError) return { ok: false, error: refusedError }
     const locked = lockedSave()
     if (locked) return locked
-    if (!granted('saveAs'))
-      return { ok: false, error: { code: 'forbidden', message: 'save-as not granted' } }
+    if (!canSaveAs())
+      return { ok: false, error: { code: 'unsupported', message: 'save-as not granted' } }
     if (hostSaveAs)
       return { ok: false, error: { code: 'busy', message: 'a save-as is already running' } }
     return new Promise<SaveResult>((resolve) => {
@@ -640,7 +659,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   })
 
   port.handlePrint(async (payload) => {
-    const started = runMenu(payload?.mode === 'pdf' ? 'export-pdf' : 'print')
+    const pdf = payload?.mode === 'pdf'
+    if (pdf ? !canExportPdf() : !canPrint()) return { printed: false }
+    const started = runMenu(pdf ? 'export-pdf' : 'print')
     return { printed: started }
   })
 
@@ -934,9 +955,17 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         throw new Error(refusedError.message)
       }
       if (remote?.locked()) throw new Error(remote.lockText())
-      if (!canSave() || (input.mode === 'save-as' && !granted('saveAs'))) {
-        hostSaveAs?.settle({ ok: false, error: { code: 'forbidden', message: 'view-only' } })
-        throw new Error(text('appWebViewOnly'))
+      const isSaveAs = input.mode === 'save-as' || hostSaveAs !== null
+      if (isSaveAs ? !canSaveAs() : !canSave()) {
+        hostSaveAs?.settle({
+          ok: false,
+          error: { code: 'unsupported', message: 'save-as not granted' },
+        })
+        throw new Error(
+          isSaveAs
+            ? 'unsupported: saveAs is not granted'
+            : `unsupported: ${text('appWebViewOnly')}`,
+        )
       }
       const request = resolveTransfer(input)
       const session = sessions.get(request.sessionId)
@@ -1036,19 +1065,43 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     autoRenameWorkbook: async (_sessionId: string, _baseName: string) => ({ renamed: false }),
 
     // ---- export / print ----------------------------------------------------
-    async exportPdf(request) {
+    async exportPdf(
+      request: Partial<Parameters<DesktopApi['exportPdf']>[0]> & { fileName: string; html: string },
+    ) {
+      if (!canExportPdf()) {
+        return {
+          canceled: false as const,
+          error: 'unsupported: exportPdf is not granted',
+        } as unknown as WorkbookExportPdfResult
+      }
       const r = await print(request.html)
       return r.ok
         ? { canceled: false as const, path: `${withExt(request.fileName, '.pdf')} (print dialog)` }
         : { canceled: true as const }
     },
-    async printWorkbook(request) {
+    async printWorkbook(
+      request: Partial<Parameters<DesktopApi['printWorkbook']>[0]> & { html: string },
+    ) {
+      if (!canPrint()) {
+        return { ok: false as const, error: 'unsupported: print is not granted' }
+      }
       const r = await print(request.html)
       return r.ok
         ? { ok: true as const }
         : { ok: false as const, ...(r.error ? { error: r.error } : {}) }
     },
-    async exportCsv(request) {
+    async exportCsv(
+      request: Partial<Parameters<DesktopApi['exportCsv']>[0]> & {
+        fileName: string
+        content: string
+      },
+    ) {
+      if (!canSaveAs()) {
+        return {
+          canceled: false as const,
+          error: 'unsupported: saveAs is not granted',
+        } as unknown as WorkbookExportCsvResult
+      }
       const name = withExt(request.fileName, '.csv')
       download(name, new Blob(['﻿', request.content], { type: 'text/csv;charset=utf-8' }))
       return { canceled: false as const, path: name }

@@ -54,6 +54,7 @@ import type {
   SlidesApi,
 } from '../../../apps/slides/src/shared/ipc'
 import {
+  isReadOnlyProfile,
   toProtocolError,
   type FileMeta,
   type FileSource,
@@ -428,8 +429,15 @@ export function createWebSlidesApi(
   })
   const handlerCtx: HandlerContext = { clientId: WEB_CLIENT_ID, host }
 
-  /** without the host's `save` grant the frame is view-only: the deck is never changed */
-  const viewOnly = (): boolean => ctx.capabilities.save === false
+  let readOnlyProfile = false
+  /** without the host's `save` grant (or in readOnly profile) the frame is view-only: the deck is never changed */
+  const viewOnly = (): boolean => readOnlyProfile || ctx.capabilities.save === false
+  const canSaveAs = (): boolean =>
+    !readOnlyProfile && ctx.capabilities.saveAs !== false && state.effective?.saveAs !== false
+  const canPrint = (): boolean =>
+    ctx.capabilities.print !== false && state.effective?.print !== false
+  const canExportPdf = (): boolean =>
+    ctx.capabilities.exportPdf !== false && state.effective?.exportPdf !== false
 
   /** a session handler with IPC semantics: cloned in, cloned out, rejections for throws */
   async function invoke(channel: SessionChannel, ...args: unknown[]): Promise<any> {
@@ -444,9 +452,11 @@ export function createWebSlidesApi(
         return null
       }
     }
-    if (viewOnly() && !READ_ONLY_CHANNELS.has(channel)) {
-      return channel === 'slides:save' || channel === 'slides:save-as'
-        ? { ok: false, error: text('webReadOnly') }
+    if (channel === 'slides:save-as') {
+      if (!canSaveAs()) return { ok: false, error: 'unsupported: slides:save-as is not granted' }
+    } else if (viewOnly() && !READ_ONLY_CHANNELS.has(channel)) {
+      return channel === 'slides:save'
+        ? { ok: false, error: 'unsupported: slides:save is not granted in view-only mode' }
         : null
     }
     const handler = callSessionHandler as (
@@ -595,7 +605,15 @@ export function createWebSlidesApi(
     .then(async (s) => {
       userName = (s as { user?: { displayName?: string } }).user?.displayName || undefined
       initDocumentId = s.documentId
+      readOnlyProfile = isReadOnlyProfile(s)
       state.effective = s.capabilities
+      if (readOnlyProfile) {
+        Object.assign(ctx.capabilities, {
+          save: false,
+          saveAs: false,
+          exportHtml: false,
+        })
+      }
       return (
         s.open ??
         (await port.request('api.open', { fileId: s.documentId }, { timeoutMs: TIMEOUTS.transfer }))
@@ -715,6 +733,12 @@ export function createWebSlidesApi(
     if (state.fatal) return { ok: false, error: state.fatal }
     const locked = lockedSave()
     if (locked) return locked
+    if (viewOnly()) {
+      return {
+        ok: false,
+        error: { code: 'unsupported' as const, message: 'save is not granted in view-only mode' },
+      }
+    }
     if (!current)
       return { ok: false, error: { code: 'not_ready' as const, message: 'no document is open' } }
     if (state.hostSaving)
@@ -748,6 +772,12 @@ export function createWebSlidesApi(
     if (state.fatal) return { ok: false, error: state.fatal }
     const locked = lockedSave()
     if (locked) return locked
+    if (!canSaveAs()) {
+      return {
+        ok: false,
+        error: { code: 'unsupported' as const, message: 'save-as is not granted' },
+      }
+    }
     if (hostSaveAs)
       return {
         ok: false,
@@ -794,7 +824,9 @@ export function createWebSlidesApi(
   })
 
   let hostPrint: ((printed: boolean) => void) | null = null
-  port.handlePrint(async () => {
+  port.handlePrint(async (payload) => {
+    const pdf = payload?.mode === 'pdf'
+    if (pdf ? !canExportPdf() : !canPrint()) return { printed: false }
     if (menuEvents.size === 0) return { printed: false }
     return new Promise((resolve) => {
       const timer = setTimeout(() => settle(false), 10 * 60_000)
@@ -832,8 +864,8 @@ export function createWebSlidesApi(
     if (!command) return
     e.preventDefault()
     if (command === 'open' && ctx.capabilities.open !== true) return
-    if (command === 'save' && ctx.capabilities.save === false) return
-    if (command === 'save-as' && ctx.capabilities.saveAs === false) return
+    if (command === 'save' && viewOnly()) return
+    if (command === 'save-as' && !canSaveAs()) return
     if (state.fatal) return
     menuEvents.emit(command)
   }
@@ -1223,8 +1255,9 @@ export function createWebSlidesApi(
     },
 
     // export / print: in-frame downloads and printing (no directory or path on the web)
-    pickExportDir: async () => 'web-download',
+    pickExportDir: async () => (canSaveAs() ? 'web-download' : null),
     savePicture: async (op: SavePictureOp): Promise<SavePictureResult> => {
+      if (!canSaveAs()) return { ok: false, error: 'unsupported: saveAs is not granted' }
       const name = withExt(safeFileName(op.defaultName, 'picture'), '.png')
       download(
         name,
@@ -1233,6 +1266,7 @@ export function createWebSlidesApi(
       return { ok: true, path: name }
     },
     exportImages: async (op: ExportImagesOp): Promise<ExportImagesResult> => {
+      if (!canSaveAs()) return { ok: false, error: 'unsupported: saveAs is not granted' }
       try {
         const name = safeFileName(`${op.baseName}-images.zip`, 'slides-images.zip')
         const zip = await zipImages(op.baseName, op.pngsBase64)
@@ -1242,8 +1276,10 @@ export function createWebSlidesApi(
         return { ok: false, error: String(err) }
       }
     },
-    pickExportPdfPath: async (defaultName) => withExt(safeFileName(defaultName, 'slides'), '.pdf'),
+    pickExportPdfPath: async (defaultName) =>
+      canExportPdf() ? withExt(safeFileName(defaultName, 'slides'), '.pdf') : null,
     exportPdf: async (op: ExportPdfOp): Promise<ExportPdfResult> => {
+      if (!canExportPdf()) return { ok: false, error: 'unsupported: exportPdf is not granted' }
       try {
         const name = withExt(
           safeFileName(op.filePath.split(/[\\/]/).pop() || 'slides', 'slides'),
@@ -1261,6 +1297,10 @@ export function createWebSlidesApi(
       }
     },
     printSlides: async (op: PrintSlidesOp) => {
+      if (!canPrint()) {
+        hostPrint?.(false)
+        return { ok: false, error: 'unsupported: print is not granted' }
+      }
       const r = await (opts.print ?? printHtml)(printDocument(op))
       hostPrint?.(r.ok)
       return r
@@ -1315,7 +1355,26 @@ export function createWebSlidesApi(
   }
 
   return {
-    slidesApi,
+    slidesApi: slidesApi as SlidesApi & {
+      pickExportDir: (defaultName?: string) => Promise<string | null>
+      exportImages: (
+        op: ExportImagesOp | { baseName: string; pngsBase64: readonly string[]; dir?: string },
+      ) => Promise<ExportImagesResult>
+      exportPdf: (
+        op:
+          | ExportPdfOp
+          | { filePath: string; pngsBase64: readonly string[]; widthPx: number; heightPx: number },
+      ) => Promise<ExportPdfResult>
+      printSlides: (
+        op:
+          | PrintSlidesOp
+          | {
+              pages: ReadonlyArray<{ index: number; pngBase64: string }>
+              widthPx: number
+              heightPx: number
+            },
+      ) => Promise<{ ok: boolean; error?: string }>
+    },
     /** for tests and the e2e driver */
     state,
     host,

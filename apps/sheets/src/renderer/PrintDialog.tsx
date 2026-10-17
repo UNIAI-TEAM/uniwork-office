@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { PrinterInfo } from '../shared/desktop-api'
+import { cap } from './capabilities'
 import type { PageSetupJournalState } from './edit-journal'
 import { useI18n } from './i18n/locale'
 import { useModalDialog } from './modal-dialog'
@@ -524,29 +525,33 @@ export function PrintDialog({
           <button className="secondary" onClick={onClose}>
             {t('dlgCancel')}
           </button>
-          <button
-            className="secondary"
-            disabled={!canOutput}
-            onClick={() => void run((built) => host.exportPdf(built, pages))}
-          >
-            {t('dlgPrintToPdf')}
-          </button>
-          <button
-            className="primary-action"
-            disabled={!canOutput}
-            onClick={() =>
-              void run((built) =>
-                host.print(built, {
-                  deviceName: deviceName === SYSTEM_DIALOG ? null : deviceName,
-                  copies,
-                  collate,
-                  pages,
-                }),
-              )
-            }
-          >
-            {t('dlgPrintButton')}
-          </button>
+          {cap('exportPdf') && (
+            <button
+              className="secondary"
+              disabled={!canOutput}
+              onClick={() => void run((built) => host.exportPdf(built, pages))}
+            >
+              {t('dlgPrintToPdf')}
+            </button>
+          )}
+          {cap('print') && (
+            <button
+              className="primary-action"
+              disabled={!canOutput}
+              onClick={() =>
+                void run((built) =>
+                  host.print(built, {
+                    deviceName: deviceName === SYSTEM_DIALOG ? null : deviceName,
+                    copies,
+                    collate,
+                    pages,
+                  }),
+                )
+              }
+            >
+              {t('dlgPrintButton')}
+            </button>
+          )}
         </div>
       </div>
     </div>

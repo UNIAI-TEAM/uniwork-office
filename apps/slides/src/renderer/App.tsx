@@ -2163,6 +2163,7 @@ export function App() {
 
   const addComment = useCallback(
     async (text: string) => {
+      if (isViewOnly()) return
       const r = await window.slidesApi.addComment({ slideIndex: current, text })
       if (r) {
         setComments(r)
@@ -2175,6 +2176,7 @@ export function App() {
 
   const deleteComment = useCallback(
     async (c: SlideComment) => {
+      if (isViewOnly()) return
       const r = await window.slidesApi.deleteComment({
         slideIndex: current,
         authorId: c.authorId,
@@ -2198,6 +2200,7 @@ export function App() {
 
   // "New Comment" on a bound document: a server thread on this slide (+ the one selected object)
   const newComment = useCallback(() => {
+    if (!serverComments && isViewOnly()) return
     openComments(!serverComments)
     if (!serverComments) return
     const ctx = ctxRef.current
@@ -2267,9 +2270,17 @@ export function App() {
   useEffect(() => {
     if (viewMode !== 'reading') return
     const onKey = (e: KeyboardEvent) => {
+      if (
+        document.querySelector(
+          '[role="dialog"], [role="menu"], [aria-modal="true"], [data-esc-local]',
+        )
+      )
+        return
       if (e.key === 'Escape') {
-        e.preventDefault()
-        if (!uniworkRef.current.readOnly) setViewMode('normal')
+        if (!uniworkRef.current.readOnly) {
+          e.preventDefault()
+          setViewMode('normal')
+        }
       } else if (
         e.key === 'ArrowRight' ||
         e.key === 'ArrowDown' ||
@@ -2491,9 +2502,9 @@ export function App() {
       else if (cmd === 'save') void save()
       else if (cmd === 'save-as') void saveAs()
       // macOS has no File ribbon tab, so these only exist in the menu
-      else if (cmd === 'export-pdf') void exportPdf()
-      else if (cmd === 'export-images') void exportImages()
-      else if (cmd === 'print') setPrintDlgOpen(true)
+      else if (cmd === 'export-pdf' && cap('exportPdf')) void exportPdf()
+      else if (cmd === 'export-images' && cap('saveAs')) void exportImages()
+      else if (cmd === 'print' && cap('print')) setPrintDlgOpen(true)
       // Through the preview path so the zoom pivots on the viewport center, not the scroll origin
       else if (cmd === 'zoom-in') previewZoom(nextPreset)
       else if (cmd === 'zoom-out') previewZoom(prevPreset)
@@ -2642,12 +2653,15 @@ export function App() {
   useEffect(() => {
     if (!mediaPlay) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMediaPlay(null)
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setMediaPlay(null)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [mediaPlay])
-  useEscOverlay(!!mediaPlay || !!drawKind || viewMode === 'reading')
+  useEscOverlay(!!mediaPlay || !!drawKind || (viewMode === 'reading' && !uniwork.readOnly))
   const overlayOpen = useEscOverlayOpen()
 
   const startEditCell = useCallback((sourceId: string, row: number, col: number) => {
@@ -4045,7 +4059,10 @@ export function App() {
                                       }
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') commitRenameSection()
-                                        else if (e.key === 'Escape') setRenamingSec(null)
+                                        else if (e.key === 'Escape') {
+                                          e.preventDefault()
+                                          setRenamingSec(null)
+                                        }
                                       }}
                                       onBlur={commitRenameSection}
                                     />

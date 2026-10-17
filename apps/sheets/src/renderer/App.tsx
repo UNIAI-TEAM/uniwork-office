@@ -4860,11 +4860,11 @@ export function App({
     if (action === 'open') {
       void handleInspectWorkbook()
     } else if (action === 'print') {
-      void openPrintPreviewHost(pageLayoutContext()).then(setPrintHost)
+      if (cap('print')) void openPrintPreviewHost(pageLayoutContext()).then(setPrintHost)
     } else if (action === 'export-pdf') {
-      void handleExportPdfImpl(pageLayoutContext())
+      if (cap('exportPdf')) void handleExportPdfImpl(pageLayoutContext())
     } else if (action === 'export-csv') {
-      void handleExportCsvImpl(csvExportContext())
+      if (cap('exportCsv') && cap('saveAs')) void handleExportCsvImpl(csvExportContext())
     } else if (action === 'undo' || action === 'redo') {
       // The shell's own text fields (AI prompt, dialog inputs) keep native
       // text undo; everywhere else ⌘Z means workbook history.

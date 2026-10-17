@@ -153,13 +153,15 @@ async function svgToPngBase64(
 
 /** The desktop's export pages (vector SVG or PNG) as PNGs for the image-per-page PDF */
 export async function exportPagesToPngs(op: {
-  pages: readonly ExportPdfPage[]
+  pages?: readonly ExportPdfPage[]
+  pngsBase64?: readonly string[]
   widthPx: number
   heightPx: number
   fontCss?: string
 }): Promise<string[]> {
+  if (op.pngsBase64) return [...op.pngsBase64]
   const out: string[] = []
-  for (const page of op.pages)
+  for (const page of op.pages ?? [])
     out.push(
       'png' in page
         ? page.png
@@ -204,8 +206,12 @@ export async function slidesPdf(op: {
 
 /** the print document the desktop prints (same layouts: full / handouts / notes) */
 export function printDocument(op: PrintSlidesOp): string {
+  const pngs =
+    op.pngsBase64 ??
+    (op as { pages?: ReadonlyArray<{ pngBase64: string }> }).pages?.map((p) => p.pngBase64) ??
+    []
   return buildPrintDocumentHtml({
-    srcs: op.pngsBase64.map((b64) => `data:image/png;base64,${b64}`),
+    srcs: pngs.map((b64) => `data:image/png;base64,${b64}`),
     ratio: op.widthPx / op.heightPx,
     layout: op.layout ?? 'full',
     ...(op.notes ? { notes: op.notes } : {}),

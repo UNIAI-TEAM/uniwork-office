@@ -241,7 +241,10 @@ export function PivotFieldPane({
       setMenu(null)
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setMenu(null)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMenu(null)
+      }
     }
     document.addEventListener('pointerdown', close, true)
     document.addEventListener('keydown', onKey)

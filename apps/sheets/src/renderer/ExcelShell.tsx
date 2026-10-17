@@ -785,6 +785,18 @@ export function ExcelShell({
     // dialogs, Univer's find/replace and formula bar) never trigger these.
     const onKeyDown = (event: KeyboardEvent): void => {
       if (openingWorkbookRef.current) return
+      if (
+        event.key === 'Escape' &&
+        !event.defaultPrevented &&
+        !isModalOpen() &&
+        !document.querySelector(
+          '[role="dialog"], [role="menu"], [aria-modal="true"], [data-esc-local]',
+        ) &&
+        onIsCellEditingRef.current()
+      ) {
+        event.preventDefault()
+        return
+      }
       const action = resolveGlobalShortcut(event, {
         isMac: IS_MAC,
         modalOpen: isModalOpen(),
@@ -1619,6 +1631,7 @@ function TableNameInput({
           commit()
           event.currentTarget.blur()
         } else if (event.key === 'Escape') {
+          event.preventDefault()
           cancelledRef.current = true
           setValue(name)
           event.currentTarget.blur()
@@ -4228,7 +4241,10 @@ function useEscapeClose(open: boolean, close: () => void): void {
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') closeRef.current()
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeRef.current()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -4424,6 +4440,7 @@ function EditableMenuSelect({
             if (event.key === 'Enter') {
               event.currentTarget.blur() // blur handler commits
             } else if (event.key === 'Escape') {
+              event.preventDefault()
               setDraft(null)
               event.currentTarget.blur()
             }

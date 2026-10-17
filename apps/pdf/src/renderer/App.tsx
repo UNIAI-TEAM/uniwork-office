@@ -5478,7 +5478,7 @@ export default function App() {
       opFailed(t('redactStructureBlocked'))
       return undefined
     }
-    if (dirty && !(await save('internal'))) return undefined
+    if (dirty && cap('save') && !(await save('internal'))) return undefined
     return fn()
   }
 
@@ -5696,6 +5696,7 @@ export default function App() {
   // currentPage only tracks scroll, so it can outlive a page deletion
   const printCurrentPage = Math.max(1, Math.min(currentPage, pageCount))
   const openPrintDlg = () => {
+    if (!cap('print')) return
     setPrintMode('all')
     setPrintInput(String(printCurrentPage))
     setPrintInvalid(false)
@@ -6234,7 +6235,7 @@ export default function App() {
         const k = e.key.toLowerCase()
         if (k === 's') {
           e.preventDefault()
-          void save()
+          if (cap('save')) void save()
         } else if (k === 'z') {
           e.preventDefault()
           if (e.shiftKey) redo()
@@ -6244,7 +6245,7 @@ export default function App() {
           openSearch()
         } else if (k === 'p' && !e.shiftKey) {
           e.preventDefault()
-          openPrintDlg()
+          if (cap('print')) openPrintDlg()
         } else if (e.key === '=' || e.key === '+') {
           e.preventDefault()
           zoomIn()
@@ -6259,20 +6260,54 @@ export default function App() {
         return
       }
       if (e.key === 'Escape') {
-        // Modal dialogs own Escape; the states behind them must not react too
-        if (signDlg || stampDlg || propsDlg) return
-        if (askPop) setAskPop(null)
-        else if (textDraft) setTextDraft(null)
-        else if (pendingTextInsert) setPendingTextInsert(null)
-        else if (imagePick) setImagePick(null)
-        else if (editTextMode) setEditTextMode(false)
-        else if (editImageMode) setEditImageMode(false)
-        else if (pendingSign) setPendingSign(null)
-        else if (noteDraft) setNoteDraft(null)
-        else if (activeNote) setActiveNote(null)
-        else if (drawTool) setDrawTool(null)
-        else if (selected) setSelected(null)
-        else if (searchOpen) closeSearch()
+        // Modal dialogs and local overlays own Escape; the states behind them must not react too
+        if (
+          e.defaultPrevented ||
+          signDlg ||
+          stampDlg ||
+          propsDlg ||
+          document.querySelector(
+            '[role="dialog"], [role="menu"], [aria-modal="true"], [data-esc-local]',
+          )
+        )
+          return
+        if (askPop) {
+          e.preventDefault()
+          setAskPop(null)
+        } else if (textDraft) {
+          e.preventDefault()
+          setTextDraft(null)
+        } else if (pendingTextInsert) {
+          e.preventDefault()
+          setPendingTextInsert(null)
+        } else if (imagePick) {
+          e.preventDefault()
+          setImagePick(null)
+        } else if (editTextMode) {
+          e.preventDefault()
+          setEditTextMode(false)
+        } else if (editImageMode) {
+          e.preventDefault()
+          setEditImageMode(false)
+        } else if (pendingSign) {
+          e.preventDefault()
+          setPendingSign(null)
+        } else if (noteDraft) {
+          e.preventDefault()
+          setNoteDraft(null)
+        } else if (activeNote) {
+          e.preventDefault()
+          setActiveNote(null)
+        } else if (drawTool) {
+          e.preventDefault()
+          setDrawTool(null)
+        } else if (selected) {
+          e.preventDefault()
+          setSelected(null)
+        } else if (searchOpen) {
+          e.preventDefault()
+          closeSearch()
+        }
         return
       }
       if (inEditable) return
@@ -6745,19 +6780,21 @@ export default function App() {
     <div className="app" inert={redactionCopyInFlight} aria-busy={redactionCopyInFlight}>
       <div className={`ribbon ${collapse.rootClass}`} ref={collapse.rootRef}>
         <div className="ribbon-tabs" onDoubleClick={collapse.onTabsDoubleClick}>
-          <button
-            className="qa-btn"
-            data-tip={`${t('save')} (${platformShortcuts('⌘S')})`}
-            aria-label={t('save')}
-            disabled={
-              (!dirty && !openBoxesDirty && !(uniwork.bound && !uniwork.readOnly)) ||
-              uniwork.readOnly ||
-              saveState === 'saving'
-            }
-            onClick={() => void save()}
-          >
-            <IconSave />
-          </button>
+          {cap('save') && (
+            <button
+              className="qa-btn"
+              data-tip={`${t('save')} (${platformShortcuts('⌘S')})`}
+              aria-label={t('save')}
+              disabled={
+                (!dirty && !openBoxesDirty && !(uniwork.bound && !uniwork.readOnly)) ||
+                uniwork.readOnly ||
+                saveState === 'saving'
+              }
+              onClick={() => void save()}
+            >
+              <IconSave />
+            </button>
+          )}
           <button
             className="qa-btn"
             data-tip={`${t('undo')} (${platformShortcuts('⌘Z')})`}
@@ -6951,28 +6988,32 @@ export default function App() {
               <div className="ribbon-group">
                 <div className="ribbon-group-items">
                   {searchBtn}
-                  <button
-                    className="rb-big"
-                    data-tip={`${t('print')} (${platformShortcuts('⌘P')})`}
-                    disabled={printing}
-                    onClick={openPrintDlg}
-                  >
-                    <span className="rb-big-icon">
-                      <IconPrint />
-                    </span>
-                    {printing ? t('printPreparing') : t('print')}
-                  </button>
-                  <button
-                    className="rb-big"
-                    data-tip={t('exportImagesAll')}
-                    disabled={exporting}
-                    onClick={() => void exportImages(true)}
-                  >
-                    <span className="rb-big-icon">
-                      <IconExportImg />
-                    </span>
-                    {exporting ? t('exporting') : t('exportImages')}
-                  </button>
+                  {cap('print') && (
+                    <button
+                      className="rb-big"
+                      data-tip={`${t('print')} (${platformShortcuts('⌘P')})`}
+                      disabled={printing}
+                      onClick={openPrintDlg}
+                    >
+                      <span className="rb-big-icon">
+                        <IconPrint />
+                      </span>
+                      {printing ? t('printPreparing') : t('print')}
+                    </button>
+                  )}
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      data-tip={t('exportImagesAll')}
+                      disabled={exporting}
+                      onClick={() => void exportImages(true)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconExportImg />
+                      </span>
+                      {exporting ? t('exporting') : t('exportImages')}
+                    </button>
+                  )}
                   <button
                     className="rb-big"
                     data-tip={t('propsTitle')}
@@ -7455,16 +7496,18 @@ export default function App() {
                     </span>
                     {t('deletePage')}
                   </button>
-                  <button
-                    className="rb-big"
-                    disabled={curOrigIdx < 0 || readOnly}
-                    onClick={openExtractDlg}
-                  >
-                    <span className="rb-big-icon">
-                      <IconExtract />
-                    </span>
-                    {t('extractPage')}
-                  </button>
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      disabled={curOrigIdx < 0 || readOnly}
+                      onClick={openExtractDlg}
+                    >
+                      <span className="rb-big-icon">
+                        <IconExtract />
+                      </span>
+                      {t('extractPage')}
+                    </button>
+                  )}
                   {cap('insertPages') && (
                     <button
                       className="rb-big"
@@ -7539,42 +7582,50 @@ export default function App() {
                     </span>
                     {t('reversePages')}
                   </button>
-                  <button
-                    className="rb-big"
-                    disabled={pageCount <= 1 || readOnly}
-                    onClick={openSplitDlg}
-                  >
-                    <span className="rb-big-icon">
-                      <IconSplitPdf />
-                    </span>
-                    {t('splitPdf')}
-                  </button>
-                  <button className="rb-big" disabled={readOnly} onClick={() => void mergePdf()}>
-                    <span className="rb-big-icon">
-                      <IconMergePdf />
-                    </span>
-                    {t('mergePdf')}
-                  </button>
-                  <button
-                    className="rb-big"
-                    disabled={pageCount <= 1 || readOnly}
-                    onClick={openMergePagesDlg}
-                  >
-                    <span className="rb-big-icon">
-                      <IconMergePages />
-                    </span>
-                    {t('mergePages')}
-                  </button>
-                  <button
-                    className="rb-big"
-                    disabled={pageCount === 0 || readOnly}
-                    onClick={() => setSplitPagesDlg(true)}
-                  >
-                    <span className="rb-big-icon">
-                      <IconSplitPages />
-                    </span>
-                    {t('splitPages')}
-                  </button>
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      disabled={pageCount <= 1 || readOnly}
+                      onClick={openSplitDlg}
+                    >
+                      <span className="rb-big-icon">
+                        <IconSplitPdf />
+                      </span>
+                      {t('splitPdf')}
+                    </button>
+                  )}
+                  {cap('saveAs') && cap('insertPages') && (
+                    <button className="rb-big" disabled={readOnly} onClick={() => void mergePdf()}>
+                      <span className="rb-big-icon">
+                        <IconMergePdf />
+                      </span>
+                      {t('mergePdf')}
+                    </button>
+                  )}
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      disabled={pageCount <= 1 || readOnly}
+                      onClick={openMergePagesDlg}
+                    >
+                      <span className="rb-big-icon">
+                        <IconMergePages />
+                      </span>
+                      {t('mergePages')}
+                    </button>
+                  )}
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      disabled={pageCount === 0 || readOnly}
+                      onClick={() => setSplitPagesDlg(true)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconSplitPages />
+                      </span>
+                      {t('splitPages')}
+                    </button>
+                  )}
                 </div>
               </div>
             </>
@@ -8659,6 +8710,7 @@ export default function App() {
                                               e.preventDefault()
                                               commitTextDraft()
                                             } else if (e.key === 'Escape') {
+                                              e.preventDefault()
                                               e.stopPropagation()
                                               setTextDraft(null)
                                             } else if (
@@ -9045,7 +9097,10 @@ export default function App() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') searchStep(e.shiftKey ? -1 : 1)
-                    else if (e.key === 'Escape') closeSearch()
+                    else if (e.key === 'Escape') {
+                      e.preventDefault()
+                      closeSearch()
+                    }
                   }}
                 />
                 <span className="pdf-search-count">
@@ -9401,14 +9456,16 @@ export default function App() {
                 >
                   {t('deletePage')}
                 </button>
-                <button
-                  onClick={() => {
-                    setThumbMenu(null)
-                    void extractPage(menuOrig)
-                  }}
-                >
-                  {t('extractPage')}
-                </button>
+                {cap('saveAs') && (
+                  <button
+                    onClick={() => {
+                      setThumbMenu(null)
+                      void extractPage(menuOrig)
+                    }}
+                  >
+                    {t('extractPage')}
+                  </button>
+                )}
                 {cap('insertPages') && (
                   <button
                     onClick={() => {
@@ -9550,7 +9607,10 @@ export default function App() {
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') confirmExtract()
-                      else if (e.key === 'Escape') setExtractDlg(false)
+                      else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setExtractDlg(false)
+                      }
                     }}
                   />
                   <div className="pdf-modal-actions">
@@ -9579,7 +9639,10 @@ export default function App() {
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') confirmSplit()
-                      else if (e.key === 'Escape') setSplitDlg(false)
+                      else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setSplitDlg(false)
+                      }
                     }}
                   />
                   <div className="pdf-modal-actions">
@@ -9638,7 +9701,10 @@ export default function App() {
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') confirmPrint()
-                        else if (e.key === 'Escape') setPrintDlg(false)
+                        else if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setPrintDlg(false)
+                        }
                       }}
                     />
                   )}
@@ -9670,7 +9736,10 @@ export default function App() {
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') confirmMergePages()
-                        else if (e.key === 'Escape') setMergePagesDlg(false)
+                        else if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setMergePagesDlg(false)
+                        }
                       }}
                     />
                   </label>
@@ -9729,7 +9798,10 @@ export default function App() {
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') confirmReplace()
-                      else if (e.key === 'Escape') setReplaceDlg(false)
+                      else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setReplaceDlg(false)
+                      }
                     }}
                   />
                   <div className="pdf-modal-actions">
