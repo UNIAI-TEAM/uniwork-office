@@ -1786,4 +1786,52 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(onOpenDocument).not.toHaveBeenCalled()
     expect(host.querySelector('.uw-act-toast')).toBeNull()
   })
+
+  it('renders the My Folder card first when a children page returns [Alpha Folder, My Folder] (DH1-E2E-7)', async () => {
+    rootItems = [
+      {
+        id: 'f-alpha',
+        workspaceId: 'ws-1',
+        title: 'Alpha Folder',
+        format: 'docx',
+        updatedAt: '2026-10-15T10:00:00.000Z',
+        kind: 'folder',
+        parentId: null,
+      },
+      {
+        id: 'f-mine',
+        workspaceId: 'ws-1',
+        title: 'my-folder-raw',
+        format: 'docx',
+        updatedAt: '2026-10-14T10:00:00.000Z',
+        kind: 'folder',
+        parentId: null,
+        systemKind: 'my_folder',
+      },
+    ]
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const cards = Array.from(host.querySelectorAll<HTMLElement>('.dh-folder-card'))
+    expect(cards.map((c) => c.getAttribute('data-folder-id'))).toEqual(['f-mine', 'f-alpha'])
+    expect(cards.map((c) => c.querySelector<HTMLElement>('.dh-folder-name')?.textContent)).toEqual([
+      'My Folder',
+      'Alpha Folder',
+    ])
+  })
 })
