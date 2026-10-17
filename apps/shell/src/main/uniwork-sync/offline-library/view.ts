@@ -4,6 +4,7 @@ import type {
   OfflineFailureCode,
   OfflineLibraryQuota,
   OfflineLibrarySnapshot,
+  OfflineRowState,
   OfflineRowView,
 } from '../../../shared/offline-library'
 import type { LibraryRefusal, LibraryRefusalCode, PinRow } from './manager'
@@ -138,11 +139,27 @@ export function offlineRowView(row: PinRow, capabilityOn: boolean): OfflineRowVi
  * S5 "Tải lại" of a dirty working copy reads this synchronously (`hasOfflineHead`
  * cannot await the library), so it is derived once per snapshot - a copy
  * that is behind its head is not offline, and a document with no copy never is.
+ *
+ * Only a row whose committed copy can actually be opened counts (BE-R1-6): the
+ * ready / view-only states (or an update row that is still the head) with a
+ * usable lease, never a lease-expired / locked / revoked / deleted / corrupt
+ * one - S5 must not offer a reload the open path would then refuse.
  */
+const OPENABLE_HEAD_STATES: ReadonlySet<OfflineRowState> = new Set([
+  'ready',
+  'view-only',
+  'update-available',
+  'update-kept',
+])
+
 export function offlineHeadIds(rows: readonly OfflineRowView[]): Set<string> {
   const heads = new Set<string>()
   for (const row of rows) {
-    if (row.version !== null && row.version === row.headVersion) heads.add(row.documentId)
+    if (row.version === null || row.version !== row.headVersion) continue
+    // a blocked row (lease-expired / locked / revoked / deleted / corrupt) is not openable
+    if (row.lockReason) continue
+    if (!OPENABLE_HEAD_STATES.has(row.state)) continue
+    heads.add(row.documentId)
   }
   return heads
 }
