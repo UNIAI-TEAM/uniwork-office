@@ -15,7 +15,10 @@ import type {
 } from '../src/shared/home-api'
 import type { TabSummary } from '../src/shared/tabs-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
-import { SaveDialogHost } from '../src/renderer/src/uniwork-folders/SaveDialog'
+import {
+  SaveDialogHost,
+  resetFirstSavesForTests,
+} from '../src/renderer/src/uniwork-folders/SaveDialog'
 import { UniworkNotice } from '../src/renderer/src/UniworkChrome'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { uniworkSaveStrings } from '../src/renderer/src/i18n/strings-uniwork-save'
@@ -245,6 +248,7 @@ afterEach(async () => {
   host.remove()
   document.body.innerHTML = ''
   resetLiveForTests()
+  resetFirstSavesForTests()
 })
 
 describe('SaveDialog host: the first-save-open push (S01-R1-6)', () => {
@@ -564,5 +568,209 @@ describe('SaveDialog State 2 "Chọn nơi lưu" (AC-3)', () => {
     // the tree is read again and the new folder is listed under its parent
     expect(treeItem('Phụ lục')).toBeDefined()
     expect($('.uws-pick')).not.toBeNull()
+  })
+})
+
+describe('SaveDialog while a first save runs (FE-S01-R1-1, -2, -6)', () => {
+  const OTHER_PATH = 'C:\\Users\\me\\Documents\\Hợp đồng thuê.docx'
+  const DOC_ID = '01J8X4DOC0N1P2Q3R4S5T6U7'
+  const named = (code: 'first_save_bind_failed' | 'first_save_orphaned') =>
+    ({
+      ok: false,
+      error: code,
+      documentId: DOC_ID,
+      documentTitle: 'Họp tuần 44.docx',
+    }) as UniworkDocActionResult<UniworkDocSummary>
+  const namedText = (k: 'usErrBindFailed' | 'usErrOrphaned') =>
+    en[k].replace('{title}', 'Họp tuần 44.docx').replace('{id}', DOC_ID)
+  const nameValue = () => $<HTMLInputElement>('.uws-name-input')?.value
+
+  let resolveSave: (r: UniworkDocActionResult<UniworkDocSummary>) => void
+  beforeEach(() => {
+    firstSaveAnswer = () => new Promise((r) => (resolveSave = r))
+    tabs = [
+      ...tabs,
+      { id: 't2', kind: 'docs', title: 'y', closable: true, active: false, filePath: OTHER_PATH },
+    ]
+  })
+
+  async function settle(result: UniworkDocActionResult<UniworkDocSummary>) {
+    await act(async () => resolveSave(result))
+    await flush()
+  }
+
+  /** the chrome re-renders without the host: the dialog goes with it */
+  async function dropHost() {
+    await act(async () => {
+      root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(UniworkLiveHost)))
+    })
+    await flush()
+  }
+
+  it.each([
+    ['first_save_bind_failed', 'usErrBindFailed'],
+    ['first_save_orphaned', 'usErrOrphaned'],
+  ] as const)(
+    'busy: Esc, the close button and the backdrop keep the dialog; %s is still shown with id + title',
+    async (code, k) => {
+      await render('en')
+      await push()
+      await click($('.uws-save'))
+      await key($('.uws-name-input')!, 'Escape')
+      await click($('.uws-close'))
+      await click($('.uw-act-overlay'))
+      expect($('.uws-dialog')).not.toBeNull()
+      expect($('.uws-close')?.getAttribute('aria-disabled')).toBe('true')
+      await settle(named(code))
+      expect(alertText()).toBe(namedText(k))
+      // settled: close works again and nothing more is sent
+      await click($('.uws-close'))
+      expect($('.uws-dialog')).toBeNull()
+      expect(api.uniworkFirstSave).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('a push for another open tab while busy is held, then opens after the save settles ok', async () => {
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    await push(OTHER_PATH)
+    expect(api.uniworkFirstSaveOpenAck).toHaveBeenCalledWith(OTHER_PATH)
+    expect($$('.uws-dialog')).toHaveLength(1)
+    expect(nameValue()).toBe('Biên bản họp tuần 43')
+    expect($('.uws-save')?.getAttribute('aria-busy')).toBe('true')
+    await settle(ok(summary('d1', 'Biên bản họp tuần 43.docx')))
+    expect($$('.uws-dialog')).toHaveLength(1)
+    expect(nameValue()).toBe('Hợp đồng thuê')
+    expect($('.uws-save')?.getAttribute('aria-busy')).toBeNull()
+  })
+
+  it('a held push waits behind a refused save: the first result is shown, the held tab opens on close', async () => {
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    await push(OTHER_PATH)
+    await settle(named('first_save_orphaned'))
+    expect(nameValue()).toBe('Biên bản họp tuần 43')
+    expect(alertText()).toBe(namedText('usErrOrphaned'))
+    // a further push for the other tab still waits behind the shown result
+    await push(OTHER_PATH)
+    expect(alertText()).toBe(namedText('usErrOrphaned'))
+    await click($('.uws-close'))
+    expect(nameValue()).toBe('Hợp đồng thuê')
+    await click($('.uws-close'))
+    expect($('.uws-dialog')).toBeNull()
+  })
+
+  it.each([
+    ['first_save_bind_failed', 'usErrBindFailed'],
+    ['first_save_orphaned', 'usErrOrphaned'],
+  ] as const)(
+    'the host unmounting mid-save keeps %s and shows it (id + title) when the host renders again',
+    async (code, k) => {
+      await render('en')
+      await push()
+      await click($('.uws-save'))
+      await dropHost()
+      expect($('.uws-dialog')).toBeNull()
+      await settle(named(code))
+      // said at once through the shell's live region
+      expect($('#uw-live-host [role="alert"]')?.textContent).toBe(namedText(k))
+      await render('en')
+      expect($('.uws-dialog')).not.toBeNull()
+      expect(alertText()).toBe(namedText(k))
+      expect(alertText()).toContain(DOC_ID)
+      expect(alertText()).toContain('Họp tuần 44.docx')
+      // shown once: closing it does not bring it back
+      await click($('.uws-close'))
+      await dropHost()
+      await render('en')
+      expect($('.uws-dialog')).toBeNull()
+      expect(api.uniworkFirstSave).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('a dialog reopened while its tab’s save still runs stays busy and shows that result', async () => {
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    await dropHost()
+    await render('en')
+    await push()
+    expect($('.uws-save')?.getAttribute('aria-busy')).toBe('true')
+    await click($('.uws-save'))
+    expect(api.uniworkFirstSave).toHaveBeenCalledTimes(1)
+    await settle(named('first_save_bind_failed'))
+    expect(alertText()).toBe(namedText('usErrBindFailed'))
+  })
+
+  it('Save before the workspace resolves shows the busy state and saves once it resolves', async () => {
+    let resolveList!: (r: Awaited<ReturnType<HomeApi['uniworkListWorkspaces']>>) => void
+    api.uniworkListWorkspaces.mockImplementationOnce(() => new Promise((r) => (resolveList = r)))
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    expect(api.uniworkFirstSave).not.toHaveBeenCalled()
+    expect($('.uws-save')?.getAttribute('aria-busy')).toBe('true')
+    expect($('.uws-save .uw-spinner')).not.toBeNull()
+    await act(async () =>
+      resolveList(
+        ok([
+          { id: 'w1', name: 'Team', orgId: 'o1', slug: 'team', orgSlug: 'org', myRole: 'member' },
+        ]),
+      ),
+    )
+    await flush()
+    expect(api.uniworkFirstSave).toHaveBeenCalledTimes(1)
+    expect(api.uniworkFirstSave).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'w1', target: { kind: 'my_folder' } }),
+    )
+  })
+
+  it('after the workspace read fails (network), Save re-runs the resolve and then saves', async () => {
+    api.uniworkListWorkspaces.mockRejectedValueOnce(new Error('offline'))
+    await render('en')
+    await push()
+    expect(api.uniworkListWorkspaces).toHaveBeenCalledTimes(1)
+    await click($('.uws-save'))
+    expect(api.uniworkListWorkspaces).toHaveBeenCalledTimes(2)
+    expect(api.uniworkEnsureMyFolder).toHaveBeenCalledWith('w1')
+    expect(api.uniworkFirstSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('a resolve that fails again shows the network error, and the next Save retries it', async () => {
+    api.uniworkListWorkspaces
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new Error('offline'))
+    await render('en')
+    await push()
+    await click($('.uws-save'))
+    expect(api.uniworkListWorkspaces).toHaveBeenCalledTimes(2)
+    expect(alertText()).toBe(docEn.uwErrNetwork)
+    expect($('.uws-save')?.getAttribute('aria-busy')).toBeNull()
+    await click($('.uws-save'))
+    expect(api.uniworkListWorkspaces).toHaveBeenCalledTimes(3)
+    expect(api.uniworkFirstSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('busy shows a spinner on Lưu and the name cannot be edited', async () => {
+    await render()
+    await push()
+    await click($('.uws-save'))
+    const save = $<HTMLButtonElement>('.uws-save')!
+    expect(save.querySelector('.uw-spinner')).not.toBeNull()
+    expect(save.textContent).toBe(vi_.usSave)
+    expect($<HTMLInputElement>('.uws-name-input')!.readOnly).toBe(true)
+    await settle(ok(summary('d1', 'x.docx')))
+    expect($('.uws-dialog')).toBeNull()
+  })
+
+  it('a same-path re-push keeps the typed name (R1-8 a)', async () => {
+    await render()
+    await push()
+    await type($<HTMLInputElement>('.uws-name-input')!, 'Đang gõ dở')
+    await push()
+    expect($$('.uws-dialog')).toHaveLength(1)
+    expect(nameValue()).toBe('Đang gõ dở')
   })
 })
