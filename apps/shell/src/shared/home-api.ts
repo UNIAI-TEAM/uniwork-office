@@ -464,6 +464,8 @@ export interface UniworkUploadProgress {
   path: string
   loaded: number
   total: number
+  /** BIGUP-A1: 'checking' while the server verifies a chunked upload; absent = uploading */
+  phase?: 'uploading' | 'checking'
 }
 
 /** MYFOLDER-01 / SAVE-01: where the first Save to UniWork creates the document */

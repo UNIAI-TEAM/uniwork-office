@@ -139,6 +139,9 @@ describe('SIZE-F1 desktop document size limits', () => {
         max_bytes: 100 * MB_BYTES,
         warn_ratio: 0.85,
         warn_bytes: Math.floor(100 * MB_BYTES * 0.85),
+        // BIGUP-A1: the chunked-upload threshold rides along, so the upload
+        // path knows when to open a session instead of one big request
+        chunked_upload_threshold_bytes: 40 * MB_BYTES,
       })
 
       // every field is optional and falls back on its own

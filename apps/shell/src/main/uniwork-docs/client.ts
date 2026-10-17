@@ -36,7 +36,10 @@ import type {
   LaunchDescriptor,
   OrgMemberPage,
   UploadReceipt,
+  UploadSessionComplete,
+  UploadSessionState,
 } from './parse'
+import { parseUploadSession, parseUploadSessionComplete } from './parse'
 
 /**
  * Main-process client for the UniWork documents routes this app uses, and
@@ -268,6 +271,80 @@ export interface UniworkDocsClient {
   }): Promise<LaunchDescriptor>
   /** SIZE-F1: reads `documents.limits` from `GET /api/v1/config` with fallback defaults */
   getDocumentLimits?(): Promise<DocumentLimits>
+  /**
+   * BIGUP-A1: opens a multipart upload session for a NEW file document
+   * (`POST /workspaces/{ws}/documents/upload-sessions`). `parent_id`/`title`/
+   * `visibility` are this route's alone; `Idempotency-Key` is mandatory (the
+   * server answers 400 without one) and the same key with the same body
+   * replays the same session. Its `complete` answers the created document.
+   */
+  createWorkspaceUploadSession(input: {
+    workspaceId: string
+    filename: string
+    sizeBytes: number
+    probe: LocalFileProbePayload
+    idempotencyKey: string
+    parentId?: string | null
+    title?: string
+    visibility?: string | null
+    signal?: AbortSignal
+  }): Promise<UploadSessionState>
+  /**
+   * BIGUP-A1: opens a multipart upload session for a NEW VERSION of an
+   * existing document (`POST /documents/{id}/upload-sessions`). Its `complete`
+   * answers the staged upload the existing `versions/commit` claims.
+   */
+  createDocumentUploadSession(input: {
+    documentId: string
+    filename: string
+    sizeBytes: number
+    probe: LocalFileProbePayload
+    idempotencyKey: string
+    signal?: AbortSignal
+  }): Promise<UploadSessionState>
+  /**
+   * BIGUP-A1: the session's status plus a fresh presigned URL for every part
+   * still missing (`GET /upload-sessions/{id}`). A session that expired, was
+   * aborted or GC'd answers 410; an unknown one 404.
+   */
+  getUploadSession(sessionId: string): Promise<UploadSessionState>
+  /**
+   * BIGUP-A1: assembles the parts and validates the file
+   * (`POST /upload-sessions/{id}/complete`). Idempotent: a repeat of a
+   * finished session answers the same result.
+   */
+  completeUploadSession(input: {
+    sessionId: string
+    parts: Array<{ partNumber: number; etag: string }>
+  }): Promise<UploadSessionComplete>
+  /** BIGUP-A1: aborts the session and releases its reserved quota (204) */
+  deleteUploadSession(sessionId: string): Promise<void>
+  /**
+   * BIGUP-A1: one part straight to the presigned storage URL - no UniWork auth
+   * header, no cookies, `credentials: 'omit'`; the answer's `ETag` header is
+   * what `complete` needs. A part PUT never goes through `send()`: it is not a
+   * UniWork route and must not carry the session token.
+   */
+  putUploadPart(input: {
+    partNumber: number
+    url: string
+    headers?: Record<string, string>
+    bytes: Uint8Array
+    signal?: AbortSignal
+  }): Promise<{ etag: string }>
+}
+
+/**
+ * BIGUP-A1: the probe of the local file a session is opened for, as the wire
+ * spells it (snake_case). `readLocalFileProbe` builds it; the client only sends
+ * it. `cd_offset`/`cd_size` are null for a container that has no central
+ * directory (PDF, plain text).
+ */
+export interface LocalFileProbePayload {
+  head_b64: string
+  central_dir_b64: string
+  cd_offset: number | null
+  cd_size: number | null
 }
 
 /** a route segment: an id the server issued, never a path (the work client uses it too) */
@@ -318,7 +395,7 @@ function fromAuthFailure(error: unknown): UniworkDocError {
 
 /** one request to a UniWork route (documents, and the Workbench's work routes) */
 export interface UniworkCall<T> {
-  method: 'GET' | 'POST' | 'PATCH'
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
   route: string
   query?: URLSearchParams
   json?: unknown
@@ -999,5 +1076,131 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         clearTimeout(timer)
       }
     },
+
+    // ---- BIGUP-A1: large upload sessions --------------------------------
+    //
+    // The three create routes and the three session routes all answer the
+    // same session shape; only `complete` differs by route family, and the
+    // reader tells the two answers apart by the body itself.
+
+    async createWorkspaceUploadSession(input) {
+      const raw = await send({
+        method: 'POST',
+        route: `/workspaces/${id(input.workspaceId)}/documents/upload-sessions`,
+        json: sessionOpenBody(input),
+        idempotencyKey: input.idempotencyKey,
+        ...(input.signal ? { signal: input.signal } : {}),
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseUploadSession(raw)
+    },
+
+    async createDocumentUploadSession(input) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(input.documentId)}/upload-sessions`,
+        json: sessionOpenBody(input),
+        idempotencyKey: input.idempotencyKey,
+        ...(input.signal ? { signal: input.signal } : {}),
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseUploadSession(raw)
+    },
+
+    async getUploadSession(sessionId) {
+      const raw = await send({
+        method: 'GET',
+        route: `/upload-sessions/${id(sessionId)}`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseUploadSession(raw)
+    },
+
+    async completeUploadSession(input) {
+      const raw = await send({
+        method: 'POST',
+        route: `/upload-sessions/${id(input.sessionId)}/complete`,
+        json: {
+          parts: input.parts.map((part) => ({
+            part_number: part.partNumber,
+            etag: part.etag,
+          })),
+        },
+        // R4: validating a 200 MiB file takes a while; the request holds the
+        // connection until the server is done, so it gets the transfer
+        // deadline, not the metadata one
+        timeoutMs: transferTimeout,
+        read: json,
+      })
+      return parseUploadSessionComplete(raw)
+    },
+
+    async deleteUploadSession(sessionId) {
+      await send({
+        method: 'DELETE',
+        route: `/upload-sessions/${id(sessionId)}`,
+        timeoutMs: metadataTimeout,
+        read: async () => undefined,
+      })
+    },
+
+    async putUploadPart(input) {
+      // The part URL is the storage's own presigned URL: it is NOT a UniWork
+      // route, so it must not carry the bearer token, the Idempotency-Key or
+      // any cookie, and its host is not `apiOrigin` (the egress rule that
+      // rejects a foreign host applies to UniWork calls only). `send()` is
+      // therefore bypassed on purpose.
+      const fetchImpl: FetchLike = options.fetch ?? ((url, init) => fetch(url, init))
+      const response = await fetchImpl(input.url, {
+        method: 'PUT',
+        headers: { ...(input.headers ?? {}) },
+        // the presigned URL is the credential: no cookie, no ambient auth
+        credentials: 'omit',
+        cache: 'no-store',
+        redirect: 'error',
+        ...(input.signal ? { signal: input.signal } : {}),
+        body: input.bytes as unknown as BodyInit,
+      } as RequestInit)
+      if (!response.ok) {
+        throw errorFromResponse(response.status, await response.json().catch(() => undefined))
+      }
+      const etag = response.headers.get('ETag') ?? response.headers.get('etag')
+      if (!etag)
+        throw new UniworkDocError('malformed_response', { serverCode: 'part_etag_missing' })
+      return { etag }
+    },
   }
+}
+
+/**
+ * BIGUP-A1: the create body of both scoped routes. `parent_id`/`title`/
+ * `visibility` belong to the workspace route alone (the document route's
+ * parent is on the path), and the probe is always the full four-field shape -
+ * the server refuses a probe whose head is not exactly `min(size, 64 KiB)`.
+ */
+function sessionOpenBody(input: {
+  filename: string
+  sizeBytes: number
+  probe: LocalFileProbePayload
+  parentId?: string | null
+  title?: string
+  visibility?: string | null
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    filename: input.filename,
+    size_bytes: input.sizeBytes,
+    probe: {
+      head_b64: input.probe.head_b64,
+      central_dir_b64: input.probe.central_dir_b64,
+      cd_offset: input.probe.cd_offset ?? 0,
+      cd_size: input.probe.cd_size ?? 0,
+    },
+  }
+  if (input.parentId !== undefined) body.parent_id = parentOf(input.parentId)
+  if (input.title !== undefined) body.title = input.title
+  if (input.visibility !== undefined) body.visibility = input.visibility
+  return body
 }

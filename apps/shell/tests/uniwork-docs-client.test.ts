@@ -271,6 +271,311 @@ describe('Retry-After (G5-06 be-9)', () => {
   })
 })
 
+describe('BIGUP-A1: upload-session routes', () => {
+  const SESSION = 'ups_01ja09k3'
+  const sessionBody = {
+    session_id: SESSION,
+    part_size: 8388608,
+    total_parts: 6,
+    completed_parts: [{ part_number: 1, etag: '"e1"', size: 8388608 }],
+    parts: [
+      {
+        part_number: 2,
+        method: 'PUT',
+        url: 'https://storage.example/part/2?sig=abc',
+        headers: { 'x-amz-acl': 'private' },
+        expires_at: '2026-10-18T15:00:00Z',
+      },
+    ],
+    expires_at: '2026-10-19T14:00:00Z',
+  }
+  const probe = {
+    head_b64: 'UEsDBBQAAAAIAA==',
+    central_dir_b64: 'UEsFBgAAAAABAAEALgAuAAAA',
+    cd_offset: 83820000,
+    cd_size: 66080,
+  }
+
+  it('creates a workspace session with the probe and the mandatory key', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(201, sessionBody))
+    const session = await client(fetch).createWorkspaceUploadSession({
+      workspaceId: 'ws_1',
+      filename: 'Bao-cao.docx',
+      sizeBytes: 45 * 1024 * 1024,
+      probe,
+      idempotencyKey: 'office-key-1',
+      parentId: 'fold_1',
+      title: 'Báo cáo',
+    })
+    const [url, init] = fetch.mock.calls[0]!
+    expect(url).toBe(`${ORIGIN}/api/v1/workspaces/ws_1/documents/upload-sessions`)
+    expect(init.method).toBe('POST')
+    expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('office-key-1')
+    expect(JSON.parse(String(init.body))).toEqual({
+      filename: 'Bao-cao.docx',
+      size_bytes: 45 * 1024 * 1024,
+      probe,
+      parent_id: 'fold_1',
+      title: 'Báo cáo',
+    })
+    // the create answer carries no status: the reader leaves it null
+    expect(session).toEqual({
+      sessionId: SESSION,
+      status: null,
+      partSize: 8388608,
+      totalParts: 6,
+      completedParts: [{ partNumber: 1, etag: '"e1"', size: 8388608 }],
+      parts: [
+        {
+          partNumber: 2,
+          method: 'PUT',
+          url: 'https://storage.example/part/2?sig=abc',
+          headers: { 'x-amz-acl': 'private' },
+          expiresAt: '2026-10-18T15:00:00Z',
+        },
+      ],
+      expiresAt: '2026-10-19T14:00:00Z',
+    })
+  })
+
+  it('creates a document session (a new version) and omits a null cd_offset as 0', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(201, sessionBody))
+    await client(fetch).createDocumentUploadSession({
+      documentId: DOC,
+      filename: 'v2.docx',
+      sizeBytes: 45 * 1024 * 1024,
+      probe: { head_b64: 'AA==', central_dir_b64: '', cd_offset: null, cd_size: null },
+      idempotencyKey: 'k',
+    })
+    const [url, init] = fetch.mock.calls[0]!
+    expect(url).toBe(`${ORIGIN}/api/v1/documents/${DOC}/upload-sessions`)
+    expect(JSON.parse(String(init.body))).toEqual({
+      filename: 'v2.docx',
+      size_bytes: 45 * 1024 * 1024,
+      probe: { head_b64: 'AA==', central_dir_b64: '', cd_offset: 0, cd_size: 0 },
+    })
+  })
+
+  it('reads a session by id, and its status, and sends the parts in snake_case', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, { ...sessionBody, status: 'open' }))
+    const api = client(fetch)
+    const state = await api.getUploadSession(SESSION)
+    expect(fetch.mock.calls[0]![0]).toBe(`${ORIGIN}/api/v1/upload-sessions/${SESSION}`)
+    expect(state.status).toBe('open')
+
+    const completing = vi.fn<FetchLike>(async () =>
+      json(200, {
+        document: {
+          id: DOC,
+          organization_id: 'o',
+          workspace_id: 'w',
+          title: 't.docx',
+          kind: 'file',
+          revision: '1',
+          current_version: 1,
+          file: {
+            filename: 't.docx',
+            mime_type: '',
+            version: 1,
+            checksum_sha256: 'a'.repeat(64),
+            size_bytes: 1,
+          },
+        },
+      }),
+    )
+    const done = await client(completing).completeUploadSession({
+      sessionId: SESSION,
+      parts: [
+        { partNumber: 1, etag: '"e1"' },
+        { partNumber: 2, etag: '"e2"' },
+      ],
+    })
+    const [, init] = completing.mock.calls[0]!
+    expect(completing.mock.calls[0]![0]).toBe(
+      `${ORIGIN}/api/v1/upload-sessions/${SESSION}/complete`,
+    )
+    expect(JSON.parse(String(init.body))).toEqual({
+      parts: [
+        { part_number: 1, etag: '"e1"' },
+        { part_number: 2, etag: '"e2"' },
+      ],
+    })
+    expect(done.kind).toBe('document')
+  })
+
+  it('reads a version complete as the staged upload the commit route claims', async () => {
+    const api = client(async () =>
+      json(200, {
+        upload_id: 'upl_1',
+        checksum_sha256: 'a'.repeat(64),
+        size_bytes: 45 * 1024 * 1024,
+        claim_expires_at: '2026-10-18T00:00:00Z',
+      }),
+    )
+    const answer = await api.completeUploadSession({ sessionId: SESSION, parts: [] })
+    expect(answer).toEqual({
+      kind: 'upload',
+      upload: {
+        uploadId: 'upl_1',
+        checksumSha256: 'a'.repeat(64),
+        sizeBytes: 45 * 1024 * 1024,
+        claimExpiresAt: '2026-10-18T00:00:00Z',
+      },
+    })
+  })
+
+  it('deletes a session with a 204', async () => {
+    const fetch = vi.fn<FetchLike>(async () => new Response(null, { status: 204 }))
+    await client(fetch).deleteUploadSession(SESSION)
+    const [url, init] = fetch.mock.calls[0]!
+    expect(url).toBe(`${ORIGIN}/api/v1/upload-sessions/${SESSION}`)
+    expect(init.method).toBe('DELETE')
+  })
+
+  it('PUTs a part straight to the presigned URL: no bearer, no cookie, ETag read', async () => {
+    const fetch = vi.fn<FetchLike>(
+      async () =>
+        new Response(null, {
+          status: 200,
+          headers: { ETag: '"d41d8cd98f00b204e9800998ecf8427e"' },
+        }),
+    )
+    const answer = await client(fetch).putUploadPart({
+      partNumber: 3,
+      url: 'https://storage.example/part/3?sig=abc',
+      headers: { 'x-amz-acl': 'private' },
+      bytes: new Uint8Array([1, 2, 3]),
+    })
+    expect(answer).toEqual({ etag: '"d41d8cd98f00b204e9800998ecf8427e"' })
+    const [url, init] = fetch.mock.calls[0]!
+    expect(url).toBe('https://storage.example/part/3?sig=abc')
+    expect(init.method).toBe('PUT')
+    expect(init.credentials).toBe('omit')
+    expect(init.headers).toEqual({ 'x-amz-acl': 'private' })
+  })
+
+  it('a part PUT without an ETag, or refused, is a typed failure', async () => {
+    const noEtag = client(async () => new Response(null, { status: 200 }))
+    expect(
+      await codeOf(
+        noEtag.putUploadPart({
+          partNumber: 1,
+          url: 'https://storage.example/p',
+          bytes: new Uint8Array(1),
+        }),
+      ),
+    ).toBe('malformed_response')
+
+    const expired = client(
+      async () =>
+        new Response(JSON.stringify({ error: { code: 'access_denied' } }), { status: 403 }),
+    )
+    expect(
+      await codeOf(
+        expired.putUploadPart({
+          partNumber: 1,
+          url: 'https://storage.example/p',
+          bytes: new Uint8Array(1),
+        }),
+      ),
+    ).toBe('forbidden')
+  })
+
+  const sessionFailures: Array<[Response, string, string | undefined]> = [
+    // a threshold drift: the caller falls back to the single-request path
+    [envelope(422, 'upload_session_too_small'), 'server_error', 'upload_session_too_small'],
+    // a session that expired is gone, not a document tombstone
+    [envelope(410, 'upload_session_expired'), 'not_found', 'upload_session_expired'],
+    [envelope(404, 'not_found'), 'not_found', 'not_found'],
+    [envelope(422, 'upload_parts_invalid'), 'server_error', 'upload_parts_invalid'],
+    // the file changed under us: never retried silently
+    [envelope(422, 'upload_size_mismatch'), 'malformed_response', 'upload_size_mismatch'],
+    [envelope(422, 'upload_probe_mismatch'), 'malformed_response', 'upload_probe_mismatch'],
+    [envelope(415, 'unsupported_media_type'), 'unsupported_format', 'unsupported_media_type'],
+    [envelope(429, 'upload_sessions_exhausted'), 'server_error', 'upload_sessions_exhausted'],
+    [
+      envelope(409, 'idempotency_payload_mismatch'),
+      'idempotency_mismatch',
+      'idempotency_payload_mismatch',
+    ],
+    [envelope(403, 'quota_exceeded'), 'quota_exceeded', 'quota_exceeded'],
+  ]
+  it.each(
+    sessionFailures.map(
+      ([response, code, serverCode], i) => [i, response, code, serverCode] as const,
+    ),
+  )('session failure %i -> %s', async (_i, response, code, serverCode) => {
+    const api = client(async () => response.clone())
+    try {
+      await api.getUploadSession(SESSION)
+      throw new Error('expected a failure')
+    } catch (error) {
+      expect(error).toBeInstanceOf(UniworkDocError)
+      expect((error as UniworkDocError).code).toBe(code)
+      expect((error as UniworkDocError).serverCode).toBe(serverCode)
+    }
+  })
+
+  it('409 upload_session_busy keeps the delay from fields.retry_after', async () => {
+    const api = client(async () =>
+      json(409, {
+        error: { code: 'upload_session_busy', message: 'x', fields: { retry_after: 5 } },
+      }),
+    )
+    try {
+      await api.completeUploadSession({ sessionId: SESSION, parts: [] })
+      throw new Error('expected a failure')
+    } catch (error) {
+      expect(error).toBeInstanceOf(UniworkDocError)
+      expect((error as UniworkDocError).code).toBe('server_error')
+      expect((error as UniworkDocError).serverCode).toBe('upload_session_busy')
+      expect((error as UniworkDocError).retryAfterMs).toBe(5_000)
+    }
+  })
+
+  it('429 upload_sessions_exhausted keeps Retry-After from the header', async () => {
+    const api = client(
+      async () =>
+        new Response(JSON.stringify({ error: { code: 'upload_sessions_exhausted' } }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+        }),
+    )
+    try {
+      await api.createWorkspaceUploadSession({
+        workspaceId: 'ws_1',
+        filename: 'x.docx',
+        sizeBytes: 45 * 1024 * 1024,
+        probe,
+        idempotencyKey: 'k',
+      })
+      throw new Error('expected a failure')
+    } catch (error) {
+      expect((error as UniworkDocError).code).toBe('server_error')
+      expect((error as UniworkDocError).retryAfterMs).toBe(60_000)
+    }
+  })
+
+  it('413 file_too_large carries the cap, and a part route is refused before the network', async () => {
+    const api = client(async () =>
+      json(413, {
+        error: { code: 'file_too_large', message: 'x', fields: { max_bytes: 209715200 } },
+      }),
+    )
+    try {
+      await api.getUploadSession(SESSION)
+      throw new Error('expected a failure')
+    } catch (error) {
+      expect((error as UniworkDocError).code).toBe('too_large')
+      expect((error as UniworkDocError).maxBytes).toBe(209715200)
+    }
+
+    const fetch = vi.fn<FetchLike>(async () => json(200, {}))
+    expect(await codeOf(client(fetch).getUploadSession('../../evil'))).toBe('not_found')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
 describe('401: one shared refresh, one retry (real account session)', () => {
   const profile: DeploymentProfile = {
     deploymentId: 'default',
