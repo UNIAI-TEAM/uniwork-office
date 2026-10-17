@@ -162,4 +162,69 @@ describe('G5-05u B8 the tab menu unpin confirms before it unpins (BE-R1-3)', () 
     h.session.scope = accountA
     expect(await h.manager.row('doc_1')).toMatchObject({ documentId: 'doc_1', state: 'ready' })
   })
+
+  it('an account switch while hasLocalWork is parked never unpins the incoming account pin (BE-R3-1)', async () => {
+    let gateLocalWork: (() => Promise<boolean>) | null = null
+    const h = createHarness({
+      hasLocalWork: async () => (gateLocalWork ? await gateLocalWork() : false),
+    })
+    addDoc(h, 'doc_1', 1, 2048)
+    const api = createOfflineLibraryApi({
+      library: () => h.manager,
+      activeOrgId: () => ORG,
+      capabilityOn: async () => true,
+      signedOut: () => h.session.scope === null,
+      lastOwner: () => null,
+      libraryLayer: () => h.layer,
+      openDocument: async () => ({ ok: false, error: 'network' }),
+      openCopy: async () => ({ kind: 'none' }),
+      revealLibraryFolder: async () => true,
+      lockRefused: () => undefined,
+      changed: () => undefined,
+    })
+    const accountA = { deploymentId: SCOPE.deploymentId, accountId: 'user_1' }
+    const accountB = { deploymentId: SCOPE.deploymentId, accountId: 'user_2' }
+    h.session.scope = accountA
+    expect(await h.manager.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })).toMatchObject(
+      { kind: 'pinned' },
+    )
+    h.session.scope = accountB
+    expect(await h.manager.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })).toMatchObject(
+      { kind: 'pinned' },
+    )
+    const quotaBefore = await h.manager.quota()
+    expect(quotaBefore).toMatchObject({ pins: 1, usedBytes: 2048 })
+
+    h.session.scope = accountA
+    const reached = Promise.withResolvers<void>()
+    const gate = Promise.withResolvers<boolean>()
+    gateLocalWork = async () => {
+      reached.resolve()
+      return await gate.promise
+    }
+    const results: OfflineUnpinResult[] = []
+    const confirm = vi.fn(async () => true)
+    const pending = unpinTabDocument({
+      unpin: async (id, options) => {
+        const result = await api.unpin(id, options)
+        results.push(result)
+        return result
+      },
+      documentId: 'doc_1',
+      account: () => h.session.scope,
+      confirm,
+    })
+    await reached.promise
+    // the active account switches to B after checkBoundary() while hasLocalWork() is still parked
+    h.session.scope = accountB
+    gate.resolve(false)
+    await pending
+
+    expect(results).toEqual([{ ok: false, code: 'interrupted' }])
+    expect(confirm).not.toHaveBeenCalled()
+    expect(await h.manager.row('doc_1')).toMatchObject({ documentId: 'doc_1', state: 'ready' })
+    expect(await h.manager.quota()).toEqual(quotaBefore)
+    h.session.scope = accountA
+    expect(await h.manager.row('doc_1')).toMatchObject({ documentId: 'doc_1', state: 'ready' })
+  })
 })

@@ -1095,11 +1095,18 @@ export class OfflineLibraryManager {
    */
   async unpin(documentId: string, options: { confirmed?: boolean } = {}): Promise<UnpinResult> {
     if (!this.checkBoundary()) return refused('no_session')
+    const epoch = this.epoch
     if (!options.confirmed && (await this.options.hasLocalWork(documentId))) {
+      if (!this.checkBoundary()) return refused('no_session')
+      if (this.epoch !== epoch) return refused('interrupted')
       return { kind: 'needsConfirm' }
     }
+    if (!this.checkBoundary()) return refused('no_session')
+    if (this.epoch !== epoch) return refused('interrupted')
     await this.stopJob(documentId)
     return this.withDoc(documentId, async (): Promise<UnpinResult> => {
+      if (!this.checkBoundary()) return refused('no_session')
+      if (this.epoch !== epoch) return refused('interrupted')
       const read = await this.options.store.getPin(documentId)
       if (isUnavailable(read)) return refused(read.kind)
       if (read.kind !== 'ok') return refused('not_pinned')
