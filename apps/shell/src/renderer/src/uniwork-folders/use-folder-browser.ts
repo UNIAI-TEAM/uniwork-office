@@ -97,12 +97,10 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
   const activeMoreContents = useRef<{
     request: number
     startCursor: string
-    resolved: UniworkFolderChildren | null
   } | null>(null)
   const activeMoreResults = useRef<{
     request: number
     startCursor: string
-    resolved: UniworkFolderChildren | null
   } | null>(null)
   const treeGate = useRef(createRequestGate())
   const contentsGate = useRef(createRequestGate())
@@ -210,7 +208,6 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
           nextCursor !== null &&
           (consumedMore < pendingMore.entries.length ||
             (activeMoreContents.current !== null &&
-              !activeMoreContents.current.resolved &&
               activeMoreContents.current.startCursor !== nextCursor))
         ) {
           if (consumedMore < pendingMore.entries.length) {
@@ -248,32 +245,13 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
         }
         if (softMoreContents.current === pendingMore) softMoreContents.current = null
         if (opts.soft && (moreError || nextCursor === null)) {
-          if (activeMoreContents.current && !activeMoreContents.current.resolved) {
+          if (activeMoreContents.current) {
             contentsMoreGate.current.next()
             activeMoreContents.current = null
           }
         }
-        if (opts.soft && moreError) {
-          for (const item of contentsRef.current.items) {
-            if (!seen.has(item.id)) {
-              seen.add(item.id)
-              items.push(item)
-            }
-          }
-          for (const entry of pendingMore?.entries ?? []) {
-            for (const item of entry.items) {
-              if (!seen.has(item.id)) {
-                seen.add(item.id)
-                items.push(item)
-              }
-            }
-          }
-        }
         loadedContentsPages.current = pagesLoaded
-        const stillLoadingMore =
-          Boolean(opts.soft) &&
-          activeMoreContents.current !== null &&
-          !activeMoreContents.current.resolved
+        const stillLoadingMore = Boolean(opts.soft) && activeMoreContents.current !== null
         setContents(() => ({
           status: 'ready',
           items,
@@ -291,14 +269,12 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     if (!prev.nextCursor || prev.loadingMore || prev.status !== 'ready') return
     const startCursor = prev.nextCursor
     const request = contentsMoreGate.current.next()
-    activeMoreContents.current = { request, startCursor, resolved: null }
+    activeMoreContents.current = { request, startCursor }
     setContents({ ...prev, loadingMore: true, moreError: undefined })
     void readContents(folderRef.current, startCursor).then((result) => {
       if (!mounted.current || !contentsMoreGate.current.isCurrent(request)) return
       if (activeMoreContents.current?.request === request) {
-        activeMoreContents.current = result.ok
-          ? { request, startCursor, resolved: result.value }
-          : null
+        activeMoreContents.current = null
       }
       if (result.ok) {
         loadedContentsPages.current += 1
@@ -399,7 +375,6 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
           nextCursor !== null &&
           (consumedMore < pendingMore.entries.length ||
             (activeMoreResults.current !== null &&
-              !activeMoreResults.current.resolved &&
               activeMoreResults.current.startCursor !== nextCursor))
         ) {
           if (consumedMore < pendingMore.entries.length) {
@@ -443,32 +418,13 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
         }
         if (softMoreResults.current === pendingMore) softMoreResults.current = null
         if (opts.soft && (moreError || nextCursor === null)) {
-          if (activeMoreResults.current && !activeMoreResults.current.resolved) {
+          if (activeMoreResults.current) {
             searchMoreGate.current.next()
             activeMoreResults.current = null
           }
         }
-        if (opts.soft && moreError) {
-          for (const item of resultsRef.current.items) {
-            if (!seen.has(item.id)) {
-              seen.add(item.id)
-              items.push(item)
-            }
-          }
-          for (const entry of pendingMore?.entries ?? []) {
-            for (const item of entry.items) {
-              if (!seen.has(item.id)) {
-                seen.add(item.id)
-                items.push(item)
-              }
-            }
-          }
-        }
         loadedResultsPages.current = pagesLoaded
-        const stillLoadingMore =
-          Boolean(opts.soft) &&
-          activeMoreResults.current !== null &&
-          !activeMoreResults.current.resolved
+        const stillLoadingMore = Boolean(opts.soft) && activeMoreResults.current !== null
         setResults(() => ({
           status: 'ready',
           items,
@@ -514,7 +470,7 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     if (!query || !prev.nextCursor || prev.loadingMore || prev.status !== 'ready') return
     const startCursor = prev.nextCursor
     const request = searchMoreGate.current.next()
-    activeMoreResults.current = { request, startCursor, resolved: null }
+    activeMoreResults.current = { request, startCursor }
     setResults({ ...prev, loadingMore: true, moreError: undefined })
     void searchDocuments({
       workspaceId,
@@ -525,9 +481,7 @@ export function useFolderBrowser(workspaceId: string, initialFolderId: string | 
     }).then((result) => {
       if (!mounted.current || !searchMoreGate.current.isCurrent(request)) return
       if (activeMoreResults.current?.request === request) {
-        activeMoreResults.current = result.ok
-          ? { request, startCursor, resolved: result.value }
-          : null
+        activeMoreResults.current = null
       }
       if (result.ok) {
         loadedResultsPages.current += 1
