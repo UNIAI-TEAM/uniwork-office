@@ -8,7 +8,8 @@ import { FileBadge } from './FileBadge'
 import { useI18n } from './locale'
 import { docExtension, formatWhen } from './uniwork-docs-model'
 import { openRecentEntry, openUniworkDocument } from './uniwork-open'
-import { WbIconBtn, WbRowActions } from './WbRowActions'
+import { IconOfflinePin, WbIconBtn, WbRowActions } from './WbRowActions'
+import { useOfflineToggle } from './OfflineToggle'
 import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
 import { WorkSkeleton, WorkStatePanel } from './WorkErrorState'
 
@@ -52,6 +53,7 @@ export function DeskInProgress({
   const when = (ms: number) => formatWhen(new Date(ms).toISOString(), dateLocale)
   const sectionRef = useRef<HTMLElement>(null)
   const retryRef = useRef<HTMLButtonElement>(null)
+  const offline = useOfflineToggle()
   const partial = !loading && cloudFailed
   // the partial line goes (the list loaded) while its Retry holds the focus: read before the
   // commit removes the button, so the section can take the focus instead of <body>
@@ -117,12 +119,14 @@ export function DeskInProgress({
           }
           const doc = r.doc
           if (doc.source === 'uniwork') {
+            const offlineLabel = offline.labelOf(doc.doc.id)
             return (
               <li key={`u:${doc.doc.id}`} className="wb-row wb-desk-row">
                 <FileBadge ext={docExtension(doc.doc)} size={24} />
                 <span className="wb-desk-row-main">
                   <button
                     type="button"
+                    id={rowTitleId}
                     className="wb-row-title wb-desk-row-title"
                     onClick={() =>
                       void openUniworkDocument(
@@ -140,6 +144,23 @@ export function DeskInProgress({
                 <span className="wb-desk-when wb-num">
                   {formatWhen(doc.doc.updatedAt, dateLocale)}
                 </span>
+                {offlineLabel && (
+                  <WbRowActions>
+                    <WbIconBtn
+                      label={offlineLabel}
+                      aria-describedby={rowTitleId}
+                      onClick={() =>
+                        offline.toggle({
+                          documentId: doc.doc.id,
+                          workspaceId: doc.doc.workspaceId,
+                          name: doc.doc.title,
+                        })
+                      }
+                    >
+                      <IconOfflinePin />
+                    </WbIconBtn>
+                  </WbRowActions>
+                )}
               </li>
             )
           }
@@ -198,6 +219,7 @@ export function DeskInProgress({
         </button>
       </div>
       {body()}
+      {offline.node}
       {partial ? (
         <p className="wb-ov-partial">
           {t('wbDeskCloudFailed')} ·{' '}

@@ -8,10 +8,10 @@ import { pathKey } from './uniwork-docs-model'
  * went away, and pushes a lock; the shell shows one panel per refused path.
  * The strings are keys, translated at render time.
  *
- * G5-05u (UNI-1360) added the offline library's reasons to `UniworkLockReason`
- * ("Lý do bị chặn" / "Trạng thái khóa (S11)"); the mutation lane (F7) owns the
- * per-reason action semantics (renew the lease, re-check, open the sync center,
- * switch account). The panel keeps one title, one sentence and one action.
+ * G5-05u (UNI-1360) added the offline library's reasons to `UniworkLockReason`:
+ * title and sentence per "Trạng thái khóa (S11)", the one action per "Lý do bị
+ * chặn" (Kết nối lại / Thử lại / Kiểm tra lại re-check the account and the
+ * lock list, Đăng nhập, Chuyển tài khoản, Mở trung tâm đồng bộ, Đóng).
  */
 
 export type LockTitleKey =
@@ -46,13 +46,18 @@ export type LockActionKey =
   | 'uwActReconnect'
   | 'uwActRecheck'
   | 'uwActSwitchAccount'
+  | 'uwQueueOpenCenter'
 
 export interface LockCopy {
   titleKey: LockTitleKey
   bodyKey: LockBodyKey
   actionKey: LockActionKey
-  /** `retry` and `sign-in` have their own handlers; everything else dismisses the lock */
-  action: 'dismiss' | 'retry' | 'sign-in'
+  /**
+   * `retry`: re-read the account and the lock list (Kết nối lại, Thử lại, Kiểm tra lại);
+   * `sign-in`; `switch-account` (Settings › Account); `sync-center` (lease_expired while
+   * `offline_library` is off); `dismiss` closes the panel (Đóng)
+   */
+  action: 'dismiss' | 'retry' | 'sign-in' | 'switch-account' | 'sync-center'
 }
 
 const COPY: Record<UniworkLockReason, LockCopy> = {
@@ -84,7 +89,7 @@ const COPY: Record<UniworkLockReason, LockCopy> = {
     titleKey: 'uwLockForeignTitle',
     bodyKey: 'uwLockForeign',
     actionKey: 'uwActSwitchAccount',
-    action: 'sign-in',
+    action: 'switch-account',
   },
   permission_revoked: {
     titleKey: 'uwLockRevokedTitle',
@@ -126,9 +131,15 @@ const COPY: Record<UniworkLockReason, LockCopy> = {
 
 export function lockCopyOf(lock: Pick<UniworkDocLock, 'reason' | 'libraryOff'>): LockCopy {
   const copy = COPY[lock.reason]
-  // the lease cannot be renewed while the org turned offline documents off (S11 uwLockLibraryOff)
+  // the lease cannot be renewed while the org turned offline documents off (S11 uwLockLibraryOff):
+  // "Kết nối lại" would do nothing, the drafts wait in the sync center
   if (lock.libraryOff === true && copy.bodyKey === 'uwLockExpired') {
-    return { ...copy, bodyKey: 'uwLockLibraryOff' }
+    return {
+      ...copy,
+      bodyKey: 'uwLockLibraryOff',
+      actionKey: 'uwQueueOpenCenter',
+      action: 'sync-center',
+    }
   }
   return copy
 }

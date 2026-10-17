@@ -359,6 +359,33 @@
   font-size: 13px;
 }
 
+/* S3 usage header (G5-05u): inside the tabpanel, above the table */
+.sc-usage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sc-usage .set-btn {
+  min-height: 24px;
+}
+
+/* a refused pin (cap reached): stays until the next action */
+.sc-notice {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 6px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
 /* store error: replaces the table */
 .sc-store-error {
   display: flex;
@@ -454,7 +481,8 @@
   .sc-act,
   .sc-link,
   .sc-doc-btn,
-  .sc-tab {
+  .sc-tab,
+  .sc-usage .set-btn {
     min-height: 44px;
   }
 }
