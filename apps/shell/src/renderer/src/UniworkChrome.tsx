@@ -47,6 +47,7 @@ import {
   type RemoteBarAction,
 } from './uniwork-docs-model'
 import { UniworkConflictHost } from './UniworkConflictDialog'
+import { SaveDialogHost } from './uniwork-folders/SaveDialog'
 import { UniworkQueuePopover } from './UniworkQueuePopover'
 import {
   failedReasonKeyOf,
@@ -1054,6 +1055,7 @@ export function UniworkNotice({ openDocumentIds }: { openDocumentIds: ReadonlySe
       {notice && <NoticePill notice={notice} onDismiss={() => setNotice(null)} />}
       <RenamedAnnouncer openDocumentIds={openDocumentIds} />
       <UniworkConflictHost />
+      <SaveDialogHost />
     </>
   )
 }
