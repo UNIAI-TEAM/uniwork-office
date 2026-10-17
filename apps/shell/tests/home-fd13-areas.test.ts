@@ -481,7 +481,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     api.starred = vi.fn(async () => ({ entries: starredEntries, total: starredEntries.length }))
     api.uniworkListDocuments = vi.fn(async () =>
       ok({
-        items: [
+        documents: [
           {
             id: 'uw-doc-1',
             workspaceId: 'ws-1',
