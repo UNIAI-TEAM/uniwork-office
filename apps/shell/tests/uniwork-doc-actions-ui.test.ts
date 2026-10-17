@@ -31,6 +31,7 @@ import type {
 } from '../src/renderer/src/uniwork-library-api'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
+import { uniworkSaveStrings } from '../src/renderer/src/i18n/strings-uniwork-save'
 
 /**
  * S18: New document, Upload, Rename, Archive / Restore from the UniWork
@@ -42,6 +43,8 @@ actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const en = uniworkDocumentStrings.en
 const folderEn = uniworkFolderStrings.en
+// SAVE-01 Q1: no folder chosen = My Folder (main sends destination my_folder)
+const myFolderEn = uniworkSaveStrings.en.usMyFolder
 
 const WORKSPACES = [
   { id: 'w1', name: 'Sales', orgId: 'o1', myRole: 'admin' },
@@ -261,7 +264,7 @@ describe('S18 new document', () => {
     await click(dialog.querySelector('input[value="pptx"]')!)
     // FD-11 S4: "Location" is a button showing the chosen path; it opens the folder picker
     const location = dialog.querySelector<HTMLButtonElement>('.uwf-location-btn')!
-    expect(location.textContent).toContain(folderEn.ufLocationRoot)
+    expect(location.textContent).toContain(myFolderEn)
     expect(dialog.querySelectorAll('select')).toHaveLength(1)
     await click(location)
     const picker = host.querySelector('.uwf-picker')!
@@ -296,8 +299,8 @@ describe('S18 new document', () => {
     const btn = locRow.querySelector<HTMLButtonElement>('.uwf-location-btn')!
     expect(select).not.toBeNull()
     expect(btn).not.toBeNull()
-    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe(folderEn.ufLocationRoot)
-    expect(btn.getAttribute('title')).toBe(folderEn.ufLocationRoot)
+    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe(myFolderEn)
+    expect(btn.getAttribute('title')).toBe(myFolderEn)
 
     await click(btn)
     const picker = host.querySelector('.uwf-picker')!

@@ -11,7 +11,13 @@ import {
 } from '../uniwork-docs-model'
 import { FolderMenu, type FolderMenuItem } from './FolderMenu'
 import { FolderGlyph } from './UniworkFolderTree'
-import { isFolderEntry, shortPath } from './uniwork-folders-model'
+import {
+  MY_FOLDER_LABEL_KEY,
+  entryTitleOf,
+  isFolderEntry,
+  labelMyFolderPath,
+  shortPath,
+} from './uniwork-folders-model'
 import type { ListState } from './use-folder-browser'
 
 /** id of the muted hidden-formats count line referenced by aria-describedby (R2-3) */
@@ -32,6 +38,7 @@ export function BrowserContents({
   hiddenHintId,
   emptyText,
   search,
+  myFolderId = null,
   openingId,
   menuFor,
   onOpenFolder,
@@ -46,6 +53,8 @@ export function BrowserContents({
   emptyText: string
   /** search hits: show each row's path */
   search: boolean
+  /** MYFOLDER-01: names My Folder by its label inside a search hit's path */
+  myFolderId?: string | null
   openingId?: string | null
   menuFor: (doc: UniworkDocSummary) => FolderMenuItem[]
   onOpenFolder: (doc: UniworkDocSummary) => void
@@ -178,7 +187,14 @@ export function BrowserContents({
       >
         {rows.map((doc) => {
           const folder = isFolderEntry(doc)
-          const path = search && doc.path ? shortPath(doc.path, t('ufRoot')) : null
+          const title = entryTitleOf(doc, t(MY_FOLDER_LABEL_KEY))
+          const path =
+            search && doc.path
+              ? shortPath(
+                  labelMyFolderPath(doc.path, myFolderId, t(MY_FOLDER_LABEL_KEY)),
+                  t('ufRoot'),
+                )
+              : null
           const items = menuFor(doc)
           const meta = folder ? '' : pickerRowMeta(doc, t, dateLocale)
           return (
@@ -211,7 +227,7 @@ export function BrowserContents({
                   <FileBadge ext={docExtension(doc)} size={24} />
                 )}
                 <span className="uw-pick-row-text">
-                  <span className="uw-pick-row-title">{doc.title}</span>
+                  <span className="uw-pick-row-title">{title}</span>
                   {path && (
                     <span className="uw-pick-row-meta uwf-path">
                       <span aria-hidden="true">{path.short}</span>
@@ -223,7 +239,7 @@ export function BrowserContents({
               </div>
               {items.length > 0 && (
                 <FolderMenu
-                  label={t('ufActionsFor', { name: doc.title })}
+                  label={t('ufActionsFor', { name: title })}
                   items={items}
                   dataFor={doc.id}
                   open={menuId === doc.id}
