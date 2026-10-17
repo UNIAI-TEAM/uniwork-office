@@ -907,7 +907,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
           .poll(() => stub.commits(created.id).length, { timeout: 30_000 })
           .toBe(commitsBeforeMenu + 1)
         expect(stub.uploads(created.id)).toHaveLength(uploadsBeforeMenu + 1)
-        await expectState(shell, 'ready')
+        await expectState(shell, 'saved')
         expect(
           stub.documents().filter((d) => d.title === 'first-saved-to-my-folder.docx'),
         ).toHaveLength(1)
@@ -922,7 +922,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
           .poll(() => stub.commits(created.id).length, { timeout: 30_000 })
           .toBe(commitsBeforeCtrlS + 1)
         expect(stub.uploads(created.id)).toHaveLength(uploadsBeforeCtrlS + 1)
-        await expectState(shell, 'ready')
+        await expectState(shell, 'saved')
         expect(
           stub.documents().filter((d) => d.title === 'first-saved-to-my-folder.docx'),
         ).toHaveLength(1)
@@ -1085,7 +1085,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       expect(contentTitles).toContain('Alpha Folder')
 
       // Contents row menu for My Folder offers New subfolder only (no rename/move/archive/share)
-      await dialog
+      await contents
         .getByRole('button', {
           name: uniworkFoldersEn.ufActionsFor.replace('{name}', uniworkSaveEn.usMyFolder),
           exact: true,
