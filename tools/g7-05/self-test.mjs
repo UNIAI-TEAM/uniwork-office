@@ -583,7 +583,7 @@ function testPreloadApiReferencesAndUiSelectors() {
   )
   const syncCenterApiKeys = extractPreloadApiKeys(
     preloadSource,
-    'const syncCenterApi: UniworkSyncCenterApi = {',
+    'const syncCenterApi: UniworkSyncCenterApi',
     "contextBridge.exposeInMainWorld('uniworkSyncCenter', syncCenterApi)",
   )
 
