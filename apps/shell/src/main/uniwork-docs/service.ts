@@ -477,6 +477,33 @@ const MAX_FOLDER_NAME_RUNES = 255
  */
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
+/**
+ * SIZE-F1 / SAVE-01 merge M-2 (D-S1): the ONE size preflight upload and first
+ * save share. The server's `max_bytes` comes first and is named as itself, then
+ * the interim 50 MiB staging cap, whose refusal names `min(max_bytes, 50 MiB)`
+ * as the effective limit so the copy stays truthful. `filename` is the basename
+ * sent as the upload `file` part; `size` is the payload's byte length at this
+ * call's point - the stat's size before the read, the buffer's after it. Both
+ * callers run it on both, so a file that grew between the two is refused too.
+ * The refusal carries filename/sizeBytes/maxBytes to the renderer unchanged.
+ */
+function assertUploadSize(filename: string, size: number, limits: DocumentLimits): void {
+  if (size > limits.max_bytes) {
+    throw new UniworkDocError('too_large', {
+      filename,
+      sizeBytes: size,
+      maxBytes: limits.max_bytes,
+    })
+  }
+  if (size > MAX_UPLOAD_BYTES) {
+    throw new UniworkDocError('too_large', {
+      filename,
+      sizeBytes: size,
+      maxBytes: Math.min(limits.max_bytes, MAX_UPLOAD_BYTES),
+    })
+  }
+}
+
 /** the renderer's own id for one upload start; a Cancel names the upload through it */
 const MAX_UPLOAD_ID_LENGTH = 128
 
@@ -3786,22 +3813,7 @@ export class UniworkDocsService {
         if (controller.signal.aborted) throw cancelledUpload()
         const limits = await this.limitsCache.get()
         if (controller.signal.aborted) throw cancelledUpload()
-        if (size > limits.max_bytes) {
-          throw new UniworkDocError('too_large', {
-            filename,
-            sizeBytes: size,
-            maxBytes: limits.max_bytes,
-          })
-        }
-        // under the document cap but over what D stages per upload part: still
-        // refused unread, naming the part limit as the effective one
-        if (size > MAX_UPLOAD_BYTES) {
-          throw new UniworkDocError('too_large', {
-            filename,
-            sizeBytes: size,
-            maxBytes: Math.min(limits.max_bytes, MAX_UPLOAD_BYTES),
-          })
-        }
+        assertUploadSize(filename, size, limits)
         let bytes: Uint8Array
         try {
           bytes = new Uint8Array(await readFile(input.path, { signal: controller.signal }))
@@ -3812,13 +3824,7 @@ export class UniworkDocsService {
         // the read can also resolve just as the abort lands: no POST then
         if (controller.signal.aborted) throw cancelledUpload()
         const total = bytes.byteLength
-        if (total > limits.max_bytes) {
-          throw new UniworkDocError('too_large', {
-            filename,
-            sizeBytes: total,
-            maxBytes: limits.max_bytes,
-          })
-        }
+        assertUploadSize(filename, total, limits)
         this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: 0, total })
         const created = await this.api()
           .createFile({
@@ -3932,9 +3938,8 @@ export class UniworkDocsService {
       }
       if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
     }
-    // S01-R1-9: the same preflight uploadDocument runs before buffering - a
-    // real regular file under the server's 50 MiB staging cap, refused typed
-    // and unread
+    // S01-R1-9: a real regular file, stat'ed before anything is read - the
+    // path that is a directory (or is gone) is `not_found`, never an upload
     let size: number
     try {
       const info = await stat(tabPath)
@@ -3943,13 +3948,20 @@ export class UniworkDocsService {
     } catch (error) {
       throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
     }
-    if (size > MAX_UPLOAD_BYTES) throw new UniworkDocError('too_large')
+    // S01-R1-9 / merge M-2 (D-S1): the upload path's OWN preflight, one shared
+    // guard - the server cap first, then the 50 MiB staging cap - so a first
+    // save is refused typed and unread exactly like an upload, details included
+    const limits = await this.limitsCache.get()
+    assertUploadSize(filename, size, limits)
     let bytes: Uint8Array
     try {
       bytes = new Uint8Array(await readFile(tabPath))
     } catch {
       throw new UniworkDocError('not_found')
     }
+    // the same re-check the upload runs on what it actually buffered: a file
+    // that grew past the cap between the stat and the read is refused too
+    assertUploadSize(filename, bytes.byteLength, limits)
     // the path may have been bound (another first save, an open) while the
     // flush, the stat or the read ran: its document wins, this attempt never
     // creates
