@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import {
   chmodSync,
   existsSync,
@@ -21,6 +22,7 @@ import { BINDING_FILE, scopeWorkingCopyDirs } from '../src/main/uniwork-docs/bin
 import { ID } from '../src/main/uniwork-sync/feed/http'
 import {
   OFFLINE_COPY_KEY_MAX,
+  OFFLINE_COPY_KEY_SUFFIX,
   createOfflineCopies,
   offlineCopyKey,
   type OfflineCopies,
@@ -59,7 +61,7 @@ interface OpenHarness {
   opened: string[]
   locks: UniworkDocLock[]
   /** the open-path test seam: what `isPathOpen` answers */
-  pathOpen: { value: boolean }
+  pathOpen: { value: boolean; closed: Set<string> }
   clock: { now: number }
   capability: { on: boolean }
   /** the server read: every URL asked, and an optional answer (default: no network) */
@@ -83,7 +85,8 @@ function openHarness(): OpenHarness {
   const userDataDir = mkdtempSync(join(tmpdir(), 'uw-offline-open-'))
   const opened: string[] = []
   const locks: UniworkDocLock[] = []
-  const pathOpen = { value: true }
+  const pathOpen = { value: true, closed: new Set<string>() }
+  const isPathOpen = (path: string) => !pathOpen.closed.has(path) && pathOpen.value
   const clock = { now: 1_000 }
   const capability = { on: true }
   const server: OpenHarness['server'] = { answer: null, calls: [] }
@@ -124,7 +127,7 @@ function openHarness(): OpenHarness {
       opened.push(path)
       return true
     },
-    isPathOpen: () => pathOpen.value,
+    isPathOpen,
     requestModuleSave: () => false,
     reloadPath: () => undefined,
     activePath: () => undefined,
@@ -144,7 +147,7 @@ function openHarness(): OpenHarness {
       scopeWorkingCopyDirs(service.store.root, { deploymentId, accountId }),
     scope: () => ({ deploymentId: SCOPE.deploymentId, accountId: SCOPE.accountId }),
     show: (path) => service.showOfflineCopy(path),
-    isPathOpen: () => pathOpen.value,
+    isPathOpen,
     appVersion: () => '0.0.0-test',
     now: () => clock.now,
   })
@@ -183,7 +186,10 @@ describe('G5-05u B5 an offline open shows the read-only cached copy', () => {
     const doc = addDoc(o.h, 'doc_1', 1)
     expect((await pin(o.h)).kind).toBe('pinned')
     const result = await o.service.openDocument('doc_1')
-    expect(result).toEqual({ ok: true, value: { path: expect.stringContaining('doc_1@offline') } })
+    expect(result).toEqual({
+      ok: true,
+      value: { path: expect.stringContaining(offlineCopyKey('doc_1')) },
+    })
     const path = o.service.store.dirFor(
       SCOPE.deploymentId,
       SCOPE.accountId,
@@ -448,6 +454,47 @@ describe('G5-05u B5 the copy is named and cleared like the normal open path (BE-
     expect(new Uint8Array(await readFile(o.opened[0]!))).toEqual(doc.bytes)
   })
 
+  it('two accepted ids never share a copy folder: a long id and its shortened twin (BE-R2-1)', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const longId = 'a'.repeat(128)
+    // the reviewer's pair: the 120-char id that aliased the old shortened key of
+    // `longId`, plus the key stem of `longId` itself (both are accepted feed ids)
+    const shortId = `${longId.slice(0, 103)}-${createHash('sha256').update(longId).digest('hex').slice(0, 16)}`
+    const stemId = offlineCopyKey(longId).slice(0, -OFFLINE_COPY_KEY_SUFFIX.length)
+    expect(ID.test(longId)).toBe(true)
+    expect(ID.test(shortId)).toBe(true)
+    expect(ID.test(stemId)).toBe(true)
+    expect(shortId).not.toBe(longId)
+    expect(offlineCopyKey(shortId)).not.toBe(offlineCopyKey(longId))
+    expect(offlineCopyKey(stemId)).not.toBe(offlineCopyKey(longId))
+    const longDoc = addDoc(o.h, longId, 1)
+    const shortDoc = addDoc(o.h, shortId, 1)
+    expect((await o.h.manager.pin({ documentId: longId, orgId: ORG, workspaceId: WS })).kind).toBe(
+      'pinned',
+    )
+    expect((await o.h.manager.pin({ documentId: shortId, orgId: ORG, workspaceId: WS })).kind).toBe(
+      'pinned',
+    )
+    const long = await o.copies.open(longId)
+    const short = await o.copies.open(shortId)
+    if (long.kind !== 'opened' || short.kind !== 'opened') throw new Error('both must open')
+    expect(dirname(long.path)).not.toBe(dirname(short.path))
+    // both plaintexts and bindings survive both opens, byte for byte
+    expect(new Uint8Array(await readFile(long.path))).toEqual(longDoc.bytes)
+    expect(new Uint8Array(await readFile(short.path))).toEqual(shortDoc.bytes)
+    expect(o.service.store.lookup(long.path)?.binding.documentId).toBe(longId)
+    expect(o.service.store.lookup(short.path)?.binding.documentId).toBe(shortId)
+    // cleaning up one copy leaves the other copy and its binding untouched
+    o.pathOpen.closed.add(short.path)
+    o.clock.now += 31_000
+    await o.copies.sweep()
+    expect(existsSync(dirname(short.path))).toBe(false)
+    expect(existsSync(dirname(long.path))).toBe(true)
+    expect(new Uint8Array(await readFile(long.path))).toEqual(longDoc.bytes)
+    expect(o.service.store.lookup(long.path)?.binding.documentId).toBe(longId)
+  })
+
   it('the account activation sweep deletes a leftover copy folder and keeps a real working copy', async () => {
     const o = openHarness()
     dirs.push(o.userDataDir)
@@ -514,7 +561,7 @@ describe('G5-05u B5 only the network class opens the cached copy (BE-R1-4)', () 
     const result = await o.service.openDocument('doc_1')
     expect(result.ok).toBe(true)
     expect(o.opened).toHaveLength(1)
-    expect(o.opened[0]).toContain('doc_1@offline')
+    expect(o.opened[0]).toContain(offlineCopyKey('doc_1'))
   })
 })
 

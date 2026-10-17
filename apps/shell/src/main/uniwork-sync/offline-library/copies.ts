@@ -116,20 +116,16 @@ export interface OfflineCopies {
 
 /**
  * The one copy key of a document: its own folder, so no real working copy is
- * touched. A 128-char document id (the feed's own cap) does not fit the
- * binding path segment with the suffix (BE-R1-5), so a longer id keeps its head
- * and a fixed-length digest of the whole id: still one accepted segment, still
- * the same key for the same document.
+ * touched. The key is the FULL sha256 hex of the document id plus `@offline`
+ * (BE-R2-1): 72 characters, always inside one binding path segment, stable per
+ * id, and two distinct ids can never share a folder - the old
+ * head-plus-short-digest branch shared one namespace with the ids it shortened,
+ * so an accepted 120-char id could alias a 128-char one and one open deleted
+ * the other's plaintext.
  */
 export function offlineCopyKey(documentId: string): string {
-  const raw = `${documentId}${OFFLINE_COPY_KEY_SUFFIX}`
-  if (raw.length <= OFFLINE_COPY_KEY_MAX) return raw
-  const digest = createHash('sha256').update(documentId).digest('hex').slice(0, 16)
-  const head = documentId.slice(
-    0,
-    OFFLINE_COPY_KEY_MAX - OFFLINE_COPY_KEY_SUFFIX.length - digest.length - 1,
-  )
-  return `${head}-${digest}${OFFLINE_COPY_KEY_SUFFIX}`
+  const digest = createHash('sha256').update(documentId).digest('hex')
+  return `${digest}${OFFLINE_COPY_KEY_SUFFIX}`
 }
 
 export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
