@@ -70,6 +70,17 @@ export function IconFile(): ReactElement {
   )
 }
 
+/** G5-05u: "Dùng khi không có mạng" / "Bỏ dùng khi không có mạng" (a cloud with a down arrow) */
+export function IconOfflinePin(): ReactElement {
+  return (
+    <Svg>
+      <path d="M4.6 12.5a2.85 2.85 0 0 1-.35-5.67 3.9 3.9 0 0 1 7.55.8 2.45 2.45 0 0 1-.35 4.87" />
+      <path d="M8 7.5v5.5" />
+      <path d="M6 11l2 2 2-2" />
+    </Svg>
+  )
+}
+
 type IconBtnProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
   label: string
   variant?: 'default' | 'danger' | 'accent'

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { UNIWORK_DOC_CHANNELS } from '../src/shared/home-api'
+import { UNIWORK_DOC_CHANNELS, UNIWORK_LOCK_REASONS } from '../src/shared/home-api'
 
 /**
  * G5-04g: every open route (File > Open, recents, argv/open-with, drag, the MCP
@@ -90,8 +90,12 @@ describe('the shell open router (G5-04g)', () => {
     // the whole list when main clears a keystore lock (a Retry that worked)
     expect(source).toMatch(/onUniworkLocksChanged\(cb\)/)
     expect(source).toMatch(/ipcRenderer\.on\(UNIWORK_DOC_CHANNELS\.locksChanged,/)
-    // the validator must not drop a keystore_locked lock on the way to the shell
-    expect(source).toMatch(/r\.reason !== 'store_newer' && r\.reason !== 'keystore_locked'/)
+    // the validator must not drop a keystore_locked lock on the way to the shell:
+    // it accepts from the shared reason list (not an inline whitelist), and that
+    // list carries keystore_locked. Behaviour of the guard itself is exercised in
+    // uniwork-lock-preload-guard.test.ts.
+    expect(source).toMatch(/UNIWORK_LOCK_REASON_SET[^\n]*UNIWORK_LOCK_REASONS/)
+    expect(UNIWORK_LOCK_REASONS).toContain('keystore_locked')
     expect(UNIWORK_DOC_CHANNELS.locksChanged).toBe('uniwork-doc:locks-changed')
     // the wiring pushes the current list on that channel
     const wiring = read('src/main/uniwork-docs/wiring.ts')

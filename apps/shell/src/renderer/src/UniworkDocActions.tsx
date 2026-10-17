@@ -602,6 +602,11 @@ export function RowMenu({
   if (actions.rename) items.push({ action: 'rename', label: t('uwDocRename') })
   if (actions.archive) items.push({ action: 'archive', label: t('uwDocArchive') })
   if (actions.restore) items.push({ action: 'restore', label: t('uwDocRestore') })
+  if (actions.offline)
+    items.push({
+      action: 'offline',
+      label: t(actions.offline === 'pin' ? 'uwOfflinePin' : 'uwOfflineUnpin'),
+    })
 
   // measured before paint: the popup never shows at a wrong place first
   useLayoutEffect(() => {
