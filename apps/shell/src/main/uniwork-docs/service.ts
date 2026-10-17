@@ -504,6 +504,30 @@ function assertUploadSize(filename: string, size: number, limits: DocumentLimits
   }
 }
 
+/**
+ * SAVE-01 r4 (S01-R4-3): the ONE re-wrap both POST paths answer a server
+ * `too_large` with. D can refuse the bytes after the local preflight passed (a
+ * stale limits cache, or a cap lowered between the read and the POST);
+ * `errorFromResponse` fills `sizeBytes`/`maxBytes` from the envelope's fields
+ * but never the filename, so the caller supplies its own basename and its own
+ * payload length - the bytes it handed the client - as the fallbacks. Upload
+ * and first save therefore answer the renderer the identical shape.
+ */
+function rethrowServerTooLarge(
+  error: UniworkDocError,
+  filename: string,
+  sizeBytes: number,
+  limits: DocumentLimits,
+): never {
+  throw new UniworkDocError('too_large', {
+    status: error.status,
+    serverCode: error.serverCode,
+    filename,
+    sizeBytes: error.sizeBytes ?? sizeBytes,
+    maxBytes: error.maxBytes ?? limits.max_bytes,
+  })
+}
+
 /** the renderer's own id for one upload start; a Cancel names the upload through it */
 const MAX_UPLOAD_ID_LENGTH = 128
 
@@ -3841,13 +3865,7 @@ export class UniworkDocsService {
             // answer, not the network failure the abort surfaced as
             if (controller.signal.aborted) throw cancelledUpload()
             if (error instanceof UniworkDocError && error.code === 'too_large') {
-              throw new UniworkDocError('too_large', {
-                status: error.status,
-                serverCode: error.serverCode,
-                filename,
-                sizeBytes: error.sizeBytes ?? total,
-                maxBytes: error.maxBytes ?? limits.max_bytes,
-              })
+              rethrowServerTooLarge(error, filename, total, limits)
             }
             throw error
           })
@@ -4003,6 +4021,12 @@ export class UniworkDocsService {
         // then answer with the typed (retryable) verdict
         if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
           this.firstSaveKeys.delete(keyFp)
+        }
+        // S01-R4-3: the server's own size refusal, after the local preflight
+        // passed - re-wrapped exactly as the upload path does, so the renderer
+        // gets the basename, the size and the cap, never a bare too_large
+        if (error instanceof UniworkDocError && error.code === 'too_large') {
+          rethrowServerTooLarge(error, filename, bytes.byteLength, limits)
         }
         throw error
       })
