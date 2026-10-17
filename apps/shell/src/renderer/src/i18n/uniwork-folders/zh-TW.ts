@@ -51,5 +51,6 @@ export const zhTW = {
   ufTreeError: '無法載入資料夾樹。',
   ufActionsFor: '{name} 的動作',
   ufAreaLabel: '區域',
+  ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: '本機尚無資料夾。',
 } satisfies Record<keyof typeof zh, string>

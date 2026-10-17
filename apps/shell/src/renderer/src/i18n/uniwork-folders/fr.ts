@@ -52,5 +52,6 @@ export const fr = {
   ufTreeError: 'Impossible de charger les dossiers.',
   ufActionsFor: 'Actions pour {name}',
   ufAreaLabel: 'Espace',
+  ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'Aucun dossier sur cet appareil pour le moment.',
 } satisfies Record<keyof typeof zh, string>

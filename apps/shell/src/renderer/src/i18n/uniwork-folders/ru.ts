@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const ru = {
   ufRoot: 'UniWork',
+  ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Папки',
   ufContentsLabel: 'Содержимое папки',
   ufRecent: 'Недавние',

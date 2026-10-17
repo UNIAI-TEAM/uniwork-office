@@ -51,5 +51,6 @@ export const he = {
   ufTreeError: 'לא ניתן לטעון את התיקיות.',
   ufActionsFor: 'פעולות עבור {name}',
   ufAreaLabel: 'אזור',
+  ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'אין עדיין תיקיות במכשיר זה.',
 } satisfies Record<keyof typeof zh, string>

@@ -52,5 +52,6 @@ export const ja = {
   ufTreeError: 'フォルダーを読み込めませんでした。',
   ufActionsFor: '{name} の操作',
   ufAreaLabel: 'エリア',
+  ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'この端末にはまだフォルダがありません。',
 } satisfies Record<keyof typeof zh, string>

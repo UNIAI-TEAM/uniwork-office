@@ -145,15 +145,18 @@ describe('uniwork folders string shards', () => {
     expect(strings.he.openLocal).toBe('פתיחת קובץ במכשיר זה')
     expect(strings.hi.openLocal).toBe('इस डिवाइस पर फ़ाइल खोलें')
 
-    expect(workbenchStrings.vi.wbDeskSubCloud).toBe('UniWork')
-    expect(workbenchStrings.en.wbDeskSubCloud).toBe('UniWork')
+    expect(workbenchStrings.vi.wbDeskSubCloud).toBe('Trên UniWork')
+    expect(workbenchStrings.en.wbDeskSubCloud).toBe('On UniWork')
+    expect(workbenchStrings.zh.wbDeskSubCloud).toBe('在 UniWork 上')
     expect(workbenchStrings.vi.wbOnThisDevice).toBe('Trên máy này')
     expect(workbenchStrings.en.wbOnThisDevice).toBe('On this device')
 
+    for (const lang of LANGS) {
+      expect(table(lang).ufAreaUniwork).toBe('UniWork')
+    }
     expect(table('vi').ufAreaLabel).toBe('Khu vực')
     expect(table('en').ufAreaLabel).toBe('Area')
     expect(table('vi').ufNoDeviceFolders).toBe('Chưa có thư mục nào trên máy này.')
     expect(table('en').ufNoDeviceFolders).toBe('No folders on this device yet.')
   })
 })
-

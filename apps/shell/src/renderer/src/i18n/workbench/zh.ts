@@ -258,7 +258,7 @@ export const zh = {
   wbDeskRestore: '恢复',
   wbDeskSubOpenTab: '已在标签页中打开',
   wbDeskSubRecovery: '上次会话意外关闭',
-  wbDeskSubCloud: 'UniWork',
+  wbDeskSubCloud: '在 UniWork 上',
   wbDeskDrawerInto: '起草到',
   wbDeskDrawerPack: '起草目标资料包',
   wbDeskDefaultPack: '默认项目',

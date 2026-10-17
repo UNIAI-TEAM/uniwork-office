@@ -52,5 +52,6 @@ export const it = {
   ufTreeError: 'Impossibile caricare le cartelle.',
   ufActionsFor: 'Azioni per {name}',
   ufAreaLabel: 'Area',
+  ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'Nessuna cartella su questo dispositivo.',
 } satisfies Record<keyof typeof zh, string>

@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const th = {
   ufRoot: 'UniWork',
+  ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'โฟลเดอร์',
   ufContentsLabel: 'เนื้อหาโฟลเดอร์',
   ufRecent: 'ล่าสุด',

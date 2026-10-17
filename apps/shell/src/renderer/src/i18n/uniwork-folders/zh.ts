@@ -50,5 +50,6 @@ export const zh = {
   ufTreeError: '无法加载文件夹树。',
   ufActionsFor: '{name} 的操作',
   ufAreaLabel: '区域',
+  ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: '本机尚无文件夹。',
 }

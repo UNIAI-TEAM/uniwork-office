@@ -52,5 +52,6 @@ export const cs = {
   ufTreeError: 'Složky se nepodařilo načíst.',
   ufActionsFor: 'Akce pro {name}',
   ufAreaLabel: 'Oblast',
+  ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'V tomto zařízení zatím nejsou žádné složky.',
 } satisfies Record<keyof typeof zh, string>

@@ -257,7 +257,7 @@ export const en = {
   wbDeskRestore: 'Restore',
   wbDeskSubOpenTab: 'Open in a tab',
   wbDeskSubRecovery: 'The last session closed unexpectedly',
-  wbDeskSubCloud: 'UniWork',
+  wbDeskSubCloud: 'On UniWork',
   wbDeskDrawerInto: 'drafts go to',
   wbDeskDrawerPack: 'Pack to draft into',
   wbDeskDefaultPack: 'Default project',

@@ -51,5 +51,6 @@ export const hi = {
   ufTreeError: 'फ़ोल्डर लोड नहीं हो सके।',
   ufActionsFor: '{name} के लिए कार्रवाइयाँ',
   ufAreaLabel: 'क्षेत्र',
+  ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'इस डिवाइस पर अभी कोई फ़ोल्डर नहीं है।',
 } satisfies Record<keyof typeof zh, string>
