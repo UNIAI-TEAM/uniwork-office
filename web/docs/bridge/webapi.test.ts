@@ -303,16 +303,7 @@ describe('saveDocx', () => {
 
     // If the file becomes view-only while a save hits 409, save-copy and overwrite are omitted
     mock.override('api.save', () => {
-      mock.emit('file.renamed', {
-        fileId: 'f1',
-        name: 'Report-ro.docx',
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        size: DOCX.length,
-        etag: '"f1-v2"',
-        versionId: 'v2',
-        updatedAt: '2026-03-23T00:01:00.000Z',
-        writable: false,
-      })
+      mock.rename('f1', 'Report-ro.docx', { writable: false })
       return Promise.reject(protocolError('conflict', 'HTTP 409'))
     })
     const pending2 = api.saveDocx(doc.path, buf([9]))
@@ -334,8 +325,8 @@ describe('saveDocx', () => {
 
     const dlg = await dialogShown('conflict')
     // Back on step 1 with the Done alert quoting the copy's title
-    for (let i = 0; i < 50 && !dlg.querySelector('.ow-dlg-alert'); i++) await flush()
-    const copyCalls = mock.calls.filter((c) => (c.type as string) === 'api.saveCopy')
+    for (let i = 0; i < 50 && !dlg.querySelector('.ow-dlg-alert')?.textContent; i++) await flush()
+    const copyCalls = mock.calls.filter((c) => c.type === 'api.saveCopy')
     expect(copyCalls).toHaveLength(1)
     const sent = copyCalls[0]!.payload as { data: ArrayBuffer; name: string }
     expect(new Uint8Array(sent.data)).toEqual(new Uint8Array([9, 8, 7]))
@@ -353,7 +344,7 @@ describe('saveDocx', () => {
     await choose('conflict', 'go')
     expect(await pending).toEqual({ ok: true })
     const saves = mock.calls.filter((c) => c.type === 'api.save')
-    expect(saves.map((c) => (c.payload as { fileId: string; etag?: string }))).toEqual([
+    expect(saves.map((c) => c.payload as { fileId: string; etag?: string })).toEqual([
       expect.objectContaining({ fileId: 'f1', etag: '"f1-v1"' }),
       expect.objectContaining({ fileId: 'f1', etag: remote.etag }),
     ])
@@ -363,7 +354,7 @@ describe('saveDocx', () => {
     const doc = await bootWith('Báo cáo.docx')
     setWebLanguage('vi', { host: true })
     mock.bumpRemote('f1')
-    mock.override('api.saveCopy' as never, () =>
+    mock.override('api.saveCopy', () =>
       Promise.reject(protocolError('unsupported', 'api.saveCopy')),
     )
     const pending = api.saveDocx(doc.path, buf([4, 5]))
@@ -371,29 +362,35 @@ describe('saveDocx', () => {
     await choose('conflict', 'go')
 
     const dlg = await dialogShown('conflict')
-    for (let i = 0; i < 50 && !dlg.querySelector('.ow-dlg-alert'); i++) await flush()
+    for (let i = 0; i < 50 && !dlg.querySelector('.ow-dlg-alert')?.textContent; i++) await flush()
     expect(dlg.querySelector('.ow-dlg-alert')?.textContent).toBe(
       webText('vi', 'uwConflictSaveCopyFailed'),
     )
-    const sent = mock.calls.find((c) => (c.type as string) === 'api.saveCopy')!.payload as {
+    const sent = mock.calls.find((c) => c.type === 'api.saveCopy')!.payload as {
       name: string
     }
     expect(sent.name).toBe('Báo cáo (bản sao)')
 
     // Generic / host-refusal error (e.g. forbidden with apiCode copy_consent_required) also shows failed alert
-    mock.override('api.saveCopy' as never, () =>
+    mock.override('api.saveCopy', () =>
       Promise.reject(
-        protocolError('forbidden', 'copy refused', false, 403, {
-          apiCode: 'copy_consent_required',
+        protocolError('forbidden', 'copy refused', {
+          status: 403,
+          details: { apiCode: 'copy_consent_required' },
         }),
       ),
     )
     await choose('conflict', 'go')
-    for (let i = 0; i < 50 && !dlg.querySelector('.ow-dlg-alert'); i++) await flush()
+    for (let i = 0; i < 50 && mock.calls.filter((c) => c.type === 'api.saveCopy').length < 2; i++) {
+      await flush()
+    }
+    await flush()
+    for (let i = 0; i < 50 && !dlg.querySelector('.ow-dlg-alert')?.textContent; i++) await flush()
     expect(dlg.querySelector('.ow-dlg-alert')?.textContent).toBe(
       webText('vi', 'uwConflictSaveCopyFailed'),
     )
 
+    await choose('conflict', 'back')
     await choose('conflict', 'cancel')
     expect(await pending).toEqual({ ok: false, error: text('appWebConflictNotSaved') })
   })
@@ -401,8 +398,13 @@ describe('saveDocx', () => {
   it('conflict -> Save as a copy…: too_large with details.max_bytes returns to step 1 with limit alert (UNI-1872)', async () => {
     const doc = await bootWith()
     mock.bumpRemote('f1')
-    mock.override('api.saveCopy' as never, () =>
-      Promise.reject(protocolError('too_large', 'HTTP 413', false, 413, { max_bytes: 2 })),
+    mock.override('api.saveCopy', () =>
+      Promise.reject(
+        protocolError('too_large', 'HTTP 413', {
+          status: 413,
+          details: { max_bytes: 2 },
+        }),
+      ),
     )
     const pending = api.saveDocx(doc.path, buf([1, 2, 3, 4]))
     await choose('conflict', 'save-copy')
@@ -411,15 +413,15 @@ describe('saveDocx', () => {
     const dlg = await dialogShown('conflict')
     for (
       let i = 0;
-      i < 50 && (!dlg.querySelector('.ow-dlg-alert') || !dlg.querySelector('[data-choice="save-copy"]'));
+      i < 50 &&
+      (!dlg.querySelector('.ow-dlg-alert')?.textContent ||
+        !dlg.querySelector('[data-choice="save-copy"]'));
       i++
     ) {
       await flush()
     }
-    expect(dlg.querySelector('.ow-dlg-alert')?.textContent).toContain('0.0 MB')
-    expect(
-      dlg.querySelector('[data-choice="save-copy"]')?.getAttribute('aria-disabled'),
-    ).toBe('true')
+    expect(dlg.querySelector('.ow-dlg-alert')?.textContent).toContain('over 0 MB')
+    expect(document.activeElement).toBe(dlg.querySelector('[data-choice="save-copy"]'))
     await choose('conflict', 'cancel')
     await pending
   })

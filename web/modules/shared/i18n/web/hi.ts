@@ -81,6 +81,7 @@ export const hi = {
   uwConflictReloadTitle: 'नवीनतम फिर से लोड करें',
   uwConflictReloadGo: 'फिर से लोड करें',
   uwConflictSaveCopy: 'प्रति के रूप में सहेजें…',
+  uwConflictSaveCopyName: '{name} (प्रति)',
   uwConflictSaveCopyTitle: 'प्रति के रूप में सहेजें?',
   uwConflictSaveCopyConfirm:
     'UniWork आपके संस्करण से एक नया दस्तावेज़ बनाएगा, जिसका स्वामी और पहुँच इस दस्तावेज़ जैसी होगी। मौजूदा दस्तावेज़ और {author} का संस्करण {server} जैसे हैं वैसे ही रहेंगे।',

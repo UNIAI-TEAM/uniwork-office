@@ -409,7 +409,7 @@ describe('document size limits and events (SIZE-F1, additive)', () => {
       parseEnvelope(env({ kind: 'response', type: 'api.saveCopy', payload }))
 
     expect(req({ data: new ArrayBuffer(8), name: 'Report (copy)' }).ok).toBe(true)
-    expect(req({ data: new Uint8Array([1, 2, 3]), name: 'Báo cáo (bản sao)' }).ok).toBe(true)
+    expect(req({ data: new Uint8Array([1, 2, 3]).buffer, name: 'Báo cáo (bản sao)' }).ok).toBe(true)
     expect(req({ data: new ArrayBuffer(8), name: '' }).ok).toBe(false)
     expect(req({ data: 'not-bytes', name: 'Report (copy)' }).ok).toBe(false)
     expect(req(null).ok).toBe(false)
@@ -420,4 +420,3 @@ describe('document size limits and events (SIZE-F1, additive)', () => {
     expect(res({ documentId: 'doc-copy-1' }).ok).toBe(false)
   })
 })
-

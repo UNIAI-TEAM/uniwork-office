@@ -225,6 +225,57 @@ export async function overwriteHead(
 }
 
 /**
+ * Default copy title for `api.saveCopy`: strips a trailing document extension from `fileName`
+ * (fallback `'Untitled'`) and formats `uwConflictSaveCopyName` in the active UI language.
+ */
+export function copyNameFor(
+  fileName: string | null | undefined,
+  lang: Lang = webLanguage(),
+): string {
+  const stem =
+    (fileName ?? '').replace(/\.(docx|doc|pdf|xlsx|pptx|md|markdown|txt|html?)$/i, '').trim() ||
+    'Untitled'
+  return format(webText(lang, 'uwConflictSaveCopyName'), { name: stem })
+}
+
+/**
+ * Save as a copy (`api.saveCopy`, UNI-1872): sends the open bytes from the 409'd save and the
+ * localized copy title (`uwConflictSaveCopyName`). Offered only while `canEdit` is true. Never
+ * re-points or reloads the open document; maps a reply to `{ ok: true, title }` and any thrown or
+ * protocol error to `{ ok: false, error }` (preserving `too_large` + `details.max_bytes` and host
+ * refusal `details.apiCode`).
+ */
+export function saveCopyVia(
+  port: RequestPort,
+  canEdit: boolean,
+  data: ArrayBuffer | Uint8Array,
+  fileName: () => string | null | undefined,
+): ConflictIo['saveCopy'] {
+  if (!canEdit) return undefined
+  return async (): Promise<SaveCopyAttempt> => {
+    const payload = {
+      data: copyBuffer(data),
+      name: copyNameFor(fileName()),
+    }
+    try {
+      const res = await port.request('api.saveCopy', payload, {
+        timeoutMs: TIMEOUTS.transfer,
+        transfer: [payload.data],
+      })
+      if (res && typeof res.documentId === 'string' && typeof res.title === 'string') {
+        return { ok: true, title: res.title }
+      }
+      return {
+        ok: false,
+        error: { code: 'malformed', message: 'api.saveCopy: unexpected result' },
+      }
+    } catch (err) {
+      return { ok: false, error: toProtocolError(err).toShape() }
+    }
+  }
+}
+
+/**
  * The host's `init.downloadMaxBytes` as the protocol session holds it (a later `init` after a
  * frame reload updates the same session object): read when the dialog opens, undefined until
  * `init` or when the host sent none.

@@ -82,6 +82,7 @@ export const it = {
   uwConflictReloadTitle: 'Ricarica l’ultima versione',
   uwConflictReloadGo: 'Ricarica',
   uwConflictSaveCopy: 'Salva come copia…',
+  uwConflictSaveCopyName: '{name} (copia)',
   uwConflictSaveCopyTitle: 'Salvare come copia?',
   uwConflictSaveCopyConfirm:
     'UniWork creerà un nuovo documento dalla tua versione, con lo stesso proprietario e gli stessi accessi di questo documento. Il documento attuale e la versione {server} di {author} restano invariati.',

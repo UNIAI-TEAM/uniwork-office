@@ -67,6 +67,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `api.open`                      | request | {fileId, versionId?} → `OpenPayload` + {versionChanged?} (head only; see below)         |
 | `api.save`                      | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)                |
 | `api.saveAs`                    | request | {name, data, sourceFileId?, folderId?, silent?} → `SaveResult`                          |
+| `api.saveCopy`                  | request | {data, name} → `SaveCopyResult` ({documentId, title}, additive, UNI-1872; see below)    |
 | `api.recents`                   | request | {limit?} → {files: FileMeta[]}                                                          |
 | `api.export`                    | request | {format: 'pdf' \| 'html', fileId?, data?, html?, geometry?} → {data, mimeType, name?}   |
 | `api.attachments.add`           | request | {files: UploadItem[]} → {accepted, rejected}                                            |
@@ -126,6 +127,13 @@ URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
   opens nothing. The frame shows and saves on `openReplyRevision(reply)` only; `null` (a host before X-02 ignores
   `versionId` and sends no `revision`) means the bar without a number, never the number it asked for.
 - `FileMeta.revision?`: decimal string, compared as BigInt.
+- `api.saveCopy {data, name}` (additive, UNI-1872): conflict-dialog "Save as a copy". `data` is the `ArrayBuffer` of
+  the open document at the moment of the 409'd save; `name` is the localized copy title formatted by the frame's i18n
+  (e.g. `"<name> (copy)"` / `"<tên> (bản sao)"`), which the host passes to the server as the new document's title.
+  Success returns `SaveCopyResult = { documentId: string; title: string }` without re-pointing or reloading the open
+  document. Failures reuse existing `ProtocolErrorCode` values (`conflict`, `forbidden`, `too_large` with
+  `details.max_bytes`, `network`, `internal`, `unsupported`); a host refusal keeps its server code in
+  `details.apiCode` (e.g. `owner_requires_copy`, `copy_consent_required`, `document_locked`).
 - `api.download {data}`: bytes only; the host names, types, size-checks, checks the permission and downloads from its
   own origin (the frame has no `allow-downloads`). Refusals use existing codes (`malformed`, `too_large`,
   `forbidden`). The host advertises `download` only once it handles `api.download`; every frame declares it, so the
