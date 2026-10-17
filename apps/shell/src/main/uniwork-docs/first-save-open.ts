@@ -133,7 +133,17 @@ export async function saveTabToUniWork(deps: SaveTabToUniWorkDeps): Promise<bool
   // false answer means the module could not be reached - nobody handled this
   // save, so it must not report success (S01-R1-6)
   if (deps.isBound(filePath)) {
-    if (!deps.requestModuleSave(filePath)) {
+    // S01-R2-2: the module renderer can die between the requester's
+    // isDestroyed check and its webContents.send - the send throws through
+    // requestModuleSave. That dead-renderer race must warn and answer false,
+    // never reject into the void'ed menu caller
+    let saved: boolean
+    try {
+      saved = deps.requestModuleSave(filePath)
+    } catch {
+      saved = false
+    }
+    if (!saved) {
       deps.warn()
       return false
     }

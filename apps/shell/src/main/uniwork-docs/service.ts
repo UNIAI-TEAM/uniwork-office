@@ -3736,15 +3736,17 @@ export class UniworkDocsService {
     if (!tabPath) throw new UniworkDocError('not_found')
     const key = pathKey(tabPath)
     const owner = `${session.identity.deploymentId}${session.identity.accountId}`
+    // S01-R2-1: the IPC target is the exact runtime union, validated FIRST -
+    // before the claimed-path classification (its binding.json read), the
+    // flush, the stat, any file read or a request. A malformed target on a
+    // store-owned or already-claimed path is invalid_destination, never a
+    // conflict, and never touches the disk (S01-R1-5 pin stands)
+    const createTarget = firstSaveTargetOf(input.target)
     // an already-bound path is never re-created, and neither is the original
     // of a first save this account already bound: its tab moved to the store
     // copy, so a retry from the old path finds a plain file and would create
     // a twin (S01-R1-3)
     if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
-    // S01-R1-5: the IPC target is the exact runtime union, validated BEFORE
-    // any flush, read or request - a malformed target is never a silent
-    // My Folder (or root) create
-    const createTarget = firstSaveTargetOf(input.target)
     const title = requireName(input.title)
     const filename = basename(tabPath)
     if (!filename || !formatForName(filename)) {
@@ -3786,27 +3788,49 @@ export class UniworkDocsService {
     if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
     // S01-R1-4: one Idempotency-Key per attempt, kept while the create's fate
     // is unknown: a retry after a lost answer replays it, so the server dedups
-    // to one document (the fingerprint rides D's own: path + target + title)
+    // to one document.
+    //
+    // S01-R2-3: the key belongs to the exact attempt BODY. D fingerprints the
+    // create by its checksum (fileCreateFingerprint, server
+    // document_files.go), so the local fingerprint carries the bytes' sha256
+    // too: edited bytes mint a NEW attempt under a NEW key - replaying a spent
+    // key against different bytes is refused there and must never be sent.
     const destination =
       'parentId' in createTarget && createTarget.parentId
         ? `parent:${createTarget.parentId}`
         : 'my_folder'
-    const keyFp = [owner, workspaceId, key, title, destination].join('')
+    const bytesChecksum = sha256Hex(bytes)
+    const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
     const idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
     this.firstSaveKeys.set(keyFp, idempotencyKey)
     // one client per save: the create + the bind read share it, so a
     // session landing mid-flight does not turn the second call into a
     // fresh not_signed_in on the same action
     const api = this.api()
-    const created = await api.createFile({
-      workspaceId,
-      bytes,
-      filename,
-      title,
-      idempotencyKey,
-      ...createTarget,
-    })
+    const created = await api
+      .createFile({
+        workspaceId,
+        bytes,
+        filename,
+        title,
+        idempotencyKey,
+        ...createTarget,
+      })
+      .catch((error: unknown) => {
+        // S01-R2-3: D answered the fingerprint mismatch verdict for this
+        // create - the retained key is wrong for this body and must not pin
+        // the path until restart; drop it so the next retry mints a fresh key,
+        // then answer with the typed (retryable) verdict
+        if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
+          this.firstSaveKeys.delete(keyFp)
+        }
+        throw error
+      })
     const createdTitle = created.title || title
+    // S01-R2-6: the written working copy is tracked so the compensation catch
+    // can remove it on EVERY bind failure - a store.write that throws strands
+    // it just like the sweep-refusal branch below did
+    let workingCopy: { dir: string; name: string } | null = null
     try {
       // a binder that won the race while the create was in flight: this row
       // is a duplicate, compensated below like any other bind failure
@@ -3821,6 +3845,7 @@ export class UniworkDocsService {
       )
       const name = workingCopyName(title, detail.file.filename, formatForName(filename)!)
       const path = await this.store.writeWorkingCopy(dir, name, bytes)
+      workingCopy = { dir, name }
       const binding = withServerContext(
         {
           schema: 2,
@@ -3833,7 +3858,7 @@ export class UniworkDocsService {
           access: accessFor(detail.myLevel),
           baseRevision: detail.revision,
           baseVersion: detail.file.version,
-          baseChecksum: sha256Hex(bytes),
+          baseChecksum: bytesChecksum,
           state: 'ready',
           minStoreLevel: APP_STORE_LEVEL,
           minAppVersion: this.buildVersion(),
@@ -3844,7 +3869,6 @@ export class UniworkDocsService {
       const written = await this.store.write(dir, binding)
       if (!written) {
         // the migration sweep holds this folder: the bound copy cannot land
-        await this.store.removeWorkingCopy(dir, name)
         throw new UniworkDocError('server_error')
       }
       // the tab follows its file into the store: from here the path is a
@@ -3880,6 +3904,21 @@ export class UniworkDocsService {
       // save-copy flow does when its step 2 fails - archive moves the created
       // document to the trash (restorable), never a delete (no such route)
       // (S01-R1-2)
+      //
+      // S01-R2-6: the written working copy (a thrown store.write strands it
+      // as much as the refused write did) goes first, so the folder never
+      // keeps a partial document the store would scan back. Its failure is
+      // logged and never replaces the typed result below.
+      if (workingCopy) {
+        try {
+          await this.store.removeWorkingCopy(workingCopy.dir, workingCopy.name)
+        } catch (cleanupError) {
+          console.warn(
+            `uniwork docs: first-save: the stranded working copy ${workingCopy.name} could not be removed`,
+            cleanupError,
+          )
+        }
+      }
       console.warn(
         `uniwork docs: first-save: binding ${created.id} failed; archiving the created document`,
         error instanceof UniworkDocError ? error.code : 'unknown',
