@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  safeStorage,
+  session,
+  type IpcMain,
+  type WebContents,
+} from 'electron'
 import { randomUUID } from 'node:crypto'
 import { basename, extname, join } from 'node:path'
 import { showSaveDialogWithMemory } from '@genoffice/electron-utils'
@@ -1042,6 +1050,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     capabilityRead: (orgId) => runtime.capabilityRead(orgId),
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
+      if (signedIn) applySpellcheckDictionaryDownloadGate(true)
       /** the org the feed currently runs for; null = no pass may run */
       let feedOrg: string | null = null
       /**
@@ -1082,6 +1091,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
             .catch(() => undefined)
         }
         const now = status.state === 'signed-in'
+        if (now !== signedIn) applySpellcheckDictionaryDownloadGate(now)
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
         syncFeed(status, identity)
@@ -1089,4 +1099,29 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       startLaunch((url) => void service.launch.handleUrl(url))
     },
   }
+}
+
+export const SPELLCHECK_DOWNLOAD_BLOCKED_URL = 'file:///nonexistent/'
+export const SPELLCHECK_DOWNLOAD_DEFAULT_URL = 'https://redirector.gvt1.com/edgedl/chrome/dict/'
+
+let hostResolverConfigured = false
+
+/**
+ * NET-OFF-01: Disable Chromium's built-in DNS-over-HTTPS (secure DNS) probe at
+ * startup, immediately after `app.whenReady()` and before any window or session
+ * can issue a network request.
+ */
+export function configureStartupHostResolver(): void {
+  if (hostResolverConfigured) return
+  hostResolverConfigured = true
+  app.configureHostResolver({ secureDnsMode: 'off' })
+}
+
+export function resetStartupHostResolverForTest(): void {
+  hostResolverConfigured = false
+}
+
+export function applySpellcheckDictionaryDownloadGate(signedIn: boolean): void {
+  const url = signedIn ? SPELLCHECK_DOWNLOAD_DEFAULT_URL : SPELLCHECK_DOWNLOAD_BLOCKED_URL
+  session.defaultSession.setSpellCheckerDictionaryDownloadURL(url)
 }

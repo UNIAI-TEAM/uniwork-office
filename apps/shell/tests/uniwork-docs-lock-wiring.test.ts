@@ -29,7 +29,7 @@ let accountOrg: { id: string; slug: string } | null = null
 const safe = vi.hoisted(() => ({ locked: false }))
 
 vi.mock('electron', () => ({
-  app: { getPath: () => dir },
+  app: { getPath: () => dir, configureHostResolver: () => undefined },
   BrowserWindow: { getFocusedWindow: () => null },
   dialog: {},
   safeStorage: {
@@ -43,6 +43,11 @@ vi.mock('electron', () => ({
     decryptString: (buf: Buffer) => {
       if (safe.locked) throw new Error('keychain locked')
       return buf.toString().slice(4)
+    },
+  },
+  session: {
+    defaultSession: {
+      setSpellCheckerDictionaryDownloadURL: () => undefined,
     },
   },
 }))
