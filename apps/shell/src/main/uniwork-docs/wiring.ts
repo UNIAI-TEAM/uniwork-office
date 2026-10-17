@@ -21,6 +21,7 @@ import {
   type UniworkConflictAction,
   type UniworkCreateDocInput,
   type UniworkCreateFolderInput,
+  type UniworkFirstSaveInput,
   type UniworkDocListQuery,
   type UniworkDocLock,
   type UniworkFolderQuery,
@@ -86,6 +87,7 @@ import { UPLOAD_EXTENSIONS } from './formats'
 import { scopeWorkingCopyDirs } from './binding-store'
 import { tUniworkDocs } from './strings'
 import { createTreeChangedCoalescer } from './tree-changed'
+import { registerFirstSaveOpenAck } from './first-save-open'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
 import { createOfflineCopies } from '../uniwork-sync/offline-library/copies'
@@ -910,6 +912,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.activeDocStatus, () => service.activeDocStatus())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.save, (_event, path: unknown) => service.save(path as string))
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.ensureMyFolder, (_event, workspaceId: unknown) =>
+    service.ensureMyFolder(workspaceId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.firstSave, (_event, input: unknown) =>
+    service.firstSave((input ?? {}) as UniworkFirstSaveInput),
+  )
+  // SAVE-01 r2 (S01-R1-6): the renderer's "dialog is open" ack that releases a
+  // File > Save's pending firstSaveOpen; a stale or foreign ack is a no-op
+  registerFirstSaveOpenAck(ipcMain)
   ipcMain.handle(UNIWORK_DOC_CHANNELS.saveLocalCopy, (_event, path: unknown) =>
     service.saveLocalCopy(path as string),
   )

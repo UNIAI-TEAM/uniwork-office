@@ -513,3 +513,248 @@ describe('the folder refusals', () => {
     expect(formatForMime('toString')).toBeNull()
   })
 })
+
+// SAVE-01 / MYFOLDER-01 (D service/document_my_folder.go): the server's
+// `system_kind` marks the caller's personal "My Folder" row. It is omitempty
+// and a loose enum - the client keeps the known value on rows, list pages and
+// tree nodes and drops anything else instead of failing the parse.
+describe('the My Folder system_kind marker (SAVE-01)', () => {
+  it('keeps system_kind on tree nodes and drops unknown values', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(200, {
+        documents: [
+          {
+            id: 'fold_my',
+            kind: 'folder',
+            title: 'My Folder',
+            position: 0,
+            system_kind: 'my_folder',
+            children: [
+              {
+                id: 'fold_sub',
+                kind: 'folder',
+                title: 'Inbox',
+                parent_id: 'fold_my',
+                position: 0,
+                system_kind: 'something_new',
+                children: [],
+              },
+            ],
+          },
+          { id: 'fold_3', kind: 'folder', title: 'Archive', position: 1, children: [] },
+        ],
+      }),
+    )
+    const api = client(fetch)
+
+    const tree = await api.folderTree(WS)
+    expect(tree[0]!.systemKind).toBe('my_folder')
+    // an unknown marker the server adds later is dropped, never surfaced nor fatal
+    expect(tree[0]!.children[0]!.systemKind).toBeUndefined()
+    // absent stays absent: an ordinary folder carries no systemKind at all
+    expect(tree[1]!.systemKind).toBeUndefined()
+  })
+
+  it('keeps system_kind on list rows and on the create/move answer', async () => {
+    const fetch = vi.fn<FetchLike>(async (url, init) => {
+      const u = new URL(url)
+      // the children list and folder-create share one route; the POST is the create
+      if (u.pathname === `/api/v1/workspaces/${WS}/documents` && init.method === 'POST') {
+        return json(201, {
+          document: {
+            id: 'fold_new',
+            kind: 'folder',
+            title: 'x',
+            workspace_id: WS,
+            revision: '1',
+            system_kind: 'my_folder',
+          },
+        })
+      }
+      if (u.pathname === `/api/v1/workspaces/${WS}/documents`) {
+        return json(200, {
+          documents: [
+            {
+              id: 'fold_my',
+              kind: 'folder',
+              title: 'My Folder',
+              workspace_id: WS,
+              updated_at: '2026-10-13T09:00:00Z',
+              system_kind: 'my_folder',
+            },
+            {
+              id: 'doc_x',
+              kind: 'file',
+              title: 'a.docx',
+              workspace_id: WS,
+              updated_at: '2026-10-13T09:00:00Z',
+              system_kind: 'bogus',
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return json(404, { error: { code: 'not_found', message: 'x' } })
+    })
+    const api = client(fetch)
+
+    const children = await api.listChildren({ workspaceId: WS, parentId: null })
+    expect(children.documents[0]!.systemKind).toBe('my_folder')
+    expect(children.documents[1]!.systemKind).toBeUndefined()
+
+    const created = await api.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'x',
+      idempotencyKey: 'k_sys',
+    })
+    expect(created.systemKind).toBe('my_folder')
+  })
+})
+
+// SAVE-01 / MYFOLDER-01: POST /workspaces/{ws}/documents/my-folder ensures the
+// caller's personal folder (200 DocumentSDO, same row on repeat); the
+// `destination` create field asks for it in one request and never combines
+// with parent_id (D validateDocumentDestination: both -> 400
+// invalid_destination).
+describe('My Folder ensure and the create destination (SAVE-01)', () => {
+  it('POSTs the my-folder ensure route and reads the summary', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(200, {
+        document: {
+          id: 'fold_my',
+          kind: 'folder',
+          title: 'My Folder',
+          workspace_id: WS,
+          revision: '3',
+          system_kind: 'my_folder',
+        },
+      }),
+    )
+    const api = client(fetch)
+
+    const folder = await api.ensureMyFolder(WS)
+    expect(folder).toMatchObject({ id: 'fold_my', kind: 'folder', systemKind: 'my_folder' })
+    const [url, init] = fetch.mock.calls[0]!
+    expect(url).toBe(`${ORIGIN}/api/v1/workspaces/${WS}/documents/my-folder`)
+    expect(init.method).toBe('POST')
+    // empty body: no JSON payload and no Content-Type header
+    expect(init.body).toBeUndefined()
+    expect((init.headers as Record<string, string>)['Content-Type'] ?? init.body).toBeUndefined()
+  })
+
+  it('sends destination=my_folder on a blank create instead of parent_id', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(201, {
+        document: {
+          id: 'doc_new',
+          kind: 'file',
+          title: 'Plan',
+          workspace_id: WS,
+          revision: '1',
+          parent_id: 'fold_my',
+        },
+      }),
+    )
+    const api = client(fetch)
+
+    const created = await api.createBlank({
+      workspaceId: WS,
+      format: 'docx',
+      title: 'Plan',
+      destination: 'my_folder',
+      idempotencyKey: 'k_dst',
+    })
+    expect(created.id).toBe('doc_new')
+    const body = JSON.parse(String(fetch.mock.calls[0]![1].body))
+    // the wire carries destination and no parent_id at all
+    expect(body).toEqual({ format: 'docx', title: 'Plan', destination: 'my_folder' })
+  })
+
+  it('sends destination=my_folder as a form field before file on an upload create', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(201, {
+        document: {
+          id: 'doc_up',
+          kind: 'file',
+          title: 'up.docx',
+          workspace_id: WS,
+          revision: '1',
+        },
+      }),
+    )
+    const api = client(fetch)
+
+    await api.createFile({
+      workspaceId: WS,
+      bytes: new Uint8Array([1, 2]),
+      filename: 'up.docx',
+      title: 'up.docx',
+      destination: 'my_folder',
+      idempotencyKey: 'k_up',
+    })
+    const form = fetch.mock.calls[0]![1].body as FormData
+    expect(form.get('destination')).toBe('my_folder')
+    expect(form.get('parent_id')).toBeNull()
+    // D reads the form fields before the file part (createDocumentFile); the
+    // field order is part of the contract, not a nicety
+    expect([...form.keys()]).toEqual(['destination', 'title', 'file'])
+  })
+})
+
+// SAVE-01 / MYFOLDER-01: `destination` never leaves the copy route (D's
+// validateDocumentDestination exists only on the create routes - /copies
+// refuses it), and createFolder stays parent_id-only.
+describe('SAVE-01 destination exclusions', () => {
+  it('copyDocument sends consent + parent_id only, never destination', async () => {
+    const seen: { url: string; body: unknown }[] = []
+    const fetch = vi.fn<FetchLike>(async (url, init) => {
+      seen.push({ url, body: JSON.parse(String(init.body)) })
+      return json(200, {
+        document: {
+          id: 'doc_copy',
+          kind: 'file',
+          title: 'x',
+          workspace_id: WS,
+          revision: '2',
+          file: { filename: 'x.docx', version: 1 },
+        },
+      })
+    })
+    const api = client(fetch)
+    await api.copyDocument({
+      documentId: DOC,
+      title: 'x',
+      parentId: 'fold_1',
+      idempotencyKey: 'k',
+    })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]!.url).toContain(`/api/v1/documents/${DOC}/copies`)
+    expect(seen[0]!.body).toEqual({ consent: 'copy', title: 'x', parent_id: 'fold_1' })
+  })
+
+  it('copyDocument without a parent sends no parent_id and no destination', async () => {
+    const seen: { body: unknown }[] = []
+    const fetch = vi.fn<FetchLike>(async (_url, init) => {
+      seen.push({ body: JSON.parse(String(init.body)) })
+      return json(200, {
+        document: {
+          id: 'doc_copy',
+          kind: 'file',
+          title: 'x',
+          workspace_id: WS,
+          revision: '2',
+          file: { filename: 'x.docx', version: 1 },
+        },
+      })
+    })
+    const api = client(fetch)
+    await api.copyDocument({
+      documentId: DOC,
+      title: 'x',
+      parentId: null,
+      idempotencyKey: 'k',
+    })
+    expect(seen[0]!.body).toEqual({ consent: 'copy', title: 'x' })
+  })
+})

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { UniworkDocSummary } from '../../../shared/home-api'
 import { useI18n } from '../locale'
@@ -52,6 +53,7 @@ export function UniworkBrowser({
   initialFolderId = null,
   onFolderChange,
   sidebarTop,
+  sidebarHost,
   mainOverride,
   query: hostQuery,
   onClearQuery,
@@ -68,6 +70,8 @@ export function UniworkBrowser({
   /** the open folder changed (the host's New / Upload default to it) */
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
   sidebarTop?: ReactNode
+  /** optional external container to portal the `.uwf-side` column into (FD-13 single-sidebar frame) */
+  sidebarHost?: HTMLElement | null
   /** host content shown instead of the folder contents (its Recent / Shared views) */
   mainOverride?: ReactNode
   /** the host's committed search text; undefined = the browser's own search box */
@@ -165,6 +169,7 @@ export function UniworkBrowser({
   const list = searching ? browser.results : browser.contents
   const view = contentsView(list.items, searching ? null : sort, dateLocale)
   const showHiddenHint = !mainOverride && list.status === 'ready' && view.hiddenCount > 0
+  const hiddenHintId = onHiddenHintChange ? BROWSER_HIDDEN_HINT_ID : `${uid}-hidden`
 
   const onHiddenHintChangeRef = useRef(onHiddenHintChange)
   onHiddenHintChangeRef.current = onHiddenHintChange
@@ -299,6 +304,7 @@ export function UniworkBrowser({
           list={list}
           rows={view.rows}
           hiddenCount={view.hiddenCount}
+          hiddenHintId={hiddenHintId}
           emptyText={searching ? t('ufNoResults', { query }) : t('ufEmptyFolder')}
           search={searching}
           openingId={openingId}
@@ -313,31 +319,40 @@ export function UniworkBrowser({
   )
 
   const nameDialog = actions.nameDialog
+  const sideNode = (
+    <div className="uwf-side">
+      {sidebarTop}
+      {hostQuery === undefined && (
+        <input
+          className="uw-pick-search uwf-own-search"
+          type="search"
+          aria-label={t('uwPickSearch')}
+          aria-describedby={showHiddenHint ? hiddenHintId : undefined}
+          placeholder={t('ufSearchPh')}
+          value={ownDraft}
+          spellCheck={false}
+          onChange={(e) => setOwnDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && ownDraft) {
+              e.preventDefault()
+              e.stopPropagation()
+              setOwnDraft('')
+            }
+          }}
+        />
+      )}
+      {renderTree()}
+    </div>
+  )
   return (
-    <div className={`uwf-browser uwf-${variant}`}>
-      <div className="uwf-side">
-        {sidebarTop}
-        {hostQuery === undefined && (
-          <input
-            className="uw-pick-search uwf-own-search"
-            type="search"
-            aria-label={t('uwPickSearch')}
-            aria-describedby={showHiddenHint ? BROWSER_HIDDEN_HINT_ID : undefined}
-            placeholder={t('ufSearchPh')}
-            value={ownDraft}
-            spellCheck={false}
-            onChange={(e) => setOwnDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' && ownDraft) {
-                e.preventDefault()
-                e.stopPropagation()
-                setOwnDraft('')
-              }
-            }}
-          />
-        )}
-        {renderTree()}
-      </div>
+    <div
+      className={`uwf-browser uwf-${variant}${sidebarHost !== undefined ? ' has-sidebar-host' : ''}${mainOverride ? ' has-main-override' : ''}`}
+    >
+      {sidebarHost !== undefined
+        ? sidebarHost
+          ? createPortal(sideNode, sidebarHost)
+          : null
+        : sideNode}
       <div className="uwf-main">{mainOverride ?? renderMain()}</div>
       {nameDialog && (
         <FolderNameDialog

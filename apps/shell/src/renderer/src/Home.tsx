@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { DragEvent as ReactDragEvent, ReactElement } from 'react'
+import type {
+  DragEvent as ReactDragEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  ReactElement,
+} from 'react'
 import appIcon from './assets/app-icon.png'
 import type {
   AccountStatus,
@@ -14,6 +18,9 @@ import type {
   FileSearchHit,
   FileSearchPage,
   FileSearchRerank,
+  UniworkDocSummary,
+  UniworkResult,
+  UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import type { IntegrationsApi } from '../../shared/integrations-api'
 import type { UniworkWorkApi } from '../../shared/uniwork-work-api'
@@ -21,12 +28,19 @@ import { markText } from '../../shared/text-marks'
 import { openLocalHint } from '../../shared/open-extensions'
 import { useDismissablePopover } from '@genoffice/ui'
 import { boxOf, clipBoxesOf, followMenuAnchor } from './folder-menu-anchor'
-import { fileCountLabel, visiblePageCount } from './counts'
+import { fileCountLabel } from './counts'
 import { useI18n } from './locale'
 import type { I18n, StringKey } from './locale'
 import { CreditWallet } from './CreditWallet'
 import type { SettingsSectionId, SettingsTarget } from './SettingsModal'
 import { AccountEntry } from './AccountEntry'
+import { showsProfile, viewOf, type AccountView } from './account-model'
+import {
+  afterWorkspaceList,
+  readActiveWorkspaceId,
+  writeActiveWorkspaceId,
+  type WorkspaceListState,
+} from './active-workspace'
 import { skillUpdateDue } from './IntegrationsPane'
 import { getPractice, isPracticeId, requirePractice, type PracticeId } from '@uniwork/practice-core'
 import { AgentIntentBanner } from './AgentIntentBanner'
@@ -36,14 +50,25 @@ import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
 import { UniworkOpenCard } from './UniworkOpenCard'
-import { openRecentEntry } from './uniwork-open'
+import { publishUniworkNotice } from './uniwork-notice-bus'
+import { openRecentEntry, openUniworkDocument } from './uniwork-open'
 import { subscribeUniworkOpened } from './uniwork-recents-refresh'
 import {
   recentOpenAction,
   recentRowIsMissing,
   recentRowModifiedMs,
   recentRowPolicy,
+  splitEntriesByArea,
 } from './uniwork-docs-model'
+import { WorkErrorState, WorkNoWorkspace, WorkSkeleton } from './WorkErrorState'
+import { UniworkBrowser } from './uniwork-folders/UniworkBrowser'
+
+export const HOME_AREA_KEY = 'uniwork.wb.homeArea'
+export type HomeArea = 'uniwork' | 'device'
+
+function isHomeArea(raw: string | null | undefined): raw is HomeArea {
+  return raw === 'uniwork' || raw === 'device'
+}
 
 declare global {
   interface Window {
@@ -320,8 +345,10 @@ function useFolderListings() {
   // dir → whether a reload was requested while its request was in flight (the
   // in-flight answer may predate the change, so it is fetched once more)
   const inflight = useRef(new Map<string, boolean>())
+  const cached = useRef(new Set<string>())
 
   const load = useCallback((dir: string, force = false) => {
+    if (!force && cached.current.has(dir)) return
     if (inflight.current.has(dir)) {
       if (force) inflight.current.set(dir, true)
       return
@@ -330,9 +357,17 @@ function useFolderListings() {
     void window.aiOffice
       .listFolder(dir)
       .then((listing) => {
+        cached.current.add(dir)
         setListings((prev) => {
           const next = new Map(prev)
           next.set(dir, listing)
+          return next
+        })
+      })
+      .catch(() => {
+        setListings((prev) => {
+          const next = new Map(prev)
+          next.set(dir, { dir, folders: [], files: [], missing: true })
           return next
         })
       })
@@ -345,6 +380,7 @@ function useFolderListings() {
 
   const invalidate = useCallback(
     (dirs: readonly string[]) => {
+      for (const dir of dirs) cached.current.delete(dir)
       setListings((prev) => {
         let changed = false
         const next = new Map(prev)
@@ -358,7 +394,10 @@ function useFolderListings() {
     [load],
   )
 
-  const reset = useCallback(() => setListings(new Map()), [])
+  const reset = useCallback(() => {
+    cached.current.clear()
+    setListings(new Map())
+  }, [])
 
   /** shown or currently loading: the folders a watch event should refresh */
   const tracked = useCallback(
@@ -1258,16 +1297,40 @@ function DropToOpenOverlay(): ReactElement | null {
 export function Home() {
   const i18n = useI18n()
   const { t, lang } = i18n
+  const areaTabsRef = useRef<HTMLDivElement>(null)
   // ── Paged list state (rows loaded for the current view + filter) ──
   const [entries, setEntries] = useState<RecentEntry[]>([])
+  const [otherEntries, setOtherEntries] = useState<RecentEntry[]>([])
   /** total count under the current view + filter (not just the loaded rows) */
   const [listTotal, setListTotal] = useState(0)
-  /** sidebar Recent / Starred counts under the active type filter */
-  const [navCounts, setNavCounts] = useState({ recent: 0, starred: 0 })
+  const [otherTotal, setOtherTotal] = useState(0)
+  const [listLoaded, setListLoaded] = useState(false)
+  const [otherLoaded, setOtherLoaded] = useState(false)
+  const [lastPageLen, setLastPageLen] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [view, setView] = useState<'recent' | 'starred'>('recent')
+  // FD-13 persisted area preference ('uniwork' | 'device')
+  const [savedArea, setSavedArea] = useState<HomeArea | null>(() => {
+    const raw = wbStoreGetRaw(HOME_AREA_KEY)
+    return isHomeArea(raw) ? raw : null
+  })
+  const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null)
+  const acctView: AccountView = accountStatus ? viewOf(accountStatus) : 'loading'
+  const isSignedIn = showsProfile(acctView, accountStatus)
+  const area: HomeArea = savedArea ?? (isSignedIn ? 'uniwork' : 'device')
+  const [uniworkSubView, setUniworkSubView] = useState<'folder' | 'recent' | 'starred'>('folder')
+  const [uniworkFolderByWs, setUniworkFolderByWs] = useState<Record<string, string | null>>({})
+  const [uniworkSidebarSlot, setUniworkSidebarSlot] = useState<HTMLDivElement | null>(null)
+  const [openingDocId, setOpeningDocId] = useState<string | null>(null)
+  const [uwWsState, setUwWsState] = useState<WorkspaceListState>(() => ({
+    workspaces: null,
+    workspaceId: readActiveWorkspaceId(),
+    workspaceError: null,
+  }))
+  const [uwWsTick, setUwWsTick] = useState(0)
+  const userChoseChatRef = useRef(false)
   /** Natural-language start surface (desktop New chat). */
-  const [chatMode, setChatMode] = useState(true)
+  const [chatMode, setChatMode] = useState(() => savedArea === null)
   // Profession practice workbench (teacher / legal / …)
   const [eduMode, setEduMode] = useState(false)
   const [eduSelectedId, setEduSelectedId] = useState<string | null>(null)
@@ -1340,6 +1403,11 @@ export function Home() {
   // single source of account state: AccountEntry reports every change (initial
   // load, login, logout), keeping the greeting name in sync
   const handleAccountStatus = useCallback((s: AccountStatus | null) => {
+    setAccountStatus(s)
+    const rawArea = wbStoreGetRaw(HOME_AREA_KEY)
+    const nextArea = isHomeArea(rawArea) ? rawArea : null
+    setSavedArea(nextArea)
+    if (nextArea !== null && !userChoseChatRef.current) setChatMode(false)
     setRecentsAccount(s?.loggedIn ? (s.profile?.accountId ?? s.email ?? '') : '')
     // the cached profile still names the user while UniWork is unreachable
     if (!s?.loggedIn && !(s?.state === 'server-unreachable' && s.profile)) {
@@ -1347,6 +1415,7 @@ export function Home() {
       setOrgName('')
       return
     }
+    if (!userChoseChatRef.current) setChatMode(false)
     setOrgName(s.org?.name?.trim() ?? '')
     const display = s.profile?.displayName?.trim()
     if (display) {
@@ -1358,15 +1427,102 @@ export function Home() {
     setAccountName(local ? local[0]!.toUpperCase() + local.slice(1) : '')
   }, [])
 
-  const goHomeList = (next: 'recent' | 'starred' = 'recent') => {
-    changeView(next)
+  useEffect(() => {
+    if (acctView === 'loading') return
+    if (!isSignedIn) {
+      setUwWsState({ workspaces: null, workspaceId: null, workspaceError: null })
+      return
+    }
+    const listWorkspaces = window.aiOffice.uniworkListWorkspaces
+    if (!listWorkspaces) return
+    let live = true
+    void listWorkspaces()
+      .catch((): UniworkResult<UniworkWorkspaceRef[]> => ({ ok: false, error: 'network' }))
+      .then((result) => {
+        if (!live) return
+        setUwWsState((prev) => afterWorkspaceList(prev, result, readActiveWorkspaceId()))
+      })
+    return () => {
+      live = false
+    }
+  }, [acctView, isSignedIn, recentsAccount, orgName, uwWsTick])
+
+  useEffect(() => {
+    if (uwWsState.workspaceId && uwWsState.workspaceId !== readActiveWorkspaceId()) {
+      writeActiveWorkspaceId(uwWsState.workspaceId)
+    }
+  }, [uwWsState.workspaceId])
+
+  const selectArea = (nextArea: HomeArea) => {
+    setSavedArea(nextArea)
+    wbStoreSetRaw(HOME_AREA_KEY, nextArea)
+    if (nextArea === 'uniwork') setUniworkSubView('folder')
+    setChatMode(false)
+    setEduMode(false)
     setSelectedProjectId(null)
-    setSelectedFolder(null)
+    setSelected(new Set())
+    setRowMenu(null)
+  }
+
+  const onAreaTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, current: HomeArea) => {
+    let next: HomeArea | null = null
+    if (
+      event.key === 'ArrowRight' ||
+      event.key === 'ArrowLeft' ||
+      event.key === 'ArrowDown' ||
+      event.key === 'ArrowUp'
+    ) {
+      next = current === 'uniwork' ? 'device' : 'uniwork'
+    } else if (event.key === 'Home') {
+      next = 'uniwork'
+    } else if (event.key === 'End') {
+      next = 'device'
+    }
+    if (!next) return
+    event.preventDefault()
+    selectArea(next)
+    const idx = next === 'uniwork' ? 0 : 1
+    areaTabsRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[idx]?.focus()
+  }
+
+  const selectUniworkWorkspace = (nextWsId: string) => {
+    if (!nextWsId || nextWsId === uwWsState.workspaceId) return
+    writeActiveWorkspaceId(nextWsId)
+    setUwWsState((prev) => ({ ...prev, workspaceId: nextWsId }))
+    setUniworkFolderByWs((prev) => ({ ...prev, [nextWsId]: null }))
+    setUniworkSubView('folder')
+    setChatMode(false)
+    setEduMode(false)
+    setSelectedProjectId(null)
+  }
+
+  const openUniworkDocFromPane = (doc: UniworkDocSummary) => {
+    if (openingDocId) return
+    setOpeningDocId(doc.id)
+    void Promise.resolve()
+      .then(() => openUniworkDocument({ documentId: doc.id, title: doc.title }, window.aiOffice))
+      .catch(() => {
+        publishUniworkNotice({ phase: 'failed', error: 'network' })
+      })
+      .finally(() => {
+        setOpeningDocId(null)
+      })
+  }
+
+  const goHomeList = (next: 'recent' | 'starred' = 'recent') => {
+    setView(next)
+    setUniworkSubView(next)
+    setSelectedProjectId(null)
+    if (area === 'device') setSelectedFolder(null)
     setEduMode(false)
     setChatMode(false)
+    setSelected(new Set())
+    setRowMenu(null)
+    setGroupFilter(null)
   }
 
   const goNewChat = () => {
+    userChoseChatRef.current = true
     setChatMode(true)
     setEduMode(false)
     setSelectedProjectId(null)
@@ -1446,23 +1602,31 @@ export function Home() {
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const dragExpandTimer = useRef<number | null>(null)
 
+  const [rootsLoaded, setRootsLoaded] = useState(false)
+
   const loadRoot = useCallback(() => {
-    void window.aiOffice.folderRoots().then((next) => {
-      setRoots((prev) => {
-        if (prev[0] && prev[0].path !== next[0]?.path) {
-          // the default save folder changed in settings: the old tree is meaningless
-          resetFolders()
-          setSelectedFolder(null)
-          setExpanded(new Set(next.map((r) => r.path)))
-        } else if (prev.length > 0) {
-          // a folder just added opens so its contents show right away
-          const known = new Set(prev.map((r) => r.path))
-          const added = next.filter((r) => !known.has(r.path)).map((r) => r.path)
-          if (added.length > 0) setExpanded((e) => new Set([...e, ...added]))
-        }
-        return next
+    void window.aiOffice
+      .folderRoots()
+      .then((next) => {
+        setRoots((prev) => {
+          if (prev[0] && prev[0].path !== next[0]?.path) {
+            // the default save folder changed in settings: the old tree is meaningless
+            resetFolders()
+            setSelectedFolder(null)
+            setExpanded(new Set(next.map((r) => r.path)))
+          } else if (prev.length > 0) {
+            // a folder just added opens so its contents show right away
+            const known = new Set(prev.map((r) => r.path))
+            const added = next.filter((r) => !known.has(r.path)).map((r) => r.path)
+            if (added.length > 0) setExpanded((e) => new Set([...e, ...added]))
+          }
+          return next
+        })
       })
-    })
+      .catch(() => {})
+      .finally(() => {
+        setRootsLoaded(true)
+      })
   }, [resetFolders])
 
   useEffect(loadRoot, [loadRoot])
@@ -1470,6 +1634,18 @@ export function Home() {
   useEffect(() => {
     if (root?.usable) writeTreeState({ expanded: [...expanded], root: root.path })
   }, [expanded, root])
+
+  const listingsRef = useRef(listings)
+  listingsRef.current = listings
+
+  useEffect(() => {
+    for (const r of roots) {
+      if (!r.readable) continue
+      const cur = listingsRef.current.get(r.path)
+      if (!cur) loadFolder(r.path)
+      else if (cur.missing) loadFolder(r.path, true)
+    }
+  }, [roots, loadFolder])
 
   useEffect(() => {
     if (!root?.usable) return
@@ -1516,6 +1692,9 @@ export function Home() {
   /** reload the list; keepCount keeps the loaded row count (refresh), otherwise back to page one */
   const reload = (keepCount: boolean) => {
     const seq = ++requestSeq.current
+    setLoadingMore(false)
+    setListLoaded(false)
+    setOtherLoaded(false)
     const ext = filter === 'all' ? undefined : filter
     // the group pills only scope the Starred view's own list; the sidebar
     // counters and the other view stay group-agnostic
@@ -1523,25 +1702,39 @@ export function Home() {
     const limit = keepCount ? Math.max(entriesLen.current, PAGE_SIZE) : PAGE_SIZE
     const primary = view === 'recent' ? window.aiOffice.recents : window.aiOffice.starred
     const secondary = view === 'recent' ? window.aiOffice.starred : window.aiOffice.recents
-    void primary({ offset: 0, limit, ext, group }).then((page) => {
-      if (seq !== requestSeq.current) return
-      setEntries(page.entries)
-      setListTotal(page.total)
-      setNavCounts((prev) =>
-        view === 'recent'
-          ? { ...prev, recent: visiblePageCount(page) }
-          : { ...prev, starred: visiblePageCount(page) },
-      )
-    })
-    // The other view fetches only its count under the same active filter.
-    void secondary({ offset: 0, limit: 0, ext }).then((page) => {
-      if (seq !== requestSeq.current) return
-      setNavCounts((prev) =>
-        view === 'recent'
-          ? { ...prev, starred: visiblePageCount(page) }
-          : { ...prev, recent: visiblePageCount(page) },
-      )
-    })
+    void primary({ offset: 0, limit, ext, group })
+      .then((page) => {
+        if (seq !== requestSeq.current) return
+        setEntries(page.entries)
+        setListTotal(page.total)
+        setLastPageLen(page.entries.length)
+        setListLoaded(true)
+      })
+      .catch(() => {
+        if (seq !== requestSeq.current) return
+        if (!keepCount) {
+          setEntries([])
+          setListTotal(0)
+          setLastPageLen(0)
+        }
+        setListLoaded(true)
+      })
+    // The other view fetches its page under the same active filter so splitEntriesByArea can count per area.
+    void secondary({ offset: 0, limit: PAGE_SIZE, ext })
+      .then((page) => {
+        if (seq !== requestSeq.current) return
+        setOtherEntries(page.entries)
+        setOtherTotal(page.total)
+        setOtherLoaded(true)
+      })
+      .catch(() => {
+        if (seq !== requestSeq.current) return
+        if (!keepCount) {
+          setOtherEntries([])
+          setOtherTotal(0)
+        }
+        setOtherLoaded(true)
+      })
     if (projectMode) {
       void window.aiOfficeProject!.listProjects().then(setProjects)
     }
@@ -1650,7 +1843,7 @@ export function Home() {
     refreshRef.current()
   }, [recentsAccount])
 
-  const hasMore = entries.length < listTotal
+  const hasMore = listLoaded && entries.length < listTotal
 
   // unified dismissal: outside press, window blur, chrome press (tab strip / window drag)
   useDismissablePopover(fileSortMenuOpen, () => setFileSortMenuOpen(false), {
@@ -1662,22 +1855,29 @@ export function Home() {
     setLoadingMore(true)
     const seq = requestSeq.current
     const ext = filter === 'all' ? undefined : filter
+    const group = view === 'starred' && groupFilter ? groupFilter : undefined
     const api = view === 'recent' ? window.aiOffice.recents : window.aiOffice.starred
-    void api({ offset: entriesLen.current, limit: PAGE_SIZE, ext }).then((page) => {
-      setLoadingMore(false)
-      if (seq !== requestSeq.current) return
-      setEntries((prev) => [...prev, ...page.entries])
-      setListTotal(page.total)
-    })
+    void api({ offset: entriesLen.current, limit: PAGE_SIZE, ext, group })
+      .then((page) => {
+        if (seq !== requestSeq.current) return
+        setLoadingMore(false)
+        setLastPageLen(page.entries.length)
+        if (page.entries.length === 0) {
+          setListTotal(entriesLen.current)
+          return
+        }
+        setEntries((prev) => [...prev, ...page.entries])
+        setListTotal(page.total)
+      })
+      .catch(() => {
+        if (seq !== requestSeq.current) return
+        setLoadingMore(false)
+        setLastPageLen(0)
+        setListTotal(entriesLen.current)
+      })
   }
   const loadMoreRef = useRef(loadMore)
   loadMoreRef.current = loadMore
-
-  // oldest-first over a partially loaded list would miss the tail pages —
-  // keep pulling until the list is complete (backend caps recents at 100)
-  useEffect(() => {
-    if (fileSort === 'oldest' && hasMore) loadMoreRef.current()
-  }, [fileSort, hasMore, entries.length])
 
   // Load the next page once the bottom sentinel enters the viewport (240px early);
   // depending on entries.length rebuilds the observer after each page — observe fires an immediate
@@ -1804,10 +2004,36 @@ export function Home() {
     </div>
   )
 
-  // ── Plain view (no folder selected): filtering runs in the main process; entries is the visible list ──
-  const selectedPaths = entries.filter((e) => selected.has(e.path)).map((e) => e.path)
+  // ── Plain view (no folder selected): FD-13 splits loaded entries by area (UniWork vs device) ──
+  const splitCurrent = splitEntriesByArea(entries)
+  const splitOther = splitEntriesByArea(otherEntries)
+  const areaEntries = area === 'uniwork' ? splitCurrent.uniwork : splitCurrent.device
+  const otherAreaEntries = area === 'uniwork' ? splitOther.uniwork : splitOther.device
+  const primaryExhausted = listLoaded && !hasMore
+  const otherExhausted = otherLoaded && otherEntries.length >= otherTotal
+  const currentAreaCount = primaryExhausted ? areaEntries.filter((e) => !e.missing).length : 0
+  const otherAreaCount = otherExhausted ? otherAreaEntries.filter((e) => !e.missing).length : 0
+  const navCounts =
+    view === 'recent'
+      ? { recent: currentAreaCount, starred: otherAreaCount }
+      : { recent: otherAreaCount, starred: currentAreaCount }
+
+  // Keep pulling pages when the active area has no rows yet (or fewer than a full page when PAGE_SIZE
+  // pages are returned) or when sorting oldest-first over a partially loaded list
+  useEffect(() => {
+    if (!hasMore || loadingMore) return
+    if (
+      fileSort === 'oldest' ||
+      areaEntries.length === 0 ||
+      (lastPageLen >= PAGE_SIZE && areaEntries.length < PAGE_SIZE)
+    ) {
+      loadMoreRef.current()
+    }
+  }, [fileSort, hasMore, loadingMore, areaEntries.length, lastPageLen])
+
+  const selectedPaths = areaEntries.filter((e) => selected.has(e.path)).map((e) => e.path)
   // UniWork documents have no local file to move or delete: they are never selectable
-  const selectableEntries = entries.filter((e) => recentRowPolicy(e).selectable)
+  const selectableEntries = areaEntries.filter((e) => recentRowPolicy(e).selectable)
   const allSelected =
     selectableEntries.length > 0 && selectedPaths.length === selectableEntries.length
 
@@ -1898,17 +2124,6 @@ export function Home() {
     projectFileEntries.length > 0 && projSelectedPaths.length === projectFileEntries.length
   const toggleSelectAllProject = () => {
     setSelected(projAllSelected ? new Set() : new Set(projectFileEntries.map((e) => e.path)))
-  }
-
-  const changeView = (next: 'recent' | 'starred') => {
-    setView(next)
-    setSelectedFolder(null)
-    setSelectedProjectId(null)
-    setEduMode(false)
-    setChatMode(false)
-    setSelected(new Set())
-    setRowMenu(null)
-    setGroupFilter(null)
   }
 
   const changeFilter = (key: string) => {
@@ -2533,30 +2748,28 @@ export function Home() {
             {t('folders')}
           </h2>
           <div className="folder-panel-actions">
-            {roots.length > 0 && (
-              <button
-                className="folder-add-btn folder-add-root-btn"
-                data-tip={t('addFolderRoot')}
-                aria-label={t('addFolderRoot')}
-                onClick={addFolderRoot}
+            <button
+              className="folder-add-btn folder-add-root-btn"
+              data-tip={t('addFolderRoot')}
+              aria-label={t('addFolderRoot')}
+              onClick={addFolderRoot}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1" />
-                  <path d="M2 13h10" />
-                  <path d="m9 16 3-3-3-3" />
-                </svg>
-              </button>
-            )}
+                <path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1" />
+                <path d="M2 13h10" />
+                <path d="m9 16 3-3-3-3" />
+              </svg>
+            </button>
             {canCreate && (
               <button
                 className="folder-add-btn folder-new-btn"
@@ -2576,26 +2789,28 @@ export function Home() {
             )}
           </div>
         </div>
-        <ul className="tree" role="tree">
-          {root && !root.usable ? (
-            <li className="folder-unusable">
-              <p>{t('rootUnusable')}</p>
-              <button
-                className="btn btn-secondary"
-                onClick={() => void window.aiOffice.pickDefaultSaveDir().then(() => loadRoot())}
-              >
-                {t('pickSaveDir')}
-              </button>
-            </li>
-          ) : (
-            root && renderTreeNode({ path: root.path, name: root.name, hasSubfolders: true }, 0)
-          )}
-          {roots
-            .slice(1)
-            .map((r) =>
-              renderTreeNode({ path: r.path, name: r.name, hasSubfolders: r.readable }, 0),
+        {roots.length > 0 && (
+          <ul className="tree" role="tree">
+            {root && !root.usable ? (
+              <li className="folder-unusable">
+                <p>{t('rootUnusable')}</p>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => void window.aiOffice.pickDefaultSaveDir().then(() => loadRoot())}
+                >
+                  {t('pickSaveDir')}
+                </button>
+              </li>
+            ) : (
+              root && renderTreeNode({ path: root.path, name: root.name, hasSubfolders: true }, 0)
             )}
-        </ul>
+            {roots
+              .slice(1)
+              .map((r) =>
+                renderTreeNode({ path: r.path, name: r.name, hasSubfolders: r.readable }, 0),
+              )}
+          </ul>
+        )}
       </section>
     )
   }
@@ -2668,7 +2883,7 @@ export function Home() {
           ) : (
             <span className="recent-name">{entry.name}</span>
           )}
-          {policy.badge ? (
+          {policy.badge && area === 'uniwork' ? (
             <span className="recent-path">
               <span className="uw-recent-badge" title={t('uwRecentBadgeTip')}>
                 {t('uwRecentBadge')}
@@ -3193,7 +3408,6 @@ export function Home() {
   }
 
   function renderFolderContent() {
-    if (roots.length === 0) return null
     const total = folderSubfolders.length + folderFiles.length
     const sortedFiles = fileSort === 'oldest' ? [...folderFiles].reverse() : folderFiles
     return (
@@ -3298,7 +3512,7 @@ export function Home() {
 
   // ── Plain view ────────────────────────────────────────
 
-  function renderGlobalContent() {
+  function renderGlobalSections() {
     const now = new Date()
     const hour = now.getHours()
     const greetKey =
@@ -3311,8 +3525,18 @@ export function Home() {
             : 'greetEvening'
     const cjk = lang === 'zh' || lang === 'zh-TW' || lang === 'ja'
     const greeting = `${t(greetKey)}${accountName ? (cjk ? '，' : ', ') + accountName : ''}${cjk ? '。' : '. '}`
+    const noUsableDeviceRoots =
+      rootsLoaded &&
+      (roots.length === 0 ||
+        roots.every((r) => !r.readable || listings.get(r.path)?.missing === true))
+    const deviceRootsPending =
+      area === 'device' &&
+      filter === 'all' &&
+      (!rootsLoaded ||
+        (!roots.some((r) => r.readable && listings.has(r.path) && !listings.get(r.path)?.missing) &&
+          roots.some((r) => r.readable && !listings.has(r.path))))
     return (
-      <main className="content">
+      <>
         <section className="quick-start" aria-label={t('secQuickStart')}>
           <div className="home-hero">
             <h1 className="hero-title">
@@ -3410,20 +3634,41 @@ export function Home() {
                 <span className="section-label">
                   {view === 'recent' ? t('secRecent') : t('secStarred')}
                 </span>
-                <span className="file-count">{fileCountLabel(listTotal, lang, t)}</span>
+                {primaryExhausted && (
+                  <span className="file-count">{fileCountLabel(areaEntries.length, lang, t)}</span>
+                )}
               </div>
             )}
           </div>
 
           {searchActive ? (
             renderSearchResults()
-          ) : entries.length === 0 ? (
-            renderEmpty(
-              view === 'starred'
-                ? t('emptyStarred')
-                : navCounts.recent === 0
-                  ? t('emptyRecent')
-                  : t('emptyFiltered'),
+          ) : areaEntries.length === 0 ? (
+            !listLoaded || hasMore || deviceRootsPending ? (
+              <div ref={sentinelRef} className="load-more" aria-hidden="true">
+                <span className="load-more-spinner" />
+              </div>
+            ) : area === 'device' && filter === 'all' && noUsableDeviceRoots ? (
+              <div className="folder-empty-state" role="status">
+                <p className="folder-empty-text">{t('ufNoDeviceFolders')}</p>
+                <button
+                  type="button"
+                  className="btn btn-secondary folder-empty-cta"
+                  onClick={addFolderRoot}
+                >
+                  {t('addFolderRoot')}
+                </button>
+              </div>
+            ) : (
+              renderEmpty(
+                filter !== 'all'
+                  ? t('emptyFiltered')
+                  : view === 'starred'
+                    ? t('emptyStarred')
+                    : navCounts.recent === 0
+                      ? t('emptyRecent')
+                      : t('emptyFiltered'),
+              )
             )
           ) : (
             <div className={`recent-table${selectedPaths.length > 0 ? ' has-selection' : ''}`}>
@@ -3444,7 +3689,7 @@ export function Home() {
                 <span />
               </div>
               <ul className="recent-list">
-                {(fileSort === 'oldest' ? [...entries].reverse() : entries).map((entry) =>
+                {(fileSort === 'oldest' ? [...areaEntries].reverse() : areaEntries).map((entry) =>
                   renderFileRow(entry, 'global'),
                 )}
               </ul>
@@ -3456,8 +3701,12 @@ export function Home() {
             </div>
           )}
         </section>
-      </main>
+      </>
     )
+  }
+
+  function renderGlobalContent() {
+    return <main className="content">{renderGlobalSections()}</main>
   }
 
   // ── Project files view ──
@@ -3569,6 +3818,65 @@ export function Home() {
       return parent?.folders.some((f) => f.path === p) ?? false
     })
 
+  const activeRecentInArea =
+    !selectedProjectId &&
+    !eduMode &&
+    !chatMode &&
+    view === 'recent' &&
+    (area === 'uniwork' ? uniworkSubView === 'recent' : !selectedFolder)
+  const activeStarredInArea =
+    !selectedProjectId &&
+    !eduMode &&
+    !chatMode &&
+    view === 'starred' &&
+    (area === 'uniwork' ? uniworkSubView === 'starred' : !selectedFolder)
+
+  const renderAreaNav = () => (
+    <div className="home-area-nav">
+      <button
+        className={`nav-item${activeRecentInArea ? ' active' : ''}`}
+        aria-current={activeRecentInArea ? 'page' : undefined}
+        data-nav="recent"
+        onClick={() => goHomeList('recent')}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.2" stroke="currentColor" strokeWidth="1.3" />
+          <path
+            d="M8 4.8V8l2.2 1.6"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="nav-label">{t('navRecent')}</span>
+        {navCounts.recent > 0 && <span className="nav-count">{navCounts.recent}</span>}
+      </button>
+      <button
+        className={`nav-item${activeStarredInArea ? ' active' : ''}`}
+        aria-current={activeStarredInArea ? 'page' : undefined}
+        onClick={() => goHomeList('starred')}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M8 1.9l1.9 3.85 4.25.62-3.07 3 .72 4.23L8 11.6l-3.8 2 .72-4.23-3.07-3 4.25-.62z"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span className="nav-label">{t('navStarred')}</span>
+        {navCounts.starred > 0 && <span className="nav-count">{navCounts.starred}</span>}
+      </button>
+    </div>
+  )
+
+  const activeUwWorkspaceId = uwWsState.workspaceId
+  const activeUwFolderId = activeUwWorkspaceId
+    ? (uniworkFolderByWs[activeUwWorkspaceId] ?? null)
+    : null
+  const showUniworkPane =
+    area === 'uniwork' && !selectedProjectId && !eduMode && !chatMode && isSignedIn
+
   return (
     <div className="home">
       <aside className="sidebar">
@@ -3611,48 +3919,6 @@ export function Home() {
                   : 'My AI'}
             </span>
           </button>
-          <button
-            className={`nav-item${view === 'recent' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode ? ' active' : ''}`}
-            aria-current={
-              view === 'recent' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode
-                ? 'page'
-                : undefined
-            }
-            data-nav="recent"
-            onClick={() => goHomeList('recent')}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <circle cx="8" cy="8" r="6.2" stroke="currentColor" strokeWidth="1.3" />
-              <path
-                d="M8 4.8V8l2.2 1.6"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="nav-label">{t('navRecent')}</span>
-            {navCounts.recent > 0 && <span className="nav-count">{navCounts.recent}</span>}
-          </button>
-          <button
-            className={`nav-item${view === 'starred' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode ? ' active' : ''}`}
-            aria-current={
-              view === 'starred' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode
-                ? 'page'
-                : undefined
-            }
-            onClick={() => goHomeList('starred')}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path
-                d="M8 1.9l1.9 3.85 4.25.62-3.07 3 .72 4.23L8 11.6l-3.8 2 .72-4.23-3.07-3 4.25-.62z"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="nav-label">{t('navStarred')}</span>
-            {navCounts.starred > 0 && <span className="nav-count">{navCounts.starred}</span>}
-          </button>
           {projectMode && (
             <button
               className={`nav-item${eduMode && !selectedProjectId ? ' active' : ''}`}
@@ -3678,25 +3944,96 @@ export function Home() {
             </button>
           )}
         </nav>
-        {renderFolderPanel()}
-        {/* project sidebar */}
-        {projectMode && (
-          <ProjectPanel
-            projects={projects}
-            selectedId={selectedProjectId}
-            onSelect={(id) => {
-              setSelectedProjectId(id)
-              setSelectedFolder(null)
-              setEduMode(false)
-              setChatMode(false)
-              // reset list-selection state on any project switch (paths are
-              // shared between the plain view and project views)
-              setSelected(new Set())
-              setRowMenu(null)
-            }}
-            onRefresh={refresh}
-          />
-        )}
+
+        <div
+          className="home-area-tabs"
+          role="tablist"
+          aria-label={t('ufAreaLabel')}
+          ref={areaTabsRef}
+        >
+          <button
+            type="button"
+            id="home-area-tab-uniwork"
+            role="tab"
+            aria-selected={area === 'uniwork'}
+            aria-controls="home-area-panel"
+            tabIndex={area === 'uniwork' ? 0 : -1}
+            title={t('ufAreaUniwork')}
+            className={`home-area-tab${area === 'uniwork' ? ' active' : ''}`}
+            onClick={() => selectArea('uniwork')}
+            onKeyDown={(e) => onAreaTabKeyDown(e, 'uniwork')}
+          >
+            {t('ufAreaUniwork')}
+          </button>
+          <button
+            type="button"
+            id="home-area-tab-device"
+            role="tab"
+            aria-selected={area === 'device'}
+            aria-controls="home-area-panel"
+            tabIndex={area === 'device' ? 0 : -1}
+            title={t('wbOnThisDevice')}
+            className={`home-area-tab${area === 'device' ? ' active' : ''}`}
+            onClick={() => selectArea('device')}
+            onKeyDown={(e) => onAreaTabKeyDown(e, 'device')}
+          >
+            {t('wbOnThisDevice')}
+          </button>
+        </div>
+
+        <div
+          id="home-area-panel"
+          role="tabpanel"
+          aria-labelledby={area === 'uniwork' ? 'home-area-tab-uniwork' : 'home-area-tab-device'}
+          className="home-area-panel"
+        >
+          {area === 'uniwork' ? (
+            <>
+              {isSignedIn && uwWsState.workspaces && uwWsState.workspaces.length > 0 && (
+                <select
+                  className="home-uw-ws"
+                  aria-label={t('wbTopWorkspace')}
+                  value={activeUwWorkspaceId ?? ''}
+                  onChange={(e) => selectUniworkWorkspace(e.target.value)}
+                >
+                  {uwWsState.workspaces.map((ws) => (
+                    <option key={ws.id} value={ws.id}>
+                      {ws.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {showUniworkPane && activeUwWorkspaceId ? (
+                <div className="home-uw-side-slot" ref={setUniworkSidebarSlot} />
+              ) : (
+                renderAreaNav()
+              )}
+            </>
+          ) : (
+            <>
+              {renderAreaNav()}
+              {renderFolderPanel()}
+              {/* project sidebar */}
+              {projectMode && (
+                <ProjectPanel
+                  projects={projects}
+                  selectedId={selectedProjectId}
+                  onSelect={(id) => {
+                    setSelectedProjectId(id)
+                    setSelectedFolder(null)
+                    setEduMode(false)
+                    setChatMode(false)
+                    // reset list-selection state on any project switch (paths are
+                    // shared between the plain view and project views)
+                    setSelected(new Set())
+                    setRowMenu(null)
+                  }}
+                  onRefresh={refresh}
+                />
+              )}
+            </>
+          )}
+        </div>
 
         <SidebarFooter
           onStatusChange={handleAccountStatus}
@@ -3726,8 +4063,6 @@ export function Home() {
           newItems={NEW_ITEMS}
           accountName={accountName}
         />
-      ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
-        renderFolderContent()
       ) : chatMode ? (
         <NewChatPane
           practiceId={activePracticeId}
@@ -3738,6 +4073,57 @@ export function Home() {
             setSelectedFolder(null)
           }}
         />
+      ) : area === 'uniwork' ? (
+        acctView === 'loading' ? (
+          <main className="content">
+            <WorkSkeleton />
+          </main>
+        ) : !isSignedIn ? (
+          <main className="content">
+            <WorkErrorState
+              state="signed-out"
+              onRetry={() => setSettingsRequest({ section: 'account' })}
+            />
+          </main>
+        ) : uwWsState.workspaceError ? (
+          <main className="content">
+            <WorkErrorState
+              state={uwWsState.workspaceError}
+              onRetry={() => setUwWsTick((n) => n + 1)}
+            />
+          </main>
+        ) : uwWsState.workspaces === null ? (
+          <main className="content">
+            <WorkSkeleton />
+          </main>
+        ) : uwWsState.workspaces.length === 0 || !activeUwWorkspaceId ? (
+          <main className="content">
+            <WorkNoWorkspace
+              error={uwWsState.workspaceError}
+              onRetry={() => setUwWsTick((n) => n + 1)}
+            />
+          </main>
+        ) : (
+          <main className={`content${uniworkSubView === 'folder' ? ' home-uw-pane' : ''}`}>
+            <UniworkBrowser
+              key={activeUwWorkspaceId}
+              variant="pane"
+              workspaceId={activeUwWorkspaceId}
+              initialFolderId={activeUwFolderId}
+              onFolderChange={(folderId) => {
+                setUniworkFolderByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: folderId }))
+                setUniworkSubView('folder')
+              }}
+              onOpenDocument={openUniworkDocFromPane}
+              openingId={openingDocId}
+              sidebarTop={renderAreaNav()}
+              sidebarHost={uniworkSidebarSlot}
+              mainOverride={uniworkSubView === 'folder' ? null : renderGlobalSections()}
+            />
+          </main>
+        )
+      ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
+        renderFolderContent()
       ) : (
         renderGlobalContent()
       )}

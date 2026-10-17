@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const ko = {
   ufRoot: 'UniWork',
+  ufAreaUniwork: 'UniWork',
   ufTreeLabel: '폴더',
   ufContentsLabel: '폴더 내용',
   ufRecent: '최근',
@@ -50,4 +51,6 @@ export const ko = {
   ufDisabledDeep: '너무 깊음',
   ufTreeError: '폴더를 불러오지 못했습니다.',
   ufActionsFor: '{name} 작업',
+  ufAreaLabel: '영역',
+  ufNoDeviceFolders: '이 기기에 아직 폴더가 없습니다.',
 } satisfies Record<keyof typeof zh, string>

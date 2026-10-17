@@ -239,6 +239,11 @@ export interface UniworkDocSummary {
   /** FD-11: the folder/page holding the document; null = the workspace root */
   parentId?: string | null
   /**
+   * MYFOLDER-01 / SAVE-01: the server's `system_kind`, kept only for the known
+   * `'my_folder'` marker (unknown values are dropped at parse).
+   */
+  systemKind?: UniworkSystemKind
+  /**
    * FD-11: the ancestors of a search row, root first. Only the title search
    * sends one (cut at the first unreadable ancestor).
    */
@@ -247,6 +252,14 @@ export interface UniworkDocSummary {
 
 /** FD-11: the three entry kinds the folder tree holds */
 export type UniworkEntryKind = 'folder' | 'file' | 'page'
+
+/**
+ * MYFOLDER-01 / SAVE-01: the server's `system_kind` (omitempty, loose enum).
+ * `'my_folder'` marks the caller's personal "My Folder" (D
+ * `DocumentSystemKindMyFolder`); anything else or absent is an ordinary row.
+ * The stored title is never the label - the renderer shows a localized name.
+ */
+export type UniworkSystemKind = 'my_folder'
 
 /**
  * FD-11: one node of `GET /workspaces/{ws}/documents/tree?folders_only=true`,
@@ -258,6 +271,8 @@ export interface UniworkFolderNode {
   title: string
   position: number
   children: UniworkFolderNode[]
+  /** MYFOLDER-01 / SAVE-01: `'my_folder'` on the caller's personal folder row */
+  systemKind?: UniworkSystemKind
 }
 
 /** FD-11: one contents page of a folder (folders + files + pages, server order) */
@@ -375,9 +390,26 @@ export type UniworkDocNameError = 'name_empty' | 'name_too_long' | 'folder_name_
  * `upload_cancelled` is an upload the person aborted; none of them is part of
  * `UniworkDocErrorCode`, because that union is switched on exhaustively by the
  * renderer's error copy table.
+ * MYFOLDER-01 / SAVE-01: `my_folder_locked` (409, error_class "conflict") and
+ * `invalid_destination` (400) arrive on the error's `serverCode` and join here
+ * for the same reason - the renderer shows them verbatim, keyed by code.
+ * SAVE-01 r2: `first_save_flush_failed` = the editor could not be written to
+ * disk (refused or timed out), so nothing was created. `first_save_bind_failed`
+ * = the document was created but the local bind failed; the created document
+ * was archived to the trash (restorable). `first_save_orphaned` = the create
+ * landed and the compensating archive failed too; both carry `documentId` /
+ * `documentTitle` so the dialog can tell the person where the document is.
  */
 export type UniworkDocActionError =
-  UniworkDocErrorCode | UniworkDocNameError | 'move_name_taken' | 'upload_cancelled'
+  | UniworkDocErrorCode
+  | UniworkDocNameError
+  | 'move_name_taken'
+  | 'upload_cancelled'
+  | 'my_folder_locked'
+  | 'invalid_destination'
+  | 'first_save_flush_failed'
+  | 'first_save_bind_failed'
+  | 'first_save_orphaned'
 export type UniworkDocActionResult<T> =
   | { ok: true; value: T }
   | {
@@ -393,6 +425,13 @@ export type UniworkDocActionResult<T> =
        * `maxDocumentDepth`). Absent for every other failure.
        */
       max?: number
+      /**
+       * SAVE-01 r2 (S01-R1-2): on `first_save_bind_failed` /
+       * `first_save_orphaned` the document that was created, so the dialog can
+       * name it (trash, or the folder it landed in). Absent everywhere else.
+       */
+      documentId?: string
+      documentTitle?: string
     }
 
 /** the formats the New document dialog offers (D accepts more; these three are the Office ones) */
@@ -425,6 +464,23 @@ export interface UniworkUploadProgress {
   path: string
   loaded: number
   total: number
+}
+
+/** MYFOLDER-01 / SAVE-01: where the first Save to UniWork creates the document */
+export type UniworkFirstSaveTarget = { kind: 'my_folder' } | { kind: 'folder'; folderId: string }
+
+/**
+ * SAVE-01: the Save dialog's confirm. `tabPath` is the unbound file the tab
+ * shows; `workspaceId` scopes the create (the dialog's workspace). Main flushes
+ * the editor, creates the document (destination my_folder, or the picked
+ * parent_id) and binds the tab to the answer, so the next save is a plain
+ * bound commit with no dialog.
+ */
+export interface UniworkFirstSaveInput {
+  tabPath: string
+  title: string
+  workspaceId: string
+  target: UniworkFirstSaveTarget
 }
 
 /** a document's title changed (here, or renamed elsewhere and picked up by main) */
@@ -1127,6 +1183,21 @@ export interface HomeApi {
   /** Save a local copy of the bound working copy at `path` to a user-chosen path ("Lưu bản sao về máy"). */
   uniworkSaveLocalCopy?(path: string): Promise<boolean>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
+  /** SAVE-01: main asks the shell renderer to open the first-save dialog for an unbound path */
+  onUniworkFirstSaveOpen(cb: (request: { path: string }) => void): () => void
+  /**
+   * SAVE-01: the dialog's confirm - flush the editor, create the document in
+   * My Folder (or the picked folder) and bind the tab to it in one call.
+   */
+  uniworkFirstSave(input: UniworkFirstSaveInput): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /**
+   * SAVE-01 r2 (S01-R1-6): acknowledge a firstSaveOpen push the moment the
+   * SaveDialog opens. Without it File > Save on an unbound tab cannot tell a
+   * live dialog from a dead renderer and would warn every time.
+   */
+  uniworkFirstSaveOpenAck(path: string): Promise<void>
+  /** MYFOLDER-01 (Q3): ensure the caller's personal My Folder (dialog open) */
+  uniworkEnsureMyFolder(workspaceId: string): Promise<UniworkResult<UniworkDocSummary>>
   /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
   onUniworkConflict(cb: (view: UniworkConflictView) => void): () => void
   /** G5-09: main ended the open S5 session itself (tab/language switch, document closed) */
@@ -1723,6 +1794,24 @@ export const UNIWORK_DOC_CHANNELS = {
   conflictOpen: 'uniwork-doc:conflict-open',
   /** main -> shell renderer: main ended the open S5 session itself (G5-09) */
   conflictClosed: 'uniwork-doc:conflict-closed',
+  /**
+   * SAVE-01: main -> shell renderer: the active tab is not bound and asks to
+   * save to UniWork - open the name/target SaveDialog for it ({ path })
+   */
+  firstSaveOpen: 'uniwork-doc:first-save-open',
+  /**
+   * SAVE-01: invoke(UniworkFirstSaveInput) -> create + bind in one call;
+   * UniworkDocActionResult<UniworkDocSummary>
+   */
+  firstSave: 'uniwork-doc:first-save',
+  /**
+   * SAVE-01 r2 (S01-R1-6): invoke(path) — the renderer acknowledges it opened
+   * the SaveDialog for a firstSaveOpen push. No ack within main's window means
+   * no dialog is up and File > Save warns instead of reporting a phantom save.
+   */
+  firstSaveOpenAck: 'uniwork-doc:first-save-open-ack',
+  /** MYFOLDER-01 (Q3): invoke(workspaceId) -> the ensured My Folder row (DocumentSDO) */
+  ensureMyFolder: 'uniwork-doc:ensure-my-folder',
   /** invoke(sessionId, action) -> UniworkConflictReply (G5-09) */
   conflictAct: 'uniwork-doc:conflict-act',
   /** invoke(path, action) -> the S6 bar action (later/close/retry/reload/reload-now) */

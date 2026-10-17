@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenDialogOptions } from 'electron'
 import { UNIWORK_DOC_CHANNELS } from '../src/shared/home-api'
 import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
+import { requestFirstSaveOpen } from '../src/main/uniwork-docs/first-save-open'
 
 /**
  * G8-17 S18: the shell's own IPC bridge for create / upload / rename / archive
@@ -344,5 +345,119 @@ describe('the S18 action IPC', () => {
     expect(sent.filter((message) => message.channel === UNIWORK_DOC_CHANNELS.treeChanged)).toEqual([
       { channel: UNIWORK_DOC_CHANNELS.treeChanged, payload: { workspaceId: 'ws_1' } },
     ])
+  })
+})
+
+describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
+  it('registers the first-save, ensure-my-folder and ack channels, not the push', async () => {
+    const { handlers } = await setup()
+    for (const channel of [
+      UNIWORK_DOC_CHANNELS.firstSave,
+      UNIWORK_DOC_CHANNELS.ensureMyFolder,
+      UNIWORK_DOC_CHANNELS.firstSaveOpenAck,
+    ]) {
+      expect(handlers.has(channel)).toBe(true)
+    }
+    // first-save-open is a push to the shell renderer, never an invoke handler
+    expect(handlers.has(UNIWORK_DOC_CHANNELS.firstSaveOpen)).toBe(false)
+  })
+
+  it('a malformed first-save target answers invalid_destination with zero requests', async () => {
+    const { handlers } = await setup()
+    const fetch = vi.fn(async () => new Response('{}', { status: 404 }))
+    vi.stubGlobal('fetch', fetch)
+    try {
+      const file = join(dir, 'Draft.docx')
+      const result = await handlers.get(UNIWORK_DOC_CHANNELS.firstSave)!(null, {
+        tabPath: file,
+        title: 'Draft.docx',
+        workspaceId: 'ws_1',
+        // an empty folder id is an unknown destination, not a root create
+        target: { kind: 'folder', folderId: '   ' },
+      })
+      expect(result).toEqual({ ok: false, error: 'invalid_destination' })
+      // the union is refused before stat/read/POST: nothing left the process
+      expect(fetch).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('a malformed workspace id still answers a result instead of throwing', async () => {
+    const { handlers } = await setup()
+    const result = await handlers.get(UNIWORK_DOC_CHANNELS.firstSave)!(null, {
+      tabPath: 7,
+      title: 'Draft.docx',
+      workspaceId: 'ws_1',
+      target: { kind: 'my_folder' },
+    })
+    expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  it('ensureMyFolder posts to the my-folder route and answers the folder', async () => {
+    const { handlers } = await setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        if (
+          String(url).endsWith('/workspaces/ws_1/documents/my-folder') &&
+          init.method === 'POST'
+        ) {
+          return new Response(
+            JSON.stringify({
+              document: {
+                id: 'fold_my',
+                kind: 'folder',
+                workspace_id: 'ws_1',
+                title: 'My Folder',
+                updated_at: '2026-10-17T09:00:00Z',
+                my_level: 'manage',
+                system_kind: 'my_folder',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        return new Response('{}', { status: 404 })
+      }),
+    )
+    try {
+      const result = (await handlers.get(UNIWORK_DOC_CHANNELS.ensureMyFolder)!(null, 'ws_1')) as {
+        ok: boolean
+        value?: { id: string; systemKind?: string }
+      }
+      expect(result.ok).toBe(true)
+      expect(result.value?.id).toBe('fold_my')
+      expect(result.value?.systemKind).toBe('my_folder')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('the firstSaveOpenAck invoke releases the pending waiter of its sender+path', async () => {
+    const { handlers } = await setup()
+    const wc = { id: 42, isDestroyed: () => false, send: vi.fn() }
+    const pending = requestFirstSaveOpen(wc, 'C:/tmp/Draft.docx', 5_000)
+    // the renderer's invoke carries the sender's own webContents id
+    handlers.get(UNIWORK_DOC_CHANNELS.firstSaveOpenAck)!(
+      { sender: { id: 42 } },
+      'C:/tmp/Draft.docx',
+    )
+    expect(await pending).toBe(true)
+    expect(wc.send).toHaveBeenCalledWith(UNIWORK_DOC_CHANNELS.firstSaveOpen, {
+      path: 'C:/tmp/Draft.docx',
+    })
+  })
+
+  it('an ack from a different sender or path releases nothing', async () => {
+    const { handlers } = await setup()
+    const wc = { id: 42, isDestroyed: () => false, send: vi.fn() }
+    const pending = requestFirstSaveOpen(wc, 'C:/tmp/Draft.docx', 30)
+    const ack = handlers.get(UNIWORK_DOC_CHANNELS.firstSaveOpenAck)!
+    // foreign sender, foreign path, empty path: all no-ops
+    ack({ sender: { id: 9 } }, 'C:/tmp/Draft.docx')
+    ack({ sender: { id: 42 } }, 'C:/tmp/Other.docx')
+    ack({ sender: { id: 42 } }, '')
+    expect(await pending).toBe(false)
   })
 })

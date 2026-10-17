@@ -51,4 +51,7 @@ export const de = {
   ufDisabledDeep: 'Zu tief',
   ufTreeError: 'Die Ordner konnten nicht geladen werden.',
   ufActionsFor: 'Aktionen für {name}',
+  ufAreaLabel: 'Bereich',
+  ufAreaUniwork: 'UniWork',
+  ufNoDeviceFolders: 'Noch keine Ordner auf diesem Gerät.',
 } satisfies Record<keyof typeof zh, string>

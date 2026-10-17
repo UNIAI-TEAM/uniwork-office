@@ -1401,7 +1401,7 @@ test.describe.serial('UniWork documents', () => {
     const dir = await mkdtemp(join(tmpdir(), 'uniwork-e2e-local-'))
     const local = join(dir, 'local-only.docx')
     await copyFile(join(ROOT, 'fixtures/generated/simple.docx'), local)
-    const before = stub.callCount()
+    const atStart = stub.callCount()
     await withApp(
       'uniwork-docs-local',
       async ({ launched, shell }) => {
@@ -1410,6 +1410,30 @@ test.describe.serial('UniWork documents', () => {
         expect(await statusOf(shell, local)).toBeNull()
         await expect(chip(shell)).toHaveCount(0)
         await expect(shell.locator('.uw-tab-marker')).toHaveCount(0)
+
+        // wait for the signed-in Home UniWork pane launch reads (workspaces, tree, root contents) to settle
+        await expect(shell.locator('.home-uw-side-slot [role="tree"]')).toHaveCount(1, {
+          timeout: 15_000,
+        })
+        await expect(shell.locator('.home-uw-pane')).toHaveCount(1, { timeout: 15_000 })
+        await expect(shell.locator('.home-uw-pane .uw-pick-skeleton')).toHaveCount(0, {
+          timeout: 15_000,
+        })
+        let quietCount = stub.callCount()
+        for (;;) {
+          await sleep(1_000)
+          const now = stub.callCount()
+          if (now === quietCount) break
+          quietCount = now
+        }
+        const before = stub.callCount()
+        console.log(
+          'case h launch calls:',
+          stub
+            .calls()
+            .slice(atStart, before)
+            .map((c) => `${c.method} ${c.route}`),
+        )
 
         await typeInDocs(editor, MARKER)
         await saveShortcut(editor)

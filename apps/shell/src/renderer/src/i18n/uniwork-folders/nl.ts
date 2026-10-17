@@ -2,6 +2,7 @@ import type { zh } from './zh'
 
 export const nl = {
   ufRoot: 'UniWork',
+  ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Mappen',
   ufContentsLabel: 'Inhoud van de map',
   ufRecent: 'Recent',
@@ -51,4 +52,6 @@ export const nl = {
   ufDisabledDeep: 'Te diep',
   ufTreeError: 'De mappen konden niet worden geladen.',
   ufActionsFor: 'Acties voor {name}',
+  ufAreaLabel: 'Gebied',
+  ufNoDeviceFolders: 'Nog geen mappen op dit apparaat.',
 } satisfies Record<keyof typeof zh, string>

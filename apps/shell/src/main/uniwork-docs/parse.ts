@@ -3,6 +3,7 @@ import type {
   UniworkDocSummary,
   UniworkEntryKind,
   UniworkFolderNode,
+  UniworkSystemKind,
 } from '../../shared/home-api'
 import { UniworkDocError } from './errors'
 import { formatForMime, formatForName, isDecimalString } from './formats'
@@ -157,6 +158,15 @@ function kindOf(value: unknown): UniworkEntryKind | null {
 }
 
 /**
+ * MYFOLDER-01 / SAVE-01: `system_kind` is a loose enum and omitempty. Only the
+ * known `my_folder` marker is kept; an unknown value the server adds later is
+ * dropped (the row stays an ordinary entry, never a malformed one).
+ */
+function systemKindOf(value: unknown): UniworkSystemKind | undefined {
+  return value === 'my_folder' ? 'my_folder' : undefined
+}
+
+/**
  * FD-11: `parent_id` as the renderer's `parentId`. Absent, `null` and `''` all
  * mean the workspace root; a malformed one fails closed.
  */
@@ -203,6 +213,7 @@ function summaryRow(
     kind,
     parentId: parentIdOf(row.parent_id),
     ...(path ? { path } : {}),
+    ...(systemKindOf(row.system_kind) ? { systemKind: 'my_folder' as const } : {}),
   }
 }
 
@@ -584,6 +595,7 @@ export function parseDocumentSummary(raw: unknown): UniworkDocSummary {
     ),
     ...(kind ? { kind } : {}),
     ...(doc.parent_id === undefined ? {} : { parentId: parentIdOf(doc.parent_id) }),
+    ...(systemKindOf(doc.system_kind) ? { systemKind: 'my_folder' as const } : {}),
   }
 }
 
@@ -609,6 +621,7 @@ function folderNode(value: unknown, depth: number): UniworkFolderNode {
     title: str(node.title),
     position,
     children: children.map((child) => folderNode(child, depth + 1)),
+    ...(systemKindOf(node.system_kind) ? { systemKind: 'my_folder' as const } : {}),
   }
 }
 
