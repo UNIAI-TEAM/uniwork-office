@@ -4,7 +4,12 @@ import type { UniworkConflictView } from '../../../shared/uniwork-conflict'
 import { useI18n } from '../locale'
 import { loadFolderTree } from '../uniwork-library-api'
 import { UniworkFolderPicker, type PickedFolder } from './UniworkFolderPicker'
-import { buildFolderIndex, folderPath } from './uniwork-folders-model'
+import {
+  MY_FOLDER_LABEL_KEY,
+  buildFolderIndex,
+  folderPath,
+  withMyFolderLabel,
+} from './uniwork-folders-model'
 import './uniwork-folders.css'
 
 /**
@@ -68,7 +73,10 @@ export function ConflictCopyLocation({
   } else if (view.parentId === undefined) {
     label = t('ufSameFolder')
   } else if (nodes !== null) {
-    const path = folderPath(buildFolderIndex(nodes), view.parentId)
+    const path = folderPath(
+      buildFolderIndex(withMyFolderLabel(nodes, t(MY_FOLDER_LABEL_KEY))),
+      view.parentId,
+    )
     label =
       path.length > 0 ? [t('ufRoot'), ...path.map((p) => p.title)].join(' › ') : t('ufSameFolder')
   } else if (treeFailed) {

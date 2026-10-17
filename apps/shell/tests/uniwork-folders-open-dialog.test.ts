@@ -15,6 +15,7 @@ import type {
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { UniworkOpenDialog } from '../src/renderer/src/UniworkOpenDialog'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
+import { uniworkSaveStrings } from '../src/renderer/src/i18n/strings-uniwork-save'
 
 /**
  * FD-11 S1/S2 inside "Open from UniWork": the dialog's body is the browser.
@@ -218,11 +219,13 @@ describe('Open from UniWork as the browser', () => {
     await click(button('New document'))
     const location = $<HTMLButtonElement>('.modal.uw-act .uwf-location-btn')!
     expect(location.textContent).toContain('UniWork › Alpha')
-    // Recent: the top level, as before
+    // Recent: no folder, which is My Folder since SAVE-01 Q1 (main sends destination my_folder)
     await click(button('Cancel'))
     await click(button(en.ufRecent))
     await click(button('New document'))
-    expect($('.modal.uw-act .uwf-location-btn')!.textContent).toContain(en.ufLocationRoot)
+    expect($('.modal.uw-act .uwf-location-btn')!.textContent).toContain(
+      uniworkSaveStrings.en.usMyFolder,
+    )
   })
 
   it('a file in a folder opens through the existing open path', async () => {

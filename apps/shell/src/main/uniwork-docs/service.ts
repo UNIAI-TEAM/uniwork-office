@@ -191,7 +191,6 @@ export interface ConflictUi {
 
 /** which close prompt: Save to UniWork, the conflict dialog, or the reason a save is not possible */
 export type UnsavedCloseKind = 'unsent' | 'conflict' | 'blocked'
-
 /** 'save' (unsent) and 'resolve' (conflict) are each kind's default button */
 export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
 
@@ -203,6 +202,23 @@ export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
  * captured), so the copy stays as the owner's own locked folder until the owner
  * signs in again.
  */
+/**
+ * G5-05u (B5): what the offline library did with a document whose server open
+ * failed. `opened` = the read-only cached copy is on screen; `locked` = it
+ * refused and the shell shows the S11 panel named by `reason`; null = nothing is
+ * pinned.
+ */
+export type OfflineCopyOpen =
+  | { kind: 'opened'; path: string; title: string }
+  | {
+      kind: 'locked'
+      path: string
+      name: string
+      reason: UniworkLockReason
+      libraryOff?: boolean
+    }
+  | null
+
 export interface SignOutLockResult {
   ok: boolean
   captureFailed: string[]
@@ -334,6 +350,13 @@ export interface UniworkDocsServiceDeps {
   pickDownloadPath?(defaultName: string): Promise<string | null>
   /** G5-09 S5: seam for G5-05 offline head availability (default false until G5-05 lands) */
   hasOfflineHead?(documentId: string, revision?: string): boolean
+  /**
+   * G5-05u (B5): the verified cached copy of a pinned document, for an open
+   * whose server read failed (no network). `opened` = the read-only copy is on
+   * screen; `locked` = the library refused and the S11 panel names `reason`;
+   * null = nothing is pinned (the open fails as it did before).
+   */
+  openOfflineCopy?(documentId: string): Promise<OfflineCopyOpen>
   /**
    * The org capability cache (the same one the sync runtime reads), for the
    * save queue's lane verdicts. Absent = writes allowed (tests that never read
@@ -3341,10 +3364,33 @@ export class UniworkDocsService {
     }
   }
 
-  private recordLock(store: NewerStore, reason: UniworkLockReason = 'store_newer'): void {
-    const lock: UniworkDocLock = { path: store.path, reason, name: store.name }
+  private recordLock(
+    store: NewerStore,
+    reason: UniworkLockReason = 'store_newer',
+    libraryOff?: boolean,
+  ): void {
+    const lock: UniworkDocLock = {
+      path: store.path,
+      reason,
+      name: store.name,
+      ...(libraryOff ? { libraryOff: true } : {}),
+    }
     this.locks.set(pathKey(lock.path), lock)
     this.deps.pushLock?.(lock)
+  }
+
+  /**
+   * G5-05u (B5): the offline library refused to open a pinned document's copy.
+   * The reason is an S11 row ("Lý do bị chặn"); `libraryOff` says the org turned
+   * offline documents off, so the lease cannot be renewed (`uwLockLibraryOff`).
+   */
+  recordOfflineLock(lock: {
+    path: string
+    name: string
+    reason: UniworkLockReason
+    libraryOff?: boolean
+  }): void {
+    this.recordLock({ path: lock.path, name: lock.name }, lock.reason, lock.libraryOff)
   }
 
   /** a lock named by the working-copy path itself */
@@ -6385,7 +6431,26 @@ export class UniworkDocsService {
     for (const dir of dirs) {
       if (await this.refuseLockedDir(dir)) throw new UniworkDocError('engine_incompatible')
     }
-    const detail = await this.api().getDocument(documentId)
+    let detail: DocumentDetail
+    try {
+      detail = await this.api().getDocument(documentId)
+    } catch (error) {
+      // G5-05u (B5): with no network a pinned document opens its verified cached
+      // copy, read-only - the offline edit hold is G5-08d (UNI-1645). Only the
+      // network/timeout class falls back (BE-R1-4): 401/403/404/410 are the
+      // server's own verdict about this document (a revoke, a delete), and a
+      // stale ready copy must never reopen over them.
+      const offline =
+        error instanceof UniworkDocError && (error.code === 'network' || error.code === 'timeout')
+      if (offline) {
+        const copy: OfflineCopyOpen =
+          (await this.deps.openOfflineCopy?.(documentId).catch(() => null as OfflineCopyOpen)) ??
+          null
+        if (copy?.kind === 'opened') return { path: copy.path, title: copy.title }
+        if (copy?.kind === 'locked') this.recordOfflineLock(copy)
+      }
+      throw error
+    }
     const format =
       formatForMime(detail.file.mimeType) ??
       formatForName(detail.file.filename) ??
@@ -6565,11 +6630,24 @@ export class UniworkDocsService {
     return { path, title }
   }
 
-  private show(path: string, binding: Binding): { path: string; title: string } {
+  /**
+   * G5-05u B5: show a file of this session's working-copy store that no open
+   * flow produced - the read-only offline copy of a pinned document. Null when
+   * the shell did not open it.
+   */
+  showOfflineCopy(path: string): { path: string; title: string } | null {
+    try {
+      return this.show(path, null)
+    } catch {
+      return null
+    }
+  }
+
+  private show(path: string, binding: Binding | null): { path: string; title: string } {
     this.refuseOpen(path)
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     const doc = this.store.lookup(path)
     if (doc) this.publish(toStatus(doc))
-    return { path, title: binding.title }
+    return { path, title: binding?.title ?? doc?.binding.title ?? basename(path) }
   }
 }

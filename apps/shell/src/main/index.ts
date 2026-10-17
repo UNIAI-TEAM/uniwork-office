@@ -111,7 +111,14 @@ import {
   uniworkCloud,
   uniworkDeploymentProfile,
 } from './uniwork-auth'
-import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
+import {
+  applySpellcheckDictionaryDownloadGate,
+  configureStartupHostResolver,
+  createUniworkDocs,
+  type UniworkDocsHandle,
+} from './uniwork-docs/wiring'
+import { offlineTabMenuItem, unpinTabDocument } from './uniwork-sync/offline-library/menu'
+import type { OfflineLibraryApi } from './uniwork-sync/offline-library/api'
 import { registerUniworkWork } from './uniwork-work/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
 import {
@@ -680,6 +687,10 @@ const tMain = createI18n({
     menuFile: '文件',
     menuSectionNew: '新建',
     menuOpenInNewWindow: '在新窗口中打开',
+    uwOfflinePin: '设为可离线使用',
+    uwOfflineUnpin: '移除离线副本',
+    uwOfflineUnpinConfirm: '下载的副本将从这台电脑上删除。草稿和排队中的保存会保留。',
+    uwOfflineUnpinShort: '取消固定',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: '未命名表格',
@@ -790,6 +801,11 @@ const tMain = createI18n({
     menuUiZoomOut: 'Interface Zoom Out',
     menuUiZoomReset: 'Reset Interface Zoom',
     menuOpenInNewWindow: 'Open in New Window',
+    uwOfflinePin: 'Make available offline',
+    uwOfflineUnpin: 'Remove offline copy',
+    uwOfflineUnpinConfirm:
+      'The downloaded copy will be removed from this computer. Drafts and queued saves are kept.',
+    uwOfflineUnpinShort: 'Unpin',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Untitled Spreadsheet',
@@ -900,6 +916,11 @@ const tMain = createI18n({
     menuFile: 'Tệp',
     menuSectionNew: 'Mới',
     menuOpenInNewWindow: 'Mở trong cửa sổ mới',
+    uwOfflinePin: 'Dùng khi không có mạng',
+    uwOfflineUnpin: 'Bỏ dùng khi không có mạng',
+    uwOfflineUnpinConfirm:
+      'Bản tải về sẽ được xóa khỏi máy này. Nháp và lần lưu đang chờ được giữ lại.',
+    uwOfflineUnpinShort: 'Bỏ ghim',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Bảng tính chưa có tiêu đề',
@@ -1014,6 +1035,11 @@ const tMain = createI18n({
     menuFile: 'ファイル',
     menuSectionNew: '新規作成',
     menuOpenInNewWindow: '新しいウィンドウで開く',
+    uwOfflinePin: 'オフラインで使用可能にする',
+    uwOfflineUnpin: 'オフラインコピーを削除',
+    uwOfflineUnpinConfirm:
+      'ダウンロードしたコピーはこのコンピューターから削除されます。下書きと保存待ちは保持されます。',
+    uwOfflineUnpinShort: '固定を解除',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: '無題のスプレッドシート',
@@ -1128,6 +1154,11 @@ const tMain = createI18n({
     menuFile: '파일',
     menuSectionNew: '새로 만들기',
     menuOpenInNewWindow: '새 창에서 열기',
+    uwOfflinePin: '오프라인으로 사용 가능하게 설정',
+    uwOfflineUnpin: '오프라인 사본 제거',
+    uwOfflineUnpinConfirm:
+      '다운로드한 사본이 이 컴퓨터에서 제거됩니다. 초안과 대기 중인 저장은 보관됩니다.',
+    uwOfflineUnpinShort: '고정 해제',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: '제목 없는 스프레드시트',
@@ -1241,6 +1272,11 @@ const tMain = createI18n({
     menuFile: 'Fichier',
     menuSectionNew: 'Nouveau',
     menuOpenInNewWindow: 'Ouvrir dans une nouvelle fenêtre',
+    uwOfflinePin: 'Rendre disponible hors ligne',
+    uwOfflineUnpin: 'Supprimer la copie hors ligne',
+    uwOfflineUnpinConfirm:
+      'La copie téléchargée sera supprimée de cet ordinateur. Les brouillons et enregistrements en attente sont conservés.',
+    uwOfflineUnpinShort: 'Désépingler',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Feuille de calcul sans titre',
@@ -1356,6 +1392,11 @@ const tMain = createI18n({
     menuFile: 'Datei',
     menuSectionNew: 'Neu',
     menuOpenInNewWindow: 'In neuem Fenster öffnen',
+    uwOfflinePin: 'Offline verfügbar machen',
+    uwOfflineUnpin: 'Offlinekopie entfernen',
+    uwOfflineUnpinConfirm:
+      'Die heruntergeladene Kopie wird von diesem Computer entfernt. Entwürfe und eingereihte Speicherstände bleiben erhalten.',
+    uwOfflineUnpinShort: 'Lösen',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Unbenannte Tabelle',
@@ -1472,6 +1513,11 @@ const tMain = createI18n({
     menuFile: 'Archivo',
     menuSectionNew: 'Nuevo',
     menuOpenInNewWindow: 'Abrir en una ventana nueva',
+    uwOfflinePin: 'Hacer disponible sin conexión',
+    uwOfflineUnpin: 'Quitar copia sin conexión',
+    uwOfflineUnpinConfirm:
+      'La copia descargada se eliminará de este equipo. Los borradores y guardados en cola se conservan.',
+    uwOfflineUnpinShort: 'Desanclar',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Hoja de cálculo sin título',
@@ -1587,6 +1633,11 @@ const tMain = createI18n({
     menuFile: 'ไฟล์',
     menuSectionNew: 'สร้างใหม่',
     menuOpenInNewWindow: 'เปิดในหน้าต่างใหม่',
+    uwOfflinePin: 'ทำให้ใช้ได้แบบออฟไลน์',
+    uwOfflineUnpin: 'ลบสำเนาออฟไลน์',
+    uwOfflineUnpinConfirm:
+      'สำเนาที่ดาวน์โหลดจะถูกลบออกจากคอมพิวเตอร์เครื่องนี้ แบบร่างและการบันทึกในคิวจะเก็บไว้',
+    uwOfflineUnpinShort: 'เลิกปักหมุด',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'สเปรดชีตไม่มีชื่อ',
@@ -1698,6 +1749,11 @@ const tMain = createI18n({
     menuFile: 'File',
     menuSectionNew: 'Baru',
     menuOpenInNewWindow: 'Buka di Jendela Baru',
+    uwOfflinePin: 'Sediakan offline',
+    uwOfflineUnpin: 'Hapus salinan offline',
+    uwOfflineUnpinConfirm:
+      'Salinan yang diunduh akan dihapus dari komputer ini. Draf dan penyimpanan dalam antrean tetap disimpan.',
+    uwOfflineUnpinShort: 'Lepas sematan',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Spreadsheet tanpa judul',
@@ -1813,6 +1869,11 @@ const tMain = createI18n({
     menuFile: 'Файл',
     menuSectionNew: 'Создать',
     menuOpenInNewWindow: 'Открыть в новом окне',
+    uwOfflinePin: 'Сделать доступным офлайн',
+    uwOfflineUnpin: 'Удалить офлайн-копию',
+    uwOfflineUnpinConfirm:
+      'Загруженная копия будет удалена с этого компьютера. Черновики и сохранения в очереди останутся.',
+    uwOfflineUnpinShort: 'Открепить',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Таблица без названия',
@@ -1928,6 +1989,11 @@ const tMain = createI18n({
     menuFile: 'ملف',
     menuSectionNew: 'جديد',
     menuOpenInNewWindow: 'فتح في نافذة جديدة',
+    uwOfflinePin: 'إتاحة دون اتصال',
+    uwOfflineUnpin: 'إزالة النسخة دون اتصال',
+    uwOfflineUnpinConfirm:
+      'ستُزال النسخة المنزّلة من هذا الكمبيوتر. يتم الاحتفاظ بالمسودات وعمليات الحفظ في قائمة الانتظار.',
+    uwOfflineUnpinShort: 'إلغاء التثبيت',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'جدول بيانات بلا عنوان',
@@ -2039,6 +2105,11 @@ const tMain = createI18n({
     menuFile: 'Arquivo',
     menuSectionNew: 'Novo',
     menuOpenInNewWindow: 'Abrir em nova janela',
+    uwOfflinePin: 'Disponibilizar offline',
+    uwOfflineUnpin: 'Remover cópia offline',
+    uwOfflineUnpinConfirm:
+      'A cópia baixada será removida deste computador. Rascunhos e salvamentos na fila são mantidos.',
+    uwOfflineUnpinShort: 'Desafixar',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Planilha sem título',
@@ -2154,6 +2225,11 @@ const tMain = createI18n({
     menuFile: 'File',
     menuSectionNew: 'Nuovo',
     menuOpenInNewWindow: 'Apri in una nuova finestra',
+    uwOfflinePin: 'Rendi disponibile offline',
+    uwOfflineUnpin: 'Rimuovi copia offline',
+    uwOfflineUnpinConfirm:
+      'La copia scaricata verrà rimossa da questo computer. Bozze e salvataggi in coda vengono conservati.',
+    uwOfflineUnpinShort: 'Sblocca',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Foglio di calcolo senza titolo',
@@ -2269,6 +2345,11 @@ const tMain = createI18n({
     menuFile: 'Plik',
     menuSectionNew: 'Nowy',
     menuOpenInNewWindow: 'Otwórz w nowym oknie',
+    uwOfflinePin: 'Udostępnij offline',
+    uwOfflineUnpin: 'Usuń kopię offline',
+    uwOfflineUnpinConfirm:
+      'Pobrana kopia zostanie usunięta z tego komputera. Szkice i zapisy w kolejce zostaną zachowane.',
+    uwOfflineUnpinShort: 'Odepnij',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Arkusz bez tytułu',
@@ -2384,6 +2465,11 @@ const tMain = createI18n({
     menuFile: 'Soubor',
     menuSectionNew: 'Nový',
     menuOpenInNewWindow: 'Otevřít v novém okně',
+    uwOfflinePin: 'Zpřístupnit offline',
+    uwOfflineUnpin: 'Odebrat offline kopii',
+    uwOfflineUnpinConfirm:
+      'Stažená kopie bude z tohoto počítače odstraněna. Koncepty a uložení ve frontě zůstanou.',
+    uwOfflineUnpinShort: 'Odepnout',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Sešit bez názvu',
@@ -2497,6 +2583,11 @@ const tMain = createI18n({
     menuFile: 'Bestand',
     menuSectionNew: 'Nieuw',
     menuOpenInNewWindow: 'Openen in nieuw venster',
+    uwOfflinePin: 'Offline beschikbaar maken',
+    uwOfflineUnpin: 'Offlinekopie verwijderen',
+    uwOfflineUnpinConfirm:
+      'De gedownloade kopie wordt van deze computer verwijderd. Concepten en opslagen in de wachtrij blijven bewaard.',
+    uwOfflineUnpinShort: 'Losmaken',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Naamloze spreadsheet',
@@ -2612,6 +2703,11 @@ const tMain = createI18n({
     menuFile: 'Fail',
     menuSectionNew: 'Baharu',
     menuOpenInNewWindow: 'Buka dalam Tetingkap Baharu',
+    uwOfflinePin: 'Jadikan tersedia luar talian',
+    uwOfflineUnpin: 'Alih keluar salinan luar talian',
+    uwOfflineUnpinConfirm:
+      'Salinan yang dimuat turun akan dialih keluar dari komputer ini. Draf dan simpanan dalam baris gilir disimpan.',
+    uwOfflineUnpinShort: 'Nyahsemat',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'Hamparan tanpa tajuk',
@@ -2726,6 +2822,10 @@ const tMain = createI18n({
     menuFile: 'קובץ',
     menuSectionNew: 'חדש',
     menuOpenInNewWindow: 'פתח בחלון חדש',
+    uwOfflinePin: 'הפיכה לזמין במצב לא מקוון',
+    uwOfflineUnpin: 'הסרת העותק הלא מקוון',
+    uwOfflineUnpinConfirm: 'העותק שהורד יוסר מהמחשב הזה. טיוטות ושמירות בתור נשמרות.',
+    uwOfflineUnpinShort: 'ביטול הצמדה',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'גיליון אלקטרוני ללא שם',
@@ -2838,6 +2938,11 @@ const tMain = createI18n({
     menuFile: 'फ़ाइल',
     menuSectionNew: 'नया',
     menuOpenInNewWindow: 'नई विंडो में खोलें',
+    uwOfflinePin: 'ऑफ़लाइन उपलब्ध करें',
+    uwOfflineUnpin: 'ऑफ़लाइन प्रति हटाएँ',
+    uwOfflineUnpinConfirm:
+      'डाउनलोड की गई प्रति इस कंप्यूटर से हटा दी जाएगी। ड्राफ़्ट और कतार की सहेजें रखी जाएँगी।',
+    uwOfflineUnpinShort: 'अनपिन करें',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: 'शीर्षकहीन स्प्रेडशीट',
@@ -2953,6 +3058,10 @@ const tMain = createI18n({
     menuFile: '檔案',
     menuSectionNew: '新增',
     menuOpenInNewWindow: '在新視窗中開啟',
+    uwOfflinePin: '設為可離線使用',
+    uwOfflineUnpin: '移除離線副本',
+    uwOfflineUnpinConfirm: '下載的副本將從這台電腦上刪除。草稿和佇列中的儲存會保留。',
+    uwOfflineUnpinShort: '取消釘選',
     menuNewDoc: 'AI Docs',
     menuNewSheet: 'AI Sheets',
     untitledSheet: '未命名試算表',
@@ -5600,8 +5709,55 @@ function registerTabsIpc(): void {
   ipcMain.on(TABS_CHANNELS.dockIndex, (_event, index: unknown) => {
     lastDockIndex = typeof index === 'number' && Number.isInteger(index) ? index : undefined
   })
+  /**
+   * G5-05u (B8): the UniWork binding of a tab path - the document, its
+   * workspace and its org - or null for a plain local file (nothing to pin).
+   */
+  const offlineBindingOf = (
+    path: string | undefined,
+  ): { documentId: string; workspaceId: string; orgId: string } | null => {
+    if (!path) return null
+    const bound = uniworkDocs?.aiBinding(path)
+    if (!bound || bound === 'hidden') return null
+    const doc = uniworkDocs?.service.store.lookup(path)
+    if (!doc) return null
+    return {
+      documentId: bound.documentId,
+      workspaceId: doc.binding.workspaceId,
+      orgId: bound.orgId,
+    }
+  }
+  /**
+   * G5-05u (B8, BE-R1-3): the tab menu's unpin confirms natively. A native menu
+   * cannot host the renderer's confirm popover, so the message box is the tab
+   * window's own; the item never unpins without it.
+   */
+  const unpinFromTabMenu = async (
+    offline: OfflineLibraryApi,
+    documentId: string,
+  ): Promise<void> => {
+    await unpinTabDocument({
+      unpin: (id, options) => offline.unpin(id, options),
+      documentId,
+      account: () => uniworkSessionIdentity(),
+      confirm: async () => {
+        const options: Electron.MessageBoxOptions = {
+          type: 'question',
+          message: tm('uwOfflineUnpinConfirm'),
+          buttons: [tm('uwOfflineUnpinShort'), tm('btnCancel')],
+          defaultId: 1,
+          cancelId: 1,
+        }
+        const answer =
+          shellWindow && !shellWindow.isDestroyed()
+            ? await dialog.showMessageBox(shellWindow, options)
+            : await dialog.showMessageBox(options)
+        return answer.response === 0
+      },
+    })
+  }
   // per-tab context menu — native for the same reason as the tab list above
-  ipcMain.handle(TABS_CHANNELS.showTabMenu, (_event, id: unknown, x: unknown, y: unknown) => {
+  ipcMain.handle(TABS_CHANNELS.showTabMenu, async (_event, id: unknown, x: unknown, y: unknown) => {
     if (!tabManager || !shellWindow || typeof id !== 'string') return
     const tab = tabManager.list().find((t) => t.id === id)
     if (!tab || tab.kind === 'home') return
@@ -5614,6 +5770,23 @@ function registerTabsIpc(): void {
         click: () => detachTabToWindow(id),
       })
       template.push({ type: 'separator' })
+    }
+    // G5-05u (B8): a UniWork-bound tab can be pinned for offline use here; a
+    // plain local file has no document to pin (and no item)
+    const offlineBinding = offlineBindingOf(tab.filePath)
+    const offline = uniworkDocs?.offline
+    if (offlineBinding && offline) {
+      const item = offlineTabMenuItem({
+        bound: offlineBinding,
+        state: await offline.state(offlineBinding.documentId),
+        labels: { pin: tm('uwOfflinePin'), unpin: tm('uwOfflineUnpin') },
+        pin: () => void offline.pin(offlineBinding),
+        unpin: () => void unpinFromTabMenu(offline, offlineBinding.documentId),
+      })
+      if (item) {
+        template.push(item)
+        template.push({ type: 'separator' })
+      }
     }
     template.push({
       label: tm('menuClose'),
@@ -6543,6 +6716,8 @@ async function runHeadlessExportEntry(
 }
 
 app.whenReady().then(async () => {
+  configureStartupHostResolver()
+  applySpellcheckDictionaryDownloadGate(false)
   // a dev run has no bundle icns; packaged macOS builds take the Dock icon from the bundle
   if (!app.isPackaged && process.platform === 'darwin') {
     const dockIcon = join(app.getAppPath(), 'build', 'icon-mac.png')
