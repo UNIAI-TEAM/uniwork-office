@@ -274,6 +274,7 @@ export function DocumentsHome({
   const [uploadModal, setUploadModal] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
+  const uploadRunRef = useRef(0)
   const [docRename, setDocRename] = useState<{
     doc: DocumentsHomeDoc
     error: DocNameError | null
@@ -769,11 +770,13 @@ export function DocumentsHome({
   const handleUploadDoc = async (
     input: DocTarget & { path: string; name: string },
   ): Promise<ActionOutcome> => {
+    const run = ++uploadRunRef.current
     let targetFolderId = input.folderId
     if (!targetFolderId && typeof window.aiOffice?.uniworkEnsureMyFolder === 'function') {
       const ensured = await window.aiOffice
         .uniworkEnsureMyFolder(input.workspaceId)
         .catch(() => ({ ok: false as const, error: 'network' as const }))
+      if (run !== uploadRunRef.current) return { ok: true }
       if (ensured.ok) {
         targetFolderId = ensured.value.id
         setMyFolderId(ensured.value.id)
@@ -788,11 +791,13 @@ export function DocumentsHome({
       path: input.path,
       uploadId,
     })
+    if (run !== uploadRunRef.current) return { ok: true }
     uploadIdRef.current = null
     setUploadProgress(null)
     if (res.ok) {
       setUploadModal(false)
       refreshAll()
+      onOpenDocument(res.value)
       return { ok: true }
     }
     if (res.error === 'upload_cancelled') {
@@ -1775,6 +1780,7 @@ export function DocumentsHome({
           onUpload={handleUploadDoc}
           progress={uploadProgress}
           onCancel={() => {
+            uploadRunRef.current++
             if (uploadIdRef.current) {
               void cancelUploadDocument(uploadIdRef.current)
               uploadIdRef.current = null
