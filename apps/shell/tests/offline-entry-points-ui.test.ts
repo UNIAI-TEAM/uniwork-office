@@ -325,7 +325,7 @@ describe('UniworkOpenCard offline', () => {
     expect(document.querySelector('.modal.uw-pick')).toBeNull()
   })
 
-  it('offline with an empty library, or online: the picker as before', async () => {
+  it('offline with an empty library: the picker as before', async () => {
     account('server-unreachable')
     syncCenter(library())
     const onOpen = vi.fn()
