@@ -62,6 +62,7 @@ import {
 } from './uniwork-docs-model'
 import { WorkErrorState, WorkNoWorkspace, WorkSkeleton } from './WorkErrorState'
 import { UniworkBrowser } from './uniwork-folders/UniworkBrowser'
+import { useOfflineToggle } from './OfflineToggle'
 
 export const HOME_AREA_KEY = 'uniwork.wb.homeArea'
 export type HomeArea = 'uniwork' | 'device'
@@ -1387,6 +1388,8 @@ export function Home() {
   const [fileSortMenuOpen, setFileSortMenuOpen] = useState(false)
   const fileSortRef = useRef<HTMLDivElement>(null)
   const [rowMenu, setRowMenu] = useState<string | null>(null)
+  // G5-05u: "Dùng khi không có mạng" in a UniWork recents row's menu
+  const offlineToggle = useOfflineToggle()
   // actions cell (… button + menu) of the row whose menu is open — the dismissal guard root
   const rowMenuWrapRef = useRef<HTMLSpanElement>(null)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
@@ -2944,6 +2947,21 @@ export function Home() {
                 >
                   {t('open')}
                 </button>
+                {entry.uniwork && offlineToggle.labelOf(entry.uniwork.documentId) && (
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setRowMenu(null)
+                      offlineToggle.toggle({
+                        documentId: entry.uniwork!.documentId,
+                        workspaceId: entry.uniwork!.workspaceId,
+                        name: entry.uniwork!.title || entry.name,
+                      })
+                    }}
+                  >
+                    {offlineToggle.labelOf(entry.uniwork.documentId)}
+                  </button>
+                )}
                 {policy.showLocation && (
                   <>
                     <button
@@ -4274,6 +4292,7 @@ export function Home() {
         />
       )}
 
+      {offlineToggle.node}
       <DropToOpenOverlay />
     </div>
   )
