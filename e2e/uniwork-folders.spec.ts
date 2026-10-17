@@ -73,7 +73,7 @@ interface AppContext {
 type ShellWindowApis = {
   aiOffice: {
     uniworkActiveDocStatus(): Promise<DocStatus | null>
-    uniworkDocStatusForPath(filePath: string): Promise<DocStatus | null>
+    uniworkDocStatus(filePath: string): Promise<DocStatus | null>
   }
   uniworkSyncCenter: {
     syncNow(): Promise<void>
@@ -95,7 +95,7 @@ const activeStatus = (shell: Page): Promise<DocStatus | null> =>
 
 const statusOf = (shell: Page, filePath: string): Promise<DocStatus | null> =>
   shell.evaluate(
-    (p) => (window as unknown as ShellWindowApis).aiOffice.uniworkDocStatusForPath(p),
+    (p) => (window as unknown as ShellWindowApis).aiOffice.uniworkDocStatus(p),
     filePath,
   )
 
