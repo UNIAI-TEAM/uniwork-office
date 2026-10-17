@@ -731,7 +731,7 @@ describe('view-only (no save grant)', () => {
     expect(t.mock.calls.some((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toBe(false)
     expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
       ok: false,
-      error: { code: 'forbidden' },
+      error: { code: 'unsupported' },
     })
   })
 })
@@ -1460,7 +1460,7 @@ describe('FRAME-RO-01: capability flags, readOnly profile, and Escape (UNI-1876)
 
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]], 'save')),
-    ).rejects.toThrow(/unsupported|read-only/i)
+    ).rejects.toThrow("View only: you can't save changes to this workbook.")
     expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
       ok: false,
       error: { code: 'unsupported' },
@@ -1487,33 +1487,35 @@ describe('FRAME-RO-01: capability flags, readOnly profile, and Escape (UNI-1876)
 
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 2]], 'save-as')),
-    ).rejects.toThrow(/unsupported/i)
+    ).rejects.toThrow("View only: you can't save changes to this workbook.")
     expect(await t.mock.host.saveAs({ name: 'Copy.xlsx' })).toMatchObject({
       ok: false,
       error: { code: 'unsupported' },
     })
-    expect(await t.desktop.exportCsv({ fileName: 'Budget.csv', content: 'a,b' })).toEqual({
+    expect(
+      await t.desktop.exportCsv({ fileName: 'Budget.csv', content: 'a,b', hasFormulas: false }),
+    ).toEqual({
       canceled: false,
-      error: 'unsupported: saveAs is not granted',
+      error: "View only: you can't save changes to this workbook.",
     })
     expect(t.download).not.toHaveBeenCalled()
     expect(t.mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
   })
 
   it('print and exportPdf capabilities gate host print and desktopApi printWorkbook / exportPdf independently', async () => {
+    const req = { fileName: 'Budget.xlsx', html: '<p>x</p>' } as never
     const noPrint = setup({ grants: { save: true, saveAs: true, print: false, exportPdf: true } })
     await noPrint.boot()
     expect(noPrint.caps.print).toBe(false)
     expect(noPrint.caps.exportPdf).toBe(true)
-    expect(await noPrint.desktop.printWorkbook({ html: '<p>x</p>' })).toEqual({
+    expect(await noPrint.desktop.printWorkbook(req)).toEqual({
       ok: false,
-      error: 'unsupported: print is not granted',
+      error: "View only: you can't save changes to this workbook.",
     })
     expect(await noPrint.mock.host.print({ mode: 'dialog' })).toEqual({ printed: false })
     expect(noPrint.print).not.toHaveBeenCalled()
     const offPdf = noPrint.desktop.onMenuAction((a) => {
-      if (a === 'export-pdf')
-        void noPrint.desktop.exportPdf({ fileName: 'Budget', html: '<p>x</p>' })
+      if (a === 'export-pdf') void noPrint.desktop.exportPdf(req)
     })
     expect(await noPrint.mock.host.print({ mode: 'pdf' })).toEqual({ printed: true })
     offPdf()
@@ -1523,14 +1525,14 @@ describe('FRAME-RO-01: capability flags, readOnly profile, and Escape (UNI-1876)
     await noPdf.boot()
     expect(noPdf.caps.print).toBe(true)
     expect(noPdf.caps.exportPdf).toBe(false)
-    expect(await noPdf.desktop.exportPdf({ fileName: 'Budget', html: '<p>x</p>' })).toEqual({
+    expect(await noPdf.desktop.exportPdf(req)).toEqual({
       canceled: false,
-      error: 'unsupported: exportPdf is not granted',
+      error: "View only: you can't save changes to this workbook.",
     })
     expect(await noPdf.mock.host.print({ mode: 'pdf' })).toEqual({ printed: false })
     expect(noPdf.print).not.toHaveBeenCalled()
     const offPrint = noPdf.desktop.onMenuAction((a) => {
-      if (a === 'print') void noPdf.desktop.printWorkbook({ html: '<p>x</p>' })
+      if (a === 'print') void noPdf.desktop.printWorkbook(req)
     })
     expect(await noPdf.mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
     offPrint()
@@ -1564,10 +1566,10 @@ describe('FRAME-RO-01: capability flags, readOnly profile, and Escape (UNI-1876)
 
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]], 'save')),
-    ).rejects.toThrow(/unsupported|read-only/i)
+    ).rejects.toThrow("View only: you can't save changes to this workbook.")
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]], 'save-as')),
-    ).rejects.toThrow(/unsupported/i)
+    ).rejects.toThrow("View only: you can't save changes to this workbook.")
     expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({
       ok: false,
       error: { code: 'unsupported' },
@@ -1576,17 +1578,20 @@ describe('FRAME-RO-01: capability flags, readOnly profile, and Escape (UNI-1876)
       ok: false,
       error: { code: 'unsupported' },
     })
-    expect(await t.desktop.exportCsv({ fileName: 'Budget.csv', content: 'a,b' })).toEqual({
+    expect(
+      await t.desktop.exportCsv({ fileName: 'Budget.csv', content: 'a,b', hasFormulas: false }),
+    ).toEqual({
       canceled: false,
-      error: 'unsupported: saveAs is not granted',
+      error: "View only: you can't save changes to this workbook.",
     })
     expect(
       t.mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs'),
     ).toHaveLength(0)
 
     // D3: granted print and exportPdf stay available in readOnly profile
-    expect(await t.desktop.printWorkbook({ html: '<p>x</p>' })).toEqual({ ok: true })
-    expect(await t.desktop.exportPdf({ fileName: 'Budget', html: '<p>x</p>' })).toEqual({
+    const req = { fileName: 'Budget.xlsx', html: '<p>x</p>' } as never
+    expect(await t.desktop.printWorkbook(req)).toEqual({ ok: true })
+    expect(await t.desktop.exportPdf(req)).toEqual({
       canceled: false,
       path: 'Budget.pdf (print dialog)',
     })

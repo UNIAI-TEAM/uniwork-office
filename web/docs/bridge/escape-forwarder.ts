@@ -26,13 +26,16 @@ function isInsideLocalEscScope(node: unknown): boolean {
 
 /**
  * Listens for `keydown` `Escape` on `target` in the bubble phase and calls `report('escape')`
- * only when `!event.defaultPrevented` and no element inside `[role="dialog"]`, `[role="menu"]`,
- * `[aria-modal="true"]`, or `[data-esc-local]` holds focus. Returns an uninstall function.
+ * after dispatch (`setTimeout(..., 0)`) only when `!event.defaultPrevented` (including later-registered
+ * window bubble listeners) and no element inside `[role="dialog"]`, `[role="menu"]`,
+ * `[aria-modal="true"]`, or `[data-esc-local]` held focus at keydown time. Returns an uninstall
+ * function that also cancels any pending timer.
  */
 export function installEscapeForwarder(
   target: Window,
   report: (reason: CloseRequestedReason) => void,
 ): () => void {
+  let pendingTimer: ReturnType<typeof setTimeout> | null = null
   const onKeyDown = (event: KeyboardEvent): void => {
     if (
       event.key !== 'Escape' ||
@@ -44,10 +47,18 @@ export function installEscapeForwarder(
       return
     const active = target.document?.activeElement ?? null
     if (isInsideLocalEscScope(active) || isInsideLocalEscScope(event.target)) return
-    report('escape')
+    if (pendingTimer !== null) clearTimeout(pendingTimer)
+    pendingTimer = setTimeout(() => {
+      pendingTimer = null
+      if (!event.defaultPrevented) report('escape')
+    }, 0)
   }
   target.addEventListener('keydown', onKeyDown, false)
   return () => {
     target.removeEventListener('keydown', onKeyDown, false)
+    if (pendingTimer !== null) {
+      clearTimeout(pendingTimer)
+      pendingTimer = null
+    }
   }
 }

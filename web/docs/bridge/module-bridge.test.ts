@@ -217,7 +217,7 @@ describe('FRAME-RO-01: readOnly profile & Escape forwarder in installModuleBridg
     expect(viewerCaps).toEqual({ save: false, readOnlyProfile: false })
   })
 
-  it('installModuleBridge forwards unhandled Escape on target to reportCloseRequested("escape") and skips [data-esc-local]', () => {
+  it('installModuleBridge forwards unhandled Escape on target to reportCloseRequested("escape") and skips [data-esc-local]', async () => {
     const mock = createMockPort()
     installModuleBridge({
       module: 'markdown',
@@ -236,11 +236,13 @@ describe('FRAME-RO-01: readOnly profile & Escape forwarder in installModuleBridg
     btn.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
     )
+    await new Promise((r) => setTimeout(r, 0))
     expect(mock.closeRequested).toEqual([])
 
     document.body.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
     )
+    await new Promise((r) => setTimeout(r, 0))
     expect(mock.closeRequested).toEqual(['escape'])
     local.remove()
   })

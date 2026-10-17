@@ -453,11 +453,9 @@ export function createWebSlidesApi(
       }
     }
     if (channel === 'slides:save-as') {
-      if (!canSaveAs()) return { ok: false, error: 'unsupported: slides:save-as is not granted' }
+      if (!canSaveAs()) return { ok: false, error: text('webReadOnly') }
     } else if (viewOnly() && !READ_ONLY_CHANNELS.has(channel)) {
-      return channel === 'slides:save'
-        ? { ok: false, error: 'unsupported: slides:save is not granted in view-only mode' }
-        : null
+      return channel === 'slides:save' ? { ok: false, error: text('webReadOnly') } : null
     }
     const handler = callSessionHandler as (
       c: SessionChannel,
@@ -1257,7 +1255,7 @@ export function createWebSlidesApi(
     // export / print: in-frame downloads and printing (no directory or path on the web)
     pickExportDir: async () => (canSaveAs() ? 'web-download' : null),
     savePicture: async (op: SavePictureOp): Promise<SavePictureResult> => {
-      if (!canSaveAs()) return { ok: false, error: 'unsupported: saveAs is not granted' }
+      if (!canSaveAs()) return { ok: false, error: text('webReadOnly') }
       const name = withExt(safeFileName(op.defaultName, 'picture'), '.png')
       download(
         name,
@@ -1266,7 +1264,7 @@ export function createWebSlidesApi(
       return { ok: true, path: name }
     },
     exportImages: async (op: ExportImagesOp): Promise<ExportImagesResult> => {
-      if (!canSaveAs()) return { ok: false, error: 'unsupported: saveAs is not granted' }
+      if (!canSaveAs()) return { ok: false, error: text('webReadOnly') }
       try {
         const name = safeFileName(`${op.baseName}-images.zip`, 'slides-images.zip')
         const zip = await zipImages(op.baseName, op.pngsBase64)
@@ -1279,7 +1277,7 @@ export function createWebSlidesApi(
     pickExportPdfPath: async (defaultName) =>
       canExportPdf() ? withExt(safeFileName(defaultName, 'slides'), '.pdf') : null,
     exportPdf: async (op: ExportPdfOp): Promise<ExportPdfResult> => {
-      if (!canExportPdf()) return { ok: false, error: 'unsupported: exportPdf is not granted' }
+      if (!canExportPdf()) return { ok: false, error: text('webReadOnly') }
       try {
         const name = withExt(
           safeFileName(op.filePath.split(/[\\/]/).pop() || 'slides', 'slides'),
@@ -1299,7 +1297,7 @@ export function createWebSlidesApi(
     printSlides: async (op: PrintSlidesOp) => {
       if (!canPrint()) {
         hostPrint?.(false)
-        return { ok: false, error: 'unsupported: print is not granted' }
+        return { ok: false, error: text('webReadOnly') }
       }
       const r = await (opts.print ?? printHtml)(printDocument(op))
       hostPrint?.(r.ok)
@@ -1355,26 +1353,7 @@ export function createWebSlidesApi(
   }
 
   return {
-    slidesApi: slidesApi as SlidesApi & {
-      pickExportDir: (defaultName?: string) => Promise<string | null>
-      exportImages: (
-        op: ExportImagesOp | { baseName: string; pngsBase64: readonly string[]; dir?: string },
-      ) => Promise<ExportImagesResult>
-      exportPdf: (
-        op:
-          | ExportPdfOp
-          | { filePath: string; pngsBase64: readonly string[]; widthPx: number; heightPx: number },
-      ) => Promise<ExportPdfResult>
-      printSlides: (
-        op:
-          | PrintSlidesOp
-          | {
-              pages: ReadonlyArray<{ index: number; pngBase64: string }>
-              widthPx: number
-              heightPx: number
-            },
-      ) => Promise<{ ok: boolean; error?: string }>
-    },
+    slidesApi,
     /** for tests and the e2e driver */
     state,
     host,

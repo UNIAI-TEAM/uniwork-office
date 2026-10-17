@@ -816,7 +816,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       if (isSaveAs) {
         if (fatal) return fail(text('webFatalTitle'))
         if (remote?.locked()) return fail(remote.lockText())
-        if (!canSaveAs()) return fail('unsupported: saveAs is not granted')
+        if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
         if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
       } else {
         const refused = writeRefusal(request?.path)
@@ -995,7 +995,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
     // ---- new files -> downloads (the desktop writes them next to the default folder)
     async extractPages(request) {
-      if (!canSaveAs()) return fail('unsupported: saveAs is not granted')
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path) || !Array.isArray(request.pages)) return fail(NOT_GRANTED)
       try {
         const bytes = await (await core()).extractPagesBytes(doc.bytes.slice(), request.pages)
@@ -1012,7 +1012,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async splitPdf(request) {
-      if (!canSaveAs()) return fail('unsupported: saveAs is not granted')
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
       try {
         const parts = await (
@@ -1033,7 +1033,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async mergePdf(request) {
-      if (!canSaveAs()) return fail('unsupported: saveAs is not granted')
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
       if (!can('insertPages')) return fail(NOT_AVAILABLE)
       const others: Uint8Array[] = []
@@ -1071,7 +1071,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async mergePages(request) {
-      if (!canSaveAs()) return fail('unsupported: saveAs is not granted')
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
       const { perSheet, direction, separator } = request
       if (!Number.isInteger(perSheet) || perSheet < 2 || perSheet > 16) {
@@ -1098,7 +1098,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async splitPages(request) {
-      if (!canSaveAs()) return fail('unsupported: saveAs is not granted')
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
       if (request.perPage !== 2 && request.perPage !== 4 && request.perPage !== 9) {
         return fail('pdf: unsupported split grid')
@@ -1118,7 +1118,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async exportImages(request) {
-      if (!canSaveAs()) return fail('unsupported: saveAs is not granted')
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       const { images, pageNumbers, baseName } = request ?? {}
       if (!Array.isArray(images) || images.length === 0) return fail('pdf: no images')
       try {

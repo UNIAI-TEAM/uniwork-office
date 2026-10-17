@@ -883,7 +883,7 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
 
     expect(await s.api.save(req(path, { targetPath: 'uniwork://save-as/Copy.pdf' }))).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'this document is view-only',
     })
     expect(await s.mock.host.saveAs({ name: 'Copy' })).toMatchObject({
       ok: false,
@@ -891,15 +891,15 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     })
     expect(await s.api.extractPages({ path, pages: [0], suggestedName: 'Report-p1.pdf' })).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'this document is view-only',
     })
     expect(await s.api.splitPdf({ path, chunkSize: 1, baseName: 'Report' })).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'this document is view-only',
     })
     expect(await s.api.mergePdf({ path, suggestedName: 'Report-merged.pdf' })).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'this document is view-only',
     })
     expect(
       await s.api.mergePages({
@@ -911,19 +911,19 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       }),
     ).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'this document is view-only',
     })
     expect(await s.api.splitPages({ path, perPage: 2, suggestedName: 'Report-split.pdf' })).toEqual(
       {
         ok: false,
-        error: 'unsupported: saveAs is not granted',
+        error: 'this document is view-only',
       },
     )
     expect(
       await s.api.exportImages({ images: [btoa('png')], pageNumbers: [1], baseName: 'Report' }),
     ).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'this document is view-only',
     })
     expect(s.downloads).toHaveLength(0)
     expect(s.mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
@@ -997,7 +997,7 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     expect((await api.save(req(path))).ok).toBe(false)
     expect(await api.save(req(path, { targetPath: 'uniwork://save-as/Copy.pdf' }))).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'this document is view-only',
     })
     expect(await mock.host.save({ reason: 'user' })).toMatchObject({
       ok: false,
@@ -1010,7 +1010,7 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     expect((await api.insertBlankPage({ path, afterPageIndex: 0 })).ok).toBe(false)
     expect(await api.extractPages({ path, pages: [0], suggestedName: 'Report-p1.pdf' })).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'this document is view-only',
     })
     expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toHaveLength(
       0,

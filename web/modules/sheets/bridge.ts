@@ -603,10 +603,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (refusedError) return { ok: false, error: refusedError }
     const locked = lockedSave()
     if (locked) return locked
-    if (!canSave()) {
-      const code = readOnlyProfile || capabilities.saveAs === true ? 'unsupported' : 'forbidden'
-      return { ok: false, error: { code, message: 'view-only' } }
-    }
+    if (!canSave()) return { ok: false, error: { code: 'unsupported', message: 'view-only' } }
     if (!current) return { ok: false, error: { code: 'not_ready', message: 'no workbook is open' } }
     if (hostSave)
       return { ok: false, error: { code: 'busy', message: 'a save is already running' } }
@@ -961,11 +958,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
           ok: false,
           error: { code: 'unsupported', message: 'save-as not granted' },
         })
-        throw new Error(
-          isSaveAs
-            ? 'unsupported: saveAs is not granted'
-            : `unsupported: ${text('appWebViewOnly')}`,
-        )
+        throw new Error(text('appWebViewOnly'))
       }
       const request = resolveTransfer(input)
       const session = sessions.get(request.sessionId)
@@ -1065,13 +1058,11 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     autoRenameWorkbook: async (_sessionId: string, _baseName: string) => ({ renamed: false }),
 
     // ---- export / print ----------------------------------------------------
-    async exportPdf(
-      request: Partial<Parameters<DesktopApi['exportPdf']>[0]> & { fileName: string; html: string },
-    ) {
+    async exportPdf(request: Parameters<DesktopApi['exportPdf']>[0]) {
       if (!canExportPdf()) {
         return {
           canceled: false as const,
-          error: 'unsupported: exportPdf is not granted',
+          error: text('appWebViewOnly'),
         } as unknown as WorkbookExportPdfResult
       }
       const r = await print(request.html)
@@ -1079,27 +1070,20 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         ? { canceled: false as const, path: `${withExt(request.fileName, '.pdf')} (print dialog)` }
         : { canceled: true as const }
     },
-    async printWorkbook(
-      request: Partial<Parameters<DesktopApi['printWorkbook']>[0]> & { html: string },
-    ) {
+    async printWorkbook(request: Parameters<DesktopApi['printWorkbook']>[0]) {
       if (!canPrint()) {
-        return { ok: false as const, error: 'unsupported: print is not granted' }
+        return { ok: false as const, error: text('appWebViewOnly') }
       }
       const r = await print(request.html)
       return r.ok
         ? { ok: true as const }
         : { ok: false as const, ...(r.error ? { error: r.error } : {}) }
     },
-    async exportCsv(
-      request: Partial<Parameters<DesktopApi['exportCsv']>[0]> & {
-        fileName: string
-        content: string
-      },
-    ) {
+    async exportCsv(request: Parameters<DesktopApi['exportCsv']>[0]) {
       if (!canSaveAs()) {
         return {
           canceled: false as const,
-          error: 'unsupported: saveAs is not granted',
+          error: text('appWebViewOnly'),
         } as unknown as WorkbookExportCsvResult
       }
       const name = withExt(request.fileName, '.csv')

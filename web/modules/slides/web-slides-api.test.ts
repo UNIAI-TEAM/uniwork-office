@@ -1123,7 +1123,7 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     expect(await api.uniworkState()).toEqual({ bound: false, readOnly: true })
     expect(await api.save()).toEqual({
       ok: false,
-      error: 'unsupported: slides:save is not granted in view-only mode',
+      error: 'This presentation is read-only.',
     })
     expect(await mock.host.save({ reason: 'user' })).toMatchObject({
       ok: false,
@@ -1163,20 +1163,26 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
 
     expect(await api.saveAs('Copy.pptx')).toEqual({
       ok: false,
-      error: 'unsupported: slides:save-as is not granted',
+      error: 'This presentation is read-only.',
     })
     expect(await mock.host.saveAs({ name: 'Copy.pptx' })).toMatchObject({
       ok: false,
       error: { code: 'unsupported' },
     })
-    expect(await api.pickExportDir('deck')).toBeNull()
+    expect(await api.pickExportDir()).toBeNull()
     expect(await api.savePicture({ defaultName: 'slide-1', pngBase64: btoa('png') })).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'This presentation is read-only.',
     })
-    expect(await api.exportImages({ baseName: 'deck', pngsBase64: [btoa('png')] })).toEqual({
+    expect(
+      await api.exportImages({
+        dir: 'web-download',
+        baseName: 'deck',
+        pngsBase64: [btoa('png')],
+      }),
+    ).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'This presentation is read-only.',
     })
     expect(downloads).toHaveLength(0)
     expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
@@ -1197,11 +1203,11 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     await noPrint.api.consumePendingOpen(FIT)
     expect(
       await noPrint.api.printSlides({
-        pages: [{ index: 1, pngBase64: btoa('p') }],
+        pngsBase64: [btoa('p')],
         widthPx: 960,
         heightPx: 540,
       }),
-    ).toEqual({ ok: false, error: 'unsupported: print is not granted' })
+    ).toEqual({ ok: false, error: 'This presentation is read-only.' })
     expect(await noPrint.mock.host.print({ mode: 'dialog' })).toEqual({ printed: false })
     expect(printFn).not.toHaveBeenCalled()
 
@@ -1220,11 +1226,11 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     expect(
       await noPdf.api.exportPdf({
         filePath: 'deck.pptx',
-        pngsBase64: [btoa('p')],
+        pages: [{ png: btoa('p') }],
         widthPx: 960,
         heightPx: 540,
       }),
-    ).toEqual({ ok: false, error: 'unsupported: exportPdf is not granted' })
+    ).toEqual({ ok: false, error: 'This presentation is read-only.' })
     expect(await noPdf.mock.host.print({ mode: 'pdf' })).toEqual({ printed: false })
     expect(noPdf.downloads).toHaveLength(0)
     const offPrint = noPdf.api.onMenuCommand((cmd) => {
@@ -1285,11 +1291,11 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
 
     expect(await web.slidesApi.save()).toEqual({
       ok: false,
-      error: 'unsupported: slides:save is not granted in view-only mode',
+      error: 'This presentation is read-only.',
     })
     expect(await web.slidesApi.saveAs('Copy.pptx')).toEqual({
       ok: false,
-      error: 'unsupported: slides:save-as is not granted',
+      error: 'This presentation is read-only.',
     })
     expect(await mock.host.save({ reason: 'user' })).toMatchObject({
       ok: false,
@@ -1302,7 +1308,7 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     expect(await web.slidesApi.addComment({ slideIndex: 0, text: 'nope' })).toBeNull()
     expect(await web.slidesApi.savePicture({ defaultName: 's1', pngBase64: btoa('p') })).toEqual({
       ok: false,
-      error: 'unsupported: saveAs is not granted',
+      error: 'This presentation is read-only.',
     })
     expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toHaveLength(
       0,
@@ -1311,7 +1317,7 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     // D3: granted print stays available in readOnly profile
     expect(
       await web.slidesApi.printSlides({
-        pages: [{ index: 1, pngBase64: btoa('p') }],
+        pngsBase64: [btoa('p')],
         widthPx: 960,
         heightPx: 540,
       }),
