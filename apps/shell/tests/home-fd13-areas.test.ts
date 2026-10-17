@@ -93,11 +93,14 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
   beforeEach(() => {
     localStorage.clear()
     document.documentElement.lang = 'en'
-    ;(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = class {
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-    }
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe() {}
+        disconnect() {}
+        unobserve() {}
+      },
+    )
 
     accountStatus = {
       state: 'signed-in',
@@ -258,6 +261,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       root.unmount()
     })
     host.remove()
+    vi.unstubAllGlobals()
   })
 
   async function flush(ticks = 4) {
@@ -399,7 +403,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(main!.textContent).toContain('Sign in to UniWork')
   })
 
-  it('renders a neutral loading skeleton in the UniWork area while accountStatus is loading and does not reset workspace state (FE13-R1-4)', async () => {
+  it('renders a neutral loading skeleton in the UniWork area while accountStatus is loading, does not call uniworkListWorkspaces, and does not reset workspace state (FE13-R1-4, FE13-R2-4, FE13-R3-5)', async () => {
     wbStoreSetRaw('uniwork.wb.homeArea', 'uniwork')
     wbStoreSetRaw('uniwork.wb.activeWorkspace', 'ws-2')
     let resolveStatus!: (s: AccountStatus) => void
@@ -409,21 +413,52 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     api.accountStatus = vi.fn(() => deferredStatus)
     api.accountGetStatus = vi.fn(() => deferredStatus)
 
-    await mountHome()
+    const activeWsMod = await import('../src/renderer/src/active-workspace')
+    const afterSpy = vi.spyOn(activeWsMod, 'afterWorkspaceList')
+    const accountMod = await import('../src/renderer/src/account-model')
 
-    const main = host.querySelector('main.content')
-    expect(main).not.toBeNull()
-    expect(main!.querySelector('.wb-work-skeleton')).not.toBeNull()
-    expect(main!.textContent).not.toContain('Sign in to UniWork')
-    expect(wbStoreGetRaw('uniwork.wb.activeWorkspace')).toBe('ws-2')
+    try {
+      await mountHome()
 
-    await act(async () => {
-      resolveStatus(accountStatus)
-    })
-    await flush()
+      const main = host.querySelector('main.content')
+      expect(main).not.toBeNull()
+      expect(main!.querySelector('.wb-work-skeleton')).not.toBeNull()
+      expect(main!.textContent).not.toContain('Sign in to UniWork')
+      expect(api.uniworkListWorkspaces).not.toHaveBeenCalled()
+      expect(wbStoreGetRaw('uniwork.wb.activeWorkspace')).toBe('ws-2')
 
-    expect(main!.querySelector('.wb-work-skeleton')).toBeNull()
-    expect(host.textContent).toContain('Marketing Plan.docx')
+      // Even if showsProfile returned true while acctView === 'loading', the acctView === 'loading' guard prevents calling uniworkListWorkspaces
+      const showsProfileSpy = vi
+        .spyOn(accountMod, 'showsProfile')
+        .mockImplementation(
+          (view, s) => view === 'loading' || view === 'signed-in' || !!s?.loggedIn,
+        )
+      try {
+        const docsPill = Array.from(host.querySelectorAll<HTMLButtonElement>('.filter-pill'))[0]
+        docsPill?.click()
+        await flush()
+        expect(api.uniworkListWorkspaces).not.toHaveBeenCalled()
+      } finally {
+        showsProfileSpy.mockRestore()
+      }
+
+      await act(async () => {
+        resolveStatus(accountStatus)
+      })
+      await flush()
+
+      expect(api.uniworkListWorkspaces).toHaveBeenCalledTimes(1)
+      // Verify uwWsState (passed as prev to afterWorkspaceList) was NOT reset to { workspaceId: null } while acctView === 'loading'
+      expect(afterSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: 'ws-2' }),
+        expect.anything(),
+        'ws-2',
+      )
+      expect(main!.querySelector('.wb-work-skeleton')).toBeNull()
+      expect(host.textContent).toContain('Marketing Plan.docx')
+    } finally {
+      afterSpy.mockRestore()
+    }
   })
 
   it('isolates sources per area (no mixing), shows accurate per-area counts, and keeps the open UniWork folder across area switches (FE13-R1-1, FE13-R1-6)', async () => {
@@ -527,7 +562,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(localFolderRowAfter?.getAttribute('aria-selected')).toBe('true')
   })
 
-  it('keeps paging when page 1 has only UniWork rows so the device area shows page-2 device rows and Load more, never the empty state, and stops auto-paging on a short/empty page (FE13-R1-1, FE13-R2-3)', async () => {
+  it('keeps paging when page 1 has only UniWork rows so the device area shows page-2 device rows and Load more, never the empty state, stops auto-paging on a short/empty page, drains remaining pages when fileSort === "oldest", and passes group on starred Load more (FE13-R1-1, FE13-R2-3, FE13-R3-5, FE13-R3-8)', async () => {
     const page1Uw = [
       makeEntry('/cache/uw-1.docx', 'UW Page1 A.docx', {
         documentId: 'uw-1',
@@ -547,14 +582,17 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     const page3Dev = [makeEntry('/Users/linh/Documents/Device Page3 C.docx', 'Device Page3 C.docx')]
 
     let intersectCb: ((records: Array<{ isIntersecting: boolean }>) => void) | null = null
-    ;(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = class {
-      constructor(cb: (records: Array<{ isIntersecting: boolean }>) => void) {
-        intersectCb = cb
-      }
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-    }
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(cb: (records: Array<{ isIntersecting: boolean }>) => void) {
+          intersectCb = cb
+        }
+        observe() {}
+        disconnect() {}
+        unobserve() {}
+      },
+    )
 
     api.recents = vi.fn(async ({ offset = 0 }: { offset?: number }) => {
       if (offset === 0) return { entries: page1Uw, total: 5 }
@@ -607,9 +645,13 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     const shortPage2: RecentEntry[] = [
       makeEntry('/Users/linh/Documents/Device Short 2.docx', 'Device Short 2.docx'),
     ]
+    const tailPage3: RecentEntry[] = [
+      makeEntry('/Users/linh/Documents/Device Oldest Tail 3.docx', 'Device Oldest Tail 3.docx'),
+    ]
     api.recents = vi.fn(async ({ offset = 0 }: { offset?: number }) => {
-      if (offset === 0) return { entries: fullPage1, total: 500 }
-      return { entries: shortPage2, total: 500 }
+      if (offset === 0) return { entries: fullPage1, total: 202 }
+      if (offset === 200) return { entries: shortPage2, total: 202 }
+      return { entries: tailPage3, total: 202 }
     })
     const docsPill = Array.from(host.querySelectorAll<HTMLButtonElement>('.filter-pill')).find(
       (btn) => btn.textContent === 'Docs',
@@ -624,6 +666,47 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(api.recents).toHaveBeenNthCalledWith(2, expect.objectContaining({ offset: 200 }))
     expect(host.textContent).toContain('Device Full 1.docx')
     expect(host.textContent).toContain('Device Short 2.docx')
+    expect(host.textContent).not.toContain('Device Oldest Tail 3.docx')
+
+    // (c) FE13-R3-5: switching fileSort to 'oldest' over a partially loaded list (201 < 202) drains the remaining page(s)
+    const sortBtn = host.querySelector<HTMLButtonElement>('.cloud-col-sort-btn')
+    expect(sortBtn).not.toBeNull()
+    await act(async () => {
+      sortBtn!.click()
+    })
+    await flush()
+    const oldestItem = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('.cloud-sort-menu [role="menuitemradio"]'),
+    ).find((btn) => btn.textContent?.includes('Oldest'))
+    expect(oldestItem).toBeDefined()
+    await act(async () => {
+      oldestItem!.click()
+    })
+    await flush()
+
+    expect(api.recents).toHaveBeenCalledTimes(3)
+    expect(api.recents).toHaveBeenNthCalledWith(3, expect.objectContaining({ offset: 201 }))
+    const rowNames = Array.from(host.querySelectorAll('.recent-list .recent-name')).map(
+      (el) => el.textContent,
+    )
+    expect(rowNames).toEqual([
+      'Device Oldest Tail 3.docx',
+      'Device Short 2.docx',
+      'Device Full 1.docx',
+    ])
+
+    // Switch sort back to 'recent' before testing empty-page stop
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.cloud-col-sort-btn')!.click()
+    })
+    await flush()
+    const recentSortItem = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('.cloud-sort-menu [role="menuitemradio"]'),
+    ).find((btn) => !btn.textContent?.includes('Oldest'))!
+    await act(async () => {
+      recentSortItem.click()
+    })
+    await flush()
 
     // (b) when the backend returns an empty page (entries: []) while total > entries.length,
     //     loadMore clamps listTotal to entries.length and auto-paging stops without looping endlessly.
@@ -644,6 +727,57 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(api.recents).toHaveBeenNthCalledWith(2, expect.objectContaining({ offset: 2 }))
     expect(host.querySelector('.load-more')).toBeNull()
     expect(host.textContent).toContain('No recent files — create or open a file to get started.')
+
+    // (d) FE13-R3-5: in Starred view with an active groupFilter, Load more passes the group param to api.starred
+    api.starredGroups = vi.fn(async () => ['Finance'])
+    api.starred = vi.fn(async ({ offset = 0 }: { offset?: number; group?: string }) => {
+      if (offset === 0) {
+        return {
+          entries: [makeEntry('/Users/linh/Documents/Starred Page1.docx', 'Starred Page1.docx')],
+          total: 2,
+        }
+      }
+      return {
+        entries: [makeEntry('/Users/linh/Documents/Starred Page2.docx', 'Starred Page2.docx')],
+        total: 2,
+      }
+    })
+    const starredNavBtn = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('.home-area-nav .nav-item'),
+    )[1]!
+    await act(async () => {
+      starredNavBtn.click()
+    })
+    await flush()
+
+    const financePill = Array.from(host.querySelectorAll<HTMLButtonElement>('.filter-pill')).find(
+      (btn) => btn.textContent === 'Finance',
+    )
+    expect(financePill).toBeDefined()
+    api.starred.mockClear()
+    await act(async () => {
+      financePill!.click()
+    })
+    await flush()
+
+    expect(api.starred).toHaveBeenCalledTimes(1)
+    expect(api.starred).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ offset: 0, group: 'Finance' }),
+    )
+    expect(host.querySelector('.load-more')).not.toBeNull()
+
+    await act(async () => {
+      intersectCb!([{ isIntersecting: true }])
+    })
+    await flush()
+
+    expect(api.starred).toHaveBeenCalledTimes(2)
+    expect(api.starred).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ offset: 1, group: 'Finance' }),
+    )
+    expect(host.textContent).toContain('Starred Page2.docx')
   })
 
   it('keys the UniWork pane by workspaceId so switching workspaces resets folder and drops pending ws-1 tree, children, and search replies at the Home boundary (FE13-R1-6, FE13-R2-4)', async () => {
@@ -797,7 +931,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.textContent).not.toContain('Stale WS1 Search Hit.docx')
   })
 
-  it('renders the device add-folder CTA only when filter === "all" and all device roots are unreadable or missing, without flashing emptyRecent while root listings load (FE13-R1-9, V13-4, FE13-R2-1)', async () => {
+  it('renders the device add-folder CTA only when filter === "all" and all device roots are unreadable or missing, without flashing emptyRecent while folderRoots or root listings load (FE13-R1-9, V13-4, FE13-R2-1, FE13-R3-4)', async () => {
     // Case 1: roots = [default folder missing on disk] and no device recents (only a UniWork recent)
     recentEntries = [
       makeEntry('/cache/cloud-spec.docx', 'Cloud Spec.docx', {
@@ -936,14 +1070,70 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     await flush()
     expect(host.querySelector('main.content .folder-empty-state')).not.toBeNull()
     expect(host.textContent).toContain('No folders on this device yet.')
+
+    // Case 6 (FE13-R3-4): !rootsLoaded spinner branch (deferred folderRoots -> spinner, never emptyRecent or CTA)
+    await act(async () => {
+      root.unmount()
+    })
+    let resolveFolderRoots!: (roots: FolderRoot[]) => void
+    api.folderRoots = vi.fn(
+      () =>
+        new Promise((r) => {
+          resolveFolderRoots = r
+        }),
+    )
+    api.listFolder = vi.fn(async (dir: string) => ({
+      dir,
+      folders: [],
+      files: [],
+    }))
+    root = createRoot(host)
+    await mountHome()
+
+    expect(host.querySelector('.load-more-spinner')).not.toBeNull()
+    expect(host.querySelector('.folder-empty-state')).toBeNull()
+    expect(host.textContent).not.toContain(
+      'No recent files — create or open a file to get started.',
+    )
+
+    await act(async () => {
+      resolveFolderRoots([
+        {
+          path: '/Users/linh/Documents',
+          name: 'Documents',
+          readable: true,
+          usable: true,
+          removable: false,
+        },
+      ])
+    })
+    await flush()
+    expect(host.querySelector('.load-more-spinner')).toBeNull()
+    expect(host.querySelector('.folder-empty-state')).toBeNull()
+    expect(host.textContent).toContain('No recent files — create or open a file to get started.')
+
+    // Case 7 (FE13-R3-4): listFolder reject -> marks root listing missing and renders .folder-empty-state CTA
+    await act(async () => {
+      root.unmount()
+    })
+    api.folderRoots = vi.fn(async () => folderRoots)
+    api.listFolder = vi.fn(async () => {
+      throw new Error('fs read failed')
+    })
+    root = createRoot(host)
+    await mountHome()
+
+    expect(host.querySelector('.load-more-spinner')).toBeNull()
+    expect(host.querySelector('main.content .folder-empty-state')).not.toBeNull()
+    expect(host.textContent).toContain('No folders on this device yet.')
   })
 
-  it('recovers from rejected recents/starred promises in reload and loadMore with seq guards so spinners do not wedge (FE13-R2-2)', async () => {
+  it('recovers from rejected recents/starred promises in reload and loadMore with seq guards, preserves visible entries on a rejected soft (keepCount) reload while showing empty state on a rejected page-one reload, and keeps the other view count on stale secondary rejection (FE13-R2-2, FE13-R3-2, FE13-R3-6, FE13-R3-8)', async () => {
     wbStoreSetRaw('uniwork.wb.homeArea', 'device')
     await mountHome()
 
-    // Sub-case 1: stale reload rejection is ignored when a newer reload succeeds, and a fresh reload rejection
-    // transitions listLoaded/otherLoaded to true so the spinner clears
+    // Sub-case 1: stale reload rejection is ignored when a newer reload succeeds (both primary and secondary),
+    // and a fresh page-one reload rejection transitions listLoaded/otherLoaded to true and shows the empty state
     let rejectStaleRecents!: (err: Error) => void
     let rejectStaleStarred!: (err: Error) => void
     let callIdx = 0
@@ -971,7 +1161,13 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
         })
       }
       if (starredCallIdx === 2) {
-        return Promise.resolve({ entries: [], total: 0 })
+        return Promise.resolve({
+          entries: [
+            makeEntry('/Users/linh/Documents/Starred1.docx', 'Starred1.docx'),
+            makeEntry('/Users/linh/Documents/Starred2.docx', 'Starred2.docx'),
+          ],
+          total: 2,
+        })
       }
       return Promise.reject(new Error('starred ipc failed'))
     })
@@ -992,27 +1188,45 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     })
     await flush()
 
-    // Reload #2 (Sheets): succeeds with Recovered.docx
+    // Reload #2 (Sheets): succeeds with Recovered.docx and 2 starred device entries
     await act(async () => {
       sheetsPill.click()
     })
     await flush()
     expect(host.textContent).toContain('Recovered.docx')
+    const starredNavCountBefore = Array.from(
+      host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item'),
+    )[1]?.querySelector('.nav-count')?.textContent
+    expect(starredNavCountBefore).toBe('2')
 
-    // Reject stale Reload #1 -> must NOT clobber Reload #2's entries
+    // Reject stale Reload #1 -> must NOT clobber Reload #2's primary entries OR secondary starred count (FE13-R3-6)
     await act(async () => {
       rejectStaleRecents(new Error('stale recents rejection'))
       rejectStaleStarred(new Error('stale starred rejection'))
     })
     await flush()
     expect(host.textContent).toContain('Recovered.docx')
+    const starredNavCountAfter = Array.from(
+      host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item'),
+    )[1]?.querySelector('.nav-count')?.textContent
+    expect(starredNavCountAfter).toBe('2')
 
-    // Reload #3 (All): both recents() and starred() reject -> spinner clears and empty state renders
+    // FE13-R3-2: a soft (keepCount) reload (e.g. window focus / refresh) that rejects keeps the visible entries (only marks loaded)
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await flush()
+    expect(host.textContent).toContain('Recovered.docx')
+    expect(host.querySelector('.load-more-spinner')).toBeNull()
+    expect(host.querySelector('.empty')).toBeNull()
+
+    // FE13-R3-2: a page-one reload (e.g. filter change to All) that rejects clears the entries and shows the empty state
     await act(async () => {
       allPill.click()
     })
     await flush()
     expect(host.querySelector('.load-more-spinner')).toBeNull()
+    expect(host.textContent).not.toContain('Recovered.docx')
     expect(host.textContent).toContain('No recent files — create or open a file to get started.')
 
     // Sub-case 2: loadMore rejection resets loadingMore and clamps listTotal so the sentinel stops spinning
@@ -1020,14 +1234,17 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       root.unmount()
     })
     let intersectCb: ((records: Array<{ isIntersecting: boolean }>) => void) | null = null
-    ;(globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = class {
-      constructor(cb: (records: Array<{ isIntersecting: boolean }>) => void) {
-        intersectCb = cb
-      }
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-    }
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(cb: (records: Array<{ isIntersecting: boolean }>) => void) {
+          intersectCb = cb
+        }
+        observe() {}
+        disconnect() {}
+        unobserve() {}
+      },
+    )
     api.recents = vi.fn(async ({ offset = 0 }: { offset?: number }) => {
       if (offset === 0) {
         return {
@@ -1055,22 +1272,31 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.querySelector('.load-more')).toBeNull()
   })
 
-  it('does not re-list already-cached folder roots when roots refreshes without invalidation (FE13-R2-7)', async () => {
+  it('does not re-list already-cached folder roots when roots refreshes without invalidation, but re-lists roots whose listing rejected or was missing (FE13-R2-7, FE13-R3-1)', async () => {
     wbStoreSetRaw('uniwork.wb.homeArea', 'device')
+    recentEntries = []
     folderRoots = [
       {
         path: '/Users/linh/Documents',
         name: 'Documents',
         readable: true,
-        usable: true,
+        usable: false,
         removable: false,
       },
     ]
-    api.listFolder = vi.fn(async (dir: string) => ({
-      dir,
-      folders: [],
-      files: [],
-    }))
+    let docsShouldReject = true
+    api.listFolder = vi.fn(async (dir: string) => {
+      if (dir === '/Users/linh/Documents' && docsShouldReject) {
+        throw new Error('transient listFolder error')
+      }
+      return {
+        dir,
+        folders: [
+          { path: `${dir}/Sub`, name: 'Sub', mtimeMs: 1_700_000_000_000, hasSubfolders: false },
+        ],
+        files: [],
+      }
+    })
     api.addFolderRoot = vi.fn(async () => {
       folderRoots = [
         ...folderRoots,
@@ -1087,12 +1313,39 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
 
     await mountHome()
 
-    const docsCallsBefore = api.listFolder.mock.calls.filter(
+    // Step 1 (FE13-R3-1): listFolder rejects once -> CTA shows
+    expect(api.listFolder.mock.calls.filter((c) => c[0] === '/Users/linh/Documents').length).toBe(1)
+    expect(host.querySelector('main.content .folder-empty-state')).not.toBeNull()
+
+    // Step 2 (FE13-R3-1): next listFolder succeeds; re-picking the same default folder via pickDefaultSaveDir
+    // calls loadRoot() (a roots refresh without refresh()'s invalidateFolders) and re-lists the missing/errored root
+    docsShouldReject = false
+    folderRoots = [
+      {
+        path: '/Users/linh/Documents',
+        name: 'Documents',
+        readable: true,
+        usable: true,
+        removable: false,
+      },
+    ]
+    const pickBtn = host.querySelector<HTMLButtonElement>('.folder-unusable button')
+    expect(pickBtn).not.toBeNull()
+    await act(async () => {
+      pickBtn!.click()
+    })
+    await flush()
+
+    expect(api.listFolder.mock.calls.filter((c) => c[0] === '/Users/linh/Documents').length).toBe(2)
+    expect(host.querySelector('main.content .folder-empty-state')).toBeNull()
+    expect(host.querySelector('.folder-panel [role="tree"]')?.textContent).toContain('Sub')
+    expect(host.textContent).toContain('No recent files — create or open a file to get started.')
+
+    // Step 3 (FE13-R2-7): now that /Users/linh/Documents is cached and not missing, adding a second root refreshes roots
+    // without re-listing /Users/linh/Documents
+    const docsCallsBeforeAdd = api.listFolder.mock.calls.filter(
       (c) => c[0] === '/Users/linh/Documents',
     ).length
-    expect(docsCallsBefore).toBe(1)
-
-    // Add a second root -> triggers loadRoot() -> roots refreshes without invalidating /Users/linh/Documents
     const addRootBtn = host.querySelector<HTMLButtonElement>('.folder-panel .folder-add-root-btn')
     expect(addRootBtn).not.toBeNull()
     await act(async () => {
@@ -1100,14 +1353,72 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     })
     await flush()
 
-    const docsCallsAfter = api.listFolder.mock.calls.filter(
+    const docsCallsAfterAdd = api.listFolder.mock.calls.filter(
       (c) => c[0] === '/Users/linh/Documents',
     ).length
-    const desktopCallsAfter = api.listFolder.mock.calls.filter(
+    const desktopCallsAfterAdd = api.listFolder.mock.calls.filter(
       (c) => c[0] === '/Users/linh/Desktop',
     ).length
-    expect(docsCallsAfter).toBe(1)
-    expect(desktopCallsAfter).toBe(1)
+    expect(docsCallsAfterAdd).toBe(docsCallsBeforeAdd)
+    expect(desktopCallsAfterAdd).toBe(1)
+  })
+
+  it('catches folderRoots rejections in loadRoot, keeps previous roots without unhandled rejection, and settles rootsLoaded (FE13-R3-3)', async () => {
+    wbStoreSetRaw('uniwork.wb.homeArea', 'device')
+    recentEntries = []
+    folderRoots = [
+      {
+        path: '/Users/linh/Documents',
+        name: 'Documents',
+        readable: true,
+        usable: true,
+        removable: false,
+      },
+    ]
+    api.listFolder = vi.fn(async (dir: string) => ({
+      dir,
+      folders: [],
+      files: [],
+    }))
+
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason)
+    }
+    process.on('unhandledRejection', onUnhandled)
+
+    try {
+      await mountHome()
+      expect(host.querySelector('.folder-panel [role="treeitem"]')?.textContent).toContain(
+        'Documents',
+      )
+      expect(host.querySelector('.folder-empty-state')).toBeNull()
+
+      // Now make folderRoots reject on a subsequent loadRoot (triggered by window focus) -> previous roots stay intact, no CTA, no unhandledRejection
+      api.folderRoots = vi.fn(() => Promise.reject(new Error('folderRoots ipc failed')))
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      await flush()
+
+      expect(host.querySelector('.folder-panel [role="treeitem"]')?.textContent).toContain(
+        'Documents',
+      )
+      expect(host.querySelector('.folder-empty-state')).toBeNull()
+
+      // Also verify initial mount when folderRoots rejects -> rootsLoaded still settles (spinner clears) and no unhandledRejection fires
+      await act(async () => {
+        root.unmount()
+      })
+      root = createRoot(host)
+      await mountHome()
+
+      expect(host.querySelector('.load-more-spinner')).toBeNull()
+      expect(host.querySelector('main.content .folder-empty-state')).not.toBeNull()
+      expect(unhandled).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
   })
 
   it('catches openUniworkDocFromPane rejections, publishes open-failure feedback, and resets openingDocId (FE13-R1-11)', async () => {

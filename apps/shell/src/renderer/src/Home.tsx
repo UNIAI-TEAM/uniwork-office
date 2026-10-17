@@ -365,7 +365,6 @@ function useFolderListings() {
         })
       })
       .catch(() => {
-        cached.current.add(dir)
         setListings((prev) => {
           const next = new Map(prev)
           next.set(dir, { dir, folders: [], files: [], missing: true })
@@ -1624,6 +1623,7 @@ export function Home() {
           return next
         })
       })
+      .catch(() => {})
       .finally(() => {
         setRootsLoaded(true)
       })
@@ -1635,11 +1635,17 @@ export function Home() {
     if (root?.usable) writeTreeState({ expanded: [...expanded], root: root.path })
   }, [expanded, root])
 
+  const listingsRef = useRef(listings)
+  listingsRef.current = listings
+
   useEffect(() => {
     for (const r of roots) {
-      if (r.readable && !listings.has(r.path)) loadFolder(r.path)
+      if (!r.readable) continue
+      const cur = listingsRef.current.get(r.path)
+      if (!cur) loadFolder(r.path)
+      else if (cur.missing) loadFolder(r.path, true)
     }
-  }, [roots, listings, loadFolder])
+  }, [roots, loadFolder])
 
   useEffect(() => {
     if (!root?.usable) return
@@ -1706,9 +1712,11 @@ export function Home() {
       })
       .catch(() => {
         if (seq !== requestSeq.current) return
-        setEntries([])
-        setListTotal(0)
-        setLastPageLen(0)
+        if (!keepCount) {
+          setEntries([])
+          setListTotal(0)
+          setLastPageLen(0)
+        }
         setListLoaded(true)
       })
     // The other view fetches its page under the same active filter so splitEntriesByArea can count per area.
@@ -1721,8 +1729,10 @@ export function Home() {
       })
       .catch(() => {
         if (seq !== requestSeq.current) return
-        setOtherEntries([])
-        setOtherTotal(0)
+        if (!keepCount) {
+          setOtherEntries([])
+          setOtherTotal(0)
+        }
         setOtherLoaded(true)
       })
     if (projectMode) {
