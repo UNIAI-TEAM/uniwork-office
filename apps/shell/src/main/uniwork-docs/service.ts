@@ -5985,11 +5985,19 @@ export class UniworkDocsService {
       detail = await this.api().getDocument(documentId)
     } catch (error) {
       // G5-05u (B5): with no network a pinned document opens its verified cached
-      // copy, read-only - the offline edit hold is G5-08d (UNI-1645)
-      const copy: OfflineCopyOpen =
-        (await this.deps.openOfflineCopy?.(documentId).catch(() => null as OfflineCopyOpen)) ?? null
-      if (copy?.kind === 'opened') return { path: copy.path, title: copy.title }
-      if (copy?.kind === 'locked') this.recordOfflineLock(copy)
+      // copy, read-only - the offline edit hold is G5-08d (UNI-1645). Only the
+      // network/timeout class falls back (BE-R1-4): 401/403/404/410 are the
+      // server's own verdict about this document (a revoke, a delete), and a
+      // stale ready copy must never reopen over them.
+      const offline =
+        error instanceof UniworkDocError && (error.code === 'network' || error.code === 'timeout')
+      if (offline) {
+        const copy: OfflineCopyOpen =
+          (await this.deps.openOfflineCopy?.(documentId).catch(() => null as OfflineCopyOpen)) ??
+          null
+        if (copy?.kind === 'opened') return { path: copy.path, title: copy.title }
+        if (copy?.kind === 'locked') this.recordOfflineLock(copy)
+      }
       throw error
     }
     const format =
