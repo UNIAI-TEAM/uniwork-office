@@ -1,4 +1,4 @@
-import type { UniworkDocErrorCode } from '../../shared/home-api'
+import type { UniworkDocEditLock, UniworkDocErrorCode } from '../../shared/home-api'
 import { isDecimalString } from './formats'
 
 /**
@@ -34,6 +34,10 @@ export class UniworkDocError extends Error {
    */
   readonly documentId?: string
   readonly documentTitle?: string
+  /** EL-1(a) (UNI-1645c): main-only holder user id from 423 `document_locked` (`fields.holder_id`) */
+  readonly holderId?: string | null
+  /** EL-1(a) (UNI-1645c): lock holder metadata from 423 `document_locked` */
+  readonly editLock?: UniworkDocEditLock
 
   constructor(
     code: UniworkDocErrorCode,
@@ -48,6 +52,8 @@ export class UniworkDocError extends Error {
       maxDepth?: number
       documentId?: string
       documentTitle?: string
+      holderId?: string | null
+      editLock?: UniworkDocEditLock
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -63,7 +69,13 @@ export class UniworkDocError extends Error {
     this.maxDepth = extra.maxDepth
     this.documentId = extra.documentId
     this.documentTitle = extra.documentTitle
+    this.holderId = extra.holderId
+    this.editLock = extra.editLock
   }
+}
+
+function boundedLockString(value: unknown, max: number): string | null {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= max ? value : null
 }
 
 /**
@@ -143,6 +155,27 @@ export function errorFromResponse(
   // throttled (429) or temporarily down (503): retryable, never a terminal
   // refusal - the save queue backs off and can honour the Retry-After
   if (status === 429 || status === 503) return new UniworkDocError('server_error', retried)
+  // EL-1(a) (UNI-1645c): HTTP 423 document_locked -> edit_locked (never conflict, never server_error).
+  // Any other 423 code or bare 423 falls through to server_error.
+  if (status === 423 && serverCode === 'document_locked') {
+    const fields = envelope?.fields
+    const holderId = boundedLockString(fields?.holder_id, 128)
+    const offlineHoldUntil = boundedLockString(fields?.offline_hold_until, 64)
+    const editLock: UniworkDocEditLock = {
+      holderName: boundedLockString(fields?.holder_name, 256),
+      since: boundedLockString(fields?.since, 64),
+      expiresAt: boundedLockString(fields?.expires_at, 64),
+      heldByMe: fields?.held_by_me === true,
+      ...(offlineHoldUntil ? { offlineHoldUntil } : {}),
+    }
+    const current = fields?.current_revision
+    return new UniworkDocError('edit_locked', {
+      ...at,
+      holderId,
+      editLock,
+      ...(isDecimalString(current) ? { currentRevision: current } : {}),
+    })
+  }
   if (serverCode && CONFLICT_CODES.has(serverCode)) {
     const current = envelope?.fields?.current_revision
     return new UniworkDocError('conflict', {
@@ -205,11 +238,11 @@ export function errorFromResponse(
       envelope?.fields?.max_bytes ??
       envelope?.fields?.upload_max_bytes ??
       envelope?.fields?.maxBytes
+    const rawSize = envelope?.fields?.size_bytes ?? envelope?.fields?.sizeBytes
     const maxBytes =
       typeof rawMax === 'number' && Number.isFinite(rawMax) && rawMax > 0
         ? Math.floor(rawMax)
         : undefined
-    const rawSize = envelope?.fields?.size_bytes ?? envelope?.fields?.sizeBytes
     const sizeBytes =
       typeof rawSize === 'number' && Number.isFinite(rawSize) && rawSize >= 0
         ? Math.floor(rawSize)
@@ -241,7 +274,13 @@ export function isTerminalRefusal(error: UniworkDocError): boolean {
     // `document_archived` is deliberately NOT here: the archive is reversible
     // (the block lifts when the document is unarchived), so its intent record
     // stays parked for the access probe / the sync center's re-check to free -
-    // unlike the terminal document_deleted, whose copy only a reopen answers
+    // unlike the terminal document_deleted, whose copy only a reopen answers.
+    // `edit_locked` (HTTP 423 document_locked) is also NOT here: `isTerminalRefusal`
+    // in save-coordinator.ts deletes the stored intent + recovery bytes via
+    // `cleanupIntent`. For `edit_locked`, the local edit and recovery snapshot
+    // must be kept in the intent store (settled to `failed` with `lastError:
+    // 'edit_locked'` and no `retryAt` so it never auto-retries on a timer) until
+    // the user explicitly saves again or closes the document.
     error.code === 'too_large' ||
     error.code === 'engine_incompatible' ||
     // a 409 the pipeline cannot recover by replaying (upload claim gone, ...);

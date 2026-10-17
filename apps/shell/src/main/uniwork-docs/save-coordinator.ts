@@ -194,6 +194,7 @@ export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocSta
     ...(b.level ? { commentsLevel: b.level } : {}),
     state: b.state,
     ...(b.error ? { error: b.error } : {}),
+    ...(b.state === 'edit_locked' && b.editLock ? { editLock: b.editLock } : {}),
     ...(b.sizeBytes !== undefined ? { sizeBytes: b.sizeBytes } : {}),
     ...(b.maxBytes !== undefined ? { maxBytes: b.maxBytes } : {}),
     ...(b.lastSavedAt ? { lastSavedAt: b.lastSavedAt } : {}),
@@ -204,6 +205,7 @@ export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocSta
 function withoutError(binding: Binding): Binding {
   const next = { ...binding }
   delete next.error
+  delete next.editLock
   delete next.sizeBytes
   delete next.maxBytes
   return next
@@ -508,12 +510,29 @@ export class SaveCoordinator {
     const stored = await intents.read(doc.key, facts)
     // a terminal record (cancelled / committed) is spent: the next Save mints a
     // fresh intent (the machine's own `save` rule)
-    const pending = stored && !isTerminalQueueState(stored.intent.state) ? stored : null
+    let pending = stored && !isTerminalQueueState(stored.intent.state) ? stored : null
 
     // bytes identical to the base never touch the network, and an unchanged
     // copy over the cap is already on the server: the no-op verdict comes first
     // so a lowered limit never marks an unchanged document failed
     const unchangedFromBase = checksum === doc.binding.baseChecksum
+    // EL-1(a) (UNI-1645c): when the previous commit was refused with 423
+    // `document_locked` (`edit_locked`), the intent is parked in `failed` with
+    // `lastError: 'edit_locked'` so background polls never auto-retry it, while
+    // keeping the recovery snapshot on disk. On the next explicit Save by the
+    // user, supersede that parked record before minting a fresh intent so Save
+    // makes one commit attempt (never opening the queue popover instead).
+    if (
+      pending &&
+      (pending.intent.lastError === 'edit_locked' || doc.binding.state === 'edit_locked') &&
+      !IN_FLIGHT_QUEUE_STATES.has(pending.intent.state)
+    ) {
+      await this.settleRecord(intents, doc, pending.intent, { type: 'supersede' })
+      if (unchangedFromBase) {
+        await this.cleanupIntent(intents, doc, pending.intent)
+      }
+      pending = null
+    }
     if (!pending && unchangedFromBase) {
       return await this.commitState(doc, withoutError({ ...doc.binding, state: 'saved' }))
     }
@@ -949,6 +968,29 @@ export class SaveCoordinator {
       this.pendingNext.delete(doc.path)
     }
     switch (error.code) {
+      case 'edit_locked':
+        // EL-1(a) (UNI-1645c): HTTP 423 document_locked — someone else holds the
+        // server edit lock. Never classify as conflict and never auto-retry on a
+        // timer: park the intent in `failed` with `lastError: 'edit_locked'` so
+        // the recovery snapshot is kept on disk until the user explicitly saves
+        // again or closes the document.
+        this.pendingNext.delete(doc.path)
+        await this.settleRecord(intents, doc, intent, {
+          type: 'commitFailed',
+          error: 'edit_locked',
+        })
+        return this.commitState(doc, {
+          ...base,
+          state: 'edit_locked',
+          error: 'edit_locked',
+          editLock: error.editLock ?? {
+            holderName: null,
+            since: null,
+            expiresAt: null,
+            heldByMe: false,
+          },
+          ...(error.currentRevision ? { serverRevision: error.currentRevision } : {}),
+        })
       case 'conflict':
         // the working copy and the base stay; the user chooses what happens next.
         // The intent is durable: the SAME record and key survive the conflict,

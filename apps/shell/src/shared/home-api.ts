@@ -156,6 +156,8 @@ export type UniworkSaveState =
   | 'reconciling'
   | 'reconciling-stuck'
   | 'failed'
+  // EL-1(a) (UNI-1645c): HTTP 423 document_locked — someone else holds the active edit lock
+  | 'edit_locked'
 export type UniworkDocErrorCode =
   | 'not_signed_in'
   | 'session_expired'
@@ -199,6 +201,8 @@ export type UniworkDocErrorCode =
   | 'organization_suspended'
   | 'drafts_full'
   | 'other_window'
+  // EL-1(a) (UNI-1645c): HTTP 423 document_locked — another user holds the server edit lock
+  | 'edit_locked'
 
 export interface UniworkWorkspaceRef {
   id: string
@@ -534,6 +538,18 @@ export interface UniworkLockWhileOpen {
     | 'signed_out'
 }
 
+/**
+ * EL-1(a) (UNI-1645c): active edit-lock holder metadata from HTTP 423 `document_locked`.
+ * `holderId` is kept main-side only; only the display name and timestamps cross to the renderer.
+ */
+export interface UniworkDocEditLock {
+  holderName: string | null
+  since: string | null
+  expiresAt: string | null
+  heldByMe: boolean
+  offlineHoldUntil?: string
+}
+
 export interface UniworkDocStatus {
   path: string
   documentId: string
@@ -548,6 +564,8 @@ export interface UniworkDocStatus {
   commentsLevel?: 'view' | 'comment' | 'edit' | 'manage'
   state: UniworkSaveState
   error?: UniworkDocErrorCode
+  /** EL-1(a) (UNI-1645c): populated while `state === 'edit_locked'`; absent otherwise. */
+  editLock?: UniworkDocEditLock
   /** Payload size in bytes when known (e.g. when `error === 'too_large'`). */
   sizeBytes?: number
   /** Server/configured maximum document size in bytes when `error === 'too_large'`. */

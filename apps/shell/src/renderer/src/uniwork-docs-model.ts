@@ -67,6 +67,7 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   organization_suspended: 'uwLockSuspended',
   drafts_full: 'uwConflictDraftCapReached',
   other_window: 'uwLockOtherWindow',
+  edit_locked: 'uwChipEditLocked',
 }
 
 /** chip label for every save state (ready and saved read the same: nothing is waiting to upload) */
@@ -89,6 +90,7 @@ export const UNIWORK_STATE_KEYS: Record<UniworkSaveState, StringKey> = {
   reconciling: 'uwChipReconciling',
   'reconciling-stuck': 'uwChipReconcileStuck',
   failed: 'uwChipError',
+  edit_locked: 'uwChipEditLocked',
 }
 
 export type { UniworkLockReason }
@@ -171,6 +173,8 @@ export interface ChipModel {
   labelKey: StringKey
   /** filled into {reason} of the label (blocked) */
   reasonKey?: StringKey
+  /** filled into {name} of uwChipEditLocked / uwTipEditLocked (EL-1(a) 423 document_locked) */
+  holderName?: string | null
   /** filled into {max} of uwReasonTooLargeWithLimit */
   maxBytes?: number
   tipKey: StringKey
@@ -390,6 +394,18 @@ export function chipModelOf(
       savedAt: ctx.queuedAt,
     }
   }
+  // EL-1(a) (UNI-1645c): HTTP 423 document_locked — someone else is editing (info tone, manual retry)
+  if (state === 'edit_locked') {
+    const lock = status.editLock
+    return {
+      tone: 'info',
+      labelKey: 'uwChipEditLocked',
+      holderName: lock?.holderName ?? null,
+      tipKey: lock?.heldByMe ? 'uwTipEditLockedSelf' : 'uwTipEditLocked',
+      savedAt: lock?.since ?? undefined,
+      action: { kind: 'retry', labelKey: 'uwActRetry' },
+    }
+  }
   // 14 view-only
   if (access === 'view' && QUIET_STATES.has(state)) {
     return { tone: 'neutral', labelKey: 'uwChipViewOnly', tipKey: 'uwTipViewOnly' }
@@ -455,6 +471,7 @@ const QUEUED_TIME_TIPS: ReadonlySet<StringKey> = new Set([
   'uwTipQueued',
   'uwTipQueuedNewer',
   'uwTipPausedUser',
+  'uwTipEditLocked',
 ])
 
 /**
@@ -473,12 +490,22 @@ export function chipCopy(
       ? { max: formatSizeMB(model.maxBytes, dateLocale, 'exact') }
       : undefined
   const reasonText = model.reasonKey ? t(model.reasonKey, reasonParams) : undefined
+  const holderName =
+    model.holderName !== undefined || model.labelKey === 'uwChipEditLocked'
+      ? model.holderName && model.holderName.trim().length > 0
+        ? model.holderName
+        : t('uwEditLockSomeone')
+      : undefined
+  const labelParams: Record<string, string> = {}
+  if (reasonText !== undefined) labelParams.reason = reasonText
+  if (holderName !== undefined) labelParams.name = holderName
   const label =
-    reasonText !== undefined ? t(model.labelKey, { reason: reasonText }) : t(model.labelKey)
+    Object.keys(labelParams).length > 0 ? t(model.labelKey, labelParams) : t(model.labelKey)
   const tipParams: Record<string, string> = {}
   if (model.savedAt) tipParams.time = formatSaveTime(model.savedAt, dateLocale, now)
   else if (QUEUED_TIME_TIPS.has(model.tipKey)) tipParams.time = '—'
   if (reasonText !== undefined) tipParams.reason = reasonText
+  if (holderName !== undefined) tipParams.name = holderName
   const tip = t(model.tipKey, tipParams)
   const fullTip = model.errorKey ? `${t(model.errorKey)} ${tip}` : tip
   return { label, tip: fullTip, title: `${label}\n${fullTip}` }

@@ -161,4 +161,8 @@ export const pl = {
   uwErrUploadTooLarge:
     'Plik {name} ma {size}, co przekracza limit {max}. Zmniejsz rozmiar obrazów lub podziel plik, a następnie prześlij go ponownie.',
   uwReasonTooLargeWithLimit: 'powyżej limitu {max}',
+  uwChipEditLocked: '{name} is editing',
+  uwEditLockSomeone: 'Someone',
+  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
+  uwTipEditLockedSelf: 'You’re editing this document in another window.',
 } satisfies Record<keyof typeof zh, string>

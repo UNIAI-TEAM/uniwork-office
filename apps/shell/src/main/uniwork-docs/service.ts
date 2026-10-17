@@ -405,6 +405,7 @@ const KEEP_LOCAL_STATES: ReadonlySet<string> = new Set([
   'signed-out',
   'error',
   'failed',
+  'edit_locked',
 ])
 
 /** states whose local bytes are not in UniWork (the close prompt) */
@@ -416,6 +417,7 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
   'blocked',
   'conflict',
   'failed',
+  'edit_locked',
 ])
 
 /**
@@ -798,10 +800,15 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   else if (state === 'blocked') patched.error = error ?? 'server_error'
   else if (state === 'reconciling-stuck') patched.error = error ?? 'intent_unknown'
   else if (state === 'failed') {
-    patched.error = error ?? 'server_error'
-    if (record.maxBytes !== undefined) {
-      patched.maxBytes = record.maxBytes
-      patched.sizeBytes = record.length
+    if (error === 'edit_locked') {
+      patched.state = 'edit_locked'
+      patched.error = 'edit_locked'
+    } else {
+      patched.error = error ?? 'server_error'
+      if (record.maxBytes !== undefined) {
+        patched.maxBytes = record.maxBytes
+        patched.sizeBytes = record.length
+      }
     }
   }
   // the waiting states carry no refusal: a block that lifted (the `unblock`
@@ -810,6 +817,7 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   // `undefined` overwrites the stale code in the merge; the store's JSON drops it
   else if (state === 'queued' || state === 'paused_user') {
     patched.error = undefined
+    patched.editLock = undefined
     patched.maxBytes = undefined
     patched.sizeBytes = undefined
   }

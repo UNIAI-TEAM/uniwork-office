@@ -168,4 +168,8 @@ export const de = {
   uwErrUploadTooLarge:
     '{name} ist {size} groß und überschreitet das Limit von {max}. Verkleinern Sie Bilder oder teilen Sie die Datei auf und laden Sie sie erneut hoch.',
   uwReasonTooLargeWithLimit: 'über dem Limit von {max}',
+  uwChipEditLocked: '{name} is editing',
+  uwEditLockSomeone: 'Someone',
+  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
+  uwTipEditLockedSelf: 'You’re editing this document in another window.',
 } satisfies Record<keyof typeof zh, string>

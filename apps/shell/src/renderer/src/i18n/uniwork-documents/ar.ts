@@ -157,4 +157,8 @@ export const ar = {
   uwErrUploadTooLarge:
     'حجم {name} هو {size}، وهو يتجاوز الحد الأقصى {max}. قلّل حجم الصور أو قسّم الملف ثم ارفعه مرة أخرى.',
   uwReasonTooLargeWithLimit: 'يتجاوز الحد {max}',
+  uwChipEditLocked: '{name} is editing',
+  uwEditLockSomeone: 'Someone',
+  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
+  uwTipEditLockedSelf: 'You’re editing this document in another window.',
 } satisfies Record<keyof typeof zh, string>

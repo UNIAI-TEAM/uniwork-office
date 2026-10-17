@@ -164,4 +164,8 @@ export const es = {
   uwErrUploadTooLarge:
     '{name} pesa {size}, lo que supera el límite de {max}. Reduce el tamaño de las imágenes o divide el archivo y vuelve a subirlo.',
   uwReasonTooLargeWithLimit: 'supera el límite de {max}',
+  uwChipEditLocked: '{name} is editing',
+  uwEditLockSomeone: 'Someone',
+  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
+  uwTipEditLockedSelf: 'You’re editing this document in another window.',
 } satisfies Record<keyof typeof zh, string>

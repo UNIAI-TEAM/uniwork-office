@@ -159,4 +159,8 @@ export const hi = {
   uwErrUploadTooLarge:
     '{name} का आकार {size} है, जो {max} सीमा से अधिक है। छवियों का आकार घटाएँ या फ़ाइल को विभाजित करें, फिर दोबारा अपलोड करें।',
   uwReasonTooLargeWithLimit: '{max} सीमा से अधिक',
+  uwChipEditLocked: '{name} is editing',
+  uwEditLockSomeone: 'Someone',
+  uwTipEditLocked: '{name} has been editing since {time}. You’re viewing read‑only.',
+  uwTipEditLockedSelf: 'You’re editing this document in another window.',
 } satisfies Record<keyof typeof zh, string>
