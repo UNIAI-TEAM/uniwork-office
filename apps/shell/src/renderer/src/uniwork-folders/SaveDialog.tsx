@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import type {
   UniworkDocActionResult,
   UniworkDocSummary,
+  UniworkFirstSaveInput,
   UniworkFirstSaveTarget,
   UniworkFolderNode,
   UniworkResult,
@@ -20,6 +21,7 @@ import {
   uploadTooLargeTextOf,
 } from '../uniwork-docs-model'
 import { loadFolderTree, onTreeChanged } from '../uniwork-library-api'
+import { announce } from '../uniwork-live'
 import { FolderNameDialog } from './FolderNameDialog'
 import { UniworkFolderPicker, type PickedFolder } from './UniworkFolderPicker'
 import { FolderGlyph } from './UniworkFolderTree'
@@ -38,7 +40,90 @@ type TFn = ReturnType<typeof useI18n>['t']
 /** where the first save goes, as the dialog shows it (the wire target drops the path) */
 type ShownTarget = { kind: 'my_folder' } | { kind: 'folder'; folderId: string; path: PathPart[] }
 
-type SaveFailure = Extract<UniworkDocActionResult<UniworkDocSummary>, { ok: false }>
+type FirstSaveResult = UniworkDocActionResult<UniworkDocSummary>
+
+type SaveFailure = Extract<FirstSaveResult, { ok: false }>
+
+/**
+ * FE-S01-R1-1: a first save outlives its dialog. Once sent it cannot be
+ * cancelled, so its run is kept here by tab (pathKey) with the dialogs that
+ * watch that tab. A refusal that names a created document (bind failed /
+ * orphaned) that no dialog is left to show waits in `unshown` for the host's
+ * next render, and is said at once through the shell's live region.
+ */
+const running = new Map<string, Promise<FirstSaveResult>>()
+const watching = new Map<string, number>()
+let unshown: readonly { path: string; failure: SaveFailure }[] = []
+const unshownListeners = new Set<() => void>()
+
+function setUnshown(next: readonly { path: string; failure: SaveFailure }[]) {
+  unshown = next
+  for (const listener of unshownListeners) listener()
+}
+
+function onUnshown(listener: () => void): () => void {
+  unshownListeners.add(listener)
+  return () => {
+    unshownListeners.delete(listener)
+  }
+}
+
+/** the refusals that leave a document in UniWork: the person must hear its id and title */
+const namesDocument = (failure: SaveFailure) =>
+  failure.error === 'first_save_bind_failed' || failure.error === 'first_save_orphaned'
+
+function watchTab(key: string): () => void {
+  watching.set(key, (watching.get(key) ?? 0) + 1)
+  return () => {
+    const left = (watching.get(key) ?? 1) - 1
+    if (left > 0) watching.set(key, left)
+    else watching.delete(key)
+  }
+}
+
+function startFirstSave(
+  input: UniworkFirstSaveInput,
+  say: (failure: SaveFailure) => string,
+): Promise<FirstSaveResult> {
+  const key = pathKey(input.tabPath)
+  const run = window.aiOffice
+    .uniworkFirstSave(input)
+    .catch((): FirstSaveResult => ({ ok: false, error: 'network' }))
+  running.set(key, run)
+  // registered before any dialog's own handler, so it sees who still watches
+  void run.then((result) => {
+    running.delete(key)
+    if (result.ok || watching.has(key) || !namesDocument(result)) return
+    setUnshown([...unshown, { path: input.tabPath, failure: result }])
+    announce(say(result), { assertive: true })
+  })
+  return run
+}
+
+/** Test seam: forget every run and unshown result between cases. */
+export function resetFirstSavesForTests(): void {
+  running.clear()
+  watching.clear()
+  setUnshown([])
+}
+
+function Spinner() {
+  return (
+    <svg className="uw-spinner" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+      <circle
+        cx="8"
+        cy="8"
+        r="6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        fill="none"
+        strokeDasharray="26"
+        strokeDashoffset="18"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
 
 /** the file name split into the editable name and its fixed extension (".docx") */
 export function nameParts(path: string): { base: string; ext: string } {
@@ -111,9 +196,23 @@ export function firstSaveErrorText(failure: SaveFailure, t: TFn, dateLocale: str
  * to the person); "Đổi" opens State 2 "Chọn nơi lưu", the FD-11 picker with
  * its save parts. My Folder is ensured when the dialog opens (Q3) and its id
  * marks the current row. Close / Esc cancel and send nothing; Lưu sends one
- * `uniworkFirstSave` and the tab is bound when it answers ok.
+ * `uniworkFirstSave` and the tab is bound when it answers ok. A sent save
+ * cannot be cancelled: while it runs close / Esc / backdrop do nothing, and its
+ * result reaches the person even if the dialog goes away (FE-S01-R1-1).
  */
-export function SaveDialog({ path, onClose }: { path: string; onClose: () => void }) {
+export function SaveDialog({
+  path,
+  onClose,
+  initialFailure = null,
+  onHold,
+}: {
+  path: string
+  onClose: () => void
+  /** a result kept while no dialog could show it */
+  initialFailure?: SaveFailure | null
+  /** whether the dialog must not be replaced: a save runs, or its result is on screen */
+  onHold?: (hold: boolean) => void
+}) {
   const { t, dateLocale } = useI18n()
   const id = useId()
   const [{ base, ext }] = useState(() => nameParts(path))
@@ -122,9 +221,14 @@ export function SaveDialog({ path, onClose }: { path: string; onClose: () => voi
   const [target, setTarget] = useState<ShownTarget>({ kind: 'my_folder' })
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<SaveFailure | null>(null)
+  const [resolveAttempt, setResolveAttempt] = useState(0)
   const [myFolderId, setMyFolderId] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState<SaveFailure | null>(null)
+  // a save this tab already sent (from a dialog that went away) is still running
+  const [saving, setSaving] = useState(() => running.has(pathKey(path)))
+  // Lưu pressed before the workspace is known: it is sent once it resolves (FE-S01-R1-2)
+  const [queued, setQueued] = useState(false)
+  const busy = saving || queued
+  const [failure, setFailure] = useState<SaveFailure | null>(initialFailure)
   const [nodes, setNodes] = useState<UniworkFolderNode[] | null>(null)
   const [revealIn, setRevealIn] = useState<string | null | undefined>(undefined)
   const [toast, setToast] = useState<{ message: string; tone: 'ok' | 'error' } | null>(null)
@@ -133,14 +237,34 @@ export function SaveDialog({ path, onClose }: { path: string; onClose: () => voi
   const mounted = useRef(true)
   const treeRequest = useRef<Promise<UniworkResult<UniworkFolderNode[]>> | null>(null)
 
-  useEffect(
-    () => () => {
-      mounted.current = false
-    },
-    [],
-  )
+  const settle = (result: FirstSaveResult) => {
+    if (!mounted.current) return
+    setSaving(false)
+    if (result.ok) onClose()
+    else setFailure(result)
+  }
 
-  // the workspace the document is created in (the Workbench's own pick), then My Folder (Q3)
+  useEffect(() => {
+    mounted.current = true
+    const unwatch = watchTab(pathKey(path))
+    let live = true
+    const run = running.get(pathKey(path))
+    if (run) void run.then((result) => live && settle(result))
+    return () => {
+      live = false
+      mounted.current = false
+      unwatch()
+    }
+    // the tab is fixed for the dialog's life; a reopened dialog joins its tab's run once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    onHold?.(busy || failure !== null)
+  }, [busy, failure, onHold])
+
+  // the workspace the document is created in (the Workbench's own pick), then My Folder (Q3);
+  // read again when Lưu is pressed after the read failed
   useEffect(() => {
     let live = true
     const stored = readActiveWorkspaceId()
@@ -172,7 +296,7 @@ export function SaveDialog({ path, onClose }: { path: string; onClose: () => voi
     return () => {
       live = false
     }
-  }, [])
+  }, [resolveAttempt])
 
   /** one tree read shared by the picker's own load and the dialog's refreshes */
   const loadTree = useCallback((ws: string) => {
@@ -212,34 +336,61 @@ export function SaveDialog({ path, onClose }: { path: string; onClose: () => voi
 
   const mineId = myFolderId ?? (nodes ? myFolderIdOf(nodes) : null)
 
-  const save = () => {
-    if (busy) return
+  /** the title to send, or null once the field says why the name cannot be sent */
+  const checkedTitle = (): string | null => {
     const checked = checkDocName(name)
     const title = checked.ok ? titleWithExt(checked.name, ext) : ''
     if (!checked.ok || isDocTitleTooLong(title)) {
       setFailure({ ok: false, error: checked.ok ? 'name_too_long' : checked.error })
       nameRef.current?.focus()
-      return
+      return null
     }
-    if (!workspaceId) {
-      if (workspaceError) setFailure(workspaceError)
-      return
-    }
+    return title
+  }
+
+  const send = (ws: string) => {
+    const title = checkedTitle()
+    if (title === null) return
     const wire: UniworkFirstSaveTarget =
       target.kind === 'folder'
         ? { kind: 'folder', folderId: target.folderId }
         : { kind: 'my_folder' }
-    setBusy(true)
+    setSaving(true)
     setFailure(null)
-    void window.aiOffice
-      .uniworkFirstSave({ tabPath: path, title, workspaceId, target: wire })
-      .catch((): UniworkDocActionResult<UniworkDocSummary> => ({ ok: false, error: 'network' }))
-      .then((result) => {
-        if (!mounted.current) return
-        setBusy(false)
-        if (result.ok) onClose()
-        else setFailure(result)
-      })
+    void startFirstSave({ tabPath: path, title, workspaceId: ws, target: wire }, (refused) =>
+      firstSaveErrorText(refused, t, dateLocale),
+    ).then(settle)
+  }
+
+  const save = () => {
+    if (busy || checkedTitle() === null) return
+    if (workspaceId) {
+      send(workspaceId)
+      return
+    }
+    // FE-S01-R1-2: wait (busy) for the workspace; a failed read is read again
+    setFailure(null)
+    setQueued(true)
+    if (workspaceError) {
+      setWorkspaceError(null)
+      setResolveAttempt((n) => n + 1)
+    }
+  }
+
+  useEffect(() => {
+    if (!queued) return
+    if (workspaceId) {
+      setQueued(false)
+      send(workspaceId)
+    } else if (workspaceError) {
+      setQueued(false)
+      setFailure(workspaceError)
+    }
+  }, [queued, workspaceId, workspaceError]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // a sent save cannot be cancelled: close / Esc / backdrop wait for its answer
+  const cancel = () => {
+    if (!saving) onClose()
   }
 
   const onPick = (picked: PickedFolder) => {
@@ -316,7 +467,7 @@ export function SaveDialog({ path, onClose }: { path: string; onClose: () => voi
     <ActionModal
       labelledBy={`${id}-title`}
       className="uws-dialog"
-      onCancel={onClose}
+      onCancel={cancel}
       initialFocus=".uws-name-input"
     >
       <div className="uws-head">
@@ -324,7 +475,13 @@ export function SaveDialog({ path, onClose }: { path: string; onClose: () => voi
         <h3 id={`${id}-title`} className="uw-act-heading">
           {t('usDialogTitle')}
         </h3>
-        <button type="button" className="uws-close" aria-label={t('usClose')} onClick={onClose}>
+        <button
+          type="button"
+          className="uws-close"
+          aria-label={t('usClose')}
+          aria-disabled={saving || undefined}
+          onClick={cancel}
+        >
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
             <path
               d="M4 4l8 8M12 4l-8 8"
@@ -360,6 +517,7 @@ export function SaveDialog({ path, onClose }: { path: string; onClose: () => voi
               aria-invalid={failure !== null}
               aria-describedby={`${id}-error`}
               spellCheck={false}
+              readOnly={busy}
               onChange={(e) => {
                 setName(e.target.value)
                 if (failure) setFailure(null)
@@ -404,6 +562,7 @@ export function SaveDialog({ path, onClose }: { path: string; onClose: () => voi
             aria-disabled={busy || undefined}
             aria-busy={busy || undefined}
           >
+            {busy && <Spinner />}
             {t('usSave')}
           </button>
         </div>
@@ -427,10 +586,45 @@ async function isOpenTab(path: string): Promise<boolean> {
  * SAVE-01 / S01-R1-6: listens for main's first-save-open push. Every push is
  * acknowledged at once, before anything that can fail or wait, so File > Save
  * knows the renderer heard it; then the dialog opens for the push's tab. A
- * push for a path no tab shows is dropped.
+ * push for a path no tab shows is dropped. A push for another tab never
+ * replaces a dialog whose save runs or whose result is on screen: it is held
+ * and opens when that dialog closes (FE-S01-R1-1). A result kept while the
+ * host was away opens with its dialog when the host renders again.
  */
 export function SaveDialogHost() {
-  const [request, setRequest] = useState<{ path: string; n: number } | null>(null)
+  type Request = { path: string; key: number; failure?: SaveFailure }
+  const [request, setRequest] = useState<Request | null>(null)
+  const shown = useRef<Request | null>(null)
+  const held = useRef<Request[]>([])
+  const holding = useRef(false)
+  const seq = useRef(0)
+  const kept = useSyncExternalStore(onUnshown, () => unshown)
+
+  const show = useCallback((next: Omit<Request, 'key'>) => {
+    const same = (r: Request) => pathKey(r.path) === pathKey(next.path)
+    const current = shown.current
+    // a repeated File > Save for the same tab keeps the dialog (and the typed name)
+    if (current && same(current)) return
+    const keyed = { ...next, key: ++seq.current }
+    if (current && holding.current) {
+      if (!held.current.some(same)) held.current.push(keyed)
+      return
+    }
+    shown.current = keyed
+    holding.current = false
+    setRequest(keyed)
+  }, [])
+
+  const close = useCallback(() => {
+    const next = held.current.shift() ?? null
+    shown.current = next
+    holding.current = false
+    setRequest(next)
+  }, [])
+
+  const hold = useCallback((on: boolean) => {
+    holding.current = on
+  }, [])
 
   useEffect(() => {
     // a bridge without the SAVE-01 push (a stale preload) simply never opens the dialog
@@ -445,15 +639,27 @@ export function SaveDialogHost() {
       }
       const ticket = ++n
       void isOpenTab(path).then((open) => {
-        if (!open || ticket !== n) return
-        // a repeated File > Save for the same tab keeps the dialog (and the typed name)
-        setRequest((prev) =>
-          prev && pathKey(prev.path) === pathKey(path) ? prev : { path, n: ticket },
-        )
+        if (open && ticket === n) show({ path })
       })
     })
-  }, [])
+  }, [show])
+
+  // a result no dialog was left to show: shown once, in its tab's dialog
+  useEffect(() => {
+    if (request || kept.length === 0) return
+    const [first, ...rest] = kept
+    setUnshown(rest)
+    show({ path: first!.path, failure: first!.failure })
+  }, [request, kept, show])
 
   if (!request) return null
-  return <SaveDialog key={request.n} path={request.path} onClose={() => setRequest(null)} />
+  return (
+    <SaveDialog
+      key={request.key}
+      path={request.path}
+      initialFailure={request.failure}
+      onClose={close}
+      onHold={hold}
+    />
+  )
 }
