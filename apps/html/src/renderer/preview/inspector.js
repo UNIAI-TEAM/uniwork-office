@@ -1029,8 +1029,9 @@
       const altKey =
         e.altKey && !mod ? { ArrowUp: 'moveUp', ArrowDown: 'moveDown' }[e.key] : undefined
       const command = modKey || altKey || map[e.key]
-      if (!command || !selected || inField) return
-      e.preventDefault()
+      if (!command || inField) return
+      if (!selected && command !== 'escape') return
+      if (selected) e.preventDefault()
       post({ type: 'gx:keyCommand', command })
     },
     true,

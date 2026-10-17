@@ -118,7 +118,7 @@ export const zh = {
     '此文档已超过 {max}。你的更改仍在当前页面。请先将副本下载到电脑，再压缩图片或拆分文档。',
   webSaveBlockDownload: '下载我的副本',
   uwConflictTooLargeWithLimit:
-    '你的版本已超过 {max}（当前 {size}）。请选择“下载我的副本”或关闭此对话框以减小文件大小。',
+    '你的版本已超过 {max}（当前 {size}）。请关闭此对话框以减小文件大小，或选择“重新加载最新版本”下载你的版本。',
   uwConflictSaveCopyTooLarge:
     '你的版本超过了 UniWork 的大小限制，因此无法创建副本。请关闭此对话框以减小文件大小，或选择“重新加载最新版本”下载你的版本。',
   uwConflictSaveCopyTooLargeWithLimit:

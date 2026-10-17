@@ -138,7 +138,7 @@ export const pl = {
     'Ten dokument przekracza {max}. Twoje zmiany nadal tu są. Pobierz swoją kopię na komputer, a następnie zmniejsz rozmiar obrazów lub podziel dokument.',
   webSaveBlockDownload: 'Pobierz moją kopię',
   uwConflictTooLargeWithLimit:
-    'Twoja wersja przekracza {max} (obecnie {size}). Wybierz „Pobierz moją kopię” lub zamknij to okno, aby zmniejszyć rozmiar pliku.',
+    'Twoja wersja przekracza {max} (obecnie {size}). Zamknij to okno, aby zmniejszyć rozmiar pliku, lub wybierz „Wczytaj najnowszą wersję”, aby pobrać swoją wersję.',
   uwConflictSaveCopyTooLarge:
     'Twoja wersja przekracza limit rozmiaru UniWork, więc nie udało się utworzyć kopii. Zamknij to okno, aby zmniejszyć rozmiar pliku, lub wybierz „Wczytaj najnowszą wersję”, aby pobrać swoją wersję.',
   uwConflictSaveCopyTooLargeWithLimit:

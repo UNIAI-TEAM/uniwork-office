@@ -137,7 +137,7 @@ export const cs = {
     'Tento dokument překračuje limit {max}. Vaše změny jsou stále zde. Stáhněte si kopii do počítače a poté zmenšete velikost obrázků nebo dokument rozdělte.',
   webSaveBlockDownload: 'Stáhnout moji kopii',
   uwConflictTooLargeWithLimit:
-    'Vaše verze překračuje limit {max} (aktuálně {size}). Zvolte „Stáhnout moji kopii“ nebo toto dialogové okno zavřete a zmenšete velikost souboru.',
+    'Vaše verze překračuje limit {max} (aktuálně {size}). Zavřete toto dialogové okno a zmenšete velikost souboru, nebo zvolte „Načíst nejnovější verzi“ a stáhněte si svou verzi.',
   uwConflictSaveCopyTooLarge:
     'Vaše verze překračuje limit velikosti UniWork, proto kopii nešlo vytvořit. Zavřete toto dialogové okno a zmenšete velikost souboru, nebo zvolte „Načíst nejnovější verzi“ a stáhněte si svou verzi.',
   uwConflictSaveCopyTooLargeWithLimit:

@@ -139,7 +139,7 @@ export const nl = {
     'Dit document is groter dan {max}. Je wijzigingen staan nog hier. Download je kopie naar je computer en verklein daarna de afbeeldingen of splits het document.',
   webSaveBlockDownload: 'Mijn kopie downloaden',
   uwConflictTooLargeWithLimit:
-    'Je versie is groter dan {max} (momenteel {size}). Kies “Mijn kopie downloaden” of sluit dit venster om de bestandsgrootte te verkleinen.',
+    'Je versie is groter dan {max} (momenteel {size}). Sluit dit venster om de bestandsgrootte te verkleinen, of kies “Nieuwste versie laden” om je versie te downloaden.',
   uwConflictSaveCopyTooLarge:
     'Je versie is groter dan de limiet van UniWork, dus de kopie kon niet worden gemaakt. Sluit dit venster om de bestandsgrootte te verkleinen, of kies “Nieuwste versie laden” om je versie te downloaden.',
   uwConflictSaveCopyTooLargeWithLimit:

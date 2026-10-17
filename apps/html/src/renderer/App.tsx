@@ -844,7 +844,14 @@ export default function App() {
             return
           }
           const sid = selectedSidRef.current
-          if (sid === null) return
+          if (sid === null) {
+            if (msg.command === 'escape') {
+              window.dispatchEvent(
+                new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+              )
+            }
+            return
+          }
           const map = getMap()
           const e = map.bySid.get(sid)
           if (!e) return

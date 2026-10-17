@@ -111,7 +111,7 @@ import { HeaderFooterDialog, type HeaderFooterResult } from './HeaderFooterDialo
 import type { PrintPreviewHost } from './page-layout-actions'
 import { PrintDialog } from './PrintDialog'
 import type { HeaderFooterParts } from './edit-journal'
-import { cap, platform } from './capabilities'
+import { cap, isViewOnly, platform } from './capabilities'
 import { isNarrowViewport } from './narrow-layout'
 import { useModalDialog } from './modal-dialog'
 import type { SelectedTableRibbon } from './table-design-actions'
@@ -125,6 +125,7 @@ import { ZoomDialog } from './ZoomDialog'
 // No File tab: file commands live in the macOS
 // application menu (File → Open/Save/Save As) and the toolbar icons.
 const ribbonTabs = ['Home', 'Insert', 'Page Layout', 'Formulas', 'Data', 'Review', 'View'] as const
+const VIEW_ONLY_TABS: readonly RibbonTab[] = ['View']
 
 /// 'Chart Design' is contextual: it exists only while a chart is selected,
 /// and appears without stealing the active tab.
@@ -565,7 +566,9 @@ export function ExcelShell({
   onGetFillSeriesContext,
 }: ExcelShellProps): React.JSX.Element {
   const { t } = useI18n()
-  const [activeTab, setActiveTab] = useState<RibbonTab>('Home')
+  const viewOnly = isViewOnly() || aiViewOnly
+  const [activeTab, setActiveTab] = useState<RibbonTab>(() => (viewOnly ? 'View' : 'Home'))
+  const effectiveTab: RibbonTab = viewOnly ? 'View' : activeTab
   const collapse = useRibbonCollapse('ai-sheets-ribbon-collapsed', {
     collapse: t('appRibbonCollapse'),
     expand: t('appRibbonExpand'),
@@ -623,6 +626,7 @@ export function ExcelShell({
     }
     const timer = window.setTimeout(() => onSend(aiPreset.text), 120)
     return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiPreset?.nonce])
   // the "show the AI sidebar" setting off hides the copilot rail (soft hide):
   // an explicit AI action (ribbon run, toggle) still opens the panel, and
@@ -676,6 +680,7 @@ export function ExcelShell({
   const insertFunctionOpen = insertFunction !== null
   const liveFunctions = useMemo(
     () => (insertFunctionOpen ? onListFunctions() : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [insertFunctionOpen],
   )
   const insertFunctionOpenRef = useRef(insertFunctionOpen)
@@ -915,13 +920,15 @@ export function ExcelShell({
       document.querySelector('.goto-in-bar')?.remove()
     }
   }, [])
-  const visibleTabs: readonly RibbonTab[] = [
-    ...ribbonTabs,
-    ...(selectedChart ? (['Chart Design'] as const) : []),
-    ...(selectedTable ? (['Table Design'] as const) : []),
-    ...(selectedVisualKind === 'shape' ? (['Shape Format'] as const) : []),
-    ...(selectedVisualKind === 'image' ? (['Picture Format'] as const) : []),
-  ]
+  const visibleTabs: readonly RibbonTab[] = viewOnly
+    ? VIEW_ONLY_TABS
+    : [
+        ...ribbonTabs,
+        ...(selectedChart ? (['Chart Design'] as const) : []),
+        ...(selectedTable ? (['Table Design'] as const) : []),
+        ...(selectedVisualKind === 'shape' ? (['Shape Format'] as const) : []),
+        ...(selectedVisualKind === 'image' ? (['Picture Format'] as const) : []),
+      ]
   const saveAsTitle = `${t('appSaveAs')} (${platformShortcuts('⇧⌘S')})`
 
   return (
@@ -996,14 +1003,14 @@ export function ExcelShell({
             </label>
           )}
           <span className="qa-sep" aria-hidden="true" />
-          <RibbonTabScroller activeKey={activeTab}>
+          <RibbonTabScroller activeKey={effectiveTab}>
             {visibleTabs.map((tab) => (
               <button
-                className={`ribbon-tab ${collapse.tabClass(tab === activeTab)} ${CONTEXTUAL_TABS.includes(tab) ? 'contextual' : ''}`}
-                data-tip={collapse.tabTip(tab === activeTab)}
+                className={`ribbon-tab ${collapse.tabClass(tab === effectiveTab)} ${CONTEXTUAL_TABS.includes(tab) ? 'contextual' : ''}`}
+                data-tip={collapse.tabTip(tab === effectiveTab)}
                 key={tab}
                 onClick={() => {
-                  collapse.onTabPress(tab === activeTab)
+                  collapse.onTabPress(tab === effectiveTab)
                   setActiveTab(tab)
                 }}
               >
@@ -1025,7 +1032,7 @@ export function ExcelShell({
         </nav>
 
         <Ribbon
-          activeTab={activeTab}
+          activeTab={effectiveTab}
           selectionFormat={selectionFormat}
           formatPainterActive={formatPainterActive}
           sheetHasContent={sheetHasContent}

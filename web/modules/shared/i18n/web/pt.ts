@@ -140,7 +140,7 @@ export const pt = {
     'Este documento ultrapassa {max}. Suas alterações ainda estão aqui. Baixe sua cópia no computador e depois reduza o tamanho das imagens ou divida o documento.',
   webSaveBlockDownload: 'Baixar minha cópia',
   uwConflictTooLargeWithLimit:
-    'Sua versão ultrapassa {max} (atualmente {size}). Escolha “Baixar minha cópia” ou feche este diálogo para reduzir o tamanho do arquivo.',
+    'Sua versão ultrapassa {max} (atualmente {size}). Feche este diálogo para reduzir o tamanho do arquivo ou escolha “Recarregar a versão mais recente” para baixar sua versão.',
   uwConflictSaveCopyTooLarge:
     'Sua versão ultrapassa o limite de tamanho do UniWork, então não foi possível criar a cópia. Feche este diálogo para reduzir o tamanho do arquivo ou escolha “Recarregar a versão mais recente” para baixar sua versão.',
   uwConflictSaveCopyTooLargeWithLimit:

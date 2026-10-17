@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { navAction, shouldHandleDocumentUndo } from '../src/renderer/keyNav'
+import { clickMarkupTool, navAction, shouldHandleDocumentUndo } from '../src/renderer/keyNav'
 
 describe('navAction', () => {
   it('steps a whole page on ArrowDown/ArrowUp when focus is in the thumbnail sidebar', () => {
@@ -67,5 +67,33 @@ describe('shouldHandleDocumentUndo', () => {
     expect(shouldHandleDocumentUndo(target, 'z', true)).toBe(true)
     expect(shouldHandleDocumentUndo(target, 'y', true)).toBe(true)
     expect(shouldHandleDocumentUndo(document.createElement('input'), 'z', false)).toBe(true)
+  })
+})
+
+describe('armed markup tool and Escape (UNI-1876 SVF-3)', () => {
+  it('arms Highlight / Underline / Strikeout when clicked without a selection and toggles off on repeat click', () => {
+    expect(clickMarkupTool(null, 'highlight', false)).toEqual({
+      kind: 'arm',
+      nextTool: 'highlight',
+    })
+    expect(clickMarkupTool('highlight', 'highlight', false)).toEqual({
+      kind: 'arm',
+      nextTool: null,
+    })
+    expect(clickMarkupTool('highlight', 'underline', false)).toEqual({
+      kind: 'arm',
+      nextTool: 'underline',
+    })
+  })
+
+  it('applies immediately when text is already selected instead of leaving the tool armed', () => {
+    expect(clickMarkupTool(null, 'highlight', true)).toEqual({
+      kind: 'apply',
+      nextTool: null,
+    })
+    expect(clickMarkupTool('highlight', 'highlight', true)).toEqual({
+      kind: 'apply',
+      nextTool: null,
+    })
   })
 })

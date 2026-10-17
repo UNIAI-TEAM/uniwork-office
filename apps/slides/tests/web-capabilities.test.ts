@@ -179,6 +179,19 @@ describe('Ribbon gating', () => {
     const menu = texts(el.querySelector('.file-menu') as HTMLElement)
     expect(menu.some((t) => /Ctrl\+S/.test(t))).toBe(false)
   })
+
+  it('Escape closes an open File menu and calls preventDefault for the Escape forwarder (UNI-1876 SVF-2)', () => {
+    setCaps(WEB_DEFAULTS)
+    const el = mountRibbon()
+    act(() => (el.querySelector('.ribbon-tab-file') as HTMLButtonElement).click())
+    expect(el.querySelector('.file-menu')).not.toBeNull()
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    act(() => {
+      window.dispatchEvent(event)
+    })
+    expect(event.defaultPrevented).toBe(true)
+    expect(el.querySelector('.file-menu')).toBeNull()
+  })
 })
 
 describe('save flow', () => {

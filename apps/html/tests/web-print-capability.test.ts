@@ -42,12 +42,17 @@ async function mountApp(caps: Record<string, unknown>) {
   resetForTest()
   let exportRequest: ((format: string) => void) | undefined
   const exportPdf = vi.fn(async () => ({ ok: true, path: 'page.pdf' }))
-  const stubs: Record<string, ReturnType<typeof vi.fn>> = {
+  let previewMessage: ((data: unknown) => void) | undefined
+  const stubs: Record<string, (...args: unknown[]) => unknown> = {
     consumePending: vi.fn(async () => '/u/page.html'),
     getPreviewInfo: vi.fn(async () => ({ url: 'about:blank' })),
     readFile: vi.fn(async () => RAW),
     uniworkState: vi.fn(async () => ({ bound: false, readOnly: false })),
     exportPdf,
+    connectPreview: vi.fn((_win: unknown, handlers: { onMessage: (data: unknown) => void }) => {
+      previewMessage = handlers.onMessage
+      return { post: () => {}, close: () => {} }
+    }),
     onExportRequest: vi.fn((cb: (format: string) => void) => {
       exportRequest = cb
       return () => {}
@@ -74,7 +79,12 @@ async function mountApp(caps: Record<string, unknown>) {
     act(() => root.unmount())
     container.remove()
   })
-  return { exportPdf, request: (format: string) => exportRequest!(format) }
+  return {
+    container,
+    exportPdf,
+    request: (format: string) => exportRequest!(format),
+    sendPreview: (data: unknown) => previewMessage?.(data),
+  }
 }
 
 describe('host Print without an exportPdf grant', () => {
@@ -98,5 +108,30 @@ describe('host Print without an exportPdf grant', () => {
     await act(async () => request('pdf'))
     await act(async () => await new Promise((r) => setTimeout(r, 50)))
     expect(exportPdf).not.toHaveBeenCalled()
+  })
+})
+
+describe('preview iframe Escape relay (UNI-1876 SVF-5)', () => {
+  it('dispatches a cancelable window Escape keydown when gx:keyCommand escape arrives with no selected element', async () => {
+    const { container, sendPreview } = await mountApp({
+      platform: 'web',
+      htmlPreviewScripts: true,
+    })
+    const frame = container.querySelector('iframe.preview-frame')!
+    await act(async () => {
+      frame.dispatchEvent(new Event('load'))
+    })
+    const seen: KeyboardEvent[] = []
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') seen.push(e)
+    }
+    window.addEventListener('keydown', onKey)
+    cleanups.push(() => window.removeEventListener('keydown', onKey))
+
+    await act(async () => {
+      sendPreview({ type: 'gx:keyCommand', command: 'escape', version: 0 })
+    })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]!.defaultPrevented).toBe(false)
   })
 })

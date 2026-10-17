@@ -15,7 +15,7 @@ import {
   type SaveCopyAttempt,
 } from './conflict-dialog'
 import { onFrameModal } from './frame-dialog'
-import { webText, type WebStringKey } from './i18n/strings-web'
+import { webStrings, webText, type WebStringKey } from './i18n/strings-web'
 
 const t = (key: WebStringKey, params?: Record<string, string>) =>
   webText(webLanguage(), key, params)
@@ -916,7 +916,8 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
     expect(alertLine().textContent).toBe(
       format(t('uwConflictTooLargeWithLimit'), { size: '200.1 MB', max: '200 MB' }),
     )
-
+    expect(alertLine().textContent).not.toContain('Download my copy')
+    expect(alertLine().textContent).toContain('Reload latest')
     // Save as a copy also stays on step 1 without calling io.saveCopy, using copy-specific text (SVC-3)
     await pick('save-copy')
     expect(saveCopy).not.toHaveBeenCalled()
@@ -1044,6 +1045,27 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
       expect(await doneEn).toEqual({ kind: 'cancelled' })
     } finally {
       setWebLanguage(prevLang)
+    }
+  })
+
+  it('SVF-7 / RFR2-1 / RFR2-2: step-1 too-large messages in all 19 locales never name the non-existent webSaveBlockDownload button and explain that Reload latest downloads the version', () => {
+    for (const [lang, dict] of Object.entries(webStrings)) {
+      expect(dict.uwConflictTooLargeWithLimit, `${lang} uwConflictTooLargeWithLimit`).not.toContain(
+        dict.webSaveBlockDownload,
+      )
+      expect(dict.uwConflictSaveCopyTooLarge, `${lang} uwConflictSaveCopyTooLarge`).not.toContain(
+        dict.webSaveBlockDownload,
+      )
+      expect(
+        dict.uwConflictSaveCopyTooLargeWithLimit,
+        `${lang} uwConflictSaveCopyTooLargeWithLimit`,
+      ).not.toContain(dict.webSaveBlockDownload)
+    }
+    for (const lang of ['ar', 'he', 'hi', 'ko', 'th'] as const) {
+      const dict = webStrings[lang]
+      expect(dict.uwConflictTooLargeWithLimit).toContain(dict.uwConflictReloadTitle)
+      expect(dict.uwConflictSaveCopyTooLarge).toContain(dict.uwConflictReloadTitle)
+      expect(dict.uwConflictSaveCopyTooLargeWithLimit).toContain(dict.uwConflictReloadTitle)
     }
   })
 })

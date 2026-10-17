@@ -74,7 +74,7 @@ import { CropDialog, CutoutDialog, cropImagePng } from './ImageDialogs'
 import { cropRect, flipPixels, multiplyAlpha } from './image-bake'
 import type { CropFractions, ImageBakeOp } from './image-bake'
 import { removeBackground, type PixelImage } from './cutout'
-import { navAction, shouldHandleDocumentUndo } from './keyNav'
+import { clickMarkupTool, navAction, shouldHandleDocumentUndo } from './keyNav'
 import { rowOfVisIdx, spreadRows, stepPage } from './spread'
 import {
   captureViewState,
@@ -466,6 +466,7 @@ export default function App() {
   const drawingsRef = useRef(drawings)
   drawingsRef.current = drawings
   const [drawTool, setDrawTool] = useState<DrawTool | null>(null)
+  const [markupTool, setMarkupTool] = useState<MarkupType | null>(null)
   const [redactions, setRedactions] = useState<LocalRedaction[]>([])
   const redactionApplyConfirmedRef = useRef(false)
   const redactionRequestInFlightRef = useRef(false)
@@ -1197,6 +1198,8 @@ export default function App() {
         setAnnotDeletes([])
         setNoteEdits([])
         setDrawings([])
+        setDrawTool(null)
+        setMarkupTool(null)
         applyTextEdits(() => [])
         commitTextInserts([])
         setPendingTextInsert(null)
@@ -1476,6 +1479,9 @@ export default function App() {
   /** View-only UniWork documents reuse the same read-only mode (edit tools and Save off) */
   const readOnly = viewOnly || encryptedReadOnly || uniwork.readOnly
 
+  useEffect(() => {
+    if (readOnly && markupTool) setMarkupTool(null)
+  }, [readOnly, markupTool])
   useEffect(() => {
     if (
       activeFormWidgetId &&
@@ -2338,7 +2344,6 @@ export default function App() {
     // The line affordance is just as stale after a reload (it hangs at the last
     // pre-save pointer position until the next mousemove)
     clearLineHover()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc])
 
   /** Cluster paragraph boxes for pages scrolled into view while edit-text mode is on.
@@ -2372,6 +2377,7 @@ export default function App() {
     return () => {
       stale = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editTextMode, readOnly, doc, visibleRows, rows, pageBlocks, getSearchIndex])
 
   /** Saved markup/note annotations are keyed to the loaded doc; drop them on save-reload */
@@ -2533,6 +2539,12 @@ export default function App() {
       }
       // Read-only documents still get the bar for its Ask-AI entry (Q&A works);
       // the markup buttons themselves are hidden in that state
+      if (markupTool && !readOnly) {
+        applyMarkup(markupTool)
+        window.getSelection()?.removeAllRanges()
+        setSelPopup(null)
+        return
+      }
       setSelPopup({
         x: Math.min(Math.max(box.left + box.width / 2, 70), window.innerWidth - 70),
         y: box.top >= 52 ? box.top - 44 : Math.min(box.bottom + 8, window.innerHeight - 44),
@@ -2605,6 +2617,29 @@ export default function App() {
             ],
       ),
     )
+  }
+
+  const onRibbonMarkupClick = (type: MarkupType) => {
+    if (readOnly) return
+    const selQuads = selectionQuads()
+    const outcome = clickMarkupTool(markupTool, type, selQuads !== null)
+    if (outcome.kind === 'apply') {
+      setMarkupTool(null)
+      applyMarkup(type)
+      return
+    }
+    if (outcome.nextTool) {
+      setEditTextMode(false)
+      setTextDraft(null)
+      setPendingTextInsert(null)
+      setDrawTool(null)
+      setPendingSign(null)
+      setSignatureTarget(null)
+      setImagePick(null)
+      setPendingStaticFill(null)
+      setEditImageMode(false)
+    }
+    setMarkupTool(outcome.nextTool)
   }
 
   /** Ask-AI entry on the markup bar: capture the selection box as the popover
@@ -3713,6 +3748,7 @@ export default function App() {
     if (!formHasXfa || !filePath || warnedXfaPathRef.current === filePath) return
     warnedXfaPathRef.current = filePath
     showNotice(t('formXfaWarning'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, formHasXfa])
 
   /** Localize known structured main-process errors; other messages pass through raw */
@@ -4298,6 +4334,7 @@ export default function App() {
     setTextDraft(null)
     setPendingTextInsert(null)
     setDrawTool(null)
+    setMarkupTool(null)
     setPendingSign(null)
     setSignatureTarget(null)
     setEditImageMode(false)
@@ -4446,6 +4483,7 @@ export default function App() {
     setTextDraft(null)
     setPendingTextInsert(null)
     setDrawTool(null)
+    setMarkupTool(null)
     setPendingSign(null)
     setSignatureTarget(null)
     setPendingStaticFill(null)
@@ -6301,6 +6339,9 @@ export default function App() {
         } else if (drawTool) {
           e.preventDefault()
           setDrawTool(null)
+        } else if (markupTool) {
+          e.preventDefault()
+          setMarkupTool(null)
         } else if (selected) {
           e.preventDefault()
           setSelected(null)
@@ -6484,10 +6525,11 @@ export default function App() {
           className="rb-drop-wrap rb-highlight-drop-wrap rb-highlight-split"
         >
           <button
-            className="rb-big rb-highlight-main"
+            className={`rb-big rb-highlight-main${markupTool === 'highlight' ? ' active' : ''}`}
+            aria-pressed={markupTool === 'highlight'}
             disabled={readOnly}
             data-tip={t('highlight')}
-            onClick={() => applyMarkup('highlight')}
+            onClick={() => onRibbonMarkupClick('highlight')}
           >
             <span className="rb-big-icon">
               <span className="rb-big-icon-colored">
@@ -6516,10 +6558,11 @@ export default function App() {
           )}
         </div>
         <button
-          className="rb-big"
+          className={`rb-big${markupTool === 'underline' ? ' active' : ''}`}
+          aria-pressed={markupTool === 'underline'}
           disabled={readOnly}
           data-tip={t('underline')}
-          onClick={() => applyMarkup('underline')}
+          onClick={() => onRibbonMarkupClick('underline')}
         >
           <span className="rb-big-icon">
             <IconUnderline />
@@ -6527,10 +6570,11 @@ export default function App() {
           {t('underline')}
         </button>
         <button
-          className="rb-big"
+          className={`rb-big${markupTool === 'strikeout' ? ' active' : ''}`}
+          aria-pressed={markupTool === 'strikeout'}
           disabled={readOnly}
           data-tip={t('strikeout')}
-          onClick={() => applyMarkup('strikeout')}
+          onClick={() => onRibbonMarkupClick('strikeout')}
         >
           <span className="rb-big-icon">
             <IconStrike />
@@ -6625,6 +6669,7 @@ export default function App() {
         setTextDraft(null)
         setPendingTextInsert(null)
         setDrawTool(null)
+        setMarkupTool(null)
         setPendingSign(null)
         setImagePick(null)
         setEditImageMode(false)
@@ -6651,6 +6696,7 @@ export default function App() {
         setEditTextMode(false)
         setTextDraft(null)
         setDrawTool(null)
+        setMarkupTool(null)
         setPendingSign(null)
         setSignatureTarget(null)
         setImagePick(null)
@@ -6710,6 +6756,7 @@ export default function App() {
     setTextDraft(null)
     setPendingTextInsert(null)
     setDrawTool(null)
+    setMarkupTool(null)
     setImagePick(null)
     setEditImageMode(false)
     setPendingSign(null)
@@ -7079,6 +7126,7 @@ export default function App() {
                         setPendingTextInsert(null)
                         setImagePick(null)
                         setEditImageMode(false)
+                        setMarkupTool(null)
                         setDrawTool((v) => (v === tool ? null : tool))
                       }}
                     >
@@ -7145,6 +7193,7 @@ export default function App() {
                           setEditTextMode(false)
                           setTextDraft(null)
                           setEditImageMode(false)
+                          setMarkupTool(null)
                           setDrawTool((tool) => (tool === 'redact' ? null : 'redact'))
                         }}
                       >
@@ -7272,6 +7321,7 @@ export default function App() {
                         setEditTextMode(false)
                         setTextDraft(null)
                         setDrawTool(null)
+                        setMarkupTool(null)
                         setPendingSign(null)
                         setImagePick(null)
                         setPendingTextInsert(null)

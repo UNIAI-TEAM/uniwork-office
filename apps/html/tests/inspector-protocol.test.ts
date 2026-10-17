@@ -1,6 +1,12 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
 import { isFromInspector } from '../src/renderer/preview/inspector-protocol'
 
+const here = dirname(fileURLToPath(import.meta.url))
+const inspectorSrc = readFileSync(join(here, '../src/renderer/preview/inspector.js'), 'utf8')
 describe('isFromInspector', () => {
   it('accepts well-formed inspector messages', () => {
     expect(isFromInspector({ type: 'gx:ready', version: 3, title: 't', docHeight: 10 })).toBe(true)
@@ -16,5 +22,35 @@ describe('isFromInspector', () => {
     expect(isFromInspector({ type: 'gx:ready', title: 't' })).toBe(false)
     expect(isFromInspector({ type: 'gx:ready', version: '3' })).toBe(false)
     expect(isFromInspector({ type: 'gx:ready', version: Number.NaN })).toBe(false)
+  })
+})
+
+describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
+  function makePreview() {
+    const messages: Array<Record<string, unknown>> = []
+    const dom = new JSDOM('<!doctype html><html><body><p data-gx-sid="1">Hello</p></body></html>', {
+      runScripts: 'dangerously',
+    })
+    Object.assign(dom.window, {
+      __gxPreviewPort: {
+        start: () => {},
+        addEventListener: () => {},
+        postMessage: (msg: Record<string, unknown>) => messages.push(msg),
+      },
+    })
+    dom.window.eval(inspectorSrc.replace('__GX_VERSION__', '1'))
+    messages.length = 0
+    return { dom, messages }
+  }
+
+  it('relays Escape from the preview iframe when no element is selected and focus is not in a field', () => {
+    const { dom, messages } = makePreview()
+    const ev = new dom.window.KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    })
+    dom.window.document.body.dispatchEvent(ev)
+    expect(messages).toEqual([{ type: 'gx:keyCommand', command: 'escape', version: 1 }])
   })
 })

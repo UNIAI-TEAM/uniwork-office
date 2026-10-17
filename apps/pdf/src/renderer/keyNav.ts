@@ -1,3 +1,23 @@
+import type { MarkupType } from '../shared/ipc'
+
+export type MarkupToolClickOutcome =
+  | { readonly kind: 'apply'; readonly nextTool: null }
+  | { readonly kind: 'arm'; readonly nextTool: MarkupType | null }
+
+/**
+ * Ribbon Highlight / Underline / Strikeout click: with an active page selection
+ * the markup applies immediately; without one, clicking arms (or toggles off)
+ * the markup tool so the next selection applies it and Escape disarms it.
+ */
+export function clickMarkupTool(
+  currentTool: MarkupType | null,
+  clicked: MarkupType,
+  hasSelection: boolean,
+): MarkupToolClickOutcome {
+  if (hasSelection) return { kind: 'apply', nextTool: null }
+  return { kind: 'arm', nextTool: currentTool === clicked ? null : clicked }
+}
+
 /** What a plain (no-modifier) navigation key should do in the viewer */
 export type NavAction =
   | { type: 'scrollBy'; delta: number }
