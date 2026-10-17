@@ -6,7 +6,7 @@ import { createWebApi, idFromPath, pathFor, WEB_PRINT_PART, type WebApi } from '
 import { createMockPort, protocolError, timeoutAfter, type MockPort } from './testing/mock-port'
 import { text } from './notice'
 import { webText, type WebStringKey } from '../../modules/shared/i18n/strings-web'
-import { webLanguage } from './browser'
+import { setWebLanguage, webLanguage } from './browser'
 import { frameAiRun } from '../../modules/shared/ai-run'
 // the renderer's own reader: resolves the bridge's in-page handoff without fetch()
 import { fetchDocBytes as bytesAt } from '../../../apps/docs/src/renderer/doc-bytes'
@@ -77,6 +77,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  setWebLanguage('en', { host: true })
   vi.restoreAllMocks()
   vi.useRealTimers()
   document.body.replaceChildren()
@@ -262,8 +263,8 @@ describe('saveDocx', () => {
     )
     // the host learns that a frame modal is open (protocol `modal`)
     expect(mock.modals).toEqual([true])
-    // Tab cycles inside the dialog (View differences, reload, overwrite, the way out, then the
-    // close X), starting from Cancel: cancel -> X -> diff -> reload -> overwrite; Shift+Tab goes back
+    // Tab cycles inside the dialog (View differences, reload, save-copy, overwrite, the way out,
+    // then the close X), starting from Cancel: cancel -> X -> diff -> reload -> save-copy -> overwrite; Shift+Tab goes back
     const tab = (shiftKey = false) =>
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true }))
     tab()
@@ -273,7 +274,11 @@ describe('saveDocx', () => {
     tab()
     expect(document.activeElement).toBe(btn('reload'))
     tab()
+    expect(document.activeElement).toBe(btn('save-copy'))
+    tab()
     expect(document.activeElement).toBe(btn('overwrite'))
+    tab(true)
+    expect(document.activeElement).toBe(btn('save-copy'))
     tab(true)
     expect(document.activeElement).toBe(btn('reload'))
     tab(true)
@@ -285,6 +290,138 @@ describe('saveDocx', () => {
     expect(mock.saved).toHaveLength(0)
     expect(document.querySelector('[data-docs-web="conflict"]')).toBeNull()
     expect(mock.modals).toEqual([true, false])
+  })
+
+  it('conflict -> Save as a copy…: present when editable, absent when view-only (UNI-1872)', async () => {
+    const doc = await bootWith()
+    mock.bumpRemote('f1')
+    const pending1 = api.saveDocx(doc.path, buf([7, 8]))
+    const dlg1 = await dialogShown('conflict')
+    expect(dlg1.querySelector('[data-choice="save-copy"]')).not.toBeNull()
+    await choose('conflict', 'cancel')
+    await pending1
+
+    // If the file becomes view-only while a save hits 409, save-copy and overwrite are omitted
+    mock.override('api.save', () => {
+      mock.emit('file.renamed', {
+        fileId: 'f1',
+        name: 'Report-ro.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        size: DOCX.length,
+        etag: '"f1-v2"',
+        versionId: 'v2',
+        updatedAt: '2026-03-23T00:01:00.000Z',
+        writable: false,
+      })
+      return Promise.reject(protocolError('conflict', 'HTTP 409'))
+    })
+    const pending2 = api.saveDocx(doc.path, buf([9]))
+    const dlg2 = await dialogShown('conflict')
+    expect(dlg2.querySelector('[data-choice="save-copy"]')).toBeNull()
+    expect(dlg2.querySelector('[data-choice="overwrite"]')).toBeNull()
+    await choose('conflict', 'cancel')
+    await pending2
+  })
+
+  it('conflict -> Save as a copy… -> confirm: sends api.saveCopy with open bytes and localized copy name, shows Done alert without re-pointing open document (UNI-1872)', async () => {
+    const doc = await bootWith('Report.docx')
+    const seenOpens: OpenFileResult[] = []
+    api.onOpenDocx((r) => seenOpens.push(r as OpenFileResult))
+    const remote = mock.bumpRemote('f1')
+    const pending = api.saveDocx(doc.path, buf([9, 8, 7]))
+    await choose('conflict', 'save-copy')
+    await choose('conflict', 'go')
+
+    const dlg = await dialogShown('conflict')
+    // Back on step 1 with the Done alert quoting the copy's title
+    for (let i = 0; i < 50 && !dlg.querySelector('.ow-dlg-alert'); i++) await flush()
+    const copyCalls = mock.calls.filter((c) => (c.type as string) === 'api.saveCopy')
+    expect(copyCalls).toHaveLength(1)
+    const sent = copyCalls[0]!.payload as { data: ArrayBuffer; name: string }
+    expect(new Uint8Array(sent.data)).toEqual(new Uint8Array([9, 8, 7]))
+    expect(sent.name).toBe('Report (copy)')
+    expect(dlg.querySelector('.ow-dlg-alert')?.textContent).toBe(
+      webText(webLanguage(), 'uwConflictSaveCopyDone', { title: 'Report (copy)' }),
+    )
+    // Open document was NOT re-pointed, reloaded, or reported saved
+    expect(seenOpens).toEqual([])
+    expect(mock.saved).toEqual([])
+    expect(mock.bytesOf('f1')).toEqual(DOCX)
+
+    // Still in step 1: Overwrite still targets f1 against remote.etag
+    await choose('conflict', 'overwrite')
+    await choose('conflict', 'go')
+    expect(await pending).toEqual({ ok: true })
+    const saves = mock.calls.filter((c) => c.type === 'api.save')
+    expect(saves.map((c) => (c.payload as { fileId: string; etag?: string }))).toEqual([
+      expect.objectContaining({ fileId: 'f1', etag: '"f1-v1"' }),
+      expect.objectContaining({ fileId: 'f1', etag: remote.etag }),
+    ])
+  })
+
+  it('conflict -> Save as a copy…: unsupported and generic/refusal errors show failed alert and keep edits safe (UNI-1872)', async () => {
+    const doc = await bootWith('Báo cáo.docx')
+    setWebLanguage('vi', { host: true })
+    mock.bumpRemote('f1')
+    mock.override('api.saveCopy' as never, () =>
+      Promise.reject(protocolError('unsupported', 'api.saveCopy')),
+    )
+    const pending = api.saveDocx(doc.path, buf([4, 5]))
+    await choose('conflict', 'save-copy')
+    await choose('conflict', 'go')
+
+    const dlg = await dialogShown('conflict')
+    for (let i = 0; i < 50 && !dlg.querySelector('.ow-dlg-alert'); i++) await flush()
+    expect(dlg.querySelector('.ow-dlg-alert')?.textContent).toBe(
+      webText('vi', 'uwConflictSaveCopyFailed'),
+    )
+    const sent = mock.calls.find((c) => (c.type as string) === 'api.saveCopy')!.payload as {
+      name: string
+    }
+    expect(sent.name).toBe('Báo cáo (bản sao)')
+
+    // Generic / host-refusal error (e.g. forbidden with apiCode copy_consent_required) also shows failed alert
+    mock.override('api.saveCopy' as never, () =>
+      Promise.reject(
+        protocolError('forbidden', 'copy refused', false, 403, {
+          apiCode: 'copy_consent_required',
+        }),
+      ),
+    )
+    await choose('conflict', 'go')
+    for (let i = 0; i < 50 && !dlg.querySelector('.ow-dlg-alert'); i++) await flush()
+    expect(dlg.querySelector('.ow-dlg-alert')?.textContent).toBe(
+      webText('vi', 'uwConflictSaveCopyFailed'),
+    )
+
+    await choose('conflict', 'cancel')
+    expect(await pending).toEqual({ ok: false, error: text('appWebConflictNotSaved') })
+  })
+
+  it('conflict -> Save as a copy…: too_large with details.max_bytes returns to step 1 with limit alert (UNI-1872)', async () => {
+    const doc = await bootWith()
+    mock.bumpRemote('f1')
+    mock.override('api.saveCopy' as never, () =>
+      Promise.reject(protocolError('too_large', 'HTTP 413', false, 413, { max_bytes: 2 })),
+    )
+    const pending = api.saveDocx(doc.path, buf([1, 2, 3, 4]))
+    await choose('conflict', 'save-copy')
+    await choose('conflict', 'go')
+
+    const dlg = await dialogShown('conflict')
+    for (
+      let i = 0;
+      i < 50 && (!dlg.querySelector('.ow-dlg-alert') || !dlg.querySelector('[data-choice="save-copy"]'));
+      i++
+    ) {
+      await flush()
+    }
+    expect(dlg.querySelector('.ow-dlg-alert')?.textContent).toContain('0.0 MB')
+    expect(
+      dlg.querySelector('[data-choice="save-copy"]')?.getAttribute('aria-disabled'),
+    ).toBe('true')
+    await choose('conflict', 'cancel')
+    await pending
   })
 
   it('conflict -> Overwrite… -> confirm: re-reads the head etag and saves over the newer version', async () => {
