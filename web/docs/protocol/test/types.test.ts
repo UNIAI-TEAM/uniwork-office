@@ -422,14 +422,14 @@ describe('document size limits and events (SIZE-F1, additive)', () => {
   })
 })
 
-import * as protocolTypes from '../types'
+import { commentsAccess, isReadOnlyProfile } from '../types'
 
 describe('read-only profile and close_requested event (UNI-1876, additive)', () => {
   it('accepts absent or exact readOnly profile on init and rejects any other value', () => {
     expect(PROTOCOL_VERSION).toBe(1)
     expect(isInitPayload(init)).toBe(true)
     expect(isInitPayload({ ...init, profile: undefined })).toBe(true)
-    expect(isInitPayload({ ...init, profile: 'readOnly' } as unknown)).toBe(true)
+    expect(isInitPayload({ ...init, profile: 'readOnly' })).toBe(true)
     expect(
       parseEnvelope(
         env({ kind: 'request', type: 'init', payload: { ...init, profile: 'readOnly' } }),
@@ -465,21 +465,15 @@ describe('read-only profile and close_requested event (UNI-1876, additive)', () 
   })
 
   it('exposes isReadOnlyProfile helper and forces commentsAccess to view only when profile is readOnly (D4)', () => {
-    const isReadOnlyProfile = (
-      protocolTypes as unknown as {
-        isReadOnlyProfile?: (x: { profile?: unknown } | null | undefined) => boolean
-      }
-    ).isReadOnlyProfile
-    expect(typeof isReadOnlyProfile).toBe('function')
-    expect(isReadOnlyProfile?.({ profile: 'readOnly' })).toBe(true)
-    expect(isReadOnlyProfile?.({})).toBe(false)
-    expect(isReadOnlyProfile?.({ profile: undefined })).toBe(false)
-    expect(isReadOnlyProfile?.({ profile: 'edit' })).toBe(false)
-    expect(isReadOnlyProfile?.(null)).toBe(false)
-    expect(isReadOnlyProfile?.(undefined)).toBe(false)
+    expect(isReadOnlyProfile({ profile: 'readOnly' })).toBe(true)
+    expect(isReadOnlyProfile({})).toBe(false)
+    expect(isReadOnlyProfile({ profile: undefined })).toBe(false)
+    expect(isReadOnlyProfile({ profile: 'edit' })).toBe(false)
+    expect(isReadOnlyProfile(null)).toBe(false)
+    expect(isReadOnlyProfile(undefined)).toBe(false)
 
     // D4: save:false alone keeps comments per commentsLevel
-    const commenter = protocolTypes.commentsAccess({
+    const commenter = commentsAccess({
       capabilities: { save: false, comments: true },
       commentsLevel: 'comment',
       user: { id: 'u1' },
@@ -487,12 +481,12 @@ describe('read-only profile and close_requested event (UNI-1876, additive)', () 
     expect(commenter).toMatchObject({ enabled: true, level: 'comment', canCreate: true })
 
     // profile:'readOnly' forces server comments to view-only regardless of commentsLevel
-    const viewer = protocolTypes.commentsAccess({
+    const viewer = commentsAccess({
       capabilities: { save: false, comments: true },
       commentsLevel: 'edit',
       user: { id: 'u1' },
       profile: 'readOnly',
-    } as Parameters<typeof protocolTypes.commentsAccess>[0])
+    })
     expect(viewer).toMatchObject({ enabled: true, level: 'view', canCreate: false })
   })
 })

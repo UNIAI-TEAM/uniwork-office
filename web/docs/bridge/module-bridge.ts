@@ -39,6 +39,9 @@ import {
 } from '../../modules/shared/ai/web-ai'
 import { FRAME_COMMENTS, frameCommentsClaim } from '../../modules/shared/discussion/claim'
 import { mountFrameDiscussion, type DiscussionPort } from '../../modules/shared/discussion/mount'
+import { installEscapeForwarder, isReadOnlyProfile } from './escape-forwarder'
+
+export { installEscapeForwarder, isReadOnlyProfile }
 
 /** what the installer hands each global's factory */
 export interface ModuleBridgeContext {
@@ -76,6 +79,7 @@ export type ModuleBridgePort = Pick<
   | 'reportSizeWarning'
   | 'reportSaveBlocked'
   | 'reportLagDetected'
+  | 'reportCloseRequested'
 >
 
 export interface ModuleBridgeSpec {

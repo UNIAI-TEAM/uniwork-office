@@ -30,6 +30,8 @@
     "frame-boot.ts",
     "module-bridge.ts",
     "module-bridge.test.ts",
+    "escape-forwarder.ts",
+    "escape-forwarder.test.ts",
     "draft-recovery.ts",
     "draft-recovery.test.ts",
     "mock-port.test.ts",

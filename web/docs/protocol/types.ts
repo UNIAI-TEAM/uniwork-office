@@ -442,6 +442,26 @@ export interface InitPayload extends TokenPayload {
    * independently to DEFAULT_DOCUMENT_LIMITS via resolveDocumentSizeLimits and never fail init.
    */
   limits?: DocumentSizeLimits
+  /**
+   * additive (UNI-1876): when set, the frame shows no editing UI regardless of grants (editor
+   * read-only, no Save / Save as / Save copy, no local comments, server comments view-only, no PDF
+   * edit tools, no export-to-new-file such as Export Word, AI write tools off); granted viewing
+   * actions (`download`, `print`, `exportPdf`) stay; a host must ALSO withhold the edit
+   * capabilities because an older frame ignores the field.
+   */
+  profile?: 'readOnly'
+}
+
+export const FRAME_PROFILES = ['readOnly'] as const
+export type FrameProfile = (typeof FRAME_PROFILES)[number]
+
+/**
+ * True when the `init` payload or initialized frame session sets `profile: 'readOnly'` (UNI-1876).
+ */
+export function isReadOnlyProfile(
+  init: { readonly profile?: unknown } | null | undefined,
+): boolean {
+  return init?.profile === 'readOnly'
 }
 
 /**
@@ -1259,19 +1279,22 @@ export type CommentAction = 'edit' | 'delete' | 'resolve' | 'reopen'
  * The frame's affordance rules (§10, OQ-C12, G8-18): view = nothing that writes; comment =
  * composer, own edit/delete, and resolve/reopen on own root threads only; edit = composer, own
  * edit/delete, resolve/reopen any thread; manage = also edit/delete of others; missing level =
- * composer and actions on own comments, never on others. `forbidden`: a 403 from the server turns
- * the panel read-only. Never probe the level with a write request.
+ * composer and actions on own comments, never on others. `forbidden` (a 403 from the server) or
+ * `profile: 'readOnly'` (UNI-1876 D4) turns the panel read-only (`save: false` alone keeps the
+ * caller's `commentsLevel`). Never probe the level with a write request.
  */
 export function commentsAccess(
   session: {
     capabilities: Capabilities
     commentsLevel?: CommentsLevel
     user?: { id?: string }
+    profile?: 'readOnly'
   },
   opts: { forbidden?: boolean } = {},
 ): CommentsAccess {
   const enabled = session.capabilities.comments === true
-  const level: CommentsLevel | null = opts.forbidden ? 'view' : (session.commentsLevel ?? null)
+  const level: CommentsLevel | null =
+    opts.forbidden || isReadOnlyProfile(session) ? 'view' : (session.commentsLevel ?? null)
   const out: CommentsAccess = { enabled, level, canCreate: enabled && level !== 'view' }
   if (session.user?.id) out.userId = session.user.id
   return out
@@ -1416,6 +1439,17 @@ export interface LagDetectedPayload {
   bytes?: number
 }
 
+export const CLOSE_REQUESTED_REASONS = ['escape'] as const
+export type CloseRequestedReason = (typeof CLOSE_REQUESTED_REASONS)[number]
+
+/**
+ * additive (UNI-1876): sent when Esc is pressed in the frame and no frame-local UI consumed it;
+ * the host decides what to close.
+ */
+export interface CloseRequestedPayload {
+  reason: CloseRequestedReason
+}
+
 /** Events the frame sends to the host. */
 export interface FrameEvents {
   /** handshake: the frame booted and listens; the host answers with `init` */
@@ -1439,6 +1473,11 @@ export interface FrameEvents {
   lag_detected: LagDetectedPayload
   /** additive (SIZE-F1, contract-size-frame §3.1a): the frame refused to open the document */
   open_refused: OpenRefusedPayload
+  /**
+   * additive (UNI-1876): sent when Esc is pressed in the frame and no frame-local UI consumed it;
+   * the host decides what to close.
+   */
+  close_requested: CloseRequestedPayload
 }
 
 export type HostRequestType = keyof HostRequests
@@ -1522,6 +1561,7 @@ const FRAME_EVENTS: Record<FrameEventType, true> = {
   save_blocked: true,
   lag_detected: true,
   open_refused: true,
+  close_requested: true,
 }
 export const HOST_REQUEST_TYPES = Object.keys(HOST_REQUESTS) as readonly HostRequestType[]
 export const HOST_EVENT_TYPES = Object.keys(HOST_EVENTS) as readonly HostEventType[]
@@ -1754,6 +1794,13 @@ export function isReadyPayload(x: unknown): x is ReadyPayload {
   )
 }
 
+const isFrameProfile = isOneOf(FRAME_PROFILES)
+const isCloseRequestedReason = isOneOf(CLOSE_REQUESTED_REASONS)
+
+export function isCloseRequestedPayload(x: unknown): x is CloseRequestedPayload {
+  return isObj(x) && isCloseRequestedReason(x.reason)
+}
+
 export function isInitPayload(x: unknown): x is InitPayload {
   return (
     isTokenPayload(x) &&
@@ -1770,7 +1817,8 @@ export function isInitPayload(x: unknown): x is InitPayload {
     isOpt(x.module, isOfficeModule) &&
     isOpt(x.user, isInitUser) &&
     isOpt(x.recovery, isInitRecovery) &&
-    isOpt(x.downloadMaxBytes, isPositiveSafeInt)
+    isOpt(x.downloadMaxBytes, isPositiveSafeInt) &&
+    isOpt(x.profile, isFrameProfile)
     // x.commentsLevel is a hint: any value passes, the frame drops an unknown one (FE-W8P-1)
   )
 }
@@ -1931,6 +1979,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
     isPositiveSafeInt(x.count) &&
     (x.window_ms === 0 || x.window_ms === 120_000) &&
     isOpt(x.bytes, isNonNegSafeInt),
+  'event:close_requested': isCloseRequestedPayload,
   // successful responses
   'response:init': isInitAck,
   'response:open': (x) => isObj(x) && x.opened === true && isOpt(x.title, isStr),

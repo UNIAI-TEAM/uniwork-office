@@ -1739,18 +1739,9 @@ describe('read-only profile and close_requested (UNI-1876, additive)', () => {
     await client.whenInitialized()
 
     const seen: unknown[] = []
-    const off = (
-      host.on as unknown as (
-        type: 'close_requested',
-        listener: (payload: { reason: 'escape' }) => void,
-      ) => () => void
-    )('close_requested', (p) => seen.push(p))
+    const off = host.on('close_requested', (p) => seen.push(p))
 
-    const reportCloseRequested = (
-      client as unknown as { reportCloseRequested?: (reason: 'escape') => void }
-    ).reportCloseRequested
-    expect(typeof reportCloseRequested).toBe('function')
-    reportCloseRequested?.('escape')
+    client.reportCloseRequested('escape')
     await flush()
 
     expect(seen).toEqual([{ reason: 'escape' }])
@@ -1767,7 +1758,7 @@ describe('read-only profile and close_requested (UNI-1876, additive)', () => {
     for (const m of closeEvents) expect(parseEnvelope(m).ok).toBe(true)
 
     off()
-    reportCloseRequested?.('escape')
+    client.reportCloseRequested('escape')
     await flush()
     expect(seen).toHaveLength(1)
   })
@@ -1775,13 +1766,10 @@ describe('read-only profile and close_requested (UNI-1876, additive)', () => {
   it('propagates init.profile to client session and clears it on re-init without profile', async () => {
     let currentProfile: 'readOnly' | undefined = 'readOnly'
     const { host, client, hostWin, frameWin } = setup({
-      getInit: async () =>
-        baseInit(
-          currentProfile ? ({ profile: currentProfile } as Partial<InitPayload>) : undefined,
-        ),
+      getInit: async () => baseInit(currentProfile ? { profile: currentProfile } : undefined),
     })
     await host.whenReady()
-    const session = (await client.whenInitialized()) as { profile?: string }
+    const session = await client.whenInitialized()
     expect(session.profile).toBe('readOnly')
 
     // Re-init without profile clears session.profile
