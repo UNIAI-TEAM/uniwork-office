@@ -61,6 +61,7 @@ import type {
   UniworkDocRenamedEvent,
   UniworkDocStatus,
   UniworkDocSummary,
+  UniworkFirstSaveInput,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
@@ -1228,6 +1229,24 @@ const homeApi: HomeApi = {
   },
   async uniworkResolveConflict(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.resolveConflict, path))
+  },
+  onUniworkFirstSaveOpen(cb: (request: { path: string }) => void) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const path = raw && typeof raw === 'object' ? (raw as { path?: unknown }).path : undefined
+      if (typeof path === 'string' && path) cb({ path })
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.firstSaveOpen, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.firstSaveOpen, listener)
+  },
+  async uniworkFirstSave(input: UniworkFirstSaveInput) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.firstSave, input),
+    )
+  },
+  async uniworkEnsureMyFolder(workspaceId: string) {
+    return asUniworkResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.ensureMyFolder, workspaceId),
+    )
   },
   onUniworkConflict(cb) {
     const listener = (_event: IpcRendererEvent, raw: unknown) => {

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -21,6 +21,7 @@ import type {
   UniworkDocRenamedEvent,
   UniworkDocSummary,
   UniworkDocStatus,
+  UniworkFirstSaveInput,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
@@ -67,7 +68,12 @@ import {
   type PathBinding,
   scopeWorkingCopyDirs,
 } from './binding-store'
-import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
+import {
+  type FetchLike,
+  type UniworkCreateTarget,
+  type UniworkDocsClient,
+  createUniworkDocsClient,
+} from './client'
 import { UniworkDocError } from './errors'
 import {
   copyTitleFor,
@@ -3190,7 +3196,12 @@ export class UniworkDocsService {
   /** a module's successful explicit user Save of `path` */
   onUserSave(path: string): void {
     const doc = this.store.lookup(path)
-    if (!doc || !this.ownsLocally(doc)) return
+    // SAVE-01: a first-save flush waits on this hook even for a path that is
+    // not bound yet (no binding before the first upload); release it anyway
+    if (!doc || !this.ownsLocally(doc)) {
+      this.draftFlushWaiters.get(pathKey(path))?.(true)
+      return
+    }
     this.lastUserSave.set(doc.path, ++this.saveCounter)
     // the module just wrote what its editor held
     this.editorDirty.delete(doc.path)
@@ -3241,6 +3252,23 @@ export class UniworkDocsService {
         ),
       )
       return workspaces.map((ws, index) => ({ ...ws, myRole: roles[index] ?? null }))
+    })
+  }
+
+  /**
+   * MYFOLDER-01 / SAVE-01 (Q3): the Save dialog opens on this call, which lazily
+   * creates and returns the caller's personal "My Folder" row (systemKind
+   * `'my_folder'`); the "Đang lưu trong" row and the folder picker read it.
+   */
+  ensureMyFolder(workspaceId: string): Promise<UniworkResult<UniworkDocSummary>> {
+    return result(async () => {
+      const session = this.captureActionSession()
+      const ws = typeof workspaceId === 'string' ? workspaceId : ''
+      if (!ws) throw new UniworkDocError('not_found')
+      const folder = await this.api().ensureMyFolder(ws)
+      // a first ensure may have created the folder: its workspace's tree changed
+      this.pushTreeChangedFor(session, folder.workspaceId)
+      return folder
     })
   }
 
@@ -3494,7 +3522,7 @@ export class UniworkDocsService {
           workspaceId: target.workspaceId,
           format: input.format,
           title: name,
-          parentId: target.folderId,
+          ...target.create,
           idempotencyKey: this.newIdempotencyKey(),
         })
         // FD-11: a new document changes the folder's contents for every view
@@ -3568,7 +3596,7 @@ export class UniworkDocsService {
             bytes,
             filename,
             title: filename,
-            parentId: target.folderId,
+            ...target.create,
             idempotencyKey: this.newIdempotencyKey(),
             signal: controller.signal,
           })
@@ -3585,6 +3613,149 @@ export class UniworkDocsService {
       } finally {
         // a newer upload with the same id (never minted twice) keeps its controller
         if (this.uploads.get(uploadId) === controller) this.uploads.delete(uploadId)
+      }
+    })
+  }
+
+  /**
+   * SAVE-01: the first Save to UniWork of a tab that is not bound yet. The
+   * editor is flushed to disk (its own module Save, so unwritten state lands),
+   * then `createFile` creates the document with the dialog's title and target -
+   * `destination: 'my_folder'` (Advisor Q1/Q3) or the picked `parent_id` - and
+   * the tab is bound exactly as the open-by-id flow binds: the working copy
+   * moves into the document's store folder and a binding.json names it, so the
+   * next Ctrl+S is a normal bound save with no dialog. The session is captured
+   * at entry like every own action, so a sign-out mid-flight pushes nothing.
+   *
+   * `conflict` answers a path that is already bound (a double-submit or a
+   * second Lưu racing the first): the document exists already, so creating
+   * again would duplicate it.
+   */
+  firstSave(input: UniworkFirstSaveInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(
+      async () => {
+        const session = this.captureActionSession()
+        const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
+        if (!workspaceId) throw new UniworkDocError('not_found')
+        const tabPath = typeof input.tabPath === 'string' ? resolve(input.tabPath) : ''
+        if (!tabPath) throw new UniworkDocError('not_found')
+        // an already-bound path is never re-created: the dialog answered for a
+        // document this session already owns
+        if (this.store.classify(tabPath).kind !== 'plain') {
+          throw new UniworkDocError('conflict')
+        }
+        const title = requireName(input.title)
+        const filename = basename(tabPath)
+        if (!filename || !formatForName(filename)) {
+          throw new UniworkDocError('unsupported_format')
+        }
+        // the editor's own Save writes the bytes; unbound paths resolve the
+        // flush waiter through the branch onUserSave keeps for them
+        if (this.deps.isPathOpen(tabPath)) await this.flushEditorToDisk(tabPath)
+        const bytes = new Uint8Array(await readFile(tabPath))
+        const target = input.target
+        if (target?.kind === 'folder' && typeof target.folderId !== 'string') {
+          // a folder target without an id is malformed, never a My Folder save
+          throw new UniworkDocError('invalid_destination' as UniworkDocErrorCode)
+        }
+        const createTarget =
+          target?.kind === 'folder'
+            ? { parentId: target.folderId }
+            : { destination: 'my_folder' as const }
+        // one client per save: the create + the bind read share it, so a
+        // session landing mid-flight does not turn the second call into a
+        // fresh not_signed_in on the same action
+        const api = this.api()
+        const created = await api.createFile({
+          workspaceId,
+          bytes,
+          filename,
+          title,
+          idempotencyKey: this.newIdempotencyKey(),
+          ...createTarget,
+        })
+        // the create summary carries no revision: the read binds the same
+        // fields the open flow binds (revision, version, checksum, level)
+        const detail = await api.getDocument(created.id)
+        const dir = this.store.dirFor(
+          session.identity.deploymentId,
+          session.identity.accountId,
+          created.id,
+        )
+        const name = workingCopyName(title, detail.file.filename, formatForName(filename)!)
+        const path = await this.store.writeWorkingCopy(dir, name, bytes)
+        const binding = withServerContext(
+          {
+            schema: 2,
+            documentId: created.id,
+            workspaceId: detail.workspaceId || created.workspaceId,
+            orgId: detail.organizationId,
+            title: detail.title,
+            filename: name,
+            format: formatForName(filename)!,
+            access: accessFor(detail.myLevel),
+            baseRevision: detail.revision,
+            baseVersion: detail.file.version,
+            baseChecksum: sha256Hex(bytes),
+            state: 'ready',
+            minStoreLevel: APP_STORE_LEVEL,
+            minAppVersion: this.buildVersion(),
+            lastSavedAt: new Date().toISOString(),
+          },
+          detail,
+        )
+        const written = await this.store.write(dir, binding)
+        if (!written) {
+          // the migration sweep holds this folder: the bound copy cannot land,
+          // so the stray working copy goes and the local file stays unbound -
+          // the open flow retries against the migrated store later
+          await this.store.removeWorkingCopy(dir, name)
+          throw new UniworkDocError('server_error')
+        }
+        // the tab follows its file into the store: from here the path is a
+        // bound working copy, so the next save is one upload + commit
+        this.deps.notifyPathRenamed?.(tabPath, path)
+        await unlink(tabPath).catch(() => undefined)
+        const doc = this.store.lookup(path)
+        if (doc) this.publish(toStatus(doc))
+        this.pushTreeChangedFor(session, created.workspaceId)
+        return created
+      },
+      { nameField: true },
+    )
+  }
+
+  /**
+   * SAVE-01: flushes the open editor of an unbound `path` to disk and awaits
+   * the module's user-save hook, without ever starting a save upload (the
+   * binding does not exist yet). No tab answers within CLOSE_SAVE_WAIT_MS =
+   * the disk copy is taken as is.
+   */
+  private flushEditorToDisk(path: string): Promise<boolean> {
+    const key = pathKey(path)
+    this.draftFlushWaiters.get(key)?.(false)
+    return new Promise<boolean>((resolveFlush) => {
+      let settled = false
+      const finish = (wrote: boolean) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        if (this.draftFlushWaiters.get(key) === finish) {
+          this.draftFlushWaiters.delete(key)
+        }
+        resolveFlush(wrote)
+      }
+      const timer = setTimeout(() => finish(false), CLOSE_SAVE_WAIT_MS)
+      ;(timer as { unref?: () => void }).unref?.()
+      this.draftFlushWaiters.set(key, finish)
+      let requested: boolean
+      try {
+        requested = this.deps.requestModuleSave(path, () => finish(false))
+      } catch {
+        requested = false
+      }
+      if (!requested) {
+        finish(false)
       }
     })
   }
@@ -3666,15 +3837,20 @@ export class UniworkDocsService {
     })
   }
 
-  /** the workspace/folder a create or upload targets, validated before any call */
+  /** the workspace + create target of a create or upload, validated before any call */
   private docTarget(input: { workspaceId?: unknown; folderId?: unknown }): {
     workspaceId: string
-    folderId: string | null
+    create: UniworkCreateTarget
   } {
     const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
     if (!workspaceId) throw new UniworkDocError('not_found')
     const folderId = typeof input.folderId === 'string' && input.folderId ? input.folderId : null
-    return { workspaceId, folderId }
+    // MYFOLDER-01 / SAVE-01 (Q1): a create/upload with no folder lands in the
+    // caller's My Folder, never at the workspace root
+    const create: UniworkCreateTarget = folderId
+      ? { parentId: folderId }
+      : { destination: 'my_folder' }
+    return { workspaceId, create }
   }
 
   /** archive/restore need manage; a view row (and an edit row) is refused without a call */

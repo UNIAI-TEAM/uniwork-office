@@ -13,6 +13,7 @@ import {
   type UniworkConflictAction,
   type UniworkCreateDocInput,
   type UniworkCreateFolderInput,
+  type UniworkFirstSaveInput,
   type UniworkDocListQuery,
   type UniworkDocLock,
   type UniworkFolderQuery,
@@ -857,6 +858,12 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.activeDocStatus, () => service.activeDocStatus())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.save, (_event, path: unknown) => service.save(path as string))
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.ensureMyFolder, (_event, workspaceId: unknown) =>
+    service.ensureMyFolder(workspaceId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.firstSave, (_event, input: unknown) =>
+    service.firstSave((input ?? {}) as UniworkFirstSaveInput),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
   )

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -266,6 +267,21 @@ function fakeServer(
         next_cursor: null,
       })
     }
+    // SAVE-01 / MYFOLDER-01: ensure the caller's personal folder (idempotent:
+    // the same DocumentSDO row answers on every call, system_kind marks it)
+    if (u.pathname === `/api/v1/workspaces/${WS}/documents/my-folder`) {
+      if (!state.documents.has('fold_my')) {
+        state.documents.set('fold_my', { title: 'My Folder', bytes: enc('') })
+      }
+      return json(200, {
+        document: {
+          ...docJson('fold_my'),
+          kind: 'folder',
+          title: 'My Folder',
+          system_kind: 'my_folder',
+        },
+      })
+    }
     // folders
     if (u.pathname === `/api/v1/workspaces/${WS}/documents`) {
       // FD-11: create one folder (or refuse it with the server's own code)
@@ -444,7 +460,19 @@ afterEach(async () => {
   }
 })
 
-function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: boolean } = {}) {
+/** the fake UniWork documents server a setup() wires the service's client to */
+type FakeServer = ReturnType<typeof fakeServer>
+
+function setup(
+  server: FakeServer,
+  options: {
+    pathOpen?: boolean
+    /** SAVE-01: a module Save writes these bytes to the path, then fires onUserSave */
+    moduleSaveWrites?: string
+    /** SAVE-01: runs inside notifyPathRenamed, between the bind and its push */
+    onPathMoved?: () => void
+  } = {},
+) {
   const statuses: UniworkDocStatus[] = []
   const renamed: Array<{ documentId: string; title: string }> = []
   const progress: Array<{ path: string; loaded: number; total: number }> = []
@@ -484,7 +512,15 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     fetch: (url, init) => server.fetch(url, init),
     openPath: () => true,
     isPathOpen: () => options.pathOpen === true,
-    requestModuleSave: () => false,
+    requestModuleSave: (path) => {
+      // the module's own Save writes the file, then its user-save hook fires;
+      // the queueMicrotask is the renderer round-trip that lands it
+      if (options.moduleSaveWrites !== undefined) {
+        writeFileSync(path, options.moduleSaveWrites)
+      }
+      queueMicrotask(() => service.onUserSave(path))
+      return true
+    },
     reloadPath: () => undefined,
     activePath: () => undefined,
     stopRuntime: () => onStopRuntime?.(),
@@ -492,7 +528,10 @@ function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: bool
     pushUploadProgress: (event) => progress.push(event),
     pushDocRenamed: (event) => renamed.push(event),
     pushTreeChanged: (event) => onPushTreeChanged(event),
-    notifyPathRenamed: (oldPath, newPath) => pathRenames.push({ oldPath, newPath }),
+    notifyPathRenamed: (oldPath, newPath) => {
+      pathRenames.push({ oldPath, newPath })
+      options.onPathMoved?.()
+    },
     notifyTitleRenamed: (path, title) => titleRenames.push({ path, title }),
     ui,
     pushStatus: (s) => statuses.push(s),
@@ -2031,5 +2070,200 @@ describe('SAVE-01 my_folder_locked and invalid_destination', () => {
       await ctx.service.createFolder({ workspaceId: WS, parentId: null, title: 'Contracts' }),
     ).toEqual({ ok: false, error: 'invalid_destination' })
     expect(server.calls).toHaveLength(1)
+  })
+})
+
+// SAVE-01: the first Save to UniWork of an unbound tab - the editor flushes,
+// the document is created (My Folder by default, or the picked folder), and
+// the tab binds to it so the next Ctrl+S is a plain bound save.
+describe('SAVE-01 first save', () => {
+  it('flushes the editor, creates with destination my_folder and binds the tab', async () => {
+    const server = fakeServer()
+    const ctx = setup(server, { pathOpen: true, moduleSaveWrites: 'fresh editor bytes' })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'stale disk bytes')
+
+    const saved = await ctx.service.firstSave({
+      tabPath: file,
+      title: 'Draft.docx',
+      workspaceId: WS,
+      target: { kind: 'my_folder' },
+    })
+
+    expect(saved.ok).toBe(true)
+    // ONE POST to the create route carrying the destination and the title in
+    // the fields before the file part (Advisor Q6: title on create, no PATCH)
+    const posts = server.calls.filter(
+      (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents/files`,
+    )
+    expect(posts).toHaveLength(1)
+    const body = posts[0]!.body as { destination?: unknown; parent_id?: unknown; title?: unknown }
+    expect(body.destination).toBe('my_folder')
+    expect(body.parent_id).toBeNull()
+    expect(body.title).toBe('Draft.docx')
+    // the bytes the editor wrote win over the stale disk copy
+    expect(Buffer.from((posts[0]!.body as { bytes: Uint8Array }).bytes).toString('utf8')).toBe(
+      'fresh editor bytes',
+    )
+    // the tab followed its file into the document's store folder
+    expect(ctx.pathRenames).toHaveLength(1)
+    const moved = ctx.pathRenames[0]!.newPath
+    expect(ctx.service.isBound(moved)).toBe(true)
+    const status = await ctx.service.docStatus(moved)
+    expect(status?.state).toBe('ready')
+    // the old local path is gone: the store copy is the only file left
+    expect(existsSync(file)).toBe(false)
+    expect(ctx.treeChanged).toEqual([{ workspaceId: WS }])
+  })
+
+  it('creates under the picked folder with parent_id and no destination', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const file = join(dir, 'Local.docx')
+    writeFileSync(file, 'bytes')
+
+    const saved = await ctx.service.firstSave({
+      tabPath: file,
+      title: 'Local.docx',
+      workspaceId: WS,
+      target: { kind: 'folder', folderId: 'fold_1' },
+    })
+
+    expect(saved.ok).toBe(true)
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents/files`,
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.parent_id).toBe('fold_1')
+    expect(body.destination).toBeNull()
+  })
+
+  it('refuses a path that is already bound (a second Lưu never double-creates)', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    // an open-by-id open leaves the tab bound to DOC's working copy
+    const opened = await ctx.service.openDocument(DOC)
+    expect(opened.ok).toBe(true)
+    const boundPath = opened.ok ? opened.value.path : ''
+    const callsBefore = server.calls.length
+
+    const again = await ctx.service.firstSave({
+      tabPath: boundPath,
+      title: 'Draft.docx',
+      workspaceId: WS,
+      target: { kind: 'my_folder' },
+    })
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(server.calls).toHaveLength(callsBefore)
+  })
+
+  it('suppresses the tree push when the session is lost while the create is in flight', async () => {
+    const server = fakeServer()
+    // the drop lands inside notifyPathRenamed: the document is created and the
+    // working copy bound, only the FD-11 own-action push must never arrive
+    const ctx = setup(server, { onPathMoved: () => ctx.setIdentity(null) })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+
+    const saved = await ctx.service.firstSave({
+      tabPath: file,
+      title: 'Draft.docx',
+      workspaceId: WS,
+      target: { kind: 'my_folder' },
+    })
+
+    expect(saved.ok).toBe(true)
+    expect(ctx.treeChanged).toEqual([])
+  })
+
+  it('ensureMyFolder posts once to the my-folder route and parses systemKind', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const ensured = await ctx.service.ensureMyFolder(WS)
+    expect(ensured.ok).toBe(true)
+    if (!ensured.ok) return
+    expect(ensured.value.id).toBe('fold_my')
+    expect(ensured.value.systemKind).toBe('my_folder')
+    const post = server.calls.find(
+      (c) => c.path === `/api/v1/workspaces/${WS}/documents/my-folder`,
+    )!
+    expect(post.method).toBe('POST')
+    // a second ensure is idempotent on the server: same row id answers again
+    const again = await ctx.service.ensureMyFolder(WS)
+    expect(again.ok && again.value.id === 'fold_my').toBe(true)
+  })
+})
+
+// SAVE-01 (Q1): New / Upload from Home or the workspace root land in the
+// caller's My Folder - the wire carries `destination`, never a bare root
+// parent. Folder and copy creates keep the FD-11 `parent_id` only.
+describe('SAVE-01 create destinations', () => {
+  it('sends destination my_folder for a blank create with no folder', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name: 'Plan.docx',
+      format: 'docx',
+    })
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files/blank'),
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.destination).toBe('my_folder')
+    expect(body.parent_id).toBeUndefined()
+  })
+
+  it('still sends parent_id (and no destination) when a folder is open', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      name: 'Plan.docx',
+      format: 'docx',
+    })
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files/blank'),
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.parent_id).toBe('fold_1')
+    expect(body.destination).toBeUndefined()
+  })
+
+  it('sends destination my_folder for an upload with no folder', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: null,
+      path: ctx.uploadFile,
+      uploadId: 'up_1',
+    })
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.destination).toBe('my_folder')
+    expect(body.parent_id).toBeNull()
+  })
+
+  it('sends parent_id (and no destination) for an upload into a folder', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.uploadDocument({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      path: ctx.uploadFile,
+      uploadId: 'up_1',
+    })
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith('/documents/files'),
+    )!
+    const body = post.body as { destination?: unknown; parent_id?: unknown }
+    expect(body.parent_id).toBe('fold_1')
+    expect(body.destination).toBeNull()
   })
 })

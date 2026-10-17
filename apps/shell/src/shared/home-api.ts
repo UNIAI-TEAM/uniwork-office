@@ -447,6 +447,23 @@ export interface UniworkUploadProgress {
   total: number
 }
 
+/** MYFOLDER-01 / SAVE-01: where the first Save to UniWork creates the document */
+export type UniworkFirstSaveTarget = { kind: 'my_folder' } | { kind: 'folder'; folderId: string }
+
+/**
+ * SAVE-01: the Save dialog's confirm. `tabPath` is the unbound file the tab
+ * shows; `workspaceId` scopes the create (the dialog's workspace). Main flushes
+ * the editor, creates the document (destination my_folder, or the picked
+ * parent_id) and binds the tab to the answer, so the next save is a plain
+ * bound commit with no dialog.
+ */
+export interface UniworkFirstSaveInput {
+  tabPath: string
+  title: string
+  workspaceId: string
+  target: UniworkFirstSaveTarget
+}
+
 /** a document's title changed (here, or renamed elsewhere and picked up by main) */
 export interface UniworkDocRenamedEvent {
   documentId: string
@@ -1112,6 +1129,15 @@ export interface HomeApi {
   onUniworkQueuePopover(cb: (request: UniworkQueuePopoverRequest) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
+  /** SAVE-01: main asks the shell renderer to open the first-save dialog for an unbound path */
+  onUniworkFirstSaveOpen(cb: (request: { path: string }) => void): () => void
+  /**
+   * SAVE-01: the dialog's confirm - flush the editor, create the document in
+   * My Folder (or the picked folder) and bind the tab to it in one call.
+   */
+  uniworkFirstSave(input: UniworkFirstSaveInput): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** MYFOLDER-01 (Q3): ensure the caller's personal My Folder (dialog open) */
+  uniworkEnsureMyFolder(workspaceId: string): Promise<UniworkResult<UniworkDocSummary>>
   /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
   onUniworkConflict(cb: (view: UniworkConflictView) => void): () => void
   /** G5-09: main ended the open S5 session itself (tab/language switch, document closed) */
@@ -1708,6 +1734,18 @@ export const UNIWORK_DOC_CHANNELS = {
   conflictOpen: 'uniwork-doc:conflict-open',
   /** main -> shell renderer: main ended the open S5 session itself (G5-09) */
   conflictClosed: 'uniwork-doc:conflict-closed',
+  /**
+   * SAVE-01: main -> shell renderer: the active tab is not bound and asks to
+   * save to UniWork - open the name/target SaveDialog for it ({ path })
+   */
+  firstSaveOpen: 'uniwork-doc:first-save-open',
+  /**
+   * SAVE-01: invoke(UniworkFirstSaveInput) -> create + bind in one call;
+   * UniworkDocActionResult<UniworkDocSummary>
+   */
+  firstSave: 'uniwork-doc:first-save',
+  /** MYFOLDER-01 (Q3): invoke(workspaceId) -> the ensured My Folder row (DocumentSDO) */
+  ensureMyFolder: 'uniwork-doc:ensure-my-folder',
   /** invoke(sessionId, action) -> UniworkConflictReply (G5-09) */
   conflictAct: 'uniwork-doc:conflict-act',
   /** invoke(path, action) -> the S6 bar action (later/close/retry/reload/reload-now) */
