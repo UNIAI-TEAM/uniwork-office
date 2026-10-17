@@ -637,7 +637,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(restoreItem).toBeDefined()
   })
 
-  it('renders folder cards with a real <button class="dh-folder-open">, sibling FolderMenu, and stops Enter/Space on the menu wrapper from opening the folder (DH1-R1-9)', async () => {
+  it('renders folder cards with a real <button class="dh-folder-open">, sibling FolderMenu, and pressing Enter/Space or clicking the menu trigger opens the menu without opening the folder (DH1-R1-9, DH1-R3-6)', async () => {
     await act(async () => {
       root.render(
         createElement(
@@ -667,16 +667,55 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(openBtn!.querySelector('.uw-row-menu')).toBeNull()
     const menuTrigger = card!.querySelector<HTMLButtonElement>('.uw-row-menu-btn')
     expect(menuTrigger).not.toBeNull()
+    expect(menuTrigger!.getAttribute('aria-expanded')).toBe('false')
 
     api.uniworkListChildren.mockClear()
 
-    // Pressing Enter or Space on the menu trigger must NOT bubble/trigger folder open
+    // Pressing Enter on the menu trigger opens the menu and does NOT open the folder
     await act(async () => {
       menuTrigger!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    await flush()
+    expect(api.uniworkListChildren).not.toHaveBeenCalled()
+    expect(menuTrigger!.getAttribute('aria-expanded')).toBe('true')
+    const openMenuAfterEnter = document.querySelector<HTMLElement>('.uw-row-menu-list[role="menu"]')
+    expect(openMenuAfterEnter).not.toBeNull()
+
+    // Close the menu with Escape, then press Space on the menu trigger: menu opens and folder does NOT open
+    await act(async () => {
+      openMenuAfterEnter!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      )
+    })
+    await flush()
+    expect(menuTrigger!.getAttribute('aria-expanded')).toBe('false')
+    expect(document.querySelector('.uw-row-menu-list[role="menu"]')).toBeNull()
+
+    await act(async () => {
       menuTrigger!.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }))
     })
     await flush()
     expect(api.uniworkListChildren).not.toHaveBeenCalled()
+    expect(menuTrigger!.getAttribute('aria-expanded')).toBe('true')
+    const openMenuAfterSpace = document.querySelector<HTMLElement>('.uw-row-menu-list[role="menu"]')
+    expect(openMenuAfterSpace).not.toBeNull()
+
+    // Close the menu, then click the sibling menu button while the card is mounted: menu opens and folder does NOT open
+    await act(async () => {
+      openMenuAfterSpace!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      )
+    })
+    await flush()
+    expect(menuTrigger!.getAttribute('aria-expanded')).toBe('false')
+
+    await act(async () => {
+      menuTrigger!.click()
+    })
+    await flush()
+    expect(api.uniworkListChildren).not.toHaveBeenCalled()
+    expect(menuTrigger!.getAttribute('aria-expanded')).toBe('true')
+    expect(document.querySelector('.uw-row-menu-list[role="menu"]')).not.toBeNull()
 
     // Clicking the card area outside the name (icon / open-button padding) opens the folder
     api.uniworkListChildren.mockClear()
@@ -687,14 +726,6 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(api.uniworkListChildren).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: 'ws-1', parentId: 'f-board' }),
     )
-
-    // Clicking the sibling menu button must not open the folder
-    api.uniworkListChildren.mockClear()
-    await act(async () => {
-      menuTrigger!.click()
-    })
-    await flush()
-    expect(api.uniworkListChildren).not.toHaveBeenCalled()
 
     // Open button fills the card so padding / gap clicks hit .dh-folder-open, not the card chrome
     const docsHomeCss = readFileSync(
@@ -1340,6 +1371,167 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(rootNotice?.textContent?.trim()).toBe('Thư mục này không còn ở đây.')
     expect(host.querySelector('.uw-pick-state[role="alert"]')).toBeNull()
     expect(host.textContent).not.toContain('Tài liệu này không còn tồn tại.')
+  })
+
+  it.each([
+    ['forbidden', 'Bạn không còn quyền truy cập thư mục này.'],
+    ['deleted', 'Thư mục này không còn ở đây.'],
+  ] as const)(
+    'falls back to the nearest live parent with the right status copy when a children read returns %s (DH1-R3-2, DH1-R3-3)',
+    async (errorCode, expectedNotice) => {
+      let leafFails = false
+      api.uniworkFolderTree.mockImplementation(async () =>
+        ok([
+          folderTree[0]!,
+          {
+            id: 'f-hub',
+            parentId: null,
+            title: 'Source Hub',
+            position: 1,
+            children: leafFails
+              ? []
+              : [
+                  {
+                    id: 'f-leaf',
+                    parentId: 'f-hub',
+                    title: 'Restricted Leaf',
+                    position: 0,
+                    children: [],
+                  },
+                ],
+          },
+        ]),
+      )
+
+      api.uniworkListChildren.mockImplementation(
+        async (q: {
+          workspaceId: string
+          parentId: string | null
+        }): Promise<UniworkResult<UniworkFolderChildren>> => {
+          if (q.parentId === 'f-hub') {
+            return ok({
+              items: [
+                {
+                  id: 'f-leaf',
+                  workspaceId: 'ws-1',
+                  title: 'Restricted Leaf',
+                  format: 'docx',
+                  updatedAt: '2026-10-17T08:00:00.000Z',
+                  kind: 'folder',
+                  parentId: 'f-hub',
+                },
+              ],
+              nextCursor: null,
+            })
+          }
+          if (q.parentId === 'f-leaf') {
+            return { ok: false, error: errorCode }
+          }
+          return ok({
+            items: [
+              {
+                id: 'f-hub',
+                workspaceId: 'ws-1',
+                title: 'Source Hub',
+                format: 'docx',
+                updatedAt: '2026-10-17T08:00:00.000Z',
+                kind: 'folder',
+                parentId: null,
+              },
+            ],
+            nextCursor: null,
+          })
+        },
+      )
+
+      await act(async () => {
+        root.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'vi' },
+            createElement(DocumentsHome, {
+              workspaceId: 'ws-1',
+              workspaces,
+              onWorkspaceChange: vi.fn(),
+              onOpenDocument: vi.fn(),
+              sidebarHost: sidebarSlot,
+            }),
+          ),
+        )
+      })
+      await flush()
+
+      const hubBtn = host.querySelector<HTMLButtonElement>(
+        '.dh-folder-card[data-folder-id="f-hub"] button.dh-folder-open',
+      )!
+      expect(hubBtn).not.toBeNull()
+      await act(async () => {
+        hubBtn.click()
+      })
+      await flush()
+
+      leafFails = true
+      const leafBtn = host.querySelector<HTMLButtonElement>(
+        '.dh-folder-card[data-folder-id="f-leaf"] button.dh-folder-open',
+      )!
+      expect(leafBtn).not.toBeNull()
+      await act(async () => {
+        leafBtn.click()
+      })
+      await flush()
+
+      expect(host.querySelector('h1.dh-title')?.textContent).toBe('Source Hub')
+      expect(host.querySelector('.uwf-crumbs [aria-current="page"]')?.textContent?.trim()).toBe(
+        'Source Hub',
+      )
+      const notice = host.querySelector<HTMLElement>('.uwf-notice[role="status"]')
+      expect(notice).not.toBeNull()
+      expect(notice?.textContent?.trim()).toBe(expectedNotice)
+      expect(host.querySelector('.uw-pick-state[role="alert"]')).toBeNull()
+    },
+  )
+
+  it('falls back to the workspace root when a folder children read fails while the folder tree failed to load (empty index, DH1-R3-3)', async () => {
+    api.uniworkFolderTree.mockResolvedValue({ ok: false, error: 'server_error' })
+    api.uniworkListChildren.mockImplementation(
+      async (q: {
+        workspaceId: string
+        parentId: string | null
+      }): Promise<UniworkResult<UniworkFolderChildren>> => {
+        if (q.parentId === 'f-legal') {
+          return { ok: false, error: 'not_found' }
+        }
+        return ok({ items: rootItems, nextCursor: null })
+      },
+    )
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument: vi.fn(),
+            sidebarHost: sidebarSlot,
+            initialFolderId: 'f-legal',
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    // Tree failed (empty index) and initialFolderId 'f-legal' returned not_found -> falls back to workspace root
+    expect(sidebarSlot.querySelector('.uwf-side-state[role="alert"]')).not.toBeNull()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Tài liệu của workspace')
+    expect(host.querySelector('.uwf-crumbs')).toBeNull()
+    const notice = host.querySelector<HTMLElement>('.uwf-notice[role="status"]')
+    expect(notice).not.toBeNull()
+    expect(notice?.textContent?.trim()).toBe('Thư mục này không còn ở đây.')
+    expect(host.querySelector('.uw-pick-state[role="alert"]')).toBeNull()
+    expect(host.textContent).toContain('Báo cáo kết quả kinh doanh Q3-2026.docx')
   })
 
   it('renders visually hidden screen-reader full ancestor paths (.uw-sr-only with ufPathLabel) alongside aria-hidden short paths on search result rows (DH1-E2E-4)', async () => {
