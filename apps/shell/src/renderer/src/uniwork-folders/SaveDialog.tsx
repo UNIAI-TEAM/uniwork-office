@@ -10,6 +10,7 @@ import type {
 import { DEFAULT_MAX_DOCUMENT_BYTES } from '../../../shared/size-format'
 import { pathKey } from '../../../shared/path-key'
 import { FileBadge } from '../FileBadge'
+import { stateOf } from '../account-model'
 import { pickActiveWorkspace, readActiveWorkspaceId } from '../active-workspace'
 import { useI18n, type StringKey } from '../locale'
 import { ActionModal, ActionToast } from '../UniworkDocActions'
@@ -22,6 +23,7 @@ import {
 } from '../uniwork-docs-model'
 import { loadFolderTree, onTreeChanged } from '../uniwork-library-api'
 import { announce } from '../uniwork-live'
+import { currentWorkbenchBucket, isWorkbenchBucketCleared } from '../workbench-bucket'
 import { FolderNameDialog } from './FolderNameDialog'
 import { UniworkFolderPicker, type PickedFolder } from './UniworkFolderPicker'
 import { FolderGlyph } from './UniworkFolderTree'
@@ -49,14 +51,18 @@ type SaveFailure = Extract<FirstSaveResult, { ok: false }>
  * cancelled, so its run is kept here by tab (pathKey) with the dialogs that
  * watch that tab. A refusal that names a created document (bind failed /
  * orphaned) that no dialog is left to show waits in `unshown` for the host's
- * next render, and is said at once through the shell's live region.
+ * next render, and is said at once through the shell's live region. A kept
+ * result names a document of one account's workspace: it is tagged with both
+ * and never shown to another (FE-S01-R2-3).
  */
+type Kept = { path: string; failure: SaveFailure; bucket: string; workspaceId: string }
+
 const running = new Map<string, Promise<FirstSaveResult>>()
 const watching = new Map<string, number>()
-let unshown: readonly { path: string; failure: SaveFailure }[] = []
+let unshown: readonly Kept[] = []
 const unshownListeners = new Set<() => void>()
 
-function setUnshown(next: readonly { path: string; failure: SaveFailure }[]) {
+function setUnshown(next: readonly Kept[]) {
   unshown = next
   for (const listener of unshownListeners) listener()
 }
@@ -72,6 +78,29 @@ function onUnshown(listener: () => void): () => void {
 const namesDocument = (failure: SaveFailure) =>
   failure.error === 'first_save_bind_failed' || failure.error === 'first_save_orphaned'
 
+/** whether a kept result belongs to the signed-in account (bucket) and the workspace shown */
+function isOwnKept(entry: Kept): boolean {
+  if (isWorkbenchBucketCleared() || entry.bucket !== currentWorkbenchBucket()) return false
+  const active = readActiveWorkspaceId()
+  return active === null || active === entry.workspaceId
+}
+
+/** the kept results that may still be shown: another account's or workspace's are dropped */
+function ownKept(): readonly Kept[] {
+  if (unshown.every(isOwnKept)) return unshown
+  setUnshown(unshown.filter(isOwnKept))
+  return unshown
+}
+
+/** takes the kept result of a tab out of the store (null when there is none to show) */
+function takeKept(path: string): SaveFailure | null {
+  const key = pathKey(path)
+  const entry = ownKept().find((k) => pathKey(k.path) === key)
+  if (!entry) return null
+  setUnshown(unshown.filter((k) => k !== entry))
+  return entry.failure
+}
+
 function watchTab(key: string): () => void {
   watching.set(key, (watching.get(key) ?? 0) + 1)
   return () => {
@@ -86,6 +115,8 @@ function startFirstSave(
   say: (failure: SaveFailure) => string,
 ): Promise<FirstSaveResult> {
   const key = pathKey(input.tabPath)
+  // the account the document is created for, as it is when the save is sent
+  const bucket = currentWorkbenchBucket()
   const run = window.aiOffice
     .uniworkFirstSave(input)
     .catch((): FirstSaveResult => ({ ok: false, error: 'network' }))
@@ -94,7 +125,10 @@ function startFirstSave(
   void run.then((result) => {
     running.delete(key)
     if (result.ok || watching.has(key) || !namesDocument(result)) return
-    setUnshown([...unshown, { path: input.tabPath, failure: result }])
+    setUnshown([
+      ...unshown,
+      { path: input.tabPath, failure: result, bucket, workspaceId: input.workspaceId },
+    ])
     announce(say(result), { assertive: true })
   })
   return run
@@ -250,6 +284,12 @@ export function SaveDialog({
     let live = true
     const run = running.get(pathKey(path))
     if (run) void run.then((result) => live && settle(result))
+    else {
+      // FE-S01-R2-2: the run settled between the first render and this effect
+      setSaving(false)
+      const kept = takeKept(path)
+      if (kept) setFailure(kept)
+    }
     return () => {
       live = false
       mounted.current = false
@@ -589,7 +629,11 @@ async function isOpenTab(path: string): Promise<boolean> {
  * push for a path no tab shows is dropped. A push for another tab never
  * replaces a dialog whose save runs or whose result is on screen: it is held
  * and opens when that dialog closes (FE-S01-R1-1). A result kept while the
- * host was away opens with its dialog when the host renders again.
+ * host was away opens with its dialog when the host renders again. A held push
+ * or a kept result is checked against the open tabs again before it opens; a
+ * closed tab's entry is dropped (a kept result was already said through the
+ * live region when it was kept) (FE-S01-R2-4). Signing out clears the kept
+ * results (FE-S01-R2-3).
  */
 export function SaveDialogHost() {
   type Request = { path: string; key: number; failure?: SaveFailure }
@@ -599,6 +643,8 @@ export function SaveDialogHost() {
   const holding = useRef(false)
   const seq = useRef(0)
   const kept = useSyncExternalStore(onUnshown, () => unshown)
+  // a held push or kept result is being checked against the open tabs
+  const [checking, setChecking] = useState(false)
 
   const show = useCallback((next: Omit<Request, 'key'>) => {
     const same = (r: Request) => pathKey(r.path) === pathKey(next.path)
@@ -616,10 +662,9 @@ export function SaveDialogHost() {
   }, [])
 
   const close = useCallback(() => {
-    const next = held.current.shift() ?? null
-    shown.current = next
+    shown.current = null
     holding.current = false
-    setRequest(next)
+    setRequest(null)
   }, [])
 
   const hold = useCallback((on: boolean) => {
@@ -644,13 +689,36 @@ export function SaveDialogHost() {
     })
   }, [show])
 
-  // a result no dialog was left to show: shown once, in its tab's dialog
   useEffect(() => {
-    if (request || kept.length === 0) return
-    const [first, ...rest] = kept
-    setUnshown(rest)
-    show({ path: first!.path, failure: first!.failure })
-  }, [request, kept, show])
+    if (typeof window.aiOffice?.onAccountStatus !== 'function') return
+    return window.aiOffice.onAccountStatus((status) => {
+      if (stateOf(status) === 'signed-out') setUnshown([])
+    })
+  }, [])
+
+  // with no dialog: the next held push, else a result no dialog was left to
+  // show (shown once, in its tab's dialog), each only while its tab is open
+  useEffect(() => {
+    if (request || checking) return
+    let next: Omit<Request, 'key'> | undefined = held.current.shift()
+    if (!next) {
+      const [first, ...rest] = ownKept()
+      if (!first) return
+      setUnshown(rest)
+      next = { path: first.path, failure: first.failure }
+    }
+    const entry = next
+    setChecking(true)
+    void isOpenTab(entry.path).then((open) => {
+      setChecking(false)
+      if (!open) return
+      const current = shown.current
+      // a push opened meanwhile: the entry waits behind it like any held push
+      if (current && pathKey(current.path) !== pathKey(entry.path)) {
+        held.current.unshift({ ...entry, key: ++seq.current })
+      } else show(entry)
+    })
+  }, [request, checking, kept, show])
 
   if (!request) return null
   return (

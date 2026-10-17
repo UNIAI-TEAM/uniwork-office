@@ -36,6 +36,17 @@
   color: var(--text);
 }
 
+/* a sent save cannot be cancelled: the × waits for its answer (FE-S01-R2-6) */
+.uws-close[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.uws-close[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
 .uws-close:focus-visible,
 .uwf-picker-back:focus-visible,
 .uws-loc:focus-visible {
@@ -133,6 +144,10 @@
 .uws-loc[aria-disabled='true'] {
   cursor: default;
   opacity: 0.7;
+}
+
+.uws-loc[aria-disabled='true']:hover {
+  background: var(--surface);
 }
 
 .uws-loc-icon {
