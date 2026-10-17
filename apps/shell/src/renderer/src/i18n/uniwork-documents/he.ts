@@ -157,4 +157,5 @@ export const he = {
   uwErrUploadTooLarge:
     'גודלו של {name} הוא {size}, מעבר למגבלת {max}. הקטן את גודל התמונות או פצל את הקובץ והעלה שוב.',
   uwReasonTooLargeWithLimit: 'מעבר למגבלת {max}',
+  uwUploadChecking: 'בודק את הקובץ…',
 } satisfies Record<keyof typeof zh, string>

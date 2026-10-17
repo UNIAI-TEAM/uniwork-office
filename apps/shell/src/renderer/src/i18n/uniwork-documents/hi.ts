@@ -159,4 +159,5 @@ export const hi = {
   uwErrUploadTooLarge:
     '{name} का आकार {size} है, जो {max} सीमा से अधिक है। छवियों का आकार घटाएँ या फ़ाइल को विभाजित करें, फिर दोबारा अपलोड करें।',
   uwReasonTooLargeWithLimit: '{max} सीमा से अधिक',
+  uwUploadChecking: 'फ़ाइल की जाँच हो रही है…',
 } satisfies Record<keyof typeof zh, string>

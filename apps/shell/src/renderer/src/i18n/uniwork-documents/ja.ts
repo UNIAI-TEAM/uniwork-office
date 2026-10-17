@@ -163,4 +163,5 @@ export const ja = {
   uwErrUploadTooLarge:
     '{name} は {size} あり、上限 {max} を超えています。画像を圧縮するかファイルを分割してから、もう一度アップロードしてください。',
   uwReasonTooLargeWithLimit: '上限 {max} を超過',
+  uwUploadChecking: 'ファイルを確認しています…',
 } satisfies Record<keyof typeof zh, string>

@@ -161,4 +161,5 @@ export const id = {
   uwErrUploadTooLarge:
     '{name} berukuran {size}, melebihi batas {max}. Perkecil ukuran gambar atau bagi file, lalu unggah lagi.',
   uwReasonTooLargeWithLimit: 'melebihi batas {max}',
+  uwUploadChecking: 'Memeriksa file…',
 } satisfies Record<keyof typeof zh, string>

@@ -161,4 +161,5 @@ export const it = {
   uwErrUploadTooLarge:
     '{name} pesa {size}, oltre il limite di {max}. Riduci le dimensioni delle immagini o dividi il file, quindi caricalo di nuovo.',
   uwReasonTooLargeWithLimit: 'oltre il limite di {max}',
+  uwUploadChecking: 'Verifica del file in corso…',
 } satisfies Record<keyof typeof zh, string>

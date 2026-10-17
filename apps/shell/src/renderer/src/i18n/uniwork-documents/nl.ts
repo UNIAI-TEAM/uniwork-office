@@ -164,4 +164,5 @@ export const nl = {
   uwErrUploadTooLarge:
     '{name} is {size}, wat groter is dan de limiet van {max}. Verklein de afbeeldingen of splits het bestand en upload het opnieuw.',
   uwReasonTooLargeWithLimit: 'boven de limiet van {max}',
+  uwUploadChecking: 'Bestand controleren…',
 } satisfies Record<keyof typeof zh, string>

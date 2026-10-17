@@ -159,4 +159,5 @@ export const en = {
   uwErrUploadTooLarge:
     '{name} is {size}, which is over the {max} limit. Reduce image sizes or split the file, then upload again.',
   uwReasonTooLargeWithLimit: 'over the {max} limit',
+  uwUploadChecking: 'Checking file…',
 } satisfies Record<keyof typeof zh, string>
