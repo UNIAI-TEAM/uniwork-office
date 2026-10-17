@@ -27,6 +27,7 @@ export const fr = {
   ufCycle: 'Un dossier ne peut pas être déplacé dans lui-même ni dans un de ses sous-dossiers.',
   ufParentKind: 'Un dossier se trouve à la racine ou dans un autre dossier.',
   ufFolderGone: "Ce dossier n'est plus ici.",
+  ufFolderNoAccess: "Vous n'avez plus accès à ce dossier.",
   ufNoPermission: "Vous n'avez pas l'autorisation de modifier ce dossier.",
   ufEmptyFolder: 'Ce dossier est vide',
   ufLocation: 'Emplacement',

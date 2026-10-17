@@ -28,6 +28,7 @@ export const nl = {
   ufCycle: 'Een map kan niet naar zichzelf of naar een van zijn submappen worden verplaatst.',
   ufParentKind: 'Een map staat in de hoofdmap of in een andere map.',
   ufFolderGone: 'Deze map is hier niet meer.',
+  ufFolderNoAccess: 'Je hebt geen toegang meer tot deze map.',
   ufNoPermission: 'Je hebt geen toestemming om deze map te wijzigen.',
   ufEmptyFolder: 'Deze map is leeg',
   ufLocation: 'Locatie',

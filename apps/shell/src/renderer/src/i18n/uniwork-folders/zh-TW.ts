@@ -26,6 +26,7 @@ export const zhTW = {
   ufCycle: '資料夾無法移動到自身或其子資料夾中。',
   ufParentKind: '資料夾只能位於根目錄或其他資料夾中。',
   ufFolderGone: '此資料夾已不在這裡。',
+  ufFolderNoAccess: '你已無權存取此資料夾。',
   ufNoPermission: '你沒有權限變更此資料夾。',
   ufEmptyFolder: '此資料夾是空的',
   ufLocation: '位置',

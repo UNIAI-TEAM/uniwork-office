@@ -26,6 +26,7 @@ export const en = {
   ufCycle: "A folder can't move into itself or into one of its subfolders.",
   ufParentKind: 'A folder sits at the root or in another folder.',
   ufFolderGone: 'This folder is no longer here.',
+  ufFolderNoAccess: 'You no longer have access to this folder.',
   ufNoPermission: "You don't have permission to change this folder.",
   ufEmptyFolder: 'This folder is empty',
   ufLocation: 'Location',

@@ -248,7 +248,7 @@ export function DocumentsHome({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY]))
   const [tree, setTree] = useState<TreeState>({ status: 'loading', nodes: [] })
   const [treeTick, setTreeTick] = useState(0)
-  const [folderGone, setFolderGone] = useState(false)
+  const [folderNotice, setFolderNotice] = useState<'ufFolderGone' | 'ufFolderNoAccess' | null>(null)
   const subViewRef = useRef(subView)
   subViewRef.current = subView
   const folderIdRef = useRef(folderId)
@@ -326,7 +326,7 @@ export function DocumentsHome({
     openPathRef.current = []
     setSubView('workspace')
     setFolderId(null)
-    setFolderGone(false)
+    setFolderNotice(null)
     setMyFolderId(null)
     setExpanded(new Set([ROOT_KEY]))
     setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)
@@ -385,7 +385,7 @@ export function DocumentsHome({
                   ? folderPath(nextIndex, fallback.folderId).map((p) => p.id)
                   : []
                 folderIdRef.current = fallback.folderId
-                setFolderGone(true)
+                setFolderNotice('ufFolderGone')
                 setFolderId(fallback.folderId)
               }
             }
@@ -535,7 +535,7 @@ export function DocumentsHome({
               ? ancestors.slice(0, ancestors.indexOf(fallbackId) + 1)
               : []
             folderIdRef.current = fallbackId
-            setFolderGone(true)
+            setFolderNotice(result.error === 'forbidden' ? 'ufFolderNoAccess' : 'ufFolderGone')
             setFolderId(fallbackId)
             if (!treeLoadingRef.current) {
               setTreeTick((n) => n + 1)
@@ -671,7 +671,7 @@ export function DocumentsHome({
 
   const selectSubView = (next: DocumentsHomeSubViewId) => {
     setSearchDraft('')
-    setFolderGone(false)
+    setFolderNotice(null)
     subViewRef.current = next
     setSubView(next)
     if (next === 'workspace') {
@@ -683,7 +683,7 @@ export function DocumentsHome({
 
   const openFolderInWorkspace = (id: string | null) => {
     setSearchDraft('')
-    setFolderGone(false)
+    setFolderNotice(null)
     if (id !== null && id === resolvedMyFolderId) {
       openPathRef.current = [id]
       folderIdRef.current = id
@@ -1298,9 +1298,9 @@ export function DocumentsHome({
 
         {subView === 'my-folder' && <p className="dh-subview-banner">{t('uhMyFolderNote')}</p>}
         {subView === 'trash' && <p className="dh-subview-banner">{t('uhTrashNote')}</p>}
-        {folderGone && (
+        {folderNotice && (
           <p className="uwf-notice" role="status">
-            {t('ufFolderGone')}
+            {t(folderNotice)}
           </p>
         )}
 
