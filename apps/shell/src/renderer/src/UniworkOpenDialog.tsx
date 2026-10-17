@@ -965,6 +965,8 @@ export function UniworkOpenDialog({
               onHiddenHintChange={setFolderHiddenHint}
               sidebarTop={views}
               mainOverride={folderView ? undefined : pickBody}
+              offlineOf={(doc) => rowActionsOf(doc, offlineOf(doc)).offline}
+              onOffline={(doc) => onRowAction(doc, 'offline')}
             />
           ) : (
             pickBody

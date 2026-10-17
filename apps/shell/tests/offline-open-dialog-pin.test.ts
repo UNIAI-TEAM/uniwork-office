@@ -261,4 +261,45 @@ describe('Open dialog RowMenu offline item', () => {
     expect(labels).not.toContain(EN.uwOfflinePin)
     expect(labels).not.toContain(EN.uwOfflineUnpin)
   })
+
+  async function openFolderRowMenu(props: Record<string, unknown> = {}) {
+    await mount(props)
+    const rootTree = $$<HTMLElement>('[role="treeitem"]')[0]!
+    await act(async () => rootTree.click())
+    await flush()
+    const button = $$<HTMLButtonElement>('[data-folder-menu-for="d1"]')[0]!
+    await act(async () => button.click())
+    await flush()
+    return $$<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]')
+  }
+
+  it('in the folder view the row menu offers "Make available offline" after Move to and pins it (VG5-2)', async () => {
+    setup()
+    const items = await openFolderRowMenu()
+    expect(items.map((b) => b.textContent)).toEqual(['Move to…', EN.uwOfflinePin])
+    await act(async () => items[1]!.click())
+    await flush()
+    expect(sync.offlinePin).toHaveBeenCalledWith({ documentId: 'd1', workspaceId: 'w1' })
+  })
+
+  it('in the folder view a pinned row offers "Remove offline copy" (VG5-2)', async () => {
+    setup({ rows: [pinned('d1')] })
+    const items = await openFolderRowMenu()
+    expect(items.map((b) => b.textContent)).toEqual(['Move to…', EN.uwOfflineUnpin])
+    await act(async () => items[1]!.click())
+    await flush()
+    expect(sync.offlineUnpin).toHaveBeenCalledWith('d1', undefined)
+  })
+
+  it('in the folder view capability off hides the pin item (VG5-2)', async () => {
+    setup({ capabilityOn: false })
+    const items = await openFolderRowMenu()
+    expect(items.map((b) => b.textContent)).toEqual(['Move to…'])
+  })
+
+  it('in the folder view pin mode (onPick) shows no offline item (VG5-2)', async () => {
+    setup({ rows: [pinned('d1')] })
+    const items = await openFolderRowMenu({ onPick: vi.fn(async () => null) })
+    expect(items.map((b) => b.textContent)).toEqual(['Move to…'])
+  })
 })

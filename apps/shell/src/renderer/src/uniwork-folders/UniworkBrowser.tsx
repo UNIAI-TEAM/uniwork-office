@@ -60,6 +60,8 @@ export function UniworkBrowser({
   folderSelected = true,
   onSelectFolder,
   onHiddenHintChange,
+  offlineOf,
+  onOffline,
 }: {
   workspaceId: string
   variant: 'dialog' | 'pane'
@@ -83,6 +85,9 @@ export function UniworkBrowser({
   onSelectFolder?: () => void
   /** whether the hidden-formats status line is shown in the folder/search view (R2-3) */
   onHiddenHintChange?: (shown: boolean) => void
+  /** G5-05u F5: optional offline item for a file row's "…" menu */
+  offlineOf?: (doc: UniworkDocSummary) => 'pin' | 'unpin' | null
+  onOffline?: (doc: UniworkDocSummary) => void
 }) {
   const { t, dateLocale } = useI18n()
   const uid = useId()
@@ -149,7 +154,7 @@ export function UniworkBrowser({
 
   const rowMenu = (doc: UniworkDocSummary): FolderMenuItem[] => {
     // a row the server says I cannot edit gets no actions; no flag = offer them (403 is a toast)
-    if (doc.canEdit === false) return []
+    const canEdit = doc.canEdit !== false
     const parentId = doc.parentId ?? browser.folderId
     const move: FolderMenuItem = {
       id: 'move',
@@ -157,7 +162,19 @@ export function UniworkBrowser({
       onSelect: () =>
         actions.startMove({ id: doc.id, kind: doc.kind ?? 'file', parentId, title: doc.title }),
     }
-    if (!isFolderEntry(doc)) return [move]
+    if (!isFolderEntry(doc)) {
+      const items: FolderMenuItem[] = canEdit ? [move] : []
+      const offline = offlineOf?.(doc) ?? null
+      if (offline && onOffline) {
+        items.push({
+          id: 'offline',
+          label: t(offline === 'pin' ? 'uwOfflinePin' : 'uwOfflineUnpin'),
+          onSelect: () => onOffline(doc),
+        })
+      }
+      return items
+    }
+    if (!canEdit) return []
     return [
       { id: 'new', label: t('ufNewSubfolder'), onSelect: () => actions.openCreate(doc.id, true) },
       { id: 'rename', label: t('ufRename'), onSelect: () => actions.openRename(doc) },
