@@ -219,6 +219,12 @@ export interface UniworkDocSummary {
   format: UniworkDocFormat | null
   updatedAt: string
   updatedByName?: string
+  /** DESKTOP-HOME: server `updated_by` ULID; absent when omitted */
+  updatedById?: string
+  /** DESKTOP-HOME: server `visibility`; absent when omitted or unknown */
+  visibility?: 'private' | 'workspace' | 'restricted'
+  /** DESKTOP-HOME: server `my_level`; absent when omitted or unknown */
+  myLevel?: 'view' | 'comment' | 'edit' | 'manage'
   /** shared-with-me rows only: the workspace the share lives in (name resolved by main) */
   workspaceName?: string
   /**
@@ -262,6 +268,16 @@ export type UniworkEntryKind = 'folder' | 'file' | 'page'
 export type UniworkSystemKind = 'my_folder'
 
 /**
+ * DESKTOP-HOME: optional list filters for `listChildren`, `listDocuments`,
+ * `listSharedByMe`, and `listTrash`. Unset = parameter omitted.
+ */
+export interface UniworkListFilters {
+  format?: UniworkDocFormat
+  updatedBy?: string
+  updatedFrom?: string
+}
+
+/**
  * FD-11: one node of `GET /workspaces/{ws}/documents/tree?folders_only=true`,
  * to depth 20 (the server's own cap).
  */
@@ -282,7 +298,7 @@ export interface UniworkFolderChildren {
 }
 
 /** FD-11: the contents of one folder; `parentId: null` = the workspace root */
-export interface UniworkFolderQuery {
+export interface UniworkFolderQuery extends UniworkListFilters {
   workspaceId: string
   parentId: string | null
   cursor?: string
@@ -323,7 +339,7 @@ export interface UniworkMoveResult {
   renamedTo: string | null
 }
 
-export interface UniworkDocListQuery {
+export interface UniworkDocListQuery extends UniworkListFilters {
   workspaceId: string
   query?: string
   cursor?: string
@@ -1094,6 +1110,14 @@ export interface HomeApi {
   uniworkListDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>>
   /** documents shared directly with me, aggregated across the selected org's workspaces (S17) */
   uniworkListSharedWithMe(query?: UniworkSharedQuery): Promise<UniworkResult<UniworkSharedPage>>
+  /** DESKTOP-HOME: documents shared by the caller in one workspace (paged) */
+  uniworkListSharedByMe(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>>
+  /** DESKTOP-HOME: archived documents in the workspace's trash (`archived=1`, paged) */
+  uniworkListTrash(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>>
   /** the document properties panel (S17); nulls where the server sends no value */
   uniworkDocumentProperties(documentId: string): Promise<UniworkResult<UniworkDocProperties>>
   /** S18: create a blank document (docx/xlsx/pptx) in a workspace/folder */
@@ -1727,6 +1751,10 @@ export const UNIWORK_DOC_CHANNELS = {
   listDocuments: 'uniwork-doc:list-documents',
   /** invoke(query?) -> the org's documents shared directly with me (paged) */
   listSharedWithMe: 'uniwork-doc:list-shared-with-me',
+  /** invoke(q) -> documents shared by me in one workspace (DESKTOP-HOME) */
+  listSharedByMe: 'uniwork-doc:list-shared-by-me',
+  /** invoke(q) -> archived documents in one workspace's trash (DESKTOP-HOME) */
+  listTrash: 'uniwork-doc:list-trash',
   /** invoke(documentId) -> the properties panel of one document */
   documentProperties: 'uniwork-doc:document-properties',
   /** invoke(input) -> create a blank document (S18) */

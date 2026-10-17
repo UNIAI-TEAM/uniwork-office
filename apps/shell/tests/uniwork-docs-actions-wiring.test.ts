@@ -465,4 +465,69 @@ describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
     ack({ sender: { id: 42 } }, '')
     expect(await pending).toBe(false)
   })
+
+  it('registers listSharedByMe and listTrash IPC handlers and routes them to the service', async () => {
+    const { handlers } = await setup()
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        seen.push(String(input))
+        const url = new URL(String(input))
+        if (url.pathname === '/api/v1/workspaces/ws_1/members') {
+          return new Response(
+            JSON.stringify({
+              members: [{ user_id: 'u_1', display_name: 'Alice' }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+        return new Response(
+          JSON.stringify({
+            documents: [
+              {
+                id: 'doc_1',
+                workspace_id: 'ws_1',
+                title: 'Shared.docx',
+                kind: 'file',
+                updated_at: '2026-10-17T09:00:00Z',
+                updated_by: 'u_1',
+                visibility: 'restricted',
+                my_level: 'manage',
+              },
+            ],
+            next_cursor: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }),
+    )
+    try {
+      const sharedByMe = (await handlers.get(UNIWORK_DOC_CHANNELS.listSharedByMe)!(null, {
+        workspaceId: 'ws_1',
+        format: 'docx',
+      })) as { ok: boolean; value?: { documents: Array<{ id: string; updatedByName?: string }> } }
+      expect(sharedByMe.ok).toBe(true)
+      expect(sharedByMe.value?.documents[0]).toMatchObject({
+        id: 'doc_1',
+        updatedByName: 'Alice',
+      })
+
+      const trash = (await handlers.get(UNIWORK_DOC_CHANNELS.listTrash)!(null, {
+        workspaceId: 'ws_1',
+      })) as { ok: boolean; value?: { documents: Array<{ id: string; updatedByName?: string }> } }
+      expect(trash.ok).toBe(true)
+      expect(trash.value?.documents[0]).toMatchObject({
+        id: 'doc_1',
+        updatedByName: 'Alice',
+      })
+
+      expect(seen.some((u) => u.includes('shared_by_me=true') && u.includes('format=docx'))).toBe(
+        true,
+      )
+      expect(seen.some((u) => u.includes('archived=1'))).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })

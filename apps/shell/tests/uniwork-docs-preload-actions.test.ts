@@ -27,6 +27,8 @@ interface ActionsBridge {
   uniworkFirstSave(input: unknown): Promise<unknown>
   uniworkFirstSaveOpenAck(path: string): Promise<unknown>
   onUniworkFirstSaveOpen(cb: (request: { path: string }) => void): () => void
+  uniworkListSharedByMe(q: unknown): Promise<unknown>
+  uniworkListTrash(q: unknown): Promise<unknown>
 }
 
 /**
@@ -278,5 +280,37 @@ describe('the SAVE-01 first-save bridge members (S01-R1-7)', () => {
         }),
       ).toEqual({ ok: false, error })
     }
+  })
+
+  it('routes uniworkListSharedByMe and uniworkListTrash through their IPC channels', async () => {
+    const page = { ok: true, value: { documents: [], nextCursor: null } }
+    const { bridge, invoked } = await loadBridge(page)
+    invoked.length = 0
+
+    expect(
+      await bridge.uniworkListSharedByMe({
+        workspaceId: 'ws_1',
+        format: 'docx',
+        updatedBy: 'u_1',
+      }),
+    ).toEqual(page)
+    expect(
+      await bridge.uniworkListTrash({
+        workspaceId: 'ws_1',
+        cursor: 'c_1',
+        limit: 25,
+      }),
+    ).toEqual(page)
+
+    expect(invoked).toEqual([
+      {
+        channel: UNIWORK_DOC_CHANNELS.listSharedByMe,
+        args: [{ workspaceId: 'ws_1', format: 'docx', updatedBy: 'u_1' }],
+      },
+      {
+        channel: UNIWORK_DOC_CHANNELS.listTrash,
+        args: [{ workspaceId: 'ws_1', cursor: 'c_1', limit: 25 }],
+      },
+    ])
   })
 })

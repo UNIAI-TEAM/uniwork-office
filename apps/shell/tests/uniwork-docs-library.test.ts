@@ -630,4 +630,205 @@ describe('member-name cache and org switch (S16)', () => {
     await service.documentProperties('d1')
     expect(server.calls.filter((c) => c.path === '/api/v1/orgs/acme/members')).toHaveLength(3)
   })
+
+  it('enriches listDocuments, listChildren, searchDocuments, listSharedByMe, and listTrash with workspace member names', async () => {
+    let wsMembersCalls = 0
+    const fetch: FetchLike = async (url) => {
+      const parsed = new URL(url)
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/members') {
+        wsMembersCalls += 1
+        return json(200, {
+          members: [
+            { user_id: 'u_alice', display_name: 'Alice Nguyen' },
+            { user_id: 'u_bob', display_name: 'Bob Tran' },
+          ],
+        })
+      }
+      if (
+        parsed.pathname === '/api/v1/workspaces/ws_1/documents' ||
+        parsed.pathname === '/api/v1/workspaces/ws_1/documents/recent'
+      ) {
+        return json(200, {
+          documents: [
+            {
+              id: 'doc_1',
+              workspace_id: 'ws_1',
+              title: 'Spec.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by: 'u_alice',
+              visibility: 'workspace',
+              my_level: 'edit',
+            },
+            {
+              id: 'doc_2',
+              workspace_id: 'ws_1',
+              title: 'Notes.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T07:00:00Z',
+              updated_by: 'u_ghost',
+              visibility: 'private',
+              my_level: 'manage',
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return envelope(404, 'not_found')
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+      keystoreLocked: () => false,
+      selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+
+    // Concurrent calls for the same workspace share one in-flight members read
+    const [docs, children, search, sharedByMe, trash] = await Promise.all([
+      service.listDocuments({ workspaceId: 'ws_1' }),
+      service.listChildren({ workspaceId: 'ws_1', parentId: null }),
+      service.searchDocuments({ workspaceId: 'ws_1', query: 'Spec', kind: 'all' }),
+      service.listSharedByMe({ workspaceId: 'ws_1' }),
+      service.listTrash({ workspaceId: 'ws_1' }),
+    ])
+
+    expect(wsMembersCalls).toBe(1)
+
+    for (const res of [docs, sharedByMe, trash]) {
+      expect(res.ok).toBe(true)
+      if (!res.ok) continue
+      expect(res.value.documents[0]).toMatchObject({
+        id: 'doc_1',
+        updatedById: 'u_alice',
+        updatedByName: 'Alice Nguyen',
+        visibility: 'workspace',
+        myLevel: 'edit',
+      })
+      expect(res.value.documents[1]!.updatedById).toBe('u_ghost')
+      expect(res.value.documents[1]!.updatedByName).toBeUndefined()
+    }
+    for (const res of [children, search]) {
+      expect(res.ok).toBe(true)
+      if (!res.ok) continue
+      expect(res.value.items[0]).toMatchObject({
+        id: 'doc_1',
+        updatedById: 'u_alice',
+        updatedByName: 'Alice Nguyen',
+      })
+      expect(res.value.items[1]!.updatedByName).toBeUndefined()
+    }
+  })
+
+  it('caches a failed workspace members read as an empty Map and drops the cache on reload, org change, and account change', async () => {
+    let wsMembersCalls = 0
+    let shouldFail = true
+    let accountId = 'acc_1'
+    let currentOrg: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }
+
+    const fetch: FetchLike = async (url) => {
+      const parsed = new URL(url)
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/members') {
+        wsMembersCalls += 1
+        if (shouldFail) return envelope(500, 'internal_error')
+        return json(200, {
+          members: [{ user_id: 'u_1', display_name: 'Member One' }],
+        })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/documents/recent') {
+        return json(200, {
+          documents: [
+            {
+              id: 'doc_1',
+              workspace_id: 'ws_1',
+              title: 'Plan.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by: 'u_1',
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return envelope(404, 'not_found')
+    }
+
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => ({ accountId, deviceSessionId: 'dev_1', deploymentId: 'default' }),
+      keystoreLocked: () => false,
+      selectedOrg: () => currentOrg,
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+
+    // First call fails: cached as empty Map, not retried on second call
+    const first = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(first.ok && first.value.documents[0]!.updatedByName).toBeUndefined()
+    expect(wsMembersCalls).toBe(1)
+
+    shouldFail = false
+    const second = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(second.ok && second.value.documents[0]!.updatedByName).toBeUndefined()
+    expect(wsMembersCalls).toBe(1)
+
+    // noteLibraryReload drops the cache -> retries and resolves name
+    service.noteLibraryReload()
+    const third = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(third.ok && third.value.documents[0]!.updatedByName).toBe('Member One')
+    expect(wsMembersCalls).toBe(2)
+
+    // org change drops the cache
+    currentOrg = { id: 'org_b', slug: 'beta' }
+    service.noteSelectedOrg('org_b')
+    await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(wsMembersCalls).toBe(3)
+
+    // account change drops the cache
+    accountId = 'acc_2'
+    service.noteSessionIdentity()
+    await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(wsMembersCalls).toBe(4)
+  })
 })

@@ -26,6 +26,7 @@ import type {
   UniworkFolderNode,
   UniworkFolderQuery,
   UniworkLaunchEvent,
+  UniworkListFilters,
   UniworkLockReason,
   UniworkMoveDocumentInput,
   UniworkMoveResult,
@@ -900,6 +901,14 @@ export class UniworkDocsService {
   /** the one in-flight members read per org, shared by concurrent panel opens */
   private orgMemberNamesInFlight: { orgId: string; promise: Promise<Map<string, string>> } | null =
     null
+  /** DESKTOP-HOME: workspaceId -> (userId -> displayName) cache; dropped on org/account change & reload */
+  private readonly workspaceMemberNames = new Map<string, Map<string, string>>()
+  /** DESKTOP-HOME: the one in-flight workspace members read per workspaceId */
+  private readonly workspaceMemberNamesInFlight = new Map<string, Promise<Map<string, string>>>()
+  /** DESKTOP-HOME: the org id under which `workspaceMemberNames` was populated */
+  private workspaceMemberNamesOrg: string | null = null
+  /** DESKTOP-HOME: the last live account key (`deploymentId/accountId`) observed for member caches */
+  private sessionAccountKey: string | null = null
   /** per path, the saveMark of its last user Save */
   private readonly lastUserSave = new Map<string, number>()
   private saveCounter = 0
@@ -1358,6 +1367,16 @@ export class UniworkDocsService {
   /** the session's account may have changed: remember it as the last owner */
   noteSessionIdentity(): void {
     const identity = this.liveIdentity()
+    const accountKey = identity ? `${identity.deploymentId}/${identity.accountId}` : null
+    if (this.sessionAccountKey !== accountKey) {
+      this.sessionAccountKey = accountKey
+      this.orgMemberNames = new Map()
+      this.orgMemberNamesOrg = null
+      this.orgMemberNamesInFlight = null
+      this.workspaceMemberNames.clear()
+      this.workspaceMemberNamesInFlight.clear()
+      this.workspaceMemberNamesOrg = null
+    }
     if (identity) {
       // session boot / deployment switch: the new server's `documents.limits`
       // replace whatever the previous one published
@@ -2843,6 +2862,10 @@ export class UniworkDocsService {
     this.orgMemberNamesOrg = null
     this.notedOrgId = null
     this.orgMemberNamesInFlight = null
+    this.workspaceMemberNames.clear()
+    this.workspaceMemberNamesInFlight.clear()
+    this.workspaceMemberNamesOrg = null
+    this.sessionAccountKey = null
     this.migratedScopes.delete(scopeToken)
     this.limitsCache.reset()
     this.coordinator.resetSessionWarnings()
@@ -3171,6 +3194,15 @@ export class UniworkDocsService {
     }
     if (this.orgMemberNamesInFlight && this.orgMemberNamesInFlight.orgId !== orgId) {
       this.orgMemberNamesInFlight = null
+    }
+    if (
+      orgKnown &&
+      ((this.workspaceMemberNamesOrg !== null && this.workspaceMemberNamesOrg !== orgId) ||
+        (prevOrgId !== null && prevOrgId !== orgId))
+    ) {
+      this.workspaceMemberNames.clear()
+      this.workspaceMemberNamesInFlight.clear()
+      this.workspaceMemberNamesOrg = orgId
     }
     if (changed && orgId && this.deps.identity()) {
       void this.limitsCache.refresh().catch(() => undefined)
@@ -3646,8 +3678,10 @@ export class UniworkDocsService {
         parentId: typeof q.parentId === 'string' && q.parentId ? q.parentId : null,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...this.listFiltersOf(q),
       })
-      return { items: page.documents, nextCursor: page.nextCursor }
+      const items = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { items, nextCursor: page.nextCursor }
     })
   }
 
@@ -3664,7 +3698,8 @@ export class UniworkDocsService {
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
       })
-      return { items: page.documents, nextCursor: page.nextCursor }
+      const items = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { items, nextCursor: page.nextCursor }
     })
   }
 
@@ -4394,6 +4429,101 @@ export class UniworkDocsService {
   }
 
   /**
+   * DESKTOP-HOME: the workspace's member names (`user_id` -> `display_name`),
+   * read once per `workspaceId` via `GET /workspaces/{ws}/members` (capped at
+   * `MEMBERS_PAGE_SIZE * MEMBERS_MAX_PAGES` = 2000 entries). Concurrent list
+   * calls for the same workspace share one in-flight read; on failure, an empty
+   * `Map` is cached for the session so a missing/forbidden members read is
+   * never retried per row. Dropped on org change, account change, and
+   * `noteLibraryReload()`.
+   */
+  private memberNamesForWorkspace(workspaceId: string): Promise<Map<string, string>> {
+    const identity = this.deps.identity()
+    const accountKey = identity ? `${identity.deploymentId}/${identity.accountId}` : null
+    if (this.sessionAccountKey !== null && this.sessionAccountKey !== accountKey) {
+      this.workspaceMemberNames.clear()
+      this.workspaceMemberNamesInFlight.clear()
+      this.workspaceMemberNamesOrg = null
+    }
+    this.sessionAccountKey = accountKey
+    const orgId = this.deps.selectedOrg()?.id ?? null
+    if (this.workspaceMemberNamesOrg !== null && this.workspaceMemberNamesOrg !== orgId) {
+      this.workspaceMemberNames.clear()
+      this.workspaceMemberNamesInFlight.clear()
+    }
+    this.workspaceMemberNamesOrg = orgId
+    const cached = this.workspaceMemberNames.get(workspaceId)
+    if (cached) return Promise.resolve(cached)
+    const inflight = this.workspaceMemberNamesInFlight.get(workspaceId)
+    if (inflight) return inflight
+    const epoch = this.sessionEpoch
+    const promise = this.loadWorkspaceMemberNames(workspaceId, epoch, accountKey, orgId)
+    this.workspaceMemberNamesInFlight.set(workspaceId, promise)
+    return promise
+  }
+
+  private async loadWorkspaceMemberNames(
+    workspaceId: string,
+    epoch: number,
+    accountKey: string | null,
+    orgId: string | null,
+  ): Promise<Map<string, string>> {
+    const cap = MEMBERS_PAGE_SIZE * MEMBERS_MAX_PAGES
+    try {
+      const api = this.api()
+      if (typeof api.listWorkspaceMembers !== 'function') {
+        return new Map()
+      }
+      const members = await api.listWorkspaceMembers(workspaceId)
+      const names = new Map<string, string>()
+      for (const member of members) {
+        if (names.size >= cap) break
+        names.set(member.userId, member.displayName)
+      }
+      if (
+        this.sessionEpoch === epoch &&
+        this.sessionAccountKey === accountKey &&
+        this.workspaceMemberNamesOrg === orgId
+      ) {
+        this.workspaceMemberNames.set(workspaceId, names)
+      }
+      return names
+    } catch {
+      const empty = new Map<string, string>()
+      if (
+        this.sessionEpoch === epoch &&
+        this.sessionAccountKey === accountKey &&
+        this.workspaceMemberNamesOrg === orgId
+      ) {
+        this.workspaceMemberNames.set(workspaceId, empty)
+      }
+      return empty
+    } finally {
+      this.workspaceMemberNamesInFlight.delete(workspaceId)
+    }
+  }
+
+  private async enrichWorkspaceRows(
+    workspaceId: string,
+    rows: UniworkDocSummary[],
+  ): Promise<UniworkDocSummary[]> {
+    const names = await this.memberNamesForWorkspace(workspaceId)
+    if (names.size === 0) return rows
+    return rows.map((row) => {
+      const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
+      return updatedByName ? { ...row, updatedByName } : row
+    })
+  }
+
+  private listFiltersOf(q: UniworkListFilters): UniworkListFilters {
+    return {
+      ...(typeof q.format === 'string' && q.format ? { format: q.format } : {}),
+      ...(typeof q.updatedBy === 'string' && q.updatedBy ? { updatedBy: q.updatedBy } : {}),
+      ...(typeof q.updatedFrom === 'string' && q.updatedFrom ? { updatedFrom: q.updatedFrom } : {}),
+    }
+  }
+
+  /**
    * The renderer re-read the library (picker open, Retry, or the org-change
    * status push): the org member-name cache is dropped so a read that failed
    * earlier is retried at this point, not on every properties panel.
@@ -4403,17 +4533,61 @@ export class UniworkDocsService {
     // map is dropped here, so the one-in-flight rule is not broken
     this.orgMemberNames = new Map()
     this.orgMemberNamesOrg = null
+    this.workspaceMemberNames.clear()
   }
 
   listDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>> {
     return result(async () => {
-      if (!query || typeof query.workspaceId !== 'string') throw new UniworkDocError('not_found')
-      return this.api().listDocuments({
+      if (!query || typeof query.workspaceId !== 'string' || !query.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const page = await this.api().listDocuments({
         workspaceId: query.workspaceId,
         ...(typeof query.query === 'string' ? { query: query.query } : {}),
         ...(typeof query.cursor === 'string' ? { cursor: query.cursor } : {}),
         ...(typeof query.limit === 'number' ? { limit: query.limit } : {}),
+        ...this.listFiltersOf(query),
       })
+      const documents = await this.enrichWorkspaceRows(query.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** DESKTOP-HOME: documents shared by the caller in one workspace (paged) */
+  listSharedByMe(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const page = await this.api().listSharedByMe({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...this.listFiltersOf(q),
+      })
+      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** DESKTOP-HOME: archived documents in the workspace's trash (`archived=1`, paged) */
+  listTrash(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const page = await this.api().listTrash({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...this.listFiltersOf(q),
+      })
+      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
     })
   }
 
