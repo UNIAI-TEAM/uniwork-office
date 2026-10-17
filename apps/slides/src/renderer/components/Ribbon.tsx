@@ -2075,6 +2075,10 @@ export function Ribbon({
                           aria-label={
                             preset.kind === 'pen' ? t('ribbonPenTip') : t('ribbonHighlighterTip')
                           }
+                          onMouseDown={(e) => {
+                            e.stopPropagation()
+                            closeSiblingPanels(e, closePanels, 'pen')
+                          }}
                           onClick={(event) => {
                             if (held) {
                               const rect = event.currentTarget.getBoundingClientRect()
@@ -2118,7 +2122,11 @@ export function Ribbon({
                 {penFlyout && (
                   <>
                     <div className="pen-flyout-backdrop" onClick={() => setPenFlyout(null)} />
-                    <div className="pen-flyout" style={{ left: penFlyout.x, top: penFlyout.y }}>
+                    <div
+                      className="pen-flyout"
+                      style={{ left: penFlyout.x, top: penFlyout.y }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
                       {renderInkSettings(penFlyout.index)}
                     </div>
                   </>

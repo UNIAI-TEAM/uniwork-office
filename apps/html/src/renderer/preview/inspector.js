@@ -1012,6 +1012,9 @@
           return
         }
       }
+      // held-key autorepeat and IME-cancel presses must not reach the host close path
+      // (same rule as web/docs/bridge/escape-forwarder.ts)
+      if (e.key === 'Escape' && (e.repeat || e.isComposing)) return
       if (mode !== 'inspect') {
         if (e.key === 'Escape') post({ type: 'gx:keyCommand', command: 'escape' })
         return

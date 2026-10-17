@@ -1033,6 +1033,7 @@ export function ExcelShell({
 
         <Ribbon
           activeTab={effectiveTab}
+          viewOnly={viewOnly}
           selectionFormat={selectionFormat}
           formatPainterActive={formatPainterActive}
           sheetHasContent={sheetHasContent}
@@ -1993,6 +1994,7 @@ function LinkDialog({
 
 function Ribbon({
   activeTab,
+  viewOnly,
   selectionFormat,
   formatPainterActive,
   sheetHasContent,
@@ -2016,6 +2018,9 @@ function Ribbon({
   onIsSelectionInPivot,
 }: {
   readonly activeTab: RibbonTab
+  /** Read-only profile (withheld save or view-only UniWork doc): the View tab is the
+   *  only tab, so the reading tools that normally live on Home are surfaced there */
+  readonly viewOnly: boolean
   readonly selectionFormat: SelectionFormat | null
   readonly formatPainterActive: boolean
   readonly sheetHasContent: boolean
@@ -3355,6 +3360,23 @@ function Ribbon({
             { value: 'unfreeze', label: t('appUnfreeze') },
           ])}
         </RibbonGroup>
+        {/* view-only shows only this tab, so the Home > Editing Find control moves here
+            (same command and strings, no duplicate of Replace/Go To which would edit) */}
+        {viewOnly && (
+          <RibbonGroup label={t('appGroupEditing')}>
+            <div className="ribbon-rows">
+              <div className="inline-tools">
+                <button
+                  className="labeled"
+                  data-tip={t('appFindTitle')}
+                  onClick={() => onCommand('find')}
+                >
+                  <ToolSymbol symbol="🔍" /> {t('appFind')}
+                </button>
+              </div>
+            </div>
+          </RibbonGroup>
+        )}
       </div>
     )
   }
