@@ -403,4 +403,156 @@ describe('401: one shared refresh, one retry (real account session)', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
     expect(transport.refresh).toHaveBeenCalledTimes(1)
   })
+
+  it('parses visibility, myLevel and updatedById on list and shared-with-me rows, dropping unknown values', async () => {
+    const fetch = vi.fn<FetchLike>(async (url) => {
+      if (url.includes('/shared-with-me')) {
+        return json(200, {
+          documents: [
+            {
+              id: 's1',
+              workspace_id: 'ws_1',
+              title: 'Shared.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T01:00:00Z',
+              visibility: 'restricted',
+              my_level: 'comment',
+              updated_by: 'usr_9',
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return json(200, {
+        documents: [
+          {
+            id: 'd_priv',
+            workspace_id: 'ws_1',
+            title: 'Private.docx',
+            kind: 'file',
+            updated_at: '2026-10-17T01:00:00Z',
+            visibility: 'private',
+            my_level: 'manage',
+            updated_by: 'usr_1',
+          },
+          {
+            id: 'd_ws',
+            workspace_id: 'ws_1',
+            title: 'Workspace.xlsx',
+            kind: 'file',
+            updated_at: '2026-10-17T02:00:00Z',
+            visibility: 'workspace',
+            my_level: 'view',
+            updated_by: '',
+          },
+          {
+            id: 'd_unknown',
+            workspace_id: 'ws_1',
+            title: 'Unknown.pptx',
+            kind: 'file',
+            updated_at: '2026-10-17T03:00:00Z',
+            visibility: 'public_link',
+            my_level: 'superadmin',
+          },
+        ],
+        next_cursor: null,
+      })
+    })
+    const api = client(fetch)
+    const list = await api.listDocuments({ workspaceId: 'ws_1' })
+    expect(list.documents[0]).toMatchObject({
+      id: 'd_priv',
+      visibility: 'private',
+      myLevel: 'manage',
+      updatedById: 'usr_1',
+      canEdit: true,
+      canManage: true,
+    })
+    expect(list.documents[1]).toMatchObject({
+      id: 'd_ws',
+      visibility: 'workspace',
+      myLevel: 'view',
+      canEdit: false,
+      canManage: false,
+    })
+    expect(list.documents[1]!.updatedById).toBeUndefined()
+    expect(list.documents[2]!.visibility).toBeUndefined()
+    expect(list.documents[2]!.myLevel).toBeUndefined()
+    expect(list.documents[2]!.updatedById).toBeUndefined()
+
+    const shared = await api.listSharedWithMe({ workspaceId: 'ws_1' })
+    expect(shared.documents[0]).toMatchObject({
+      id: 's1',
+      visibility: 'restricted',
+      myLevel: 'comment',
+      updatedById: 'usr_9',
+      canEdit: false,
+      canManage: false,
+    })
+  })
+
+  it('sends listSharedByMe, listTrash, listWorkspaceMembers and filter params only when set', async () => {
+    const seen: string[] = []
+    const fetch = vi.fn<FetchLike>(async (url) => {
+      seen.push(url)
+      if (url.endsWith('/members')) {
+        return json(200, {
+          members: [
+            { user_id: 'u_1', display_name: 'Alice' },
+            { user_id: 'u_2', display_name: '' },
+          ],
+        })
+      }
+      return json(200, { documents: [], next_cursor: null })
+    })
+    const api = client(fetch)
+
+    // Unset filters stay byte-identical
+    await api.listSharedByMe({ workspaceId: 'ws_1' })
+    await api.listTrash({ workspaceId: 'ws_1', limit: 25, cursor: 'c_trash' })
+    await api.listChildren({ workspaceId: 'ws_1', parentId: null })
+    await api.listDocuments({ workspaceId: 'ws_1' })
+
+    // Set filters append format, updated_by, updated_from
+    await api.listSharedByMe({
+      workspaceId: 'ws_1',
+      format: 'docx',
+      updatedBy: 'u_1',
+      updatedFrom: '2026-10-01T00:00:00Z',
+    })
+    await api.listTrash({
+      workspaceId: 'ws_1',
+      format: 'xlsx',
+      updatedBy: 'u_2',
+      updatedFrom: '2026-10-10T00:00:00Z',
+    })
+    await api.listChildren({
+      workspaceId: 'ws_1',
+      parentId: 'fold_1',
+      format: 'pptx',
+      updatedBy: 'u_3',
+      updatedFrom: '2026-10-15T00:00:00Z',
+    })
+    await api.listDocuments({
+      workspaceId: 'ws_1',
+      format: 'pdf',
+      updatedBy: 'u_4',
+      updatedFrom: '2026-10-16T00:00:00Z',
+    })
+
+    const members = await api.listWorkspaceMembers('ws_1')
+    expect(members).toEqual([{ userId: 'u_1', displayName: 'Alice' }])
+
+    expect(seen).toEqual([
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?shared_by_me=true&limit=50`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?archived=1&limit=25&cursor=c_trash`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?parent_id=&limit=50`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/recent?limit=50&kind=file`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?shared_by_me=true&limit=50&format=docx&updated_by=u_1&updated_from=2026-10-01T00%3A00%3A00Z`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?archived=1&limit=50&format=xlsx&updated_by=u_2&updated_from=2026-10-10T00%3A00%3A00Z`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?parent_id=fold_1&limit=50&format=pptx&updated_by=u_3&updated_from=2026-10-15T00%3A00%3A00Z`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?limit=50&kind=file&format=pdf&updated_by=u_4&updated_from=2026-10-16T00%3A00%3A00Z`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/members`,
+    ])
+  })
 })
