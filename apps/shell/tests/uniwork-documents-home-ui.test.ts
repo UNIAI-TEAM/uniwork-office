@@ -1155,4 +1155,281 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       expect(css, `raw rgb/rgba in ${label}`).not.toMatch(/\brgba?\s*\(/)
     }
   })
+
+  it('falls back to the nearest live parent (or workspace root) with the ufFolderGone status notice when an open folder disappears via tree change or not_found children read, never showing uwErrNotFound (DH1-E2E-2)', async () => {
+    let treeChangedCb: ((ev: { workspaceId: string }) => void) | null = null
+    api.onUniworkTreeChanged.mockImplementation((cb: (ev: { workspaceId: string }) => void) => {
+      treeChangedCb = cb
+      return () => {
+        treeChangedCb = null
+      }
+    })
+
+    let vanished = false
+    let legalVanished = false
+    api.uniworkFolderTree.mockImplementation(async () =>
+      ok([
+        folderTree[0]!,
+        {
+          id: 'f-hub',
+          parentId: null,
+          title: 'Source Hub',
+          position: 1,
+          children: vanished
+            ? []
+            : [
+                {
+                  id: 'f-leaf',
+                  parentId: 'f-hub',
+                  title: 'Vanishing Leaf',
+                  position: 0,
+                  children: [],
+                },
+              ],
+        },
+        ...(legalVanished ? [] : [folderTree[2]!]),
+      ]),
+    )
+
+    const hubChildren: DocumentsHomeDoc[] = [
+      {
+        id: 'f-leaf',
+        workspaceId: 'ws-1',
+        title: 'Vanishing Leaf',
+        format: 'docx',
+        updatedAt: '2026-10-17T08:00:00.000Z',
+        kind: 'folder',
+        parentId: 'f-hub',
+      },
+      {
+        id: 'doc-in-hub',
+        workspaceId: 'ws-1',
+        title: 'Tài liệu trong Source Hub.docx',
+        format: 'docx',
+        updatedAt: '2026-10-17T08:00:00.000Z',
+        kind: 'file',
+        parentId: 'f-hub',
+      },
+    ]
+
+    api.uniworkListChildren.mockImplementation(
+      async (q: {
+        workspaceId: string
+        parentId: string | null
+      }): Promise<UniworkResult<UniworkFolderChildren>> => {
+        if (q.parentId === 'f-hub') {
+          return ok({
+            items: vanished ? hubChildren.slice(1) : hubChildren,
+            nextCursor: null,
+          })
+        }
+        if (q.parentId === 'f-leaf') {
+          if (vanished) {
+            return { ok: false, error: 'not_found' }
+          }
+          return ok({ items: [], nextCursor: null })
+        }
+        if (q.parentId === 'f-legal') {
+          if (legalVanished) {
+            return { ok: false, error: 'not_found' }
+          }
+          return ok({ items: [], nextCursor: null })
+        }
+        return ok({
+          items: [
+            {
+              id: 'f-hub',
+              workspaceId: 'ws-1',
+              title: 'Source Hub',
+              format: 'docx',
+              updatedAt: '2026-10-17T08:00:00.000Z',
+              kind: 'folder',
+              parentId: null,
+            },
+            ...(legalVanished ? [] : [rootItems[1]!]),
+            rootItems[2]!,
+          ],
+          nextCursor: null,
+        })
+      },
+    )
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    // Navigate into Source Hub -> Vanishing Leaf
+    const hubBtn = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-hub"] button.dh-folder-open',
+    )!
+    expect(hubBtn).not.toBeNull()
+    await act(async () => {
+      hubBtn.click()
+    })
+    await flush()
+
+    const leafBtn = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-leaf"] button.dh-folder-open',
+    )!
+    expect(leafBtn).not.toBeNull()
+    await act(async () => {
+      leafBtn.click()
+    })
+    await flush()
+
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Vanishing Leaf')
+    expect(host.querySelector('.uwf-crumbs [aria-current="page"]')?.textContent?.trim()).toBe(
+      'Vanishing Leaf',
+    )
+
+    // 1. Archive Vanishing Leaf on the web and fire onUniworkTreeChanged
+    vanished = true
+    await act(async () => {
+      treeChangedCb?.({ workspaceId: 'ws-1' })
+    })
+    await flush()
+
+    // Falls back to nearest live parent (Source Hub) and shows role="status" ufFolderGone notice
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Source Hub')
+    expect(host.querySelector('.uwf-crumbs [aria-current="page"]')?.textContent?.trim()).toBe(
+      'Source Hub',
+    )
+    const notice = host.querySelector<HTMLElement>('.uwf-notice[role="status"]')
+    expect(notice).not.toBeNull()
+    expect(notice?.textContent?.trim()).toBe('Thư mục này không còn ở đây.')
+    expect(host.querySelector('.uw-pick-state[role="alert"]')).toBeNull()
+    expect(host.textContent).not.toContain('Tài liệu này không còn tồn tại.')
+    expect(host.textContent).toContain('Tài liệu trong Source Hub.docx')
+
+    // 2. Navigating to another folder clears the ufFolderGone notice; if that root-level folder's
+    // children read answers not_found directly, it falls back to workspace root with ufFolderGone
+    const rootCrumb = host.querySelector<HTMLButtonElement>('.uwf-crumbs button.uwf-crumb')!
+    await act(async () => {
+      rootCrumb.click()
+    })
+    await flush()
+    expect(host.querySelector('.uwf-notice')).toBeNull()
+
+    legalVanished = true
+    const legalBtn = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-legal"] button.dh-folder-open',
+    )!
+    expect(legalBtn).not.toBeNull()
+    await act(async () => {
+      legalBtn.click()
+    })
+    await flush()
+
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Tài liệu của workspace')
+    expect(host.querySelector('.uwf-crumbs')).toBeNull()
+    const rootNotice = host.querySelector<HTMLElement>('.uwf-notice[role="status"]')
+    expect(rootNotice).not.toBeNull()
+    expect(rootNotice?.textContent?.trim()).toBe('Thư mục này không còn ở đây.')
+    expect(host.querySelector('.uw-pick-state[role="alert"]')).toBeNull()
+    expect(host.textContent).not.toContain('Tài liệu này không còn tồn tại.')
+  })
+
+  it('renders visually hidden screen-reader full ancestor paths (.uw-sr-only with ufPathLabel) alongside aria-hidden short paths on search result rows (DH1-E2E-4)', async () => {
+    api.uniworkSearchDocuments.mockResolvedValueOnce(
+      ok({
+        items: [
+          {
+            id: 'f-budget-ledger',
+            workspaceId: 'ws-1',
+            title: 'Budget Ledger Folder',
+            format: 'docx',
+            updatedAt: '2026-10-17T08:00:00.000Z',
+            kind: 'folder',
+            parentId: 'f-fy26',
+            path: [
+              { id: 'f-fin', title: 'Finance' },
+              { id: 'f-fy26', title: 'FY2026' },
+            ],
+          } satisfies DocumentsHomeDoc,
+          {
+            id: 'doc-budget-deep',
+            workspaceId: 'ws-1',
+            title: 'budget-deep-branch.docx',
+            format: 'docx',
+            updatedAt: '2026-10-17T08:00:00.000Z',
+            kind: 'file',
+            parentId: 'd4',
+            path: [
+              { id: 'd1', title: 'Division' },
+              { id: 'd2', title: 'Region' },
+              { id: 'd3', title: 'Country' },
+              { id: 'd4', title: 'Branch' },
+            ],
+          } satisfies DocumentsHomeDoc,
+        ],
+        nextCursor: null,
+      }),
+    )
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const searchInput = host.querySelector<HTMLInputElement>('input.uwf-own-search')!
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(searchInput, 'budget')
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+
+    // No All/Folders/Documents kind radiogroup in DocumentsHome
+    expect(host.querySelector('[role="radiogroup"]')).toBeNull()
+
+    // Document search row has aria-hidden short path + .uw-sr-only full path + title attribute
+    const docRow = host.querySelector<HTMLElement>('.dh-doc-row[data-doc-id="doc-budget-deep"]')!
+    expect(docRow).not.toBeNull()
+    const docSubpath = docRow.querySelector<HTMLElement>('.dh-doc-subpath')!
+    expect(docSubpath).not.toBeNull()
+    expect(docSubpath.getAttribute('title')).toBe('UniWork › Division › Region › Country › Branch')
+    expect(docSubpath.querySelector('[aria-hidden="true"]')?.textContent).toBe('… › Branch ›')
+    expect(docSubpath.querySelector('.uw-sr-only')?.textContent).toBe(
+      'Đường dẫn: UniWork › Division › Region › Country › Branch',
+    )
+
+    // Folder search card also has aria-hidden short path + .uw-sr-only full path + title attribute
+    const folderCard = host.querySelector<HTMLElement>(
+      '.dh-folder-card[data-folder-id="f-budget-ledger"]',
+    )!
+    expect(folderCard).not.toBeNull()
+    const folderSubpath = folderCard.querySelector<HTMLElement>('.dh-doc-subpath')!
+    expect(folderSubpath).not.toBeNull()
+    expect(folderSubpath.getAttribute('title')).toBe('UniWork › Finance › FY2026')
+    expect(folderSubpath.querySelector('[aria-hidden="true"]')?.textContent).toBe('… › FY2026 ›')
+    expect(folderSubpath.querySelector('.uw-sr-only')?.textContent).toBe(
+      'Đường dẫn: UniWork › Finance › FY2026',
+    )
+  })
 })
