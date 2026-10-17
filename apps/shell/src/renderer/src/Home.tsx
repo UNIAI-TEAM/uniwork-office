@@ -345,8 +345,10 @@ function useFolderListings() {
   // dir → whether a reload was requested while its request was in flight (the
   // in-flight answer may predate the change, so it is fetched once more)
   const inflight = useRef(new Map<string, boolean>())
+  const cached = useRef(new Set<string>())
 
   const load = useCallback((dir: string, force = false) => {
+    if (!force && cached.current.has(dir)) return
     if (inflight.current.has(dir)) {
       if (force) inflight.current.set(dir, true)
       return
@@ -355,9 +357,18 @@ function useFolderListings() {
     void window.aiOffice
       .listFolder(dir)
       .then((listing) => {
+        cached.current.add(dir)
         setListings((prev) => {
           const next = new Map(prev)
           next.set(dir, listing)
+          return next
+        })
+      })
+      .catch(() => {
+        cached.current.add(dir)
+        setListings((prev) => {
+          const next = new Map(prev)
+          next.set(dir, { dir, folders: [], files: [], missing: true })
           return next
         })
       })
@@ -370,6 +381,7 @@ function useFolderListings() {
 
   const invalidate = useCallback(
     (dirs: readonly string[]) => {
+      for (const dir of dirs) cached.current.delete(dir)
       setListings((prev) => {
         let changed = false
         const next = new Map(prev)
@@ -383,7 +395,10 @@ function useFolderListings() {
     [load],
   )
 
-  const reset = useCallback(() => setListings(new Map()), [])
+  const reset = useCallback(() => {
+    cached.current.clear()
+    setListings(new Map())
+  }, [])
 
   /** shown or currently loading: the folders a watch event should refresh */
   const tracked = useCallback(
@@ -1588,23 +1603,30 @@ export function Home() {
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const dragExpandTimer = useRef<number | null>(null)
 
+  const [rootsLoaded, setRootsLoaded] = useState(false)
+
   const loadRoot = useCallback(() => {
-    void window.aiOffice.folderRoots().then((next) => {
-      setRoots((prev) => {
-        if (prev[0] && prev[0].path !== next[0]?.path) {
-          // the default save folder changed in settings: the old tree is meaningless
-          resetFolders()
-          setSelectedFolder(null)
-          setExpanded(new Set(next.map((r) => r.path)))
-        } else if (prev.length > 0) {
-          // a folder just added opens so its contents show right away
-          const known = new Set(prev.map((r) => r.path))
-          const added = next.filter((r) => !known.has(r.path)).map((r) => r.path)
-          if (added.length > 0) setExpanded((e) => new Set([...e, ...added]))
-        }
-        return next
+    void window.aiOffice
+      .folderRoots()
+      .then((next) => {
+        setRoots((prev) => {
+          if (prev[0] && prev[0].path !== next[0]?.path) {
+            // the default save folder changed in settings: the old tree is meaningless
+            resetFolders()
+            setSelectedFolder(null)
+            setExpanded(new Set(next.map((r) => r.path)))
+          } else if (prev.length > 0) {
+            // a folder just added opens so its contents show right away
+            const known = new Set(prev.map((r) => r.path))
+            const added = next.filter((r) => !known.has(r.path)).map((r) => r.path)
+            if (added.length > 0) setExpanded((e) => new Set([...e, ...added]))
+          }
+          return next
+        })
       })
-    })
+      .finally(() => {
+        setRootsLoaded(true)
+      })
   }, [resetFolders])
 
   useEffect(loadRoot, [loadRoot])
@@ -1615,9 +1637,9 @@ export function Home() {
 
   useEffect(() => {
     for (const r of roots) {
-      if (r.readable) loadFolder(r.path)
+      if (r.readable && !listings.has(r.path)) loadFolder(r.path)
     }
-  }, [roots, loadFolder])
+  }, [roots, listings, loadFolder])
 
   useEffect(() => {
     if (!root?.usable) return
@@ -1674,20 +1696,35 @@ export function Home() {
     const limit = keepCount ? Math.max(entriesLen.current, PAGE_SIZE) : PAGE_SIZE
     const primary = view === 'recent' ? window.aiOffice.recents : window.aiOffice.starred
     const secondary = view === 'recent' ? window.aiOffice.starred : window.aiOffice.recents
-    void primary({ offset: 0, limit, ext, group }).then((page) => {
-      if (seq !== requestSeq.current) return
-      setEntries(page.entries)
-      setListTotal(page.total)
-      setLastPageLen(page.entries.length)
-      setListLoaded(true)
-    })
+    void primary({ offset: 0, limit, ext, group })
+      .then((page) => {
+        if (seq !== requestSeq.current) return
+        setEntries(page.entries)
+        setListTotal(page.total)
+        setLastPageLen(page.entries.length)
+        setListLoaded(true)
+      })
+      .catch(() => {
+        if (seq !== requestSeq.current) return
+        setEntries([])
+        setListTotal(0)
+        setLastPageLen(0)
+        setListLoaded(true)
+      })
     // The other view fetches its page under the same active filter so splitEntriesByArea can count per area.
-    void secondary({ offset: 0, limit: PAGE_SIZE, ext }).then((page) => {
-      if (seq !== requestSeq.current) return
-      setOtherEntries(page.entries)
-      setOtherTotal(page.total)
-      setOtherLoaded(true)
-    })
+    void secondary({ offset: 0, limit: PAGE_SIZE, ext })
+      .then((page) => {
+        if (seq !== requestSeq.current) return
+        setOtherEntries(page.entries)
+        setOtherTotal(page.total)
+        setOtherLoaded(true)
+      })
+      .catch(() => {
+        if (seq !== requestSeq.current) return
+        setOtherEntries([])
+        setOtherTotal(0)
+        setOtherLoaded(true)
+      })
     if (projectMode) {
       void window.aiOfficeProject!.listProjects().then(setProjects)
     }
@@ -1810,17 +1847,24 @@ export function Home() {
     const ext = filter === 'all' ? undefined : filter
     const group = view === 'starred' && groupFilter ? groupFilter : undefined
     const api = view === 'recent' ? window.aiOffice.recents : window.aiOffice.starred
-    void api({ offset: entriesLen.current, limit: PAGE_SIZE, ext, group }).then((page) => {
-      if (seq !== requestSeq.current) return
-      setLoadingMore(false)
-      setLastPageLen(page.entries.length)
-      if (page.entries.length === 0) {
+    void api({ offset: entriesLen.current, limit: PAGE_SIZE, ext, group })
+      .then((page) => {
+        if (seq !== requestSeq.current) return
+        setLoadingMore(false)
+        setLastPageLen(page.entries.length)
+        if (page.entries.length === 0) {
+          setListTotal(entriesLen.current)
+          return
+        }
+        setEntries((prev) => [...prev, ...page.entries])
+        setListTotal(page.total)
+      })
+      .catch(() => {
+        if (seq !== requestSeq.current) return
+        setLoadingMore(false)
+        setLastPageLen(0)
         setListTotal(entriesLen.current)
-        return
-      }
-      setEntries((prev) => [...prev, ...page.entries])
-      setListTotal(page.total)
-    })
+      })
   }
   const loadMoreRef = useRef(loadMore)
   loadMoreRef.current = loadMore
@@ -3472,8 +3516,15 @@ export function Home() {
     const cjk = lang === 'zh' || lang === 'zh-TW' || lang === 'ja'
     const greeting = `${t(greetKey)}${accountName ? (cjk ? '，' : ', ') + accountName : ''}${cjk ? '。' : '. '}`
     const noUsableDeviceRoots =
-      roots.length === 0 ||
-      roots.every((r) => !r.readable || !r.usable || listings.get(r.path)?.missing === true)
+      rootsLoaded &&
+      (roots.length === 0 ||
+        roots.every((r) => !r.readable || listings.get(r.path)?.missing === true))
+    const deviceRootsPending =
+      area === 'device' &&
+      filter === 'all' &&
+      (!rootsLoaded ||
+        (!roots.some((r) => r.readable && listings.has(r.path) && !listings.get(r.path)?.missing) &&
+          roots.some((r) => r.readable && !listings.has(r.path))))
     return (
       <>
         <section className="quick-start" aria-label={t('secQuickStart')}>
@@ -3583,11 +3634,11 @@ export function Home() {
           {searchActive ? (
             renderSearchResults()
           ) : areaEntries.length === 0 ? (
-            !listLoaded || hasMore ? (
+            !listLoaded || hasMore || deviceRootsPending ? (
               <div ref={sentinelRef} className="load-more" aria-hidden="true">
                 <span className="load-more-spinner" />
               </div>
-            ) : area === 'device' && noUsableDeviceRoots ? (
+            ) : area === 'device' && filter === 'all' && noUsableDeviceRoots ? (
               <div className="folder-empty-state" role="status">
                 <p className="folder-empty-text">{t('ufNoDeviceFolders')}</p>
                 <button
@@ -3600,11 +3651,13 @@ export function Home() {
               </div>
             ) : (
               renderEmpty(
-                view === 'starred'
-                  ? t('emptyStarred')
-                  : navCounts.recent === 0
-                    ? t('emptyRecent')
-                    : t('emptyFiltered'),
+                filter !== 'all'
+                  ? t('emptyFiltered')
+                  : view === 'starred'
+                    ? t('emptyStarred')
+                    : navCounts.recent === 0
+                      ? t('emptyRecent')
+                      : t('emptyFiltered'),
               )
             )
           ) : (
