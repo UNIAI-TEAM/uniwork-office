@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -3713,9 +3713,10 @@ export class UniworkDocsService {
           throw new UniworkDocError('server_error')
         }
         // the tab follows its file into the store: from here the path is a
-        // bound working copy, so the next save is one upload + commit
+        // bound working copy, so the next save is one upload + commit. The
+        // user's original file stays where it is, byte for byte and
+        // unbound - a first save never deletes or moves it (S01-W1-1).
         this.deps.notifyPathRenamed?.(tabPath, path)
-        await unlink(tabPath).catch(() => undefined)
         const doc = this.store.lookup(path)
         if (doc) this.publish(toStatus(doc))
         this.pushTreeChangedFor(session, created.workspaceId)

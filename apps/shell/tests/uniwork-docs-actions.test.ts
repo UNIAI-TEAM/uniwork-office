@@ -6,6 +6,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   truncateSync,
   writeFileSync,
 } from 'node:fs'
@@ -2111,8 +2112,11 @@ describe('SAVE-01 first save', () => {
     expect(ctx.service.isBound(moved)).toBe(true)
     const status = await ctx.service.docStatus(moved)
     expect(status?.state).toBe('ready')
-    // the old local path is gone: the store copy is the only file left
-    expect(existsSync(file)).toBe(false)
+    // the user's original file is left alone: still on disk, now unbound
+    // (S01-W1-1); the store copy is the only bound file
+    expect(existsSync(file)).toBe(true)
+    expect(readFileSync(file, 'utf8')).toBe('fresh editor bytes')
+    expect(ctx.service.isBound(file)).toBe(false)
     expect(ctx.treeChanged).toEqual([{ workspaceId: WS }])
   })
 
@@ -2192,6 +2196,43 @@ describe('SAVE-01 first save', () => {
     // a second ensure is idempotent on the server: same row id answers again
     const again = await ctx.service.ensureMyFolder(WS)
     expect(again.ok && again.value.id === 'fold_my').toBe(true)
+  })
+  // S01-W1-1: a first save binds the tab to a copy inside the store. The file
+  // the user opened is theirs - it stays where it is, byte for byte, and the
+  // old path simply stops being the tab's file.
+  it('never touches the original file while re-keying the tab to the store copy', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const file = join(dir, 'Report.docx')
+    writeFileSync(file, 'original bytes keep me')
+    const before = statSync(file)
+
+    const saved = await ctx.service.firstSave({
+      tabPath: file,
+      title: 'Report.docx',
+      workspaceId: WS,
+      target: { kind: 'my_folder' },
+    })
+
+    expect(saved.ok).toBe(true)
+    // the original: still there, identical bytes, untouched mtime, unbound
+    expect(existsSync(file)).toBe(true)
+    expect(readFileSync(file, 'utf8')).toBe('original bytes keep me')
+    expect(statSync(file).mtimeMs).toBe(before.mtimeMs)
+    expect(ctx.service.isBound(file)).toBe(false)
+    // the tab now lives at a bound working copy of the new document
+    const [moved] = ctx.pathRenames
+    expect(moved?.oldPath).toBe(file)
+    expect(moved?.newPath).not.toBe(file)
+    expect(ctx.service.isBound(moved!.newPath)).toBe(true)
+    // the next save is a bound save (module-save path, never another create)
+    const status = await ctx.service.save(moved!.newPath)
+    expect(status).not.toBeNull()
+    expect(status!.path).toBe(moved!.newPath)
+    expect(status!.documentId).toBe(saved.ok ? saved.value.id : '')
+    expect(
+      server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/documents/files')),
+    ).toHaveLength(1)
   })
 })
 
