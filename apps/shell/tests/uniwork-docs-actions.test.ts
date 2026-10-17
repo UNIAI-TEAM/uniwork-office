@@ -72,6 +72,19 @@ const statGate = vi.hoisted(() => ({
   entered: null as (() => void) | null,
 }))
 
+/**
+ * S01-R4-1: size can also change between the stat and the read, and the buffer
+ * is what actually leaves. A test names the one path whose read is held open -
+ * the gate matches on the path, so a binding or working-copy read is never
+ * held - and grows the file inside that window. With no path set this mock is
+ * the real module.
+ */
+const readGate = vi.hoisted(() => ({
+  path: null as string | null,
+  held: null as Promise<void> | null,
+  entered: null as (() => void) | null,
+}))
+
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
@@ -81,9 +94,13 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       if (statGate.held) await statGate.held
       return actual.stat(...args)
     }),
-    readFile: vi.fn(async (...args: Parameters<typeof actual.readFile>) =>
-      actual.readFile(...args),
-    ),
+    readFile: vi.fn(async (...args: Parameters<typeof actual.readFile>) => {
+      if (readGate.path !== null && String(args[0]) === readGate.path) {
+        readGate.entered?.()
+        if (readGate.held) await readGate.held
+      }
+      return actual.readFile(...args)
+    }),
   }
 })
 
@@ -103,6 +120,9 @@ function latch() {
 afterEach(() => {
   statGate.held = null
   statGate.entered = null
+  readGate.path = null
+  readGate.held = null
+  readGate.entered = null
 })
 
 interface Call {
@@ -186,6 +206,14 @@ function fakeServer(
      * default caps (209,715,200 bytes) - the upload tests' own preflight.
      */
     limits?: unknown
+    /**
+     * SAVE-01 r4 (S01-R4-3): D's own 413 `document_too_large` on the
+     * upload/first-save create - the server refusing bytes the local preflight
+     * let through (a stale limits cache, or a cap lowered after the read). The
+     * envelope carries no `fields`, so the only size detail a caller can hand
+     * the renderer is its own; no row is created.
+     */
+    createTooLarge?: boolean
   } = {},
 ) {
   const state = {
@@ -307,6 +335,12 @@ function fakeServer(
       }
       if (options.invalidDestination) {
         return json(400, { error: { code: 'invalid_destination', message: 'x' } })
+      }
+      // SAVE-01 r4 (S01-R4-3): D refuses the bytes itself - after the caller's
+      // preflight passed - and no row is created. The envelope names only the
+      // code, so the filename and the payload length can come from the caller.
+      if (options.createTooLarge) {
+        return json(413, { error: { code: 'document_too_large', message: 'x' } })
       }
       // SAVE-01 r2 (S01-R1-4): D dedupes a retried create by its
       // Idempotency-Key - the same row answers again, never a second document
@@ -2640,6 +2674,184 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
         maxBytes: 1024 * 1024,
       })
     })
+
+    // S01-R4-3: D can refuse the bytes itself after the local preflight passed
+    // (a stale limits cache, or a cap lowered since the read). The upload path
+    // re-wraps that answer with its own basename and payload length because
+    // `errorFromResponse` fills the size fields but never the filename; the
+    // first save must answer the renderer the same shape.
+    it("adopts a server 413 too_large with the call's own basename, size and cap", async () => {
+      // the cached cap is higher than the one D enforces, so only the server
+      // refuses this file - and it refuses it after the bytes were read
+      const server = fakeServer({
+        limits: { upload_max_bytes: 8 * 1024 * 1024 },
+        createTooLarge: true,
+      })
+      const ctx = setup(server)
+      const file = join(dir, 'Adopted.docx')
+      writeFileSync(file, 'x')
+      truncateSync(file, 1024 * 1024)
+
+      const saved = await ctx.service.firstSave(input(file))
+
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Adopted.docx',
+        sizeBytes: 1024 * 1024,
+        maxBytes: 8 * 1024 * 1024,
+      })
+      // one create attempt, and it left nothing behind: no bind, no move, no
+      // compensation (the refusal precedes the row), original file intact
+      expect(
+        server.calls.filter(
+          (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+        ),
+      ).toHaveLength(1)
+      expect(server.calls.filter((call) => call.path.endsWith('/archive'))).toHaveLength(0)
+      expect(ctx.pathRenames).toEqual([])
+      expect(ctx.service.isBound(file)).toBe(false)
+      expect(readFileSync(file).byteLength).toBe(1024 * 1024)
+    })
+
+    // S01-R4-1: the stat and the read are two moments - a file that grows
+    // between them is refused on what was actually buffered, exactly like the
+    // upload path, and nothing of it leaves.
+    it('refuses a first save whose file grew past the server cap between the stat and the read', async () => {
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Grown.docx')
+      writeFileSync(file, 'x')
+      const gate = latch()
+      readGate.path = file
+      readGate.entered = gate.entered
+      readGate.held = gate.held
+
+      const pending = ctx.service.firstSave(input(file))
+      await gate.reached
+      // the stat already saw 1 byte: only the post-read guard can refuse this
+      truncateSync(file, 1024 * 1024 + 1)
+      gate.release()
+      const saved = await pending
+
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Grown.docx',
+        sizeBytes: 1024 * 1024 + 1,
+        maxBytes: 1024 * 1024,
+      })
+      expect(
+        server.calls.filter(
+          (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+        ),
+      ).toHaveLength(0)
+      expect(ctx.pathRenames).toEqual([])
+      expect(ctx.service.isBound(file)).toBe(false)
+    })
+
+    it('refuses a first save whose file grew past the 50 MiB staging cap between the stat and the read', async () => {
+      // the server cap is above the staging cap, so the second branch names
+      // `min(max_bytes, 50 MiB)` as the effective limit
+      const server = fakeServer({ limits: { upload_max_bytes: 200 * 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Grown big.docx')
+      writeFileSync(file, 'x')
+      const gate = latch()
+      readGate.path = file
+      readGate.entered = gate.entered
+      readGate.held = gate.held
+
+      const pending = ctx.service.firstSave(input(file))
+      await gate.reached
+      truncateSync(file, 50 * 1024 * 1024 + 1)
+      gate.release()
+      const saved = await pending
+
+      expect(saved).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Grown big.docx',
+        sizeBytes: 50 * 1024 * 1024 + 1,
+        maxBytes: 50 * 1024 * 1024,
+      })
+      expect(
+        server.calls.filter(
+          (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+        ),
+      ).toHaveLength(0)
+      expect(ctx.service.isBound(file)).toBe(false)
+    })
+
+    it('refuses an upload whose file grew past the server cap between the stat and the read', async () => {
+      // the upload path's own post-read guard, the one first save shares
+      const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+      const ctx = setup(server)
+      const file = join(dir, 'Grown upload.docx')
+      writeFileSync(file, 'x')
+      const gate = latch()
+      readGate.path = file
+      readGate.entered = gate.entered
+      readGate.held = gate.held
+
+      const pending = ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-grown',
+      })
+      await gate.reached
+      truncateSync(file, 1024 * 1024 + 1)
+      gate.release()
+      const uploaded = await pending
+
+      expect(uploaded).toEqual({
+        ok: false,
+        error: 'too_large',
+        name: 'Grown upload.docx',
+        sizeBytes: 1024 * 1024 + 1,
+        maxBytes: 1024 * 1024,
+      })
+      expect(
+        server.calls.filter(
+          (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+        ),
+      ).toHaveLength(0)
+    })
+  })
+
+  // S01-R4-2: a settled refusal must release the path. The join map is the
+  // single-flight's whole memory, so a leaked entry would keep answering the
+  // old too_large - not `conflict` - after the user shrank the file and saved
+  // again, and no request would ever be made.
+  it('a second first save succeeds and binds once the too_large file is under the cap', async () => {
+    const server = fakeServer({ limits: { upload_max_bytes: 1024 * 1024 } })
+    const ctx = setup(server)
+    const file = join(dir, 'Shrink.docx')
+    writeFileSync(file, 'x')
+    truncateSync(file, 2 * 1024 * 1024)
+
+    const refused = await ctx.service.firstSave(input(file))
+    expect(refused).toEqual({
+      ok: false,
+      error: 'too_large',
+      name: 'Shrink.docx',
+      sizeBytes: 2 * 1024 * 1024,
+      maxBytes: 1024 * 1024,
+    })
+
+    truncateSync(file, 1024 * 1024)
+    const saved = await ctx.service.firstSave(input(file))
+
+    expect(saved.ok).toBe(true)
+    expect(ctx.pathRenames).toHaveLength(1)
+    expect(ctx.service.isBound(ctx.pathRenames[0]!.newPath)).toBe(true)
+    // the retry is the call that created: the refusal created nothing
+    expect(
+      server.calls.filter(
+        (call) => call.method === 'POST' && call.path.endsWith('/documents/files'),
+      ),
+    ).toHaveLength(1)
   })
 
   it('refuses a directory path before any read', async () => {
