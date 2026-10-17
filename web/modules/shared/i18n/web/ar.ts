@@ -124,4 +124,8 @@ export const ar = {
   webSaveBlockDownload: 'تنزيل نسختي',
   uwConflictTooLargeWithLimit:
     'تجاوزت نسختك الحد الأقصى {max} (الحجم الحالي {size}). اختر "تنزيل نسختي" أو أغلق مربع الحوار هذا لتقليل حجم الملف.',
+  uwConflictSaveCopyTooLarge:
+    'نسختك تتجاوز حد الحجم في UniWork، لذا تعذّر إنشاء النسخة. أغلق مربع الحوار هذا لتقليل حجم الملف، أو اختر "إعادة تحميل أحدث إصدار" لتنزيل نسختك.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'تجاوزت نسختك الحد الأقصى {max} (الحجم الحالي {size})، لذا تعذّر إنشاء النسخة. أغلق مربع الحوار هذا لتقليل حجم الملف، أو اختر "إعادة تحميل أحدث إصدار" لتنزيل نسختك.',
 } satisfies Record<keyof typeof zh, string>

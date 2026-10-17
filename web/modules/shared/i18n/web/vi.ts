@@ -133,4 +133,8 @@ export const vi = {
   webSaveBlockDownload: 'Tải bản của tôi',
   uwConflictTooLargeWithLimit:
     'Tài liệu đã vượt {max} (đang {size}) nên chưa thực hiện được. Hãy bấm “Tải bản của tôi” hoặc đóng hộp thoại để giảm dung lượng.',
+  uwConflictSaveCopyTooLarge:
+    'Bản của bạn vượt giới hạn kích thước của UniWork nên chưa tạo được bản sao. Hãy đóng hộp thoại để giảm dung lượng, hoặc bấm “Tải lại bản mới nhất” để tải bản của bạn về máy.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'Bản của bạn đã vượt {max} (đang {size}) nên chưa tạo được bản sao. Hãy đóng hộp thoại để giảm dung lượng, hoặc bấm “Tải lại bản mới nhất” để tải bản của bạn về máy.',
 } satisfies Record<keyof typeof zh, string>

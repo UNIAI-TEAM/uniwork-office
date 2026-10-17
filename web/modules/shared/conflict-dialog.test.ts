@@ -2,7 +2,7 @@
 // the confirmation steps in the same card, the failure variants and the `save` answers.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { format } from '@genoffice/i18n'
-import { webLanguage } from '../../docs/bridge/browser'
+import { setWebLanguage, webLanguage } from '../../docs/bridge/browser'
 import {
   conflictSaveResult,
   headFromFile,
@@ -688,7 +688,7 @@ describe('Save as a copy… (S5-03)', () => {
     expect(saveCopy).not.toHaveBeenCalled()
   })
 
-  it('Create copy: back to step 1 with the Done line, focus Cancel, no answer to the save', async () => {
+  it('Create copy: back to step 1 with the Done line in success tone (role="status"), focus Cancel, no answer to the save (SVC-1)', async () => {
     const saveCopy = copy()
     const settled = vi.fn()
     void runConflictDialog(io({ saveCopy })).then(settled)
@@ -696,19 +696,24 @@ describe('Save as a copy… (S5-03)', () => {
     await pick('go')
     expect(saveCopy).toHaveBeenCalledTimes(1)
     expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
-    expect(alertLine().textContent).toBe(t('uwConflictSaveCopyDone', { title: 'Notes (copy)' }))
+    const statusLine = card().querySelector<HTMLElement>('.ow-dlg-alert')!
+    expect(statusLine.textContent).toBe(t('uwConflictSaveCopyDone', { title: 'Notes (copy)' }))
+    expect(statusLine.getAttribute('role')).toBe('status')
+    expect(statusLine.className).toBe('ow-dlg-alert success')
     expect(document.activeElement).toBe(btn('cancel'))
     await flush()
     expect(settled).not.toHaveBeenCalled()
   })
 
-  it('a failed copy stays on the confirmation with the failure line', async () => {
+  it('a failed copy stays on the confirmation with the failure line in error tone (role="alert")', async () => {
     const saveCopy = vi.fn(async (): Promise<SaveCopyAttempt> => ({ ok: false }))
     const done = runConflictDialog(io({ saveCopy }))
     await pick('save-copy')
     await pick('go')
     expect(choices()).toEqual(['go', 'back'])
     expect(alertLine().textContent).toBe(t('uwConflictSaveCopyFailed'))
+    expect(alertLine().getAttribute('role')).toBe('alert')
+    expect(alertLine().className).toBe('ow-dlg-alert')
     // closing from there is a plain cancel: the host's save stays unanswered by any new version
     card().querySelector<HTMLButtonElement>('.ow-dlg-close')!.click()
     expect(await done).toEqual({ kind: 'cancelled' })
@@ -912,13 +917,14 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
       format(t('uwConflictTooLargeWithLimit'), { size: '200.1 MB', max: '200 MB' }),
     )
 
-    // Save as a copy also stays on step 1 without calling io.saveCopy
+    // Save as a copy also stays on step 1 without calling io.saveCopy, using copy-specific text (SVC-3)
     await pick('save-copy')
     expect(saveCopy).not.toHaveBeenCalled()
     expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
     expect(alertLine().textContent).toBe(
-      format(t('uwConflictTooLargeWithLimit'), { size: '200.1 MB', max: '200 MB' }),
+      format(t('uwConflictSaveCopyTooLargeWithLimit'), { size: '200.1 MB', max: '200 MB' }),
     )
+    expect(alertLine().textContent).not.toContain('Download my copy')
 
     // Reload -> "Download my copy, then reload" stays active (not aria-disabled)
     await pick('reload')
@@ -957,5 +963,87 @@ describe('SIZE-F1: Overwrite / Save as a copy over limits.max_bytes', () => {
     await pick('back')
     await pick('cancel')
     expect(await done).toEqual({ kind: 'cancelled' })
+  })
+
+  it('Save as a copy too-large (SVC-3): names actions that exist on step 1 in both vi and en, and maps file_too_large / too_large', async () => {
+    const prevLang = webLanguage()
+    try {
+      // 1. Vietnamese (vi): server 413 file_too_large with details.max_bytes
+      setWebLanguage('vi')
+      const saveCopyVi = vi.fn(async (): Promise<SaveCopyAttempt> => ({
+        ok: false,
+        error: {
+          code: 'too_large',
+          status: 413,
+          message: 'HTTP 413',
+          details: { code: 'file_too_large', max_bytes: 200 * MB },
+        },
+      }))
+      const doneVi = runConflictDialog(
+        io({
+          sizeBytes: 200 * MB + 1,
+          saveCopy: saveCopyVi,
+        }),
+      )
+      await pick('save-copy')
+      await pick('go')
+      expect(saveCopyVi).toHaveBeenCalledTimes(1)
+      expect(choices()).toEqual(['reload', 'save-copy', 'overwrite', 'cancel'])
+      expect(alertLine().getAttribute('role')).toBe('alert')
+      expect(alertLine().textContent).toBe(
+        format(webText('vi', 'uwConflictSaveCopyTooLargeWithLimit'), {
+          size: '200,1 MB',
+          max: '200 MB',
+        }),
+      )
+      expect(alertLine().textContent).not.toContain('Tải bản của tôi')
+      expect(alertLine().textContent).toContain('Tải lại bản mới nhất')
+      await pick('cancel')
+      expect(await doneVi).toEqual({ kind: 'cancelled' })
+
+      // 2. English (en): server file_too_large with details.fields.max_bytes
+      document.body.replaceChildren()
+      setWebLanguage('en')
+      let call = 0
+      const saveCopyEn = vi.fn(async (): Promise<SaveCopyAttempt> => {
+        call += 1
+        return call === 1
+          ? {
+              ok: false,
+              error: {
+                code: 'invalid_arg',
+                message: 'file_too_large',
+                details: { apiCode: 'file_too_large', fields: { max_bytes: 50 * MB } },
+              },
+            }
+          : {
+              ok: false,
+              error: {
+                code: 'too_large',
+                message: 'HTTP 413',
+              },
+            }
+      })
+      const doneEn = runConflictDialog(
+        io({
+          sizeBytes: 55 * MB,
+          saveCopy: saveCopyEn,
+        }),
+      )
+      await pick('save-copy')
+      await pick('go')
+      expect(alertLine().textContent).toBe(
+        format(webText('en', 'uwConflictSaveCopyTooLargeWithLimit'), {
+          size: '55 MB',
+          max: '50 MB',
+        }),
+      )
+      expect(alertLine().textContent).not.toContain('Download my copy')
+      expect(alertLine().textContent).toContain('Reload latest')
+      await pick('cancel')
+      expect(await doneEn).toEqual({ kind: 'cancelled' })
+    } finally {
+      setWebLanguage(prevLang)
+    }
   })
 })

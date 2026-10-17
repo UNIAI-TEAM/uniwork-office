@@ -135,4 +135,8 @@ export const ko = {
   webSaveBlockDownload: '내 사본 다운로드',
   uwConflictTooLargeWithLimit:
     '내 버전이 {max}를 초과했습니다(현재 {size}). “내 사본 다운로드”를 선택하거나 이 대화상자를 닫아 파일 크기를 줄이세요.',
+  uwConflictSaveCopyTooLarge:
+    '내 버전이 UniWork의 크기 제한을 넘어 사본을 만들 수 없습니다. 이 대화상자를 닫아 파일 크기를 줄이거나 “최신 버전 다시 불러오기”를 선택해 내 버전을 다운로드하세요.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    '내 버전이 {max}를 초과해(현재 {size}) 사본을 만들 수 없습니다. 이 대화상자를 닫아 파일 크기를 줄이거나 “최신 버전 다시 불러오기”를 선택해 내 버전을 다운로드하세요.',
 } satisfies Record<keyof typeof zh, string>

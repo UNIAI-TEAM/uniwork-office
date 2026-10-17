@@ -138,4 +138,8 @@ export const ja = {
   webSaveBlockDownload: '自分のコピーをダウンロード',
   uwConflictTooLargeWithLimit:
     'あなたのバージョンは {max} を超えています（現在 {size}）。「自分のコピーをダウンロード」を選択するか、このダイアログを閉じてファイルサイズを縮小してください。',
+  uwConflictSaveCopyTooLarge:
+    'あなたのバージョンは UniWork のサイズ上限を超えているため、コピーを作成できませんでした。このダイアログを閉じてファイルサイズを縮小するか、「最新版を再読み込み」を選択して自分のバージョンをダウンロードしてください。',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'あなたのバージョンは {max} を超えているため（現在 {size}）、コピーを作成できませんでした。このダイアログを閉じてファイルサイズを縮小するか、「最新版を再読み込み」を選択して自分のバージョンをダウンロードしてください。',
 } satisfies Record<keyof typeof zh, string>

@@ -138,4 +138,8 @@ export const cs = {
   webSaveBlockDownload: 'Stáhnout moji kopii',
   uwConflictTooLargeWithLimit:
     'Vaše verze překračuje limit {max} (aktuálně {size}). Zvolte „Stáhnout moji kopii“ nebo toto dialogové okno zavřete a zmenšete velikost souboru.',
+  uwConflictSaveCopyTooLarge:
+    'Vaše verze překračuje limit velikosti UniWork, proto kopii nešlo vytvořit. Zavřete toto dialogové okno a zmenšete velikost souboru, nebo zvolte „Načíst nejnovější verzi“ a stáhněte si svou verzi.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'Vaše verze překračuje limit {max} (aktuálně {size}), proto kopii nešlo vytvořit. Zavřete toto dialogové okno a zmenšete velikost souboru, nebo zvolte „Načíst nejnovější verzi“ a stáhněte si svou verzi.',
 } satisfies Record<keyof typeof zh, string>

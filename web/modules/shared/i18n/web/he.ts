@@ -124,4 +124,8 @@ export const he = {
   webSaveBlockDownload: 'הורד את העותק שלי',
   uwConflictTooLargeWithLimit:
     'הגרסה שלך חורגת מ-{max} (כעת {size}). בחר "הורד את העותק שלי" או סגור חלון זה כדי להקטין את גודל הקובץ.',
+  uwConflictSaveCopyTooLarge:
+    'הגרסה שלך חורגת ממגבלת הגודל של UniWork, ולכן לא ניתן היה ליצור את העותק. סגור חלון זה כדי להקטין את גודל הקובץ, או בחר "טעינת הגרסה העדכנית" כדי להוריד את הגרסה שלך.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'הגרסה שלך חורגת מ-{max} (כעת {size}), ולכן לא ניתן היה ליצור את העותק. סגור חלון זה כדי להקטין את גודל הקובץ, או בחר "טעינת הגרסה העדכנית" כדי להוריד את הגרסה שלך.',
 } satisfies Record<keyof typeof zh, string>

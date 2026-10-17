@@ -141,4 +141,8 @@ export const es = {
   webSaveBlockDownload: 'Descargar mi copia',
   uwConflictTooLargeWithLimit:
     'Tu versión supera el límite de {max} (actualmente {size}). Elige «Descargar mi copia» o cierra este diálogo para reducir el tamaño del archivo.',
+  uwConflictSaveCopyTooLarge:
+    'Tu versión supera el límite de tamaño de UniWork, así que no se pudo crear la copia. Cierra este diálogo para reducir el tamaño del archivo o elige «Cargar la última versión» para descargar tu versión.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'Tu versión supera el límite de {max} (actualmente {size}), así que no se pudo crear la copia. Cierra este diálogo para reducir el tamaño del archivo o elige «Cargar la última versión» para descargar tu versión.',
 } satisfies Record<keyof typeof zh, string>

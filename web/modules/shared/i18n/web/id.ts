@@ -137,4 +137,8 @@ export const id = {
   webSaveBlockDownload: 'Unduh salinan saya',
   uwConflictTooLargeWithLimit:
     'Versi Anda melebihi {max} (saat ini {size}). Pilih “Unduh salinan saya” atau tutup dialog ini untuk mengurangi ukuran file.',
+  uwConflictSaveCopyTooLarge:
+    'Versi Anda melebihi batas ukuran UniWork, jadi salinan tidak dapat dibuat. Tutup dialog ini untuk mengurangi ukuran file, atau pilih “Muat versi terbaru” untuk mengunduh versi Anda.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'Versi Anda melebihi {max} (saat ini {size}), jadi salinan tidak dapat dibuat. Tutup dialog ini untuk mengurangi ukuran file, atau pilih “Muat versi terbaru” untuk mengunduh versi Anda.',
 } satisfies Record<keyof typeof zh, string>

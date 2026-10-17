@@ -121,4 +121,8 @@ export const zhTW = {
   webSaveBlockDownload: '下載我的副本',
   uwConflictTooLargeWithLimit:
     '你的版本已超過 {max}（目前 {size}）。請選擇「下載我的副本」或關閉此對話方塊以縮小檔案大小。',
+  uwConflictSaveCopyTooLarge:
+    '你的版本超過了 UniWork 的大小限制，因此無法建立副本。請關閉此對話方塊以縮小檔案大小，或選擇「重新載入最新版本」下載你的版本。',
+  uwConflictSaveCopyTooLargeWithLimit:
+    '你的版本已超過 {max}（目前 {size}），因此無法建立副本。請關閉此對話方塊以縮小檔案大小，或選擇「重新載入最新版本」下載你的版本。',
 } satisfies Record<keyof typeof zh, string>

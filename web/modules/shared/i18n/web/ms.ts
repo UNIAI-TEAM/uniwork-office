@@ -139,4 +139,8 @@ export const ms = {
   webSaveBlockDownload: 'Muat turun salinan saya',
   uwConflictTooLargeWithLimit:
     'Versi anda melebihi {max} (kini {size}). Pilih “Muat turun salinan saya” atau tutup dialog ini untuk mengurangkan saiz fail.',
+  uwConflictSaveCopyTooLarge:
+    'Versi anda melebihi had saiz UniWork, jadi salinan tidak dapat dicipta. Tutup dialog ini untuk mengurangkan saiz fail, atau pilih “Muat semula versi terkini” untuk memuat turun versi anda.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'Versi anda melebihi {max} (kini {size}), jadi salinan tidak dapat dicipta. Tutup dialog ini untuk mengurangkan saiz fail, atau pilih “Muat semula versi terkini” untuk memuat turun versi anda.',
 } satisfies Record<keyof typeof zh, string>
