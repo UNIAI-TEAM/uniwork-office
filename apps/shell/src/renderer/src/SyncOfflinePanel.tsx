@@ -76,7 +76,9 @@ export function SyncOfflinePanel({
   useEffect(() => {
     const ready = readyTransitions(lastStates.current, offline.rows)
     lastStates.current = new Map(offline.rows.map((r) => [r.documentId, r.state]))
-    if (ready[0]) setLive(t('uwOfflineReadyAnnounce', { doc: ready[0].name }))
+    if (ready.length > 0) {
+      setLive(ready.map((r) => t('uwOfflineReadyAnnounce', { doc: r.name })).join(' '))
+    }
     // `t` is not stable (CLAUDE.md): the announcement reads the current one
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offline.rows, setLive])
@@ -294,6 +296,7 @@ export function SyncOfflinePanel({
     const model = offlineRowModel(row, { capabilityOn: offline.capabilityOn })
     const docId = `${base}-off-doc-${row.documentId}`
     const openable = model.actions.some((a) => a.id === 'open')
+    const determinate = Boolean(model.progress && model.progress.total > 0)
     return (
       <tr
         key={row.documentId}
@@ -326,9 +329,9 @@ export function SyncOfflinePanel({
               className="sc-progress"
               role="progressbar"
               aria-labelledby={docId}
-              aria-valuemin={0}
-              aria-valuemax={model.progress.total}
-              aria-valuenow={model.progress.done}
+              aria-valuemin={determinate ? 0 : undefined}
+              aria-valuemax={determinate ? model.progress.total : undefined}
+              aria-valuenow={determinate ? model.progress.done : undefined}
               aria-valuetext={t('uwOfflineRowProgressAria', {
                 done: formatBytes(model.progress.done, dateLocale),
                 total: formatBytes(model.progress.total, dateLocale),
@@ -337,7 +340,7 @@ export function SyncOfflinePanel({
               <span
                 className="sc-progress-fill"
                 style={{
-                  width: `${model.progress.total > 0 ? Math.min(100, (model.progress.done / model.progress.total) * 100) : 0}%`,
+                  width: `${determinate ? Math.min(100, (model.progress.done / model.progress.total) * 100) : 0}%`,
                 }}
               />
             </span>

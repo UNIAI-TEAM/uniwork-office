@@ -114,7 +114,11 @@ export function offlineRowModel(
 ): OfflineRowModel {
   const model = baseModel(row)
   if (ctx.capabilityOn) return model
-  return { ...model, actions: model.actions.filter((a) => CAPABILITY_OFF_KEEPS.has(a.id)) }
+  const actions = model.actions.filter((a) => CAPABILITY_OFF_KEEPS.has(a.id))
+  if (row.state !== 'verifying' && !actions.some((a) => a.id === 'unpin')) {
+    actions.push(act('unpin'))
+  }
+  return { ...model, actions }
 }
 
 function baseModel(row: OfflineRowView): OfflineRowModel {
@@ -256,10 +260,19 @@ function baseModel(row: OfflineRowView): OfflineRowModel {
 /** the states a row reads "Sẵn sàng offline" in: reaching one of them is announced once */
 const READY_STATES: ReadonlySet<OfflineRowView['state']> = new Set(['ready', 'view-only'])
 
+/** the download states whose completion announces "Sẵn sàng offline" (FE-R1-7) */
+const DOWNLOAD_FROM_STATES: ReadonlySet<OfflineRowView['state']> = new Set([
+  'waiting-network',
+  'downloading',
+  'verifying',
+  'interrupted',
+])
+
 /**
  * The rows that just became ready (polite `uwOfflineReadyAnnounce`): a row
- * that was listed before in a state that is not ready. A first snapshot, a new
- * row or a row that was already ready is not a transition.
+ * that was listed before in a download state (`waiting-network`, `downloading`,
+ * `verifying`, `interrupted`). A first snapshot, a new row, a row that was
+ * already ready, or a renewal/update transition is not announced.
  */
 export function readyTransitions(
   before: ReadonlyMap<string, OfflineRowView['state']> | null,
@@ -268,7 +281,7 @@ export function readyTransitions(
   if (!before) return []
   return rows.filter((r) => {
     const was = before.get(r.documentId)
-    return was !== undefined && !READY_STATES.has(was) && READY_STATES.has(r.state)
+    return was !== undefined && DOWNLOAD_FROM_STATES.has(was) && READY_STATES.has(r.state)
   })
 }
 
@@ -331,12 +344,13 @@ const TAB_EVENT = 'uniwork:sync-center-tab'
 
 /**
  * Open Settings › Sync center on `tab`. A pane that mounts reads the tab once
- * (`takeRequestedSyncTab`); one already open hears the event.
+ * (`takeRequestedSyncTab`); one already open hears the event and clears
+ * `requestedTab` so a later mount opens on its default tab.
  */
 export function openSyncCenter(tab?: SyncCenterTabId): void {
   requestedTab = tab ?? null
-  window.dispatchEvent(new CustomEvent('uniwork:open-settings', { detail: { section: 'sync' } }))
   if (tab) window.dispatchEvent(new CustomEvent(TAB_EVENT, { detail: { tab } }))
+  window.dispatchEvent(new CustomEvent('uniwork:open-settings', { detail: { section: 'sync' } }))
 }
 
 export function takeRequestedSyncTab(): SyncCenterTabId | null {
