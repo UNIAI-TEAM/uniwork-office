@@ -997,8 +997,8 @@ const tMain = createI18n({
     uwSaving: 'Đang lưu vào UniWork…',
     uwSavedVersion: 'Đã lưu thành v{version}',
     uwSaveFailed: 'Lưu vào UniWork thất bại',
-    uwVersionConflict: 'Đã có phiên bản mới hơn. Tệp cục bộ của bạn được giữ lại.',
-    uwAccessDenied: 'Quyền truy cập Work Product này đã bị gỡ. Tệp cục bộ của bạn được giữ lại.',
+    uwVersionConflict: 'Đã có phiên bản mới hơn. Tệp trên máy của bạn được giữ lại.',
+    uwAccessDenied: 'Quyền truy cập Work Product này đã bị gỡ. Tệp trên máy của bạn được giữ lại.',
     uwSessionExpired: 'Phiên UniWork đã hết hạn.',
     uwUnsupported: 'Không thể mở loại tệp này từ UniWork.',
   },
@@ -3885,9 +3885,26 @@ async function openOfficeBridgeUrl(raw: string): Promise<boolean> {
 
 async function saveActiveTabToUniWork(): Promise<boolean> {
   const filePath = tabManager?.activeFilePath()
-  if (!filePath || !liveBridgeSessionForPath(filePath)) {
+  if (!filePath) {
     showAppWarning(tm('uwSaveFailed'))
     return false
+  }
+  // a bound UniWork working copy saves through its module hook (the usual
+  // Ctrl+S path: write to disk, then the save queue uploads + commits)
+  if (uniworkDocs?.service.isBound(filePath)) {
+    requestUniworkModuleSave(filePath)
+    return true
+  }
+  // SAVE-01: an unbound tab asks the renderer for a name and a destination
+  // (default My Folder); the dialog answers through uniwork-doc:first-save
+  if (!liveBridgeSessionForPath(filePath)) {
+    const shellWc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
+    if (!shellWc) {
+      showAppWarning(tm('uwSaveFailed'))
+      return false
+    }
+    shellWc.send(UNIWORK_DOC_CHANNELS.firstSaveOpen, { path: filePath })
+    return true
   }
   const wc =
     tabManager?.activePdfTab()?.webContents ??

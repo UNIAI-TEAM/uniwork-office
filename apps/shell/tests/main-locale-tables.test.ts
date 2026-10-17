@@ -53,3 +53,19 @@ describe('the File > New menu label', () => {
     expect(new Set(labels)).toEqual(new Set(['AI Markdown']))
   })
 })
+
+/**
+ * SAVE-01 (UNI-1847): the vi table says "Tệp trên máy" (the file on this
+ * device), never "cục bộ" - the board's wording is the product's, and a stray
+ * "cục bộ" anywhere in the vi block is the old phrasing leaking back.
+ */
+describe('the vi UniWork copy', () => {
+  it('never calls the local file "cục bộ"', () => {
+    expect(localeBlock('vi')).not.toContain('cục bộ')
+  })
+
+  it('reads "Tệp trên máy" in the version-conflict and access-denied hints', () => {
+    const vi = localeBlock('vi')
+    expect(vi).toContain('Tệp trên máy của bạn được giữ lại.')
+  })
+})
