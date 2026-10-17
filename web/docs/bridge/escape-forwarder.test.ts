@@ -89,6 +89,23 @@ describe('escape-forwarder and isReadOnlyProfile (UNI-1876)', () => {
     expect(report).not.toHaveBeenCalled()
   })
 
+  it('does not report while IME is composing (isComposing or keyCode 229) or on auto-repeat (RFW1-1, RFW1-2)', () => {
+    const report = vi.fn()
+    off = installEscapeForwarder(window, report)
+
+    document.body.innerHTML = '<div id="editor" tabindex="0">text</div>'
+    const editor = document.getElementById('editor') as HTMLElement
+    editor.focus()
+
+    pressKey(editor, 'Escape', { isComposing: true })
+    pressKey(editor, 'Escape', { keyCode: 229 })
+    pressKey(editor, 'Escape', { repeat: true })
+    expect(report).not.toHaveBeenCalled()
+
+    pressKey(editor, 'Escape')
+    expect(report).toHaveBeenCalledTimes(1)
+  })
+
   it('stops reporting once uninstalled', () => {
     const report = vi.fn()
     off = installEscapeForwarder(window, report)

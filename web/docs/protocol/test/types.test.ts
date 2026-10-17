@@ -425,7 +425,7 @@ describe('document size limits and events (SIZE-F1, additive)', () => {
 import { commentsAccess, isReadOnlyProfile } from '../types'
 
 describe('read-only profile and close_requested event (UNI-1876, additive)', () => {
-  it('accepts absent or exact readOnly profile on init and rejects any other value', () => {
+  it('tolerates unknown profile values on init like commentsLevel (RFW1-4)', () => {
     expect(PROTOCOL_VERSION).toBe(1)
     expect(isInitPayload(init)).toBe(true)
     expect(isInitPayload({ ...init, profile: undefined })).toBe(true)
@@ -436,12 +436,13 @@ describe('read-only profile and close_requested event (UNI-1876, additive)', () 
       ).ok,
     ).toBe(true)
 
-    for (const bad of ['edit', 'readonly', 'view', '', null, true, false, 1, {}]) {
-      expect(isInitPayload({ ...init, profile: bad } as unknown)).toBe(false)
+    for (const unknown of ['presenter', 'edit', 'readonly', 'view', '', null, true, false, 1, {}]) {
+      expect(isInitPayload({ ...init, profile: unknown } as unknown)).toBe(true)
       expect(
-        parseEnvelope(env({ kind: 'request', type: 'init', payload: { ...init, profile: bad } }))
-          .ok,
-      ).toBe(false)
+        parseEnvelope(
+          env({ kind: 'request', type: 'init', payload: { ...init, profile: unknown } }),
+        ).ok,
+      ).toBe(true)
     }
   })
 

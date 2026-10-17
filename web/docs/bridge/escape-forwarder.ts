@@ -34,7 +34,14 @@ export function installEscapeForwarder(
   report: (reason: CloseRequestedReason) => void,
 ): () => void {
   const onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== 'Escape' || event.defaultPrevented) return
+    if (
+      event.key !== 'Escape' ||
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.keyCode === 229 ||
+      event.repeat
+    )
+      return
     const active = target.document?.activeElement ?? null
     if (isInsideLocalEscScope(active) || isInsideLocalEscScope(event.target)) return
     report('escape')

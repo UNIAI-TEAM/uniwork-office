@@ -1786,6 +1786,19 @@ describe('read-only profile and close_requested (UNI-1876, additive)', () => {
       ORIGIN,
       hostWin,
     )
+    // Re-init with an unknown future profile drops it to undefined without rejecting init (RFW1-4)
+    frameWin.deliver(
+      {
+        ns: PROTOCOL_NS,
+        v: PROTOCOL_VERSION,
+        id: 'h-reinit-unknown',
+        kind: 'request',
+        type: 'init',
+        payload: { ...baseInit(), protocolVersion: PROTOCOL_VERSION, profile: 'presenter' },
+      },
+      ORIGIN,
+      hostWin,
+    )
     await flush()
     expect(session.profile).toBeUndefined()
   })

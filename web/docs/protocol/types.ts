@@ -1794,7 +1794,6 @@ export function isReadyPayload(x: unknown): x is ReadyPayload {
   )
 }
 
-const isFrameProfile = isOneOf(FRAME_PROFILES)
 const isCloseRequestedReason = isOneOf(CLOSE_REQUESTED_REASONS)
 
 export function isCloseRequestedPayload(x: unknown): x is CloseRequestedPayload {
@@ -1817,9 +1816,8 @@ export function isInitPayload(x: unknown): x is InitPayload {
     isOpt(x.module, isOfficeModule) &&
     isOpt(x.user, isInitUser) &&
     isOpt(x.recovery, isInitRecovery) &&
-    isOpt(x.downloadMaxBytes, isPositiveSafeInt) &&
-    isOpt(x.profile, isFrameProfile)
-    // x.commentsLevel is a hint: any value passes, the frame drops an unknown one (FE-W8P-1)
+    isOpt(x.downloadMaxBytes, isPositiveSafeInt)
+    // x.commentsLevel and x.profile are hints: any value passes, the frame drops an unknown one (FE-W8P-1, RFW1-4)
   )
 }
 
