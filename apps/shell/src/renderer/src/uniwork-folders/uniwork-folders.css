@@ -24,6 +24,16 @@
   background: var(--surface);
 }
 
+.uwf-browser.has-sidebar-host {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.uwf-browser.uwf-pane.has-main-override {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .uwf-side {
   display: flex;
   flex-direction: column;

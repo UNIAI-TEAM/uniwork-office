@@ -260,6 +260,139 @@ body.vib .home {
   color: var(--text);
 }
 
+/* ---- FD-13 two-area sidebar switch (UniWork / On this device) ---- */
+.home-area-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+}
+
+.home-area-tab {
+  min-height: 28px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.home-area-tab:hover {
+  color: var(--text);
+}
+
+.home-area-tab.active {
+  background: var(--bg-surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.home-area-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.home-area-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.home-area-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-uw-ws {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.home-uw-ws:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.home-uw-side-slot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content.home-uw-pane {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.folder-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  background: var(--bg-hover);
+}
+
+.folder-empty-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.folder-empty-cta {
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.folder-empty-cta:hover {
+  background: var(--bg-hover);
+}
+
+.folder-empty-cta:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* ---- bottom-left dock: AI credits on top, then account + Settings ----
  * flush with the rows above (no card), set off by one hairline */
 .sidebar-footer {

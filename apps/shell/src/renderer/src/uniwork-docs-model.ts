@@ -1408,3 +1408,21 @@ export function workspaceLabel(ws: UniworkWorkspaceRef, t: TFunc): string {
   if (!role) return ws.name
   return t('uwLibWsRole', { workspace: ws.name, role })
 }
+
+// ── FD-13: Home area split (UniWork vs On this device) ──
+
+/**
+ * FD-13: split Recent / Starred rows into UniWork rows (`entry.uniwork` present)
+ * vs device rows (`!entry.uniwork`). Every row goes to exactly one bucket.
+ */
+export function splitEntriesByArea<T extends Pick<RecentEntry, 'uniwork'>>(
+  entries: readonly T[],
+): { uniwork: T[]; device: T[] } {
+  const uniwork: T[] = []
+  const device: T[] = []
+  for (const entry of entries) {
+    if (entry.uniwork) uniwork.push(entry)
+    else device.push(entry)
+  }
+  return { uniwork, device }
+}
