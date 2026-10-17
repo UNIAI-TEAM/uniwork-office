@@ -1095,6 +1095,7 @@ export const UPGRADE_MATRIX_IDS = Object.freeze({
   filename: 'fx-docx-report-vi.docx',
   title: 'fx-docx-report-vi',
   apiOrigin: 'https://127.0.0.1:1',
+  intentId: 'intent-g705-seed-1',
   intentKey: 'office-save-seed-1',
 })
 
@@ -1401,8 +1402,9 @@ export function seedUpgradeMatrixStore({ userDataDir, fixtureSourcePath }) {
     state: 'dirty',
     lastSyncedAt: '2026-10-17T00:00:00.000Z',
     pendingIntent: {
-      kind: 'save',
-      key: UPGRADE_MATRIX_IDS.intentKey,
+      intentId: UPGRADE_MATRIX_IDS.intentId,
+      idempotencyKey: UPGRADE_MATRIX_IDS.intentKey,
+      documentId: UPGRADE_MATRIX_IDS.documentId,
       baseRevision: '1',
       checksum: docSha256,
       createdAt: '2026-10-17T00:00:00.000Z',
@@ -1419,15 +1421,27 @@ export function seedUpgradeMatrixStore({ userDataDir, fixtureSourcePath }) {
 
 export function inspectUpgradeMatrixStore(userDataDir) {
   const paths = getUpgradeMatrixPaths(userDataDir)
-  const bindingRaw = existsSync(paths.bindingPath)
-    ? JSON.parse(readFileSync(paths.bindingPath, 'utf8'))
-    : null
+  let bindingRaw
+  try {
+    bindingRaw = existsSync(paths.bindingPath)
+      ? JSON.parse(readFileSync(paths.bindingPath, 'utf8'))
+      : null
+  } catch {
+    bindingRaw = null
+  }
   const bindingSha256 = existsSync(paths.bindingPath) ? sha256File(paths.bindingPath) : null
   const docSha256 = existsSync(paths.docPath) ? sha256File(paths.docPath) : null
   const docBytes = existsSync(paths.docPath) ? statSync(paths.docPath).size : 0
   const hasLegacyPendingUpload = existsSync(paths.legacyPendingUploadPath)
   const hasEncryptedIntentRecord = existsSync(paths.intentRecordPath)
-  const intentRecord = hasEncryptedIntentRecord ? readUws1Header(paths.intentRecordPath) : null
+  let intentRecord = null
+  if (hasEncryptedIntentRecord) {
+    try {
+      intentRecord = readUws1Header(paths.intentRecordPath)
+    } catch {
+      intentRecord = null
+    }
+  }
 
   const docsTree = snapshotTreeDigests(paths.docsRoot)
   const syncTree = snapshotTreeDigests(paths.syncRoot)
@@ -1448,4 +1462,27 @@ export function inspectUpgradeMatrixStore(userDataDir) {
     syncTree,
     combinedTree,
   }
+}
+
+export async function waitForUpgradeMatrixStoreLevel(
+  userDataDir,
+  expectedLevel,
+  timeoutMs = 15_000,
+) {
+  const deadline = Date.now() + timeoutMs
+  let lastSnap = inspectUpgradeMatrixStore(userDataDir)
+  while (Date.now() < deadline) {
+    if (
+      lastSnap.binding?.schema === 2 &&
+      lastSnap.binding?.min_store_level === expectedLevel &&
+      lastSnap.hasLegacyPendingUpload === false &&
+      lastSnap.hasEncryptedIntentRecord === true &&
+      lastSnap.intentRecord?.header?.min_store_level === expectedLevel
+    ) {
+      return lastSnap
+    }
+    await sleep(100)
+    lastSnap = inspectUpgradeMatrixStore(userDataDir)
+  }
+  return lastSnap
 }

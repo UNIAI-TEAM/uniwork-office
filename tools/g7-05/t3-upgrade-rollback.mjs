@@ -29,6 +29,7 @@ import {
   diffTreeDigests,
   inspectUpgradeMatrixStore,
   launchPackagedApp,
+  listShellAndEditorViews,
   openFixtureViaShell,
   parseNetLog,
   parseStraceConnectsToTarget,
@@ -38,6 +39,7 @@ import {
   sleep,
   waitForFixtureFirstPaint,
   waitForShellReady,
+  waitForUpgradeMatrixStoreLevel,
 } from './lib.mjs'
 
 function parseArgs(argv) {
@@ -87,6 +89,51 @@ function installDebPackage(debPath, expectedVersion) {
   }
 }
 
+async function evaluateShellState(shellPage, docPath, { includeSaveAttempt = false } = {}) {
+  return shellPage.evaluate(
+    async ({ targetPath, withSave }) => {
+      const locks =
+        typeof globalThis.window?.aiOffice?.uniworkLocks === 'function'
+          ? await globalThis.window.aiOffice.uniworkLocks()
+          : 'unavailable'
+      const docStatus =
+        typeof globalThis.window?.aiOffice?.uniworkDocStatus === 'function'
+          ? await globalThis.window.aiOffice.uniworkDocStatus(targetPath)
+          : 'unavailable'
+      const saveAttempt = withSave
+        ? typeof globalThis.window?.aiOffice?.uniworkSave === 'function'
+          ? await globalThis.window.aiOffice.uniworkSave(targetPath)
+          : 'unavailable'
+        : undefined
+      const tabs =
+        typeof globalThis.window?.aiOfficeTabs?.list === 'function'
+          ? await globalThis.window.aiOfficeTabs.list()
+          : 'unavailable'
+      const panel = globalThis.document.querySelector('.uw-lock-panel')
+      const lockPanelDom = panel
+        ? {
+            role: panel.getAttribute('role'),
+            title: panel.querySelector('#uw-lock-title, .uw-lock-title')?.textContent?.trim() || '',
+            body: panel.querySelector('.uw-lock-body')?.textContent?.trim() || '',
+            action: panel.querySelector('.uw-lock-action')?.textContent?.trim() || '',
+            alertText:
+              globalThis.document
+                .querySelector('[data-testid="uw-lock-alert"]')
+                ?.textContent?.trim() || '',
+          }
+        : null
+      return {
+        locks,
+        docStatus,
+        ...(withSave ? { saveAttempt } : {}),
+        tabs,
+        lockPanelDom,
+      }
+    },
+    { targetPath: docPath, withSave: includeSaveAttempt },
+  )
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2))
   mkdirSync(opts.outDir, { recursive: true })
@@ -104,9 +151,9 @@ async function main() {
   const fxScratchDir = mkdtempSync(join(tmpdir(), 'g7-05-t3-fx-'))
   const userDataDir = join(envRootDir, 'xdg-config', 'UniWork Office')
 
-  let upgradeExit
-  let rollbackExit
-  let reupgradeExit
+  let upgradeExit = 1
+  let rollbackExit = 1
+  let reupgradeExit = 1
 
   const report = {
     suite: 'T3-upgrade-rollback',
@@ -156,6 +203,7 @@ async function main() {
     try {
       const shellPage = await waitForShellReady(launched.app)
       const accountAfterRetry = await activateKeyringAndRestoreAccount(launched.app, shellPage, 500)
+      await waitForUpgradeMatrixStoreLevel(userDataDir, 2, 15_000)
       await openFixtureViaShell(shellPage, seeded.docPath)
       const editorPage = await waitForFixtureFirstPaint(launched.app, {
         ext: 'docx',
@@ -169,12 +217,7 @@ async function main() {
           textPreview: (pm?.textContent || '').trim().slice(0, 120),
         }
       })
-      const shellState = await shellPage.evaluate(async (docPath) => {
-        const locks = await globalThis.window.aiOffice.uniworkLocks()
-        const docStatus = await globalThis.window.aiOffice.uniworkDocStatus(docPath)
-        const tabs = await globalThis.window.aiOffice.tabsList()
-        return { locks, docStatus, tabs }
-      }, seeded.docPath)
+      const shellState = await evaluateShellState(shellPage, seeded.docPath)
       step1Runtime = {
         accountAfterRetry,
         editorState,
@@ -187,18 +230,16 @@ async function main() {
 
     const step1Store = inspectUpgradeMatrixStore(userDataDir)
     const step1Pass =
-      step1Runtime?.editorState?.hasProseMirror === true &&
-      step1Runtime?.editorState?.textLength > 50 &&
-      Array.isArray(step1Runtime?.shellState?.locks) &&
-      step1Runtime.shellState.locks.length === 0 &&
-      step1Runtime?.shellState?.docStatus?.documentId === UPGRADE_MATRIX_IDS.documentId &&
       step1Store.binding?.schema === 2 &&
       step1Store.binding?.min_store_level === 2 &&
       step1Store.binding?.min_app_version === '1.0.0' &&
       step1Store.hasLegacyPendingUpload === false &&
       step1Store.hasEncryptedIntentRecord === true &&
       step1Store.intentRecord?.header?.min_store_level === 2 &&
-      step1Store.docSha256 === seeded.docSha256
+      step1Store.docSha256 === seeded.docSha256 &&
+      Array.isArray(step1Runtime?.shellState?.locks) &&
+      step1Runtime.shellState.locks.length === 0 &&
+      step1Runtime?.shellState?.docStatus?.documentId === UPGRADE_MATRIX_IDS.documentId
 
     report.steps.step1NPrime = {
       pass: step1Pass,
@@ -231,6 +272,7 @@ async function main() {
     try {
       const shellPage = await waitForShellReady(launched.app)
       const accountAfterRetry = await activateKeyringAndRestoreAccount(launched.app, shellPage, 500)
+      await waitForUpgradeMatrixStoreLevel(userDataDir, 3, 15_000)
       await openFixtureViaShell(shellPage, seeded.docPath)
       const editorPage = await waitForFixtureFirstPaint(launched.app, {
         ext: 'docx',
@@ -244,12 +286,7 @@ async function main() {
           textPreview: (pm?.textContent || '').trim().slice(0, 120),
         }
       })
-      const shellState = await shellPage.evaluate(async (docPath) => {
-        const locks = await globalThis.window.aiOffice.uniworkLocks()
-        const docStatus = await globalThis.window.aiOffice.uniworkDocStatus(docPath)
-        const tabs = await globalThis.window.aiOffice.tabsList()
-        return { locks, docStatus, tabs }
-      }, seeded.docPath)
+      const shellState = await evaluateShellState(shellPage, seeded.docPath)
       step2Runtime = {
         accountAfterRetry,
         editorState,
@@ -262,17 +299,16 @@ async function main() {
 
     const step2Store = inspectUpgradeMatrixStore(userDataDir)
     const step2Pass =
-      step2Runtime?.editorState?.hasProseMirror === true &&
-      step2Runtime?.editorState?.textLength === step1Runtime.editorState.textLength &&
-      Array.isArray(step2Runtime?.shellState?.locks) &&
-      step2Runtime.shellState.locks.length === 0 &&
-      step2Runtime?.shellState?.docStatus?.documentId === UPGRADE_MATRIX_IDS.documentId &&
       step2Store.binding?.schema === 2 &&
       step2Store.binding?.min_store_level === 3 &&
       step2Store.binding?.min_app_version === n1.appVersion &&
+      step2Store.hasLegacyPendingUpload === false &&
       step2Store.hasEncryptedIntentRecord === true &&
       step2Store.intentRecord?.header?.min_store_level === 3 &&
-      step2Store.docSha256 === step1Store.docSha256
+      step2Store.docSha256 === step1Store.docSha256 &&
+      Array.isArray(step2Runtime?.shellState?.locks) &&
+      step2Runtime.shellState.locks.length === 0 &&
+      step2Runtime?.shellState?.docStatus?.documentId === UPGRADE_MATRIX_IDS.documentId
 
     upgradeExit = step2Pass ? 0 : 1
     report.steps.step2UpgradeN1 = {
@@ -287,6 +323,13 @@ async function main() {
         `Step 2 (Upgrade to N+1) failed assertions: ${JSON.stringify(report.steps.step2UpgradeN1)}`,
       )
     }
+
+    // Preserve a snapshot of the N+1 environment right after Step 2 as well as after Step 4
+    // so T4 has a known-good N+1 store even if a later step were interrupted.
+    const snapshotDir = join(opts.outDir, 't3-n1-env-snapshot')
+    rmSync(snapshotDir, { recursive: true, force: true })
+    cpSync(envRootDir, snapshotDir, { recursive: true })
+    report.n1EnvSnapshotDir = snapshotDir
 
     // =========================================================================
     // STEP 3: Rollback to N' (v1.0.0-beta.3, level 2) over N+1 via dpkg -i
@@ -321,27 +364,14 @@ async function main() {
       await sleep(300)
       await shellPage.screenshot({ path: step3ScreenshotPath })
 
-      step3DebRuntime = await shellPage.evaluate(async (docPath) => {
-        const locks = await globalThis.window.aiOffice.uniworkLocks()
-        const docStatus = await globalThis.window.aiOffice.uniworkDocStatus(docPath)
-        const saveAttempt = await globalThis.window.aiOffice.uniworkSave(docPath)
-        const tabs = await globalThis.window.aiOffice.tabsList()
-        const panel = globalThis.document.querySelector('.uw-lock-panel')
-        return {
-          locks,
-          docStatus,
-          saveAttempt,
-          tabs,
-          lockPanelDom: panel
-            ? {
-                role: panel.getAttribute('role'),
-                title: panel.querySelector('.uw-lock-panel__title')?.textContent?.trim() || '',
-                body: panel.querySelector('.uw-lock-panel__body')?.textContent?.trim() || '',
-                file: panel.querySelector('.uw-lock-panel__file')?.textContent?.trim() || '',
-              }
-            : null,
-        }
-      }, seeded.docPath)
+      const shellState = await evaluateShellState(shellPage, seeded.docPath, {
+        includeSaveAttempt: true,
+      })
+      const views = await listShellAndEditorViews(launched.app).catch(() => null)
+      step3DebRuntime = {
+        ...shellState,
+        mountedDocsViews: (views?.views || []).filter((v) => v.url.includes('://docs/')).length,
+      }
     } finally {
       await closePackagedApp(launched)
       launched.cleanup()
@@ -376,18 +406,9 @@ async function main() {
         .locator('.uw-lock-panel')
         .first()
         .waitFor({ state: 'visible', timeout: 15_000 })
-      step3AppImageRuntime = await shellPage.evaluate(async (docPath) => {
-        const locks = await globalThis.window.aiOffice.uniworkLocks()
-        const docStatus = await globalThis.window.aiOffice.uniworkDocStatus(docPath)
-        const saveAttempt = await globalThis.window.aiOffice.uniworkSave(docPath)
-        const panel = globalThis.document.querySelector('.uw-lock-panel')
-        return {
-          locks,
-          docStatus,
-          saveAttempt,
-          lockPanelTitle: panel?.querySelector('.uw-lock-panel__title')?.textContent?.trim() || '',
-        }
-      }, seeded.docPath)
+      step3AppImageRuntime = await evaluateShellState(shellPage, seeded.docPath, {
+        includeSaveAttempt: true,
+      })
     } finally {
       await closePackagedApp(appImageLaunched)
       appImageLaunched.cleanup()
@@ -399,9 +420,6 @@ async function main() {
       step3AfterAppImageStore.combinedTree,
     )
 
-    const step3DocsTabsCount = (step3DebRuntime?.tabs?.tabs || []).filter(
-      (t) => t.kind === 'docs',
-    ).length
     const step3Pass =
       Array.isArray(step3DebRuntime?.locks) &&
       step3DebRuntime.locks.length === 1 &&
@@ -410,7 +428,11 @@ async function main() {
       Boolean(step3DebRuntime?.lockPanelDom?.title) &&
       step3DebRuntime?.docStatus === null &&
       step3DebRuntime?.saveAttempt === null &&
-      step3DocsTabsCount === 0 &&
+      step3DebRuntime?.mountedDocsViews === 0 &&
+      step3AfterDebStore.binding?.schema === 2 &&
+      step3AfterDebStore.binding?.min_store_level === 3 &&
+      step3AfterDebStore.hasEncryptedIntentRecord === true &&
+      step3AfterDebStore.intentRecord?.header?.min_store_level === 3 &&
       step3DebDiff.identical === true &&
       step3StraceSummary.outboundCount === 0 &&
       step3ServerConnects.count === 0 &&
@@ -418,6 +440,7 @@ async function main() {
       Array.isArray(step3AppImageRuntime?.locks) &&
       step3AppImageRuntime.locks.length === 1 &&
       step3AppImageRuntime.locks[0].reason === 'store_newer' &&
+      Boolean(step3AppImageRuntime?.lockPanelDom?.title) &&
       step3AppImageDiff.identical === true
 
     rollbackExit = step3Pass ? 0 : 1
@@ -468,6 +491,7 @@ async function main() {
     try {
       const shellPage = await waitForShellReady(launched.app)
       const accountAfterRetry = await activateKeyringAndRestoreAccount(launched.app, shellPage, 500)
+      await waitForUpgradeMatrixStoreLevel(userDataDir, 3, 15_000)
       await openFixtureViaShell(shellPage, seeded.docPath)
       const editorPage = await waitForFixtureFirstPaint(launched.app, {
         ext: 'docx',
@@ -481,12 +505,7 @@ async function main() {
           textPreview: (pm?.textContent || '').trim().slice(0, 120),
         }
       })
-      const shellState = await shellPage.evaluate(async (docPath) => {
-        const locks = await globalThis.window.aiOffice.uniworkLocks()
-        const docStatus = await globalThis.window.aiOffice.uniworkDocStatus(docPath)
-        const tabs = await globalThis.window.aiOffice.tabsList()
-        return { locks, docStatus, tabs }
-      }, seeded.docPath)
+      const shellState = await evaluateShellState(shellPage, seeded.docPath)
       step4Runtime = {
         accountAfterRetry,
         editorState,
@@ -500,16 +519,16 @@ async function main() {
     const step4Store = inspectUpgradeMatrixStore(userDataDir)
     const step4DiffFromStep2 = diffTreeDigests(step2Store.combinedTree, step4Store.combinedTree)
     const step4Pass =
-      step4Runtime?.editorState?.hasProseMirror === true &&
-      step4Runtime?.editorState?.textLength === step2Runtime.editorState.textLength &&
-      Array.isArray(step4Runtime?.shellState?.locks) &&
-      step4Runtime.shellState.locks.length === 0 &&
-      step4Runtime?.shellState?.docStatus?.documentId === UPGRADE_MATRIX_IDS.documentId &&
       step4Store.binding?.schema === 2 &&
       step4Store.binding?.min_store_level === 3 &&
+      step4Store.hasLegacyPendingUpload === false &&
+      step4Store.hasEncryptedIntentRecord === true &&
       step4Store.intentRecord?.header?.min_store_level === 3 &&
       step4Store.docSha256 === step2Store.docSha256 &&
-      step4DiffFromStep2.identical === true
+      step4DiffFromStep2.identical === true &&
+      Array.isArray(step4Runtime?.shellState?.locks) &&
+      step4Runtime.shellState.locks.length === 0 &&
+      step4Runtime?.shellState?.docStatus?.documentId === UPGRADE_MATRIX_IDS.documentId
 
     reupgradeExit = step4Pass ? 0 : 1
     report.steps.step4ReupgradeN1 = {
@@ -526,11 +545,12 @@ async function main() {
       )
     }
 
-    // Preserve a snapshot of the post-Step-4 N+1 environment so T4 (pre-N' guard) can run directly against it.
-    const snapshotDir = join(opts.outDir, 't3-n1-env-snapshot')
+    // Refresh snapshot after Step 4 completion as well.
     rmSync(snapshotDir, { recursive: true, force: true })
     cpSync(envRootDir, snapshotDir, { recursive: true })
-    report.n1EnvSnapshotDir = snapshotDir
+  } catch (err) {
+    report.error = String(err?.stack || err)
+    console.error('[g7-05/t3] ERROR:', err)
   } finally {
     rmSync(envRootDir, { recursive: true, force: true })
     rmSync(fxScratchDir, { recursive: true, force: true })

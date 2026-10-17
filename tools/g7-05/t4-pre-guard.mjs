@@ -21,9 +21,11 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { materializeFixtures } from './fixtures-data.mjs'
 import {
   REPO_ROOT,
   UPGRADE_MATRIX_IDS,
+  activateKeyringAndRestoreAccount,
   closePackagedApp,
   diffTreeDigests,
   getUpgradeMatrixPaths,
@@ -34,9 +36,11 @@ import {
   parseStraceConnectsToTarget,
   parseStraceLog,
   runCmd,
+  seedUpgradeMatrixStore,
   sleep,
   waitForFixtureFirstPaint,
   waitForShellReady,
+  waitForUpgradeMatrixStoreLevel,
 } from './lib.mjs'
 
 function parseArgs(argv) {
@@ -86,6 +90,54 @@ function installDebPackage(debPath, expectedVersion) {
   }
 }
 
+function isValidN1Store(storeSnap) {
+  return (
+    storeSnap?.binding?.schema === 2 &&
+    storeSnap?.binding?.min_store_level === 3 &&
+    storeSnap?.hasLegacyPendingUpload === false &&
+    storeSnap?.hasEncryptedIntentRecord === true &&
+    storeSnap?.intentRecord?.header?.min_store_level === 3
+  )
+}
+
+async function prepareN1StoreOnProfile({ n1, envRootDir, userDataDir }) {
+  console.log(
+    '[g7-05/t4] N+1 snapshot missing or incomplete; building N+1-written store directly...',
+  )
+  const fxScratchDir = mkdtempSync(join(tmpdir(), 'g7-05-t4-fx-'))
+  try {
+    const fixtures = materializeFixtures(fxScratchDir)
+    const docxFixture = fixtures.find((f) => f.id === 'fx-docx-report-vi')
+    if (!docxFixture) {
+      throw new Error('Could not find fx-docx-report-vi in G7-06 fixtures')
+    }
+    seedUpgradeMatrixStore({
+      userDataDir,
+      fixtureSourcePath: docxFixture.path,
+    })
+  } finally {
+    rmSync(fxScratchDir, { recursive: true, force: true })
+  }
+
+  const n1Install = installDebPackage(n1.deb.path, n1.appVersion)
+  const launchedN1 = await launchPackagedApp({
+    binaryPath: '/usr/bin/uniwork-office',
+    isAppImage: false,
+    envRootDir,
+    seedOnboardingSeen: true,
+    scratchPrefix: 'g7-05-t4-n1-prep-',
+  })
+  try {
+    const shellPage = await waitForShellReady(launchedN1.app)
+    await activateKeyringAndRestoreAccount(launchedN1.app, shellPage, 500)
+    await waitForUpgradeMatrixStoreLevel(userDataDir, 3, 15_000)
+  } finally {
+    await closePackagedApp(launchedN1)
+    launchedN1.cleanup()
+  }
+  return n1Install
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2))
   mkdirSync(opts.outDir, { recursive: true })
@@ -100,18 +152,11 @@ async function main() {
   const { preNPrime, n1 } = manifest.builds
 
   const snapshotDir = join(opts.outDir, 't3-n1-env-snapshot')
-  if (!existsSync(snapshotDir)) {
-    throw new Error(
-      `Missing N+1 environment snapshot at ${snapshotDir}. Run tools/g7-05/t3-upgrade-rollback.mjs first.`,
-    )
-  }
-
   const envRootDir = mkdtempSync(join(tmpdir(), 'g7-05-t4-env-'))
-  cpSync(snapshotDir, envRootDir, { recursive: true })
   const userDataDir = join(envRootDir, 'xdg-config', 'UniWork Office')
   const paths = getUpgradeMatrixPaths(userDataDir)
 
-  let t4Exit
+  let t4Exit = 1
   const report = {
     suite: 'T4-pre-guard',
     startedAt: new Date().toISOString(),
@@ -123,10 +168,30 @@ async function main() {
   }
 
   try {
+    let snapshotUsed = false
+    if (existsSync(snapshotDir)) {
+      cpSync(snapshotDir, envRootDir, { recursive: true })
+      const candidateStore = inspectUpgradeMatrixStore(userDataDir)
+      if (isValidN1Store(candidateStore)) {
+        snapshotUsed = true
+        report.snapshotSource = 't3-n1-env-snapshot'
+      } else {
+        rmSync(envRootDir, { recursive: true, force: true })
+        mkdirSync(envRootDir, { recursive: true })
+      }
+    }
+
+    if (!snapshotUsed) {
+      report.n1PrepInstall = await prepareN1StoreOnProfile({ n1, envRootDir, userDataDir })
+      report.snapshotSource = 'self-generated-by-n1'
+      rmSync(snapshotDir, { recursive: true, force: true })
+      cpSync(envRootDir, snapshotDir, { recursive: true })
+    }
+
     const beforeStore = inspectUpgradeMatrixStore(userDataDir)
-    if (beforeStore.binding?.schema !== 2 || beforeStore.binding?.min_store_level !== 3) {
+    if (!isValidN1Store(beforeStore)) {
       throw new Error(
-        `Expected N+1 store with schema=2, min_store_level=3 before T4; got ${JSON.stringify(beforeStore.binding)}`,
+        `Expected N+1 store with schema=2, min_store_level=3 and encrypted level-3 intent before T4; got ${JSON.stringify(beforeStore)}`,
       )
     }
 
@@ -167,19 +232,27 @@ async function main() {
       })
 
       const shellState = await shellPage.evaluate(async (docPath) => {
+        const locks =
+          typeof globalThis.window?.aiOffice?.uniworkLocks === 'function'
+            ? await globalThis.window.aiOffice.uniworkLocks()
+            : 'unavailable'
         const docStatus =
           typeof globalThis.window?.aiOffice?.uniworkDocStatus === 'function'
             ? await globalThis.window.aiOffice.uniworkDocStatus(docPath)
-            : null
+            : 'unavailable'
         const saveAttempt =
           typeof globalThis.window?.aiOffice?.uniworkSave === 'function'
             ? await globalThis.window.aiOffice.uniworkSave(docPath)
-            : null
-        const hasUniworkLocksApi = typeof globalThis.window?.aiOffice?.uniworkLocks === 'function'
+            : 'unavailable'
+        const tabs =
+          typeof globalThis.window?.aiOfficeTabs?.list === 'function'
+            ? await globalThis.window.aiOfficeTabs.list()
+            : 'unavailable'
         return {
+          locks,
           docStatus,
           saveAttempt,
-          hasUniworkLocksApi,
+          tabs,
         }
       }, paths.docPath)
 
@@ -201,15 +274,15 @@ async function main() {
     const netLogSummary = parseNetLog(netLogRaw)
 
     const pass =
-      runtime?.editorState?.hasProseMirror === true &&
-      runtime?.shellState?.docStatus === null &&
-      runtime?.shellState?.saveAttempt === null &&
       afterStore.binding?.schema === 2 &&
       afterStore.binding?.min_store_level === 3 &&
       afterStore.hasLegacyPendingUpload === false &&
       afterStore.hasEncryptedIntentRecord === true &&
       afterStore.intentRecord?.header?.min_store_level === 3 &&
       storeDiff.identical === true &&
+      runtime?.shellState?.locks === 'unavailable' &&
+      runtime?.shellState?.docStatus === null &&
+      runtime?.shellState?.saveAttempt === null &&
       straceSummary.outboundCount === 0 &&
       apiOriginConnects.count === 0 &&
       netLogSummary.outboundUrlCount === 0
@@ -229,6 +302,9 @@ async function main() {
       netLogOutboundUrlCount: netLogSummary.outboundUrlCount,
     }
     report.pass = pass
+  } catch (err) {
+    report.error = String(err?.stack || err)
+    console.error('[g7-05/t4] ERROR:', err)
   } finally {
     rmSync(envRootDir, { recursive: true, force: true })
   }

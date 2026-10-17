@@ -278,6 +278,11 @@ function testUpgradeMatrixHelpersAndN1Patch() {
     const snap1 = inspectUpgradeMatrixStore(userDataDir)
     assert.equal(snap1.binding.schema, 1)
     assert.equal(snap1.binding.documentId, UPGRADE_MATRIX_IDS.documentId)
+    assert.equal(snap1.binding.pendingIntent?.intentId, UPGRADE_MATRIX_IDS.intentId)
+    assert.equal(snap1.binding.pendingIntent?.idempotencyKey, UPGRADE_MATRIX_IDS.intentKey)
+    assert.equal(snap1.binding.pendingIntent?.documentId, UPGRADE_MATRIX_IDS.documentId)
+    assert.equal(snap1.binding.pendingIntent?.baseRevision, '1')
+    assert.equal(snap1.binding.pendingIntent?.checksum, seeded.docSha256)
     assert.equal(snap1.hasLegacyPendingUpload, true)
     assert.equal(snap1.docSha256, seeded.docSha256)
     const snap2 = inspectUpgradeMatrixStore(userDataDir)
@@ -337,6 +342,111 @@ function testUpgradeMatrixHelpersAndN1Patch() {
   }
 }
 
+function extractPreloadApiKeys(preloadSource, startMarker, endMarker) {
+  const startIdx = preloadSource.indexOf(startMarker)
+  const endIdx = preloadSource.indexOf(endMarker, startIdx)
+  assert.ok(startIdx !== -1 && endIdx > startIdx, `Could not locate ${startMarker} .. ${endMarker}`)
+  const block = preloadSource.slice(startIdx, endIdx)
+  const keys = new Set()
+  const keyRe = /^\s{2}(?:async\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(|:)/gm
+  let match
+  while ((match = keyRe.exec(block)) !== null) {
+    keys.add(match[1])
+  }
+  return keys
+}
+
+function findAiOfficeReferences(sourceText) {
+  const aiOfficeRefs = new Set()
+  const aiOfficeTabsRefs = new Set()
+  const officeRe = /\baiOffice(?:\?\.)?\.([A-Za-z_][A-Za-z0-9_]*)/g
+  const tabsRe = /\baiOfficeTabs(?:\?\.)?\.([A-Za-z_][A-Za-z0-9_]*)/g
+  let m
+  while ((m = officeRe.exec(sourceText)) !== null) {
+    aiOfficeRefs.add(m[1])
+  }
+  while ((m = tabsRe.exec(sourceText)) !== null) {
+    aiOfficeTabsRefs.add(m[1])
+  }
+  return { aiOfficeRefs: [...aiOfficeRefs], aiOfficeTabsRefs: [...aiOfficeTabsRefs] }
+}
+
+function testPreloadApiReferencesAndUiSelectors() {
+  const preloadPath = join(REPO_ROOT, 'apps/shell/src/preload/index.ts')
+  const preloadSource = readFileSync(preloadPath, 'utf8')
+
+  const homeApiKeys = extractPreloadApiKeys(
+    preloadSource,
+    'const homeApi: HomeApi = {',
+    "contextBridge.exposeInMainWorld('aiOffice', homeApi)",
+  )
+  const tabsApiKeys = extractPreloadApiKeys(
+    preloadSource,
+    'const tabsApi: TabsApi = {',
+    "contextBridge.exposeInMainWorld('aiOfficeTabs', tabsApi)",
+  )
+
+  // Negative check: tabsList does NOT exist on window.aiOffice and must be rejected if referenced.
+  assert.equal(
+    homeApiKeys.has('tabsList'),
+    false,
+    'window.aiOffice.tabsList must not be present in homeApi',
+  )
+  const badRefs = findAiOfficeReferences('await globalThis.window.aiOffice.tabsList()')
+  assert.deepEqual(badRefs.aiOfficeRefs, ['tabsList'])
+  assert.equal(homeApiKeys.has(badRefs.aiOfficeRefs[0]), false)
+
+  const targetScripts = [
+    'tools/g7-05/t3-upgrade-rollback.mjs',
+    'tools/g7-05/t4-pre-guard.mjs',
+    'tools/g7-05/lib.mjs',
+    'tools/g7-05/t1-smoke.mjs',
+    'tools/g7-05/t2-net-zero.mjs',
+    'tools/g7-05/t6-perf.mjs',
+  ]
+
+  for (const relPath of targetScripts) {
+    const src = readFileSync(join(REPO_ROOT, relPath), 'utf8')
+    const { aiOfficeRefs, aiOfficeTabsRefs } = findAiOfficeReferences(src)
+    if (relPath.includes('t3-upgrade-rollback') || relPath.includes('t4-pre-guard')) {
+      assert.ok(
+        aiOfficeRefs.length > 0,
+        `${relPath} must reference at least one window.aiOffice.<name> preload method`,
+      )
+    }
+    for (const refName of aiOfficeRefs) {
+      assert.ok(
+        homeApiKeys.has(refName),
+        `${relPath} references window.aiOffice.${refName}, which does not exist in apps/shell/src/preload/index.ts`,
+      )
+    }
+    for (const refName of aiOfficeTabsRefs) {
+      assert.ok(
+        tabsApiKeys.has(refName),
+        `${relPath} references window.aiOfficeTabs.${refName}, which does not exist in apps/shell/src/preload/index.ts`,
+      )
+    }
+  }
+
+  // Verify S11 lock panel DOM selectors used in t3-upgrade-rollback.mjs exist in UniworkLockPanel.tsx.
+  const lockPanelSource = readFileSync(
+    join(REPO_ROOT, 'apps/shell/src/renderer/src/UniworkLockPanel.tsx'),
+    'utf8',
+  )
+  for (const token of [
+    'uw-lock-panel',
+    'uw-lock-title',
+    'uw-lock-body',
+    'uw-lock-action',
+    'uw-lock-alert',
+  ]) {
+    assert.ok(
+      lockPanelSource.includes(token),
+      `UniworkLockPanel.tsx must contain expected S11 selector token "${token}"`,
+    )
+  }
+}
+
 testFixtureMaterialization()
 testStraceParser()
 testNetLogParserAndUrlClassifier()
@@ -344,4 +454,5 @@ testRssAndMetadata()
 await testWrapperAndProcessTracking()
 await testPackagedShellAndEditorViewResolution()
 testUpgradeMatrixHelpersAndN1Patch()
+testPreloadApiReferencesAndUiSelectors()
 console.log('[g7-05/self-test] All unit assertions passed.')
