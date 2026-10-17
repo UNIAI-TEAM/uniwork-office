@@ -168,4 +168,5 @@ export const fr = {
   uwErrUploadTooLarge:
     '{name} fait {size}, ce qui dépasse la limite de {max}. Réduisez la taille des images ou divisez le fichier, puis importez-le à nouveau.',
   uwReasonTooLargeWithLimit: 'dépasse la limite de {max}',
+  uwUploadChecking: 'Vérification du fichier…',
 } satisfies Record<keyof typeof zh, string>

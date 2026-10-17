@@ -158,4 +158,5 @@ export const vi = {
   uwErrUploadTooLarge:
     '{name} nặng {size}, vượt giới hạn {max}. Giảm dung lượng ảnh hoặc chia nhỏ tệp rồi tải lên lại.',
   uwReasonTooLargeWithLimit: 'vượt giới hạn {max}',
+  uwUploadChecking: 'Đang kiểm tra tệp…',
 } satisfies Record<keyof typeof zh, string>

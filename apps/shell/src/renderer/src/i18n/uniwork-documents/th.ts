@@ -161,4 +161,5 @@ export const th = {
   uwErrUploadTooLarge:
     '{name} มีขนาด {size} ซึ่งเกินขีดจำกัด {max} ลดขนาดรูปภาพหรือแบ่งไฟล์ แล้วอัปโหลดอีกครั้ง',
   uwReasonTooLargeWithLimit: 'เกินขีดจำกัด {max}',
+  uwUploadChecking: 'กำลังตรวจสอบไฟล์…',
 } satisfies Record<keyof typeof zh, string>

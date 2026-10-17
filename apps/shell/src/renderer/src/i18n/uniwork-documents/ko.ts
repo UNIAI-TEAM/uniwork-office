@@ -159,4 +159,5 @@ export const ko = {
   uwErrUploadTooLarge:
     '{name}의 크기는 {size}로, {max} 한도를 초과했습니다. 이미지 크기를 줄이거나 파일을 분할한 후 다시 업로드하세요.',
   uwReasonTooLargeWithLimit: '{max} 한도 초과',
+  uwUploadChecking: '파일 확인 중…',
 } satisfies Record<keyof typeof zh, string>

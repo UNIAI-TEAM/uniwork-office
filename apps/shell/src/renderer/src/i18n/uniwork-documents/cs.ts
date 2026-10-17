@@ -159,4 +159,5 @@ export const cs = {
   uwErrUploadTooLarge:
     '{name} má {size}, což překračuje limit {max}. Zmenšete obrázky nebo soubor rozdělte a nahrajte jej znovu.',
   uwReasonTooLargeWithLimit: 'přes limit {max}',
+  uwUploadChecking: 'Kontrola souboru…',
 } satisfies Record<keyof typeof zh, string>

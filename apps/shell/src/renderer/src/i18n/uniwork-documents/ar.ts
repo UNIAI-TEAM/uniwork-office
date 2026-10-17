@@ -157,4 +157,5 @@ export const ar = {
   uwErrUploadTooLarge:
     'حجم {name} هو {size}، وهو يتجاوز الحد الأقصى {max}. قلّل حجم الصور أو قسّم الملف ثم ارفعه مرة أخرى.',
   uwReasonTooLargeWithLimit: 'يتجاوز الحد {max}',
+  uwUploadChecking: 'جارٍ التحقق من الملف…',
 } satisfies Record<keyof typeof zh, string>
