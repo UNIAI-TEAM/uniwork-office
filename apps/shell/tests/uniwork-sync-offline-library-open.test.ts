@@ -745,6 +745,24 @@ describe('G5-05u B5 the copy is named and cleared like the normal open path (BE-
     expect(existsSync(dirB)).toBe(false)
   })
 
+  it('a rejected open never wedges the queue: the next open resolves and a sweep still runs (BE-R3-2)', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const doc = addDoc(o.h, 'doc_1', 1)
+    await pin(o.h, 'doc_1')
+    const dir = o.service.store.dirFor(SCOPE.deploymentId, SCOPE.accountId, offlineCopyKey('doc_1'))
+    vi.spyOn(o.h.manager, 'row').mockRejectedValueOnce(new Error('row read failed'))
+    await expect(o.copies.open('doc_1')).rejects.toThrow('row read failed')
+    const opened = await o.copies.open('doc_1')
+    expect(opened.kind).toBe('opened')
+    expect(existsSync(dir)).toBe(true)
+    expect(new Uint8Array(await readFile(join(dir, 'doc_1.docx')))).toEqual(doc.bytes)
+    o.pathOpen.value = false
+    o.clock.now += 31_000
+    await o.copies.sweep()
+    expect(existsSync(dir)).toBe(false)
+  })
+
   it('a save of the offline copy is refused as view-only, and mints no intent', async () => {
     const o = openHarness()
     dirs.push(o.userDataDir)
