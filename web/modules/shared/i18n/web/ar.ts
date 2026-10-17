@@ -72,6 +72,7 @@ export const ar = {
   uwConflictReloadTitle: 'إعادة تحميل الأحدث',
   uwConflictReloadGo: 'إعادة التحميل',
   uwConflictSaveCopy: 'الحفظ كنسخة…',
+  uwConflictSaveCopyName: '{name} (نسخة)',
   uwConflictSaveCopyTitle: 'هل تريد الحفظ كنسخة؟',
   uwConflictSaveCopyConfirm:
     'سينشئ UniWork مستندًا جديدًا من نسختك، بالمالك وصلاحيات الوصول نفسها لهذا المستند. يبقى المستند الحالي والإصدار {server} الخاص بـ {author} كما هما.',

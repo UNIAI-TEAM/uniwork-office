@@ -79,6 +79,7 @@ export const vi = {
   uwConflictReloadTitle: 'Tải lại bản mới nhất',
   uwConflictReloadGo: 'Tải lại',
   uwConflictSaveCopy: 'Lưu thành bản sao…',
+  uwConflictSaveCopyName: '{name} (bản sao)',
   uwConflictSaveCopyTitle: 'Lưu thành bản sao?',
   uwConflictSaveCopyConfirm:
     'UniWork sẽ tạo một tài liệu mới từ bản của bạn, cùng chủ sở hữu và quyền truy cập với tài liệu này. Tài liệu hiện tại và phiên bản {server} của {author} không đổi.',

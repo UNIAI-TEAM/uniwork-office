@@ -82,6 +82,7 @@ export const pt = {
   uwConflictReloadTitle: 'Recarregar a mais recente',
   uwConflictReloadGo: 'Recarregar',
   uwConflictSaveCopy: 'Salvar como cópia…',
+  uwConflictSaveCopyName: '{name} (cópia)',
   uwConflictSaveCopyTitle: 'Salvar como cópia?',
   uwConflictSaveCopyConfirm:
     'O UniWork criará um novo documento a partir da sua versão, com o mesmo proprietário e acesso deste documento. O documento atual e a versão {server} de {author} permanecem como estão.',

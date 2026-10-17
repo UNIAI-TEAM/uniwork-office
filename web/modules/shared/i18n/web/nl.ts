@@ -83,6 +83,7 @@ export const nl = {
   uwConflictReloadTitle: 'Nieuwste opnieuw laden',
   uwConflictReloadGo: 'Opnieuw laden',
   uwConflictSaveCopy: 'Opslaan als kopie…',
+  uwConflictSaveCopyName: '{name} (kopie)',
   uwConflictSaveCopyTitle: 'Opslaan als kopie?',
   uwConflictSaveCopyConfirm:
     'UniWork maakt een nieuw document van jouw versie, met dezelfde eigenaar en toegang als dit document. Het huidige document en versie {server} van {author} blijven ongewijzigd.',

@@ -82,6 +82,7 @@ export const pl = {
   uwConflictReloadTitle: 'Wczytaj najnowszą',
   uwConflictReloadGo: 'Wczytaj ponownie',
   uwConflictSaveCopy: 'Zapisz jako kopię…',
+  uwConflictSaveCopyName: '{name} (kopia)',
   uwConflictSaveCopyTitle: 'Zapisać jako kopię?',
   uwConflictSaveCopyConfirm:
     'UniWork utworzy nowy dokument z Twojej wersji, z tym samym właścicielem i dostępem co ten dokument. Bieżący dokument i wersja {server} autorstwa {author} pozostaną bez zmian.',

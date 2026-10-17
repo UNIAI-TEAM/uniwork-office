@@ -60,40 +60,41 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 
 ### Frame → host
 
-| type                            | kind    | payload → result                                                                        |
-| ------------------------------- | ------- | --------------------------------------------------------------------------------------- |
-| `ready`                         | event   | {protocolVersion, frameVersion?, capabilities, instanceId?, module?}                    |
-| `token.refresh`                 | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                        |
-| `api.open`                      | request | {fileId, versionId?} → `OpenPayload` + {versionChanged?} (head only; see below)         |
-| `api.save`                      | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)                |
-| `api.saveAs`                    | request | {name, data, sourceFileId?, folderId?, silent?} → `SaveResult`                          |
-| `api.recents`                   | request | {limit?} → {files: FileMeta[]}                                                          |
-| `api.export`                    | request | {format: 'pdf' \| 'html', fileId?, data?, html?, geometry?} → {data, mimeType, name?}   |
-| `api.attachments.add`           | request | {files: UploadItem[]} → {accepted, rejected}                                            |
-| `api.images.upload`             | request | UploadItem + {fileId?} → {imageId, url}                                                 |
-| `file.pick`                     | request | {purpose: 'open' \| 'insert', accept?} → {file: OpenPayload \| null}                    |
-| `image.fetch`                   | request | {url (http/s)} → {image: {base64, mime} \| null}                                        |
-| `convert.altChunkHtml`          | request | {html} → {data: ArrayBuffer \| null}                                                    |
-| `app.open`                      | request | {feature?} → {outcome: 'launched' \| 'installer' \| 'unavailable'} (cap `desktopOpen`)  |
-| `api.assets.resolve`            | request | {fileId?, paths: string[] (1..50)} → {assets: Record<path, url>} (Markdown/HTML frames) |
-| `api.download`                  | request | {data} → {delivered: true} (cap `download`, additive, X-02; see below)                  |
-| `dirty`                         | event   | {dirty} (client de-duplicates)                                                          |
-| `title`                         | event   | {title}                                                                                 |
-| `modal`                         | event   | {open} — a frame dialog is open; the host may dim its own chrome (advisory, additive)   |
-| `resize`                        | event   | {height} (CSS px, content height)                                                       |
-| `saved`                         | event   | {file, versionId?, initiatedByFrame}                                                    |
-| `error`                         | event   | {error: ProtocolErrorShape, fatal}                                                      |
-| `cancel`                        | event   | {id} — abort a frame→host request                                                       |
-| `aiRun`                         | event   | {state: 'running' \| 'idle', run_id?} — an AI turn started / ended (additive, X-02)     |
-| `open_refused`                  | event   | {reason, bytes?, measure?} — the frame cannot show the document (additive, SIZE-F1)     |
-| `comments.*`, `mentions.search` | request | server comments (additive, G8-08, cap `comments`); see "Server comments" below          |
-| `size_warning`                  | event   | {bytes, max_bytes, warn_ratio} — serialized save size reached warn threshold (SIZE-F1)  |
-| `save_blocked`                  | event   | {bytes, max_bytes} — save blocked because serialized bytes exceeded max_bytes (SIZE-F1) |
+| type                            | kind    | payload → result                                                                                     |
+| ------------------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `ready`                         | event   | {protocolVersion, frameVersion?, capabilities, instanceId?, module?}                                 |
+| `token.refresh`                 | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                                     |
+| `api.open`                      | request | {fileId, versionId?} → `OpenPayload` + {versionChanged?} (head only; see below)                      |
+| `api.save`                      | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)                             |
+| `api.saveAs`                    | request | {name, data, sourceFileId?, folderId?, silent?} → `SaveResult`                                       |
+| `api.saveCopy`                  | request | {data, name} → `SaveCopyResult` ({documentId, title}, cap `saveCopy`, additive, UNI-1872; see below) |
+| `api.recents`                   | request | {limit?} → {files: FileMeta[]}                                                                       |
+| `api.export`                    | request | {format: 'pdf' \| 'html', fileId?, data?, html?, geometry?} → {data, mimeType, name?}                |
+| `api.attachments.add`           | request | {files: UploadItem[]} → {accepted, rejected}                                                         |
+| `api.images.upload`             | request | UploadItem + {fileId?} → {imageId, url}                                                              |
+| `file.pick`                     | request | {purpose: 'open' \| 'insert', accept?} → {file: OpenPayload \| null}                                 |
+| `image.fetch`                   | request | {url (http/s)} → {image: {base64, mime} \| null}                                                     |
+| `convert.altChunkHtml`          | request | {html} → {data: ArrayBuffer \| null}                                                                 |
+| `app.open`                      | request | {feature?} → {outcome: 'launched' \| 'installer' \| 'unavailable'} (cap `desktopOpen`)               |
+| `api.assets.resolve`            | request | {fileId?, paths: string[] (1..50)} → {assets: Record<path, url>} (Markdown/HTML frames)              |
+| `api.download`                  | request | {data} → {delivered: true} (cap `download`, additive, X-02; see below)                               |
+| `dirty`                         | event   | {dirty} (client de-duplicates)                                                                       |
+| `title`                         | event   | {title}                                                                                              |
+| `modal`                         | event   | {open} — a frame dialog is open; the host may dim its own chrome (advisory, additive)                |
+| `resize`                        | event   | {height} (CSS px, content height)                                                                    |
+| `saved`                         | event   | {file, versionId?, initiatedByFrame}                                                                 |
+| `error`                         | event   | {error: ProtocolErrorShape, fatal}                                                                   |
+| `cancel`                        | event   | {id} — abort a frame→host request                                                                    |
+| `aiRun`                         | event   | {state: 'running' \| 'idle', run_id?} — an AI turn started / ended (additive, X-02)                  |
+| `open_refused`                  | event   | {reason, bytes?, measure?} — the frame cannot show the document (additive, SIZE-F1)                  |
+| `comments.*`, `mentions.search` | request | server comments (additive, G8-08, cap `comments`); see "Server comments" below                       |
+| `size_warning`                  | event   | {bytes, max_bytes, warn_ratio} — serialized save size reached warn threshold (SIZE-F1)               |
+| `save_blocked`                  | event   | {bytes, max_bytes} — save blocked because serialized bytes exceeded max_bytes (SIZE-F1)              |
 
 `api.*`, `file.pick`, `image.fetch` and `convert.altChunkHtml` are proxied by the host's `api` handlers; a type
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
-Capabilities: `save`, `saveAs`, `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
+Capabilities: `save`, `saveAs`, `saveCopy` (additive, UNI-1872), `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
 `ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`, and (additive, SIZE-F1) `sizeUi`. The effective set is the frame's ∩
 the host's grant. `desktopOpen` (additive, default false) is the "Open in desktop app" grant, see "Open in desktop app (`app.open`)" below. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
@@ -126,6 +127,16 @@ URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
   opens nothing. The frame shows and saves on `openReplyRevision(reply)` only; `null` (a host before X-02 ignores
   `versionId` and sends no `revision`) means the bar without a number, never the number it asked for.
 - `FileMeta.revision?`: decimal string, compared as BigInt.
+- `api.saveCopy {data, name}` (cap `saveCopy`, additive, UNI-1872): conflict-dialog "Save as a copy". The host
+  advertises `saveCopy` in `init.capabilities` only when it handles `api.saveCopy`; the Docs frame claims `saveCopy` in
+  `ready` and offers "Save as a copy…" only when the effective capability `saveCopy` is true and the document is
+  editable. `data` is the `ArrayBuffer` of
+  the open document at the moment of the 409'd save; `name` is the localized copy title formatted by the frame's i18n
+  (e.g. `"<name> (copy)"` / `"<tên> (bản sao)"`), which the host passes to the server as the new document's title.
+  Success returns `SaveCopyResult = { documentId: string; title: string }` without re-pointing or reloading the open
+  document. Failures reuse existing `ProtocolErrorCode` values (`conflict`, `forbidden`, `too_large` with
+  `details.max_bytes`, `network`, `internal`, `unsupported`); a host refusal keeps its server code in
+  `details.apiCode` (e.g. `owner_requires_copy`, `copy_consent_required`, `document_locked`).
 - `api.download {data}`: bytes only; the host names, types, size-checks, checks the permission and downloads from its
   own origin (the frame has no `allow-downloads`). Refusals use existing codes (`malformed`, `too_large`,
   `forbidden`). The host advertises `download` only once it handles `api.download`; every frame declares it, so the
