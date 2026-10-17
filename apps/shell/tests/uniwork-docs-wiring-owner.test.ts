@@ -22,13 +22,18 @@ let fetched: string[] = []
 let fetchedCalls: { url: string; path: string; headers: Record<string, string> }[] = []
 
 vi.mock('electron', () => ({
-  app: { getPath: () => dir },
+  app: { getPath: () => dir, configureHostResolver: () => undefined },
   BrowserWindow: { getFocusedWindow: () => null },
   dialog: {},
   safeStorage: {
     isEncryptionAvailable: () => true,
     encryptString: (text: string) => Buffer.from(`ENC1${text}`),
     decryptString: (buf: Buffer) => buf.toString().slice(4),
+  },
+  session: {
+    defaultSession: {
+      setSpellCheckerDictionaryDownloadURL: () => undefined,
+    },
   },
 }))
 

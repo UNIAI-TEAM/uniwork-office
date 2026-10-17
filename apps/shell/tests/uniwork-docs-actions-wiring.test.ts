@@ -28,7 +28,7 @@ const dialogs = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
-  app: { getPath: () => dir },
+  app: { getPath: () => dir, configureHostResolver: () => undefined },
   BrowserWindow: { getFocusedWindow: () => null },
   dialog: {
     showOpenDialog: vi.fn(async (...args: unknown[]) => {
@@ -42,6 +42,11 @@ vi.mock('electron', () => ({
     isEncryptionAvailable: () => true,
     encryptString: (text: string) => Buffer.from(`ENC1${text}`),
     decryptString: (buf: Buffer) => buf.toString().slice(4),
+  },
+  session: {
+    defaultSession: {
+      setSpellCheckerDictionaryDownloadURL: () => undefined,
+    },
   },
 }))
 
