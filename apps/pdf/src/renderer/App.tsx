@@ -149,7 +149,7 @@ import {
   type PdfReadOnlySaveSeam,
   type SaveOrigin,
 } from './uniwork-save'
-import { usePdfUniworkState, type PdfUniworkSeam } from './uniwork-state'
+import { openBoxesCountAsDirty, usePdfUniworkState, type PdfUniworkSeam } from './uniwork-state'
 import { collabStrings } from '@genoffice/ui/collab'
 import { PdfServerCommentsHost, type PdfServerComments } from './server-comments/PdfServerComments'
 import { commentFrameBox, rerunOnResize, scrollLeftToReveal } from './server-comments/reveal-view'
@@ -5494,8 +5494,12 @@ export default function App() {
     }
     return { textEdits: edits, noteFlush, newNotes, open }
   }
-  const openBoxesDirty =
-    !readOnly && (textDraft || noteEditDraft || noteDraft) ? pendingOpenBoxes().open : false
+  // platform read-only only: a draft typed before the edit lock was lost still counts (edits kept)
+  const openBoxesDirty = openBoxesCountAsDirty(
+    viewOnly || encryptedReadOnly,
+    !!(textDraft || noteEditDraft || noteDraft),
+    () => pendingOpenBoxes().open,
+  )
 
   // Mirror dirty state to the main process (close-tab/close-window guard). An open editor box with
   // typed changes counts: Save folds it in, and the web draft copy needs the frame to be dirty

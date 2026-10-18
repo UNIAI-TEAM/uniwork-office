@@ -21,6 +21,20 @@ export async function queryPdfUniworkState(
   }
 }
 
+/**
+ * EL-1(b) fix10: whether an open editor box with typed text counts as unsaved
+ * for the close guard. `platformReadOnly` is view-only / encrypted, never the
+ * UniWork lock: a box typed before the lock was lost in place keeps its text,
+ * so closing must still ask.
+ */
+export function openBoxesCountAsDirty(
+  platformReadOnly: boolean,
+  hasDraft: boolean,
+  pendingOpen: () => boolean,
+): boolean {
+  return !platformReadOnly && hasDraft ? pendingOpen() : false
+}
+
 export interface PdfUniworkSeam {
   uniworkState?(path: string): Promise<PdfUniworkState>
   onUniworkStateChanged?(cb: (path: string) => void): () => void

@@ -3,6 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import {
   PLAIN_PDF_STATE,
+  openBoxesCountAsDirty,
   queryPdfUniworkState,
   usePdfUniworkState,
   type PdfUniworkSeam,
@@ -120,5 +121,24 @@ describe('usePdfUniworkState follows the lock ping', () => {
     act(() => root?.unmount())
     root = null
     expect(unsubscribes).toBe(1)
+  })
+})
+
+describe('EL-1(b) fix10 (EL1B-FE-R2-2): open editor boxes keep counting as unsaved after a lock loss', () => {
+  it('a typed draft still counts when only the UniWork lock made the document read-only', () => {
+    // the caller passes platform view-only / encrypted, never uniwork.readOnly
+    expect(openBoxesCountAsDirty(false, true, () => true)).toBe(true)
+  })
+
+  it('no draft, an empty draft, or a platform-read-only document never counts', () => {
+    expect(openBoxesCountAsDirty(false, false, () => true)).toBe(false)
+    expect(openBoxesCountAsDirty(false, true, () => false)).toBe(false)
+    expect(openBoxesCountAsDirty(true, true, () => true)).toBe(false)
+  })
+
+  it('does not evaluate the pending boxes without a draft', () => {
+    const pending = vi.fn(() => true)
+    openBoxesCountAsDirty(false, false, pending)
+    expect(pending).not.toHaveBeenCalled()
   })
 })
