@@ -550,6 +550,29 @@ export interface UniworkDocEditLock {
   offlineHoldUntil?: string
 }
 
+/** EL-1(b): the desktop's own edit-lock session phase for an open bound document */
+export type UniworkEditLockPhase =
+  | 'acquiring'       // R2 in flight (first open or "Sửa ở đây")
+  | 'held'            // we hold it; saves carry edit_lock_id
+  | 'other'           // someone else holds it: read-only, polled every 30 s (c1)
+  | 'self_elsewhere'  // the same user holds it in another session: read-only, "Sửa ở đây" = move_from_self
+  | 'free'            // was 'other', the poll saw it free: still read-only until "Sửa ở đây"
+  | 'lost'            // 409 edit_lock_lost / TTL deadline / 423 on commit while held: saving stops, edits kept
+  | 'unreachable'     // acquire could not reach the server (Q2 pending: behaviour decided by the Advisor/user)
+export type UniworkEditLockLostReason =
+  | 'released' | 'expired' | 'taken_over' | 'handed_over' | 'access_lost' | 'document_archived' | 'moved_here' | 'unknown'
+export interface UniworkEditLockSessionView {
+  phase: UniworkEditLockPhase
+  /** 'other' | 'self_elsewhere': the holder's display name (null when the server sent none) */
+  holderName: string | null
+  /** 'other' | 'self_elsewhere': ISO time the holder started */
+  since: string | null
+  /** 'lost' only */
+  lostReason?: UniworkEditLockLostReason
+  /** 'lost' with taken_over / handed_over: who took it */
+  byName?: string | null
+}
+
 export interface UniworkDocStatus {
   path: string
   documentId: string
@@ -566,6 +589,8 @@ export interface UniworkDocStatus {
   error?: UniworkDocErrorCode
   /** EL-1(a) (UNI-1645c): populated while `state === 'edit_locked'`; absent otherwise. */
   editLock?: UniworkDocEditLock
+  /** EL-1(b): absent = no lock session (unbound, view access, version ticket, signed out) */
+  lockSession?: UniworkEditLockSessionView
   /** Payload size in bytes when known (e.g. when `error === 'too_large'`). */
   sizeBytes?: number
   /** Server/configured maximum document size in bytes when `error === 'too_large'`. */
@@ -1201,6 +1226,8 @@ export interface HomeApi {
   /** G5-06u: main asks for the queue popover of a path (Ctrl/Cmd+S with a pending save) */
   onUniworkQueuePopover(cb: (request: UniworkQueuePopoverRequest) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
+  /** EL-1(b): "Sửa ở đây" - acquire (move_from_self when self_elsewhere); resolves with the new status */
+  uniworkEditHere(path: string): Promise<UniworkDocStatus | null>
   /** Save a local copy of the bound working copy at `path` to a user-chosen path ("Lưu bản sao về máy"). */
   uniworkSaveLocalCopy?(path: string): Promise<boolean>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
