@@ -1342,6 +1342,15 @@ export class UniworkDocsService {
     void this.releaseAllEditLocks(1500)
   }
 
+  /**
+   * EL-1(b) fix3 B2: MCP closeTabWithoutPrompt / removeTab and a macOS
+   * clean-window close drop bound paths without confirmClose. One hook,
+   * best-effort, capped like quit. Stub until the production body lands.
+   */
+  async notePathsDropped(_paths: string[]): Promise<void> {
+    throw new Error('notePathsDropped: not implemented')
+  }
+
   notePowerResume(): void {
     for (const session of this.editLocks.values()) void session.wake()
   }
