@@ -74,7 +74,7 @@ import { CropDialog, CutoutDialog, cropImagePng } from './ImageDialogs'
 import { cropRect, flipPixels, multiplyAlpha } from './image-bake'
 import type { CropFractions, ImageBakeOp } from './image-bake'
 import { removeBackground, type PixelImage } from './cutout'
-import { clickMarkupTool, navAction, shouldHandleDocumentUndo } from './keyNav'
+import { clickMarkupTool, navAction, resetDocLoadState, shouldHandleDocumentUndo } from './keyNav'
 import { rowOfVisIdx, spreadRows, stepPage } from './spread'
 import {
   captureViewState,
@@ -1190,29 +1190,37 @@ export default function App() {
       setDoc(loaded)
       if (renderedPages) await renderedPages
       if (!saved) {
-        setAiSelection(null)
-        setAskPop(null)
-        setMarkups([])
-        setRedactions([])
-        redactionApplyConfirmedRef.current = false
-        setAnnotDeletes([])
-        setNoteEdits([])
-        setDrawings([])
-        setDrawTool(null)
-        setMarkupTool(null)
-        applyTextEdits(() => [])
-        commitTextInserts([])
-        setPendingTextInsert(null)
-        updateImageEdits(() => [])
-        setTextDraft(null)
-        setStampCfg(null)
-        setFormEdits(new Map())
-        setSignatureTarget(null)
-        rotationsRef.current = new Map()
-        setRotations(rotationsRef.current)
-        setDeleted(new Set())
-        setOrder(null)
-        setMetadata(null)
+        // A load without a saved snapshot clears pending document state but
+        // keeps the armed draw/markup tool: this is also the reload after
+        // applying redactions to the working copy, and disarming 'redact' here
+        // made the next mark create nothing (UNI-1876 redaction regression).
+        resetDocLoadState({
+          aiSelection: () => setAiSelection(null),
+          askPop: () => setAskPop(null),
+          markups: () => setMarkups([]),
+          redactions: () => setRedactions([]),
+          redactionApplyConfirmed: () => {
+            redactionApplyConfirmedRef.current = false
+          },
+          annotDeletes: () => setAnnotDeletes([]),
+          noteEdits: () => setNoteEdits([]),
+          drawings: () => setDrawings([]),
+          textEdits: () => applyTextEdits(() => []),
+          textInserts: () => commitTextInserts([]),
+          pendingTextInsert: () => setPendingTextInsert(null),
+          imageEdits: () => updateImageEdits(() => []),
+          textDraft: () => setTextDraft(null),
+          stampCfg: () => setStampCfg(null),
+          formEdits: () => setFormEdits(new Map()),
+          signatureTarget: () => setSignatureTarget(null),
+          rotations: () => {
+            rotationsRef.current = new Map()
+            setRotations(rotationsRef.current)
+          },
+          deletedPages: () => setDeleted(new Set()),
+          order: () => setOrder(null),
+          metadata: () => setMetadata(null),
+        })
       } else {
         // Post-save reload: subtract exactly what the save wrote. Edits made while the
         // write was in flight stay pending, with page indices remapped through the

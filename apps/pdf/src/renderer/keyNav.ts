@@ -18,6 +18,40 @@ export function clickMarkupTool(
   return { kind: 'arm', nextTool: currentTool === clicked ? null : clicked }
 }
 
+/** Pending edit/UI state cleared when a document loads without a saved
+    snapshot (a fresh open, or the reload after applying redactions to the
+    working copy). Order matches the reset sequence in App.loadDoc. The armed
+    draw/markup tool is deliberately absent: it is viewer state, not document
+    state, and the redaction reload must keep it or the next mark fails. */
+export const DOC_LOAD_RESET_KEYS = [
+  'aiSelection',
+  'askPop',
+  'markups',
+  'redactions',
+  'redactionApplyConfirmed',
+  'annotDeletes',
+  'noteEdits',
+  'drawings',
+  'textEdits',
+  'textInserts',
+  'pendingTextInsert',
+  'imageEdits',
+  'textDraft',
+  'stampCfg',
+  'formEdits',
+  'signatureTarget',
+  'rotations',
+  'deletedPages',
+  'order',
+  'metadata',
+] as const
+
+export type DocLoadReset = Record<(typeof DOC_LOAD_RESET_KEYS)[number], () => void>
+
+export function resetDocLoadState(reset: DocLoadReset): void {
+  for (const key of DOC_LOAD_RESET_KEYS) reset[key]()
+}
+
 /** What a plain (no-modifier) navigation key should do in the viewer */
 export type NavAction =
   | { type: 'scrollBy'; delta: number }
