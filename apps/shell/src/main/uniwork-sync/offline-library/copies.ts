@@ -382,6 +382,16 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
   const formatOfCached = (cached: CachedDocument): UniworkDocFormat | null =>
     formatForMime(cached.manifest.main.mimeType) ?? formatForName(cached.manifest.main.filename)
 
+  /**
+   * G703-R11-1: the open work can outlast the whole remaining lease, so the deadline
+   * captured at the row read is already behind us when the copy is tracked. The default
+   * arming would pick the 30 s close grace for it and leave expired plaintext served;
+   * the short, positive re-check reads the lease at once instead. A future deadline
+   * keeps its own timer.
+   */
+  const armingAtOpen = (deadline: number | null): Arming =>
+    deadline !== null && deadline <= now() ? 'recheck' : 'expiry'
+
   const openOne = async (documentId: string): Promise<OfflineCopyOutcome> => {
     const library = deps.library()
     const scope = deps.scope()
@@ -429,7 +439,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       if (row && rowDeadline !== null) {
         shownBefore.orgId = row.orgId
         shownBefore.leaseUntilMs = rowDeadline
-        scheduleExpiry(documentId)
+        scheduleExpiry(documentId, armingAtOpen(rowDeadline))
       }
       return {
         kind: 'opened',
@@ -474,7 +484,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       timer: null,
       counted: true,
     })
-    scheduleExpiry(documentId)
+    scheduleExpiry(documentId, armingAtOpen(rowDeadline))
     return { kind: 'opened', path, title: shown.title }
   }
 

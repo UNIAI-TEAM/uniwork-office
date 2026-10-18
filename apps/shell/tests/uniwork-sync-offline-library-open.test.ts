@@ -1349,6 +1349,43 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     }
   })
 
+  it('(G703-R11-1) an open whose work outlasts the whole sampled lease re-checks within a second of opening, not after the 30 s grace', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-r111-'))
+    dirs.push(base)
+    const rl = realLease(base)
+    const o = openHarness({ lease: rl.lease })
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    // 10 s of lease are left when the open reads the row
+    rl.advance(24 * LEASE_HOUR - 10_000)
+    o.clock.now += 24 * LEASE_HOUR - 10_000
+    const timers = virtualTimers((ms) => {
+      rl.advance(ms)
+      o.clock.now += ms
+    })
+    try {
+      // 12 s pass in the open work after the row was sampled: the deadline is behind us when the copy is tracked
+      o.capability.during = () => {
+        o.capability.during = null
+        rl.advance(12_000)
+        o.clock.now += 12_000
+      }
+      const outcome = await o.copies.open('doc_1')
+      if (outcome.kind !== 'opened') throw new Error(`expected an open, got ${outcome.kind}`)
+      const path = outcome.path
+      // the short re-check, never the 30 s grace
+      expect(timers.armed).toEqual([750])
+      // no manual sweep: within a second of the open returning the timers lock and remove it
+      await timers.advance(1_000)
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(path)).toBe(false)
+    } finally {
+      timers.restore()
+    }
+  })
+
   it('(G703-R10-2) a renewal that cancelled the removal and lives under a second is locked within a second of its own expiry, not after the 30 s retry', async () => {
     const base = mkdtempSync(join(tmpdir(), 'uw-offline-r102-'))
     dirs.push(base)
