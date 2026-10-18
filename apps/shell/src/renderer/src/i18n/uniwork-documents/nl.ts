@@ -190,4 +190,5 @@ export const nl = {
     'Je hebt geen toestemming meer om dit document te bewerken. Je niet-opgeslagen wijzigingen zijn er nog.',
   uwLockLostGeneric:
     'Je bent niet meer aan het bewerken. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostHeldBy: '{name} bewerkt nu. Je niet-opgeslagen wijzigingen zijn er nog.',
 } satisfies Record<keyof typeof zh, string>

@@ -193,4 +193,6 @@ export const fr = {
   uwLockLostAccessLost:
     'Vous n’avez plus l’autorisation de modifier ce document. Vos changements non enregistrés sont toujours là.',
   uwLockLostGeneric: 'Vous ne modifiez plus. Vos changements non enregistrés sont toujours là.',
+  uwLockLostHeldBy:
+    '{name} modifie actuellement. Vos changements non enregistrés sont toujours là.',
 } satisfies Record<keyof typeof zh, string>

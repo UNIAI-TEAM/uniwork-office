@@ -176,4 +176,5 @@ export const zh = {
   uwLockLostMovedHere: '你正在另一个窗口中编辑此文档。此窗口中未保存的更改仍在这里。',
   uwLockLostAccessLost: '你不再拥有此文档的编辑权限。你未保存的更改仍在这里。',
   uwLockLostGeneric: '你不再拥有编辑权限。你未保存的更改仍在这里。',
+  uwLockLostHeldBy: '{name} 正在编辑。你未保存的更改仍在这里。',
 }

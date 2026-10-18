@@ -184,4 +184,5 @@ export const pl = {
   uwLockLostAccessLost:
     'Nie masz już uprawnienia do edycji tego dokumentu. Twoje niezapisane zmiany wciąż tu są.',
   uwLockLostGeneric: 'Już nie edytujesz. Twoje niezapisane zmiany wciąż tu są.',
+  uwLockLostHeldBy: '{name} teraz edytuje. Twoje niezapisane zmiany wciąż tu są.',
 } satisfies Record<keyof typeof zh, string>

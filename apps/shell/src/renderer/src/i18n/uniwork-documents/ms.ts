@@ -187,4 +187,6 @@ export const ms = {
     'Anda tidak lagi mempunyai kebenaran untuk menyunting dokumen ini. Perubahan anda yang belum disimpan masih di sini.',
   uwLockLostGeneric:
     'Anda tidak lagi menyunting. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostHeldBy:
+    '{name} sedang menyunting sekarang. Perubahan anda yang belum disimpan masih di sini.',
 } satisfies Record<keyof typeof zh, string>

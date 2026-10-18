@@ -188,4 +188,6 @@ export const pt = {
   uwLockLostAccessLost:
     'Já não tem permissão para editar este documento. As suas alterações não guardadas ainda estão aqui.',
   uwLockLostGeneric: 'Já não está a editar. As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostHeldBy:
+    '{name} está a editar agora. As suas alterações não guardadas ainda estão aqui.',
 } satisfies Record<keyof typeof zh, string>

@@ -185,4 +185,5 @@ export const ja = {
     'この文書は別のウィンドウで編集中になりました。このウィンドウの未保存の変更はまだ残っています。',
   uwLockLostAccessLost: 'この文書を編集する権限がありません。未保存の変更はまだ残っています。',
   uwLockLostGeneric: 'あなたはもう編集していません。未保存の変更はまだ残っています。',
+  uwLockLostHeldBy: '{name} が現在編集しています。未保存の変更はまだ残っています。',
 } satisfies Record<keyof typeof zh, string>

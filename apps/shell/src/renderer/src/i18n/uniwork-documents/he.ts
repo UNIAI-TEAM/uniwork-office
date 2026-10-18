@@ -179,4 +179,5 @@ export const he = {
     'אתה עורך כעת את המסמך הזה בחלון אחר. השינויים שלא נשמרו בחלון זה עדיין כאן.',
   uwLockLostAccessLost: 'אין לך עוד הרשאה לערוך את המסמך הזה. השינויים שלך שלא נשמרו עדיין כאן.',
   uwLockLostGeneric: 'אתה כבר לא עורך. השינויים שלך שלא נשמרו עדיין כאן.',
+  uwLockLostHeldBy: '{name} עורך כעת. השינויים שלך שלא נשמרו עדיין כאן.',
 } satisfies Record<keyof typeof zh, string>

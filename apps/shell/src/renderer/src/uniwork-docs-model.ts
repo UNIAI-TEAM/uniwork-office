@@ -283,15 +283,19 @@ export function chipModelOf(
   const limitBytes = ctx.maxBytes ?? status.maxBytes
   const session = status.lockSession
   // EL-1(b): a lost lock session stops saving (the edits stay local); the pill names the
-  // lost state, says who took it, and its one button re-acquires ("Sửa ở đây"). It outranks
-  // remote / lockWhileOpen and every save state: nothing else can happen until the lock
-  // is settled.
+  // lost state (or the holder via uwChipEditLocked when lost with byName and no named
+  // reason — the commit-423 path, EL1B-W3-2), says who took/holds it, and its one button
+  // re-acquires ("Sửa ở đây"). It outranks remote / lockWhileOpen and every save state:
+  // nothing else can happen until the lock is settled.
   if (session?.phase === 'lost') {
+    const reasonKey = lostReasonKeyOf(session.lostReason)
+    const byName = session.byName?.trim() ? session.byName : null
+    const heldBy = reasonKey === 'uwLockLostGeneric' && byName !== null
     return {
       tone: 'warn',
-      labelKey: 'uwLockLostTitle',
+      labelKey: heldBy ? 'uwChipEditLocked' : 'uwLockLostTitle',
       holderName: session.byName ?? null,
-      tipKey: lostReasonKeyOf(session.lostReason),
+      tipKey: heldBy ? 'uwLockLostHeldBy' : reasonKey,
       action: { kind: 'edit-here', labelKey: 'uwLockEditHere' },
     }
   }
@@ -898,19 +902,24 @@ export function lockBannerModelOf(
         editHere: true,
         busy: true,
       }
-    case 'lost':
+    case 'lost': {
+      const reasonKey = lostReasonKeyOf(session.lostReason)
+      const byName = session.byName?.trim() ? session.byName : null
+      const heldBy = reasonKey === 'uwLockLostGeneric' && byName !== null
       return {
         phase: 'lost',
         tone: 'warn',
         titleKey: 'uwLockLostTitle',
-        messageKey: lostReasonKeyOf(session.lostReason),
-        params:
-          session.lostReason === 'taken_over' || session.lostReason === 'handed_over'
-            ? { name: session.byName?.trim() ? session.byName : t('uwEditLockSomeone') }
+        messageKey: heldBy ? 'uwLockLostHeldBy' : reasonKey,
+        params: heldBy
+          ? { name: byName }
+          : session.lostReason === 'taken_over' || session.lostReason === 'handed_over'
+            ? { name: byName ?? t('uwEditLockSomeone') }
             : {},
         editHere: true,
         busy: false,
       }
+    }
     // 'held' / 'unreachable' (and anything main adds later): nothing new is rendered —
     // 'unreachable' is the user-decided interim until EL-2 (the document stays editable
     // and the existing offline / queued pill says enough).

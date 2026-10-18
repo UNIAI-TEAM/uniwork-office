@@ -182,4 +182,5 @@ export const hi = {
   uwLockLostAccessLost:
     'आपके पास अब इस दस्तावेज़ को संपादित करने की अनुमति नहीं है। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
   uwLockLostGeneric: 'आप अब संपादित नहीं कर रहे। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
+  uwLockLostHeldBy: '{name} अभी संपादित कर रहे हैं। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
 } satisfies Record<keyof typeof zh, string>

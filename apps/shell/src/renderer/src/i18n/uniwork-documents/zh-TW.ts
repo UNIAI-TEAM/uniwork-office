@@ -177,4 +177,5 @@ export const zhTW = {
   uwLockLostMovedHere: '您正在另一個視窗中編輯此文件。此視窗中未儲存的變更仍在這裡。',
   uwLockLostAccessLost: '您不再擁有此文件的編輯權限。您未儲存的變更仍在這裡。',
   uwLockLostGeneric: '您不再擁有編輯權限。您未儲存的變更仍在這裡。',
+  uwLockLostHeldBy: '{name} 正在編輯。您未儲存的變更仍在這裡。',
 } satisfies Record<keyof typeof zh, string>

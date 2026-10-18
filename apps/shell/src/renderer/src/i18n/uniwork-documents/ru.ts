@@ -189,4 +189,5 @@ export const ru = {
   uwLockLostAccessLost:
     'У вас больше нет разрешения редактировать этот документ. Ваши несохранённые изменения всё ещё здесь.',
   uwLockLostGeneric: 'Вы больше не редактируете. Ваши несохранённые изменения всё ещё здесь.',
+  uwLockLostHeldBy: '{name} сейчас редактирует. Ваши несохранённые изменения всё ещё здесь.',
 } satisfies Record<keyof typeof zh, string>
