@@ -523,7 +523,14 @@ function onTick(record: IntentRecordV2, now: number, ctx: QueueContext): Transit
     if (now - Date.parse(record.reconcileSince) >= limits.stuckAfterMs) {
       return { record: enterStuck(record, tickCtx), effects: [] }
     }
-    return { record, effects: [] }
+    // B70: a lost commit answer reconciles - the next poll pass looks the
+    // intent up (once), then the existing jittered backoff spaces the retries
+    // (`in_flight` sets `retryAt`; a `not_committed` requeues and re-sends the
+    // same key). Never a new attempt, never a re-uploaded byte.
+    if (record.retryAt !== undefined && now < Date.parse(record.retryAt)) {
+      return { record, effects: [] }
+    }
+    return { record, effects: [{ kind: 'lookup' }] }
   }
   if (record.state === 'reconciling-stuck') {
     // every recheckMs one lookup, never a new attempt

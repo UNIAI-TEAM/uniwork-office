@@ -100,6 +100,22 @@ function needsRecheck(error: unknown): error is UniworkDocError {
 }
 
 /**
+ * B70: a COMMIT-leg failure whose answer the server never gave. It keeps the
+ * original code and status - `applyFailure` and the trace read the same
+ * verdicts - and exists only so the pipeline can tell a lost commit answer
+ * (reconcile) from the same error on the upload leg (today's `offline`).
+ */
+class CommitAnswerLostError extends UniworkDocError {
+  constructor(reason: UniworkDocError) {
+    super(reason.code, {
+      ...(reason.serverCode === undefined ? {} : { serverCode: reason.serverCode }),
+      ...(reason.status === undefined ? {} : { status: reason.status }),
+      ...(reason.retryAfterMs === undefined ? {} : { retryAfterMs: reason.retryAfterMs }),
+    })
+  }
+}
+
+/**
  * The intent store of the live session, or why it cannot be reached. A locked
  * store refuses the save with `keystore_locked`; a session without one never
  * saves (the intent is what makes a replay safe).
@@ -735,6 +751,13 @@ export class SaveCoordinator {
             intents,
           )
         }
+        // B70: the commit POST may have landed and its answer was lost - the
+        // record reconciles (a lookup with the SAME key decides) instead of
+        // being re-POSTed by the next poll. Upload-leg failures keep today's
+        // `offline`/`queued` mapping: they are provably before the POST.
+        if (error instanceof CommitAnswerLostError) {
+          return await this.reconcileLostCommit(saving, intent, error, intents)
+        }
         return await this.fail(saving, intent, error, intents)
       }
       if (receipt.documentId !== intent.documentId || receipt.checksumSha256 !== intent.checksum) {
@@ -887,6 +910,28 @@ export class SaveCoordinator {
   }
 
   /**
+   * B70: a lost commit answer. The record reconciles through the machine
+   * (`commitFailed` from `committing` → `reconciling`, never `failed`, never
+   * `offline`) and the chip follows it. The commit key is untouched: the poll's
+   * tick performs the ONE lookup that decides. The binding state mirrors what
+   * `queueChipState` maps for `reconciling`, so the chip and the record agree
+   * even before the dispatcher's own publish lands.
+   */
+  private async reconcileLostCommit(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    error: UniworkDocError,
+    intents: IntentStore,
+  ): Promise<BoundDocument> {
+    await this.settleRecord(intents, doc, intent, {
+      type: 'commitFailed',
+      error: error.code,
+      ...(error.retryAfterMs === undefined ? {} : { retryAfterMs: error.retryAfterMs }),
+    })
+    return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+  }
+
+  /**
    * The intent can no longer be replayed or its receipt does not verify: the
    * document's current checksum decides. Equal -> these bytes are the current
    * version (an earlier attempt committed them); 404/410 -> the document is
@@ -964,12 +1009,35 @@ export class SaveCoordinator {
         if (!this.deps.isSignedIn() || !this.deps.ownsBinding(doc)) {
           throw new UniworkDocError('not_signed_in')
         }
-        return await this.deps.client.commit({
-          documentId: intent.documentId,
-          uploadId: upload.uploadId,
-          baseRevision: intent.baseRevision,
-          idempotencyKey: intent.idempotencyKey,
-        })
+        // B70: the commit is about to be POSTed, so the durable record must say
+        // so BEFORE the request leaves - a crash or a lost answer then reads
+        // `committing`, never `queued` (which the next poll would re-POST
+        // blindly). Compare-then-put: a newer intent (N+1) is never clobbered.
+        await this.settleRecord(intents, doc, intent, { type: 'dispatch' })
+        await this.settleRecord(intents, doc, intent, { type: 'uploaded' })
+        await this.settleRecord(intents, doc, intent, { type: 'uploaded' })
+        try {
+          return await this.deps.client.commit({
+            documentId: intent.documentId,
+            uploadId: upload.uploadId,
+            baseRevision: intent.baseRevision,
+            idempotencyKey: intent.idempotencyKey,
+          })
+        } catch (error) {
+          // only the COMMIT leg is tagged, and only for an answer the server
+          // never gave (a network drop or a timeout): the same error before the
+          // POST is provably not-committed and keeps today's `offline`/`queued`
+          // mapping. A coded refusal is a real answer, and an
+          // `idempotency_in_flight` keeps today's bounded retry then `offline`.
+          if (
+            error instanceof UniworkDocError &&
+            (error.code === 'network' || error.code === 'timeout') &&
+            error.serverCode !== 'idempotency_in_flight'
+          ) {
+            throw new CommitAnswerLostError(error)
+          }
+          throw error
+        }
       } catch (error) {
         const inFlight =
           error instanceof UniworkDocError && error.serverCode === 'idempotency_in_flight'
