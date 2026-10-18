@@ -1985,4 +1985,126 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     await flush()
     expect(document.querySelector('.uwf-picker-new svg')).not.toBeNull()
   })
+
+  it('renders each document row "…" button in static flow inside its Thao tác cell, one per row, and opens the menu from a real click on that button while leaving Open-dialog rows untouched (VDH-11)', async () => {
+    const tokensCss = readFileSync(
+      resolve(__dirname, '../../../packages/ui/src/tokens.css'),
+      'utf8',
+    )
+    const homeCss = readFileSync(resolve(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const uwfCss = readFileSync(
+      resolve(__dirname, '../src/renderer/src/uniwork-folders/uniwork-folders.css'),
+      'utf8',
+    )
+    const dhCss = docsHomeCss()
+
+    const style = document.createElement('style')
+    const cleanedHomeCss = homeCss
+      .replace(/@keyframes\s+[\w-]+\s*\{(?:\{[^{}]*\}|[^{}])*\}/g, '')
+      .replace(/@position-try\s+[\w-]+\s*\{[^{}]*\}/g, '')
+    style.textContent = `${tokensCss}\n${cleanedHomeCss}\n${uwfCss}\n${dhCss}`
+    document.head.appendChild(style)
+
+    try {
+      await mountHome()
+
+      const rows = Array.from(host.querySelectorAll<HTMLElement>('.dh-doc-row'))
+      expect(rows).toHaveLength(3)
+
+      for (const row of rows) {
+        const docId = row.getAttribute('data-doc-id')!
+        const cell = row.querySelector<HTMLElement>('.dh-cell-actions')
+        expect(cell).not.toBeNull()
+
+        const rowBtns = row.querySelectorAll<HTMLButtonElement>('.uw-row-menu-btn')
+        const cellBtns = cell!.querySelectorAll<HTMLButtonElement>('.uw-row-menu-btn')
+        expect(rowBtns).toHaveLength(1)
+        expect(cellBtns).toHaveLength(1)
+
+        const btn = cellBtns[0]!
+        expect(btn.getAttribute('data-folder-menu-for')).toBe(docId)
+        const wrap = btn.closest<HTMLElement>('.uw-row-menu')!
+        expect(cell!.contains(wrap)).toBe(true)
+
+        expect(window.getComputedStyle(wrap).position).toBe('static')
+        expect(window.getComputedStyle(btn).position).toBe('static')
+        expect(window.getComputedStyle(btn).transform).toBe('none')
+      }
+
+      // Folder card "…" button is also static inside .dh-folder-actions
+      const folderCardBtns = Array.from(
+        host.querySelectorAll<HTMLButtonElement>(
+          '.dh-folder-card .dh-folder-actions .uw-row-menu-btn',
+        ),
+      )
+      expect(folderCardBtns).toHaveLength(2)
+      for (const btn of folderCardBtns) {
+        const wrap = btn.closest<HTMLElement>('.uw-row-menu')!
+        expect(window.getComputedStyle(wrap).position).toBe('static')
+        expect(window.getComputedStyle(btn).position).toBe('static')
+        expect(window.getComputedStyle(btn).transform).toBe('none')
+      }
+
+      // Real click on the first row's button opens its menu anchored to that button;
+      // clicking the second row's button moves the open menu to the second row
+      const firstBtn = rows[0]!.querySelector<HTMLButtonElement>(
+        '.dh-cell-actions .uw-row-menu-btn',
+      )!
+      const secondBtn = rows[1]!.querySelector<HTMLButtonElement>(
+        '.dh-cell-actions .uw-row-menu-btn',
+      )!
+      expect(firstBtn.getAttribute('aria-expanded')).toBe('false')
+      expect(document.querySelector('.uw-row-menu-list[role="menu"]')).toBeNull()
+
+      await act(async () => {
+        firstBtn.click()
+      })
+      await flush()
+      expect(firstBtn.getAttribute('aria-expanded')).toBe('true')
+      const menu1 = document.querySelector<HTMLElement>('.uw-row-menu-list[role="menu"]')
+      expect(menu1).not.toBeNull()
+      expect(menu1!.getAttribute('id')).toBe(firstBtn.getAttribute('aria-controls'))
+
+      await act(async () => {
+        secondBtn.click()
+      })
+      await flush()
+      expect(firstBtn.getAttribute('aria-expanded')).toBe('false')
+      expect(secondBtn.getAttribute('aria-expanded')).toBe('true')
+      const menu2 = document.querySelector<HTMLElement>('.uw-row-menu-list[role="menu"]')
+      expect(menu2).not.toBeNull()
+      expect(menu2!.getAttribute('id')).toBe(secondBtn.getAttribute('aria-controls'))
+
+      // Open dialog / browser rows (.uwf-contents .uw-pick-item) keep their absolute positioning
+      const pickProbe = document.createElement('div')
+      pickProbe.innerHTML =
+        '<ul class="uw-pick-list uwf-contents"><li class="uw-pick-item"><span class="uw-row-menu uwf-menu"><button type="button" class="uw-pick-info-btn uw-row-menu-btn"></button></span></li></ul>'
+      document.body.appendChild(pickProbe)
+      try {
+        const pickWrap = pickProbe.querySelector<HTMLElement>('.uw-row-menu.uwf-menu')!
+        const pickBtn = pickProbe.querySelector<HTMLElement>('.uw-row-menu-btn')!
+        expect(window.getComputedStyle(pickWrap).position).toBe('absolute')
+        expect(window.getComputedStyle(pickBtn).position).toBe('absolute')
+      } finally {
+        pickProbe.remove()
+      }
+    } finally {
+      style.remove()
+    }
+  })
+
+  it('keeps "Tạo mới" on the first toolbar line at 1280px while preserving the 900px wrap (VDH-12)', () => {
+    const css = docsHomeCss()
+    // .dh-toolbar-spacer must not take minimum flex width or force wrapping;
+    // .dh-search-box and .dh-toolbar-btn fit on one line at 1280px alongside the title and workspace select,
+    // while .dh-toolbar keeps flex-wrap: wrap so narrow viewports (900px) still wrap cleanly
+    expect(cssBlock(css, '.dh-toolbar')).toMatch(/flex-wrap:\s*wrap/)
+    expect(cssBlock(css, '.dh-toolbar-btn')).toMatch(/flex-shrink:\s*0|white-space:\s*nowrap/)
+    const wideMedia =
+      css.match(/@media\s*\(\s*min-width:\s*1101px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(
+      /flex-wrap:\s*nowrap/.test(cssBlock(wideMedia, '.dh-toolbar')) ||
+        /width:\s*2[0-6]\dpx/.test(cssBlock(css, '.dh-search-box')),
+    ).toBe(true)
+  })
 })
