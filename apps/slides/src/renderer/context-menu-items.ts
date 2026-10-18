@@ -520,7 +520,7 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
       disabled: !single,
       sub: [zOrder('back'), zOrder('backward')],
     },
-    ...(node?.type !== 'table'
+    ...(cap('saveAs') && node?.type !== 'table'
       ? [
           {
             label: t('appCtxSaveAsPicture'),

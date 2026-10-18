@@ -33,6 +33,7 @@ import { TIMEOUTS, type FramePort, type PortSession } from '../../docs/bridge/fr
 import {
   FOCUS_TITLE,
   openFrameDialog,
+  type FrameAlertTone,
   type FrameChoice,
   type FrameDialogHandle,
 } from './frame-dialog'
@@ -344,6 +345,31 @@ function next(revision: string | undefined): string | undefined {
   }
 }
 
+function isTooLargeError(err: ProtocolErrorShape | undefined): boolean {
+  if (!err) return false
+  if (err.code === 'too_large' || err.status === 413) return true
+  const sub = err.details?.apiCode ?? err.details?.code
+  return sub === 'file_too_large' || sub === 'document_too_large' || sub === 'payload_too_large'
+}
+
+function maxBytesFromError(
+  err: ProtocolErrorShape | undefined,
+  fallback: number | undefined,
+): number | undefined {
+  const d = err?.details
+  if (d) {
+    if (typeof d.max_bytes === 'number' && d.max_bytes > 0) return d.max_bytes
+    const fields =
+      typeof d.fields === 'object' && d.fields !== null
+        ? (d.fields as Record<string, unknown>)
+        : undefined
+    if (fields && typeof fields.max_bytes === 'number' && fields.max_bytes > 0) {
+      return fields.max_bytes
+    }
+  }
+  return fallback
+}
+
 /** the S5 dialog; resolves once the user has settled the conflict one way or another */
 export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome> {
   const lang: Lang = webLanguage()
@@ -375,9 +401,20 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
   let failure: ConflictOutcome | null = null
   let activeMaxBytes = io.maxBytes
   const sizeBytes = io.sizeBytes ?? io.download?.size
-  function tooLargeWithLimitAlert(limitBytes: number, actualBytes?: number): string {
+  /** the too-large alerts that can also offer the Reload-step download */
+  type TooLargeKey =
+    | 'uwConflictTooLargeWithLimit'
+    | 'uwConflictSaveCopyTooLarge'
+    | 'uwConflictSaveCopyTooLargeWithLimit'
+  /** the same text plus “choose Reload latest to download your version” */
+  type TooLargeDownloadKey = `${TooLargeKey}Download`
+  function tooLargeWithLimitAlert(
+    limitBytes: number,
+    actualBytes?: number,
+    key: WebStringKey = 'uwConflictTooLargeWithLimit',
+  ): string {
     const sz = actualBytes !== undefined && actualBytes > limitBytes ? actualBytes : limitBytes + 1
-    return t('uwConflictTooLargeWithLimit', {
+    return t(key, {
       size: formatSizeMB(sz, lang, { band: 'block', maxBytes: limitBytes }),
       max: formatSizeMB(limitBytes, lang),
     })
@@ -391,7 +428,27 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
     io.download.maxBytes !== undefined &&
     (io.maxBytes === undefined || io.download.maxBytes !== io.maxBytes) &&
     io.download.size > io.download.maxBytes
+  /** the download choice exists only with `io.download` + edit access and is disabled over the cap */
+  const tooLargeDownloadKey: Record<TooLargeKey, TooLargeDownloadKey> = {
+    uwConflictTooLargeWithLimit: 'uwConflictTooLargeWithLimitDownload',
+    uwConflictSaveCopyTooLarge: 'uwConflictSaveCopyTooLargeDownload',
+    uwConflictSaveCopyTooLargeWithLimit: 'uwConflictSaveCopyTooLargeWithLimitDownload',
+  }
+  /**
+   * A too-large alert names a way out that must exist: the base text says only to close the
+   * dialog and reduce the file size; the `…Download` variant additionally names Reload latest,
+   * which is honest only while its download choice can run (the same gate as `reloadStep`,
+   * evaluated now that `tooLarge` is final for the path that sets the alert)
+   */
+  function tooLargeAlert(key: TooLargeKey, limitBytes?: number, actualBytes?: number): string {
+    const chosen = io.download && io.canEdit() && !tooLarge ? tooLargeDownloadKey[key] : key
+    return chosen === 'uwConflictSaveCopyTooLarge' ||
+      chosen === 'uwConflictSaveCopyTooLargeDownload'
+      ? t(chosen)
+      : tooLargeWithLimitAlert(limitBytes ?? 0, actualBytes, chosen)
+  }
   let alert = ''
+  let alertTone: FrameAlertTone = 'error'
   let focus: Id | typeof FOCUS_TITLE = 'cancel'
   /** step 1 is the one on screen: the only step whose Reload / Overwrite depend on the network */
   let onStep1 = false
@@ -505,9 +562,11 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       // Reload latest is the primary, yet a stray Enter must not discard the edits
       focusId: focus === FOCUS_TITLE || choices.some((c) => c.id === focus) ? focus : 'cancel',
       alert,
+      alertTone,
     })
     if (focus === 'diff') diffEl?.focus({ preventScroll: true })
     alert = ''
+    alertTone = 'error'
     return shown.finally(() => {
       onStep1 = false
     })
@@ -679,7 +738,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
 
       if (choice === 'save-copy') {
         if (sizeBytes !== undefined && activeMaxBytes !== undefined && sizeBytes > activeMaxBytes) {
-          alert = tooLargeWithLimitAlert(activeMaxBytes, sizeBytes)
+          alert = tooLargeAlert('uwConflictSaveCopyTooLargeWithLimit', activeMaxBytes, sizeBytes)
           focus = 'save-copy'
           continue
         }
@@ -698,19 +757,17 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
           if (res.ok) {
             // stay in the dialog: step 1 again, the Done line in its alert, nothing else changed
             alert = format(t('uwConflictSaveCopyDone'), { title: res.title })
+            alertTone = 'success'
             break
           }
-          if (res.error?.code === 'too_large') {
-            const errMax =
-              typeof res.error.details?.max_bytes === 'number' && res.error.details.max_bytes > 0
-                ? res.error.details.max_bytes
-                : activeMaxBytes
+          if (isTooLargeError(res.error)) {
+            const errMax = maxBytesFromError(res.error, activeMaxBytes)
             if (errMax !== undefined) {
               activeMaxBytes = errMax
-              alert = tooLargeWithLimitAlert(errMax, sizeBytes)
+              alert = tooLargeAlert('uwConflictSaveCopyTooLargeWithLimit', errMax, sizeBytes)
             } else {
               tooLarge = true
-              alert = t('uwConflictTooLarge')
+              alert = tooLargeAlert('uwConflictSaveCopyTooLarge')
             }
             focus = 'save-copy'
             break
@@ -722,7 +779,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
 
       if (choice === 'overwrite') {
         if (sizeBytes !== undefined && activeMaxBytes !== undefined && sizeBytes > activeMaxBytes) {
-          alert = tooLargeWithLimitAlert(activeMaxBytes, sizeBytes)
+          alert = tooLargeAlert('uwConflictTooLargeWithLimit', activeMaxBytes, sizeBytes)
           focus = 'overwrite'
           continue
         }
@@ -760,14 +817,11 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
           alert = t('uwConflictSessionWeb')
           continue
         }
-        if (code === 'too_large') {
-          const errMax =
-            typeof res.error.details?.max_bytes === 'number' && res.error.details.max_bytes > 0
-              ? res.error.details.max_bytes
-              : activeMaxBytes
+        if (isTooLargeError(res.error)) {
+          const errMax = maxBytesFromError(res.error, activeMaxBytes)
           if (errMax !== undefined) {
             activeMaxBytes = errMax
-            alert = tooLargeWithLimitAlert(errMax, sizeBytes)
+            alert = tooLargeAlert('uwConflictTooLargeWithLimit', errMax, sizeBytes)
           } else {
             tooLarge = true
             alert = t('uwConflictTooLarge')

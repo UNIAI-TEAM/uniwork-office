@@ -25,10 +25,12 @@ export function readContext(value: unknown): ServerCommentsContext | null {
   const v = value as Record<string, unknown>
   if (!isId(v.documentId)) return null
   if (v.versionId !== null && v.versionId !== undefined && !isId(v.versionId)) return null
-  const level =
+  const forcedView = v.profile === 'readOnly'
+  const rawLevel =
     v.level === 'view' || v.level === 'comment' || v.level === 'edit' || v.level === 'manage'
       ? v.level
       : undefined
+  const level = forcedView ? ('view' as const) : rawLevel
   return {
     documentId: v.documentId,
     versionId: isId(v.versionId) ? v.versionId : null,

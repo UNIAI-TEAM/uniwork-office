@@ -21,6 +21,7 @@ import {
 import type { FramePort, PortSession } from '../../../docs/bridge/frame-port'
 import {
   commentsAccess,
+  isReadOnlyProfile,
   toProtocolError,
   type CommentsLevel,
   type FrameRequestType,
@@ -144,7 +145,11 @@ export function createFrameCommentsApi(
           documentId: session.documentId,
           // the bridges note every open/save; before the first one, init's open payload
           versionId: version.current().versionId ?? session.open?.file.versionId ?? null,
-          ...(isLevel(session.commentsLevel) ? { level: session.commentsLevel } : {}),
+          ...(isReadOnlyProfile(session)
+            ? { level: 'view' as const }
+            : isLevel(session.commentsLevel)
+              ? { level: session.commentsLevel }
+              : {}),
           ...(typeof userId === 'string' && userId ? { myUserId: userId } : {}),
           frame: true,
         }
@@ -175,7 +180,10 @@ export async function installFrameComments(
   } catch {
     return null
   }
-  if (!commentsAccess({ capabilities: session.capabilities ?? {} }).enabled) return null
+  if (
+    !commentsAccess({ capabilities: session.capabilities ?? {}, profile: session.profile }).enabled
+  )
+    return null
   // the editor serving the anchored comments registers its onReveal owner later: the reveal router
   // waits for it instead of answering revealed:false for an id the editor owns; an editor that ends
   // without a server mode says so through `noEditor` and the wait is released (idempotent)

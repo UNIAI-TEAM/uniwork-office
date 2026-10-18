@@ -896,6 +896,17 @@ function RibbonInner({
         panel.parentElement,
       ]),
   })
+  useEffect(() => {
+    if (dropdown === null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setDropdown(null)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [dropdown])
 
   // leaving the Draw tab always drops back to text editing, so the drawing
   // overlay never swallows clicks while its controls are off-screen
@@ -1907,7 +1918,10 @@ function RibbonInner({
       }, 180)
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPainter(null)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setPainter(null)
+      }
     }
 
     // Word-style paintbrush cursor over the text area while the painter is armed
@@ -2019,25 +2033,29 @@ function RibbonInner({
                     {t('ribbonOpen')} <span className="file-menu-key">Ctrl+O</span>
                   </button>
                 )}
-                <button
-                  disabled={!hasDoc}
-                  onClick={() => {
-                    setDropdown(null)
-                    onSave()
-                  }}
-                >
-                  {t('ribbonSave')} <span className="file-menu-key">Ctrl+S</span>
-                </button>
-                <button
-                  disabled={!hasDoc}
-                  onClick={() => {
-                    setDropdown(null)
-                    onSaveAs()
-                  }}
-                >
-                  {t('ribbonSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
-                </button>
-                {onExportPdf && (
+                {cap('save') && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setDropdown(null)
+                      onSave()
+                    }}
+                  >
+                    {t('ribbonSave')} <span className="file-menu-key">Ctrl+S</span>
+                  </button>
+                )}
+                {cap('saveAs') && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setDropdown(null)
+                      onSaveAs()
+                    }}
+                  >
+                    {t('ribbonSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                  </button>
+                )}
+                {cap('exportPdf') && onExportPdf && (
                   <button
                     disabled={!hasDoc}
                     onClick={() => {
@@ -2048,7 +2066,7 @@ function RibbonInner({
                     {t('appFileExportPdf')}
                   </button>
                 )}
-                {onPrint && (
+                {cap('print') && onPrint && (
                   <button
                     disabled={!hasDoc}
                     onClick={() => {

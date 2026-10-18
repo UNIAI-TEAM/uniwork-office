@@ -306,6 +306,19 @@ export interface DesktopCapabilities {
   /** web only (A7): the "Open in app" action of the "use the app" messages; granted by the host while
    *  its own launch action is available */
   desktopOpen?: boolean
+  /** File > Save / Ctrl+S / QAT Save (web: only when the host grants `save` and not in `readOnly` profile) */
+  save?: boolean
+  /** File > Save As / Ctrl+Shift+S (web: only when the host grants `saveAs` and not in `readOnly` profile) */
+  saveAs?: boolean
+  /** File > Print / Ctrl+P (web: only when the host grants `print`) */
+  print?: boolean
+  /** File > Export as PDF (web: only when the host grants `exportPdf`) */
+  exportPdf?: boolean
+  /** File > Export as HTML (web: only when the host grants `exportHtml` and not in `readOnly` profile) */
+  exportHtml?: boolean
+  /** web only: the host set the `readOnly` profile; hides the document's own comments panel (a view-only
+   *  user without the profile keeps it) */
+  readOnlyProfile?: boolean
 }
 
 /**

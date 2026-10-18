@@ -5421,6 +5421,7 @@ function wireProtectedInteractionMode(
   }
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Escape' || !dom.classList.contains('doc-content-editing')) return
+    event.preventDefault()
     setEditing(false)
     selectObject()
     dom.focus()

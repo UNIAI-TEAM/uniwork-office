@@ -4,6 +4,7 @@
  * notes together like Excel, and Delete falls back to the note at the
  * selection when the cell has no thread.
  */
+import { isViewOnly } from './capabilities'
 import { t } from './i18n/locale'
 import type { RibbonCommandContext } from './ribbon-actions'
 import { serverComments } from './server-comments/SheetsServerComments'
@@ -46,6 +47,23 @@ export function handleThreadedCommentCommand(
         return
       case 'comment-reply':
       case 'comment-resolve':
+      case 'notes-convert':
+        threadPane.show()
+        return
+      default:
+        break
+    }
+  }
+
+  if (isViewOnly()) {
+    switch (command) {
+      case 'comment-new':
+      case 'comment-reply':
+        if (thread) threadPane.openAt(sheetId, row, column, false)
+        else threadPane.show()
+        return
+      case 'comment-resolve':
+      case 'comment-delete':
       case 'notes-convert':
         threadPane.show()
         return

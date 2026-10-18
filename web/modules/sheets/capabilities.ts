@@ -43,6 +43,9 @@ export function sheetsWebCapabilities(
     // granted by the host on `init` (see sheetsHostGrants)
     save: false,
     saveAs: false,
+    print: false,
+    exportPdf: false,
+    exportHtml: false,
     // browser download
     exportCsv: true,
     // the engine (GO-D3 = C, CONTRACT C11)
@@ -60,7 +63,17 @@ export function sheetsHostGrants(
   granted: Capabilities | undefined,
 ): Pick<
   SheetsCapabilities,
-  'open' | 'recents' | 'save' | 'saveAs' | 'ai' | 'webSearch' | 'imageSearch' | 'imageGeneration'
+  | 'open'
+  | 'recents'
+  | 'save'
+  | 'saveAs'
+  | 'print'
+  | 'exportPdf'
+  | 'exportHtml'
+  | 'ai'
+  | 'webSearch'
+  | 'imageSearch'
+  | 'imageGeneration'
 > & { aiCredentials: boolean; uniworkAi: boolean } {
   const ai = aiHostGrants(granted)
   return {
@@ -77,5 +90,8 @@ export function sheetsHostGrants(
     recents: granted?.recents === true,
     save: granted?.save === true,
     saveAs: granted?.saveAs === true,
+    print: granted?.print === true,
+    exportPdf: granted?.exportPdf === true,
+    exportHtml: granted?.exportHtml === true,
   }
 }

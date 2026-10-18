@@ -59,6 +59,7 @@ import type {
   PdfExportResult,
 } from '../../../apps/docs/src/shared/ipc'
 import {
+  isReadOnlyProfile,
   toProtocolError,
   type Capabilities,
   type FileMeta,
@@ -203,16 +204,32 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   let current: string | null = null
   /** the host's effective grants from `init` (undefined until the handshake, and in unit-test sessions) */
   let grants: Capabilities | undefined
+  /** `init.profile === 'readOnly'`: forces view-only regardless of capabilities (UNI-1876) */
+  let readOnlyProfile = false
   /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
   const downloadCap = bridgeDownloadCap(port)
 
   /**
-   * View-only (protocol README "Read-only documents"): the host withheld the `save` grant, or the
-   * file is not writable. Without a grants object (unit-test sessions) nothing is withheld.
+   * View-only (protocol README "Read-only documents"): the host set `profile: 'readOnly'`, withheld
+   * the `save` grant, or marked the file `writable: false`. Without a grants object (unit-test
+   * sessions) nothing is withheld unless `readOnlyProfile` is set.
    */
   function isViewOnly(fileId?: string | null): boolean {
+    if (readOnlyProfile) return true
     if (grants !== undefined && grants.save !== true) return true
     return fileId ? files.get(fileId)?.writable === false : false
+  }
+
+  function canSaveAs(): boolean {
+    return !readOnlyProfile && (grants === undefined || grants.saveAs === true)
+  }
+
+  function canExportPdf(): boolean {
+    return grants === undefined || grants.exportPdf === true
+  }
+
+  function canExportHtml(): boolean {
+    return !readOnlyProfile && (grants === undefined || grants.exportHtml === true)
   }
   /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below, once the open plumbing exists */
   let remote: RemoteVersion | undefined = undefined
@@ -370,6 +387,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     .whenInitialized()
     .then((s) => {
       grants = s.capabilities
+      readOnlyProfile = isReadOnlyProfile(s)
       initDocumentId = s.documentId
       return s.open ? toOpenResult(s.open) : openById(s.documentId)
     })
@@ -429,6 +447,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     if (fatal) return { ok: false, error: fatal }
     const locked = lockedSave()
     if (locked) return locked
+    if (!canSaveAs()) return failure('unsupported', READ_ONLY)
     if (hostSaveAs) return failure('busy', 'a save-as is already running')
     return new Promise<SaveResult>((resolve) => {
       // bounded wait for the editor to reach saveDocxAs (it serializes the document first);
@@ -611,6 +630,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     pageHeightTwips: number,
     scale?: number,
   ): Promise<PdfExportResult> {
+    if (!canExportPdf()) return { ok: false, error: 'unsupported' }
     const fileId = current
     const data = !fileId || session.isDirty() ? await liveDocBytes() : null
     if (!fileId && !data) return printViaBrowser()
@@ -820,10 +840,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         pending?.settle(lock)
         return { ok: false, error: lock.error.message }
       }
-      // "save a copy" of a document the user cannot overwrite is its own grant (`saveAs`)
-      if (isViewOnly(idFromPath(sourcePath)) && grants?.saveAs !== true) {
-        pending?.settle(failure('unsupported', READ_ONLY))
-        return { ok: false, error: READ_ONLY }
+      // "save a copy" is its own grant (`saveAs`) regardless of whether `save` is granted
+      if (!canSaveAs()) {
+        const errText = isViewOnly(idFromPath(sourcePath)) ? READ_ONLY : 'unsupported'
+        pending?.settle(failure('unsupported', errText))
+        return { ok: false, error: errText }
       }
       const gate = await sizeGate.checkBeforeSave(data)
       if (!gate.allowed) {
@@ -867,6 +888,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       const lock = lockedSave()
       if (lock && !lock.ok) return { ok: false, error: lock.error.message }
+      if (isViewOnly() && !canSaveAs()) {
+        if (hostSave) hostSave.error = { code: 'unsupported', message: READ_ONLY }
+        return { ok: false, error: READ_ONLY }
+      }
       const gate = await sizeGate.checkBeforeSave(data)
       if (!gate.allowed) {
         if (hostSave) hostSave.error = gate.error
@@ -910,6 +935,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     },
 
     async exportHtml(defaultName: string, html: string, _outPath?: string) {
+      if (!canExportHtml()) return { ok: false, error: 'unsupported' }
       if (typeof html !== 'string' || !html) return { ok: false, error: 'empty document' }
       const name = withExt(defaultName, '.html')
       downloadBlob(name, new Blob([html], { type: 'text/html;charset=utf-8' }))
@@ -931,6 +957,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     },
 
     async saveMergedPdf(defaultName: string, base64Parts: string[], _outPath?: string) {
+      if (!canExportPdf()) return { ok: false, error: 'unsupported' }
       if (base64Parts.every((p) => p === WEB_PRINT_PART)) return exportCurrentPdf(defaultName, 0, 0)
       return { ok: false, error: 'merging real PDF parts is not supported on web' }
     },

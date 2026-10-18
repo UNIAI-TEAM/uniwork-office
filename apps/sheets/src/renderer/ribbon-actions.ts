@@ -17,6 +17,7 @@ import { columnLabel, formatAddress } from '@genoffice/xlsx-gateway/domain/cell-
 import type { WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { ApplyOutcome } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { SET_ROW_IS_AUTO_HEIGHT_COMMAND } from './autofit-multi-row'
+import { cap } from './capabilities'
 import { CELL_HIDDEN_KEY, CELL_LOCKED_KEY, effectiveSheetProtection } from './sheet-protection'
 import { fullColumnSpans, fullRowSpans } from './autofit-selection'
 import { applyFormatPainterClick } from './format-painter'
@@ -1299,7 +1300,7 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
     return
   }
   if (command === 'export-pdf') {
-    void ctx.handleExportPdf()
+    if (cap('exportPdf')) void ctx.handleExportPdf()
     return
   }
   if (command.startsWith('row-height:') || command.startsWith('col-width:')) {

@@ -37,11 +37,13 @@ import {
   type ApiMode,
   type ApiOpenResult,
   type Capabilities,
+  type CloseRequestedReason,
   type CommentsChangedPayload,
   type CommentsLevel,
   type DocBlockedPayload,
   type DocumentSizeLimits,
   type FileMeta,
+  type FrameProfile,
   type FrameRequestType,
   type FrameRequests,
   type HostEvents,
@@ -116,6 +118,8 @@ export interface FrameSession {
   commentsLevel?: CommentsLevel
   /** active document size limits (SIZE-F1): open.limits ?? init.limits ?? DEFAULT_DOCUMENT_LIMITS */
   limits: DocumentSizeLimits
+  /** UI profile from `init.profile` (UNI-1876), if the host sent one */
+  profile?: FrameProfile
 }
 
 type HostRequestHandler<K extends keyof HostRequests> = (
@@ -195,6 +199,11 @@ export interface DocsFrameClient {
   reportOpenRefused(payload: OpenRefusedPayload): void
   /** passive main-thread lag detector tripped (additive, UNI-1865 §4.1; once per documentId) */
   reportLagDetected(payload: LagDetectedPayload): void
+  /**
+   * sent when Esc is pressed in the frame and no frame-local UI consumed it (additive, UNI-1876);
+   * the host decides what to close.
+   */
+  reportCloseRequested(reason: CloseRequestedReason): void
   dispose(): void
 }
 
@@ -320,6 +329,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     else if (hasInitLimits || p.open?.limits !== undefined) next.downloadMaxBytes = limits.max_bytes
     // an unknown (future) or null level is treated as missing: the fallback rules apply
     if (isCommentsLevel(p.commentsLevel)) next.commentsLevel = p.commentsLevel
+    if (p.profile === 'readOnly') next.profile = p.profile
     // a repeated init (host re-handshake) updates the object callers already hold
     if (session) {
       delete session.open
@@ -327,6 +337,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       delete session.recovery
       delete session.downloadMaxBytes
       delete session.commentsLevel
+      delete session.profile
       Object.assign(session, next)
     } else session = next
     resolveInit(session)
@@ -592,6 +603,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     reportSaveBlocked: (payload) => guarded(() => ep.emit('save_blocked', { ...payload })),
     reportOpenRefused: (payload) => guarded(() => ep.emit('open_refused', payload)),
     reportLagDetected: (payload) => guarded(() => ep.emit('lag_detected', { ...payload })),
+    reportCloseRequested: (reason) => guarded(() => ep.emit('close_requested', { reason })),
     dispose() {
       stopReady()
       token = null

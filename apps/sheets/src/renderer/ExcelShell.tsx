@@ -111,7 +111,7 @@ import { HeaderFooterDialog, type HeaderFooterResult } from './HeaderFooterDialo
 import type { PrintPreviewHost } from './page-layout-actions'
 import { PrintDialog } from './PrintDialog'
 import type { HeaderFooterParts } from './edit-journal'
-import { cap, platform } from './capabilities'
+import { cap, isViewOnly, platform } from './capabilities'
 import { isNarrowViewport } from './narrow-layout'
 import { useModalDialog } from './modal-dialog'
 import type { SelectedTableRibbon } from './table-design-actions'
@@ -125,6 +125,7 @@ import { ZoomDialog } from './ZoomDialog'
 // No File tab: file commands live in the macOS
 // application menu (File → Open/Save/Save As) and the toolbar icons.
 const ribbonTabs = ['Home', 'Insert', 'Page Layout', 'Formulas', 'Data', 'Review', 'View'] as const
+const VIEW_ONLY_TABS: readonly RibbonTab[] = ['View']
 
 /// 'Chart Design' is contextual: it exists only while a chart is selected,
 /// and appears without stealing the active tab.
@@ -565,7 +566,9 @@ export function ExcelShell({
   onGetFillSeriesContext,
 }: ExcelShellProps): React.JSX.Element {
   const { t } = useI18n()
-  const [activeTab, setActiveTab] = useState<RibbonTab>('Home')
+  const viewOnly = isViewOnly() || aiViewOnly
+  const [activeTab, setActiveTab] = useState<RibbonTab>(() => (viewOnly ? 'View' : 'Home'))
+  const effectiveTab: RibbonTab = viewOnly ? 'View' : activeTab
   const collapse = useRibbonCollapse('ai-sheets-ribbon-collapsed', {
     collapse: t('appRibbonCollapse'),
     expand: t('appRibbonExpand'),
@@ -623,6 +626,7 @@ export function ExcelShell({
     }
     const timer = window.setTimeout(() => onSend(aiPreset.text), 120)
     return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiPreset?.nonce])
   // the "show the AI sidebar" setting off hides the copilot rail (soft hide):
   // an explicit AI action (ribbon run, toggle) still opens the panel, and
@@ -676,6 +680,7 @@ export function ExcelShell({
   const insertFunctionOpen = insertFunction !== null
   const liveFunctions = useMemo(
     () => (insertFunctionOpen ? onListFunctions() : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [insertFunctionOpen],
   )
   const insertFunctionOpenRef = useRef(insertFunctionOpen)
@@ -785,6 +790,18 @@ export function ExcelShell({
     // dialogs, Univer's find/replace and formula bar) never trigger these.
     const onKeyDown = (event: KeyboardEvent): void => {
       if (openingWorkbookRef.current) return
+      if (
+        event.key === 'Escape' &&
+        !event.defaultPrevented &&
+        !isModalOpen() &&
+        !document.querySelector(
+          '[role="dialog"], [role="menu"], [aria-modal="true"], [data-esc-local]',
+        ) &&
+        onIsCellEditingRef.current()
+      ) {
+        event.preventDefault()
+        return
+      }
       const action = resolveGlobalShortcut(event, {
         isMac: IS_MAC,
         modalOpen: isModalOpen(),
@@ -903,13 +920,15 @@ export function ExcelShell({
       document.querySelector('.goto-in-bar')?.remove()
     }
   }, [])
-  const visibleTabs: readonly RibbonTab[] = [
-    ...ribbonTabs,
-    ...(selectedChart ? (['Chart Design'] as const) : []),
-    ...(selectedTable ? (['Table Design'] as const) : []),
-    ...(selectedVisualKind === 'shape' ? (['Shape Format'] as const) : []),
-    ...(selectedVisualKind === 'image' ? (['Picture Format'] as const) : []),
-  ]
+  const visibleTabs: readonly RibbonTab[] = viewOnly
+    ? VIEW_ONLY_TABS
+    : [
+        ...ribbonTabs,
+        ...(selectedChart ? (['Chart Design'] as const) : []),
+        ...(selectedTable ? (['Table Design'] as const) : []),
+        ...(selectedVisualKind === 'shape' ? (['Shape Format'] as const) : []),
+        ...(selectedVisualKind === 'image' ? (['Picture Format'] as const) : []),
+      ]
   const saveAsTitle = `${t('appSaveAs')} (${platformShortcuts('⇧⌘S')})`
 
   return (
@@ -984,14 +1003,14 @@ export function ExcelShell({
             </label>
           )}
           <span className="qa-sep" aria-hidden="true" />
-          <RibbonTabScroller activeKey={activeTab}>
+          <RibbonTabScroller activeKey={effectiveTab}>
             {visibleTabs.map((tab) => (
               <button
-                className={`ribbon-tab ${collapse.tabClass(tab === activeTab)} ${CONTEXTUAL_TABS.includes(tab) ? 'contextual' : ''}`}
-                data-tip={collapse.tabTip(tab === activeTab)}
+                className={`ribbon-tab ${collapse.tabClass(tab === effectiveTab)} ${CONTEXTUAL_TABS.includes(tab) ? 'contextual' : ''}`}
+                data-tip={collapse.tabTip(tab === effectiveTab)}
                 key={tab}
                 onClick={() => {
-                  collapse.onTabPress(tab === activeTab)
+                  collapse.onTabPress(tab === effectiveTab)
                   setActiveTab(tab)
                 }}
               >
@@ -1013,7 +1032,8 @@ export function ExcelShell({
         </nav>
 
         <Ribbon
-          activeTab={activeTab}
+          activeTab={effectiveTab}
+          viewOnly={viewOnly}
           selectionFormat={selectionFormat}
           formatPainterActive={formatPainterActive}
           sheetHasContent={sheetHasContent}
@@ -1619,6 +1639,7 @@ function TableNameInput({
           commit()
           event.currentTarget.blur()
         } else if (event.key === 'Escape') {
+          event.preventDefault()
           cancelledRef.current = true
           setValue(name)
           event.currentTarget.blur()
@@ -1973,6 +1994,7 @@ function LinkDialog({
 
 function Ribbon({
   activeTab,
+  viewOnly,
   selectionFormat,
   formatPainterActive,
   sheetHasContent,
@@ -1996,6 +2018,9 @@ function Ribbon({
   onIsSelectionInPivot,
 }: {
   readonly activeTab: RibbonTab
+  /** Read-only profile (withheld save or view-only UniWork doc): the View tab is the
+   *  only tab, so the reading tools that normally live on Home are surfaced there */
+  readonly viewOnly: boolean
   readonly selectionFormat: SelectionFormat | null
   readonly formatPainterActive: boolean
   readonly sheetHasContent: boolean
@@ -3335,6 +3360,23 @@ function Ribbon({
             { value: 'unfreeze', label: t('appUnfreeze') },
           ])}
         </RibbonGroup>
+        {/* view-only shows only this tab, so the Home > Editing Find control moves here
+            (same command and strings, no duplicate of Replace/Go To which would edit) */}
+        {viewOnly && (
+          <RibbonGroup label={t('appGroupEditing')}>
+            <div className="ribbon-rows">
+              <div className="inline-tools">
+                <button
+                  className="labeled"
+                  data-tip={t('appFindTitle')}
+                  onClick={() => onCommand('find')}
+                >
+                  <ToolSymbol symbol="🔍" /> {t('appFind')}
+                </button>
+              </div>
+            </div>
+          </RibbonGroup>
+        )}
       </div>
     )
   }
@@ -4228,7 +4270,10 @@ function useEscapeClose(open: boolean, close: () => void): void {
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') closeRef.current()
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeRef.current()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -4424,6 +4469,7 @@ function EditableMenuSelect({
             if (event.key === 'Enter') {
               event.currentTarget.blur() // blur handler commits
             } else if (event.key === 'Escape') {
+              event.preventDefault()
               setDraft(null)
               event.currentTarget.blur()
             }

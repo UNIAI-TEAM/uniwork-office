@@ -24,7 +24,10 @@ export function RecoveryDialog({
   // explicit.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onChoose(false)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onChoose(false)
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

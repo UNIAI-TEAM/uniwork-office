@@ -340,6 +340,7 @@ export function PdfCommentsPanel(p: PdfCommentsPanelProps) {
     if (!baseRef.current.newThread || !(e.target as HTMLElement).closest('.collab-thread--new'))
       return
     if (!comments.cancelEmptyThread()) return
+    e.preventDefault()
     e.stopPropagation()
     onClose()
     focusOpenerRef.current?.()

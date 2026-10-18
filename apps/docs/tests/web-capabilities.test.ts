@@ -13,7 +13,7 @@ import { EditorContextMenu } from '../src/renderer/components/ContextMenu'
 import { ProtectDialog } from '../src/renderer/components/ProtectDialog'
 import { createDocsSkill } from '../src/renderer/ai/docs-skill'
 import { LocaleProvider, setModuleLang, t } from '../src/renderer/i18n/locale'
-import { cap, resetCapabilitiesForTest } from '../src/renderer/capabilities'
+import { cap, isReadOnlyProfile, resetCapabilitiesForTest } from '../src/renderer/capabilities'
 import type { DesktopCapabilities } from '../src/shared/ipc'
 import { ribbonProps } from './helpers/ribbon-props'
 
@@ -32,6 +32,7 @@ const WEB: DesktopCapabilities = {
   billing: false,
   open: false,
   recents: false,
+  readOnlyProfile: false,
 }
 
 function useCapabilities(capabilities: DesktopCapabilities | undefined): void {
@@ -162,6 +163,47 @@ describe('Ribbon entries', () => {
 
     useCapabilities({ ...WEB, open: true })
     expect(hasOpen(fileMenu())).toBe(true)
+  })
+
+  it('File: Save, Save As, Export PDF and Print follow their own capability flags', () => {
+    const fileMenu = (): string[] => {
+      openTab(t('ribbonTabFile'))
+      return [...container.querySelectorAll('.file-menu button')].map((b) => b.textContent ?? '')
+    }
+    useCapabilities({
+      ...WEB,
+      save: false,
+      saveAs: false,
+      exportPdf: false,
+      print: false,
+    })
+    const labels = fileMenu()
+    expect(labels.some((l) => l.startsWith(t('ribbonSave')))).toBe(false)
+    expect(labels.some((l) => l.startsWith(t('ribbonSaveAs')))).toBe(false)
+    expect(labels.some((l) => l.startsWith(t('appFileExportPdf')))).toBe(false)
+    expect(labels.some((l) => l.startsWith(t('appFilePrint')))).toBe(false)
+  })
+
+  it('dropdown Escape closes the menu and calls preventDefault for the Escape forwarder', () => {
+    useCapabilities(WEB)
+    openTab(t('ribbonTabFile'))
+    expect(container.querySelector('.file-menu')).not.toBeNull()
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    act(() => {
+      window.dispatchEvent(event)
+    })
+    expect(event.defaultPrevented).toBe(true)
+    expect(container.querySelector('.file-menu')).toBeNull()
+  })
+
+  it('isReadOnlyProfile is true only when the bridge marked the readOnly profile (RFW2-3)', () => {
+    useCapabilities(undefined)
+    expect(isReadOnlyProfile()).toBe(false)
+    // a view-only user without the profile (save withheld) keeps the document's own comments
+    useCapabilities({ ...WEB, save: false })
+    expect(isReadOnlyProfile()).toBe(false)
+    useCapabilities({ ...WEB, readOnlyProfile: true })
+    expect(isReadOnlyProfile()).toBe(true)
   })
 
   it('References: the Zotero group stays on the web as a "use the app" entry', () => {

@@ -127,7 +127,8 @@ import { hfFooterLine, hfLayoutResolved, hfPhantomSpec, hfWithPhantom } from './
 import { textColorValue } from './editor/text-color'
 import { textOutlineCssValue } from './editor/text-outline'
 import { AiAskPopover } from './components/AiAskPopover'
-import { cap } from './capabilities'
+import { cap, isReadOnlyProfile } from './capabilities'
+import { installReadModeEscape } from './read-mode-escape'
 import { isNarrowViewport, widthFitZoom } from './narrow-viewport'
 import { EDIT_QUEUE_MAX, selectionForAnchor, type DocsEditQueueItem } from './ai/edit-queue'
 import { addQueueAnchor, clearQueueAnchors, removeQueueAnchors } from './editor/ai-queue-anchors'
@@ -1930,8 +1931,10 @@ export function App() {
     editRestriction === 'comments'
   /** a view-only UniWork document reuses the protection read-only mode */
   const isProtected = docProtected || uniwork.readOnly
-  /** comments restriction: body read-only but adding comments stays allowed */
-  const commentsAllowed = !writeLocked && editRestriction === 'comments'
+  /** comments restriction: body read-only but adding comments stays allowed (or server comments on a view-only copy per D4) */
+  const commentsAllowed = uniwork.readOnly
+    ? serverMode !== null && serverMode.level !== 'view'
+    : !writeLocked && editRestriction === 'comments'
   /** trackedChanges restriction: editing allowed, revision recording forced on */
   const trackChangesForced = !writeLocked && editRestriction === 'trackedChanges'
 
@@ -1948,11 +1951,7 @@ export function App() {
     setEditorEditable(editor, !readMode && !isProtected && !refusedMessage)
     scheduleUiRefresh()
     if (!readMode) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setReadMode(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return installReadModeEscape(() => setReadMode(false))
   }, [editor, readMode, isProtected, refusedMessage, scheduleUiRefresh])
 
   // Track Changes: the recorder plugin reads its toggle from extension storage
@@ -2427,6 +2426,7 @@ export function App() {
 
   /** newDocName: the first-save name the AI ask card showed (a never-saved document only) */
   const save = useCallback((saveAs: boolean, auto = false, newDocName?: string) => {
+    if (!(saveAs ? cap('saveAs') : cap('save'))) return Promise.resolve(false)
     // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
     const state = uniworkStateFor(uniworkRef.current, fileCtxRef.current.doc?.filePath)
     if (!uniworkAllowsSave(state, saveAs, auto)) return Promise.resolve(false)
@@ -2852,16 +2852,19 @@ export function App() {
     setStatus(t('appPgNumFormatSet'))
   }, [pgNumModal, sections, activeSection])
 
-  const exportPdf = useCallback(
-    (outPath?: string) => exportPdfImpl(fileCtxRef.current, outPath),
-    [],
-  )
-  const exportHtml = useCallback(
-    (outPath?: string) => exportHtmlImpl(fileCtxRef.current, outPath),
-    [],
-  )
+  const exportPdf = useCallback((outPath?: string) => {
+    if (!cap('exportPdf')) return Promise.resolve(false)
+    return exportPdfImpl(fileCtxRef.current, outPath)
+  }, [])
+  const exportHtml = useCallback((outPath?: string) => {
+    if (!cap('exportHtml')) return Promise.resolve(false)
+    return exportHtmlImpl(fileCtxRef.current, outPath)
+  }, [])
   const exportImages = useCallback(() => exportImagesImpl(fileCtxRef.current), [])
-  const printDoc = useCallback(() => printDocImpl(fileCtxRef.current), [])
+  const printDoc = useCallback(() => {
+    if (!cap('print')) return Promise.resolve()
+    return printDocImpl(fileCtxRef.current)
+  }, [])
 
   // for real-device verification: trigger export directly via CDP (same as __pageDebug)
   useEffect(() => {
@@ -5453,7 +5456,7 @@ export function App() {
       const canEdit = !!editor?.isEditable && focusInEditor()
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
-        void save(e.shiftKey)
+        if (e.shiftKey ? cap('saveAs') : cap('save')) void save(e.shiftKey)
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
         e.preventDefault()
@@ -5965,7 +5968,7 @@ export function App() {
   const onDocClick = useCallback(
     (e: ReactMouseEvent) => {
       const commentSpan = (e.target as HTMLElement).closest('.doc-comment') as HTMLElement | null
-      if (commentSpan) {
+      if (commentSpan && (!isReadOnlyProfile() || serverMode !== null)) {
         const ids = (commentSpan.dataset.commentIds ?? '').split(' ')
         if (comments.some((c) => !c.done && ids.includes(c.id))) setShowComments(true)
       }
@@ -5982,7 +5985,7 @@ export function App() {
       const line = (e.target as HTMLElement).closest('.doc-toc-line') as HTMLElement | null
       if (line) jumpToAnchor(line.dataset.tocAnchor ?? '', line.dataset.tocTitle ?? '')
     },
-    [comments, openLink, jumpToAnchor],
+    [comments, openLink, jumpToAnchor, serverMode],
   )
 
   /** Editor right-click menu, only inside the document body */
@@ -6998,6 +7001,7 @@ export function App() {
       editor.view.dispatch(tr.setSelection(TextSelection.near($pos, 1)).setMeta(TRACK_IGNORE, true))
     },
     onCommentBalloon: (id) => {
+      if (isReadOnlyProfile() && serverMode === null) return
       setShowComments(true)
       setCommentFocus({ id, nonce: Date.now() })
     },
@@ -7027,16 +7031,18 @@ export function App() {
   const quickActions = useMemo(
     () => (
       <>
-        <button
-          className="qa-btn"
-          data-tip={t('appSaveShortcutTip')}
-          aria-label={t('appSaveShortcutTip')}
-          // a UniWork document saves even when clean (retry after a failed upload)
-          disabled={!hasDoc || uniwork.readOnly || (!hasUnsavedChanges && !uniwork.bound)}
-          onClick={() => void save(false)}
-        >
-          <IconSave size={16} />
-        </button>
+        {cap('save') && (
+          <button
+            className="qa-btn"
+            data-tip={t('appSaveShortcutTip')}
+            aria-label={t('appSaveShortcutTip')}
+            // a UniWork document saves even when clean (retry after a failed upload)
+            disabled={!hasDoc || uniwork.readOnly || (!hasUnsavedChanges && !uniwork.bound)}
+            onClick={() => void save(false)}
+          >
+            <IconSave size={16} />
+          </button>
+        )}
         <button
           className="qa-btn"
           data-tip={t('appUndo')}
@@ -7271,7 +7277,10 @@ export function App() {
         openCommentCount={comments.filter((c) => !c.parentId && c.done !== true).length}
         resolvedCommentCount={comments.filter((c) => !c.parentId && c.done === true).length}
         commentAtCaret={commentThreadAtCaretImpl(reviewCtxRef.current) !== null}
-        canComment={!editor.state.selection.empty || wordRangeAtCaret(editor) !== null}
+        canComment={
+          (serverMode === null || serverMode.level !== 'view') &&
+          (!editor.state.selection.empty || wordRangeAtCaret(editor) !== null)
+        }
         trackChanges={trackChanges}
         spellcheck={spellcheckActive}
         revisionDisplay={revisionDisplay}
@@ -7612,7 +7621,7 @@ export function App() {
               )}
             </div>
             {readMode && (
-              <button className="read-exit" onClick={() => setReadMode(false)}>
+              <button data-esc-local="" className="read-exit" onClick={() => setReadMode(false)}>
                 {t('appExitReadMode')}
               </button>
             )}
@@ -7634,11 +7643,12 @@ export function App() {
                 codec={serverCodec}
               />
             )}
-            {doc && !serverMode && showComments && (
+            {doc && !serverMode && !isReadOnlyProfile() && showComments && (
               <CommentsPanel
                 comments={comments}
                 docNode={editor.state.doc}
                 composing={commentComposing}
+                readOnly={isProtected && !commentsAllowed}
                 onSubmitNew={submitNewComment}
                 onReply={replyToComment}
                 onEdit={editComment}
@@ -7847,6 +7857,7 @@ export function App() {
         <EditorContextMenu
           editor={editor}
           menu={ctxMenu}
+          commentsAllowed={commentsAllowed}
           onClose={() => setCtxMenu(null)}
           onFontDialog={() => setShowFontDialog(true)}
           onParagraphDialog={() => setShowParaDialog(true)}
@@ -8153,7 +8164,7 @@ export function App() {
           className="modal-backdrop"
           onMouseDown={(e) => e.target === e.currentTarget && setPgNumModal(null)}
         >
-          <div className="modal">
+          <div className="modal" role="dialog" aria-modal="true">
             <h2>{t('appPageNumFormatTitle')}</h2>
             <label className="pgnum-row">
               {t('appNumberFormat')}

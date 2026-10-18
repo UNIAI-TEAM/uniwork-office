@@ -42,6 +42,11 @@ import { createPdfWebApi } from './webapi'
 export const PDF_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.freeze({
   ...MODULE_WEB_CAPABILITIES,
   edit: false,
+  save: false,
+  saveAs: false,
+  print: false,
+  exportPdf: false,
+  exportHtml: false,
   insertPages: false,
   pdfTextEdit: true,
   pdfImageEdit: true,
@@ -62,9 +67,15 @@ export const PDF_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.fr
 })
 
 export function pdfGrants(granted: Capabilities | undefined): Record<string, unknown> {
+  const edit = granted?.save === true
   return {
     ...hostGrants(granted),
-    edit: granted?.save === true,
+    edit,
+    save: edit,
+    saveAs: granted?.saveAs === true,
+    print: granted?.print === true,
+    exportPdf: granted?.exportPdf === true,
+    exportHtml: granted?.exportHtml === true,
     insertPages: granted?.filePick === true,
   }
 }
@@ -83,7 +94,7 @@ export const bridge = installModuleBridge({
   // no frame comments yet: the page panel serves Comments + Discussion until the in-frame comments land
   frameComments: false,
   // what this bundle supports; effective = this ∩ the host grant
-  frameCapabilities: { save: true, saveAs: true, print: true, filePick: true },
+  frameCapabilities: { save: true, saveAs: true, print: true, exportPdf: true, filePick: true },
   capabilities: { defaults: PDF_WEB_CAPABILITIES, grants: pdfGrants, on: ['pdfApi'] },
   globals: {
     pdfApi: (ctx) =>

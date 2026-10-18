@@ -34,7 +34,10 @@ export function ColorWell({
       if (!wrapRef.current?.contains(event.target as Node)) setOpen(false)
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setOpen(false)
+      }
     }
     window.addEventListener('pointerdown', onDown, true)
     window.addEventListener('keydown', onKey)

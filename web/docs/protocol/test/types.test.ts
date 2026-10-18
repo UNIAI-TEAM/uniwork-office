@@ -421,3 +421,73 @@ describe('document size limits and events (SIZE-F1, additive)', () => {
     expect(res({ documentId: 'doc-copy-1' }).ok).toBe(false)
   })
 })
+
+import { commentsAccess, isReadOnlyProfile } from '../types'
+
+describe('read-only profile and close_requested event (UNI-1876, additive)', () => {
+  it('tolerates unknown profile values on init like commentsLevel (RFW1-4)', () => {
+    expect(PROTOCOL_VERSION).toBe(1)
+    expect(isInitPayload(init)).toBe(true)
+    expect(isInitPayload({ ...init, profile: undefined })).toBe(true)
+    expect(isInitPayload({ ...init, profile: 'readOnly' })).toBe(true)
+    expect(
+      parseEnvelope(
+        env({ kind: 'request', type: 'init', payload: { ...init, profile: 'readOnly' } }),
+      ).ok,
+    ).toBe(true)
+
+    for (const unknown of ['presenter', 'edit', 'readonly', 'view', '', null, true, false, 1, {}]) {
+      expect(isInitPayload({ ...init, profile: unknown } as unknown)).toBe(true)
+      expect(
+        parseEnvelope(
+          env({ kind: 'request', type: 'init', payload: { ...init, profile: unknown } }),
+        ).ok,
+      ).toBe(true)
+    }
+  })
+
+  it('validates the close_requested frame event payload', () => {
+    const closeEnv = (payload: unknown) =>
+      parseEnvelope(env({ kind: 'event', type: 'close_requested', payload }))
+
+    expect(closeEnv({ reason: 'escape' }).ok).toBe(true)
+    for (const bad of [
+      { reason: 'click' },
+      { reason: 'Escape' },
+      { reason: '' },
+      { reason: null },
+      { reason: 1 },
+      {},
+      null,
+      'escape',
+    ]) {
+      expect(closeEnv(bad)).toMatchObject({ ok: false, reason: 'malformed' })
+    }
+  })
+
+  it('exposes isReadOnlyProfile helper and forces commentsAccess to view only when profile is readOnly (D4)', () => {
+    expect(isReadOnlyProfile({ profile: 'readOnly' })).toBe(true)
+    expect(isReadOnlyProfile({})).toBe(false)
+    expect(isReadOnlyProfile({ profile: undefined })).toBe(false)
+    expect(isReadOnlyProfile({ profile: 'edit' })).toBe(false)
+    expect(isReadOnlyProfile(null)).toBe(false)
+    expect(isReadOnlyProfile(undefined)).toBe(false)
+
+    // D4: save:false alone keeps comments per commentsLevel
+    const commenter = commentsAccess({
+      capabilities: { save: false, comments: true },
+      commentsLevel: 'comment',
+      user: { id: 'u1' },
+    })
+    expect(commenter).toMatchObject({ enabled: true, level: 'comment', canCreate: true })
+
+    // profile:'readOnly' forces server comments to view-only regardless of commentsLevel
+    const viewer = commentsAccess({
+      capabilities: { save: false, comments: true },
+      commentsLevel: 'edit',
+      user: { id: 'u1' },
+      profile: 'readOnly',
+    })
+    expect(viewer).toMatchObject({ enabled: true, level: 'view', canCreate: false })
+  })
+})

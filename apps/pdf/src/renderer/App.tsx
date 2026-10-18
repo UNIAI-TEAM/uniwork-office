@@ -74,7 +74,7 @@ import { CropDialog, CutoutDialog, cropImagePng } from './ImageDialogs'
 import { cropRect, flipPixels, multiplyAlpha } from './image-bake'
 import type { CropFractions, ImageBakeOp } from './image-bake'
 import { removeBackground, type PixelImage } from './cutout'
-import { navAction, shouldHandleDocumentUndo } from './keyNav'
+import { clickMarkupTool, navAction, resetDocLoadState, shouldHandleDocumentUndo } from './keyNav'
 import { rowOfVisIdx, spreadRows, stepPage } from './spread'
 import {
   captureViewState,
@@ -466,6 +466,7 @@ export default function App() {
   const drawingsRef = useRef(drawings)
   drawingsRef.current = drawings
   const [drawTool, setDrawTool] = useState<DrawTool | null>(null)
+  const [markupTool, setMarkupTool] = useState<MarkupType | null>(null)
   const [redactions, setRedactions] = useState<LocalRedaction[]>([])
   const redactionApplyConfirmedRef = useRef(false)
   const redactionRequestInFlightRef = useRef(false)
@@ -1189,27 +1190,37 @@ export default function App() {
       setDoc(loaded)
       if (renderedPages) await renderedPages
       if (!saved) {
-        setAiSelection(null)
-        setAskPop(null)
-        setMarkups([])
-        setRedactions([])
-        redactionApplyConfirmedRef.current = false
-        setAnnotDeletes([])
-        setNoteEdits([])
-        setDrawings([])
-        applyTextEdits(() => [])
-        commitTextInserts([])
-        setPendingTextInsert(null)
-        updateImageEdits(() => [])
-        setTextDraft(null)
-        setStampCfg(null)
-        setFormEdits(new Map())
-        setSignatureTarget(null)
-        rotationsRef.current = new Map()
-        setRotations(rotationsRef.current)
-        setDeleted(new Set())
-        setOrder(null)
-        setMetadata(null)
+        // A load without a saved snapshot clears pending document state but
+        // keeps the armed draw/markup tool: this is also the reload after
+        // applying redactions to the working copy, and disarming 'redact' here
+        // made the next mark create nothing (UNI-1876 redaction regression).
+        resetDocLoadState({
+          aiSelection: () => setAiSelection(null),
+          askPop: () => setAskPop(null),
+          markups: () => setMarkups([]),
+          redactions: () => setRedactions([]),
+          redactionApplyConfirmed: () => {
+            redactionApplyConfirmedRef.current = false
+          },
+          annotDeletes: () => setAnnotDeletes([]),
+          noteEdits: () => setNoteEdits([]),
+          drawings: () => setDrawings([]),
+          textEdits: () => applyTextEdits(() => []),
+          textInserts: () => commitTextInserts([]),
+          pendingTextInsert: () => setPendingTextInsert(null),
+          imageEdits: () => updateImageEdits(() => []),
+          textDraft: () => setTextDraft(null),
+          stampCfg: () => setStampCfg(null),
+          formEdits: () => setFormEdits(new Map()),
+          signatureTarget: () => setSignatureTarget(null),
+          rotations: () => {
+            rotationsRef.current = new Map()
+            setRotations(rotationsRef.current)
+          },
+          deletedPages: () => setDeleted(new Set()),
+          order: () => setOrder(null),
+          metadata: () => setMetadata(null),
+        })
       } else {
         // Post-save reload: subtract exactly what the save wrote. Edits made while the
         // write was in flight stay pending, with page indices remapped through the
@@ -1476,6 +1487,9 @@ export default function App() {
   /** View-only UniWork documents reuse the same read-only mode (edit tools and Save off) */
   const readOnly = viewOnly || encryptedReadOnly || uniwork.readOnly
 
+  useEffect(() => {
+    if (readOnly && markupTool) setMarkupTool(null)
+  }, [readOnly, markupTool])
   useEffect(() => {
     if (
       activeFormWidgetId &&
@@ -2338,7 +2352,6 @@ export default function App() {
     // The line affordance is just as stale after a reload (it hangs at the last
     // pre-save pointer position until the next mousemove)
     clearLineHover()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc])
 
   /** Cluster paragraph boxes for pages scrolled into view while edit-text mode is on.
@@ -2372,6 +2385,7 @@ export default function App() {
     return () => {
       stale = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editTextMode, readOnly, doc, visibleRows, rows, pageBlocks, getSearchIndex])
 
   /** Saved markup/note annotations are keyed to the loaded doc; drop them on save-reload */
@@ -2533,6 +2547,12 @@ export default function App() {
       }
       // Read-only documents still get the bar for its Ask-AI entry (Q&A works);
       // the markup buttons themselves are hidden in that state
+      if (markupTool && !readOnly) {
+        applyMarkup(markupTool)
+        window.getSelection()?.removeAllRanges()
+        setSelPopup(null)
+        return
+      }
       setSelPopup({
         x: Math.min(Math.max(box.left + box.width / 2, 70), window.innerWidth - 70),
         y: box.top >= 52 ? box.top - 44 : Math.min(box.bottom + 8, window.innerHeight - 44),
@@ -2605,6 +2625,29 @@ export default function App() {
             ],
       ),
     )
+  }
+
+  const onRibbonMarkupClick = (type: MarkupType) => {
+    if (readOnly) return
+    const selQuads = selectionQuads()
+    const outcome = clickMarkupTool(markupTool, type, selQuads !== null)
+    if (outcome.kind === 'apply') {
+      setMarkupTool(null)
+      applyMarkup(type)
+      return
+    }
+    if (outcome.nextTool) {
+      setEditTextMode(false)
+      setTextDraft(null)
+      setPendingTextInsert(null)
+      setDrawTool(null)
+      setPendingSign(null)
+      setSignatureTarget(null)
+      setImagePick(null)
+      setPendingStaticFill(null)
+      setEditImageMode(false)
+    }
+    setMarkupTool(outcome.nextTool)
   }
 
   /** Ask-AI entry on the markup bar: capture the selection box as the popover
@@ -3713,6 +3756,7 @@ export default function App() {
     if (!formHasXfa || !filePath || warnedXfaPathRef.current === filePath) return
     warnedXfaPathRef.current = filePath
     showNotice(t('formXfaWarning'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, formHasXfa])
 
   /** Localize known structured main-process errors; other messages pass through raw */
@@ -4298,6 +4342,7 @@ export default function App() {
     setTextDraft(null)
     setPendingTextInsert(null)
     setDrawTool(null)
+    setMarkupTool(null)
     setPendingSign(null)
     setSignatureTarget(null)
     setEditImageMode(false)
@@ -4446,6 +4491,7 @@ export default function App() {
     setTextDraft(null)
     setPendingTextInsert(null)
     setDrawTool(null)
+    setMarkupTool(null)
     setPendingSign(null)
     setSignatureTarget(null)
     setPendingStaticFill(null)
@@ -5478,7 +5524,7 @@ export default function App() {
       opFailed(t('redactStructureBlocked'))
       return undefined
     }
-    if (dirty && !(await save('internal'))) return undefined
+    if (dirty && cap('save') && !(await save('internal'))) return undefined
     return fn()
   }
 
@@ -5696,6 +5742,7 @@ export default function App() {
   // currentPage only tracks scroll, so it can outlive a page deletion
   const printCurrentPage = Math.max(1, Math.min(currentPage, pageCount))
   const openPrintDlg = () => {
+    if (!cap('print')) return
     setPrintMode('all')
     setPrintInput(String(printCurrentPage))
     setPrintInvalid(false)
@@ -6234,7 +6281,7 @@ export default function App() {
         const k = e.key.toLowerCase()
         if (k === 's') {
           e.preventDefault()
-          void save()
+          if (cap('save')) void save()
         } else if (k === 'z') {
           e.preventDefault()
           if (e.shiftKey) redo()
@@ -6244,7 +6291,7 @@ export default function App() {
           openSearch()
         } else if (k === 'p' && !e.shiftKey) {
           e.preventDefault()
-          openPrintDlg()
+          if (cap('print')) openPrintDlg()
         } else if (e.key === '=' || e.key === '+') {
           e.preventDefault()
           zoomIn()
@@ -6259,20 +6306,57 @@ export default function App() {
         return
       }
       if (e.key === 'Escape') {
-        // Modal dialogs own Escape; the states behind them must not react too
-        if (signDlg || stampDlg || propsDlg) return
-        if (askPop) setAskPop(null)
-        else if (textDraft) setTextDraft(null)
-        else if (pendingTextInsert) setPendingTextInsert(null)
-        else if (imagePick) setImagePick(null)
-        else if (editTextMode) setEditTextMode(false)
-        else if (editImageMode) setEditImageMode(false)
-        else if (pendingSign) setPendingSign(null)
-        else if (noteDraft) setNoteDraft(null)
-        else if (activeNote) setActiveNote(null)
-        else if (drawTool) setDrawTool(null)
-        else if (selected) setSelected(null)
-        else if (searchOpen) closeSearch()
+        // Modal dialogs and local overlays own Escape; the states behind them must not react too
+        if (
+          e.defaultPrevented ||
+          signDlg ||
+          stampDlg ||
+          propsDlg ||
+          document.querySelector(
+            '[role="dialog"], [role="menu"], [aria-modal="true"], [data-esc-local]',
+          )
+        )
+          return
+        if (askPop) {
+          e.preventDefault()
+          setAskPop(null)
+        } else if (textDraft) {
+          e.preventDefault()
+          setTextDraft(null)
+        } else if (pendingTextInsert) {
+          e.preventDefault()
+          setPendingTextInsert(null)
+        } else if (imagePick) {
+          e.preventDefault()
+          setImagePick(null)
+        } else if (editTextMode) {
+          e.preventDefault()
+          setEditTextMode(false)
+        } else if (editImageMode) {
+          e.preventDefault()
+          setEditImageMode(false)
+        } else if (pendingSign) {
+          e.preventDefault()
+          setPendingSign(null)
+        } else if (noteDraft) {
+          e.preventDefault()
+          setNoteDraft(null)
+        } else if (activeNote) {
+          e.preventDefault()
+          setActiveNote(null)
+        } else if (drawTool) {
+          e.preventDefault()
+          setDrawTool(null)
+        } else if (markupTool) {
+          e.preventDefault()
+          setMarkupTool(null)
+        } else if (selected) {
+          e.preventDefault()
+          setSelected(null)
+        } else if (searchOpen) {
+          e.preventDefault()
+          closeSearch()
+        }
         return
       }
       if (inEditable) return
@@ -6449,10 +6533,11 @@ export default function App() {
           className="rb-drop-wrap rb-highlight-drop-wrap rb-highlight-split"
         >
           <button
-            className="rb-big rb-highlight-main"
+            className={`rb-big rb-highlight-main${markupTool === 'highlight' ? ' active' : ''}`}
+            aria-pressed={markupTool === 'highlight'}
             disabled={readOnly}
             data-tip={t('highlight')}
-            onClick={() => applyMarkup('highlight')}
+            onClick={() => onRibbonMarkupClick('highlight')}
           >
             <span className="rb-big-icon">
               <span className="rb-big-icon-colored">
@@ -6481,10 +6566,11 @@ export default function App() {
           )}
         </div>
         <button
-          className="rb-big"
+          className={`rb-big${markupTool === 'underline' ? ' active' : ''}`}
+          aria-pressed={markupTool === 'underline'}
           disabled={readOnly}
           data-tip={t('underline')}
-          onClick={() => applyMarkup('underline')}
+          onClick={() => onRibbonMarkupClick('underline')}
         >
           <span className="rb-big-icon">
             <IconUnderline />
@@ -6492,10 +6578,11 @@ export default function App() {
           {t('underline')}
         </button>
         <button
-          className="rb-big"
+          className={`rb-big${markupTool === 'strikeout' ? ' active' : ''}`}
+          aria-pressed={markupTool === 'strikeout'}
           disabled={readOnly}
           data-tip={t('strikeout')}
-          onClick={() => applyMarkup('strikeout')}
+          onClick={() => onRibbonMarkupClick('strikeout')}
         >
           <span className="rb-big-icon">
             <IconStrike />
@@ -6590,6 +6677,7 @@ export default function App() {
         setTextDraft(null)
         setPendingTextInsert(null)
         setDrawTool(null)
+        setMarkupTool(null)
         setPendingSign(null)
         setImagePick(null)
         setEditImageMode(false)
@@ -6616,6 +6704,7 @@ export default function App() {
         setEditTextMode(false)
         setTextDraft(null)
         setDrawTool(null)
+        setMarkupTool(null)
         setPendingSign(null)
         setSignatureTarget(null)
         setImagePick(null)
@@ -6675,6 +6764,7 @@ export default function App() {
     setTextDraft(null)
     setPendingTextInsert(null)
     setDrawTool(null)
+    setMarkupTool(null)
     setImagePick(null)
     setEditImageMode(false)
     setPendingSign(null)
@@ -6745,19 +6835,21 @@ export default function App() {
     <div className="app" inert={redactionCopyInFlight} aria-busy={redactionCopyInFlight}>
       <div className={`ribbon ${collapse.rootClass}`} ref={collapse.rootRef}>
         <div className="ribbon-tabs" onDoubleClick={collapse.onTabsDoubleClick}>
-          <button
-            className="qa-btn"
-            data-tip={`${t('save')} (${platformShortcuts('⌘S')})`}
-            aria-label={t('save')}
-            disabled={
-              (!dirty && !openBoxesDirty && !(uniwork.bound && !uniwork.readOnly)) ||
-              uniwork.readOnly ||
-              saveState === 'saving'
-            }
-            onClick={() => void save()}
-          >
-            <IconSave />
-          </button>
+          {cap('save') && (
+            <button
+              className="qa-btn"
+              data-tip={`${t('save')} (${platformShortcuts('⌘S')})`}
+              aria-label={t('save')}
+              disabled={
+                (!dirty && !openBoxesDirty && !(uniwork.bound && !uniwork.readOnly)) ||
+                uniwork.readOnly ||
+                saveState === 'saving'
+              }
+              onClick={() => void save()}
+            >
+              <IconSave />
+            </button>
+          )}
           <button
             className="qa-btn"
             data-tip={`${t('undo')} (${platformShortcuts('⌘Z')})`}
@@ -6951,28 +7043,32 @@ export default function App() {
               <div className="ribbon-group">
                 <div className="ribbon-group-items">
                   {searchBtn}
-                  <button
-                    className="rb-big"
-                    data-tip={`${t('print')} (${platformShortcuts('⌘P')})`}
-                    disabled={printing}
-                    onClick={openPrintDlg}
-                  >
-                    <span className="rb-big-icon">
-                      <IconPrint />
-                    </span>
-                    {printing ? t('printPreparing') : t('print')}
-                  </button>
-                  <button
-                    className="rb-big"
-                    data-tip={t('exportImagesAll')}
-                    disabled={exporting}
-                    onClick={() => void exportImages(true)}
-                  >
-                    <span className="rb-big-icon">
-                      <IconExportImg />
-                    </span>
-                    {exporting ? t('exporting') : t('exportImages')}
-                  </button>
+                  {cap('print') && (
+                    <button
+                      className="rb-big"
+                      data-tip={`${t('print')} (${platformShortcuts('⌘P')})`}
+                      disabled={printing}
+                      onClick={openPrintDlg}
+                    >
+                      <span className="rb-big-icon">
+                        <IconPrint />
+                      </span>
+                      {printing ? t('printPreparing') : t('print')}
+                    </button>
+                  )}
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      data-tip={t('exportImagesAll')}
+                      disabled={exporting}
+                      onClick={() => void exportImages(true)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconExportImg />
+                      </span>
+                      {exporting ? t('exporting') : t('exportImages')}
+                    </button>
+                  )}
                   <button
                     className="rb-big"
                     data-tip={t('propsTitle')}
@@ -7038,6 +7134,7 @@ export default function App() {
                         setPendingTextInsert(null)
                         setImagePick(null)
                         setEditImageMode(false)
+                        setMarkupTool(null)
                         setDrawTool((v) => (v === tool ? null : tool))
                       }}
                     >
@@ -7104,6 +7201,7 @@ export default function App() {
                           setEditTextMode(false)
                           setTextDraft(null)
                           setEditImageMode(false)
+                          setMarkupTool(null)
                           setDrawTool((tool) => (tool === 'redact' ? null : 'redact'))
                         }}
                       >
@@ -7231,6 +7329,7 @@ export default function App() {
                         setEditTextMode(false)
                         setTextDraft(null)
                         setDrawTool(null)
+                        setMarkupTool(null)
                         setPendingSign(null)
                         setImagePick(null)
                         setPendingTextInsert(null)
@@ -7455,16 +7554,18 @@ export default function App() {
                     </span>
                     {t('deletePage')}
                   </button>
-                  <button
-                    className="rb-big"
-                    disabled={curOrigIdx < 0 || readOnly}
-                    onClick={openExtractDlg}
-                  >
-                    <span className="rb-big-icon">
-                      <IconExtract />
-                    </span>
-                    {t('extractPage')}
-                  </button>
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      disabled={curOrigIdx < 0 || readOnly}
+                      onClick={openExtractDlg}
+                    >
+                      <span className="rb-big-icon">
+                        <IconExtract />
+                      </span>
+                      {t('extractPage')}
+                    </button>
+                  )}
                   {cap('insertPages') && (
                     <button
                       className="rb-big"
@@ -7539,42 +7640,50 @@ export default function App() {
                     </span>
                     {t('reversePages')}
                   </button>
-                  <button
-                    className="rb-big"
-                    disabled={pageCount <= 1 || readOnly}
-                    onClick={openSplitDlg}
-                  >
-                    <span className="rb-big-icon">
-                      <IconSplitPdf />
-                    </span>
-                    {t('splitPdf')}
-                  </button>
-                  <button className="rb-big" disabled={readOnly} onClick={() => void mergePdf()}>
-                    <span className="rb-big-icon">
-                      <IconMergePdf />
-                    </span>
-                    {t('mergePdf')}
-                  </button>
-                  <button
-                    className="rb-big"
-                    disabled={pageCount <= 1 || readOnly}
-                    onClick={openMergePagesDlg}
-                  >
-                    <span className="rb-big-icon">
-                      <IconMergePages />
-                    </span>
-                    {t('mergePages')}
-                  </button>
-                  <button
-                    className="rb-big"
-                    disabled={pageCount === 0 || readOnly}
-                    onClick={() => setSplitPagesDlg(true)}
-                  >
-                    <span className="rb-big-icon">
-                      <IconSplitPages />
-                    </span>
-                    {t('splitPages')}
-                  </button>
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      disabled={pageCount <= 1 || readOnly}
+                      onClick={openSplitDlg}
+                    >
+                      <span className="rb-big-icon">
+                        <IconSplitPdf />
+                      </span>
+                      {t('splitPdf')}
+                    </button>
+                  )}
+                  {cap('saveAs') && cap('insertPages') && (
+                    <button className="rb-big" disabled={readOnly} onClick={() => void mergePdf()}>
+                      <span className="rb-big-icon">
+                        <IconMergePdf />
+                      </span>
+                      {t('mergePdf')}
+                    </button>
+                  )}
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      disabled={pageCount <= 1 || readOnly}
+                      onClick={openMergePagesDlg}
+                    >
+                      <span className="rb-big-icon">
+                        <IconMergePages />
+                      </span>
+                      {t('mergePages')}
+                    </button>
+                  )}
+                  {cap('saveAs') && (
+                    <button
+                      className="rb-big"
+                      disabled={pageCount === 0 || readOnly}
+                      onClick={() => setSplitPagesDlg(true)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconSplitPages />
+                      </span>
+                      {t('splitPages')}
+                    </button>
+                  )}
                 </div>
               </div>
             </>
@@ -8659,6 +8768,7 @@ export default function App() {
                                               e.preventDefault()
                                               commitTextDraft()
                                             } else if (e.key === 'Escape') {
+                                              e.preventDefault()
                                               e.stopPropagation()
                                               setTextDraft(null)
                                             } else if (
@@ -9045,7 +9155,10 @@ export default function App() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') searchStep(e.shiftKey ? -1 : 1)
-                    else if (e.key === 'Escape') closeSearch()
+                    else if (e.key === 'Escape') {
+                      e.preventDefault()
+                      closeSearch()
+                    }
                   }}
                 />
                 <span className="pdf-search-count">
@@ -9401,14 +9514,16 @@ export default function App() {
                 >
                   {t('deletePage')}
                 </button>
-                <button
-                  onClick={() => {
-                    setThumbMenu(null)
-                    void extractPage(menuOrig)
-                  }}
-                >
-                  {t('extractPage')}
-                </button>
+                {cap('saveAs') && (
+                  <button
+                    onClick={() => {
+                      setThumbMenu(null)
+                      void extractPage(menuOrig)
+                    }}
+                  >
+                    {t('extractPage')}
+                  </button>
+                )}
                 {cap('insertPages') && (
                   <button
                     onClick={() => {
@@ -9550,7 +9665,10 @@ export default function App() {
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') confirmExtract()
-                      else if (e.key === 'Escape') setExtractDlg(false)
+                      else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setExtractDlg(false)
+                      }
                     }}
                   />
                   <div className="pdf-modal-actions">
@@ -9579,7 +9697,10 @@ export default function App() {
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') confirmSplit()
-                      else if (e.key === 'Escape') setSplitDlg(false)
+                      else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setSplitDlg(false)
+                      }
                     }}
                   />
                   <div className="pdf-modal-actions">
@@ -9638,7 +9759,10 @@ export default function App() {
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') confirmPrint()
-                        else if (e.key === 'Escape') setPrintDlg(false)
+                        else if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setPrintDlg(false)
+                        }
                       }}
                     />
                   )}
@@ -9670,7 +9794,10 @@ export default function App() {
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') confirmMergePages()
-                        else if (e.key === 'Escape') setMergePagesDlg(false)
+                        else if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setMergePagesDlg(false)
+                        }
                       }}
                     />
                   </label>
@@ -9729,7 +9856,10 @@ export default function App() {
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') confirmReplace()
-                      else if (e.key === 'Escape') setReplaceDlg(false)
+                      else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setReplaceDlg(false)
+                      }
                     }}
                   />
                   <div className="pdf-modal-actions">

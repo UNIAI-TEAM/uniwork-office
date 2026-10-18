@@ -88,6 +88,7 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
     capabilities: session.capabilities ?? {},
     commentsLevel: session.commentsLevel,
     user: session.user,
+    profile: session.profile,
   })
   const handle = useRef<FrameDiscussionHandle>(null)
   const shield = useRef<EditorShield | null>(null)
@@ -160,7 +161,10 @@ export async function mountFrameDiscussion(
   } catch {
     return () => {}
   }
-  const access = commentsAccess({ capabilities: session.capabilities ?? {} })
+  const access = commentsAccess({
+    capabilities: session.capabilities ?? {},
+    profile: session.profile,
+  })
   if (!access.enabled) return () => {}
 
   const container = doc.createElement('div')

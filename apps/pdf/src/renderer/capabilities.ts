@@ -32,6 +32,11 @@ import { createCapabilityReader } from '@genoffice/ui/capabilities'
  */
 export type PdfCapability =
   | 'edit'
+  | 'save'
+  | 'saveAs'
+  | 'print'
+  | 'exportPdf'
+  | 'exportHtml'
   | 'ai'
   | 'imageGeneration'
   | 'autoSave'

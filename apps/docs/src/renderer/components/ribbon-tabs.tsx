@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Editor, JSONContent } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import { TextSelection, type Transaction } from '@tiptap/pm/state'
@@ -1362,6 +1362,17 @@ export function ViewTab({
   useDismissablePopover(winMenuOpen, () => setWinMenuOpen(false), {
     inside: () => [winMenuRef.current],
   })
+  useEffect(() => {
+    if (!winMenuOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setWinMenuOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [winMenuOpen])
 
   return (
     <>

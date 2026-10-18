@@ -23,6 +23,7 @@ import {
   type CollabAnchorSlot,
 } from '@genoffice/ui/collab'
 import type { SlideComment } from '../../shared/ipc'
+import { isViewOnly } from '../capabilities'
 import { displayCommentAuthor } from '../comment-author'
 import { useI18n } from '../i18n/locale'
 import {
@@ -65,6 +66,7 @@ export function CommentsPane({
   onCollapse,
 }: Props) {
   const { t, dateLocale } = useI18n()
+  const viewOnly = isViewOnly()
   // G8-02: the neutral author ("User" in the file) shows in the UI language
   const authorLabel = (author: string) =>
     displayCommentAuthor(author, t('paneCommentsNeutralAuthor'))
@@ -76,6 +78,7 @@ export function CommentsPane({
   }, [focusNonce])
 
   const submit = () => {
+    if (viewOnly) return
     const text = draft.trim()
     if (!text) return
     onAdd(text)
@@ -116,38 +119,42 @@ export function CommentsPane({
                 <span className="comment-author">{authorLabel(c.author)}</span>
                 {c.dt && <span className="comment-time">{fmtDt(c.dt, dateLocale)}</span>}
               </span>
-              <button
-                className="comment-del"
-                data-tip={t('paneCommentsDelete')}
-                aria-label={t('paneCommentsDelete')}
-                onClick={() => onDelete(c)}
-              >
-                ✕
-              </button>
+              {!viewOnly && (
+                <button
+                  className="comment-del"
+                  data-tip={t('paneCommentsDelete')}
+                  aria-label={t('paneCommentsDelete')}
+                  onClick={() => onDelete(c)}
+                >
+                  ✕
+                </button>
+              )}
             </div>
             <div className="comment-text">{c.text}</div>
           </div>
         ))}
       </div>
 
-      <div className="comment-new">
-        <textarea
-          ref={inputRef}
-          rows={3}
-          value={draft}
-          placeholder={t('paneCommentsPlaceholder')}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault()
-              submit()
-            }
-          }}
-        />
-        <button className="btn-primary" disabled={!draft.trim()} onClick={submit}>
-          {t('paneCommentsPost')}
-        </button>
-      </div>
+      {!viewOnly && (
+        <div className="comment-new">
+          <textarea
+            ref={inputRef}
+            rows={3}
+            value={draft}
+            placeholder={t('paneCommentsPlaceholder')}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                submit()
+              }
+            }}
+          />
+          <button className="btn-primary" disabled={!draft.trim()} onClick={submit}>
+            {t('paneCommentsPost')}
+          </button>
+        </div>
+      )}
     </aside>
   )
 }
@@ -223,6 +230,7 @@ export function ServerCommentsPane({ server, slides, inFile, onCollapse }: Serve
   // pane. The empty composer is dropped and the pane closes (focus returns to the opener).
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key !== 'Escape' || e.defaultPrevented || e.nativeEvent.isComposing) return
+    e.preventDefault()
     e.stopPropagation()
     if (baseCtl.newThread && (e.target as HTMLElement).closest('.collab-thread--new')) {
       baseCtl.cancelThread()

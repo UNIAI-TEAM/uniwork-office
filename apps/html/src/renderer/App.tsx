@@ -844,7 +844,14 @@ export default function App() {
             return
           }
           const sid = selectedSidRef.current
-          if (sid === null) return
+          if (sid === null) {
+            if (msg.command === 'escape') {
+              window.dispatchEvent(
+                new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+              )
+            }
+            return
+          }
           const map = getMap()
           const e = map.bySid.get(sid)
           if (!e) return
@@ -1174,10 +1181,13 @@ export default function App() {
   useEffect(() => {
     if (canvasMode !== 'present') return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setCanvasMode('edit')
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setCanvasMode('edit')
+      }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [canvasMode, setCanvasMode])
 
   const startPresent = useCallback(
@@ -1243,7 +1253,8 @@ export default function App() {
 
   const doSave = useCallback(
     async (mode: SaveMode, suggestedName?: string, origin?: 'auto'): Promise<boolean> => {
-      if (statusRef.current !== 'ready' || !cap('save')) return false
+      const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
+      if (statusRef.current !== 'ready' || !allowed) return false
       // uncommitted live style pokes belong to the document being saved
       flushPending()
       // a menu save or ⌘S during an autosave queues behind it instead of being dropped;
@@ -1317,7 +1328,15 @@ export default function App() {
   const exportingRef = useRef(false)
   /** `outPath` (headless export only) skips the save dialog; resolves true when a file was written. */
   const runExport = useCallback(async (format: ExportFormat, outPath?: string) => {
-    if (statusRef.current !== 'ready' || exportingRef.current) return false
+    const allowed =
+      format === 'pdf'
+        ? // host Print renders its PDF through this same export; the bridge still refuses a
+          // plain Export PDF without the `exportPdf` grant
+          cap('exportPdf') || cap('print')
+        : format === 'html'
+          ? cap('exportHtml')
+          : cap('exportDocx') && cap('saveAs')
+    if (statusRef.current !== 'ready' || exportingRef.current || !allowed) return false
     exportingRef.current = true
     try {
       flushPending()
@@ -1352,7 +1371,7 @@ export default function App() {
 
   const printingRef = useRef(false)
   const runPrint = useCallback(async () => {
-    if (statusRef.current !== 'ready') return false
+    if (statusRef.current !== 'ready' || !cap('print')) return false
     return runGuardedPrint(
       printingRef,
       async () => {
@@ -1652,13 +1671,16 @@ export default function App() {
   return (
     <div
       className={`app${canvasMode === 'present' ? ` present${presentFull ? ' present-full' : ''}` : ''}`}
+      data-esc-local={canvasMode === 'present' ? '' : undefined}
     >
       <Ribbon
-        disabled={status !== 'ready' || !canEdit}
+        disabled={status !== 'ready'}
         dirty={dirty}
         onSave={() => void doSave('save')}
         onSaveAs={() => void doSave('saveAs')}
-        onExport={platform() === 'web' ? () => void runExport('html') : undefined}
+        onExport={
+          platform() === 'web' && cap('exportHtml') ? () => void runExport('html') : undefined
+        }
         exportDisabled={status !== 'ready'}
         onFind={() => openFind(false)}
         canUndo={historyState.undo}
@@ -1678,7 +1700,7 @@ export default function App() {
         aiOffHint={aiEnabled ? undefined : t('aiNotEnabled')}
         presentNewTab={cap('presentNewTab')}
         uniworkBound={uniwork.bound}
-        readOnly={uniwork.readOnly}
+        readOnly={uniwork.readOnly || !canEdit}
         view={view}
         onView={setView}
         aiOpen={aiOpen}

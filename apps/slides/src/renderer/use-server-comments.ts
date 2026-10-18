@@ -202,6 +202,7 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
   }, [ready, runRound])
 
   const startThread = useCallback((index: number, objectId?: string): boolean => {
+    if (!ctlRef.current.can.canWrite) return false
     const base = versionRef.current
     const anchor = pptxAnchorFor(slidesRef.current, index, objectId)
     if (!anchor || !base) return false

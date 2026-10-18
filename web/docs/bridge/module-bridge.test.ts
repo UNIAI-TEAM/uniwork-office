@@ -160,3 +160,90 @@ describe('C10: no autosave on the web', () => {
     expect(capabilities).toMatchObject({ autoSave: false, autoSaveToDisk: false, ai: false })
   })
 })
+
+describe('FRAME-RO-01: readOnly profile & Escape forwarder in installModuleBridge', () => {
+  it('createCapabilityObject forces save/saveAs/edit/htmlVisualEdit off in readOnly profile while keeping print and exportPdf', async () => {
+    const mock = createMockPort()
+    const caps = createCapabilityObject(
+      {
+        save: false,
+        saveAs: false,
+        edit: false,
+        htmlVisualEdit: false,
+        print: false,
+        exportPdf: false,
+      },
+      mock.port,
+      (g) => ({
+        save: g?.save === true,
+        saveAs: g?.saveAs === true,
+        edit: g?.save === true,
+        htmlVisualEdit: g?.save === true,
+        print: g?.print === true,
+        exportPdf: g?.exportPdf === true,
+      }),
+    )
+    mock.init({
+      profile: 'readOnly',
+      capabilities: { save: true, saveAs: true, print: true, exportPdf: true },
+    })
+    await flush()
+    expect(caps).toEqual({
+      save: false,
+      saveAs: false,
+      edit: false,
+      htmlVisualEdit: false,
+      print: true,
+      exportPdf: true,
+    })
+  })
+
+  it('createCapabilityObject marks readOnlyProfile for the profile only, not for save:false alone (RFW2-3)', async () => {
+    const defaults = { save: false, readOnlyProfile: false }
+    const grants = (g: { save?: boolean } | undefined): Partial<typeof defaults> => ({
+      save: g?.save === true,
+    })
+
+    const profile = createMockPort()
+    const profileCaps = createCapabilityObject(defaults, profile.port, grants)
+    profile.init({ profile: 'readOnly', capabilities: { save: true } })
+
+    const viewer = createMockPort()
+    const viewerCaps = createCapabilityObject(defaults, viewer.port, grants)
+    viewer.init({ capabilities: {} })
+
+    await flush()
+    expect(profileCaps.readOnlyProfile).toBe(true)
+    expect(viewerCaps).toEqual({ save: false, readOnlyProfile: false })
+  })
+
+  it('installModuleBridge forwards unhandled Escape on target to reportCloseRequested("escape") and skips [data-esc-local]', async () => {
+    const mock = createMockPort()
+    installModuleBridge({
+      module: 'markdown',
+      frameCapabilities: {},
+      client: mock.port,
+      target: window as unknown as Record<string, unknown>,
+      globals: { markdownApi: () => ({}) },
+    })
+
+    const local = document.createElement('div')
+    local.setAttribute('data-esc-local', '')
+    const btn = document.createElement('button')
+    local.appendChild(btn)
+    document.body.appendChild(local)
+
+    btn.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    )
+    await new Promise((r) => setTimeout(r, 0))
+    expect(mock.closeRequested).toEqual([])
+
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    )
+    await new Promise((r) => setTimeout(r, 0))
+    expect(mock.closeRequested).toEqual(['escape'])
+    local.remove()
+  })
+})
