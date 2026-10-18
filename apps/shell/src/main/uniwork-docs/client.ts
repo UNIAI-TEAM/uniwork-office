@@ -474,25 +474,30 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
   const streamCeiling = options.streamCeilingMs ?? STREAM_CEILING_MS
   const send = createUniworkSend(options)
   const json = (response: Response): Promise<unknown> => response.json()
+  /**
+   * DESKTOP-HOME list filters. Returns whether the flat `/documents` route is
+   * REQUIRED: the server forwards `format` to `/documents/recent`
+   * (`internal/service/document_search.go:650,665-675`), but not `updated_by` or
+   * `updated_from`, so only those two force the wider workspace list.
+   */
   const applyListFilters = (params: URLSearchParams, input: UniworkListFilters): boolean => {
-    let filtered = false
+    let flatRequired = false
     if (typeof input.format === 'string' && input.format) {
       params.set('format', input.format)
-      filtered = true
     }
     const updatedBy =
       typeof input.updatedBy === 'string' ? input.updatedBy.trim().slice(0, 128) : ''
     if (updatedBy) {
       params.set('updated_by', updatedBy)
-      filtered = true
+      flatRequired = true
     }
     const updatedFrom =
       typeof input.updatedFrom === 'string' ? input.updatedFrom.trim().slice(0, 64) : ''
     if (updatedFrom) {
       params.set('updated_from', updatedFrom)
-      filtered = true
+      flatRequired = true
     }
-    return filtered
+    return flatRequired
   }
   /**
    * FD-11: one document's own fields, whatever its kind (a folder has no file
@@ -876,11 +881,18 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
       params.set('kind', 'file')
-      const filtered = applyListFilters(params, input)
+      // DH1-BE-1: `/documents/recent` forwards `format` (server
+      // document_search.go:650,665-675), so a format-only Recent keeps the
+      // caller's recent scope. `q` and the non-forwardable updater/date filters
+      // still need the flat workspace list.
+      const flatRequired = applyListFilters(params, input)
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',
-        route: q || filtered ? `/workspaces/${ws}/documents` : `/workspaces/${ws}/documents/recent`,
+        route:
+          q || flatRequired
+            ? `/workspaces/${ws}/documents`
+            : `/workspaces/${ws}/documents/recent`,
         query: params,
         timeoutMs: metadataTimeout,
         read: json,
