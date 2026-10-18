@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  classifyDroppedToolReason,
-  noticeToPanelNote,
-  resultChip,
-  extractSheetsCellsMeta,
-} from '../src/index.js'
+import { classifyDroppedToolReason, resultChip, extractSheetsCellsMeta } from '../src/index.js'
 
 describe('notice-surface structured dropped reasons', () => {
   it('classifies only strict x_uniwork.dropped_tool_calls reasons (view_only and not_allowlisted) and rejects local aliases like readonly', () => {
@@ -14,29 +9,6 @@ describe('notice-surface structured dropped reasons', () => {
     expect(classifyDroppedToolReason('not_allowlisted')).toBe('not_allowlisted')
     expect(classifyDroppedToolReason('other_reason')).toBe('other')
     expect(classifyDroppedToolReason(undefined)).toBe('other')
-
-    const noteViewOnly = noticeToPanelNote({
-      kind: 'dropped_tool_calls',
-      calls: [{ name: 'apply_ops', reason: 'view_only' }],
-    })
-    expect(noteViewOnly).toEqual({
-      kind: 'dropped',
-      key: 'aiNoticeDroppedTool',
-      params: { name: 'apply_ops' },
-      reason: 'view_only',
-    })
-
-    const noteNotAllowlisted = noticeToPanelNote({
-      kind: 'dropped_tool_calls',
-      calls: [{ name: 'run_macro', reason: 'not_allowlisted', module: 'Sheets' }],
-    })
-    expect(noteNotAllowlisted).toEqual({
-      kind: 'dropped',
-      key: 'aiNoticeDroppedTool',
-      params: { name: 'run_macro' },
-      reason: 'not_allowlisted',
-      module: 'Sheets',
-    })
   })
 })
 

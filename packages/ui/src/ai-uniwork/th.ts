@@ -68,16 +68,12 @@ export const th = {
   aiErrQuestionRejected: 'UniWork AI รับคำขอนี้ไม่ได้ โปรดแก้ไขคำขอแล้วส่งอีกครั้ง',
   aiUniworkImagesNotSent: 'ระบบไม่ส่งรูปภาพไปยัง UniWork AI ส่งเฉพาะข้อความของคุณเท่านั้น',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'พร้อมใช้งาน',
   cloudStateNotEntitled: 'ไม่รวมในแพ็กเกจของคุณ',
   cloudStateExhausted: 'เครดิต AI หมดแล้ว',
   cloudStateUnavailable: 'ใช้งานไม่ได้ในขณะนี้',
-  cloudStateSignedOut: 'ยังไม่ได้ลงชื่อเข้าใช้',
   cloudStateInactive: 'การสมัครสมาชิกไม่ใช้งาน',
-  cloudCredits: 'เครดิต AI',
   cloudCreditsLeft: 'เหลือ {remaining} / {limit}',
   cloudCreditsUnlimited: 'ไม่จำกัด',
-  cloudCreditsRenews: 'รีเซ็ตวันที่ {date}',
   cloudInactiveBody:
     'การสมัครสมาชิก UniWork ขององค์กรไม่ได้ใช้งานอยู่ AI บนคลาวด์จึงหยุดชั่วคราว โปรดให้ผู้ดูแลต่ออายุ ผู้ให้บริการของคุณเองด้านล่างยังใช้งานได้ตามปกติ',
   acctSignIn: 'เข้าสู่ระบบ',

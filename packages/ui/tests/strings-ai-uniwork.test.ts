@@ -178,9 +178,6 @@ describe('ai-uniwork string shards', () => {
     expect(aiUniworkText('en', 'cloudCreditsLeft', { remaining: 10, limit: 100 })).toBe(
       '10 / 100 left',
     )
-    expect(aiUniworkText('en', 'cloudCreditsRenews', { date: '2026-11-01' })).toBe(
-      'Renews 2026-11-01',
-    )
     expect(
       aiUniworkText('en', 'aiResultCellsMeta', {
         written: 4,
@@ -214,8 +211,6 @@ describe('ai-uniwork string shards', () => {
     expect(aiUniworkText('vi', 'acctSignIn')).toBe('Đăng nhập')
     expect(aiUniworkText('en', 'acctSignInAgain')).toBe('Sign in again')
     expect(aiUniworkText('vi', 'acctSignInAgain')).toBe('Đăng nhập lại')
-    expect(aiUniworkText('en', 'cloudStateReady')).toBe('Available')
-    expect(aiUniworkText('vi', 'cloudStateReady')).toBe('Sẵn sàng')
     expect(aiUniworkText('en', 'cloudInactiveBody')).toContain('subscription is not active')
     expect(aiUniworkText('vi', 'cloudInactiveBody')).toContain('không hoạt động')
     expect(aiUniworkText('en', 'aiUniworkLocalFileRestart')).toContain(
