@@ -633,7 +633,9 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
         title ? `title: ${title}` : '',
         view.trim()
           ? ''
-          : 'The document is empty: plan_page (mode new) or write_document creates it.',
+          : access.uniworkBound?.() === true
+            ? 'The document is empty: fill it in place with apply_ops edits.'
+            : 'The document is empty: plan_page (mode new) or write_document creates it.',
       ].filter(Boolean)
       let outline = buildOutline(proj, map, { depth: 2, maxLines: 60 })
       const selectedSid = access.getSelectedSid()
@@ -1014,6 +1016,9 @@ function refuseBound(name: string): ToolExecution {
 const VIEW_ONLY_NOTE =
   '\n\nNote: this document is view-only. You can read it and answer questions about it, but you cannot edit it: no edit tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
 
+const BOUND_NOTE =
+  '\n\nNote: this is a UniWork document. plan_page and write_document are unavailable on it; do not call or promise them. Do restyles, theme changes and structural edits with apply_ops on the existing page (incl. the --brief-* CSS variables); never replace the whole document.'
+
 /** A live prompt is read on every request, so it can follow the document. */
 export function createHtmlSkill(
   access: HtmlDocAccess,
@@ -1027,7 +1032,11 @@ export function createHtmlSkill(
     // live: the predicate is re-read before every model request
     get systemPrompt() {
       const prompt = typeof systemPrompt === 'string' ? systemPrompt : systemPrompt.systemPrompt
-      return isReadOnly?.() ? prompt + VIEW_ONLY_NOTE : prompt
+      return (
+        prompt +
+        (isReadOnly?.() ? VIEW_ONLY_NOTE : '') +
+        (access.uniworkBound?.() ? BOUND_NOTE : '')
+      )
     },
     get tools() {
       // a bound page keeps the editing tools but loses the whole-page writers;
