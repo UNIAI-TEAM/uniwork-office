@@ -1405,6 +1405,8 @@ export function Home() {
   const [accountName, setAccountName] = useState('')
   // whose UniWork documents recents may list ('' = nobody): a change re-reads them
   const [recentsAccount, setRecentsAccount] = useState('')
+  // DH1-R4-1: reset the kept per-workspace sub-view and folder when the account changes
+  const uniworkAccountRef = useRef<string | null>(null)
   // the signed-in organization, shown under the wordmark ('' = the edition label)
   const [orgName, setOrgName] = useState('')
   // single source of account state: AccountEntry reports every change (initial
@@ -1415,7 +1417,13 @@ export function Home() {
     const nextArea = isHomeArea(rawArea) ? rawArea : null
     setSavedArea(nextArea)
     if (nextArea !== null && !userChoseChatRef.current) setChatMode(false)
-    setRecentsAccount(s?.loggedIn ? (s.profile?.accountId ?? s.email ?? '') : '')
+    const acctKey = s?.loggedIn ? (s.profile?.accountId ?? s.email ?? '') : ''
+    if (uniworkAccountRef.current !== null && uniworkAccountRef.current !== acctKey) {
+      setUniworkFolderByWs({})
+      setUniworkSubViewByWs({})
+    }
+    if (s !== null) uniworkAccountRef.current = acctKey
+    setRecentsAccount(acctKey)
     // the cached profile still names the user while UniWork is unreachable
     if (!s?.loggedIn && !(s?.state === 'server-unreachable' && s.profile)) {
       setAccountName('')
@@ -4113,7 +4121,7 @@ export function Home() {
         ) : (
           <main className="content home-uw-pane">
             <DocumentsHome
-              key={activeUwWorkspaceId}
+              key={`${recentsAccount}:${activeUwWorkspaceId}`}
               workspaceId={activeUwWorkspaceId}
               workspaces={uwWsState.workspaces}
               onWorkspaceChange={selectUniworkWorkspace}

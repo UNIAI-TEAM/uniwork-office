@@ -233,6 +233,21 @@ export function collectUpdatedByOptions(
     .map(([id, name]) => ({ id, name }))
 }
 
+/**
+ * Keeps the active `updatedBy` filter id in the `<select>` options with a generic
+ * label when no loaded row resolves its name (DH1-R4-9), while unselected unnamed
+ * ids stay omitted (DH1-BE-10).
+ */
+export function updatedByOptionsForSelect(
+  options: readonly UpdatedByOption[],
+  selectedId: string,
+  fallbackName: string,
+): readonly UpdatedByOption[] {
+  const selected = selectedId.trim()
+  if (!selected || options.some((opt) => opt.id === selected)) return options
+  return [...options, { id: selected, name: fallbackName }]
+}
+
 export interface FormattedAccessCell {
   visibilityLabel: string | null
   levelLabel: string | null

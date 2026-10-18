@@ -86,6 +86,7 @@ import {
   hasActiveFilters,
   splitAndSortItems,
   toUniworkListFilters,
+  updatedByOptionsForSelect,
   visibleDocumentsHomeNavEntries,
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
@@ -282,6 +283,13 @@ export function DocumentsHome({
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
   const uploadRunRef = useRef(0)
+  // DH1-R4-8: an in-flight upload must never call onOpenDocument after unmount
+  useEffect(
+    () => () => {
+      uploadRunRef.current++
+    },
+    [],
+  )
   const [docRename, setDocRename] = useState<{
     doc: DocumentsHomeDoc
     error: DocNameError | null
@@ -806,7 +814,10 @@ export function DocumentsHome({
       path: input.path,
       uploadId,
     })
-    if (run !== uploadRunRef.current) return { ok: true }
+    if (run !== uploadRunRef.current) {
+      if (res.ok) refreshAll()
+      return { ok: true }
+    }
     uploadIdRef.current = null
     setUploadProgress(null)
     if (res.ok) {
@@ -1383,7 +1394,11 @@ export function DocumentsHome({
                   }
                 >
                   <option value="">{t('uhFilterAnyPerson')}</option>
-                  {knownAuthors.map((author) => (
+                  {updatedByOptionsForSelect(
+                    knownAuthors,
+                    filters.updatedBy,
+                    t('uwEditLockSomeone'),
+                  ).map((author) => (
                     <option key={author.id} value={author.id}>
                       {author.name}
                     </option>
