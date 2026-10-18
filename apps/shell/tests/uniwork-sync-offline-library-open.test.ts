@@ -131,7 +131,7 @@ interface OpenHarness {
   clock: { now: number }
   /** the lease manager's commit stamp (G703-R7-1): odd while a renewal commit is in flight */
   leaseStamp: { value: number }
-  capability: { on: boolean; delayMs: number }
+  capability: { on: boolean; delayMs: number; during: (() => void) | null }
   /** the auth module's state the service reads: a cold restore with a locked keychain has no identity */
   account: { signedIn: boolean; keystoreLocked: boolean }
   scope: { value: { deploymentId: string; accountId: string } }
@@ -160,7 +160,7 @@ function openHarness(options: { lease?: LeaseManager } = {}): OpenHarness {
   const isPathOpen = (path: string) => !pathOpen.closed.has(path) && pathOpen.value
   const clock = { now: 1_000 }
   const leaseStamp = { value: 0 }
-  const capability = { on: true, delayMs: 0 }
+  const capability = { on: true, delayMs: 0, during: null as (() => void) | null }
   const account = { signedIn: true, keystoreLocked: false }
   const scope = { value: { deploymentId: SCOPE.deploymentId, accountId: SCOPE.accountId } }
   const server: OpenHarness['server'] = { answer: null, calls: [] }
@@ -218,6 +218,8 @@ function openHarness(options: { lease?: LeaseManager } = {}): OpenHarness {
   const copies = createOfflineCopies({
     library: () => h.manager,
     capabilityOn: async () => {
+      // a test seam: time that passes while the open path awaits the capability read
+      capability.during?.()
       if (capability.delayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, capability.delayMs))
       }
@@ -1293,6 +1295,46 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
       expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
       expect(existsSync(path)).toBe(false)
       expect(timers.armed.every((ms) => ms <= 1_000 || ms === 30_000)).toBe(true)
+    } finally {
+      timers.restore()
+    }
+  })
+
+  it('(G703-R10-1) the lease deadline is fixed when the row is read: 5 s of open work after a 10 s sample still locks at the original deadline', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-r101-'))
+    dirs.push(base)
+    const rl = realLease(base)
+    const o = openHarness({ lease: rl.lease })
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    // 10 s of lease are left when the open reads the row
+    rl.advance(24 * LEASE_HOUR - 10_000)
+    o.clock.now += 24 * LEASE_HOUR - 10_000
+    const timers = virtualTimers((ms) => {
+      rl.advance(ms)
+      o.clock.now += ms
+    })
+    try {
+      // 5 s pass while the open path awaits the capability read, after the row was sampled
+      o.capability.during = () => {
+        o.capability.during = null
+        rl.advance(5_000)
+        o.clock.now += 5_000
+      }
+      const outcome = await o.copies.open('doc_1')
+      if (outcome.kind !== 'opened') throw new Error(`expected an open, got ${outcome.kind}`)
+      const path = outcome.path
+      // the copy has 5 s of real lease left: that is the timer, not the sampled 10 s
+      expect(timers.armed).toEqual([5_000])
+      await timers.advance(4_000)
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      // with no sweep at all, the timers alone lock it right after the original deadline
+      await timers.advance(2_000)
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(path)).toBe(false)
     } finally {
       timers.restore()
     }

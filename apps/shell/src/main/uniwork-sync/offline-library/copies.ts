@@ -390,6 +390,12 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     const onScreen = shownBefore !== undefined && deps.isPathOpen(shownBefore.path)
     const dir = deps.store.dirFor(scope.deploymentId, scope.accountId, offlineCopyKey(documentId))
     const row = await library.row(documentId)
+    // G703-R10-1: the row's remaining time is a duration sampled at this read, and the open
+    // path awaits below (openCached, the capability read, the write, the display) before the
+    // copy is tracked. Turn it into an absolute deadline here, once, and carry that through
+    // every branch: re-anchoring the sampled duration at the end would arm the expiry from the
+    // end of the open work instead of from the real lease deadline.
+    const rowDeadline = row ? expiryOf(row, now()) : null
     // the lease check of openCached runs for a copy already on screen too: an
     // expired lease must not be brought forward (G703B-P1)
     const cached = await library.openCached(documentId)
@@ -420,9 +426,9 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       return refusal
     }
     if (onScreen && !shownBefore.locked) {
-      if (row) {
+      if (row && rowDeadline !== null) {
         shownBefore.orgId = row.orgId
-        shownBefore.leaseUntilMs = expiryOf(row, now())
+        shownBefore.leaseUntilMs = rowDeadline
         scheduleExpiry(documentId)
       }
       return {
@@ -464,7 +470,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       openedAt: now(),
       locked: false,
       orgId: row.orgId,
-      leaseUntilMs: expiryOf(row, now()),
+      leaseUntilMs: rowDeadline,
       timer: null,
       counted: true,
     })
