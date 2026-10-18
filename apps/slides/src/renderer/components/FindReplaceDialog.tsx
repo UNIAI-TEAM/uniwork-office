@@ -138,7 +138,15 @@ export function FindReplaceDialog({
   }
 
   return (
-    <div className="find-panel" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+    <div
+      className="find-panel"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          onClose()
+        }
+      }}
+    >
       <div className="find-panel-head">
         <span>{t('paneFrTitle')}</span>
         <button

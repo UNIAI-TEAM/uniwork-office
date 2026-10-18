@@ -422,6 +422,36 @@ describe('open dialog reflow and focus (S5)', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(document.activeElement).toBe(opener)
   })
+
+  it('alertTone switches between error (role="alert") and success (role="status", .ow-dlg-alert.success) (SVC-1)', () => {
+    const handle = openFrameDialog<string>({ marker: 'tone' })
+    void handle.step({
+      title: 'Step 1',
+      body: 'b',
+      choices: [{ id: 'cancel', label: 'Cancel' }],
+      cancelId: 'cancel',
+      alert: 'Your version was saved as a new document.',
+      alertTone: 'success',
+    })
+    const alertEl = document.querySelector<HTMLElement>('.ow-dlg-alert')!
+    expect(alertEl.textContent).toBe('Your version was saved as a new document.')
+    expect(alertEl.getAttribute('role')).toBe('status')
+    expect(alertEl.className).toBe('ow-dlg-alert success')
+
+    handle.setAlert('Something failed.')
+    expect(alertEl.textContent).toBe('Something failed.')
+    expect(alertEl.getAttribute('role')).toBe('alert')
+    expect(alertEl.className).toBe('ow-dlg-alert')
+
+    handle.setAlert('Copied again.', 'success')
+    expect(alertEl.getAttribute('role')).toBe('status')
+    expect(alertEl.className).toBe('ow-dlg-alert success')
+
+    handle.setAlert('', 'success')
+    expect(alertEl.getAttribute('role')).toBe('alert')
+    expect(alertEl.className).toBe('ow-dlg-alert')
+    handle.close()
+  })
 })
 
 describe('toneOf', () => {

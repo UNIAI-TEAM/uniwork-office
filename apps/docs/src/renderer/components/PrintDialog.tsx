@@ -56,6 +56,7 @@ export function PrintDialog({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault()
         e.stopPropagation()
         onClose()
       }

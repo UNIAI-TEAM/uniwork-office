@@ -221,6 +221,15 @@
   background: var(--danger-bg);
 }
 
+.ow-dlg-alert.success {
+  color: var(--success);
+}
+
+.ow-dlg-alert.success:not(:empty) {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+
 .ow-dlg-alert:empty {
   height: 0;
   overflow: hidden;

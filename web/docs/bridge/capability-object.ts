@@ -8,8 +8,10 @@
  * (frame ∩ host) are assigned into the same object when the handshake completes. Boot waits
  * (bounded) for `init`, so the grants land before the first render.
  */
-import type { Capabilities } from '../protocol/types'
+import { isReadOnlyProfile, type Capabilities } from '../protocol/types'
 import type { FramePort } from './frame-port'
+
+const READ_ONLY_DISABLED_CAPS = ['save', 'saveAs', 'edit', 'htmlVisualEdit', 'exportHtml'] as const
 
 export function createCapabilityObject<C extends object>(
   defaults: Readonly<C>,
@@ -19,7 +21,18 @@ export function createCapabilityObject<C extends object>(
   const caps = { ...defaults } as C
   port
     .whenInitialized()
-    .then((session) => Object.assign(caps, grants(session.capabilities)))
+    .then((session) => {
+      Object.assign(caps, grants(session.capabilities))
+      if (isReadOnlyProfile(session)) {
+        const record = caps as Record<string, unknown>
+        for (const key of READ_ONLY_DISABLED_CAPS) {
+          if (key in record) record[key] = false
+        }
+        // the one flag that says "profile" itself (a view-only user without it keeps the document's
+        // own comments); only objects that declare the key carry it
+        if ('readOnlyProfile' in record) record.readOnlyProfile = true
+      }
+    })
     .catch(() => {}) // a failed handshake is reported elsewhere (bridge open flow / host)
   return caps
 }

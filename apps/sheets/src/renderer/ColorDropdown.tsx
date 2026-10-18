@@ -87,7 +87,10 @@ export function ColorDropdown({
       if (!wrapRef.current?.contains(target) && !popRef.current?.contains(target)) setOpen(false)
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setOpen(false)
+      }
     }
     // capture phase: the grid canvas stops mousedown propagation, so bubble-phase listeners never fire
     window.addEventListener('pointerdown', onDown, true)

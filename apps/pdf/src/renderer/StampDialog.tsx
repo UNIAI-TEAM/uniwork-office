@@ -32,7 +32,10 @@ export function StampDialog({
       if (!colorWrapRef.current?.contains(event.target as Node)) setColorOpen(false)
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setColorOpen(false)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setColorOpen(false)
+      }
     }
     window.addEventListener('pointerdown', onDown, true)
     window.addEventListener('keydown', onKey)

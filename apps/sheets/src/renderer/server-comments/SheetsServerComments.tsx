@@ -325,6 +325,8 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
     return () => window.removeEventListener(FRAME_SIDE_PANEL_EVENT, onOther)
   }, [])
 
+  const levelRef = useRef(mode.level)
+  levelRef.current = mode.level
   const statusRef = useRef(p.onStatus)
   statusRef.current = p.onStatus
   const saveFirstRef = useRef(p.saveFirstMessage)
@@ -341,6 +343,10 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
     }
     const handle: SheetsServerCommentsHandle = {
       startThread: () => {
+        if (levelRef.current === 'view') {
+          openRef.current()
+          return
+        }
         // a root comment needs base_version_id (OQ-C2): unknown until the first Save receipt
         if (!versionRef.current) {
           explain(saveFirstRef.current)

@@ -1382,6 +1382,7 @@ export function Ribbon({
   // ribbon-tabs window drag region (drag regions swallow mousedown, so a
   // press there could never dismiss otherwise)
   const anyPanelOpen =
+    fileOpen ||
     tableOpen ||
     colorOpen ||
     translateOpen ||
@@ -1401,13 +1402,25 @@ export function Ribbon({
     slideSizeOpen ||
     transparencyOpen ||
     lineSpacingOpen ||
-    collapseOpen != null
+    collapseOpen != null ||
+    penFlyout != null
 
   // Clicking elsewhere collapses every popup (the font color palette uses
   // onMouseDown without stealing focus, collapsing naturally when the edit
   // commits). The shared installer covers outside mousedown, window blur and
   // the shell app:chrome-pressed relay; panels survive via stopPropagation.
   useDismissablePopover(anyPanelOpen, closePanels)
+  useEffect(() => {
+    if (!anyPanelOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closePanels()
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [anyPanelOpen, closePanels])
 
   // ── Responsive collapse (PowerPoint model): the collapsed set is a pure
   // function of the current width, never of resize history — pick the fewest
@@ -1767,7 +1780,7 @@ export function Ribbon({
               {t('ribbonTabFile')}
             </button>
             {fileOpen && (
-              <div className="file-menu">
+              <div className="file-menu" onMouseDown={(e) => e.stopPropagation()}>
                 {cap('open') && (
                   <button
                     onClick={() => {
@@ -1800,16 +1813,18 @@ export function Ribbon({
                     {t('ribbonFileSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
                   </button>
                 )}
-                <button
-                  disabled={!hasDoc}
-                  onClick={() => {
-                    setFileOpen(false)
-                    onExportPdf()
-                  }}
-                >
-                  {t('ribbonFileExportPdf')}
-                </button>
-                {isWeb() && (
+                {cap('exportPdf') && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setFileOpen(false)
+                      onExportPdf()
+                    }}
+                  >
+                    {t('ribbonFileExportPdf')}
+                  </button>
+                )}
+                {isWeb() && cap('exportPdf') && (
                   <button
                     disabled={!hasDoc}
                     data-use-app="print-pdf"
@@ -1821,24 +1836,28 @@ export function Ribbon({
                     {t('ribbonFileExportPdfPrint')}
                   </button>
                 )}
-                <button
-                  disabled={!hasDoc}
-                  onClick={() => {
-                    setFileOpen(false)
-                    onPrint()
-                  }}
-                >
-                  {t('ribbonFilePrint')} <span className="file-menu-key">Ctrl+P</span>
-                </button>
-                <button
-                  disabled={!hasDoc}
-                  onClick={() => {
-                    setFileOpen(false)
-                    onExportImages()
-                  }}
-                >
-                  {t('ribbonFileExportImages')}
-                </button>
+                {cap('print') && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setFileOpen(false)
+                      onPrint()
+                    }}
+                  >
+                    {t('ribbonFilePrint')} <span className="file-menu-key">Ctrl+P</span>
+                  </button>
+                )}
+                {cap('saveAs') && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setFileOpen(false)
+                      onExportImages()
+                    }}
+                  >
+                    {t('ribbonFileExportImages')}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -2056,6 +2075,10 @@ export function Ribbon({
                           aria-label={
                             preset.kind === 'pen' ? t('ribbonPenTip') : t('ribbonHighlighterTip')
                           }
+                          onMouseDown={(e) => {
+                            e.stopPropagation()
+                            closeSiblingPanels(e, closePanels, 'pen')
+                          }}
                           onClick={(event) => {
                             if (held) {
                               const rect = event.currentTarget.getBoundingClientRect()
@@ -2099,7 +2122,11 @@ export function Ribbon({
                 {penFlyout && (
                   <>
                     <div className="pen-flyout-backdrop" onClick={() => setPenFlyout(null)} />
-                    <div className="pen-flyout" style={{ left: penFlyout.x, top: penFlyout.y }}>
+                    <div
+                      className="pen-flyout"
+                      style={{ left: penFlyout.x, top: penFlyout.y }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
                       {renderInkSettings(penFlyout.index)}
                     </div>
                   </>

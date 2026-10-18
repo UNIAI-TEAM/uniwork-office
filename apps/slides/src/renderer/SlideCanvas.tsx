@@ -1010,6 +1010,7 @@ export function SlideCanvas({
     }
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === 'Escape') {
+        ev.preventDefault()
         drawRef.current = null
         setDrawPreview(null)
         onDrawCancel?.()

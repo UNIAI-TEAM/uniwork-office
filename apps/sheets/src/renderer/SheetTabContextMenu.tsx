@@ -144,7 +144,10 @@ export function SheetTabContextMenu({
       if (!menuRef.current?.contains(event.target as Node)) setMenuAt(null)
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setMenuAt(null)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMenuAt(null)
+      }
     }
     window.addEventListener('mousedown', onPress)
     window.addEventListener('keydown', onKey)

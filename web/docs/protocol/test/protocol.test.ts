@@ -1730,3 +1730,76 @@ describe('open_refused (SIZE-F1, additive)', () => {
     ])
   })
 })
+
+describe('read-only profile and close_requested (UNI-1876, additive)', () => {
+  it('includes close_requested in FRAME_EVENT_TYPES and delivers it from client.reportCloseRequested to host.on', async () => {
+    expect(FRAME_EVENT_TYPES).toContain('close_requested')
+    const { host, client, frameWin } = setup()
+    await host.whenReady()
+    await client.whenInitialized()
+
+    const seen: unknown[] = []
+    const off = host.on('close_requested', (p) => seen.push(p))
+
+    client.reportCloseRequested('escape')
+    await flush()
+
+    expect(seen).toEqual([{ reason: 'escape' }])
+    const closeEvents = frameWin.sent.filter(
+      (m) => typeof m === 'object' && m !== null && 'type' in m && m.type === 'close_requested',
+    )
+    expect(closeEvents).toEqual([
+      expect.objectContaining({
+        kind: 'event',
+        type: 'close_requested',
+        payload: { reason: 'escape' },
+      }),
+    ])
+    for (const m of closeEvents) expect(parseEnvelope(m).ok).toBe(true)
+
+    off()
+    client.reportCloseRequested('escape')
+    await flush()
+    expect(seen).toHaveLength(1)
+  })
+
+  it('propagates init.profile to client session and clears it on re-init without profile', async () => {
+    let currentProfile: 'readOnly' | undefined = 'readOnly'
+    const { host, client, hostWin, frameWin } = setup({
+      getInit: async () => baseInit(currentProfile ? { profile: currentProfile } : undefined),
+    })
+    await host.whenReady()
+    const session = await client.whenInitialized()
+    expect(session.profile).toBe('readOnly')
+
+    // Re-init without profile clears session.profile
+    currentProfile = undefined
+    frameWin.deliver(
+      {
+        ns: PROTOCOL_NS,
+        v: PROTOCOL_VERSION,
+        id: 'h-reinit',
+        kind: 'request',
+        type: 'init',
+        payload: { ...baseInit(), protocolVersion: PROTOCOL_VERSION },
+      },
+      ORIGIN,
+      hostWin,
+    )
+    // Re-init with an unknown future profile drops it to undefined without rejecting init (RFW1-4)
+    frameWin.deliver(
+      {
+        ns: PROTOCOL_NS,
+        v: PROTOCOL_VERSION,
+        id: 'h-reinit-unknown',
+        kind: 'request',
+        type: 'init',
+        payload: { ...baseInit(), protocolVersion: PROTOCOL_VERSION, profile: 'presenter' },
+      },
+      ORIGIN,
+      hostWin,
+    )
+    await flush()
+    expect(session.profile).toBeUndefined()
+  })
+})

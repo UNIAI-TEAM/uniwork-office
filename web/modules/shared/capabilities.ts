@@ -18,6 +18,12 @@ export const TEXT_MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = O
   billing: false,
   // editing and saving: on only with the host's `save` grant (view-only otherwise)
   save: false,
+  // saving a copy / exporting to a new file: on only with the host's `saveAs` grant (D2, UNI-1876)
+  saveAs: false,
+  // printing and exports: on only with the corresponding host grant (UNI-1876)
+  print: false,
+  exportPdf: false,
+  exportHtml: false,
   // pictures go to the asset store only with the host's `images` grant (else embedded)
   images: false,
   // "Open in the UniWork Office app" action of the use-the-app messages: on with the host's `desktopOpen` grant
@@ -33,6 +39,10 @@ export function textModuleGrants(granted: Capabilities | undefined): Record<stri
     open: granted?.filePick === true,
     recents: granted?.recents === true,
     save: granted?.save === true,
+    saveAs: granted?.saveAs === true,
+    print: granted?.print === true,
+    exportPdf: granted?.exportPdf === true,
+    exportHtml: granted?.exportHtml === true,
     images: granted?.images === true,
     desktopOpen: granted?.desktopOpen === true,
   }

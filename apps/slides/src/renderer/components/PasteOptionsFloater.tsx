@@ -26,7 +26,10 @@ export function PasteOptionsFloater({ mode, onSelect, onDismiss }: Props) {
   useEffect(() => {
     if (menuPos) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onDismiss()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onDismiss()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

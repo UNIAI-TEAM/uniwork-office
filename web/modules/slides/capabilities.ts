@@ -13,6 +13,9 @@ export const SLIDES_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   ...MODULE_WEB_CAPABILITIES,
   save: false,
   saveAs: false,
+  print: false,
+  exportPdf: false,
+  exportHtml: false,
   tabs: false,
   webSearch: false,
   imageSearch: false,
@@ -30,12 +33,15 @@ export const SLIDES_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   errorLabel: false,
 })
 
-/** host grants -> keys: File > Open (filePick), recents, and saving (a frame without `save` is view-only) */
+/** host grants -> keys: File > Open (filePick), recents, saving, print, and exports */
 export function slidesHostGrants(granted: Capabilities | undefined): Record<string, boolean> {
   return {
     ...hostGrants(granted),
     save: granted?.save === true,
     saveAs: granted?.saveAs === true,
+    print: granted?.print === true,
+    exportPdf: granted?.exportPdf === true,
+    exportHtml: granted?.exportHtml === true,
     desktopOpen: granted?.desktopOpen === true,
   }
 }

@@ -254,6 +254,7 @@ export function startSheetShapeDraw(
   }
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
+      e.preventDefault()
       cleanup()
       return
     }

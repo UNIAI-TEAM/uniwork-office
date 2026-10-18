@@ -476,7 +476,12 @@ export function FindPanel({
     : ''
 
   return (
-    <div className="find-panel" role="dialog" aria-label={t('appFindPlaceholder')}>
+    <div
+      data-esc-local=""
+      className="find-panel"
+      role="dialog"
+      aria-label={t('appFindPlaceholder')}
+    >
       <div className="find-tabs" role="tablist">
         {(['find', ...(canEdit ? (['replace'] as const) : []), 'goto'] as FindTab[]).map((k) => (
           <button
@@ -524,7 +529,10 @@ export function FindPanel({
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') step(e.shiftKey ? -1 : 1)
-                if (e.key === 'Escape') close()
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  close()
+                }
               }}
             />
             <span className="find-count" aria-live="polite">
@@ -589,7 +597,10 @@ export function FindPanel({
                 onChange={(e) => setReplacement(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') replaceOne()
-                  if (e.key === 'Escape') close()
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    close()
+                  }
                 }}
               />
               <button
@@ -674,7 +685,10 @@ export function FindPanel({
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') runGoTo(1, true)
-                  if (e.key === 'Escape') close()
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    close()
+                  }
                 }}
               >
                 <option value="">{t('appGoToPickBookmark')}</option>
@@ -697,7 +711,10 @@ export function FindPanel({
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') runGoTo(e.shiftKey ? -1 : 1, true)
-                  if (e.key === 'Escape') close()
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    close()
+                  }
                 }}
               />
             )}

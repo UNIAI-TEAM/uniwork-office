@@ -132,5 +132,15 @@ export const vi = {
     'Tài liệu đã vượt {max}. Thay đổi của bạn vẫn ở đây. Tải bản của bạn về máy rồi giảm dung lượng ảnh hoặc chia nhỏ tài liệu.',
   webSaveBlockDownload: 'Tải bản của tôi',
   uwConflictTooLargeWithLimit:
-    'Tài liệu đã vượt {max} (đang {size}) nên chưa thực hiện được. Hãy bấm “Tải bản của tôi” hoặc đóng hộp thoại để giảm dung lượng.',
+    'Bản của bạn đã vượt {max} (đang {size}) nên chưa ghi đè được. Hãy đóng hộp thoại để giảm dung lượng.',
+  uwConflictTooLargeWithLimitDownload:
+    'Bản của bạn đã vượt {max} (đang {size}) nên chưa ghi đè được. Hãy đóng hộp thoại để giảm dung lượng, hoặc bấm “Tải lại bản mới nhất” để tải bản của bạn về máy.',
+  uwConflictSaveCopyTooLarge:
+    'Bản của bạn vượt giới hạn kích thước của UniWork nên chưa tạo được bản sao. Hãy đóng hộp thoại để giảm dung lượng.',
+  uwConflictSaveCopyTooLargeDownload:
+    'Bản của bạn vượt giới hạn kích thước của UniWork nên chưa tạo được bản sao. Hãy đóng hộp thoại để giảm dung lượng, hoặc bấm “Tải lại bản mới nhất” để tải bản của bạn về máy.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'Bản của bạn đã vượt {max} (đang {size}) nên chưa tạo được bản sao. Hãy đóng hộp thoại để giảm dung lượng.',
+  uwConflictSaveCopyTooLargeWithLimitDownload:
+    'Bản của bạn đã vượt {max} (đang {size}) nên chưa tạo được bản sao. Hãy đóng hộp thoại để giảm dung lượng, hoặc bấm “Tải lại bản mới nhất” để tải bản của bạn về máy.',
 } satisfies Record<keyof typeof zh, string>

@@ -103,6 +103,8 @@ interface EditorContextMenuProps {
   sectionContentWidthPx?: number
   /** re-mark existing text after the session dictionary or languages changed */
   onRespell?: () => void
+  /** whether adding comments is allowed when the document body is read-only */
+  commentsAllowed?: boolean
 }
 
 const MENU_WIDTH = 240
@@ -147,6 +149,7 @@ export function EditorContextMenu({
   onTableDialog,
   sectionContentWidthPx = 624,
   onRespell,
+  commentsAllowed = false,
 }: EditorContextMenuProps) {
   const { t, lang } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
@@ -256,17 +259,20 @@ export function EditorContextMenu({
       if (!ref.current?.contains(e.target as Node)) onClose()
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
     }
     window.addEventListener('mousedown', close)
-    window.addEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
     window.addEventListener('blur', onClose)
     // shell tab-strip presses never reach this document; the preload relays
     // them (app:chrome-pressed) so the menu still dismisses
     const offChrome = window.desktop?.onChromePressed?.(onClose)
     return () => {
       window.removeEventListener('mousedown', close)
-      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('blur', onClose)
       offChrome?.()
     }
@@ -340,6 +346,7 @@ export function EditorContextMenu({
   return (
     <div
       ref={ref}
+      data-esc-local=""
       className="ctx-menu"
       style={{ left: pos.left, top: pos.top, minWidth: MENU_WIDTH }}
       onContextMenu={(e) => e.preventDefault()}
@@ -754,7 +761,10 @@ export function EditorContextMenu({
       ) : (
         item(t('appHyperlinkMenu'), { key: '⌘K', disabled: !canEdit, onClick: run(onLink) })
       )}
-      {item(t('appNewComment'), { disabled: !canComment, onClick: run(onNewComment) })}
+      {item(t('appNewComment'), {
+        disabled: !canComment || (!canEdit && !commentsAllowed),
+        onClick: run(onNewComment),
+      })}
     </div>
   )
 }

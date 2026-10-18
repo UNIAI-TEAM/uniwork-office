@@ -300,10 +300,11 @@ export async function loadCommentsContext(
     v.level === 'view' || v.level === 'comment' || v.level === 'edit' || v.level === 'manage'
       ? v.level
       : undefined
+  const forceView = v.profile === 'readOnly' || (readOnly && v.frame !== true)
   return {
     documentId: v.documentId,
     versionId: v.versionId,
-    ...(readOnly ? { level: 'view' as const } : level ? { level } : {}),
+    ...(forceView ? { level: 'view' as const } : level ? { level } : {}),
     ...(isId(v.myUserId) ? { myUserId: v.myUserId } : {}),
     // web frame only: the frame reloads on its own push, so the desktop poll stays off there
     ...(v.frame === true ? { frame: true as const } : {}),

@@ -6,8 +6,10 @@
 import {
   toProtocolError,
   type Capabilities,
+  type CloseRequestedReason,
   type DocumentSizeLimits,
   type FileMeta,
+  type FrameProfile,
   type FrameRequestType,
   type FrameRequests,
   type HostRequests,
@@ -51,6 +53,8 @@ export interface PortSession {
   apiBase?: string
   /** `session.limits` (additive, SIZE-F1): active document size limits; absent in unit-test sessions */
   limits?: DocumentSizeLimits
+  /** `init.profile` (additive, UNI-1876): `'readOnly'` forces read-only UI across the frame */
+  profile?: FrameProfile
 }
 
 type HostHandler<K extends keyof HostRequests> = (
@@ -103,6 +107,8 @@ export interface FramePort {
   reportSaveBlocked?(payload: SaveBlockedPayload): void
   /** protocol `lag_detected` event (UNI-1865; optional for older clients and mocks) */
   reportLagDetected?(payload: LagDetectedPayload): void
+  /** protocol `close_requested` event (UNI-1876; optional for older clients and mocks) */
+  reportCloseRequested?(reason: CloseRequestedReason): void
 }
 
 export function errorCode(err: unknown): ProtocolErrorCode {

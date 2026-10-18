@@ -158,6 +158,7 @@ export function exportBaseName(ctx: ActionCtx): string {
 
 /** Export as images: each page (skipping hidden ones) rendered offscreen to 2x PNG, written to disk by the main process */
 export async function exportImages(ctx: ActionCtx): Promise<void> {
+  if (!cap('saveAs')) return
   const visible = ctx.slides.filter((s) => !s.hidden)
   if (visible.length === 0) {
     ctx.setStatus(t('appExportNoSlides'))
@@ -212,6 +213,7 @@ async function collectPdfLinks(ctx: ActionCtx): Promise<ExportPdfLink[][]> {
  * the file goes. Resolves true only when a PDF was written.
  */
 export async function exportPdf(ctx: ActionCtx, outPath?: string): Promise<boolean> {
+  if (!outPath && !cap('exportPdf')) return false
   const visible = ctx.slides.filter((s) => !s.hidden)
   if (visible.length === 0) {
     ctx.setStatus(t('appExportNoSlides'))

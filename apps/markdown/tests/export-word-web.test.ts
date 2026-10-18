@@ -124,4 +124,28 @@ describe('Export Word ribbon entry', () => {
     const { container } = await mountApp('/u/notes.txt', { platform: 'web' })
     expect(entry(container)!.disabled).toBe(true)
   })
+
+  it('hides Save when save is false, and hides Save As + Export Word when saveAs is false', async () => {
+    const { container } = await mountApp('/u/notes.md', {
+      platform: 'web',
+      save: false,
+      saveAs: false,
+    })
+    expect(container.querySelector('button[aria-label="Save (Ctrl+S)"]')).toBeNull()
+    expect(container.querySelector('.qa-save-as')).toBeNull()
+    expect(entry(container)).toBeNull()
+  })
+
+  it('link popover Escape closes the popover and calls preventDefault for the Escape forwarder', async () => {
+    const { container } = await mountApp('/u/notes.md', { platform: 'web' })
+    const linkBtn = container.querySelector<HTMLButtonElement>('.rb-link-anchor button.rb-btn')!
+    act(() => linkBtn.click())
+    expect(container.querySelector('.rb-link-pop')).not.toBeNull()
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    act(() => {
+      window.dispatchEvent(event)
+    })
+    expect(event.defaultPrevented).toBe(true)
+    expect(container.querySelector('.rb-link-pop')).toBeNull()
+  })
 })

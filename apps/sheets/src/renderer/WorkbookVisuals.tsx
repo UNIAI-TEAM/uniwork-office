@@ -2462,7 +2462,10 @@ function VisualContextMenu({
   closeRef.current = onClose
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') closeRef.current()
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeRef.current()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

@@ -19,6 +19,7 @@ import { flushActiveEdit } from './file-actions'
 import { shouldRouteHistoryToDeck } from './undo-routing'
 import { rangeSelection } from '../shared/slide-selection'
 import { nextPreset, prevPreset } from './zoom-steps'
+import { cap } from './capabilities'
 
 /** Whether focus is in a text input (input/textarea/contentEditable) — these cases use native undo/delete */
 function inTextField(): boolean {
@@ -163,7 +164,7 @@ export function handleGlobalKeydown(
   if (mod && !e.altKey && !e.shiftKey && (e.key === 'p' || e.key === 'P')) {
     if (editing || inField) return
     e.preventDefault()
-    ctx.setPrintDlgOpen(true)
+    if (cap('print')) ctx.setPrintDlgOpen(true)
     return
   }
   // PowerPoint text formatting: ⌘L/E/R/J align, ⌘]/⌘[ ±1 pt, ⇧⌘>/⇧⌘< grow/shrink
@@ -225,7 +226,15 @@ export function handleGlobalKeydown(
     if (sel && !sel.isCollapsed) return
   }
   // An open overlay (menu, dialog, popover, crop, media, draw mode) owns Escape outright
-  if (e.key === 'Escape' && ctx.overlayOpen) return
+  if (
+    e.key === 'Escape' &&
+    (ctx.overlayOpen ||
+      e.defaultPrevented ||
+      document.querySelector(
+        '[role="dialog"], [role="menu"], [aria-modal="true"], [data-esc-local]',
+      ))
+  )
+    return
   // Esc: drop the ink pen/highlighter/eraser back to the select tool (PowerPoint behavior)
   if (e.key === 'Escape' && ctx.inkTool !== 'select') {
     e.preventDefault()

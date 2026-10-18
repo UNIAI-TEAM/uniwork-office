@@ -294,6 +294,7 @@ export function FindReplacePanel({
       style={position ? { left: position.x, top: position.y, right: 'auto' } : undefined}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
+          event.preventDefault()
           event.stopPropagation()
           onClose()
         }

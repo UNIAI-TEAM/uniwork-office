@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode, Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { ColorPicker, useDismissablePopover } from '@genoffice/ui'
@@ -57,6 +57,7 @@ export function ColorPop(p: PopProps) {
         else if (p.popRef) p.popRef.current = el
       }}
       className="hx-color-pop"
+      data-esc-local=""
       style={pos}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -101,6 +102,17 @@ export function ColorField(p: FieldProps) {
   useDismissablePopover(open, () => setOpen(false), {
     inside: () => [btnRef.current, popRef.current],
   })
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [open])
 
   return (
     <>

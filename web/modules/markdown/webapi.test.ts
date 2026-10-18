@@ -39,6 +39,7 @@ const FULL: Capabilities = { save: true, saveAs: true, print: true, exportPdf: t
 function setup(
   opts: {
     caps?: Capabilities
+    profile?: 'readOnly'
     bytes?: Uint8Array
     name?: string
     drafts?: TextWebApiOptions['drafts']
@@ -75,6 +76,7 @@ function setup(
   mock.init({
     documentId: file.fileId,
     capabilities: opts.caps ?? FULL,
+    ...(opts.profile ? { profile: opts.profile } : {}),
     ...(opts.revision !== undefined
       ? { open: { ...mock.openPayload(file.fileId), file: { ...file, revision: opts.revision } } }
       : {}),
@@ -640,6 +642,7 @@ describe('markdownApi: pictures and exports', () => {
 
   it('exportDocx downloads the renderer-built bytes; open-in-Docs is refused', async () => {
     const { api } = setup()
+    await open(api)
     const create = vi.fn(() => 'blob:x')
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: () => {} })
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
@@ -976,5 +979,118 @@ describe('markdownApi: save size gate (SIZE-F1, UNI-1861)', () => {
     const dl = await mock.host['doc.download']({})
     expect(dl).toEqual({ delivered: true })
     expect(mock.calls.filter((c) => c.type === 'api.download')).toHaveLength(1)
+  })
+})
+
+describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => {
+  it('refuses saveAs and exportDocx without the saveAs grant even when save is granted', async () => {
+    const { api, mock } = setup({
+      caps: { save: true, saveAs: false, print: true, exportPdf: true, images: true },
+    })
+    const { text } = await open(api)
+    api.provideText(() => text)
+    expect(api.capabilities).toMatchObject({
+      save: true,
+      saveAs: false,
+      exportPdf: true,
+    })
+    expect(
+      await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.md' }),
+    ).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.md' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(
+      await api.exportDocx({ base64: 'UEsDBA==', suggestedName: 'Notes', mode: 'dialog' }),
+    ).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
+  })
+
+  it('allows saveAs in view-only mode when saveAs is granted (without save)', async () => {
+    const { api, mock } = setup({
+      caps: { save: false, saveAs: true, print: true, exportPdf: true },
+    })
+    const { text } = await open(api)
+    api.provideText(() => text)
+    api.onSaveRequest((mode) => {
+      void api.save({ text, imageSources: [], mode, defaultName: 'Copy2.md' })
+    })
+    expect(api.capabilities).toMatchObject({
+      save: false,
+      saveAs: true,
+    })
+    expect(
+      await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.md' }),
+    ).toMatchObject({
+      ok: true,
+    })
+    expect(await mock.host.saveAs({ name: 'Copy2.md' })).toMatchObject({
+      ok: true,
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(2)
+  })
+
+  it('refuses exportPdf without the exportPdf grant', async () => {
+    const { api, print } = setup({
+      caps: { save: true, saveAs: true, print: true, exportPdf: false },
+    })
+    await open(api)
+    expect(api.capabilities.exportPdf).toBe(false)
+    expect(await api.exportPdf({ html: '<p>x</p>', suggestedName: 'Notes' })).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(print).not.toHaveBeenCalled()
+  })
+
+  it('readOnly profile forces viewOnly, save:false, saveAs:false, refuses save/saveAs/exportDocx, and keeps print and exportPdf', async () => {
+    const { api, mock, print } = setup({
+      profile: 'readOnly',
+      caps: { save: true, saveAs: true, print: true, exportPdf: true, images: true },
+    })
+    const { text } = await open(api)
+    api.provideText(() => text)
+    expect(await api.uniworkState()).toEqual({ bound: false, readOnly: true })
+    expect(api.capabilities).toMatchObject({
+      save: false,
+      saveAs: false,
+      print: true,
+      exportPdf: true,
+    })
+    expect(await api.save({ text, imageSources: [], mode: 'save' })).toEqual({
+      ok: false,
+      error: 'read-only document',
+    })
+    expect(
+      await api.save({ text, imageSources: [], mode: 'saveAs', defaultName: 'Copy.md' }),
+    ).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.md' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(
+      await api.exportDocx({ base64: 'UEsDBA==', suggestedName: 'Notes', mode: 'dialog' }),
+    ).toEqual({
+      ok: false,
+      error: 'unsupported',
+    })
+    // D3: granted print and exportPdf stay available in readOnly profile
+    expect(await api.exportPdf({ html: '<p>x</p>', suggestedName: 'Notes' })).toEqual({
+      ok: true,
+      path: 'Notes.pdf',
+    })
+    api.onExportRequest(() => void api.exportPdf({ html: '<p>x</p>', suggestedName: 'Notes' }))
+    expect(await mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
+    expect(print).toHaveBeenCalledTimes(2)
   })
 })

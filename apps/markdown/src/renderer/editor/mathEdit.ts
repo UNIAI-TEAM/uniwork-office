@@ -43,6 +43,7 @@ export function openMathEditor(editor: Editor, options: OpenMathOptions): void {
 
   const pop = document.createElement('div')
   pop.className = 'md-math-pop'
+  pop.setAttribute('data-esc-local', '')
 
   const input = document.createElement('textarea')
   input.className = 'md-math-input'
@@ -115,6 +116,7 @@ export function openMathEditor(editor: Editor, options: OpenMathOptions): void {
 
   pop.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
+      event.preventDefault()
       event.stopPropagation()
       close()
       editor.commands.focus()

@@ -100,6 +100,74 @@ describe('Export HTML ribbon entry', () => {
       expect(dict.exportHtmlEntry, lang).not.toMatch(/…$/)
     }
   })
+
+  it('hides Save, Save As, and Export HTML when their capabilities are withheld', () => {
+    stubApi({
+      capabilities: {
+        platform: 'web',
+        save: false,
+        saveAs: false,
+        exportHtml: false,
+      },
+    })
+    const noop = vi.fn()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    act(() =>
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(Ribbon, {
+            disabled: false,
+            dirty: false,
+            onSave: noop,
+            onSaveAs: noop,
+            onExport: noop,
+            onFind: noop,
+            autoSave: false,
+            onToggleAutoSave: noop,
+            aiOpen: false,
+            onToggleAi: noop,
+            onAiPreset: noop,
+            canUndo: false,
+            canRedo: false,
+            onUndo: noop,
+            onRedo: noop,
+            view: 'preview',
+            onView: noop,
+            canInsert: true,
+            onInsert: noop,
+            canvasMode: 'edit',
+            onPresent: noop,
+          } as never),
+        ),
+      ),
+    )
+    cleanups.push(() => {
+      act(() => root.unmount())
+      container.remove()
+    })
+    expect(container.querySelector('.ribbon-tabs button[aria-label="Save (Ctrl+S)"]')).toBeNull()
+    expect(container.querySelector('.qa-save-as')).toBeNull()
+    expect(container.querySelector('.qa-export')).toBeNull()
+  })
+
+  it('Present menu Escape closes the menu and calls preventDefault for the Escape forwarder', () => {
+    const box = ribbon({})
+    const presentBtn = [...box.querySelectorAll<HTMLButtonElement>('button.rb-view')].find((b) =>
+      b.textContent?.includes('Present'),
+    )!
+    act(() => presentBtn.click())
+    expect(box.querySelector('[role="menu"]')).not.toBeNull()
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    act(() => {
+      window.dispatchEvent(event)
+    })
+    expect(event.defaultPrevented).toBe(true)
+    expect(box.querySelector('[role="menu"]')).toBeNull()
+  })
 })
 
 describe('style edits not committed yet reach the draft copy', () => {

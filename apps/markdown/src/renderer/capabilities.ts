@@ -29,6 +29,10 @@ export type MarkdownCapability =
   | 'aiImageFetch'
   | 'mdTheme'
   | 'save'
+  | 'saveAs'
+  | 'print'
+  | 'exportPdf'
+  | 'exportHtml'
   | 'saveStatus'
   | 'viewOnlyChip'
 

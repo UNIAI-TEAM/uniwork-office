@@ -28,6 +28,11 @@ export function appOpenAvailable(): boolean {
   return caps.platform === 'web' && caps.desktopOpen === true
 }
 
+/** the host's `readOnly` profile is on: the document's own comments stay hidden too (an unset key is off) */
+export function isReadOnlyProfile(): boolean {
+  return capabilities().readOnlyProfile === true
+}
+
 /** the editor runs in a web frame (the host around it has its own chrome, e.g. a Comments drawer) */
 export function isWebFrame(): boolean {
   return capabilities().platform === 'web'
