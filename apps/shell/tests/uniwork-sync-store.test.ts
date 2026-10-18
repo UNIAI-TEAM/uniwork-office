@@ -320,12 +320,17 @@ describe('uniwork sync store layer', () => {
 
   // B33 (UNI-1362): a real write failure (ENOSPC) used to leave the encrypted
   // temp file behind until the next scope scrub. The write drops the file it
-  // owns, then rethrows the original error.
+  // owns, then rethrows the original error. R1-5: the writer must really create
+  // the temp first (a throw-only writer never writes a byte, so the assertion
+  // held with the cleanup removed), and a cleanup that itself fails must not
+  // replace the primary error.
   it('a failed flush leaves no temp file behind and rethrows the original error', async () => {
     const storePath = join(dir, 'dep_1', 'acc_1', 'cursors')
     const layer = makeLayer({
       fs: {
-        writeFile: async () => {
+        // half the encrypted record lands, then the disk fills: the temp exists
+        writeFile: async (path, data, mode) => {
+          await writeFile(path, data.subarray(0, Math.max(1, Math.floor(data.length / 2))), { mode })
           throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' })
         },
       },
@@ -335,18 +340,43 @@ describe('uniwork sync store layer', () => {
     expect(readdirSync(storePath)).toEqual([])
   })
 
-  it('a refused publish drops its temp file too', async () => {
+  it('a cleanup that fails does not replace the error the flush reported', async () => {
     const storePath = join(dir, 'dep_1', 'acc_1', 'cursors')
     const layer = makeLayer({
       fs: {
-        renameSync: () => {
-          throw Object.assign(new Error('the disk is gone'), { code: 'EIO' })
+        writeFile: async (path, data, mode) => {
+          await writeFile(path, data.subarray(0, Math.max(1, Math.floor(data.length / 2))), { mode })
+          throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' })
+        },
+        rm: async () => {
+          throw Object.assign(new Error('the temp cannot be removed'), { code: 'EACCES' })
         },
       },
     })
     const records = await openRecords(layer)
-    await expect(records.write('k', Buffer.from('value'))).rejects.toThrow('the disk is gone')
-    expect(readdirSync(storePath)).toEqual([])
+    await expect(records.write('k', Buffer.from('value'))).rejects.toThrow('no space left')
+    expect(readdirSync(storePath)).toHaveLength(1)
+  })
+
+  it('a refused publish drops its temp file too and keeps the published value', async () => {
+    const storePath = join(dir, 'dep_1', 'acc_1', 'cursors')
+    let renames = 0
+    const layer = makeLayer({
+      fs: {
+        // the first publish lands; the replacement cannot rename its temp
+        renameSync: (from, to) => {
+          renames += 1
+          if (renames > 1) throw Object.assign(new Error('the disk is gone'), { code: 'EIO' })
+          renameSync(from, to)
+        },
+      },
+    })
+    const records = await openRecords(layer)
+    expect(await records.write('k', Buffer.from('first'))).toEqual({ kind: 'ok' })
+    await expect(records.write('k', Buffer.from('second'))).rejects.toThrow('the disk is gone')
+    // the temp of the refused replacement is gone; the published value stays
+    expect(readdirSync(storePath)).toHaveLength(1)
+    expect(await readValue(records, 'k')).toEqual(Buffer.from('first'))
   })
 
   it('rejects unregistered stores, duplicate registrations and invalid registrations', async () => {
