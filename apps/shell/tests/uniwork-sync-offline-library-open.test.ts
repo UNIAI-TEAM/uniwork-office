@@ -507,6 +507,44 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     expect((await o.copies.open('doc_1')).kind).toBe('opened')
     expect(existsSync(copyDir(o))).toBe(true)
   })
+
+  it('(G703-R6-3) a visible copy with the feed stopped and no session still locks and deletes plaintext when its lease expires', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    o.clock.now = 1_760_000_000_000
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    o.h.leases.states.set('doc_1', {
+      ...leaseState('valid'),
+      record: {
+        expires_at: new Date(o.clock.now + 40).toISOString(),
+      } as never,
+      remainingMs: 40,
+    })
+    const outcome = await o.copies.open('doc_1')
+    if (outcome.kind !== 'opened') throw new Error(`expected an open, got ${outcome.kind}`)
+    const path = outcome.path
+    expect(existsSync(copyDir(o))).toBe(true)
+    // feed poll is stopped and the session scope is gone: library.row('doc_1') is null
+    o.h.session.scope = null
+    o.account.signedIn = false
+    expect(await o.h.manager.row('doc_1')).toBeNull()
+    // time reaches the lease expiry without any reopen or forced poll
+    o.clock.now += 50
+    await vi.waitFor(() => {
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(copyDir(o))).toBe(false)
+    })
+    // and when a copy has no tracked expiry and loses session scope, sweep locks it as signed_out
+    const o2 = openHarness()
+    dirs.push(o2.userDataDir)
+    const path2 = await openCopy(o2)
+    o2.h.session.scope = null
+    o2.scope.value = null as never
+    await o2.copies.sweep()
+    expect(o2.locks).toEqual([expect.objectContaining({ path: path2, reason: 'signed_out' })])
+    expect(existsSync(copyDir(o2))).toBe(false)
+  })
 })
 
 describe('G5-05u B5 every refusal names its S11 lock', () => {

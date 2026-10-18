@@ -3,7 +3,7 @@ import type { Dirent } from 'node:fs'
 import { chmod, lstat, readdir, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { UniworkDocLock } from '../../../shared/home-api'
-import type { OfflineFailure } from '../../../shared/offline-library'
+import type { OfflineBlockedReason, OfflineFailure } from '../../../shared/offline-library'
 import type { Binding } from '../../uniwork-docs/binding-store'
 import { formatForMime, formatForName, sanitizeFilename } from '../../uniwork-docs/formats'
 import { APP_STORE_LEVEL } from '../store-level'
@@ -147,13 +147,29 @@ export function offlineCopyKey(documentId: string): string {
   return `${digest}${OFFLINE_COPY_KEY_SUFFIX}`
 }
 
+const MAX_TIMEOUT_MS = 2_147_483_647
+
+function parseExpiryMs(leaseUntil: string | null | undefined): number | null {
+  if (!leaseUntil) return null
+  const ms = Date.parse(leaseUntil)
+  return Number.isFinite(ms) ? ms : null
+}
+
+interface TrackedCopy {
+  dir: string
+  path: string
+  title: string
+  openedAt: number
+  locked: boolean
+  orgId: string
+  leaseUntilMs: number | null
+  timer: NodeJS.Timeout | null
+}
+
 export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
   const now = () => deps.now?.() ?? Date.now()
   /** documentId -> the copy on screen (one per document, however many tabs read it) */
-  const copies = new Map<
-    string,
-    { dir: string; path: string; title: string; openedAt: number; locked: boolean }
-  >()
+  const copies = new Map<string, TrackedCopy>()
   /** every folder whose deletion failed (tracked or crash leftover) until a retry confirms it gone (BE-R2-3, BE-R2-8, BE-R2-11) */
   const pendingRemoval = new Set<string>()
   /** one queue across open, sweep, recover and dropAll so recovery or sign-out never races an open (BE-R2-2, BE-R2-5) */
@@ -183,12 +199,38 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     }
   }
 
+  const clearTimer = (copy: TrackedCopy | undefined): void => {
+    if (!copy?.timer) return
+    clearTimeout(copy.timer)
+    copy.timer = null
+  }
+
+  const scheduleExpiry = (documentId: string): void => {
+    const copy = copies.get(documentId)
+    clearTimer(copy)
+    if (!copy || copy.locked) return
+    const delay =
+      copy.leaseUntilMs !== null
+        ? Math.min(MAX_TIMEOUT_MS, Math.max(0, copy.leaseUntilMs - now()))
+        : OFFLINE_COPY_CLOSE_GRACE_MS
+    const timer = setTimeout(() => {
+      if (copies.get(documentId) === copy) copy.timer = null
+      void serial(sweepOne).catch(() => undefined)
+    }, delay)
+    if (typeof timer === 'object' && 'unref' in timer) timer.unref()
+    copy.timer = timer
+  }
+
   const drop = async (documentId: string, closed: boolean): Promise<boolean> => {
     const copy = copies.get(documentId)
     if (!copy) return true
+    clearTimer(copy)
     // a folder that would not go stays on the record: the next sweep retries
     // instead of forgetting a plaintext leftover (BE-R1-2, BE-R2-8, BE-R2-11)
-    if (!(await dropDir(copy.dir))) return false
+    if (!(await dropDir(copy.dir))) {
+      scheduleExpiry(documentId)
+      return false
+    }
     copies.delete(documentId)
     // the pin's deferred cleanup waits for the last reader: tell the library the tab is gone
     if (closed)
@@ -202,11 +244,14 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
   const lockInPlace = async (documentId: string): Promise<boolean> => {
     const copy = copies.get(documentId)
     if (!copy) return true
-    if (!(await dropDir(copy.dir))) return false
+    clearTimer(copy)
+    if (!(await dropDir(copy.dir))) {
+      scheduleExpiry(documentId)
+      return false
+    }
     copy.locked = true
     return true
   }
-
   const openOne = async (documentId: string): Promise<OfflineCopyOutcome> => {
     const library = deps.library()
     const scope = deps.scope()
@@ -245,6 +290,11 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       return refusal
     }
     if (onScreen && !shownBefore.locked) {
+      if (row) {
+        shownBefore.orgId = row.orgId
+        shownBefore.leaseUntilMs = parseExpiryMs(row.leaseUntil)
+        scheduleExpiry(documentId)
+      }
       return {
         kind: 'opened',
         path: shownBefore.path,
@@ -254,7 +304,10 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     const format =
       formatForMime(cached.manifest.main.mimeType) ?? formatForName(cached.manifest.main.filename)
     if (!format || !row) return { kind: 'none' }
-    if (shownBefore && shownBefore.dir !== dir) pendingRemoval.add(shownBefore.dir)
+    if (shownBefore) {
+      clearTimer(shownBefore)
+      if (shownBefore.dir !== dir) pendingRemoval.add(shownBefore.dir)
+    }
     // whatever an earlier session (a crash, a remove that failed) left under this
     // key goes before the new bytes land, whether this session knows the copy or not
     if (!(await dropDir(dir))) return { kind: 'none' }
@@ -296,28 +349,51 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     }
     // the pin's cleanup defers while a tab reads the copy (markClosed at its close)
     if (!onScreen) library.markOpen(documentId)
-    copies.set(documentId, { dir, path, title: shown.title, openedAt: now(), locked: false })
+    copies.set(documentId, {
+      dir,
+      path,
+      title: shown.title,
+      openedAt: now(),
+      locked: false,
+      orgId: row.orgId,
+      leaseUntilMs: parseExpiryMs(row.leaseUntil),
+      timer: null,
+    })
+    scheduleExpiry(documentId)
     return { kind: 'opened', path, title: shown.title }
   }
 
   /**
-   * G703B-P1: a copy still on screen whose lease lapsed (or was rolled back /
-   * locked) is locked in place - the row already derives the reason at read
-   * time, but nothing fires when it changes, so the existing poll asks.
+   * G703B-P1 / G703-R6-3: a copy still on screen whose lease lapsed (or was
+   * rolled back / locked, or whose session scope is gone) is locked in place.
+   * Each tracked copy also schedules its own expiry check, so a stopped feed or
+   * lost session never leaves plaintext served silently.
    */
-  const lockLapsed = async (
-    documentId: string,
-    copy: { path: string; locked: boolean },
-  ): Promise<void> => {
+  const lockLapsed = async (documentId: string, copy: TrackedCopy): Promise<void> => {
     if (copy.locked) return
     const row = await deps
       .library()
       ?.row(documentId)
       .catch(() => null)
-    const reason = row?.lockReason
-    if (!row || !reason) return
+    if (row) {
+      copy.orgId = row.orgId
+      const nextExpiry = parseExpiryMs(row.leaseUntil)
+      if (nextExpiry !== copy.leaseUntilMs || copy.timer === null) {
+        copy.leaseUntilMs = nextExpiry
+        scheduleExpiry(documentId)
+      }
+    }
+    const expiredOffline =
+      !row && (copy.leaseUntilMs !== null ? now() >= copy.leaseUntilMs : deps.scope() === null)
+    const reason: OfflineBlockedReason | null =
+      row?.lockReason ?? (expiredOffline ? (copy.leaseUntilMs !== null ? 'lease_expired' : 'signed_out') : null)
+    if (!reason) {
+      if (copy.timer === null) scheduleExpiry(documentId)
+      return
+    }
+    const orgId = row?.orgId ?? copy.orgId
     const libraryOff =
-      reason === 'lease_expired' && !(await deps.capabilityOn(row.orgId).catch(() => false))
+      reason === 'lease_expired' && !(await deps.capabilityOn(orgId).catch(() => false))
     // the plaintext goes first: if it will not, the next pass retries the lock too
     if (!(await lockInPlace(documentId))) return
     deps.lockOpened({
@@ -363,6 +439,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
 
   const dropAllOne = async (): Promise<void> => {
     for (const [documentId, copy] of [...copies]) {
+      clearTimer(copy)
       // a folder that would not go is still a copy: it stays on the record and in pendingRemoval
       if (await dropDir(copy.dir)) copies.delete(documentId)
     }

@@ -1196,6 +1196,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         // BE-R1-2: an account activation is the startup sweep - the last
         // session's read-only `@offline` plaintext goes before anything opens one
         void offlineCopies.recover().catch(() => undefined)
+        void offlineCopies.sweep().catch(() => undefined)
         // G8-16 S16: changing the organization reloads the library data. An
         // org-less push carrying orgsError is a transient /orgs failure; an
         // org-less push without it (deactivation, the picker) is a lasting
