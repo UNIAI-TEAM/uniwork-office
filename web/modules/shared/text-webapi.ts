@@ -198,11 +198,13 @@ export function createTextWebApi(
    * Complete a save-as name: a name that already ends in a document extension this module knows
    * (its own, or one it opens without converting) keeps it; anything else, and bare names, gets
    * the extension the open document saves under — 'notes.txt' saves as .txt, never .txt.md.
+   * The else branch only appends: any trailing '.xxx' there is part of the user's name
+   * ('Báo cáo 2026.10.18' -> 'Báo cáo 2026.10.18.md'), never an extension to cut.
    */
   const withExt = (name: string, file: FileMeta | null): string =>
     config.extPattern.test(name) || (config.keepExtPattern?.test(name) ?? false)
       ? name
-      : name.replace(/\.[^.\\/]+$/, '') + saveExt(file)
+      : name + saveExt(file)
 
   /** fileId -> latest server metadata (etag = If-Match base of the next save) */
   const files = new Map<string, FileMeta>()
