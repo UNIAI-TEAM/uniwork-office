@@ -268,13 +268,13 @@ import {
 import { saveUntilPersisted } from './save-until-persisted'
 import {
   autoSaveToggleVisible,
-  nextDirtyWhileEditable,
   saveStateLabel,
   setEditorEditable,
   uniworkAllowsSave,
   uniworkCloseDirty,
   uniworkExplainReadOnlySave,
   uniworkStateFor,
+  useDirtyWhileEditable,
   useUniworkDocState,
   type UniworkLockSeam,
 } from './uniwork-doc-state'
@@ -5379,9 +5379,7 @@ export function App() {
   const hasUnsavedChanges = isDocDirty(fileCtxRef.current)
   anyDirtyRef.current = hasUnsavedChanges
   // edits held when the edit lock is lost in place must still prompt on close
-  const dirtyWhileEditableRef = useRef(false)
-  dirtyWhileEditableRef.current = nextDirtyWhileEditable(
-    dirtyWhileEditableRef.current,
+  const dirtyWhileEditableRef = useDirtyWhileEditable(
     uniwork.readOnly,
     hasUnsavedChanges || dirtyRef.current,
   )
@@ -5422,7 +5420,7 @@ export function App() {
       offCheck?.()
       offSave?.()
     }
-  }, [doc, save, autoSaveActive, uniwork.readOnly])
+  }, [doc, save, autoSaveActive, uniwork.readOnly, dirtyWhileEditableRef])
 
   // autosave: every 30s and on window blur, silently persist pending changes
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import { noteEditableIntent } from './editor/editable-intent'
 
 /**
@@ -48,13 +48,35 @@ export function uniworkAllowsSave(
  * state, read-only renders keep the last editable answer, so edits held when
  * the lock is lost in place are remembered (AC-3 "edits kept") while a copy
  * opened view-only never starts remembering any.
+ *
+ * EL-1(b) fix11 (EL1B-FE-R3-2): an edit sets the live dirty flag before its
+ * re-render runs, so the first render that sees it can already be the
+ * read-only one. The editable -> read-only render (`wasReadOnly` false)
+ * therefore samples the live `dirty` instead of keeping `previous`.
  */
 export function nextDirtyWhileEditable(
   previous: boolean,
   readOnly: boolean,
   dirty: boolean,
+  wasReadOnly: boolean = readOnly,
 ): boolean {
-  return readOnly ? previous : dirty
+  if (!readOnly) return dirty
+  return wasReadOnly ? previous : dirty
+}
+
+/**
+ * The held-edits memory as a ref the close guard reads, updated on every
+ * render from `nextDirtyWhileEditable` and the previous render's read-only.
+ */
+export function useDirtyWhileEditable(
+  readOnly: boolean,
+  dirty: boolean,
+): MutableRefObject<boolean> {
+  const held = useRef(false)
+  const wasReadOnly = useRef(readOnly)
+  held.current = nextDirtyWhileEditable(held.current, readOnly, dirty, wasReadOnly.current)
+  wasReadOnly.current = readOnly
+  return held
 }
 
 /**

@@ -14,6 +14,7 @@ import {
   nextDirtyWhileEditable,
   uniworkCloseDirty,
   uniworkExplainReadOnlySave,
+  useDirtyWhileEditable,
   useUniworkDocState,
   type UniworkDocState,
 } from '../src/renderer/uniwork-doc-state'
@@ -220,5 +221,57 @@ describe('EL-1(b) fix10 (EL1B-FE-R2-2): the close check keeps edits held when th
     expect(uniworkCloseDirty(false, held, false)).toBe(false)
     // edits gone after the flip (Save As / discard) -> nothing left to ask about
     expect(uniworkCloseDirty(true, true, false)).toBe(false)
+  })
+})
+
+describe('EL-1(b) fix11 (EL1B-FE-R3-2): an edit made just before the lock is lost is remembered', () => {
+  it('edit -> lock loss before the edit was ever rendered -> close is dirty', () => {
+    // the last editable render saw a clean document: the edit set the live dirty flag
+    // (onUpdate) but its rAF re-render has not run, so the first render to see the edit
+    // is already the read-only one
+    const held = nextDirtyWhileEditable(false, true, true, false)
+    expect(uniworkCloseDirty(true, held, true)).toBe(true)
+  })
+
+  it('a flip with nothing held, or a copy that was read-only all along, stays clean', () => {
+    expect(nextDirtyWhileEditable(false, true, false, false)).toBe(false)
+    expect(nextDirtyWhileEditable(false, true, true, true)).toBe(false)
+  })
+
+  it('a flip right after a Save does not keep the old edits alive', () => {
+    expect(nextDirtyWhileEditable(true, true, false, false)).toBe(false)
+  })
+
+  it('the hook carries it: the first render that sees the edit is the read-only one', async () => {
+    let held: { current: boolean } = { current: false }
+    function Held({ readOnly, dirty }: { readOnly: boolean; dirty: boolean }) {
+      held = useDirtyWhileEditable(readOnly, dirty)
+      return null
+    }
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    await act(async () => {
+      root!.render(createElement(Held, { readOnly: false, dirty: false }))
+    })
+    expect(held.current).toBe(false)
+    await act(async () => {
+      root!.render(createElement(Held, { readOnly: true, dirty: true }))
+    })
+    expect(held.current).toBe(true)
+    expect(uniworkCloseDirty(true, held.current, true)).toBe(true)
+    // a later read-only render keeps it, a copy that was read-only all along never starts it
+    await act(async () => {
+      root!.render(createElement(Held, { readOnly: true, dirty: true }))
+    })
+    expect(held.current).toBe(true)
+    await act(async () => {
+      root!.unmount()
+    })
+    root = createRoot(host)
+    await act(async () => {
+      root!.render(createElement(Held, { readOnly: true, dirty: true }))
+    })
+    expect(held.current).toBe(false)
   })
 })
