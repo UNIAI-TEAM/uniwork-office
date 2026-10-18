@@ -7,7 +7,7 @@ import type { OfflineBlockedReason, OfflineFailure } from '../../../shared/offli
 import type { Binding } from '../../uniwork-docs/binding-store'
 import { formatForMime, formatForName, sanitizeFilename } from '../../uniwork-docs/formats'
 import { APP_STORE_LEVEL } from '../store-level'
-import type { OfflineLibraryManager } from './manager'
+import type { OfflineLibraryManager, PinRow } from './manager'
 import { offlineFailureOf } from './view'
 
 /**
@@ -369,12 +369,11 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
    * Each tracked copy also schedules its own expiry check, so a stopped feed or
    * lost session never leaves plaintext served silently.
    */
-  const lockLapsed = async (documentId: string, copy: TrackedCopy): Promise<void> => {
-    if (copy.locked) return
-    const row = await deps
-      .library()
-      ?.row(documentId)
-      .catch(() => null)
+  const evaluateLapse = (
+    documentId: string,
+    copy: TrackedCopy,
+    row: PinRow | null | undefined,
+  ): OfflineBlockedReason | null => {
     if (row) {
       copy.orgId = row.orgId
       const nextExpiry = parseExpiryMs(row.leaseUntil)
@@ -386,21 +385,39 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     const expiredOffline =
       !row && (copy.leaseUntilMs !== null ? now() >= copy.leaseUntilMs : deps.scope() === null)
     const reason: OfflineBlockedReason | null =
-      row?.lockReason ?? (expiredOffline ? (copy.leaseUntilMs !== null ? 'lease_expired' : 'signed_out') : null)
-    if (!reason) {
-      if (copy.timer === null) scheduleExpiry(documentId)
-      return
-    }
+      row?.lockReason ??
+      (expiredOffline ? (copy.leaseUntilMs !== null ? 'lease_expired' : 'signed_out') : null)
+    if (!reason && copy.timer === null) scheduleExpiry(documentId)
+    return reason
+  }
+
+  const lockLapsed = async (documentId: string, copy: TrackedCopy): Promise<void> => {
+    if (copy.locked) return
+    const row = await deps
+      .library()
+      ?.row(documentId)
+      .catch(() => null)
+    const firstReason = evaluateLapse(documentId, copy, row)
+    if (!firstReason) return
     const orgId = row?.orgId ?? copy.orgId
     const libraryOff =
-      reason === 'lease_expired' && !(await deps.capabilityOn(orgId).catch(() => false))
+      firstReason === 'lease_expired' && !(await deps.capabilityOn(orgId).catch(() => false))
+    // G703-R6-4: revalidate right before the destructive step in case an online
+    // renewal landed while capabilityOn was awaited
+    if (copy.locked || copies.get(documentId) !== copy) return
+    const rechecked = await deps
+      .library()
+      ?.row(documentId)
+      .catch(() => null)
+    const reason = evaluateLapse(documentId, copy, rechecked)
+    if (!reason) return
     // the plaintext goes first: if it will not, the next pass retries the lock too
     if (!(await lockInPlace(documentId))) return
     deps.lockOpened({
       path: copy.path,
       name: basename(copy.path),
       reason,
-      ...(libraryOff ? { libraryOff: true } : {}),
+      ...(reason === 'lease_expired' && libraryOff ? { libraryOff: true } : {}),
     })
   }
 

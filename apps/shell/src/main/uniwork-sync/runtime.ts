@@ -587,13 +587,14 @@ export class SyncRuntime {
     // online, and a pass with nothing to do (no chosen org) reports neither
     // (G506-be-3)
     const verdict = attempted ? !transportFailed : undefined
+    // G5-08c row 2 / G703-R6-4: the pass renews due leases before reporting the
+    // poll verdict to listeners (so offlineCopies.sweep() sees the renewed lease)
+    if (verdict !== undefined) this.online = verdict
+    await this.leases.onOnlinePass(verdict).catch(() => undefined)
+    if (!current()) return
     // the save queue's onPoll, then the G5-10 listeners, with this one verdict
     await this.reportPoll(verdict)
     if (!current()) return
-    // G5-08c row 2: the same verdict gates the lease renewal pass - an online
-    // pass renews the held leases that are due, an offline one sends nothing
-    if (verdict !== undefined) this.online = verdict
-    await this.leases.onOnlinePass(verdict).catch(() => undefined)
     // G5-05: a reached server downloads the pins that waited for the network
     if (verdict === true && current()) await this.library?.onReconnect().catch(() => undefined)
   }

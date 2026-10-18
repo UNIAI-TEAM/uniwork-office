@@ -545,6 +545,29 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     expect(o2.locks).toEqual([expect.objectContaining({ path: path2, reason: 'signed_out' })])
     expect(existsSync(copyDir(o2))).toBe(false)
   })
+
+  it('(G703-R6-4) a renewal that lands after the first expired read but before the destructive action keeps the copy and raises no lock', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const path = await openCopy(o)
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    let rowReads = 0
+    const origRow = o.h.manager.row.bind(o.h.manager)
+    vi.spyOn(o.h.manager, 'row').mockImplementation(async (id) => {
+      rowReads += 1
+      const r = await origRow(id)
+      if (rowReads === 1) {
+        // renewal lands right after the first expired read, while capabilityOn runs
+        o.h.leases.states.set('doc_1', leaseState('valid'))
+      }
+      return r
+    })
+    await o.copies.sweep()
+    expect(rowReads).toBe(2)
+    expect(o.locks).toEqual([])
+    expect(existsSync(copyDir(o))).toBe(true)
+    expect(existsSync(path)).toBe(true)
+  })
 })
 
 describe('G5-05u B5 every refusal names its S11 lock', () => {
