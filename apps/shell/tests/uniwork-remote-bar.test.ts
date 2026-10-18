@@ -7,7 +7,10 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HomeApi, UniworkDocStatus, UniworkRemoteBar } from '../src/shared/home-api'
 import { LocaleProvider, type StringKey } from '../src/renderer/src/locale'
-import { UniworkRemoteBar as RemoteBar } from '../src/renderer/src/UniworkChrome'
+import {
+  UniworkRemoteBar as RemoteBar,
+  REMOTE_BAR_ALERT_MS,
+} from '../src/renderer/src/UniworkChrome'
 import { REMOTE_BAR_AUTO_HIDE_MS, remoteBarModelOf } from '../src/renderer/src/uniwork-docs-model'
 import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
@@ -553,10 +556,31 @@ describe('UniworkRemoteBar: announcements', () => {
     expect(alert().textContent).toBe('')
   })
 
-  it('an error kind is announced as an alert', async () => {
+  it('an error kind is announced as an alert and clears after ~1 s', async () => {
+    vi.useFakeTimers()
     await mount(status({ kind: 'deleted' }))
     expect(alert().textContent).toBe(text('en', 'uwRemoteDeleted'))
     expect(polite().textContent).toBe('')
+    await act(async () => {
+      vi.advanceTimersByTime(REMOTE_BAR_ALERT_MS)
+    })
+    expect(alert().textContent).toBe('')
+  })
+
+  it('two error bars inside the alert window are both announced: the second queues behind the first', async () => {
+    vi.useFakeTimers()
+    await mount(status({ kind: 'deleted' }))
+    // a second assertive event while the first sentence is still on screen does not overwrite it
+    await mount(status({ kind: 'revoked' }))
+    expect(alert().textContent).toBe(text('en', 'uwRemoteDeleted'))
+    await act(async () => {
+      vi.advanceTimersByTime(REMOTE_BAR_ALERT_MS)
+    })
+    expect(alert().textContent).toBe(text('en', 'uwRemoteRevoked'))
+    await act(async () => {
+      vi.advanceTimersByTime(REMOTE_BAR_ALERT_MS)
+    })
+    expect(alert().textContent).toBe('')
   })
 
   it('the live nodes are in the DOM before any bar shows', async () => {
