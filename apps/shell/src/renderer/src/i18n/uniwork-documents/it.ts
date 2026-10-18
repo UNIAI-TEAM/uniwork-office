@@ -168,4 +168,21 @@ export const it = {
   uwTipEditLockedSelf: 'Stai modificando questo documento in un’altra finestra.',
   uwErrEditLocked: 'Qualcun altro sta modificando questo documento.',
   uwReasonEditLocked: 'qualcun altro sta modificando',
+  uwLockBannerOther: '{name} sta modificando da {time}. Stai visualizzando in sola lettura.',
+  uwLockBannerSelfElsewhere: 'Stai modificando questo documento in un’altra finestra.',
+  uwLockBannerFree: 'Nessuno sta modificando questo documento adesso.',
+  uwLockEditHere: 'Modifica qui',
+  uwLockAcquiring: 'Acquisizione dell’accesso in modifica…',
+  uwLockReadOnlyExplain: 'Nulla è stato salvato — il documento è in sola lettura.',
+  uwLockLostTitle: 'Non stai più modificando',
+  uwLockLostTakenOver: '{name} ha preso la modifica. Le tue modifiche non salvate sono ancora qui.',
+  uwLockLostHandedOver:
+    'Hai affidato la modifica a {name}. Le tue modifiche non salvate sono ancora qui.',
+  uwLockLostExpired:
+    'La modifica è scaduta perché non siamo riusciti a raggiungere il server per un po’ (nessuna rete o il dispositivo è andato in sospensione). Le tue modifiche non salvate sono ancora qui.',
+  uwLockLostMovedHere:
+    'Ora stai modificando questo documento in un’altra finestra. Le modifiche non salvate in questa finestra sono ancora qui.',
+  uwLockLostAccessLost:
+    'Non hai più l’autorizzazione a modificare questo documento. Le tue modifiche non salvate sono ancora qui.',
+  uwLockLostGeneric: 'Non stai più modificando. Le tue modifiche non salvate sono ancora qui.',
 } satisfies Record<keyof typeof zh, string>

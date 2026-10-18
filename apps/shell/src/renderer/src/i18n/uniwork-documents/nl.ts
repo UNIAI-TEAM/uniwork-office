@@ -171,4 +171,23 @@ export const nl = {
   uwTipEditLockedSelf: 'U bewerkt dit document in een ander venster.',
   uwErrEditLocked: 'Iemand anders bewerkt dit document.',
   uwReasonEditLocked: 'iemand anders bewerkt het',
+  uwLockBannerOther: '{name} bewerkt sinds {time}. Je bekijkt alleen-lezen.',
+  uwLockBannerSelfElsewhere: 'Je bewerkt dit document in een ander venster.',
+  uwLockBannerFree: 'Niemand bewerkt dit document nu.',
+  uwLockEditHere: 'Hier bewerken',
+  uwLockAcquiring: 'Bewerkingstoegang wordt opgehaald…',
+  uwLockReadOnlyExplain: 'Er is niets opgeslagen — het document is alleen-lezen.',
+  uwLockLostTitle: 'Je bent niet meer aan het bewerken',
+  uwLockLostTakenOver:
+    '{name} heeft het bewerken overgenomen. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostHandedOver:
+    'Je hebt het bewerken aan {name} overgedragen. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostExpired:
+    'Het bewerken is verlopen omdat we de server een tijd niet konden bereiken (geen netwerk of het apparaat sliep). Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostMovedHere:
+    'Je bewerkt dit document nu in een ander venster. De niet-opgeslagen wijzigingen in dit venster zijn er nog.',
+  uwLockLostAccessLost:
+    'Je hebt geen toestemming meer om dit document te bewerken. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostGeneric:
+    'Je bent niet meer aan het bewerken. Je niet-opgeslagen wijzigingen zijn er nog.',
 } satisfies Record<keyof typeof zh, string>

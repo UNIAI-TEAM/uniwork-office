@@ -164,4 +164,19 @@ export const ar = {
   uwTipEditLockedSelf: 'أنت تحرّر هذا المستند في نافذة أخرى.',
   uwErrEditLocked: 'شخص آخر يحرّر هذا المستند.',
   uwReasonEditLocked: 'شخص آخر يحرّر',
+  uwLockBannerOther: '{name} يعدّل منذ {time}. أنت تعرض للقراءة فقط.',
+  uwLockBannerSelfElsewhere: 'أنت تعدّل هذا المستند في نافذة أخرى.',
+  uwLockBannerFree: 'لا أحد يعدّل هذا المستند الآن.',
+  uwLockEditHere: 'عدّل هنا',
+  uwLockAcquiring: 'جارٍ الحصول على صلاحية التعديل…',
+  uwLockReadOnlyExplain: 'لم يُحفظ شيء — المستند للقراءة فقط.',
+  uwLockLostTitle: 'لم تعد تملك صلاحية التعديل',
+  uwLockLostTakenOver: 'استحوذ {name} على التعديل. تغييراتك غير المحفوظة ما زالت هنا.',
+  uwLockLostHandedOver: 'سلّمت التعديل إلى {name}. تغييراتك غير المحفوظة ما زالت هنا.',
+  uwLockLostExpired:
+    'انتهت صلاحية التعديل لتعذّر الوصول إلى الخادم مدة (لا شبكة أو دخل الجهاز في وضع السكون). تغييراتك غير المحفوظة ما زالت هنا.',
+  uwLockLostMovedHere:
+    'أنت تعدّل هذا المستند الآن في نافذة أخرى. التغييرات غير المحفوظة في هذه النافذة ما زالت هنا.',
+  uwLockLostAccessLost: 'لم تعد تملك إذن تعديل هذا المستند. تغييراتك غير المحفوظة ما زالت هنا.',
+  uwLockLostGeneric: 'لم تعد تعدّل. تغييراتك غير المحفوظة ما زالت هنا.',
 } satisfies Record<keyof typeof zh, string>

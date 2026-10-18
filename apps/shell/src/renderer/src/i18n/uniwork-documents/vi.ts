@@ -165,4 +165,20 @@ export const vi = {
   uwTipEditLockedSelf: 'Bạn đang sửa tài liệu này ở cửa sổ khác.',
   uwErrEditLocked: 'Người khác đang sửa tài liệu này.',
   uwReasonEditLocked: 'người khác đang sửa',
+  uwLockBannerOther: '{name} đang sửa từ {time}. Bạn đang xem ở chế độ chỉ đọc.',
+  uwLockBannerSelfElsewhere: 'Bạn đang sửa tài liệu này ở cửa sổ khác.',
+  uwLockBannerFree: 'Không còn ai sửa tài liệu này.',
+  uwLockEditHere: 'Sửa ở đây',
+  uwLockAcquiring: 'Đang lấy quyền sửa…',
+  uwLockReadOnlyExplain: 'Không có gì được lưu — tài liệu ở chế độ chỉ đọc.',
+  uwLockLostTitle: 'Bạn không còn quyền sửa',
+  uwLockLostTakenOver: '{name} đã lấy quyền sửa. Thay đổi chưa lưu của bạn vẫn ở đây.',
+  uwLockLostHandedOver: 'Bạn đã nhường quyền sửa cho {name}. Thay đổi chưa lưu của bạn vẫn ở đây.',
+  uwLockLostExpired:
+    'Quyền sửa đã hết hạn vì một lúc lâu không liên lạc được với máy chủ (mất mạng hoặc máy ngủ). Thay đổi chưa lưu của bạn vẫn ở đây.',
+  uwLockLostMovedHere:
+    'Bạn đang sửa tài liệu này ở cửa sổ khác. Thay đổi chưa lưu ở cửa sổ này vẫn ở đây.',
+  uwLockLostAccessLost:
+    'Bạn không còn quyền sửa tài liệu này. Thay đổi chưa lưu của bạn vẫn ở đây.',
+  uwLockLostGeneric: 'Bạn không còn giữ quyền sửa. Thay đổi chưa lưu của bạn vẫn ở đây.',
 } satisfies Record<keyof typeof zh, string>

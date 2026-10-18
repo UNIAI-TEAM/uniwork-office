@@ -162,4 +162,18 @@ export const zh = {
   uwTipEditLockedSelf: '你正在另一个窗口中编辑此文档。',
   uwErrEditLocked: '其他人正在编辑此文档。',
   uwReasonEditLocked: '其他人正在编辑',
+  uwLockBannerOther: '{name} 自 {time} 起正在编辑。你当前为只读模式。',
+  uwLockBannerSelfElsewhere: '你正在另一个窗口中编辑此文档。',
+  uwLockBannerFree: '目前没有人在编辑此文档。',
+  uwLockEditHere: '在此处编辑',
+  uwLockAcquiring: '正在获取编辑权限…',
+  uwLockReadOnlyExplain: '未保存任何更改 — 文档为只读模式',
+  uwLockLostTitle: '你不再拥有编辑权限',
+  uwLockLostTakenOver: '{name} 接管了编辑。你未保存的更改仍在这里。',
+  uwLockLostHandedOver: '你已将编辑权限移交给 {name}。你未保存的更改仍在这里。',
+  uwLockLostExpired:
+    '因一段时间无法连接服务器（无网络或设备休眠），编辑权限已过期。你未保存的更改仍在这里。',
+  uwLockLostMovedHere: '你正在另一个窗口中编辑此文档。此窗口中未保存的更改仍在这里。',
+  uwLockLostAccessLost: '你不再拥有此文档的编辑权限。你未保存的更改仍在这里。',
+  uwLockLostGeneric: '你不再拥有编辑权限。你未保存的更改仍在这里。',
 }

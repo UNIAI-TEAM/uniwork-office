@@ -163,4 +163,18 @@ export const zhTW = {
   uwTipEditLockedSelf: '你正在另一個視窗中編輯此文件。',
   uwErrEditLocked: '其他人正在編輯此文件。',
   uwReasonEditLocked: '其他人正在編輯',
+  uwLockBannerOther: '{name} 自 {time} 起正在編輯。您目前為唯讀模式。',
+  uwLockBannerSelfElsewhere: '您正在另一個視窗中編輯此文件。',
+  uwLockBannerFree: '目前沒有人在編輯此文件。',
+  uwLockEditHere: '在此處編輯',
+  uwLockAcquiring: '正在取得編輯權限…',
+  uwLockReadOnlyExplain: '未儲存任何變更 — 文件為唯讀模式',
+  uwLockLostTitle: '您不再擁有編輯權限',
+  uwLockLostTakenOver: '{name} 接管了編輯。您未儲存的變更仍在這裡。',
+  uwLockLostHandedOver: '您已將編輯權限移交給 {name}。您未儲存的變更仍在這裡。',
+  uwLockLostExpired:
+    '因一段時間無法連接伺服器（無網路或裝置休眠），編輯權限已過期。您未儲存的變更仍在這裡。',
+  uwLockLostMovedHere: '您正在另一個視窗中編輯此文件。此視窗中未儲存的變更仍在這裡。',
+  uwLockLostAccessLost: '您不再擁有此文件的編輯權限。您未儲存的變更仍在這裡。',
+  uwLockLostGeneric: '您不再擁有編輯權限。您未儲存的變更仍在這裡。',
 } satisfies Record<keyof typeof zh, string>

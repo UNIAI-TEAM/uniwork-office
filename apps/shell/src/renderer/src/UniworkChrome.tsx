@@ -36,6 +36,7 @@ import {
   chipModelOf,
   focusTipRoomOf,
   launchNoticeOf,
+  lockBannerModelOf,
   miniGlyphOf,
   type MiniGlyph,
   pathKey,
@@ -44,6 +45,7 @@ import {
   sizeWarnTextOf,
   type ChipActionKind,
   type LaunchNotice,
+  type LockBannerModel,
   type RemoteBarAction,
 } from './uniwork-docs-model'
 import { UniworkConflictHost } from './UniworkConflictDialog'
@@ -447,7 +449,13 @@ ${uiScaleOf(el)}`
 
 /** the states whose arrival is said to a screen reader at once (EXPERIENCE: blocked, failed, conflict) */
 function isUrgent(status: UniworkDocStatus, labelKey: StringKey): boolean {
-  return status.state === 'failed' || labelKey === 'uwChipBlocked' || labelKey === 'uwChipConflict'
+  return (
+    status.state === 'failed' ||
+    labelKey === 'uwChipBlocked' ||
+    labelKey === 'uwChipConflict' ||
+    // EL-1(b): the lock was lost while we held it — unsaved work stops uploading
+    labelKey === 'uwLockLostTitle'
+  )
 }
 
 /**
@@ -754,7 +762,10 @@ ${action ? t(action.labelKey) : ''}`,
         ? window.aiOffice.uniworkSave(status.path)
         : kind === 'reload'
           ? window.aiOffice.uniworkRemoteAction(status.path, 'reload')
-          : window.aiOffice.uniworkResolveConflict(status.path)
+          : kind === 'edit-here'
+            ? // EL-1(b): "Sửa ở đây" — acquire (move_from_self when self_elsewhere), re-acquire when lost
+              window.aiOffice.uniworkEditHere(status.path)
+            : window.aiOffice.uniworkResolveConflict(status.path)
     void call
       .then((next) => {
         if (next) onStatus(next)
@@ -937,6 +948,7 @@ ${action ? t(action.labelKey) : ''}`,
           onClose={() => setPopover(null)}
           onSignIn={() => account.signIn()}
           onFocusEditor={() => window.aiOfficeTabs?.focusActive()}
+          onStatus={onStatus}
         />
       )}
       {saveBlockCopy && (
@@ -1172,9 +1184,12 @@ export function UniworkRemoteBar({
   status: UniworkDocStatus | null
   onStatus: (status: UniworkDocStatus) => void
 }) {
-  const { t } = useI18n()
+  const { t, dateLocale } = useI18n()
   const id = useId()
   const model = status ? remoteBarModelOf(status) : null
+  // EL-1(b): the lock-session strip shares this band — 'lost' suppresses the remote model
+  // inside remoteBarModelOf already; the other phases stack with a remote notice.
+  const lockModel = status ? lockBannerModelOf(status, t, dateLocale) : null
   const path = status ? pathKey(status.path) : null
   const signature = remoteSignature(status)
   const noticeKey = remoteNoticeKey(status)
@@ -1182,11 +1197,33 @@ export function UniworkRemoteBar({
   const [hidden, setHidden] = useState<ReadonlyMap<string, string>>(new Map())
   const hiddenHere = path !== null && noticeKey !== null && hidden.get(path) === noticeKey
   const visible = Boolean(model) && !hiddenHere
+  // an 'acquiring' that follows a visible lock is the button's busy state: the strip keeps
+  // its last sentence instead of swapping to "Đang lấy quyền sửa…" (quieter). 'acquiring'
+  // on a first open (nothing shown yet) gets its own quiet sentence.
+  const lastLockRef = useRef<{ path: string; model: LockBannerModel | null }>({
+    path: '',
+    model: null,
+  })
+  if (path !== lastLockRef.current.path) {
+    lastLockRef.current = { path: path ?? '', model: null }
+  }
+  if (lockModel && lockModel.phase !== 'acquiring') {
+    lastLockRef.current = { path: path ?? '', model: lockModel }
+  }
+  const shownLock = useMemo(() => {
+    if (!lockModel) return null
+    if (lockModel.phase === 'acquiring' && lastLockRef.current.model) {
+      return { ...lastLockRef.current.model, busy: true }
+    }
+    return lockModel
+  }, [lockModel])
+  const [lockBusy, setLockBusy] = useState(false)
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const [busy, setBusy] = useState(false)
   const [say, setSay] = useState<RemoteSay | null>(null)
-  const barRef = useRef<HTMLDivElement>(null)
+  const [lockSay, setLockSay] = useState<{ text: string; n: number } | null>(null)
+  const stackRef = useRef<HTMLDivElement>(null)
   const heightRef = useRef(0)
 
   const hide = useCallback(() => {
@@ -1248,6 +1285,44 @@ export function UniworkRemoteBar({
 
   // an information bar hides itself unless the pointer or the focus is in it; leaving restarts the 8 s
   const autoHideMs = visible ? model?.autoHideMs : undefined
+
+  // EL-1(b): the lock sentence is read once per phase change through the polite node below
+  // (the 'lost' title leads its reason). A session that leaves ('held' / no session) clears it.
+  const lockAnnounceRef = useRef<string | null>(null)
+  const lockModelRef = useRef(lockModel)
+  lockModelRef.current = lockModel
+  const lockSign =
+    path !== null && lockModel
+      ? `${path}\n${lockModel.phase}\n${JSON.stringify(lockModel.params)}`
+      : null
+  useEffect(() => {
+    const current = lockModelRef.current
+    if (lockSign === null || current === null) {
+      if (path !== null) lockAnnounceRef.current = null
+      setLockSay(null)
+      return
+    }
+    if (lockAnnounceRef.current === lockSign) return
+    lockAnnounceRef.current = lockSign
+    const message = t(current.messageKey, current.params)
+    const text = current.titleKey ? `${t(current.titleKey)}. ${message}` : message
+    setLockSay((prev) => ({ text, n: (prev?.n ?? 0) + 1 }))
+    // t is not referentially stable (CLAUDE.md): the signature is the dependency
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockSign, path])
+
+  const editHere = useCallback(() => {
+    if (!status || lockBusy || shownLock?.busy) return
+    setLockBusy(true)
+    void window.aiOffice
+      .uniworkEditHere(status.path)
+      .then((next) => {
+        if (next) onStatus(next)
+      })
+      .catch(() => undefined)
+      .finally(() => setLockBusy(false))
+  }, [status, lockBusy, shownLock?.busy, onStatus])
+
   const actRef = useRef(act)
   actRef.current = act
   useEffect(() => {
@@ -1262,24 +1337,25 @@ export function UniworkRemoteBar({
     }
   }, [visible])
 
-  // main moves the active editor view down by the bar's unscaled CSS-px height (main multiplies by
-  // the interface scale): 0 when there is no bar or no document tab. An open queue popover adds
-  // its own height below the bar; the inset owner sends the sum.
+  // main moves the active editor view down by the band's unscaled CSS-px height (main multiplies by
+  // the interface scale): 0 when there is no bar, no lock strip, or no document tab. An open queue
+  // popover adds its own height below the band; the inset owner sends the sum.
+  const stackVisible = visible || shownLock !== null
   const report = useCallback((px: number) => setTopInsetPart('bar', px), [])
   useEffect(() => {
-    const bar = barRef.current
-    if (!visible || !bar) {
+    const stack = stackRef.current
+    if (!stackVisible || !stack) {
       heightRef.current = 0
       report(0)
       return
     }
     const cssHeight = () => {
       const rawScale = Number.parseFloat(
-        getComputedStyle(bar).getPropertyValue('--ui-scale') ||
+        getComputedStyle(stack).getPropertyValue('--ui-scale') ||
           document.documentElement.style.getPropertyValue('--ui-scale'),
       )
       const scale = Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1
-      return Math.ceil(bar.getBoundingClientRect().height / scale)
+      return Math.ceil(stack.getBoundingClientRect().height / scale)
     }
     const measure = () => {
       const px = cssHeight()
@@ -1291,10 +1367,10 @@ export function UniworkRemoteBar({
     report(heightRef.current)
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(measure)
-    observer.observe(bar)
+    observer.observe(stack)
     return () => observer.disconnect()
     // a tab switch sends the height again (the view that becomes active needs it)
-  }, [visible, path, shownKey, report])
+  }, [stackVisible, path, shownKey, shownLock, report])
   useEffect(() => () => report(0), [report])
 
   const messageId = `${id}-msg`
@@ -1304,60 +1380,95 @@ export function UniworkRemoteBar({
 
   return (
     <>
-      {visible && model && (
-        <div
-          ref={barRef}
-          className="uw-remote-bar"
-          role="region"
-          aria-label={t(model.regionKey)}
-          aria-busy={busy ? 'true' : undefined}
-          data-tone={model.tone}
-          data-kind={status?.lockWhileOpen ? 'lock-while-open' : status?.remote?.kind}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          onFocus={() => setFocused(true)}
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false)
-          }}
-        >
-          <span className="uw-remote-dot" aria-hidden="true" />
-          <div className="uw-remote-text">
-            <p id={messageId} className="uw-remote-message">
-              {t(model.messageKey, model.params)}
-            </p>
-            {showReason && reasonKey && (
-              <p id={reasonId} className="uw-remote-reason">
-                {t(reasonKey)}
-              </p>
-            )}
-          </div>
-          {model.actions.length > 0 && (
-            <div className="uw-remote-actions">
-              {model.actions.map((action) => {
-                const blocked = Boolean(action.disabledReasonKey)
-                return (
+      {stackVisible && (
+        <div ref={stackRef} className="uw-top-bars">
+          {visible && model && (
+            <div
+              className="uw-remote-bar"
+              role="region"
+              aria-label={t(model.regionKey)}
+              aria-busy={busy ? 'true' : undefined}
+              data-tone={model.tone}
+              data-kind={status?.lockWhileOpen ? 'lock-while-open' : status?.remote?.kind}
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
+              onFocus={() => setFocused(true)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                  setFocused(false)
+              }}
+            >
+              <span className="uw-remote-dot" aria-hidden="true" />
+              <div className="uw-remote-text">
+                <p id={messageId} className="uw-remote-message">
+                  {t(model.messageKey, model.params)}
+                </p>
+                {showReason && reasonKey && (
+                  <p id={reasonId} className="uw-remote-reason">
+                    {t(reasonKey)}
+                  </p>
+                )}
+              </div>
+              {model.actions.length > 0 && (
+                <div className="uw-remote-actions">
+                  {model.actions.map((action) => {
+                    const blocked = Boolean(action.disabledReasonKey)
+                    return (
+                      <button
+                        key={action.kind}
+                        type="button"
+                        className="uw-remote-action"
+                        data-action={action.kind}
+                        aria-disabled={blocked || busy ? 'true' : undefined}
+                        aria-describedby={
+                          action.disabledReasonKey
+                            ? action.disabledReasonKey === model.messageKey
+                              ? messageId
+                              : reasonId
+                            : undefined
+                        }
+                        onClick={() => {
+                          if (blocked || busy) return
+                          act(action.kind)
+                        }}
+                      >
+                        {t(action.labelKey)}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          {shownLock && (
+            // EL-1(b): why the document is read-only right now and the way on; the visible
+            // text is hidden from AT (the polite node below reads it), buttons stay out.
+            <div
+              className="uw-editlock-strip"
+              data-tone={shownLock.tone}
+              data-phase={shownLock.phase}
+              aria-busy={shownLock.busy ? 'true' : undefined}
+            >
+              <span className="uw-remote-dot" aria-hidden="true" />
+              <div className="uw-editlock-text" aria-hidden="true">
+                {shownLock.titleKey && <p className="uw-editlock-title">{t(shownLock.titleKey)}</p>}
+                <p className="uw-editlock-message">{t(shownLock.messageKey, shownLock.params)}</p>
+              </div>
+              {shownLock.editHere && (
+                <div className="uw-editlock-actions">
                   <button
-                    key={action.kind}
                     type="button"
-                    className="uw-remote-action"
-                    data-action={action.kind}
-                    aria-disabled={blocked || busy ? 'true' : undefined}
-                    aria-describedby={
-                      action.disabledReasonKey
-                        ? action.disabledReasonKey === model.messageKey
-                          ? messageId
-                          : reasonId
-                        : undefined
-                    }
-                    onClick={() => {
-                      if (blocked || busy) return
-                      act(action.kind)
-                    }}
+                    className="uw-remote-action uw-editlock-action"
+                    data-lock-action="edit-here"
+                    aria-disabled={shownLock.busy || lockBusy ? 'true' : undefined}
+                    aria-busy={shownLock.busy || lockBusy ? 'true' : undefined}
+                    onClick={editHere}
                   >
-                    {t(action.labelKey)}
+                    {shownLock.busy && <Spinner />}
+                    {t('uwLockEditHere')}
                   </button>
-                )
-              })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1368,6 +1479,10 @@ export function UniworkRemoteBar({
       </span>
       <span className="uw-sr-only" role="alert">
         {say?.assertive ? <span key={say.n}>{t(say.key, say.params)}</span> : null}
+      </span>
+      {/* the lock strip's polite reading channel: text only, so phase changes are said once */}
+      <span className="uw-sr-only" role="status" aria-live="polite" data-lock-status="">
+        {lockSay ? <span key={lockSay.n}>{lockSay.text}</span> : null}
       </span>
     </>
   )

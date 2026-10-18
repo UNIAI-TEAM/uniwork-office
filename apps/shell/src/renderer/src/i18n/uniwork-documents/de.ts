@@ -175,4 +175,22 @@ export const de = {
   uwTipEditLockedSelf: 'Sie bearbeiten dieses Dokument in einem anderen Fenster.',
   uwErrEditLocked: 'Jemand anderes bearbeitet dieses Dokument.',
   uwReasonEditLocked: 'jemand anderes bearbeitet es',
+  uwLockBannerOther: '{name} bearbeitet seit {time}. Sie sehen schreibgeschützt.',
+  uwLockBannerSelfElsewhere: 'Sie bearbeiten dieses Dokument in einem anderen Fenster.',
+  uwLockBannerFree: 'Niemand bearbeitet dieses Dokument gerade.',
+  uwLockEditHere: 'Hier bearbeiten',
+  uwLockAcquiring: 'Bearbeitungszugriff wird angefordert…',
+  uwLockReadOnlyExplain: 'Nichts wurde gespeichert — das Dokument ist schreibgeschützt.',
+  uwLockLostTitle: 'Sie bearbeiten nicht mehr',
+  uwLockLostTakenOver:
+    '{name} hat die Bearbeitung übernommen. Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockLostHandedOver:
+    'Sie haben die Bearbeitung an {name} abgegeben. Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockLostExpired:
+    'Die Bearbeitung ist abgelaufen, weil der Server eine Weile nicht erreichbar war (kein Netzwerk oder das Gerät schlief). Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockLostMovedHere:
+    'Sie bearbeiten dieses Dokument jetzt in einem anderen Fenster. Die ungespeicherten Änderungen in diesem Fenster sind noch da.',
+  uwLockLostAccessLost:
+    'Sie dürfen dieses Dokument nicht mehr bearbeiten. Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockLostGeneric: 'Sie bearbeiten nicht mehr. Ihre ungespeicherten Änderungen sind noch da.',
 } satisfies Record<keyof typeof zh, string>

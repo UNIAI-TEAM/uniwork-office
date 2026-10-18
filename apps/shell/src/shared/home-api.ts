@@ -1229,6 +1229,8 @@ export interface HomeApi {
   /** G5-06u: main asks for the queue popover of a path (Ctrl/Cmd+S with a pending save) */
   onUniworkQueuePopover(cb: (request: UniworkQueuePopoverRequest) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
+  /** EL-1(b): "Sửa ở đây" - acquire (move_from_self when self_elsewhere); resolves with the new status */
+  uniworkEditHere(path: string): Promise<UniworkDocStatus | null>
   /** Save a local copy of the bound working copy at `path` to a user-chosen path ("Lưu bản sao về máy"). */
   uniworkSaveLocalCopy?(path: string): Promise<boolean>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
@@ -1261,10 +1263,6 @@ export interface HomeApi {
    * or the two reloads); resolves to the status after the action.
    */
   uniworkRemoteAction(path: string, action: UniworkRemoteAction): Promise<UniworkDocStatus | null>
-  /**
-   * EL-1(b): "Sửa ở đây" - acquire (move_from_self when self_elsewhere); resolves with the new status
-   */
-  uniworkEditHere(path: string): Promise<UniworkDocStatus | null>
   /** S6: the bar's unscaled CSS-px height; main scales it by `--ui-scale` and moves the active editor view down by it */
   uniworkSetBarInset(heightPx: number): Promise<void>
   onUniworkLaunch(cb: (event: UniworkLaunchEvent) => void): () => void
