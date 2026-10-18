@@ -960,4 +960,169 @@ describe('member-name cache and org switch (S16)', () => {
     const resAcc2 = await callAcc2
     expect(resAcc2.ok && resAcc2.value.documents[0]!.updatedByName).toBe('Fresh Acc 2 Name')
   })
+
+  // DH1-BE-7: the workspace-keyed name cache must stay keyed. The same updater
+  // id resolves to a different display name in each workspace, so a future
+  // refactor that collapses the map into shared state serves one workspace's
+  // names to the other and fails here.
+  it('keeps workspace member names isolated per workspace (DH1-BE-7)', async () => {
+    const membersCalls: Record<string, number> = {}
+    const fetch: FetchLike = async (url) => {
+      const parsed = new URL(url)
+      const membersMatch = /^\/api\/v1\/workspaces\/(ws_[12])\/members$/.exec(parsed.pathname)
+      if (membersMatch) {
+        const ws = membersMatch[1]!
+        membersCalls[ws] = (membersCalls[ws] ?? 0) + 1
+        return json(200, {
+          members: [
+            { user_id: 'u_shared', display_name: ws === 'ws_1' ? 'Alice One' : 'Alice Two' },
+          ],
+        })
+      }
+      const docsMatch = /^\/api\/v1\/workspaces\/(ws_[12])\/documents\/recent$/.exec(parsed.pathname)
+      if (docsMatch) {
+        const ws = docsMatch[1]!
+        return json(200, {
+          documents: [
+            {
+              id: `doc_${ws}`,
+              workspace_id: ws,
+              title: 'Shared.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by: 'u_shared',
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return json(404, { error: { code: 'not_found' } })
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-isolation-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+      keystoreLocked: () => false,
+      selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+
+    // Repeat reads of both workspaces: each row keeps its own workspace's name
+    for (let round = 0; round < 2; round += 1) {
+      const one = await service.listDocuments({ workspaceId: 'ws_1' })
+      const two = await service.listDocuments({ workspaceId: 'ws_2' })
+      expect(one.ok && one.value.documents[0]!.updatedByName).toBe('Alice One')
+      expect(two.ok && two.value.documents[0]!.updatedByName).toBe('Alice Two')
+    }
+    // and each workspace's members list is fetched exactly once
+    expect(membersCalls['ws_1']).toBe(1)
+    expect(membersCalls['ws_2']).toBe(1)
+  })
+
+  // DH1-BE-8: the stored-name bound is observable. 2001 distinct members are
+  // served, so the last one sits beyond the cap; a row updated by it must stay
+  // unnamed while the member just inside the cap resolves.
+  it('caps stored workspace member names at the boundary, leaving an updater beyond it unnamed (DH1-BE-8)', async () => {
+    const members = Array.from({ length: 2001 }, (_, index) => ({
+      user_id: `u_${String(index).padStart(4, '0')}`,
+      display_name: `Member ${index}`,
+    }))
+    const fetch: FetchLike = async (url) => {
+      const parsed = new URL(url)
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/members') {
+        return json(200, { members })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/documents/recent') {
+        return json(200, {
+          documents: [
+            {
+              id: 'doc_first',
+              workspace_id: 'ws_1',
+              title: 'First.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T09:00:00Z',
+              updated_by: 'u_0000',
+            },
+            {
+              id: 'doc_inside',
+              workspace_id: 'ws_1',
+              title: 'Inside.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by: 'u_1999',
+            },
+            {
+              id: 'doc_beyond',
+              workspace_id: 'ws_1',
+              title: 'Beyond.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T07:00:00Z',
+              updated_by: 'u_2000',
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return json(404, { error: { code: 'not_found' } })
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-cap-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+      keystoreLocked: () => false,
+      selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+
+    const result = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const [first, inside, beyond] = result.value.documents
+    // inside the cap: the first stored name and the last one that fits
+    expect(first!.updatedByName).toBe('Member 0')
+    expect(inside!.updatedByName).toBe('Member 1999')
+    // beyond the cap: the 2001st member is not stored, so this row stays unnamed
+    expect(beyond!.updatedById).toBe('u_2000')
+    expect(beyond!.updatedByName).toBeUndefined()
+  })
 })

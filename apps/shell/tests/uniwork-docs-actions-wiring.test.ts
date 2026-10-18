@@ -530,4 +530,79 @@ describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
       vi.unstubAllGlobals()
     }
   })
+
+  // DH1-BE-3: the service hop is what carries the filters to the client. A
+  // future edit that drops `listFiltersOf` from one of these methods leaves the
+  // direct-client URL tests passing, so this asserts the OUTGOING request the
+  // fake HTTP layer receives for each list method through the IPC path.
+  it('forwards format, updated_by and updated_from through the service for listChildren, listDocuments and listTrash (DH1-BE-3)', async () => {
+    const { handlers } = await setup()
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        seen.push(String(input))
+        const url = new URL(String(input))
+        if (url.pathname === '/api/v1/workspaces/ws_1/members') {
+          return new Response(JSON.stringify({ members: [] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
+        return new Response(JSON.stringify({ documents: [], next_cursor: null }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }),
+    )
+    const filters = {
+      format: 'docx',
+      updatedBy: 'u_9',
+      updatedFrom: '2026-10-01T00:00:00Z',
+    }
+    try {
+      const children = await handlers.get(UNIWORK_DOC_CHANNELS.listChildren)!(null, {
+        workspaceId: 'ws_1',
+        parentId: null,
+        ...filters,
+      })
+      const docs = await handlers.get(UNIWORK_DOC_CHANNELS.listDocuments)!(null, {
+        workspaceId: 'ws_1',
+        ...filters,
+      })
+      const trash = await handlers.get(UNIWORK_DOC_CHANNELS.listTrash)!(null, {
+        workspaceId: 'ws_1',
+        ...filters,
+      })
+      // the handler answers `unknown`; read only the boolean we assert on
+      const okOf = (result: unknown): boolean =>
+        typeof result === 'object' && result !== null && 'ok' in result && result.ok === true
+      expect([children, docs, trash].map(okOf)).toEqual([true, true, true])
+
+      const queryOf = (match: (url: URL) => boolean): URLSearchParams => {
+        const found = seen.map((u) => new URL(u)).filter(match)
+        expect(found).toHaveLength(1)
+        return found[0]!.searchParams
+      }
+      // listChildren: the folder route, filters plus the empty-root parent_id
+      const childParams = queryOf((u) => u.searchParams.get('parent_id') === '')
+      expect(childParams.get('format')).toBe('docx')
+      expect(childParams.get('updated_by')).toBe('u_9')
+      expect(childParams.get('updated_from')).toBe('2026-10-01T00:00:00Z')
+      // listDocuments: updater/date force the flat workspace list, filters included
+      const docParams = queryOf(
+        (u) => u.pathname === '/api/v1/workspaces/ws_1/documents' && u.searchParams.has('kind'),
+      )
+      expect(docParams.get('format')).toBe('docx')
+      expect(docParams.get('updated_by')).toBe('u_9')
+      expect(docParams.get('updated_from')).toBe('2026-10-01T00:00:00Z')
+      // listTrash: the archived route, filters included
+      const trashParams = queryOf((u) => u.searchParams.get('archived') === '1')
+      expect(trashParams.get('format')).toBe('docx')
+      expect(trashParams.get('updated_by')).toBe('u_9')
+      expect(trashParams.get('updated_from')).toBe('2026-10-01T00:00:00Z')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
