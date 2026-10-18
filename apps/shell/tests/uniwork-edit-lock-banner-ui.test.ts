@@ -248,7 +248,7 @@ describe('chipModelOf: edit-lock session', () => {
       expect(copyEn.tip).toBe('Grace Hopper is editing now. Your unsaved changes are still here.')
       const copyVi = chipCopy(model, tFor('vi'), 'vi-VN', NOW)
       expect(copyVi.label).toBe('Grace Hopper đang sửa')
-      expect(copyVi.tip).toBe('Grace Hopper đang sửa. Các thay đổi chưa lưu của bạn vẫn còn ở đây.')
+      expect(copyVi.tip).toBe('Grace Hopper đang sửa. Thay đổi chưa lưu của bạn vẫn ở đây.')
     }
     // no byName -> generic
     const noName = chip(status(lock('lost', { lostReason: 'unknown', byName: null })))
@@ -384,6 +384,32 @@ describe('queue popover: the lock read-only explanation', () => {
     expect(lostModel.line2?.key).toBe('uwLockLostTakenOver')
     expect(lostModel.line2?.name).toBe('Ngọc Phạm')
     expect(lostModel.actions).toContainEqual({ id: 'edit-here', labelKey: 'uwLockEditHere' })
+  })
+
+  it(`'lost' with byName and unnamed reason (unknown/released/none): line 2 is uwLockLostHeldBy with holder name via lostHolderNameOf (EL1B-FE-1)`, () => {
+    const { lostHolderNameOf } = docsModel as typeof docsModel & {
+      lostHolderNameOf?: (s: UniworkEditLockSessionView | undefined) => string | null
+    }
+    expect(typeof lostHolderNameOf).toBe('function')
+    for (const lostReason of ['unknown', 'released', undefined] as const) {
+      const sess = lock('lost', { lostReason, byName: 'Grace Hopper' })
+      expect(lostHolderNameOf?.(sess)).toBe('Grace Hopper')
+      const model = queuePopoverModelOf(status(sess), undefined, 'ctrl-s')
+      expect(model.line1.key).toBe('uwLockReadOnlyExplain')
+      expect(model.line2?.key).toBe('uwLockLostHeldBy')
+      expect(model.line2?.name).toBe('Grace Hopper')
+      expect(model.actions).toContainEqual({ id: 'edit-here', labelKey: 'uwLockEditHere' })
+    }
+    expect(
+      lostHolderNameOf?.(lock('lost', { lostReason: 'taken_over', byName: 'Grace Hopper' })),
+    ).toBeNull()
+    expect(lostHolderNameOf?.(lock('lost', { lostReason: 'unknown', byName: '  ' }))).toBeNull()
+    const generic = queuePopoverModelOf(
+      status(lock('lost', { lostReason: 'unknown', byName: null })),
+      undefined,
+      'ctrl-s',
+    )
+    expect(generic.line2?.key).toBe('uwLockLostGeneric')
   })
 })
 
@@ -568,6 +594,85 @@ describe('UniworkRemoteBar: edit-lock strip', () => {
     expect(strip()).not.toBeNull()
     expect(host.querySelector('.uw-remote-bar')).not.toBeNull()
   })
+
+  it('the strip button points aria-describedby at the unique strip message id (EL1B-FE-4)', async () => {
+    await mountBar(status(lock('self_elsewhere')))
+    const button = editHereButton()!
+    const msg = host.querySelector<HTMLElement>('.uw-editlock-strip .uw-editlock-message')!
+    const descId = button.getAttribute('aria-describedby')
+    expect(descId).toBeTruthy()
+    expect(msg.id).toBe(descId)
+    // unique even when the remote bar is rendered above it
+    await mountBar(status(lock('self_elsewhere'), { remote: { kind: 'newer-dirty', version: 4 } }))
+    const remoteMsg = host.querySelector<HTMLElement>('.uw-remote-message')!
+    const lockMsg = host.querySelector<HTMLElement>('.uw-editlock-strip .uw-editlock-message')!
+    expect(lockMsg.id).toBeTruthy()
+    expect(lockMsg.id).not.toBe(remoteMsg.id)
+    expect(editHereButton()!.getAttribute('aria-describedby')).toBe(lockMsg.id)
+  })
+
+  it('the strip button shows the spinner from the click until uniworkEditHere settles (EL1B-FE-5)', async () => {
+    let resolveAcquire!: (next: UniworkDocStatus | null) => void
+    editHere.mockImplementationOnce(
+      () =>
+        new Promise<UniworkDocStatus | null>((resolve) => {
+          resolveAcquire = resolve
+        }),
+    )
+    await mountBar(status(lock('self_elsewhere')))
+    const button = editHereButton()!
+    expect(button.querySelector('.uw-spinner')).toBeNull()
+    await act(async () => {
+      button.click()
+    })
+    // before main pushes 'acquiring': local busy already renders the spinner
+    expect(editHereButton()!.getAttribute('aria-busy')).toBe('true')
+    expect(editHereButton()!.querySelector('.uw-spinner')).not.toBeNull()
+    await act(async () => {
+      resolveAcquire(status(lock('held')))
+    })
+  })
+
+  it('when uniworkEditHere rejects or resolves null on the strip, shows uwLockAcquireFailed politely unless status is already other (EL1B-FE-3)', async () => {
+    editHere.mockRejectedValueOnce(new Error('network'))
+    await mountBar(status(lock('self_elsewhere')))
+    await act(async () => {
+      editHereButton()!.click()
+    })
+    expect(stripText()).toContain('Couldn’t get editing access. Try again in a few minutes.')
+    expect(lockStatusNode()!.getAttribute('aria-live')).toBe('polite')
+    expect(lockStatusNode()!.textContent).toBe(
+      'Couldn’t get editing access. Try again in a few minutes.',
+    )
+
+    // null return while still in free (not 'other') -> also shows acquireFailed
+    editHere.mockResolvedValueOnce(null)
+    await mountBar(status(lock('free')), 'vi')
+    await act(async () => {
+      editHereButton()!.click()
+    })
+    expect(stripText()).toContain('Chưa lấy được quyền sửa. Thử lại sau ít phút.')
+    expect(lockStatusNode()!.textContent).toBe('Chưa lấy được quyền sửa. Thử lại sau ít phút.')
+
+    // null return when a fresh status already moved the strip to 'other' -> not a failure
+    let finishNull!: (next: UniworkDocStatus | null) => void
+    editHere.mockImplementationOnce(
+      () =>
+        new Promise<UniworkDocStatus | null>((resolve) => {
+          finishNull = resolve
+        }),
+    )
+    await mountBar(status(lock('free')))
+    await act(async () => {
+      editHereButton()!.click()
+    })
+    await mountBar(status(lock('other', { holderName: 'Ada Lovelace' })))
+    await act(async () => {
+      finishNull(null)
+    })
+    expect(stripText()).not.toContain('Couldn’t get editing access')
+    expect(stripText()).toContain('Ada Lovelace has been editing')
+  })
 })
 
 describe('UniworkStatusChip: edit-lock session', () => {
@@ -642,6 +747,92 @@ describe('UniworkStatusChip: edit-lock session', () => {
     expect(pop.textContent).toContain('Ngọc Phạm took over editing')
     expect(pop.querySelector('[data-popover-action="edit-here"]')).not.toBeNull()
   })
+
+  it(`Ctrl/Cmd+S on 'lost' with byName and unnamed reason shows uwLockLostHeldBy with holder name (EL1B-FE-1)`, async () => {
+    await mountChip(status(lock('lost', { lostReason: 'unknown', byName: 'Grace Hopper' })))
+    await act(async () => {
+      ctrlSRequest!({ path: PATH })
+    })
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve()
+    })
+    const pop = host.querySelector<HTMLElement>('.uw-queue-pop')!
+    expect(pop.textContent).toContain('Nothing was saved')
+    expect(pop.textContent).toContain(
+      'Grace Hopper is editing now. Your unsaved changes are still here.',
+    )
+  })
+
+  it(`a transition into 'lost' is announced in the role=alert (assertive) lane for both generic and heldBy variants (EL1B-FE-2)`, async () => {
+    await mountChip(status(lock('held'), { state: 'saved' }))
+    expect(document.querySelector<HTMLElement>('#uw-live-host [role="alert"]')!.textContent).toBe(
+      '',
+    )
+    // heldBy variant (labelKey = uwChipEditLocked, not uwLockLostTitle)
+    await mountChip(status(lock('lost', { lostReason: 'unknown', byName: 'Grace Hopper' })))
+    expect(
+      document.querySelector<HTMLElement>('#uw-live-host [role="alert"]')!.textContent,
+    ).toContain('Grace Hopper is editing')
+
+    // generic / named-reason variant (labelKey = uwLockLostTitle)
+    resetLiveForTests()
+    await mountChip(status(lock('held'), { state: 'saved' }))
+    await mountChip(status(lock('lost', { lostReason: 'expired', byName: null })))
+    expect(
+      document.querySelector<HTMLElement>('#uw-live-host [role="alert"]')!.textContent,
+    ).toContain('You’re no longer editing')
+  })
+
+  it(`when uniworkEditHere rejects or resolves null in the popover, keeps the popover open and shows uwLockAcquireFailed politely unless status is other (EL1B-FE-3)`, async () => {
+    await mountChip(status(lock('self_elsewhere')))
+    await act(async () => {
+      ctrlSRequest!({ path: PATH })
+    })
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve()
+    })
+    editHere.mockRejectedValueOnce(new Error('offline'))
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-popover-action="edit-here"]')!.click()
+    })
+    const popAfterReject = host.querySelector<HTMLElement>('.uw-queue-pop')
+    expect(popAfterReject).not.toBeNull()
+    expect(popAfterReject!.querySelector('.uw-queue-pop-error')?.textContent).toBe(
+      'Couldn’t get editing access. Try again in a few minutes.',
+    )
+    expect(document.querySelector<HTMLElement>('#uw-live-host [role="status"]')!.textContent).toBe(
+      'Couldn’t get editing access. Try again in a few minutes.',
+    )
+    expect(document.querySelector<HTMLElement>('#uw-live-host [role="alert"]')!.textContent).toBe(
+      '',
+    )
+
+    // null return while still self_elsewhere -> also shows acquireFailed
+    editHere.mockResolvedValueOnce(null)
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-popover-action="edit-here"]')!.click()
+    })
+    expect(host.querySelector('.uw-queue-pop-error')?.textContent).toBe(
+      'Couldn’t get editing access. Try again in a few minutes.',
+    )
+
+    // null return when a fresh status already moved the session to 'other' -> not a failure
+    let finishNull!: (next: UniworkDocStatus | null) => void
+    editHere.mockImplementationOnce(
+      () =>
+        new Promise<UniworkDocStatus | null>((resolve) => {
+          finishNull = resolve
+        }),
+    )
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-popover-action="edit-here"]')!.click()
+    })
+    await mountChip(status(lock('other', { holderName: 'Ada Lovelace' })))
+    await act(async () => {
+      finishNull(null)
+    })
+    expect(host.querySelector('.uw-queue-pop-error')).toBeNull()
+  })
 })
 
 // ── copy: the 21 shards ─────────────────────────────────
@@ -661,11 +852,11 @@ const NEW_KEYS = [
   'uwLockLostAccessLost',
   'uwLockLostGeneric',
   'uwLockLostHeldBy',
+  'uwLockAcquireFailed',
 ] as const
 
 describe('EL-1(b) copy: uwLock* keys in every shard', () => {
-  it('every one of the 21 locale shards defines all 14 keys, non-empty', () => {
-    expect(Object.keys(uniworkDocumentStrings)).toHaveLength(21)
+  it('every one of the 21 locale shards defines all 15 keys, non-empty', () => {
     for (const [locale, dict] of Object.entries(uniworkDocumentStrings)) {
       const record = dict as Record<string, string>
       for (const k of NEW_KEYS) {
@@ -730,11 +921,13 @@ describe('EL-1(b) copy: uwLock* keys in every shard', () => {
     expect(enDict.uwLockLostGeneric).toBe(
       'You’re no longer editing. Your unsaved changes are still here.',
     )
-    expect(viDict.uwLockLostHeldBy).toBe(
-      '{name} đang sửa. Các thay đổi chưa lưu của bạn vẫn còn ở đây.',
-    )
+    expect(viDict.uwLockLostHeldBy).toBe('{name} đang sửa. Thay đổi chưa lưu của bạn vẫn ở đây.')
     expect(enDict.uwLockLostHeldBy).toBe(
       '{name} is editing now. Your unsaved changes are still here.',
+    )
+    expect(viDict.uwLockAcquireFailed).toBe('Chưa lấy được quyền sửa. Thử lại sau ít phút.')
+    expect(enDict.uwLockAcquireFailed).toBe(
+      'Couldn’t get editing access. Try again in a few minutes.',
     )
   })
 
