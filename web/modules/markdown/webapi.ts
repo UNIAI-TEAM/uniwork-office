@@ -58,6 +58,9 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
       module: 'markdown',
       ext: '.md',
       extPattern: /\.(md|markdown|mdown|mkd)$/i,
+      // a stored *.txt opens here in plain mode (UNI-1905, UN-02): a save never renames or
+      // retypes it to .md, and Save As defaults to the opened file's extension
+      keepExtPattern: /\.txt$/i,
       mimeType: 'text/markdown',
     },
     { capabilities: ctx.capabilities, ...opts },
