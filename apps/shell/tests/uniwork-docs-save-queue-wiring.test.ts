@@ -22,7 +22,7 @@ import { createDocLock } from '../src/main/uniwork-sync/doc-lock'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits } from '../src/main/uniwork-docs/limits'
 import type { CapabilitySource } from '../src/main/uniwork-sync/capability/cache'
 import { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
-import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
+import { createStoreLayer, type StoreLayer, type StoreRecords } from '../src/main/uniwork-sync/store'
 import {
   createLockableSafeStorage,
   type LockableSafeStorage,
@@ -335,12 +335,16 @@ function setup(
     account?: string | null
     /** the capability answer per org (default: sync_write on) */
     capability?: Record<string, boolean>
-    /** true = the store cannot be built (the queue's registrations are absent) */
-    bareLayer?: boolean
     /** SIZE-F1/BIGUP-A1: the `documents.limits` the service reads (defaults when absent) */
     limits?: () => DocumentLimits | Promise<DocumentLimits>
     /** the per-account store budget (default 1 MiB; a chunked test needs more) */
     budgetBytes?: number
+    /**
+     * R1-2 (UNI-1362): wraps the records the SERVICE opens, so a test can make
+     * one store unable to answer (a refused/interrupted read). The stores are
+     * all registered, as production registers them.
+     */
+    wrapRecords?: (name: string, records: StoreRecords) => StoreRecords
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -361,12 +365,25 @@ function setup(
     clock: () => 1_700_000_000_000,
   })
   layer.register(INTENT_STORE_REGISTRATION)
-  if (!opts.bareLayer) {
-    layer.register(DRAFTS_STORE_REGISTRATION)
-    layer.register(PAUSE_STORE_REGISTRATION)
-  }
+  layer.register(DRAFTS_STORE_REGISTRATION)
+  layer.register(PAUSE_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({
-    layer,
+    layer: opts.wrapRecords
+      ? {
+          ...layer,
+          async open(scope) {
+            const opened = await layer.open(scope)
+            if (opened.kind !== 'ok') return opened
+            return {
+              kind: 'ok',
+              store: {
+                scope: opened.store.scope,
+                records: (name: string) => opts.wrapRecords!(name, opened.store.records(name)),
+              },
+            }
+          },
+        }
+      : layer,
     scope: () => (account ? { deploymentId: 'default', accountId: account } : null),
   })
   const ui: ConflictUi = {
@@ -653,6 +670,58 @@ describe('G5-06 W4b save queue wiring', () => {
     const kept = await drafts.list(key)
     expect(kept).toHaveLength(1)
     expect(Buffer.from(kept[0]!.snapshot)).toEqual(Buffer.from(enc('kept snapshot')))
+  })
+
+  // R1-1 (UNI-1362): the presence check must not sit behind the binding read.
+  // A clean copy is never parked at sign-out, so its plaintext folder - binding
+  // included - is deleted while its kept draft survives in the sync store. On
+  // the next sign-in only parked copies come back: the copy has no binding, and
+  // "no binding" must not mean "nothing local".
+  it('R1-1: a kept draft is local work even when the copy has no binding left', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    const drafts = createDraftStore(opened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    expect(
+      await drafts.keep(basename(dirname(path)), enc('kept snapshot'), {
+        id: 'draft_1',
+        createdAt: '2026-04-17T00:00:00.000Z',
+      }),
+    ).toBe('ok')
+    // the sign-out deleted the clean copy's plaintext folder: binding and bytes gone
+    await rm(dirname(path), { recursive: true, force: true })
+    expect(await ctx.service.hasLocalDraft(DOC)).toBe(true)
+  })
+
+  // R1-2 (UNI-1362): `list` maps a refused/interrupted read to an empty list, so
+  // a store that cannot answer looked like "no draft". The presence check fails
+  // CLOSED instead: only a readable record with no entries proves there is none.
+  it('R1-2: a drafts store that cannot answer counts as local work', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const refuse = setup(server, {
+      wrapRecords: (name, records) =>
+        name === DRAFTS_STORE_REGISTRATION.name
+          ? { ...records, read: async () => ({ kind: 'refused' as const }) }
+          : records,
+    })
+    await openDoc(refuse)
+    expect(await refuse.service.hasLocalDraft(DOC)).toBe(true)
+
+    const fail = setup(server, {
+      wrapRecords: (name, records) =>
+        name === DRAFTS_STORE_REGISTRATION.name
+          ? {
+              ...records,
+              read: async () => {
+                throw new Error('EIO: the drafts record cannot be read')
+              },
+            }
+          : records,
+    })
+    await openDoc(fail)
+    expect(await fail.service.hasLocalDraft(DOC)).toBe(true)
   })
 
   describe("G5-11 d6-3: a switch during cancel/discard keeps nothing in the next account's drafts", () => {

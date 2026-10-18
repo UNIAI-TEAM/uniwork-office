@@ -3287,41 +3287,54 @@ export class UniworkDocsService {
     if (!identity) return false
     const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
     const binding = await this.store.readDir(dir)
-    if (!binding || binding.documentId !== documentId) return false
-    if (KEEP_LOCAL_STATES.has(binding.state) || binding.state === 'saving') return true
-    // the editor holds edits the file does not show yet: keeping the index
-    // entry keeps the tab's document reachable until the save lands
-    if (this.editorDirty.has(join(dir, binding.filename))) return true
-    const access = await this.intentAccess()
-    // the store cannot answer: keep the copy rather than evict local work
-    if (access.kind !== 'ok') return true
-    // the editor signal was read before this await: an editor that turned
-    // dirty while the store was answering is local work too, so re-read it
-    // here instead of evicting the entry the tab still needs
-    if ((await access.intents.get(documentId)) !== null) return true
+    const bound = binding && binding.documentId === documentId ? binding : null
+    if (bound) {
+      if (KEEP_LOCAL_STATES.has(bound.state) || bound.state === 'saving') return true
+      // the editor holds edits the file does not show yet: keeping the index
+      // entry keeps the tab's document reachable until the save lands
+      if (this.editorDirty.has(join(dir, bound.filename))) return true
+      const access = await this.intentAccess()
+      // the store cannot answer: keep the copy rather than evict local work
+      if (access.kind !== 'ok') return true
+      // the editor signal was read before this await: an editor that turned
+      // dirty while the store was answering is local work too, so re-read it
+      // here instead of evicting the entry the tab still needs
+      if ((await access.intents.get(documentId)) !== null) return true
+    }
     // B34 (UNI-1362): a kept draft - the user's snapshot of a cancelled intent -
     // is local work as well, and it lives in its own store, never in the intent
     // one. A closed document whose only local work is a kept draft must still
     // answer true: the offline library asks this before an unpin deletes the
     // committed copy, and the feed's resync asks it before evicting the index
     // entry. Read only: the draft bytes are never touched.
-    if (await this.hasKeptDraft(documentId)) return true
-    return this.editorDirty.has(join(dir, binding.filename))
+    //
+    // R1-1: this runs even without a readable binding. A copy whose plaintext
+    // folder the sign-out deleted (never parked: it was clean) or that was
+    // never opened here has no binding at all, and the kept draft of it is
+    // still the user's work - answering "nothing local" there loses it.
+    if ((await this.hasKeptDraft(documentId)) === true) return true
+    return bound ? this.editorDirty.has(join(dir, bound.filename)) : false
   }
 
   /**
    * B34 (UNI-1362): whether the drafts store holds at least one kept draft of
-   * `documentId`. The store is listed, never written; a layer without the drafts
-   * registration (a bare test store) holds no draft.
+   * `documentId`. The store is only read, never written.
+   *
+   * R1-2: every outcome that cannot prove "no draft" answers true, because the
+   * callers use this to decide whether deleting or evicting the copy is safe: a
+   * store that will not open, a namespace this build cannot reach, a read the
+   * boundary refused or interrupted, and a read that throws all leave the draft
+   * unproven, so they count as local work. Only a readable record with no
+   * entries answers false.
    */
   private async hasKeptDraft(documentId: string): Promise<boolean> {
     try {
       const open = await this.openSyncStore()
       if (open.kind !== 'ok') return true
       const drafts = createDraftStore(open.records(DRAFTS_STORE_REGISTRATION.name))
-      return (await drafts.list(documentId)).length > 0
+      return (await drafts.has(documentId)) !== false
     } catch {
-      return false
+      return true
     }
   }
 

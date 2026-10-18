@@ -22,6 +22,7 @@ import {
   type StoreRecords,
 } from '../src/main/uniwork-sync/store'
 import { createIntentStore, INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
+import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
 import {
   createLockableSafeStorage,
   runStoreCompliance,
@@ -98,6 +99,9 @@ function harness(
     clock: () => clock.now(),
   })
   layer.register(INTENT_STORE_REGISTRATION)
+  // R1-2 (UNI-1362): the production namespace, so "no kept draft" is a real
+  // readable answer here rather than an unregistered store (which fails closed)
+  layer.register(DRAFTS_STORE_REGISTRATION)
   layer.register(FEED_CURSORS_REGISTRATION)
   layer.register(DOC_INDEX_REGISTRATION)
 
