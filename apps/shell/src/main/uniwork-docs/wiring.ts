@@ -936,6 +936,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.remoteAction, (_event, path: unknown, action: unknown) =>
     service.remoteAction(path as string, action as UniworkRemoteAction),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.editHere, (_event, path: unknown) =>
+    service.editHere(path as string),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {
     if (typeof path === 'string') service.dismissLock(path)

@@ -1308,6 +1308,9 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.remoteAction, path, action),
     )
   },
+  async uniworkEditHere(path) {
+    return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.editHere, path))
+  },
   async uniworkSetBarInset(heightPx) {
     if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.barInset, Math.max(0, Math.round(heightPx)))
