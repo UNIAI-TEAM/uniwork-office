@@ -378,7 +378,11 @@ import { reloadPathTarget } from './reload-view'
 import { listDeskDrafts } from './desk-drafts'
 import { runDeskTool } from './desk-tools'
 import { installShellCloseGuard } from './window-close-guard'
-import { beginEditLockWillQuit, finishEditLockWillQuit } from './uniwork-docs/edit-lock-quit'
+import {
+  beginEditLockWillQuit,
+  finishEditLockWillQuit,
+  quitAgainAfterWillQuit,
+} from './uniwork-docs/edit-lock-quit'
 import {
   activateDetached,
   closeDetachedByPath,
@@ -7050,11 +7054,11 @@ app.on('before-quit', () => {
 // never released the lock. Token is still valid: stopUniworkAccount is after
 // the bounded release on the second pass.
 app.on('will-quit', (event) => {
-  if (beginEditLockWillQuit() === 'hold') {
+  if (beginEditLockWillQuit(uniworkDocs?.service.hasEditLocksToRelease() ?? false) === 'hold') {
     event.preventDefault()
     void finishEditLockWillQuit(
       (capMs) => uniworkDocs?.service.releaseAllEditLocks(capMs) ?? Promise.resolve(),
-    ).then(() => app.quit())
+    ).then(() => quitAgainAfterWillQuit(() => app.quit()))
     return
   }
   stopUniworkAccount()

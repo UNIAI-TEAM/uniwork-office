@@ -1389,6 +1389,11 @@ export class UniworkDocsService {
     for (const p of paths) this.notifyDocStateChanged(p)
   }
 
+  /** will-quit holds the quit only while a held lock or a drop release is outstanding */
+  hasEditLocksToRelease(): boolean {
+    return this.editLocks.size > 0 || this.inFlightDropReleases.size > 0
+  }
+
   /** will-quit: best-effort, 1.5 s cap; the quit gate awaits this then re-quits */
   releaseEditLocksOnQuit(): Promise<void> {
     return this.releaseAllEditLocks(EDIT_LOCK_QUIT_CAP_MS)

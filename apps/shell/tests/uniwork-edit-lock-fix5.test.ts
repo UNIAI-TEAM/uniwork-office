@@ -210,6 +210,8 @@ describe('EL1B-BE-R2-1: will-quit joins in-flight drop releases', () => {
     await vi.advanceTimersByTimeAsync(EDIT_LOCK_QUIT_CAP_MS - 1)
     expect(order).toEqual([])
     await vi.advanceTimersByTimeAsync(1)
+    // fix9: quit is re-issued on a later macrotask (fake setImmediate)
+    await vi.advanceTimersByTimeAsync(1)
     await first
     expect(order).toEqual(['quit'])
   })
@@ -218,13 +220,16 @@ describe('EL1B-BE-R2-1: will-quit joins in-flight drop releases', () => {
     const h = setup({})
     vi.useFakeTimers()
     const order: string[] = []
-    await runEditLockWillQuit({
+    const gate = runEditLockWillQuit({
       preventDefault: () => undefined,
       release: async (capMs) => {
         await h.service.releaseAllEditLocks(capMs)
       },
       quitAgain: () => order.push('quit'),
     })
+    // fix9: quit is re-issued on a later macrotask (fake setImmediate)
+    await vi.advanceTimersByTimeAsync(0)
+    await gate
     expect(order).toEqual(['quit'])
   })
 
