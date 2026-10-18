@@ -1198,12 +1198,17 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     const realSetTimeout = globalThis.setTimeout
     const held = new Map<unknown, { at: number; fn: () => void }>()
     const armed: number[] = []
+    /** every timer below 100 ms: forwarded to a native timer, recorded so a test can see it armed */
+    const short: number[] = []
     let virtualNow = 0
     const setSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
       fn: () => void,
       ms?: number,
     ) => {
-      if ((ms ?? 0) < 100) return realSetTimeout(fn, ms)
+      if ((ms ?? 0) < 100) {
+        short.push(ms ?? 0)
+        return realSetTimeout(fn, ms)
+      }
       armed.push(ms ?? 0)
       const handle = realSetTimeout(() => undefined, 0)
       held.set(handle, { at: virtualNow + (ms ?? 0), fn })
@@ -1218,6 +1223,7 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     const settle = () => new Promise((resolve) => realSetTimeout(resolve, 250))
     return {
       armed,
+      short,
       async advance(ms: number): Promise<void> {
         const target = virtualNow + ms
         for (;;) {
@@ -1349,6 +1355,86 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     }
   })
 
+  it('(G703-R11-2) time that passes inside the cache verification, after the row sample, does not move the deadline: 5 s timer, autonomous lock at the original deadline', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-r112-'))
+    dirs.push(base)
+    const rl = realLease(base)
+    const o = openHarness({ lease: rl.lease })
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    rl.advance(24 * LEASE_HOUR - 10_000)
+    o.clock.now += 24 * LEASE_HOUR - 10_000
+    const timers = virtualTimers((ms) => {
+      rl.advance(ms)
+      o.clock.now += ms
+    })
+    const openCached = o.h.manager.openCached.bind(o.h.manager)
+    const cacheSpy = vi.spyOn(o.h.manager, 'openCached').mockImplementation(async (...args) => {
+      const cached = await openCached(...args)
+      // 5 s pass in the blob reads and the pin write of the cache verification, after the row was sampled
+      rl.advance(5_000)
+      o.clock.now += 5_000
+      return cached
+    })
+    try {
+      const outcome = await o.copies.open('doc_1')
+      if (outcome.kind !== 'opened') throw new Error(`expected an open, got ${outcome.kind}`)
+      const path = outcome.path
+      expect(cacheSpy).toHaveBeenCalledTimes(1)
+      expect(timers.armed).toEqual([5_000])
+      await timers.advance(4_000)
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      await timers.advance(2_000)
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(path)).toBe(false)
+    } finally {
+      cacheSpy.mockRestore()
+      timers.restore()
+    }
+  })
+
+  it('(G703-R11-3) reopening the copy still on screen fixes its deadline at the row read too: 10 s left, 5 s of work, replacement 5 s timer, removal at the original deadline', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-r113-'))
+    dirs.push(base)
+    const rl = realLease(base)
+    const o = openHarness({ lease: rl.lease })
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    const timers = virtualTimers((ms) => {
+      rl.advance(ms)
+      o.clock.now += ms
+    })
+    try {
+      const path = (await openCopyOf(o)).path
+      // 10 s of lease are left when the copy, still on screen, is opened again
+      await timers.advance(24 * LEASE_HOUR - 10_000)
+      expect(o.locks).toEqual([])
+      o.capability.during = () => {
+        o.capability.during = null
+        rl.advance(5_000)
+        o.clock.now += 5_000
+      }
+      const reopened = await o.copies.open('doc_1')
+      expect(reopened).toMatchObject({ kind: 'opened', path })
+      // the replacement timer is the 5 s the copy has left, not the sampled 10 s
+      expect(timers.armed.at(-1)).toBe(5_000)
+      await timers.advance(4_000)
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      // no sweep: the timer alone removes it at the original deadline
+      await timers.advance(2_000)
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(path)).toBe(false)
+    } finally {
+      timers.restore()
+    }
+  })
+
   it('(G703-R11-1) an open whose work outlasts the whole sampled lease re-checks within a second of opening, not after the 30 s grace', async () => {
     const base = mkdtempSync(join(tmpdir(), 'uw-offline-r111-'))
     dirs.push(base)
@@ -1419,8 +1505,13 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
       expect(existsSync(path)).toBe(true)
       expect(timers.armed.at(-1)).toBe(30_000)
       // one more pass reads the usable renewal (500 ms left) - and no pass follows it
+      const shortBefore = timers.short.length
       await o.copies.sweep()
       expect(o.locks).toEqual([])
+      // G703-R11-4: the re-check that replaces the 30 s retry is exactly 750 ms, a positive delay
+      // the helper holds - a zero or any other sub-100 ms delay would re-enter at once instead
+      expect(timers.armed.at(-1)).toBe(750)
+      expect(timers.short.slice(shortBefore)).toEqual([])
       await timers.advance(400)
       expect(o.locks).toEqual([])
       expect(existsSync(path)).toBe(true)
