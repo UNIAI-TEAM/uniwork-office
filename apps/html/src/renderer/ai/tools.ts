@@ -59,6 +59,8 @@ export interface HtmlDocAccess {
   listAttachmentNames?(): string[]
   /** sids an element-scoped turn may edit (Ask AI on the selection, edit queue); null = the whole page */
   getEditFence?(): readonly number[] | null
+  /** live predicate: the page is a UniWork working copy (hides the whole-page writers, C-BOUND) */
+  uniworkBound?(): boolean
 }
 
 export type PlanMode = 'new' | 'redesign' | 'restyle' | 'extract'
@@ -991,6 +993,24 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
 /** the only tools a view-only UniWork document keeps: they read the page, none writes it */
 export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['get_outline', 'read_source'])
 
+/**
+ * Tools that replace the whole document as a generated page (plan_page modes
+ * new/redesign write through access.writePage + replaceAll; write_document the
+ * same for prose). A UniWork-bound page never offers them: wholesale
+ * replacement is a new document's content, not an edit of the bound one
+ * (C-BOUND; the same bound rule as the other apps' file-level tools).
+ */
+export const BOUND_HIDDEN_TOOLS: ReadonlySet<string> = new Set(['plan_page', 'write_document'])
+
+function refuseBound(name: string): ToolExecution {
+  return {
+    output: `${name} is unavailable: this is a UniWork document, so the AI cannot replace it wholesale.`,
+    isError: true,
+    mutated: false,
+    summary: name,
+  }
+}
+
 const VIEW_ONLY_NOTE =
   '\n\nNote: this document is view-only. You can read it and answer questions about it, but you cannot edit it: no edit tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
 
@@ -1010,10 +1030,17 @@ export function createHtmlSkill(
       return isReadOnly?.() ? prompt + VIEW_ONLY_NOTE : prompt
     },
     get tools() {
-      return isReadOnly?.() ? AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name)) : AGENT_TOOLS
+      // a bound page keeps the editing tools but loses the whole-page writers;
+      // a view-only bound page still reads only (the narrower list wins)
+      if (isReadOnly?.()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
+      if (access.uniworkBound?.() === true)
+        return AGENT_TOOLS.filter((t) => !BOUND_HIDDEN_TOOLS.has(t.name))
+      return AGENT_TOOLS
     },
     buildContext: () => core.buildContext(),
     executeTool: (call, signal) => {
+      if (access.uniworkBound?.() === true && BOUND_HIDDEN_TOOLS.has(call.name))
+        return refuseBound(call.name)
       if (isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)) {
         return {
           output: 'This document is view-only; it cannot be edited.',
