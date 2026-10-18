@@ -6,7 +6,7 @@
 //     bar and no toast.
 // Run: npx playwright test -c web/e2e docs-rename-save
 import { test, expect, type Page, type Frame } from '@playwright/test'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const repoRoot = resolve(__dirname, '../..')
@@ -14,11 +14,13 @@ const EDITOR = '.ProseMirror[contenteditable="true"]'
 const NEW_NAME = 'Kế hoạch Q4.docx'
 
 // the spec needs the docs web build (the test host iframes /index.html)
-test.skip(
-  !existsSync(resolve(repoRoot, 'dist-web/docs/index.html')) &&
-    !existsSync(resolve(repoRoot, 'dist-web/index.html')),
-  'no dist-web docs build',
-)
+function docsBuilt(): boolean {
+  const root = resolve(repoRoot, 'dist-web/docs')
+  return (
+    existsSync(root) && readdirSync(root).some((v) => existsSync(resolve(root, v, 'manifest.json')))
+  )
+}
+test.skip(!docsBuilt(), 'no dist-web/docs build')
 
 interface HostApi {
   documentId: string
