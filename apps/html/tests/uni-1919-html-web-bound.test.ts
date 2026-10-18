@@ -23,8 +23,8 @@ const BOUND_HIDDEN = ['plan_page', 'write_document']
 /** the web adapter's answer (web/modules/html/webapi.ts uniworkState) for an editable frame */
 const WEB_EDITABLE = { bound: false, readOnly: false }
 
-function fakeAccess(bound: boolean) {
-  let text = DOC
+function fakeAccess(bound: boolean, doc = DOC) {
+  let text = doc
   const map = buildParseMap(text, 1, null)
   const access: HtmlDocAccess = {
     getText: () => text,
@@ -97,6 +97,39 @@ describe('the web HTML frame is UniWork-bound for the AI', () => {
     expect(result.isError).toBe(true)
     expect(result.output).toMatch(/UniWork/)
     expect(text()).toBe(DOC)
+  })
+})
+
+describe('a bound page steers the model away from the hidden writers', () => {
+  // RPB-2: the prompt still drives the model to plan_page / write_document on a
+  // bound page where both tools are gone — name them unavailable instead
+  it('the system prompt carries a bound note on a bound frame', () => {
+    installWebCaps()
+    const bound = createDocumentSkill(fakeAccess(WEB_EDITABLE.bound).access)
+    expect(bound.systemPrompt).toContain('UniWork document')
+    expect(bound.systemPrompt).toContain('plan_page and write_document are unavailable')
+    expect(bound.systemPrompt).toContain('apply_ops')
+    expect(bound.systemPrompt).toContain('never replace the whole document')
+  })
+
+  // only desktop can be unbound: on web uniworkBoundForAi always reads bound
+  it('an unbound desktop page keeps today’s prompt', () => {
+    const unbound = createDocumentSkill(fakeAccess(false).access)
+    expect(unbound.systemPrompt).not.toContain('plan_page and write_document are unavailable')
+    expect(unbound.systemPrompt).not.toContain('never replace the whole document')
+  })
+
+  it('the empty-document hint names no hidden tool on a bound frame', () => {
+    installWebCaps()
+    const ctx = createDocumentSkill(fakeAccess(WEB_EDITABLE.bound, '').access).buildContext()
+    expect(ctx).toContain('The document is empty')
+    for (const n of BOUND_HIDDEN) expect(ctx).not.toContain(n)
+  })
+
+  it('an empty desktop page still names the page writers', () => {
+    const unboundCtx = createDocumentSkill(fakeAccess(false, '').access).buildContext()
+    expect(unboundCtx).toContain('plan_page (mode new)')
+    expect(unboundCtx).toContain('write_document')
   })
 })
 
