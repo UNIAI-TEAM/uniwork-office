@@ -296,7 +296,9 @@ export function chipModelOf(
       labelKey: heldBy ? 'uwChipEditLocked' : 'uwLockLostTitle',
       holderName: heldBy ?? session.byName ?? null,
       tipKey: heldBy ? 'uwLockLostHeldBy' : reasonKey,
-      action: { kind: 'edit-here', labelKey: 'uwLockEditHere' },
+      action: isTerminalLockLostReason(session.lostReason)
+        ? undefined
+        : { kind: 'edit-here', labelKey: 'uwLockEditHere' },
     }
   }
   // 1 blocked
@@ -788,6 +790,7 @@ export function remoteBarModelOf(
  * or none sent) reads the generic sentence — the unsaved edits are always named kept.
  */
 export function lostReasonKeyOf(reason: UniworkEditLockLostReason | undefined): StringKey {
+  if (isTerminalLockLostReason(reason)) return 'uwLockLostAccessLost'
   switch (reason) {
     case 'taken_over':
       return 'uwLockLostTakenOver'
@@ -801,6 +804,25 @@ export function lostReasonKeyOf(reason: UniworkEditLockLostReason | undefined): 
       return 'uwLockLostAccessLost'
     default:
       return 'uwLockLostGeneric'
+  }
+}
+
+/**
+ * Amendment A1 (B9, UNI-1645c): the four server end reasons a lock session cannot
+ * come back from — the session was revoked, the member deactivated, the
+ * organization suspended, or the document deleted. They read the access-lost
+ * sentence on every surface and offer no "Sửa ở đây": re-acquiring cannot
+ * succeed. They are named reasons, so the heldBy rule never applies to them.
+ */
+export function isTerminalLockLostReason(reason: UniworkEditLockLostReason | undefined): boolean {
+  switch (reason) {
+    case 'session_revoked':
+    case 'member_deactivated':
+    case 'organization_suspended':
+    case 'document_deleted':
+      return true
+    default:
+      return false
   }
 }
 
@@ -929,7 +951,7 @@ export function lockBannerModelOf(
           : session.lostReason === 'taken_over' || session.lostReason === 'handed_over'
             ? { name: byName ?? t('uwEditLockSomeone') }
             : {},
-        editHere: true,
+        editHere: !isTerminalLockLostReason(session.lostReason),
         busy: false,
       }
     }

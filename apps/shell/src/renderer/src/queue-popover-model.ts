@@ -10,6 +10,7 @@ import {
   blockedReasonKey,
   formatSaveTime,
   isEditLockReadOnlyPhase,
+  isTerminalLockLostReason,
   lostHolderNameOf,
   lostReasonKeyOf,
 } from './uniwork-docs-model'
@@ -216,7 +217,11 @@ export function queuePopoverModelOf(
     return {
       line1: { key: 'uwLockReadOnlyExplain' },
       line2,
-      actions: session.phase === 'other' ? [] : [{ id: 'edit-here', labelKey: 'uwLockEditHere' }],
+      actions:
+        session.phase === 'other' ||
+        (session.phase === 'lost' && isTerminalLockLostReason(session.lostReason))
+          ? []
+          : [{ id: 'edit-here', labelKey: 'uwLockEditHere' }],
     }
   }
 
