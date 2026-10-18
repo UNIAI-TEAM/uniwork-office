@@ -22,7 +22,11 @@ import { createDocLock } from '../src/main/uniwork-sync/doc-lock'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits } from '../src/main/uniwork-docs/limits'
 import type { CapabilitySource } from '../src/main/uniwork-sync/capability/cache'
 import { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
-import { createStoreLayer, type StoreLayer, type StoreRecords } from '../src/main/uniwork-sync/store'
+import {
+  createStoreLayer,
+  type StoreLayer,
+  type StoreRecords,
+} from '../src/main/uniwork-sync/store'
 import {
   createLockableSafeStorage,
   type LockableSafeStorage,

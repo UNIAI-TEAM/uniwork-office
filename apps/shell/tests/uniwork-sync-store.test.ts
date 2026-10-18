@@ -330,7 +330,9 @@ describe('uniwork sync store layer', () => {
       fs: {
         // half the encrypted record lands, then the disk fills: the temp exists
         writeFile: async (path, data, mode) => {
-          await writeFile(path, data.subarray(0, Math.max(1, Math.floor(data.length / 2))), { mode })
+          await writeFile(path, data.subarray(0, Math.max(1, Math.floor(data.length / 2))), {
+            mode,
+          })
           throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' })
         },
       },
@@ -345,7 +347,9 @@ describe('uniwork sync store layer', () => {
     const layer = makeLayer({
       fs: {
         writeFile: async (path, data, mode) => {
-          await writeFile(path, data.subarray(0, Math.max(1, Math.floor(data.length / 2))), { mode })
+          await writeFile(path, data.subarray(0, Math.max(1, Math.floor(data.length / 2))), {
+            mode,
+          })
           throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' })
         },
         rm: async () => {
