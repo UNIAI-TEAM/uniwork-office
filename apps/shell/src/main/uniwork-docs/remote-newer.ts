@@ -44,8 +44,9 @@ export interface RemoteLocal {
   receiptRevision?: string
   /** revisions this app produced (settled receipts + selfRenamed) */
   ownEcho: ReadonlySet<string>
-  /** the copy is locked from the feed side (a reload/metadata 403/404/410) */
-  locked: 'revoked' | 'deleted' | null
+  /** the copy is locked from the feed side (a reload/metadata 403/404/410), or EL-1(a)
+   * (UNI-1645c) an HTTP 423 left it `edit_locked` (someone else holds the edit lock) */
+  locked: 'revoked' | 'deleted' | 'edit_locked' | null
 }
 
 export type RemoteDecision =

@@ -111,6 +111,8 @@ const REASON_ACTION: Partial<Record<SyncCenterBlockedReason, PopoverAction>> = {
 const FAILED_REASON_KEY: Record<string, StringKey> = {
   quota: 'uwReasonQuota',
   too_large: 'uwReasonTooLarge',
+  // EL-1(a) (UNI-1645c): a commit refused by someone else's edit lock
+  edit_locked: 'uwReasonEditLocked',
   other: 'uwReasonOther',
 }
 

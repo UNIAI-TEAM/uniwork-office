@@ -851,3 +851,19 @@ describe('SIZE-be-d1-8: wired Sync Center carries failedReason and maxBytes from
     })
   })
 })
+
+describe('EL1A-R2-2: wired Sync Center names edit_locked from a stored failed record', () => {
+  it('maps a stored failed record with lastError edit_locked onto the attention row failedReason', async () => {
+    const h = wired({
+      docs: [{ key: 'doc-edit-locked', state: 'failed', lastError: 'edit_locked' }],
+    })
+    const snapshot = await h.controller.getSnapshot()
+    const row = snapshot.tabs.attention.find((item) => item.documentKey === 'doc-edit-locked')
+    expect(row).toBeDefined()
+    expect(row).toMatchObject({
+      documentKey: 'doc-edit-locked',
+      state: 'failed',
+      failedReason: 'edit_locked',
+    })
+  })
+})

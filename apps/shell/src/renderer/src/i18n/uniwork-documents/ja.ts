@@ -163,4 +163,11 @@ export const ja = {
   uwErrUploadTooLarge:
     '{name} は {size} あり、上限 {max} を超えています。画像を圧縮するかファイルを分割してから、もう一度アップロードしてください。',
   uwReasonTooLargeWithLimit: '上限 {max} を超過',
+  uwChipEditLocked: '{name} が編集中',
+  uwChipEditLockedSelf: '別のウィンドウで編集中',
+  uwEditLockSomeone: '他のユーザー',
+  uwTipEditLocked: '{name} が {time} から編集中です。',
+  uwTipEditLockedSelf: 'あなたは別のウィンドウでこの文書を編集しています。',
+  uwErrEditLocked: '他のユーザーがこの文書を編集中です。',
+  uwReasonEditLocked: '他のユーザーが編集中',
 } satisfies Record<keyof typeof zh, string>

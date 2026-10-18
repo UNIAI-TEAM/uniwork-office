@@ -353,4 +353,57 @@ describe('parseBinding + write (what this build stamps)', () => {
     expect(parseBinding({ ...schema2, schema: 3 })).toBeNull()
     expect(parseBinding(null)).toBeNull()
   })
+
+  it('EL1A-BE-5: an edit_locked binding round-trips with its holder metadata; other states drop it', () => {
+    const editLock = {
+      holderName: 'Minh Trần',
+      since: '2026-04-17T03:00:00Z',
+      expiresAt: '2026-04-17T03:02:00Z',
+      heldByMe: false,
+      offlineHoldUntil: '2026-04-17T03:15:00Z',
+    }
+    const parsed = parseBinding({
+      ...schema2,
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock,
+    })
+    expect(parsed).toMatchObject({ state: 'edit_locked', error: 'edit_locked', editLock })
+    // a lenient read: a missing/non-string field is null, never a throw, and held_by_me is strict
+    const bare = parseBinding({ ...schema2, state: 'edit_locked' })
+    expect(bare?.editLock).toBeUndefined()
+    expect(
+      parseBinding({
+        ...schema2,
+        state: 'edit_locked',
+        editLock: { holder_name: 'x', holderName: 42, since: '', expiresAt: null, heldByMe: 'yes' },
+      })?.editLock,
+    ).toEqual({ holderName: null, since: null, expiresAt: null, heldByMe: false })
+    // the holder never rides on a state that is not edit_locked
+    expect(parseBinding({ ...schema2, state: 'dirty', editLock })?.editLock).toBeUndefined()
+    expect(parseBinding({ ...schema2, state: 'failed', editLock })?.editLock).toBeUndefined()
+  })
+
+  it('EL1A-BE-5: an edit_locked binding is written back exactly as it was read', async () => {
+    const editLock = {
+      holderName: 'Minh Trần',
+      since: '2026-04-17T03:00:00Z',
+      expiresAt: '2026-04-17T03:02:00Z',
+      heldByMe: true,
+    }
+    const { dir, path } = folder({
+      ...schema2,
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock,
+    })
+    const store = new BindingStore(root)
+    const doc = store.lookup(path)
+    if (!doc) throw new Error('not bound')
+    expect(doc.binding.editLock).toEqual(editLock)
+    await store.write(dir, doc.binding)
+    const raw = JSON.parse(readFileSync(join(dir, BINDING_FILE), 'utf8')) as Record<string, unknown>
+    expect(raw.editLock).toEqual(editLock)
+    expect(parseBinding(raw)?.editLock).toEqual(editLock)
+  })
 })
