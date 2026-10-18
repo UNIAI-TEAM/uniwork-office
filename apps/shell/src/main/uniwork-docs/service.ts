@@ -1790,7 +1790,11 @@ export class UniworkDocsService {
     const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
     const sameOwner = (known: LastOwner | null) =>
       !!known && known.accountId === owner.accountId && known.deploymentId === owner.deploymentId
-    if (!sameOwner(this.lastOwner)) this.lastOwner = owner
+    if (!sameOwner(this.lastOwner)) {
+      this.lastOwner = owner
+      // the back-off belongs to the owner whose write failed, not to the next one
+      this.lastOwnerRetryAt = 0
+    }
     // a failed write is not remembered as persisted: a later observation retries it,
     // at most once per back-off so a stuck disk does not stall every status read
     if (!sameOwner(this.lastOwnerOnDisk) && Date.now() >= this.lastOwnerRetryAt) {

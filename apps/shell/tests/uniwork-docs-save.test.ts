@@ -2032,6 +2032,35 @@ describe('the comments context of a bound copy (G8-12 §3.1)', () => {
     }
   })
 
+  it('the failed-write back-off belongs to the owner that failed: a different owner on a recovered disk is written at once (EL1B-BE-R3C-8)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await openDoc(ctx)
+      const store = ctx.service.store
+      const real = store.writeLastOwner.bind(store)
+      const write = vi.spyOn(store, 'writeLastOwner').mockImplementationOnce(() => false)
+      ctx.signInAs('acc_2')
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(store.readLastOwner()).not.toEqual({ accountId: 'acc_2', deploymentId: 'default' })
+
+      // the same failing owner stays throttled ...
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(1)
+      // ... but owner C, observed inside B's window on a recovered disk, is not
+      write.mockImplementation(real)
+      vi.advanceTimersByTime(500)
+      ctx.signInAs('acc_3')
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(2)
+      expect(store.readLastOwner()).toEqual({ accountId: 'acc_3', deploymentId: 'default' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a settled Save moves the version id to the receipt and pushes it once', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
