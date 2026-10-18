@@ -74,6 +74,8 @@ export default defineConfig({
       ),
       '@genoffice/ui/collab.css': local('../../packages/ui/src/collab/collab.css'),
       '@genoffice/ui/collab': local('../../packages/ui/src/collab/index.ts'),
+      // subpath before the bare name (string aliases are prefix replacements)
+      '@genoffice/ui/capabilities': local('../../packages/ui/src/capabilities.ts'),
       '@genoffice/ui': local('../../packages/ui/src/index.ts'),
     },
   },
