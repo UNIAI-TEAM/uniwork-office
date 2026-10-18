@@ -146,6 +146,32 @@ describe('lockBannerModelOf', () => {
     expect(model.editHere).toBe(true)
   })
 
+  it(`'lost' with byName and unnamed reason (unknown/released/none): strip message names the holder via uwLockLostHeldBy (EL1B-W3-2)`, () => {
+    for (const lostReason of ['unknown', 'released', undefined] as const) {
+      const model = lockBannerModelOf(
+        status(lock('lost', { lostReason, byName: 'Grace Hopper' })),
+        tFor('en'),
+        'en-US',
+        NOW,
+      )!
+      expect(model.tone).toBe('warn')
+      expect(model.titleKey).toBe('uwLockLostTitle')
+      expect(model.messageKey).toBe('uwLockLostHeldBy')
+      expect(model.params).toEqual({ name: 'Grace Hopper' })
+      expect(model.editHere).toBe(true)
+    }
+    // no byName -> unchanged generic copy
+    const generic = lockBannerModelOf(
+      status(lock('lost', { lostReason: 'unknown', byName: null })),
+      tFor('en'),
+      'en-US',
+      NOW,
+    )!
+    expect(generic.titleKey).toBe('uwLockLostTitle')
+    expect(generic.messageKey).toBe('uwLockLostGeneric')
+    expect(generic.params).toEqual({})
+  })
+
   it.each([['held'], ['unreachable']] as const)(
     `'unreachable' / '%s' / no session renders nothing (interim until EL-2)`,
     (phase) => {
@@ -207,6 +233,27 @@ describe('chipModelOf: edit-lock session', () => {
     expect(model.holderName).toBe('Ngọc Phạm')
     expect(model.tone).toBe('warn')
     expect(model.action).toEqual({ kind: 'edit-here', labelKey: 'uwLockEditHere' })
+  })
+
+  it(`'lost' with byName and unnamed reason (unknown/released/none): pill label is uwChipEditLocked with holderName, tip is uwLockLostHeldBy, button stays uwLockEditHere (EL1B-W3-2)`, () => {
+    for (const lostReason of ['unknown', 'released', undefined] as const) {
+      const model = chip(status(lock('lost', { lostReason, byName: 'Grace Hopper' })))
+      expect(model.tone).toBe('warn')
+      expect(model.labelKey).toBe('uwChipEditLocked')
+      expect(model.holderName).toBe('Grace Hopper')
+      expect(model.tipKey).toBe('uwLockLostHeldBy')
+      expect(model.action).toEqual({ kind: 'edit-here', labelKey: 'uwLockEditHere' })
+      const copyEn = chipCopy(model, tFor('en'), 'en-US', NOW)
+      expect(copyEn.label).toBe('Grace Hopper is editing')
+      expect(copyEn.tip).toBe('Grace Hopper is editing now. Your unsaved changes are still here.')
+      const copyVi = chipCopy(model, tFor('vi'), 'vi-VN', NOW)
+      expect(copyVi.label).toBe('Grace Hopper đang sửa')
+      expect(copyVi.tip).toBe('Grace Hopper đang sửa. Các thay đổi chưa lưu của bạn vẫn còn ở đây.')
+    }
+    // no byName -> generic
+    const noName = chip(status(lock('lost', { lostReason: 'unknown', byName: null })))
+    expect(noName.labelKey).toBe('uwLockLostTitle')
+    expect(noName.tipKey).toBe('uwLockLostGeneric')
   })
 
   it(`'lost' outranks remote / lockWhileOpen (and the conflict state)`, () => {
@@ -613,10 +660,11 @@ const NEW_KEYS = [
   'uwLockLostMovedHere',
   'uwLockLostAccessLost',
   'uwLockLostGeneric',
+  'uwLockLostHeldBy',
 ] as const
 
 describe('EL-1(b) copy: uwLock* keys in every shard', () => {
-  it('every one of the 21 locale shards defines all 13 keys, non-empty', () => {
+  it('every one of the 21 locale shards defines all 14 keys, non-empty', () => {
     expect(Object.keys(uniworkDocumentStrings)).toHaveLength(21)
     for (const [locale, dict] of Object.entries(uniworkDocumentStrings)) {
       const record = dict as Record<string, string>
@@ -682,6 +730,12 @@ describe('EL-1(b) copy: uwLock* keys in every shard', () => {
     expect(enDict.uwLockLostGeneric).toBe(
       'You’re no longer editing. Your unsaved changes are still here.',
     )
+    expect(viDict.uwLockLostHeldBy).toBe(
+      '{name} đang sửa. Các thay đổi chưa lưu của bạn vẫn còn ở đây.',
+    )
+    expect(enDict.uwLockLostHeldBy).toBe(
+      '{name} is editing now. Your unsaved changes are still here.',
+    )
   })
 
   it('the other 19 shards translate the new keys (never an English copy)', () => {
@@ -696,6 +750,7 @@ describe('EL-1(b) copy: uwLock* keys in every shard', () => {
       expect(record.uwLockBannerOther).toContain('{name}')
       expect(record.uwLockBannerOther).toContain('{time}')
       expect(record.uwLockLostTakenOver).toContain('{name}')
+      expect(record.uwLockLostHeldBy).toContain('{name}')
     }
   })
 
