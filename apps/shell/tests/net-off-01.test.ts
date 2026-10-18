@@ -20,9 +20,23 @@ let statusListener: ((status: AccountStatus) => void) | null = null
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
 let statusNow: AccountStatus = { loggedIn: false, state: 'signed-out' }
 
+let spellLanguages = ['en-US', 'fr']
+let spellEnabled = true
+
 const electronMocks = vi.hoisted(() => ({
   configureHostResolver: vi.fn(),
   setSpellCheckerDictionaryDownloadURL: vi.fn(),
+  getSpellCheckerLanguages: vi.fn(() => [...spellLanguages]),
+  setSpellCheckerLanguages: vi.fn((langs: string[]) => {
+    spellLanguages = [...langs]
+    // Mirror Electron/Chromium native SpellcheckService::OnSpellCheckDictionariesChanged:
+    // setting a non-empty list enables spellcheck, setting [] disables it.
+    spellEnabled = langs.length > 0
+  }),
+  isSpellCheckerEnabled: vi.fn(() => spellEnabled),
+  setSpellCheckerEnabled: vi.fn((enabled: boolean) => {
+    spellEnabled = enabled
+  }),
 }))
 
 vi.mock('electron', () => ({
@@ -41,6 +55,10 @@ vi.mock('electron', () => ({
   session: {
     defaultSession: {
       setSpellCheckerDictionaryDownloadURL: electronMocks.setSpellCheckerDictionaryDownloadURL,
+      getSpellCheckerLanguages: electronMocks.getSpellCheckerLanguages,
+      setSpellCheckerLanguages: electronMocks.setSpellCheckerLanguages,
+      isSpellCheckerEnabled: electronMocks.isSpellCheckerEnabled,
+      setSpellCheckerEnabled: electronMocks.setSpellCheckerEnabled,
     },
   },
 }))
@@ -67,8 +85,14 @@ beforeEach(() => {
   statusListener = null
   identity = null
   statusNow = { loggedIn: false, state: 'signed-out' }
+  spellLanguages = ['en-US', 'fr']
+  spellEnabled = true
   electronMocks.configureHostResolver.mockClear()
   electronMocks.setSpellCheckerDictionaryDownloadURL.mockClear()
+  electronMocks.getSpellCheckerLanguages.mockClear()
+  electronMocks.setSpellCheckerLanguages.mockClear()
+  electronMocks.isSpellCheckerEnabled.mockClear()
+  electronMocks.setSpellCheckerEnabled.mockClear()
   vi.stubGlobal('fetch', () =>
     Promise.resolve(
       new Response(
@@ -155,17 +179,19 @@ describe('NET-OFF-01: signed-out network suppression (secure DNS + spellcheck di
     expect(electronMocks.configureHostResolver).toHaveBeenCalledTimes(1)
     expect(electronMocks.configureHostResolver).toHaveBeenCalledWith({ secureDnsMode: 'off' })
 
-    // Initially signed out -> dictionary download URL set to local unreachable URL at whenReady
+    // Initially signed out -> dictionary download URL set to local unreachable URL at whenReady; no reload
     expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenCalledTimes(1)
     expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenLastCalledWith(
       'file:///nonexistent/',
     )
+    expect(electronMocks.setSpellCheckerLanguages).not.toHaveBeenCalled()
 
-    // Redundant signed-out status push does not re-apply
+    // Redundant signed-out status push does not re-apply or reload
     statusListener?.({ loggedIn: false, state: 'signed-out' })
     expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenCalledTimes(1)
+    expect(electronMocks.setSpellCheckerLanguages).not.toHaveBeenCalled()
 
-    // Sign in -> restored to Chromium default CDN URL
+    // Sign in (blocked -> allowed) -> restored to Chromium default CDN URL and reloads selected languages once
     identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
     statusNow = {
       loggedIn: true,
@@ -179,12 +205,17 @@ describe('NET-OFF-01: signed-out network suppression (secure DNS + spellcheck di
     expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenLastCalledWith(
       'https://redirector.gvt1.com/edgedl/chrome/dict/',
     )
+    expect(electronMocks.setSpellCheckerLanguages.mock.calls).toEqual([[[]], [['en-US', 'fr']]])
+    expect(spellLanguages).toEqual(['en-US', 'fr'])
+    expect(spellEnabled).toBe(true)
+    expect(electronMocks.setSpellCheckerEnabled).not.toHaveBeenCalled()
 
-    // Redundant signed-in status push does not re-apply
+    // Redundant signed-in status push does not re-apply or reload again
     statusListener?.(statusNow)
     expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenCalledTimes(2)
+    expect(electronMocks.setSpellCheckerLanguages).toHaveBeenCalledTimes(2)
 
-    // Sign out again -> blocked again with local unreachable URL
+    // Sign out again (allowed -> blocked) -> blocked again with local unreachable URL; no reload
     identity = null
     statusNow = { loggedIn: false, state: 'signed-out' }
     statusListener?.(statusNow)
@@ -192,5 +223,37 @@ describe('NET-OFF-01: signed-out network suppression (secure DNS + spellcheck di
     expect(electronMocks.setSpellCheckerDictionaryDownloadURL).toHaveBeenLastCalledWith(
       'file:///nonexistent/',
     )
+    expect(electronMocks.setSpellCheckerLanguages).toHaveBeenCalledTimes(2)
+  })
+
+  it('preserves spellchecker disabled state across the blocked -> allowed dictionary reload and skips reload when no languages are selected', async () => {
+    spellLanguages = ['de-DE']
+    spellEnabled = false
+    await activateWiring()
+
+    identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+    statusNow = { loggedIn: true, state: 'signed-in' }
+    statusListener?.(statusNow)
+
+    expect(electronMocks.setSpellCheckerLanguages.mock.calls).toEqual([[[]], [['de-DE']]])
+    expect(electronMocks.setSpellCheckerEnabled).toHaveBeenCalledTimes(1)
+    expect(electronMocks.setSpellCheckerEnabled).toHaveBeenCalledWith(false)
+    expect(spellLanguages).toEqual(['de-DE'])
+    expect(spellEnabled).toBe(false)
+
+    // Sign out, clear languages (e.g. macOS native checker / empty language list), sign in again -> no-op reload
+    identity = null
+    statusNow = { loggedIn: false, state: 'signed-out' }
+    statusListener?.(statusNow)
+    electronMocks.setSpellCheckerLanguages.mockClear()
+    electronMocks.setSpellCheckerEnabled.mockClear()
+    spellLanguages = []
+
+    identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+    statusNow = { loggedIn: true, state: 'signed-in' }
+    statusListener?.(statusNow)
+
+    expect(electronMocks.setSpellCheckerLanguages).not.toHaveBeenCalled()
+    expect(electronMocks.setSpellCheckerEnabled).not.toHaveBeenCalled()
   })
 })

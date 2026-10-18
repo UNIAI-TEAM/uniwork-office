@@ -1210,7 +1210,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
             .catch(() => undefined)
         }
         const now = status.state === 'signed-in'
-        if (now !== signedIn) applySpellcheckDictionaryDownloadGate(now)
+        if (now !== signedIn) applySpellcheckDictionaryDownloadGate(now, now && !signedIn)
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
         syncFeed(status, identity)
@@ -1240,7 +1240,15 @@ export function resetStartupHostResolverForTest(): void {
   hostResolverConfigured = false
 }
 
-export function applySpellcheckDictionaryDownloadGate(signedIn: boolean): void {
+export function applySpellcheckDictionaryDownloadGate(signedIn: boolean, reload = false): void {
+  const ses = session.defaultSession
   const url = signedIn ? SPELLCHECK_DOWNLOAD_DEFAULT_URL : SPELLCHECK_DOWNLOAD_BLOCKED_URL
-  session.defaultSession.setSpellCheckerDictionaryDownloadURL(url)
+  ses.setSpellCheckerDictionaryDownloadURL(url)
+  if (!reload) return
+  const langs = ses.getSpellCheckerLanguages()
+  if (langs.length === 0) return
+  const enabled = ses.isSpellCheckerEnabled()
+  ses.setSpellCheckerLanguages([])
+  ses.setSpellCheckerLanguages(langs)
+  if (!enabled) ses.setSpellCheckerEnabled(false)
 }
