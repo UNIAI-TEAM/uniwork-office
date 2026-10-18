@@ -1010,6 +1010,7 @@ export function AiPanel({
       readOnly: () => readOnlyRef.current,
       // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
       uniworkBound: () => uniworkBoundForAi(uniworkBoundRef.current ?? false, platform()),
+      uniworkAi: () => settingsRef.current.provider === 'uniwork',
       imageUrls: createImageUrlRegistry({
         enforce: () => settingsRef.current.provider === 'uniwork',
         attachments: () =>
