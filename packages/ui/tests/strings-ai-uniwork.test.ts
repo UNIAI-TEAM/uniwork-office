@@ -3,7 +3,7 @@ import { LANGS } from '@genoffice/i18n'
 import {
   aiUniworkStrings,
   aiUniworkText,
-  isUniworkQuestionRefusal,
+  isUniworkRefusalErrorKey,
 } from '../src/strings-ai-uniwork'
 
 /**
@@ -249,16 +249,13 @@ describe('ai-uniwork string shards', () => {
   })
 })
 
-describe('isUniworkQuestionRefusal', () => {
-  it.each([...LANGS])('knows the two refusal messages of %s', (lang) => {
-    expect(isUniworkQuestionRefusal(aiUniworkText(lang, 'aiErrQuestionTooLong'))).toBe(true)
-    expect(isUniworkQuestionRefusal(aiUniworkText(lang, 'aiErrQuestionRejected'))).toBe(true)
-  })
-
-  it('is false for every other message and for nothing', () => {
-    expect(isUniworkQuestionRefusal(aiUniworkText('vi', 'aiErrUnavailable'))).toBe(false)
-    expect(isUniworkQuestionRefusal('Network error')).toBe(false)
-    expect(isUniworkQuestionRefusal('')).toBe(false)
-    expect(isUniworkQuestionRefusal(undefined)).toBe(false)
+describe('isUniworkRefusalErrorKey', () => {
+  it('is true only for the two refusal keys', () => {
+    expect(isUniworkRefusalErrorKey('aiErrQuestionTooLong')).toBe(true)
+    expect(isUniworkRefusalErrorKey('aiErrQuestionRejected')).toBe(true)
+    expect(isUniworkRefusalErrorKey('aiErrUnavailable')).toBe(false)
+    expect(isUniworkRefusalErrorKey('Network error')).toBe(false)
+    expect(isUniworkRefusalErrorKey('')).toBe(false)
+    expect(isUniworkRefusalErrorKey(undefined)).toBe(false)
   })
 })

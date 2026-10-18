@@ -253,7 +253,7 @@ describe('UniWork AI notices (slides panel)', () => {
     'a refused question (%s) shows its error, offers no Retry or regenerate, and puts the question back in the composer',
     async (key) => {
       const c = await startRun()
-      await act(async () => harness.events!.onError?.(ui(key)))
+      await act(async () => harness.events!.onError?.(ui(key), key))
       await flush()
       expect(c.querySelector('.ai-msg-error')?.textContent).toContain(ui(key))
       expect(c.querySelector('.ai-retry-btn')).toBeNull()

@@ -72,7 +72,7 @@ import { createSaveGate, recoveryCopyBacksSession, shouldRunSaveTick } from './s
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   aiUniworkText,
-  isUniworkQuestionRefusal,
+  isUniworkRefusalErrorKey,
   useAutoSavePref,
   useCloudSignedIn,
   useAiModelNeedHint,
@@ -1679,15 +1679,15 @@ export function App({
           setAiRunScope(undefined)
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
-        onError: (error) => {
+        onError: (error, errorKey) => {
           // a refused question (too long, rejected) goes back into the composer to be shortened or
           // fixed, as the message says
-          if (isUniworkQuestionRefusal(error))
+          if (isUniworkRefusalErrorKey(errorKey))
             setPrompt((current) => current || runQuestionRef.current)
           // the chat bubble is the only place the failure is shown; the status line only drops
           // the "AI is working" state (the same text also sat in the ribbon row and the status bar)
           setMessage('')
-          setChat((previous) => markRunFailed(previous, error))
+          setChat((previous) => markRunFailed(previous, error, errorKey))
           setAiRunScope(undefined)
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },

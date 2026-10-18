@@ -95,10 +95,8 @@ import {
   RecoveryClearEpochs,
 } from '@genoffice/electron-utils'
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
-import {
-  answerUniworkAiFlagOff,
-  answerUniworkCloudStatusOff,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore, type PracticeId } from '@genoffice/project-store'

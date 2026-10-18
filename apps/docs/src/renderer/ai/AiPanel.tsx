@@ -1,6 +1,6 @@
 import {
   aiUniworkText,
-  isUniworkQuestionRefusal,
+  isUniworkRefusalErrorKey,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -102,7 +102,7 @@ import { createElectronTransport } from './transport'
 import { workedStepsLabel } from './worked-steps'
 import { docHasAiMarks } from '../editor/ai-marker'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
-import { AiErrorAction, Markdown, uniworkErrorForChip, useAiModelNeedHint } from '@genoffice/ui'
+import { AiErrorAction, Markdown, uniworkErrorForEntry, useAiModelNeedHint } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { AiSaveDraftCard } from '@genoffice/ui'
 import {
@@ -160,6 +160,8 @@ interface ChatEntry {
   role: 'user' | 'assistant'
   text: string
   error?: string
+  /** the S9 key the transport chose for `error` (UniWork AI); absent for any other failure */
+  errorKey?: string
   streaming?: boolean
   turnLimit?: boolean
   stopped?: boolean
@@ -1157,10 +1159,10 @@ export function AiPanel({
             persistMessage('assistant', finalText, runToolsRef.current)
           }
         },
-        onError: (error) => {
+        onError: (error, errorKey) => {
           // a refused question (too long, rejected) was not answered: it goes back into the composer
           // to be shortened or fixed, as the message says
-          if (isUniworkQuestionRefusal(error))
+          if (isUniworkRefusalErrorKey(errorKey))
             setInput((current) => current || lastInstructionRef.current)
           setChat((prev) => {
             const next = [...prev]
@@ -1169,6 +1171,7 @@ export function AiPanel({
               next[next.length - 1] = {
                 ...last,
                 streaming: false,
+                errorKey,
                 waitLine: undefined,
                 error,
                 tools: last.tools?.filter((tl) => !tl.running),
@@ -1749,7 +1752,7 @@ export function AiPanel({
                   clarifyAsked: Boolean(lastEntry.clarifyReceipts?.length),
                   droppedToolCalls: droppedCallsOfNotes(lastEntry.notes),
                   toolExecutions: lastEntry.tools,
-                  error: uniworkErrorForChip(lastEntry.error),
+                  error: uniworkErrorForEntry(lastEntry.errorKey, lastEntry.error),
                 }
               : null,
         })
@@ -1928,7 +1931,7 @@ export function AiPanel({
               clarifyAsked: Boolean(entry.clarifyReceipts?.length),
               droppedToolCalls: droppedCallsOfNotes(entry.notes),
               toolExecutions: entry.tools,
-              error: uniworkErrorForChip(entry.error),
+              error: uniworkErrorForEntry(entry.errorKey, entry.error),
             },
           )
           const chip = chipView?.chip ?? null
@@ -2118,7 +2121,7 @@ export function AiPanel({
                     !busy &&
                     lastInstructionRef.current &&
                     !aiNoticeKind(entry.error) &&
-                    !isUniworkQuestionRefusal(entry.error) &&
+                    !isUniworkRefusalErrorKey(entry.errorKey) &&
                     // the labelled "Thử lại" under the error line is the retry of an error turn
                     chip?.errorLine?.action !== 'retry' && (
                       <button

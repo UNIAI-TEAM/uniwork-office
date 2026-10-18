@@ -61,10 +61,8 @@ import {
   recoveryEpochKey,
 } from '@genoffice/electron-utils'
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
-import {
-  answerUniworkAiFlagOff,
-  answerUniworkCloudStatusOff,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
 import { sniffImageMime } from './media-mime'
 import { canWriteElementClipboardImage, writeElementClipboardImage } from './element-clipboard'

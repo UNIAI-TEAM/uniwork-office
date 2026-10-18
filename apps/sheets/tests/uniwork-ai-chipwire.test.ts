@@ -91,9 +91,16 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
     })
     return container
   }
-  const errorTurn = (text: string): readonly AiChatMessage[] => [
+  const errorTurn = (text: string, errorKey?: string): readonly AiChatMessage[] => [
     user,
-    { role: 'assistant', text, tools: [], isError: true, streaming: false },
+    {
+      role: 'assistant',
+      text,
+      tools: [],
+      isError: true,
+      streaming: false,
+      ...(errorKey ? { errorKey } : {}),
+    },
   ]
 
   it.each([
@@ -104,7 +111,7 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
   ] as const)(
     'F1/F2/F11: a %s error turn shows its labelled action and announces the line it shows',
     async (errKey, actionKey) => {
-      const c = await mount(errorTurn(ui(errKey)))
+      const c = await mount(errorTurn(ui(errKey), errKey))
       expect(c.querySelector('.ai-result-chip')?.textContent).toBe(ui('aiResultError'))
       expect(
         [...c.querySelectorAll<HTMLButtonElement>('.ai-error-action button')].map(
@@ -126,7 +133,7 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
   })
 
   it('F1: Thử lại sends the question again, Chọn nhà cung cấp khác opens the model settings', async () => {
-    const c = await mount(errorTurn(ui('aiErrUnavailable')))
+    const c = await mount(errorTurn(ui('aiErrUnavailable'), 'aiErrUnavailable'))
     // a send entry refuses until the UniWork disclosure is acknowledged (S8)
     const ack = c.querySelector<HTMLButtonElement>('[role="region"] button')
     if (ack) await act(async () => ack.click())
@@ -134,7 +141,7 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
     expect(onSend).toHaveBeenCalledWith('sum column B', [], 0)
     act(() => root!.unmount())
     container!.remove()
-    const c2 = await mount(errorTurn(ui('aiErrCredits')))
+    const c2 = await mount(errorTurn(ui('aiErrCredits'), 'aiErrCredits'))
     await act(async () => c2.querySelector<HTMLButtonElement>('.ai-error-action button')!.click())
     expect(desktopApi.openAiSettings).toHaveBeenCalled()
   })
