@@ -116,9 +116,8 @@ export { CROP_EDGE_LABELS } from './strings-crop-edges'
 export {
   aiUniworkStrings,
   aiUniworkText,
-  isUniworkQuestionRefusal,
-  uniworkErrorForChip,
-  uniworkErrorKeyOfText,
+  isUniworkRefusalErrorKey,
+  uniworkErrorForEntry,
   type AiUniworkStringKey,
 } from './strings-ai-uniwork'
 export { AiErrorAction, type AiErrorActionProps } from './AiErrorAction'

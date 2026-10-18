@@ -38,9 +38,3 @@ export function installUniworkAiFlagBridge(): void {
     }),
   )
 }
-
-export {
-  createUniworkCloudStatusBridge,
-  installUniworkCloudStatusBridge,
-  type UniworkCloudStatusIpc,
-} from './uniwork-cloud-status-bridge'

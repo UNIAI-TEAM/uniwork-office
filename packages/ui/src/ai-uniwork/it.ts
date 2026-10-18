@@ -78,16 +78,12 @@ export const it = {
   aiUniworkImagesNotSent:
     'Le immagini non vengono inviate a UniWork AI; è stato inviato solo il testo.',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'Disponibile',
   cloudStateNotEntitled: 'Non incluso nel tuo piano',
   cloudStateExhausted: 'Crediti IA esauriti',
   cloudStateUnavailable: 'Non disponibile',
-  cloudStateSignedOut: 'Accesso non effettuato',
   cloudStateInactive: 'Abbonamento inattivo',
-  cloudCredits: 'Crediti IA',
   cloudCreditsLeft: '{remaining} / {limit} rimasti',
   cloudCreditsUnlimited: 'Illimitato',
-  cloudCreditsRenews: 'Si rinnova il {date}',
   cloudInactiveBody:
     'L’abbonamento UniWork della tua organizzazione non è attivo, quindi l’IA cloud è in pausa. Chiedi a un amministratore di rinnovarlo; i tuoi provider qui sotto continuano a funzionare.',
   acctSignIn: 'Accedi',

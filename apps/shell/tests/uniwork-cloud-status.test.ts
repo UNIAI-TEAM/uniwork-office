@@ -12,7 +12,7 @@ import {
   UNIWORK_CLOUD_STATUS_OPEN_ACCOUNT,
   UNIWORK_CLOUD_STATUS_SIGN_IN,
   type UniworkCloudStatusSnapshot,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+} from '@genoffice/electron-utils/uniwork-cloud-status'
 import { HOME_CHANNELS } from '../src/shared/home-api'
 
 const electron = vi.hoisted(() => ({

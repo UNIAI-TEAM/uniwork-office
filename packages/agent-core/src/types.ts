@@ -159,7 +159,8 @@ export interface AgentStreamCallbacks {
   /** tokens the provider billed for this turn; transports whose provider does not report usage omit this */
   onUsage?(usage: AgentTokenUsage): void
   onDone(): void
-  onError(error: string): void
+  /** error: the localized message; errorKey: the S9 key when the failure was a UniWork AI one */
+  onError(error: string, errorKey?: string): void
 }
 
 /** a tool call the UniWork AI server refused to hand to the client (`x_uniwork.dropped_tool_calls[]`) */

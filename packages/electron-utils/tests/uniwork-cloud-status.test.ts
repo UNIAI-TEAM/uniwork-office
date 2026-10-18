@@ -170,12 +170,14 @@ describe('uniwork-cloud-status bridge', () => {
     expect(listeners.size).toBe(0)
   })
 
-  it('every editor preload and the shell preload install the cloud status bridge', () => {
+  it('every editor preload installs the cloud status bridge (RB1-11: the shell reads aiOffice instead)', () => {
     const apps = join(__dirname, '../../../apps')
-    for (const app of ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html', 'shell']) {
+    for (const app of ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']) {
       const src = readFileSync(join(apps, app, 'src/preload/index.ts'), 'utf8')
       expect(src, `${app} preload`).toContain('installUniworkCloudStatusBridge()')
     }
+    const shellSrc = readFileSync(join(apps, 'shell', 'src/preload/index.ts'), 'utf8')
+    expect(shellSrc).not.toContain('installUniworkCloudStatusBridge')
   })
 
   it('every standalone editor main answers the cloud-status pull; the shell registers the real handler instead (RB1-5)', () => {

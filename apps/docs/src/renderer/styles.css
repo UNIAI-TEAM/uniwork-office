@@ -9386,11 +9386,6 @@ body.docs-crop-active
   flex-shrink: 0;
 }
 
-.ai-track-btn:focus-visible {
-  outline: 2px solid var(--color-border-brand);
-  outline-offset: 2px;
-}
-
 /* reason tip of the locked pill: anchored to the composer box (.ai-input-box), above the footer, aligned to
    its end and never wider than the box, so it cannot run past the panel edge (the global ScreenTip did) */
 .ai-track-tip {

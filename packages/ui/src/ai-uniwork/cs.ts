@@ -72,16 +72,12 @@ export const cs = {
   aiErrQuestionRejected: 'UniWork AI tento požadavek nemůže přijmout. Upravte ho a odešlete znovu.',
   aiUniworkImagesNotSent: 'Obrázky se do UniWork AI neodesílají; odeslal se jen text.',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'K dispozici',
   cloudStateNotEntitled: 'Není ve vašem tarifu',
   cloudStateExhausted: 'Kredity AI vyčerpány',
   cloudStateUnavailable: 'Nedostupné',
-  cloudStateSignedOut: 'Nepřihlášeno',
   cloudStateInactive: 'Předplatné není aktivní',
-  cloudCredits: 'Kredity AI',
   cloudCreditsLeft: 'Zbývá {remaining} / {limit}',
   cloudCreditsUnlimited: 'Neomezeně',
-  cloudCreditsRenews: 'Obnoví se {date}',
   cloudInactiveBody:
     'Předplatné UniWork vaší organizace není aktivní, proto je cloudová AI pozastavena. Požádejte správce o obnovení; vaši vlastní poskytovatelé níže fungují dál.',
   acctSignIn: 'Přihlásit se',

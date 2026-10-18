@@ -57,7 +57,8 @@ export interface AgentLoopEvents<TSnapshot> {
    *  this run's terminal onDone/onError, so key UI on the hook order, not on onDone */
   onRunEnd?(runId: string, end: AgentRunEnd): void
   onDone?(result: AgentRunResult): void
-  onError?(error: string): void
+  /** error: the localized message; errorKey: the S9 key when the failure was a UniWork AI one */
+  onError?(error: string, errorKey?: string): void
 }
 
 export interface AgentRunEnd {
@@ -1092,7 +1093,7 @@ export class AgentLoop<TSnapshot = unknown> {
             settled = true
             this.settleTurn()
           },
-          onError: (error) => {
+          onError: (error, errorKey) => {
             if (generation !== this.generation || settled) return
             settled = true
             // The no-partial-output guard keeps the empty-stream retry idempotent (an
@@ -1121,7 +1122,7 @@ export class AgentLoop<TSnapshot = unknown> {
             this.running = false
             this.rollbackFailedRun()
             this.closeRun('error')
-            this.options.events?.onError?.(error)
+            this.options.events?.onError?.(error, errorKey)
           },
         },
       )

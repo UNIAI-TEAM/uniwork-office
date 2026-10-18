@@ -30,7 +30,9 @@
     "./safe-external-url": "./src/safe-external-url.ts",
     "./safe-remote-url": "./src/safe-remote-url.ts",
     "./uniwork-ai-flag": "./src/uniwork-ai-flag.ts",
-    "./uniwork-ai-flag-bridge": "./src/uniwork-ai-flag-bridge.ts"
+    "./uniwork-ai-flag-bridge": "./src/uniwork-ai-flag-bridge.ts",
+    "./uniwork-cloud-status": "./src/uniwork-cloud-status.ts",
+    "./uniwork-cloud-status-bridge": "./src/uniwork-cloud-status-bridge.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

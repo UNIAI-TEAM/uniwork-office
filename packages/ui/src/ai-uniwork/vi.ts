@@ -70,16 +70,12 @@ export const vi = {
   aiErrQuestionRejected: 'UniWork AI không nhận được yêu cầu này. Hãy sửa lại yêu cầu rồi gửi lại.',
   aiUniworkImagesNotSent: 'UniWork AI không nhận ảnh; chỉ phần chữ đã được gửi.',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'Sẵn sàng',
   cloudStateNotEntitled: 'Gói hiện tại chưa bao gồm',
   cloudStateExhausted: 'Đã hết tín dụng AI',
   cloudStateUnavailable: 'Tạm thời không dùng được',
-  cloudStateSignedOut: 'Chưa đăng nhập',
   cloudStateInactive: 'Gói đăng ký không hoạt động',
-  cloudCredits: 'Tín dụng AI',
   cloudCreditsLeft: 'Còn {remaining} / {limit}',
   cloudCreditsUnlimited: 'Không giới hạn',
-  cloudCreditsRenews: 'Làm mới vào {date}',
   cloudInactiveBody:
     'Gói đăng ký UniWork của tổ chức bạn không hoạt động nên AI đám mây đang tạm dừng. Hãy nhờ quản trị viên gia hạn; nhà cung cấp riêng bên dưới vẫn hoạt động.',
   acctSignIn: 'Đăng nhập',

@@ -73,16 +73,12 @@ export const ru = {
   aiErrQuestionRejected: 'UniWork AI не может принять этот запрос. Измените его и отправьте снова.',
   aiUniworkImagesNotSent: 'Изображения не отправляются в UniWork AI; отправлен только ваш текст.',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'Доступен',
   cloudStateNotEntitled: 'Не входит в ваш тариф',
   cloudStateExhausted: 'Кредиты ИИ закончились',
   cloudStateUnavailable: 'Недоступен',
-  cloudStateSignedOut: 'Вход не выполнен',
   cloudStateInactive: 'Подписка неактивна',
-  cloudCredits: 'Кредиты ИИ',
   cloudCreditsLeft: 'Осталось {remaining} / {limit}',
   cloudCreditsUnlimited: 'Без ограничений',
-  cloudCreditsRenews: 'Обновится {date}',
   cloudInactiveBody:
     'Подписка UniWork вашей организации неактивна, поэтому облачный ИИ приостановлен. Попросите администратора продлить её; ваши собственные провайдеры ниже продолжают работать.',
   acctSignIn: 'Войти',
