@@ -307,15 +307,19 @@ export interface UniworkDocsClient {
    * still missing (`GET /upload-sessions/{id}`). A session that expired, was
    * aborted or GC'd answers 410; an unknown one 404.
    */
-  getUploadSession(sessionId: string): Promise<UploadSessionState>
+  getUploadSession(sessionId: string, signal?: AbortSignal): Promise<UploadSessionState>
   /**
    * BIGUP-A1: assembles the parts and validates the file
    * (`POST /upload-sessions/{id}/complete`). Idempotent: a repeat of a
-   * finished session answers the same result.
+   * finished session answers the same result. `signal` (R1-BE-02) cancels the
+   * call like every other `send()` route: an abort BEFORE D accepted the
+   * request ends it, an abort after the accepted 2xx is ignored and the answer
+   * is read as usual (the same boundary the create paths use).
    */
   completeUploadSession(input: {
     sessionId: string
     parts: Array<{ partNumber: number; etag: string }>
+    signal?: AbortSignal
   }): Promise<UploadSessionComplete>
   /** BIGUP-A1: aborts the session and releases its reserved quota (204) */
   deleteUploadSession(sessionId: string): Promise<void>
@@ -1109,10 +1113,11 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return parseUploadSession(raw)
     },
 
-    async getUploadSession(sessionId) {
+    async getUploadSession(sessionId, signal) {
       const raw = await send({
         method: 'GET',
         route: `/upload-sessions/${id(sessionId)}`,
+        ...(signal ? { signal } : {}),
         timeoutMs: metadataTimeout,
         read: json,
       })
@@ -1129,6 +1134,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
             etag: part.etag,
           })),
         },
+        ...(input.signal ? { signal: input.signal } : {}),
         // R4: validating a 200 MiB file takes a while; the request holds the
         // connection until the server is done, so it gets the transfer
         // deadline, not the metadata one
@@ -1153,24 +1159,57 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       // any cookie, and its host is not `apiOrigin` (the egress rule that
       // rejects a foreign host applies to UniWork calls only). `send()` is
       // therefore bypassed on purpose.
+      //
+      // R1-BE-01: bypassing `send()` also bypasses its transport normalization
+      // and its deadline, so this call carries its own: the transfer deadline
+      // (a stalled PUT can otherwise hold a worker for ever) composed with the
+      // caller's abort, and a native fetch rejection (`TypeError`) turned into
+      // the typed `network`/`timeout` the part retry ladder switches on. A
+      // caller abort stays distinguishable: the core re-checks its own signal
+      // and answers `upload_cancelled` (see upload-session.ts).
       const fetchImpl: FetchLike = options.fetch ?? ((url, init) => fetch(url, init))
-      const response = await fetchImpl(input.url, {
-        method: 'PUT',
-        headers: { ...(input.headers ?? {}) },
-        // the presigned URL is the credential: no cookie, no ambient auth
-        credentials: 'omit',
-        cache: 'no-store',
-        redirect: 'error',
-        ...(input.signal ? { signal: input.signal } : {}),
-        body: input.bytes as unknown as BodyInit,
-      } as RequestInit)
-      if (!response.ok) {
-        throw errorFromResponse(response.status, await response.json().catch(() => undefined))
+      const controller = new AbortController()
+      let timedOut = false
+      const expire = (): void => {
+        timedOut = true
+        controller.abort()
       }
-      const etag = response.headers.get('ETag') ?? response.headers.get('etag')
-      if (!etag)
-        throw new UniworkDocError('malformed_response', { serverCode: 'part_etag_missing' })
-      return { etag }
+      const timer = setTimeout(expire, transferTimeout)
+      const abortFromCaller = (): void => controller.abort()
+      if (input.signal) {
+        if (input.signal.aborted) controller.abort()
+        else input.signal.addEventListener('abort', abortFromCaller, { once: true })
+      }
+      try {
+        let response: Response
+        try {
+          response = await fetchImpl(input.url, {
+            method: 'PUT',
+            headers: { ...(input.headers ?? {}) },
+            // the presigned URL is the credential: no cookie, no ambient auth
+            credentials: 'omit',
+            cache: 'no-store',
+            redirect: 'error',
+            signal: controller.signal,
+            body: input.bytes as unknown as BodyInit,
+          } as RequestInit)
+        } catch (error) {
+          if (timedOut) throw new UniworkDocError('timeout')
+          // a redirect means another host or path answered: never followed
+          throw new UniworkDocError(isRedirectRefusal(error) ? 'server_error' : 'network')
+        }
+        if (!response.ok) {
+          const body: unknown = await response.json().catch(() => undefined)
+          throw timedOut ? new UniworkDocError('timeout') : errorFromResponse(response.status, body)
+        }
+        const etag = response.headers.get('ETag') ?? response.headers.get('etag')
+        if (!etag)
+          throw new UniworkDocError('malformed_response', { serverCode: 'part_etag_missing' })
+        return { etag }
+      } finally {
+        clearTimeout(timer)
+        input.signal?.removeEventListener('abort', abortFromCaller)
+      }
     },
   }
 }
