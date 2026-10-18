@@ -1980,6 +1980,26 @@ describe('the comments context of a bound copy (G8-12 §3.1)', () => {
     expect(ctx.service.commentContext(path)).toBeNull()
   })
 
+  it('switching account and reading commentContext persists last-account.json synchronously with no late write after teardown (EL-1(b) fix8)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.signInAs('acc_2')
+    expect(ctx.service.commentContext(path)).toBeNull()
+    // The new owner must already be persisted synchronously when commentContext returns,
+    // and removing the directory immediately must not be raced by a late async write.
+    expect(ctx.service.store.readLastOwner()).toEqual({
+      accountId: 'acc_2',
+      deploymentId: 'default',
+    })
+    const lastOwnerPath = join(dir, 'uniwork-documents', 'last-account.json')
+    rmSync(lastOwnerPath, { force: true })
+    for (let i = 0; i < 30; i += 1) {
+      await readFile(path)
+    }
+    expect(existsSync(lastOwnerPath)).toBe(false)
+  })
+
   it('a settled Save moves the version id to the receipt and pushes it once', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
