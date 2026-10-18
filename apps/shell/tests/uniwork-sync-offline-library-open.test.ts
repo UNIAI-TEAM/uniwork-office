@@ -415,14 +415,20 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     await o.copies.sweep()
     expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
     expect(existsSync(copyDir(o))).toBe(false)
-    // the tab is gone from the library's point of view: the pin's cleanup no longer waits for it
+    // the tab is still on screen while locked in place: open remains true until the tab closes
     expect(await o.h.manager.row('doc_1')).toMatchObject({
       state: 'lease-expired',
-      open: false,
+      open: true,
     })
-    // and the next pass does not raise it again
+    // and the next pass does not raise it again or falsify open
     await o.copies.sweep()
     expect(o.locks).toHaveLength(1)
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
+    // once the tab actually closes (past the close grace), open becomes false
+    o.pathOpen.value = false
+    o.clock.now += 31_000
+    await o.copies.sweep()
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: false })
   })
 
   it('(a) the capability off names the lock libraryOff, a clock rollback its own reason', async () => {
@@ -467,6 +473,7 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
       lock: { path, reason: 'lease_expired' },
     })
     expect(existsSync(copyDir(o))).toBe(false)
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
   })
 
   it('(b) the app-level reopen (offline, copy on screen, lease expired) raises the lock and never answers opened', async () => {

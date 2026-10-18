@@ -150,7 +150,10 @@ export function offlineCopyKey(documentId: string): string {
 export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
   const now = () => deps.now?.() ?? Date.now()
   /** documentId -> the copy on screen (one per document, however many tabs read it) */
-  const copies = new Map<string, { dir: string; path: string; title: string; openedAt: number }>()
+  const copies = new Map<
+    string,
+    { dir: string; path: string; title: string; openedAt: number; locked: boolean }
+  >()
   /** every folder whose deletion failed (tracked or crash leftover) until a retry confirms it gone (BE-R2-3, BE-R2-8, BE-R2-11) */
   const pendingRemoval = new Set<string>()
   /** one queue across open, sweep, recover and dropAll so recovery or sign-out never races an open (BE-R2-2, BE-R2-5) */
@@ -196,6 +199,14 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     return true
   }
 
+  const lockInPlace = async (documentId: string): Promise<boolean> => {
+    const copy = copies.get(documentId)
+    if (!copy) return true
+    if (!(await dropDir(copy.dir))) return false
+    copy.locked = true
+    return true
+  }
+
   const openOne = async (documentId: string): Promise<OfflineCopyOutcome> => {
     const library = deps.library()
     const scope = deps.scope()
@@ -228,12 +239,12 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
           ...(failure.libraryOff ? { libraryOff: true } : {}),
         },
       }
-      // the refused copy does not stay served: its plaintext goes with the lock
-      if (onScreen) await drop(documentId, true)
+      // the refused copy does not stay served: its plaintext goes with the lock,
+      // while the open-tab count stays until the tab closes (G703-R6-2)
+      if (onScreen) await lockInPlace(documentId)
       return refusal
     }
-    if (onScreen) {
-      // already on screen: bring it forward instead of writing a second copy
+    if (onScreen && !shownBefore.locked) {
       return {
         kind: 'opened',
         path: shownBefore.path,
@@ -247,7 +258,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     // whatever an earlier session (a crash, a remove that failed) left under this
     // key goes before the new bytes land, whether this session knows the copy or not
     if (!(await dropDir(dir))) return { kind: 'none' }
-    copies.delete(documentId)
+    if (!onScreen) copies.delete(documentId)
     // the copy is named exactly as the normal open path names it: the manifest's
     // file name made one safe segment (BE-R1-1) - never the raw server string
     const filename = sanitizeFilename(cached.manifest.main.filename, format)
@@ -284,8 +295,8 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       return { kind: 'none' }
     }
     // the pin's cleanup defers while a tab reads the copy (markClosed at its close)
-    library.markOpen(documentId)
-    copies.set(documentId, { dir, path, title: shown.title, openedAt: now() })
+    if (!onScreen) library.markOpen(documentId)
+    copies.set(documentId, { dir, path, title: shown.title, openedAt: now(), locked: false })
     return { kind: 'opened', path, title: shown.title }
   }
 
@@ -294,7 +305,11 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
    * locked) is locked in place - the row already derives the reason at read
    * time, but nothing fires when it changes, so the existing poll asks.
    */
-  const lockLapsed = async (documentId: string, copy: { path: string }): Promise<void> => {
+  const lockLapsed = async (
+    documentId: string,
+    copy: { path: string; locked: boolean },
+  ): Promise<void> => {
+    if (copy.locked) return
     const row = await deps
       .library()
       ?.row(documentId)
@@ -304,7 +319,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     const libraryOff =
       reason === 'lease_expired' && !(await deps.capabilityOn(row.orgId).catch(() => false))
     // the plaintext goes first: if it will not, the next pass retries the lock too
-    if (!(await drop(documentId, true))) return
+    if (!(await lockInPlace(documentId))) return
     deps.lockOpened({
       path: copy.path,
       name: basename(copy.path),
