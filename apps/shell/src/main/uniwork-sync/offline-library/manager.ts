@@ -330,6 +330,12 @@ export class OfflineLibraryManager {
   private readonly progress = new Map<string, PinProgress>()
   private readonly openCounts = new Map<string, number>()
   private readonly docLocks = new Map<string, Promise<unknown>>()
+  /**
+   * A settled row the full store refused to write (ENOSPC takes the row write
+   * too). Rows read from the store would keep saying `downloading`, so the
+   * settled state is held here and preferred until a later write succeeds.
+   */
+  private readonly unsaved = new Map<string, PinRecord>()
   private indexLock: Promise<unknown> = Promise.resolve()
   /** bumped by every boundary: a download started before it never commits */
   private epoch = 0
@@ -367,6 +373,7 @@ export class OfflineLibraryManager {
     for (const job of this.jobs.values()) job.controller.abort()
     this.progress.clear()
     this.openCounts.clear()
+    this.unsaved.clear()
     this.options.store.forget()
   }
 
@@ -474,8 +481,14 @@ export class OfflineLibraryManager {
 
   private async put(record: PinRecord): Promise<boolean> {
     const written = await this.options.store.putPin(record)
+    if (written.kind === 'ok') this.unsaved.delete(record.documentId)
     this.changed(record.documentId)
     return written.kind === 'ok'
+  }
+
+  /** the row as the library holds it: a settled state the store refused wins over the stored row */
+  private held(record: PinRecord): PinRecord {
+    return this.unsaved.get(record.documentId) ?? record
   }
 
   /** stop a download of the document and wait until it cleaned its staging */
@@ -625,6 +638,7 @@ export class OfflineLibraryManager {
               : started
       return { kind: 'settled', record: await this.settleFailure(record, outcome, live) }
     }
+    this.unsaved.delete(documentId)
     this.progress.set(documentId, { receivedBytes: 0, totalBytes: total })
     this.changed(documentId)
     const controller = new AbortController()
@@ -726,6 +740,7 @@ export class OfflineLibraryManager {
           : { kind: 'interrupted', reason: 'boundary' }
       return this.settleFailure(current, failure, live)
     }
+    this.unsaved.delete(documentId)
     // the previous copy is replaced: its blobs go
     if (current.readyGeneration && current.readyManifest) {
       await wipeKeys(
@@ -798,7 +813,9 @@ export class OfflineLibraryManager {
               : outcome.kind
         break
     }
-    await this.put(settled)
+    // a full store refuses this row too: the user must still see the settled
+    // state (disk-full / update-kept), so it is held in memory until a write lands
+    if (!(await this.put(settled))) this.unsaved.set(settled.documentId, settled)
     return settled
   }
 
@@ -1123,6 +1140,7 @@ export class OfflineLibraryManager {
       if (!deferred) await wipeKeys(this.options.store, keys)
       await this.options.store.deletePin(documentId)
       this.progress.delete(documentId)
+      this.unsaved.delete(documentId)
       await this.options.leases.release(documentId).catch(() => undefined)
       this.changed(documentId)
       return { kind: 'unpinned', deferred }
@@ -1219,7 +1237,7 @@ export class OfflineLibraryManager {
   async row(documentId: string): Promise<PinRow | null> {
     if (!this.checkBoundary()) return null
     const read = await this.options.store.getPin(documentId)
-    return read.kind === 'ok' ? this.view(read.record) : null
+    return read.kind === 'ok' ? this.view(this.held(read.record)) : null
   }
 
   async list(): Promise<PinRow[]> {
@@ -1229,7 +1247,7 @@ export class OfflineLibraryManager {
     const rows: PinRow[] = []
     for (const documentId of index.index.pins) {
       const read = await this.options.store.getPin(documentId)
-      if (read.kind === 'ok') rows.push(await this.view(read.record))
+      if (read.kind === 'ok') rows.push(await this.view(this.held(read.record)))
     }
     return rows
   }
