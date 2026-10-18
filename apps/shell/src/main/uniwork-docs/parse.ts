@@ -214,6 +214,35 @@ function summaryRow(
     parentId: parentIdOf(row.parent_id),
     ...(path ? { path } : {}),
     ...(systemKindOf(row.system_kind) ? { systemKind: 'my_folder' as const } : {}),
+    ...editLockOf(row.edit_lock),
+  }
+}
+
+/** EL-1(b): optional list-row `edit_lock` summary. Malformed objects are dropped, not the row. */
+function editLockOf(
+  raw: unknown,
+): { editLock: import('../../shared/home-api').UniworkDocEditLock } | Record<string, never> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const row = raw as Record<string, unknown>
+  const holderName =
+    typeof row.holder_name === 'string' && row.holder_name.trim() && row.holder_name.length <= 256
+      ? row.holder_name
+      : null
+  const since = typeof row.since === 'string' && row.since.length <= 64 ? row.since : null
+  const expiresAt =
+    typeof row.expires_at === 'string' && row.expires_at.length <= 64 ? row.expires_at : null
+  const offline =
+    typeof row.offline_hold_until === 'string' && row.offline_hold_until.length <= 64
+      ? row.offline_hold_until
+      : undefined
+  return {
+    editLock: {
+      holderName,
+      since,
+      expiresAt,
+      heldByMe: row.held_by_me === true,
+      ...(offline ? { offlineHoldUntil: offline } : {}),
+    },
   }
 }
 
