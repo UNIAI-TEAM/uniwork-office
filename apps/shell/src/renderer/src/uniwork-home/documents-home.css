@@ -253,6 +253,7 @@
 
 .dh-toolbar-btn {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
   height: 36px;
@@ -260,6 +261,7 @@
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 /* Quick create row */
@@ -755,12 +757,21 @@
   gap: 4px;
 }
 
-/* the folder menu component is absolutely positioned for list rows; inside the
-   table grid it must flow with the actions cell instead of floating at the
-   row's far edge (VDH-1) */
-.dh-doc-table:not(.grid-mode) .uw-row-menu.uwf-menu {
+/* the folder menu component and its button are absolutely positioned for
+   Open-dialog / browser list rows (home.css:6482, uniwork-folders.css:198);
+   inside DocumentsHome cards and table cells they must flow in place (VDH-1, VDH-11) */
+.dh-folder-actions .uw-row-menu.uwf-menu,
+.dh-doc-table .dh-cell-actions .uw-row-menu.uwf-menu {
   position: static;
   width: auto;
+}
+
+.dh-folder-actions .uw-row-menu-btn,
+.dh-doc-table .dh-cell-actions .uw-row-menu-btn {
+  position: static;
+  top: auto;
+  right: auto;
+  transform: none;
 }
 
 .dh-row-btn {
@@ -817,6 +828,16 @@
 .dh-main .uw-pick-state .btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* VDH-12: at wide desktop viewports (>= 1101 px, e.g. 1280 px) keep the toolbar
+   (title, workspace select, search, Tải lên, Tạo mới) on a single row like the board;
+   below 1100 px (e.g. 900 px) the base flex-wrap: wrap lets the search and buttons
+   wrap cleanly to the second line */
+@media (min-width: 1101px) {
+  .dh-toolbar {
+    flex-wrap: nowrap;
+  }
 }
 
 /* VDH-4: below ~1100 px the five columns cannot fit — collapse the two
