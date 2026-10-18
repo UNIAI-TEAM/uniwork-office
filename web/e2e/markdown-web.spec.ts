@@ -168,9 +168,22 @@ test('markdown: a .txt opens in plain mode and saves byte-identical under the .t
   await expect(frame.locator('.doc-editor')).toHaveCount(0)
   await expect(frame.locator('.qa-export')).toBeDisabled()
 
+  // the save shortcut lives on the frame's window keydown: the click is what routes
+  // Control+s into the frame (the plain surface has no autofocus to do it for us)
+  await frame.locator('.cm-line', { hasText: '1. first' }).click()
   await page.keyboard.press('Control+s')
   await expect.poll(async () => (await hostState(page)).lastSaved?.name).toBe('notes.txt')
   expect((await hostState(page)).lastSaved!.bytes).toEqual(Array.from(encode(TXT)))
+
+  // an edit + save rewrites only the touched line: `---`, `*x*` and the `1.` marker
+  // stay inert bytes, and the file's CRLF endings survive the round-trip
+  await page.keyboard.press('End')
+  await page.keyboard.type(' edited')
+  await page.keyboard.press('Control+s')
+  await expect.poll(async () => (await hostState(page)).lastSaved?.versionId).toBe('v3')
+  expect((await hostState(page)).lastSaved!.bytes).toEqual(
+    Array.from(encode(TXT.replace('1. first', '1. first edited'))),
+  )
 
   // Save As defaults to the opened file's extension: a host name keeps .txt, never .txt.md
   const savedAs = await hostRequest<{ ok: boolean; file?: { name: string } }>(page, 'saveAs', {
