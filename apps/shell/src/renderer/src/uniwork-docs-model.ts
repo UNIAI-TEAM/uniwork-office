@@ -143,9 +143,8 @@ export function blockedReasonKey(
 
 /**
  * what the person can do about an error: sign in again, try again, or nothing (just read it).
- * Deferred (G504-fe-3): a save refused with keystore_locked / store_full has its own S4 action
- * ("Mở trung tâm đồng bộ" / Retry, EXPERIENCE l.156, l.212) once the sync center and the S4
- * row exist in the shell; the Open dialog and launch notice never see these two codes.
+ * A save refused by a locked keychain gets its own action in the queue popover
+ * (`queue-popover-model.ts`); the Open dialog and launch notice never see that code.
  */
 export type ErrorAction = 'sign-in' | 'retry' | 'none'
 

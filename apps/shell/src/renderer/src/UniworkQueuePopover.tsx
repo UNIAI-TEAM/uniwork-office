@@ -355,6 +355,10 @@ export function UniworkQueuePopover({
       case 'recheck':
         if (api && row) void call(id, () => api.recheck(row.id))
         return
+      case 'retry':
+        // the account's own Retry (keystore refusal has no row to re-check)
+        void Promise.resolve(window.aiOffice.accountRetry?.()).catch(() => undefined)
+        return
       case 'save-again':
         if (api && row) void call(id, () => api.saveAgain(row.id))
         return
