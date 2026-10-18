@@ -625,6 +625,36 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(Buffer.from(kept[0]!.snapshot)).toEqual(Buffer.from(enc('v4')))
   })
 
+  // B34 (UNI-1362): the drafts store is a store of its own, so a closed document
+  // whose only local work is a kept draft answered "no local work" - and the
+  // library asks exactly this before an unpin deletes the committed copy.
+  it('a kept draft of a clean, intent-less copy is local work', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const key = basename(dirname(path))
+    // clean on disk, no intent: nothing local to lose yet
+    expect(binding(path).state).not.toBe('dirty')
+    expect(await storedIntent(ctx, path)).toBeNull()
+    expect(await ctx.service.hasLocalDraft(DOC)).toBe(false)
+
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    const drafts = createDraftStore(opened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    expect(
+      await drafts.keep(key, enc('kept snapshot'), {
+        id: 'draft_1',
+        createdAt: '2026-04-17T00:00:00.000Z',
+      }),
+    ).toBe('ok')
+
+    // the kept draft alone makes the copy local work, and the draft is untouched
+    expect(await ctx.service.hasLocalDraft(DOC)).toBe(true)
+    const kept = await drafts.list(key)
+    expect(kept).toHaveLength(1)
+    expect(Buffer.from(kept[0]!.snapshot)).toEqual(Buffer.from(enc('kept snapshot')))
+  })
+
   describe("G5-11 d6-3: a switch during cancel/discard keeps nothing in the next account's drafts", () => {
     /** the drafts the store of `account` keeps for the document at `path` */
     const draftsOf = async (ctx: Ctx, path: string, account: string) => {

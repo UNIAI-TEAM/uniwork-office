@@ -3298,10 +3298,31 @@ export class UniworkDocsService {
     // the editor signal was read before this await: an editor that turned
     // dirty while the store was answering is local work too, so re-read it
     // here instead of evicting the entry the tab still needs
-    return (
-      (await access.intents.get(documentId)) !== null ||
-      this.editorDirty.has(join(dir, binding.filename))
-    )
+    if ((await access.intents.get(documentId)) !== null) return true
+    // B34 (UNI-1362): a kept draft - the user's snapshot of a cancelled intent -
+    // is local work as well, and it lives in its own store, never in the intent
+    // one. A closed document whose only local work is a kept draft must still
+    // answer true: the offline library asks this before an unpin deletes the
+    // committed copy, and the feed's resync asks it before evicting the index
+    // entry. Read only: the draft bytes are never touched.
+    if (await this.hasKeptDraft(documentId)) return true
+    return this.editorDirty.has(join(dir, binding.filename))
+  }
+
+  /**
+   * B34 (UNI-1362): whether the drafts store holds at least one kept draft of
+   * `documentId`. The store is listed, never written; a layer without the drafts
+   * registration (a bare test store) holds no draft.
+   */
+  private async hasKeptDraft(documentId: string): Promise<boolean> {
+    try {
+      const open = await this.openSyncStore()
+      if (open.kind !== 'ok') return true
+      const drafts = createDraftStore(open.records(DRAFTS_STORE_REGISTRATION.name))
+      return (await drafts.list(documentId)).length > 0
+    } catch {
+      return false
+    }
   }
 
   /**
