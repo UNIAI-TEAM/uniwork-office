@@ -1152,8 +1152,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   offlinePush = () => syncCenter.controller.notifyChanged()
   offlineRowChanged = (documentId) => offlineApi.rowChanged(documentId)
   registerOfflineLibraryIpc(ipcMain, offlineApi)
-  // a copy no window shows any more goes at the next pass (the offline twin of the draft sweep)
-  runtime.onPollVerdict(() => void offlineCopies.sweep())
+  // a copy no window shows any more goes at the next pass (the offline twin of the draft
+  // sweep); it runs after the pass's lease renewal so it reads the renewed lease (G703-R7-3)
+  runtime.onAfterLeasePass(() => void offlineCopies.sweep())
   changeListeners.push(() => syncCenter.controller.notifyChanged())
   // every feed pass's connectivity verdict: the offline header, its refusals and lastSyncAt
   runtime.onPollVerdict((online) => void syncCenter.notePoll(online))

@@ -364,6 +364,7 @@ export class SyncRuntime {
   private generation = 0
   /** told after every pass's onPoll, with the same verdict (G5-10 sync center) */
   private readonly pollListeners = new Set<(online: boolean | undefined) => void>()
+  private readonly leasePassListeners = new Set<(online: boolean | undefined) => void>()
   /** the feed verdict of the last completed pass (G5-10 header conditions 7 and 9) */
   private lastFeedVerdict = { resynced: false, resyncFailed: false }
   /** the last pass's connectivity verdict; false keeps every lease request home */
@@ -480,6 +481,17 @@ export class SyncRuntime {
   }
 
   /**
+   * G703-R7-3: listen to every pass once its lease renewal pass settled (an
+   * offline or verdict-less pass renews nothing and reports at once). Unlike
+   * `onPollVerdict` it runs after the renewal, so a listener reads the leases a
+   * renewal just wrote. Returns the unsubscribe.
+   */
+  onAfterLeasePass(listener: (online: boolean | undefined) => void): () => void {
+    this.leasePassListeners.add(listener)
+    return () => this.leasePassListeners.delete(listener)
+  }
+
+  /**
    * G5-10: whether the last completed pass rebuilt a feed from a full resync,
    * and whether a feed's resync is refused past FEED_RESYNC_FAILED_AFTER. A
    * stop() (sign-out, account switch) forgets both.
@@ -514,6 +526,17 @@ export class SyncRuntime {
     }
   }
 
+  /** the listeners that run once a pass's lease renewal settled (they see the renewed leases) */
+  private reportLeasePass(online: boolean | undefined): void {
+    for (const listener of [...this.leasePassListeners]) {
+      try {
+        listener(online)
+      } catch {
+        // a listener never breaks the pass
+      }
+    }
+  }
+
   private async run(): Promise<void> {
     const generation = this.generation
     const current = () => this.generation === generation
@@ -524,6 +547,7 @@ export class SyncRuntime {
       // no session to reach the server: nothing was attempted, so there is no
       // connectivity verdict to report (G506-be-3)
       await this.reportPoll(undefined)
+      this.reportLeasePass(undefined)
       return
     }
     const open = await this.options.store.open()
@@ -533,6 +557,7 @@ export class SyncRuntime {
       // Nothing was attempted, so there is no verdict either (G506-be-3)
       this.running.clear()
       await this.reportPoll(undefined)
+      this.reportLeasePass(undefined)
       return
     }
     /** whether any capability or feed round trip was attempted at all */
@@ -587,14 +612,17 @@ export class SyncRuntime {
     // online, and a pass with nothing to do (no chosen org) reports neither
     // (G506-be-3)
     const verdict = attempted ? !transportFailed : undefined
-    // G5-08c row 2 / G703-R6-4: the pass renews due leases before reporting the
-    // poll verdict to listeners (so offlineCopies.sweep() sees the renewed lease)
-    if (verdict !== undefined) this.online = verdict
-    await this.leases.onOnlinePass(verdict).catch(() => undefined)
-    if (!current()) return
     // the save queue's onPoll, then the G5-10 listeners, with this one verdict
     await this.reportPoll(verdict)
     if (!current()) return
+    // G5-08c row 2: the same verdict gates the lease renewal pass - an online
+    // pass renews the held leases that are due, an offline one sends nothing
+    if (verdict !== undefined) this.online = verdict
+    await this.leases.onOnlinePass(verdict).catch(() => undefined)
+    // G703-R7-3: what must see the renewed leases (the offline-copy sweep) runs
+    // here, so the queue and the listeners above never wait on a renewal request
+    if (!current()) return
+    this.reportLeasePass(verdict)
     // G5-05: a reached server downloads the pins that waited for the network
     if (verdict === true && current()) await this.library?.onReconnect().catch(() => undefined)
   }

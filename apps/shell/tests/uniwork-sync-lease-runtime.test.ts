@@ -67,6 +67,9 @@ function harness() {
   let wallMs = T0
   let monoMs = 5_000
   let feedFails = false
+  let renewGate: Promise<void> | null = null
+  let renewEntered: () => void = () => undefined
+  const events: string[] = []
   const grantCalls: string[] = []
   const renewCalls: string[] = []
   const releaseCalls: string[] = []
@@ -89,6 +92,10 @@ function harness() {
     },
     async renew(documentId) {
       renewCalls.push(documentId)
+      events.push('renew-enter')
+      renewEntered()
+      if (renewGate) await renewGate
+      events.push('renew-exit')
       return makeSdo(wallMs, { document_id: documentId, generation: 2, renewed: true })
     },
     async release(documentId) {
@@ -118,6 +125,9 @@ function harness() {
     capability: async () => capability,
     client: () => feed,
     keepDraft: async () => false,
+    onPoll: async () => {
+      events.push('queue')
+    },
     clock: { now: () => wallMs },
     schedule: () => () => undefined,
     lease: {
@@ -137,6 +147,21 @@ function harness() {
     },
     setFeedFails(next: boolean) {
       feedFails = next
+    },
+    events,
+    /** the next renewal request waits until the returned release is called */
+    blockRenewal(): { entered: Promise<void>; release: () => void } {
+      let release: () => void = () => undefined
+      renewGate = new Promise<void>((resolve) => {
+        release = () => {
+          renewGate = null
+          resolve()
+        }
+      })
+      const entered = new Promise<void>((resolve) => {
+        renewEntered = resolve
+      })
+      return { entered, release }
     },
   }
 }
@@ -192,6 +217,46 @@ describe('the lease manager inside the feed runtime (W1f)', () => {
     h.setFeedFails(false)
     await h.runtime.tick()
     expect(h.renewCalls).toEqual(['doc_1'])
+  })
+
+  it('G703-R7-3: a blocked lease renewal does not delay the queue or the poll listeners', async () => {
+    const h = harness()
+    h.runtime.onPollVerdict(() => h.events.push('listener'))
+    await h.runtime.tick()
+    await h.runtime.leases.grant('doc_1')
+    h.events.length = 0
+    h.advance(13 * HOUR)
+    const gate = h.blockRenewal()
+    const pass = h.runtime.tick()
+    await gate.entered
+    // the renewal round trip is still pending: the verdict was already delivered
+    expect(h.events).toEqual(['queue', 'listener', 'renew-enter'])
+    gate.release()
+    await pass
+    expect(h.events).toEqual(['queue', 'listener', 'renew-enter', 'renew-exit'])
+  })
+
+  it('G703-R7-4: the post-renewal hook runs after the renewal settled, with the pass verdict', async () => {
+    const h = harness()
+    const seen: Array<boolean | undefined> = []
+    h.runtime.onAfterLeasePass((online) => {
+      seen.push(online)
+      h.events.push('after-lease-pass')
+    })
+    await h.runtime.tick()
+    await h.runtime.leases.grant('doc_1')
+    h.events.length = 0
+    seen.length = 0
+    h.advance(13 * HOUR)
+    const gate = h.blockRenewal()
+    const pass = h.runtime.tick()
+    await gate.entered
+    expect(h.events).not.toContain('after-lease-pass')
+    gate.release()
+    await pass
+    expect(h.events).toEqual(['queue', 'renew-enter', 'renew-exit', 'after-lease-pass'])
+    expect(seen).toEqual([true])
+    expect((await h.runtime.leases.effectiveState('doc_1')).record?.generation).toBe(2)
   })
 
   it('R1BE-12: the runtime builds its one lease manager from the lease options', () => {
