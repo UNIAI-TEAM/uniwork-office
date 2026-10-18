@@ -187,6 +187,7 @@ function parseExpiryMs(leaseUntil: string | null | undefined): number | null {
 }
 
 interface TrackedCopy {
+  documentId: string
   dir: string
   path: string
   title: string
@@ -195,6 +196,8 @@ interface TrackedCopy {
   orgId: string
   leaseUntilMs: number | null
   timer: NodeJS.Timeout | null
+  /** whether this copy still holds the library's open-tab count (`markOpen` without its `markClosed`) */
+  counted: boolean
 }
 
 export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
@@ -257,6 +260,16 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     copy.timer = timer
   }
 
+  /** G703-R7-2: the one `markClosed` of a copy's tab, whatever the copy's lock state */
+  const releaseTab = async (copy: TrackedCopy): Promise<void> => {
+    if (!copy.counted) return
+    copy.counted = false
+    await deps
+      .library()
+      ?.markClosed(copy.documentId)
+      .catch(() => undefined)
+  }
+
   const drop = async (documentId: string, closed: boolean): Promise<boolean> => {
     const copy = copies.get(documentId)
     if (!copy) return true
@@ -269,11 +282,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     }
     copies.delete(documentId)
     // the pin's deferred cleanup waits for the last reader: tell the library the tab is gone
-    if (closed)
-      await deps
-        .library()
-        ?.markClosed(documentId)
-        .catch(() => undefined)
+    if (closed) await releaseTab(copy)
     return true
   }
 
@@ -352,6 +361,9 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     if (shownBefore) {
       clearTimer(shownBefore)
       if (shownBefore.dir !== dir) pendingRemoval.add(shownBefore.dir)
+      // G703-R7-2: a retained copy whose tab closed before any sweep saw it gives
+      // its open-tab count back exactly once, before the reopen takes a new one
+      if (!onScreen) await releaseTab(shownBefore)
     }
     // whatever an earlier session (a crash, a remove that failed) left under this
     // key goes before the new bytes land, whether this session knows the copy or not
@@ -395,6 +407,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     // the pin's cleanup defers while a tab reads the copy (markClosed at its close)
     if (!onScreen) library.markOpen(documentId)
     copies.set(documentId, {
+      documentId,
       dir,
       path,
       title: shown.title,
@@ -403,6 +416,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       orgId: row.orgId,
       leaseUntilMs: parseExpiryMs(row.leaseUntil),
       timer: null,
+      counted: true,
     })
     scheduleExpiry(documentId)
     return { kind: 'opened', path, title: shown.title }

@@ -621,6 +621,44 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     expect(o.locks).toEqual([])
     expect(existsSync(path)).toBe(true)
   })
+
+  it('(G703-R7-2) a locked copy whose tab closes and reopens before the next sweep keeps one open-tab count, and the final close releases it', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const path = await openCopy(o)
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    await o.copies.sweep()
+    expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+    expect(existsSync(copyDir(o))).toBe(false)
+    // the lease is renewed and the user closes the locked tab, then reopens the document
+    // before any sweep noticed the close
+    o.h.leases.states.set('doc_1', leaseState('valid'))
+    o.pathOpen.value = false
+    const reopened = await o.copies.open('doc_1')
+    expect(reopened.kind).toBe('opened')
+    expect(existsSync(copyDir(o))).toBe(true)
+    o.pathOpen.value = true
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
+    // the one tab closes for good: open turns false (one markClosed was enough)
+    o.pathOpen.value = false
+    o.clock.now += 31_000
+    await o.copies.sweep()
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: false })
+    expect(existsSync(copyDir(o))).toBe(false)
+  })
+
+  it('(G703-R7-2) an unlocked copy whose tab closed and reopened before the sweep does not double its count either', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    await openCopy(o)
+    o.pathOpen.value = false
+    expect((await o.copies.open('doc_1')).kind).toBe('opened')
+    o.pathOpen.value = true
+    o.pathOpen.value = false
+    o.clock.now += 31_000
+    await o.copies.sweep()
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: false })
+  })
 })
 
 describe('G5-05u B5 every refusal names its S11 lock', () => {
