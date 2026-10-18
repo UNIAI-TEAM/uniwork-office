@@ -215,22 +215,39 @@ export function UniworkFolderPicker({
         heading
       )}
       {searchLabel && nodes && (
-        <input
-          className="uw-pick-search uwf-picker-search"
-          type="search"
-          aria-label={searchLabel}
-          placeholder={searchLabel}
-          value={query}
-          spellCheck={false}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape' && query) {
-              e.preventDefault()
-              e.stopPropagation()
-              setQuery('')
-            }
-          }}
-        />
+        <div className="uwf-picker-search-wrap">
+          <svg
+            className="uwf-picker-search-icon"
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            className="uw-pick-search uwf-picker-search"
+            type="search"
+            aria-label={searchLabel}
+            placeholder={searchLabel}
+            value={query}
+            spellCheck={false}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && query) {
+                e.preventDefault()
+                e.stopPropagation()
+                setQuery('')
+              }
+            }}
+          />
+        </div>
       )}
       <div className="uwf-picker-body">
         {load.status === 'loading' && (

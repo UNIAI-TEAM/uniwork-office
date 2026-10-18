@@ -27,6 +27,7 @@ export const pt = {
   ufCycle: 'Uma pasta não pode ser movida para dentro de si mesma nem de uma de suas subpastas.',
   ufParentKind: 'Uma pasta fica na raiz ou dentro de outra pasta.',
   ufFolderGone: 'Esta pasta não está mais aqui.',
+  ufFolderNoAccess: 'Você não tem mais acesso a esta pasta.',
   ufNoPermission: 'Você não tem permissão para alterar esta pasta.',
   ufEmptyFolder: 'Esta pasta está vazia',
   ufLocation: 'Local',

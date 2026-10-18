@@ -28,6 +28,7 @@ export const ms = {
   ufCycle: 'Folder tidak boleh dialihkan ke dalam dirinya sendiri atau salah satu subfoldernya.',
   ufParentKind: 'Folder terletak di akar atau di dalam folder lain.',
   ufFolderGone: 'Folder ini tiada lagi di sini.',
+  ufFolderNoAccess: 'Anda tidak lagi mempunyai akses kepada folder ini.',
   ufNoPermission: 'Anda tiada kebenaran untuk mengubah folder ini.',
   ufEmptyFolder: 'Folder ini kosong',
   ufLocation: 'Lokasi',

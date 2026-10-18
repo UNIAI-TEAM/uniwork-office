@@ -14,6 +14,7 @@ import { accountStrings } from './i18n/strings-account'
 import { cloudStrings } from './i18n/strings-cloud'
 import { uniworkDocumentStrings } from './i18n/strings-uniwork-documents'
 import { uniworkFolderStrings } from './i18n/strings-uniwork-folders'
+import { uniworkHomeStrings } from './i18n/strings-uniwork-home'
 import { uniworkSaveStrings } from './i18n/strings-uniwork-save'
 import { syncStrings } from './i18n/strings-sync'
 import { workbenchStrings } from './i18n/strings-workbench'
@@ -26,6 +27,7 @@ export type StringKey =
   | keyof typeof cloudStrings.zh
   | keyof typeof uniworkDocumentStrings.zh
   | keyof typeof uniworkFolderStrings.zh
+  | keyof typeof uniworkHomeStrings.zh
   | keyof typeof uniworkSaveStrings.zh
   | keyof typeof syncStrings.zh
   | keyof typeof workbenchStrings.zh
@@ -41,6 +43,7 @@ const shards: readonly Record<Lang, Record<string, string>>[] = [
   cloudStrings,
   uniworkDocumentStrings,
   uniworkFolderStrings,
+  uniworkHomeStrings,
   uniworkSaveStrings,
   syncStrings,
   workbenchStrings,

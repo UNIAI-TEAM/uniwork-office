@@ -192,6 +192,24 @@ function pathOf(row: Record<string, unknown>): { id: string; title: string }[] |
   return ancestors
 }
 
+/**
+ * DESKTOP-HOME: `visibility` is a loose enum (`private` | `workspace` |
+ * `restricted`); unknown or absent values are dropped at parse.
+ */
+function visibilityOf(value: unknown): UniworkDocSummary['visibility'] {
+  return value === 'private' || value === 'workspace' || value === 'restricted' ? value : undefined
+}
+
+/**
+ * DESKTOP-HOME: `my_level` on list rows (`view` | `comment` | `edit` |
+ * `manage`); unknown or absent values are dropped at parse.
+ */
+function rowMyLevelOf(value: unknown): UniworkDocSummary['myLevel'] {
+  return value === 'view' || value === 'comment' || value === 'edit' || value === 'manage'
+    ? value
+    : undefined
+}
+
 /** one list row as the renderer's summary (title is the only name the server sends) */
 function summaryRow(
   row: Record<string, unknown>,
@@ -200,6 +218,9 @@ function summaryRow(
 ): UniworkDocSummary {
   const title = str(row.title)
   const path = pathOf(row)
+  const visibility = visibilityOf(row.visibility)
+  const myLevel = rowMyLevelOf(row.my_level)
+  const updatedById = optId(row.updated_by) ?? undefined
   return {
     id: str(row.id, 128),
     workspaceId:
@@ -209,6 +230,9 @@ function summaryRow(
     // row's own file block (or a file/page title) decides that
     format: kind === 'folder' ? null : formatOf(row, title),
     updatedAt: str(row.updated_at, 64),
+    ...(updatedById ? { updatedById } : {}),
+    ...(visibility ? { visibility } : {}),
+    ...(myLevel ? { myLevel } : {}),
     ...summaryFlags(row),
     kind,
     parentId: parentIdOf(row.parent_id),

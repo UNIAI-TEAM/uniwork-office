@@ -178,11 +178,27 @@ const callsFor = (stub: UniworkDocumentsStub, id: string): StubCall[] =>
   stub.calls().filter((c) => c.route.startsWith(`/documents/${id}`))
 
 async function openFromPicker(shell: Page, title: string): Promise<void> {
-  await shell.locator('.uw-open-card').click()
-  const dialog = shell.locator('.uw-pick')
-  await expect(dialog).toBeVisible()
-  await dialog.locator('.uw-pick-row', { hasText: title }).click()
-  await expect(dialog).toBeHidden({ timeout: 30_000 })
+  const uwTab = shell.locator('#home-area-tab-uniwork')
+  if ((await uwTab.getAttribute('aria-selected')) === 'false') {
+    await uwTab.click()
+  }
+  const home = shell.locator('.dh-home')
+  await expect(home).toBeVisible()
+  await expect(home.locator('.uw-pick-skeleton')).toHaveCount(0, { timeout: 15_000 })
+  const row = home.locator('.dh-doc-row', { hasText: title })
+  if (!(await row.isVisible())) {
+    const recentNav = shell.locator('.dh-subnav .nav-item[data-nav="recent"]')
+    const wsNav = shell.locator('.dh-subnav .nav-item[data-nav="workspace"]')
+    if ((await recentNav.getAttribute('aria-current')) === 'page') {
+      await wsNav.click()
+    } else {
+      await recentNav.click()
+    }
+    await expect(home.locator('.uw-pick-skeleton')).toHaveCount(0, { timeout: 15_000 })
+  }
+  await expect(row).toBeVisible()
+  await row.locator('.dh-doc-open').click()
+  await expect.poll(async () => (await activeStatus(shell))?.title, { timeout: 30_000 }).toBe(title)
 }
 
 /** answers the next native message boxes of main (conflict choice, discard confirm) in order */
@@ -394,12 +410,41 @@ test.describe.serial('UniWork documents', () => {
       expect(stub.uploads(doc.id)).toHaveLength(1)
       expect(stub.commits(doc.id)).toHaveLength(1)
 
-      // recents list the UniWork copy with its badge
+      // recents list the UniWork copy with its access badge in the DocumentsHome table
       await shell.locator('.tab-item.tab-home').click()
-      const row = shell.locator('.recent-row', { hasText: name })
+      await shell.locator('.dh-subnav .nav-item[data-nav="recent"]').click()
+      const row = shell.locator('.dh-doc-row', { hasText: name })
       await expect(row).toBeVisible()
-      await expect(row.locator('.uw-recent-badge')).toBeVisible()
+      await expect(row.locator('.dh-vis-badge')).toBeVisible()
       await shell.screenshot({ path: screenshotPath('uniwork-docs-recents') })
+    })
+  })
+
+  // a2 ──────────────────────────────────────────────────────────────────────
+  test('a2. open a document from the Open from UniWork dialog (.uw-open-card -> .uw-pick): document opens and dialog closes', async () => {
+    test.setTimeout(150_000)
+    const name = 'open-from-uniwork-dialog.docx'
+    const doc = stub.addDocument({ filename: name, bytes: await docxBytes() })
+    await withApp('uniwork-docs-open-dialog', async ({ launched, shell }) => {
+      // UniworkOpenCard (.uw-open-card) lives in Home.tsx's device-area quick cards
+      await shell.locator('#home-area-tab-device').click()
+      await shell.locator('.uw-open-card').click()
+      const dialog = shell.locator('.uw-pick')
+      await expect(dialog).toBeVisible()
+      await dialog.locator('.uw-pick-row', { hasText: name }).click()
+      await expect(dialog).toBeHidden({ timeout: 30_000 })
+
+      await docsEditor(launched.app)
+      expect(await activeStatus(shell)).toMatchObject({
+        documentId: doc.id,
+        title: name,
+        access: 'edit',
+        state: 'ready',
+      })
+      // Switch Home back to the UniWork area so the persisted HOME_AREA_KEY stays on 'uniwork'
+      await shell.locator('.tab-item.tab-home').click()
+      await shell.locator('#home-area-tab-uniwork').click()
+      await expect(shell.locator('#home-area-tab-uniwork')).toHaveAttribute('aria-selected', 'true')
     })
   })
 

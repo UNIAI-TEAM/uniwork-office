@@ -27,6 +27,7 @@ export const it = {
   ufCycle: 'Una cartella non può essere spostata in sé stessa o in una delle sue sottocartelle.',
   ufParentKind: "Una cartella si trova nella radice o in un'altra cartella.",
   ufFolderGone: 'Questa cartella non è più qui.',
+  ufFolderNoAccess: 'Non hai più accesso a questa cartella.',
   ufNoPermission: 'Non hai l’autorizzazione per modificare questa cartella.',
   ufEmptyFolder: 'Questa cartella è vuota',
   ufLocation: 'Posizione',

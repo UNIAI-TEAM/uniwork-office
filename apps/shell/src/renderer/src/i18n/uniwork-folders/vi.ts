@@ -26,6 +26,7 @@ export const vi = {
   ufCycle: 'Không thể chuyển thư mục vào chính nó hoặc thư mục con của nó.',
   ufParentKind: 'Thư mục chỉ nằm ở gốc hoặc trong thư mục khác.',
   ufFolderGone: 'Thư mục này không còn ở đây.',
+  ufFolderNoAccess: 'Bạn không còn quyền truy cập thư mục này.',
   ufNoPermission: 'Bạn không có quyền thay đổi thư mục này.',
   ufEmptyFolder: 'Thư mục trống',
   ufLocation: 'Vị trí',

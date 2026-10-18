@@ -27,6 +27,7 @@ export const ja = {
   ufCycle: 'フォルダーをそれ自身やそのサブフォルダーに移動することはできません。',
   ufParentKind: 'フォルダーはルートか別のフォルダーの中にのみ置けます。',
   ufFolderGone: 'このフォルダーはもうここにありません。',
+  ufFolderNoAccess: 'このフォルダーへのアクセス権がなくなりました。',
   ufNoPermission: 'このフォルダーを変更する権限がありません。',
   ufEmptyFolder: 'このフォルダーは空です',
   ufLocation: '場所',

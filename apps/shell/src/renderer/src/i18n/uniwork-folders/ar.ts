@@ -26,6 +26,7 @@ export const ar = {
   ufCycle: 'لا يمكن نقل مجلد إلى نفسه أو إلى أحد مجلداته الفرعية.',
   ufParentKind: 'يوجد المجلد في الجذر أو داخل مجلد آخر.',
   ufFolderGone: 'لم يعد هذا المجلد هنا.',
+  ufFolderNoAccess: 'لم تعد لديك صلاحية الوصول إلى هذا المجلد.',
   ufNoPermission: 'ليس لديك إذن لتغيير هذا المجلد.',
   ufEmptyFolder: 'هذا المجلد فارغ',
   ufLocation: 'الموقع',
