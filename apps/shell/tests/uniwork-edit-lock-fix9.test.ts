@@ -246,6 +246,32 @@ describe('EL-1(b) fix9: hold only when there is something to release', () => {
     expect(opened.path).toBeTruthy()
   })
 
+  it('drop-only work (no held session, one in-flight drop release): will-quit holds and joins it (EL1B-BE-R3-14)', async () => {
+    const order: string[] = []
+    const h = setup({
+      release: async () => {
+        await drain(50)
+        order.push('DELETE')
+      },
+    })
+    const opened = await h.service.openFromServer(DOC)
+    await drain()
+    // the last window closes: the held session is dropped, its DELETE is in flight
+    void h.service.notePathsDropped([opened.path])
+    expect((h.service as unknown as { editLocks: Map<string, unknown> }).editLocks.size).toBe(0)
+    expect(h.service.hasEditLocksToRelease()).toBe(true)
+
+    const out = await runEditLockWillQuit({
+      hasWork: () => h.service.hasEditLocksToRelease(),
+      preventDefault: () => order.push('hold'),
+      release: (capMs) => h.service.releaseEditLocksOnQuit().then(() => void capMs),
+      quitAgain: () => order.push('quit'),
+    })
+    expect(out).toBe('released')
+    expect(order).toEqual(['hold', 'DELETE', 'quit'])
+    expect(h.service.hasEditLocksToRelease()).toBe(false)
+  })
+
   it('index.ts asks the service before holding', () => {
     const source = readFileSync(join(__dirname, '..', 'src/main/index.ts'), 'utf8').replace(
       /\r\n/g,
