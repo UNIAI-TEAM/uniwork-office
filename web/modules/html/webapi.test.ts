@@ -547,7 +547,7 @@ describe('UNI-1920 item B: Ctrl/Cmd+P inside the HTML frame runs the module prin
     return ev
   }
 
-  it('mod+P invokes the renderer\'s onPrintRequest (runPrint) once, repeat ignored', async () => {
+  it("mod+P invokes the renderer's onPrintRequest (runPrint) once, repeat ignored", async () => {
     const { api } = setup()
     // consumePending resolves after init assigned the grants, so the gate reads them already
     await api.consumePending()

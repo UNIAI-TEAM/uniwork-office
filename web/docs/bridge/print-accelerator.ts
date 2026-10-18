@@ -11,7 +11,15 @@
  * is the browser default suppressed, so an unhandled press keeps the browser's print dialog.
  * Returns an uninstall function.
  */
-export function installPrintAccelerator(_target: Window, _run: () => boolean): () => void {
-  // signature stub for the red tests; the capture-phase listener lands in the green commit
-  return () => {}
+export function installPrintAccelerator(target: Window, run: () => boolean): () => void {
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.repeat || !(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return
+    if (event.key.toLowerCase() !== 'p') return
+    // the print path answers whether it ran (cap effective + a listener mounted): the browser
+    // default survives a press nobody claimed, so a viewer's Ctrl+P still opens the system dialog
+    if (run() !== true) return
+    event.preventDefault()
+  }
+  target.addEventListener('keydown', onKeyDown, true)
+  return () => target.removeEventListener('keydown', onKeyDown, true)
 }

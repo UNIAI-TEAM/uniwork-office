@@ -75,6 +75,7 @@ import { ownHeadAfterUnknown } from './head-match'
 import { downloadBlob, printFrame } from './browser'
 import { buildDiff, diffFailure } from './conflict-diff'
 import { ask, conflictFrame, hideFatal, onModalChange, showFatal, text } from './notice'
+import { installPrintAccelerator } from './print-accelerator'
 import {
   conflictSaveResult,
   bridgeDownloadCap,
@@ -682,6 +683,15 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     const r = await (opts.print ?? printFrame)()
     return { printed: r.ok }
   })
+
+  // Ctrl/Cmd+P inside the frame (UNI-1920): the renderer binds no mod+P, so the browser's own
+  // print dialog would bypass the app's print dialog — the same 'print' menu command File > Print
+  // dispatches. Only while the host granted `print`; otherwise the browser keeps its default.
+  if (typeof window !== 'undefined') {
+    installPrintAccelerator(window, () =>
+      grants?.print === true ? session.runMenuCommand('print') : false,
+    )
+  }
 
   // ------------------------------------------------------------ new version on UniWork (G5-03w, S6)
 
