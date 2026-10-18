@@ -12,6 +12,12 @@ export interface SheetsUniworkSeam {
   uniworkReadOnlySave?(path?: string): Promise<void>
 }
 
+/** The workbook-file fields the UniWork lock seam reads and updates. */
+export type SheetsUniworkFile = Pick<
+  WorkbookFile,
+  'path' | 'csvPath' | 'readOnly' | 'uniworkBound' | 'needsSaveAs' | 'unsavedNew'
+>
+
 /** Whether a `uniwork:doc-state-changed` ping for `pingPath` targets `file`. */
 export function sheetsMatchesUniworkPath(
   file: Pick<WorkbookFile, 'path' | 'csvPath'> | null | undefined,
@@ -28,15 +34,15 @@ export function sheetsMatchesUniworkPath(
  * Patch `file` with the fresh `{bound, readOnly}` answer from main (converted
  * `.xls` imports keep `needsSaveAs` and stay editable/unbound, matching open).
  */
-export function applySheetsUniworkAnswer(
-  file: WorkbookFile,
+export function applySheetsUniworkAnswer<T extends SheetsUniworkFile>(
+  file: T,
   answer: { bound: boolean; readOnly: boolean },
-): WorkbookFile {
+): T {
   const converted = file.needsSaveAs === true && file.unsavedNew !== true
   const bound = !converted && answer.bound === true
   const readOnly = !converted && answer.readOnly === true
   if (file.readOnly === readOnly && (file.uniworkBound === true) === bound) return file
-  const next: WorkbookFile = { ...file, readOnly }
+  const next: T = { ...file, readOnly }
   if (bound) next.uniworkBound = true
   else delete next.uniworkBound
   return next
@@ -48,15 +54,36 @@ export function applySheetsUniworkAnswer(
  * between locked (read-only) and released (editable) without touching the edit
  * journal. Returns the unsubscribe cleanup.
  */
-export function watchSheetsUniworkState(_deps: {
+export function watchSheetsUniworkState<T extends SheetsUniworkFile>(deps: {
   api: SheetsUniworkSeam | null | undefined
-  getFile(): WorkbookFile | null
-  setFile(next: WorkbookFile): void
+  getFile(): T | null
+  setFile(next: T): void
   getWorkbook(): EditableWorkbook | null
   lock: ViewOnlyLock
   webViewOnly: boolean
 }): () => void {
-  return () => {}
+  let live = true
+  const unsubscribe = deps.api?.onUniworkStateChanged?.((pingPath) => {
+    const before = deps.getFile()
+    if (!sheetsMatchesUniworkPath(before, pingPath)) return
+    void deps.api
+      ?.uniworkState?.()
+      ?.then((answer) => {
+        if (!live || !answer) return
+        const current = deps.getFile()
+        if (!sheetsMatchesUniworkPath(current, pingPath) || !current) return
+        const next = applySheetsUniworkAnswer(current, answer)
+        if (next === current) return
+        deps.setFile(next)
+        const workbook = deps.getWorkbook()
+        deps.lock.set(next.readOnly && !deps.webViewOnly ? workbook : null)
+      })
+      ?.catch(() => {})
+  })
+  return () => {
+    live = false
+    unsubscribe?.()
+  }
 }
 
 /**
@@ -66,10 +93,15 @@ export function watchSheetsUniworkState(_deps: {
  * editable files return false.
  */
 export function sheetsBlocksReadOnlySave(
-  _api: SheetsUniworkSeam | null | undefined,
-  _file: Pick<WorkbookFile, 'path' | 'csvPath' | 'readOnly' | 'uniworkBound'> | null | undefined,
-  _mode: 'save' | 'save-as' | 'recovery',
-  _quiet: boolean,
+  api: SheetsUniworkSeam | null | undefined,
+  file: Pick<WorkbookFile, 'path' | 'csvPath' | 'readOnly' | 'uniworkBound'> | null | undefined,
+  mode: 'save' | 'save-as' | 'recovery',
+  quiet: boolean,
 ): boolean {
-  return false
+  if (mode !== 'save' || file?.readOnly !== true) return false
+  if (!quiet && file.uniworkBound === true) {
+    const target = file.csvPath ?? file.path
+    void api?.uniworkReadOnlySave?.(target)?.catch(() => {})
+  }
+  return true
 }

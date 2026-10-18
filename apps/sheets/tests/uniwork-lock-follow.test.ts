@@ -6,60 +6,21 @@
  * calls `uniworkReadOnlySave` once instead of silently doing nothing.
  */
 import { describe, expect, it, vi } from 'vitest'
-import type { WorkbookFile } from '../src/shared/desktop-api'
 import { createViewOnlyLock, type EditableWorkbook } from '../src/renderer/view-only-lock'
 import {
   applySheetsUniworkAnswer,
   sheetsBlocksReadOnlySave,
   sheetsMatchesUniworkPath,
   watchSheetsUniworkState,
+  type SheetsUniworkFile,
 } from '../src/renderer/uniwork-state'
 
 const PATH = 'C:/u/uniwork-documents/dep/user/doc1/budget.xlsx'
 const OTHER = 'C:/u/uniwork-documents/dep/user/doc2/other.xlsx'
 
-function makeFile(overrides: Partial<WorkbookFile> = {}): WorkbookFile {
+function makeFile(overrides: Partial<SheetsUniworkFile> = {}): SheetsUniworkFile {
   return {
-    sessionId: '00000000-0000-4000-8000-000000000001',
-    name: 'budget.xlsx',
     path: PATH,
-    sha256: '0'.repeat(64),
-    entryCount: 1,
-    sheets: [
-      {
-        id: 'sheet-1',
-        name: 'Sheet1',
-        rowCount: 10,
-        columnCount: 5,
-        nonEmptyCellCount: 0,
-        formulaCellCount: 0,
-        mergedRanges: [],
-        rowHeights: [],
-        columnWidths: [],
-        hiddenRows: [],
-        hiddenColumns: [],
-        outlineRows: [],
-        outlineColumns: [],
-        conditionalFormatting: [],
-        dataValidations: [],
-        hyperlinks: [],
-        sparklines: [],
-        tables: [],
-        autoFilter: null,
-        freeze: { xSplit: 0, ySplit: 0 },
-        showGridlines: true,
-        tabColor: null,
-        notes: [],
-        threadedComments: [],
-        pageSetup: { orientation: 'portrait' },
-        cellImages: [],
-      },
-    ],
-    activeTab: 0,
-    styles: [],
-    dxfStyles: [],
-    visuals: [],
-    definedNames: [],
     readOnly: true,
     uniworkBound: true,
     ...overrides,
@@ -68,9 +29,9 @@ function makeFile(overrides: Partial<WorkbookFile> = {}): WorkbookFile {
 
 describe('watchSheetsUniworkState follows the lock ping', () => {
   it('flips read-only -> editable -> read-only on a ping for the open path and updates viewOnlyLock', async () => {
-    let file: WorkbookFile | null = makeFile({ readOnly: true, uniworkBound: true })
+    let file: SheetsUniworkFile | null = makeFile({ readOnly: true, uniworkBound: true })
     let answer = { bound: true, readOnly: false }
-    let ping: ((path: string) => void) | null = null
+    let ping = (_path: string): void => {}
     let unsubscribes = 0
     const editableHistory: boolean[] = []
     const workbook: EditableWorkbook = {
@@ -104,14 +65,14 @@ describe('watchSheetsUniworkState follows the lock ping', () => {
     })
 
     // Ping for another document is ignored
-    ping?.(OTHER)
+    ping(OTHER)
     await Promise.resolve()
     await Promise.resolve()
     expect(uniworkState).not.toHaveBeenCalled()
     expect(file?.readOnly).toBe(true)
 
     // Ping for this workbook -> becomes editable, viewOnlyLock releases (setEditable(true))
-    ping?.(PATH)
+    ping(PATH)
     await Promise.resolve()
     await Promise.resolve()
     expect(uniworkState).toHaveBeenCalledTimes(1)
@@ -121,7 +82,7 @@ describe('watchSheetsUniworkState follows the lock ping', () => {
 
     // Ping -> lock lost, becomes read-only again, viewOnlyLock re-locks (setEditable(false))
     answer = { bound: true, readOnly: true }
-    ping?.(PATH)
+    ping(PATH)
     await Promise.resolve()
     await Promise.resolve()
     expect(uniworkState).toHaveBeenCalledTimes(2)
