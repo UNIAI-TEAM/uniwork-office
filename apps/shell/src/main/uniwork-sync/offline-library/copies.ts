@@ -507,7 +507,10 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       (expiredOffline ? (copy.leaseUntilMs !== null ? 'lease_expired' : 'signed_out') : null)
     // due by the copy's own clock while the lease clock still reads it usable: look again shortly
     const due = copy.leaseUntilMs !== null && copy.leaseUntilMs <= now()
-    if (rearm || (!reason && copy.timer === null)) {
+    // a usable row with a due stored deadline always replaces an armed retry (the 30 s
+    // grace of a cancelled removal) with the short re-check: the lease just read is the
+    // one that decides now, and the movement threshold hides a subsecond renewal (G703-R10-2)
+    if (rearm || (!reason && (due || copy.timer === null))) {
       scheduleExpiry(documentId, !reason && due ? 'recheck' : 'expiry')
     }
     return reason

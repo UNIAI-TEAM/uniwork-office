@@ -280,7 +280,12 @@ const pin = (h: Harness, documentId = 'doc_1') =>
 const LEASE_T0 = 1_760_000_000_000
 const LEASE_HOUR = 60 * 60 * 1000
 
-function leaseSdoAt(wallMs: number, generation: number, renewed: boolean): OfficeOfflineLeaseSDO {
+function leaseSdoAt(
+  wallMs: number,
+  generation: number,
+  renewed: boolean,
+  lifetimeMs = 24 * LEASE_HOUR,
+): OfficeOfflineLeaseSDO {
   return {
     lease: `ofl1.token-at-${wallMs}`,
     lease_id: '01J8X4LEASE1P2Q3R4S5T6U7V8',
@@ -295,8 +300,8 @@ function leaseSdoAt(wallMs: number, generation: number, renewed: boolean): Offic
     generation,
     renewed,
     issued_at: new Date(wallMs).toISOString(),
-    expires_at: new Date(wallMs + 24 * LEASE_HOUR).toISOString(),
-    renew_after: new Date(wallMs + 12 * LEASE_HOUR).toISOString(),
+    expires_at: new Date(wallMs + lifetimeMs).toISOString(),
+    renew_after: new Date(wallMs + lifetimeMs / 2).toISOString(),
     server_time: new Date(wallMs).toISOString(),
   }
 }
@@ -309,9 +314,11 @@ function realLease(base: string) {
   const clock = { wallMs: LEASE_T0, monoMs: 5_000 }
   /** every renewal commits a record of its own generation: the seam below targets one */
   let generation = 1
+  /** how long the next renewals live (a short one models a renewal that is nearly spent) */
+  const renewal = { lifetimeMs: 24 * LEASE_HOUR }
   const client: LeaseClient = {
     grant: async () => leaseSdoAt(clock.wallMs, 1, false),
-    renew: async () => leaseSdoAt(clock.wallMs, ++generation, true),
+    renew: async () => leaseSdoAt(clock.wallMs, ++generation, true, renewal.lifetimeMs),
     release: async () => undefined,
   }
   const layer = createStoreLayer({
@@ -353,6 +360,7 @@ function realLease(base: string) {
   })
   return {
     lease,
+    renewal,
     advance(ms: number) {
       clock.wallMs += ms
       clock.monoMs += ms
@@ -1333,6 +1341,53 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
       expect(existsSync(path)).toBe(true)
       // with no sweep at all, the timers alone lock it right after the original deadline
       await timers.advance(2_000)
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(path)).toBe(false)
+    } finally {
+      timers.restore()
+    }
+  })
+
+  it('(G703-R10-2) a renewal that cancelled the removal and lives under a second is locked within a second of its own expiry, not after the 30 s retry', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-r102-'))
+    dirs.push(base)
+    const rl = realLease(base)
+    const o = openHarness({ lease: rl.lease })
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    const timers = virtualTimers((ms) => {
+      rl.advance(ms)
+      o.clock.now += ms
+    })
+    try {
+      const path = await openCopy(o)
+      const dir = copyDir(o)
+      // the lease lapses 100 ms ago: the stored deadline of the copy is due
+      rl.advance(24 * LEASE_HOUR + 100)
+      o.clock.now += 24 * LEASE_HOUR + 100
+      expect((await rl.lease.effectiveState('doc_1')).state).toBe('expired')
+      let renewed = false
+      fsFault.chmodGate = async (target) => {
+        if (renewed || !target.startsWith(dir)) return
+        renewed = true
+        // the renewal commits after the copy was made writable and before the native removal
+        rl.renewal.lifetimeMs = 500
+        expect((await rl.lease.renew('doc_1')).kind).toBe('renewed')
+      }
+      await o.copies.sweep()
+      expect(renewed).toBe(true)
+      // the removal was called off: the copy stays, a 30 s retry is armed
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      expect(timers.armed.at(-1)).toBe(30_000)
+      // one more pass reads the usable renewal (500 ms left) - and no pass follows it
+      await o.copies.sweep()
+      expect(o.locks).toEqual([])
+      await timers.advance(400)
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      // the renewal's own expiry is 500 ms in: within a second of it the timers lock the copy
+      await timers.advance(1_100)
       expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
       expect(existsSync(path)).toBe(false)
     } finally {
