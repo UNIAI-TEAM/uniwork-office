@@ -5,6 +5,9 @@
 // is `docsUniworkBoundForAi`: AiPanel feeds the docs-skill `isBound` through it
 // (`bound || platform() === 'web'`, the shared rule).
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Editor } from '@tiptap/core'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { createDocsSkill } from '../src/renderer/ai/docs-skill'
@@ -122,5 +125,17 @@ describe('the web save path is untouched', () => {
     // …while the AI filter reads the same frame as bound
     expect(docsUniworkBoundForAi(state.bound)).toBe(true)
     expect(docsUniworkBoundForAi(NO_UNIWORK_STATE.bound)).toBe(true)
+  })
+  // skillFor rebuilds the wiring by hand, so it cannot notice AiPanel dropping
+  // the shared rule (RPB-3): read the feed like the html bound test does
+  it('AiPanel feeds isBound through docsUniworkBoundForAi, not the raw bound prop', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/ai/AiPanel.tsx'),
+      'utf8',
+    )
+    const start = src.indexOf('createDocsSkill(')
+    expect(start).toBeGreaterThan(-1)
+    const block = src.slice(start, src.indexOf('createFilesSkill', start))
+    expect(block).toMatch(/docsUniworkBoundForAi\(boundRef\.current/)
   })
 })
