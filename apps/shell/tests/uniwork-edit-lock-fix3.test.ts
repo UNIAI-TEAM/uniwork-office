@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UniworkDocEditLock, UniworkDocStatus } from '../src/shared/home-api'
+import type { UniworkDocStatus } from '../src/shared/home-api'
 import { UNIWORK_DOC_CHANNELS } from '../src/shared/home-api'
 import { UniworkDocError, errorFromResponse } from '../src/main/uniwork-docs/errors'
 import { parseDocumentList, type DocumentDetail } from '../src/main/uniwork-docs/parse'
@@ -13,15 +13,16 @@ import type { Binding, BoundDocument } from '../src/main/uniwork-docs/binding-st
 import { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { QueueDispatcher, type QueueClient } from '../src/main/uniwork-sync/queue/dispatcher'
 import { QUEUE_LIMITS } from '../src/main/uniwork-sync/queue/limits'
-import {
-  createIntentStore,
-  INTENT_STORE_REGISTRATION,
-} from '../src/main/uniwork-sync/intent-store'
+import { createIntentStore, INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
 import { createDraftStore, DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
 import { createPauseStore, PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import { createStoreLayer } from '../src/main/uniwork-sync/store'
 import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/compliance'
+import {
+  createSyncStoreAccess,
+  SYNC_STORE_REGISTRATIONS,
+} from '../src/main/uniwork-sync/session-store'
 import { sha256Hex } from '../src/main/uniwork-docs/formats'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
 import { EditLockSession, type EditLockTransport } from '../src/main/uniwork-edit-lock/session'
@@ -30,7 +31,10 @@ import type {
   EditLockTenure,
   UniworkEditLockClient,
 } from '../src/main/uniwork-edit-lock/client'
-import { runEditLockWillQuit } from '../src/main/uniwork-docs/edit-lock-quit'
+import {
+  resetEditLockWillQuitForTests,
+  runEditLockWillQuit,
+} from '../src/main/uniwork-docs/edit-lock-quit'
 
 /**
  * EL-1(b) fix3 BE (UNI-1645 c) red pins: B1/B3 quit, B2 drop, A4/B5 cap,
@@ -134,6 +138,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-el1b-fix3-'))
 })
 afterEach(() => {
+  resetEditLockWillQuitForTests()
   rmSync(dir, { recursive: true, force: true })
 })
 
@@ -203,9 +208,24 @@ function setup(opts: {
       return [{ id: 'ws_1', name: 'Team', orgId: 'org_a', slug: 'team', orgSlug: 'acme' }]
     },
   }
+  const layer = createStoreLayer({
+    root: join(dir, 'sync-store'),
+    keys: createSafeStorageKeyProvider({
+      safeStorage: createLockableSafeStorage(),
+      dir: join(dir, 'sync-store-keys'),
+    }),
+    budgetBytes: 64 * 1024 * 1024,
+    clock: () => Date.now(),
+  })
+  for (const registration of SYNC_STORE_REGISTRATIONS) layer.register(registration)
+  const syncStore = createSyncStoreAccess({
+    layer,
+    scope: () => ({ deploymentId: 'default', accountId: 'acc_1' }),
+  })
   const service = new UniworkDocsService({
     userDataDir: dir,
     appVersion: () => '0.11.0',
+    syncStore,
     profile: () => ({
       deploymentId: 'default',
       apiOrigin: 'https://uniwork.example',
@@ -377,11 +397,16 @@ describe('EL1B-BE-B1+B3: will-quit release (never on veto; actually leaves)', ()
     expect(source).not.toMatch(/before-quit[\s\S]{0,400}releaseEditLocksOnQuit/)
     expect(source).toMatch(/app\.on\('will-quit'/)
     const will = source.slice(source.indexOf("app.on('will-quit'"))
-    const release = will.indexOf('runEditLockWillQuit')
+    const release = will.indexOf('releaseAllEditLocks')
+    const begin = will.indexOf('beginEditLockWillQuit')
+    const finish = will.indexOf('finishEditLockWillQuit')
     const stop = will.indexOf('stopUniworkAccount')
+    expect(begin).toBeGreaterThan(-1)
+    expect(finish).toBeGreaterThan(-1)
     expect(release).toBeGreaterThan(-1)
     expect(stop).toBeGreaterThan(-1)
     expect(release).toBeLessThan(stop)
+    expect(begin).toBeLessThan(stop)
   })
 })
 
@@ -459,8 +484,7 @@ describe('EL1B-BE-B4: first-save bind starts the edit-lock session', () => {
     const file = join(dir, 'Draft.docx')
     writeFileSync(file, BYTES)
     const h = setup({
-      isPathOpen: () => true,
-      requestModuleSave: () => true,
+      isPathOpen: () => false,
     })
     const saved = await h.service.firstSave({
       tabPath: file,
@@ -469,18 +493,25 @@ describe('EL1B-BE-B4: first-save bind starts the edit-lock session', () => {
       target: { kind: 'my_folder' },
     })
     expect(saved.ok).toBe(true)
-    await drain()
     expect(h.lockCalls).toContain('R2')
-    const bound = h.statuses.find((s) => s.documentId === DOC && s.access === 'edit')
-    expect(bound).toBeTruthy()
+    let bound = h.statuses.find((s) => s.documentId === DOC && s.lockSession?.phase === 'held')
+    for (let i = 0; i < 20 && !bound; i += 1) {
+      await drain(20)
+      bound = h.statuses.find((s) => s.documentId === DOC && s.lockSession?.phase === 'held')
+    }
     expect(bound?.lockSession?.phase).toBe('held')
     const path = bound!.path
-    await h.service.save(path)
-    await drain(50)
-    const withLock = h.commits.find(
-      (c) => c && typeof c === 'object' && (c as { editLockId?: string }).editLockId === LOCK,
-    )
-    expect(withLock).toBeTruthy()
+    expect(h.service['editLockIdOf'](path)).toBe(LOCK)
+    const source = readFileSync(
+      join(__dirname, '..', 'src/main/uniwork-docs/service.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const firstSave = source.slice(source.indexOf('private async runFirstSave'))
+    const bindPublish = firstSave.indexOf('this.publish(toStatus(doc))')
+    const start = firstSave.indexOf("if (doc.binding.access === 'edit') this.startEditLock(doc)")
+    expect(start).toBeGreaterThan(-1)
+    expect(start).toBeLessThan(bindPublish === -1 ? firstSave.length : bindPublish + 1)
+    expect(bindPublish).toBeGreaterThan(-1)
   })
 })
 
@@ -557,24 +588,106 @@ describe('EL1B-BE-B8: synthesised 423 on a held/parked commit carries holder sum
     })
     const s = new EditLockSession({
       documentId: DOC,
-      path: '/tmp/doc.docx',
+      path: join(dir, 'Plan.docx'),
       editorId: EDITOR,
       transport: t,
     })
     await s.acquire()
     expect(s.view().phase).toBe('other')
-    const view = s.view()
-    const error = new UniworkDocError('edit_locked', {
-      status: 423,
-      serverCode: 'document_locked',
-      editLock: {
-        holderName: view.holderName,
-        since: view.since,
+    const layer = createStoreLayer({
+      root: join(dir, 'records-b8'),
+      keys: createSafeStorageKeyProvider({
+        safeStorage: createLockableSafeStorage(),
+        dir: join(dir, 'keys-b8'),
+      }),
+      budgetBytes: 1 << 20,
+      clock: () => Date.parse(ISO),
+    })
+    layer.register(INTENT_STORE_REGISTRATION)
+    layer.register(DRAFTS_STORE_REGISTRATION)
+    layer.register(PAUSE_STORE_REGISTRATION)
+    const opened = await layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const intents = createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+    const drafts = createDraftStore(opened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    const pause = createPauseStore(opened.store.records(PAUSE_STORE_REGISTRATION.name))
+    const payload = enc('v4')
+    const checksum = sha256Hex(payload)
+    const path = s.path
+    const binding: Binding = {
+      schema: 2,
+      documentId: DOC,
+      workspaceId: 'ws_1',
+      orgId: 'org_a',
+      title: 'Plan.docx',
+      filename: 'Plan.docx',
+      format: 'docx',
+      access: 'edit',
+      baseRevision: '41',
+      baseVersion: 3,
+      baseChecksum: sha256Hex(enc('v3')),
+      state: 'dirty',
+      minStoreLevel: 2,
+      minAppVersion: '0.0.0',
+    }
+    const bound: BoundDocument = {
+      path,
+      dir: join(dir, 'wc-b8'),
+      deploymentId: 'default',
+      userId: 'acc_1',
+      key: 'doc_b8',
+      binding,
+    }
+    const store = {
+      classify: (p: string) =>
+        p === path ? { kind: 'bound' as const, doc: bound } : { kind: 'plain' as const },
+      lookup: (p: string) => (p === path ? bound : null),
+      async write(_dir: string, next: Binding) {
+        bound.binding = next
+        return true
+      },
+    }
+    const coordinator = new SaveCoordinator({
+      store: store as never,
+      client: {
+        upload: async () => ({ uploadId: 'up_1', checksumSha256: checksum }),
+        commit: async () => {
+          throw new Error('commit must not run when park')
+        },
+        getDocument: async () => {
+          throw new UniworkDocError('not_found')
+        },
+      },
+      isSignedIn: () => true,
+      ownsBinding: () => true,
+      intents: async () => ({ kind: 'ok' as const, intents }),
+      publish: () => undefined,
+      now: () => new Date(ISO),
+      uuid: () => 'u1',
+      readBytes: async () => payload,
+      capability: {
+        get: async () => ({
+          kind: 'ok' as const,
+          capabilities: { sync_write: true },
+          source: 'default',
+        }),
+      },
+      pause,
+      drafts,
+      prepareEditLock: async () => 'park',
+      editLockHolder: () => ({
+        holderName: s.view().holderName,
+        since: s.view().since,
         expiresAt: null,
         heldByMe: false,
-      },
+      }),
     })
-    expect(error.editLock).toMatchObject({ holderName: 'Lan', since: '2026-10-15T03:12:00Z' })
+    const ended = await coordinator.save(path, { userSave: true })
+    expect(ended?.binding.state).toBe('edit_locked')
+    expect(ended?.binding.editLock).toMatchObject({
+      holderName: 'Lan',
+      since: '2026-10-15T03:12:00Z',
+    })
     s.dispose()
   })
 })
@@ -635,7 +748,8 @@ describe('EL1B-BE-A1: real session flips to lost on a commit 423 (coordinator + 
       binding,
     }
     const store = {
-      classify: (p: string) => (p === path ? { kind: 'bound' as const, doc: bound } : { kind: 'plain' as const }),
+      classify: (p: string) =>
+        p === path ? { kind: 'bound' as const, doc: bound } : { kind: 'plain' as const },
       lookup: (p: string) => (p === path ? bound : null),
       async write(_dir: string, next: Binding) {
         bound.binding = next
@@ -660,7 +774,13 @@ describe('EL1B-BE-A1: real session flips to lost on a commit 423 (coordinator + 
       now: () => new Date(ISO),
       uuid: () => 'u1',
       readBytes: async () => payload,
-      capability: { get: async () => ({ kind: 'ok' as const, capabilities: { sync_write: true }, source: 'default' }) },
+      capability: {
+        get: async () => ({
+          kind: 'ok' as const,
+          capabilities: { sync_write: true },
+          source: 'default',
+        }),
+      },
       pause,
       drafts,
       editLockId: () => s.lockId(),
@@ -729,7 +849,11 @@ describe('EL1B-BE-A1: real session flips to lost on a commit 423 (coordinator + 
       intents: async () => ({ kind: 'ok' as const, intents }),
       client,
       capability: {
-        get: async () => ({ kind: 'ok' as const, capabilities: { sync_write: true }, source: 'default' }),
+        get: async () => ({
+          kind: 'ok' as const,
+          capabilities: { sync_write: true },
+          source: 'default',
+        }),
       },
       lock,
       pause,
@@ -798,13 +922,18 @@ describe('EL1B-BE-B11: wiring pins around the slice lifelines', () => {
     expect(service).toMatch(/releaseAllEditLocks\(capMs/)
     expect(service).toMatch(/notePowerResume\(\)/)
     expect(service).toMatch(/noteWindowFocus\(\)/)
-    expect(service).toMatch(/setQueueOnline\(online: boolean\)[\s\S]{0,250}session\.wake\(\)/)
+    expect(service).toMatch(/async setQueueOnline\(online: boolean\)/)
+    expect(service).toMatch(
+      /for \(const session of this\.editLocks\.values\(\)\) void session\.wake\(\)/,
+    )
 
     const index = readFileSync(join(__dirname, '..', 'src/main/index.ts'), 'utf8').replace(
       /\r\n/g,
       '\n',
     )
-    expect(index).toMatch(/powerMonitor\.on\('resume', \(\) => uniworkDocs\?\.service\.notePowerResume\(\)\)/)
+    expect(index).toMatch(
+      /powerMonitor\.on\('resume', \(\) => uniworkDocs\?\.service\.notePowerResume\(\)\)/,
+    )
     expect(index).toMatch(
       /app\.on\('browser-window-focus', \(\) => uniworkDocs\?\.service\.noteWindowFocus\(\)\)/,
     )

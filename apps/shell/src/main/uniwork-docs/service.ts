@@ -21,6 +21,7 @@ import type {
   UniworkDocRenamedEvent,
   UniworkDocSummary,
   UniworkDocStatus,
+  UniworkDocEditLock,
   UniworkEditLockSessionView,
   UniworkFirstSaveInput,
   UniworkFolderChildren,
@@ -86,6 +87,7 @@ import {
   type EditLockSessionView,
 } from '../uniwork-edit-lock/session'
 import { UniworkDocError } from './errors'
+import { EDIT_LOCK_QUIT_CAP_MS } from './edit-lock-quit'
 import {
   copyTitleFor,
   formatForMime,
@@ -1186,6 +1188,7 @@ export class UniworkDocsService {
       dispatcherBusy: (key) => this.queueInFlight.has(key),
       prepareEditLock: (path) => this.prepareEditLock(path),
       editLockId: (path) => this.editLockIdOf(path),
+      editLockHolder: (path) => this.editLockHolderOf(path),
       onCommitEditLocked: (path, error) =>
         this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
@@ -1249,6 +1252,17 @@ export class UniworkDocsService {
     return this.editLocks.get(pathKey(path))?.lockId() ?? null
   }
 
+  private editLockHolderOf(path: string): UniworkDocEditLock | null {
+    const view = this.editLocks.get(pathKey(path))?.view()
+    if (!view) return null
+    return {
+      holderName: view.holderName,
+      since: view.since,
+      expiresAt: null,
+      heldByMe: view.phase === 'self_elsewhere',
+    }
+  }
+
   private async prepareEditLock(path: string): Promise<'held' | 'park' | 'proceed'> {
     const session = this.editLocks.get(pathKey(path))
     if (!session) return 'proceed'
@@ -1281,7 +1295,13 @@ export class UniworkDocsService {
     if (!api) return
     const key = pathKey(doc.path)
     const existing = this.editLocks.get(key)
-    if (existing && existing.documentId === doc.binding.documentId) return
+    if (
+      existing &&
+      existing.documentId === doc.binding.documentId &&
+      existing.view().phase !== 'acquiring'
+    ) {
+      return
+    }
     if (existing) void this.stopEditLock(doc.path, true)
     let editorId = this.editorIds.get(key)
     if (!editorId) {
@@ -1306,8 +1326,10 @@ export class UniworkDocsService {
     void session.acquire().then(() => {
       const view = session.view()
       if (view.phase === 'none') {
-        this.editLocks.delete(key)
-        session.dispose()
+        if (this.editLocks.get(key) === session) {
+          this.editLocks.delete(key)
+          session.dispose()
+        }
         return
       }
       const now = this.store.lookup(doc.path)
@@ -1320,8 +1342,8 @@ export class UniworkDocsService {
     const key = pathKey(path)
     const session = this.editLocks.get(key)
     if (!session) return
-    this.editLocks.delete(key)
-    if (release) await session.release()
+    if (this.editLocks.get(key) === session) this.editLocks.delete(key)
+    if (release) await this.capped(session.release(), EDIT_LOCK_QUIT_CAP_MS)
     session.dispose()
   }
 
@@ -1330,25 +1352,43 @@ export class UniworkDocsService {
     this.editLocks.clear()
     const work = Promise.all(sessions.map((s) => s.release().catch(() => undefined)))
     if (capMs !== undefined) {
-      await Promise.race([work, this.sleepMs(capMs)])
+      await this.capped(work, capMs)
     } else {
       await work
     }
     for (const s of sessions) s.dispose()
   }
 
-  /** before-quit: best-effort, 1.5 s cap, never blocks quit */
-  releaseEditLocksOnQuit(): void {
-    void this.releaseAllEditLocks(1500)
+  /** will-quit: best-effort, 1.5 s cap; the quit gate awaits this then re-quits */
+  releaseEditLocksOnQuit(): Promise<void> {
+    return this.releaseAllEditLocks(EDIT_LOCK_QUIT_CAP_MS)
   }
 
   /**
    * EL-1(b) fix3 B2: MCP closeTabWithoutPrompt / removeTab and a macOS
    * clean-window close drop bound paths without confirmClose. One hook,
-   * best-effort, capped like quit. Stub until the production body lands.
+   * best-effort, capped like quit.
    */
-  async notePathsDropped(_paths: string[]): Promise<void> {
-    throw new Error('notePathsDropped: not implemented')
+  async notePathsDropped(paths: string[]): Promise<void> {
+    const sessions: EditLockSession[] = []
+    for (const path of paths) {
+      if (typeof path !== 'string' || !path) continue
+      const key = pathKey(path)
+      const session = this.editLocks.get(key)
+      if (!session) continue
+      this.editLocks.delete(key)
+      sessions.push(session)
+    }
+    if (sessions.length === 0) return
+    await this.capped(
+      Promise.all(sessions.map((s) => s.release().catch(() => undefined))),
+      EDIT_LOCK_QUIT_CAP_MS,
+    )
+    for (const s of sessions) s.dispose()
+  }
+
+  private async capped(work: Promise<unknown>, capMs: number): Promise<void> {
+    await Promise.race([work.catch(() => undefined), this.sleepMs(capMs)])
   }
 
   notePowerResume(): void {
@@ -1407,7 +1447,7 @@ export class UniworkDocsService {
 
   /** every status push: the shell window, then in-process waiters (close prompt) */
   private publish(status: UniworkDocStatus): void {
-    const full = this.withRemote(this.present(status))
+    const full = this.withRemote(this.present(this.withLockSession(status)))
     this.deps.pushStatus(full)
     for (const listener of [...this.statusListeners]) listener(full)
     const open = this.conflictPrompt
@@ -1530,15 +1570,24 @@ export class UniworkDocsService {
   }
 
   private statusOf(doc: BoundDocument): UniworkDocStatus {
-    const status = this.withRemote(this.present(toStatus(doc)))
+    return this.withRemote(this.present(this.withLockSession(toStatus(doc))))
+  }
+
+  /** live lock view on every status (B6: one place, including non-statusOf publishes) */
+  private withLockSession(status: UniworkDocStatus): UniworkDocStatus {
     const lockSession = this.toLockView(
-      this.editLocks.get(pathKey(doc.path))?.view() ?? {
+      this.editLocks.get(pathKey(status.path))?.view() ?? {
         phase: 'none',
         holderName: null,
         since: null,
       },
     )
-    return lockSession ? { ...status, lockSession } : status
+    if (!lockSession) {
+      if (!status.lockSession) return status
+      const { lockSession: _dropped, ...rest } = status
+      return rest
+    }
+    return { ...status, lockSession }
   }
 
   /**
@@ -1970,6 +2019,7 @@ export class UniworkDocsService {
       },
       prepareEditLock: (path) => this.prepareEditLock(path),
       editLockId: (path) => this.editLockIdOf(path),
+      editLockHolder: (path) => this.editLockHolderOf(path),
       onCommitEditLocked: (path, error) =>
         this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
     })
@@ -2727,8 +2777,8 @@ export class UniworkDocsService {
     const planned = this.plannedRamOnly.get(scopeToken)
     this.plannedRamOnly.delete(scopeToken)
 
-    // EL-1(b): release held locks BEFORE the token / runtime go
-    await this.releaseAllEditLocks()
+    // EL-1(b): release held locks BEFORE the token / runtime go (capped)
+    await this.releaseAllEditLocks(EDIT_LOCK_QUIT_CAP_MS)
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.sessionEpoch += 1
@@ -4400,7 +4450,10 @@ export class UniworkDocsService {
       }
       try {
         const doc = this.store.lookup(path)
-        if (doc) this.publish(toStatus(doc))
+        if (doc) {
+          if (doc.binding.access === 'edit') this.startEditLock(doc)
+          this.publish(toStatus(doc))
+        }
       } catch (error) {
         console.warn('uniwork docs: first-save: the status push failed:', error)
       }

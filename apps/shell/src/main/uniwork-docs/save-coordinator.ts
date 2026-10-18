@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import type { UniworkDocStatus } from '../../shared/home-api'
+import type { UniworkDocEditLock, UniworkDocStatus } from '../../shared/home-api'
 import type { Binding, BindingStore, BoundDocument } from './binding-store'
 import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
@@ -174,6 +174,8 @@ export interface SaveCoordinatorDeps {
   prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
   /** EL-1(b): lock id of a held path, sent as commit `edit_lock_id` */
   editLockId?(path: string): string | null
+  /** EL-1(b) B8: holder summary for a synthesised park 423 */
+  editLockHolder?(path: string): UniworkDocEditLock | null
   /** EL-1(b): 423 on commit while held — session becomes 'lost' */
   onCommitEditLocked?(path: string, error: UniworkDocError): void
 }
@@ -938,9 +940,11 @@ export class SaveCoordinator {
         }
         const prepared = (await this.deps.prepareEditLock?.(doc.path)) ?? 'proceed'
         if (prepared === 'park') {
+          const holder = this.deps.editLockHolder?.(doc.path)
           throw new UniworkDocError('edit_locked', {
             status: 423,
             serverCode: 'document_locked',
+            ...(holder ? { editLock: holder } : {}),
           })
         }
         const editLockId = this.deps.editLockId?.(doc.path) ?? null

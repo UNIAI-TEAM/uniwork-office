@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { CommitLookup } from '../../uniwork-docs/parse'
 import { UniworkDocError } from '../../uniwork-docs/errors'
+import type { UniworkDocEditLock } from '../../../shared/home-api'
 import type { DocLock } from '../doc-lock'
 import { QUEUE_LIMITS, type QueueLimits } from './limits'
 import {
@@ -167,6 +168,8 @@ export interface QueueDispatcherDeps {
   prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
   /** EL-1(b): current lock id of a held path (outgoing commit body) */
   editLockId?(path: string): string | null
+  /** EL-1(b) B8: holder summary for a synthesised park 423 */
+  editLockHolder?(path: string): UniworkDocEditLock | null
   /** EL-1(b): a 423 on commit while we held — session becomes 'lost' */
   onCommitEditLocked?(path: string, error: UniworkDocError): void
 }
@@ -773,9 +776,14 @@ export class QueueDispatcher {
       // EL-1(b) Q2: an unreachable open acquires before the first queued commit
       const prepared = (await this.deps.prepareEditLock?.(doc.path)) ?? 'proceed'
       if (prepared === 'park') {
+        const holder = this.deps.editLockHolder?.(doc.path)
         await this.failCommit(
           doc,
-          new UniworkDocError('edit_locked', { status: 423, serverCode: 'document_locked' }),
+          new UniworkDocError('edit_locked', {
+            status: 423,
+            serverCode: 'document_locked',
+            ...(holder ? { editLock: holder } : {}),
+          }),
           now,
         )
         return doc.record.state

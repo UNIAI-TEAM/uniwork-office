@@ -230,6 +230,10 @@ describe('EditLockSession', () => {
     'access_lost',
     'document_archived',
     'moved_here',
+    'session_revoked',
+    'member_deactivated',
+    'organization_suspended',
+    'document_deleted',
   ] as const)('409 reason %s is kept', async (reason) => {
     const t = transport({
       async heartbeat() {

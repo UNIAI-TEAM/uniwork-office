@@ -377,6 +377,7 @@ import { reloadPathTarget } from './reload-view'
 import { listDeskDrafts } from './desk-drafts'
 import { runDeskTool } from './desk-tools'
 import { installShellCloseGuard } from './window-close-guard'
+import { beginEditLockWillQuit, finishEditLockWillQuit } from './uniwork-docs/edit-lock-quit'
 import {
   activateDetached,
   closeDetachedByPath,
@@ -3857,6 +3858,8 @@ function createShellWindow(): void {
   win.on('closed', () => {
     if (shellWindow === win) shellWindow = null
     if (tabManager === manager) {
+      const dropped = manager.openFilePaths()
+      if (dropped.length > 0) void uniworkDocs?.service.notePathsDropped(dropped)
       tabManager = null
       setDockHost(null)
       publishAllOpenDocuments()
@@ -7030,15 +7033,22 @@ app.on('before-quit', () => {
   // No close prompt may fall through to "Save" during shutdown
   markSheetsShuttingDown()
   stopSheetsSidecar()
-  // EL-1(b): best-effort lock release, 1.5 s cap, never blocks quit
-  uniworkDocs?.service.releaseEditLocksOnQuit()
   // release the MCP port synchronously (macOS keeps the process alive after
   // the last window closes, so window-all-closed is not enough)
   stopMcpSync()
 })
 
-// after every window has closed, so the shell window's own 'closed' republish cannot revive the file
-app.on('will-quit', () => {
+// after every window has closed with no veto, so a cancelled close prompt
+// never released the lock. Token is still valid: stopUniworkAccount is after
+// the bounded release on the second pass.
+app.on('will-quit', (event) => {
+  if (beginEditLockWillQuit() === 'hold') {
+    event.preventDefault()
+    void finishEditLockWillQuit((capMs) =>
+      uniworkDocs?.service.releaseAllEditLocks(capMs) ?? Promise.resolve(),
+    ).then(() => app.quit())
+    return
+  }
   stopUniworkAccount()
   fileIndexer?.stop()
   fileIndexStore?.close()

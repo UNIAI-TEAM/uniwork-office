@@ -50,7 +50,7 @@ import {
   type UniworkCommentsHandle,
 } from './comments-wiring'
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
-import { setUniworkCloseGuard } from './close-guard'
+import { setUniworkCloseGuard, setUniworkPathDropHook } from './close-guard'
 import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
 import {
   SyncRuntime,
@@ -958,6 +958,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pending.resolve(answer?.confirmed === true)
   })
   setUniworkCloseGuard(service)
+  setUniworkPathDropHook((paths) => {
+    void service.notePathsDropped(paths)
+  })
   const runtime = createSyncRuntime(service, {
     treeChanged: (workspaceId) => treeChanged.notify(workspaceId),
     libraryChanged: (documentId) => offlineRowChanged(documentId),

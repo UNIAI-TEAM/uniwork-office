@@ -563,6 +563,10 @@ export type UniworkEditLockLostReason =
   | 'access_lost'
   | 'document_archived'
   | 'moved_here'
+  | 'session_revoked'
+  | 'member_deactivated'
+  | 'organization_suspended'
+  | 'document_deleted'
   | 'unknown'
 export interface UniworkEditLockSessionView {
   phase: UniworkEditLockPhase

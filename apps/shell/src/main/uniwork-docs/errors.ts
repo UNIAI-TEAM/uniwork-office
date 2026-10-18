@@ -47,6 +47,10 @@ export class UniworkDocError extends Error {
     | 'access_lost'
     | 'document_archived'
     | 'moved_here'
+    | 'session_revoked'
+    | 'member_deactivated'
+    | 'organization_suspended'
+    | 'document_deleted'
     | 'unknown'
   /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.by_name */
   readonly byName?: string | null
@@ -98,6 +102,10 @@ const EDIT_LOCK_LOST_REASONS = new Set([
   'access_lost',
   'document_archived',
   'moved_here',
+  'session_revoked',
+  'member_deactivated',
+  'organization_suspended',
+  'document_deleted',
 ])
 
 function lostReasonOf(value: unknown): NonNullable<UniworkDocError['lostReason']> {

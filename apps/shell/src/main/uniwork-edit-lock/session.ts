@@ -18,6 +18,10 @@ export type EditLockLostReason =
   | 'access_lost'
   | 'document_archived'
   | 'moved_here'
+  | 'session_revoked'
+  | 'member_deactivated'
+  | 'organization_suspended'
+  | 'document_deleted'
   | 'unknown'
 
 export interface EditLockSessionView {
@@ -105,6 +109,8 @@ export class EditLockSession {
   private op = 0
   private releaseWarned = false
   private acquiring = false
+  /** in-flight acquire; ensureHeldBeforeCommit awaits this instead of returning mid-flight */
+  private acquireInFlight: Promise<void> | null = null
 
   constructor(opts: EditLockSessionOptions) {
     this.documentId = opts.documentId
@@ -142,7 +148,10 @@ export class EditLockSession {
   async acquire(moveFromSelf = false): Promise<void> {
     if (this.disposed) return
     if (this.state.phase === 'held' && !moveFromSelf) return
-    if (this.acquiring && !moveFromSelf) return
+    if (this.acquiring && !moveFromSelf) {
+      if (this.acquireInFlight) await this.acquireInFlight
+      return
+    }
     const op = ++this.op
     this.acquiring = true
     this.clearTimers()
@@ -153,11 +162,14 @@ export class EditLockSession {
       lostReason: undefined,
       byName: undefined,
     })
-    try {
-      await this.runAcquire(op, moveFromSelf, false)
-    } finally {
-      if (op === this.op) this.acquiring = false
-    }
+    const work = this.runAcquire(op, moveFromSelf, false).finally(() => {
+      if (op === this.op) {
+        this.acquiring = false
+        this.acquireInFlight = null
+      }
+    })
+    this.acquireInFlight = work
+    await work
   }
 
   /** "Sửa ở đây": R2, with move_from_self only from self_elsewhere. Never automatic. */
