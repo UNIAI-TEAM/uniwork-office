@@ -1214,7 +1214,8 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
       held.delete(handle)
       realClearTimeout(handle)
     }) as typeof clearTimeout)
-    const settle = () => new Promise((resolve) => realSetTimeout(resolve, 60))
+    // generous: the real fs and the encrypted lease store behind a fired timer slow down under a parallel run
+    const settle = () => new Promise((resolve) => realSetTimeout(resolve, 250))
     return {
       armed,
       async advance(ms: number): Promise<void> {
