@@ -2000,6 +2000,38 @@ describe('the comments context of a bound copy (G8-12 §3.1)', () => {
     expect(existsSync(lastOwnerPath)).toBe(false)
   })
 
+  it('a failed last-account.json write is retried on a later identity observation, not cached as persisted (EL1B-BE-R3-8)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await openDoc(ctx)
+      const store = ctx.service.store
+      const real = store.writeLastOwner.bind(store)
+      const write = vi.spyOn(store, 'writeLastOwner').mockImplementationOnce(() => false)
+      ctx.signInAs('acc_2')
+      expect(ctx.service.commentContext(path)).toBeNull()
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(store.readLastOwner()).not.toEqual({ accountId: 'acc_2', deploymentId: 'default' })
+
+      // right after the failure nothing hammers the disk again ...
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(1)
+      // ... but the next observation after the back-off retries it and persists
+      vi.advanceTimersByTime(5_000)
+      write.mockImplementation(real)
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(2)
+      expect(store.readLastOwner()).toEqual({ accountId: 'acc_2', deploymentId: 'default' })
+      // persisted: no further writes for the same owner
+      vi.advanceTimersByTime(5_000)
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a settled Save moves the version id to the receipt and pushes it once', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)

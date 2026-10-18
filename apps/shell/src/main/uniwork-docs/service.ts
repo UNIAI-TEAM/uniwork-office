@@ -489,6 +489,9 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
  */
 export const CLOSE_SAVE_WAIT_MS = 30_000
 
+/** back-off before a failed last-account.json write is retried */
+const LAST_OWNER_RETRY_MS = 2000
+
 /** shared-with-me aggregation bounds (one workspace page, total rows, total pages) */
 const SHARED_PAGE_SIZE = 50
 const SHARED_MAX_ROWS = 500
@@ -1015,6 +1018,9 @@ export class UniworkDocsService {
   /** pathKey -> editor_id for this process + path */
   private readonly editorIds = new Map<string, string>()
   private lastOwner: LastOwner | null
+  /** the owner last-account.json holds: a failed write leaves it behind `lastOwner` and is retried */
+  private lastOwnerOnDisk: LastOwner | null
+  private lastOwnerRetryAt = 0
   private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
   /** path key -> the newer-store lock currently shown for it (S11) */
   private readonly locks = new Map<string, UniworkDocLock>()
@@ -1180,6 +1186,7 @@ export class UniworkDocsService {
       this.heldByMigration(dir),
     )
     this.lastOwner = this.store.readLastOwner()
+    this.lastOwnerOnDisk = this.lastOwner
     this.limitsCache = createDocumentLimitsCache({
       origin: () => this.deps.profile()?.apiOrigin ?? null,
       fetchLimits: async (startedOrigin) => {
@@ -1766,15 +1773,15 @@ export class UniworkDocsService {
   private liveIdentity(): SessionIdentity | null {
     const identity = this.deps.identity()
     if (!identity) return null
-    const last = this.lastOwner
-    if (
-      !last ||
-      last.accountId !== identity.accountId ||
-      last.deploymentId !== identity.deploymentId
-    ) {
-      const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
-      this.lastOwner = owner
-      this.store.writeLastOwner(owner)
+    const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
+    const sameOwner = (known: LastOwner | null) =>
+      !!known && known.accountId === owner.accountId && known.deploymentId === owner.deploymentId
+    if (!sameOwner(this.lastOwner)) this.lastOwner = owner
+    // a failed write is not remembered as persisted: a later observation retries it,
+    // at most once per back-off so a stuck disk does not stall every status read
+    if (!sameOwner(this.lastOwnerOnDisk) && Date.now() >= this.lastOwnerRetryAt) {
+      if (this.store.writeLastOwner(owner)) this.lastOwnerOnDisk = owner
+      else this.lastOwnerRetryAt = Date.now() + LAST_OWNER_RETRY_MS
     }
     return identity
   }
