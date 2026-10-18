@@ -107,8 +107,10 @@
   color: var(--text-secondary);
 }
 
-/* Lưu with its spinner while the save runs */
-.uws-save,
+/* Lưu with its spinner while the save runs. `.modal.uw-act` lifts the selector
+   past the later `.btn-primary` redefinition in home.css so the board's accent
+   primary (radius 8) wins in State 1 exactly like the picker's confirm (VDH-8) */
+.modal.uw-act .uws-save,
 .uwf-picker.uws-pick .uwf-picker-confirm {
   display: inline-flex;
   align-items: center;
@@ -123,7 +125,7 @@
   font-weight: 600;
 }
 
-.uws-save:hover:not([aria-disabled='true']),
+.modal.uw-act .uws-save:hover:not([aria-disabled='true']),
 .uwf-picker.uws-pick .uwf-picker-confirm:hover:not([aria-disabled='true']) {
   background: var(--color-dialog-primary-hover);
 }

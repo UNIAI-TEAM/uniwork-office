@@ -33,6 +33,7 @@ import {
   type NewDocFormat,
 } from '../uniwork-docs-model'
 import { BrowserCrumbs } from '../uniwork-folders/BrowserCrumbs'
+import { useOfflineToggle } from '../OfflineToggle'
 import { FolderMenu, type FolderMenuItem } from '../uniwork-folders/FolderMenu'
 import { FolderNameDialog } from '../uniwork-folders/FolderNameDialog'
 import { UniworkFolderPicker } from '../uniwork-folders/UniworkFolderPicker'
@@ -213,6 +214,9 @@ export interface DocumentsHomeProps {
   openingId?: string | null
   sidebarHost?: HTMLElement | null
   initialFolderId?: string | null
+  /** sub-view to mount with (kept by the host so an area switch can restore it — VDH-7) */
+  initialSubView?: DocumentsHomeSubViewId
+  onSubViewChange?: (subView: DocumentsHomeSubViewId) => void
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
 }
 
@@ -238,12 +242,14 @@ export function DocumentsHome({
   openingId,
   sidebarHost,
   initialFolderId = null,
+  initialSubView = 'workspace',
+  onSubViewChange,
   onFolderChange,
 }: DocumentsHomeProps) {
   const { t, dateLocale } = useI18n()
   const uid = useId()
 
-  const [subView, setSubView] = useState<DocumentsHomeSubViewId>('workspace')
+  const [subView, setSubView] = useState<DocumentsHomeSubViewId>(initialSubView)
   const [folderId, setFolderId] = useState<string | null>(initialFolderId)
   const [myFolderId, setMyFolderId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY]))
@@ -285,6 +291,8 @@ export function DocumentsHome({
   const [toast, setToast] = useState<{ message: string; tone: 'ok' | 'error' } | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
 
+  // G5-05u / NET-OFF-01: pin/unpin entry in each document row's "…" menu (hidden while the capability is off)
+  const offlineToggle = useOfflineToggle()
   const myFolderLabel = t(MY_FOLDER_LABEL_KEY)
   const labeledNodes = useMemo(
     () => tree.nodes.map((n) => (isMyFolder(n) ? { ...n, title: myFolderLabel } : n)),
@@ -426,6 +434,12 @@ export function DocumentsHome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderId, pathKey])
 
+  // Notify host of sub-view changes so an area switch can restore it on remount (VDH-7)
+  const onSubViewChangeRef = useRef(onSubViewChange)
+  onSubViewChangeRef.current = onSubViewChange
+  useEffect(() => {
+    onSubViewChangeRef.current?.(subView)
+  }, [subView])
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
   const listSeqRef = useRef(0)
@@ -951,6 +965,25 @@ export function DocumentsHome({
       }
       return items
     }
+    // NET-OFF-01: Open first, then the pin/unpin item (hidden while the capability is off)
+    items.push({
+      id: 'open',
+      label: t('open'),
+      onSelect: () => onOpenDocument(doc),
+    })
+    const offlineLabel = offlineToggle.labelOf(doc.id)
+    if (offlineLabel) {
+      items.push({
+        id: 'offline',
+        label: offlineLabel,
+        onSelect: () =>
+          offlineToggle.toggle({
+            documentId: doc.id,
+            workspaceId: doc.workspaceId ?? workspaceId,
+            name: doc.title,
+          }),
+      })
+    }
     if (doc.canEdit !== false) {
       if (doc.canEdit === true) {
         items.push({
@@ -1141,21 +1174,21 @@ export function DocumentsHome({
         <div className="dh-toolbar">
           <div className="dh-title-group">
             <h1 className="dh-title">{currentHeading}</h1>
-            {workspaces.length > 0 && (
-              <select
-                className="home-uw-ws dh-ws-select"
-                aria-label={t('uwPickWorkspace')}
-                value={workspaceId}
-                onChange={(e) => onWorkspaceChange(e.target.value)}
-              >
-                {workspaces.map((ws) => (
-                  <option key={ws.id} value={ws.id}>
-                    {workspaceLabel(ws, t)}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
+          {workspaces.length > 0 && (
+            <select
+              className="home-uw-ws dh-ws-select"
+              aria-label={t('uwPickWorkspace')}
+              value={workspaceId}
+              onChange={(e) => onWorkspaceChange(e.target.value)}
+            >
+              {workspaces.map((ws) => (
+                <option key={ws.id} value={ws.id}>
+                  {workspaceLabel(ws, t)}
+                </option>
+              ))}
+            </select>
+          )}
           <div className="dh-toolbar-spacer" />
           <div className="dh-search-box" role="search">
             <svg
@@ -1631,7 +1664,7 @@ export function DocumentsHome({
                         role="row"
                         data-doc-id={doc.id}
                         aria-busy={isOpening || undefined}
-                        className={`dh-doc-row uw-pick-row${isOpening ? ' opening' : ''}`}
+                        className={`dh-doc-row${isOpening ? ' opening' : ''}`}
                         onDoubleClick={() => {
                           if (!renaming && !isFolderEntry(doc)) onOpenDocument(doc)
                         }}
@@ -1829,6 +1862,8 @@ export function DocumentsHome({
           onCancel={folderActions.cancelMove}
         />
       )}
+
+      {offlineToggle.node}
 
       {toast && <ActionToast message={toast.message} tone={toast.tone} onDone={clearToast} />}
     </div>

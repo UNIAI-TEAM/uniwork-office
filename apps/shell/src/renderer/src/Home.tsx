@@ -62,6 +62,7 @@ import {
 } from './uniwork-docs-model'
 import { WorkErrorState, WorkNoWorkspace, WorkSkeleton } from './WorkErrorState'
 import { DocumentsHome } from './uniwork-home/DocumentsHome'
+import type { DocumentsHomeSubViewId } from './uniwork-home/documents-home-model'
 import { useOfflineToggle } from './OfflineToggle'
 
 export const HOME_AREA_KEY = 'uniwork.wb.homeArea'
@@ -1320,6 +1321,10 @@ export function Home() {
   const isSignedIn = showsProfile(acctView, accountStatus)
   const area: HomeArea = savedArea ?? (isSignedIn ? 'uniwork' : 'device')
   const [uniworkFolderByWs, setUniworkFolderByWs] = useState<Record<string, string | null>>({})
+  // FD-13/VDH-7: the UniWork sub-view kept per workspace so an area switch restores it
+  const [uniworkSubViewByWs, setUniworkSubViewByWs] = useState<
+    Record<string, DocumentsHomeSubViewId>
+  >({})
   const [uniworkSidebarSlot, setUniworkSidebarSlot] = useState<HTMLDivElement | null>(null)
   const [openingDocId, setOpeningDocId] = useState<string | null>(null)
   const [uwWsState, setUwWsState] = useState<WorkspaceListState>(() => ({
@@ -1491,6 +1496,7 @@ export function Home() {
     writeActiveWorkspaceId(nextWsId)
     setUwWsState((prev) => ({ ...prev, workspaceId: nextWsId }))
     setUniworkFolderByWs((prev) => ({ ...prev, [nextWsId]: null }))
+    setUniworkSubViewByWs((prev) => ({ ...prev, [nextWsId]: 'workspace' }))
     setChatMode(false)
     setEduMode(false)
     setSelectedProjectId(null)
@@ -3890,6 +3896,9 @@ export function Home() {
   const activeUwFolderId = activeUwWorkspaceId
     ? (uniworkFolderByWs[activeUwWorkspaceId] ?? null)
     : null
+  const activeUwSubView: DocumentsHomeSubViewId = activeUwWorkspaceId
+    ? (uniworkSubViewByWs[activeUwWorkspaceId] ?? 'workspace')
+    : 'workspace'
   const showUniworkPane =
     area === 'uniwork' && !selectedProjectId && !eduMode && !chatMode && isSignedIn
 
@@ -4109,6 +4118,10 @@ export function Home() {
               workspaces={uwWsState.workspaces}
               onWorkspaceChange={selectUniworkWorkspace}
               initialFolderId={activeUwFolderId}
+              initialSubView={activeUwSubView}
+              onSubViewChange={(sv) => {
+                setUniworkSubViewByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: sv }))
+              }}
               onFolderChange={(folderId) => {
                 setUniworkFolderByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: folderId }))
               }}
