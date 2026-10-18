@@ -420,6 +420,23 @@ describe('save', () => {
     off()
     expect(res).toMatchObject({ ok: true, file: { name: 'Copy.xlsx' } })
   })
+
+  it('a host-declined in-place save (api.save "cancelled") ends as a cancel, not an error', async () => {
+    const t = setup()
+    const wb = await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    // SAVE-01 (UNI-1909): the host declines the frame's own save to open its name
+    // dialog — resolves quietly like the cancelled Save As dialog (a throw is what
+    // the editor turns into its error toast)
+    t.mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'cancelled', message: 'cancelled', retryable: false },
+    }))
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]])),
+    ).resolves.toEqual({ canceled: true })
+    expect(t.mock.dirty.at(-1)).toBe(true)
+  })
 })
 
 describe('engine crash and failed session swap', () => {

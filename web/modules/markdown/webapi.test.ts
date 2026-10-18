@@ -215,6 +215,22 @@ describe('markdownApi: open and save', () => {
       canceled: true,
     })
   })
+
+  it('a host-declined in-place save (api.save "cancelled") is a quiet cancel too', async () => {
+    const { api, mock } = setup()
+    const { text } = await open(api)
+    // SAVE-01 (UNI-1909): the host declines the frame's own save to open its name
+    // dialog — the same quiet cancel as a dismissed Save As, never an error
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'cancelled', message: 'cancelled', retryable: false },
+    }))
+    expect(await api.save({ text, imageSources: [], mode: 'save' })).toEqual({
+      ok: true,
+      canceled: true,
+    })
+    expect(mock.errors).toHaveLength(0)
+  })
 })
 
 describe('markdownApi: save conflicts', () => {

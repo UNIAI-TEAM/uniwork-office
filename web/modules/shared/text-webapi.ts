@@ -587,6 +587,12 @@ export function createTextWebApi(
       host?.settle(res)
       return { ok: true, path }
     }
+    // a declined save (the host runs its own dialog, e.g. the first save's name
+    // prompt, UNI-1909): a quiet cancel like the dismissed Save As dialog
+    if (res.error.code === 'cancelled') {
+      host?.settle(res)
+      return { ok: true, canceled: true }
+    }
     if (res.error.code === 'too_large') {
       const msg = sizeGate.handleServerTooLarge(res.error, encodeText(data))
       host?.settle(res)

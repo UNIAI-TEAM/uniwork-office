@@ -758,6 +758,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     const res = await putSave(fileId, data)
     if (res.ok) return { file: res.file }
     if (hostSave) hostSave.error = res.error
+    // a declined save (the host runs its own dialog, e.g. the first save's name
+    // prompt, UNI-1909): ends quietly like the cancelled Save As dialog
+    if (res.error.code === 'cancelled') return { canceled: true }
     if (res.error.code === 'too_large') {
       sizeGate.handleServerTooLarge(res.error, data)
       return { canceled: true }
