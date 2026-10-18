@@ -379,7 +379,15 @@ function asUploadProgress(raw: unknown): UniworkUploadProgress | null {
   if (typeof r.path !== 'string' || !r.path) return null
   if (typeof r.loaded !== 'number' || !Number.isFinite(r.loaded) || r.loaded < 0) return null
   if (typeof r.total !== 'number' || !Number.isFinite(r.total) || r.total < 0) return null
-  return { uploadId: r.uploadId, path: r.path, loaded: r.loaded, total: r.total }
+  // BIGUP-A1: only the two known phases cross; anything else is omitted
+  const phase = r.phase === 'uploading' || r.phase === 'checking' ? r.phase : undefined
+  return {
+    uploadId: r.uploadId,
+    path: r.path,
+    loaded: r.loaded,
+    total: r.total,
+    ...(phase ? { phase } : {}),
+  }
 }
 
 /**
