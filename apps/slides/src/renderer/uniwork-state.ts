@@ -31,14 +31,24 @@ export function useSlidesUniworkState(
       setState(PLAIN_SLIDES_STATE)
       return
     }
-    void api
-      ?.uniworkState?.()
-      ?.then((s) => {
-        if (live && s) setState({ bound: !!s.bound, readOnly: !!s.readOnly })
-      })
-      ?.catch(() => {})
+    const query = () => {
+      void api
+        ?.uniworkState?.()
+        ?.then((s) => {
+          if (live && s) setState({ bound: !!s.bound, readOnly: !!s.readOnly })
+        })
+        ?.catch(() => {})
+    }
+    query()
+    // EL-1(b): the edit lock makes readOnly change while the deck stays open;
+    // the shell pings the affected path, and only a ping for this deck's path
+    // re-queries (other tabs' pings stay ignored).
+    const unsubscribe = api?.onUniworkStateChanged?.((p) => {
+      if (p === path) query()
+    })
     return () => {
       live = false
+      unsubscribe?.()
     }
   }, [api, path])
   return state
@@ -50,7 +60,10 @@ export function useSlidesUniworkState(
  * today's behaviour.
  */
 export function slidesExplainReadOnlySave(
-  _api: SlidesUniworkSeam | null | undefined,
-  _state: SlidesUniworkState,
-  _origin: 'user' | 'auto',
-): void {}
+  api: SlidesUniworkSeam | null | undefined,
+  state: SlidesUniworkState,
+  origin: 'user' | 'auto',
+): void {
+  if (origin !== 'user' || !state.bound || !state.readOnly) return
+  void api?.uniworkReadOnlySave?.()?.catch(() => {})
+}
