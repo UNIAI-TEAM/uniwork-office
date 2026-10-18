@@ -146,8 +146,10 @@ describe('a read-only bound page gets only the view-only note (RPB-5)', () => {
   it('the empty-document hint does not mention apply_ops when read-only and bound', () => {
     installWebCaps()
     const ctx = createHtmlSkill(fakeAccess(true, '').access, 'base', () => true).buildContext()
-    expect(ctx).toContain('The document is empty')
-    expect(ctx).not.toContain('apply_ops')
+    // the outline legend names apply_ops elsewhere; only the hint line matters
+    const hint = ctx.split('\n').find((l) => l.startsWith('The document is empty'))
+    expect(hint).toBeDefined()
+    expect(hint).not.toContain('apply_ops')
   })
 
   it('an editable bound page is unchanged', () => {

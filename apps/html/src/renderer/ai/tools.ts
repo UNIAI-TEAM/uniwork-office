@@ -561,7 +561,11 @@ export async function expandAttachmentRefs(
   return { ops: expanded, errors }
 }
 
-export function createHtmlSkillCore(access: HtmlDocAccess): {
+export function createHtmlSkillCore(
+  access: HtmlDocAccess,
+  /** live predicate: a view-only frame offers no edit tool, so the hint must not name one */
+  isReadOnly?: () => boolean,
+): {
   buildContext(): string
   executeTool(call: AgentToolCall, signal?: AbortSignal): ToolExecution | Promise<ToolExecution>
 } {
@@ -633,9 +637,11 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
         title ? `title: ${title}` : '',
         view.trim()
           ? ''
-          : access.uniworkBound?.() === true
-            ? 'The document is empty: fill it in place with apply_ops edits.'
-            : 'The document is empty: plan_page (mode new) or write_document creates it.',
+          : isReadOnly?.()
+            ? 'The document is empty.'
+            : access.uniworkBound?.() === true
+              ? 'The document is empty: fill it in place with apply_ops edits.'
+              : 'The document is empty: plan_page (mode new) or write_document creates it.',
       ].filter(Boolean)
       let outline = buildOutline(proj, map, { depth: 2, maxLines: 60 })
       const selectedSid = access.getSelectedSid()
@@ -1026,7 +1032,7 @@ export function createHtmlSkill(
   /** live predicate: a view-only UniWork document, where the assistant may read but never edit */
   isReadOnly?: () => boolean,
 ): AgentSkill {
-  const core = createHtmlSkillCore(access)
+  const core = createHtmlSkillCore(access, isReadOnly)
   return {
     id: 'html',
     // live: the predicate is re-read before every model request
@@ -1035,7 +1041,7 @@ export function createHtmlSkill(
       return (
         prompt +
         (isReadOnly?.() ? VIEW_ONLY_NOTE : '') +
-        (access.uniworkBound?.() ? BOUND_NOTE : '')
+        (access.uniworkBound?.() && !isReadOnly?.() ? BOUND_NOTE : '')
       )
     },
     get tools() {
