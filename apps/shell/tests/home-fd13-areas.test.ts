@@ -89,8 +89,15 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
   let treeByWs: Record<string, UniworkFolderNode[]>
   let childrenByWs: Record<string, Record<string, UniworkDocSummary[]>>
   let api: Record<string, ReturnType<typeof vi.fn>>
+  /** broadcasts an account status change to every active onAccountStatus subscriber */
+  let accountStatusListeners: Array<(s: AccountStatus) => void> = []
+  const pushAccountStatus = (s: AccountStatus) => {
+    accountStatus = s
+    for (const cb of [...accountStatusListeners]) cb(s)
+  }
 
   beforeEach(() => {
+    accountStatusListeners = []
     localStorage.clear()
     document.documentElement.lang = 'en'
     vi.stubGlobal(
@@ -226,7 +233,12 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       pickDefaultSaveDir: vi.fn(async () => null),
       accountStatus: vi.fn(async () => accountStatus),
       accountGetStatus: vi.fn(async () => accountStatus),
-      onAccountStatus: vi.fn(() => () => {}),
+      onAccountStatus: vi.fn((cb: (s: AccountStatus) => void) => {
+        accountStatusListeners.push(cb)
+        return () => {
+          accountStatusListeners = accountStatusListeners.filter((fn) => fn !== cb)
+        }
+      }),
       onAccountChanged: vi.fn(() => () => {}),
       onAccountLogin: vi.fn(() => () => {}),
       onAccountLoginEvent: vi.fn(() => () => {}),
@@ -1673,5 +1685,118 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     })
     await flush()
     expect(host.querySelector('h1.dh-title')?.textContent).toBe('Trash')
+  })
+  it('resets the UniWork sub-view and open folder to the workspace root on a workspace switch (VDH-7)', async () => {
+    await mountHome()
+
+    // Open Alpha Folder in ws-1, then switch to the Trash sub-view
+    const alphaCard = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-alpha"] button.dh-folder-open',
+    )!
+    await act(async () => {
+      alphaCard.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!.click()
+    })
+    await flush()
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('trash')
+
+    // Switching workspace never keeps the previous workspace's sub-view or folder
+    const wsSelect = host.querySelector<HTMLSelectElement>('select.home-uw-ws')!
+    await act(async () => {
+      wsSelect.value = 'ws-2'
+      wsSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('workspace')
+    expect(host.querySelector('h1.dh-title')?.textContent).not.toBe('Alpha Folder')
+    expect(host.textContent).toContain('Marketing Plan.docx')
+    expect(api.uniworkListChildren).toHaveBeenLastCalledWith(
+      expect.objectContaining({ workspaceId: 'ws-2', parentId: null }),
+    )
+  })
+
+  it('clears the kept UniWork sub-view and folder when the account signs out or switches, so the next account opens on the default workspace root (DH1-R4-1)', async () => {
+    await mountHome()
+    expect(accountStatusListeners.length).toBeGreaterThan(0)
+
+    // acc-1: open Alpha Folder and move to Trash so both kept maps hold ws-1 state
+    const alphaCard = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-alpha"] button.dh-folder-open',
+    )!
+    await act(async () => {
+      alphaCard.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!.click()
+    })
+    await flush()
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('trash')
+
+    // Sign out -> UniWork pane unmounts; sign in as a different account in the same workspace list
+    await act(async () => {
+      pushAccountStatus({ state: 'signed-out', loggedIn: false })
+    })
+    await flush()
+    expect(host.querySelector('.uwf-browser.uwf-pane')).toBeNull()
+
+    const account2: AccountStatus = {
+      state: 'signed-in',
+      loggedIn: true,
+      email: 'mai@example.com',
+      profile: { accountId: 'acc-2', email: 'mai@example.com', displayName: 'Mai' },
+      org: { id: 'org-1', name: 'UniWork Corp' },
+    }
+    await act(async () => {
+      pushAccountStatus(account2)
+    })
+    await flush()
+
+    // The new account must not inherit acc-1's Trash sub-view or open folder
+    expect(host.querySelector('.uwf-browser.uwf-pane')).not.toBeNull()
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('workspace')
+    expect(host.querySelector('h1.dh-title')?.textContent).not.toBe('Alpha Folder')
+    expect(host.textContent).toContain('Root Cloud Doc.docx')
+
+    // A signed-in -> signed-in account switch clears them the same way
+    const alphaCard2 = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-alpha"] button.dh-folder-open',
+    )!
+    await act(async () => {
+      alphaCard2.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    const account3: AccountStatus = {
+      ...account2,
+      email: 'nam@example.com',
+      profile: { accountId: 'acc-3', email: 'nam@example.com', displayName: 'Nam' },
+    }
+    await act(async () => {
+      pushAccountStatus(account3)
+    })
+    await flush()
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('workspace')
+    expect(host.querySelector('h1.dh-title')?.textContent).not.toBe('Alpha Folder')
+    expect(host.textContent).toContain('Root Cloud Doc.docx')
   })
 })

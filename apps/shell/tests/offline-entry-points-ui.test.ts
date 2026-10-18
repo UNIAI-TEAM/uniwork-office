@@ -123,6 +123,7 @@ describe('Home recents "…" menu (UniWork rows)', () => {
       access: 'edit',
     },
   }
+  let homeApi: Record<string, unknown> = {}
 
   beforeEach(() => {
     localStorage.clear()
@@ -186,8 +187,21 @@ describe('Home recents "…" menu (UniWork rows)', () => {
       openPath: vi.fn(async () => {}),
       uniworkOpenDocument: vi.fn(async () => ok({ path: '/cache/opened.docx' })),
     }
+    homeApi = api
     ;(window as unknown as { aiOffice: HomeApi }).aiOffice = api as unknown as HomeApi
   })
+
+  async function openMenuFor(selector: string, match?: string) {
+    const row = match
+      ? Array.from(host.querySelectorAll<HTMLElement>(selector)).find((r) =>
+          r.textContent?.includes(match),
+        )!
+      : host.querySelector<HTMLElement>(selector)!
+    expect(row).toBeDefined()
+    await click(row.querySelector('.uw-row-menu-btn')!)
+    // the row menu is portalled to document.body
+    return Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+  }
 
   async function openRowMenu() {
     await act(async () => {
@@ -196,13 +210,7 @@ describe('Home recents "…" menu (UniWork rows)', () => {
     await flush()
     // the UniWork area now renders DocumentsHome; open its Recent sub-view
     await click(host.querySelector('.nav-item[data-nav="recent"]')!)
-    const row = Array.from(host.querySelectorAll<HTMLElement>('.dh-doc-row')).find((r) =>
-      r.textContent?.includes('Cloud Spec.docx'),
-    )!
-    expect(row).toBeDefined()
-    await click(row.querySelector('.uw-row-menu-btn')!)
-    // the row menu is portalled to document.body
-    return Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+    return openMenuFor('.dh-doc-row', 'Cloud Spec.docx')
   }
 
   it('offers "Make available offline" right after Open, and pins the document', async () => {
@@ -226,6 +234,117 @@ describe('Home recents "…" menu (UniWork rows)', () => {
     syncCenter(library({ capabilityOn: false }))
     const items = await openRowMenu()
     expect(items.map((b) => b.textContent)).not.toContain(EN.uwOfflinePin)
+  })
+
+  it('an unpin that needs_confirm asks first on the DocumentsHome row menu, then unpins confirmed (DH1-R4-4)', async () => {
+    const api = syncCenter(library({ rows: [pinnedRow('uw-doc-1')] }))
+    api.offlineUnpin.mockResolvedValueOnce({ ok: false, code: 'needs_confirm' } as never)
+    const items = await openRowMenu()
+    await click(items[1]!)
+    const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain(EN.uwOfflineUnpinConfirm)
+    const go = Array.from(dialog.querySelectorAll('button')).find(
+      (b) => b.textContent === EN.uwOfflineUnpinShort,
+    )!
+    await click(go)
+    expect(api.offlineUnpin).toHaveBeenLastCalledWith('uw-doc-1', { confirmed: true })
+  })
+
+  it('a cap refusal on pin shows uwOfflineCapReached from the DocumentsHome menu and pins nothing (DH1-R4-4)', async () => {
+    const api = syncCenter(library())
+    api.offlinePin.mockResolvedValueOnce({
+      ok: false,
+      code: 'offline_cap_reached',
+      cap: 2 * 1024 ** 3,
+      maxDocs: 200,
+    } as never)
+    const items = await openRowMenu()
+    await click(items[1]!)
+    expect(document.querySelector('.uw-act-toast')!.textContent).toContain(
+      EN.uwOfflineCapReached!.replace('{cap}', '2 GB').replace('{maxDocs}', '200'),
+    )
+  })
+
+  it('a second pin click while the pin is in flight is a no-op on the DocumentsHome menu (DH1-R4-4)', async () => {
+    const api = syncCenter(library())
+    const pin = Promise.withResolvers<{ ok: true }>()
+    api.offlinePin.mockImplementationOnce(() => pin.promise)
+    const items = await openRowMenu()
+    await act(async () => items[1]!.click())
+    await flush()
+    // menu closed but the pin is still in flight: reopening and clicking again must not re-issue it
+    const itemsAgain = await openMenuFor('.dh-doc-row', 'Cloud Spec.docx')
+    await act(async () => itemsAgain[1]!.click())
+    await flush()
+    expect(api.offlinePin).toHaveBeenCalledTimes(1)
+    await act(async () => pin.resolve({ ok: true }))
+    await flush()
+  })
+
+  it('the pin item is absent on the workspace folder card and on trash rows even when it is pinned (DH1-R4-4)', async () => {
+    homeApi.uniworkListChildren = vi.fn(async () =>
+      ok({
+        items: [
+          {
+            id: 'f-board',
+            workspaceId: 'ws-1',
+            title: 'Board Folder',
+            format: null,
+            updatedAt: '2026-10-15T10:00:00.000Z',
+            kind: 'folder',
+            parentId: null,
+          },
+          {
+            id: 'uw-doc-1',
+            workspaceId: 'ws-1',
+            title: 'Cloud Spec.docx',
+            format: 'docx',
+            updatedAt: '2026-10-17T10:00:00.000Z',
+            kind: 'file',
+            parentId: null,
+          },
+        ],
+        nextCursor: null,
+      }),
+    )
+    homeApi.uniworkListTrash = vi.fn(async () =>
+      ok({
+        documents: [
+          {
+            id: 'doc-trashed',
+            workspaceId: 'ws-1',
+            title: 'Trashed Spec.docx',
+            format: 'docx',
+            updatedAt: '2026-10-10T06:00:00.000Z',
+            kind: 'file',
+            parentId: null,
+            canManage: true,
+          },
+        ],
+        nextCursor: null,
+      }),
+    )
+    syncCenter(library({ rows: [pinnedRow('uw-doc-1'), pinnedRow('doc-trashed')] }))
+
+    await act(async () => {
+      root.render(createElement(LocaleProvider, null, createElement(Home)))
+    })
+    await flush()
+
+    // folder card menu: no offline entry (pin or unpin) even though uw-doc-1 is pinned
+    const folderItems = await openMenuFor('.dh-folder-card', 'Board Folder')
+    expect(folderItems.length).toBeGreaterThan(0)
+    const folderLabels = folderItems.map((b) => b.textContent)
+    expect(folderLabels).not.toContain(EN.uwOfflinePin)
+    expect(folderLabels).not.toContain(EN.uwOfflineUnpin)
+
+    // trash row menu: only restore-class actions, never the pin item
+    await click(host.querySelector('.nav-item[data-nav="trash"]')!)
+    const trashItems = await openMenuFor('.dh-doc-row', 'Trashed Spec.docx')
+    expect(trashItems.length).toBeGreaterThan(0)
+    const trashLabels = trashItems.map((b) => b.textContent)
+    expect(trashLabels).not.toContain(EN.uwOfflinePin)
+    expect(trashLabels).not.toContain(EN.uwOfflineUnpin)
   })
 })
 

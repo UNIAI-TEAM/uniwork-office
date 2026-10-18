@@ -1787,6 +1787,220 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.querySelector('.uw-act-toast')).toBeNull()
   })
 
+  it('refreshes the list but never opens the doc when an upload superseded by cancel still resolves ok (DH1-R4-8)', async () => {
+    const uploadedSummary: DocumentsHomeDoc = {
+      id: 'doc-uploaded-late-refresh',
+      workspaceId: 'ws-1',
+      title: 'uploaded-handbook.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T10:00:00.000Z',
+      kind: 'file',
+      parentId: 'f-mine',
+    }
+    api.uniworkPickUploadFile = vi.fn(async () => ({
+      path: 'C:\\Users\\minh\\Documents\\uploaded-handbook.docx',
+      name: 'uploaded-handbook.docx',
+    }))
+    api.uniworkCancelUploadDocument = vi.fn(async () => undefined)
+    let finishUpload: (res: UniworkResult<DocumentsHomeDoc>) => void = () => undefined
+    api.uniworkUploadDocument = vi.fn(() => {
+      const { promise, resolve } = Promise.withResolvers<UniworkResult<DocumentsHomeDoc>>()
+      finishUpload = resolve
+      return promise
+    })
+    const onOpenDocument = vi.fn()
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument,
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const uploadBtn = host.querySelector<HTMLButtonElement>('button.dh-btn-upload')!
+    await act(async () => {
+      uploadBtn.click()
+    })
+    await flush()
+    const dialog = host.querySelector<HTMLElement>('.modal[role="dialog"]')!
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.uw-act-file button')!.click()
+    })
+    await flush()
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-primary')!.click()
+    })
+    await flush()
+
+    // Cancel while the upload is in flight, then let the server-finished result arrive
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-secondary')!.click()
+    })
+    await flush()
+    const childrenCallsBefore = api.uniworkListChildren.mock.calls.length
+    await act(async () => {
+      finishUpload(ok(uploadedSummary))
+    })
+    await flush()
+
+    // the server already created the doc: the list refreshes so it appears, but nothing opens it
+    expect(api.uniworkListChildren.mock.calls.length).toBeGreaterThan(childrenCallsBefore)
+    expect(onOpenDocument).not.toHaveBeenCalled()
+  })
+
+  it('never fires onOpenDocument for an upload that resolves after DocumentsHome unmounted (DH1-R4-8)', async () => {
+    const uploadedSummary: DocumentsHomeDoc = {
+      id: 'doc-uploaded-unmounted',
+      workspaceId: 'ws-1',
+      title: 'uploaded-handbook.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T10:00:00.000Z',
+      kind: 'file',
+      parentId: 'f-mine',
+    }
+    api.uniworkPickUploadFile = vi.fn(async () => ({
+      path: 'C:\\Users\\minh\\Documents\\uploaded-handbook.docx',
+      name: 'uploaded-handbook.docx',
+    }))
+    let finishUpload: (res: UniworkResult<DocumentsHomeDoc>) => void = () => undefined
+    api.uniworkUploadDocument = vi.fn(() => {
+      const { promise, resolve } = Promise.withResolvers<UniworkResult<DocumentsHomeDoc>>()
+      finishUpload = resolve
+      return promise
+    })
+    const onOpenDocument = vi.fn()
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument,
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const uploadBtn = host.querySelector<HTMLButtonElement>('button.dh-btn-upload')!
+    await act(async () => {
+      uploadBtn.click()
+    })
+    await flush()
+    const dialog = host.querySelector<HTMLElement>('.modal[role="dialog"]')!
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.uw-act-file button')!.click()
+    })
+    await flush()
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-primary')!.click()
+    })
+    await flush()
+    expect(api.uniworkUploadDocument).toHaveBeenCalledTimes(1)
+
+    // DocumentsHome unmounts mid-upload (e.g. the host remounts it on a workspace key change)
+    await act(async () => {
+      root.unmount()
+    })
+    await act(async () => {
+      finishUpload(ok(uploadedSummary))
+    })
+    await flush()
+    expect(onOpenDocument).not.toHaveBeenCalled()
+    // restore the root so afterEach can unmount cleanly
+    root = createRoot(host)
+  })
+
+  it('cancelling the upload while uniworkEnsureMyFolder is still pending never uploads or opens (DH1-R4-7)', async () => {
+    // No my-folder node in the tree -> the upload targets an unresolved folder
+    // and must await uniworkEnsureMyFolder before starting.
+    api.uniworkFolderTree = vi.fn(async () => ok([]))
+    const ensuredNode: UniworkFolderNode = {
+      id: 'f-mine',
+      parentId: null,
+      title: 'My Folder',
+      position: 0,
+      kind: 'my_folder',
+      isSystem: true,
+      children: [],
+    }
+    let finishEnsure: (res: UniworkResult<UniworkFolderNode>) => void = () => undefined
+    api.uniworkEnsureMyFolder = vi.fn(() => {
+      const { promise, resolve } = Promise.withResolvers<UniworkResult<UniworkFolderNode>>()
+      finishEnsure = resolve
+      return promise
+    })
+    api.uniworkPickUploadFile = vi.fn(async () => ({
+      path: 'C:\\Users\\minh\\Documents\\uploaded-handbook.docx',
+      name: 'uploaded-handbook.docx',
+    }))
+    api.uniworkCancelUploadDocument = vi.fn(async () => undefined)
+    api.uniworkUploadDocument = vi.fn(async () => ok({ id: 'doc-should-not-upload' }))
+    const onOpenDocument = vi.fn()
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument,
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const uploadBtn = host.querySelector<HTMLButtonElement>('button.dh-btn-upload')!
+    await act(async () => {
+      uploadBtn.click()
+    })
+    await flush()
+    const dialog = host.querySelector<HTMLElement>('.modal[role="dialog"]')!
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.uw-act-file button')!.click()
+    })
+    await flush()
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-primary')!.click()
+    })
+    await flush()
+    expect(api.uniworkEnsureMyFolder).toHaveBeenCalledTimes(1)
+    expect(api.uniworkUploadDocument).not.toHaveBeenCalled()
+
+    // cancel while the ensure call is still pending, then let it resolve
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-secondary')!.click()
+    })
+    await flush()
+    await act(async () => {
+      finishEnsure(ok(ensuredNode))
+    })
+    await flush()
+
+    expect(api.uniworkUploadDocument).not.toHaveBeenCalled()
+    expect(onOpenDocument).not.toHaveBeenCalled()
+  })
+
   it('renders the My Folder card first when a children page returns [Alpha Folder, My Folder] (DH1-E2E-7)', async () => {
     rootItems = [
       {
@@ -2099,7 +2313,9 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     // .dh-search-box and .dh-toolbar-btn fit on one line at 1280px alongside the title and workspace select,
     // while .dh-toolbar keeps flex-wrap: wrap so narrow viewports (900px) still wrap cleanly
     expect(cssBlock(css, '.dh-toolbar')).toMatch(/flex-wrap:\s*wrap/)
-    expect(cssBlock(css, '.dh-toolbar-btn')).toMatch(/flex-shrink:\s*0|white-space:\s*nowrap/)
+    // both one-line guards must hold on their own — an OR regex would let either slip (DH1-R4-5)
+    expect(cssBlock(css, '.dh-toolbar-btn')).toMatch(/flex-shrink:\s*0/)
+    expect(cssBlock(css, '.dh-toolbar-btn')).toMatch(/white-space:\s*nowrap/)
     const wideMedia =
       css.match(/@media\s*\(\s*min-width:\s*1101px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
     expect(

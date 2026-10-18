@@ -10,6 +10,7 @@ import {
   hasActiveFilters,
   splitAndSortItems,
   toUniworkListFilters,
+  updatedByOptionsForSelect,
   updatedFromIsoOf,
   visibleDocumentsHomeNavEntries,
   type DocumentsHomeApiAdapter,
@@ -148,6 +149,32 @@ describe('DH1-W2 documents-home-model', () => {
       { id: 'u-1', name: 'Minh Trần' },
       { id: 'u-late', name: 'Hải Lê' },
       { id: 'u-2', name: 'Lan Nguyễn' },
+    ])
+  })
+
+  it('keeps the selected Updated-by id in the options with the generic label when no loaded row names it, while other unnamed ids stay omitted (DH1-R4-9)', () => {
+    const docs: DocumentsHomeDoc[] = [
+      makeDoc({ id: 'd1', updatedById: 'u-1', updatedByName: 'Minh Trần' }),
+      makeDoc({ id: 'd2', updatedById: 'u-ghost' }),
+      makeDoc({ id: 'd3', updatedById: 'u-other' }),
+    ]
+    const named = collectUpdatedByOptions(docs)
+    expect(named).toEqual([{ id: 'u-1', name: 'Minh Trần' }])
+
+    // the selected id is always a valid option (the select never blanks while
+    // the filter is active); an unselected unnamed id is still omitted (DH1-BE-10)
+    expect(updatedByOptionsForSelect(named, 'u-ghost', 'Someone')).toEqual([
+      { id: 'u-1', name: 'Minh Trần' },
+      { id: 'u-ghost', name: 'Someone' },
+    ])
+    expect(updatedByOptionsForSelect(named, 'u-1', 'Someone')).toEqual([
+      { id: 'u-1', name: 'Minh Trần' },
+    ])
+    expect(updatedByOptionsForSelect(named, '', 'Someone')).toEqual([
+      { id: 'u-1', name: 'Minh Trần' },
+    ])
+    expect(updatedByOptionsForSelect(named, '   ', 'Someone')).toEqual([
+      { id: 'u-1', name: 'Minh Trần' },
     ])
   })
 
