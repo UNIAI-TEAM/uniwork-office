@@ -29,7 +29,26 @@ interface HostApi {
   request: (type: string, payload: unknown) => Promise<unknown>
   events: Array<{ type: string; payload: unknown }>
 }
-const host = (page: Page) => page.evaluate(() => (window as unknown as { __host: HostApi }).__host)
+type HostMethod = 'rename' | 'cancelNextSave' | 'saveCalls' | 'lastSaved' | 'request'
+
+/**
+ * Call one test-host method inside the page. page.evaluate serializes its result, so
+ * returning window.__host itself would drop every function: each call is its own evaluate
+ * and only its (serializable) return value crosses back. A Promise result is awaited.
+ */
+function hostCall<T>(page: Page, name: HostMethod, ...args: unknown[]): Promise<T> {
+  return page.evaluate(
+    ([n, a]) => {
+      const h = (window as unknown as { __host: Record<string, (...x: unknown[]) => unknown> })
+        .__host
+      return h[n as string]!(...(a as unknown[]))
+    },
+    [name, args] as const,
+  ) as Promise<T>
+}
+
+const hostDocumentId = (page: Page): Promise<string> =>
+  page.evaluate(() => (window as unknown as { __host: HostApi }).__host.documentId)
 
 /** open the simple fixture through the test host (vi locale = the reported symptom) */
 async function openDoc(page: Page): Promise<Frame> {
@@ -59,28 +78,26 @@ async function ctrlS(page: Page, ed: Frame): Promise<void> {
 
 test('a rename before the save is the name Save as proposes', async ({ page }) => {
   const ed = await openDoc(page)
-  const h = await host(page)
-  const fileId = h.documentId
+  const fileId = await hostDocumentId(page)
 
   // an edit so the save has something to persist
   await ed.locator(EDITOR).first().click()
   await page.keyboard.type(' rename-marker')
-  await page.evaluate(
-    ({ fileId, name }) => (window as unknown as { __host: HostApi }).__host.rename(fileId, name),
-    { fileId, name: NEW_NAME },
-  )
+  await hostCall(page, 'rename', fileId, NEW_NAME)
   // the frame's document title follows the rename before any save result could teach it
   await expect.poll(() => ed.evaluate(() => document.title)).toBe(NEW_NAME)
 
   await ctrlS(page, ed)
-  await expect.poll(async () => (await host(page)).saveCalls()).toBe(1)
-  await expect.poll(async () => (await host(page)).lastSaved()?.name).toBe(NEW_NAME)
+  await expect.poll(() => hostCall<number>(page, 'saveCalls')).toBe(1)
+  await expect
+    .poll(async () => (await hostCall<{ name: string } | null>(page, 'lastSaved'))?.name)
+    .toBe(NEW_NAME)
 
   // File -> Save as: the name the frame proposes to the host's api.saveAs
-  const result = (await (await host(page)).request('saveAs', {})) as {
+  const result = await hostCall<{
     ok: boolean
     file?: { name: string }
-  }
+  }>(page, 'request', 'saveAs', {})
   expect(result.ok).toBe(true)
   expect(result.file?.name).toBe(NEW_NAME)
 })
@@ -92,15 +109,17 @@ test('a host-declined save (api.save "cancelled") shows no failure in the status
 
   await ed.locator(EDITOR).first().click()
   await page.keyboard.type(' cancel-marker')
-  await page.evaluate(() => (window as unknown as { __host: HostApi }).__host.cancelNextSave())
+  await hostCall(page, 'cancelNextSave')
 
   await ctrlS(page, ed)
-  await expect.poll(async () => (await host(page)).saveCalls()).toBe(1)
+  await expect.poll(() => hostCall<number>(page, 'saveCalls')).toBe(1)
+  // settle signal: the declined save left the document dirty, so the frame's save-state
+  // item reads "unsaved" once the save round trip is over (no sleep before the negatives)
+  await expect(ed.locator('.status-save-state.unsaved')).toBeVisible()
   // the declined save wrote nothing
-  expect((await host(page)).lastSaved()).toBeNull()
+  expect(await hostCall<{ name: string } | null>(page, 'lastSaved')).toBeNull()
   // silent: no "Lưu thất bại" status line, no error toast (doc stays dirty)
-  await page.waitForTimeout(500)
   await expect(ed.locator('.status-bar')).not.toContainText('Lưu thất bại')
-  await expect(ed.locator('.status-msg')).toHaveCount(0)
+  await expect(ed.locator('.status-msg')).not.toContainText('Lưu thất bại')
   await expect(ed.locator('.toast, [role="alert"]').filter({ hasText: 'Lưu' })).toHaveCount(0)
 })
