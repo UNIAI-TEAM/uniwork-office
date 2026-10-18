@@ -533,9 +533,13 @@ describe('401: one shared refresh, one retry (real account session)', () => {
       updatedBy: 'u_3',
       updatedFrom: '2026-10-15T00:00:00Z',
     })
+    // DH1-BE-1: the server forwards `format` to `/documents/recent`, so a
+    // format-only Recent keeps the caller's recent scope. Only the filters
+    // that route cannot forward (updater, date) need the flat workspace list.
+    await api.listDocuments({ workspaceId: 'ws_1', format: 'pdf' })
+    await api.listDocuments({ workspaceId: 'ws_1', updatedBy: 'u_4' })
     await api.listDocuments({
       workspaceId: 'ws_1',
-      format: 'pdf',
       updatedBy: 'u_4',
       updatedFrom: '2026-10-16T00:00:00Z',
     })
@@ -551,7 +555,9 @@ describe('401: one shared refresh, one retry (real account session)', () => {
       `${ORIGIN}/api/v1/workspaces/ws_1/documents?shared_by_me=true&limit=50&format=docx&updated_by=u_1&updated_from=2026-10-01T00%3A00%3A00Z`,
       `${ORIGIN}/api/v1/workspaces/ws_1/documents?archived=1&limit=50&format=xlsx&updated_by=u_2&updated_from=2026-10-10T00%3A00%3A00Z`,
       `${ORIGIN}/api/v1/workspaces/ws_1/documents?parent_id=fold_1&limit=50&format=pptx&updated_by=u_3&updated_from=2026-10-15T00%3A00%3A00Z`,
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents?limit=50&kind=file&format=pdf&updated_by=u_4&updated_from=2026-10-16T00%3A00%3A00Z`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/recent?limit=50&kind=file&format=pdf`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?limit=50&kind=file&updated_by=u_4`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?limit=50&kind=file&updated_by=u_4&updated_from=2026-10-16T00%3A00%3A00Z`,
       `${ORIGIN}/api/v1/workspaces/ws_1/members`,
     ])
   })
