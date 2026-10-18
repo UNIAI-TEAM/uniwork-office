@@ -49,6 +49,21 @@ async function makeWritable(dir: string): Promise<void> {
   }
 }
 
+/** every file under `dir` back to read-only: undoes `makeWritable` for a removal that was called off */
+async function makeReadOnly(dir: string): Promise<void> {
+  let entries: Dirent[]
+  try {
+    entries = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    const target = join(dir, entry.name)
+    if (entry.isDirectory()) await makeReadOnly(target)
+    else await chmod(target, 0o444).catch(() => undefined)
+  }
+}
+
 /**
  * Only definite absence (`ENOENT`) counts as gone (BE-R2-8): any other
  * inspection failure (`EACCES`, `EIO`, `EBUSY`) leaves the folder in doubt, so
@@ -63,17 +78,27 @@ async function absent(dir: string): Promise<boolean> {
   }
 }
 
+type RemoveOutcome = 'removed' | 'failed' | 'cancelled'
+
 /**
- * Delete a copy folder, undoing the read-only mode first (BE-R1-2). `true`
- * only when `rm` succeeded or `lstat` confirmed `ENOENT` (BE-R2-8).
+ * Delete a copy folder, undoing the read-only mode first (BE-R1-2). `removed`
+ * only when `rm` succeeded or `lstat` confirmed `ENOENT` (BE-R2-8). A
+ * `stillDue` guard is read synchronously right before `rm` starts (G703-R7-1):
+ * no await separates that last check from the deletion, so a lease renewal
+ * that commits any time before it calls the removal off (`cancelled`).
  */
-async function removeDir(dir: string): Promise<boolean> {
+async function removeDir(dir: string, stillDue?: () => boolean): Promise<RemoveOutcome> {
+  if (stillDue && !stillDue()) return 'cancelled'
   await makeWritable(dir)
+  if (stillDue && !stillDue()) {
+    await makeReadOnly(dir)
+    return 'cancelled'
+  }
   try {
     await rm(dir, { recursive: true, force: true, maxRetries: 2 })
-    return true
+    return 'removed'
   } catch {
-    return await absent(dir)
+    return (await absent(dir)) ? 'removed' : 'failed'
   }
 }
 
@@ -115,6 +140,12 @@ export interface OfflineCopiesDeps {
    */
   lockOpened(lock: UniworkDocLock): void
   appVersion(): string
+  /**
+   * G703-R7-1: the lease manager's commit stamp of a document. It changes
+   * whenever a lease commit starts or lands and is odd while one is in flight,
+   * so a destructive lock decision made on an older read can tell it went stale.
+   */
+  leaseStamp?(documentId: string): number
   now?(): number
 }
 
@@ -183,14 +214,14 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     return run
   }
 
-  const dropDir = async (dir: string): Promise<boolean> => {
-    if (await removeDir(dir)) {
-      pendingRemoval.delete(dir)
-      return true
-    }
-    pendingRemoval.add(dir)
-    return false
+  const dropDirOutcome = async (dir: string, stillDue?: () => boolean): Promise<RemoveOutcome> => {
+    const outcome = await removeDir(dir, stillDue)
+    if (outcome === 'removed') pendingRemoval.delete(dir)
+    else if (outcome === 'failed') pendingRemoval.add(dir)
+    return outcome
   }
+
+  const dropDir = async (dir: string): Promise<boolean> => (await dropDirOutcome(dir)) === 'removed'
 
   const retryPending = async (keepDirs: ReadonlySet<string>): Promise<void> => {
     for (const dir of [...pendingRemoval]) {
@@ -205,12 +236,17 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     copy.timer = null
   }
 
-  const scheduleExpiry = (documentId: string): void => {
+  /**
+   * `retry`: after a removal that failed or was called off, the lease expiry is
+   * already behind us: a zero delay would spin, so the retry waits the close
+   * grace (G703-R7-5)
+   */
+  const scheduleExpiry = (documentId: string, retry = false): void => {
     const copy = copies.get(documentId)
     clearTimer(copy)
     if (!copy || copy.locked) return
     const delay =
-      copy.leaseUntilMs !== null
+      copy.leaseUntilMs !== null && !retry
         ? Math.min(MAX_TIMEOUT_MS, Math.max(0, copy.leaseUntilMs - now()))
         : OFFLINE_COPY_CLOSE_GRACE_MS
     const timer = setTimeout(() => {
@@ -241,16 +277,25 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     return true
   }
 
-  const lockInPlace = async (documentId: string): Promise<boolean> => {
+  /**
+   * The plaintext goes, the tracked copy and its open-tab count stay (G703-R6-2).
+   * `stillDue` calls the removal off when the reason it was decided on went stale.
+   */
+  const lockInPlace = async (
+    documentId: string,
+    stillDue?: () => boolean,
+  ): Promise<RemoveOutcome> => {
     const copy = copies.get(documentId)
-    if (!copy) return true
+    if (!copy) return 'removed'
     clearTimer(copy)
-    if (!(await dropDir(copy.dir))) {
-      scheduleExpiry(documentId)
-      return false
+    const outcome = await dropDirOutcome(copy.dir, stillDue)
+    if (outcome !== 'removed') {
+      // a failed removal retries at the lease expiry as before; a called-off one waits
+      scheduleExpiry(documentId, outcome === 'cancelled')
+      return outcome
     }
     copy.locked = true
-    return true
+    return 'removed'
   }
   const openOne = async (documentId: string): Promise<OfflineCopyOutcome> => {
     const library = deps.library()
@@ -405,6 +450,14 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     // G703-R6-4: revalidate right before the destructive step in case an online
     // renewal landed while capabilityOn was awaited
     if (copy.locked || copies.get(documentId) !== copy) return
+    // G703-R7-1: the lease commit stamp is taken before that final read. A
+    // commit in flight (odd) leaves the decision to the pass after it; one that
+    // lands later changes the stamp, and the removal calls itself off
+    const stamp = deps.leaseStamp?.(documentId) ?? 0
+    if (stamp % 2 === 1) {
+      scheduleExpiry(documentId, true)
+      return
+    }
     const rechecked = await deps
       .library()
       ?.row(documentId)
@@ -412,7 +465,11 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     const reason = evaluateLapse(documentId, copy, rechecked)
     if (!reason) return
     // the plaintext goes first: if it will not, the next pass retries the lock too
-    if (!(await lockInPlace(documentId))) return
+    const stillDue = (): boolean =>
+      !copy.locked &&
+      copies.get(documentId) === copy &&
+      (deps.leaseStamp?.(documentId) ?? 0) === stamp
+    if ((await lockInPlace(documentId, stillDue)) !== 'removed') return
     deps.lockOpened({
       path: copy.path,
       name: basename(copy.path),

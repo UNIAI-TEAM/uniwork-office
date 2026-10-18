@@ -259,6 +259,21 @@ describe('the lease manager inside the feed runtime (W1f)', () => {
     expect((await h.runtime.leases.effectiveState('doc_1')).record?.generation).toBe(2)
   })
 
+  it('G703-R7-1: the commit stamp is even while idle, odd during a lease write, and moves on every landed commit', async () => {
+    const h = harness()
+    await h.runtime.tick()
+    expect(h.runtime.leases.commitStamp('doc_1')).toBe(0)
+    await h.runtime.leases.grant('doc_1')
+    const afterGrant = h.runtime.leases.commitStamp('doc_1')
+    expect(afterGrant).toBeGreaterThan(0)
+    expect(afterGrant % 2).toBe(0)
+    h.advance(13 * HOUR)
+    await h.runtime.tick()
+    const afterRenew = h.runtime.leases.commitStamp('doc_1')
+    expect(afterRenew).toBeGreaterThan(afterGrant)
+    expect(afterRenew % 2).toBe(0)
+  })
+
   it('R1BE-12: the runtime builds its one lease manager from the lease options', () => {
     const h = harness()
     expect(h.runtime.leases).toBeDefined()

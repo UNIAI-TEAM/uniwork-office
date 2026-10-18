@@ -99,6 +99,8 @@ interface OpenHarness {
   /** the open-path test seam: what `isPathOpen` answers */
   pathOpen: { value: boolean; closed: Set<string> }
   clock: { now: number }
+  /** the lease manager's commit stamp (G703-R7-1): odd while a renewal commit is in flight */
+  leaseStamp: { value: number }
   capability: { on: boolean }
   /** the auth module's state the service reads: a cold restore with a locked keychain has no identity */
   account: { signedIn: boolean; keystoreLocked: boolean }
@@ -127,6 +129,7 @@ function openHarness(): OpenHarness {
   const pathOpen = { value: true, closed: new Set<string>() }
   const isPathOpen = (path: string) => !pathOpen.closed.has(path) && pathOpen.value
   const clock = { now: 1_000 }
+  const leaseStamp = { value: 0 }
   const capability = { on: true }
   const account = { signedIn: true, keystoreLocked: false }
   const scope = { value: { deploymentId: SCOPE.deploymentId, accountId: SCOPE.accountId } }
@@ -194,6 +197,7 @@ function openHarness(): OpenHarness {
     isPathOpen,
     appVersion: () => '0.0.0-test',
     lockOpened: (lock) => service.recordOfflineLock(lock),
+    leaseStamp: () => leaseStamp.value,
     now: () => clock.now,
   })
   const api = createOfflineLibraryApi({
@@ -221,6 +225,7 @@ function openHarness(): OpenHarness {
     locks,
     pathOpen,
     clock,
+    leaseStamp,
     capability,
     account,
     scope,
@@ -566,6 +571,54 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     expect(rowReads).toBe(2)
     expect(o.locks).toEqual([])
     expect(existsSync(copyDir(o))).toBe(true)
+    expect(existsSync(path)).toBe(true)
+  })
+
+  it('(G703-R7-1) a renewal that lands after the final row read and before the deletion keeps the copy and raises no lock', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const path = await openCopy(o)
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    let rowReads = 0
+    const origRow = o.h.manager.row.bind(o.h.manager)
+    vi.spyOn(o.h.manager, 'row').mockImplementation(async (id) => {
+      rowReads += 1
+      const read = await origRow(id)
+      if (rowReads === 2) {
+        // the final expired read is already in hand: the renewal commits now
+        o.h.leases.states.set('doc_1', leaseState('valid'))
+        o.leaseStamp.value += 2
+      }
+      return read
+    })
+    await o.copies.sweep()
+    expect(rowReads).toBe(2)
+    expect(o.locks).toEqual([])
+    expect(existsSync(copyDir(o))).toBe(true)
+    expect(existsSync(path)).toBe(true)
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
+    // the cancelled lock retries later (bounded, not a spin) and sees the valid lease
+    rowReads = 100
+    o.clock.now += 40_000
+    await o.copies.sweep()
+    expect(o.locks).toEqual([])
+    expect(existsSync(path)).toBe(true)
+  })
+
+  it('(G703-R7-1) a renewal commit in flight defers the lock: the copy stays until it settles', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const path = await openCopy(o)
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    o.leaseStamp.value = 1
+    await o.copies.sweep()
+    expect(o.locks).toEqual([])
+    expect(existsSync(path)).toBe(true)
+    // the commit settled with a renewed lease
+    o.h.leases.states.set('doc_1', leaseState('valid'))
+    o.leaseStamp.value = 2
+    await o.copies.sweep()
+    expect(o.locks).toEqual([])
     expect(existsSync(path)).toBe(true)
   })
 })
