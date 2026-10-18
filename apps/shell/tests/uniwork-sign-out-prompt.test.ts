@@ -303,6 +303,56 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(document.activeElement).toBe(backBtn)
   })
 
+  it('Tab wraps inside the prompt: it never leaves the alertdialog', async () => {
+    await render(statusFor('signed-in'), {
+      lang: 'en',
+      plan: { count: 2, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+    })
+    await click(button(en.acctSignOut))
+    expect(promptDialog()).not.toBeNull()
+    const backBtn = promptButton(syncEn.uwActBack)!
+    const goBtn = promptButton(syncEn.uwSignOutGo)!
+    expect(document.activeElement).toBe(backBtn)
+
+    // Shift+Tab on the first stop wraps to the last, and the press is consumed
+    const wrapBack = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      backBtn.dispatchEvent(wrapBack)
+    })
+    expect(wrapBack.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(goBtn)
+
+    // Tab on the last stop wraps to the first
+    const wrapFwd = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      goBtn.dispatchEvent(wrapFwd)
+    })
+    expect(wrapFwd.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(backBtn)
+
+    // a Tab that is not at an edge is left alone (the handler does not consume it)
+    const midTab = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      backBtn.dispatchEvent(midTab)
+    })
+    expect(midTab.defaultPrevented).toBe(false)
+    goBtn.focus()
+    expect(document.activeElement).toBe(goBtn)
+  })
+
   it('waiting: uwSignOutWaiting in a polite live node, Đăng xuất aria-disabled', async () => {
     await render(statusFor('signed-in'), {
       lang: 'vi',
@@ -1039,6 +1089,7 @@ describe('Settings → Account sign-out prompt (S3)', () => {
       expect(api.answerSignOutPrompt).toHaveBeenCalledWith(`notice-${lang}`, true)
       expect(api.accountLogout).not.toHaveBeenCalled()
       expect(promptDialog()).toBeNull()
+
       expect(document.activeElement).toBe(button(acct.acctSignOut))
 
       // a second click path (Escape) has nothing left to answer
@@ -1088,6 +1139,30 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(2)
     expect(api.answerSignOutPrompt).toHaveBeenLastCalledWith('req-notice', true)
     expect(promptDialog()).toBeNull()
+  })
+
+  it("Q2 = a: Tab wraps the notice's one button back onto itself", async () => {
+    await render(statusFor('signed-in'), { lang: 'en', open: false })
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'req-notice-tab',
+        plan: { count: 1, waiting: 0, keystoreLocked: true, ramOnly: 2 },
+        mode: 'notice',
+      })
+    })
+    await flush()
+    const okBtn = promptButton(syncEn.uwSwitchLostOk)!
+    expect(document.activeElement).toBe(okBtn)
+    const wrap = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      okBtn.dispatchEvent(wrap)
+    })
+    expect(wrap.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(okBtn)
   })
 
   it('FE d4-1: a switch notice waits for an open aria-modal dialog: Settings stays closed, then opens and focuses OK', async () => {

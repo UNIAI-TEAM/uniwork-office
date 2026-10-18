@@ -33,3 +33,38 @@ export function whenNoForeignModal(run: () => void, inside?: Element | null): ()
   })
   return () => observer.disconnect()
 }
+
+/**
+ * Keeps Tab / Shift+Tab inside an inline alertdialog (the settings-page confirms
+ * and notices that are not aria-modal): reaching the last stop wraps to the first
+ * and vice versa. Focus that is not inside the root is pulled back in; nothing
+ * runs for other keys or for a root without stops, and the handler only sees keys
+ * pressed inside its own dialog, so a foreign modal keeps its focus untouched.
+ */
+export function wrapTabKey(event: {
+  key: string
+  shiftKey: boolean
+  currentTarget: EventTarget | null
+  preventDefault: () => void
+}): void {
+  if (event.key !== 'Tab' || typeof document === 'undefined') return
+  const root = event.currentTarget
+  if (!(root instanceof HTMLElement)) return
+  const stops = Array.from(
+    root.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]'),
+  ).filter((el) => el.tabIndex >= 0 && !('disabled' in el && el.disabled))
+  if (stops.length === 0) return
+  const first = stops[0]!
+  const last = stops[stops.length - 1]!
+  const active = document.activeElement
+  if (!root.contains(active)) {
+    event.preventDefault()
+    ;(event.shiftKey ? last : first).focus()
+  } else if (active === first && event.shiftKey) {
+    event.preventDefault()
+    last.focus()
+  } else if (active === last && !event.shiftKey) {
+    event.preventDefault()
+    first.focus()
+  }
+}
