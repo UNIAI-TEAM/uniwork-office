@@ -945,6 +945,12 @@ export class UniworkDocsService {
   private editLockOrigin: string | null = null
   /** pathKey -> live edit-lock session of this window */
   private readonly editLocks = new Map<string, EditLockSession>()
+  /**
+   * EL1B-BE-R2-1: fire-and-forget drop DELETEs (window closed / removeTab /
+   * detached teardown) still in flight. will-quit joins these under the same
+   * cap as held sessions. Settled promises leave the set.
+   */
+  private readonly inFlightDropReleases = new Set<Promise<unknown>>()
   /** pathKey -> editor_id for this process + path */
   private readonly editorIds = new Map<string, string>()
   private lastOwner: LastOwner | null
@@ -1350,7 +1356,8 @@ export class UniworkDocsService {
   async releaseAllEditLocks(capMs?: number): Promise<void> {
     const sessions = [...this.editLocks.values()]
     this.editLocks.clear()
-    const work = Promise.all(sessions.map((s) => s.release().catch(() => undefined)))
+    const drops = [...this.inFlightDropReleases]
+    const work = Promise.all([...sessions.map((s) => s.release().catch(() => undefined)), ...drops])
     if (capMs !== undefined) {
       await this.capped(work, capMs)
     } else {
@@ -1367,7 +1374,8 @@ export class UniworkDocsService {
   /**
    * EL-1(b) fix3 B2: MCP closeTabWithoutPrompt / removeTab and a macOS
    * clean-window close drop bound paths without confirmClose. One hook,
-   * best-effort, capped like quit.
+   * best-effort, capped like quit. Callers stay fire-and-forget; will-quit
+   * joins the in-flight DELETE under the same single cap (EL1B-BE-R2-1).
    */
   async notePathsDropped(paths: string[]): Promise<void> {
     const sessions: EditLockSession[] = []
@@ -1380,10 +1388,12 @@ export class UniworkDocsService {
       sessions.push(session)
     }
     if (sessions.length === 0) return
-    await this.capped(
-      Promise.all(sessions.map((s) => s.release().catch(() => undefined))),
-      EDIT_LOCK_QUIT_CAP_MS,
-    )
+    const work = Promise.all(sessions.map((s) => s.release().catch(() => undefined)))
+    this.inFlightDropReleases.add(work)
+    void work.finally(() => {
+      this.inFlightDropReleases.delete(work)
+    })
+    await this.capped(work, EDIT_LOCK_QUIT_CAP_MS)
     for (const s of sessions) s.dispose()
   }
 
