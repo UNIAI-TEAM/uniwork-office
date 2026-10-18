@@ -51,6 +51,18 @@ export function uniworkAllowsSave(
 export function autoSaveToggleVisible(platformAutoSave: boolean, bound: boolean): boolean {
   return platformAutoSave && !bound
 }
+/**
+ * EL-1(b): the preload surface the shell adds for the desktop edit lock
+ * (uniwork:doc-state-changed ping + the read-only-save explain route). Both
+ * members stay optional here: a web bridge or an older shell never defines
+ * them, and the renderer then behaves exactly as before the lock existed.
+ */
+export interface UniworkLockSeam {
+  /** pushed with the affected document path; return value unsubscribes */
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  /** explicit Save of a read-only bound document: main explains, never writes */
+  uniworkReadOnlySave?(path?: string): Promise<void>
+}
 
 /** Query main for the document at `path`; re-queried whenever the path changes. */
 export function useUniworkDocState(path: string | null | undefined): UniworkDocState {
@@ -61,22 +73,53 @@ export function useUniworkDocState(path: string | null | undefined): UniworkDocS
       return
     }
     let live = true
-    const query = window.desktop.uniworkState?.(path)
-    if (!query) return
-    query.then(
-      (answer) => {
-        if (!live) return
-        setState({ path, bound: answer?.bound === true, readOnly: answer?.readOnly === true })
-      },
-      () => {
-        /* no answer: keep treating it as a plain local file */
-      },
-    )
+    const query = () => {
+      const request = window.desktop.uniworkState?.(path)
+      if (!request) return
+      request.then(
+        (answer) => {
+          if (!live) return
+          setState({ path, bound: answer?.bound === true, readOnly: answer?.readOnly === true })
+        },
+        () => {
+          /* no answer: keep treating it as a plain local file */
+        },
+      )
+    }
+    query()
+    // EL-1(b): the edit lock makes bound/read-only change while the document
+    // stays open; the shell pings the affected path. Other paths' pings never
+    // touch this document's answer.
+    const seam = window.desktop as UniworkLockSeam
+    const unsubscribe = seam.onUniworkStateChanged?.((p) => {
+      if (p === path) query()
+    })
     return () => {
       live = false
+      unsubscribe?.()
     }
   }, [path])
   return state
+}
+
+/**
+ * EL-1(b) VEL-1: an explicit Save (Ctrl+S, File > Save, toolbar Save) on a
+ * read-only *bound* document asks the shell to explain the lock instead of
+ * silently doing nothing. Autosave and Save As never explain (autosave is
+ * not a user gesture; Save As writes a plain local copy). A read-only local
+ * file or an absent seam keeps today's behaviour.
+ */
+export function uniworkExplainReadOnlySave(
+  seam: UniworkLockSeam | null | undefined,
+  state: { bound: boolean; readOnly: boolean },
+  saveAs: boolean,
+  auto: boolean,
+  path: string | null | undefined,
+): void {
+  if (saveAs || auto || !state.bound || !state.readOnly) return
+  void seam?.uniworkReadOnlySave?.(path ?? undefined)?.catch(() => {
+    /* the explain route is best-effort: the lock still blocks the write */
+  })
 }
 
 /**

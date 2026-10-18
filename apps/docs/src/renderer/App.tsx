@@ -271,8 +271,10 @@ import {
   saveStateLabel,
   setEditorEditable,
   uniworkAllowsSave,
+  uniworkExplainReadOnlySave,
   uniworkStateFor,
   useUniworkDocState,
+  type UniworkLockSeam,
 } from './uniwork-doc-state'
 import { SPELLCHECK_KEY, spellcheckEnabled } from './spellcheck-pref'
 import { cachedByDoc } from './doc-cache'
@@ -2428,8 +2430,12 @@ export function App() {
   const save = useCallback((saveAs: boolean, auto = false, newDocName?: string) => {
     if (!(saveAs ? cap('saveAs') : cap('save'))) return Promise.resolve(false)
     // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
-    const state = uniworkStateFor(uniworkRef.current, fileCtxRef.current.doc?.filePath)
-    if (!uniworkAllowsSave(state, saveAs, auto)) return Promise.resolve(false)
+    const filePath = fileCtxRef.current.doc?.filePath
+    const state = uniworkStateFor(uniworkRef.current, filePath)
+    if (!uniworkAllowsSave(state, saveAs, auto)) {
+      uniworkExplainReadOnlySave(window.desktop as UniworkLockSeam, state, saveAs, auto, filePath)
+      return Promise.resolve(false)
+    }
     return saveImpl(fileCtxRef.current, saveAs, auto, newDocName)
   }, [])
 
