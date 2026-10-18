@@ -1395,6 +1395,145 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     }
   })
 
+  it('(G703-R10-3) wall and lease deadlines differ and the library row is lost after the open: the copy stays readable past the ISO deadline and locks at the lease-clock expiry', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-r103-'))
+    dirs.push(base)
+    const rl = realLease(base)
+    const o = openHarness({ lease: rl.lease })
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    // the wall clock runs 800 ms ahead of the lease clock: the lease record's ISO deadline
+    // (server time) lies 800 ms before the lease clock's own expiry on the wall clock
+    rl.skewWall(800)
+    o.clock.now += 800
+    const timers = virtualTimers((ms) => {
+      rl.advance(ms)
+      o.clock.now += ms
+    })
+    try {
+      const path = (await openCopyOf(o)).path
+      // the library row is gone for good: only the copy's tracked deadline decides now
+      o.h.session.scope = null
+      o.account.signedIn = false
+      expect(await o.h.manager.row('doc_1')).toBeNull()
+      // 200 ms past the ISO deadline the lease clock still has 600 ms: readable, no lock
+      await timers.advance(24 * LEASE_HOUR - 800 + 200)
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      // the lease clock's own expiry has passed and the timer locks it
+      await timers.advance(800 + 1_000)
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(path)).toBe(false)
+    } finally {
+      timers.restore()
+    }
+  })
+
+  describe('(G703-R10-4) a deadline that moved while the copy is usable is adopted and drives the timer alone', () => {
+    const SECOND = 1_000
+    /** the fake lease reads `expiresAt` on the copy's own clock, like the lease manager would */
+    const readLease = (o: OpenHarness, expiresAt: number) => {
+      const at = o.clock.now
+      const record = { expires_at: new Date(expiresAt).toISOString() } as never
+      o.h.leases.states.set(
+        'doc_1',
+        at >= expiresAt
+          ? { ...leaseState('expired'), record }
+          : { ...leaseState('valid'), record, remainingMs: expiresAt - at },
+      )
+    }
+
+    async function openWith(initialMs: number) {
+      const o = openHarness()
+      dirs.push(o.userDataDir)
+      o.clock.now = LEASE_T0
+      addDoc(o.h, 'doc_1', 1)
+      await pin(o.h)
+      const first = LEASE_T0 + initialMs
+      readLease(o, first)
+      const timers = virtualTimers((ms) => {
+        o.clock.now += ms
+        readLease(o, expiresAt.value)
+      })
+      const expiresAt = { value: first }
+      const path = (await openCopyOf(o)).path
+      return { o, timers, path, expiresAt, first }
+    }
+
+    it('a lease shortened while usable locks at the new deadline with no further sweep', async () => {
+      const { o, timers, path, expiresAt, first } = await openWith(60 * SECOND)
+      try {
+        expect(timers.armed).toEqual([60 * SECOND])
+        // the lease is cut to 10 s; one sweep sees it, then none runs again
+        expiresAt.value = LEASE_T0 + 10 * SECOND
+        readLease(o, expiresAt.value)
+        await o.copies.sweep()
+        expect(o.locks).toEqual([])
+        await timers.advance(9 * SECOND)
+        expect(o.locks).toEqual([])
+        expect(existsSync(path)).toBe(true)
+        await timers.advance(2 * SECOND)
+        expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+        expect(existsSync(path)).toBe(false)
+        expect(o.clock.now).toBeLessThan(first)
+      } finally {
+        timers.restore()
+      }
+    })
+
+    it('a lease renewed to a later deadline keeps the copy until that deadline, even after the row is lost', async () => {
+      const { o, timers, path, expiresAt } = await openWith(10 * SECOND)
+      try {
+        expiresAt.value = LEASE_T0 + 60 * SECOND
+        readLease(o, expiresAt.value)
+        await o.copies.sweep()
+        // the row is lost: the tracked deadline alone decides, and it is the renewed one
+        o.h.session.scope = null
+        o.account.signedIn = false
+        await timers.advance(11 * SECOND)
+        expect(o.locks).toEqual([])
+        expect(existsSync(path)).toBe(true)
+        await timers.advance(50 * SECOND)
+        expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+        expect(existsSync(path)).toBe(false)
+      } finally {
+        timers.restore()
+      }
+    })
+
+    // below the 1 s threshold a moved deadline is read jitter and kept; at it, it is adopted
+    it.each([
+      { shiftMs: 999, adopted: false },
+      { shiftMs: 1_000, adopted: true },
+      { shiftMs: -999, adopted: false },
+      { shiftMs: -1_000, adopted: true },
+    ])(
+      'a deadline moved by $shiftMs ms is adopted: $adopted (observed after the row is lost)',
+      async ({ shiftMs, adopted }) => {
+        const { o, timers, path, expiresAt, first } = await openWith(60 * SECOND)
+        try {
+          expiresAt.value = first + shiftMs
+          readLease(o, expiresAt.value)
+          await o.copies.sweep()
+          o.h.session.scope = null
+          o.account.signedIn = false
+          const tracked = adopted ? first + shiftMs : first
+          // 500 ms before the tracked deadline nothing locked; 500 ms after it the lock has landed
+          await timers.advance(tracked - o.clock.now - 500)
+          expect(o.locks).toEqual([])
+          expect(existsSync(path)).toBe(true)
+          await timers.advance(1_000)
+          expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+          expect(existsSync(path)).toBe(false)
+        } finally {
+          timers.restore()
+        }
+      },
+    )
+  })
+
   it('(G703-R9-4) a timer-triggered expiry with a slow capability read arms no zero-delay timer: one removal attempt, one retry after the grace', async () => {
     const o = openHarness()
     dirs.push(o.userDataDir)
