@@ -154,6 +154,14 @@ export class EditLockSession {
     return this.deniedBy
   }
 
+  /**
+   * Moves with every acquire attempt. A caller that awaited one attempt compares it
+   * afterwards: a newer attempt owns the result, the older one finalizes nothing (R3D-6).
+   */
+  acquireGeneration(): number {
+    return this.op
+  }
+
   async acquire(moveFromSelf = false): Promise<void> {
     await this.beginAcquire(moveFromSelf, null)
   }
@@ -330,13 +338,13 @@ export class EditLockSession {
         if (!heldByMe) this.armPoll()
         return true
       }
+      // only the server's coded verdict is a denial: a bare 403/404 (a gateway page, no UniWork
+      // envelope) reaches the client as `server_error` and is as transient as a 5xx (R3D-1)
       if (
         isUniworkDocError(error) &&
         (error.code === 'forbidden' ||
           error.code === 'permission_revoked' ||
-          error.status === 403 ||
-          error.code === 'not_found' ||
-          error.status === 404)
+          error.code === 'not_found')
       ) {
         this.clearTimers()
         this.deniedBy = error

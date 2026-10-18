@@ -181,6 +181,12 @@ export interface SaveCoordinatorDeps {
    * 'unreachable'. 'park' = 423 — fail as edit_locked, send no commit.
    */
   prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
+  /**
+   * EL-1(b) fix12: the server refused this copy's edit lock (a coded 403/404 on "Sửa ở đây").
+   * Read-only without touching the binding: nothing is serialized, uploaded or committed, and an
+   * existing intent and payload stay as they are.
+   */
+  isEditDenied?(doc: BoundDocument): boolean
   /** EL-1(b): lock id of a held path, sent as commit `edit_lock_id` */
   editLockId?(path: string): string | null
   /** EL-1(b) B8: holder summary for a synthesised park 423 */
@@ -380,6 +386,7 @@ export class SaveCoordinator {
     }
     const b = doc.binding
     if (b.access === 'view') return doc
+    if (this.deps.isEditDenied?.(doc)) return this.requestPopover(doc, options)
     if (b.state === 'conflict') return this.requestPopover(doc, options)
     // permission and existence refusals stay until the document is opened again
     if (b.state === 'blocked' && b.error !== 'quota_exceeded') {
