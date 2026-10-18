@@ -168,4 +168,22 @@ export const id = {
   uwTipEditLockedSelf: 'Anda mengedit dokumen ini di jendela lain.',
   uwErrEditLocked: 'Orang lain sedang mengedit dokumen ini.',
   uwReasonEditLocked: 'orang lain sedang mengedit',
+  uwLockBannerOther: '{name} sedang mengedit sejak {time}. Anda melihat dalam mode baca-saja.',
+  uwLockBannerSelfElsewhere: 'Anda sedang mengedit dokumen ini di jendela lain.',
+  uwLockBannerFree: 'Tidak ada yang sedang mengedit dokumen ini sekarang.',
+  uwLockEditHere: 'Edit di sini',
+  uwLockAcquiring: 'Mendapatkan akses edit…',
+  uwLockReadOnlyExplain: 'Tidak ada yang disimpan — dokumen dalam mode baca-saja.',
+  uwLockLostTitle: 'Anda tidak lagi mengedit',
+  uwLockLostTakenOver:
+    '{name} mengambil alih pengeditan. Perubahan Anda yang belum disimpan masih di sini.',
+  uwLockLostHandedOver:
+    'Anda menyerahkan pengeditan kepada {name}. Perubahan Anda yang belum disimpan masih di sini.',
+  uwLockLostExpired:
+    'Pengeditan kedaluwarsa karena kami tidak dapat menjangkau server selama beberapa waktu (tidak ada jaringan atau perangkat tidur). Perubahan Anda yang belum disimpan masih di sini.',
+  uwLockLostMovedHere:
+    'Anda sekarang mengedit dokumen ini di jendela lain. Perubahan yang belum disimpan di jendela ini masih di sini.',
+  uwLockLostAccessLost:
+    'Anda tidak lagi memiliki izin untuk mengedit dokumen ini. Perubahan Anda yang belum disimpan masih di sini.',
+  uwLockLostGeneric: 'Anda tidak lagi mengedit. Perubahan Anda yang belum disimpan masih di sini.',
 } satisfies Record<keyof typeof zh, string>

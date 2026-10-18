@@ -70,8 +70,6 @@ const tFor =
     (copy(lang)[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) =>
       String(params?.[name] ?? ''),
     )
-const text = (lang: 'en' | 'vi', key: StringKey, params?: Parameters<TFunc>[1]) =>
-  tFor(lang)(key, params)
 
 const {
   lockBannerModelOf,
@@ -148,12 +146,12 @@ describe('lockBannerModelOf', () => {
     expect(model.editHere).toBe(true)
   })
 
-  it.each([
-    ['held'],
-    ['unreachable'],
-  ] as const)(`'unreachable' / '%s' / no session renders nothing (interim until EL-2)`, (phase) => {
-    expect(lockBannerModelOf(status(lock(phase)), tFor('en'), 'en-US', NOW)).toBeNull()
-  })
+  it.each([['held'], ['unreachable']] as const)(
+    `'unreachable' / '%s' / no session renders nothing (interim until EL-2)`,
+    (phase) => {
+      expect(lockBannerModelOf(status(lock(phase)), tFor('en'), 'en-US', NOW)).toBeNull()
+    },
+  )
 
   it('no lockSession at all renders nothing', () => {
     expect(lockBannerModelOf(status(), tFor('en'), 'en-US', NOW)).toBeNull()
@@ -283,9 +281,7 @@ describe('remoteBarModelOf: a lost lock session outranks the remote/lock bars', 
   })
   it('lost + lockWhileOpen -> no remote bar model', () => {
     expect(
-      remoteBarModelOf(
-        status(lost, { lockWhileOpen: { mode: 'store', reason: 'lease_expired' } }),
-      ),
+      remoteBarModelOf(status(lost, { lockWhileOpen: { mode: 'store', reason: 'lease_expired' } })),
     ).toBeNull()
   })
   it('non-lost lock phases leave the remote bar model alone', () => {
@@ -359,7 +355,7 @@ async function mountBar(s: UniworkDocStatus | null, lang: 'en' | 'vi' = 'en'): P
       createElement(
         LocaleProvider,
         { initial: lang },
-        createElement(RemoteBar, { status: s, onStatus }),
+        createElement(UniworkRemoteBar, { status: s, onStatus }),
       ),
     )
   })
@@ -384,8 +380,7 @@ async function mountChip(s: UniworkDocStatus, lang: 'en' | 'vi' = 'en'): Promise
 const strip = () => host.querySelector<HTMLElement>('.uw-lock-strip')
 const stripText = () =>
   host.querySelector<HTMLElement>('.uw-lock-strip .uw-lock-text')?.textContent ?? ''
-const editHereButton = () =>
-  host.querySelector<HTMLButtonElement>('[data-lock-action="edit-here"]')
+const editHereButton = () => host.querySelector<HTMLButtonElement>('[data-lock-action="edit-here"]')
 const lockStatusNode = () => host.querySelector<HTMLElement>('[data-lock-status]')
 
 beforeEach(() => {
@@ -485,7 +480,9 @@ describe('UniworkRemoteBar: edit-lock strip', () => {
     const el = strip()!
     expect(el.dataset.tone).toBe('warn')
     expect(stripText()).toContain('Bạn không còn quyền sửa')
-    expect(stripText()).toContain('Ngọc Phạm đã lấy quyền sửa. Thay đổi chưa lưu của bạn vẫn ở đây.')
+    expect(stripText()).toContain(
+      'Ngọc Phạm đã lấy quyền sửa. Thay đổi chưa lưu của bạn vẫn ở đây.',
+    )
     expect(editHereButton()!.textContent).toBe('Sửa ở đây')
     // the remote-newer bar never stacks over a lost lock
     expect(host.querySelector('.uw-remote-bar')).toBeNull()
@@ -640,9 +637,7 @@ describe('EL-1(b) copy: uwLock* keys in every shard', () => {
       '{name} has been editing since {time}. You’re viewing read‑only.',
     )
     expect(viDict.uwLockBannerSelfElsewhere).toBe('Bạn đang sửa tài liệu này ở cửa sổ khác.')
-    expect(enDict.uwLockBannerSelfElsewhere).toBe(
-      'You’re editing this document in another window.',
-    )
+    expect(enDict.uwLockBannerSelfElsewhere).toBe('You’re editing this document in another window.')
     expect(viDict.uwLockBannerFree).toBe('Không còn ai sửa tài liệu này.')
     expect(enDict.uwLockBannerFree).toBe('No one is editing this document now.')
     expect(viDict.uwLockEditHere).toBe('Sửa ở đây')

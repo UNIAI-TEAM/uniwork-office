@@ -62,6 +62,8 @@ export interface UniworkQueuePopoverProps {
   onSignIn: () => void
   /** Esc / close after a Ctrl/Cmd+S opening hands focus back to the editor */
   onFocusEditor?: () => void
+  /** EL-1(b): "Sửa ở đây" resolves with the document's new status */
+  onStatus: (status: UniworkDocStatus) => void
 }
 
 /**
@@ -117,6 +119,7 @@ export function UniworkQueuePopover({
   onClose,
   onSignIn,
   onFocusEditor,
+  onStatus,
 }: UniworkQueuePopoverProps) {
   const { t, dateLocale } = useI18n()
   const { row, settled } = useQueueRow(status.documentId)
@@ -153,6 +156,8 @@ export function UniworkQueuePopover({
         base: line.base ?? '—',
         reason: line.reasonKey ? t(line.reasonKey, reasonParams) : '',
         cap: QUEUE_DRAFT_CAP,
+        // EL-1(b): an unnamed lock holder / taker reads the web's lostSomeone
+        name: line.name ?? t('uwEditLockSomeone'),
       })
     },
     [t, dateLocale],
@@ -352,6 +357,19 @@ export function UniworkQueuePopover({
         onSignIn()
         close('action')
         return
+      case 'edit-here': {
+        // EL-1(b): "Sửa ở đây" — re-acquire the lock (move_from_self when self_elsewhere)
+        if (busy !== null) return
+        setBusy('edit-here')
+        void window.aiOffice
+          .uniworkEditHere(status.path)
+          .then((next) => {
+            if (next) onStatus(next)
+          })
+          .catch(() => undefined)
+          .finally(() => close('action'))
+        return
+      }
       case 'recheck':
         if (api && row) void call(id, () => api.recheck(row.id))
         return
