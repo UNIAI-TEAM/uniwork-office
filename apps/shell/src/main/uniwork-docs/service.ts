@@ -101,6 +101,7 @@ import {
   createUploadSessionStore,
   uploadSessionKey,
   UPLOAD_SESSIONS_STORE_REGISTRATION,
+  type UploadSessionRecord,
   type UploadSessionStore,
 } from '../uniwork-sync/upload-sessions'
 import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
@@ -4091,27 +4092,27 @@ export class UniworkDocsService {
     const api = this.api()
     const resumeKey = uploadSessionKey(path, size, mtimeMs)
     const store = await this.uploadSessionStore()
-    const saved = (await store?.get(resumeKey)) ?? null
-    const resume: SavedUploadSession | undefined =
-      saved && saved.sessionId && saved.workspaceId === target.workspaceId
-        ? {
-            sessionId: saved.sessionId,
-            partSize: saved.partSize,
-            totalParts: saved.totalParts,
-            completedParts: saved.completedParts,
-            expiresAt: saved.expiresAt,
-          }
-        : undefined
-    const idempotencyKey = this.newIdempotencyKey()
     // the session route names its folder by id only (there is no `destination`
     // field), so a `my_folder` target is resolved to the caller's personal
     // folder first - the same row `POST .../documents/files` would land in
     const parentId = await this.uploadSessionParentId(api, target)
+    const title = filename
+    // R1-BE-03: resume only when the WHOLE create fingerprint still matches
+    // (workspace, effective parent, title, filename). A record left by a failed
+    // upload into folder A must never be resumed by a pick aimed at folder B -
+    // the old session is aborted (best effort) and this run starts fresh.
+    const saved = (await store?.get(resumeKey)) ?? null
+    const resume = await this.resumeForCreate(api, saved, {
+      workspaceId: target.workspaceId,
+      folderId: parentId,
+      title,
+      filename,
+    })
     const targetForSession: UploadSessionTarget = {
       kind: 'workspace',
       workspaceId: target.workspaceId,
       parentId,
-      title: filename,
+      title,
     }
     const pushProgress = (loaded: number, total: number, phase?: 'checking'): void => {
       this.deps.pushUploadProgress?.({
@@ -4122,22 +4123,31 @@ export class UniworkDocsService {
         ...(phase ? { phase } : {}),
       })
     }
+    // R1-BE-02: the LIVE session id, held in memory for the whole operation so a
+    // Cancel can issue the DELETE even when the resume store never accepted the
+    // record (refused / full / unavailable). The store is a convenience, not the
+    // authority on what to abort.
+    let liveSessionId: string | null = null
     const result = await runChunkedUpload(api, {
       target: targetForSession,
       filename,
       size,
       readRange: (offset, length) => readFileRange(path, offset, length, controller.signal),
       probe,
-      idempotencyKey,
+      idempotencyKey: this.newIdempotencyKey(),
       ...(resume ? { resume } : {}),
       signal: controller.signal,
+      freshIdempotencyKey: () => this.newIdempotencyKey(),
       onProgress: (loaded, total) => pushProgress(loaded, total),
       onPhase: (phase) => pushProgress(size, size, phase === 'checking' ? 'checking' : undefined),
       onSessionState: async (state) => {
+        liveSessionId = state.sessionId
         await store?.put(resumeKey, {
           sessionId: state.sessionId,
           workspaceId: target.workspaceId,
-          folderId: 'parentId' in target.create ? (target.create.parentId ?? null) : null,
+          folderId: parentId,
+          title,
+          filename,
           path,
           size,
           mtimeMs,
@@ -4150,7 +4160,7 @@ export class UniworkDocsService {
       },
     }).catch(async (error: unknown) => {
       if (controller.signal.aborted) {
-        await this.abortChunkedUpload(api, resumeKey)
+        await this.abortChunkedUpload(api, resumeKey, liveSessionId)
         throw cancelledUpload()
       }
       if (error instanceof UniworkDocError && error.code === 'too_large') {
@@ -4178,6 +4188,42 @@ export class UniworkDocsService {
   }
 
   /**
+   * R1-BE-03: the saved session this command may resume from, or undefined.
+   * Resume requires the WHOLE create fingerprint - workspace, effective parent
+   * folder, title and file name - to match the record the session was opened
+   * with. A record whose fingerprint differs (the same unchanged file re-picked
+   * for another folder, or a first save retried under another title) describes a
+   * DIFFERENT command, so the stale session is aborted best-effort and the run
+   * starts fresh; a record written before this build carries no fingerprint and
+   * is likewise never resumed.
+   */
+  private async resumeForCreate(
+    api: UniworkDocsClient,
+    saved: UploadSessionRecord | null,
+    want: { workspaceId: string; folderId: string | null; title: string; filename: string },
+  ): Promise<SavedUploadSession | undefined> {
+    if (!saved || !saved.sessionId) return undefined
+    const matches =
+      saved.workspaceId === want.workspaceId &&
+      (saved.folderId ?? null) === (want.folderId ?? null) &&
+      saved.title === want.title &&
+      saved.filename === want.filename
+    if (!matches) {
+      // the record is for another command: free its session so it cannot hold
+      // quota for 24 h, then start over (a failed DELETE is logged, not fatal)
+      await abortUploadSession(api, saved.sessionId).catch(() => undefined)
+      return undefined
+    }
+    return {
+      sessionId: saved.sessionId,
+      partSize: saved.partSize,
+      totalParts: saved.totalParts,
+      completedParts: saved.completedParts,
+      expiresAt: saved.expiresAt,
+    }
+  }
+
+  /**
    * The folder id an upload session creates its document in. The session route
    * takes `parent_id` only (never the one-request route's `destination`), so a
    * `my_folder` target is resolved through the same idempotent `my-folder`
@@ -4192,16 +4238,35 @@ export class UniworkDocsService {
     return (await api.ensureMyFolder(target.workspaceId)).id
   }
 
-  /** cancel a chunked upload: the session goes, and so does its saved record */
-  private async abortChunkedUpload(api: UniworkDocsClient, resumeKey: string): Promise<void> {
-    try {
-      const store = await this.uploadSessionStore()
-      const saved = await store?.get(resumeKey)
-      if (saved) await abortUploadSession(api, saved.sessionId)
-      await store?.remove(resumeKey)
-    } catch (error) {
-      console.warn('uniwork docs: the upload session could not be aborted', error)
+  /**
+   * Cancel a chunked upload: the session goes, and so does its saved record.
+   * R1-BE-02: the DELETE is issued from the in-memory session id the running
+   * operation holds - the resume store may have refused or never received the
+   * record, and a Cancel must still free the server session. A failed DELETE is
+   * NOT reported as clean: the typed code is logged and the saved record is
+   * KEPT, so the next start can retry the abort (its session id survives).
+   */
+  private async abortChunkedUpload(
+    api: UniworkDocsClient,
+    resumeKey: string,
+    liveSessionId: string | null,
+  ): Promise<void> {
+    const store = await this.uploadSessionStore().catch(() => null)
+    const saved = await store?.get(resumeKey).catch(() => null)
+    const sessionId = liveSessionId ?? saved?.sessionId ?? null
+    if (sessionId) {
+      try {
+        await abortUploadSession(api, sessionId)
+      } catch (error) {
+        // only the typed code: a store/filesystem error can carry a local path
+        console.warn(
+          'uniwork docs: the upload session could not be aborted:',
+          error instanceof UniworkDocError ? error.code : 'unknown',
+        )
+        return
+      }
     }
+    await store?.remove(resumeKey).catch(() => undefined)
   }
 
   /**
@@ -4482,7 +4547,7 @@ export class UniworkDocsService {
     // the path may have been bound while the checksum streamed
     if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
     const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
-    const idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
+    let idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
     this.firstSaveKeys.set(keyFp, idempotencyKey)
     const api = this.api()
     const probe = await readLocalFileProbe({ path: tabPath }, size, filename)
@@ -4492,17 +4557,16 @@ export class UniworkDocsService {
     })
     const resumeKey = uploadSessionKey(tabPath, size, mtimeMs)
     const store = await this.uploadSessionStore()
+    // R1-BE-03: the same full-fingerprint rule as the new-document path - a
+    // first save retried under another title or destination must not finish the
+    // old command through the old session.
     const saved = (await store?.get(resumeKey)) ?? null
-    const resume: SavedUploadSession | undefined =
-      saved && saved.workspaceId === workspaceId
-        ? {
-            sessionId: saved.sessionId,
-            partSize: saved.partSize,
-            totalParts: saved.totalParts,
-            completedParts: saved.completedParts,
-            expiresAt: saved.expiresAt,
-          }
-        : undefined
+    const resume = await this.resumeForCreate(api, saved, {
+      workspaceId,
+      folderId: parentId,
+      title,
+      filename,
+    })
     let result: ChunkedUploadResult
     try {
       result = await runChunkedUpload(api, {
@@ -4513,11 +4577,21 @@ export class UniworkDocsService {
         probe,
         idempotencyKey,
         ...(resume ? { resume } : {}),
+        // R1-BE-08: a `409 idempotency_payload_mismatch` (or a session the
+        // server no longer knows) restarts under a NEW key, and the rejected
+        // one is dropped so no later retry of these bytes reuses it
+        freshIdempotencyKey: () => this.newIdempotencyKey(),
+        onIdempotencyKey: (fresh) => {
+          this.firstSaveKeys.set(keyFp, fresh)
+          idempotencyKey = fresh
+        },
         onSessionState: async (state) => {
           await store?.put(resumeKey, {
             sessionId: state.sessionId,
             workspaceId,
             folderId: parentId,
+            title,
+            filename,
             path: tabPath,
             size,
             mtimeMs,
@@ -4543,6 +4617,15 @@ export class UniworkDocsService {
     await store?.remove(resumeKey)
     if (result.kind === 'upload') throw new UniworkDocError('malformed_response')
     const created = result.document
+    // R1-BE-04: the chunked path copies the LIVE file after the server has
+    // validated the uploaded bytes. If the editor autosaved (or another process
+    // replaced the file) during the upload/checking interval, the copy would be
+    // a different generation than the document the server created, and binding
+    // it `ready` would silently declare those mismatched bytes as saved. The
+    // copied working copy is therefore stream-hashed and must equal BOTH the
+    // pre-upload hash and the server's own `checksum_sha256`; otherwise nothing
+    // is bound, the created row is compensated, and the user's file is left
+    // untouched (a disk copy, never a whole-file buffer).
     return await this.bindFirstSaveDocument({
       session,
       owner,
@@ -4556,6 +4639,14 @@ export class UniworkDocsService {
       bytesChecksum,
       onBindFailure: () => this.firstSaveKeys.delete(keyFp),
       writeWorkingCopy: (dir, name) => this.store.copyIntoWorkingCopy(dir, name, tabPath),
+      verifyWorkingCopy: async (copiedPath, serverChecksum) => {
+        const copied = await sha256File(copiedPath)
+        if (copied !== bytesChecksum || serverChecksum !== copied) {
+          throw new UniworkDocError('malformed_response', {
+            serverCode: 'upload_checksum_mismatch',
+          })
+        }
+      },
     })
   }
 
@@ -4566,7 +4657,10 @@ export class UniworkDocsService {
    * delete - no such route) so no server document is left without a binding.
    * `writeWorkingCopy` is the only difference between the two callers: the
    * buffered path writes the bytes it already holds, the chunked path copies
-   * the file it never read whole.
+   * the file it never read whole. That chunked copy also supplies
+   * `verifyWorkingCopy` (R1-BE-04), which runs on the copied path and throws
+   * when the copy is not the bytes the server validated - so a source that
+   * changed under the upload never binds.
    */
   private async bindFirstSaveDocument(input: {
     session: { identity: SessionIdentity; epoch: number }
@@ -4580,6 +4674,8 @@ export class UniworkDocsService {
     created: UniworkDocSummary
     bytesChecksum: string
     writeWorkingCopy(dir: string, name: string): Promise<string>
+    /** R1-BE-04: proves the copied working copy matches the uploaded bytes, or throws */
+    verifyWorkingCopy?(copiedPath: string, serverChecksum: string): Promise<void>
     onBindFailure(): void
   }): Promise<UniworkDocSummary> {
     const { session, owner, tabPath, key, title, filename, api, created, bytesChecksum } = input
@@ -4603,6 +4699,12 @@ export class UniworkDocsService {
       const name = workingCopyName(title, detail.file.filename, formatForName(filename)!)
       const path = await input.writeWorkingCopy(dir, name)
       workingCopy = { dir, name }
+      // R1-BE-04: the copy exists but is not yet declared ready - the chunked
+      // caller hashes it here (streamed) and refuses when the live source
+      // drifted from the bytes the server validated. The throw lands in the
+      // compensation catch below: the created row is archived and the user's
+      // own file is never touched.
+      await input.verifyWorkingCopy?.(path, detail.file.checksumSha256)
       const binding = withServerContext(
         {
           schema: 2,

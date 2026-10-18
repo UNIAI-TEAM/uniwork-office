@@ -227,6 +227,18 @@ function fakeServer(
     partGate?: () => Promise<void>
     /** BIGUP-A1: this part PUT is refused once with a non-retryable 415 */
     partFailsOnceAt?: number
+    /**
+     * R1-BE-04: the bytes the session's storage accumulates from the part PUTs,
+     * so `complete` creates a document whose `checksum_sha256` is the truth
+     * about what the server actually holds (the verification compares it).
+     */
+    sessionAssemblesParts?: boolean
+    /** R1-BE-04: holds the session `complete` open until it settles */
+    sessionCompleteGate?: () => Promise<void>
+    /** R1-BE-08: the first session create answers 409 idempotency_payload_mismatch */
+    sessionCreateMismatch?: boolean
+    /** R1-BE-02: the session DELETE answers 500, so the abort is not reported clean */
+    sessionDeleteRefused?: boolean
   } = {},
 ) {
   const state = {
@@ -257,6 +269,15 @@ function fakeServer(
     completedParts: [] as Array<{ part_number: number; etag: string }>,
     /** BIGUP-A1: the parts a `partFailsOnceAt` run has already refused */
     failedParts: new Set<number>(),
+    /**
+     * R1-BE-04: the session storage's own bytes, assembled from the part PUTs
+     * when `sessionAssemblesParts` is set. `complete` then creates a document
+     * whose `checksum_sha256` is the truth about what the server holds, which is
+     * what the app's post-upload verification compares against.
+     */
+    sessionBytes: new Uint8Array(0),
+    /** R1-BE-08: the `sessionCreateMismatch` verdict has been spent */
+    sessionMismatchSpent: false,
   }
   let seq = 0
   /** every request the fake saw, in order */
@@ -651,6 +672,10 @@ function fakeServer(
       if (options.sessionTooSmall) {
         return json(422, { error: { code: 'upload_session_too_small', message: 'x' } })
       }
+      if (options.sessionCreateMismatch && !state.sessionMismatchSpent) {
+        state.sessionMismatchSpent = true
+        return json(409, { error: { code: 'idempotency_payload_mismatch', message: 'x' } })
+      }
       if (options.sessionRefused) {
         return json(415, {
           error: {
@@ -668,6 +693,7 @@ function fakeServer(
         sessionId: `ups_${++state.sessionSeq}`,
       }
       state.completedParts = []
+      state.sessionBytes = new Uint8Array(body.size_bytes)
       return json(201, sessionJson())
     }
     if (u.hostname === 'storage.example' && call.method === 'PUT') {
@@ -690,6 +716,13 @@ function fakeServer(
         state.failedParts.add(partNumber)
         return envelope(415, 'unsupported_media_type')
       }
+      // R1-BE-04: the storage keeps what it was sent, so `complete`'s document
+      // checksum is the truth about the server's bytes
+      if (options.sessionAssemblesParts) {
+        const body = (init.body as Uint8Array | undefined) ?? new Uint8Array(0)
+        const partSize = options.sessionPartSize ?? 8 * 1024 * 1024
+        state.sessionBytes.set(body, (partNumber - 1) * partSize)
+      }
       return new Response(null, {
         status: 200,
         headers: { ETag: `"etag-${u.pathname.split('/').pop()}"` },
@@ -704,6 +737,7 @@ function fakeServer(
         return json(404, { error: { code: 'not_found', message: 'x' } })
       }
       if (call.method === 'DELETE') {
+        if (options.sessionDeleteRefused) return envelope(500, 'server_error')
         state.session = null
         return new Response(null, { status: 204 })
       }
@@ -712,11 +746,18 @@ function fakeServer(
           parts: Array<{ part_number: number; etag: string }>
         }
         call.body = body
+        // R1-BE-04: holds the validation open so a test can change the source
+        // while the server is checking the uploaded bytes
+        if (options.sessionCompleteGate) await options.sessionCompleteGate()
         state.completedParts = body.parts
         const id = `new_${++seq}`
+        // R1-BE-04: the created document's bytes are what the storage actually
+        // assembled (when the fake keeps them), so its checksum_sha256 is the
+        // truth the app's post-upload verification compares against
+        const bytes = options.sessionAssemblesParts ? state.sessionBytes : enc('big bytes')
         state.documents.set(id, {
           title: session.title ?? session.filename,
-          bytes: enc('big bytes'),
+          bytes,
         })
         return json(200, {
           document: {
@@ -880,6 +921,12 @@ function setup(
     callbacksThrow?: boolean
     /** SAVE-01 r2 (S01-R1-8): a real durable sync store under dir (intent saves) */
     syncStore?: boolean
+    /**
+     * R1-BE-02: the sync store's byte budget. A tiny budget makes the resume
+     * store's `put` refuse (`store_full`), so a cancel must still issue its
+     * DELETE from the session id the running operation holds in memory.
+     */
+    syncStoreBudgetBytes?: number
     /** SAVE-01: runs inside notifyPathRenamed, between the bind and its push */
     onPathMoved?: () => void
   } = {},
@@ -927,7 +974,7 @@ function setup(
         safeStorage: createLockableSafeStorage(),
         dir: join(dir, 'sync-store-keys'),
       }),
-      budgetBytes: 64 * 1024 * 1024,
+      budgetBytes: options.syncStoreBudgetBytes ?? 64 * 1024 * 1024,
       clock: () => Date.now(),
     })
     for (const registration of SYNC_STORE_REGISTRATIONS) layer.register(registration)
@@ -3019,13 +3066,15 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
       expect(refresh.path).toBe('/api/v1/upload-sessions/ups_1')
       expect(
         second.calls.filter(
-          (call) => call.path === '/api/v1/workspaces/ws_a/documents/upload-sessions',
+          (call) => call.path === '/api/v1/workspaces/ws_1/documents/upload-sessions',
         ),
       ).toHaveLength(0)
       const putParts = second.calls
         .filter((call) => call.path.startsWith('/part/'))
         .map((call) => (call.body as { partNumber: number }).partNumber)
-      expect(putParts).toEqual([2, 3])
+      // only the missing parts went again; the pool runs them concurrently, so
+      // their PUT order is not guaranteed
+      expect([...putParts].sort((a, b) => a - b)).toEqual([2, 3])
       const complete = second.calls.find((call) => call.path.endsWith('/complete'))!
       expect((complete.body as { parts: Array<{ part_number: number }> }).parts).toHaveLength(3)
     })
@@ -3053,6 +3102,280 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
       expect(uploaded).toEqual({ ok: false, error: 'unsupported_format' })
       expect(server.calls.filter((call) => call.path.endsWith('/complete'))).toHaveLength(0)
       expect(server.calls.filter((call) => call.method === 'DELETE')).toHaveLength(0)
+    })
+
+    it('takes a valid > 50 MiB package through the session when the threshold is present', async () => {
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionAssemblesParts: true,
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'Huge.docx')
+      // a real 60 MiB package: above the 50 MiB single-request staging cap,
+      // accepted only because the threshold opens the chunked path
+      const bytes = buildDocxBytes(60 * 1024 * 1024)
+      writeFileSync(file, bytes)
+
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-huge',
+      })
+
+      expect(uploaded.ok).toBe(true)
+      // the whole file never entered main
+      expect(vi.mocked(readFile).mock.calls.map((call) => String(call[0]))).not.toContain(file)
+      // 60 MiB in 8 MiB parts = 8 parts, all PUT, then one complete
+      const parts = server.calls.filter((call) => call.path.startsWith('/part/'))
+      expect(parts).toHaveLength(8)
+      for (const part of parts) expect(part.method).toBe('PUT')
+      expect(server.calls.find((call) => call.path.endsWith('/complete'))).toBeTruthy()
+    })
+
+    it('R1-BE-02: a cancel while the store refused the record still deletes the session', async () => {
+      const gate = latch()
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        partGate: () => {
+          gate.entered()
+          return gate.held
+        },
+      })
+      // a store so small its `put` refuses: the resume record never lands, so
+      // the session id must come from the running operation's memory
+      const ctx = setup(server, { syncStore: true, syncStoreBudgetBytes: 16 })
+      const file = join(dir, 'CancelNoStore.docx')
+      writeFileSync(file, buildDocxBytes(30 * 1024 * 1024))
+
+      const pending = ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-cancel-nostore',
+      })
+      await gate.reached
+      ctx.service.cancelUpload('up-cancel-nostore')
+      gate.release()
+      const uploaded = await pending
+
+      expect(uploaded).toEqual({ ok: false, error: 'upload_cancelled' })
+      // the DELETE was issued even though no record was ever persisted
+      const deleted = server.calls.find((call) => call.method === 'DELETE')!
+      expect(deleted.path).toMatch(/^\/api\/v1\/upload-sessions\//)
+    })
+
+    it('R1-BE-03: re-picking the same file for another folder aborts the old session', async () => {
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionPartSize: 8 * 1024 * 1024,
+        partFailsOnceAt: 1,
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'TwoFolders.docx')
+      writeFileSync(file, buildDocxBytes(20 * 1024 * 1024))
+
+      // first pick: folder A. part 1 is refused for good, so the record
+      // survives (a failure is not a cancel) and the session stays open
+      const first = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: 'fold_a',
+        path: file,
+        uploadId: 'up-folder-a',
+      })
+      expect(first.ok).toBe(false)
+      expect(server.calls.filter((call) => call.method === 'DELETE')).toHaveLength(0)
+      const sessionA = server.state.session!.sessionId
+
+      // second pick: the same unchanged file, now aimed at folder B. The saved
+      // record's fingerprint names folder A, so it is NOT resumed: the old
+      // session is aborted and a fresh one is created for folder B
+      const second = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: 'fold_b',
+        path: file,
+        uploadId: 'up-folder-b',
+      })
+
+      expect(second.ok).toBe(true)
+      const aborted = server.calls.find((call) => call.method === 'DELETE')!
+      expect(aborted.path).toBe(`/api/v1/upload-sessions/${sessionA}`)
+      const creates = server.calls.filter(
+        (call) => call.path === `/api/v1/workspaces/ws_1/documents/upload-sessions`,
+      )
+      expect(creates).toHaveLength(2)
+      const secondCreate = creates[1]!.body as { parent_id?: string }
+      expect(secondCreate.parent_id).toBe('fold_b')
+    })
+
+    it('R1-BE-03: a first save retried under another title does not finish the old command', async () => {
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionPartSize: 8 * 1024 * 1024,
+        partFailsOnceAt: 1,
+        // R1-BE-04: the chunked first save verifies the copied working copy
+        // against the server checksum, so the fake's complete must answer the
+        // bytes its storage actually assembled
+        sessionAssemblesParts: true,
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'Retitle.docx')
+      writeFileSync(file, buildDocxBytes(20 * 1024 * 1024))
+
+      const first = await ctx.service.firstSave({
+        tabPath: file,
+        title: 'First title.docx',
+        workspaceId: WS,
+        target: { kind: 'my_folder' },
+      })
+      expect(first.ok).toBe(false)
+      const sessionA = server.state.session!.sessionId
+
+      const second = await ctx.service.firstSave({
+        tabPath: file,
+        title: 'Second title.docx',
+        workspaceId: WS,
+        target: { kind: 'my_folder' },
+      })
+      expect(second.ok).toBe(true)
+      // the old title's session was aborted, and the new create carries the
+      // new title - never the old session finished under the old title
+      const aborted = server.calls.find((call) => call.method === 'DELETE')!
+      expect(aborted.path).toBe(`/api/v1/upload-sessions/${sessionA}`)
+      const creates = server.calls.filter(
+        (call) => call.path === `/api/v1/workspaces/ws_1/documents/upload-sessions`,
+      )
+      const secondCreate = creates[1]!.body as { title?: string }
+      expect(secondCreate.title).toBe('Second title.docx')
+    })
+
+    it('R1-BE-04: a source changed under the upload is never bound as ready', async () => {
+      const gate = latch()
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionPartSize: 8 * 1024 * 1024,
+        sessionAssemblesParts: true,
+        sessionCompleteGate: () => {
+          gate.entered()
+          return gate.held
+        },
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'Drift.docx')
+      writeFileSync(file, buildDocxBytes(20 * 1024 * 1024))
+
+      const pending = ctx.service.firstSave({
+        tabPath: file,
+        title: 'Drift.docx',
+        workspaceId: WS,
+        target: { kind: 'my_folder' },
+      })
+      // the server is validating the uploaded bytes: the editor autosaves a
+      // new generation of the same file at the same path
+      await gate.reached
+      writeFileSync(file, buildDocxBytes(20 * 1024 * 1024, { macro: false }).fill(7, 4096, 8192))
+      gate.release()
+      const saved = await pending
+
+      // the mismatch is refused: nothing is bound, and the created row is
+      // compensated (archived) rather than left without a binding
+      expect(saved.ok).toBe(false)
+      expect(ctx.pathRenames).toHaveLength(0)
+      expect(
+        server.calls.some((call) => call.method === 'POST' && call.path.endsWith('/archive')),
+      ).toBe(true)
+      // the user's own file is untouched
+      expect(existsSync(file)).toBe(true)
+    })
+
+    it('R1-BE-02: a failed DELETE is not reported as clean and the record survives', async () => {
+      const gate = latch()
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionDeleteRefused: true,
+        partGate: () => {
+          gate.entered()
+          return gate.held
+        },
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'DeleteRefused.docx')
+      writeFileSync(file, buildDocxBytes(30 * 1024 * 1024))
+
+      const pending = ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-delete-refused',
+      })
+      await gate.reached
+      ctx.service.cancelUpload('up-delete-refused')
+      gate.release()
+      const uploaded = await pending
+
+      // the person still sees their cancel; the refused abort is logged, not
+      // silently swallowed, and the saved record is KEPT - a later start for
+      // the same unchanged file re-reads that session (a GET) instead of
+      // creating a new one, so the abort can be retried
+      expect(uploaded).toEqual({ ok: false, error: 'upload_cancelled' })
+      expect(server.calls.some((call) => call.method === 'DELETE')).toBe(true)
+
+      const next = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-delete-refused-2',
+      })
+      expect(next.ok).toBe(true)
+      // the saved record was resumed: the run re-read the old session, and no
+      // second session was created
+      expect(
+        server.calls.some(
+          (call) => call.method === 'GET' && call.path.startsWith('/api/v1/upload-sessions/'),
+        ),
+      ).toBe(true)
+      expect(
+        server.calls.filter(
+          (call) =>
+            call.method === 'POST' &&
+            call.path === `/api/v1/workspaces/ws_1/documents/upload-sessions`,
+        ),
+      ).toHaveLength(1)
+    })
+
+    it('R1-BE-08: a session create mismatch restarts once under a fresh key', async () => {
+      const server = fakeServer({
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 20 * 1024 * 1024,
+        sessionPartSize: 8 * 1024 * 1024,
+        sessionCreateMismatch: true,
+        sessionAssemblesParts: true,
+      })
+      const ctx = setup(server, { syncStore: true })
+      const file = join(dir, 'Mismatch.docx')
+      writeFileSync(file, buildDocxBytes(20 * 1024 * 1024))
+
+      const uploaded = await ctx.service.uploadDocument({
+        workspaceId: WS,
+        folderId: null,
+        path: file,
+        uploadId: 'up-mismatch',
+      })
+
+      expect(uploaded.ok).toBe(true)
+      const creates = server.calls.filter(
+        (call) => call.path === `/api/v1/workspaces/ws_1/documents/upload-sessions`,
+      )
+      expect(creates).toHaveLength(2)
+      // the retry never replayed the rejected key
+      expect(creates[0]!.idempotencyKey).not.toBe(creates[1]!.idempotencyKey)
+      expect(creates[1]!.idempotencyKey).toBeTruthy()
     })
   })
 

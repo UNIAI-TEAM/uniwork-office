@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { deflateRawSync } from 'node:zlib'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import { createUniworkDocsClient, type FetchLike } from '../src/main/uniwork-docs/client'
 import { parseDocumentLimits, type DocumentLimits } from '../src/main/uniwork-docs/limits'
 import type { UploadSessionState, UploadSessionStatus } from '../src/main/uniwork-docs/parse'
 import {
@@ -103,6 +104,26 @@ interface EntrySpec {
   /** deflated when given; `storedSize` writes a sparse all-zero STORE entry instead */
   data?: Uint8Array
   storedSize?: number
+  /**
+   * R1-BE-07: write the central-directory sizes the ZIP64 way - the 32-bit
+   * fields saturate at `0xffffffff` and the real sizes ride in the entry's
+   * extra field (id 0x0001). `truncate` cuts the record short (the declared
+   * size is longer than the payload), `noRecord` writes no ZIP64 record at all.
+   */
+  zip64?: { compressed: number; uncompressed: number; truncate?: boolean; noRecord?: boolean }
+}
+
+/** the ZIP64 extra record (id 0x0001): uncompressed then compressed, 8 bytes each */
+function zip64Extra(spec: NonNullable<EntrySpec['zip64']>): Buffer {
+  if (spec.noRecord) return Buffer.alloc(0)
+  const payload = Buffer.alloc(16)
+  payload.writeBigUInt64LE(BigInt(spec.uncompressed), 0)
+  payload.writeBigUInt64LE(BigInt(spec.compressed), 8)
+  const header = Buffer.alloc(4)
+  header.writeUInt16LE(0x0001, 0)
+  // the declared record size is what the probe trusts: a truncated one lies
+  header.writeUInt16LE(spec.truncate ? 16 : 16, 2)
+  return Buffer.concat([header, spec.truncate ? payload.subarray(0, 8) : payload])
 }
 
 /** builds a ZIP whose local data, central directory and EOCD are all real */
@@ -139,17 +160,19 @@ function buildZip(path: string, entries: EntrySpec[]): { size: number; cdOffset:
         ftruncateSync(fd, offset + size)
         offset += size
       }
+      const extra = entry.zip64 ? zip64Extra(entry.zip64) : Buffer.alloc(0)
       const cd = Buffer.alloc(46)
       cd.writeUInt32LE(0x02014b50, 0)
       cd.writeUInt16LE(20, 4)
       cd.writeUInt16LE(20, 6)
       cd.writeUInt16LE(stored ? 0 : 8, 10)
       cd.writeUInt32LE(crc, 16)
-      cd.writeUInt32LE(body?.length ?? size, 20)
-      cd.writeUInt32LE(size, 24)
+      cd.writeUInt32LE(entry.zip64 ? 0xffffffff : (body?.length ?? size), 20)
+      cd.writeUInt32LE(entry.zip64 ? 0xffffffff : size, 24)
       cd.writeUInt16LE(name.length, 28)
+      cd.writeUInt16LE(extra.length, 30)
       cd.writeUInt32LE(localOffset, 42)
-      central.push(cd, name)
+      central.push(cd, name, extra)
     }
     const cdOffset = offset
     const cdBuffer = Buffer.concat(central)
@@ -196,6 +219,10 @@ interface FakeOptions {
   completeFaults?: UniworkDocError[]
   /** `getUploadSession` answers this instead of a session */
   getFault?: UniworkDocError
+  /** R1-BE-02: holds a GET (resume/refresh) until it settles or the signal aborts */
+  getGate?: () => Promise<void>
+  /** R1-BE-02: holds `complete` until it settles or the signal aborts */
+  completeGate?: () => Promise<void>
   /** part 1's URL is already inside the 30 s refresh margin */
   nearExpiry?: boolean
   status?: UploadSessionStatus
@@ -276,14 +303,21 @@ function fakeSessions(options: FakeOptions = {}) {
       sessionId = `ups_${generation}`
       return state()
     },
-    async getUploadSession() {
+    async getUploadSession(_sessionId, signal) {
       if (options.getFault) throw options.getFault
+      if (options.getGate) {
+        // a real GET is a request: an abort rejects it before it settles
+        await holdOn(options.getGate, signal)
+      }
       calls.refreshes += 1
       generation += 1
       return state()
     },
     async completeUploadSession(input) {
       calls.completes.push(input.parts)
+      if (options.completeGate) {
+        await holdOn(options.completeGate, input.signal)
+      }
       const fault = completeFaults.shift()
       if (fault) throw fault
       return {
@@ -321,6 +355,36 @@ function fakeSessions(options: FakeOptions = {}) {
     },
   }
   return { client, calls }
+}
+
+/** R1-BE-02: a promise a test resolves when it wants a held request to finish */
+function deferred() {
+  let resolve: () => void = () => undefined
+  const promise = new Promise<void>((settle) => {
+    resolve = settle
+  })
+  return { promise, resolve }
+}
+
+/**
+ * R1-BE-02: a request held open until its gate settles - an abort of the
+ * caller's signal rejects it first, exactly as a real fetch does.
+ */
+async function holdOn(gate: () => Promise<void>, signal?: AbortSignal): Promise<void> {
+  if (!signal) {
+    await gate()
+    return
+  }
+  await new Promise<void>((resolve, reject) => {
+    const abort = () => {
+      const error = new Error('The operation was aborted.')
+      error.name = 'AbortError'
+      reject(error)
+    }
+    if (signal.aborted) abort()
+    else signal.addEventListener('abort', abort, { once: true })
+    gate().then(resolve, reject)
+  })
 }
 
 /** the file-handle reader a chunked upload is given: exactly `[offset, offset+length)` */
@@ -643,6 +707,9 @@ describe('runChunkedUpload', () => {
         size: built.size,
         probe,
         idempotencyKey: 'idem-5',
+        // R1-BE-09: the dead session's key is never replayed - the restart
+        // creates under a fresh one (the server dedups a key to its session)
+        freshIdempotencyKey: () => 'fresh-5',
         resume: {
           sessionId: 'ups_gone',
           partSize: PART_SIZE,
@@ -657,6 +724,7 @@ describe('runChunkedUpload', () => {
         readRange: reader.readRange,
       })
       expect(calls.creates).toHaveLength(1)
+      expect(calls.creates[0]!.idempotencyKey).toBe('fresh-5')
       expect([...calls.partPuts].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6])
     } finally {
       reader.close()
@@ -841,5 +909,571 @@ describe('abortUploadSession', () => {
       },
     }
     await expect(abortUploadSession(refused, 'ups_3')).rejects.toBeInstanceOf(UniworkDocError)
+  })
+})
+
+// ---- R1-BE-02: cancel reaches a held GET and a held complete ---------------
+
+describe('R1-BE-02: a cancel interrupts metadata and complete', () => {
+  it('a cancel during a held resume GET ends the run as upload_cancelled', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    const gate = deferred()
+    let entered: () => void = () => undefined
+    const reached = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const { client, calls } = fakeSessions({
+      size: built.size,
+      getGate: () => {
+        entered()
+        return gate.promise
+      },
+    })
+    const reader = fileReader(path)
+    const controller = new AbortController()
+    try {
+      const pending = runChunkedUpload(client, {
+        target: { kind: 'workspace', workspaceId: 'ws_1' },
+        filename: 'big.docx',
+        size: built.size,
+        probe,
+        idempotencyKey: 'idem-r1-02a',
+        resume: {
+          sessionId: 'ups_1',
+          partSize: PART_SIZE,
+          totalParts: 6,
+          completedParts: [],
+          expiresAt: '2026-10-18T00:00:00Z',
+        },
+        readRange: reader.readRange,
+        signal: controller.signal,
+      }).catch((e) => e)
+      // the GET is genuinely in flight when the person cancels
+      await reached
+      controller.abort()
+      gate.resolve()
+      const error = await pending
+      expect((error as UniworkDocError).code).toBe('upload_cancelled')
+      expect(calls.partPuts).toEqual([])
+      expect(calls.completes).toEqual([])
+    } finally {
+      reader.close()
+    }
+  })
+
+  it('a cancel during a held complete wins: no document is returned', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    const gate = deferred()
+    const { client, calls } = fakeSessions({ size: built.size, completeGate: () => gate.promise })
+    const reader = fileReader(path)
+    const controller = new AbortController()
+    try {
+      const pending = runChunkedUpload(client, {
+        target: { kind: 'workspace', workspaceId: 'ws_1' },
+        filename: 'big.docx',
+        size: built.size,
+        probe,
+        idempotencyKey: 'idem-r1-02b',
+        readRange: reader.readRange,
+        signal: controller.signal,
+      }).catch((e) => e)
+      // wait until complete is in flight (all parts stored, checking started)
+      await vi.waitFor(() => {
+        expect(calls.completes).toHaveLength(1)
+      })
+      controller.abort()
+      gate.resolve()
+      const error = await pending
+      expect((error as UniworkDocError).code).toBe('upload_cancelled')
+    } finally {
+      reader.close()
+    }
+  })
+})
+
+// ---- R1-BE-01: the real part transport is typed and has a deadline ---------
+
+describe('R1-BE-01: the real putUploadPart is typed and deadline-bounded', () => {
+  /**
+   * The session lifecycle of the fake, but the REAL `putUploadPart` - the one
+   * that bypasses `send()` and so must normalize its own transport failures and
+   * carry its own deadline.
+   */
+  function realPartClient(
+    fetch: FetchLike,
+    transferTimeoutMs: number,
+  ): { client: UploadSessionClient; calls: FakeCalls } {
+    const { client, calls } = fakeSessions({ size: BIG_FILE_BYTES })
+    const real = createUniworkDocsClient({
+      apiOrigin: 'https://uniwork.example',
+      authorized: (call) => call('tok'),
+      isSignedIn: () => true,
+      fetch,
+      transferTimeoutMs,
+    })
+    return { client: { ...client, putUploadPart: real.putUploadPart.bind(real) }, calls }
+  }
+
+  it('retries a part whose fetch rejects with a TypeError (a real network failure)', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    let firstForPart1 = true
+    const putCounts = new Map<number, number>()
+    const fetch: FetchLike = async (url) => {
+      const part = Number(new URL(url).pathname.split('/').pop())
+      putCounts.set(part, (putCounts.get(part) ?? 0) + 1)
+      if (part === 1 && firstForPart1) {
+        firstForPart1 = false
+        // what native fetch does on a connection reset / DNS failure
+        throw new TypeError('fetch failed')
+      }
+      return new Response(null, { status: 200, headers: { ETag: `"e${part}"` } })
+    }
+    const { client, calls } = realPartClient(fetch, 3_600_000)
+    const reader = fileReader(path)
+    try {
+      const result = await runChunkedUpload(client, {
+        target: { kind: 'workspace', workspaceId: 'ws_1' },
+        filename: 'big.docx',
+        size: built.size,
+        probe,
+        idempotencyKey: 'idem-r1-01a',
+        readRange: reader.readRange,
+      })
+      expect(result.kind).toBe('document')
+      // the TypeError was normalized to a retryable network failure: part 1
+      // went twice, not once, and the run completed
+      expect(putCounts.get(1)).toBe(2)
+      expect(calls.completes).toHaveLength(1)
+      expect(calls.completes[0]).toHaveLength(6)
+    } finally {
+      reader.close()
+    }
+  })
+
+  it('deadline-aborts a part whose fetch never settles, then retries it', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    let firstForPart1 = true
+    const putCounts = new Map<number, number>()
+    const fetch: FetchLike = async (url, init) => {
+      const part = Number(new URL(url).pathname.split('/').pop())
+      putCounts.set(part, (putCounts.get(part) ?? 0) + 1)
+      if (part === 1 && firstForPart1) {
+        firstForPart1 = false
+        // a stalled PUT: it settles only when the deadline aborts it
+        return await new Promise<Response>((_resolve, reject) => {
+          const abort = () => {
+            const error = new Error('The operation was aborted.')
+            error.name = 'AbortError'
+            reject(error)
+          }
+          if (init?.signal?.aborted) abort()
+          else init?.signal?.addEventListener('abort', abort, { once: true })
+        })
+      }
+      return new Response(null, { status: 200, headers: { ETag: `"e${part}"` } })
+    }
+    const { client, calls } = realPartClient(fetch, 5)
+    const reader = fileReader(path)
+    try {
+      const result = await runChunkedUpload(client, {
+        target: { kind: 'workspace', workspaceId: 'ws_1' },
+        filename: 'big.docx',
+        size: built.size,
+        probe,
+        idempotencyKey: 'idem-r1-01b',
+        readRange: reader.readRange,
+      })
+      expect(result.kind).toBe('document')
+      // the deadline turned the stall into a typed timeout, which is retryable
+      expect(putCounts.get(1)).toBe(2)
+      expect(calls.completes).toHaveLength(1)
+    } finally {
+      reader.close()
+    }
+  })
+})
+
+// ---- R1-BE-06: the exact OOXML main part ------------------------------------
+
+describe('R1-BE-06: the probe demands the format main part, not just its folder', () => {
+  it('refuses a media-only DOCX, and accepts the same package with its main part', async () => {
+    const mediaOnly = join(dir, 'media-only.docx')
+    const built = buildZip(mediaOnly, [
+      { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+      { name: 'word/media/image1.png', data: Buffer.from('png') },
+    ])
+    const refused = await readLocalFileProbe(
+      { path: mediaOnly },
+      built.size,
+      'media-only.docx',
+    ).catch((error: unknown) => error)
+    expect(refused).toBeInstanceOf(UniworkDocError)
+    expect((refused as UniworkDocError).serverCode).toBe('ooxml_missing_part')
+
+    // the same package with the exact main part is a DOCX
+    const complete = join(dir, 'complete.docx')
+    const withMain = buildZip(complete, [
+      { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+      { name: 'word/media/image1.png', data: Buffer.from('png') },
+      { name: 'word/document.xml', data: Buffer.from('<w:document/>') },
+    ])
+    await expect(
+      readLocalFileProbe({ path: complete }, withMain.size, 'complete.docx'),
+    ).resolves.toBeTruthy()
+  })
+
+  it('demands each format’s own main part, case-folded', async () => {
+    const cases: Array<[string, string]> = [
+      ['a.xlsx', 'xl/workbook.xml'],
+      ['a.pptx', 'ppt/presentation.xml'],
+    ]
+    for (const [filename, mainPart] of cases) {
+      const path = join(dir, filename)
+      const without = buildZip(path, [
+        { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+        { name: mainPart.replace(/[^/]+$/, 'other.xml'), data: Buffer.from('<x/>') },
+      ])
+      const refused = await readLocalFileProbe({ path }, without.size, filename).catch((e) => e)
+      expect((refused as UniworkDocError).serverCode).toBe('ooxml_missing_part')
+
+      // the main part's case never matters: the server case-folds it too
+      const upper = join(dir, `upper-${filename}`)
+      const withMain = buildZip(upper, [
+        { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+        { name: mainPart.toUpperCase(), data: Buffer.from('<x/>') },
+      ])
+      await expect(
+        readLocalFileProbe({ path: upper }, withMain.size, filename),
+      ).resolves.toBeTruthy()
+    }
+  })
+})
+
+// ---- R1-BE-07: ZIP64 entry sizes -------------------------------------------
+
+describe('R1-BE-07: a ZIP64 entry size is read from its extra field', () => {
+  it('accepts a valid ZIP64-entry package with tiny real sizes', async () => {
+    const path = join(dir, 'zip64.docx')
+    const built = buildZip(path, [
+      { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+      { name: 'word/document.xml', data: Buffer.from('<w:document/>') },
+      // both 32-bit sizes saturate; the real sizes (4 and 2 bytes) ride the
+      // ZIP64 extra record. Reading the sentinel as a number refused this as
+      // a >512 MiB zip bomb
+      {
+        name: 'word/media/tiny.bin',
+        data: Buffer.from('abcd'),
+        zip64: { compressed: 2, uncompressed: 4 },
+      },
+    ])
+    const probe = await readLocalFileProbe({ path }, built.size, 'zip64.docx')
+    expect(probe.cd_offset).toBe(built.cdOffset)
+  })
+
+  it('refuses a saturated size with a truncated ZIP64 record, and with none at all', async () => {
+    const truncated = join(dir, 'zip64-truncated.docx')
+    const cut = buildZip(truncated, [
+      { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+      { name: 'word/document.xml', data: Buffer.from('<w:document/>') },
+      {
+        name: 'word/media/tiny.bin',
+        data: Buffer.from('abcd'),
+        zip64: { compressed: 2, uncompressed: 4, truncate: true },
+      },
+    ])
+    const refused = await readLocalFileProbe(
+      { path: truncated },
+      cut.size,
+      'zip64-truncated.docx',
+    ).catch((error: unknown) => error)
+    expect((refused as UniworkDocError).serverCode).toBe('zip_unreadable')
+
+    const missing = join(dir, 'zip64-missing.docx')
+    const none = buildZip(missing, [
+      { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+      { name: 'word/document.xml', data: Buffer.from('<w:document/>') },
+      {
+        name: 'word/media/tiny.bin',
+        data: Buffer.from('abcd'),
+        zip64: { compressed: 2, uncompressed: 4, noRecord: true },
+      },
+    ])
+    const without = await readLocalFileProbe(
+      { path: missing },
+      none.size,
+      'zip64-missing.docx',
+    ).catch((error: unknown) => error)
+    expect((without as UniworkDocError).serverCode).toBe('zip_unreadable')
+  })
+})
+
+// ---- R1-BE-05: the retry ladder is independent of URL refreshes ------------
+
+describe('R1-BE-05: a re-sign never consumes a transient retry', () => {
+  it('re-signs on three 403s and still retries the next 503 at the first 1 s delay', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    const { client, calls } = fakeSessions({
+      size: built.size,
+      // part 1: after the re-signs, one 503 that must still get a 1 s retry
+      putFaults: { 1: { error: new UniworkDocError('server_error', { status: 503 }), times: 1 } },
+    })
+    let forbids = 3
+    let part1Attempts = 0
+    const originalPut = client.putUploadPart.bind(client)
+    client.putUploadPart = async (input) => {
+      if (input.partNumber === 1) part1Attempts += 1
+      if (input.partNumber === 1 && forbids > 0) {
+        forbids -= 1
+        throw new UniworkDocError('forbidden', { status: 403 })
+      }
+      return await originalPut(input)
+    }
+    // capture the retry delays without faking time, so the real 1 s sleep still
+    // runs and its exact value is asserted (the spy calls through)
+    const timerSpy = vi.spyOn(globalThis, 'setTimeout')
+    const reader = fileReader(path)
+    try {
+      const result = await runChunkedUpload(client, {
+        target: { kind: 'workspace', workspaceId: 'ws_1' },
+        filename: 'big.docx',
+        size: built.size,
+        probe,
+        idempotencyKey: 'idem-r1-05',
+        readRange: reader.readRange,
+      })
+      expect(result.kind).toBe('document')
+      // three 403 attempts, one fresh-URL attempt, one 503, one retry: five
+      // PUTs. A shared counter would have thrown on the 503 (attempt 4)
+      expect(part1Attempts).toBe(5)
+      expect(calls.refreshes).toBeGreaterThanOrEqual(3)
+      // the re-signs consumed no retry, so the first transient retry is 1 s
+      const delays = timerSpy.mock.calls
+        .map((call) => call[1])
+        .filter((ms) => ms === 1_000 || ms === 2_000 || ms === 4_000)
+      expect(delays[0]).toBe(1_000)
+    } finally {
+      reader.close()
+    }
+  })
+})
+
+// ---- R1-BE-08: a create idempotency mismatch restarts under a fresh key ----
+
+describe('R1-BE-08: a rejected create key is replaced once', () => {
+  it('retries the create under a fresh key on 409 idempotency_payload_mismatch', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    const { client, calls } = fakeSessions({ size: built.size })
+    const createKeys: string[] = []
+    let first = true
+    const original = client.createWorkspaceUploadSession.bind(client)
+    client.createWorkspaceUploadSession = async (input) => {
+      createKeys.push(input.idempotencyKey)
+      if (first) {
+        first = false
+        throw new UniworkDocError('idempotency_mismatch', {
+          status: 409,
+          serverCode: 'idempotency_payload_mismatch',
+        })
+      }
+      return await original(input)
+    }
+    const keys: string[] = []
+    const reader = fileReader(path)
+    try {
+      const result = await runChunkedUpload(client, {
+        target: { kind: 'workspace', workspaceId: 'ws_1' },
+        filename: 'big.docx',
+        size: built.size,
+        probe,
+        idempotencyKey: 'rejected-key',
+        freshIdempotencyKey: () => 'fresh-key',
+        onIdempotencyKey: (key) => keys.push(key),
+        readRange: reader.readRange,
+      })
+      expect(result.kind).toBe('document')
+      // the retry never replayed the rejected key
+      expect(createKeys).toEqual(['rejected-key', 'fresh-key'])
+      expect(keys).toEqual(['fresh-key'])
+      expect(calls.completes).toHaveLength(1)
+    } finally {
+      reader.close()
+    }
+  })
+
+  it('does not retry a second mismatch: the verdict is the answer', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    const { client } = fakeSessions({ size: built.size })
+    let creates = 0
+    client.createWorkspaceUploadSession = async () => {
+      creates += 1
+      throw new UniworkDocError('idempotency_mismatch', {
+        status: 409,
+        serverCode: 'idempotency_payload_mismatch',
+      })
+    }
+    const error = await runChunkedUpload(client, {
+      target: { kind: 'workspace', workspaceId: 'ws_1' },
+      filename: 'big.docx',
+      size: built.size,
+      probe,
+      idempotencyKey: 'rejected-key',
+      freshIdempotencyKey: () => 'fresh-key',
+      readRange: async (offset, length) => new Uint8Array(length),
+    }).catch((e) => e)
+    expect((error as UniworkDocError).code).toBe('idempotency_mismatch')
+    // the first attempt plus exactly one restart under the fresh key
+    expect(creates).toBe(2)
+  })
+})
+
+// ---- R1-BE-09: a session gone mid-run restarts once, real verdict kept -----
+
+describe('R1-BE-09: a session gone at refresh, complete or the busy poll restarts once', () => {
+  const resume: SavedUploadSession = {
+    sessionId: 'ups_1',
+    partSize: PART_SIZE,
+    totalParts: 6,
+    completedParts: [{ partNumber: 1, etag: 'e1' }],
+    expiresAt: '2026-10-18T00:00:00Z',
+  }
+
+  it('restarts from part 1 when a URL refresh answers 410', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    // no parts stored: part 1's URL is present, so the pool uploads first and
+    // only a later refresh can 410 (the refresh happens on the NEXT publish
+    // cycle). To force a refresh deterministically, part 1's URL is missing.
+    const { client, calls } = fakeSessions({ size: built.size, nearExpiry: true })
+    // the FIRST get (the resume) succeeds; every later refresh 410s once
+    let gets = 0
+    const originalGet = client.getUploadSession.bind(client)
+    client.getUploadSession = async (sessionId, signal) => {
+      gets += 1
+      if (gets === 2) {
+        throw new UniworkDocError('not_found', {
+          status: 410,
+          serverCode: 'upload_session_expired',
+        })
+      }
+      return await originalGet(sessionId, signal)
+    }
+    const keys: string[] = []
+    const reader = fileReader(path)
+    try {
+      const result = await runChunkedUpload(client, {
+        target: { kind: 'workspace', workspaceId: 'ws_1' },
+        filename: 'big.docx',
+        size: built.size,
+        probe,
+        idempotencyKey: 'idem-r1-09a',
+        // no part stored yet: part 1 is the pool's first PUT, and its
+        // near-expiry URL forces the refresh that 410s
+        resume: { ...resume, completedParts: [] },
+        freshIdempotencyKey: () => 'fresh-r1-09a',
+        onIdempotencyKey: (key) => keys.push(key),
+        readRange: reader.readRange,
+      })
+      expect(result.kind).toBe('document')
+      // a restart created a fresh session under the fresh key (the dead
+      // session's key is never replayed), and every part went again (the pool
+      // may have had a few parts in flight when the refresh 410'd, so a part
+      // can appear twice - what matters is that all six go at least once)
+      expect(keys).toEqual(['fresh-r1-09a'])
+      expect(calls.creates).toHaveLength(1)
+      expect(calls.creates[0]!.idempotencyKey).toBe('fresh-r1-09a')
+      expect([...new Set(calls.partPuts)].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6])
+    } finally {
+      reader.close()
+    }
+  })
+
+  it('restarts when complete answers 410, and reports that verdict not an earlier one', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    const { client, calls } = fakeSessions({
+      size: built.size,
+      completeFaults: [
+        new UniworkDocError('not_found', { status: 410, serverCode: 'upload_session_expired' }),
+      ],
+    })
+    const keys: string[] = []
+    const reader = fileReader(path)
+    try {
+      const result = await runChunkedUpload(client, {
+        target: { kind: 'workspace', workspaceId: 'ws_1' },
+        filename: 'big.docx',
+        size: built.size,
+        probe,
+        idempotencyKey: 'idem-r1-09b',
+        resume,
+        freshIdempotencyKey: () => 'fresh-r1-09b',
+        onIdempotencyKey: (key) => keys.push(key),
+        readRange: reader.readRange,
+      })
+      expect(result.kind).toBe('document')
+      expect(keys).toEqual(['fresh-r1-09b'])
+      // one restart create under the fresh key, then a second complete that
+      // succeeds; the restart re-sends the parts from part 1 (the resumed
+      // session's parts are not carried into the new one)
+      expect(calls.creates).toHaveLength(1)
+      expect(calls.creates[0]!.idempotencyKey).toBe('fresh-r1-09b')
+      expect(calls.completes).toHaveLength(2)
+      expect([...new Set(calls.partPuts)].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6])
+    } finally {
+      reader.close()
+    }
+  })
+
+  it('a gone session found by the busy poll ends the run with its own verdict', async () => {
+    const path = join(dir, 'big.docx')
+    const built = buildBigDocx(path)
+    const probe = await readLocalFileProbe({ path }, built.size, 'big.docx')
+    const { client } = fakeSessions({
+      size: built.size,
+      completeFaults: [
+        new UniworkDocError('server_error', {
+          status: 409,
+          serverCode: 'upload_session_busy',
+          retryAfterMs: 0,
+        }),
+      ],
+    })
+    // the poll after the busy verdict finds the session gone
+    let gets = 0
+    const originalGet = client.getUploadSession.bind(client)
+    client.getUploadSession = async (sessionId, signal) => {
+      gets += 1
+      if (gets === 1) {
+        throw new UniworkDocError('not_found', { status: 404, serverCode: 'not_found' })
+      }
+      return await originalGet(sessionId, signal)
+    }
+    // no fresh-key source: the gone verdict must surface, never the busy error
+    const error = await runChunkedUpload(client, {
+      target: { kind: 'workspace', workspaceId: 'ws_1' },
+      filename: 'big.docx',
+      size: built.size,
+      probe,
+      idempotencyKey: 'idem-r1-09c',
+      readRange: async (offset, length) => new Uint8Array(length),
+    }).catch((e) => e)
+    expect((error as UniworkDocError).code).toBe('not_found')
+    expect((error as UniworkDocError).serverCode).toBe('not_found')
   })
 })

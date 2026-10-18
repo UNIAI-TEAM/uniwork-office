@@ -102,6 +102,17 @@ export interface ChunkedUploadInput {
   onPhase?(phase: ChunkedUploadPhase): void
   /** called after create and after every finished part, so the caller can persist resume state */
   onSessionState?(state: SavedUploadSession): void | Promise<void>
+  /**
+   * R1-BE-08 / R1-BE-09: mints the create key of a RESTART. A create refused
+   * `409 idempotency_payload_mismatch` (the old key was for other bytes) and a
+   * session the server no longer knows (404/410) both need a NEW key: the
+   * server's idempotency record still holds the rejected one, so replaying it
+   * would refuse the retry for ever. Absent = the run cannot restart and the
+   * verdict propagates.
+   */
+  freshIdempotencyKey?(): string
+  /** R1-BE-08: the run adopted a new create key - the caller drops the rejected one */
+  onIdempotencyKey?(key: string): void | Promise<void>
 }
 
 export type ChunkedUploadResult =
@@ -119,6 +130,19 @@ interface ZipEntry {
   method: number
   compressedSize: number
   uncompressedSize: number
+}
+
+/**
+ * The exact part each editor opens first, case-folded - the server's own
+ * `ooxmlMainPart` map (`document/file_validation.go`). A package carrying only
+ * `word/media/image.png` is not a DOCX whatever its `[Content_Types].xml` says,
+ * and the server answers 415 `ooxml_missing_part`; the local probe must refuse
+ * it before a session is opened, with no request.
+ */
+const OOXML_MAIN_PART: Record<string, string> = {
+  docx: 'word/document.xml',
+  xlsx: 'xl/workbook.xml',
+  pptx: 'ppt/presentation.xml',
 }
 
 const utf8 = new TextDecoder('utf-8', { fatal: false })
@@ -362,18 +386,42 @@ function checkZipRules(centralDir: Uint8Array, format: string): void {
     const extraLength = view.getUint16(at + 30, true)
     const commentLength = view.getUint16(at + 32, true)
     const nameStart = at + 46
-    if (nameStart + nameLength > centralDir.length) {
+    const extraStart = nameStart + nameLength
+    if (extraStart + extraLength > centralDir.length) {
       throw new UniworkDocError('unsupported_format', { serverCode: 'zip_unreadable' })
     }
     const name = utf8.decode(centralDir.subarray(nameStart, nameStart + nameLength))
+    // R1-BE-07: a saturated 32-bit field means the real value is in the entry's
+    // ZIP64 extra field (id 0x0001, the same order the spec fixes: uncompressed
+    // then compressed, each present only when its 32-bit twin is saturated).
+    // Reading the sentinel as a number counted a valid ZIP64 entry as 4 GiB and
+    // refused the package as a zip bomb; the server's `archive/zip` reads
+    // `UncompressedSize64`/`CompressedSize64` and accepts it.
+    const compressed32 = view.getUint32(at + 20, true)
+    const uncompressed32 = view.getUint32(at + 24, true)
+    let compressedSize = compressed32
+    let uncompressedSize = uncompressed32
+    if (compressed32 === 0xffffffff || uncompressed32 === 0xffffffff) {
+      const zip64 = readZip64EntrySizes(
+        centralDir,
+        extraStart,
+        extraLength,
+        compressed32 === 0xffffffff,
+        uncompressed32 === 0xffffffff,
+      )
+      if (zip64) {
+        uncompressedSize = zip64.uncompressedSize
+        compressedSize = zip64.compressedSize
+      }
+    }
     const entry: ZipEntry = {
       name,
       method: view.getUint16(at + 10, true),
-      compressedSize: view.getUint32(at + 20, true),
-      uncompressedSize: view.getUint32(at + 24, true),
+      compressedSize,
+      uncompressedSize,
     }
     entries.push(entry)
-    at = nameStart + nameLength + extraLength + commentLength
+    at = extraStart + extraLength + commentLength
   }
   if (entries.length === 0) {
     throw new UniworkDocError('unsupported_format', { serverCode: 'zip_unreadable' })
@@ -405,13 +453,70 @@ function checkZipRules(centralDir: Uint8Array, format: string): void {
       throw new UniworkDocError('unsupported_format', { serverCode: 'zip_compression_ratio' })
     }
   }
-  const required = format === 'docx' ? 'word/' : format === 'xlsx' ? 'xl/' : 'ppt/'
   if (!seen.has('[content_types].xml')) {
     throw new UniworkDocError('unsupported_format', { serverCode: 'ooxml_missing_part' })
   }
-  if (!entries.some((entry) => entry.name.toLowerCase().startsWith(required))) {
+  // R1-BE-06: the format's EXACT main part, not merely its folder - a DOCX with
+  // only `word/media/image.png` is refused here, exactly as the server refuses
+  // it (`ooxmlMainPart`), so no session is ever opened for it.
+  if (!seen.has(OOXML_MAIN_PART[format]!)) {
     throw new UniworkDocError('unsupported_format', { serverCode: 'ooxml_missing_part' })
   }
+}
+
+/**
+ * R1-BE-07: the ZIP64 sizes of one central-directory entry, read from its
+ * bounded extra field (id 0x0001) when a 32-bit size field is saturated. The
+ * extra field is a chain of `[id: u16][size: u16][payload]` records; the ZIP64
+ * record holds `uncompressed` first, then `compressed`, each only when the
+ * matching 32-bit field is `0xffffffff`. Anything truncated or unsafe is
+ * refused rather than guessed at, and the walk never leaves the entry's own
+ * extra bytes.
+ */
+function readZip64EntrySizes(
+  centralDir: Uint8Array,
+  extraStart: number,
+  extraLength: number,
+  needCompressed: boolean,
+  needUncompressed: boolean,
+): { uncompressedSize: number; compressedSize: number } | null {
+  const view = new DataView(centralDir.buffer, centralDir.byteOffset, centralDir.byteLength)
+  let at = extraStart
+  const end = extraStart + extraLength
+  while (at + 4 <= end) {
+    const id = view.getUint16(at, true)
+    const size = view.getUint16(at + 2, true)
+    const body = at + 4
+    if (body + size > end) {
+      throw new UniworkDocError('unsupported_format', { serverCode: 'zip_unreadable' })
+    }
+    if (id === 0x0001) {
+      let cursor = body
+      let uncompressedSize: number | undefined
+      let compressedSize: number | undefined
+      if (needUncompressed) {
+        if (cursor + 8 > body + size) {
+          throw new UniworkDocError('unsupported_format', { serverCode: 'zip_unreadable' })
+        }
+        uncompressedSize = readUint64(view, cursor)
+        cursor += 8
+      }
+      if (needCompressed) {
+        if (cursor + 8 > body + size) {
+          throw new UniworkDocError('unsupported_format', { serverCode: 'zip_unreadable' })
+        }
+        compressedSize = readUint64(view, cursor)
+      }
+      return {
+        uncompressedSize: uncompressedSize ?? 0xffffffff,
+        compressedSize: compressedSize ?? 0xffffffff,
+      }
+    }
+    at = body + size
+  }
+  // a saturated field with no ZIP64 record to explain it: the package is not
+  // one this probe can size, so it is refused rather than read as 4 GiB
+  throw new UniworkDocError('unsupported_format', { serverCode: 'zip_unreadable' })
 }
 
 /** the server's `checkEntryName`: relative, forward slashes, no control bytes, bounded */
@@ -438,12 +543,54 @@ function checkEntryName(name: string): void {
  * whole error table of the contract is here - a session the server no longer
  * knows restarts from part 1, a busy `complete` waits and re-reads, and a part
  * whose URL expired is re-signed without touching the parts already stored.
+ *
+ * R1-BE-09: "a session the server no longer knows" is a verdict about the
+ * WHOLE run, not just the initial resume GET: a 404/410 from a URL refresh, a
+ * `complete`, or the busy poll ends this attempt the same way, and the run
+ * restarts ONCE - from part 1, under a NEW create key (the server's idempotency
+ * record still holds the old one, so replaying it would return the dead
+ * session again) - with the real not-found verdict as the answer when there is
+ * no fresh key to restart with.
  */
 export async function runChunkedUpload(
   client: UploadSessionClient,
   input: ChunkedUploadInput,
 ): Promise<ChunkedUploadResult> {
-  let session = await openOrResumeSession(client, input)
+  let idempotencyKey = input.idempotencyKey
+  let restarted = false
+  for (;;) {
+    try {
+      return await runSessionAttempt(client, input, {
+        idempotencyKey,
+        ...(restarted || !input.resume ? {} : { resume: input.resume }),
+      })
+    } catch (error) {
+      // R1-BE-02: a cancel before an accepted 2xx is the answer, whatever the
+      // aborted request surfaced as (a GET/complete rejection, a transport
+      // error). A Cancel AFTER an accepted 2xx returned normally above and is
+      // never seen here, which keeps the existing boundary rule intact.
+      if (input.signal?.aborted) throw abortedError()
+      // R1-BE-08 / R1-BE-09: a create key the server rejected for another body,
+      // and a session it no longer knows, both end this attempt; each restarts
+      // ONCE from part 1 under a NEW create key
+      if (!isSessionGone(error) && !isCreateKeyRejected(error)) throw error
+      if (restarted) throw error
+      const fresh = input.freshIdempotencyKey?.()
+      if (!fresh || fresh === idempotencyKey) throw error
+      restarted = true
+      idempotencyKey = fresh
+      await input.onIdempotencyKey?.(fresh)
+    }
+  }
+}
+
+/** one attempt at a session: open (or resume) it, upload the parts, complete */
+async function runSessionAttempt(
+  client: UploadSessionClient,
+  input: ChunkedUploadInput,
+  attempt: { idempotencyKey: string; resume?: SavedUploadSession },
+): Promise<ChunkedUploadResult> {
+  let session = await openOrResumeSession(client, input, attempt)
   let completed = new Map(session.completedParts.map((part) => [part.partNumber, part.etag]))
   let urls = new Map(session.parts.map((part) => [part.partNumber, part]))
   const total = input.size
@@ -464,7 +611,7 @@ export async function runChunkedUpload(
   input.onProgress?.(loaded, total)
 
   const refreshUrls = async (): Promise<void> => {
-    const fresh = await client.getUploadSession(session.sessionId)
+    const fresh = await client.getUploadSession(session.sessionId, input.signal)
     session = fresh
     urls = new Map(fresh.parts.map((part) => [part.partNumber, part]))
     // the server's ListParts is the authority on what the storage holds, so a
@@ -501,8 +648,14 @@ export async function runChunkedUpload(
   }
 
   const uploadPart = async (partNumber: number): Promise<void> => {
+    // R1-BE-05: two independent budgets. `refreshes` counts re-signs (an
+    // expired presigned URL is NOT a failed attempt - the contract is explicit
+    // that a refresh does not count as a retry), `retries` counts only the
+    // transient failures whose ladder is 1/2/4 s. Sharing one counter made a
+    // re-signed part lose transient retries and shifted the first delay to 2 s.
     let refreshes = 0
-    for (let attempt = 0; ; attempt += 1) {
+    let retries = 0
+    for (;;) {
       throwIfAborted(input.signal)
       const part = urls.get(partNumber)
       if (!part || Date.parse(part.expiresAt) - Date.now() <= PART_URL_EXPIRY_MARGIN_MS) {
@@ -541,8 +694,9 @@ export async function runChunkedUpload(
           await refreshUrls()
           continue
         }
-        if (!isRetryablePartFailure(error) || attempt >= PART_RETRY_DELAYS_MS.length) throw error
-        await sleep(PART_RETRY_DELAYS_MS[attempt]!, input.signal)
+        if (!isRetryablePartFailure(error) || retries >= PART_RETRY_DELAYS_MS.length) throw error
+        await sleep(PART_RETRY_DELAYS_MS[retries]!, input.signal)
+        retries += 1
       }
     }
   }
@@ -584,32 +738,32 @@ export async function runChunkedUpload(
 async function openOrResumeSession(
   client: UploadSessionClient,
   input: ChunkedUploadInput,
+  attempt: { idempotencyKey: string; resume?: SavedUploadSession },
 ): Promise<UploadSessionForRun> {
-  if (input.resume) {
-    try {
-      const state = await client.getUploadSession(input.resume.sessionId)
-      // A session the server is already validating (or has completed) has all
-      // its parts: the run skips straight to `complete`, which answers the
-      // stored result for a finished one. `validating` on the GET is therefore
-      // NOT a restart - the parts are there, and a fresh session would throw
-      // 200 MiB of upload away.
-      return {
-        sessionId: state.sessionId,
-        status: state.status,
-        partSize: state.partSize || input.resume.partSize,
-        totalParts: state.totalParts || input.resume.totalParts,
-        completedParts: state.completedParts.length
-          ? state.completedParts.map((part) => ({ partNumber: part.partNumber, etag: part.etag }))
-          : input.resume.completedParts,
-        parts: state.parts,
-        expiresAt: state.expiresAt,
-      }
-    } catch (error) {
-      // 404 / 410: the saved session is gone - start over from part 1
-      if (!isSessionGone(error)) throw error
+  if (attempt.resume) {
+    // R1-BE-09: a saved session the server no longer knows is NOT swallowed
+    // here - the GET's 404/410 propagates so the run can restart once with a
+    // fresh create key. Creating under the old key would only return the dead
+    // session again (the server dedups a key to the session it produced).
+    const state = await client.getUploadSession(attempt.resume.sessionId, input.signal)
+    // A session the server is already validating (or has completed) has all
+    // its parts: the run skips straight to `complete`, which answers the
+    // stored result for a finished one. `validating` on the GET is therefore
+    // NOT a restart - the parts are there, and a fresh session would throw
+    // 200 MiB of upload away.
+    return {
+      sessionId: state.sessionId,
+      status: state.status,
+      partSize: state.partSize || attempt.resume.partSize,
+      totalParts: state.totalParts || attempt.resume.totalParts,
+      completedParts: state.completedParts.length
+        ? state.completedParts.map((part) => ({ partNumber: part.partNumber, etag: part.etag }))
+        : attempt.resume.completedParts,
+      parts: state.parts,
+      expiresAt: state.expiresAt,
     }
   }
-  return createSession(client, input)
+  return createSession(client, input, attempt.idempotencyKey)
 }
 
 interface UploadSessionForRun {
@@ -632,6 +786,7 @@ interface UploadSessionForRun {
 async function createSession(
   client: UploadSessionClient,
   input: ChunkedUploadInput,
+  idempotencyKey: string,
 ): Promise<UploadSessionForRun> {
   const probe: LocalFileProbePayload = {
     head_b64: input.probe.head_b64,
@@ -647,7 +802,7 @@ async function createSession(
           filename: input.filename,
           sizeBytes: input.size,
           probe,
-          idempotencyKey: input.idempotencyKey,
+          idempotencyKey,
           ...(target.parentId !== undefined ? { parentId: target.parentId } : {}),
           ...(target.title !== undefined ? { title: target.title } : {}),
           ...(target.visibility !== undefined ? { visibility: target.visibility } : {}),
@@ -658,7 +813,7 @@ async function createSession(
           filename: input.filename,
           sizeBytes: input.size,
           probe,
-          idempotencyKey: input.idempotencyKey,
+          idempotencyKey,
           ...(input.signal ? { signal: input.signal } : {}),
         })
   return { ...state, status: state.status ?? 'open' }
@@ -683,7 +838,11 @@ async function completeWithBusyRetry(
   for (let attempt = 0; ; attempt += 1) {
     throwIfAborted(signal)
     try {
-      const answer = await client.completeUploadSession({ sessionId: session.sessionId, parts })
+      const answer = await client.completeUploadSession({
+        sessionId: session.sessionId,
+        parts,
+        ...(signal ? { signal } : {}),
+      })
       return answer.kind === 'document'
         ? { kind: 'document', document: answer.document }
         : { kind: 'upload', upload: answer.upload }
@@ -694,10 +853,10 @@ async function completeWithBusyRetry(
       const delay = error.retryAfterMs ?? COMPLETE_BUSY_DEFAULT_DELAY_MS
       for (let waited = 0; waited <= COMPLETE_BUSY_WAIT_LIMIT; waited += 1) {
         await sleep(delay, signal)
-        const status = await readSessionStatus(client, session.sessionId)
-        // a session the server no longer has is not ours to finish: the caller
-        // drops its saved session and its next attempt starts a fresh one
-        if (status === null) throw error
+        // R1-BE-09: a poll that finds the session gone throws its own 404/410 -
+        // that is the verdict about this run, not the earlier busy error, so it
+        // propagates and the run restarts from part 1.
+        const status = (await client.getUploadSession(session.sessionId, signal)).status ?? 'open'
         if (status !== 'validating') break
       }
     }
@@ -710,19 +869,6 @@ const COMPLETE_BUSY_ATTEMPTS = 3
 const COMPLETE_BUSY_DEFAULT_DELAY_MS = 5_000
 /** how many times one run waits out another call's validation */
 const COMPLETE_BUSY_WAIT_LIMIT = 60
-
-/** the session's status, or null when the server no longer knows the session */
-async function readSessionStatus(
-  client: UploadSessionClient,
-  sessionId: string,
-): Promise<UploadSessionStatus | null> {
-  try {
-    return (await client.getUploadSession(sessionId)).status
-  } catch (error) {
-    if (isSessionGone(error)) return null
-    throw error
-  }
-}
 
 /** the parts the server holds of a saved session, as bytes already sent */
 function sumPartBytes(completed: Map<number, string>, partSize: number, total: number): number {
@@ -768,11 +914,26 @@ function isRetryablePartFailure(error: unknown): boolean {
   return error.status === 429 || error.status >= 500
 }
 
-/** the session is gone: drop the saved state and start a new one */
+/**
+ * R1-BE-09: the session is gone - the server no longer has it. `404 not_found`
+ * is the plain case and `410 upload_session_expired` maps to the same code (see
+ * `errorFromResponse`), so both are covered. A `upload_session_too_small` is NOT
+ * a gone session: it is the threshold drift, which the caller answers by falling
+ * back to the single-request path - restarting it under a fresh key would only
+ * spend another create.
+ */
 function isSessionGone(error: unknown): boolean {
-  if (!(error instanceof UniworkDocError)) return false
-  if (error.code === 'not_found') return true
-  return error.serverCode === 'upload_session_too_small'
+  return error instanceof UniworkDocError && error.code === 'not_found'
+}
+
+/**
+ * R1-BE-08: the create key was already used for a different body
+ * (`409 idempotency_payload_mismatch`). The server's idempotency record still
+ * holds that key, so replaying it can only refuse again - the run must mint a
+ * fresh key and try the create once more.
+ */
+function isCreateKeyRejected(error: unknown): boolean {
+  return error instanceof UniworkDocError && error.code === 'idempotency_mismatch'
 }
 
 function abortedError(): UniworkDocError {
@@ -818,6 +979,13 @@ export async function abortUploadSession(
     await client.deleteUploadSession(sessionId)
   } catch (error) {
     if (isSessionGone(error)) return
+    // R1 side note: the raw error is never logged - a store/filesystem failure
+    // can carry a local path. Only the typed code is, like every hardened
+    // boundary in this module.
+    console.warn(
+      'uniwork docs: the upload session could not be aborted:',
+      error instanceof UniworkDocError ? error.code : 'unknown',
+    )
     throw error
   }
 }

@@ -37,6 +37,18 @@ export interface UploadSessionRecord {
   workspaceId: string
   /** the folder the document will be created in; null = the caller's My Folder */
   folderId: string | null
+  /**
+   * R1-BE-03: the rest of the create fingerprint - the title, file name and
+   * visibility the session was opened with. A saved session may only be resumed
+   * when ALL of them still match the new command, so a re-pick of the same
+   * unchanged file for another folder, or a first save retried under another
+   * title, aborts the old session instead of finishing the old command.
+   * Optional because a record written before this build has none (it then
+   * cannot be proven to match, so it is not resumed).
+   */
+  title?: string
+  filename?: string
+  visibility?: string | null
   path: string
   size: number
   mtimeMs: number
@@ -105,6 +117,13 @@ function decodeRecord(raw: unknown): UploadSessionRecord | null {
     sessionId: record.sessionId,
     workspaceId: record.workspaceId,
     folderId: typeof record.folderId === 'string' ? record.folderId : null,
+    ...(isStr(record.title) ? { title: record.title } : {}),
+    ...(isStr(record.filename) ? { filename: record.filename } : {}),
+    ...(typeof record.visibility === 'string'
+      ? { visibility: record.visibility }
+      : record.visibility === null
+        ? { visibility: null }
+        : {}),
     path: record.path,
     size: record.size,
     mtimeMs: record.mtimeMs,
