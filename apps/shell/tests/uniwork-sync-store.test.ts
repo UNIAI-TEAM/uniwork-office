@@ -318,6 +318,37 @@ describe('uniwork sync store layer', () => {
     expect(await readValue(records, 'k')).toEqual(Buffer.from('value'))
   })
 
+  // B33 (UNI-1362): a real write failure (ENOSPC) used to leave the encrypted
+  // temp file behind until the next scope scrub. The write drops the file it
+  // owns, then rethrows the original error.
+  it('a failed flush leaves no temp file behind and rethrows the original error', async () => {
+    const storePath = join(dir, 'dep_1', 'acc_1', 'cursors')
+    const layer = makeLayer({
+      fs: {
+        writeFile: async () => {
+          throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' })
+        },
+      },
+    })
+    const records = await openRecords(layer)
+    await expect(records.write('k', Buffer.from('value'))).rejects.toThrow('no space left')
+    expect(readdirSync(storePath)).toEqual([])
+  })
+
+  it('a refused publish drops its temp file too', async () => {
+    const storePath = join(dir, 'dep_1', 'acc_1', 'cursors')
+    const layer = makeLayer({
+      fs: {
+        renameSync: () => {
+          throw Object.assign(new Error('the disk is gone'), { code: 'EIO' })
+        },
+      },
+    })
+    const records = await openRecords(layer)
+    await expect(records.write('k', Buffer.from('value'))).rejects.toThrow('the disk is gone')
+    expect(readdirSync(storePath)).toEqual([])
+  })
+
   it('rejects unregistered stores, duplicate registrations and invalid registrations', async () => {
     const layer = makeLayer()
     const opened = await layer.open(SCOPE)
