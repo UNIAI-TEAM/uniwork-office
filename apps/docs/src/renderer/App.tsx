@@ -268,9 +268,11 @@ import {
 import { saveUntilPersisted } from './save-until-persisted'
 import {
   autoSaveToggleVisible,
+  nextDirtyWhileEditable,
   saveStateLabel,
   setEditorEditable,
   uniworkAllowsSave,
+  uniworkCloseDirty,
   uniworkExplainReadOnlySave,
   uniworkStateFor,
   useUniworkDocState,
@@ -5376,13 +5378,27 @@ export function App() {
   const anyDirtyRef = useRef(false)
   const hasUnsavedChanges = isDocDirty(fileCtxRef.current)
   anyDirtyRef.current = hasUnsavedChanges
+  // edits held when the edit lock is lost in place must still prompt on close
+  const dirtyWhileEditableRef = useRef(false)
+  dirtyWhileEditableRef.current = nextDirtyWhileEditable(
+    dirtyWhileEditableRef.current,
+    uniwork.readOnly,
+    hasUnsavedChanges || dirtyRef.current,
+  )
 
   // close guard: the main process queries dirty state before closing a tab/window; choosing "Save" runs a full save and reports back
   useEffect(() => {
     const offCheck = window.desktop.onCloseCheck?.(() => {
       window.desktop.reportCloseCheck({
-        // a view-only UniWork document cannot be saved in place: nothing to ask
-        dirty: !!doc && !uniwork.readOnly && (anyDirtyRef.current || dirtyRef.current),
+        // a view-only UniWork document cannot be saved in place: nothing to ask,
+        // unless it lost its lock while holding edits (those are kept, so ask)
+        dirty:
+          !!doc &&
+          uniworkCloseDirty(
+            uniwork.readOnly,
+            dirtyWhileEditableRef.current,
+            anyDirtyRef.current || dirtyRef.current,
+          ),
         autoSave: autoSaveActive && !!doc?.filePath,
         filePath: doc?.filePath ?? null,
       })

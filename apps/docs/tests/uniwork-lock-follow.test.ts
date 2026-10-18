@@ -11,6 +11,8 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import {
   NO_UNIWORK_STATE,
+  nextDirtyWhileEditable,
+  uniworkCloseDirty,
   uniworkExplainReadOnlySave,
   useUniworkDocState,
   type UniworkDocState,
@@ -190,5 +192,33 @@ describe('uniworkExplainReadOnlySave', () => {
   it('is a no-op when the seam is absent', () => {
     expect(() => uniworkExplainReadOnlySave({}, boundView, false, false, PATH)).not.toThrow()
     expect(() => uniworkExplainReadOnlySave(undefined, boundView, false, false, PATH)).not.toThrow()
+  })
+})
+
+describe('EL-1(b) fix10 (EL1B-FE-R2-2): the close check keeps edits held when the lock is lost', () => {
+  it('a copy that flips read-only while holding unsaved edits still reports dirty', () => {
+    let held = false
+    // editable renders: the doc picks up an edit
+    held = nextDirtyWhileEditable(held, false, true)
+    expect(uniworkCloseDirty(false, held, true)).toBe(true)
+    // the lock is lost in place: read-only, edits still in the editor
+    held = nextDirtyWhileEditable(held, true, true)
+    expect(uniworkCloseDirty(true, held, true)).toBe(true)
+  })
+
+  it('a copy opened view-only (never edited) asks nothing on close, even if a dirty flag is stale', () => {
+    let held = false
+    held = nextDirtyWhileEditable(held, true, true)
+    expect(uniworkCloseDirty(true, held, true)).toBe(false)
+    expect(uniworkCloseDirty(true, held, false)).toBe(false)
+  })
+
+  it('a clean doc is clean; a saved doc drops the kept-edits memory', () => {
+    let held = nextDirtyWhileEditable(false, false, true)
+    held = nextDirtyWhileEditable(held, false, false)
+    expect(held).toBe(false)
+    expect(uniworkCloseDirty(false, held, false)).toBe(false)
+    // edits gone after the flip (Save As / discard) -> nothing left to ask about
+    expect(uniworkCloseDirty(true, true, false)).toBe(false)
   })
 })

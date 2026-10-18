@@ -43,6 +43,34 @@ export function uniworkAllowsSave(
 }
 
 /**
+ * EL-1(b) fix10: whether the document held unsaved edits while it was still
+ * editable. Updated on every render: editable renders follow the live dirty
+ * state, read-only renders keep the last editable answer, so edits held when
+ * the lock is lost in place are remembered (AC-3 "edits kept") while a copy
+ * opened view-only never starts remembering any.
+ */
+export function nextDirtyWhileEditable(
+  previous: boolean,
+  readOnly: boolean,
+  dirty: boolean,
+): boolean {
+  return readOnly ? previous : dirty
+}
+
+/**
+ * Close-guard dirty report. A copy opened view-only has nothing to ask about
+ * (it cannot be saved in place), but one that lost its edit rights while
+ * holding unsaved edits must still prompt, or closing drops them silently.
+ */
+export function uniworkCloseDirty(
+  readOnly: boolean,
+  dirtyWhileEditable: boolean,
+  dirty: boolean,
+): boolean {
+  return dirty && (!readOnly || dirtyWhileEditable)
+}
+
+/**
  * Whether the AutoSave switch is shown. A UniWork document is written only by
  * an explicit Save (product rule), so it has no AutoSave switch at all, not
  * even a disabled one. A plain local file keeps it where the platform has a
