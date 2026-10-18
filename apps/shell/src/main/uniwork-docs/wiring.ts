@@ -118,6 +118,8 @@ export interface UniworkDocsWiring {
    */
   refuseLockedPath(path: string): boolean
   isPathOpen(path: string): boolean
+  /** EL-1(b) fix6 (VEL-2): broadcast `{ path }` to every renderer webContents */
+  pushDocStateChanged?(path: string): void
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
   reloadPath(path: string): void
   /**
@@ -772,6 +774,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    pushDocStateChanged: (path) => wiring.pushDocStateChanged?.(path),
     // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
     // discussionTarget already resolves); a detached editor window is not one
     isShellTab: (path) => (wiring.discussionTarget ? wiring.discussionTarget(path) !== null : true),

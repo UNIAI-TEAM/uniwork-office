@@ -124,6 +124,7 @@ import { registerUniworkWork } from './uniwork-work/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
 import {
   COMMENT_AUTHOR_CHANGED_CHANNEL,
+  UNIWORK_DOC_STATE_CHANGED_CHANNEL,
   createCommentAuthorResolver,
   installUniworkModuleSeams,
   watchCommentAuthorChanges,
@@ -4121,6 +4122,13 @@ function uniworkDocsWiring() {
     editorStateOf: (path: string) => editorStateOfPath(path),
     activePath: () => tabManager?.activeFilePath(),
     reveal: revealShellWindow,
+    // EL-1(b) fix6 (VEL-2): broadcast lock/access read-only flips to every
+    // editor webContents so open editors re-query uniwork-state in place.
+    pushDocStateChanged: (path: string) => {
+      for (const wc of webContents.getAllWebContents()) {
+        if (!wc.isDestroyed()) wc.send(UNIWORK_DOC_STATE_CHANGED_CHANNEL, { path })
+      }
+    },
     // G8-08: the editor showing the path (its preload listens for the reveal)
     commentsTarget: (path: string) => webContentsForPath(path)?.webContents,
     // G8-08/R1-2: the path the invoking editor window shows, so its held
@@ -7044,8 +7052,8 @@ app.on('before-quit', () => {
 app.on('will-quit', (event) => {
   if (beginEditLockWillQuit() === 'hold') {
     event.preventDefault()
-    void finishEditLockWillQuit((capMs) =>
-      uniworkDocs?.service.releaseAllEditLocks(capMs) ?? Promise.resolve(),
+    void finishEditLockWillQuit(
+      (capMs) => uniworkDocs?.service.releaseAllEditLocks(capMs) ?? Promise.resolve(),
     ).then(() => app.quit())
     return
   }

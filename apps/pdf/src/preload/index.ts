@@ -29,6 +29,21 @@ const api: PdfApi = {
   autoRename: (path, baseName) => ipcRenderer.invoke(PDF_CHANNELS.autoRename, path, baseName),
   isUntitled: (path) => ipcRenderer.invoke(PDF_CHANNELS.isUntitled, path),
   uniworkState: (path) => ipcRenderer.invoke(PDF_CHANNELS.uniworkState, path),
+  onUniworkStateChanged: (cb) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'path' in payload &&
+        typeof payload.path === 'string'
+      ) {
+        cb(payload.path)
+      }
+    }
+    ipcRenderer.on('uniwork:doc-state-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:doc-state-changed', listener)
+  },
+  uniworkReadOnlySave: (path) => ipcRenderer.invoke(PDF_CHANNELS.uniworkReadOnlySave, path),
   validateTextEdits: (request) => ipcRenderer.invoke(PDF_CHANNELS.validateTextEdits, request),
   listEditFonts: () => ipcRenderer.invoke(PDF_CHANNELS.listEditFonts),
   canDrawText: (text, font, bold, italic) =>

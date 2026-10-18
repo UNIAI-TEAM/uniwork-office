@@ -4,6 +4,7 @@ import {
   uniworkIsBound,
   uniworkIsLocked,
   uniworkIsReadOnly,
+  uniworkReadOnlySave,
   uniworkSaveAsDefault,
   uniworkSaveDecision,
 } from './uniwork-policy'
@@ -788,6 +789,19 @@ function registerMarkdownIpc(): void {
   ipcMain.handle(MARKDOWN_CHANNELS.uniworkState, (e): UniworkViewState => {
     const path = savePathByWc.get(e.sender.id)
     return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
+  ipcMain.handle(MARKDOWN_CHANNELS.uniworkReadOnlySave, (e, filePath?: unknown) => {
+    const path = savePathByWc.get(e.sender.id)
+    if (!path) return
+    if (
+      typeof filePath === 'string' &&
+      filePath.length > 0 &&
+      !allowedByWc.get(e.sender.id)?.has(filePath)
+    ) {
+      return
+    }
+    uniworkReadOnlySave(typeof filePath === 'string' && filePath.length > 0 ? filePath : path)
   })
 
   ipcMain.handle(

@@ -110,8 +110,7 @@ export class EditLockSession {
   private releaseWarned = false
   private acquiring = false
   /** in-flight acquire; ensureHeldBeforeCommit awaits this instead of returning mid-flight */
-  private acquireInFlight: Promise<void> | null = null
-
+  private acquireInFlight: Promise<boolean> | null = null
   constructor(opts: EditLockSessionOptions) {
     this.documentId = opts.documentId
     this.path = opts.path
@@ -146,11 +145,42 @@ export class EditLockSession {
   }
 
   async acquire(moveFromSelf = false): Promise<void> {
-    if (this.disposed) return
-    if (this.state.phase === 'held' && !moveFromSelf) return
-    if (this.acquiring && !moveFromSelf) {
-      if (this.acquireInFlight) await this.acquireInFlight
-      return
+    await this.beginAcquire(moveFromSelf, null)
+  }
+
+  /**
+   * "Sửa ở đây": R2, with move_from_self only from self_elsewhere. Never automatic.
+   * EL-1(b) fix6 (VEL-3): returns `false` when R2 fails by network / timeout / 5xx
+   * (keeping the previous read-only phase instead of switching to `'unreachable'`).
+   */
+  async editHere(): Promise<boolean> {
+    if (this.state.phase === 'self_elsewhere') {
+      return this.beginAcquire(true, this.state)
+    }
+    if (
+      this.state.phase === 'other' ||
+      this.state.phase === 'free' ||
+      this.state.phase === 'lost'
+    ) {
+      return this.beginAcquire(false, this.state)
+    }
+    if (this.state.phase === 'unreachable' || this.state.phase === 'none') {
+      return this.beginAcquire(false, null)
+    }
+    if (this.state.phase === 'acquiring') {
+      return this.acquireInFlight ? await this.acquireInFlight : false
+    }
+    return true
+  }
+
+  private async beginAcquire(
+    moveFromSelf: boolean,
+    keepOnTransientFailure: EditLockSessionView | null,
+  ): Promise<boolean> {
+    if (this.disposed) return false
+    if (this.state.phase === 'held' && !moveFromSelf) return true
+    if (this.acquiring && !moveFromSelf && keepOnTransientFailure === null) {
+      return this.acquireInFlight ? await this.acquireInFlight : false
     }
     const op = ++this.op
     this.acquiring = true
@@ -162,29 +192,14 @@ export class EditLockSession {
       lostReason: undefined,
       byName: undefined,
     })
-    const work = this.runAcquire(op, moveFromSelf, false).finally(() => {
+    const work = this.runAcquire(op, moveFromSelf, false, keepOnTransientFailure).finally(() => {
       if (op === this.op) {
         this.acquiring = false
         this.acquireInFlight = null
       }
     })
     this.acquireInFlight = work
-    await work
-  }
-
-  /** "Sửa ở đây": R2, with move_from_self only from self_elsewhere. Never automatic. */
-  editHere(): Promise<void> {
-    if (this.state.phase === 'self_elsewhere') return this.acquire(true)
-    if (
-      this.state.phase === 'other' ||
-      this.state.phase === 'free' ||
-      this.state.phase === 'lost' ||
-      this.state.phase === 'unreachable' ||
-      this.state.phase === 'none'
-    ) {
-      return this.acquire(false)
-    }
-    return Promise.resolve()
+    return work
   }
 
   /**
@@ -266,7 +281,12 @@ export class EditLockSession {
     this.clearTimers()
   }
 
-  private async runAcquire(op: number, moveFromSelf: boolean, retried: boolean): Promise<void> {
+  private async runAcquire(
+    op: number,
+    moveFromSelf: boolean,
+    retried: boolean,
+    keepOnTransientFailure: EditLockSessionView | null,
+  ): Promise<boolean> {
     const sentAt = this.now()
     try {
       const lock = await this.transport.acquire(
@@ -277,17 +297,18 @@ export class EditLockSession {
         await this.transport
           .release({ documentId: this.documentId, lockId: lock.lockId })
           .catch(() => undefined)
-        return
+        return false
       }
       this.grant(lock, sentAt)
+      return true
     } catch (error) {
-      if (op !== this.op || this.disposed) return
+      if (op !== this.op || this.disposed) return false
       if (isUniworkDocError(error) && error.code === 'edit_locked') {
         const heldByMe = error.editLock?.heldByMe === true
         if (heldByMe && !moveFromSelf && !retried) {
           await this.sleep(SETTLE_MS)
-          if (op !== this.op || this.disposed) return
-          return this.runAcquire(op, moveFromSelf, true)
+          if (op !== this.op || this.disposed) return false
+          return this.runAcquire(op, moveFromSelf, true, keepOnTransientFailure)
         }
         this.clearTimers()
         this.setState({
@@ -296,7 +317,7 @@ export class EditLockSession {
           since: error.editLock?.since ?? null,
         })
         if (!heldByMe) this.armPoll()
-        return
+        return true
       }
       if (
         isUniworkDocError(error) &&
@@ -308,9 +329,14 @@ export class EditLockSession {
       ) {
         this.clearTimers()
         this.setState({ phase: 'none', holderName: null, since: null })
-        return
+        return true
+      }
+      if (keepOnTransientFailure !== null) {
+        this.restorePreviousAfterFailedEditHere(keepOnTransientFailure)
+        return false
       }
       this.applyAcquireUnreachable(error)
+      return false
     }
   }
 
@@ -323,6 +349,12 @@ export class EditLockSession {
     this.setState({ phase: 'unreachable', holderName: null, since: null })
   }
 
+  private restorePreviousAfterFailedEditHere(previous: EditLockSessionView): void {
+    this.clearTimers()
+    this.state = previous
+    this.onChange?.(this.state)
+    if (previous.phase === 'other') this.armPoll()
+  }
   private grant(lock: EditLockTenure, sentAt: number): void {
     this.tenure = lock
     this.heartbeatMs = lock.heartbeatIntervalMs || DEFAULT_HEARTBEAT_MS

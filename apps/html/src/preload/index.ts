@@ -25,6 +25,21 @@ const api: HtmlApi = {
   presentInNewTab: (title) => ipcRenderer.invoke(HTML_CHANNELS.presentNewTab, title),
   save: (request) => ipcRenderer.invoke(HTML_CHANNELS.save, request),
   uniworkState: () => ipcRenderer.invoke(HTML_CHANNELS.uniworkState),
+  onUniworkStateChanged: (cb) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'path' in payload &&
+        typeof payload.path === 'string'
+      ) {
+        cb(payload.path)
+      }
+    }
+    ipcRenderer.on('uniwork:doc-state-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:doc-state-changed', listener)
+  },
+  uniworkReadOnlySave: (path) => ipcRenderer.invoke(HTML_CHANNELS.uniworkReadOnlySave, path),
   setDirty: (dirty) => ipcRenderer.send(HTML_CHANNELS.dirtyChanged, dirty),
   onSaveRequest: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, mode: SaveMode) => handler(mode)

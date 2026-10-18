@@ -11,6 +11,7 @@ import {
   uniworkIsLocked,
   uniworkIsReadOnly,
   uniworkRefusesOpen,
+  uniworkReadOnlySave,
   uniworkSaveDecision,
   type UniworkSaveOrigin,
 } from './uniwork-policy'
@@ -1063,6 +1064,12 @@ export function registerSlidesIpc(): void {
   ipcMain.handle('slides:uniwork-state', (e) => {
     const path = sessions.get(e.sender.id)?.path || null
     return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+  ipcMain.handle('slides:uniwork-read-only-save', (e, filePath?: unknown) => {
+    const path = sessions.get(e.sender.id)?.path || null
+    if (!path) return
+    if (typeof filePath === 'string' && filePath.length > 0 && filePath !== path) return
+    uniworkReadOnlySave(path)
   })
 
   // Document session handlers (../session): main is a thin adapter — the calling

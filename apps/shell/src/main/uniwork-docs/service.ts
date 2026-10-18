@@ -333,6 +333,11 @@ export interface UniworkDocsServiceDeps {
   /** G5-06u: ask the shell renderer to open the queue popover of a path */
   pushQueuePopover?(request: UniworkQueuePopoverRequest): void
   /**
+   * EL-1(b) fix6 (VEL-2): broadcast `{ path }` on `uniwork:doc-state-changed`
+   * when `isReadOnly(path)` or `isBound(path)` may have changed.
+   */
+  pushDocStateChanged?(path: string): void
+  /**
    * G5-06u: whether `path` is a tab of the shell window (the only window with
    * a pill and a queue popover). False for a detached editor window, whose
    * Ctrl/Cmd+S keeps the inline replay. Absent = every path is a shell tab.
@@ -958,6 +963,8 @@ export class UniworkDocsService {
   private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
   /** path key -> the newer-store lock currently shown for it (S11) */
   private readonly locks = new Map<string, UniworkDocLock>()
+  /** pathKey -> last published access/lock signature so access flips broadcast once */
+  private readonly lastPublishedAccess: Record<string, string> = Object.create(null)
   /** path -> checksum of the file as of its mtime/size (the sync close check) */
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
   /** working copies whose editor holds edits not written to the file yet */
@@ -1334,6 +1341,7 @@ export class UniworkDocsService {
         if (view.phase === 'acquiring' || view.phase === 'none') return
         const now = this.store.lookup(doc.path)
         if (now) this.publish(this.statusOf(now))
+        this.notifyDocStateChanged(doc.path)
         void this.maybeReplayRemoteAfterUnlock(doc.path)
       },
     })
@@ -1344,6 +1352,7 @@ export class UniworkDocsService {
         if (this.editLocks.get(key) === session) {
           this.editLocks.delete(key)
           session.dispose()
+          this.notifyDocStateChanged(doc.path)
         }
         return
       }
@@ -1360,10 +1369,14 @@ export class UniworkDocsService {
     if (this.editLocks.get(key) === session) this.editLocks.delete(key)
     if (release) await this.capped(session.release(), EDIT_LOCK_QUIT_CAP_MS)
     session.dispose()
+    this.notifyDocStateChanged(path)
   }
 
   async releaseAllEditLocks(capMs?: number): Promise<void> {
     const sessions = [...this.editLocks.values()]
+    const paths = sessions
+      .map((s) => s.path)
+      .filter((p): p is string => typeof p === 'string' && p.length > 0)
     this.editLocks.clear()
     const drops = [...this.inFlightDropReleases]
     const work = Promise.all([...sessions.map((s) => s.release().catch(() => undefined)), ...drops])
@@ -1373,6 +1386,7 @@ export class UniworkDocsService {
       await work
     }
     for (const s of sessions) s.dispose()
+    for (const p of paths) this.notifyDocStateChanged(p)
   }
 
   /** will-quit: best-effort, 1.5 s cap; the quit gate awaits this then re-quits */
@@ -1388,6 +1402,7 @@ export class UniworkDocsService {
    */
   async notePathsDropped(paths: string[]): Promise<void> {
     const sessions: EditLockSession[] = []
+    const droppedPaths: string[] = []
     for (const path of paths) {
       if (typeof path !== 'string' || !path) continue
       const key = pathKey(path)
@@ -1395,6 +1410,7 @@ export class UniworkDocsService {
       if (!session) continue
       this.editLocks.delete(key)
       sessions.push(session)
+      droppedPaths.push(path)
     }
     if (sessions.length === 0) return
     const work = Promise.all(sessions.map((s) => s.release().catch(() => undefined)))
@@ -1404,6 +1420,7 @@ export class UniworkDocsService {
     })
     await this.capped(work, EDIT_LOCK_QUIT_CAP_MS)
     for (const s of sessions) s.dispose()
+    for (const p of droppedPaths) this.notifyDocStateChanged(p)
   }
 
   private async capped(work: Promise<unknown>, capMs: number): Promise<void> {
@@ -1431,7 +1448,8 @@ export class UniworkDocsService {
       session = this.editLocks.get(pathKey(path))
     }
     if (!session) return this.statusOf(doc)
-    await session.editHere()
+    const ok = await session.editHere()
+    if (!ok) return null
     const now = this.store.lookup(path)
     if (!now) return null
     void this.maybeReplayRemoteAfterUnlock(path)
@@ -1464,11 +1482,23 @@ export class UniworkDocsService {
     }
   }
 
+  private notifyDocStateChanged(path: string): void {
+    if (typeof path !== 'string' || !path) return
+    this.deps.pushDocStateChanged?.(path)
+  }
+
   /** every status push: the shell window, then in-process waiters (close prompt) */
   private publish(status: UniworkDocStatus): void {
     const full = this.withRemote(this.present(this.withLockSession(status)))
     this.deps.pushStatus(full)
     for (const listener of [...this.statusListeners]) listener(full)
+    const accessSig = `${full.access}:${full.state === 'blocked' ? (full.error ?? '') : ''}`
+    const sigKey = pathKey(full.path)
+    const prevSig = this.lastPublishedAccess[sigKey]
+    this.lastPublishedAccess[sigKey] = accessSig
+    if (prevSig !== undefined && prevSig !== accessSig) {
+      this.notifyDocStateChanged(full.path)
+    }
     const open = this.conflictPrompt
     if (open && !open.controller.signal.aborted && samePath(open.path, full.path)) {
       if (full.state === 'blocked') {
@@ -3430,13 +3460,16 @@ export class UniworkDocsService {
 
   private clearSignedOutLocks(): void {
     let cleared = false
+    const clearedPaths: string[] = []
     for (const [key, lock] of [...this.locks]) {
       if (lock.reason === 'signed_out') {
         this.locks.delete(key)
         cleared = true
+        clearedPaths.push(lock.path)
       }
     }
     if (cleared) this.deps.pushLocks?.()
+    for (const p of clearedPaths) this.notifyDocStateChanged(p)
   }
 
   /** whether the durable store holds an intent for `doc`; 'locked' = unreachable now */
@@ -3650,15 +3683,18 @@ export class UniworkDocsService {
   /** the store opened (again): the keystore_locked panels are stale */
   private clearKeystoreLocks(): void {
     let cleared = false
+    const clearedPaths: string[] = []
     for (const [key, lock] of [...this.locks]) {
       if (lock.reason === 'keystore_locked') {
         this.locks.delete(key)
         cleared = true
+        clearedPaths.push(lock.path)
       }
     }
     // the renderer's list is its own: it must be told the list changed, or a
     // Retry that worked leaves the S11 panel up until some other push
     if (cleared) this.deps.pushLocks?.()
+    for (const p of clearedPaths) this.notifyDocStateChanged(p)
   }
 
   /**
@@ -3730,6 +3766,7 @@ export class UniworkDocsService {
     }
     this.locks.set(pathKey(lock.path), lock)
     this.deps.pushLock?.(lock)
+    this.notifyDocStateChanged(lock.path)
   }
 
   /**
@@ -3885,6 +3922,22 @@ export class UniworkDocsService {
     // Only a shell tab has the pill and popover: a detached editor window keeps
     // the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
     void this.coordinator.save(path, { userSave: this.deps.isShellTab?.(path) ?? true })
+  }
+
+  /**
+   * EL-1(b) fix6 (VEL-1): an editor module's explicit Save while the bound
+   * working copy is read-only. Never writes and never fires the user-save
+   * hook; asks the shell renderer to open the explain popover for that path.
+   */
+  onReadOnlySave(path: string): void {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc)) return
+    if (!this.isReadOnly(doc.path)) return
+    const status = this.statusOf(doc)
+    this.publish(status)
+    if (this.deps.isShellTab?.(doc.path) ?? true) {
+      this.deps.pushQueuePopover?.({ path: doc.path })
+    }
   }
 
   // ---- renderer API ----------------------------------------------------------
@@ -5191,6 +5244,9 @@ export class UniworkDocsService {
     if (this.editLockReadOnly(doc.path)) {
       const status = this.statusOf(doc)
       this.publish(status)
+      if (this.deps.isShellTab?.(doc.path) ?? true) {
+        this.deps.pushQueuePopover?.({ path: doc.path })
+      }
       return status
     }
     if (!this.canSave(doc)) return this.statusOf(doc)

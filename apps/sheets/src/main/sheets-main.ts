@@ -6,6 +6,8 @@ import {
   uniworkIsReadOnly,
   uniworkRefusesOpen,
   uniworkRequestOrigin,
+  uniworkReadOnlySave,
+  uniworkSamePath,
   uniworkSaveAsDefault,
   uniworkSaveDecision,
 } from './uniwork-policy'
@@ -2607,6 +2609,33 @@ export function registerSheetsIpc(): void {
   ipcMain.handle(IPC_CHANNELS.userDisplayName, (event, sessionId: unknown): string =>
     workbookCommentAuthor(sessionFor(event).sessions, sessionId),
   )
+
+  // EL-1(b) fix6 (VEL-2 / Addendum 1): bound / read-only state of the sender's
+  // open workbook session so the renderer can re-query on the lock ping.
+  ipcMain.handle(IPC_CHANNELS.uniworkState, (event) => {
+    const entry = sheetsTabs.get(event.sender.id)
+    const session = entry ? [...entry.sessions.values()].at(-1) : undefined
+    const path = session ? sessionDocumentPath(session) : null
+    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
+  // EL-1(b) fix6 (VEL-1): explicit Save on a read-only bound workbook asks the
+  // shell to explain the lock / view-only state (never writes, never fires hook).
+  ipcMain.handle(IPC_CHANNELS.uniworkReadOnlySave, (event, filePath?: unknown) => {
+    const entry = sheetsTabs.get(event.sender.id)
+    if (!entry) return
+    const paths = [...entry.sessions.values()]
+      .map((s) => sessionDocumentPath(s))
+      .filter((p): p is string => typeof p === 'string' && p.length > 0)
+    if (typeof filePath === 'string' && filePath.length > 0) {
+      const matched = paths.find((p) => p === filePath || uniworkSamePath(p, filePath))
+      if (!matched) return
+      uniworkReadOnlySave(matched)
+      return
+    }
+    const latest = paths.at(-1)
+    if (latest) uniworkReadOnlySave(latest)
+  })
 
   // Registered here (not in registerSheetsAiIpc, skipped in shell mode):
   // slides' ai:generate-image only exists once a slides view opens, so sheets

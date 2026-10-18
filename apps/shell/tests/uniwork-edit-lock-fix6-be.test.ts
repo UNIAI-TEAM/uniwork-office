@@ -247,9 +247,9 @@ describe('Item 1 (VEL-2): UNIWORK_DOC_STATE_CHANGED_CHANNEL and doc-state broadc
         ? modulesMod.UNIWORK_DOC_STATE_CHANGED_CHANNEL
         : undefined
     expect(channelExport).toBe('uniwork:doc-state-changed')
-    expect(readFileSync(join(repo, 'apps/shell/src/main/uniwork-docs/wiring.ts'), 'utf8')).toContain(
-      'pushDocStateChanged',
-    )
+    expect(
+      readFileSync(join(repo, 'apps/shell/src/main/uniwork-docs/wiring.ts'), 'utf8'),
+    ).toContain('pushDocStateChanged')
     expect(readFileSync(join(repo, 'apps/shell/src/main/index.ts'), 'utf8')).toContain(
       'wc.send(UNIWORK_DOC_STATE_CHANGED_CHANNEL, { path })',
     )
@@ -467,16 +467,24 @@ describe('Item 3 (VEL-1): module readOnlySave -> seam onReadOnlySave -> service 
   it.each([
     ['docs', 'apps/docs/src/main/docs-main.ts', 'docs:uniwork-read-only-save', 'canDocWrite'],
     ['sheets', 'apps/sheets/src/main/sheets-main.ts', 'uniworkReadOnlySave', 'sessionDocumentPath'],
-    ['slides', 'apps/slides/src/main/slides-main.ts', 'slides:uniwork-read-only-save', 'sessions.get'],
+    [
+      'slides',
+      'apps/slides/src/main/slides-main.ts',
+      'slides:uniwork-read-only-save',
+      'sessions.get',
+    ],
     ['pdf', 'apps/pdf/src/main/pdf-main.ts', 'uniworkReadOnlySave', 'allowedByWc'],
     ['html', 'apps/html/src/main/html-main.ts', 'uniworkReadOnlySave', 'savePathByWc'],
     ['markdown', 'apps/markdown/src/main/markdown-main.ts', 'uniworkReadOnlySave', 'savePathByWc'],
-  ])('%s main registers read-only-save handler with sender guard', (_mod, mainRel, needle, guard) => {
-    const src = readFileSync(join(repo, mainRel), 'utf8')
-    expect(src).toContain(needle)
-    expect(src).toContain(guard)
-    expect(src).toContain('uniworkReadOnlySave(')
-  })
+  ])(
+    '%s main registers read-only-save handler with sender guard',
+    (_mod, mainRel, needle, guard) => {
+      const src = readFileSync(join(repo, mainRel), 'utf8')
+      expect(src).toContain(needle)
+      expect(src).toContain(guard)
+      expect(src).toContain('uniworkReadOnlySave(')
+    },
+  )
 
   it('service.onReadOnlySave: read-only by lock -> pushes explain popover; never writes or fires user-save', async () => {
     vi.useFakeTimers()
@@ -500,9 +508,9 @@ describe('Item 3 (VEL-1): module readOnlySave -> seam onReadOnlySave -> service 
     await vi.advanceTimersByTimeAsync(10)
     expect(ctx.service.isReadOnly(path)).toBe(true)
 
-    expect('onReadOnlySave' in ctx.service && typeof ctx.service.onReadOnlySave === 'function').toBe(
-      true,
-    )
+    expect(
+      'onReadOnlySave' in ctx.service && typeof ctx.service.onReadOnlySave === 'function',
+    ).toBe(true)
     if ('onReadOnlySave' in ctx.service && typeof ctx.service.onReadOnlySave === 'function') {
       ctx.service.onReadOnlySave(path)
     }
@@ -520,9 +528,9 @@ describe('Item 3 (VEL-1): module readOnlySave -> seam onReadOnlySave -> service 
     await vi.advanceTimersByTimeAsync(10)
     expect(ctx.service.isReadOnly(path)).toBe(true)
 
-    expect('onReadOnlySave' in ctx.service && typeof ctx.service.onReadOnlySave === 'function').toBe(
-      true,
-    )
+    expect(
+      'onReadOnlySave' in ctx.service && typeof ctx.service.onReadOnlySave === 'function',
+    ).toBe(true)
     if ('onReadOnlySave' in ctx.service && typeof ctx.service.onReadOnlySave === 'function') {
       ctx.service.onReadOnlySave(path)
     }
@@ -540,9 +548,9 @@ describe('Item 3 (VEL-1): module readOnlySave -> seam onReadOnlySave -> service 
     await vi.advanceTimersByTimeAsync(10)
     expect(ctx.service.isReadOnly(path)).toBe(false)
 
-    expect('onReadOnlySave' in ctx.service && typeof ctx.service.onReadOnlySave === 'function').toBe(
-      true,
-    )
+    expect(
+      'onReadOnlySave' in ctx.service && typeof ctx.service.onReadOnlySave === 'function',
+    ).toBe(true)
     if ('onReadOnlySave' in ctx.service && typeof ctx.service.onReadOnlySave === 'function') {
       ctx.service.onReadOnlySave(path)
     }
@@ -580,20 +588,15 @@ describe('Item 4 (VEL-3): explicit editHere failure keeps previous phase and res
       documentId: DOC,
       editorId: 'ed_1',
       transport,
+      sleep: async () => undefined,
       onChange: (v) => views.push(v),
     })
     return { session, views }
   }
 
   it.each([
-    [
-      '500 server_error',
-      () => new UniworkDocError('server_error', { status: 500, retried: true }),
-    ],
-    [
-      'network / timeout',
-      () => new UniworkDocError('network', { retried: true }),
-    ],
+    ['500 server_error', () => new UniworkDocError('server_error', { status: 500, retried: true })],
+    ['network / timeout', () => new UniworkDocError('network', { retried: true })],
   ])(
     'session.editHere on %s from other, free, self_elsewhere, and lost keeps the previous phase (never unreachable)',
     async (_label, makeErr) => {
