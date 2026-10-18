@@ -33,6 +33,9 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
       runScripts: 'dangerously',
     })
     Object.assign(dom.window, {
+      // postRect schedules through rAF whenever something is selected; jsdom has
+      // none — leaving it queued keeps rect chatter out of the message log
+      requestAnimationFrame: () => 0,
       __gxPreviewPort: {
         start: () => {},
         addEventListener: (type: string, fn: (e: { data: Record<string, unknown> }) => void) => {
@@ -43,6 +46,7 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
     })
     dom.window.eval(inspectorSrc.replace('__GX_VERSION__', '1'))
     messages.length = 0
+    const send = (msg: Record<string, unknown>) => hostMessages.forEach((fn) => fn({ data: msg }))
     const setMode = (mode: string) =>
       hostMessages.forEach((fn) => fn({ data: { type: 'gx:setMode', mode } }))
     const pressEscape = (init: KeyboardEventInit = {}) =>
@@ -54,7 +58,7 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
           ...init,
         }),
       )
-    return { dom, messages, setMode, pressEscape }
+    return { dom, messages, send, setMode, pressEscape }
   }
 
   it('relays Escape from the preview iframe when no element is selected and focus is not in a field', () => {
@@ -78,5 +82,26 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
     expect(messages).toEqual([])
     pressEscape()
     expect(messages).toEqual([{ type: 'gx:keyCommand', command: 'escape', version: 1 }])
+  })
+
+  it('the first Escape commits an inline text edit, keeping the element selected (SVF2-1 by design)', () => {
+    const { dom, messages, send, pressEscape } = makePreview()
+    // a click on an element's own text starts an inline edit, so what the
+    // tester saw as "selected" was really editing; the first Esc ends that
+    // edit (cancel: nothing typed) and only the next Esc clears the selection
+    send({ type: 'gx:beginTextEdit', sid: 1 })
+    messages.length = 0
+    const el = dom.window.document.querySelector('[data-gx-sid="1"]')!
+    expect(el.getAttribute('contenteditable')).toBe('plaintext-only')
+
+    pressEscape()
+    expect(messages).toEqual([{ type: 'gx:textEditCancel', version: 1 }])
+    expect(el.hasAttribute('contenteditable')).toBe(false)
+
+    pressEscape()
+    expect(messages).toEqual([
+      { type: 'gx:textEditCancel', version: 1 },
+      { type: 'gx:keyCommand', command: 'escape', version: 1 },
+    ])
   })
 })

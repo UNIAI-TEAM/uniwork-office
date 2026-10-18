@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { clickMarkupTool, navAction, shouldHandleDocumentUndo } from '../src/renderer/keyNav'
+import {
+  clickMarkupTool,
+  DOC_LOAD_RESET_KEYS,
+  navAction,
+  resetDocLoadState,
+  shouldHandleDocumentUndo,
+  type DocLoadReset,
+} from '../src/renderer/keyNav'
 
 describe('navAction', () => {
   it('steps a whole page on ArrowDown/ArrowUp when focus is in the thumbnail sidebar', () => {
@@ -95,5 +102,25 @@ describe('armed markup tool and Escape (UNI-1876 SVF-3)', () => {
       kind: 'apply',
       nextTool: null,
     })
+  })
+})
+
+describe('document load resets (UNI-1876 redaction reload regression)', () => {
+  // A load without a saved snapshot is both a fresh open and the reload after
+  // applying redactions to a working copy: pending edit data must reset, but the
+  // armed draw/markup tools are viewer state, not document state. Clearing them
+  // on the redaction reload dropped the active redact tool, so the next
+  // mark(115, 145) created nothing (e2e/pdf-redaction-workflow.spec.ts:62).
+  it('clears document-bound edit state while keeping armed tools', () => {
+    const cleared: string[] = []
+    const actions = Object.fromEntries(
+      DOC_LOAD_RESET_KEYS.map((key) => [key, () => cleared.push(key)]),
+    ) as DocLoadReset
+    resetDocLoadState(actions)
+    expect(cleared).toEqual([...DOC_LOAD_RESET_KEYS])
+    // the active draw/markup tool (e.g. 'redact' after Apply redactions reloads
+    // the working copy) is not part of the reset: nothing with 'tool' in its name
+    expect(cleared.some((name) => /tool/i.test(name))).toBe(false)
+    expect(DOC_LOAD_RESET_KEYS.some((key) => /tool/i.test(key))).toBe(false)
   })
 })
