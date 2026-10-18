@@ -260,7 +260,10 @@ export class LeaseManager {
   /** bumped by every lock and boundary change: an answer from before it is dropped */
   private generation = 0
   /** per document: the lease commits that landed, and the ones in flight (G703-R7-1) */
-  private readonly commits = new Map<string, { landed: number; inFlight: number }>()
+  private readonly commits = new Map<
+    string,
+    { landed: number; inFlight: number; waiters: Array<() => void> }
+  >()
 
   constructor(options: LeaseManagerOptions) {
     this.options = options
@@ -585,7 +588,7 @@ export class LeaseManager {
         : undefined,
     )
 
-    const commit = this.commits.get(documentId) ?? { landed: 0, inFlight: 0 }
+    const commit = this.commits.get(documentId) ?? { landed: 0, inFlight: 0, waiters: [] }
     this.commits.set(documentId, commit)
     commit.inFlight += 1
     let written: Awaited<ReturnType<typeof this.options.store.put>>
@@ -594,6 +597,7 @@ export class LeaseManager {
     } finally {
       commit.inFlight -= 1
       commit.landed += 1
+      if (commit.inFlight === 0) for (const wake of commit.waiters.splice(0)) wake()
     }
     const unavailable = unavailableResult(written)
     if (unavailable) return unavailable
@@ -828,6 +832,13 @@ export class LeaseManager {
     const commit = this.commits.get(documentId)
     if (!commit) return 0
     return commit.landed * 2 + (commit.inFlight > 0 ? 1 : 0)
+  }
+
+  /** G703-R7-1: resolves once no lease commit of the document is in flight (at once when none is) */
+  commitSettled(documentId: string): Promise<void> {
+    const commit = this.commits.get(documentId)
+    if (!commit || commit.inFlight === 0) return Promise.resolve()
+    return new Promise<void>((resolve) => commit.waiters.push(resolve))
   }
 
   /**

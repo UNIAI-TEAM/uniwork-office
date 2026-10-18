@@ -2,12 +2,12 @@ import { createHash } from 'node:crypto'
 import type { Dirent } from 'node:fs'
 import { chmod, lstat, readdir, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
-import type { UniworkDocLock } from '../../../shared/home-api'
+import type { UniworkDocFormat, UniworkDocLock } from '../../../shared/home-api'
 import type { OfflineBlockedReason, OfflineFailure } from '../../../shared/offline-library'
 import type { Binding } from '../../uniwork-docs/binding-store'
 import { formatForMime, formatForName, sanitizeFilename } from '../../uniwork-docs/formats'
 import { APP_STORE_LEVEL } from '../store-level'
-import type { OfflineLibraryManager, PinRow } from './manager'
+import type { CachedDocument, OfflineLibraryManager, PinRow } from './manager'
 import { offlineFailureOf } from './view'
 
 /**
@@ -146,6 +146,8 @@ export interface OfflineCopiesDeps {
    * so a destructive lock decision made on an older read can tell it went stale.
    */
   leaseStamp?(documentId: string): number
+  /** G703-R7-1: resolves once no lease commit of the document is in flight */
+  leaseSettled?(documentId: string): Promise<void>
   now?(): number
 }
 
@@ -305,6 +307,48 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     copy.locked = true
     return 'removed'
   }
+  /**
+   * The plaintext copy and its binding under `dir`, named exactly as the normal
+   * open path names it: the manifest's file name made one safe segment
+   * (BE-R1-1) - never the raw server string. Null when the binding would not write.
+   */
+  const writeCopy = async (
+    documentId: string,
+    dir: string,
+    row: PinRow,
+    cached: CachedDocument,
+    format: UniworkDocFormat,
+  ): Promise<string | null> => {
+    const filename = sanitizeFilename(cached.manifest.main.filename, format)
+    const path = await deps.store.writeWorkingCopy(dir, filename, cached.bytes)
+    // read-only on disk too: nothing may write this plaintext copy (the binding already says view)
+    await chmod(path, 0o444).catch(() => undefined)
+    const binding: Binding = {
+      schema: 2,
+      documentId,
+      workspaceId: row.workspaceId,
+      orgId: row.orgId,
+      title: filename,
+      filename,
+      format,
+      // UNI-1645: an offline copy is read-only
+      access: 'view',
+      level: 'view',
+      // the copy is never saved from: it carries no revision of its own (the file itself is the copy)
+      baseRevision: '0',
+      baseVersion: cached.manifest.main.version,
+      baseChecksum: cached.manifest.main.sha256,
+      state: 'ready',
+      minStoreLevel: APP_STORE_LEVEL,
+      minAppVersion: deps.appVersion(),
+      ...(cached.manifest.main.versionId ? { baseVersionId: cached.manifest.main.versionId } : {}),
+    }
+    return (await deps.store.write(dir, binding)) ? path : null
+  }
+
+  const formatOfCached = (cached: CachedDocument): UniworkDocFormat | null =>
+    formatForMime(cached.manifest.main.mimeType) ?? formatForName(cached.manifest.main.filename)
+
   const openOne = async (documentId: string): Promise<OfflineCopyOutcome> => {
     const library = deps.library()
     const scope = deps.scope()
@@ -354,8 +398,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
         title: deps.show(shownBefore.path)?.title ?? shownBefore.title,
       }
     }
-    const format =
-      formatForMime(cached.manifest.main.mimeType) ?? formatForName(cached.manifest.main.filename)
+    const format = formatOfCached(cached)
     if (!format || !row) return { kind: 'none' }
     if (shownBefore) {
       clearTimer(shownBefore)
@@ -368,33 +411,8 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     // key goes before the new bytes land, whether this session knows the copy or not
     if (!(await dropDir(dir))) return { kind: 'none' }
     if (!onScreen) copies.delete(documentId)
-    // the copy is named exactly as the normal open path names it: the manifest's
-    // file name made one safe segment (BE-R1-1) - never the raw server string
-    const filename = sanitizeFilename(cached.manifest.main.filename, format)
-    const path = await deps.store.writeWorkingCopy(dir, filename, cached.bytes)
-    // read-only on disk too: nothing may write this plaintext copy (the binding already says view)
-    await chmod(path, 0o444).catch(() => undefined)
-    const binding: Binding = {
-      schema: 2,
-      documentId,
-      workspaceId: row.workspaceId,
-      orgId: row.orgId,
-      title: filename,
-      filename,
-      format,
-      // UNI-1645: an offline copy is read-only
-      access: 'view',
-      level: 'view',
-      // the copy is never saved from: it carries no revision of its own (the file itself is the copy)
-      baseRevision: '0',
-      baseVersion: cached.manifest.main.version,
-      baseChecksum: cached.manifest.main.sha256,
-      state: 'ready',
-      minStoreLevel: APP_STORE_LEVEL,
-      minAppVersion: deps.appVersion(),
-      ...(cached.manifest.main.versionId ? { baseVersionId: cached.manifest.main.versionId } : {}),
-    }
-    if (!(await deps.store.write(dir, binding))) {
+    const path = await writeCopy(documentId, dir, row, cached, format)
+    if (!path) {
       await dropDir(dir)
       return { kind: 'none' }
     }
@@ -483,12 +501,48 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       copies.get(documentId) === copy &&
       (deps.leaseStamp?.(documentId) ?? 0) === stamp
     if ((await lockInPlace(documentId, stillDue)) !== 'removed') return
+    // a renewal that committed while the removal ran must not lose its copy
+    if (await restoreRenewed(documentId, copy, stamp)) return
     deps.lockOpened({
       path: copy.path,
       name: basename(copy.path),
       reason,
       ...(reason === 'lease_expired' && libraryOff ? { libraryOff: true } : {}),
     })
+  }
+
+  /**
+   * G703-R7-1: the plaintext of an expired copy is already gone, but a lease
+   * commit landed (or was in flight) while it went. The renewed lease must keep
+   * its copy: once the commit settled, the bytes come back from the encrypted
+   * cache at the same path and the tab stays open with no lock. False when the
+   * stamp did not move or the copy cannot be re-established (an unusable lease
+   * refuses `openCached`): the lock the caller was about to raise stands.
+   */
+  const restoreRenewed = async (
+    documentId: string,
+    copy: TrackedCopy,
+    stamp: number,
+  ): Promise<boolean> => {
+    if ((deps.leaseStamp?.(documentId) ?? 0) === stamp) return false
+    await deps.leaseSettled?.(documentId)
+    const library = deps.library()
+    if (!library || copies.get(documentId) !== copy) return false
+    const row = await library.row(documentId).catch(() => null)
+    const cached = await library.openCached(documentId).catch(() => null)
+    const format = cached?.kind === 'ok' ? formatOfCached(cached) : null
+    if (!row || cached?.kind !== 'ok' || !format) return false
+    const path = await writeCopy(documentId, copy.dir, row, cached, format)
+    if (path !== copy.path) {
+      // a head with another file name cannot reuse the tab's path: the lock stands
+      await dropDir(copy.dir)
+      return false
+    }
+    copy.locked = false
+    copy.orgId = row.orgId
+    copy.leaseUntilMs = parseExpiryMs(row.leaseUntil)
+    scheduleExpiry(documentId)
+    return true
   }
 
   const sweepOne = async (): Promise<void> => {

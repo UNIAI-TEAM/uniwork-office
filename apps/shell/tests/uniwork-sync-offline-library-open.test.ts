@@ -21,6 +21,12 @@ import {
 } from '../src/main/uniwork-docs/service'
 import { BINDING_FILE, scopeWorkingCopyDirs } from '../src/main/uniwork-docs/binding-store'
 import { ID } from '../src/main/uniwork-sync/feed/http'
+import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
+import type { LeaseClient, OfficeOfflineLeaseSDO } from '../src/main/uniwork-sync/lease/client'
+import { LeaseManager } from '../src/main/uniwork-sync/lease/manager'
+import { LEASE_STORE_REGISTRATION, createLeaseStore } from '../src/main/uniwork-sync/lease/store'
+import { createStoreLayer } from '../src/main/uniwork-sync/store'
+import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/compliance'
 import {
   OFFLINE_COPY_KEY_MAX,
   OFFLINE_COPY_KEY_SUFFIX,
@@ -121,8 +127,8 @@ const answerOf = (status: number, body: unknown): Response =>
     json: async () => body,
   }) as unknown as Response
 
-function openHarness(): OpenHarness {
-  const h = createHarness()
+function openHarness(options: { lease?: LeaseManager } = {}): OpenHarness {
+  const h = createHarness(options.lease ? { leases: options.lease } : {})
   const userDataDir = mkdtempSync(join(tmpdir(), 'uw-offline-open-'))
   const opened: string[] = []
   const locks: UniworkDocLock[] = []
@@ -197,7 +203,10 @@ function openHarness(): OpenHarness {
     isPathOpen,
     appVersion: () => '0.0.0-test',
     lockOpened: (lock) => service.recordOfflineLock(lock),
-    leaseStamp: () => leaseStamp.value,
+    leaseStamp: (documentId) => options.lease?.commitStamp(documentId) ?? leaseStamp.value,
+    ...(options.lease
+      ? { leaseSettled: (documentId: string) => options.lease!.commitSettled(documentId) }
+      : {}),
     now: () => clock.now,
   })
   const api = createOfflineLibraryApi({
@@ -623,6 +632,97 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     // the commit settled with a renewed lease
     o.h.leases.states.set('doc_1', leaseState('valid'))
     o.leaseStamp.value = 2
+    await o.copies.sweep()
+    expect(o.locks).toEqual([])
+    expect(existsSync(path)).toBe(true)
+  })
+
+  it('(G703-R7-1) a renewal committing while the native removal is pending keeps the copy: bytes back at the path, no lock, open stays true', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-r71-'))
+    dirs.push(base)
+    const T0 = 1_760_000_000_000
+    const HOUR = 60 * 60 * 1000
+    let wallMs = T0
+    let monoMs = 5_000
+    const sdoAt = (generation: number, renewed: boolean): OfficeOfflineLeaseSDO => ({
+      lease: `ofl1.token-at-${wallMs}`,
+      lease_id: '01J8X4LEASE1P2Q3R4S5T6U7V8',
+      document_id: 'doc_1',
+      organization_id: ORG,
+      workspace_id: WS,
+      version_id: 'ver_1',
+      version: 1,
+      revision: '10',
+      level: 'view',
+      policy_epoch: 0,
+      generation,
+      renewed,
+      issued_at: new Date(wallMs).toISOString(),
+      expires_at: new Date(wallMs + 24 * HOUR).toISOString(),
+      renew_after: new Date(wallMs + 12 * HOUR).toISOString(),
+      server_time: new Date(wallMs).toISOString(),
+    })
+    const client: LeaseClient = {
+      grant: async () => sdoAt(1, false),
+      renew: async () => sdoAt(2, true),
+      release: async () => undefined,
+    }
+    const layer = createStoreLayer({
+      root: join(base, 'records'),
+      keys: createSafeStorageKeyProvider({
+        safeStorage: createLockableSafeStorage(),
+        dir: join(base, 'keys'),
+      }),
+      budgetBytes: 1 << 20,
+      clock: () => wallMs,
+    })
+    layer.register(LEASE_STORE_REGISTRATION)
+    const lease = new LeaseManager({
+      store: createLeaseStore({ layer, scope: () => ({ ...SCOPE }) }),
+      client: () => client,
+      clock: { wallNow: () => wallMs, monotonicNow: () => monoMs },
+      scope: () => ({ ...SCOPE }),
+      session: () => 'dev_1',
+    })
+    const o = openHarness({ lease })
+    dirs.push(o.userDataDir)
+    o.clock.now = T0
+    const path = await openCopy(o)
+    const bytes = await readFile(path)
+    const dir = copyDir(o)
+    // the lease lapses; the sweep decides the lock and its native removal starts
+    wallMs += 25 * HOUR
+    monoMs += 25 * HOUR
+    expect((await lease.effectiveState('doc_1')).state).toBe('expired')
+    let removalStarted: () => void = () => undefined
+    const started = new Promise<void>((resolve) => {
+      removalStarted = resolve
+    })
+    let releaseRemoval: () => void = () => undefined
+    const removalGate = new Promise<void>((resolve) => {
+      releaseRemoval = resolve
+    })
+    fsFault.rmGate = async (target) => {
+      if (target !== dir) return
+      removalStarted()
+      await removalGate
+    }
+    const sweep = o.copies.sweep()
+    await started
+    // the renewal commits while the removal is still pending
+    expect((await lease.renew('doc_1')).kind).toBe('renewed')
+    expect((await lease.effectiveState('doc_1')).usable).toBe(true)
+    fsFault.rmGate = null
+    releaseRemoval()
+    await sweep
+    expect(o.locks).toEqual([])
+    expect((await lease.effectiveState('doc_1')).usable).toBe(true)
+    expect(existsSync(path)).toBe(true)
+    expect(Buffer.compare(await readFile(path), bytes)).toBe(0)
+    expect(existsSync(join(dir, BINDING_FILE))).toBe(true)
+    expect((await stat(path)).mode & 0o222).toBe(0)
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
+    // the restored copy is a live tracked copy: a later pass finds a valid lease and leaves it
     await o.copies.sweep()
     expect(o.locks).toEqual([])
     expect(existsSync(path)).toBe(true)
