@@ -252,6 +252,13 @@ export class LeaseManager {
   private readonly rollbackLatched = new Set<string>()
   private readonly wallSeen = new Map<string, number>()
   private readonly revokeListeners = new Set<(notice: LeaseRevokeNotice) => void>()
+  /**
+   * B25 (UNI-1362): a renewal answered `document_archived` (or a renewal of an
+   * already-archived record) told nobody, so the offline library's row kept its
+   * old label until some other signal arrived. These listeners carry that
+   * renewal-only verdict to the owner that projects it.
+   */
+  private readonly archivedListeners = new Set<(documentId: string) => void>()
   private globalLockReason: LeaseLockReason | null = null
   /** `deployment/account#session` last seen; undefined = never looked */
   private lastBoundaryToken: string | null | undefined = undefined
@@ -270,6 +277,23 @@ export class LeaseManager {
   onRevoked(listener: (notice: LeaseRevokeNotice) => void): () => void {
     this.revokeListeners.add(listener)
     return () => this.revokeListeners.delete(listener)
+  }
+
+  /**
+   * B25 (UNI-1362): told whenever a lease reports the document archived - the
+   * renewal that answered `document_archived`, and a renewal of a record that
+   * already carries the flag. Lease expiry and the open rules are untouched: the
+   * listener only lets the library label the row it already has.
+   */
+  onArchived(listener: (documentId: string) => void): () => void {
+    this.archivedListeners.add(listener)
+    return () => this.archivedListeners.delete(listener)
+  }
+
+  private emitArchived(documentId: string): void {
+    for (const listener of this.archivedListeners) {
+      listener(documentId)
+    }
   }
 
   private scopeToken(scope: StoreScope | null): string | null {
@@ -510,6 +534,9 @@ export class LeaseManager {
     this.trackedDocs.add(documentId)
     if (current.archived === true) {
       const state = await this.effectiveState(documentId)
+      // B25 (UNI-1362): a renewal of an already-archived record reports the same
+      // verdict as the answer that set the flag, so the library label catches up
+      this.emitArchived(documentId)
       return { kind: 'archived', record: current, state }
     }
 
@@ -692,6 +719,8 @@ export class LeaseManager {
         clock_rollback: false,
       }
       await this.options.store.put(archivedRecord)
+      // B25 (UNI-1362): the renewal-only archive signal reaches the library label
+      this.emitArchived(documentId)
       return {
         kind: 'archived',
         record: archivedRecord,

@@ -87,6 +87,7 @@ interface HarnessOptions {
 function harness(options: HarnessOptions = {}) {
   let wallMs = T0
   let revokeRenew = false
+  let archiveRenew = false
   const safeStorage = createLockableSafeStorage()
   const syncLayer = createStoreLayer({
     root: join(base, 'sync'),
@@ -115,6 +116,13 @@ function harness(options: HarnessOptions = {}) {
       return makeSdo(wallMs, documentId)
     },
     async renew() {
+      if (archiveRenew) {
+        throw new LeaseClientError({
+          kind: 'archived',
+          code: 'document_archived',
+          status: 410,
+        })
+      }
       throw new LeaseClientError({ kind: 'revoked', code: 'offline_lease_revoked', status: 403 })
     },
     async release() {},
@@ -172,6 +180,9 @@ function harness(options: HarnessOptions = {}) {
     },
     revokeOnRegrant: () => {
       revokeRenew = true
+    },
+    archiveOnRenew: () => {
+      archiveRenew = true
     },
     /** wall and monotonic clocks move together (a lease reaches its end) */
     advance: (ms: number) => {
@@ -244,6 +255,30 @@ describe('G5-05 offline library inside the sync runtime (production wiring)', ()
     expect(
       await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS }),
     ).toEqual({ kind: 'refused', code: 'capability_off' })
+  })
+
+  // B25 (UNI-1362): a renewal answered `document_archived` is the only archive
+  // signal some documents ever give (no feed row). The library label used to
+  // wait for one, so the row kept its old state while the lease already said
+  // archived.
+  it('a renewal answered document_archived marks the library row archived', async () => {
+    const h = harness()
+    addDoc(h, 'doc_1', 1)
+    await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
+    expect(await h.runtime.library!.row('doc_1')).toMatchObject({ archived: false })
+    h.archiveOnRenew()
+    expect((await h.runtime.leases.renew('doc_1', { force: true })).kind).toBe('archived')
+    await vi.waitFor(async () => {
+      expect(await h.runtime.library!.row('doc_1')).toMatchObject({
+        archived: true,
+        state: 'archived',
+      })
+    })
+    // read only: the committed copy is still there and still opens read-only
+    expect(await h.runtime.library!.openCached('doc_1')).toMatchObject({
+      kind: 'ok',
+      readOnly: true,
+    })
   })
 })
 

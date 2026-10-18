@@ -414,6 +414,13 @@ export class SyncRuntime {
     this.leases.onRevoked((notice) => {
       void manager.handleLeaseRevoked(notice).catch(() => undefined)
     })
+    // B25 (UNI-1362): a lease renewal that answers `document_archived` (or renews
+    // an already-archived record) is the only signal some documents ever give, so
+    // it reaches the same archived-label handler the feed flag uses. Read only:
+    // the row is marked, the lease expiry and open rules are untouched.
+    this.leases.onArchived((documentId) => {
+      void manager.noteArchived(documentId, true).catch(() => undefined)
+    })
     return manager
   }
 
