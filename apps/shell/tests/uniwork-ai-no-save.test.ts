@@ -253,7 +253,14 @@ describe('G6-A03 desktop: AI never saves', () => {
     // exactly one request, the chat POST: none before, none after the turn (GETs included)
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(server.calls.slice(callsBefore)).toEqual([{ method: 'POST', path: CHAT }])
-    expect(server.calls.filter((c) => c.path !== CHAT && c.method !== 'GET')).toEqual([])
+    // EL-1(b): the open of a bound editable copy already acquired the edit lock
+    // (POST /documents/{id}/edit-lock) before the turn, so the edit-lock routes
+    // are excluded here; the AI turn itself takes no lock.
+    expect(
+      server.calls.filter(
+        (c) => c.path !== CHAT && c.method !== 'GET' && !c.path.includes('/edit-lock'),
+      ),
+    ).toEqual([])
     expect(server.calls.filter((c) => /\/uploads$|\/versions\/commit$/.test(c.path))).toEqual([])
     // no module save was requested and no save intent was recorded
     expect(ctx.requestModuleSave).not.toHaveBeenCalled()
