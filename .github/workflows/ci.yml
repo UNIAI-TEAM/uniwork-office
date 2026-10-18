@@ -262,8 +262,8 @@ jobs:
         run: >
           npx playwright test -c web/e2e
           html-preview-security draft-recovery slides-presenter ai-web modules-smoke docs-web
-          conflict-dialog-layout docs-conflict-diff ui-forced-colors-picker size-gate open-refused
-          sheets-too-large
+          docs-rename-save conflict-dialog-layout docs-conflict-diff ui-forced-colors-picker
+          size-gate open-refused sheets-too-large
 
       - name: Upload web e2e artifacts on failure
         if: failure()

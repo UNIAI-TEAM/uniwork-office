@@ -283,11 +283,22 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     return { ...result, dataUrl: mintDocHandoff(data), recovered: true }
   }
 
+  /** the document's rename the renderer hears about; emitted once per name change */
+  type RenameHandler = (paths: { oldPath: string; newPath: string }) => void
+  const renameListeners = new Set<RenameHandler>()
+
   function remember(file: FileMeta): void {
-    files.set(file.fileId, { ...files.get(file.fileId), ...file })
+    const prev = files.get(file.fileId)
+    files.set(file.fileId, { ...prev, ...file })
     current = file.fileId
-    // G8-12: the comments anchor base follows the open file (open, reload, adopted head, save)
     const meta = files.get(file.fileId)!
+    // S01B-V1 (UNI-1909): a name learned any other way than file.renamed (a save
+    // result that carries it, an adopted head, a reopen) is still a rename of the
+    // open file — the host's own event may already have run or may never arrive
+    if (prev && prev.name !== meta.name) {
+      for (const l of renameListeners) l({ oldPath: pathFor(prev), newPath: pathFor(meta) })
+    }
+    // G8-12: the comments anchor base follows the open file (open, reload, adopted head, save)
     frameDocVersion.noteOpened({ path: pathFor(meta), versionId: meta.versionId ?? null })
   }
 
@@ -575,8 +586,6 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     return choice === 'discard'
   }
 
-  type RenameHandler = (paths: { oldPath: string; newPath: string }) => void
-  const renameListeners = new Set<RenameHandler>()
   port.onFileRenamed((file) => {
     const prev = files.get(file.fileId)
     if (!prev || prev.name === file.name) return
@@ -765,7 +774,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       path: string,
       data: ArrayBuffer,
       auto?: boolean,
-    ): Promise<{ ok: boolean; error?: string; reason?: 'external-modified' }> {
+    ): Promise<{ ok: boolean; error?: string; reason?: 'external-modified' | 'cancelled' }> {
       if (fatal) {
         if (hostSave) hostSave.error = fatal
         return fatalSave()
@@ -803,6 +812,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       if (hostSave) hostSave.error = res.error
       const code = res.error.code
+      // S01-V2 (UNI-1909): the host declined the save to run its own flow (its name
+      // dialog on the first save) — a silent cancel like saveDocxAs, no error text
+      if (code === 'cancelled') return { ok: false, reason: 'cancelled' }
       if (code === 'too_large') {
         sizeGate.handleServerTooLarge(res.error, data)
         return { ok: false, reason: 'external-modified' }

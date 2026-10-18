@@ -464,8 +464,9 @@ export interface DesktopApi {
     ok: boolean
     error?: string
     /** uniwork-read-only: a view-only UniWork document is never written;
-     *  uniwork-bound: autosave never writes a UniWork document (explicit Save only) */
-    reason?: 'external-modified' | 'uniwork-read-only' | 'uniwork-bound'
+     *  uniwork-bound: autosave never writes a UniWork document (explicit Save only);
+     *  cancelled: the host declined the save to run its own dialog (web frame) */
+    reason?: 'external-modified' | 'uniwork-read-only' | 'uniwork-bound' | 'cancelled'
     /** a newer password choice arrived after this save's snapshot */
     passwordIntentPending?: boolean
     /** one-shot URL of the saved document in full when an encrypted save absorbed

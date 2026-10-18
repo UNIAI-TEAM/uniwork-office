@@ -328,6 +328,19 @@ describe('htmlApi', () => {
     expect(res.ok).toBe(false)
     expect(mock.calls.some((c) => c.type === 'api.save')).toBe(false)
   })
+
+  // UNI-1905 fix1 (2a120de89 regression): a user-typed name's last dotted segment is part of
+  // the name — 'Báo cáo 2026.10.18' saves as .html whole, never 'Báo cáo 2026.10.html'.
+  it('a user-typed dotted save-as name is kept whole', async () => {
+    const { api, mock } = setup()
+    const path = (await api.consumePending())!
+    const text = await api.readFile(path)
+    api.onSaveRequest((mode) => void api.save({ text, imageSources: [], mode }))
+    expect(await mock.host.saveAs({ name: 'Báo cáo 2026.10.18' })).toMatchObject({
+      ok: true,
+      file: { name: 'Báo cáo 2026.10.18.html' },
+    })
+  })
 })
 
 describe('htmlApi: draft recovery (C18)', () => {
