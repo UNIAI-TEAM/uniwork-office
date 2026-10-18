@@ -15,7 +15,7 @@ import {
 import { setAiModelNeedHint } from './ai-model-need'
 import { ProviderLogo } from './provider-logos'
 import { useDismissablePopover } from './popover-dismiss'
-import { AI_MODEL_PICKER_STRINGS, type AiModelPickerStrings } from './strings-ai-model-picker'
+import { AI_MODEL_PICKER_STRINGS } from './strings-ai-model-picker'
 import { aiUniworkStrings, aiUniworkText } from './strings-ai-uniwork'
 
 export type AiModelPickerCloudState =
