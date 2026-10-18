@@ -168,6 +168,7 @@ export const fr = {
   uwErrUploadTooLarge:
     '{name} fait {size}, ce qui dépasse la limite de {max}. Réduisez la taille des images ou divisez le fichier, puis importez-le à nouveau.',
   uwReasonTooLargeWithLimit: 'dépasse la limite de {max}',
+  uwUploadChecking: 'Vérification du fichier…',
   uwChipEditLocked: '{name} modifie',
   uwChipEditLockedSelf: 'Modification dans une autre fenêtre',
   uwEditLockSomeone: 'Quelqu’un',

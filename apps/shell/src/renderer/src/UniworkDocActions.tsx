@@ -55,6 +55,8 @@ export interface UploadProgress {
   name: string
   loaded: number
   total: number
+  /** BIGUP-A1: 'checking' while the server verifies a chunked upload; absent = uploading */
+  phase?: 'uploading' | 'checking'
 }
 
 /**
@@ -458,10 +460,14 @@ export function UploadDocDialog({
     })
   }
 
+  const checking = progress?.phase === 'checking'
   const percent =
-    progress && progress.total > 0
+    !checking && progress && progress.total > 0
       ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
       : null
+  const progressLabel = checking
+    ? t('uwUploadChecking')
+    : t('uwDocUploading', { name: progress?.name ?? file?.name ?? '' })
 
   return (
     <ActionModal labelledBy={`${id}-title`} onCancel={onCancel}>
@@ -491,12 +497,12 @@ export function UploadDocDialog({
       />
       {busy && (
         <div className="uw-act-progress" role="status">
-          <span>{t('uwDocUploading', { name: progress?.name ?? file?.name ?? '' })}</span>
+          <span>{progressLabel}</span>
           <progress
             className="uw-act-bar"
             max={100}
             value={percent ?? undefined}
-            aria-label={t('uwDocUploading', { name: progress?.name ?? file?.name ?? '' })}
+            aria-label={progressLabel}
           />
         </div>
       )}

@@ -418,6 +418,111 @@ export function parseUpload(raw: unknown): UploadReceipt {
   }
 }
 
+/** BIGUP-A1: one presigned part PUT the client sends directly to the storage */
+export interface UploadSessionPartUrl {
+  partNumber: number
+  /** the server's method for the URL; always PUT today */
+  method: string
+  url: string
+  /** headers the PUT must carry (empty with plain S3) */
+  headers: Record<string, string>
+  expiresAt: string
+}
+
+/** BIGUP-A1: one part the storage already holds (the server's ListParts view) */
+export interface UploadSessionCompletedPart {
+  partNumber: number
+  etag: string
+  size: number
+}
+
+/** BIGUP-A1: what the session is doing right now */
+export type UploadSessionStatus = 'open' | 'validating' | 'completed'
+
+/**
+ * BIGUP-A1: the create/GET answer of an upload session. `status` and `parts`
+ * are optional on the wire (the create answer carries neither): `status` is
+ * absent until the first GET, and `parts` is present only while the session is
+ * `open` - once the server validates the assembled object there is nothing
+ * left to PUT. `parts` and `completedParts` are always arrays here, so callers
+ * never branch on an absent field.
+ */
+export interface UploadSessionState {
+  sessionId: string
+  status: UploadSessionStatus | null
+  partSize: number
+  totalParts: number
+  completedParts: UploadSessionCompletedPart[]
+  parts: UploadSessionPartUrl[]
+  expiresAt: string
+}
+
+/** one `{part_number, url, headers, expires_at}` row of the session answer */
+function partUrl(value: unknown): UploadSessionPartUrl {
+  const row = record(value)
+  const headers = record(row.headers ?? {})
+  const out: Record<string, string> = {}
+  for (const [name, header] of Object.entries(headers)) {
+    if (typeof header === 'string') out[name] = header
+  }
+  return {
+    partNumber: nonNegInt(row.part_number),
+    method: typeof row.method === 'string' && row.method ? row.method : 'PUT',
+    url: str(row.url, 4096),
+    headers: out,
+    expiresAt: str(row.expires_at, 64),
+  }
+}
+
+function completedPart(value: unknown): UploadSessionCompletedPart {
+  const row = record(value)
+  return {
+    partNumber: nonNegInt(row.part_number),
+    etag: str(row.etag, 256),
+    size: nonNegInt(row.size ?? 0),
+  }
+}
+
+function sessionStatus(value: unknown): UploadSessionStatus | null {
+  if (value === undefined || value === null || value === '') return null
+  if (value === 'open' || value === 'validating' || value === 'completed') return value
+  bad()
+}
+
+export function parseUploadSession(raw: unknown): UploadSessionState {
+  const body = record(raw)
+  const parts = body.parts
+  if (parts !== undefined && parts !== null && !Array.isArray(parts)) bad()
+  const completed = body.completed_parts
+  if (completed !== undefined && completed !== null && !Array.isArray(completed)) bad()
+  return {
+    sessionId: str(body.session_id, 128),
+    status: sessionStatus(body.status),
+    partSize: nonNegInt(body.part_size),
+    totalParts: nonNegInt(body.total_parts),
+    completedParts: (completed ?? []).map(completedPart),
+    parts: (parts ?? []).map(partUrl),
+    expiresAt: str(body.expires_at, 64),
+  }
+}
+
+/**
+ * BIGUP-A1: the `complete` answer, by the route family that opened the
+ * session. The workspace route answers the created document (the
+ * `POST .../documents/files` shape); the document route answers the staged
+ * upload the existing `versions/commit` claims. The two are told apart by the
+ * body itself (`upload_id` vs `document`), so the caller cannot mis-read one
+ * as the other.
+ */
+export type UploadSessionComplete =
+  { kind: 'document'; document: UniworkDocSummary } | { kind: 'upload'; upload: UploadReceipt }
+
+export function parseUploadSessionComplete(raw: unknown): UploadSessionComplete {
+  const body = record(raw)
+  if (body.upload_id !== undefined) return { kind: 'upload', upload: parseUpload(raw) }
+  return { kind: 'document', document: parseDocumentSummary(raw) }
+}
+
 export function parseCommit(raw: unknown): CommitReceipt {
   const body = record(raw)
   const doc = record(body.document)

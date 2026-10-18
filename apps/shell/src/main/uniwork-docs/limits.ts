@@ -16,6 +16,14 @@ export interface DocumentLimits {
   readonly max_bytes: number
   readonly warn_ratio: number
   readonly warn_bytes: number
+  /**
+   * BIGUP-A1: `chunked_upload_threshold_bytes` of `documents.limits` - the
+   * size above which the app opens an upload session instead of one request.
+   * Optional on purpose: the server emits it only where the storage can
+   * presign parts (a `local` backend never does), and an absent field means
+   * "no chunked path" - the single-request flow with its own cap stays.
+   */
+  readonly chunked_upload_threshold_bytes?: number
 }
 
 export const DEFAULT_DOCUMENT_LIMITS: DocumentLimits = Object.freeze({
@@ -49,8 +57,10 @@ function limitsObjectOf(raw: unknown): Record<string, unknown> | null {
  *
  * Every field is optional: `upload_max_bytes -> max_bytes` and `save_warn_ratio ->
  * warn_ratio`, each falling back on its own to `209,715,200` / `0.9`. `web_open`
- * (the web-open warning band) and `chunked_upload_threshold_bytes` (the >= 20 MiB
- * upload-session flow) belong to other cards and are ignored here.
+ * (the web-open warning band) belongs to another card and is ignored here.
+ * `chunked_upload_threshold_bytes` (BIGUP-A1) is kept only when it is a safe
+ * positive integer; anything else - absent, fractional, zero, negative, a
+ * string - leaves the chunked path off, never a guessed threshold.
  */
 export function parseDocumentLimits(raw: unknown): DocumentLimits {
   const obj = limitsObjectOf(raw)
@@ -72,7 +82,18 @@ export function parseDocumentLimits(raw: unknown): DocumentLimits {
   const warn_bytes =
     Number.isSafeInteger(rawWarnBytes) && rawWarnBytes >= 0 ? rawWarnBytes : DEFAULT_WARN_BYTES
 
-  return { max_bytes, warn_ratio, warn_bytes }
+  const rawChunked = obj.chunked_upload_threshold_bytes
+  const chunked_upload_threshold_bytes =
+    typeof rawChunked === 'number' && Number.isSafeInteger(rawChunked) && rawChunked >= 1
+      ? rawChunked
+      : undefined
+
+  return {
+    max_bytes,
+    warn_ratio,
+    warn_bytes,
+    ...(chunked_upload_threshold_bytes !== undefined ? { chunked_upload_threshold_bytes } : {}),
+  }
 }
 
 export interface DocumentLimitsCacheDeps {

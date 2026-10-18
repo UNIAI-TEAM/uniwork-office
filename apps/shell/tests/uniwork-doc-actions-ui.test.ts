@@ -42,6 +42,7 @@ const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONM
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const en = uniworkDocumentStrings.en
+const viStrings = uniworkDocumentStrings.vi
 const folderEn = uniworkFolderStrings.en
 // SAVE-01 Q1: no folder chosen = My Folder (main sends destination my_folder)
 const myFolderEn = uniworkSaveStrings.en.usMyFolder
@@ -130,14 +131,14 @@ async function flush() {
   })
 }
 
-async function render(docs: LibraryDocRow[]) {
+async function render(docs: LibraryDocRow[], lang: 'en' | 'vi' = 'en') {
   api = makeApi(docs)
   onClose = vi.fn()
   await act(async () => {
     root.render(
       createElement(
         LocaleProvider,
-        { initial: 'en' },
+        { initial: lang },
         createElement(UniworkOpenDialog, {
           onClose,
           accountView: 'signed-in',
@@ -499,6 +500,97 @@ describe('S18 upload', () => {
     await click(dialog.querySelector('.btn-primary')!)
     expect(modal()).toBeNull()
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('up1')
+  })
+
+  it('BIGUP-A1: shows Checking file… and an indeterminate progress bar when phase is checking while keeping cancel available', async () => {
+    await render([])
+    const { promise, resolve: finish } = Promise.withResolvers<DocActionResult<UniworkDocSummary>>()
+    api.uniworkUploadDocument.mockImplementationOnce(() => promise)
+    await click(buttonByText(host, en.uwDocUpload))
+    const dialog = modal()!
+    await click(buttonByText(dialog, en.uwDocUploadPick))
+    await click(dialog.querySelector('.btn-primary')!)
+    const sent = api.uniworkUploadDocument.mock.calls[0]![0]
+
+    // Absent phase = uploading: determinate progress bar and uploading label
+    await act(async () =>
+      api.pushProgress({
+        uploadId: sent.uploadId,
+        path: '/home/me/Q3.xlsx',
+        loaded: 200,
+        total: 200,
+      }),
+    )
+    const status = dialog.querySelector('.uw-act-progress')!
+    const bar = dialog.querySelector<HTMLProgressElement>('progress.uw-act-bar')!
+    expect(status.textContent).toBe('Uploading “Q3.xlsx”…')
+    expect(bar.getAttribute('value')).toBe('100')
+    expect(bar.getAttribute('aria-label')).toBe('Uploading “Q3.xlsx”…')
+
+    // Explicit 'uploading' phase behaves identically to absent phase
+    await act(async () =>
+      api.pushProgress({
+        uploadId: sent.uploadId,
+        path: '/home/me/Q3.xlsx',
+        loaded: 150,
+        total: 200,
+        phase: 'uploading',
+      }),
+    )
+    expect(status.textContent).toBe('Uploading “Q3.xlsx”…')
+    expect(bar.getAttribute('value')).toBe('75')
+
+    // Phase 'checking': shows Checking file… label and indeterminate bar (no value attribute, not stuck at 100%)
+    await act(async () =>
+      api.pushProgress({
+        uploadId: sent.uploadId,
+        path: '/home/me/Q3.xlsx',
+        loaded: 200,
+        total: 200,
+        phase: 'checking',
+      }),
+    )
+    expect(status.textContent).toBe(en.uwUploadChecking)
+    expect(status.textContent).toBe('Checking file…')
+    expect(bar.hasAttribute('value')).toBe(false)
+    expect(bar.getAttribute('aria-label')).toBe('Checking file…')
+
+    // Cancel button remains available and aborts the upload in checking state
+    const cancelBtn = dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-secondary')!
+    expect(cancelBtn.disabled).toBe(false)
+    expect(cancelBtn.getAttribute('aria-disabled')).toBeNull()
+    await click(cancelBtn)
+    expect(api.uniworkCancelUploadDocument).toHaveBeenCalledWith(sent.uploadId)
+    expect(modal()).toBeNull()
+    await act(async () => finish(fail('upload_cancelled')))
+    await flush()
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+  })
+
+  it('BIGUP-A1: renders Vietnamese checking copy "Đang kiểm tra tệp…" when phase is checking', async () => {
+    await render([], 'vi')
+    const { promise } = Promise.withResolvers<DocActionResult<UniworkDocSummary>>()
+    api.uniworkUploadDocument.mockImplementationOnce(() => promise)
+    await click(buttonByText(host, viStrings.uwDocUpload))
+    const dialog = modal()!
+    await click(buttonByText(dialog, viStrings.uwDocUploadPick))
+    await click(dialog.querySelector('.btn-primary')!)
+    const sent = api.uniworkUploadDocument.mock.calls[0]![0]
+
+    await act(async () =>
+      api.pushProgress({
+        uploadId: sent.uploadId,
+        path: '/home/me/Q3.xlsx',
+        loaded: 200,
+        total: 200,
+        phase: 'checking',
+      }),
+    )
+    const status = dialog.querySelector('.uw-act-progress')!
+    const bar = dialog.querySelector<HTMLProgressElement>('progress.uw-act-bar')!
+    expect(status.textContent).toBe('Đang kiểm tra tệp…')
+    expect(bar.hasAttribute('value')).toBe(false)
+    expect(bar.getAttribute('aria-label')).toBe('Đang kiểm tra tệp…')
   })
 })
 

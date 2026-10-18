@@ -164,6 +164,7 @@ export const ru = {
   uwErrUploadTooLarge:
     'Размер {name} — {size}, что превышает лимит {max}. Уменьшите размер изображений или разделите файл, затем загрузите снова.',
   uwReasonTooLargeWithLimit: 'превышает лимит {max}',
+  uwUploadChecking: 'Проверка файла…',
   uwChipEditLocked: '{name} редактирует',
   uwChipEditLockedSelf: 'Редактирование в другом окне',
   uwEditLockSomeone: 'Кто-то другой',

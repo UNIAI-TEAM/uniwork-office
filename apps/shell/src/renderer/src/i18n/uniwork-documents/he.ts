@@ -157,6 +157,7 @@ export const he = {
   uwErrUploadTooLarge:
     'גודלו של {name} הוא {size}, מעבר למגבלת {max}. הקטן את גודל התמונות או פצל את הקובץ והעלה שוב.',
   uwReasonTooLargeWithLimit: 'מעבר למגבלת {max}',
+  uwUploadChecking: 'בודק את הקובץ…',
   uwChipEditLocked: '{name} עורך',
   uwChipEditLockedSelf: 'נערך בחלון אחר',
   uwEditLockSomeone: 'מישהו אחר',

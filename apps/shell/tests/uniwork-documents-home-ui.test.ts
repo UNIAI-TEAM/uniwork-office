@@ -1685,6 +1685,121 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(onOpenDocument).toHaveBeenCalledTimes(1)
     expect(onOpenDocument).toHaveBeenCalledWith(uploadedSummary)
   })
+  it('shows the checking state when the active upload reports phase "checking" (BIGUP-A1)', async () => {
+    const uploadedSummary: DocumentsHomeDoc = {
+      id: 'doc-uploaded-checking',
+      workspaceId: 'ws-1',
+      title: 'uploaded-handbook.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T10:00:00.000Z',
+      kind: 'file',
+      parentId: 'f-mine',
+    }
+    api.uniworkPickUploadFile = vi.fn(async () => ({
+      path: 'C:\\Users\\minh\\Documents\\uploaded-handbook.docx',
+      name: 'uploaded-handbook.docx',
+    }))
+    // the upload stays in flight while the checking event arrives
+    let finishUpload: (res: UniworkResult<DocumentsHomeDoc>) => void = () => undefined
+    api.uniworkUploadDocument = vi.fn(() => {
+      const { promise, resolve } = Promise.withResolvers<UniworkResult<DocumentsHomeDoc>>()
+      finishUpload = resolve
+      return promise
+    })
+    let onProgress:
+      | ((event: {
+          uploadId: string
+          path: string
+          loaded: number
+          total: number
+          phase?: 'uploading' | 'checking'
+        }) => void)
+      | null = null
+    api.onUniworkUploadProgress = vi.fn((cb: typeof onProgress) => {
+      onProgress = cb
+      return () => {}
+    })
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    const uploadBtn = host.querySelector<HTMLButtonElement>('button.dh-btn-upload')!
+    await act(async () => {
+      uploadBtn.click()
+    })
+    await flush()
+    const dialog = host.querySelector<HTMLElement>('.modal[role="dialog"]')!
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.uw-act-file button')!.click()
+    })
+    await flush()
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.modal-buttons .btn-primary')!.click()
+    })
+    await flush()
+    expect(api.uniworkUploadDocument).toHaveBeenCalledTimes(1)
+
+    // the renderer minted this id for the in-flight upload (uploadIdRef)
+    const uploadArg: unknown = api.uniworkUploadDocument.mock.calls[0]?.[0]
+    if (
+      !uploadArg ||
+      typeof uploadArg !== 'object' ||
+      !('uploadId' in uploadArg) ||
+      typeof uploadArg.uploadId !== 'string'
+    ) {
+      throw new Error('upload input missing uploadId')
+    }
+    const uploadId: string = uploadArg.uploadId
+    expect(onProgress).not.toBeNull()
+
+    // an event for another upload is ignored
+    await act(async () => {
+      onProgress!({
+        uploadId: 'uw-up-other',
+        path: 'C:\\x\\other.docx',
+        loaded: 10,
+        total: 10,
+        phase: 'checking',
+      })
+    })
+    await flush()
+    expect(dialog.textContent).not.toContain('Đang kiểm tra tệp…')
+
+    // the active upload's checking phase reaches the dialog: label + indeterminate bar
+    await act(async () => {
+      onProgress!({
+        uploadId,
+        path: 'C:\\Users\\minh\\Documents\\uploaded-handbook.docx',
+        loaded: 10,
+        total: 10,
+        phase: 'checking',
+      })
+    })
+    await flush()
+    expect(dialog.textContent).toContain('Đang kiểm tra tệp…')
+    const bar = dialog.querySelector<HTMLProgressElement>('progress.uw-act-bar')!
+    expect(bar).not.toBeNull()
+    expect(bar.hasAttribute('value')).toBe(false)
+
+    await act(async () => {
+      finishUpload(ok(uploadedSummary))
+    })
+    await flush()
+  })
 
   it('does not open or toast when an upload is cancelled or resolves late after cancel (DH1-E2E-6)', async () => {
     const uploadedSummary: DocumentsHomeDoc = {

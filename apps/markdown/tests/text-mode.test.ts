@@ -30,6 +30,13 @@ describe('textModeForPath', () => {
     expect(textModeForPath('/a/data.json.md')).toBe('markdown')
     expect(textModeForPath('/a/data.json.bak')).toBe('plain')
   })
+
+  it('UNI-1905: the web frame path (uniwork://files/<id>/<name>) keeps its real name', () => {
+    // web/modules/shared/text-webapi.ts pathFor() builds these; the mode must read the name
+    expect(textModeForPath('uniwork://files/f1/notes.txt')).toBe('plain')
+    expect(textModeForPath('uniwork://files/f1/notes.md')).toBe('markdown')
+    expect(textModeForPath('uniwork://files/f1/notes.markdown')).toBe('markdown')
+  })
 })
 
 describe('isSourceMode', () => {
@@ -56,6 +63,13 @@ describe('source text round-trip', () => {
       const { text, format } = readSourceText(raw)
       expect(writeSourceText(text, format)).toBe(raw)
     }
+  })
+
+  it('UNI-1905: the contract .txt fixture (---, *x*, 1., CRLF) is byte-exact', () => {
+    const raw = '---\r\n*x*\r\n1. first\r\n'
+    const { text, format } = readSourceText(raw)
+    expect(format).toEqual({ bom: false, eol: '\r\n', trailingNewline: true })
+    expect(writeSourceText(text, format)).toBe(raw)
   })
 
   it('preserves CRLF, BOM and a missing trailing newline through an edit', () => {

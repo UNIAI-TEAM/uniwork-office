@@ -164,6 +164,7 @@ export const es = {
   uwErrUploadTooLarge:
     '{name} pesa {size}, lo que supera el límite de {max}. Reduce el tamaño de las imágenes o divide el archivo y vuelve a subirlo.',
   uwReasonTooLargeWithLimit: 'supera el límite de {max}',
+  uwUploadChecking: 'Comprobando archivo…',
   uwChipEditLocked: '{name} está editando',
   uwChipEditLockedSelf: 'Editando en otra ventana',
   uwEditLockSomeone: 'Alguien',

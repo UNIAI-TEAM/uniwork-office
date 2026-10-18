@@ -163,6 +163,7 @@ export const ja = {
   uwErrUploadTooLarge:
     '{name} は {size} あり、上限 {max} を超えています。画像を圧縮するかファイルを分割してから、もう一度アップロードしてください。',
   uwReasonTooLargeWithLimit: '上限 {max} を超過',
+  uwUploadChecking: 'ファイルを確認しています…',
   uwChipEditLocked: '{name} が編集中',
   uwChipEditLockedSelf: '別のウィンドウで編集中',
   uwEditLockSomeone: '他のユーザー',

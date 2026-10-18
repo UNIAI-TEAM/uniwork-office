@@ -156,6 +156,7 @@ export const zhTW = {
   uwClose: '關閉',
   uwErrUploadTooLarge: '{name} 大小為 {size}，超過 {max} 上限。請壓縮圖片或拆分檔案後再重新上傳。',
   uwReasonTooLargeWithLimit: '超過 {max} 上限',
+  uwUploadChecking: '正在檢查檔案…',
   uwChipEditLocked: '{name} 正在編輯',
   uwChipEditLockedSelf: '正在另一個視窗中編輯',
   uwEditLockSomeone: '其他人',

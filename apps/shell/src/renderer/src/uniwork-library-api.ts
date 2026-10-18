@@ -85,6 +85,8 @@ export interface UploadProgressEvent {
   path: string
   loaded: number
   total: number
+  /** BIGUP-A1: 'checking' while the server verifies a chunked upload; absent = uploading */
+  phase?: 'uploading' | 'checking'
 }
 
 export interface DocRenamedEvent {

@@ -572,6 +572,21 @@ describe('saveDocx', () => {
     expect((await pending).ok).toBe(false)
   })
 
+  it('a host-declined save (api.save "cancelled") is silent, like a cancelled Save As', async () => {
+    const doc = await bootWith()
+    // SAVE-01 (UNI-1909): the host declines the frame's own save to open its
+    // name dialog — no status error, no toast, the document stays dirty
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'cancelled', message: 'cancelled', retryable: false },
+    }))
+    const res = await api.saveDocx(doc.path, buf([5]))
+    expect(res.ok).toBe(false)
+    expect(res).not.toHaveProperty('error')
+    // the same refuse also settles a host-initiated save as cancelled
+    expect((await api.saveDocx(doc.path, buf([6]))).ok).toBe(false)
+  })
+
   it('rejects a path that is not a UniWork document', async () => {
     expect((await api.saveDocx('/tmp/a.docx', buf([1]))).ok).toBe(false)
     expect(mock.calls).toHaveLength(0)
@@ -826,6 +841,44 @@ describe('onRenamedDocx', () => {
     mock.rename('f1', 'X.docx')
     expect(seen).toEqual([])
   })
+
+  it('a save result that carries a new name is a rename the renderer hears (S01B-V1)', async () => {
+    const doc = await bootWith()
+    const seen: Array<{ oldPath: string; newPath: string }> = []
+    api.onRenamedDocx((p) => seen.push(p))
+    // the host named the file in its own dialog and its api.save result carries it;
+    // the file.renamed event it sent first already told the frame (swallow guard) or
+    // never arrived — either way the merge must surface the change once
+    mock.override('api.save', () => {
+      const meta = mock.commit('f1', new Uint8Array([7]))
+      meta.name = 'Kế hoạch Q4.docx'
+      return { ok: true, file: meta, versionId: meta.versionId }
+    })
+    const res = await api.saveDocx(doc.path, buf([7]))
+    expect(res).toEqual({ ok: true })
+    expect(seen).toEqual([{ oldPath: doc.path, newPath: 'uniwork://files/f1/Kế hoạch Q4.docx' }])
+    // and a later file.renamed carrying the same name still emits nothing
+    mock.rename('f1', 'Kế hoạch Q4.docx')
+    expect(seen).toHaveLength(1)
+  })
+
+  it('a file.renamed during an in-flight save is never clobbered by the save result', async () => {
+    const doc = await bootWith()
+    const seen: Array<{ oldPath: string; newPath: string }> = []
+    api.onRenamedDocx((p) => seen.push(p))
+    // SAVE-01 order: the host emits file.renamed BEFORE the reissued save lands
+    mock.override('api.save', () => {
+      mock.rename('f1', 'Kế hoạch Q4.docx')
+      const meta = mock.commit('f1', new Uint8Array([9]))
+      return { ok: true, file: meta, versionId: meta.versionId }
+    })
+    const res = await api.saveDocx(doc.path, buf([9]))
+    expect(res).toEqual({ ok: true })
+    expect(seen).toEqual([{ oldPath: doc.path, newPath: 'uniwork://files/f1/Kế hoạch Q4.docx' }])
+    // the next save still targets the renamed file with its newest etag
+    await api.saveDocx('uniwork://files/f1/Kế hoạch Q4.docx', buf([1]))
+    expect(mock.saved.at(-1)!.file.name).toBe('Kế hoạch Q4.docx')
+  })
 })
 
 describe('fetchImage / convertAltChunkHtml', () => {
@@ -1047,7 +1100,11 @@ describe('host save / saveAs requests (editor flows)', () => {
 
   it('save conflict: the editor result carries the localized conflict sentence, not the server message', async () => {
     const doc = await bootWith()
-    let seen: { ok: boolean; error?: string; reason?: 'external-modified' } | null = null
+    let seen: {
+      ok: boolean
+      error?: string
+      reason?: 'external-modified' | 'cancelled'
+    } | null = null
     wireRenderer(
       () => doc.path,
       async () => {

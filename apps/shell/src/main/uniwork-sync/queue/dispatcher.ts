@@ -2,6 +2,17 @@ import { randomUUID } from 'node:crypto'
 import type { CommitLookup } from '../../uniwork-docs/parse'
 import { UniworkDocError } from '../../uniwork-docs/errors'
 import type { UniworkDocEditLock } from '../../../shared/home-api'
+import {
+  DEFAULT_DOCUMENT_LIMITS,
+  type DocumentLimits,
+  type DocumentLimitsCache,
+} from '../../uniwork-docs/limits'
+import type { SavedUploadSession } from '../../uniwork-docs/upload-session'
+import {
+  abortVersionUploadSession,
+  uploadVersionBytes,
+  type DocumentUploadSessionClient,
+} from '../version-upload'
 import type { DocLock } from '../doc-lock'
 import { QUEUE_LIMITS, type QueueLimits } from './limits'
 import {
@@ -62,6 +73,11 @@ export interface QueueClient {
     checksumSha256: string | null
   }>
   lookupCommit(input: { documentId: string; idempotencyKey: string }): Promise<CommitLookup>
+  /**
+   * BIGUP-A1: the upload-session routes a version payload above the chunked
+   * threshold uses; absent = every payload uses the single-request `upload`.
+   */
+  uploadSession?: DocumentUploadSessionClient
 }
 
 /** the record exactly as a store holds it: a v1 record stays v1 */
@@ -152,6 +168,11 @@ export interface QueueDispatcherDeps {
   random?(): number
   limits?: QueueLimits
   /**
+   * BIGUP-A1: the deployment's document limits (`chunked_upload_threshold_bytes`);
+   * absent = `DEFAULT_DOCUMENT_LIMITS` (no chunked threshold).
+   */
+  documentLimits?: DocumentLimitsCache | (() => DocumentLimits | Promise<DocumentLimits>)
+  /**
    * Whether this session may still send for this document (signed in, still
    * the account that owns the binding). Checked right before the upload and
    * right before the commit: false stops the pass with no request and no state
@@ -209,6 +230,10 @@ export class QueueDispatcher {
   private readonly committing = new Set<string>()
   /** documents parked read-only because another window holds the lock */
   private readonly otherWindow = new Set<string>()
+  /** in-flight version-upload abort controllers, keyed by document key */
+  private readonly uploadAborts = new Map<string, AbortController>()
+  /** R2-BE-04: in-flight version-upload session ids in memory, independent of store persistence */
+  private readonly uploadLiveSessions = new Map<string, string>()
 
   constructor(deps: QueueDispatcherDeps) {
     this.deps = deps
@@ -301,6 +326,7 @@ export class QueueDispatcher {
         reason: access.kind === 'keystore_locked' ? 'keystore_locked' : 'unavailable',
       }
     }
+    const priorSession = doc.record.uploadSession
     const superseded = transition(doc.record, { type: 'supersede' }, await this.context(now)).record
     if (superseded?.state !== 'cancelled') return { kind: 'busy' }
     const minted = await this.mint({ ...intent, key: doc.key })
@@ -316,6 +342,7 @@ export class QueueDispatcher {
               : 'unavailable',
       }
     }
+    await this.releaseUploadSession(doc.key, priorSession)
     this.otherWindow.delete(doc.key)
     this.deps.publish(superseded)
     this.deps.publish(minted)
@@ -565,8 +592,10 @@ export class QueueDispatcher {
       const kept = await this.keepDraft(doc, options.title, now)
       if (kept !== 'ok') return this.refuseCancel(doc, kept, now)
     }
+    const priorSession = doc.record.uploadSession
     const result = await this.apply(doc, { type: 'cancel' }, now)
     if (result.record?.state !== 'cancelled') return doc.record.state
+    await this.releaseUploadSession(doc.key, priorSession)
     await this.forget(doc)
     return 'cancelled'
   }
@@ -582,15 +611,21 @@ export class QueueDispatcher {
       const kept = await this.keepDraft(doc, options.title, now)
       if (kept !== 'ok') return this.refuseCancel(doc, kept, now)
     }
+    const priorSession = doc.record.uploadSession
     const result = await this.apply(doc, { type: 'discard' }, now)
     if (result.record?.state !== 'cancelled') return doc.record.state
+    await this.releaseUploadSession(doc.key, priorSession)
     await this.forget(doc)
     return 'cancelled'
   }
 
   /** Overwrite / Reload / "Luu lai": the old intent is superseded BEFORE a new one */
   async supersede(doc: QueueDoc, now = this.deps.clock()): Promise<QueueState> {
+    const priorSession = doc.record.uploadSession
     const result = await this.apply(doc, { type: 'supersede' }, now)
+    if (result.record?.state === 'cancelled') {
+      await this.releaseUploadSession(doc.key, priorSession)
+    }
     return result.record?.state ?? doc.record.state
   }
 
@@ -600,8 +635,10 @@ export class QueueDispatcher {
    * and leaves the stored record untouched.
    */
   async abandonBlocked(doc: QueueDoc, now = this.deps.clock()): Promise<QueueState> {
+    const priorSession = doc.record.uploadSession
     const result = await this.apply(doc, { type: 'abandon' }, now)
     if (result.record?.state !== 'cancelled') return doc.record.state
+    await this.releaseUploadSession(doc.key, priorSession)
     await this.forget(doc)
     return 'cancelled'
   }
@@ -736,17 +773,29 @@ export class QueueDispatcher {
       await this.apply(doc, { type: 'dispatch' }, now)
       await this.apply(doc, { type: 'uploaded' }, now)
       let upload: { uploadId: string; checksumSha256: string }
+      const controller = new AbortController()
+      this.uploadAborts.set(doc.key, controller)
       try {
-        upload = await this.deps.client.upload({
+        upload = await uploadVersionBytes(this.deps.client, {
           documentId: doc.record.documentId,
-          bytes: doc.payload,
           filename: doc.filename,
           format: doc.format,
+          bytes: doc.payload,
           idempotencyKey: doc.record.idempotencyKey,
+          limits: await this.resolveDocumentLimits(),
+          ...(doc.record.uploadSession ? { resume: doc.record.uploadSession } : {}),
+          signal: controller.signal,
+          onSessionState: (state) => this.persistUploadSession(doc, state, now),
         })
       } catch (error) {
+        if (controller.signal.aborted) return doc.record.state
         await this.failCommit(doc, error, now)
         return doc.record.state
+      } finally {
+        if (this.uploadAborts.get(doc.key) === controller) {
+          this.uploadAborts.delete(doc.key)
+          this.uploadLiveSessions.delete(doc.key)
+        }
       }
       if (upload.checksumSha256 !== doc.record.checksum) {
         await this.failCommit(
@@ -1018,6 +1067,89 @@ export class QueueDispatcher {
     const access = await this.deps.intents()
     if (access.kind === 'ok') await access.intents.delete(doc.key)
     this.otherWindow.delete(doc.key)
+  }
+
+  private async resolveDocumentLimits(): Promise<DocumentLimits> {
+    if (!this.deps.documentLimits) return DEFAULT_DOCUMENT_LIMITS
+    try {
+      if (typeof this.deps.documentLimits === 'function') {
+        return await this.deps.documentLimits()
+      }
+      return await this.deps.documentLimits.get()
+    } catch {
+      return DEFAULT_DOCUMENT_LIMITS
+    }
+  }
+
+  /**
+   * BIGUP-A1: persist the session state (`sessionId` and `completedParts`) onto
+   * the stored `IntentRecordV2` after session creation and each finished part,
+   * under the same `intentId` + `generation` guard as `apply`.
+   */
+  private async persistUploadSession(
+    doc: QueueDoc,
+    session: SavedUploadSession | undefined,
+    now: number,
+  ): Promise<void> {
+    if (session) {
+      this.uploadLiveSessions.set(doc.key, session.sessionId)
+      doc.record = {
+        ...doc.record,
+        uploadSession: session,
+        updatedAt: new Date(now).toISOString(),
+      }
+    } else {
+      this.uploadLiveSessions.delete(doc.key)
+      const cleared: IntentRecordV2 = {
+        ...doc.record,
+        updatedAt: new Date(now).toISOString(),
+      }
+      delete cleared.uploadSession
+      doc.record = cleared
+    }
+    const access = await this.deps.intents()
+    if (access.kind !== 'ok') return
+    const stored = await access.intents.read(doc.key, this.facts(doc))
+    if (
+      !stored ||
+      stored.intent.intentId !== doc.record.intentId ||
+      stored.intent.generation !== doc.record.generation
+    ) {
+      return
+    }
+    const latest = doc.record.uploadSession ?? session
+    const next: IntentRecordV2 = {
+      ...stored.intent,
+      updatedAt: new Date(now).toISOString(),
+    }
+    if (latest) next.uploadSession = latest
+    else delete next.uploadSession
+    const written = await access.intents.put(doc.key, next, doc.payload)
+    if (written.kind === 'ok') {
+      doc.record = latest ? { ...next, uploadSession: doc.record.uploadSession ?? latest } : next
+    }
+  }
+
+  /** BIGUP-A1: abort any in-flight part PUTs for `docKey` and DELETE its upload session */
+  private async releaseUploadSession(
+    docKey: string,
+    session: SavedUploadSession | undefined,
+  ): Promise<void> {
+    const controller = this.uploadAborts.get(docKey)
+    if (controller) {
+      controller.abort()
+      this.uploadAborts.delete(docKey)
+    }
+    const liveSessionId = this.uploadLiveSessions.get(docKey)
+    this.uploadLiveSessions.delete(docKey)
+    const sessionId = session?.sessionId ?? liveSessionId
+    const client = this.deps.client.uploadSession
+    if (!sessionId || !client) return
+    try {
+      await abortVersionUploadSession(client, sessionId)
+    } catch (error) {
+      console.warn('uniwork sync: the upload session could not be aborted', error)
+    }
   }
 
   /**

@@ -161,6 +161,7 @@ export const ms = {
   uwErrUploadTooLarge:
     '{name} bersaiz {size}, melebihi had {max}. Kecilkan saiz imej atau bahagikan fail, kemudian muat naik semula.',
   uwReasonTooLargeWithLimit: 'melebihi had {max}',
+  uwUploadChecking: 'Menyemak fail…',
   uwChipEditLocked: '{name} menyunting',
   uwChipEditLockedSelf: 'Menyunting dalam tetingkap lain',
   uwEditLockSomeone: 'Orang lain',

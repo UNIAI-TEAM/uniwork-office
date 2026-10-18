@@ -159,6 +159,7 @@ export const cs = {
   uwErrUploadTooLarge:
     '{name} má {size}, což překračuje limit {max}. Zmenšete obrázky nebo soubor rozdělte a nahrajte jej znovu.',
   uwReasonTooLargeWithLimit: 'přes limit {max}',
+  uwUploadChecking: 'Kontrola souboru…',
   uwChipEditLocked: '{name} upravuje',
   uwChipEditLockedSelf: 'Úprava v jiném okně',
   uwEditLockSomeone: 'Někdo',

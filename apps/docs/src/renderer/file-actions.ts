@@ -1219,7 +1219,8 @@ async function saveOnce(
       if (!result.ok) {
         // external-modified: the main process already prompted (or the autosave
         // deferred to a manual save) — stay dirty, no second dialog/error banner.
-        // uniwork-*: a UniWork document refused an autosave / a view-only write.
+        // uniwork-*: a UniWork document refused an autosave / a view-only write;
+        // cancelled: the host declined the save to run its own dialog (web frame).
         if (!result.reason) {
           ctx.setStatus(t('appSaveFailed', { error: result.error ?? '' }))
           if (!auto) showToast(t('appSaveFailed', { error: result.error ?? '' }), 'error')
@@ -1246,8 +1247,16 @@ async function saveOnce(
         prev
           ? {
               ...prev,
-              filePath: savedPath,
-              fileName: savedPath?.split(/[\\/]/).pop() ?? prev.fileName,
+              // S01B-V1 (UNI-1909): a rename landing mid-save moved prev's path;
+              // the captured save path must not push it back. A Save As instead
+              // adopts the new file's path (the rename then belongs to the copy's
+              // source, not to this document).
+              ...(saveAs || prev.filePath === doc.filePath
+                ? {
+                    filePath: savedPath,
+                    fileName: savedPath?.split(/[\\/]/).pop() ?? prev.fileName,
+                  }
+                : {}),
             }
           : prev,
       )
@@ -1290,8 +1299,13 @@ async function saveOnce(
         ? {
             ...prev,
             parsed: reparsed,
-            filePath: savedPath,
-            fileName: savedPath?.split(/[\\/]/).pop() ?? prev.fileName,
+            // same mid-save rename guard as the dirty-exit write-back above
+            ...(saveAs || prev.filePath === doc.filePath
+              ? {
+                  filePath: savedPath,
+                  fileName: savedPath?.split(/[\\/]/).pop() ?? prev.fileName,
+                }
+              : {}),
           }
         : prev,
     )

@@ -155,6 +155,7 @@ export const zh = {
   uwClose: '关闭',
   uwErrUploadTooLarge: '{name} 大小为 {size}，超过 {max} 上限。请压缩图片或拆分文件后再重新上传。',
   uwReasonTooLargeWithLimit: '超过 {max} 上限',
+  uwUploadChecking: '正在检查文件…',
   uwChipEditLocked: '{name} 正在编辑',
   uwChipEditLockedSelf: '正在另一个窗口中编辑',
   uwEditLockSomeone: '其他人',

@@ -130,6 +130,27 @@ describe('the upload cancel and progress of the preload (FX10)', () => {
     push({}, { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 0, total: 10 })
     expect(seen).toEqual([{ uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 0, total: 10 }])
   })
+
+  it('passes a known phase through and omits any other phase (BIGUP-A1)', async () => {
+    const { bridge, handlers } = await loadBridge(undefined)
+    const seen: unknown[] = []
+    bridge.onUniworkUploadProgress((event) => seen.push(event))
+    const push = handlers.get(UNIWORK_DOC_CHANNELS.uploadProgress)!
+    push({}, { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 5, total: 10, phase: 'uploading' })
+    // BIGUP-A1: the server-verification state must reach the dialog unchanged
+    push({}, { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 10, total: 10, phase: 'checking' })
+    // a phase main never defined is dropped, not passed on
+    push({}, { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 10, total: 10, phase: 'nope' })
+    push({}, { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 10, total: 10, phase: 7 })
+    push({}, { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 10, total: 10 })
+    expect(seen).toStrictEqual([
+      { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 5, total: 10, phase: 'uploading' },
+      { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 10, total: 10, phase: 'checking' },
+      { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 10, total: 10 },
+      { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 10, total: 10 },
+      { uploadId: 'up-1', path: 'C:/Q4.docx', loaded: 10, total: 10 },
+    ])
+  })
 })
 
 describe('the FD-11 folder bridge members (FD11-A-R1-03)', () => {

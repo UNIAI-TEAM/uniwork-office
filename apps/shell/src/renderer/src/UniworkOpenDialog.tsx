@@ -237,7 +237,9 @@ export function UniworkOpenDialog({
     () =>
       onUploadProgress((event) => {
         if (event.uploadId !== uploadId.current) return
-        setUpload((prev) => (prev ? { ...prev, loaded: event.loaded, total: event.total } : prev))
+        setUpload((prev) =>
+          prev ? { ...prev, loaded: event.loaded, total: event.total, phase: event.phase } : prev,
+        )
       }),
     [],
   )

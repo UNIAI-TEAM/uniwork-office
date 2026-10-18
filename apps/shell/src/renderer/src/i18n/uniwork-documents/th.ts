@@ -161,6 +161,7 @@ export const th = {
   uwErrUploadTooLarge:
     '{name} มีขนาด {size} ซึ่งเกินขีดจำกัด {max} ลดขนาดรูปภาพหรือแบ่งไฟล์ แล้วอัปโหลดอีกครั้ง',
   uwReasonTooLargeWithLimit: 'เกินขีดจำกัด {max}',
+  uwUploadChecking: 'กำลังตรวจสอบไฟล์…',
   uwChipEditLocked: '{name} กำลังแก้ไข',
   uwChipEditLockedSelf: 'กำลังแก้ไขในหน้าต่างอื่น',
   uwEditLockSomeone: 'คนอื่น',

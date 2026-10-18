@@ -161,6 +161,7 @@ export const id = {
   uwErrUploadTooLarge:
     '{name} berukuran {size}, melebihi batas {max}. Perkecil ukuran gambar atau bagi file, lalu unggah lagi.',
   uwReasonTooLargeWithLimit: 'melebihi batas {max}',
+  uwUploadChecking: 'Memeriksa file…',
   uwChipEditLocked: '{name} sedang mengedit',
   uwChipEditLockedSelf: 'Mengedit di jendela lain',
   uwEditLockSomeone: 'Orang lain',

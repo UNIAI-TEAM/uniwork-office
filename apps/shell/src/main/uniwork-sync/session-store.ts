@@ -6,6 +6,7 @@ import { PARKED_STORE_REGISTRATION } from './queue/parked'
 import { PAUSE_STORE_REGISTRATION } from './queue/pause'
 import { DOC_INDEX_REGISTRATION, FEED_CURSORS_REGISTRATION } from './runtime'
 import type { StoreLayer, StoreRecords, StoreRegistration } from './store'
+import { UPLOAD_SESSIONS_STORE_REGISTRATION } from './upload-sessions'
 
 /**
  * The signed-in session's view of the durable store. One scope per account
@@ -36,6 +37,7 @@ export const SYNC_STORE_REGISTRATIONS: readonly StoreRegistration[] = [
   FEED_CURSORS_REGISTRATION,
   DOC_INDEX_REGISTRATION,
   LEASE_STORE_REGISTRATION,
+  UPLOAD_SESSIONS_STORE_REGISTRATION,
 ]
 
 export type SyncStoreOpen =

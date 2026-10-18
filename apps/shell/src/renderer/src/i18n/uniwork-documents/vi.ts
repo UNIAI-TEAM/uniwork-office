@@ -158,6 +158,7 @@ export const vi = {
   uwErrUploadTooLarge:
     '{name} nặng {size}, vượt giới hạn {max}. Giảm dung lượng ảnh hoặc chia nhỏ tệp rồi tải lên lại.',
   uwReasonTooLargeWithLimit: 'vượt giới hạn {max}',
+  uwUploadChecking: 'Đang kiểm tra tệp…',
   uwChipEditLocked: '{name} đang sửa',
   uwChipEditLockedSelf: 'Đang sửa ở cửa sổ khác',
   uwEditLockSomeone: 'Người khác',
