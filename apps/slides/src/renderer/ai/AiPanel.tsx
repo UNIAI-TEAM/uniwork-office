@@ -50,6 +50,7 @@ import {
   mediaAnalysisAvailable,
 } from '@genoffice/ai-provider/browser'
 import { platform } from '../capabilities'
+import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import {
@@ -1007,8 +1008,8 @@ export function AiPanel({
 
     const access: DeckAccess = {
       readOnly: () => readOnlyRef.current,
-      uniworkBound: () => uniworkBoundRef.current,
-      uniworkAi: () => settingsRef.current.provider === 'uniwork',
+      // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
+      uniworkBound: () => uniworkBoundForAi(uniworkBoundRef.current ?? false, platform()),
       imageUrls: createImageUrlRegistry({
         enforce: () => settingsRef.current.provider === 'uniwork',
         attachments: () =>
