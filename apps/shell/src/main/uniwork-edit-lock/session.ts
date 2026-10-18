@@ -8,14 +8,7 @@ import type { EditLockHeartbeat, EditLockTenure, UniworkEditLockClient } from '.
  */
 
 export type EditLockSessionPhase =
-  | 'acquiring'
-  | 'held'
-  | 'other'
-  | 'self_elsewhere'
-  | 'free'
-  | 'lost'
-  | 'unreachable'
-  | 'none'
+  'acquiring' | 'held' | 'other' | 'self_elsewhere' | 'free' | 'lost' | 'unreachable' | 'none'
 
 export type EditLockLostReason =
   | 'released'
@@ -295,7 +288,11 @@ export class EditLockSession {
       }
       if (
         isUniworkDocError(error) &&
-        (error.code === 'forbidden' || error.code === 'permission_revoked' || error.status === 403)
+        (error.code === 'forbidden' ||
+          error.code === 'permission_revoked' ||
+          error.status === 403 ||
+          error.code === 'not_found' ||
+          error.status === 404)
       ) {
         this.clearTimers()
         this.setState({ phase: 'none', holderName: null, since: null })
@@ -361,22 +358,26 @@ export class EditLockSession {
         documentId: this.documentId,
         lockId: lock.lockId,
       })
-      if (this.state.phase !== 'held' || this.tenure?.lockId !== lock.lockId) return
-      if (hb.lockId === lock.lockId) {
+      if (
+        this.state.phase === 'held' &&
+        this.tenure?.lockId === lock.lockId &&
+        hb.lockId === lock.lockId
+      ) {
         this.lastOk = sentAt
         this.tenure = { ...lock, expiresAt: hb.expiresAt }
       }
     } catch (error) {
-      if (this.state.phase !== 'held' || this.tenure?.lockId !== lock.lockId) return
-      if (this.loseFrom(error)) return
+      if (this.state.phase === 'held' && this.tenure?.lockId === lock.lockId) {
+        this.loseFrom(error)
+      }
     } finally {
       this.beating = false
-      const again = this.pendingBeat
-      this.pendingBeat = false
-      if (again && this.state.phase === 'held' && !this.disposed) {
-        await this.beat()
-        return
-      }
+    }
+    const again = this.pendingBeat
+    this.pendingBeat = false
+    if (again && this.state.phase === 'held' && !this.disposed) {
+      await this.beat()
+      return
     }
     if (this.state.phase === 'held' && !this.disposed && !this.expireIfDue()) {
       this.scheduleBeat()

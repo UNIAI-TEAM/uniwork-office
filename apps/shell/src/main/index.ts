@@ -23,6 +23,7 @@ import {
   ipcMain,
   nativeImage,
   nativeTheme,
+  powerMonitor,
   session,
   shell,
   webContents,
@@ -4572,6 +4573,8 @@ function registerHomeIpc(): void {
   )
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
   uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+  powerMonitor.on('resume', () => uniworkDocs?.service.notePowerResume())
+  app.on('browser-window-focus', () => uniworkDocs?.service.noteWindowFocus())
   // UniWork work data for the Workbench (home, tasks, calendar, profile); logic in ./uniwork-work
   registerUniworkWork(ipcMain, {
     profile: () => uniworkDeploymentProfile(),
@@ -7027,6 +7030,8 @@ app.on('before-quit', () => {
   // No close prompt may fall through to "Save" during shutdown
   markSheetsShuttingDown()
   stopSheetsSidecar()
+  // EL-1(b): best-effort lock release, 1.5 s cap, never blocks quit
+  uniworkDocs?.service.releaseEditLocksOnQuit()
   // release the MCP port synchronously (macOS keeps the process alive after
   // the last window closes, so window-all-closed is not enough)
   stopMcpSync()
