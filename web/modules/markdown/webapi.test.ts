@@ -217,6 +217,84 @@ describe('markdownApi: open and save', () => {
   })
 })
 
+// UNI-1905 (UN-02): a stored *.txt opens through the markdown module; the bridge must hand the
+// renderer the real file name so it lands in the plain source mode (CodeMirror, bytes untouched),
+// and a save / conflict-save / Save As must keep the *.txt name so the server keeps text/plain.
+describe('markdownApi: a .txt opens in plain mode and stays .txt', () => {
+  // markup the block editor would reinterpret, in CRLF: nothing may normalize on open -> save.
+  // Built like FIXTURE (a literal array): TextEncoder produces foreign-realm Uint8Arrays that
+  // jsdom toEqual refuses to compare.
+  const TXT_BYTES = new Uint8Array([...enc('---\r\n*x*\r\n1. first\r\n')])
+
+  it('the opened path carries the real name .txt, so the renderer picks the plain mode', async () => {
+    const txt = setup({ name: 'notes.txt', bytes: TXT_BYTES })
+    const txtOpen = await open(txt.api)
+    expect(txtOpen.path).toBe(`uniwork://files/${txt.file.fileId}/notes.txt`)
+    // textModeForPath stays in the app (web tests import it type-side only); the renderer's
+    // mapping of this uniwork://files path to 'plain' is pinned in text-mode.test.ts
+    const md = setup({ name: 'notes.md', bytes: TXT_BYTES })
+    const mdOpen = await open(md.api)
+    expect(mdOpen.path).toBe(`uniwork://files/${md.file.fileId}/notes.md`)
+  })
+
+  it('save without edits writes the exact input bytes and never renames or retypes the file', async () => {
+    const { api, mock, file } = setup({ name: 'notes.txt', bytes: TXT_BYTES })
+    const { text } = await open(api)
+    const res = await api.save({ text, imageSources: [], mode: 'save' })
+    expect(res).toEqual({ ok: true, path: `uniwork://files/${file.fileId}/notes.txt` })
+    const sent = lastSave(mock)!
+    // api.save carries fileId + bytes (+ If-Match), never a name: the server keeps notes.txt,
+    // so DetectContentType keeps text/plain
+    expect(sent).not.toHaveProperty('name')
+    expect(new Uint8Array(sent.data)).toEqual(TXT_BYTES)
+    expect(mock.bytesOf(file.fileId)).toEqual(TXT_BYTES)
+    expect(mock.saved.at(-1)).toMatchObject({ file: { name: 'notes.txt' } })
+  })
+
+  it('a conflict Overwrite still lands on notes.txt with the exact bytes', async () => {
+    const { api, mock, file } = setup({ name: 'notes.txt', bytes: TXT_BYTES })
+    const { text } = await open(api)
+    mock.bumpRemote(file.fileId)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const edited = `${text}mine\r\n`
+    const editedBytes = new Uint8Array([...enc(edited)])
+    const pending = api.save({ text: edited, imageSources: [], mode: 'save' })
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-office-web="conflict"]')).not.toBeNull(),
+    )
+    for (const choice of ['overwrite', 'go']) {
+      await vi.waitFor(() =>
+        expect(document.querySelector(`[data-choice="${choice}"]`)).not.toBeNull(),
+      )
+      // the dialog renders plain buttons (see 'save conflicts' below): an HTMLButtonElement is certain
+      const button = document.querySelector(`[data-choice="${choice}"]`) as HTMLButtonElement
+      button.click()
+    }
+    expect(await pending).toEqual({ ok: true, path: `uniwork://files/${file.fileId}/notes.txt` })
+    expect(new Uint8Array(lastSave(mock)!.data)).toEqual(editedBytes)
+    expect(mock.saved.at(-1)).toMatchObject({ file: { name: 'notes.txt' } })
+  })
+
+  it("Save As defaults to the opened file's extension: notes.txt stays .txt, never .txt.md", async () => {
+    const { api, mock } = setup({ name: 'notes.txt', bytes: TXT_BYTES })
+    const { text } = await open(api)
+    const res = await api.save({ text, imageSources: [], mode: 'saveAs' })
+    expect(res.ok && 'path' in res && res.path).toMatch(/notes\.txt$/)
+    const call = mock.calls.find((c) => c.type === 'api.saveAs')!
+    expect(call.payload).toMatchObject({ name: 'notes.txt' })
+  })
+
+  it('a host saveAs that names *.txt keeps it; a bare name gets the .txt default', async () => {
+    const { api, mock } = setup({ name: 'notes.txt', bytes: TXT_BYTES })
+    const { text } = await open(api)
+    api.onSaveRequest((mode) => void api.save({ text, imageSources: [], mode }))
+    const named = await mock.host.saveAs({ name: 'ban-sao.txt' })
+    expect(named).toMatchObject({ ok: true, file: { name: 'ban-sao.txt' } })
+    const bare = await mock.host.saveAs({ name: 'Copy' })
+    expect(bare).toMatchObject({ ok: true, file: { name: 'Copy.txt' } })
+  })
+})
+
 describe('markdownApi: save conflicts', () => {
   async function conflicted() {
     const s = setup()

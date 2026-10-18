@@ -15,6 +15,7 @@ import {
   concat,
   cspViolations,
   encode,
+  hostRequest,
   hostState,
   openModule,
   reloadFrame,
@@ -141,6 +142,43 @@ test('markdown: open -> save byte-identical -> type -> save -> reopen -> conflic
     'abbreviation. Mine.',
   )
 
+  await page.waitForTimeout(1_000)
+  await expectClean(page, frame, problems)
+})
+
+// UNI-1905 (UN-02): a stored *.txt opens through the markdown module in the plain source mode —
+// the test host names the file from the ?open= URL, so a .txt fixture name is all it takes for the
+// server-side mapping (text/plain -> module markdown). The bytes the block editor would rewrite
+// (---, *x*, 1., CRLF) must come back untouched, and a save keeps the .txt name: the server maps
+// that name to text/plain again. Save As keeps the opened file's extension.
+const TXT = '---\r\n*x*\r\n1. first\r\n'
+const TXT_PATH = '/e2e-fixtures/notes.txt'
+
+test('markdown: a .txt opens in plain mode and saves byte-identical under the .txt name', async ({
+  page,
+}) => {
+  const problems = await watch(page)
+  await serveFixture(page, TXT_PATH, encode(TXT), 'text/plain')
+  const frame = await openModule(page, 'markdown', { open: TXT_PATH, lang: 'en' })
+  // the plain CodeMirror surface replaces the block editor outright; markdown-only controls
+  // (block styles, Export Word) cannot act on raw text, as on the desktop
+  await expect(frame.locator('.source-editor .cm-content')).toContainText('---', {
+    timeout: 30_000,
+  })
+  await expect(frame.locator('.doc-editor')).toHaveCount(0)
+  await expect(frame.locator('.qa-export')).toBeDisabled()
+
+  await page.keyboard.press('Control+s')
+  await expect.poll(async () => (await hostState(page)).lastSaved?.name).toBe('notes.txt')
+  expect((await hostState(page)).lastSaved!.bytes).toEqual(Array.from(encode(TXT)))
+
+  // Save As defaults to the opened file's extension: a host name keeps .txt, never .txt.md
+  const savedAs = await hostRequest<{ ok: boolean; file?: { name: string } }>(page, 'saveAs', {
+    name: 'ban-sao.txt',
+  })
+  expect(savedAs).toMatchObject({ ok: true, file: { name: 'ban-sao.txt' } })
+
+  await page.screenshot({ path: screenshotPath('markdown', 'txt-plain-light-en') })
   await page.waitForTimeout(1_000)
   await expectClean(page, frame, problems)
 })

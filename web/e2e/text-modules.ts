@@ -92,6 +92,24 @@ export async function bumpRemote(page: Page, fileId: string): Promise<void> {
   )
 }
 
+/** send a host -> frame request through the test host (host.js `__host.request`): save/saveAs/print */
+export async function hostRequest<T = unknown>(
+  page: Page,
+  type: string,
+  payload: Record<string, unknown>,
+): Promise<T> {
+  return page.evaluate(
+    async (args) => {
+      // host.js installs window.__host at boot: the e2e host's own RPC channel, a test-only shape
+      const win = window as {
+        __host: { request: (type: string, payload: Record<string, unknown>) => Promise<unknown> }
+      }
+      return (await win.__host.request(args.type, args.payload)) as T
+    },
+    { type, payload },
+  )
+}
+
 /** open the module in the test host and wait for the handshake + the renderer */
 export async function openModule(
   page: Page,
