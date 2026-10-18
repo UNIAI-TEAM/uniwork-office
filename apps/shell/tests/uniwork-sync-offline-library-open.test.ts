@@ -100,6 +100,8 @@ interface OpenHarness {
   pathOpen: { value: boolean; closed: Set<string> }
   clock: { now: number }
   capability: { on: boolean }
+  /** the auth module's state the service reads: a cold restore with a locked keychain has no identity */
+  account: { signedIn: boolean; keystoreLocked: boolean }
   scope: { value: { deploymentId: string; accountId: string } }
   /** the server read: every URL asked, and an optional answer (default: no network) */
   server: { answer: ((url: string) => Response) | null; calls: string[] }
@@ -126,6 +128,7 @@ function openHarness(): OpenHarness {
   const isPathOpen = (path: string) => !pathOpen.closed.has(path) && pathOpen.value
   const clock = { now: 1_000 }
   const capability = { on: true }
+  const account = { signedIn: true, keystoreLocked: false }
   const scope = { value: { deploymentId: SCOPE.deploymentId, accountId: SCOPE.accountId } }
   const server: OpenHarness['server'] = { answer: null, calls: [] }
   /** what the wiring passes the service: the module's outcome as the service's seam */
@@ -146,12 +149,15 @@ function openHarness(): OpenHarness {
     }),
     channel: () => 'stable',
     applyProfile: async () => 'unchanged',
-    identity: () => ({
-      accountId: SCOPE.accountId,
-      deviceSessionId: 'dev_1',
-      deploymentId: SCOPE.deploymentId,
-    }),
-    keystoreLocked: () => false,
+    identity: () =>
+      account.signedIn
+        ? {
+            accountId: SCOPE.accountId,
+            deviceSessionId: 'dev_1',
+            deploymentId: SCOPE.deploymentId,
+          }
+        : null,
+    keystoreLocked: () => account.keystoreLocked,
     selectedOrg: () => ({ id: ORG, slug: 'acme' }),
     authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
     // no network at all by default: every server read is the offline case. A
@@ -214,6 +220,7 @@ function openHarness(): OpenHarness {
     pathOpen,
     clock,
     capability,
+    account,
     scope,
     server,
     userDataDir,
@@ -335,6 +342,24 @@ describe('G5-05u B5 an offline open shows the read-only cached copy', () => {
     const result = await o.service.openDocument('doc_1')
     expect(result.ok).toBe(false)
     expect(o.opened).toEqual([])
+  })
+})
+
+describe('G703B-P3 (FL-09) a pinned open with the keychain locked and no restored session', () => {
+  it('is refused keystore_locked (the S11 keychain reason), not signed_out', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    // the second launch: the saved sign-in cannot be read, so no session is restored
+    o.account.signedIn = false
+    o.account.keystoreLocked = true
+    const result = await o.api.open('doc_1')
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'keystore_locked',
+      lockReason: 'keystore_locked',
+    })
   })
 })
 
