@@ -7,6 +7,7 @@ import { FIT_WIDTH } from './app-constants'
 import type { ActionCtx } from './action-context'
 import { renderSelectionToPngBase64 } from './selection-image'
 import { t } from './i18n/locale'
+import { cap } from './capabilities'
 
 /** Enter picture crop mode: find the selected picture node and read its box and srcRect */
 export function startCrop(ctx: ActionCtx): void {
@@ -153,7 +154,7 @@ export async function replacePicture(ctx: ActionCtx): Promise<void> {
 
 /** Only top-level slide nodes render into the selection PNG, so an entered group's children cannot be saved */
 export function canSaveAsPicture(ctx: ActionCtx, sourceIds: readonly string[]): boolean {
-  return !!ctx.slide && sourceIds.length > 0 && !ctx.enteredGroupId
+  return cap('saveAs') && !!ctx.slide && sourceIds.length > 0 && !ctx.enteredGroupId
 }
 
 function pictureFileName(ctx: ActionCtx, sourceIds: readonly string[]): string {
@@ -170,7 +171,7 @@ export async function saveSelectionAsPicture(
   ctx: ActionCtx,
   sourceIds: readonly string[] = ctx.selectedIds,
 ): Promise<void> {
-  if (!ctx.slide || !canSaveAsPicture(ctx, sourceIds)) return
+  if (!cap('saveAs') || !ctx.slide || !canSaveAsPicture(ctx, sourceIds)) return
   try {
     const pngBase64 = await renderSelectionToPngBase64(ctx.slide, sourceIds, ctx.images)
     const r = await window.slidesApi.savePicture({

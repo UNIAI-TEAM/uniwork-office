@@ -27,6 +27,7 @@ export const es = {
   ufCycle: 'Una carpeta no se puede mover a sí misma ni a una de sus subcarpetas.',
   ufParentKind: 'Una carpeta está en la raíz o dentro de otra carpeta.',
   ufFolderGone: 'Esta carpeta ya no está aquí.',
+  ufFolderNoAccess: 'Ya no tienes acceso a esta carpeta.',
   ufNoPermission: 'No tienes permiso para cambiar esta carpeta.',
   ufEmptyFolder: 'Esta carpeta está vacía',
   ufLocation: 'Ubicación',

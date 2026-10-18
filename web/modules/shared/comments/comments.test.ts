@@ -63,6 +63,7 @@ function framePort(
     comments?: boolean
     commentsShareView?: boolean
     level?: 'view' | 'comment' | 'edit' | 'manage' | null
+    profile?: 'readOnly'
   } = {},
 ) {
   const mock = createMockPort({
@@ -73,6 +74,7 @@ function framePort(
       ...(session.commentsShareView ? { commentsShareView: true } : {}),
     },
     user: { displayName: 'An', id: ME },
+    ...(session.profile ? { profile: session.profile } : {}),
     ...(session.level === null ? {} : { commentsLevel: session.level ?? 'edit' }),
   } as never)
   mock.override('comments.list', () => listOf([post({ id: 'p1' })]))
@@ -671,5 +673,39 @@ describe('the frame reveal router (one handler, exactly one panel reacts)', () =
     expect(p.hasRevealHandler()).toBe(true)
     offB()
     expect(p.hasRevealHandler()).toBe(false)
+  })
+})
+
+describe('FRAME-RO-01: readOnly profile in comments (UNI-1876)', () => {
+  it('frameMentionAccess disables commentsShareView and canListMembers under readOnly profile', () => {
+    expect(
+      frameMentionAccess({
+        profile: 'readOnly',
+        commentsLevel: 'manage',
+        capabilities: { comments: true, commentsShareView: true },
+      }),
+    ).toEqual({
+      commentsShareView: false,
+      canListMembers: false,
+    })
+  })
+
+  it('createFrameCommentsApi.context() forces level:view and disables shareView/canListMembers under readOnly profile', async () => {
+    const p = framePort({ level: 'manage', commentsShareView: true, profile: 'readOnly' })
+    const target: Record<string, unknown> = {}
+    const pending = installFrameComments(p.port, {}, target)
+    p.mock.init()
+    const api = (await pending)!
+    expect(api).not.toBeNull()
+    expect(api.shareView).toBeUndefined()
+    expect(api.canListMembers).toBe(false)
+    expect(await api.context({ path: 'ignored' })).toMatchObject({
+      ok: true,
+      value: {
+        documentId: 'doc-1',
+        level: 'view',
+        frame: true,
+      },
+    })
   })
 })

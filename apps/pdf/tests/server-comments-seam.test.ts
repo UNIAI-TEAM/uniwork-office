@@ -20,7 +20,10 @@ import {
   PdfServerCommentsHost,
   type PdfServerComments,
 } from '../src/renderer/server-comments/PdfServerComments'
-import { pdfCommentsBridge } from '../src/renderer/server-comments/pdf-comments-context'
+import {
+  loadPdfCommentsContext,
+  pdfCommentsBridge,
+} from '../src/renderer/server-comments/pdf-comments-context'
 import { createPdfAnchorAdapter } from '../src/renderer/server-comments/pdf-adapter'
 import { makePdfAnchor } from '../src/renderer/server-comments/pdf-anchor'
 
@@ -328,5 +331,52 @@ describe('G8-A02 (pdf): the save receipt follows this document only', () => {
     })
     expect(bridge.anchors).not.toHaveBeenCalled()
     expect(api.current?.context.versionId).not.toBe('ver-old')
+  })
+
+  it('FRAME-RO-01 (D4): loadPdfCommentsContext forces level: view on profile: readOnly or desktop readOnly, while web save: false alone keeps commentsLevel', async () => {
+    const roProfile = {
+      context: () =>
+        ok({
+          documentId: 'doc-1',
+          versionId: 'ver-1',
+          level: 'edit' as const,
+          frame: true,
+          profile: 'readOnly',
+        }),
+    }
+    expect(await loadPdfCommentsContext(roProfile as never, PATH, false)).toMatchObject({
+      documentId: 'doc-1',
+      versionId: 'ver-1',
+      level: 'view',
+    })
+
+    const commenterFrame = {
+      context: () =>
+        ok({
+          documentId: 'doc-1',
+          versionId: 'ver-1',
+          level: 'comment' as const,
+          frame: true,
+        }),
+    }
+    expect(await loadPdfCommentsContext(commenterFrame as never, PATH, true)).toMatchObject({
+      documentId: 'doc-1',
+      versionId: 'ver-1',
+      level: 'comment',
+    })
+
+    const desktopRo = {
+      context: () =>
+        ok({
+          documentId: 'doc-1',
+          versionId: 'ver-1',
+          level: 'edit' as const,
+        }),
+    }
+    expect(await loadPdfCommentsContext(desktopRo as never, PATH, true)).toMatchObject({
+      documentId: 'doc-1',
+      versionId: 'ver-1',
+      level: 'view',
+    })
   })
 })

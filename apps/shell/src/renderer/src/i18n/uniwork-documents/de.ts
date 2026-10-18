@@ -169,4 +169,11 @@ export const de = {
     '{name} ist {size} groß und überschreitet das Limit von {max}. Verkleinern Sie Bilder oder teilen Sie die Datei auf und laden Sie sie erneut hoch.',
   uwReasonTooLargeWithLimit: 'über dem Limit von {max}',
   uwUploadChecking: 'Datei wird überprüft…',
+  uwChipEditLocked: '{name} bearbeitet',
+  uwChipEditLockedSelf: 'Bearbeitung in einem anderen Fenster',
+  uwEditLockSomeone: 'Jemand',
+  uwTipEditLocked: '{name} bearbeitet seit {time}.',
+  uwTipEditLockedSelf: 'Sie bearbeiten dieses Dokument in einem anderen Fenster.',
+  uwErrEditLocked: 'Jemand anderes bearbeitet dieses Dokument.',
+  uwReasonEditLocked: 'jemand anderes bearbeitet es',
 } satisfies Record<keyof typeof zh, string>

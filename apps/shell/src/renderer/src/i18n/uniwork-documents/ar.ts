@@ -158,4 +158,11 @@ export const ar = {
     'حجم {name} هو {size}، وهو يتجاوز الحد الأقصى {max}. قلّل حجم الصور أو قسّم الملف ثم ارفعه مرة أخرى.',
   uwReasonTooLargeWithLimit: 'يتجاوز الحد {max}',
   uwUploadChecking: 'جارٍ التحقق من الملف…',
+  uwChipEditLocked: '{name} يحرّر',
+  uwChipEditLockedSelf: 'قيد التحرير في نافذة أخرى',
+  uwEditLockSomeone: 'شخص آخر',
+  uwTipEditLocked: '{name} يحرّر منذ {time}.',
+  uwTipEditLockedSelf: 'أنت تحرّر هذا المستند في نافذة أخرى.',
+  uwErrEditLocked: 'شخص آخر يحرّر هذا المستند.',
+  uwReasonEditLocked: 'شخص آخر يحرّر',
 } satisfies Record<keyof typeof zh, string>

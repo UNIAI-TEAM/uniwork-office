@@ -199,6 +199,17 @@ function ThemePicker({
   useDismissablePopover(open, () => setOpen(false), {
     inside: () => [wrapRef.current],
   })
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [open])
   return (
     <div className="md-theme-wrap" ref={wrapRef}>
       <IconBtn
@@ -346,6 +357,17 @@ export function Ribbon({
   useDismissablePopover(linkOpen, () => setLinkOpen(false), {
     inside: () => [linkAnchorRef.current],
   })
+  useEffect(() => {
+    if (!linkOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setLinkOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [linkOpen])
 
   // editor-shaped commands stand down while the pane hides the selection;
   // Save As never does, and Find only while the source view hides its target
@@ -395,29 +417,33 @@ export function Ribbon({
     <div className={`ribbon ${collapse.rootClass}`} ref={collapse.rootRef}>
       {/* quick-access row above the toolbar (save / undo / redo / autosave), same as the docs QAT row */}
       <div className="ribbon-tabs">
-        <button
-          type="button"
-          className="qa-btn"
-          data-tip={t('save')}
-          aria-label={t('save')}
-          disabled={disabled || (!dirty && !uniworkBound)}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={onSave}
-        >
-          <IconSave size={16} />
-        </button>
-        <button
-          type="button"
-          className="qa-btn qa-save-as"
-          data-tip={t('saveAs')}
-          aria-label={t('saveAs')}
-          disabled={notReady}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={onSaveAs}
-        >
-          {t('saveAs')}
-        </button>
-        {onExport && (
+        {cap('save') && (
+          <button
+            type="button"
+            className="qa-btn"
+            data-tip={t('save')}
+            aria-label={t('save')}
+            disabled={disabled || (!dirty && !uniworkBound)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onSave}
+          >
+            <IconSave size={16} />
+          </button>
+        )}
+        {cap('saveAs') && (
+          <button
+            type="button"
+            className="qa-btn qa-save-as"
+            data-tip={t('saveAs')}
+            aria-label={t('saveAs')}
+            disabled={notReady}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onSaveAs}
+          >
+            {t('saveAs')}
+          </button>
+        )}
+        {cap('saveAs') && onExport && (
           <button
             type="button"
             className="qa-btn qa-save-as qa-export"
@@ -584,7 +610,11 @@ export function Ribbon({
                   <IconLink size={ICON} />
                 </IconBtn>
                 {linkOpen && (
-                  <span className="rb-link-pop" onMouseDown={(e) => e.stopPropagation()}>
+                  <span
+                    className="rb-link-pop"
+                    data-esc-local=""
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
                     <input
                       ref={linkInputRef}
                       value={linkUrl}
@@ -592,7 +622,10 @@ export function Ribbon({
                       onChange={(e) => setLinkUrl(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && linkUrl.trim()) applyLink()
-                        if (e.key === 'Escape') setLinkOpen(false)
+                        if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setLinkOpen(false)
+                        }
                       }}
                     />
                     <button type="button" disabled={!linkUrl.trim()} onClick={applyLink}>

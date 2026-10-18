@@ -27,6 +27,7 @@ export const de = {
   ufCycle: 'Ein Ordner kann nicht in sich selbst oder einen seiner Unterordner verschoben werden.',
   ufParentKind: 'Ein Ordner liegt im Stammverzeichnis oder in einem anderen Ordner.',
   ufFolderGone: 'Dieser Ordner ist nicht mehr hier.',
+  ufFolderNoAccess: 'Du hast keinen Zugriff mehr auf diesen Ordner.',
   ufNoPermission: 'Du hast keine Berechtigung, diesen Ordner zu ändern.',
   ufEmptyFolder: 'Dieser Ordner ist leer',
   ufLocation: 'Speicherort',

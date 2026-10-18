@@ -39,6 +39,9 @@ import {
 } from '../../modules/shared/ai/web-ai'
 import { FRAME_COMMENTS, frameCommentsClaim } from '../../modules/shared/discussion/claim'
 import { mountFrameDiscussion, type DiscussionPort } from '../../modules/shared/discussion/mount'
+import { installEscapeForwarder, isReadOnlyProfile } from './escape-forwarder'
+
+export { installEscapeForwarder, isReadOnlyProfile }
 
 /** what the installer hands each global's factory */
 export interface ModuleBridgeContext {
@@ -76,6 +79,7 @@ export type ModuleBridgePort = Pick<
   | 'reportSizeWarning'
   | 'reportSaveBlocked'
   | 'reportLagDetected'
+  | 'reportCloseRequested'
 >
 
 export interface ModuleBridgeSpec {
@@ -222,6 +226,11 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   }
   if (!('projectApi' in spec.globals)) target.projectApi = projectApi
   target.__officeWebModule = spec.module
+  if (typeof (target as unknown as Window).addEventListener === 'function') {
+    installEscapeForwarder(target as unknown as Window, (reason) =>
+      client.reportCloseRequested?.(reason),
+    )
+  }
   // the Discussion panel: mounted once the session is known, only for a bound, signed-in document
   if (spec.frameComments ?? FRAME_COMMENTS[spec.module]) {
     void mountFrameDiscussion(

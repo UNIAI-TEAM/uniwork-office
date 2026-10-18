@@ -89,6 +89,9 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
       if (request?.mode === 'openInDocs') {
         return { ok: false as const, error: 'opening in Docs is not available on the web' }
       }
+      if (!web.canSaveAs()) {
+        return { ok: false as const, error: 'unsupported' }
+      }
       if (typeof request?.base64 !== 'string' || !request.base64) {
         return { ok: false as const, error: 'empty document' }
       }

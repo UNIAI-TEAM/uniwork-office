@@ -80,7 +80,13 @@ async function setup(
   const web = createWebSlidesApi(
     {
       client: mock.port,
-      capabilities: opts.capabilities ?? { ...SLIDES_WEB_CAPABILITIES, save: true, saveAs: true },
+      capabilities: opts.capabilities ?? {
+        ...SLIDES_WEB_CAPABILITIES,
+        save: true,
+        saveAs: true,
+        print: true,
+        exportPdf: true,
+      },
     },
     { download: (name, blob) => downloads.push({ name, blob }), editorStartMs: 1000, ...opts },
   )
@@ -691,12 +697,25 @@ describe('view-only (no host save grant)', () => {
     expect(await api.uniworkState()).toEqual({ bound: false, readOnly: false })
   })
 
-  it('host grants turn save / saveAs / open / recents on', () => {
-    expect(slidesHostGrants({ save: true, saveAs: true, filePick: true, recents: true })).toEqual({
+  it('host grants turn save / saveAs / open / recents / print / exportPdf / exportHtml on', () => {
+    expect(
+      slidesHostGrants({
+        save: true,
+        saveAs: true,
+        filePick: true,
+        recents: true,
+        print: true,
+        exportPdf: true,
+        exportHtml: true,
+      }),
+    ).toEqual({
       save: true,
       saveAs: true,
       open: true,
       recents: true,
+      print: true,
+      exportPdf: true,
+      exportHtml: true,
       desktopOpen: false,
     })
     expect(slidesHostGrants({ desktopOpen: true }).desktopOpen).toBe(true)
@@ -705,6 +724,9 @@ describe('view-only (no host save grant)', () => {
       saveAs: false,
       open: false,
       recents: false,
+      print: false,
+      exportPdf: false,
+      exportHtml: false,
       desktopOpen: false,
     })
   })
@@ -1077,5 +1099,229 @@ describe('save size gate (SIZE-F1, UNI-1861)', () => {
       error: { code: 'too_large' },
     })
     off()
+  })
+})
+
+describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => {
+  it('SLIDES_WEB_CAPABILITIES defaults print/exportPdf/exportHtml to false', () => {
+    expect(SLIDES_WEB_CAPABILITIES.print).toBe(false)
+    expect(SLIDES_WEB_CAPABILITIES.exportPdf).toBe(false)
+    expect(SLIDES_WEB_CAPABILITIES.exportHtml).toBe(false)
+  })
+
+  it('save: false with saveAs: true refuses in-place save and allows Save As and savePicture/exportImages', async () => {
+    const { api, mock, downloads } = await setup({
+      capabilities: {
+        ...SLIDES_WEB_CAPABILITIES,
+        save: false,
+        saveAs: true,
+        print: true,
+        exportPdf: true,
+      },
+    })
+    await api.consumePendingOpen(FIT)
+    expect(await api.uniworkState()).toEqual({ bound: false, readOnly: true })
+    expect(await api.save()).toEqual({
+      ok: false,
+      error: 'This presentation is read-only.',
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+
+    const savedAs = await api.saveAs('Copy.pptx')
+    expect(savedAs.ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(1)
+
+    const pic = await api.savePicture({
+      defaultName: 'slide-1',
+      pngBase64: btoa('png'),
+    })
+    expect(pic).toEqual({ ok: true, path: 'slide-1.png' })
+    expect(downloads.map((d) => d.name)).toContain('slide-1.png')
+  })
+
+  it('save: true with saveAs: false allows in-place save and refuses Save As, savePicture, and exportImages (D2)', async () => {
+    const { api, mock, downloads } = await setup({
+      capabilities: {
+        ...SLIDES_WEB_CAPABILITIES,
+        save: true,
+        saveAs: false,
+        print: true,
+        exportPdf: true,
+      },
+    })
+    await api.consumePendingOpen(FIT)
+    expect(await api.uniworkState()).toEqual({ bound: false, readOnly: false })
+
+    await api.setNotes({ slideIndex: 0, text: 'edited' })
+    await flush()
+    expect((await api.save()).ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+
+    expect(await api.saveAs('Copy.pptx')).toEqual({
+      ok: false,
+      error: 'This presentation is read-only.',
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.pptx' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(await api.pickExportDir()).toBeNull()
+    expect(await api.savePicture({ defaultName: 'slide-1', pngBase64: btoa('png') })).toEqual({
+      ok: false,
+      error: 'This presentation is read-only.',
+    })
+    expect(
+      await api.exportImages({
+        dir: 'web-download',
+        baseName: 'deck',
+        pngsBase64: [btoa('png')],
+      }),
+    ).toEqual({
+      ok: false,
+      error: 'This presentation is read-only.',
+    })
+    expect(downloads).toHaveLength(0)
+    expect(mock.calls.filter((c) => c.type === 'api.saveAs')).toHaveLength(0)
+  })
+
+  it('print and exportPdf capabilities gate host print and slidesApi printSlides / exportPdf independently', async () => {
+    const printFn = vi.fn(async () => ({ ok: true as const }))
+    const noPrint = await setup({
+      print: printFn,
+      capabilities: {
+        ...SLIDES_WEB_CAPABILITIES,
+        save: true,
+        saveAs: true,
+        print: false,
+        exportPdf: true,
+      },
+    })
+    await noPrint.api.consumePendingOpen(FIT)
+    expect(
+      await noPrint.api.printSlides({
+        pngsBase64: [btoa('p')],
+        widthPx: 960,
+        heightPx: 540,
+      }),
+    ).toEqual({ ok: false, error: 'This presentation is read-only.' })
+    expect(await noPrint.mock.host.print({ mode: 'dialog' })).toEqual({ printed: false })
+    expect(printFn).not.toHaveBeenCalled()
+
+    const noPdf = await setup({
+      print: printFn,
+      capabilities: {
+        ...SLIDES_WEB_CAPABILITIES,
+        save: true,
+        saveAs: true,
+        print: true,
+        exportPdf: false,
+      },
+    })
+    await noPdf.api.consumePendingOpen(FIT)
+    expect(await noPdf.api.pickExportPdfPath('deck')).toBeNull()
+    expect(
+      await noPdf.api.exportPdf({
+        filePath: 'deck.pptx',
+        pages: [{ png: btoa('p') }],
+        widthPx: 960,
+        heightPx: 540,
+      }),
+    ).toEqual({ ok: false, error: 'This presentation is read-only.' })
+    expect(await noPdf.mock.host.print({ mode: 'pdf' })).toEqual({ printed: false })
+    expect(noPdf.downloads).toHaveLength(0)
+    const offPrint = noPdf.api.onMenuCommand((cmd) => {
+      if (cmd === 'print')
+        void noPdf.api.printSlides({
+          pngsBase64: [btoa('p')],
+          widthPx: 960,
+          heightPx: 540,
+        })
+    })
+    expect(await noPdf.mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
+    offPrint()
+    expect(printFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('readOnly profile forces readOnly state, clamps save/saveAs/exportHtml off, refuses writes, and keeps granted print and exportPdf (D3)', async () => {
+    const mock = createMockPort()
+    const file = mock.seed('deck.pptx', FIXTURE)
+    const caps: Record<string, unknown> = {
+      ...SLIDES_WEB_CAPABILITIES,
+      save: true,
+      saveAs: true,
+      print: true,
+      exportPdf: true,
+      exportHtml: true,
+    }
+    const downloads: Setup['downloads'] = []
+    const printFn = vi.fn(async () => ({ ok: true as const }))
+    const web = createWebSlidesApi(
+      { client: mock.port, capabilities: caps },
+      {
+        download: (name, blob) => downloads.push({ name, blob }),
+        print: printFn,
+        editorStartMs: 1000,
+      },
+    )
+    mock.init({
+      profile: 'readOnly',
+      documentId: file.fileId,
+      capabilities: {
+        save: true,
+        saveAs: true,
+        print: true,
+        exportPdf: true,
+        exportHtml: true,
+      },
+    })
+    await web.slidesApi.consumePendingOpen(FIT)
+
+    expect(await web.slidesApi.uniworkState()).toEqual({ bound: false, readOnly: true })
+    expect(caps).toMatchObject({
+      save: false,
+      saveAs: false,
+      exportHtml: false,
+      print: true,
+      exportPdf: true,
+    })
+
+    expect(await web.slidesApi.save()).toEqual({
+      ok: false,
+      error: 'This presentation is read-only.',
+    })
+    expect(await web.slidesApi.saveAs('Copy.pptx')).toEqual({
+      ok: false,
+      error: 'This presentation is read-only.',
+    })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(await mock.host.saveAs({ name: 'Copy.pptx' })).toMatchObject({
+      ok: false,
+      error: { code: 'unsupported' },
+    })
+    expect(await web.slidesApi.addComment({ slideIndex: 0, text: 'nope' })).toBeNull()
+    expect(await web.slidesApi.savePicture({ defaultName: 's1', pngBase64: btoa('p') })).toEqual({
+      ok: false,
+      error: 'This presentation is read-only.',
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toHaveLength(
+      0,
+    )
+
+    // D3: granted print stays available in readOnly profile
+    expect(
+      await web.slidesApi.printSlides({
+        pngsBase64: [btoa('p')],
+        widthPx: 960,
+        heightPx: 540,
+      }),
+    ).toEqual({ ok: true })
+    expect(printFn).toHaveBeenCalledTimes(1)
   })
 })

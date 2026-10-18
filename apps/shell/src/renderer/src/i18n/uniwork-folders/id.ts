@@ -27,6 +27,7 @@ export const id = {
   ufCycle: 'Folder tidak dapat dipindahkan ke dirinya sendiri atau ke salah satu subfoldernya.',
   ufParentKind: 'Folder berada di root atau di dalam folder lain.',
   ufFolderGone: 'Folder ini sudah tidak ada di sini.',
+  ufFolderNoAccess: 'Anda tidak lagi memiliki akses ke folder ini.',
   ufNoPermission: 'Anda tidak memiliki izin untuk mengubah folder ini.',
   ufEmptyFolder: 'Folder ini kosong',
   ufLocation: 'Lokasi',

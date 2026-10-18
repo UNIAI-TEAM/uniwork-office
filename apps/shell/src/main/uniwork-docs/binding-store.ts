@@ -3,6 +3,7 @@ import { mkdir, readFile, unlink } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   UniworkDocAccess,
+  UniworkDocEditLock,
   UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkSaveState,
@@ -50,6 +51,8 @@ export interface Binding {
   baseChecksum: string
   state: UniworkSaveState
   error?: UniworkDocErrorCode
+  /** EL-1(a) (UNI-1645c): populated while `state === 'edit_locked'`; absent otherwise */
+  editLock?: UniworkDocEditLock
   /** Payload size in bytes when `error === 'too_large'`. */
   sizeBytes?: number
   /** Maximum allowed document size in bytes when `error === 'too_large'`. */
@@ -231,6 +234,7 @@ const STATES: ReadonlySet<string> = new Set([
   'reconciling',
   'reconciling-stuck',
   'failed',
+  'edit_locked',
 ])
 
 function segment(value: string): string {
@@ -240,6 +244,21 @@ function segment(value: string): string {
 
 function isStr(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
+}
+
+function parseEditLock(raw: unknown): UniworkDocEditLock | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const r = raw as Record<string, unknown>
+  const strOrNull = (v: unknown, max: number): string | null =>
+    typeof v === 'string' && v.trim().length > 0 && v.length <= max ? v : null
+  const offlineHoldUntil = strOrNull(r.offlineHoldUntil, 64)
+  return {
+    holderName: strOrNull(r.holderName, 256),
+    since: strOrNull(r.since, 64),
+    expiresAt: strOrNull(r.expiresAt, 64),
+    heldByMe: r.heldByMe === true,
+    ...(offlineHoldUntil ? { offlineHoldUntil } : {}),
+  }
 }
 
 /**
@@ -271,6 +290,7 @@ export function parseBinding(raw: unknown): Binding | null {
   }
   const minStoreLevel = schema2 ? (r.min_store_level as number) : APP_STORE_LEVEL
   const minAppVersion = typeof r.min_app_version === 'string' ? r.min_app_version : ''
+  const editLock = r.state === 'edit_locked' ? parseEditLock(r.editLock) : undefined
   return {
     schema: 2,
     documentId: r.documentId,
@@ -287,6 +307,7 @@ export function parseBinding(raw: unknown): Binding | null {
     // from the durable store, so nothing is kept here
     state: r.state === 'saving' ? 'dirty' : (r.state as UniworkSaveState),
     ...(typeof r.error === 'string' ? { error: r.error as UniworkDocErrorCode } : {}),
+    ...(editLock ? { editLock } : {}),
     ...(typeof r.sizeBytes === 'number' && Number.isSafeInteger(r.sizeBytes) && r.sizeBytes >= 0
       ? { sizeBytes: r.sizeBytes }
       : {}),

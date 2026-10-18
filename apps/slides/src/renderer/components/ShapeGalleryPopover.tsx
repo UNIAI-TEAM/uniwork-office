@@ -72,7 +72,10 @@ export function ShapeGalleryPopover({ x, y, onPick, onClose }: Props) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
     }
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) onClose()

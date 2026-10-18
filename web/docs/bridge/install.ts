@@ -47,6 +47,7 @@ import { createAppOpen } from './app-open'
 import hide, { hostGrants, webCapabilities } from './hide'
 import { createHeadless, isTopLevel, parseHeadlessEntry } from './headless'
 import { installFocusReturn } from './focus-return'
+import { installEscapeForwarder } from './escape-forwarder'
 import { aiHostGrants, createWebAi, withWebAi } from '../../modules/shared/ai/web-ai'
 import { FRAME_BASE_CAPABILITIES } from './module-bridge'
 import { frameCommentsClaim } from '../../modules/shared/discussion/claim'
@@ -128,7 +129,10 @@ export function installBridge(): void {
   win.projectApi = (webapi.projectApi as BridgeObject) ?? {}
   win.__docsWebBridge = true
   // the host leave dialog hands the focus back to the frame window: put it in the editor again
-  if (!headless) installFocusReturn()
+  if (!headless) {
+    installFocusReturn()
+    installEscapeForwarder(window, (reason) => client.reportCloseRequested?.(reason))
+  }
   if (!headless && frameComments) {
     // the editor's S12 panel reads window.uniworkComments once init says `comments` is effective;
     // it awaits this promise first, since the install itself waits for init

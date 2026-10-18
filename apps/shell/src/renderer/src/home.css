@@ -127,7 +127,8 @@ body.vib .home {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  width: 240px;
+  width: 272px;
+  min-width: 272px;
   padding: 14px 10px 8px;
   border-right: 1px solid var(--border);
   overflow-y: auto;

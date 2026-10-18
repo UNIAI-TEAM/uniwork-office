@@ -157,13 +157,15 @@ const BLOCKED_REASONS: Record<string, BlockedReason> = {
   not_found: 'permission_revoked',
 }
 
-/** permanent failures: the intent is kept, but nothing retries on its own */
+/** permanent or manual-only failures: the intent is kept, but nothing retries on its own */
 const FAILED_CODES = new Set<UniworkDocErrorCode>([
   'quota_exceeded',
   'too_large',
   'unsupported_format',
   'engine_incompatible',
   'idempotency_mismatch',
+  // EL-1(a) (UNI-1645c): 423 document_locked parks until an explicit user Save or document close
+  'edit_locked',
 ])
 
 /** states a capability off parks as `paused_admin` (waiting or in flight) */

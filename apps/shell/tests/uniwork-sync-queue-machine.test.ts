@@ -566,6 +566,26 @@ describe('uniwork save queue machine', () => {
     }
   })
 
+  it('EL-1(a): 423 edit_locked → failed (lastError edit_locked, no retryAt, never queued or reconciling)', () => {
+    // EL1A-BE-5: reconciling is the weakest case - the FAILED_CODES check runs BEFORE the
+    // lost-response branch, so a 423 from a reconcile parks failed and never reconciles again
+    for (const state of ['uploading', 'committing', 'reconciling'] as const) {
+      const out = transition(
+        record({ state, retryAt: iso(NOW + 5_000), reconcileSince: iso(NOW - 1_000) }),
+        { type: 'commitFailed', error: 'edit_locked' },
+        ctx({ online: true }),
+      )
+      expect(out.record?.state).toBe('failed')
+      expect(out.record?.state).not.toBe('conflict')
+      expect(out.record?.state).not.toBe('queued')
+      expect(out.record?.state).not.toBe('reconciling')
+      expect(out.record?.lastError).toBe('edit_locked')
+      expect(out.record?.retryAt).toBeUndefined()
+      expect(out.record?.reconcileSince).toBeUndefined()
+      expect(out.effects).toEqual([])
+    }
+  })
+
   it('a lost response after the commit started → reconciling, never failed', () => {
     for (const error of ['network', 'timeout', 'server_error', 'malformed_response'] as const) {
       const out = transition(

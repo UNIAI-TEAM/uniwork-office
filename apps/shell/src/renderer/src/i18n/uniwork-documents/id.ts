@@ -162,4 +162,11 @@ export const id = {
     '{name} berukuran {size}, melebihi batas {max}. Perkecil ukuran gambar atau bagi file, lalu unggah lagi.',
   uwReasonTooLargeWithLimit: 'melebihi batas {max}',
   uwUploadChecking: 'Memeriksa file…',
+  uwChipEditLocked: '{name} sedang mengedit',
+  uwChipEditLockedSelf: 'Mengedit di jendela lain',
+  uwEditLockSomeone: 'Orang lain',
+  uwTipEditLocked: '{name} mengedit sejak {time}.',
+  uwTipEditLockedSelf: 'Anda mengedit dokumen ini di jendela lain.',
+  uwErrEditLocked: 'Orang lain sedang mengedit dokumen ini.',
+  uwReasonEditLocked: 'orang lain sedang mengedit',
 } satisfies Record<keyof typeof zh, string>

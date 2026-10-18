@@ -51,6 +51,9 @@ export interface FrameChoice<T extends string> {
 /** the first-focus target that is the dialog's own title (a variant changed in place) */
 export const FOCUS_TITLE = '@title'
 
+/** visual and ARIA tone of the dialog's alert line (`'success'` uses `role="status"`) */
+export type FrameAlertTone = 'error' | 'success'
+
 /** one step of a dialog: a later step replaces the content of the same card (no stacking) */
 export interface FrameDialogStep<T extends string> {
   title: string
@@ -69,8 +72,10 @@ export interface FrameDialogStep<T extends string> {
    * focuses the title, for a variant that changed in place
    */
   focusId?: T | typeof FOCUS_TITLE
-  /** the dialog's own alert line (role=alert, always in the tree; empty = collapsed) */
+  /** the dialog's own alert line (role=alert or role=status, always in the tree; empty = collapsed) */
   alert?: string
+  /** visual and ARIA tone of `alert` (default: `'error'`) */
+  alertTone?: FrameAlertTone
 }
 
 /** where the dialog lives: one card, marker and backdrop, whatever step it shows */
@@ -233,7 +238,7 @@ export interface FrameDialogHandle<T extends string> {
   /** answers the shown step as if the user had picked `id` (a control the caller put in `content`) */
   choose(id: T): void
   /** writes the dialog's own alert line (empty clears it) */
-  setAlert(text: string): void
+  setAlert(text: string, tone?: FrameAlertTone): void
   /**
    * turns a choice of the shown step `aria-disabled` with its reason (a string), or enabled
    * (`null`), without re-rendering the step: the focus stays where it is
@@ -269,6 +274,12 @@ export function openFrameDialog<T extends string>(
   const alert = document.createElement('div')
   alert.className = 'ow-dlg-alert'
   alert.setAttribute('role', 'alert')
+  const applyAlert = (text: string, tone: FrameAlertTone = 'error'): void => {
+    const isSuccess = Boolean(text) && tone === 'success'
+    alert.className = isSuccess ? 'ow-dlg-alert success' : 'ow-dlg-alert'
+    alert.setAttribute('role', isSuccess ? 'status' : 'alert')
+    alert.textContent = text
+  }
   const reasons = document.createElement('div')
   reasons.className = 'ow-dlg-reasons'
   head.append(details, slot, alert, reasons)
@@ -388,7 +399,7 @@ export function openFrameDialog<T extends string>(
       }),
     )
     slot.replaceChildren(...(step.content ? [step.content] : []))
-    alert.textContent = step.alert ?? ''
+    applyAlert(step.alert ?? '', step.alertTone ?? 'error')
     buttons.clear()
     actions.replaceChildren()
     const tones = tonesOf(step.choices, step.cancelId)
@@ -441,8 +452,8 @@ export function openFrameDialog<T extends string>(
     choose(choice) {
       if (current) answer(choice)
     },
-    setAlert(text) {
-      alert.textContent = text
+    setAlert(text, tone = 'error') {
+      applyAlert(text, tone)
     },
     setChoiceDisabled(choiceId, reason) {
       const b = buttons.get(choiceId)

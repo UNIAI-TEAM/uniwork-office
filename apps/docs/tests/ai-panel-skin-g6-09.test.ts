@@ -144,3 +144,14 @@ describe('AA contrast of the AI panel group summary and the docs result chip (vi
     ).toBeGreaterThanOrEqual(4.5)
   })
 })
+
+describe('status bar zoom button focus ring in dark (UNI-1876 SVF-8)', () => {
+  it('gives .zoom-btn, .zoom-value, .status-btn, and .status-view-btn a visible 2px focus-visible ring', () => {
+    const ring = rule(
+      appCss,
+      '.status-bar :is(.status-btn, .status-view-btn, .zoom-btn, .zoom-value):focus-visible',
+    )
+    expect(ring).toMatch(/outline:\s*2px solid var\(--accent\)/)
+    expect(ring).toMatch(/outline-offset:\s*1px/)
+  })
+})

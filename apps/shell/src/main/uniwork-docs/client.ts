@@ -4,6 +4,7 @@ import type {
   UniworkDocNewFormat,
   UniworkDocSummary,
   UniworkFolderNode,
+  UniworkListFilters,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'
@@ -34,6 +35,7 @@ import type {
   DocumentProperties,
   DocumentRef,
   LaunchDescriptor,
+  OrgMemberName,
   OrgMemberPage,
   UploadReceipt,
   UploadSessionComplete,
@@ -115,18 +117,38 @@ export interface UniworkDocsClient {
   listWorkspaces(orgId: string): Promise<UniworkWorkspaceRef[]>
   /** the caller's effective role in one workspace, or null when the server sends none */
   workspaceRole(workspaceId: string): Promise<string | null>
-  listDocuments(input: {
-    workspaceId: string
-    query?: string
-    cursor?: string
-    limit?: number
-  }): Promise<DocumentListResult>
+  listDocuments(
+    input: {
+      workspaceId: string
+      query?: string
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters,
+  ): Promise<DocumentListResult>
   /** documents shared directly with the caller in one workspace (paged) */
   listSharedWithMe(input: {
     workspaceId: string
     cursor?: string
     limit?: number
   }): Promise<DocumentListResult>
+  /** DESKTOP-HOME: documents shared by the caller in one workspace (paged) */
+  listSharedByMe(
+    input: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters,
+  ): Promise<DocumentListResult>
+  /** DESKTOP-HOME: archived documents in the workspace's trash (`archived=1`, paged) */
+  listTrash(
+    input: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters,
+  ): Promise<DocumentListResult>
+  /** DESKTOP-HOME: workspace members (`GET /workspaces/{ws}/members`) for row updater names */
+  listWorkspaceMembers(workspaceId: string): Promise<OrgMemberName[]>
   /** the properties panel of one document (ids/times/level/version, no names) */
   documentProperties(documentId: string): Promise<DocumentProperties>
   /**
@@ -139,12 +161,14 @@ export interface UniworkDocsClient {
    * order. `parentId: null` is the workspace root, sent as an empty
    * `parent_id` (omitting it would mean the workspace's whole list).
    */
-  listChildren(input: {
-    workspaceId: string
-    parentId: string | null
-    cursor?: string
-    limit?: number
-  }): Promise<DocumentListResult>
+  listChildren(
+    input: {
+      workspaceId: string
+      parentId: string | null
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters,
+  ): Promise<DocumentListResult>
   /**
    * FD-11: title search across a workspace (`match=title`); every row carries
    * the ancestors it sits under. `kind: 'all'` sends no kind filter.
@@ -532,6 +556,31 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
   const send = createUniworkSend(options)
   const json = (response: Response): Promise<unknown> => response.json()
   /**
+   * DESKTOP-HOME list filters. Returns whether the flat `/documents` route is
+   * REQUIRED: the server forwards `format` to `/documents/recent`
+   * (`internal/service/document_search.go:650,665-675`), but not `updated_by` or
+   * `updated_from`, so only those two force the wider workspace list.
+   */
+  const applyListFilters = (params: URLSearchParams, input: UniworkListFilters): boolean => {
+    let flatRequired = false
+    if (typeof input.format === 'string' && input.format) {
+      params.set('format', input.format)
+    }
+    const updatedBy =
+      typeof input.updatedBy === 'string' ? input.updatedBy.trim().slice(0, 128) : ''
+    if (updatedBy) {
+      params.set('updated_by', updatedBy)
+      flatRequired = true
+    }
+    const updatedFrom =
+      typeof input.updatedFrom === 'string' ? input.updatedFrom.trim().slice(0, 64) : ''
+    if (updatedFrom) {
+      params.set('updated_from', updatedFrom)
+      flatRequired = true
+    }
+    return flatRequired
+  }
+  /**
    * FD-11: one document's own fields, whatever its kind (a folder has no file
    * block, so the detail reader cannot serve it). Rename and move read the
    * revision, the current title and the level from here.
@@ -621,6 +670,52 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return parseSharedWithMe(raw, input.workspaceId)
     },
 
+    async listSharedByMe(input) {
+      const params = new URLSearchParams()
+      params.set('shared_by_me', 'true')
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      applyListFilters(params, input)
+      const ws = id(input.workspaceId)
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${ws}/documents`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async listTrash(input) {
+      const params = new URLSearchParams()
+      params.set('archived', '1')
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      applyListFilters(params, input)
+      const ws = id(input.workspaceId)
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${ws}/documents`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async listWorkspaceMembers(workspaceId) {
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${id(workspaceId)}/members`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseOrgMembers(raw).members
+    },
+
     async documentProperties(documentId) {
       const raw = await send({
         method: 'GET',
@@ -655,6 +750,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      applyListFilters(params, input)
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',
@@ -866,10 +962,16 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
       params.set('kind', 'file')
+      // DH1-BE-1: `/documents/recent` forwards `format` (server
+      // document_search.go:650,665-675), so a format-only Recent keeps the
+      // caller's recent scope. `q` and the non-forwardable updater/date filters
+      // still need the flat workspace list.
+      const flatRequired = applyListFilters(params, input)
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',
-        route: q ? `/workspaces/${ws}/documents` : `/workspaces/${ws}/documents/recent`,
+        route:
+          q || flatRequired ? `/workspaces/${ws}/documents` : `/workspaces/${ws}/documents/recent`,
         query: params,
         timeoutMs: metadataTimeout,
         read: json,

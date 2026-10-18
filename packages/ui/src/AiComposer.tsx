@@ -216,7 +216,7 @@ export function AiComposer({
     : stopLabel
 
   const inputBox = (
-    <div ref={boxRef} className="ai-input-box">
+    <div ref={boxRef} className="ai-input-box" data-esc-local={busy ? '' : undefined}>
       {queueStrip}
       {header}
       <textarea

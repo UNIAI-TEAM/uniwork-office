@@ -162,4 +162,11 @@ export const it = {
     '{name} pesa {size}, oltre il limite di {max}. Riduci le dimensioni delle immagini o dividi il file, quindi caricalo di nuovo.',
   uwReasonTooLargeWithLimit: 'oltre il limite di {max}',
   uwUploadChecking: 'Verifica del file in corso…',
+  uwChipEditLocked: '{name} sta modificando',
+  uwChipEditLockedSelf: 'Modifica in un’altra finestra',
+  uwEditLockSomeone: 'Qualcuno',
+  uwTipEditLocked: '{name} sta modificando dalle {time}.',
+  uwTipEditLockedSelf: 'Stai modificando questo documento in un’altra finestra.',
+  uwErrEditLocked: 'Qualcun altro sta modificando questo documento.',
+  uwReasonEditLocked: 'qualcun altro sta modificando',
 } satisfies Record<keyof typeof zh, string>

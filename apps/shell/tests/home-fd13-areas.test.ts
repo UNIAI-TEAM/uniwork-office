@@ -89,8 +89,15 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
   let treeByWs: Record<string, UniworkFolderNode[]>
   let childrenByWs: Record<string, Record<string, UniworkDocSummary[]>>
   let api: Record<string, ReturnType<typeof vi.fn>>
+  /** broadcasts an account status change to every active onAccountStatus subscriber */
+  let accountStatusListeners: Array<(s: AccountStatus) => void> = []
+  const pushAccountStatus = (s: AccountStatus) => {
+    accountStatus = s
+    for (const cb of [...accountStatusListeners]) cb(s)
+  }
 
   beforeEach(() => {
+    accountStatusListeners = []
     localStorage.clear()
     document.documentElement.lang = 'en'
     vi.stubGlobal(
@@ -226,7 +233,12 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       pickDefaultSaveDir: vi.fn(async () => null),
       accountStatus: vi.fn(async () => accountStatus),
       accountGetStatus: vi.fn(async () => accountStatus),
-      onAccountStatus: vi.fn(() => () => {}),
+      onAccountStatus: vi.fn((cb: (s: AccountStatus) => void) => {
+        accountStatusListeners.push(cb)
+        return () => {
+          accountStatusListeners = accountStatusListeners.filter((fn) => fn !== cb)
+        }
+      }),
       onAccountChanged: vi.fn(() => () => {}),
       onAccountLogin: vi.fn(() => () => {}),
       onAccountLoginEvent: vi.fn(() => () => {}),
@@ -461,7 +473,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     }
   })
 
-  it('isolates sources per area (no mixing), shows accurate per-area counts, and keeps the open UniWork folder across area switches (FE13-R1-1, FE13-R1-6)', async () => {
+  it('isolates sources per area (no mixing), shows accurate per-area counts, and keeps the UniWork sub-view across area switches (FE13-R1-1, FE13-R1-6, VDH-7)', async () => {
     const uwRec1 = makeEntry('/cache/cloud-spec.docx', 'Cloud Spec.docx', {
       documentId: 'uw-doc-1',
       workspaceId: 'ws-1',
@@ -479,20 +491,53 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     const starredEntries = [uwRec1, devRec1, devRec2]
     api.recents = vi.fn(async () => ({ entries: recentEntries, total: recentEntries.length }))
     api.starred = vi.fn(async () => ({ entries: starredEntries, total: starredEntries.length }))
+    api.uniworkListDocuments = vi.fn(async () =>
+      ok({
+        documents: [
+          {
+            id: 'uw-doc-1',
+            workspaceId: 'ws-1',
+            title: 'Cloud Spec.docx',
+            format: 'docx',
+            updatedAt: '2026-10-01T10:00:00Z',
+            kind: 'file',
+            parentId: null,
+          },
+          {
+            id: 'uw-doc-2',
+            workspaceId: 'ws-1',
+            title: 'Cloud Roadmap.docx',
+            format: 'docx',
+            updatedAt: '2026-10-01T09:00:00Z',
+            kind: 'file',
+            parentId: null,
+          },
+        ],
+        nextCursor: null,
+      }),
+    )
 
     await mountHome()
 
-    // In UniWork area: UniworkBrowser variant="pane" is mounted at root by default
+    // In UniWork area: DocumentsHome is mounted at root by default
     expect(host.querySelector('.uwf-browser.uwf-pane')).not.toBeNull()
     const uwTree = host.querySelector<HTMLElement>('.uwf-tree[role="tree"]')
     expect(uwTree).not.toBeNull()
     expect(host.querySelector('.folder-panel')).toBeNull()
     expect(host.textContent).toContain('Root Cloud Doc.docx')
 
-    // Per-area nav counts in UniWork area: 2 recent, 1 starred
-    const uwNavItems = Array.from(host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item'))
-    expect(uwNavItems[0]?.querySelector('.nav-count')?.textContent).toBe('2')
-    expect(uwNavItems[1]?.querySelector('.nav-count')?.textContent).toBe('1')
+    // DocumentsHome sub-nav in UniWork area renders the 6 available entries and hides starred/archive
+    const uwNavIds = Array.from(host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item')).map(
+      (el) => el.getAttribute('data-nav'),
+    )
+    expect(uwNavIds).toEqual([
+      'workspace',
+      'my-folder',
+      'recent',
+      'shared-with-me',
+      'shared-by-me',
+      'trash',
+    ])
 
     // Open "Alpha Folder" in the UniWork tree
     const alphaNode = Array.from(uwTree!.querySelectorAll<HTMLElement>('[role="treeitem"]')).find(
@@ -505,16 +550,18 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     await flush()
     expect(host.textContent).toContain('Alpha Spec.docx')
 
-    // Click Recent in UniWork area -> shows only UniWork recent rows and count 2
+    // Click Recent in UniWork area -> shows only UniWork recent rows via uniworkListDocuments
     const recentBtnUw = host.querySelector<HTMLButtonElement>('.nav-item[data-nav="recent"]')!
     await act(async () => {
       recentBtnUw.click()
     })
     await flush()
+    expect(api.uniworkListDocuments).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: 'ws-1' }),
+    )
     expect(host.textContent).toContain('Cloud Spec.docx')
     expect(host.textContent).toContain('Cloud Roadmap.docx')
     expect(host.textContent).not.toContain('Local Report.docx')
-    expect(host.querySelector('.recents-heading .file-count')?.textContent).toContain('2')
 
     // Switch to "On this device" area -> shows local folder tree, only local recent rows, and per-area counts (3 recent, 2 starred)
     const tablist = host.querySelector<HTMLElement>('[role="tablist"][aria-label="Area"]')!
@@ -544,14 +591,14 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     })
     await flush()
     expect(localFolderRow!.getAttribute('aria-selected')).toBe('true')
-
-    // Switch back to "UniWork" area -> still on "Alpha Folder"
+    // Switch back to "UniWork" area -> the kept sub-view is Recent (VDH-7): its rows, not the folder's
     const uwTab = tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')[0]!
     await act(async () => {
       uwTab.click()
     })
     await flush()
-    expect(host.textContent).toContain('Alpha Spec.docx')
+    expect(host.textContent).toContain('Cloud Spec.docx')
+    expect(host.textContent).not.toContain('Local Report.docx')
 
     // Switch back to "On this device" area -> previously open local folder "/Users/linh/Documents" is still open
     await act(async () => {
@@ -1272,7 +1319,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.querySelector('.load-more')).toBeNull()
   })
 
-  it('does not re-list already-cached folder roots when roots refreshes without invalidation, but re-lists roots whose listing rejected or was missing (FE13-R2-7, FE13-R3-1)', async () => {
+  it('does not re-list already-cached folder roots when roots refreshes without invalidation, but re-lists roots whose listing rejected or resolved with missing: true (FE13-R2-7, FE13-R3-1, FE13-R4-1)', async () => {
     wbStoreSetRaw('uniwork.wb.homeArea', 'device')
     recentEntries = []
     folderRoots = [
@@ -1285,9 +1332,18 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       },
     ]
     let docsShouldReject = true
+    let desktopMissing = false
     api.listFolder = vi.fn(async (dir: string) => {
       if (dir === '/Users/linh/Documents' && docsShouldReject) {
         throw new Error('transient listFolder error')
+      }
+      if (dir === '/Users/linh/Desktop' && desktopMissing) {
+        return {
+          dir,
+          folders: [],
+          files: [],
+          missing: true,
+        }
       }
       return {
         dir,
@@ -1298,6 +1354,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       }
     })
     api.addFolderRoot = vi.fn(async () => {
+      desktopMissing = true
       folderRoots = [
         ...folderRoots,
         {
@@ -1342,7 +1399,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.textContent).toContain('No recent files — create or open a file to get started.')
 
     // Step 3 (FE13-R2-7): now that /Users/linh/Documents is cached and not missing, adding a second root refreshes roots
-    // without re-listing /Users/linh/Documents
+    // without re-listing /Users/linh/Documents; /Users/linh/Desktop resolves with { missing: true } (so cached.current has it)
     const docsCallsBeforeAdd = api.listFolder.mock.calls.filter(
       (c) => c[0] === '/Users/linh/Documents',
     ).length
@@ -1361,6 +1418,37 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     ).length
     expect(docsCallsAfterAdd).toBe(docsCallsBeforeAdd)
     expect(desktopCallsAfterAdd).toBe(1)
+
+    // Step 4 (FE13-R4-1): /Users/linh/Desktop resolved with { missing: true } (cached in cached.current).
+    // When roots refreshes via loadRoot() (e.g. adding a third root), cur.missing triggers loadFolder(r.path, true)
+    // to force re-listing /Users/linh/Desktop while keeping non-missing /Users/linh/Documents untouched.
+    desktopMissing = false
+    api.addFolderRoot = vi.fn(async () => {
+      folderRoots = [
+        ...folderRoots,
+        {
+          path: '/Users/linh/Downloads',
+          name: 'Downloads',
+          readable: true,
+          usable: true,
+          removable: true,
+        },
+      ]
+      return folderRoots[2]!
+    })
+    await act(async () => {
+      addRootBtn!.click()
+    })
+    await flush()
+
+    const docsCallsAfterRecovery = api.listFolder.mock.calls.filter(
+      (c) => c[0] === '/Users/linh/Documents',
+    ).length
+    const desktopCallsAfterRecovery = api.listFolder.mock.calls.filter(
+      (c) => c[0] === '/Users/linh/Desktop',
+    ).length
+    expect(docsCallsAfterRecovery).toBe(docsCallsAfterAdd)
+    expect(desktopCallsAfterRecovery).toBe(2)
   })
 
   it('catches folderRoots rejections in loadRoot, keeps previous roots without unhandled rejection, and settles rootsLoaded (FE13-R3-3)', async () => {
@@ -1430,8 +1518,8 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
 
     try {
       await mountHome()
-      const fileRow = Array.from(host.querySelectorAll<HTMLElement>('.uwf-list .uw-pick-row')).find(
-        (el) => el.textContent?.includes('Root Cloud Doc.docx'),
+      const fileRow = Array.from(host.querySelectorAll<HTMLElement>('.dh-doc-row')).find((el) =>
+        el.textContent?.includes('Root Cloud Doc.docx'),
       )
       expect(fileRow).toBeDefined()
 
@@ -1548,5 +1636,167 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     } finally {
       style.remove()
     }
+  })
+  it('keeps the UniWork sub-view (and its open folder) across an area switch within the session (VDH-7)', async () => {
+    await mountHome()
+
+    // UniWork pane is up; open Alpha Folder from its card
+    expect(host.querySelector('.uwf-browser.uwf-pane')).not.toBeNull()
+    const alphaCard = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-alpha"] button.dh-folder-open',
+    )!
+    expect(alphaCard).not.toBeNull()
+    await act(async () => {
+      alphaCard.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    const tabs = host.querySelectorAll<HTMLButtonElement>(
+      '[role="tablist"][aria-label="Area"] [role="tab"]',
+    )
+
+    // area switch away and back keeps the open folder
+    await act(async () => {
+      tabs[1]!.click() // On this device
+    })
+    await flush()
+    expect(host.querySelector('.uwf-browser.uwf-pane')).toBeNull()
+    await act(async () => {
+      tabs[0]!.click() // back to UniWork
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    // a non-workspace sub-view survives the same round trip
+    const trashNav = host.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!
+    await act(async () => {
+      trashNav.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Trash')
+
+    await act(async () => {
+      tabs[1]!.click()
+    })
+    await flush()
+    await act(async () => {
+      tabs[0]!.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Trash')
+  })
+  it('resets the UniWork sub-view and open folder to the workspace root on a workspace switch (VDH-7)', async () => {
+    await mountHome()
+
+    // Open Alpha Folder in ws-1, then switch to the Trash sub-view
+    const alphaCard = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-alpha"] button.dh-folder-open',
+    )!
+    await act(async () => {
+      alphaCard.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!.click()
+    })
+    await flush()
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('trash')
+
+    // Switching workspace never keeps the previous workspace's sub-view or folder
+    const wsSelect = host.querySelector<HTMLSelectElement>('select.home-uw-ws')!
+    await act(async () => {
+      wsSelect.value = 'ws-2'
+      wsSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('workspace')
+    expect(host.querySelector('h1.dh-title')?.textContent).not.toBe('Alpha Folder')
+    expect(host.textContent).toContain('Marketing Plan.docx')
+    expect(api.uniworkListChildren).toHaveBeenLastCalledWith(
+      expect.objectContaining({ workspaceId: 'ws-2', parentId: null }),
+    )
+  })
+
+  it('clears the kept UniWork sub-view and folder when the account signs out or switches, so the next account opens on the default workspace root (DH1-R4-1)', async () => {
+    await mountHome()
+    expect(accountStatusListeners.length).toBeGreaterThan(0)
+
+    // acc-1: open Alpha Folder and move to Trash so both kept maps hold ws-1 state
+    const alphaCard = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-alpha"] button.dh-folder-open',
+    )!
+    await act(async () => {
+      alphaCard.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!.click()
+    })
+    await flush()
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('trash')
+
+    // Sign out -> UniWork pane unmounts; sign in as a different account in the same workspace list
+    await act(async () => {
+      pushAccountStatus({ state: 'signed-out', loggedIn: false })
+    })
+    await flush()
+    expect(host.querySelector('.uwf-browser.uwf-pane')).toBeNull()
+
+    const account2: AccountStatus = {
+      state: 'signed-in',
+      loggedIn: true,
+      email: 'mai@example.com',
+      profile: { accountId: 'acc-2', email: 'mai@example.com', displayName: 'Mai' },
+      org: { id: 'org-1', name: 'UniWork Corp' },
+    }
+    await act(async () => {
+      pushAccountStatus(account2)
+    })
+    await flush()
+
+    // The new account must not inherit acc-1's Trash sub-view or open folder
+    expect(host.querySelector('.uwf-browser.uwf-pane')).not.toBeNull()
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('workspace')
+    expect(host.querySelector('h1.dh-title')?.textContent).not.toBe('Alpha Folder')
+    expect(host.textContent).toContain('Root Cloud Doc.docx')
+
+    // A signed-in -> signed-in account switch clears them the same way
+    const alphaCard2 = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-alpha"] button.dh-folder-open',
+    )!
+    await act(async () => {
+      alphaCard2.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    const account3: AccountStatus = {
+      ...account2,
+      email: 'nam@example.com',
+      profile: { accountId: 'acc-3', email: 'nam@example.com', displayName: 'Nam' },
+    }
+    await act(async () => {
+      pushAccountStatus(account3)
+    })
+    await flush()
+    expect(
+      host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
+    ).toBe('workspace')
+    expect(host.querySelector('h1.dh-title')?.textContent).not.toBe('Alpha Folder')
+    expect(host.textContent).toContain('Root Cloud Doc.docx')
   })
 })

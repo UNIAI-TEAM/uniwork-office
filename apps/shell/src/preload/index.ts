@@ -1138,6 +1138,16 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listSharedWithMe, query),
     )
   },
+  async uniworkListSharedByMe(q) {
+    return asUniworkResult<UniworkDocListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listSharedByMe, q),
+    )
+  },
+  async uniworkListTrash(q) {
+    return asUniworkResult<UniworkDocListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listTrash, q),
+    )
+  },
   async uniworkDocumentProperties(documentId: string) {
     return asUniworkResult<UniworkDocProperties>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.documentProperties, documentId),

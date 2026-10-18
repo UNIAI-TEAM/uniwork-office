@@ -63,6 +63,7 @@ import type {
 } from '../../../apps/pdf/src/shared/ipc'
 import { DEFAULT_AI_PANEL_PREFS } from '@genoffice/ui'
 import {
+  isReadOnlyProfile,
   toProtocolError,
   type Capabilities,
   type FileMeta,
@@ -225,6 +226,14 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   let initDocumentId: string | null = null
   /** the effective capabilities from `init` (`download` for the conflict dialog) */
   let effective: Capabilities | undefined
+  let readOnlyProfile = false
+  const canEdit = (): boolean =>
+    !readOnlyProfile && can('edit') && deps.capabilities.save !== false && effective?.save !== false
+  const canSaveAs = (): boolean =>
+    !readOnlyProfile && deps.capabilities.saveAs !== false && effective?.saveAs !== false
+  const canPrint = (): boolean => deps.capabilities.print !== false && effective?.print !== false
+  const canExportPdf = (): boolean =>
+    deps.capabilities.exportPdf !== false && effective?.exportPdf !== false
   /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
   const downloadCap = bridgeDownloadCap(port)
   /** stops the host save's renderer timer (the conflict dialog may stay open for long) */
@@ -369,7 +378,17 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     .then(async (s) => {
       author = s.user?.displayName ?? ''
       initDocumentId = s.documentId
+      readOnlyProfile = isReadOnlyProfile(s)
       effective = s.capabilities
+      if (readOnlyProfile) {
+        Object.assign(deps.capabilities, {
+          edit: false,
+          save: false,
+          saveAs: false,
+          insertPages: false,
+          exportHtml: false,
+        })
+      }
       const open =
         s.open ??
         (await port.request('api.open', { fileId: s.documentId }, { timeoutMs: TIMEOUTS.transfer }))
@@ -453,7 +472,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
         emitReload(await openPayload(open))
         return true
       },
-      canEdit: () => can('edit'),
+      canEdit: () => canEdit(),
       download: downloadVia(port, effective, () => bytes, {
         size: bytes.byteLength,
         maxBytes: downloadCap(),
@@ -536,7 +555,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       return fail(text('webFatalTitle'))
     }
     if (remote?.locked()) return fail(remote.lockText())
-    if (!can('edit')) return fail(text('webViewOnlyNoSave'))
+    if (!canEdit()) return fail(text('webViewOnlyNoSave'))
     if (!doc || !owns(path)) return fail(NOT_GRANTED)
     return null
   }
@@ -654,7 +673,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     const locked = lockedSave()
     if (locked) return locked
     if (!doc) return failure('not_ready', 'no document is open')
-    if (!can('edit')) return failure('forbidden', 'the document is view-only')
+    if (!canEdit()) return failure('unsupported', 'the document is view-only')
     if (hostSave) return failure('busy', 'a save is already running')
     hostSave = { error: null, answer: null }
     try {
@@ -681,6 +700,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     const locked = lockedSave()
     if (locked) return locked
     if (!doc) return failure('not_ready', 'no document is open')
+    if (!canSaveAs()) return failure('unsupported', 'save-as is not granted')
     if (hostSaveAs) return failure('busy', 'a save-as is already running')
     const target = saveAsTarget(payload?.name || doc.file.name)
     return new Promise<SaveResult>((resolve) => {
@@ -711,11 +731,13 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
   port.handlePrint(async (payload) => {
     if (payload?.mode === 'pdf') {
+      if (!canExportPdf()) return { printed: false }
       // the document already is a PDF: hand the user the current version
       if (!doc) return { printed: false }
       await downloadOne(doc.file.name, doc.bytes, 'application/pdf')
       return { printed: true }
     }
+    if (!canPrint()) return { printed: false }
     if (printHandlers.size === 0) return { printed: false }
     for (const h of printHandlers) h()
     return { printed: true }
@@ -727,7 +749,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     port,
     current: () => (doc ? { fileId: doc.file.fileId, revision: revisionOf(doc.file) } : null),
     isDirty: dirtyNow,
-    canEdit: () => can('edit'),
+    canEdit: () => canEdit(),
     // a clean reload replaces the open copy in place, like a host `open` (no draft prompt)
     apply: async (reply) => {
       const path = await openPayload(reply)
@@ -789,8 +811,17 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
     // ---- save
     async save(request: SavePdfRequest): Promise<SavePdfResult> {
-      const refused = writeRefusal(request?.path)
-      if (refused) return refused
+      const isSaveAs =
+        typeof request?.targetPath === 'string' && request.targetPath !== request?.path
+      if (isSaveAs) {
+        if (fatal) return fail(text('webFatalTitle'))
+        if (remote?.locked()) return fail(remote.lockText())
+        if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
+        if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
+      } else {
+        const refused = writeRefusal(request?.path)
+        if (refused) return refused
+      }
       const fileId = doc!.file.fileId
       let bytes: Uint8Array
       let skips: Skips
@@ -799,8 +830,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       } catch (err) {
         return fail(describe(err))
       }
-      if (typeof request.targetPath === 'string' && request.targetPath !== request.path) {
-        return saveCopy(request.targetPath, bytes, skips)
+      if (isSaveAs) {
+        return saveCopy(request.targetPath!, bytes, skips)
       }
       const res = await putBytes(fileId, bytes)
       return res.ok ? { ok: true, ...skips } : res
@@ -964,6 +995,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
     // ---- new files -> downloads (the desktop writes them next to the default folder)
     async extractPages(request) {
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path) || !Array.isArray(request.pages)) return fail(NOT_GRANTED)
       try {
         const bytes = await (await core()).extractPagesBytes(doc.bytes.slice(), request.pages)
@@ -980,6 +1012,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async splitPdf(request) {
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
       try {
         const parts = await (
@@ -1000,6 +1033,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async mergePdf(request) {
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
       if (!can('insertPages')) return fail(NOT_AVAILABLE)
       const others: Uint8Array[] = []
@@ -1037,6 +1071,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async mergePages(request) {
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
       const { perSheet, direction, separator } = request
       if (!Number.isInteger(perSheet) || perSheet < 2 || perSheet > 16) {
@@ -1063,6 +1098,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async splitPages(request) {
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       if (!doc || !owns(request?.path)) return fail(NOT_GRANTED)
       if (request.perPage !== 2 && request.perPage !== 4 && request.perPage !== 9) {
         return fail('pdf: unsupported split grid')
@@ -1082,6 +1118,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
     async exportImages(request) {
+      if (!canSaveAs()) return fail(text('webViewOnlyNoSave'))
       const { images, pageNumbers, baseName } = request ?? {}
       if (!Array.isArray(images) || images.length === 0) return fail('pdf: no images')
       try {
@@ -1120,7 +1157,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     autoRename: async () => ({ renamed: false }),
     isUntitled: async () => false,
     // the frame is the UniWork document: no desktop working-copy state, view-only comes from the host grant
-    uniworkState: async () => ({ bound: false, readOnly: !can('edit') }),
+    uniworkState: async () => ({ bound: false, readOnly: !canEdit() || fatal !== null }),
     // null = "no OCR engine on this platform": the viewer stops trying
     ocrPage: async () => null,
     convertOffice: async () => {},

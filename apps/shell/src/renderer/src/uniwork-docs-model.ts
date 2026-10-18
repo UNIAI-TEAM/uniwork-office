@@ -67,6 +67,9 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   organization_suspended: 'uwLockSuspended',
   drafts_full: 'uwConflictDraftCapReached',
   other_window: 'uwLockOtherWindow',
+  // EL-1(a) (UNI-1645c): the sentence shown where an error code is rendered without params
+  // (launchNoticeOf, chipCopy's errorKey prefix): a param-free key, never uwChipEditLocked ({name})
+  edit_locked: 'uwErrEditLocked',
 }
 
 /** chip label for every save state (ready and saved read the same: nothing is waiting to upload) */
@@ -89,6 +92,7 @@ export const UNIWORK_STATE_KEYS: Record<UniworkSaveState, StringKey> = {
   reconciling: 'uwChipReconciling',
   'reconciling-stuck': 'uwChipReconcileStuck',
   failed: 'uwChipError',
+  edit_locked: 'uwChipEditLocked',
 }
 
 export type { UniworkLockReason }
@@ -128,6 +132,10 @@ export function blockedReasonKey(
       return 'uwReasonQuota'
     case 'too_large':
       return 'uwReasonTooLarge'
+    // EL1A-FE-5: a save refused by someone else's edit lock (423) says so in the failed row's
+    // reason, never the generic "unavailable"
+    case 'edit_locked':
+      return 'uwReasonEditLocked'
     default:
       return 'uwReasonOther'
   }
@@ -171,6 +179,8 @@ export interface ChipModel {
   labelKey: StringKey
   /** filled into {reason} of the label (blocked) */
   reasonKey?: StringKey
+  /** filled into {name} of uwChipEditLocked / uwTipEditLocked (EL-1(a) 423 document_locked) */
+  holderName?: string | null
   /** filled into {max} of uwReasonTooLargeWithLimit */
   maxBytes?: number
   tipKey: StringKey
@@ -200,6 +210,9 @@ const OUTRANKS_REMOTE_NEWER: ReadonlySet<UniworkSaveState> = new Set([
   'failed',
   'error',
   'conflict',
+  // EL-1(a) (UNI-1645c): a 423 document_locked outranks a newer-version bar: the pill must
+  // name the holder and offer Retry, never hide behind "newer version on UniWork"
+  'edit_locked',
   'reconciling-stuck',
   'reconciling',
 ])
@@ -256,6 +269,7 @@ export function chipModelOf(
   },
 ): ChipModel {
   const { state, access, error } = status
+  const lock = status.editLock
   const limitBytes = ctx.maxBytes ?? status.maxBytes
   // 1 blocked
   if (state === 'blocked' || isStoreRefusal(status)) {
@@ -323,6 +337,18 @@ export function chipModelOf(
         labelKey: 'uwChipConflict',
         tipKey: 'uwTipConflict',
         action: { kind: 'resolve', labelKey: 'uwActResolve' },
+      }
+    case 'edit_locked': // EL-1(a) (UNI-1645c): outranks remote-newer / paused_admin / saveWait
+      // HTTP 423 document_locked: someone else holds the server edit lock. Info tone, one
+      // manual Retry; heldByMe (the user's own other window) reads as a self label, not a
+      // third party editing. Never conflict, never auto-retried (see OUTRANKS_REMOTE_NEWER).
+      return {
+        tone: 'info',
+        labelKey: lock?.heldByMe ? 'uwChipEditLockedSelf' : 'uwChipEditLocked',
+        holderName: lock?.holderName ?? null,
+        tipKey: lock?.heldByMe ? 'uwTipEditLockedSelf' : 'uwTipEditLocked',
+        savedAt: lock?.since ?? undefined,
+        action: { kind: 'retry', labelKey: 'uwActRetry' },
       }
     case 'reconciling-stuck': // 6: the tooltip stays the reconciling one (EXPERIENCE l.190)
       return {
@@ -439,6 +465,8 @@ export function miniGlyphOf(model: ChipModel, state: UniworkSaveState): MiniGlyp
     case 'warn':
       return 'warn'
     case 'info':
+      // EL-1(a) (UNI-1645c): a locked save is not waiting to upload: a ring, not the queued clock
+      if (state === 'edit_locked') return 'ring'
       return state === 'paused_user' ? 'pause' : 'clock'
     default:
       if (model.labelKey === 'uwChipPausedAdmin') return 'pause'
@@ -455,6 +483,7 @@ const QUEUED_TIME_TIPS: ReadonlySet<StringKey> = new Set([
   'uwTipQueued',
   'uwTipQueuedNewer',
   'uwTipPausedUser',
+  'uwTipEditLocked',
 ])
 
 /**
@@ -473,12 +502,24 @@ export function chipCopy(
       ? { max: formatSizeMB(model.maxBytes, dateLocale, 'exact') }
       : undefined
   const reasonText = model.reasonKey ? t(model.reasonKey, reasonParams) : undefined
+  const holderName =
+    model.holderName !== undefined ||
+    model.labelKey === 'uwChipEditLocked' ||
+    model.labelKey === 'uwChipEditLockedSelf'
+      ? model.holderName && model.holderName.trim().length > 0
+        ? model.holderName
+        : t('uwEditLockSomeone')
+      : undefined
+  const labelParams: Record<string, string> = {}
+  if (reasonText !== undefined) labelParams.reason = reasonText
+  if (holderName !== undefined) labelParams.name = holderName
   const label =
-    reasonText !== undefined ? t(model.labelKey, { reason: reasonText }) : t(model.labelKey)
+    Object.keys(labelParams).length > 0 ? t(model.labelKey, labelParams) : t(model.labelKey)
   const tipParams: Record<string, string> = {}
   if (model.savedAt) tipParams.time = formatSaveTime(model.savedAt, dateLocale, now)
   else if (QUEUED_TIME_TIPS.has(model.tipKey)) tipParams.time = '—'
   if (reasonText !== undefined) tipParams.reason = reasonText
+  if (holderName !== undefined) tipParams.name = holderName
   const tip = t(model.tipKey, tipParams)
   const fullTip = model.errorKey ? `${t(model.errorKey)} ${tip}` : tip
   return { label, tip: fullTip, title: `${label}\n${fullTip}` }

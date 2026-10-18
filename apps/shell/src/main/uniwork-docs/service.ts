@@ -26,6 +26,7 @@ import type {
   UniworkFolderNode,
   UniworkFolderQuery,
   UniworkLaunchEvent,
+  UniworkListFilters,
   UniworkLockReason,
   UniworkMoveDocumentInput,
   UniworkMoveResult,
@@ -445,6 +446,7 @@ const KEEP_LOCAL_STATES: ReadonlySet<string> = new Set([
   'signed-out',
   'error',
   'failed',
+  'edit_locked',
 ])
 
 /** states whose local bytes are not in UniWork (the close prompt) */
@@ -456,6 +458,7 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
   'blocked',
   'conflict',
   'failed',
+  'edit_locked',
 ])
 
 /**
@@ -865,8 +868,16 @@ const EMPTY_DISPATCH = { dispatched: 0, parked: 0, outcomes: new Map() }
  * where it is (a committed/cancelled record is spent; the front's own settle or
  * cancel already moved the binding). This is the ONE mapping from a durable
  * queue state to the binding a restart reads back.
+ *
+ * `current` is the binding as it is right now: a parked `edit_locked` record
+ * carries no holder metadata of its own (IntentRecordV2 has no editLock), so the
+ * mapping keeps the one the binding already has (EL1A-BE-2). Exported for its
+ * unit test.
  */
-function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
+export function queueBindingPatch(
+  record: IntentRecordV2,
+  current?: Binding,
+): Partial<Binding> | null {
   const state = queueChipState(record.state)
   if (!state) return null
   const error = record.lastError
@@ -876,10 +887,19 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   else if (state === 'blocked') patched.error = error ?? 'server_error'
   else if (state === 'reconciling-stuck') patched.error = error ?? 'intent_unknown'
   else if (state === 'failed') {
-    patched.error = error ?? 'server_error'
-    if (record.maxBytes !== undefined) {
-      patched.maxBytes = record.maxBytes
-      patched.sizeBytes = record.length
+    if (error === 'edit_locked') {
+      patched.state = 'edit_locked'
+      patched.error = 'edit_locked'
+      // EL1A-BE-2: a queue rewrite of a parked edit_locked intent keeps the holder metadata the
+      // binding already carries; dropping it would make the chip fall back to the null holder
+      // and lose the name it names in AC-1
+      if (current?.editLock) patched.editLock = current.editLock
+    } else {
+      patched.error = error ?? 'server_error'
+      if (record.maxBytes !== undefined) {
+        patched.maxBytes = record.maxBytes
+        patched.sizeBytes = record.length
+      }
     }
   }
   // the waiting states carry no refusal: a block that lifted (the `unblock`
@@ -888,6 +908,7 @@ function queueBindingPatch(record: IntentRecordV2): Partial<Binding> | null {
   // `undefined` overwrites the stale code in the merge; the store's JSON drops it
   else if (state === 'queued' || state === 'paused_user') {
     patched.error = undefined
+    patched.editLock = undefined
     patched.maxBytes = undefined
     patched.sizeBytes = undefined
   }
@@ -978,6 +999,14 @@ export class UniworkDocsService {
   /** the one in-flight members read per org, shared by concurrent panel opens */
   private orgMemberNamesInFlight: { orgId: string; promise: Promise<Map<string, string>> } | null =
     null
+  /** DESKTOP-HOME: workspaceId -> (userId -> displayName) cache; dropped on org/account change & reload */
+  private readonly workspaceMemberNames = new Map<string, Map<string, string>>()
+  /** DESKTOP-HOME: the one in-flight workspace members read per workspaceId */
+  private readonly workspaceMemberNamesInFlight = new Map<string, Promise<Map<string, string>>>()
+  /** DESKTOP-HOME: the org id under which `workspaceMemberNames` was populated */
+  private workspaceMemberNamesOrg: string | null = null
+  /** DESKTOP-HOME: the last live account key (`deploymentId/accountId`) observed for member caches */
+  private sessionAccountKey: string | null = null
   /** per path, the saveMark of its last user Save */
   private readonly lastUserSave = new Map<string, number>()
   private saveCounter = 0
@@ -1341,6 +1370,9 @@ export class UniworkDocsService {
       if (binding.error === 'permission_revoked') return { kind: 'revoked' }
       if (binding.error === 'document_deleted') return { kind: 'deleted' }
     }
+    // EL1A-BE-1: an edit_locked copy never rebuilds a newer-* bar from a revision the 423
+    // handed back: the chip's edit_locked pill outranks it and names the holder instead
+    if (binding.state === 'edit_locked') return null
     if (
       binding.serverRevision !== undefined &&
       binding.serverVersion !== undefined &&
@@ -1445,6 +1477,16 @@ export class UniworkDocsService {
   /** the session's account may have changed: remember it as the last owner */
   noteSessionIdentity(): void {
     const identity = this.liveIdentity()
+    const accountKey = identity ? `${identity.deploymentId}/${identity.accountId}` : null
+    if (this.sessionAccountKey !== accountKey) {
+      this.sessionAccountKey = accountKey
+      this.orgMemberNames = new Map()
+      this.orgMemberNamesOrg = null
+      this.orgMemberNamesInFlight = null
+      this.workspaceMemberNames.clear()
+      this.workspaceMemberNamesInFlight.clear()
+      this.workspaceMemberNamesOrg = null
+    }
     if (identity) {
       // session boot / deployment switch: the new server's `documents.limits`
       // replace whatever the previous one published
@@ -1943,7 +1985,7 @@ export class UniworkDocsService {
       await this.settleFromRecord(doc, record)
       return
     }
-    const patch = queueBindingPatch(record)
+    const patch = queueBindingPatch(record, doc.binding)
     if (patch) await this.coordinator.commitState(doc, { ...doc.binding, ...patch })
   }
 
@@ -1977,6 +2019,7 @@ export class UniworkDocsService {
       baseVersionId: record.receipt.versionId,
     }
     delete next.error
+    delete next.editLock
     delete next.sizeBytes
     delete next.maxBytes
     delete next.serverRevision
@@ -2225,6 +2268,9 @@ export class UniworkDocsService {
       if (fresh) {
         const next: Binding = { ...fresh.binding, state: 'dirty' }
         delete next.error
+        // EL1A-BE-4: like withoutError on the inline settle: a cancelled save drops the 423's
+        // holder metadata, so a later writer spreading the binding cannot resurrect it
+        delete next.editLock
         await this.coordinator.commitState(fresh, next)
       }
     }
@@ -2942,6 +2988,10 @@ export class UniworkDocsService {
     this.orgMemberNamesOrg = null
     this.notedOrgId = null
     this.orgMemberNamesInFlight = null
+    this.workspaceMemberNames.clear()
+    this.workspaceMemberNamesInFlight.clear()
+    this.workspaceMemberNamesOrg = null
+    this.sessionAccountKey = null
     this.migratedScopes.delete(scopeToken)
     this.limitsCache.reset()
     this.coordinator.resetSessionWarnings()
@@ -3270,6 +3320,15 @@ export class UniworkDocsService {
     }
     if (this.orgMemberNamesInFlight && this.orgMemberNamesInFlight.orgId !== orgId) {
       this.orgMemberNamesInFlight = null
+    }
+    if (
+      orgKnown &&
+      ((this.workspaceMemberNamesOrg !== null && this.workspaceMemberNamesOrg !== orgId) ||
+        (prevOrgId !== null && prevOrgId !== orgId))
+    ) {
+      this.workspaceMemberNames.clear()
+      this.workspaceMemberNamesInFlight.clear()
+      this.workspaceMemberNamesOrg = orgId
     }
     if (changed && orgId && this.deps.identity()) {
       void this.limitsCache.refresh().catch(() => undefined)
@@ -3768,8 +3827,10 @@ export class UniworkDocsService {
         parentId: typeof q.parentId === 'string' && q.parentId ? q.parentId : null,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...this.listFiltersOf(q),
       })
-      return { items: page.documents, nextCursor: page.nextCursor }
+      const items = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { items, nextCursor: page.nextCursor }
     })
   }
 
@@ -3786,7 +3847,8 @@ export class UniworkDocsService {
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
       })
-      return { items: page.documents, nextCursor: page.nextCursor }
+      const items = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { items, nextCursor: page.nextCursor }
     })
   }
 
@@ -5049,6 +5111,101 @@ export class UniworkDocsService {
   }
 
   /**
+   * DESKTOP-HOME: the workspace's member names (`user_id` -> `display_name`),
+   * read once per `workspaceId` via `GET /workspaces/{ws}/members` (capped at
+   * `MEMBERS_PAGE_SIZE * MEMBERS_MAX_PAGES` = 2000 entries). Concurrent list
+   * calls for the same workspace share one in-flight read; on failure, an empty
+   * `Map` is cached for the session so a missing/forbidden members read is
+   * never retried per row. Dropped on org change, account change, and
+   * `noteLibraryReload()`.
+   */
+  private memberNamesForWorkspace(workspaceId: string): Promise<Map<string, string>> {
+    const identity = this.deps.identity()
+    const accountKey = identity ? `${identity.deploymentId}/${identity.accountId}` : null
+    if (this.sessionAccountKey !== null && this.sessionAccountKey !== accountKey) {
+      this.workspaceMemberNames.clear()
+      this.workspaceMemberNamesInFlight.clear()
+      this.workspaceMemberNamesOrg = null
+    }
+    this.sessionAccountKey = accountKey
+    const orgId = this.deps.selectedOrg()?.id ?? null
+    if (this.workspaceMemberNamesOrg !== null && this.workspaceMemberNamesOrg !== orgId) {
+      this.workspaceMemberNames.clear()
+      this.workspaceMemberNamesInFlight.clear()
+    }
+    this.workspaceMemberNamesOrg = orgId
+    const cached = this.workspaceMemberNames.get(workspaceId)
+    if (cached) return Promise.resolve(cached)
+    const inflight = this.workspaceMemberNamesInFlight.get(workspaceId)
+    if (inflight) return inflight
+    const epoch = this.sessionEpoch
+    const promise = this.loadWorkspaceMemberNames(workspaceId, epoch, accountKey, orgId)
+    this.workspaceMemberNamesInFlight.set(workspaceId, promise)
+    return promise
+  }
+
+  private async loadWorkspaceMemberNames(
+    workspaceId: string,
+    epoch: number,
+    accountKey: string | null,
+    orgId: string | null,
+  ): Promise<Map<string, string>> {
+    const cap = MEMBERS_PAGE_SIZE * MEMBERS_MAX_PAGES
+    try {
+      const api = this.api()
+      if (typeof api.listWorkspaceMembers !== 'function') {
+        return new Map()
+      }
+      const members = await api.listWorkspaceMembers(workspaceId)
+      const names = new Map<string, string>()
+      for (const member of members) {
+        if (names.size >= cap) break
+        names.set(member.userId, member.displayName)
+      }
+      if (
+        this.sessionEpoch === epoch &&
+        this.sessionAccountKey === accountKey &&
+        this.workspaceMemberNamesOrg === orgId
+      ) {
+        this.workspaceMemberNames.set(workspaceId, names)
+      }
+      return names
+    } catch {
+      const empty = new Map<string, string>()
+      if (
+        this.sessionEpoch === epoch &&
+        this.sessionAccountKey === accountKey &&
+        this.workspaceMemberNamesOrg === orgId
+      ) {
+        this.workspaceMemberNames.set(workspaceId, empty)
+      }
+      return empty
+    } finally {
+      this.workspaceMemberNamesInFlight.delete(workspaceId)
+    }
+  }
+
+  private async enrichWorkspaceRows(
+    workspaceId: string,
+    rows: UniworkDocSummary[],
+  ): Promise<UniworkDocSummary[]> {
+    const names = await this.memberNamesForWorkspace(workspaceId)
+    if (names.size === 0) return rows
+    return rows.map((row) => {
+      const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
+      return updatedByName ? { ...row, updatedByName } : row
+    })
+  }
+
+  private listFiltersOf(q: UniworkListFilters): UniworkListFilters {
+    return {
+      ...(typeof q.format === 'string' && q.format ? { format: q.format } : {}),
+      ...(typeof q.updatedBy === 'string' && q.updatedBy ? { updatedBy: q.updatedBy } : {}),
+      ...(typeof q.updatedFrom === 'string' && q.updatedFrom ? { updatedFrom: q.updatedFrom } : {}),
+    }
+  }
+
+  /**
    * The renderer re-read the library (picker open, Retry, or the org-change
    * status push): the org member-name cache is dropped so a read that failed
    * earlier is retried at this point, not on every properties panel.
@@ -5058,17 +5215,61 @@ export class UniworkDocsService {
     // map is dropped here, so the one-in-flight rule is not broken
     this.orgMemberNames = new Map()
     this.orgMemberNamesOrg = null
+    this.workspaceMemberNames.clear()
   }
 
   listDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>> {
     return result(async () => {
-      if (!query || typeof query.workspaceId !== 'string') throw new UniworkDocError('not_found')
-      return this.api().listDocuments({
+      if (!query || typeof query.workspaceId !== 'string' || !query.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const page = await this.api().listDocuments({
         workspaceId: query.workspaceId,
         ...(typeof query.query === 'string' ? { query: query.query } : {}),
         ...(typeof query.cursor === 'string' ? { cursor: query.cursor } : {}),
         ...(typeof query.limit === 'number' ? { limit: query.limit } : {}),
+        ...this.listFiltersOf(query),
       })
+      const documents = await this.enrichWorkspaceRows(query.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** DESKTOP-HOME: documents shared by the caller in one workspace (paged) */
+  listSharedByMe(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const page = await this.api().listSharedByMe({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...this.listFiltersOf(q),
+      })
+      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** DESKTOP-HOME: archived documents in the workspace's trash (`archived=1`, paged) */
+  listTrash(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const page = await this.api().listTrash({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...this.listFiltersOf(q),
+      })
+      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
     })
   }
 
@@ -5381,7 +5582,11 @@ export class UniworkDocsService {
       queue: record && !isTerminalQueueState(record.state) ? record.state : null,
       ...(record?.receipt ? { receiptRevision: record.receipt.revision } : {}),
       ownEcho: this.echoSet(doc.binding.documentId),
-      locked: this.lockedFor(doc.binding),
+      // EL1A-BE-1: an edit_locked copy takes no notice either - the holder's own
+      // commits are the newer versions, and reloading over a copy someone else is
+      // editing would fight the lock (the pill names the holder instead)
+      locked:
+        this.lockedFor(doc.binding) ?? (doc.binding.state === 'edit_locked' ? 'edit_locked' : null),
     }
   }
 

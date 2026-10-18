@@ -182,7 +182,7 @@ export function FindPanel({ target, strings, onClose, focusRequest }: FindPanelP
   }, [canEdit, flushPending, count, replacement, query, refresh, target])
 
   return (
-    <div className="find-panel">
+    <div className="find-panel" data-esc-local="">
       <div className="find-row">
         <input
           ref={inputRef}
@@ -197,7 +197,10 @@ export function FindPanel({ target, strings, onClose, focusRequest }: FindPanelP
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') step(e.shiftKey ? -1 : 1)
-            if (e.key === 'Escape') close()
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              close()
+            }
           }}
         />
         <button
@@ -270,7 +273,10 @@ export function FindPanel({ target, strings, onClose, focusRequest }: FindPanelP
             onChange={(e) => setReplacement(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') replaceOne()
-              if (e.key === 'Escape') close()
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                close()
+              }
             }}
           />
           <button type="button" className="find-action" onClick={replaceOne} disabled={count === 0}>

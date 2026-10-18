@@ -27,6 +27,7 @@ export const cs = {
   ufCycle: 'Složku nelze přesunout do sebe samé ani do některé z jejích podsložek.',
   ufParentKind: 'Složka je v kořeni nebo v jiné složce.',
   ufFolderGone: 'Tato složka tu už není.',
+  ufFolderNoAccess: 'K této složce již nemáte přístup.',
   ufNoPermission: 'Nemáte oprávnění tuto složku měnit.',
   ufEmptyFolder: 'Tato složka je prázdná',
   ufLocation: 'Umístění',

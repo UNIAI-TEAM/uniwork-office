@@ -7,6 +7,7 @@
  */
 import {
   DocsProtocolError,
+  type CloseRequestedReason,
   type DocBlockedPayload,
   type FileMeta,
   type FrameRequestType,
@@ -66,6 +67,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
   const saveBlocked: SaveBlockedPayload[] = []
   const openRefused: OpenRefusedPayload[] = []
   const lagDetected: LagDetectedPayload[] = []
+  const closeRequested: CloseRequestedReason[] = []
   const errors: Array<{ error: unknown; fatal?: boolean }> = []
   const renameListeners: Array<(file: FileMeta) => void> = []
   const themeListeners: Array<(theme: Theme) => void> = []
@@ -194,6 +196,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     reportSizeWarning: (p) => sizeWarnings.push(p),
     reportSaveBlocked: (p) => saveBlocked.push(p),
     reportLagDetected: (p) => lagDetected.push(p),
+    reportCloseRequested: (r) => closeRequested.push(r),
     reportError: (error, fatal) => errors.push({ error, fatal }),
     reportOpenRefused: (p) => openRefused.push(p),
   }
@@ -250,6 +253,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     sizeWarnings,
     saveBlocked,
     lagDetected,
+    closeRequested,
     errors,
     openRefused,
   }

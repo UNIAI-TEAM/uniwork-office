@@ -132,6 +132,7 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
     exportHtml: web.exportHtml,
     // Print = the browser print dialog over the static copy (no scripts, handlers or remote loads)
     printHtml: async ({ html }) => {
+      if (!web.canPrint()) return { ok: false as const, error: 'unsupported' }
       const r = await printHtmlDocument(toStaticHtml(html, web.resolveAssetUrl))
       return r.ok ? { ok: true as const } : { ok: false as const, error: r.error ?? 'print failed' }
     },

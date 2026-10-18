@@ -104,6 +104,11 @@ export async function uploadVersionBytes(
   const probe = await readLocalFileProbe({ bytes: input.bytes }, size, input.filename)
   const sessionClient = toUploadSessionClient(session)
   let resume = input.resume
+  // the derived create keys run s0, s1, ... across this loop AND the core's own
+  // one-shot restart (R1-BE-08/09: a gone session or a rejected key), so no key
+  // is ever sent twice for different sessions
+  let keyIndex = 0
+  const nextKey = (): string => `${input.idempotencyKey}:s${(keyIndex += 1)}`
 
   for (let attempt = 0; attempt < VERSION_SESSION_KEY_ATTEMPTS; attempt += 1) {
     try {
@@ -113,7 +118,8 @@ export async function uploadVersionBytes(
         size,
         readRange: async (offset, length) => input.bytes.subarray(offset, offset + length),
         probe,
-        idempotencyKey: `${input.idempotencyKey}:s${attempt}`,
+        idempotencyKey: `${input.idempotencyKey}:s${keyIndex}`,
+        freshIdempotencyKey: nextKey,
         ...(resume ? { resume } : {}),
         ...(input.signal ? { signal: input.signal } : {}),
         ...(input.onProgress ? { onProgress: input.onProgress } : {}),
@@ -140,6 +146,7 @@ export async function uploadVersionBytes(
           error.code === 'idempotency_mismatch')
       if (mismatch && attempt + 1 < VERSION_SESSION_KEY_ATTEMPTS) {
         resume = undefined
+        nextKey()
         continue
       }
       throw error

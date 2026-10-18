@@ -39,24 +39,24 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 
 ### Host → frame
 
-| type                | kind    | payload → result                                                                                                                                                                                                                                           |
-| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `init`              | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?, module?, user?, recovery?, downloadMaxBytes?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
-| `open`              | request | `OpenPayload` {file: FileMeta, source: {kind:'url', url} \| {kind:'bytes', data}, assets?} → {opened, title?}                                                                                                                                              |
-| `save`              | request | {reason: 'user' \| 'navigate' \| 'autosave'} → `SaveResult`                                                                                                                                                                                                |
-| `saveAs`            | request | {name?} → `SaveResult`                                                                                                                                                                                                                                     |
-| `print`             | request | {mode?: 'dialog' \| 'pdf'} → {printed}                                                                                                                                                                                                                     |
-| `doc.closeCheck`    | request | {} → {dirty, autoSave}                                                                                                                                                                                                                                     |
-| `token.update`      | event   | {token, tokenExpiresAt} — proactive rotation                                                                                                                                                                                                               |
-| `theme`             | event   | {theme: 'light' \| 'dark'} (host resolves "system")                                                                                                                                                                                                        |
-| `language`          | event   | {locale}                                                                                                                                                                                                                                                   |
-| `file.renamed`      | event   | {file: FileMeta}                                                                                                                                                                                                                                           |
-| `doc.remoteVersion` | event   | {document_id, revision (decimal), version_id, saved_at, author_name?} (additive, X-02)                                                                                                                                                                     |
-| `doc.blocked`       | event   | {document_id, reason} (additive, G5-03w)                                                                                                                                                                                                                   |
-| `cancel`            | event   | {id} — abort a host→frame request                                                                                                                                                                                                                          |
-| `comments.changed`  | event   | {document_id} — reload the comment list (additive, G8-08; see "Server comments")                                                                                                                                                                           |
-| `comments.reveal`   | request | {comment_id} → {revealed} (additive, G8-08; only after an InitAck with `comments`)                                                                                                                                                                         |
-| `doc.download`      | request | {} → {delivered: true} (additive, SIZE-F1; asks the frame to send `api.download` with its last-blocked or live serialized bytes)                                                                                                                           |
+| type                | kind    | payload → result                                                                                                                                                                                                                                                                              |
+| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init`              | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?, module?, user?, recovery?, downloadMaxBytes?, commentsLevel?, limits?, profile?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
+| `open`              | request | `OpenPayload` {file: FileMeta, source: {kind:'url', url} \| {kind:'bytes', data}, assets?} → {opened, title?}                                                                                                                                                                                 |
+| `save`              | request | {reason: 'user' \| 'navigate' \| 'autosave'} → `SaveResult`                                                                                                                                                                                                                                   |
+| `saveAs`            | request | {name?} → `SaveResult`                                                                                                                                                                                                                                                                        |
+| `print`             | request | {mode?: 'dialog' \| 'pdf'} → {printed}                                                                                                                                                                                                                                                        |
+| `doc.closeCheck`    | request | {} → {dirty, autoSave}                                                                                                                                                                                                                                                                        |
+| `token.update`      | event   | {token, tokenExpiresAt} — proactive rotation                                                                                                                                                                                                                                                  |
+| `theme`             | event   | {theme: 'light' \| 'dark'} (host resolves "system")                                                                                                                                                                                                                                           |
+| `language`          | event   | {locale}                                                                                                                                                                                                                                                                                      |
+| `file.renamed`      | event   | {file: FileMeta}                                                                                                                                                                                                                                                                              |
+| `doc.remoteVersion` | event   | {document_id, revision (decimal), version_id, saved_at, author_name?} (additive, X-02)                                                                                                                                                                                                        |
+| `doc.blocked`       | event   | {document_id, reason} (additive, G5-03w)                                                                                                                                                                                                                                                      |
+| `cancel`            | event   | {id} — abort a host→frame request                                                                                                                                                                                                                                                             |
+| `comments.changed`  | event   | {document_id} — reload the comment list (additive, G8-08; see "Server comments")                                                                                                                                                                                                              |
+| `comments.reveal`   | request | {comment_id} → {revealed} (additive, G8-08; only after an InitAck with `comments`)                                                                                                                                                                                                            |
+| `doc.download`      | request | {} → {delivered: true} (additive, SIZE-F1; asks the frame to send `api.download` with its last-blocked or live serialized bytes)                                                                                                                                                              |
 
 ### Frame → host
 
@@ -90,6 +90,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `comments.*`, `mentions.search` | request | server comments (additive, G8-08, cap `comments`); see "Server comments" below                       |
 | `size_warning`                  | event   | {bytes, max_bytes, warn_ratio} — serialized save size reached warn threshold (SIZE-F1)               |
 | `save_blocked`                  | event   | {bytes, max_bytes} — save blocked because serialized bytes exceeded max_bytes (SIZE-F1)              |
+| `close_requested`               | event   | {reason: 'escape'} — Esc pressed in the frame and no frame-local UI consumed it (additive, UNI-1876) |
 
 `api.*`, `file.pick`, `image.fetch` and `convert.altChunkHtml` are proxied by the host's `api` handlers; a type
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
@@ -287,13 +288,22 @@ One protocol serves every genoffice editor on the web (lane GO-B4/B5/B6, UNI-101
 ## Read-only documents and saving
 
 - **View-only** is the host withholding the `save` grant: when the effective capabilities (`InitAck` /
-  `FrameSession.capabilities`) have `save !== true`, the frame is a viewer. A frame then hides or disables its save
+  `FrameSession.capabilities`) have `save !== true`, the frame is a viewer. A frame then hides its save
   entries (Ctrl+S, File > Save, close-guard "Save"), never sends `api.save`, and answers a host `save` with
-  `ok:false` / `unsupported`. `FileMeta.writable === false` means the same for that file. No extra field is needed.
+  `ok:false` / `unsupported`. `FileMeta.writable === false` means the same for that file.
   `saveAs` is a separate grant (a host may allow "save a copy" of a document the user cannot overwrite).
+  `save: false` alone (e.g. a commenter without edit rights) keeps comment create/reply/edit/delete per
+  `commentsLevel` (D4).
   The module bridges (`web/modules/<module>/`) implement this. The Docs bridge answers `uniworkState` with
   `readOnly: true` (the renderer's view-only seam: read-only editor and ribbon, never dirty, no save entries),
   refuses `api.save` and a host `save` (`unsupported`), and refuses Save As unless `saveAs` is granted.
+- **Read-only profile (`init.profile?: 'readOnly'`, additive, UNI-1876):** when set to `'readOnly'`, the frame shows
+  no editing UI regardless of grants: editor read-only, no Save / Save as / Save copy, no local (in-document) comments,
+  server comments forced to view-only (`commentsAccess` returns `level: 'view'`, `canCreate: false`), no PDF edit tools,
+  no export-to-new-file actions (such as Markdown "Export Word"), and AI write tools off (read-only AI stays as
+  granted). Granted viewing actions (`download`, `print`, `exportPdf`) remain available. A host must **also** withhold
+  the edit capabilities because an older frame ignores `profile`. Any `profile` value other than absent or `'readOnly'`
+  is rejected as `malformed` on `init`. `PROTOCOL_VERSION` stays 1.
 - **No autosave on the web** (lane decision C10, 2026-10-09): Docs and every module save only on an explicit user
   save. Hosts never send `save {reason: 'autosave'}`; web bridges never set `api.save.auto`; every module's
   autosave capability is false on the web and its UI hidden. The `autosave` / `auto` values stay in the types for

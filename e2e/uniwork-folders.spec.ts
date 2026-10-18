@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path'
 import { en as syncEn } from '../apps/shell/src/renderer/src/i18n/sync/en'
 import { en as uniworkDocsEn } from '../apps/shell/src/renderer/src/i18n/uniwork-documents/en'
 import { en as uniworkFoldersEn } from '../apps/shell/src/renderer/src/i18n/uniwork-folders/en'
+import { en as uniworkHomeEn } from '../apps/shell/src/renderer/src/i18n/uniwork-home/en'
 import { en as uniworkSaveEn } from '../apps/shell/src/renderer/src/i18n/uniwork-save/en'
 import {
   closeAndSaveVideo,
@@ -132,21 +133,26 @@ async function triggerSaveToUniWork(app: LaunchedApp['app']): Promise<void> {
 }
 
 /**
- * Opens the "Open from UniWork" dialog and selects the workspace root (`UniWork`)
- * in the folder tree so the browser switches from the initial Recent list to the
- * folder contents view.
+ * Selects the UniWork area tab and the `Workspace documents` sub-nav entry so
+ * `DocumentsHome` switches deterministically to the workspace root folder view.
  */
 async function openUniworkFolderBrowser(shell: Page) {
-  await shell.locator('.uw-open-card').click()
-  const dialog = shell.getByRole('dialog', { name: 'Open from UniWork' })
-  await expect(dialog).toBeVisible()
-  const tree = dialog.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
-  await expect(tree).toBeVisible()
-  await tree.getByRole('treeitem', { name: uniworkFoldersEn.ufRoot }).click()
-  await expect(
-    dialog.getByRole('navigation', { name: uniworkFoldersEn.ufBreadcrumb }),
-  ).toBeVisible()
-  return dialog
+  const browser = shell.locator('.home')
+  const uwTab = browser.locator('#home-area-tab-uniwork')
+  if ((await uwTab.getAttribute('aria-selected')) === 'false') {
+    await uwTab.click()
+  }
+  await browser.locator('.dh-subnav .nav-item[data-nav="workspace"]').click({ timeout: 30_000 })
+  const home = browser.locator('.dh-home')
+  await expect(home.locator('.dh-title')).toHaveText(uniworkHomeEn.uhNavWorkspace)
+  await expect(home.locator('.uw-pick-skeleton')).toHaveCount(0, { timeout: 15_000 })
+  return browser
+}
+
+async function contentTitlesOf(contents: Locator): Promise<string[]> {
+  return contents
+    .locator('.dh-folder-name, .dh-doc-open')
+    .evaluateAll((els) => els.map((el) => (el.textContent ?? '').trim()))
 }
 
 /**
@@ -270,11 +276,11 @@ test.describe.serial('UniWork folders (FD-11)', () => {
     await withApp('uniwork-folders-create', async ({ shell }) => {
       const dialog = await openUniworkFolderBrowser(shell)
       const tree = dialog.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
-      const contents = dialog.getByRole('listbox', { name: uniworkFoldersEn.ufContentsLabel })
+      const contents = dialog.locator('.dh-home')
       const crumbs = dialog.getByRole('navigation', { name: uniworkFoldersEn.ufBreadcrumb })
 
       // Navigate into `Projects`
-      await contents.getByRole('option', { name: /^Projects/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'Projects' }).click()
       await expect(crumbs.getByText('Projects', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
@@ -282,7 +288,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       // Create subfolder `Q4 Specs` inside `Projects`
       await dialog.getByRole('button', { name: uniworkFoldersEn.ufNewFolder, exact: true }).click()
-      const nameDialog = shell.getByRole('dialog', { name: uniworkFoldersEn.ufNewFolder })
+      const nameDialog = shell.getByRole('dialog', { name: uniworkFoldersEn.ufNewSubfolder })
       await expect(nameDialog).toBeVisible()
       const nameInput = nameDialog.getByRole('textbox', { name: uniworkFoldersEn.ufFolderName })
       await expect(nameInput).toBeFocused()
@@ -291,9 +297,9 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       await expect(nameDialog).toBeHidden()
 
       // The new folder is visible in both the contents list and the folder tree
-      await expect(contents.getByRole('option', { name: /^Q4 Specs/ })).toBeVisible()
+      await expect(contents.locator('.dh-folder-open', { hasText: 'Q4 Specs' })).toBeVisible()
+      await expect(tree).toBeVisible()
       await expect(tree.getByRole('treeitem', { name: 'Q4 Specs' })).toBeVisible()
-
       // The stub holds `Q4 Specs` with `parentId: projects.id`
       const created = stub.folders().find((f) => f.title === 'Q4 Specs')
       expect(created).toBeDefined()
@@ -335,35 +341,44 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       const dialog = await openUniworkFolderBrowser(shell)
       const tree = dialog.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
-      const contents = dialog.getByRole('listbox', { name: uniworkFoldersEn.ufContentsLabel })
+      const contents = dialog.locator('.dh-home')
       const crumbs = dialog.getByRole('navigation', { name: uniworkFoldersEn.ufBreadcrumb })
 
       // Open `Source Hub` and verify both the subfolder and document are listed
-      await contents.getByRole('option', { name: /^Source Hub/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'Source Hub' }).click()
       await expect(crumbs.getByText('Source Hub', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
-      await expect(contents.getByRole('option', { name: /^Moving Subfolder/ })).toBeVisible()
-      await expect(contents.getByRole('option', { name: /^Vanishing Leaf/ })).toBeVisible()
-      await expect(contents.getByRole('option', { name: /^moving-roadmap\.docx/ })).toBeVisible()
+      await expect(
+        contents.locator('.dh-folder-open', { hasText: 'Moving Subfolder' }),
+      ).toBeVisible()
+      await expect(contents.locator('.dh-folder-open', { hasText: 'Vanishing Leaf' })).toBeVisible()
+      await expect(
+        contents.locator('.dh-doc-open', { hasText: 'moving-roadmap.docx' }),
+      ).toBeVisible()
 
       // Move both `Moving Subfolder` and `moving-roadmap.docx` into `Target Hub` on the web
       stub.webMove(movingSub.id, target.id)
       stub.webMove(movingDoc.id, target.id)
       await triggerFeedTick(shell)
 
-      // Without closing or reloading the dialog, `Source Hub` contents drop the moved items.
+      // Without reloading Home, `Source Hub` contents drop the moved items.
       // `Vanishing Leaf` stays: the list must have refreshed to exactly it, so a loading,
       // empty or error list cannot satisfy the `toBeHidden` checks.
-      await expect(contents.getByRole('option')).toHaveText([/^Vanishing Leaf/], {
-        timeout: 15_000,
-      })
-      await expect(contents.getByRole('option', { name: /^Vanishing Leaf/ })).toBeVisible()
-      await expect(contents.getByRole('option', { name: /^Moving Subfolder/ })).toBeHidden()
-      await expect(contents.getByRole('option', { name: /^moving-roadmap\.docx/ })).toBeHidden()
+      await expect
+        .poll(() => contentTitlesOf(contents), { timeout: 15_000 })
+        .toEqual(['Vanishing Leaf'])
+      await expect(contents.locator('.dh-folder-open', { hasText: 'Vanishing Leaf' })).toBeVisible()
+      await expect(
+        contents.locator('.dh-folder-open', { hasText: 'Moving Subfolder' }),
+      ).toBeHidden()
+      await expect(
+        contents.locator('.dh-doc-open', { hasText: 'moving-roadmap.docx' }),
+      ).toBeHidden()
 
       // The tree moved too: `Target Hub` now holds `Moving Subfolder`, `Source Hub` does not
+      await expect(tree).toBeVisible()
       await expandTreeFolder(tree, 'Target Hub')
       await expandTreeFolder(tree, 'Source Hub')
       await expect.poll(() => treeChildrenOf(tree, 'Target Hub')).toEqual(['Moving Subfolder'])
@@ -375,26 +390,33 @@ test.describe.serial('UniWork folders (FD-11)', () => {
         'aria-current',
         'page',
       )
-      await expect(contents.getByRole('option', { name: /^Moving Subfolder/ })).toBeVisible()
-      await expect(contents.getByRole('option', { name: /^moving-roadmap\.docx/ })).toBeVisible()
+      await expect(
+        contents.locator('.dh-folder-open', { hasText: 'Moving Subfolder' }),
+      ).toBeVisible()
+      await expect(
+        contents.locator('.dh-doc-open', { hasText: 'moving-roadmap.docx' }),
+      ).toBeVisible()
 
       // Rename `Moving Subfolder` on the web and advance the feed with `Target Hub` still open
       stub.webRename(movingSub.id, 'Renamed Subfolder')
       await triggerFeedTick(shell)
 
-      await expect(contents.getByRole('option')).toHaveText(
-        [/^Renamed Subfolder/, /^moving-roadmap\.docx/],
-        { timeout: 15_000 },
-      )
-      await expect(contents.getByRole('option', { name: /^Renamed Subfolder/ })).toBeVisible()
-      await expect(contents.getByRole('option', { name: /^Moving Subfolder/ })).toBeHidden()
+      await expect
+        .poll(() => contentTitlesOf(contents), { timeout: 15_000 })
+        .toEqual(['Renamed Subfolder', 'moving-roadmap.docx'])
+      await expect(
+        contents.locator('.dh-folder-open', { hasText: 'Renamed Subfolder' }),
+      ).toBeVisible()
+      await expect(
+        contents.locator('.dh-folder-open', { hasText: 'Moving Subfolder' }),
+      ).toBeHidden()
       await expect.poll(() => treeChildrenOf(tree, 'Target Hub')).toEqual(['Renamed Subfolder'])
       await expect(tree.getByRole('treeitem', { name: 'Renamed Subfolder' })).toBeVisible()
       await expect(tree.getByRole('treeitem', { name: 'Moving Subfolder' })).toBeHidden()
 
       // Navigate into `Source Hub` › `Vanishing Leaf`, then archive `Vanishing Leaf` on the web
       await tree.getByRole('treeitem', { name: 'Source Hub' }).click()
-      await contents.getByRole('option', { name: /^Vanishing Leaf/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'Vanishing Leaf' }).click()
       await expect(crumbs.getByText('Vanishing Leaf', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
@@ -412,16 +434,16 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       await expect(
         dialog.getByRole('status').filter({ hasText: uniworkFoldersEn.ufFolderGone }),
       ).toBeVisible()
-      await expect(contents.getByRole('option', { name: /^Vanishing Leaf/ })).toBeHidden()
+      await expect(contents.locator('.dh-folder-open', { hasText: 'Vanishing Leaf' })).toBeHidden()
       await expect.poll(() => treeChildrenOf(tree, 'Source Hub')).toEqual([])
       await shell.screenshot({ path: screenshotPath('uniwork-folders-feed-fallback') })
 
       // Restore `Vanishing Leaf` on the web and advance the feed: it reappears in `Source Hub`
-      // contents and in the folder tree without closing or reloading the dialog
+      // contents and in the folder tree without reloading Home
       stub.webRestore(vanishingLeaf.id)
       await triggerFeedTick(shell)
 
-      await expect(contents.getByRole('option', { name: /^Vanishing Leaf/ })).toBeVisible({
+      await expect(contents.locator('.dh-folder-open', { hasText: 'Vanishing Leaf' })).toBeVisible({
         timeout: 15_000,
       })
       await expandTreeFolder(tree, 'Source Hub')
@@ -445,30 +467,32 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
     await withApp('uniwork-folders-breadcrumbs', async ({ shell }) => {
       const dialog = await openUniworkFolderBrowser(shell)
-      const contents = dialog.getByRole('listbox', { name: uniworkFoldersEn.ufContentsLabel })
+      const contents = dialog.locator('.dh-home')
       const crumbs = dialog.getByRole('navigation', { name: uniworkFoldersEn.ufBreadcrumb })
 
       // Level 1: Platform
-      await contents.getByRole('option', { name: /^Platform/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'Platform' }).click()
       await expect(crumbs.getByText('Platform', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
 
       // Level 2: Storage
-      await contents.getByRole('option', { name: /^Storage/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'Storage' }).click()
       await expect(crumbs.getByText('Storage', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
 
       // Level 3: RFCs
-      await contents.getByRole('option', { name: /^RFCs/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'RFCs' }).click()
       await expect(crumbs.getByText('RFCs', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
-      await expect(contents.getByRole('option', { name: /^rfc-folder-tree\.docx/ })).toBeVisible()
+      await expect(
+        contents.locator('.dh-doc-open', { hasText: 'rfc-folder-tree.docx' }),
+      ).toBeVisible()
 
       // Breadcrumb trail has ancestor buttons UniWork › Platform › Storage and current page RFCs
       await expect(crumbs.getByRole('button')).toHaveText([
@@ -487,15 +511,13 @@ test.describe.serial('UniWork folders (FD-11)', () => {
         'aria-current',
         'page',
       )
-      await expect(contents.getByRole('option', { name: /^Storage/ })).toBeVisible()
+      await expect(contents.locator('.dh-folder-open', { hasText: 'Storage' })).toBeVisible()
 
       // Click `UniWork` in the breadcrumb to return to the workspace root
       await crumbs.getByRole('button', { name: uniworkFoldersEn.ufRoot, exact: true }).click()
-      await expect(crumbs.getByText(uniworkFoldersEn.ufRoot, { exact: true })).toHaveAttribute(
-        'aria-current',
-        'page',
-      )
-      await expect(contents.getByRole('option', { name: /^Platform/ })).toBeVisible()
+      await expect(crumbs).toBeHidden()
+      await expect(contents.locator('.dh-title')).toHaveText(uniworkHomeEn.uhNavWorkspace)
+      await expect(contents.locator('.dh-folder-open', { hasText: 'Platform' })).toBeVisible()
       await shell.screenshot({ path: screenshotPath('uniwork-folders-breadcrumbs') })
     })
   })
@@ -525,68 +547,55 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
     await withApp('uniwork-folders-search', async ({ shell }) => {
       const dialog = await openUniworkFolderBrowser(shell)
-      const contents = dialog.getByRole('listbox', { name: uniworkFoldersEn.ufContentsLabel })
+      const contents = dialog.locator('.dh-home')
       const crumbs = dialog.getByRole('navigation', { name: uniworkFoldersEn.ufBreadcrumb })
 
       // Open `Finance` before searching so we can verify `Escape` returns to `Finance`
-      await contents.getByRole('option', { name: /^Finance/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'Finance' }).click()
       await expect(crumbs.getByText('Finance', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
 
-      const searchBox = dialog.getByRole('combobox', { name: 'Search documents' })
+      const searchBox = contents.getByRole('searchbox', {
+        name: uniworkHomeEn.uhSearchPlaceholder,
+      })
       await searchBox.fill('budget')
 
-      const filterGroup = dialog.getByRole('radiogroup', { name: uniworkFoldersEn.ufSearchKind })
-      await expect(filterGroup).toBeVisible()
-
-      // A result's path is left-truncated to its direct parent ("… › Parent ›"); the full
-      // path is in the row `title` and in the screen-reader text
+      // A result's path is left-truncated to its direct parent ("… › Parent ›");
+      // the full ancestor path is in `.dh-doc-subpath`'s `title` and in `.uw-sr-only`
       const expectPath = async (row: Locator, short: string, full: string) => {
-        await expect(row.locator('.uwf-path > [aria-hidden="true"]')).toHaveText(short)
-        await expect(row).toHaveAttribute('title', full)
-        await expect(row.locator('.uw-sr-only')).toHaveText(
+        const subpath = row.locator('.dh-doc-subpath')
+        await expect(subpath.locator('[aria-hidden="true"]')).toHaveText(short)
+        await expect(subpath).toHaveAttribute('title', full)
+        await expect(subpath.locator('.uw-sr-only')).toHaveText(
           uniworkFoldersEn.ufPathLabel.replace('{path}', full),
         )
       }
       const root = uniworkFoldersEn.ufRoot
 
-      const forecastRow = contents.getByRole('option', { name: /budget-forecast\.docx/ })
+      const forecastRow = contents.locator('.dh-doc-row', { hasText: 'budget-forecast.docx' })
       await expect(forecastRow).toBeVisible()
       await expectPath(forecastRow, '… › FY2026 ›', `${root} › Finance › FY2026`)
 
       // A deeper path keeps only the direct parent visible
-      const deepRow = contents.getByRole('option', { name: /budget-deep-branch\.docx/ })
+      const deepRow = contents.locator('.dh-doc-row', { hasText: 'budget-deep-branch.docx' })
       await expect(deepRow).toBeVisible()
       await expectPath(deepRow, '… › Branch ›', `${root} › Division › Region › Country › Branch`)
 
-      // Folder result is also shown under `All`
-      const folderRow = contents.getByRole('option', { name: /Budget Ledger Folder/ })
-      await expect(folderRow).toBeVisible()
-      await expectPath(folderRow, '… › FY2026 ›', `${root} › Finance › FY2026`)
-
-      // Filter by `Folders`
-      await filterGroup.getByRole('radio', { name: uniworkFoldersEn.ufSearchFolders }).click()
-      await expect(folderRow).toBeVisible()
-      await expect(forecastRow).toBeHidden()
-      await expect(deepRow).toBeHidden()
-
-      // Filter by `Documents`
-      await filterGroup.getByRole('radio', { name: uniworkFoldersEn.ufSearchDocs }).click()
-      await expect(forecastRow).toBeVisible()
-      await expect(deepRow).toBeVisible()
-      await expect(folderRow).toBeHidden()
+      // Folder result is shown in the Folders section alongside the Documents table
+      const folderCard = contents.locator('.dh-folder-open', { hasText: 'Budget Ledger Folder' })
+      await expect(folderCard).toBeVisible()
+      await expectPath(folderCard, '… › FY2026 ›', `${root} › Finance › FY2026`)
       await shell.screenshot({ path: screenshotPath('uniwork-folders-search-paths') })
 
       // Pressing Escape in the search box clears search and returns to `Finance`
       await searchBox.press('Escape')
-      await expect(filterGroup).toBeHidden()
       await expect(crumbs.getByText('Finance', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
-      await expect(contents.getByRole('option', { name: /^FY2026/ })).toBeVisible()
+      await expect(contents.locator('.dh-folder-open', { hasText: 'FY2026' })).toBeVisible()
     })
   })
 
@@ -605,11 +614,12 @@ test.describe.serial('UniWork folders (FD-11)', () => {
     await withApp('uniwork-folders-conflict-copy', async ({ launched, shell }) => {
       // Open `conflict-folder-copy.docx` from `Origin Folder`
       const openDialog = await openUniworkFolderBrowser(shell)
-      const contents = openDialog.getByRole('listbox', { name: uniworkFoldersEn.ufContentsLabel })
-      await contents.getByRole('option', { name: /^Origin Folder/ }).dblclick()
-      await contents.getByRole('option', { name: /^conflict-folder-copy\.docx/ }).dblclick()
-      await expect(openDialog).toBeHidden({ timeout: 30_000 })
-
+      const contents = openDialog.locator('.dh-home')
+      await contents.locator('.dh-folder-open', { hasText: 'Origin Folder' }).click()
+      await contents.locator('.dh-doc-open', { hasText: 'conflict-folder-copy.docx' }).click()
+      await expect
+        .poll(async () => (await activeStatus(shell))?.title, { timeout: 30_000 })
+        .toBe(docName)
       // Edit locally, bump server revision, and trigger a 409 save conflict
       const editor = await docsEditor(launched.app)
       await typeInDocs(editor, MARKER)
@@ -689,16 +699,16 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       // 1. Open `Start Folder`, then create a New document into `Chosen Target` via Location picker
       const dialog = await openUniworkFolderBrowser(shell)
       const tree = dialog.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
-      const contents = dialog.getByRole('listbox', { name: uniworkFoldersEn.ufContentsLabel })
+      const contents = dialog.locator('.dh-home')
       const crumbs = dialog.getByRole('navigation', { name: uniworkFoldersEn.ufBreadcrumb })
 
-      await contents.getByRole('option', { name: /^Start Folder/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'Start Folder' }).click()
       await expect(crumbs.getByText('Start Folder', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
 
-      await dialog.getByRole('button', { name: uniworkDocsEn.uwDocNew, exact: true }).click()
+      await contents.locator('.dh-btn-create').click()
       const newDialog = shell.getByRole('dialog', { name: uniworkDocsEn.uwDocNew })
       await expect(newDialog).toBeVisible()
       await newDialog
@@ -729,7 +739,10 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       ).toBeVisible()
 
       await newDialog.getByRole('button', { name: uniworkDocsEn.uwDocCreate, exact: true }).click()
-      await expect(dialog).toBeHidden({ timeout: 30_000 })
+      await expect(newDialog).toBeHidden({ timeout: 30_000 })
+      await expect
+        .poll(async () => (await activeStatus(shell))?.title, { timeout: 30_000 })
+        .toBe('new-in-chosen-folder.docx')
 
       // Stub holds `new-in-chosen-folder.docx` with `parentId: chosenFolder.id`
       const createdDoc = stub.documents().find((d) => d.title === 'new-in-chosen-folder.docx')
@@ -742,16 +755,16 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       // Return to Home, reopen the folder browser, and verify `Chosen Target` lists the new document
       await shell.locator('.tab-item.tab-home').click()
       await openUniworkFolderBrowser(shell)
-      await contents.getByRole('option', { name: /^Chosen Target/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'Chosen Target' }).click()
       await expect(crumbs.getByText('Chosen Target', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
       await expect(
-        contents.getByRole('option', { name: /^new-in-chosen-folder\.docx/ }),
+        contents.locator('.dh-doc-open', { hasText: 'new-in-chosen-folder.docx' }),
       ).toBeVisible()
-
       // 2. Navigate to `Start Folder`, then Upload `uploaded-handbook.docx` into `Chosen Target`
+      await expect(tree).toBeVisible()
       await tree.getByRole('treeitem', { name: 'Start Folder' }).click()
       await expect(crumbs.getByText('Start Folder', { exact: true })).toHaveAttribute(
         'aria-current',
@@ -765,7 +778,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
         })) as typeof electronDialog.showOpenDialog
       }, uploadFixturePath)
 
-      await dialog.getByRole('button', { name: uniworkDocsEn.uwDocUpload, exact: true }).click()
+      await contents.locator('.dh-btn-upload').click()
       const uploadDialog = shell.getByRole('dialog', { name: uniworkDocsEn.uwDocUpload })
       await expect(uploadDialog).toBeVisible()
 
@@ -797,7 +810,10 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       await uploadDialog
         .getByRole('button', { name: uniworkDocsEn.uwDocUpload, exact: true })
         .click()
-      await expect(dialog).toBeHidden({ timeout: 30_000 })
+      await expect(uploadDialog).toBeHidden({ timeout: 30_000 })
+      await expect
+        .poll(async () => (await activeStatus(shell))?.title, { timeout: 30_000 })
+        .toBe('uploaded-handbook.docx')
 
       // Stub holds `uploaded-handbook.docx` with `parentId: chosenFolder.id` and matching checksum
       const uploadedDoc = stub.documents().find((d) => d.title === 'uploaded-handbook.docx')
@@ -811,15 +827,17 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       // Return to Home, reopen the folder browser, and verify `Chosen Target` lists both documents
       await shell.locator('.tab-item.tab-home').click()
       await openUniworkFolderBrowser(shell)
-      await contents.getByRole('option', { name: /^Chosen Target/ }).dblclick()
+      await contents.locator('.dh-folder-open', { hasText: 'Chosen Target' }).click()
       await expect(crumbs.getByText('Chosen Target', { exact: true })).toHaveAttribute(
         'aria-current',
         'page',
       )
       await expect(
-        contents.getByRole('option', { name: /^new-in-chosen-folder\.docx/ }),
+        contents.locator('.dh-doc-open', { hasText: 'new-in-chosen-folder.docx' }),
       ).toBeVisible()
-      await expect(contents.getByRole('option', { name: /^uploaded-handbook\.docx/ })).toBeVisible()
+      await expect(
+        contents.locator('.dh-doc-open', { hasText: 'uploaded-handbook.docx' }),
+      ).toBeVisible()
       await shell.screenshot({ path: screenshotPath('uniwork-folders-new-upload') })
     })
   })
@@ -1057,11 +1075,11 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       const before = stub.callCount()
       const dialog = await openUniworkFolderBrowser(shell)
       const tree = dialog.getByRole('tree', { name: uniworkFoldersEn.ufTreeLabel })
-      const contents = dialog.getByRole('listbox', { name: uniworkFoldersEn.ufContentsLabel })
-
+      const contents = dialog.locator('.dh-home')
+      await expect(tree).toBeVisible()
       await expect(tree.getByRole('treeitem', { name: uniworkSaveEn.usMyFolder })).toBeVisible()
       await expect(
-        contents.getByRole('option', { name: new RegExp(`^${uniworkSaveEn.usMyFolder}`) }),
+        contents.locator('.dh-folder-open', { hasText: uniworkSaveEn.usMyFolder }),
       ).toBeVisible()
 
       const callsMade = stub
@@ -1078,12 +1096,9 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       expect(rootTreeChildren[0]).toBe(uniworkSaveEn.usMyFolder)
       expect(rootTreeChildren).toContain('Alpha Folder')
 
-      const contentTitles = await contents
-        .locator('.uw-pick-row-title')
-        .evaluateAll((nodes) => nodes.map((n) => n.textContent ?? ''))
+      const contentTitles = await contentTitlesOf(contents)
       expect(contentTitles[0]).toBe(uniworkSaveEn.usMyFolder)
       expect(contentTitles).toContain('Alpha Folder')
-
       // Contents row menu for My Folder offers New subfolder only (no rename/move/archive/share)
       await contents
         .getByRole('button', {

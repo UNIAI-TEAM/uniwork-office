@@ -1,0 +1,861 @@
+/* DESKTOP-HOME DH-1 Documents Home (board Desktop.dc.html): semantic tokens only, both themes */
+
+.dh-sidebar-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+.dh-subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dh-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dh-nav-item:hover {
+  background: var(--hover);
+}
+
+.dh-nav-item.active {
+  background: var(--tint-blue);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.dh-nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dh-nav-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+}
+
+.dh-nav-item.active .dh-nav-icon {
+  color: var(--accent-text);
+}
+
+.dh-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-sidebar-folders {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.dh-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 4px;
+}
+
+.dh-sidebar-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dh-sidebar-add {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.dh-sidebar-add:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.dh-sidebar-add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dh-sidebar-tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Main workspace pane */
+.dh-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px 28px 36px;
+  overflow-y: auto;
+}
+
+/* every child keeps its content height: inside the scrolling column a
+   shrinkable block (wrapped toolbar, breadcrumb) would overflow onto the
+   next row instead of scrolling (VDH-3 blank gap, VDH-4 overlapped rows) */
+.dh-main > * {
+  flex: none;
+}
+
+.dh-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.dh-title-group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dh-title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-ws-select {
+  flex: 0 1 auto;
+  min-width: 120px;
+  height: 34px;
+  max-width: 220px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dh-ws-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dh-toolbar-spacer {
+  flex: 1;
+}
+
+.dh-search-box {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+  width: 320px;
+  min-width: 180px;
+  max-width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.dh-search-box:focus-within {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+}
+
+.dh-search-icon {
+  flex: none;
+  color: var(--text-tertiary);
+}
+
+.dh-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.dh-search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.dh-search-clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.dh-search-clear:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.dh-toolbar-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Quick create row */
+.dh-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dh-quick-label {
+  margin-inline-end: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dh-quick-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dh-quick-pill:hover {
+  border-color: var(--border-control);
+  background: var(--hover);
+}
+
+.dh-quick-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dh-quick-hint {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.dh-quick-hint-icon {
+  flex: none;
+  color: var(--text-tertiary);
+}
+
+.dh-quick-hint-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.dh-quick-hint-link:hover {
+  color: var(--accent);
+}
+
+.dh-subview-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+/* Filters + Sort + View mode */
+.dh-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dh-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.dh-filter-chip:focus-within {
+  border-color: var(--accent);
+}
+
+.dh-filter-k {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.dh-filter-select {
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.dh-filter-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dh-filter-clear {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dh-filter-clear:hover {
+  background: var(--hover);
+}
+
+.dh-view-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+.dh-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dh-sort-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.dh-view-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.dh-view-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.dh-view-btn:hover {
+  color: var(--text);
+}
+
+.dh-view-btn[aria-pressed='true'] {
+  background: var(--tint-blue);
+  color: var(--tint-blue-fg);
+}
+
+/* Sections */
+.dh-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dh-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dh-section-title {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dh-section-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* Folder cards */
+.dh-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dh-folder-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.dh-folder-card:hover {
+  border-color: var(--border-control);
+  background: var(--hover);
+}
+
+.dh-folder-open {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 48px 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dh-folder-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.dh-folder-actions {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+  height: 100%;
+  padding-right: 12px;
+}
+
+.dh-folder-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--tint-yellow);
+  color: var(--tint-yellow-fg);
+}
+
+.dh-folder-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Documents table (5 columns: Tên | Truy cập | Người sửa gần nhất | Cập nhật | Thao tác) */
+.dh-doc-table {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.dh-doc-head,
+.dh-doc-row {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 2.2fr)
+    minmax(130px, 1fr)
+    minmax(150px, 1.1fr)
+    minmax(110px, 0.9fr)
+    72px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+}
+
+.dh-doc-head {
+  height: 36px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.dh-doc-row {
+  min-height: 52px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dh-doc-row:last-child {
+  border-bottom: 0;
+}
+
+.dh-doc-row:hover {
+  background: var(--hover);
+}
+
+.dh-doc-row.opening {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+/* Grid view mode for documents */
+.dh-doc-table.grid-mode {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+.dh-doc-table.grid-mode .dh-doc-head {
+  display: none;
+}
+
+.dh-doc-table.grid-mode .dh-doc-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.dh-cell-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dh-doc-open {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dh-doc-open:hover {
+  color: var(--accent);
+}
+
+.dh-doc-subpath {
+  display: block;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-cell-access {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dh-vis-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.dh-vis-private {
+  color: var(--text-secondary);
+}
+
+.dh-level-sub {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.dh-cell-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.dh-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--tint-blue);
+  color: var(--tint-blue-fg);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dh-person-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-cell-time {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.dh-cell-empty {
+  color: var(--text-secondary);
+}
+
+.dh-cell-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* the folder menu component and its button are absolutely positioned for
+   Open-dialog / browser list rows (home.css:6482, uniwork-folders.css:198);
+   inside DocumentsHome cards and table cells they must flow in place (VDH-1, VDH-11) */
+.dh-folder-actions .uw-row-menu.uwf-menu,
+.dh-doc-table .dh-cell-actions .uw-row-menu.uwf-menu {
+  position: static;
+  width: auto;
+}
+
+.dh-folder-actions .uw-row-menu-btn,
+.dh-doc-table .dh-cell-actions .uw-row-menu-btn {
+  position: static;
+  top: auto;
+  right: auto;
+  transform: none;
+}
+
+.dh-row-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.dh-row-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.dh-empty {
+  padding: 28px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.dh-load-more-row {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+@media (max-width: 960px) {
+  .dh-folder-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (pointer: coarse) {
+  .dh-nav-item,
+  .dh-sidebar-add,
+  .dh-row-btn,
+  .dh-view-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* VDH-6: the error state Retry is a .btn (its own box-shadow ring); give it the
+   same 2px accent outline the other home controls use */
+.dh-main .uw-pick-state .btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* VDH-12: at wide desktop viewports (>= 1101 px, e.g. 1280 px) keep the toolbar
+   (title, workspace select, search, Tải lên, Tạo mới) on a single row like the board;
+   below 1100 px (e.g. 900 px) the base flex-wrap: wrap lets the search and buttons
+   wrap cleanly to the second line */
+@media (min-width: 1101px) {
+  .dh-toolbar {
+    flex-wrap: nowrap;
+  }
+}
+
+/* VDH-4: below ~1100 px the five columns cannot fit — collapse the two
+   lowest-priority columns (Truy cập + Người sửa) so Tên / Cập nhật / Thao tác
+   always stay visible; grid cards keep every cell */
+@media (max-width: 1100px) {
+  .dh-doc-table:not(.grid-mode) .dh-col-access,
+  .dh-doc-table:not(.grid-mode) .dh-col-person,
+  .dh-doc-table:not(.grid-mode) .dh-cell-access,
+  .dh-doc-table:not(.grid-mode) .dh-cell-person {
+    display: none;
+  }
+
+  .dh-doc-table:not(.grid-mode) .dh-doc-head,
+  .dh-doc-table:not(.grid-mode) .dh-doc-row {
+    grid-template-columns:
+      minmax(200px, 2.2fr)
+      minmax(110px, 0.9fr)
+      72px;
+  }
+}

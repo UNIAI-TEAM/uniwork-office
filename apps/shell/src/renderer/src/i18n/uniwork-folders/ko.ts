@@ -27,6 +27,7 @@ export const ko = {
   ufCycle: '폴더를 자기 자신이나 하위 폴더로 이동할 수 없습니다.',
   ufParentKind: '폴더는 루트나 다른 폴더 안에만 둘 수 있습니다.',
   ufFolderGone: '이 폴더는 더 이상 여기에 없습니다.',
+  ufFolderNoAccess: '더 이상 이 폴더에 접근할 권한이 없습니다.',
   ufNoPermission: '이 폴더를 변경할 권한이 없습니다.',
   ufEmptyFolder: '이 폴더는 비어 있습니다',
   ufLocation: '위치',

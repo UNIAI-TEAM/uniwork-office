@@ -1,4 +1,4 @@
-﻿import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deflateRawSync } from 'node:zlib'
@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { UniworkDocStatus } from '../src/shared/home-api'
 import type { Binding, BoundDocument } from '../src/main/uniwork-docs/binding-store'
 import { SaveCoordinator, toStatus } from '../src/main/uniwork-docs/save-coordinator'
+import { queueBindingPatch } from '../src/main/uniwork-docs/service'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { sha256Hex } from '../src/main/uniwork-docs/formats'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits } from '../src/main/uniwork-docs/limits'
@@ -2180,8 +2181,10 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
     expect(doc.record.state).toBe('committed')
     expect(h.sessions.calls.gets).toEqual(['ups_old'])
     expect(h.sessions.calls.creates.map((c) => c.idempotencyKey)).toEqual([
-      'key_doc_expired:s0',
+      // the 410 at the resume GET restarts under s1 (core), the 409 on that
+      // create moves the queue on to s2
       'key_doc_expired:s1',
+      'key_doc_expired:s2',
     ])
     expect(h.sessions.calls.partPuts.map((p) => p.partNumber).sort((a, b) => a - b)).toEqual([
       1, 2, 3, 4, 5, 6,
@@ -2282,5 +2285,174 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
     expect(drift.sessions.calls.creates).toHaveLength(1)
     expect(drift.server.state.counts.upload).toBe(1)
     expect(drift.server.state.counts.commit).toBe(1)
+  })
+})
+
+describe('EL-1(a): 423 document_locked -> edit_locked state, recovery preserved, manual-only retry', () => {
+  const lockPayload = {
+    holderName: 'Minh Trần',
+    since: '2026-04-17T03:00:00Z',
+    expiresAt: '2026-04-17T03:02:00Z',
+    heldByMe: false,
+    offlineHoldUntil: '2026-04-17T03:15:00Z',
+  }
+
+  it('commit 423 document_locked sets state edit_locked with editLock metadata, never conflict, and keeps recovery copy', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    h.server.state.commitError = new UniworkDocError('edit_locked', {
+      status: 423,
+      serverCode: 'document_locked',
+      holderId: 'usr_minh',
+      editLock: lockPayload,
+    })
+
+    const ended = await h.coordinator.save(doc.path, { userSave: true })
+    expect(ended?.binding.state).toBe('edit_locked')
+    expect(ended?.binding.state).not.toBe('conflict')
+    expect(ended?.binding.error).toBe('edit_locked')
+    expect(ended?.binding.editLock).toEqual(lockPayload)
+
+    const lastStatus = h.statuses.at(-1)
+    expect(lastStatus).toMatchObject({
+      state: 'edit_locked',
+      error: 'edit_locked',
+      editLock: lockPayload,
+    })
+
+    // Local edit + recovery snapshot are preserved in the intent store, parked in failed/edit_locked without retryAt
+    const parked = await stored(h.intents, doc)
+    expect(parked).not.toBeNull()
+    expect(parked?.intent.state).toBe('failed')
+    expect(parked?.intent.lastError).toBe('edit_locked')
+    expect(parked?.intent.retryAt).toBeUndefined()
+    expect(Buffer.from(parked?.payload ?? [])).toEqual(Buffer.from(doc.payload))
+  })
+
+  it('never auto-retries on a timer/poll, and makes exactly one commit attempt when the user explicitly saves again', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    h.server.state.commitError = new UniworkDocError('edit_locked', {
+      status: 423,
+      serverCode: 'document_locked',
+      holderId: 'usr_minh',
+      editLock: lockPayload,
+    })
+
+    await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.counts.commit).toBe(1)
+    const parked = await stored(h.intents, doc)
+    expect(parked?.intent.generation).toBe(1)
+
+    // Background poll / timer passes never auto-retry a parked edit_locked record
+    h.clock.advance(120_000)
+    await h.dispatcher.dispatchAll([{ ...doc, record: parked!.intent }])
+    expect(h.server.state.counts.commit).toBe(1)
+    expect(h.server.state.counts.lookup).toBe(0)
+
+    // Explicit user Save while still locked makes exactly ONE new commit attempt (never opens queue popover instead)
+    await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.counts.commit).toBe(2)
+    expect(h.statuses.at(-1)?.state).toBe('edit_locked')
+    const parked2 = await stored(h.intents, doc)
+    expect(parked2?.intent.generation).toBe(2)
+    expect(parked2?.intent.state).toBe('failed')
+    expect(parked2?.intent.lastError).toBe('edit_locked')
+
+    // Once the other user releases the lock, an explicit user Save commits and clears editLock
+    h.server.state.commitError = null
+    const saved = await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.counts.commit).toBe(3)
+    expect(saved?.binding.state).toBe('saved')
+    expect(saved?.binding.editLock).toBeUndefined()
+    expect(h.statuses.at(-1)?.state).toBe('saved')
+    expect(h.statuses.at(-1)?.editLock).toBeUndefined()
+    expect(await stored(h.intents, doc)).toBeNull()
+  })
+
+  it('EL1A-BE-1: the 423’s current_revision never lands on binding.serverRevision', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    h.server.state.commitError = new UniworkDocError('edit_locked', {
+      status: 423,
+      serverCode: 'document_locked',
+      holderId: 'usr_minh',
+      editLock: lockPayload,
+      currentRevision: '77',
+    })
+
+    const ended = await h.coordinator.save(doc.path, { userSave: true })
+    expect(ended?.binding.state).toBe('edit_locked')
+    // the holder's head is not this copy's base: a feed notice that later fills
+    // serverVersion must not rebuild an S6 newer-dirty bar while edit_locked
+    expect(ended?.binding.serverRevision).toBeUndefined()
+    expect(ended?.binding.serverVersion).toBeUndefined()
+    expect(h.statuses.at(-1)).not.toHaveProperty('serverRevision')
+    expect(h.statuses.at(-1)?.editLock).toEqual(lockPayload)
+  })
+})
+
+describe('EL1A-BE-2 / EL1A-BE-5: queueBindingPatch (the record -> binding projection)', () => {
+  const failedRecord = (over: Partial<IntentRecordV2> = {}): IntentRecordV2 => ({
+    v: 2,
+    intentId: 'intent_1',
+    idempotencyKey: 'key_1',
+    documentId: 'd_1',
+    orgId: 'org_1',
+    workspaceId: 'ws_1',
+    baseRevision: '41',
+    baseVersion: 3,
+    checksum: 'a'.repeat(64),
+    length: 2048,
+    generation: 1,
+    state: 'failed',
+    attempt: 1,
+    createdAt: '2026-10-13T00:00:00.000Z',
+    updatedAt: '2026-10-13T00:00:00.000Z',
+    ...over,
+  })
+  const bindingWith = (editLock?: Binding['editLock']): Binding =>
+    ({ state: 'edit_locked', ...(editLock ? { editLock } : {}) }) as unknown as Binding
+
+  it('a parked edit_locked record keeps the holder the binding already carries', () => {
+    const editLock = {
+      holderName: 'Minh Trần',
+      since: '2026-04-17T03:00:00Z',
+      expiresAt: '2026-04-17T03:02:00Z',
+      heldByMe: false,
+    }
+    const patch = queueBindingPatch(
+      failedRecord({ lastError: 'edit_locked' }),
+      bindingWith(editLock),
+    )
+    expect(patch).toMatchObject({ state: 'edit_locked', error: 'edit_locked' })
+    expect(patch?.editLock).toEqual(editLock)
+  })
+
+  it('a parked edit_locked record with no holder on the binding adds none (never a bogus one)', () => {
+    const patch = queueBindingPatch(failedRecord({ lastError: 'edit_locked' }), bindingWith())
+    expect(patch).toMatchObject({ state: 'edit_locked', error: 'edit_locked' })
+    expect(patch).not.toHaveProperty('editLock')
+  })
+
+  it('a failed too_large record still writes maxBytes/sizeBytes (the else branch is untouched)', () => {
+    const patch = queueBindingPatch(failedRecord({ lastError: 'too_large', maxBytes: 5_000 }))
+    expect(patch).toMatchObject({
+      state: 'failed',
+      error: 'too_large',
+      maxBytes: 5_000,
+      sizeBytes: 2048,
+    })
+  })
+
+  it('a queued record drops a stale refusal code and holder; a committed record moves nothing', () => {
+    const patch = queueBindingPatch(failedRecord({ state: 'queued' }))
+    expect(patch).toMatchObject({ state: 'queued' })
+    expect(patch?.error).toBeUndefined()
+    // EL1A-R2-5: the patch must CARRY the key as `undefined` (service.ts:832), not
+    // merely lack it - `toBeUndefined()` passed either way, so a dropped line stayed green
+    expect(patch).toHaveProperty('editLock', undefined)
+    expect(queueBindingPatch(failedRecord({ state: 'committed' }))).toBeNull()
+    expect(queueBindingPatch(failedRecord({ state: 'cancelled' }))).toBeNull()
   })
 })

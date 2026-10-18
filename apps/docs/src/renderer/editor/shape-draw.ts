@@ -254,6 +254,7 @@ export function startShapeDrawMode(
   }
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
+      if (e.type === 'keydown') e.preventDefault()
       cleanup()
       return
     }

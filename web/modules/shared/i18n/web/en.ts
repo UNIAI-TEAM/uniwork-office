@@ -133,5 +133,15 @@ export const en = {
     'This document is over {max}. Your changes are still here. Download your copy to your computer, then reduce image sizes or split the document.',
   webSaveBlockDownload: 'Download my copy',
   uwConflictTooLargeWithLimit:
-    'Your version is over {max} (currently {size}). Choose “Download my copy” or close this dialog to reduce the file size.',
+    'Your version is over {max} (currently {size}). Close this dialog to reduce the file size.',
+  uwConflictTooLargeWithLimitDownload:
+    'Your version is over {max} (currently {size}). Close this dialog to reduce the file size, or choose “Reload latest” to download your version.',
+  uwConflictSaveCopyTooLarge:
+    'Your version is over UniWork’s size limit, so the copy couldn’t be created. Close this dialog to reduce the file size.',
+  uwConflictSaveCopyTooLargeDownload:
+    'Your version is over UniWork’s size limit, so the copy couldn’t be created. Close this dialog to reduce the file size, or choose “Reload latest” to download your version.',
+  uwConflictSaveCopyTooLargeWithLimit:
+    'Your version is over {max} (currently {size}), so the copy couldn’t be created. Close this dialog to reduce the file size.',
+  uwConflictSaveCopyTooLargeWithLimitDownload:
+    'Your version is over {max} (currently {size}), so the copy couldn’t be created. Close this dialog to reduce the file size, or choose “Reload latest” to download your version.',
 } satisfies Record<keyof typeof zh, string>

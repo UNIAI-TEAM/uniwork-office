@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Ref } from 'react'
 import { useDismissablePopover } from '@genoffice/ui'
 import { useI18n } from '../i18n/locale'
@@ -81,6 +81,17 @@ function TextTools(p: Props) {
   useDismissablePopover(colorOpen, () => setColorOpen(false), {
     inside: () => [colorRef.current, popRef.current],
   })
+  useEffect(() => {
+    if (!colorOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setColorOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [colorOpen])
   const bold = Number(p.computed.fontWeight) >= 600
   const italic = p.computed.fontStyle === 'italic'
   const size = fontSizeNumber(p.computed)

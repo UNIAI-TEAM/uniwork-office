@@ -127,9 +127,41 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   return { app, page, userDataDir }
 }
 
-/** Switches Home from the My AI chat to the Recent files view (hero + quick cards). */
+/**
+ * Switches Home from the My AI chat to the active area's files view:
+ * `.home-hero` on the device area, or `.dh-home .dh-title` on the signed-in UniWork area.
+ */
 export async function openHomeFiles(page: Page): Promise<void> {
-  await page.locator('.nav-item[data-nav="recent"]').click({ timeout: 30_000 })
+  const settledAccount = page.locator(
+    '.account-btn:not([data-state="loading"]):not([data-state="signing-in"])',
+  )
+  const uniworkRoot = page.locator(
+    '.dh-subnav, .home:has(.account-btn:not([data-state="loading"]):not([data-state="signing-in"]) .account-avatar.logged-in)',
+  )
+  const deviceRoot = page.locator(
+    '.home:has(.account-btn:not([data-state="loading"]):not([data-state="signing-in"]):not(:has(.account-avatar.logged-in))) .home-area-panel .nav-item[data-nav="recent"], .home:has(.account-btn:not([data-state="loading"]):not([data-state="signing-in"]):not(:has(.account-avatar.logged-in))) .home-hero',
+  )
+  await settledAccount.waitFor({ timeout: 30_000 })
+  const branch = await Promise.race([
+    uniworkRoot
+      .first()
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => 'uniwork' as const),
+    deviceRoot
+      .first()
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => 'device' as const),
+  ])
+  if (branch === 'uniwork') {
+    const uwTab = page.locator('#home-area-tab-uniwork')
+    if ((await uwTab.getAttribute('aria-selected')) === 'false') {
+      await uwTab.click()
+    }
+    await page.locator('.dh-subnav .nav-item[data-nav="recent"]').click({ timeout: 30_000 })
+    await page.locator('.dh-home .dh-title').waitFor({ timeout: 15_000 })
+    return
+  }
+  await page.locator('.home-area-panel .nav-item[data-nav="recent"]').click({ timeout: 30_000 })
   await page.locator('.home-hero').waitFor({ timeout: 15_000 })
 }
 

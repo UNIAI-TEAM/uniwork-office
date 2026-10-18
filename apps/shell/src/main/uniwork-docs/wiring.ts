@@ -863,6 +863,12 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listSharedWithMe, (_event, query: unknown) =>
     service.listSharedWithMe((query ?? {}) as UniworkSharedQuery),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listSharedByMe, (_event, query: unknown) =>
+    service.listSharedByMe((query ?? {}) as UniworkDocListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listTrash, (_event, query: unknown) =>
+    service.listTrash((query ?? {}) as UniworkDocListQuery),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.documentProperties, (_event, documentId: unknown) =>
     service.documentProperties(documentId as string),
   )
