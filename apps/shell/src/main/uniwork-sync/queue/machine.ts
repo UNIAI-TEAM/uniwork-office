@@ -401,10 +401,6 @@ function onCommitFailed(
     // "unknown" is never queued: the outcome cannot be proven either way
     return { record: enterStuck(record, ctx), effects: [] }
   }
-  if (error === 'other_window') {
-    // another window owns the document lock: read-only, the intent stays
-    return { record: withState(record, ctx, 'paused_offline', { retryAt: undefined }), effects: [] }
-  }
   if (error === 'ticket_expired') {
     // the upload claim expired: look the intent up before touching bytes again
     return { record: enterReconciling(record, ctx), effects: [] }
