@@ -425,13 +425,14 @@ export function AiPanel({
     })
   /** ask_clarification card: the run waits on it; answered receipts stay under their user message */
   const clarify = useClarify()
+  const { dismiss } = clarify
   // another document or the panel going away answers a pending card with "no"
   useEffect(
     () => () => {
       confirmRef.current?.settle(false)
-      clarify.dismiss()
+      dismiss()
     },
-    [filePath],
+    [filePath, dismiss],
   )
   // answered receipts belong to the document they were given for: drop them when another
   // one opens (an untitled document getting its first path is the same document)
