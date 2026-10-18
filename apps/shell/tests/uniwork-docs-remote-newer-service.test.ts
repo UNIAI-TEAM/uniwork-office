@@ -420,11 +420,15 @@ describe('G5-03a S6 service: the guarded clean reload', () => {
     const h = setup()
     h.client.detail = detailOf('9', 3, HEAD_BYTES)
     notice(h)
-    await drain()
+    // the fetch happens (the head's checksum is only known after the download):
+    // wait for it to finish rather than for a fixed beat, then let its drop settle
+    await vi.waitFor(() => {
+      expect(h.client.calls.download).toBe(1)
+    })
+    await h.service.docStatus(docPath())
     expect(h.reloaded).toEqual([])
     expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
-    // the fetch happened (the head's checksum is only known after the download),
-    // but the base it returned is not newer, so nothing was written
+    // the base it returned is not newer, so nothing was written
     expect(h.client.calls.download).toBe(1)
     expect(await barOf(h)).toBeUndefined()
   })
