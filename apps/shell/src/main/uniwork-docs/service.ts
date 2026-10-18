@@ -2487,10 +2487,18 @@ export class UniworkDocsService {
       }
     }
     const keystoreLocked = this.storeLocked()
-    const access = !keystoreLocked
-      ? await this.intentAccess()
+    // A62 (UNI-1362): the plan enumerates `target`'s folders, so its intents must
+    // come from `target`'s own store, never the live session's. After an account
+    // switch the next account is already live, and reading through the live scope
+    // planned the leaving account's copies against the wrong account's intents (a
+    // copy with a stored intent could read as clean, and one without as pending).
+    // This is the same owner-scoped open `lockSession` already uses.
+    const open = !keystoreLocked
+      ? await this.openStoreOf(target)
       : ({ kind: 'keystore_locked' } as const)
-    const storeLockedNow = keystoreLocked || access.kind === 'keystore_locked'
+    const intents =
+      open.kind === 'ok' ? createIntentStore(open.records(INTENT_STORE_REGISTRATION.name)) : null
+    const storeLockedNow = keystoreLocked || open.kind === 'keystore_locked'
     const unsavedDocs = new Set<string>()
     const waitingDocs = new Set<string>()
     const ramOnlyDocs = new Set<string>()
@@ -2505,8 +2513,8 @@ export class UniworkDocsService {
         waitingDocs.add(key)
         unsavedDocs.add(key)
       }
-      if (access.kind === 'ok') {
-        const stored = await access.intents.read(key, {
+      if (intents) {
+        const stored = await intents.read(key, {
           orgId: binding.orgId,
           workspaceId: binding.workspaceId,
           baseVersion: binding.baseVersion,
