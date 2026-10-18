@@ -151,9 +151,9 @@ const PROTECTION_NOTES: Record<Exclude<AiDocProtection, 'none'>, string> = {
     '\n\nNote: this document is protected so that every change must be tracked. Your edits are recorded as tracked changes; you cannot accept or reject changes, and the tools that cannot record a tracked change (headers and footers, page setup, section breaks, styles, watermarks, notes, charts, pictures, text boxes) are not available, so tell the user instead of attempting them.',
 }
 
-function refuseProtected(tool: string, kind: AiDocProtection): ToolExecution {
+function refuseProtected(tool: string, kind: Exclude<AiDocProtection, 'none'>): ToolExecution {
   return {
-    output: `${tool} is unavailable: this document is protected (${kind === 'none' ? 'no restriction' : PROTECTION_WORDS[kind]}) and the protection does not allow it.`,
+    output: `${tool} is unavailable: this document is protected (${PROTECTION_WORDS[kind]}) and the protection does not allow it.`,
     isError: true,
     mutated: false,
     summary: tool.replace(/[_-]+/g, ' '),
@@ -271,28 +271,28 @@ export function createDocsSkill(
         getPageSetup?.()?.list(),
       )
     },
-    executeTool: (call, signal) =>
-      isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)
-        ? refuseViewOnly(call.name)
-        : protectionBlocks(protectionKind(), call.name)
-          ? refuseProtected(call.name, protectionKind())
-          : isBound?.() && BOUND_HIDDEN_TOOLS.has(call.name)
-            ? refuseBound(call.name)
-            : executeTool(
-                getEditor(),
-                call,
-                getNumIds(),
-                getTrack?.(),
-                signal,
-                frozen,
-                getComments?.(),
-                getHf?.(),
-                getWriter?.(),
-                getPageSetup?.(),
-                getExtras?.(),
-                getNotes?.(),
-                getAsk?.(),
-                imageUrls,
-              ),
+    executeTool: (call, signal) => {
+      const protection = protectionKind()
+      if (isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)) return refuseViewOnly(call.name)
+      if (protection !== 'none' && protectionBlocks(protection, call.name))
+        return refuseProtected(call.name, protection)
+      if (isBound?.() && BOUND_HIDDEN_TOOLS.has(call.name)) return refuseBound(call.name)
+      return executeTool(
+        getEditor(),
+        call,
+        getNumIds(),
+        getTrack?.(),
+        signal,
+        frozen,
+        getComments?.(),
+        getHf?.(),
+        getWriter?.(),
+        getPageSetup?.(),
+        getExtras?.(),
+        getNotes?.(),
+        getAsk?.(),
+        imageUrls,
+      )
+    },
   }
 }
