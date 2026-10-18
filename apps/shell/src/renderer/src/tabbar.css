@@ -877,43 +877,43 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   text-align: start;
 }
 
-.uw-lock-panel-icon {
+.uw-lock-icon {
   display: block;
   margin-bottom: 6px;
   color: var(--text-secondary);
 }
 
-.uw-lock-panel-title {
+.uw-lock-title {
   margin: 0 0 6px;
   font-size: var(--text-body-lg);
   font-weight: 600;
 }
 
-.uw-lock-panel-title:focus-visible {
+.uw-lock-title:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.uw-lock-panel-body {
+.uw-lock-body {
   margin: 0 0 12px;
   font-size: var(--text-small);
   line-height: 1.5;
   color: var(--text-secondary);
 }
 
-.uw-lock-panel-action {
+.uw-lock-action {
   min-width: 24px;
   min-height: 24px;
 }
 
-.uw-lock-panel-action[aria-disabled='true'] {
+.uw-lock-action[aria-disabled='true'] {
   /* busy, not disabled: it keeps focus, so no box-shadow reset (the focus ring stays) */
   opacity: 0.55;
   cursor: not-allowed;
 }
 
 @media (pointer: coarse) {
-  .uw-lock-panel-action {
+  .uw-lock-action {
     min-width: 44px;
     min-height: 44px;
   }
@@ -1040,7 +1040,7 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 /* ── EL-1(b) edit-lock strip: shares the remote bar's band, tokens and dot ── */
 
-.uw-lock-strip {
+.uw-editlock-strip {
   --uw-remote-bg: var(--surface-subtle);
   --uw-remote-border: var(--border);
   --uw-remote-text: var(--text-primary);
@@ -1060,40 +1060,40 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   -webkit-app-region: no-drag;
 }
 
-.uw-lock-strip[data-tone='warn'] {
+.uw-editlock-strip[data-tone='warn'] {
   --uw-remote-bg: var(--warning-bg);
   --uw-remote-border: var(--warning-border);
   --uw-remote-text: var(--warning-text);
   --uw-remote-accent: var(--warning-text);
 }
 
-.uw-lock-strip[data-tone='success'] {
+.uw-editlock-strip[data-tone='success'] {
   --uw-remote-bg: var(--success-bg);
   --uw-remote-border: var(--success-border);
   --uw-remote-text: var(--success);
   --uw-remote-accent: var(--success);
 }
 
-.uw-lock-text {
+.uw-editlock-strip .uw-editlock-text {
   flex: 1 1 240px;
   min-width: 0;
 }
 
-.uw-lock-strip .uw-lock-title,
-.uw-lock-strip .uw-lock-message {
+.uw-editlock-strip .uw-editlock-title,
+.uw-editlock-strip .uw-editlock-message {
   margin: 0;
   overflow-wrap: anywhere;
 }
 
-.uw-lock-strip .uw-lock-title {
+.uw-editlock-strip .uw-editlock-title {
   font-weight: 600;
 }
 
-.uw-lock-strip .uw-lock-message {
+.uw-editlock-strip .uw-editlock-message {
   margin-top: 2px;
 }
 
-.uw-lock-actions {
+.uw-editlock-strip .uw-editlock-actions {
   display: flex;
   flex: 0 0 auto;
   flex-wrap: wrap;
@@ -1101,7 +1101,7 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   margin-inline-start: auto;
 }
 
-.uw-lock-strip .uw-lock-action {
+.uw-editlock-strip .uw-editlock-action {
   /* inherits .uw-remote-action chrome; the spinner keeps the label readable while acquiring */
   display: inline-flex;
   align-items: center;

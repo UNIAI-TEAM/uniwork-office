@@ -377,9 +377,9 @@ async function mountChip(s: UniworkDocStatus, lang: 'en' | 'vi' = 'en'): Promise
   })
 }
 
-const strip = () => host.querySelector<HTMLElement>('.uw-lock-strip')
+const strip = () => host.querySelector<HTMLElement>('.uw-editlock-strip')
 const stripText = () =>
-  host.querySelector<HTMLElement>('.uw-lock-strip .uw-lock-text')?.textContent ?? ''
+  host.querySelector<HTMLElement>('.uw-editlock-strip .uw-editlock-text')?.textContent ?? ''
 const editHereButton = () => host.querySelector<HTMLButtonElement>('[data-lock-action="edit-here"]')
 const lockStatusNode = () => host.querySelector<HTMLElement>('[data-lock-status]')
 

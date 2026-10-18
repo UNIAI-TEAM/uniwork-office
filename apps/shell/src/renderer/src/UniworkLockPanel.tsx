@@ -210,7 +210,7 @@ export function UniworkLockPanel({
     <div className="uw-lock-layer">
       <section className="uw-lock-panel" role="region" aria-labelledby="uw-lock-title">
         <svg
-          className="uw-lock-panel-icon"
+          className="uw-lock-icon"
           width="20"
           height="20"
           viewBox="0 0 20 20"
@@ -222,13 +222,13 @@ export function UniworkLockPanel({
           <rect x="4" y="9" width="12" height="8" rx="2" />
           <path d="M7 9V6.5a3 3 0 0 1 6 0V9" />
         </svg>
-        <h3 id="uw-lock-title" className="uw-lock-panel-title" tabIndex={-1} ref={titleRef}>
+        <h3 id="uw-lock-title" className="uw-lock-title" tabIndex={-1} ref={titleRef}>
           {t(copy.titleKey)}
         </h3>
-        <p className="uw-lock-panel-body">{t(copy.bodyKey)}</p>
+        <p className="uw-lock-body">{t(copy.bodyKey)}</p>
         <button
           type="button"
-          className="btn btn-primary uw-lock-panel-action"
+          className="btn btn-primary uw-lock-action"
           aria-disabled={copy.action === 'retry' && retrying ? true : undefined}
           aria-busy={copy.action === 'retry' && retrying ? true : undefined}
           onClick={() => {

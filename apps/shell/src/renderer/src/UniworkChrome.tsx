@@ -1444,21 +1444,21 @@ export function UniworkRemoteBar({
             // EL-1(b): why the document is read-only right now and the way on; the visible
             // text is hidden from AT (the polite node below reads it), buttons stay out.
             <div
-              className="uw-lock-strip"
+              className="uw-editlock-strip"
               data-tone={shownLock.tone}
               data-phase={shownLock.phase}
               aria-busy={shownLock.busy ? 'true' : undefined}
             >
               <span className="uw-remote-dot" aria-hidden="true" />
-              <div className="uw-lock-text" aria-hidden="true">
-                {shownLock.titleKey && <p className="uw-lock-title">{t(shownLock.titleKey)}</p>}
-                <p className="uw-lock-message">{t(shownLock.messageKey, shownLock.params)}</p>
+              <div className="uw-editlock-text" aria-hidden="true">
+                {shownLock.titleKey && <p className="uw-editlock-title">{t(shownLock.titleKey)}</p>}
+                <p className="uw-editlock-message">{t(shownLock.messageKey, shownLock.params)}</p>
               </div>
               {shownLock.editHere && (
-                <div className="uw-lock-actions">
+                <div className="uw-editlock-actions">
                   <button
                     type="button"
-                    className="uw-remote-action uw-lock-action"
+                    className="uw-remote-action uw-editlock-action"
                     data-lock-action="edit-here"
                     aria-disabled={shownLock.busy || lockBusy ? 'true' : undefined}
                     aria-busy={shownLock.busy || lockBusy ? 'true' : undefined}
