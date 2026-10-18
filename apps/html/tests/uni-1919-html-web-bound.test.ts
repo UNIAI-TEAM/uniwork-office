@@ -14,7 +14,7 @@ import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { platform, resetForTest } from '../src/renderer/capabilities'
 import { createDocumentSkill } from '../src/renderer/ai/html-skill'
 import { buildParseMap } from '../src/renderer/document/parse-map'
-import type { HtmlDocAccess } from '../src/renderer/ai/tools'
+import { createHtmlSkill, type HtmlDocAccess } from '../src/renderer/ai/tools'
 
 const DOC = '<!doctype html>\n<html><body><h1>Quarterly</h1><p>Revenue</p></body></html>'
 
@@ -130,6 +130,32 @@ describe('a bound page steers the model away from the hidden writers', () => {
     const unboundCtx = createDocumentSkill(fakeAccess(false, '').access).buildContext()
     expect(unboundCtx).toContain('plan_page (mode new)')
     expect(unboundCtx).toContain('write_document')
+  })
+})
+
+describe('a read-only bound page gets only the view-only note (RPB-5)', () => {
+  // read-only web frames are bound too, but apply_ops is not offered there
+  it('prompt has the view-only note and no bound note when read-only and bound', () => {
+    installWebCaps()
+    const skill = createHtmlSkill(fakeAccess(true).access, 'base', () => true)
+    expect(skill.systemPrompt).toContain('this document is view-only')
+    expect(skill.systemPrompt).not.toContain('plan_page and write_document are unavailable')
+    expect(skill.systemPrompt).not.toContain('apply_ops')
+  })
+
+  it('the empty-document hint does not mention apply_ops when read-only and bound', () => {
+    installWebCaps()
+    const ctx = createHtmlSkill(fakeAccess(true, '').access, 'base', () => true).buildContext()
+    expect(ctx).toContain('The document is empty')
+    expect(ctx).not.toContain('apply_ops')
+  })
+
+  it('an editable bound page is unchanged', () => {
+    installWebCaps()
+    const skill = createHtmlSkill(fakeAccess(true, '').access, 'base', () => false)
+    expect(skill.systemPrompt).not.toContain('view-only')
+    expect(skill.systemPrompt).toContain('plan_page and write_document are unavailable')
+    expect(skill.buildContext()).toContain('fill it in place with apply_ops edits')
   })
 })
 
