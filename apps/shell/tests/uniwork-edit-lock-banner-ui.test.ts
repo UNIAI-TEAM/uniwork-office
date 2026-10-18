@@ -172,6 +172,28 @@ describe('lockBannerModelOf', () => {
     expect(generic.params).toEqual({})
   })
 
+  it.each([
+    ['session_revoked'],
+    ['member_deactivated'],
+    ['organization_suspended'],
+    ['document_deleted'],
+  ] as const)(
+    `'lost' with terminal reason '%s' reads the access-lost sentence and drops "Sửa ở đây" (Amendment A1)`,
+    (lostReason) => {
+      const model = lockBannerModelOf(
+        status(lock('lost', { lostReason, byName: 'Grace Hopper' })),
+        tFor('en'),
+        'en-US',
+        NOW,
+      )!
+      expect(model.tone).toBe('warn')
+      expect(model.titleKey).toBe('uwLockLostTitle')
+      expect(model.messageKey).toBe('uwLockLostAccessLost')
+      expect(model.params).toEqual({})
+      expect(model.editHere).toBe(false)
+    },
+  )
+
   it.each([['held'], ['unreachable']] as const)(
     `'unreachable' / '%s' / no session renders nothing (interim until EL-2)`,
     (phase) => {
@@ -195,6 +217,11 @@ describe('lostReasonKeyOf (web lostCopyKey mapping)', () => {
     ['released', 'uwLockLostGeneric'],
     ['document_archived', 'uwLockLostGeneric'],
     ['unknown', 'uwLockLostGeneric'],
+    // Amendment A1 (B9): the four terminal server end reasons read access-lost
+    ['session_revoked', 'uwLockLostAccessLost'],
+    ['member_deactivated', 'uwLockLostAccessLost'],
+    ['organization_suspended', 'uwLockLostAccessLost'],
+    ['document_deleted', 'uwLockLostAccessLost'],
     [undefined, 'uwLockLostGeneric'],
   ]
   it.each(rows)('%s -> %s', (reason, key) => {
@@ -277,6 +304,34 @@ describe('chipModelOf: edit-lock session', () => {
     expect(copyVi.tip).toBe('Người khác đã lấy quyền sửa. Thay đổi chưa lưu của bạn vẫn ở đây.')
     expect(copyVi.label).toBe('Bạn không còn quyền sửa')
   })
+
+  it.each([
+    ['session_revoked'],
+    ['member_deactivated'],
+    ['organization_suspended'],
+    ['document_deleted'],
+  ] as const)(
+    `'lost' with terminal reason '%s': the tip reads access-lost and the pill has no action (Amendment A1)`,
+    (lostReason) => {
+      const model = chip(status(lock('lost', { lostReason, byName: 'Grace Hopper' })))
+      expect(model.tone).toBe('warn')
+      expect(model.labelKey).toBe('uwLockLostTitle')
+      expect(model.tipKey).toBe('uwLockLostAccessLost')
+      expect(model.action).toBeUndefined()
+      const copyVi = chipCopy(model, tFor('vi'), 'vi-VN', NOW)
+      expect(copyVi.tip).toBe(
+        'Bạn không còn quyền sửa tài liệu này. Thay đổi chưa lưu của bạn vẫn ở đây.',
+      )
+    },
+  )
+
+  it.each([['access_lost'], ['taken_over']] as const)(
+    `'lost' with non-terminal reason '%s' still offers "Sửa ở đây" (unchanged, Amendment A1)`,
+    (lostReason) => {
+      const model = chip(status(lock('lost', { lostReason, byName: 'Ngọc Phạm' })))
+      expect(model.action).toEqual({ kind: 'edit-here', labelKey: 'uwLockEditHere' })
+    },
+  )
 
   it(`'other': visibly read-only, the tip names who edits`, () => {
     const model = chip(status(lock('other')))
@@ -404,6 +459,15 @@ describe('queue popover: the lock read-only explanation', () => {
       lostHolderNameOf?.(lock('lost', { lostReason: 'taken_over', byName: 'Grace Hopper' })),
     ).toBeNull()
     expect(lostHolderNameOf?.(lock('lost', { lostReason: 'unknown', byName: '  ' }))).toBeNull()
+    // Amendment A1: the four named terminal reasons never take the heldBy path
+    for (const lostReason of [
+      'session_revoked',
+      'member_deactivated',
+      'organization_suspended',
+      'document_deleted',
+    ] as const) {
+      expect(lostHolderNameOf?.(lock('lost', { lostReason, byName: 'Grace Hopper' }))).toBeNull()
+    }
     const generic = queuePopoverModelOf(
       status(lock('lost', { lostReason: 'unknown', byName: null })),
       undefined,
@@ -411,6 +475,38 @@ describe('queue popover: the lock read-only explanation', () => {
     )
     expect(generic.line2?.key).toBe('uwLockLostGeneric')
   })
+
+  it.each([
+    ['session_revoked'],
+    ['member_deactivated'],
+    ['organization_suspended'],
+    ['document_deleted'],
+  ] as const)(
+    `'lost' with terminal reason '%s': line 2 reads access-lost and no edit-here action is offered (Amendment A1)`,
+    (lostReason) => {
+      const model = queuePopoverModelOf(
+        status(lock('lost', { lostReason, byName: 'Grace Hopper' })),
+        undefined,
+        'ctrl-s',
+      )
+      expect(model.line1.key).toBe('uwLockReadOnlyExplain')
+      expect(model.line2?.key).toBe('uwLockLostAccessLost')
+      expect(model.line2?.name).toBeUndefined()
+      expect(model.actions.some((a) => a.id === 'edit-here')).toBe(false)
+    },
+  )
+
+  it.each([['access_lost'], ['taken_over']] as const)(
+    `'lost' with non-terminal reason '%s' still offers edit-here (unchanged, Amendment A1)`,
+    (lostReason) => {
+      const model = queuePopoverModelOf(
+        status(lock('lost', { lostReason, byName: 'Ngọc Phạm' })),
+        undefined,
+        'ctrl-s',
+      )
+      expect(model.actions).toContainEqual({ id: 'edit-here', labelKey: 'uwLockEditHere' })
+    },
+  )
 })
 
 // ── DOM: the banner strip ───────────────────────────────
@@ -564,6 +660,18 @@ describe('UniworkRemoteBar: edit-lock strip', () => {
       editHereButton()!.click()
     })
     expect(editHere).toHaveBeenCalledWith(PATH)
+  })
+
+  it(`'lost' with a terminal reason (vi): the access-lost sentence and no "Sửa ở đây" button (Amendment A1)`, async () => {
+    await mountBar(status(lock('lost', { lostReason: 'document_deleted', byName: null })), 'vi')
+    const el = strip()!
+    expect(el.dataset.tone).toBe('warn')
+    expect(stripText()).toContain('Bạn không còn quyền sửa')
+    expect(stripText()).toContain(
+      'Bạn không còn quyền sửa tài liệu này. Thay đổi chưa lưu của bạn vẫn ở đây.',
+    )
+    expect(editHereButton()).toBeNull()
+    expect(el.querySelectorAll('button')).toHaveLength(0)
   })
 
   it.each([['held'], ['unreachable']] as const)(
@@ -761,6 +869,23 @@ describe('UniworkStatusChip: edit-lock session', () => {
     expect(pop.textContent).toContain(
       'Grace Hopper is editing now. Your unsaved changes are still here.',
     )
+  })
+
+  it(`'lost' with a terminal reason: the pill has no action and Ctrl/Cmd+S popover offers no edit-here (Amendment A1)`, async () => {
+    await mountChip(status(lock('lost', { lostReason: 'session_revoked' })))
+    expect(host.querySelector('.uw-pill-action')).toBeNull()
+    await act(async () => {
+      ctrlSRequest!({ path: PATH })
+    })
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve()
+    })
+    const pop = host.querySelector<HTMLElement>('.uw-queue-pop')!
+    expect(pop.textContent).toContain('Nothing was saved')
+    expect(pop.textContent).toContain(
+      'You no longer have permission to edit this document. Your unsaved changes are still here.',
+    )
+    expect(pop.querySelector('[data-popover-action="edit-here"]')).toBeNull()
   })
 
   it(`a transition into 'lost' is announced in the role=alert (assertive) lane for both generic and heldBy variants (EL1B-FE-2)`, async () => {
