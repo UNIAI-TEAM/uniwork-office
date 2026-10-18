@@ -100,6 +100,8 @@ export interface OfflineLibraryApiDeps {
   revealLibraryFolder(): Promise<boolean>
   /** S11: a refused offline open is recorded in main and pushed to the shell */
   lockRefused(lock: UniworkDocLock): void
+  /** the S11 lock of an open the locked keychain refused (no session names the copy's folder) */
+  keystoreLock(documentId: string): UniworkDocLock
   /** the snapshot re-read (the sync center's own debounce coalesces it) */
   changed(): void
   /** test seam: the clock of the push throttle */
@@ -329,6 +331,9 @@ export function createOfflineLibraryApi(deps: OfflineLibraryApiDeps): OfflineLib
         .catch((): OfflineDocumentOpenOutcome => ({ ok: false, error: 'network' }))
       if (server.ok) return { ok: true }
       if (server.error !== 'network' && server.error !== 'timeout') {
+        // G703B-P3: the tab never opened; the S11 keychain panel says "unlock the
+        // machine and retry", the same as a refused copy does
+        if (server.error === 'keystore_locked') deps.lockRefused(deps.keystoreLock(documentId))
         return serverOpenFailureOf(server.error)
       }
       const outcome = await deps.openCopy(documentId)

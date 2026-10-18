@@ -1011,6 +1011,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     revealLibraryFolder: async () =>
       (await shell.openPath(join(app.getPath('userData'), 'uniwork-sync', 'library'))) === '',
     lockRefused: (lock) => service.recordOfflineLock(lock),
+    keystoreLock: (documentId) => service.offlineKeystoreLock(documentId),
     changed: () => offlinePush(),
   })
   /** stops the feed pass and remembers it, so the next status push restarts it */

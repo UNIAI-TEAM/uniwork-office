@@ -81,6 +81,7 @@ import {
   formatForMime,
   formatForName,
   hasReplacementChar,
+  sanitizeFilename,
   sha256Hex,
   workingCopyName,
 } from './formats'
@@ -137,6 +138,7 @@ import { compareRevision } from '../uniwork-sync/feed/revision'
 import type { FeedChange } from '../uniwork-sync/feed/client'
 import { decideRemote, type RemoteLocal, type RemoteNotice } from './remote-newer'
 import type { StoreRecords } from '../uniwork-sync/store'
+import { offlineCopyKey } from '../uniwork-sync/offline-library/copies'
 
 /**
  * UniWork documents in the shell main process: the picker reads, the open
@@ -4667,9 +4669,29 @@ export class UniworkDocsService {
   openDocument(documentId: string): Promise<UniworkResult<{ path: string }>> {
     return result(async () => {
       if (typeof documentId !== 'string') throw new UniworkDocError('not_found')
+      // G703B-P3 (FL-09): a cold restore with a locked keychain has no session
+      // to open with, and "sign in again" is the wrong answer for it: S11 says
+      // unlock the machine and retry (the data is not deleted)
+      if (!this.deps.identity() && this.storeLocked()) throw new UniworkDocError('keystore_locked')
       const { path } = await this.openFromServer(documentId)
       return { path }
     })
+  }
+
+  /**
+   * G703B-P3: the S11 lock of an offline open the locked keychain refused. The
+   * tab never opened, so the lock names where the offline copy of the document
+   * would sit: under the saved owner's scope when one is known, else under the
+   * store root (a session-less machine still has a panel to show).
+   */
+  offlineKeystoreLock(documentId: string): UniworkDocLock {
+    const scope = this.localScope()
+    const key = offlineCopyKey(documentId)
+    const dir = scope
+      ? this.store.dirFor(scope.deploymentId, scope.accountId, key)
+      : join(this.store.root, key)
+    const name = sanitizeFilename(documentId, 'docx')
+    return { path: join(dir, name), name, reason: 'keystore_locked' }
   }
 
   /** the status, after re-checking the working copy's bytes (A1.3) */

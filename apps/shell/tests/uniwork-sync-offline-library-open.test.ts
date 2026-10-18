@@ -208,6 +208,7 @@ function openHarness(): OpenHarness {
     openCopy: (documentId) => copies.open(documentId),
     revealLibraryFolder: async () => true,
     lockRefused: (lock) => service.recordOfflineLock(lock),
+    keystoreLock: (documentId) => service.offlineKeystoreLock(documentId),
     changed: () => undefined,
     now: () => clock.now,
   })
@@ -361,6 +362,32 @@ describe('G703B-P3 (FL-09) a pinned open with the keychain locked and no restore
       code: 'keystore_locked',
       lockReason: 'keystore_locked',
     })
+  })
+
+  it('raises the S11 keychain lock and opens nothing: no tab, no server read', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    o.account.signedIn = false
+    o.account.keystoreLocked = true
+    await o.api.open('doc_1')
+    expect(o.opened).toEqual([])
+    expect(o.server.calls).toEqual([])
+    expect(o.locks).toEqual([expect.objectContaining({ reason: 'keystore_locked' })])
+    // the panel names a path under the store: the tab that never opened has no folder yet
+    expect(o.locks[0]!.path.startsWith(o.service.store.root)).toBe(true)
+  })
+
+  it('a plain signed-out machine (keychain fine) still answers no_session / signed_out, no lock', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    o.account.signedIn = false
+    const result = await o.api.open('doc_1')
+    expect(result).toMatchObject({ ok: false, code: 'no_session', lockReason: 'signed_out' })
+    expect(o.locks).toEqual([])
   })
 })
 
