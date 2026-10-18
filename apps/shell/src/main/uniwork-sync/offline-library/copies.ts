@@ -244,16 +244,18 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
   /**
    * `retry`: after a removal that failed or was called off, the lease expiry is
    * already behind us: a zero delay would spin, so the retry waits the close
-   * grace (G703-R7-5)
+   * grace (G703-R7-5). An expiry that is already due is enforced by the sweep
+   * that got here, so it never arms a zero-delay timer either (G703-R8-3): the
+   * sweep's own outcome (removed, failed, cancelled, deferred) decides what follows.
    */
   const scheduleExpiry = (documentId: string, retry = false): void => {
     const copy = copies.get(documentId)
     clearTimer(copy)
     if (!copy || copy.locked) return
+    const untilExpiry =
+      copy.leaseUntilMs !== null && !retry ? copy.leaseUntilMs - now() : Number.NEGATIVE_INFINITY
     const delay =
-      copy.leaseUntilMs !== null && !retry
-        ? Math.min(MAX_TIMEOUT_MS, Math.max(0, copy.leaseUntilMs - now()))
-        : OFFLINE_COPY_CLOSE_GRACE_MS
+      untilExpiry > 0 ? Math.min(MAX_TIMEOUT_MS, untilExpiry) : OFFLINE_COPY_CLOSE_GRACE_MS
     const timer = setTimeout(() => {
       if (copies.get(documentId) === copy) copy.timer = null
       void serial(sweepOne).catch(() => undefined)

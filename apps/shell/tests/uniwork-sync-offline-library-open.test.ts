@@ -107,7 +107,7 @@ interface OpenHarness {
   clock: { now: number }
   /** the lease manager's commit stamp (G703-R7-1): odd while a renewal commit is in flight */
   leaseStamp: { value: number }
-  capability: { on: boolean }
+  capability: { on: boolean; delayMs: number }
   /** the auth module's state the service reads: a cold restore with a locked keychain has no identity */
   account: { signedIn: boolean; keystoreLocked: boolean }
   scope: { value: { deploymentId: string; accountId: string } }
@@ -136,7 +136,7 @@ function openHarness(options: { lease?: LeaseManager } = {}): OpenHarness {
   const isPathOpen = (path: string) => !pathOpen.closed.has(path) && pathOpen.value
   const clock = { now: 1_000 }
   const leaseStamp = { value: 0 }
-  const capability = { on: true }
+  const capability = { on: true, delayMs: 0 }
   const account = { signedIn: true, keystoreLocked: false }
   const scope = { value: { deploymentId: SCOPE.deploymentId, accountId: SCOPE.accountId } }
   const server: OpenHarness['server'] = { answer: null, calls: [] }
@@ -193,7 +193,12 @@ function openHarness(options: { lease?: LeaseManager } = {}): OpenHarness {
   })
   const copies = createOfflineCopies({
     library: () => h.manager,
-    capabilityOn: async () => capability.on,
+    capabilityOn: async () => {
+      if (capability.delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, capability.delayMs))
+      }
+      return capability.on
+    },
     store: service.store,
     // the account's own working-copy folders: what the startup sweep walks
     scopeDirs: (deploymentId, accountId) =>
@@ -726,6 +731,64 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     await o.copies.sweep()
     expect(o.locks).toEqual([])
     expect(existsSync(path)).toBe(true)
+  })
+
+  it('(G703-R8-3) a timer-triggered expiry of an already-due copy arms no zero-delay timer and removes once before the retry grace', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    o.clock.now = 1_760_000_000_000
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    o.h.leases.states.set('doc_1', {
+      ...leaseState('valid'),
+      record: { expires_at: new Date(o.clock.now + 40).toISOString() } as never,
+      remainingMs: 40,
+    })
+    const path = (await openCopyOf(o)).path
+    const dir = copyDir(o)
+    // the lease lapses before the copy's own expiry timer (40 ms) fires; the capability
+    // read is slow and the plaintext will not go (EBUSY)
+    o.clock.now += 50
+    o.h.leases.states.set('doc_1', {
+      ...leaseState('expired'),
+      record: { expires_at: new Date(o.clock.now - 10).toISOString() } as never,
+    })
+    o.capability.delayMs = 60
+    let removals = 0
+    fsFault.rmGate = (target) => {
+      if (target === dir) removals += 1
+    }
+    fsFault.rmFault = (target) => target === dir
+    const delays: number[] = []
+    const realSetTimeout = globalThis.setTimeout
+    const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      fn: () => void,
+      ms?: number,
+    ) => {
+      delays.push(ms ?? 0)
+      return realSetTimeout(fn, ms)
+    }) as typeof setTimeout)
+    try {
+      // the real expiry timer fires, its sweep waits on the capability read and fails to remove
+      await vi.waitFor(() => expect(removals).toBe(1))
+      await new Promise((resolve) => realSetTimeout(resolve, 200))
+      expect(removals).toBe(1)
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      // only the capability read (60 ms) and positive retries were armed - never a zero delay
+      const armed = delays.filter((ms) => ms !== 60)
+      expect(armed.length).toBeGreaterThan(0)
+      expect(armed.every((ms) => ms >= 30_000)).toBe(true)
+    } finally {
+      spy.mockRestore()
+    }
+    // the retry after the grace removes it once the folder lets go
+    fsFault.rmFault = null
+    o.clock.now += 31_000
+    await o.copies.sweep()
+    expect(removals).toBe(2)
+    expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+    expect(existsSync(dir)).toBe(false)
   })
 
   it('(G703-R7-2) a locked copy whose tab closes and reopens before the next sweep keeps one open-tab count, and the final close releases it', async () => {
