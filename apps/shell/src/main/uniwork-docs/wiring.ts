@@ -3,7 +3,6 @@ import {
   BrowserWindow,
   dialog,
   safeStorage,
-  session,
   shell,
   type IpcMain,
   type WebContents,
@@ -99,6 +98,13 @@ import {
 } from '../uniwork-sync/offline-library/api'
 import { offlineHeadIds } from '../uniwork-sync/offline-library/view'
 import { clipboard } from 'electron'
+import {
+  SPELLCHECK_DOWNLOAD_BLOCKED_URL,
+  SPELLCHECK_DOWNLOAD_DEFAULT_URL,
+  applySpellcheckDictionaryDownloadGate,
+  configureStartupHostResolver,
+  resetStartupHostResolverForTest,
+} from './spellcheck-gate'
 
 /**
  * Electron binding of the UniWork documents service: IPC handlers for every
@@ -1163,6 +1169,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     offline: offlineApi,
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
+      let needsReload = !signedIn
       if (signedIn) applySpellcheckDictionaryDownloadGate(true)
       /** the org the feed currently runs for; null = no pass may run */
       let feedOrg: string | null = null
@@ -1210,7 +1217,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
             .catch(() => undefined)
         }
         const now = status.state === 'signed-in'
-        if (now !== signedIn) applySpellcheckDictionaryDownloadGate(now, now && !signedIn)
+        if (!status.loggedIn) needsReload = true
+        if (now !== signedIn) {
+          applySpellcheckDictionaryDownloadGate(now, now && needsReload)
+          if (now) needsReload = false
+        }
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
         syncFeed(status, identity)
@@ -1220,35 +1231,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   }
 }
 
-export const SPELLCHECK_DOWNLOAD_BLOCKED_URL = 'file:///nonexistent/'
-export const SPELLCHECK_DOWNLOAD_DEFAULT_URL = 'https://redirector.gvt1.com/edgedl/chrome/dict/'
-
-let hostResolverConfigured = false
-
-/**
- * NET-OFF-01: Disable Chromium's built-in DNS-over-HTTPS (secure DNS) probe at
- * startup, immediately after `app.whenReady()` and before any window or session
- * can issue a network request.
- */
-export function configureStartupHostResolver(): void {
-  if (hostResolverConfigured) return
-  hostResolverConfigured = true
-  app.configureHostResolver({ secureDnsMode: 'off' })
-}
-
-export function resetStartupHostResolverForTest(): void {
-  hostResolverConfigured = false
-}
-
-export function applySpellcheckDictionaryDownloadGate(signedIn: boolean, reload = false): void {
-  const ses = session.defaultSession
-  const url = signedIn ? SPELLCHECK_DOWNLOAD_DEFAULT_URL : SPELLCHECK_DOWNLOAD_BLOCKED_URL
-  ses.setSpellCheckerDictionaryDownloadURL(url)
-  if (!reload) return
-  const langs = ses.getSpellCheckerLanguages()
-  if (langs.length === 0) return
-  const enabled = ses.isSpellCheckerEnabled()
-  ses.setSpellCheckerLanguages([])
-  ses.setSpellCheckerLanguages(langs)
-  if (!enabled) ses.setSpellCheckerEnabled(false)
+export {
+  SPELLCHECK_DOWNLOAD_BLOCKED_URL,
+  SPELLCHECK_DOWNLOAD_DEFAULT_URL,
+  applySpellcheckDictionaryDownloadGate,
+  configureStartupHostResolver,
+  resetStartupHostResolverForTest,
 }
