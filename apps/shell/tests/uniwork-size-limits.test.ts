@@ -1350,6 +1350,43 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(failedReasonKey({ ...row, maxBytes: undefined })).toBe('uwReasonTooLarge')
     })
 
+    it('EL1A-FE-5: an edit_locked failed save reads as "someone else is editing" in the popover and the row', () => {
+      // the queue parked the intent `failed` with lastError edit_locked (a 423 document_locked)
+      const status: UniworkDocStatus = {
+        path: 'C:\\data\\uw\\Report.docx',
+        documentId: DOC_ID,
+        workspaceId: 'ws_1',
+        title: 'Report.docx',
+        format: 'docx',
+        access: 'edit',
+        state: 'failed',
+        error: 'edit_locked',
+      }
+      const row = {
+        id: 'r-lock',
+        documentId: DOC_ID,
+        documentKey: DOC_ID,
+        title: 'Report.docx',
+        ext: 'docx',
+        state: 'failed' as const,
+        failedReason: 'edit_locked' as const,
+        savedAt: ISO,
+        canEdit: true,
+      }
+      // the popover's `{reason}` and the sync center row's, both from the row's failed reason
+      expect(failedReasonKeyOf(status, row)).toBe('uwReasonEditLocked')
+      expect(failedReasonKey(row)).toBe('uwReasonEditLocked')
+      expect(rowView(row, { online: true }).sub).toEqual({
+        key: 'uwRowFailed',
+        keyParams: { reason: 'uwReasonEditLocked' },
+      })
+      // without a row the status' own error code answers, never the generic fragment
+      expect(failedReasonKeyOf(status, undefined)).toBe('uwReasonEditLocked')
+      expect(viDocs.uwReasonEditLocked).toBeTruthy()
+      expect(viDocs.uwReasonEditLocked.toLowerCase()).not.toContain('khóa')
+      expect(viDocs.uwReasonEditLocked.toLowerCase()).not.toContain('khoá')
+    })
+
     it('keeps the intent record and payload as failed/too_large on an inline 413, never auto-replays it, and guards against overwriting a newer generation (d1-2)', async () => {
       const tmp = mkdtempSync(join(tmpdir(), 'uw-size-413-'))
       try {

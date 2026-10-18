@@ -76,6 +76,9 @@ describe('error mapping rows (shared contract)', () => {
     [410, 'document_gone', 'deleted'],
     // any other coded 403 stays the generic permission denial
     [403, 'some_other_denial', 'forbidden'],
+    // EL-1(a): 423 document_locked maps to edit_locked, never conflict or server_error
+    [423, 'document_locked', 'edit_locked'],
+    [423, 'some_other_lock', 'server_error'],
   ]
   it.each(rows)('HTTP %i %s -> %s', (status, code, expected) => {
     expect(errorFromResponse(status, { error: { code, message: 'x' } }).code).toBe(expected)
@@ -86,6 +89,8 @@ describe('error mapping rows (shared contract)', () => {
     ['intent_unknown', false],
     // 409 base conflict keeps the intent: replaying with the same key can settle it
     ['conflict', false],
+    // EL-1(a): 423 document_locked keeps the intent and recovery copy until user saves or closes
+    ['edit_locked', false],
     ['permission_revoked', true],
     ['member_deactivated', true],
     ['organization_suspended', true],
@@ -112,6 +117,91 @@ describe('error mapping rows (shared contract)', () => {
   it('a 409 the pipeline cannot replay is still terminal; other statuses are not', () => {
     expect(isTerminalRefusal(new UniworkDocError('server_error', { status: 409 }))).toBe(true)
     expect(isTerminalRefusal(new UniworkDocError('server_error', { status: 500 }))).toBe(false)
+  })
+})
+
+describe('EL-1(a): HTTP 423 document_locked envelope parsing', () => {
+  it('parses 423 document_locked with holder_id, holder_name, since, expires_at, held_by_me, offline_hold_until', () => {
+    const error = errorFromResponse(423, {
+      error: {
+        code: 'document_locked',
+        message: 'Document is currently being edited by another user',
+        fields: {
+          holder_id: 'usr_minh',
+          holder_name: 'Minh Trần',
+          since: '2026-04-17T03:00:00Z',
+          expires_at: '2026-04-17T03:02:00Z',
+          held_by_me: false,
+          offline_hold_until: '2026-04-17T03:15:00Z',
+        },
+      },
+    })
+    expect(error.code).toBe('edit_locked')
+    expect(error.code).not.toBe('conflict')
+    expect(error.status).toBe(423)
+    expect(error.serverCode).toBe('document_locked')
+    expect(error.holderId).toBe('usr_minh')
+    expect(error.editLock).toEqual({
+      holderName: 'Minh Trần',
+      since: '2026-04-17T03:00:00Z',
+      expiresAt: '2026-04-17T03:02:00Z',
+      heldByMe: false,
+      offlineHoldUntil: '2026-04-17T03:15:00Z',
+    })
+    expect(isTerminalRefusal(error)).toBe(false)
+  })
+
+  it('parses 423 document_locked leniency when fields are missing, empty, or non-strings (never throws malformed_response)', () => {
+    const bare = errorFromResponse(423, {
+      error: { code: 'document_locked', message: 'locked' },
+    })
+    expect(bare.code).toBe('edit_locked')
+    expect(bare.holderId).toBeNull()
+    expect(bare.editLock).toEqual({
+      holderName: null,
+      since: null,
+      expiresAt: null,
+      heldByMe: false,
+    })
+
+    const weird = errorFromResponse(423, {
+      error: {
+        code: 'document_locked',
+        message: 'locked',
+        fields: {
+          holder_id: 42,
+          holder_name: '   ',
+          since: 'x'.repeat(65),
+          expires_at: null,
+          held_by_me: true,
+          offline_hold_until: '',
+        },
+      },
+    })
+    expect(weird.code).toBe('edit_locked')
+    expect(weird.holderId).toBeNull()
+    expect(weird.editLock).toEqual({
+      holderName: null,
+      since: null,
+      expiresAt: null,
+      heldByMe: true,
+    })
+  })
+
+  it('423 with another code or bare 423 falls through to server_error; 409 conflict stays conflict', () => {
+    expect(errorFromResponse(423, { error: { code: 'other_lock', message: 'x' } }).code).toBe(
+      'server_error',
+    )
+    expect(errorFromResponse(423, null).code).toBe('server_error')
+    const conflict = errorFromResponse(409, {
+      error: {
+        code: 'document_version_conflict',
+        message: 'stale',
+        fields: { current_revision: '99' },
+      },
+    })
+    expect(conflict.code).toBe('conflict')
+    expect(conflict.currentRevision).toBe('99')
   })
 })
 

@@ -156,4 +156,11 @@ export const zhTW = {
   uwClose: '關閉',
   uwErrUploadTooLarge: '{name} 大小為 {size}，超過 {max} 上限。請壓縮圖片或拆分檔案後再重新上傳。',
   uwReasonTooLargeWithLimit: '超過 {max} 上限',
+  uwChipEditLocked: '{name} 正在編輯',
+  uwChipEditLockedSelf: '正在另一個視窗中編輯',
+  uwEditLockSomeone: '其他人',
+  uwTipEditLocked: '{name} 自 {time} 起正在編輯。',
+  uwTipEditLockedSelf: '你正在另一個視窗中編輯此文件。',
+  uwErrEditLocked: '其他人正在編輯此文件。',
+  uwReasonEditLocked: '其他人正在編輯',
 } satisfies Record<keyof typeof zh, string>

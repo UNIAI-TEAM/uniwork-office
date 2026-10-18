@@ -84,6 +84,8 @@ describe('uniwork documents string shards', () => {
         'drafts_full',
         'other_window',
         'document_archived',
+        // EL-1(a): HTTP 423 document_locked parks the intent in `failed`
+        'edit_locked',
         // FD-11 folder tree refusals
         'document_too_deep',
         'document_cycle',
@@ -119,6 +121,8 @@ describe('uniwork documents string shards', () => {
         'reconciling',
         'reconciling-stuck',
         'failed',
+        // EL-1(a): a 423 document_locked parks the chip in `edit_locked`
+        'edit_locked',
       ].sort(),
     )
     // the queue chips live in the sync shard

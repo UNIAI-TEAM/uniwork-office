@@ -161,4 +161,11 @@ export const ms = {
   uwErrUploadTooLarge:
     '{name} bersaiz {size}, melebihi had {max}. Kecilkan saiz imej atau bahagikan fail, kemudian muat naik semula.',
   uwReasonTooLargeWithLimit: 'melebihi had {max}',
+  uwChipEditLocked: '{name} menyunting',
+  uwChipEditLockedSelf: 'Menyunting dalam tetingkap lain',
+  uwEditLockSomeone: 'Orang lain',
+  uwTipEditLocked: '{name} menyunting sejak {time}.',
+  uwTipEditLockedSelf: 'Anda menyunting dokumen ini dalam tetingkap lain.',
+  uwErrEditLocked: 'Orang lain sedang menyunting dokumen ini.',
+  uwReasonEditLocked: 'orang lain sedang menyunting',
 } satisfies Record<keyof typeof zh, string>
