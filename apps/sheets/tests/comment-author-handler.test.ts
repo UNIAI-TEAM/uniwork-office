@@ -169,3 +169,46 @@ describe('user:display-name (registered handler, BE-7)', () => {
     expect(invoked.at(-1)).toEqual([IPC_CHANNELS.userDisplayName, 'session-7'])
   })
 })
+
+describe('EL-1(b) fix6: sheets:uniwork-state and sheets:uniwork-read-only-save', () => {
+  it('answers { bound, readOnly } for the sender workbook path and forwards read-only save only for a path the sender owns', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sheets-uniwork-state-'))
+    const bound = workbook(dir, 'Budget.xlsx')
+    const other = workbook(dir, 'Other.xlsx')
+    let readOnly = true
+    const readOnlySaves: string[] = []
+    const policy = {
+      isBound: (p: string) => p === bound,
+      isReadOnly: (p: string) => p === bound && readOnly,
+      readOnlySave: (p: string) => void readOnlySaves.push(p),
+    }
+    setUniworkDocumentPolicy(policy)
+
+    createSheetsView({ includeAiHandlers: false })
+    const event = { sender: { id: views.lastId, isDestroyed: () => false } }
+    const unknownEvent = { sender: { id: 99999, isDestroyed: () => false } }
+    const open = handlers.get(IPC_CHANNELS.reopenWorkbook)!
+    const stateHandler = handlers.get('sheets:uniwork-state')
+    const roSaveHandler = handlers.get('sheets:uniwork-read-only-save')
+    expect(typeof stateHandler).toBe('function')
+    expect(typeof roSaveHandler).toBe('function')
+    if (!stateHandler || !roSaveHandler) return
+
+    // Before opening a workbook -> unbound, editable
+    expect(stateHandler(event)).toEqual({ bound: false, readOnly: false })
+    expect(stateHandler(unknownEvent)).toEqual({ bound: false, readOnly: false })
+
+    await open(event, bound)
+    expect(stateHandler(event)).toEqual({ bound: true, readOnly: true })
+
+    readOnly = false
+    expect(stateHandler(event)).toEqual({ bound: true, readOnly: false })
+
+    // Read-only save with sender's path or pathless -> forwards; foreign path or unknown sender -> ignored
+    roSaveHandler(event, bound)
+    roSaveHandler(event)
+    roSaveHandler(event, other)
+    roSaveHandler(unknownEvent, bound)
+    expect(readOnlySaves).toEqual([bound, bound])
+  })
+})
