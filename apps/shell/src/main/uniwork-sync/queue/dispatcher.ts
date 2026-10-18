@@ -1,4 +1,4 @@
-﻿import { randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import type { CommitLookup } from '../../uniwork-docs/parse'
 import { UniworkDocError } from '../../uniwork-docs/errors'
 import type { DocLock } from '../doc-lock'
@@ -51,6 +51,8 @@ export interface QueueClient {
     uploadId: string
     baseRevision: string
     idempotencyKey: string
+    /** EL-1(b): the held lock of this path; omitted when none */
+    editLockId?: string
   }): Promise<{
     documentId: string
     versionId: string
@@ -158,6 +160,15 @@ export interface QueueDispatcherDeps {
   /** status push for every record change; the front maps a record to a chip */
   publish(record: IntentRecordV2): void
   uuid?(): string
+  /**
+   * EL-1(b): Q2 — await the path's lock session before the first queued commit
+   * when it is 'unreachable'. 'park' = 423, treat as edit_locked (no commit).
+   */
+  prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
+  /** EL-1(b): current lock id of a held path (outgoing commit body) */
+  editLockId?(path: string): string | null
+  /** EL-1(b): a 423 on commit while we held — session becomes 'lost' */
+  onCommitEditLocked?(path: string, error: UniworkDocError): void
 }
 
 /** what one pass did, for the caller (tests and the poll) */
@@ -759,6 +770,17 @@ export class QueueDispatcher {
       // and the session must still own the document right before the commit:
       // an account switch during the upload must not commit this copy
       if (!this.sessionAllows(doc)) return doc.record.state
+      // EL-1(b) Q2: an unreachable open acquires before the first queued commit
+      const prepared = (await this.deps.prepareEditLock?.(doc.path)) ?? 'proceed'
+      if (prepared === 'park') {
+        await this.failCommit(
+          doc,
+          new UniworkDocError('edit_locked', { status: 423, serverCode: 'document_locked' }),
+          now,
+        )
+        return doc.record.state
+      }
+      const editLockId = this.deps.editLockId?.(doc.path) ?? null
       // the bytes are staged: the second `uploaded` advances uploading -> committing
       await this.apply(doc, { type: 'uploaded' }, now)
       let receipt: {
@@ -774,8 +796,12 @@ export class QueueDispatcher {
           uploadId: upload.uploadId,
           baseRevision: doc.record.baseRevision,
           idempotencyKey: doc.record.idempotencyKey,
+          ...(editLockId ? { editLockId } : {}),
         })
       } catch (error) {
+        if (error instanceof UniworkDocError && error.code === 'edit_locked' && editLockId) {
+          this.deps.onCommitEditLocked?.(doc.path, error)
+        }
         await this.failCommit(doc, error, now)
         return doc.record.state
       }
