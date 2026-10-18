@@ -425,13 +425,23 @@ test.describe.serial('UniWork documents', () => {
       expect(stub.exchangeAttempts(ticket)).toBe(1)
       // the descriptor's own document: the open reads its detail and bytes, in
       // that order, and nothing of the decoy
-      const routes = callsFor(stub, doc.id).map((c) => c.route)
+      // EL-1(b): an editable open also starts an edit-lock session (POST /documents/<id>/edit-lock,
+      // plus any heartbeat / DELETE under /edit-lock); strip those routes before asserting the
+      // detail -> download open order and the G8-17 extra detail reads.
+      const docCalls = callsFor(stub, doc.id)
+      const lockPrefix = `/documents/${doc.id}/edit-lock`
+      const routes = docCalls
+        .map((c) => c.route)
+        .filter((route) => route !== lockPrefix && !route.startsWith(`${lockPrefix}/`))
       expect(routes.slice(0, 2)).toEqual([`/documents/${doc.id}`, `/documents/${doc.id}/download`])
       // G8-17 (S18 renamed-elsewhere): activating the launched tab re-reads the
       // document's metadata (main: index.ts refreshPath -> refreshMetadataFor ->
       // GET /documents/<id>), so extra detail reads may follow the open - and
       // only those.
       expect(routes.slice(2).filter((route) => route !== `/documents/${doc.id}`)).toEqual([])
+      expect(
+        docCalls.filter((c) => c.method === 'POST' && c.route === lockPrefix).length,
+      ).toBeGreaterThanOrEqual(1)
 
       // the same link handed over again is not redeemed again and opens nothing new
       await deliverUrl(launched, shellEnv(stub), url)
@@ -1721,8 +1731,11 @@ test.describe.serial('UniWork documents', () => {
         await expectState(shell, 'edit_locked')
 
         // the session flips to 'lost' (outranking edit_locked in the pill and strip); the
-        // holder's name is carried on both the parked binding's editLock and the lost session
-        await expect(label(shell)).toHaveText(uniworkDocsEn.uwLockLostTitle)
+        // holder's name is carried on both the parked binding's editLock and the lost session,
+        // and rendered visibly in the pill label (uwChipEditLocked) and strip message (uwLockLostHeldBy)
+        await expect(label(shell)).toHaveText(
+          uniworkDocsEn.uwChipEditLocked.replace('{name}', 'Grace Hopper'),
+        )
         await expect(chip(shell).locator('.uw-pill-action')).toHaveText(
           uniworkDocsEn.uwLockEditHere,
         )
@@ -1730,7 +1743,7 @@ test.describe.serial('UniWork documents', () => {
         await expect(strip).toHaveAttribute('data-phase', 'lost')
         await expect(strip.locator('.uw-editlock-title')).toHaveText(uniworkDocsEn.uwLockLostTitle)
         await expect(strip.locator('.uw-editlock-message')).toHaveText(
-          uniworkDocsEn.uwLockLostGeneric,
+          uniworkDocsEn.uwLockLostHeldBy.replace('{name}', 'Grace Hopper'),
         )
         const status = (await activeStatus(shell))!
         expect(status).toMatchObject({
