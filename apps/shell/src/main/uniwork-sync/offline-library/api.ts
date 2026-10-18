@@ -84,6 +84,12 @@ export interface OfflineLibraryApiDeps {
   signedOut(): boolean
   /** the last signed-in account (the signed-out count's scope) */
   lastOwner(): { deploymentId: string; accountId: string } | null
+  /**
+   * The deployment this build runs against (the profile the service reads). The
+   * last owner of another deployment is not this machine's library to count:
+   * its existence is not shown here (G703B-P4, FL-08).
+   */
+  activeDeploymentId(): string | null
   /** the library's own encrypted layer (the signed-out count reads it) */
   libraryLayer(): StoreLayer
   /** S3 `Mở`: the normal open flow of a document (the server path when it opens) */
@@ -227,7 +233,8 @@ export function createOfflineLibraryApi(deps: OfflineLibraryApiDeps): OfflineLib
     const used = quota && !('code' in quota) ? quota : empty
     if (!library || deps.signedOut()) {
       // signed out: the count of what the last account kept on this machine, never a name (OQ-UX11 a)
-      const owner = deps.lastOwner()
+      const last = deps.lastOwner()
+      const owner = last && last.deploymentId === deps.activeDeploymentId() ? last : null
       const index = owner
         ? await createOfflineLibraryStore({ layer: deps.libraryLayer(), scope: owner })
             .readIndex()

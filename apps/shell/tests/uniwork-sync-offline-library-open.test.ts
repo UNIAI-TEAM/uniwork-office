@@ -202,6 +202,7 @@ function openHarness(): OpenHarness {
     capabilityOn: async () => capability.on,
     signedOut: () => h.session.scope === null,
     lastOwner: () => service.store.readLastOwner(),
+    activeDeploymentId: () => SCOPE.deploymentId,
     libraryLayer: () => h.layer,
     openDocument: (documentId) => service.openDocument(documentId),
     openCopy: (documentId) => copies.open(documentId),
