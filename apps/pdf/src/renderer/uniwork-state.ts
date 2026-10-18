@@ -38,11 +38,20 @@ export function usePdfUniworkState(
       setUniwork(PLAIN_PDF_STATE)
       return
     }
-    void queryPdfUniworkState(api ?? {}, filePath).then((state) => {
-      if (live) setUniwork(state)
+    const query = () => {
+      void queryPdfUniworkState(api ?? {}, filePath).then((state) => {
+        if (live) setUniwork(state)
+      })
+    }
+    query()
+    // EL-1(b): the edit lock makes readOnly change while the PDF stays open;
+    // the shell pings the affected path, and only a ping for this file re-queries.
+    const unsubscribe = api?.onUniworkStateChanged?.((p) => {
+      if (p === filePath) query()
     })
     return () => {
       live = false
+      unsubscribe?.()
     }
   }, [api, filePath])
   return uniwork

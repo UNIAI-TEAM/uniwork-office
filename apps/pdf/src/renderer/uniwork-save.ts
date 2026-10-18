@@ -44,13 +44,15 @@ export interface PdfReadOnlySaveSeam {
  * flushes and local read-only files return false.
  */
 export function pdfExplainReadOnlySave(
-  _api: PdfReadOnlySaveSeam | null | undefined,
-  _input: {
+  api: PdfReadOnlySaveSeam | null | undefined,
+  input: {
     origin: SaveOrigin
     bound: boolean
     readOnly: boolean
     filePath: string | null | undefined
   },
 ): boolean {
-  return false
+  if (input.origin !== 'user' || !input.bound || !input.readOnly || !input.filePath) return false
+  void api?.uniworkReadOnlySave?.(input.filePath)?.catch(() => {})
+  return true
 }
