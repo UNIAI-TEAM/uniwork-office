@@ -6989,6 +6989,14 @@ export class UniworkDocsService {
       // the person cancelled the OS dialog: nothing changed
       return stay(open.downloadNotice ?? 'save_copy_no_seat')
     }
+    // A105 (UNI-1362): an account switch (or a lock) inside the awaits above ends
+    // the dialog. The same guard the reload path applies, right before the bytes
+    // leave: this account's version is never written out under another one.
+    if (!this.ownsLocally(chosen)) {
+      open.controller.abort()
+      open.finish()
+      return { kind: 'closed' }
+    }
     try {
       await writeFile(target, localBytes)
     } catch {
