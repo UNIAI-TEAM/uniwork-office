@@ -143,7 +143,7 @@ import {
 import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
 import { drainedOrigin, forcesBoundSave, type SaveOrigin } from './uniwork-save'
-import { queryPdfUniworkState } from './uniwork-state'
+import { pdfUniworkBoundForAi, queryPdfUniworkState } from './uniwork-state'
 import { collabStrings } from '@genoffice/ui/collab'
 import { PdfServerCommentsHost, type PdfServerComments } from './server-comments/PdfServerComments'
 import { commentFrameBox, rerunOnResize, scrollLeftToReveal } from './server-comments/reveal-view'
@@ -5880,7 +5880,7 @@ export default function App() {
     readOnly: () => readOnly,
     serverComments: () => serverComments,
     draftServerComment: (origIdx, at, text) => startServerComment(origIdx, at, text),
-    uniworkBound: () => uniwork.bound,
+    uniworkBound: () => pdfUniworkBoundForAi(uniwork),
     ocrText: (origIdx) => ocrPages.get(origIdx)?.entry.text ?? null,
     selection: () => aiSelection,
     pendingSummary: aiPendingSummary,
