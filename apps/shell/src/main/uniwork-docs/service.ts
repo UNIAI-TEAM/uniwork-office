@@ -1232,6 +1232,12 @@ export class UniworkDocsService {
         tombstone: async (doc) =>
           (await this.queueEngineOrNull())?.tombstone(doc) ?? doc.record.state,
         isOtherWindow: (key) => this.queueSession?.dispatcher.isOtherWindow(key) === true,
+        // A32: no engine means the durable lease cannot be read, so the overlay
+        // is kept rather than cleared on a guess (see revalidateOtherWindow)
+        holdsOtherWindow: async (key) => {
+          const dispatcher = await this.queueEngineOrNull()
+          return dispatcher ? await dispatcher.holdsOtherWindow(key) : true
+        },
       },
       // the queue engine exposes no public in-flight state, so the service
       // reports the keys its own poll pass is running right now (G506-be-1)
@@ -2339,6 +2345,21 @@ export class UniworkDocsService {
   isOtherWindow(path: string): boolean {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     return doc ? this.coordinator.isOtherWindow(doc.key) : false
+  }
+
+  /**
+   * A32 (UNI-1362): a status read revalidates the window-local `other_window`
+   * overlay against the durable lease, because `applyRecord` - the only other
+   * path that clears it - runs only on a queue record push. The holder can
+   * release the lock and no record of this document ever move again: without
+   * this, `present` keeps re-applying a read-only status the window no longer
+   * has. Cosmetic only (`canSave` reads the live dispatcher), so a lock whose
+   * state cannot be read keeps the overlay rather than clearing it on a guess.
+   */
+  private async revalidateOtherWindow(doc: BoundDocument): Promise<void> {
+    if (!this.otherWindowStatus.has(doc.path)) return
+    if (await this.coordinator.holdsOtherWindow(doc.key)) return
+    this.otherWindowStatus.delete(doc.path)
   }
 
   /**
@@ -5293,7 +5314,12 @@ export class UniworkDocsService {
   async docStatus(path: string): Promise<UniworkDocStatus | null> {
     if (typeof path !== 'string') return null
     const doc = this.store.lookup(path)
-    return doc && this.ownsLocally(doc) ? this.statusOf(await this.refreshDirty(doc)) : null
+    if (!doc || !this.ownsLocally(doc)) return null
+    // A32 (UNI-1362): the overlay is revalidated against the durable lease here,
+    // so a window whose holder released the lock stops showing read-only even
+    // when no queue record of this document ever moves again
+    await this.revalidateOtherWindow(doc)
+    return this.statusOf(await this.refreshDirty(doc))
   }
 
   activeDocStatus(): Promise<UniworkDocStatus | null> {
@@ -5305,6 +5331,9 @@ export class UniworkDocsService {
   async refreshPath(path: string | undefined): Promise<void> {
     const doc = path ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return
+    // A32 (UNI-1362): the same revalidation the status read runs, so a tab that
+    // gains focus after the holder released the lock stops reading read-only
+    await this.revalidateOtherWindow(doc)
     await this.refreshDirty(doc)
     // S18 renamed-elsewhere: a tab that gains focus re-reads the document's
     // metadata, so a title changed on the web shows here without the feed

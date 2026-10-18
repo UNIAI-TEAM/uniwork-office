@@ -1765,6 +1765,19 @@ describe('G5-06 W4b save queue wiring', () => {
     // still the holder's (never the loser's other_window)
     expect(readFileSync(join(path, '..', BINDING_FILE))).toEqual(before)
     expect(await first.service.docStatus(path)).not.toMatchObject({ error: 'other_window' })
+    // A32 (UNI-1362): the holder releases the lock and no queue record of this
+    // document ever moves again. A status read revalidates the window-local
+    // overlay against the durable lease, so the read-only chip clears instead of
+    // being re-applied forever
+    await opener.release(key, 1)
+    expect(await second.service.docStatus(path)).not.toMatchObject({ error: 'other_window' })
+    // and a lock still held keeps the overlay (the same read, the other verdict)
+    expect((await opener.acquire(key)).kind).toBe('held')
+    await second.service.pollSaveQueue()
+    expect(await second.service.docStatus(path)).toMatchObject({
+      state: 'blocked',
+      error: 'other_window',
+    })
     await opener.release(key, 1)
   })
 

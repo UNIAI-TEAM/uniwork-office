@@ -234,6 +234,21 @@ export class QueueDispatcher {
   }
 
   /**
+   * A32 (UNI-1362): whether another window holds this document's lease right
+   * now, read from the durable lock file rather than this window's in-memory
+   * set (which only a dispatch clears). A lock whose state cannot be read
+   * answers true, so a caller revalidating its read-only status keeps it instead
+   * of clearing it on a guess.
+   */
+  async holdsOtherWindow(key: string): Promise<boolean> {
+    try {
+      return await this.deps.lock.isHeld(key)
+    } catch {
+      return true
+    }
+  }
+
+  /**
    * Mint the v2 record of one Ctrl/Cmd+S: its state is the lane's verdict
    * (offline wins over a known-off capability, a user pause parks it, a
    * never-read capability allows the write).
