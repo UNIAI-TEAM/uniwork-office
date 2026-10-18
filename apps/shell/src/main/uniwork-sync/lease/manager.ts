@@ -252,15 +252,6 @@ export class LeaseManager {
   private readonly rollbackLatched = new Set<string>()
   private readonly wallSeen = new Map<string, number>()
   private readonly revokeListeners = new Set<(notice: LeaseRevokeNotice) => void>()
-  /**
-   * B25 (UNI-1362): a renewal answered `document_archived` told nobody, so the
-   * offline library's row kept its old label until some other signal arrived.
-   * These listeners carry that fresh renewal verdict to the owner that projects
-   * it (R1-3: only the fresh verdict, never the cached flag).
-   */
-  private readonly archivedListeners = new Set<
-    (documentId: string, boundaryToken: string | null) => void
-  >()
   private globalLockReason: LeaseLockReason | null = null
   /** `deployment/account#session` last seen; undefined = never looked */
   private lastBoundaryToken: string | null | undefined = undefined
@@ -279,33 +270,6 @@ export class LeaseManager {
   onRevoked(listener: (notice: LeaseRevokeNotice) => void): () => void {
     this.revokeListeners.add(listener)
     return () => this.revokeListeners.delete(listener)
-  }
-
-  /**
-   * B25 (UNI-1362): told whenever a renewal answers `document_archived` - the
-   * one fresh server archive signal. Lease expiry and the open rules are
-   * untouched: the listener only lets the library label the row it already has.
-   * R1-3: a record that merely carries the cached flag does not emit, or a
-   * restoration would be replayed on every later renewal. R1-4: the listener
-   * also gets the `deployment/account#session` token the answer belongs to, so
-   * the projection can refuse a delivery whose boundary has since moved.
-   */
-  onArchived(listener: (documentId: string, boundaryToken: string | null) => void): () => void {
-    this.archivedListeners.add(listener)
-    return () => this.archivedListeners.delete(listener)
-  }
-
-  /**
-   * R1-4 (UNI-1362): the archive verdict is delivered under the boundary that
-   * produced it. The caller revalidates its captured generation after its
-   * awaits first; the live scope/session token is read here, so the projection
-   * can refuse a delivery whose boundary has since moved.
-   */
-  private emitArchived(documentId: string): void {
-    const boundaryToken = this.lastBoundaryToken ?? null
-    for (const listener of this.archivedListeners) {
-      listener(documentId, boundaryToken)
-    }
   }
 
   private scopeToken(scope: StoreScope | null): string | null {
@@ -545,11 +509,6 @@ export class LeaseManager {
     }
     this.trackedDocs.add(documentId)
     if (current.archived === true) {
-      // B25 (UNI-1362, R1-3): no `emitArchived` here. The cached flag is not a
-      // fresh server answer: a restoration clears the library row without
-      // clearing this record, so re-emitting on every renewal would replay an
-      // archive the server has already undone. Only the fresh
-      // `document_archived` answer in `handleClientError` reports the label.
       const state = await this.effectiveState(documentId)
       return { kind: 'archived', record: current, state }
     }
@@ -733,13 +692,6 @@ export class LeaseManager {
         clock_rollback: false,
       }
       await this.options.store.put(archivedRecord)
-      // R1-4 (UNI-1362): the generation was checked before this await; the
-      // boundary may have moved while the record was being written, and an
-      // answer from the account being left must not be projected into the one
-      // signed in now. Report it as the stale result it is.
-      if (generation !== this.generation) return this.staleResult(documentId)
-      // B25 (UNI-1362): the renewal-only archive signal reaches the library label
-      this.emitArchived(documentId)
       return {
         kind: 'archived',
         record: archivedRecord,

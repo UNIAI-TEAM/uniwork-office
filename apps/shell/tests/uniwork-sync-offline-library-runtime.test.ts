@@ -20,11 +20,10 @@ import {
   OFFLINE_LIBRARY_STORE_REGISTRATION,
   SyncRuntime,
 } from '../src/main/uniwork-sync/runtime'
-import { createOfflineLibraryStore } from '../src/main/uniwork-sync/offline-library/store'
 import { INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
 import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
-import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
+import { createStoreLayer } from '../src/main/uniwork-sync/store'
 import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/compliance'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { cursorInvalid, FakeFeedClient } from './fixtures/fake-feed'
@@ -40,8 +39,6 @@ import { ORG, WS, addDoc, createFakeDocs, plaintext } from './uniwork-sync-offli
 const T0 = Date.parse('2026-10-13T08:00:00Z')
 const HOUR = 60 * 60 * 1000
 const SCOPE = { deploymentId: 'dep_1', accountId: 'acc_1' }
-/** R1-4: the account signed in after the switch */
-const OTHER_SCOPE = { deploymentId: 'dep_1', accountId: 'acc_2' }
 
 function makeSdo(nowMs: number, documentId: string): OfficeOfflineLeaseSDO {
   return {
@@ -85,19 +82,11 @@ interface HarnessOptions {
   /** the wiring's onFeedGone (uniwork-docs/wiring.ts), handed the runtime it belongs to */
   onFeedGone?(runtime: SyncRuntime, documentId: string): void
   isOpenBound?(documentId: string): boolean
-  /**
-   * R1-4: awaited after the library store read a pin record, so a test can move
-   * the account boundary while the archive projection is in flight - the window
-   * the lease manager's own revalidation cannot cover.
-   */
-  afterLibraryRead?: () => Promise<void>
 }
 
 function harness(options: HarnessOptions = {}) {
   let wallMs = T0
   let revokeRenew = false
-  let archiveRenew = false
-  let scope: { deploymentId: string; accountId: string } | null = { ...SCOPE }
   const safeStorage = createLockableSafeStorage()
   const syncLayer = createStoreLayer({
     root: join(base, 'sync'),
@@ -117,7 +106,7 @@ function harness(options: HarnessOptions = {}) {
     clock: () => wallMs,
   })
   libraryLayer.register(OFFLINE_LIBRARY_STORE_REGISTRATION)
-  const store = createSyncStoreAccess({ layer: syncLayer, scope: () => scope })
+  const store = createSyncStoreAccess({ layer: syncLayer, scope: () => ({ ...SCOPE }) })
   const leaseClient: LeaseClient = {
     async grant(documentId) {
       if (revokeRenew) {
@@ -126,13 +115,6 @@ function harness(options: HarnessOptions = {}) {
       return makeSdo(wallMs, documentId)
     },
     async renew() {
-      if (archiveRenew) {
-        throw new LeaseClientError({
-          kind: 'archived',
-          code: 'document_archived',
-          status: 410,
-        })
-      }
       throw new LeaseClientError({ kind: 'revoked', code: 'offline_lease_revoked', status: 403 })
     },
     async release() {},
@@ -155,35 +137,6 @@ function harness(options: HarnessOptions = {}) {
   }
   const docs = createFakeDocs()
   let docsOnline = true
-  // R1-4: the gate sits on the library store's pin read, so the boundary can
-  // move exactly between the archive verdict and the row it would mark
-  const gatedLibraryLayer: StoreLayer = options.afterLibraryRead
-    ? {
-        ...libraryLayer,
-        async open(scope) {
-          const opened = await libraryLayer.open(scope)
-          if (opened.kind !== 'ok') return opened
-          return {
-            kind: 'ok',
-            store: {
-              scope: opened.store.scope,
-              records: (name: string) => {
-                const records = opened.store.records(name)
-                if (name !== OFFLINE_LIBRARY_STORE_REGISTRATION.name) return records
-                return {
-                  ...records,
-                  async read(key) {
-                    const result = await records.read(key)
-                    await options.afterLibraryRead?.()
-                    return result
-                  },
-                }
-              },
-            },
-          }
-        },
-      }
-    : libraryLayer
   const runtime: SyncRuntime = new SyncRuntime({
     store,
     targets: { orgs: () => [ORG], workspaces: async () => [WS] },
@@ -202,7 +155,7 @@ function harness(options: HarnessOptions = {}) {
       monotonicNow: () => 5_000 + (wallMs - T0),
     },
     library: {
-      layer: gatedLibraryLayer,
+      layer: libraryLayer,
       docs: () => (docsOnline ? docs : null),
       hasLocalWork: async () => false,
     },
@@ -214,28 +167,11 @@ function harness(options: HarnessOptions = {}) {
     capability,
     libraryRoot: join(base, 'library', 'store'),
     syncRoot: join(base, 'sync'),
-    /** R1-4: the library store of one scope, for seeding and reading another account's row */
-    libraryStore: (scope: { deploymentId: string; accountId: string }) =>
-      createOfflineLibraryStore({ layer: libraryLayer, scope: () => scope }),
     setDocsOnline: (next: boolean) => {
       docsOnline = next
     },
     revokeOnRegrant: () => {
       revokeRenew = true
-    },
-    archiveOnRenew: () => {
-      archiveRenew = true
-    },
-    /**
-     * R1-4: sign the incoming account in and complete the boundary the way the
-     * production wiring does (uniwork-docs/wiring.ts lockStore): the leases and
-     * the library are locked for the account being left.
-     */
-    switchAccount: (next: { deploymentId: string; accountId: string }) => {
-      const owner = scope
-      scope = next
-      runtime.leases.lockBoundary(owner)
-      runtime.library?.lockBoundary()
     },
     /** wall and monotonic clocks move together (a lease reaches its end) */
     advance: (ms: number) => {
@@ -308,122 +244,6 @@ describe('G5-05 offline library inside the sync runtime (production wiring)', ()
     expect(
       await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS }),
     ).toEqual({ kind: 'refused', code: 'capability_off' })
-  })
-
-  // B25 (UNI-1362): a renewal answered `document_archived` is the only archive
-  // signal some documents ever give (no feed row). The library label used to
-  // wait for one, so the row kept its old state while the lease already said
-  // archived.
-  it('a renewal answered document_archived marks the library row archived', async () => {
-    const h = harness()
-    addDoc(h, 'doc_1', 1)
-    await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
-    expect(await h.runtime.library!.row('doc_1')).toMatchObject({ archived: false })
-    h.archiveOnRenew()
-    expect((await h.runtime.leases.renew('doc_1', { force: true })).kind).toBe('archived')
-    await vi.waitFor(async () => {
-      expect(await h.runtime.library!.row('doc_1')).toMatchObject({
-        archived: true,
-        state: 'archived',
-      })
-    })
-    // read only: the committed copy is still there and still opens read-only
-    expect(await h.runtime.library!.openCached('doc_1')).toMatchObject({
-      kind: 'ok',
-      readOnly: true,
-    })
-  })
-
-  // R1-3 (UNI-1362): the archived flag on the lease record is cached, and a
-  // restoration clears the library row without clearing that record. Re-emitting
-  // from the cached branch would replay the archive the server already undid.
-  it('R1-3: a renewal of an already-archived record does not re-mark a restored row', async () => {
-    const h = harness({ feed: feedArchiving([false]), onFeedGone: wiringFeedGone })
-    addDoc(h, 'doc_1', 1)
-    await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
-    expect(await h.runtime.library!.row('doc_1')).toMatchObject({ archived: false })
-
-    // the server answers the renewal with document_archived: the row is marked
-    h.archiveOnRenew()
-    expect((await h.runtime.leases.renew('doc_1', { force: true })).kind).toBe('archived')
-    await vi.waitFor(async () => {
-      expect(await h.runtime.library!.row('doc_1')).toMatchObject({ archived: true })
-    })
-
-    // restored on the server: the feed row says archived:false and the head read
-    // clears the mark, while the lease record keeps its cached flag
-    await h.runtime.tick()
-    await h.runtime.tick()
-    await vi.waitFor(async () => {
-      expect(await h.runtime.library!.row('doc_1')).toMatchObject({
-        archived: false,
-        state: 'view-only',
-      })
-    })
-
-    // another lease pass over that cached record: still reports archived, but
-    // the library row the user sees must not be re-marked. The listener runs
-    // synchronously inside the renewal, so the spy settles this deterministically.
-    const noted = vi.spyOn(h.runtime.library!, 'noteArchived')
-    expect((await h.runtime.leases.renew('doc_1', { force: true })).kind).toBe('archived')
-    expect(noted).not.toHaveBeenCalled()
-    expect(await h.runtime.library!.row('doc_1')).toMatchObject({
-      archived: false,
-      state: 'view-only',
-    })
-  })
-
-  // R1-4 (UNI-1362): the archive verdict is produced in one account and
-  // projected by whichever account is live when the projection resumes. The
-  // account switches while the library is inside the pin read of its
-  // projection, and the incoming account already holds its own pin of the same
-  // document (its store was locked, not wiped, at its own sign-out): the stale
-  // delivery must not mark that row.
-  it('R1-4: an archive projection that resumes after an account switch does not mark the new account', async () => {
-    const held = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
-    let armed = false
-    const h = harness({
-      afterLibraryRead: async () => {
-        if (!armed) return
-        held.resolve()
-        await release.promise
-      },
-    })
-    addDoc(h, 'doc_1', 1)
-    await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
-    // the incoming account's own copy of the same document, from its last session
-    const stored = await h.libraryStore({ ...SCOPE }).getPin('doc_1')
-    if (stored.kind !== 'ok') throw new Error('the pin record was not stored')
-    expect(await h.libraryStore({ ...OTHER_SCOPE }).putPin(stored.record)).toEqual({ kind: 'ok' })
-
-    // the listener is fire-and-forget: keep the projection promise so the test
-    // can await the delivery instead of guessing when it settled
-    const original = h.runtime.library!.noteArchived.bind(h.runtime.library!)
-    const projections: Array<Promise<unknown>> = []
-    vi.spyOn(h.runtime.library!, 'noteArchived').mockImplementation((id, archived, boundary) => {
-      const promise = original(id, archived, boundary)
-      projections.push(promise)
-      return promise
-    })
-
-    h.archiveOnRenew()
-    armed = true
-    const pending = h.runtime.leases.renew('doc_1', { force: true })
-    // the projection is inside its pin read: switch the account, then let it resume
-    await held.promise
-    armed = false
-    h.switchAccount(OTHER_SCOPE)
-    release.resolve()
-    // the renewal was the leaving account's own answer: it still reports archived
-    expect((await pending).kind).toBe('archived')
-    expect(projections).toHaveLength(1)
-    expect(await projections[0]).toBeNull()
-
-    // the projection must not have marked the incoming account's row
-    const row = await h.libraryStore({ ...OTHER_SCOPE }).getPin('doc_1')
-    if (row.kind !== 'ok') throw new Error('the incoming account lost its pin')
-    expect(row.record.archived).toBe(false)
   })
 })
 

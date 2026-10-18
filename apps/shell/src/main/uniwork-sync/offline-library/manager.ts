@@ -857,38 +857,21 @@ export class OfflineLibraryManager {
    * the revision, so the flag itself is the signal). Archived -> the row is
    * marked (no metadata read); restored -> the head is read again, which
    * clears the mark. A document that is not pinned is not touched.
-   *
-   * R1-4 (UNI-1362): `boundary` is the `deployment/account#session` token the
-   * signal belongs to (the lease manager's). When given, the projection is
-   * refused as soon as the live boundary is no longer that one - before the
-   * awaits, and again after them - so a delivery produced in one account can
-   * never mark a row in the account signed in now. The feed path passes no
-   * token: its pass already checks its own runtime generation.
    */
-  async noteArchived(
-    documentId: string,
-    archived: boolean,
-    boundary?: string,
-  ): Promise<PinRow | null> {
-    if (boundary !== undefined && this.token() !== boundary) return null
+  async noteArchived(documentId: string, archived: boolean): Promise<PinRow | null> {
     const row = await this.row(documentId)
     if (!row || row.archived === archived) return row
-    if (boundary !== undefined && this.token() !== boundary) return null
-    if (archived) return this.handleArchived(documentId, boundary)
+    if (archived) return this.handleArchived(documentId)
     const refreshed = await this.refresh(documentId)
     return refreshed.kind === 'ok' ? refreshed.row : this.row(documentId)
   }
 
   /** archived on the server: the row stays and opens until the lease ends */
-  async handleArchived(documentId: string, boundary?: string): Promise<PinRow | null> {
+  async handleArchived(documentId: string): Promise<PinRow | null> {
     this.checkBoundary()
     return this.withDoc(documentId, async () => {
-      // the boundary is re-checked inside the lock: the row read below is the
-      // one that decides which scope the mark lands in
-      if (boundary !== undefined && this.token() !== boundary) return null
       const read = await this.options.store.getPin(documentId)
       if (read.kind !== 'ok') return null
-      if (boundary !== undefined && this.token() !== boundary) return null
       const archived = { ...read.record, archived: true }
       await this.put(archived)
       return this.view(archived)
