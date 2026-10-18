@@ -1003,7 +1003,12 @@ const homeApi: HomeApi = {
       system: input.system,
       user: input.user,
     })
-    const raw = (result ?? {}) as { ok?: unknown; content?: unknown; error?: unknown }
+    const raw = (result ?? {}) as {
+      ok?: unknown
+      content?: unknown
+      error?: unknown
+      uniworkCode?: unknown
+    }
     if (raw.ok === true) {
       return {
         ok: true,
@@ -1013,6 +1018,7 @@ const homeApi: HomeApi = {
     return {
       ok: false,
       error: typeof raw.error === 'string' ? raw.error : 'AI request failed',
+      ...(typeof raw.uniworkCode === 'string' ? { uniworkCode: raw.uniworkCode } : {}),
     }
   },
   aiStream(request: AiStreamRequest) {
