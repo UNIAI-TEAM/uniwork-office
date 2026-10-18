@@ -253,10 +253,10 @@ export class LeaseManager {
   private readonly wallSeen = new Map<string, number>()
   private readonly revokeListeners = new Set<(notice: LeaseRevokeNotice) => void>()
   /**
-   * B25 (UNI-1362): a renewal answered `document_archived` (or a renewal of an
-   * already-archived record) told nobody, so the offline library's row kept its
-   * old label until some other signal arrived. These listeners carry that
-   * renewal-only verdict to the owner that projects it.
+   * B25 (UNI-1362): a renewal answered `document_archived` told nobody, so the
+   * offline library's row kept its old label until some other signal arrived.
+   * These listeners carry that fresh renewal verdict to the owner that projects
+   * it (R1-3: only the fresh verdict, never the cached flag).
    */
   private readonly archivedListeners = new Set<(documentId: string) => void>()
   private globalLockReason: LeaseLockReason | null = null
@@ -280,10 +280,11 @@ export class LeaseManager {
   }
 
   /**
-   * B25 (UNI-1362): told whenever a lease reports the document archived - the
-   * renewal that answered `document_archived`, and a renewal of a record that
-   * already carries the flag. Lease expiry and the open rules are untouched: the
-   * listener only lets the library label the row it already has.
+   * B25 (UNI-1362): told whenever a renewal answers `document_archived` - the
+   * one fresh server archive signal. Lease expiry and the open rules are
+   * untouched: the listener only lets the library label the row it already has.
+   * R1-3: a record that merely carries the cached flag does not emit, or a
+   * restoration would be replayed on every later renewal.
    */
   onArchived(listener: (documentId: string) => void): () => void {
     this.archivedListeners.add(listener)
@@ -533,10 +534,12 @@ export class LeaseManager {
     }
     this.trackedDocs.add(documentId)
     if (current.archived === true) {
+      // B25 (UNI-1362, R1-3): no `emitArchived` here. The cached flag is not a
+      // fresh server answer: a restoration clears the library row without
+      // clearing this record, so re-emitting on every renewal would replay an
+      // archive the server has already undone. Only the fresh
+      // `document_archived` answer in `handleClientError` reports the label.
       const state = await this.effectiveState(documentId)
-      // B25 (UNI-1362): a renewal of an already-archived record reports the same
-      // verdict as the answer that set the flag, so the library label catches up
-      this.emitArchived(documentId)
       return { kind: 'archived', record: current, state }
     }
 

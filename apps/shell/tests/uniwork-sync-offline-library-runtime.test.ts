@@ -280,6 +280,45 @@ describe('G5-05 offline library inside the sync runtime (production wiring)', ()
       readOnly: true,
     })
   })
+
+  // R1-3 (UNI-1362): the archived flag on the lease record is cached, and a
+  // restoration clears the library row without clearing that record. Re-emitting
+  // from the cached branch would replay the archive the server already undid.
+  it('R1-3: a renewal of an already-archived record does not re-mark a restored row', async () => {
+    const h = harness({ feed: feedArchiving([false]), onFeedGone: wiringFeedGone })
+    addDoc(h, 'doc_1', 1)
+    await h.runtime.library!.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
+    expect(await h.runtime.library!.row('doc_1')).toMatchObject({ archived: false })
+
+    // the server answers the renewal with document_archived: the row is marked
+    h.archiveOnRenew()
+    expect((await h.runtime.leases.renew('doc_1', { force: true })).kind).toBe('archived')
+    await vi.waitFor(async () => {
+      expect(await h.runtime.library!.row('doc_1')).toMatchObject({ archived: true })
+    })
+
+    // restored on the server: the feed row says archived:false and the head read
+    // clears the mark, while the lease record keeps its cached flag
+    await h.runtime.tick()
+    await h.runtime.tick()
+    await vi.waitFor(async () => {
+      expect(await h.runtime.library!.row('doc_1')).toMatchObject({
+        archived: false,
+        state: 'view-only',
+      })
+    })
+
+    // another lease pass over that cached record: still reports archived, but
+    // the library row the user sees must not be re-marked. The listener runs
+    // synchronously inside the renewal, so the spy settles this deterministically.
+    const noted = vi.spyOn(h.runtime.library!, 'noteArchived')
+    expect((await h.runtime.leases.renew('doc_1', { force: true })).kind).toBe('archived')
+    expect(noted).not.toHaveBeenCalled()
+    expect(await h.runtime.library!.row('doc_1')).toMatchObject({
+      archived: false,
+      state: 'view-only',
+    })
+  })
 })
 
 describe('T5-3 a feed delete/revoke of a CLOSED pinned document reaches the library', () => {
