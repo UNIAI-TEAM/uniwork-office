@@ -11,7 +11,14 @@
 import { isReadOnlyProfile, type Capabilities } from '../protocol/types'
 import type { FramePort } from './frame-port'
 
-const READ_ONLY_DISABLED_CAPS = ['save', 'saveAs', 'edit', 'htmlVisualEdit', 'exportHtml'] as const
+const READ_ONLY_DISABLED_CAPS = [
+  'save',
+  'saveAs',
+  'saveCopy',
+  'edit',
+  'htmlVisualEdit',
+  'exportHtml',
+] as const
 
 export function createCapabilityObject<C extends object>(
   defaults: Readonly<C>,

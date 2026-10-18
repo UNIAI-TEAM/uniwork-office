@@ -128,11 +128,13 @@ URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
   opens nothing. The frame shows and saves on `openReplyRevision(reply)` only; `null` (a host before X-02 ignores
   `versionId` and sends no `revision`) means the bar without a number, never the number it asked for.
 - `FileMeta.revision?`: decimal string, compared as BigInt.
-- `api.saveCopy {data, name}` (cap `saveCopy`, additive, UNI-1872): conflict-dialog "Save as a copy". The host
+- `api.saveCopy {data, name}` (cap `saveCopy`, additive, UNI-1872): conflict-dialog "Save as a copy" and —
+  since UNI-1920 — the Docs File menu's "Save as a copy…" on a locked-out tab. The host
   advertises `saveCopy` in `init.capabilities` only when it handles `api.saveCopy`; the Docs frame claims `saveCopy` in
-  `ready` and offers "Save as a copy…" only when the effective capability `saveCopy` is true and the document is
-  editable. `data` is the `ArrayBuffer` of
-  the open document at the moment of the 409'd save; `name` is the localized copy title formatted by the frame's i18n
+  `ready` and offers the entry when the effective capability `saveCopy` is true and the profile is not `readOnly`
+  — in the conflict dialog only while the document is editable, in the File menu only when `save` is withheld too.
+  `data` is the `ArrayBuffer` of
+  the open document (the 409'd save's bytes from the dialog, the live bytes from the menu); `name` is the localized copy title formatted by the frame's i18n
   (e.g. `"<name> (copy)"` / `"<tên> (bản sao)"`), which the host passes to the server as the new document's title.
   Success returns `SaveCopyResult = { documentId: string; title: string }` without re-pointing or reloading the open
   document. Failures reuse existing `ProtocolErrorCode` values (`conflict`, `forbidden`, `too_large` with

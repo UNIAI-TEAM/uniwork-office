@@ -15,6 +15,8 @@
  * | saveDocx(path,data,auto)  | api.save {fileId, data, etag, auto}; 'conflict' -> see "Save conflicts" below    |
  * | saveDocxAs                | api.saveAs {name, data, sourceFileId} (host dialog); 'cancelled' -> {ok:false}   |
  * | saveDocxNew               | api.saveAs {name, data, silent: true} (first save of an untitled document)       |
+ * | saveDocxCopy              | api.saveCopy {data (live bytes), name: localized "<name> (copy)"} (UNI-1920);   |
+ * |                           | the locked-out tab's File > Save a copy — refuses under the readOnly profile    |
  * | getRecentFiles            | api.recents {limit} -> `uniwork://files/<id>/<name>` paths                        |
  * | exportPdf                 | api.export {format:'pdf', fileId, data (live bytes when dirty)} -> download; failure -> window.print |
  * | provideDocBytes           | App.tsx registers the live-document serializer exportPdf uses when dirty        |
@@ -930,6 +932,28 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }
       }
       return { ok: true, path: pathFor(landed(res)) }
+    },
+
+    /**
+     * File > Save as a copy for a locked-out tab (UNI-1920, RFSH-5): the same `api.saveCopy`
+     * {data, name} the conflict dialog's saveCopyVia sends, but over the LIVE document bytes (the
+     * conflict path's are the open ones). Deliberately not gated on `isViewOnly` — a locked-out tab
+     * is view-only yet may copy itself; the readOnly profile and a missing `saveCopy` grant refuse.
+     */
+    async saveDocxCopy() {
+      if (readOnlyProfile) return { ok: false as const, error: READ_ONLY }
+      if (grants?.saveCopy !== true) return { ok: false as const, error: 'unsupported' }
+      const data = await liveDocBytes()
+      if (!data) return { ok: false as const, error: 'the open document could not be serialized' }
+      const run = saveCopyVia(port, grants, true, data, () =>
+        current === null ? null : files.get(current)?.name,
+      )
+      if (!run) return { ok: false as const, error: 'unsupported' }
+      const res = await run()
+      if (res.ok) return { ok: true as const, title: res.title }
+      if (res.error?.code === 'cancelled')
+        return { ok: false as const, reason: 'cancelled' as const }
+      return { ok: false as const, ...(res.error ? { error: res.error.message } : {}) }
     },
 
     async getRecentFiles(): Promise<string[]> {
