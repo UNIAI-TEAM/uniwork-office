@@ -16,6 +16,8 @@ const hooks = vi.hoisted(() => ({
   renameErrors: [] as NodeJS.ErrnoException[],
   renames: 0,
   fsyncErrors: [] as NodeJS.ErrnoException[],
+  /** one entry per low-level write: the most bytes it accepts, or the error it throws */
+  writePlan: [] as Array<number | NodeJS.ErrnoException>,
   events: [] as string[],
   /** Windows cannot open a directory: stand a plain file in for it when a POSIX host is simulated */
   dir: '',
@@ -30,6 +32,22 @@ vi.mock('node:fs', async (importOriginal) => {
       const error = hooks.renameErrors.shift()
       if (error) throw error
       return actual.renameSync(...args)
+    },
+    writeSync: (...args: Parameters<typeof actual.writeSync>) => {
+      const step = hooks.writePlan.shift()
+      if (step instanceof Error) throw step
+      if (step === undefined) return actual.writeSync(...args)
+      const [fd, raw, offset, length] = args as [
+        number,
+        Buffer | string,
+        number | undefined,
+        number | undefined,
+      ]
+      // a string payload is one write of its whole encoding, as a caller that ignores the count sees it
+      const data = typeof raw === 'string' ? Buffer.from(raw, 'utf8') : raw
+      const start = typeof raw === 'string' ? 0 : (offset ?? 0)
+      const wanted = typeof raw === 'string' ? data.byteLength : (length ?? data.byteLength - start)
+      return actual.writeSync(fd, data, start, Math.min(step, wanted))
     },
     fsyncSync: (fd: number) => {
       hooks.events.push('fsync')
@@ -62,6 +80,7 @@ beforeEach(() => {
   writeFileSync(join(root, 'last-account.json'), `${JSON.stringify(OLD)}\n`)
   hooks.renameErrors = []
   hooks.fsyncErrors = []
+  hooks.writePlan = []
   hooks.renames = 0
   hooks.events = []
   hooks.dir = ''
@@ -123,6 +142,35 @@ describe('BindingStore.writeLastOwner (EL-1(b) fix10)', () => {
     expect(store.readLastOwner()).toEqual(NEW)
     expect(existsSync(join(root, 'last-account.json'))).toBe(true)
     expect(JSON.parse(readFileSync(join(root, 'last-account.json'), 'utf8'))).toEqual(NEW)
+    expect(leftovers()).toEqual([])
+  })
+
+  // EL-1(b) fix11 (EL1B-BE-R3C-3/4/5/6): a short write is completed before the flush and the rename
+  it('completes a short write: the published owner is the whole record', () => {
+    hooks.writePlan = [7, 5]
+    expect(store.writeLastOwner(NEW)).toBe(true)
+    expect(readFileSync(join(root, 'last-account.json'), 'utf8')).toBe(`${JSON.stringify(NEW)}
+`)
+    expect(store.readLastOwner()).toEqual(NEW)
+    expect(leftovers()).toEqual([])
+  })
+
+  it('a short write followed by a failure keeps the old file, removes the temp file and stays retryable', () => {
+    hooks.writePlan = [7, errno('ENOSPC')]
+    expect(store.writeLastOwner(NEW)).toBe(false)
+    expect(hooks.renames).toBe(0)
+    expect(store.readLastOwner()).toEqual(OLD)
+    expect(leftovers()).toEqual([])
+    // the next attempt, on a recovered disk, publishes it
+    expect(store.writeLastOwner(NEW)).toBe(true)
+    expect(store.readLastOwner()).toEqual(NEW)
+  })
+
+  it('a write that makes no progress fails instead of spinning or publishing a prefix', () => {
+    hooks.writePlan = [7, 0]
+    expect(store.writeLastOwner(NEW)).toBe(false)
+    expect(hooks.renames).toBe(0)
+    expect(store.readLastOwner()).toEqual(OLD)
     expect(leftovers()).toEqual([])
   })
 })

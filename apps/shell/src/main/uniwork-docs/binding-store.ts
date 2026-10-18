@@ -585,11 +585,17 @@ export class BindingStore {
       mkdirSync(this.root, { recursive: true })
       const fd = openSync(tmp, 'w')
       try {
-        writeSync(
-          fd,
+        // writeSync may accept fewer bytes than asked: publish only a complete record
+        const data = Buffer.from(
           `${JSON.stringify(owner)}
 `,
+          'utf8',
         )
+        for (let offset = 0; offset < data.byteLength;) {
+          const written = writeSync(fd, data, offset, data.byteLength - offset)
+          if (written <= 0) throw new Error('last owner write made no progress')
+          offset += written
+        }
         try {
           fsyncSync(fd)
         } catch (error) {
