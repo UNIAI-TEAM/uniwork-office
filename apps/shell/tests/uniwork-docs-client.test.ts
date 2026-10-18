@@ -220,6 +220,24 @@ describe('error envelope mapping', () => {
     expect(JSON.parse(String(init.body))).toEqual({ upload_id: 'up_1', base_revision: '41' })
     expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('office-key-1')
   })
+
+  it('EL-1(b): commit sends edit_lock_id only when the input carries one', async () => {
+    const fetch = vi.fn<FetchLike>(async () => envelope(500, 'internal'))
+    await client(fetch)
+      .commit({
+        documentId: DOC,
+        uploadId: 'up_1',
+        baseRevision: '41',
+        idempotencyKey: 'office-key-1',
+        editLockId: '01J8X4LOCK0N1P2Q3R4S5T6U7V',
+      })
+      .catch(() => undefined)
+    expect(JSON.parse(String(fetch.mock.calls[0]![1].body))).toEqual({
+      upload_id: 'up_1',
+      base_revision: '41',
+      edit_lock_id: '01J8X4LOCK0N1P2Q3R4S5T6U7V',
+    })
+  })
 })
 
 describe('Retry-After (G5-06 be-9)', () => {
