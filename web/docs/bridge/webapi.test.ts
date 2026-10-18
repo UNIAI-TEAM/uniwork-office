@@ -2087,3 +2087,28 @@ describe('RFSH-5: File > Save a copy on a locked-out tab (UNI-1920)', () => {
     expect(mock.calls.some((c) => c.type === 'api.saveCopy')).toBe(false)
   })
 })
+
+describe('UNI-1920 item B: Ctrl/Cmd+P inside the Docs frame runs File > Print', () => {
+  const pressP = (init: KeyboardEventInit = {}): KeyboardEvent => {
+    const ev = new KeyboardEvent('keydown', { key: 'p', cancelable: true, ...init })
+    window.dispatchEvent(ev)
+    return ev
+  }
+
+  it('mod+P dispatches the renderer\'s "print" menu command (the in-frame print dialog)', async () => {
+    await bootWith('Report.docx', { save: true, print: true })
+    const commands: string[] = []
+    api.onMenuCommand((cmd) => commands.push(cmd))
+    pressP({ ctrlKey: true })
+    pressP({ metaKey: true })
+    expect(commands).toEqual(['print', 'print'])
+  })
+
+  it('does nothing while the print grant is withheld (the browser keeps its default)', async () => {
+    await bootWith('Report.docx', { save: true })
+    const commands: string[] = []
+    api.onMenuCommand((cmd) => commands.push(cmd))
+    pressP({ ctrlKey: true })
+    expect(commands).toEqual([])
+  })
+})

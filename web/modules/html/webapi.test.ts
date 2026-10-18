@@ -539,3 +539,32 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     expect(print).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('UNI-1920 item B: Ctrl/Cmd+P inside the HTML frame runs the module print', () => {
+  const pressP = (init: KeyboardEventInit = {}): KeyboardEvent => {
+    const ev = new KeyboardEvent('keydown', { key: 'p', cancelable: true, ...init })
+    window.dispatchEvent(ev)
+    return ev
+  }
+
+  it('mod+P invokes the renderer\'s onPrintRequest (runPrint) once, repeat ignored', async () => {
+    const { api } = setup()
+    // consumePending resolves after init assigned the grants, so the gate reads them already
+    await api.consumePending()
+    const onPrint = vi.fn()
+    api.onPrintRequest(onPrint)
+    pressP({ ctrlKey: true })
+    pressP({ metaKey: true })
+    pressP({ ctrlKey: true, repeat: true })
+    expect(onPrint).toHaveBeenCalledTimes(2)
+  })
+
+  it('does nothing while the print grant is withheld', async () => {
+    const { api } = setup({ ...FULL, print: false })
+    await api.consumePending()
+    const onPrint = vi.fn()
+    api.onPrintRequest(onPrint)
+    pressP({ ctrlKey: true })
+    expect(onPrint).not.toHaveBeenCalled()
+  })
+})
