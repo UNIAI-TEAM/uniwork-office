@@ -63,7 +63,10 @@ beforeEach(() => {
 })
 afterEach(() => rmSync(base, { recursive: true, force: true }))
 
-function harness() {
+function harness(options: { storeLocked?: boolean } = {}) {
+  let clientOff = false
+  let pollGate: Promise<void> | null = null
+  let pollEntered: () => void = () => undefined
   let wallMs = T0
   let monoMs = 5_000
   let feedFails = false
@@ -120,13 +123,17 @@ function harness() {
     source: 'fresh',
   }
   const runtime = new SyncRuntime({
-    store,
+    store: options.storeLocked
+      ? { ...store, open: async () => ({ kind: 'keystore_locked' as const }) }
+      : store,
     targets: { orgs: () => ['org_a'], workspaces: async () => ['ws_1'] },
     capability: async () => capability,
-    client: () => feed,
+    client: () => (clientOff ? null : feed),
     keepDraft: async () => false,
     onPoll: async () => {
       events.push('queue')
+      pollEntered()
+      if (pollGate) await pollGate
     },
     clock: { now: () => wallMs },
     schedule: () => () => undefined,
@@ -149,6 +156,24 @@ function harness() {
       feedFails = next
     },
     events,
+    /** the session is gone: the next pass has no client to reach the server with */
+    dropSession() {
+      clientOff = true
+    },
+    /** the next queue poll waits until the returned release is called */
+    blockPoll(): { entered: Promise<void>; release: () => void } {
+      let release: () => void = () => undefined
+      pollGate = new Promise<void>((resolve) => {
+        release = () => {
+          pollGate = null
+          resolve()
+        }
+      })
+      const entered = new Promise<void>((resolve) => {
+        pollEntered = resolve
+      })
+      return { entered, release }
+    },
     /** the next renewal request waits until the returned release is called */
     blockRenewal(): { entered: Promise<void>; release: () => void } {
       let release: () => void = () => undefined
@@ -258,6 +283,31 @@ describe('the lease manager inside the feed runtime (W1f)', () => {
     expect(seen).toEqual([true])
     expect((await h.runtime.leases.effectiveState('doc_1')).record?.generation).toBe(2)
   })
+
+  it.each([
+    ['no session', { storeLocked: false }],
+    ['no readable store', { storeLocked: true }],
+  ])(
+    'G703-R8-1: a stopped %s pass still waiting on the queue poll fires no after-lease-pass hook',
+    async (_name, options) => {
+      const h = harness(options)
+      const seen: Array<boolean | undefined> = []
+      h.runtime.onAfterLeasePass((online) => seen.push(online))
+      if (!options.storeLocked) h.dropSession()
+      const gate = h.blockPoll()
+      const oldPass = h.runtime.tick()
+      await gate.entered
+      // the pass is cancelled while its queue poll is pending; start() runs its
+      // replacement, which waits on the same gate
+      h.runtime.stop()
+      h.runtime.start()
+      const replacement = h.runtime.tick()
+      gate.release()
+      await Promise.all([oldPass, replacement])
+      // only the replacement pass reports, once
+      expect(seen).toEqual([undefined])
+    },
+  )
 
   it('G703-R7-1: the commit stamp is even while idle, odd during a lease write, and moves on every landed commit', async () => {
     const h = harness()

@@ -547,6 +547,7 @@ export class SyncRuntime {
       // no session to reach the server: nothing was attempted, so there is no
       // connectivity verdict to report (G506-be-3)
       await this.reportPoll(undefined)
+      if (!current()) return
       this.reportLeasePass(undefined)
       return
     }
@@ -557,6 +558,7 @@ export class SyncRuntime {
       // Nothing was attempted, so there is no verdict either (G506-be-3)
       this.running.clear()
       await this.reportPoll(undefined)
+      if (!current()) return
       this.reportLeasePass(undefined)
       return
     }
