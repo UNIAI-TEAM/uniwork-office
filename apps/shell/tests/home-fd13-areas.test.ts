@@ -461,7 +461,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     }
   })
 
-  it('isolates sources per area (no mixing), shows accurate per-area counts, and keeps the open UniWork folder across area switches (FE13-R1-1, FE13-R1-6)', async () => {
+  it('isolates sources per area (no mixing), shows accurate per-area counts, and keeps the UniWork sub-view across area switches (FE13-R1-1, FE13-R1-6, VDH-7)', async () => {
     const uwRec1 = makeEntry('/cache/cloud-spec.docx', 'Cloud Spec.docx', {
       documentId: 'uw-doc-1',
       workspaceId: 'ws-1',
@@ -579,14 +579,14 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     })
     await flush()
     expect(localFolderRow!.getAttribute('aria-selected')).toBe('true')
-
-    // Switch back to "UniWork" area -> still on "Alpha Folder"
+    // Switch back to "UniWork" area -> the kept sub-view is Recent (VDH-7): its rows, not the folder's
     const uwTab = tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')[0]!
     await act(async () => {
       uwTab.click()
     })
     await flush()
-    expect(host.textContent).toContain('Alpha Spec.docx')
+    expect(host.textContent).toContain('Cloud Spec.docx')
+    expect(host.textContent).not.toContain('Local Report.docx')
 
     // Switch back to "On this device" area -> previously open local folder "/Users/linh/Documents" is still open
     await act(async () => {
@@ -1506,8 +1506,8 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
 
     try {
       await mountHome()
-      const fileRow = Array.from(host.querySelectorAll<HTMLElement>('.uwf-list .uw-pick-row')).find(
-        (el) => el.textContent?.includes('Root Cloud Doc.docx'),
+      const fileRow = Array.from(host.querySelectorAll<HTMLElement>('.dh-doc-row')).find((el) =>
+        el.textContent?.includes('Root Cloud Doc.docx'),
       )
       expect(fileRow).toBeDefined()
 
@@ -1624,5 +1624,54 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     } finally {
       style.remove()
     }
+  })
+  it('keeps the UniWork sub-view (and its open folder) across an area switch within the session (VDH-7)', async () => {
+    await mountHome()
+
+    // UniWork pane is up; open Alpha Folder from its card
+    expect(host.querySelector('.uwf-browser.uwf-pane')).not.toBeNull()
+    const alphaCard = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-alpha"] button.dh-folder-open',
+    )!
+    expect(alphaCard).not.toBeNull()
+    await act(async () => {
+      alphaCard.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    const tabs = host.querySelectorAll<HTMLButtonElement>(
+      '[role="tablist"][aria-label="Area"] [role="tab"]',
+    )
+
+    // area switch away and back keeps the open folder
+    await act(async () => {
+      tabs[1]!.click() // On this device
+    })
+    await flush()
+    expect(host.querySelector('.uwf-browser.uwf-pane')).toBeNull()
+    await act(async () => {
+      tabs[0]!.click() // back to UniWork
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+
+    // a non-workspace sub-view survives the same round trip
+    const trashNav = host.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!
+    await act(async () => {
+      trashNav.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Trash')
+
+    await act(async () => {
+      tabs[1]!.click()
+    })
+    await flush()
+    await act(async () => {
+      tabs[0]!.click()
+    })
+    await flush()
+    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Trash')
   })
 })

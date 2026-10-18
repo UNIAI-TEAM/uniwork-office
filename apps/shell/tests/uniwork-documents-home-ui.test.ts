@@ -1834,4 +1834,155 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'Alpha Folder',
     ])
   })
+
+  const docsHomeCss = () =>
+    readFileSync(resolve(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'), 'utf8')
+  const saveCss = () =>
+    readFileSync(resolve(__dirname, '../src/renderer/src/uniwork-folders/save-dialog.css'), 'utf8')
+  /** the {…} body of a rule whose selector contains `sel` */
+  const cssBlock = (css: string, sel: string) =>
+    css.match(new RegExp(`${sel.replace(/[.>:-]/g, '\\$&')}[^{}]*\\{([^}]*)\\}`))?.[1] ?? ''
+
+  async function mountHome(vi_lang: 'vi' | 'en' = 'vi') {
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: vi_lang },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+  }
+
+  it('lays each document row on the table grid without the uw-pick-row flex class (VDH-1)', async () => {
+    await mountHome()
+    const rows = Array.from(host.querySelectorAll<HTMLElement>('.dh-doc-row'))
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      expect(row.classList.contains('uw-pick-row')).toBe(false)
+    }
+    // row actions live inside the actions cell, not floating at the row edge
+    for (const row of rows) {
+      const cell = row.querySelector<HTMLElement>('.dh-cell-actions')
+      expect(cell).not.toBeNull()
+      if (row.querySelector('.uw-row-menu')) {
+        expect(cell!.contains(row.querySelector('.uw-row-menu')!)).toBe(true)
+      }
+    }
+    // the documents-home stylesheet declares the row grid with no flex leak
+    const css = docsHomeCss()
+    expect(cssBlock(css, '.dh-doc-head,')).toMatch(/display:\s*grid/)
+  })
+
+  it('keeps the workspace select outside the title group so the h1 never shrinks to an ellipsis (VDH-2)', async () => {
+    await mountHome()
+    expect(host.querySelector('.dh-title-group .dh-ws-select')).toBeNull()
+    expect(host.querySelector('.dh-title-group > h1.dh-title')).not.toBeNull()
+    // the select is still in the toolbar, next to the title group
+    expect(host.querySelector('.dh-toolbar .dh-ws-select')).not.toBeNull()
+    const css = docsHomeCss()
+    expect(cssBlock(css, '.dh-title-group')).toMatch(/flex:\s*none|flex-shrink:\s*0/)
+  })
+
+  it('renders folder breadcrumbs as a non-stretching child of the scrolling column (VDH-3)', async () => {
+    await mountHome()
+    // descend into a folder so the crumbs render
+    const card = host.querySelector<HTMLButtonElement>(
+      '.dh-folder-card[data-folder-id="f-board"] button.dh-folder-open',
+    )!
+    await act(async () => {
+      card.click()
+    })
+    await flush()
+    const crumbs = host.querySelector<HTMLElement>('nav.uwf-crumbs')
+    expect(crumbs).not.toBeNull()
+    // one-line nav that must not flex-grow inside .dh-main
+    const css = docsHomeCss()
+    const blanket = cssBlock(css, '.dh-main > *')
+    const scoped = cssBlock(css, '.dh-main > .uwf-crumbs')
+    expect(/flex:\s*none/.test(blanket) || /flex:\s*none|flex-grow:\s*0/.test(scoped)).toBe(true)
+  })
+
+  it('CSS keeps the scrolling column children unshrinkable and collapses the two lowest-priority columns below 1100px (VDH-4)', () => {
+    const css = docsHomeCss()
+    // wrapped toolbar/quick-row content must never shrink below content size inside the scrolling column
+    expect(cssBlock(css, '.dh-main > *')).toMatch(/flex:\s*none/)
+    // narrow width: hide Truy cập + Người sửa, keep Tên/Cập nhật/Thao tác
+    const media = css.match(/@media \(max-width: 1100px\) \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(media).not.toBe('')
+    for (const sel of ['.dh-col-access', '.dh-col-person', '.dh-cell-access', '.dh-cell-person']) {
+      expect(cssBlock(media, sel), sel).toMatch(/display:\s*none/)
+    }
+    // grid template re-declared for the three remaining columns
+    expect(cssBlock(media, '.dh-doc-row')).toMatch(/grid-template-columns/)
+  })
+
+  it('CSS raises flagged sub-4.5 texts to --text-secondary and tints the selected sub-nav item with --accent-text (VDH-5)', () => {
+    const css = docsHomeCss()
+    for (const sel of [
+      '.dh-section-count',
+      '.dh-doc-subpath',
+      '.dh-level-sub',
+      '.dh-cell-empty',
+      '.dh-sidebar-label',
+    ]) {
+      expect(cssBlock(css, sel), sel).toMatch(/color:\s*var\(--text-secondary\)/)
+    }
+    expect(cssBlock(css, '.dh-nav-item.active')).toMatch(/color:\s*var\(--accent-text\)/)
+    expect(cssBlock(css, '.dh-nav-item.active .dh-nav-icon')).toMatch(
+      /color:\s*var\(--accent-text\)/,
+    )
+  })
+
+  it('CSS gives the filter selects and the error Retry button a visible focus ring (VDH-6)', () => {
+    const css = docsHomeCss()
+    expect(cssBlock(css, '.dh-filter-select:focus-visible')).toMatch(/outline:\s*2px solid/)
+    expect(cssBlock(css, '.dh-main .uw-pick-state .btn:focus-visible')).toMatch(
+      /outline:\s*2px solid/,
+    )
+  })
+
+  it('SaveDialog State 1 uses the accent primary at radius 8 like State 2, a 16px chevron, and the folder-plus glyph on "Thư mục mới" (VDH-8 / VS01-1)', async () => {
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(SaveDialog, {
+            path: 'C:\\Users\\me\\Documents\\Báo cáo Q4.docx',
+            onClose: vi.fn(),
+          }),
+        ),
+      )
+    })
+    await flush()
+
+    // chevron on the location row is 16px
+    const chev = document.querySelector('svg.uws-loc-chev')!
+    expect(chev.getAttribute('width')).toBe('16')
+    expect(chev.getAttribute('height')).toBe('16')
+
+    // the .uws-save rule must carry enough specificity to beat the later .btn-primary in home.css
+    const css = saveCss()
+    const scopedRule = css.match(/\.modal\.uw-act \.uws-save[^{}]*\{([^}]*)\}/)
+    expect(scopedRule).not.toBeNull()
+    expect(scopedRule![1]).toMatch(/border-radius:\s*8px/)
+    expect(scopedRule![1]).toMatch(/background:\s*var\(--color-dialog-primary\)/)
+
+    // State 2: "Thư mục mới" carries the folder-plus svg
+    const locBtn = document.querySelector<HTMLButtonElement>('.uws-loc')!
+    await act(async () => {
+      locBtn.click()
+    })
+    await flush()
+    expect(document.querySelector('.uwf-picker-new svg')).not.toBeNull()
+  })
 })

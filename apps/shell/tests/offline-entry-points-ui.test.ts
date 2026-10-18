@@ -147,6 +147,22 @@ describe('Home recents "…" menu (UniWork rows)', () => {
         total: 0,
         index: { pending: 0, scanning: false },
       })),
+      uniworkListDocuments: vi.fn(async () =>
+        ok({
+          documents: [
+            {
+              id: 'uw-doc-1',
+              workspaceId: 'ws-1',
+              title: 'Cloud Spec.docx',
+              format: 'docx',
+              updatedAt: '2026-10-17T10:00:00.000Z',
+              kind: 'file',
+              parentId: null,
+            },
+          ],
+          nextCursor: null,
+        }),
+      ),
       rerankSearch: vi.fn(async () => null),
       addFolderRoot: vi.fn(async () => null),
       removeFolderRoot: vi.fn(async () => {}),
@@ -178,12 +194,15 @@ describe('Home recents "…" menu (UniWork rows)', () => {
       root.render(createElement(LocaleProvider, null, createElement(Home)))
     })
     await flush()
+    // the UniWork area now renders DocumentsHome; open its Recent sub-view
     await click(host.querySelector('.nav-item[data-nav="recent"]')!)
-    const row = Array.from(host.querySelectorAll<HTMLElement>('.recent-row')).find((r) =>
+    const row = Array.from(host.querySelectorAll<HTMLElement>('.dh-doc-row')).find((r) =>
       r.textContent?.includes('Cloud Spec.docx'),
     )!
-    await click(row.querySelector('.more-btn')!)
-    return Array.from(host.querySelectorAll<HTMLButtonElement>('.row-menu [role="menuitem"]'))
+    expect(row).toBeDefined()
+    await click(row.querySelector('.uw-row-menu-btn')!)
+    // the row menu is portalled to document.body
+    return Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
   }
 
   it('offers "Make available offline" right after Open, and pins the document', async () => {
