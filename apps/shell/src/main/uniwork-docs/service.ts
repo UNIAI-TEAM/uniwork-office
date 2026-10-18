@@ -1167,7 +1167,7 @@ export class UniworkDocsService {
         // goes through an upload session instead of one multipart POST
         uploadSession: {
           createDocumentUploadSession: (input) => this.api().createDocumentUploadSession(input),
-          getUploadSession: (sessionId) => this.api().getUploadSession(sessionId),
+          getUploadSession: (sessionId, signal) => this.api().getUploadSession(sessionId, signal),
           completeUploadSession: (input) => this.api().completeUploadSession(input),
           deleteUploadSession: (sessionId) => this.api().deleteUploadSession(sessionId),
           putUploadPart: (input) => this.api().putUploadPart(input),
@@ -1813,7 +1813,7 @@ export class UniworkDocsService {
         // replayed intent above the threshold takes the chunked path too
         uploadSession: {
           createDocumentUploadSession: (input) => this.api().createDocumentUploadSession(input),
-          getUploadSession: (sessionId) => this.api().getUploadSession(sessionId),
+          getUploadSession: (sessionId, signal) => this.api().getUploadSession(sessionId, signal),
           completeUploadSession: (input) => this.api().completeUploadSession(input),
           deleteUploadSession: (sessionId) => this.api().deleteUploadSession(sessionId),
           putUploadPart: (input) => this.api().putUploadPart(input),

@@ -64,7 +64,12 @@ type Fault = {
 }
 
 /** a small UniWork server: idempotent uploads, commits, lookup, revisions, ACL */
-function fakeServer(initial: { bytes: Uint8Array; myLevel?: string }) {
+function fakeServer(initial: {
+  bytes: Uint8Array
+  myLevel?: string
+  partFailsOnceAt?: number
+  sessionGetGate?: (signal?: AbortSignal | null) => Promise<void>
+}) {
   const state = {
     revision: 41,
     version: 3,
@@ -239,6 +244,7 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string }) {
     }
     const sessionId = u.pathname.match(/^\/api\/v1\/upload-sessions\/([^/]+)$/)?.[1]
     if (sessionId && (init.method ?? 'GET') === 'GET') {
+      if (initial.sessionGetGate) await initial.sessionGetGate(init.signal)
       const s = sessions.get(sessionId)
       if (!s) return error(404, 'not_found')
       return json(200, {
@@ -280,8 +286,13 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string }) {
     if (partId && init.method === 'PUT') {
       const s = sessions.get(partId[1]!)
       if (!s) return error(404, 'not_found')
+      const num = Number(partId[2])
+      if (initial.partFailsOnceAt === num) {
+        initial.partFailsOnceAt = undefined
+        return new Response(null, { status: 400 })
+      }
       const raw = init.body as Uint8Array
-      s.parts.set(Number(partId[2]), raw.slice ? raw.slice() : new Uint8Array(raw))
+      s.parts.set(num, raw.slice ? raw.slice() : new Uint8Array(raw))
       return new Response(null, { status: 200, headers: { ETag: `"e${partId[2]}"` } })
     }
     return error(404, 'not_found')
@@ -2102,5 +2113,58 @@ describe('BIGUP-A1: the service wires the chunked version path', () => {
     expect(partPuts(server).length).toBeGreaterThan(1)
     expect(uploads(server)).toHaveLength(0)
     expect(await storedIntent(ctx, path)).toBeNull()
+  })
+
+  it('R2-BE-01: a cancel during a held resume GET through the real wiring ends promptly', async () => {
+    let getEntered!: () => void
+    const reachedGet = new Promise<void>((resolve) => {
+      getEntered = resolve
+    })
+    let signalAborted = false
+    const big = docxBytes(BIG)
+    const server = fakeServer({
+      bytes: enc('v3'),
+      partFailsOnceAt: 2,
+      sessionGetGate: (signal) =>
+        new Promise<void>((_resolve, reject) => {
+          getEntered()
+          if (signal?.aborted) {
+            signalAborted = true
+            reject(new DOMException('aborted', 'AbortError'))
+            return
+          }
+          signal?.addEventListener(
+            'abort',
+            () => {
+              signalAborted = true
+              reject(new DOMException('aborted', 'AbortError'))
+            },
+            { once: true },
+          )
+        }),
+    })
+    const ctx = setup(server, { limits, budgetBytes })
+    const path = await openDoc(ctx)
+    writeFileSync(path, big)
+
+    // First save fails on part 2 (400, non-retryable), leaving a persisted uploadSession
+    await ctx.service.save(path)
+    const parked = await storedIntent(ctx, path)
+    const sessionId = parked?.intent.uploadSession?.sessionId
+    expect(sessionId).toBeTruthy()
+
+    // Second save resumes the persisted session via GET, which is held
+    const resuming = ctx.service.save(path)
+    await reachedGet
+
+    // Cancel while the resume GET is held: the adapter forwards the signal so it aborts promptly
+    await ctx.service.cancelSave(path, false)
+    await resuming
+    expect(signalAborted).toBe(true)
+    expect(
+      server.calls.some(
+        (c) => c.method === 'DELETE' && c.path === `/api/v1/upload-sessions/${sessionId}`,
+      ),
+    ).toBe(true)
   })
 })

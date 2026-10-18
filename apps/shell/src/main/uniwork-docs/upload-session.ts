@@ -410,8 +410,8 @@ function checkZipRules(centralDir: Uint8Array, format: string): void {
         uncompressed32 === 0xffffffff,
       )
       if (zip64) {
-        uncompressedSize = zip64.uncompressedSize
-        compressedSize = zip64.compressedSize
+        if (zip64.uncompressedSize !== undefined) uncompressedSize = zip64.uncompressedSize
+        if (zip64.compressedSize !== undefined) compressedSize = zip64.compressedSize
       }
     }
     const entry: ZipEntry = {
@@ -479,7 +479,7 @@ function readZip64EntrySizes(
   extraLength: number,
   needCompressed: boolean,
   needUncompressed: boolean,
-): { uncompressedSize: number; compressedSize: number } | null {
+): { uncompressedSize?: number; compressedSize?: number } | null {
   const view = new DataView(centralDir.buffer, centralDir.byteOffset, centralDir.byteLength)
   let at = extraStart
   const end = extraStart + extraLength
@@ -508,8 +508,8 @@ function readZip64EntrySizes(
         compressedSize = readUint64(view, cursor)
       }
       return {
-        uncompressedSize: uncompressedSize ?? 0xffffffff,
-        compressedSize: compressedSize ?? 0xffffffff,
+        ...(uncompressedSize !== undefined ? { uncompressedSize } : {}),
+        ...(compressedSize !== undefined ? { compressedSize } : {}),
       }
     }
     at = body + size

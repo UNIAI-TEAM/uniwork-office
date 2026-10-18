@@ -49,7 +49,7 @@ export interface VersionUploadInput {
   signal?: AbortSignal
   onProgress?: (loaded: number, total: number) => void
   onPhase?: (phase: ChunkedUploadPhase) => void
-  onSessionState?: (state: SavedUploadSession) => void | Promise<void>
+  onSessionState?: (state: SavedUploadSession | undefined) => void | Promise<void>
 }
 
 /** how many derived session-create keys one version upload tries on a 409 payload mismatch */
@@ -92,6 +92,12 @@ export async function uploadVersionBytes(
   const size = input.bytes.byteLength
   const session = client.uploadSession
   if (!session || !shouldUseChunkedUpload(size, input.limits)) {
+    if (input.resume && session) {
+      await abortVersionUploadSession(session, input.resume.sessionId).catch(() => undefined)
+    }
+    if (input.resume) {
+      await input.onSessionState?.(undefined)
+    }
     return await client.upload({
       documentId: input.documentId,
       bytes: input.bytes,
@@ -104,12 +110,13 @@ export async function uploadVersionBytes(
   const probe = await readLocalFileProbe({ bytes: input.bytes }, size, input.filename)
   const sessionClient = toUploadSessionClient(session)
   let resume = input.resume
-  // the derived create keys run s0, s1, ... across this loop AND the core's own
-  // one-shot restart (R1-BE-08/09: a gone session or a rejected key), so no key
-  // is ever sent twice for different sessions
+  // R2-BE-02: a call starting from a persisted `resume` namespaces its derived
+  // restart/next keys by the resumed session id (`${K}:r:${sessionId}:s${n}`),
+  // so a second call resuming a later dead session never replays the create key
+  // an earlier call already committed to the server's idempotency ledger.
+  const keyBase = resume ? `${input.idempotencyKey}:r:${resume.sessionId}` : input.idempotencyKey
   let keyIndex = 0
-  const nextKey = (): string => `${input.idempotencyKey}:s${(keyIndex += 1)}`
-
+  const nextKey = (): string => `${keyBase}:s${(keyIndex += 1)}`
   for (let attempt = 0; attempt < VERSION_SESSION_KEY_ATTEMPTS; attempt += 1) {
     try {
       const result = await runChunkedUpload(sessionClient, {
@@ -118,7 +125,7 @@ export async function uploadVersionBytes(
         size,
         readRange: async (offset, length) => input.bytes.subarray(offset, offset + length),
         probe,
-        idempotencyKey: `${input.idempotencyKey}:s${keyIndex}`,
+        idempotencyKey: `${keyBase}:s${keyIndex}`,
         freshIdempotencyKey: nextKey,
         ...(resume ? { resume } : {}),
         ...(input.signal ? { signal: input.signal } : {}),

@@ -280,6 +280,8 @@ export class SaveCoordinator {
   private readonly sleep: (ms: number) => Promise<void>
   /** in-flight inline version-upload abort controllers, keyed by document key */
   private readonly uploadAborts = new Map<string, AbortController>()
+  /** R2-BE-04: in-flight version-upload session ids in memory, independent of store persistence */
+  private readonly uploadLiveSessions = new Map<string, string>()
   private readonly readBytes: (path: string) => Promise<Uint8Array>
 
   constructor(deps: SaveCoordinatorDeps) {
@@ -941,7 +943,13 @@ export class SaveCoordinator {
           ...(intent.uploadSession ? { resume: intent.uploadSession } : {}),
           signal: controller.signal,
           onSessionState: async (state) => {
-            intent.uploadSession = state
+            if (state) {
+              intent.uploadSession = state
+              this.uploadLiveSessions.set(doc.key, state.sessionId)
+            } else {
+              delete intent.uploadSession
+              this.uploadLiveSessions.delete(doc.key)
+            }
             await this.persistUploadSession(intents, doc, intent, state)
           },
         })
@@ -971,6 +979,7 @@ export class SaveCoordinator {
       } finally {
         if (this.uploadAborts.get(doc.key) === controller) {
           this.uploadAborts.delete(doc.key)
+          this.uploadLiveSessions.delete(doc.key)
         }
       }
     }
@@ -980,7 +989,7 @@ export class SaveCoordinator {
     intents: IntentStore,
     doc: BoundDocument,
     owner: IntentRecordV2,
-    session: SavedUploadSession,
+    session: SavedUploadSession | undefined,
   ): Promise<void> {
     const stored = await intents.read(doc.key, factsOf(doc, owner.length))
     if (
@@ -990,15 +999,13 @@ export class SaveCoordinator {
     ) {
       return
     }
-    await intents.put(
-      doc.key,
-      {
-        ...stored.intent,
-        uploadSession: session,
-        updatedAt: this.now().toISOString(),
-      },
-      stored.payload,
-    )
+    const next: IntentRecordV2 = {
+      ...stored.intent,
+      updatedAt: this.now().toISOString(),
+    }
+    if (session) next.uploadSession = session
+    else delete next.uploadSession
+    await intents.put(doc.key, next, stored.payload)
   }
 
   private async releaseUploadSession(
@@ -1010,10 +1017,13 @@ export class SaveCoordinator {
       controller.abort()
       this.uploadAborts.delete(docKey)
     }
+    const liveSessionId = this.uploadLiveSessions.get(docKey)
+    this.uploadLiveSessions.delete(docKey)
+    const sessionId = session?.sessionId ?? liveSessionId
     const client = this.deps.client.uploadSession
-    if (!session || !client) return
+    if (!sessionId || !client) return
     try {
-      await abortVersionUploadSession(client, session.sessionId)
+      await abortVersionUploadSession(client, sessionId)
     } catch (error) {
       console.warn('uniwork docs: the upload session could not be aborted', error)
     }
@@ -1199,11 +1209,7 @@ export class SaveCoordinator {
     }
     const state = await this.deps.dispatcher.cancel(doc, options)
     if (state === 'cancelled') {
-      const controller = this.uploadAborts.get(doc.key)
-      if (controller) {
-        controller.abort()
-        this.uploadAborts.delete(doc.key)
-      }
+      await this.releaseUploadSession(doc.key, undefined)
     }
     this.publishQueueState(doc, state)
   }
@@ -1217,11 +1223,7 @@ export class SaveCoordinator {
     }
     const state = await this.deps.dispatcher.discard(doc, options)
     if (state === 'cancelled') {
-      const controller = this.uploadAborts.get(doc.key)
-      if (controller) {
-        controller.abort()
-        this.uploadAborts.delete(doc.key)
-      }
+      await this.releaseUploadSession(doc.key, undefined)
     }
     this.publishQueueState(doc, state)
   }
@@ -1242,11 +1244,7 @@ export class SaveCoordinator {
     }
     const state = await this.deps.dispatcher.supersede(doc)
     if (state === 'cancelled') {
-      const controller = this.uploadAborts.get(doc.key)
-      if (controller) {
-        controller.abort()
-        this.uploadAborts.delete(doc.key)
-      }
+      await this.releaseUploadSession(doc.key, undefined)
     }
   }
 

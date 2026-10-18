@@ -110,19 +110,28 @@ interface EntrySpec {
    * extra field (id 0x0001). `truncate` cuts the record short (the declared
    * size is longer than the payload), `noRecord` writes no ZIP64 record at all.
    */
-  zip64?: { compressed: number; uncompressed: number; truncate?: boolean; noRecord?: boolean }
+  zip64?: { compressed?: number; uncompressed?: number; truncate?: boolean; noRecord?: boolean }
 }
 
-/** the ZIP64 extra record (id 0x0001): uncompressed then compressed, 8 bytes each */
+/** the ZIP64 extra record (id 0x0001): uncompressed then compressed, 8 bytes each when present */
 function zip64Extra(spec: NonNullable<EntrySpec['zip64']>): Buffer {
   if (spec.noRecord) return Buffer.alloc(0)
-  const payload = Buffer.alloc(16)
-  payload.writeBigUInt64LE(BigInt(spec.uncompressed), 0)
-  payload.writeBigUInt64LE(BigInt(spec.compressed), 8)
+  const fields: Buffer[] = []
+  if (spec.uncompressed !== undefined) {
+    const b = Buffer.alloc(8)
+    b.writeBigUInt64LE(BigInt(spec.uncompressed), 0)
+    fields.push(b)
+  }
+  if (spec.compressed !== undefined) {
+    const b = Buffer.alloc(8)
+    b.writeBigUInt64LE(BigInt(spec.compressed), 0)
+    fields.push(b)
+  }
+  const payload = Buffer.concat(fields)
   const header = Buffer.alloc(4)
   header.writeUInt16LE(0x0001, 0)
   // the declared record size is what the probe trusts: a truncated one lies
-  header.writeUInt16LE(spec.truncate ? 16 : 16, 2)
+  header.writeUInt16LE(payload.length, 2)
   return Buffer.concat([header, spec.truncate ? payload.subarray(0, 8) : payload])
 }
 
@@ -167,8 +176,11 @@ function buildZip(path: string, entries: EntrySpec[]): { size: number; cdOffset:
       cd.writeUInt16LE(20, 6)
       cd.writeUInt16LE(stored ? 0 : 8, 10)
       cd.writeUInt32LE(crc, 16)
-      cd.writeUInt32LE(entry.zip64 ? 0xffffffff : (body?.length ?? size), 20)
-      cd.writeUInt32LE(entry.zip64 ? 0xffffffff : size, 24)
+      cd.writeUInt32LE(
+        entry.zip64?.compressed !== undefined ? 0xffffffff : (body?.length ?? size),
+        20,
+      )
+      cd.writeUInt32LE(entry.zip64?.uncompressed !== undefined ? 0xffffffff : size, 24)
       cd.writeUInt16LE(name.length, 28)
       cd.writeUInt16LE(extra.length, 30)
       cd.writeUInt32LE(localOffset, 42)
@@ -1212,6 +1224,21 @@ describe('R1-BE-07: a ZIP64 entry size is read from its extra field', () => {
       'zip64-missing.docx',
     ).catch((error: unknown) => error)
     expect((without as UniworkDocError).serverCode).toBe('zip_unreadable')
+  })
+
+  it('R2-BE-05: accepts an asymmetric ZIP64 entry where only the compressed size is saturated', async () => {
+    const path = join(dir, 'zip64-asymmetric.docx')
+    const built = buildZip(path, [
+      { name: '[Content_Types].xml', data: Buffer.from('<Types/>') },
+      { name: 'word/document.xml', data: Buffer.from('<w:document/>') },
+      {
+        name: 'word/media/tiny.bin',
+        data: Buffer.from('abcd'),
+        zip64: { compressed: 2 },
+      },
+    ])
+    const probe = await readLocalFileProbe({ path }, built.size, 'zip64-asymmetric.docx')
+    expect(probe.cd_offset).toBe(built.cdOffset)
   })
 })
 

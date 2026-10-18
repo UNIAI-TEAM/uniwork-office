@@ -2181,10 +2181,10 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
     expect(doc.record.state).toBe('committed')
     expect(h.sessions.calls.gets).toEqual(['ups_old'])
     expect(h.sessions.calls.creates.map((c) => c.idempotencyKey)).toEqual([
-      // the 410 at the resume GET restarts under s1 (core), the 409 on that
-      // create moves the queue on to s2
-      'key_doc_expired:s1',
-      'key_doc_expired:s2',
+      // the 410 at the resume GET restarts under r:<deadSessionId>:s1 (core),
+      // the 409 on that create moves the queue on to r:<deadSessionId>:s2
+      'key_doc_expired:r:ups_old:s1',
+      'key_doc_expired:r:ups_old:s2',
     ])
     expect(h.sessions.calls.partPuts.map((p) => p.partNumber).sort((a, b) => a - b)).toEqual([
       1, 2, 3, 4, 5, 6,
@@ -2285,6 +2285,141 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
     expect(drift.sessions.calls.creates).toHaveLength(1)
     expect(drift.server.state.counts.upload).toBe(1)
     expect(drift.server.state.counts.commit).toBe(1)
+  })
+
+  it('R2-BE-02: two successive calls that each resume an expired session send distinct create keys and commit', async () => {
+    const partErr = new UniworkDocError('malformed_response', {
+      serverCode: 'part_etag_missing',
+    })
+    const expiredErr = new UniworkDocError('not_found', {
+      status: 410,
+      serverCode: 'upload_session_expired',
+    })
+    const h = await chunkedHarness({
+      putFaults: {
+        2: { error: partErr, times: 2 },
+      },
+    })
+    const doc = h.makeBigDoc('doc_r2_be_02')
+    await h.dispatcher.enqueue(doc)
+
+    // Attempt 1: creates session ups_v1 under K:s0, fails at part 2, persists ups_v1
+    await h.dispatcher.dispatchAll([doc])
+    expect(doc.record.uploadSession?.sessionId).toBe('ups_v1')
+    expect(h.sessions.calls.creates.map((c) => c.idempotencyKey)).toEqual(['key_doc_r2_be_02:s0'])
+
+    // Attempt 2: resumes ups_v1 -> 410 -> creates ups_v2 under K:r:ups_v1:s1, fails at part 2, persists ups_v2
+    h.sessions.setGetFault(expiredErr)
+    h.clock.advance(60_000)
+    await h.dispatcher.dispatchAll([doc])
+    expect(doc.record.uploadSession?.sessionId).toBe('ups_v2')
+    expect(h.sessions.calls.creates.map((c) => c.idempotencyKey)).toEqual([
+      'key_doc_r2_be_02:s0',
+      'key_doc_r2_be_02:r:ups_v1:s1',
+    ])
+
+    // Attempt 3: resumes ups_v2 -> 410 -> creates ups_v3 under a DISTINCT key K:r:ups_v2:s1 and commits
+    h.clock.advance(60_000)
+    await h.dispatcher.dispatchAll([doc])
+    expect(doc.record.state).toBe('committed')
+    const createKeys = h.sessions.calls.creates.map((c) => c.idempotencyKey)
+    expect(createKeys).toEqual([
+      'key_doc_r2_be_02:s0',
+      'key_doc_r2_be_02:r:ups_v1:s1',
+      'key_doc_r2_be_02:r:ups_v2:s1',
+    ])
+    expect(new Set(createKeys).size).toBe(3)
+    expect(h.server.state.counts.commit).toBe(1)
+  })
+
+  it('R2-BE-03: threshold raised between attempts commits via one-request upload AND deletes the old session', async () => {
+    const partErr = new UniworkDocError('malformed_response', {
+      serverCode: 'part_etag_missing',
+    })
+    const h = await chunkedHarness({
+      putFaults: {
+        2: { error: partErr, times: 1 },
+      },
+    })
+    const doc = h.makeBigDoc('doc_r2_be_03')
+    await h.dispatcher.enqueue(doc)
+    await h.dispatcher.dispatchAll([doc])
+    expect(doc.record.uploadSession?.sessionId).toBe('ups_v1')
+    expect((await stored(h.intents, doc))?.intent.uploadSession?.sessionId).toBe('ups_v1')
+
+    // Raise the threshold above the payload size before retry
+    h.setLimits({
+      ...DEFAULT_DOCUMENT_LIMITS,
+      chunked_upload_threshold_bytes: 64 * MB_BYTES,
+    })
+    h.clock.advance(60_000)
+    await h.dispatcher.dispatchAll([doc])
+
+    expect(doc.record.state).toBe('committed')
+    expect(doc.record.uploadSession).toBeUndefined()
+    expect(h.server.state.counts.upload).toBe(1)
+    expect(h.server.state.counts.commit).toBe(1)
+    expect(h.sessions.calls.deletes).toEqual(['ups_v1'])
+    expect(await stored(h.intents, doc)).toBeNull()
+  })
+
+  it('R2-BE-04: when the intent-store write of uploadSession is refused, cancel still sends DELETE with the live session id', async () => {
+    let partGateFn: (() => void) | null = null
+    const h = await chunkedHarness({
+      inMemoryIntents: true,
+      partGate: (_partNumber, signal) =>
+        new Promise<void>((_resolve, reject) => {
+          partGateFn?.()
+          signal?.addEventListener('abort', () => reject(new UniworkDocError('aborted')), {
+            once: true,
+          })
+        }),
+    })
+    const doc = h.makeBigDoc('doc_r2_be_04')
+    await h.dispatcher.enqueue(doc)
+
+    // Refuse only the uploadSession persistence writes; allow state transitions (e.g. cancel)
+    const origPut = h.intents.put.bind(h.intents)
+    h.intents.put = async (key, intent, payload) => {
+      if (intent.uploadSession) return { kind: 'store_full' }
+      return await origPut(key, intent, payload)
+    }
+
+    const reachedPart1 = new Promise<void>((resolve) => {
+      partGateFn = resolve
+    })
+    const running = h.dispatcher.dispatchAll([doc])
+    await reachedPart1
+
+    // A caller reading from the store sees no uploadSession because the store write was refused
+    const fromStore = await stored(h.intents, doc)
+    expect(fromStore?.intent.uploadSession).toBeUndefined()
+    const cancelDoc: QueueDoc = {
+      ...doc,
+      record: { ...fromStore!.intent, state: 'queued' },
+    }
+
+    const cancelled = await h.dispatcher.cancel(cancelDoc, { documentClosed: false })
+    await running
+    expect(cancelled).toBe('cancelled')
+    expect(h.sessions.calls.deletes).toEqual(['ups_v1'])
+
+    // Inline SaveCoordinator path: when store write of uploadSession is refused,
+    // coordinator.cancel still aborts and DELETEs the live session id
+    const inlineDoc = h.makeBigDoc('doc_r2_be_04_inline')
+    const reachedPart2 = new Promise<void>((resolve) => {
+      partGateFn = resolve
+    })
+    const inlineSave = h.coordinator.save(inlineDoc.path)
+    await reachedPart2
+    const storedInline = await stored(h.intents, inlineDoc)
+    expect(storedInline?.intent.uploadSession).toBeUndefined()
+    await h.coordinator.cancel(
+      { ...inlineDoc, record: { ...storedInline!.intent, state: 'queued' } },
+      { documentClosed: false },
+    )
+    await inlineSave
+    expect(h.sessions.calls.deletes).toEqual(['ups_v1', 'ups_v2'])
   })
 })
 

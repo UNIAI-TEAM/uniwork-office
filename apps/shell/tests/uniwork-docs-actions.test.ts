@@ -3157,6 +3157,7 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
         uploadId: 'up-cancel-nostore',
       })
       await gate.reached
+      const liveSessionId = server.state.session!.sessionId
       ctx.service.cancelUpload('up-cancel-nostore')
       gate.release()
       const uploaded = await pending
@@ -3164,7 +3165,7 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
       expect(uploaded).toEqual({ ok: false, error: 'upload_cancelled' })
       // the DELETE was issued even though no record was ever persisted
       const deleted = server.calls.find((call) => call.method === 'DELETE')!
-      expect(deleted.path).toMatch(/^\/api\/v1\/upload-sessions\//)
+      expect(deleted.path).toBe(`/api/v1/upload-sessions/${liveSessionId}`)
     })
 
     it('R1-BE-03: re-picking the same file for another folder aborts the old session', async () => {
@@ -3278,7 +3279,8 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
       // the server is validating the uploaded bytes: the editor autosaves a
       // new generation of the same file at the same path
       await gate.reached
-      writeFileSync(file, buildDocxBytes(20 * 1024 * 1024, { macro: false }).fill(7, 4096, 8192))
+      const driftedBytes = buildDocxBytes(20 * 1024 * 1024, { macro: false }).fill(7, 4096, 8192)
+      writeFileSync(file, driftedBytes)
       gate.release()
       const saved = await pending
 
@@ -3291,6 +3293,7 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
       ).toBe(true)
       // the user's own file is untouched
       expect(existsSync(file)).toBe(true)
+      expect(readFileSync(file).compare(driftedBytes)).toBe(0)
     })
 
     it('R1-BE-02: a failed DELETE is not reported as clean and the record survives', async () => {
