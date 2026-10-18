@@ -211,6 +211,9 @@ export interface UpdatedByOption {
 /**
  * Extracts distinct `(updatedById, updatedByName)` pairs seen on loaded document rows.
  * Skips rows without `updatedById` so option values are always user IDs, never display names.
+ * An id is only emitted when at least one loaded row resolves its name: a raw user
+ * id is never shown as a filter label (DH1-BE-10). Order follows each id's first
+ * row occurrence; a later named row fills in the name for an earlier unnamed id.
  */
 export function collectUpdatedByOptions(
   docs: readonly DocumentsHomeDoc[],
@@ -220,12 +223,14 @@ export function collectUpdatedByOptions(
     if (doc.kind === 'folder') continue
     const id = doc.updatedById?.trim()
     if (!id) continue
-    const name = doc.updatedByName?.trim() || id
-    if (!seen.has(id)) {
+    const name = doc.updatedByName?.trim() ?? ''
+    if (!seen.has(id) || (name !== '' && seen.get(id) === '')) {
       seen.set(id, name)
     }
   }
-  return Array.from(seen.entries()).map(([id, name]) => ({ id, name }))
+  return Array.from(seen.entries())
+    .filter(([, name]) => name !== '')
+    .map(([id, name]) => ({ id, name }))
 }
 
 export interface FormattedAccessCell {
