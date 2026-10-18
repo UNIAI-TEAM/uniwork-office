@@ -1,6 +1,6 @@
 export const strings = {
   zh: {
-    aiRedoPictureLost: '无法恢复这次运行插入的图片,所以未能重做。',
+    aiRedoPictureLost: '无法恢复这次运行插入的图片，所以未能重做。',
     aiClarifyTitle: '继续之前先确认几个问题',
     aiClarifyDecide: '帮我决定',
     aiClarifyDecideAnswer: '（帮我决定）',
@@ -5706,7 +5706,7 @@ export const strings = {
     zoomOut: 'ज़ूम आउट',
   },
   'zh-TW': {
-    aiRedoPictureLost: '無法復原這次執行插入的圖片,所以未能重做。',
+    aiRedoPictureLost: '無法復原這次執行插入的圖片，所以未能重做。',
     aiClarifyTitle: '繼續之前先確認幾個問題',
     aiClarifyDecide: '幫我決定',
     aiClarifyDecideAnswer: '（幫我決定）',
