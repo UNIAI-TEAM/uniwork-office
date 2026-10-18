@@ -187,6 +187,7 @@ function openHarness(): OpenHarness {
     show: (path) => service.showOfflineCopy(path),
     isPathOpen,
     appVersion: () => '0.0.0-test',
+    lockOpened: (lock) => service.recordOfflineLock(lock),
     now: () => clock.now,
   })
   const api = createOfflineLibraryApi({
@@ -334,6 +335,117 @@ describe('G5-05u B5 an offline open shows the read-only cached copy', () => {
     const result = await o.service.openDocument('doc_1')
     expect(result.ok).toBe(false)
     expect(o.opened).toEqual([])
+  })
+})
+
+describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in place', () => {
+  const copyDir = (o: OpenHarness) =>
+    o.service.store.dirFor(SCOPE.deploymentId, SCOPE.accountId, offlineCopyKey('doc_1'))
+
+  async function openCopy(o: OpenHarness): Promise<string> {
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    const outcome = await o.copies.open('doc_1')
+    if (outcome.kind !== 'opened') throw new Error(`expected an open, got ${outcome.kind}`)
+    return outcome.path
+  }
+
+  it('(a) the lease lapses while the copy is on screen: the next pass raises lease_expired for its path and the plaintext goes', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const path = await openCopy(o)
+    // a window shows it and the lease is fine: nothing happens
+    await o.copies.sweep()
+    expect(o.locks).toEqual([])
+    expect(existsSync(copyDir(o))).toBe(true)
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    await o.copies.sweep()
+    expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+    expect(existsSync(copyDir(o))).toBe(false)
+    // the tab is gone from the library's point of view: the pin's cleanup no longer waits for it
+    expect(await o.h.manager.row('doc_1')).toMatchObject({
+      state: 'lease-expired',
+      open: false,
+    })
+    // and the next pass does not raise it again
+    await o.copies.sweep()
+    expect(o.locks).toHaveLength(1)
+  })
+
+  it('(a) the capability off names the lock libraryOff, a clock rollback its own reason', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    await openCopy(o)
+    o.capability.on = false
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    await o.copies.sweep()
+    expect(o.locks).toEqual([
+      expect.objectContaining({ reason: 'lease_expired', libraryOff: true }),
+    ])
+    const rolled = openHarness()
+    dirs.push(rolled.userDataDir)
+    await openCopy(rolled)
+    rolled.h.leases.states.set('doc_1', leaseState('clock_rollback'))
+    await rolled.copies.sweep()
+    expect(rolled.locks).toEqual([expect.objectContaining({ reason: 'clock_rollback' })])
+  })
+
+  it('(a) a lease the online pass renewed in time never locks the open copy', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    await openCopy(o)
+    o.h.leases.states.set('doc_1', leaseState('expiring_soon'))
+    await o.copies.sweep()
+    o.h.leases.states.set('doc_1', leaseState('valid'))
+    await o.copies.sweep()
+    expect(o.locks).toEqual([])
+    expect(existsSync(copyDir(o))).toBe(true)
+  })
+
+  it('(b) a reopen of the on-screen copy with an expired lease is refused, locks, and shows nothing', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const path = await openCopy(o)
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    const again = await o.copies.open('doc_1')
+    expect(again).toMatchObject({
+      kind: 'refused',
+      failure: { code: 'lease_unusable', lockReason: 'lease_expired' },
+      lock: { path, reason: 'lease_expired' },
+    })
+    expect(existsSync(copyDir(o))).toBe(false)
+  })
+
+  it('(b) the app-level reopen (offline, copy on screen, lease expired) raises the lock and never answers opened', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const path = await openCopy(o)
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    const result = await o.api.open('doc_1')
+    expect(result).toMatchObject({ ok: false, lockReason: 'lease_expired' })
+    expect(o.locks.at(-1)).toMatchObject({ path, reason: 'lease_expired' })
+  })
+
+  it('(c) a valid lease: the reopen still brings the on-screen copy forward, no second write', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    const path = await openCopy(o)
+    const before = await readFile(path)
+    const again = await o.copies.open('doc_1')
+    expect(again).toMatchObject({ kind: 'opened', path })
+    expect(new Uint8Array(await readFile(path))).toEqual(new Uint8Array(before))
+    expect(o.locks).toEqual([])
+  })
+
+  it('a renewed lease lets the locked document open again', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    await openCopy(o)
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    await o.copies.sweep()
+    o.h.leases.states.set('doc_1', leaseState('valid'))
+    expect((await o.copies.open('doc_1')).kind).toBe('opened')
+    expect(existsSync(copyDir(o))).toBe(true)
   })
 })
 

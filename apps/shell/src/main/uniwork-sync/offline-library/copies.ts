@@ -109,6 +109,11 @@ export interface OfflineCopiesDeps {
   /** show the copy as a tab (`show`, the lock check, the open and the status push) */
   show(path: string): { path: string; title: string } | null
   isPathOpen(path: string): boolean
+  /**
+   * G703B-P1: raise the S11 lock for a copy that is ALREADY on screen when its
+   * lease stops being usable (the open path raises it for a refused open)
+   */
+  lockOpened(lock: UniworkDocLock): void
   appVersion(): string
   now?(): number
 }
@@ -116,7 +121,11 @@ export interface OfflineCopiesDeps {
 export interface OfflineCopies {
   /** the read-only copy of `documentId`, written and opened (or why not) */
   open(documentId: string): Promise<OfflineCopyOutcome>
-  /** delete every copy no window shows any more (a poll and each account change run it) */
+  /**
+   * every poll and each account change run it: it deletes every copy no window
+   * shows any more, and locks (and deletes) a copy still on screen whose lease
+   * is no longer usable
+   */
   sweep(): Promise<void>
   /** startup / account activation: every leftover `<id>@offline` folder of the account goes */
   recover(): Promise<void>
@@ -192,16 +201,11 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     const scope = deps.scope()
     if (!library || !scope) return { kind: 'none' }
     const shownBefore = copies.get(documentId)
-    if (shownBefore && deps.isPathOpen(shownBefore.path)) {
-      // already on screen: bring it forward instead of writing a second copy
-      return {
-        kind: 'opened',
-        path: shownBefore.path,
-        title: deps.show(shownBefore.path)?.title ?? shownBefore.title,
-      }
-    }
+    const onScreen = shownBefore !== undefined && deps.isPathOpen(shownBefore.path)
     const dir = deps.store.dirFor(scope.deploymentId, scope.accountId, offlineCopyKey(documentId))
     const row = await library.row(documentId)
+    // the lease check of openCached runs for a copy already on screen too: an
+    // expired lease must not be brought forward (G703B-P1)
     const cached = await library.openCached(documentId)
     const capabilityOn = row ? await deps.capabilityOn(row.orgId).catch(() => false) : true
     if (cached.kind !== 'ok') {
@@ -213,15 +217,27 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       // never a raw server name in a path (BE-R1-1): the lock names one safe segment
       const name = row?.filename ?? documentId
       const safeName = sanitizeFilename(name, formatForName(name) ?? 'docx')
-      return {
+      const refusal: OfflineCopyRefusal = {
         kind: 'refused',
         failure,
         lock: {
-          path: join(dir, safeName),
+          // the lock sits on the tab that shows the copy, when there is one
+          path: onScreen ? shownBefore.path : join(dir, safeName),
           name: safeName,
           reason: failure.lockReason ?? 'lease_expired',
           ...(failure.libraryOff ? { libraryOff: true } : {}),
         },
+      }
+      // the refused copy does not stay served: its plaintext goes with the lock
+      if (onScreen) await drop(documentId, true)
+      return refusal
+    }
+    if (onScreen) {
+      // already on screen: bring it forward instead of writing a second copy
+      return {
+        kind: 'opened',
+        path: shownBefore.path,
+        title: deps.show(shownBefore.path)?.title ?? shownBefore.title,
       }
     }
     const format =
@@ -273,10 +289,37 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     return { kind: 'opened', path, title: shown.title }
   }
 
+  /**
+   * G703B-P1: a copy still on screen whose lease lapsed (or was rolled back /
+   * locked) is locked in place - the row already derives the reason at read
+   * time, but nothing fires when it changes, so the existing poll asks.
+   */
+  const lockLapsed = async (documentId: string, copy: { path: string }): Promise<void> => {
+    const row = await deps
+      .library()
+      ?.row(documentId)
+      .catch(() => null)
+    const reason = row?.lockReason
+    if (!row || !reason) return
+    const libraryOff =
+      reason === 'lease_expired' && !(await deps.capabilityOn(row.orgId).catch(() => false))
+    // the plaintext goes first: if it will not, the next pass retries the lock too
+    if (!(await drop(documentId, true))) return
+    deps.lockOpened({
+      path: copy.path,
+      name: basename(copy.path),
+      reason,
+      ...(libraryOff ? { libraryOff: true } : {}),
+    })
+  }
+
   const sweepOne = async (): Promise<void> => {
     const at = now()
     for (const [documentId, copy] of [...copies]) {
-      if (deps.isPathOpen(copy.path)) continue
+      if (deps.isPathOpen(copy.path)) {
+        await lockLapsed(documentId, copy)
+        continue
+      }
       if (at - copy.openedAt < OFFLINE_COPY_CLOSE_GRACE_MS) continue
       await drop(documentId, true)
     }
