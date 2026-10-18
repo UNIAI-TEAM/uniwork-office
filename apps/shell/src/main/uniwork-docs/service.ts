@@ -1525,6 +1525,13 @@ export class UniworkDocsService {
     }
     if (!session) return this.statusOf(doc)
     const ok = await session.editHere()
+    // a denied re-acquire (403/404) ends the session at 'none', a phase onChange never pushes:
+    // drop it like the initial acquire does, so the open editor re-queries its read-only state
+    if (session.view().phase === 'none' && this.editLocks.get(pathKey(path)) === session) {
+      this.editLocks.delete(pathKey(path))
+      session.dispose()
+      this.notifyDocStateChanged(path)
+    }
     if (!ok) return null
     const now = this.store.lookup(path)
     if (!now) return null

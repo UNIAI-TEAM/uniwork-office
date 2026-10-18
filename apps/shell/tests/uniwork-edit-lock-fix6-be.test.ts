@@ -803,3 +803,42 @@ describe('Item 4 (VEL-3): explicit editHere failure keeps previous phase and res
     expect(granted?.lockSession?.phase).toBe('held')
   })
 })
+
+describe('EL-1(b) fix10 (EL1B-BE-R3-4): an explicit denied reacquire invalidates the editors state', () => {
+  it.each([403, 404])(
+    'editHere from other -> %i ends the session and pushes doc-state-changed once',
+    async (status) => {
+      vi.useFakeTimers()
+      let mode: 'other' | 'denied' = 'other'
+      const ctx = setupService({
+        acquire: async () => {
+          if (mode === 'other') {
+            throw new UniworkDocError('edit_locked', {
+              status: 423,
+              serverCode: 'document_locked',
+              editLock: {
+                holderName: 'Charles Babbage',
+                since: '2026-10-15T03:12:00Z',
+                expiresAt: '2026-10-15T03:14:00Z',
+                heldByMe: false,
+              },
+            })
+          }
+          throw new UniworkDocError(status === 403 ? 'forbidden' : 'not_found', { status })
+        },
+      })
+      const opened = await ctx.service.openDocument(DOC)
+      if (!opened.ok) throw new Error(opened.error)
+      const path = opened.value.path
+      await vi.advanceTimersByTimeAsync(10)
+      expect(ctx.statuses.at(-1)?.lockSession?.phase).toBe('other')
+      const before = ctx.docStatePushes.filter((p) => p === path).length
+
+      mode = 'denied'
+      // the denial resolves the settled status (no lock session left), and the open editor is told
+      const settled = await ctx.service.editHere(path)
+      expect(settled?.lockSession).toBeUndefined()
+      expect(ctx.docStatePushes.filter((p) => p === path).length).toBe(before + 1)
+    },
+  )
+})
