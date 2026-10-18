@@ -419,17 +419,26 @@ describe('G5-03a S6 service: the guarded clean reload', () => {
     seedCopy()
     const h = setup()
     h.client.detail = detailOf('9', 3, HEAD_BYTES)
-    notice(h)
-    // the fetch happens (the head's checksum is only known after the download):
-    // wait for it to finish rather than for a fixed beat, then let its drop settle
-    await vi.waitFor(() => {
-      expect(h.client.calls.download).toBe(1)
+    // join the notice-triggered guarded reload itself: its promise settles only after
+    // the not-newer decision (G703-R8-2), so the assertions below cannot run early
+    const guarded = h.service as unknown as {
+      guardedReload(path: string, notice: unknown): Promise<void>
+    }
+    const reloads: Promise<void>[] = []
+    const realGuardedReload = guarded.guardedReload.bind(guarded)
+    vi.spyOn(guarded, 'guardedReload').mockImplementation((path, remoteNotice) => {
+      const run = realGuardedReload(path, remoteNotice)
+      reloads.push(run)
+      return run
     })
-    await h.service.docStatus(docPath())
+    notice(h)
+    await vi.waitFor(() => expect(reloads).toHaveLength(1))
+    await reloads[0]
     expect(h.reloaded).toEqual([])
     expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
-    // the base it returned is not newer, so nothing was written
+    // the head was fetched, and its base is not newer, so nothing was written
     expect(h.client.calls.download).toBe(1)
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 3, state: 'saved' })
     expect(await barOf(h)).toBeUndefined()
   })
 })
