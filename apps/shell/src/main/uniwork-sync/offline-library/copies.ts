@@ -277,7 +277,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     // a folder that would not go stays on the record: the next sweep retries
     // instead of forgetting a plaintext leftover (BE-R1-2, BE-R2-8, BE-R2-11)
     if (!(await dropDir(copy.dir))) {
-      scheduleExpiry(documentId)
+      scheduleExpiry(documentId, true)
       return false
     }
     copies.delete(documentId)
@@ -299,8 +299,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     clearTimer(copy)
     const outcome = await dropDirOutcome(copy.dir, stillDue)
     if (outcome !== 'removed') {
-      // a failed removal retries at the lease expiry as before; a called-off one waits
-      scheduleExpiry(documentId, outcome === 'cancelled')
+      scheduleExpiry(documentId, true)
       return outcome
     }
     copy.locked = true

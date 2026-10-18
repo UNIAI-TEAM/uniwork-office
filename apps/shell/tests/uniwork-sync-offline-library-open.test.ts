@@ -408,6 +408,12 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     return outcome.path
   }
 
+  async function openCopyOf(o: OpenHarness): Promise<{ path: string }> {
+    const outcome = await o.copies.open('doc_1')
+    if (outcome.kind !== 'opened') throw new Error(`expected an open, got ${outcome.kind}`)
+    return { path: outcome.path }
+  }
+
   it('(a) the lease lapses while the copy is on screen: the next pass raises lease_expired for its path and the plaintext goes', async () => {
     const o = openHarness()
     dirs.push(o.userDataDir)
@@ -658,6 +664,60 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     o.clock.now += 31_000
     await o.copies.sweep()
     expect(await o.h.manager.row('doc_1')).toMatchObject({ open: false })
+  })
+
+  it('(G703-R7-5) a failed expiry removal retries after a bounded delay and never spins on a zero-delay timer', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    o.clock.now = 1_760_000_000_000
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    o.h.leases.states.set('doc_1', {
+      ...leaseState('valid'),
+      record: { expires_at: new Date(o.clock.now + 40).toISOString() } as never,
+      remainingMs: 40,
+    })
+    const path = (await openCopyOf(o)).path
+    expect(existsSync(path)).toBe(true)
+    const dir = copyDir(o)
+    // the lease lapses and the plaintext will not go (EBUSY)
+    o.clock.now += 50
+    o.h.leases.states.set('doc_1', {
+      ...leaseState('expired'),
+      record: { expires_at: new Date(o.clock.now - 10).toISOString() } as never,
+    })
+    fsFault.rmFault = (target) => target === dir
+    const delays: number[] = []
+    let firings = 0
+    const realSetTimeout = globalThis.setTimeout
+    const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      fn: () => void,
+      ms?: number,
+    ) => {
+      delays.push(ms ?? 0)
+      return realSetTimeout(() => {
+        firings += 1
+        fn()
+      }, ms)
+    }) as typeof setTimeout)
+    try {
+      await o.copies.sweep()
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      // no zero-delay (or near-zero) retry was armed: the retry waits the close grace
+      expect(delays.length).toBeGreaterThan(0)
+      expect(delays.every((ms) => ms >= 30_000)).toBe(true)
+      await new Promise((resolve) => realSetTimeout(resolve, 60))
+      expect(firings).toBe(0)
+    } finally {
+      spy.mockRestore()
+    }
+    // the retry that follows works once the folder lets go
+    fsFault.rmFault = null
+    o.clock.now += 31_000
+    await o.copies.sweep()
+    expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+    expect(existsSync(dir)).toBe(false)
   })
 })
 
