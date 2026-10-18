@@ -989,7 +989,6 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPathOpen: (path) => wiring.isPathOpen(path),
     lockOpened: (lock) => service.recordOfflineLock(lock),
     leaseStamp: (documentId) => runtime.leases.commitStamp(documentId),
-    leaseSettled: (documentId) => runtime.leases.commitSettled(documentId),
     appVersion: () => app.getVersion(),
   })
   // the service opens its cached copy through the same module (B5)

@@ -227,9 +227,6 @@ function openHarness(options: { lease?: LeaseManager } = {}): OpenHarness {
     appVersion: () => '0.0.0-test',
     lockOpened: (lock) => service.recordOfflineLock(lock),
     leaseStamp: (documentId) => options.lease?.commitStamp(documentId) ?? leaseStamp.value,
-    ...(options.lease
-      ? { leaseSettled: (documentId: string) => options.lease!.commitSettled(documentId) }
-      : {}),
     now: () => clock.now,
   })
   const api = createOfflineLibraryApi({
@@ -764,13 +761,19 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     expect(existsSync(path)).toBe(true)
   })
 
-  it('(G703-R7-1) a renewal committing while the native removal is pending keeps the copy: bytes back at the path, no lock, open stays true', async () => {
+  /**
+   * G703-R7-1 residual (Advisor option 2): a REAL LeaseManager renews while the real
+   * native removal of the expired copy is held by a gate. The removal cannot be
+   * called off any more, so the plaintext goes and the lease_expired lock stands.
+   */
+  async function renewDuringRemoval() {
     const base = mkdtempSync(join(tmpdir(), 'uw-offline-r71-'))
     dirs.push(base)
     const rl = realLease(base)
     const o = openHarness({ lease: rl.lease })
     dirs.push(o.userDataDir)
     o.clock.now = LEASE_T0
+    const markOpen = vi.spyOn(o.h.manager, 'markOpen')
     const path = await openCopy(o)
     const bytes = await readFile(path)
     const dir = copyDir(o)
@@ -792,23 +795,57 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     }
     const sweep = o.copies.sweep()
     await started
-    // the renewal commits while the removal is still pending
+    // the renewal commits while the removal is already in flight
     expect((await rl.lease.renew('doc_1')).kind).toBe('renewed')
     expect((await rl.lease.effectiveState('doc_1')).usable).toBe(true)
     fsFault.rmGate = null
     releaseRemoval()
     await sweep
-    expect(o.locks).toEqual([])
+    return { o, rl, path, bytes, dir, markOpen }
+  }
+
+  it('(G703-R7-1 residual) a renewal committing while the native removal is in flight leaves the lease_expired lock: plaintext gone, tab count kept, the queue not blocked', async () => {
+    const { o, path, dir } = await renewDuringRemoval()
+    expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+    expect(existsSync(path)).toBe(false)
+    expect(existsSync(dir)).toBe(false)
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
+    // a later pass leaves the locked copy alone: no second lock, no restore
+    await o.copies.sweep()
+    expect(o.locks).toHaveLength(1)
+    expect(existsSync(dir)).toBe(false)
+    // nothing waits on the lease commit: a following dropAll completes
+    await o.copies.dropAll()
+    expect(existsSync(dir)).toBe(false)
+  })
+
+  it('(G703-R7-1 residual) the user reopening after that lock gets the cached bytes back: lease valid, one open-tab count, no second lock', async () => {
+    const { o, rl, path, bytes, dir, markOpen } = await renewDuringRemoval()
+    expect(o.locks).toHaveLength(1)
+    expect(o.service.currentLocks()).toEqual([expect.objectContaining({ reason: 'lease_expired' })])
+    // the normal open path: the server read fails offline, the cached copy answers
+    expect(await o.service.openDocument('doc_1')).toMatchObject({ ok: true, value: { path } })
     expect((await rl.lease.effectiveState('doc_1')).usable).toBe(true)
-    expect(existsSync(path)).toBe(true)
     expect(Buffer.compare(await readFile(path), bytes)).toBe(0)
     expect(existsSync(join(dir, BINDING_FILE))).toBe(true)
     expect((await stat(path)).mode & 0o222).toBe(0)
+    // the S11 panel stays until the user closes it; the reopen raised no second lock
+    expect(o.locks).toHaveLength(1)
+    o.service.dismissLock(path)
+    expect(o.service.currentLocks()).toEqual([])
+    // R7-2 semantics: the copy kept its tab count, the reopen took no second one
+    expect(markOpen).toHaveBeenCalledTimes(1)
     expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
-    // the restored copy is a live tracked copy: a later pass finds a valid lease and leaves it
+    // the reopened copy is live: a later pass sees the valid lease and leaves it, no lock
     await o.copies.sweep()
-    expect(o.locks).toEqual([])
+    expect(o.locks).toHaveLength(1)
     expect(existsSync(path)).toBe(true)
+    // the one tab closes for good: one markClosed was enough
+    o.pathOpen.value = false
+    o.clock.now += 31_000
+    await o.copies.sweep()
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: false })
+    expect(existsSync(dir)).toBe(false)
   })
 
   it('(G703-R8-4) the real manager keeps the stamp odd while a commit is pending, advances it after a success and after a thrown write, and the copy lock defers while it is odd', async () => {

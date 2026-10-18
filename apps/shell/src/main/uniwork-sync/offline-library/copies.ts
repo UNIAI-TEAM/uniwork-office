@@ -146,8 +146,6 @@ export interface OfflineCopiesDeps {
    * so a destructive lock decision made on an older read can tell it went stale.
    */
   leaseStamp?(documentId: string): number
-  /** G703-R7-1: resolves once no lease commit of the document is in flight */
-  leaseSettled?(documentId: string): Promise<void>
   now?(): number
 }
 
@@ -503,48 +501,16 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       copies.get(documentId) === copy &&
       (deps.leaseStamp?.(documentId) ?? 0) === stamp
     if ((await lockInPlace(documentId, stillDue)) !== 'removed') return
-    // a renewal that committed while the removal ran must not lose its copy
-    if (await restoreRenewed(documentId, copy, stamp)) return
+    // G703-R7-1 residual (Advisor option 2): a renewal that commits while the native
+    // removal is already in flight cannot call it off - the plaintext is gone and this
+    // lease_expired lock stands. The lease itself is valid, so the user's reopen
+    // recovers: `openCached` sees the renewed lease and writes the copy again.
     deps.lockOpened({
       path: copy.path,
       name: basename(copy.path),
       reason,
       ...(reason === 'lease_expired' && libraryOff ? { libraryOff: true } : {}),
     })
-  }
-
-  /**
-   * G703-R7-1: the plaintext of an expired copy is already gone, but a lease
-   * commit landed (or was in flight) while it went. The renewed lease must keep
-   * its copy: once the commit settled, the bytes come back from the encrypted
-   * cache at the same path and the tab stays open with no lock. False when the
-   * stamp did not move or the copy cannot be re-established (an unusable lease
-   * refuses `openCached`): the lock the caller was about to raise stands.
-   */
-  const restoreRenewed = async (
-    documentId: string,
-    copy: TrackedCopy,
-    stamp: number,
-  ): Promise<boolean> => {
-    if ((deps.leaseStamp?.(documentId) ?? 0) === stamp) return false
-    await deps.leaseSettled?.(documentId)
-    const library = deps.library()
-    if (!library || copies.get(documentId) !== copy) return false
-    const row = await library.row(documentId).catch(() => null)
-    const cached = await library.openCached(documentId).catch(() => null)
-    const format = cached?.kind === 'ok' ? formatOfCached(cached) : null
-    if (!row || cached?.kind !== 'ok' || !format) return false
-    const path = await writeCopy(documentId, copy.dir, row, cached, format)
-    if (path !== copy.path) {
-      // a head with another file name cannot reuse the tab's path: the lock stands
-      await dropDir(copy.dir)
-      return false
-    }
-    copy.locked = false
-    copy.orgId = row.orgId
-    copy.leaseUntilMs = parseExpiryMs(row.leaseUntil)
-    scheduleExpiry(documentId)
-    return true
   }
 
   const sweepOne = async (): Promise<void> => {
