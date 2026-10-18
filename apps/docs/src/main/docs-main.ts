@@ -7,6 +7,7 @@ import {
   uniworkIsLocked,
   uniworkRefusesOpen,
   uniworkSamePath,
+  uniworkReadOnlySave,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import { createHash, randomUUID } from 'node:crypto'
@@ -5127,6 +5128,13 @@ export function registerDocsIpc(): void {
       return { bound: false, readOnly: false }
     }
     return uniworkDocState(filePath)
+  })
+
+  // EL-1(b) fix6 (VEL-1): explicit Save on a read-only bound document asks the
+  // shell to explain the lock / view-only state (never writes, never fires hook)
+  ipcMain.handle('docs:uniwork-read-only-save', (event, filePath: unknown) => {
+    if (typeof filePath !== 'string' || !canDocWrite(event.sender.id, filePath)) return
+    uniworkReadOnlySave(filePath)
   })
 
   // crash-recovery copy from a dirty renderer; best-effort, never surfaces

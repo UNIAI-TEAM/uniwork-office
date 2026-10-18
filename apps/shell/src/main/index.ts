@@ -23,6 +23,7 @@ import {
   ipcMain,
   nativeImage,
   nativeTheme,
+  powerMonitor,
   session,
   shell,
   webContents,
@@ -123,6 +124,7 @@ import { registerUniworkWork } from './uniwork-work/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
 import {
   COMMENT_AUTHOR_CHANGED_CHANNEL,
+  UNIWORK_DOC_STATE_CHANGED_CHANNEL,
   createCommentAuthorResolver,
   installUniworkModuleSeams,
   watchCommentAuthorChanges,
@@ -376,6 +378,11 @@ import { reloadPathTarget } from './reload-view'
 import { listDeskDrafts } from './desk-drafts'
 import { runDeskTool } from './desk-tools'
 import { installShellCloseGuard } from './window-close-guard'
+import {
+  beginEditLockWillQuit,
+  finishEditLockWillQuit,
+  quitAgainAfterWillQuit,
+} from './uniwork-docs/edit-lock-quit'
 import {
   activateDetached,
   closeDetachedByPath,
@@ -3856,6 +3863,8 @@ function createShellWindow(): void {
   win.on('closed', () => {
     if (shellWindow === win) shellWindow = null
     if (tabManager === manager) {
+      const dropped = manager.openFilePaths()
+      if (dropped.length > 0) void uniworkDocs?.service.notePathsDropped(dropped)
       tabManager = null
       setDockHost(null)
       publishAllOpenDocuments()
@@ -4117,6 +4126,13 @@ function uniworkDocsWiring() {
     editorStateOf: (path: string) => editorStateOfPath(path),
     activePath: () => tabManager?.activeFilePath(),
     reveal: revealShellWindow,
+    // EL-1(b) fix6 (VEL-2): broadcast lock/access read-only flips to every
+    // editor webContents so open editors re-query uniwork-state in place.
+    pushDocStateChanged: (path: string) => {
+      for (const wc of webContents.getAllWebContents()) {
+        if (!wc.isDestroyed()) wc.send(UNIWORK_DOC_STATE_CHANGED_CHANNEL, { path })
+      }
+    },
     // G8-08: the editor showing the path (its preload listens for the reveal)
     commentsTarget: (path: string) => webContentsForPath(path)?.webContents,
     // G8-08/R1-2: the path the invoking editor window shows, so its held
@@ -4572,6 +4588,8 @@ function registerHomeIpc(): void {
   )
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
   uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+  powerMonitor.on('resume', () => uniworkDocs?.service.notePowerResume())
+  app.on('browser-window-focus', () => uniworkDocs?.service.noteWindowFocus())
   // UniWork work data for the Workbench (home, tasks, calendar, profile); logic in ./uniwork-work
   registerUniworkWork(ipcMain, {
     profile: () => uniworkDeploymentProfile(),
@@ -7032,8 +7050,17 @@ app.on('before-quit', () => {
   stopMcpSync()
 })
 
-// after every window has closed, so the shell window's own 'closed' republish cannot revive the file
-app.on('will-quit', () => {
+// after every window has closed with no veto, so a cancelled close prompt
+// never released the lock. Token is still valid: stopUniworkAccount is after
+// the bounded release on the second pass.
+app.on('will-quit', (event) => {
+  if (beginEditLockWillQuit(uniworkDocs?.service.hasEditLocksToRelease() ?? false) === 'hold') {
+    event.preventDefault()
+    void finishEditLockWillQuit(
+      (capMs) => uniworkDocs?.service.releaseAllEditLocks(capMs) ?? Promise.resolve(),
+    ).then(() => quitAgainAfterWillQuit(() => app.quit()))
+    return
+  }
   stopUniworkAccount()
   fileIndexer?.stop()
   fileIndexStore?.close()

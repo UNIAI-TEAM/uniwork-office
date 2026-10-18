@@ -61,10 +61,10 @@ const enc = (text: string) => new TextEncoder().encode(text)
 const hex = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 
 /** one call the fake server saw; the guard must keep this empty for its document */
-const calls: Array<{ path: string }> = []
+const calls: Array<{ path: string; method: string }> = []
 
-function fakeFetch(url: string): Promise<Response> {
-  calls.push({ path: new URL(url).pathname })
+function fakeFetch(url: string, init?: RequestInit): Promise<Response> {
+  calls.push({ path: new URL(url).pathname, method: init?.method ?? 'GET' })
   return Promise.resolve(
     new Response(
       JSON.stringify({
@@ -371,8 +371,14 @@ describe('a schema-2 store level inside the window opens (OQ-P4)', () => {
     expect(opened.path).toBe(docPath())
     expect(ctx.deps.openPath).toHaveBeenCalledWith(docPath())
     expect(ctx.locks).toEqual([])
-    // the ordinary open flow ran: the document was read once
-    expect(calls).toHaveLength(1)
+    // the ordinary open flow ran: the document was read once. EL-1(b): an open
+    // of a bound editable copy now also acquires the edit lock
+    // (POST /documents/{id}/edit-lock), so the read-once count excludes the
+    // edit-lock routes and the acquire is asserted separately.
+    expect(calls.filter((call) => !call.path.includes('/edit-lock'))).toHaveLength(1)
+    expect(calls.filter((call) => call.path.includes('/edit-lock'))).toEqual([
+      { path: `/api/v1/documents/${DOC}/edit-lock`, method: 'POST' },
+    ])
   })
 })
 

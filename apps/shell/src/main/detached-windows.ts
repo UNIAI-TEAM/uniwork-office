@@ -25,7 +25,7 @@ import { htmlIsDirty, requestHtmlClose } from '../../../html/src/main/html-main'
 import { blankRetiredPage } from './retire-page'
 import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
 import { canonicalPath } from './tab-manager'
-import { confirmUniworkClose } from './uniwork-docs/close-guard'
+import { confirmUniworkClose, notePathsDropped } from './uniwork-docs/close-guard'
 import type { DetachedTab } from './tab-manager'
 import type { OpenDocumentTab, TabKind } from '../shared/tabs-api'
 import { DOCK_BAND_SLACK, DOCK_DWELL_MS, dockBand, pointInRect } from '../shared/tab-drag-geometry'
@@ -530,6 +530,7 @@ export function createDetachedEditorWindow(options: {
     closeConfirmed = true
     clearDockHover(rec)
     if (torn?.rec === rec) torn = null
+    if (filePath) notePathsDropped([filePath])
     win.contentView.removeChildView(view)
     detached.delete(wcId)
     // G5-03a: the window is closed mid AI turn — the document must not stay

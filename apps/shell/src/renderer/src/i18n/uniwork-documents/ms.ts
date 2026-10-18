@@ -169,4 +169,26 @@ export const ms = {
   uwTipEditLockedSelf: 'Anda menyunting dokumen ini dalam tetingkap lain.',
   uwErrEditLocked: 'Orang lain sedang menyunting dokumen ini.',
   uwReasonEditLocked: 'orang lain sedang menyunting',
+  uwLockBannerOther: '{name} sedang menyunting sejak {time}. Anda sedang melihat baca-sahaja.',
+  uwLockBannerSelfElsewhere: 'Anda sedang menyunting dokumen ini di tetingkap lain.',
+  uwLockBannerFree: 'Tiada sesiapa sedang menyunting dokumen ini sekarang.',
+  uwLockEditHere: 'Sunting di sini',
+  uwLockAcquiring: 'Mendapatkan akses sunting…',
+  uwLockReadOnlyExplain: 'Tiada apa disimpan — dokumen baca-sahaja.',
+  uwLockLostTitle: 'Anda tidak lagi menyunting',
+  uwLockLostTakenOver:
+    '{name} telah mengambil alih penyuntingan. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostHandedOver:
+    'Anda telah menyerahkan penyuntingan kepada {name}. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostExpired:
+    'Penyuntingan telah tamat tempoh kerana kami tidak dapat mencapai pelayan untuk seketika (tiada rangkaian atau peranti tertidur). Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostMovedHere:
+    'Anda kini menyunting dokumen ini di tetingkap lain. Perubahan belum disimpan dalam tetingkap ini masih di sini.',
+  uwLockLostAccessLost:
+    'Anda tidak lagi mempunyai kebenaran untuk menyunting dokumen ini. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostGeneric:
+    'Anda tidak lagi menyunting. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostHeldBy:
+    '{name} sedang menyunting sekarang. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockAcquireFailed: 'Tidak dapat memperoleh akses penyuntingan. Cuba lagi dalam beberapa minit.',
 } satisfies Record<keyof typeof zh, string>

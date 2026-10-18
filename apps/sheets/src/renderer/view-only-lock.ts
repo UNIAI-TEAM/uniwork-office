@@ -36,7 +36,9 @@ export function createViewOnlyLock(
   })
   return {
     set(workbook) {
+      const previous = locked
       locked = workbook
+      if (previous && previous !== workbook) apply(previous, true)
       if (workbook) apply(workbook, installing)
     },
   }

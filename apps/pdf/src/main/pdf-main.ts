@@ -6,6 +6,7 @@ import {
   uniworkIsLocked,
   uniworkIsReadOnly,
   uniworkMayRewriteInPlace,
+  uniworkReadOnlySave,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import { PDF_UNIWORK_VIEW_ONLY } from '../shared/uniwork-refusal'
@@ -1395,6 +1396,11 @@ function registerPdfIpc(): void {
       return { bound: false, readOnly: false }
     }
     return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
+  ipcMain.handle(PDF_CHANNELS.uniworkReadOnlySave, (e, path: unknown) => {
+    if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) return
+    uniworkReadOnlySave(path)
   })
 
   ipcMain.handle(

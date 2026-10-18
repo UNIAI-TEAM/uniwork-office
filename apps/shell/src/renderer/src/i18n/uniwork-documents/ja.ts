@@ -171,4 +171,21 @@ export const ja = {
   uwTipEditLockedSelf: 'あなたは別のウィンドウでこの文書を編集しています。',
   uwErrEditLocked: '他のユーザーがこの文書を編集中です。',
   uwReasonEditLocked: '他のユーザーが編集中',
+  uwLockBannerOther: '{name} が {time} から編集中です。あなたは読み取り専用で表示しています。',
+  uwLockBannerSelfElsewhere: 'この文書は別のウィンドウで編集中です。',
+  uwLockBannerFree: '現在、この文書を編集している人はいません。',
+  uwLockEditHere: 'ここで編集',
+  uwLockAcquiring: '編集アクセスを取得しています…',
+  uwLockReadOnlyExplain: '何も保存されませんでした — 文書は読み取り専用です。',
+  uwLockLostTitle: 'あなたはもう編集していません',
+  uwLockLostTakenOver: '{name} が編集を引き継ぎました。未保存の変更はまだ残っています。',
+  uwLockLostHandedOver: '編集を {name} に引き渡しました。未保存の変更はまだ残っています。',
+  uwLockLostExpired:
+    'しばらくサーバーに接続できなかったため（ネットワークなしまたはデバイスがスリープ）、編集権が失効しました。未保存の変更はまだ残っています。',
+  uwLockLostMovedHere:
+    'この文書は別のウィンドウで編集中になりました。このウィンドウの未保存の変更はまだ残っています。',
+  uwLockLostAccessLost: 'この文書を編集する権限がありません。未保存の変更はまだ残っています。',
+  uwLockLostGeneric: 'あなたはもう編集していません。未保存の変更はまだ残っています。',
+  uwLockLostHeldBy: '{name} が現在編集しています。未保存の変更はまだ残っています。',
+  uwLockAcquireFailed: '編集アクセスを取得できませんでした。数分後にもう一度お試しください。',
 } satisfies Record<keyof typeof zh, string>

@@ -6,7 +6,14 @@ import type {
 } from '../../shared/sync-center'
 import type { StringKey } from './locale'
 import { blockedCopy } from './sync-center-model'
-import { blockedReasonKey, formatSaveTime } from './uniwork-docs-model'
+import {
+  blockedReasonKey,
+  formatSaveTime,
+  isEditLockReadOnlyPhase,
+  isTerminalLockLostReason,
+  lostHolderNameOf,
+  lostReasonKeyOf,
+} from './uniwork-docs-model'
 
 /**
  * Pure model of the queue popover (S4, EXPERIENCE "Queue popover"): which lines it reads, which
@@ -17,7 +24,14 @@ import { blockedReasonKey, formatSaveTime } from './uniwork-docs-model'
 export type QueuePopoverOpener = 'pill' | 'ctrl-s'
 
 export type PopoverActionId =
-  'sign-in' | 'sign-in-again' | 'recheck' | 'retry' | 'save-again' | 'cancel' | 'open-center'
+  | 'sign-in'
+  | 'sign-in-again'
+  | 'recheck'
+  | 'retry'
+  | 'save-again'
+  | 'cancel'
+  | 'open-center'
+  | 'edit-here'
 
 export interface PopoverAction {
   id: PopoverActionId
@@ -35,6 +49,8 @@ export interface PopoverLine {
   reasonKey?: StringKey
   /** `{max}` in bytes when `reasonKey` is `uwReasonTooLargeWithLimit` */
   maxBytes?: number
+  /** `{name}`: the lock holder's / taker's name; the component fills lostSomeone when absent */
+  name?: string
 }
 
 export interface QueuePopoverModel {
@@ -75,7 +91,12 @@ function isStoreRefusal(status: UniworkDocStatus): boolean {
 }
 
 export function isQueuePopoverState(status: UniworkDocStatus): boolean {
-  return POPOVER_STATES.has(status.state) || isStoreRefusal(status)
+  // EL-1(b): Ctrl/Cmd+S on a read-only-by-lock document opens the lock explanation
+  return (
+    POPOVER_STATES.has(status.state) ||
+    isStoreRefusal(status) ||
+    isEditLockReadOnlyPhase(status.lockSession?.phase)
+  )
 }
 
 /** the sync-center row of this document: pending first, then attention */
@@ -173,6 +194,43 @@ export function queuePopoverModelOf(
 ): QueuePopoverModel {
   const openCenter: PopoverAction = { id: 'open-center', labelKey: 'uwQueueOpenCenter' }
   const maxBytes = row?.maxBytes ?? status.maxBytes
+
+  // EL-1(b): Ctrl/Cmd+S on a document read-only because of the lock session does not save —
+  // the popover says so (line 1), repeats the banner's sentence (line 2; for 'lost' its
+  // reason) and, where the banner offers it, the one "Sửa ở đây" action. 'other' has no
+  // way on until EL-2 (request / take-over dialogs are its scope).
+  const session = status.lockSession
+  if (session && isEditLockReadOnlyPhase(session.phase)) {
+    const heldBy = lostHolderNameOf(session)
+    const line2: PopoverLine =
+      session.phase === 'lost'
+        ? heldBy
+          ? { key: 'uwLockLostHeldBy', name: heldBy }
+          : {
+              key: lostReasonKeyOf(session.lostReason),
+              ...(session.lostReason === 'taken_over' || session.lostReason === 'handed_over'
+                ? { name: session.byName ?? undefined }
+                : {}),
+            }
+        : session.phase === 'other'
+          ? {
+              key: 'uwLockBannerOther',
+              name: session.holderName ?? undefined,
+              time: session.since ?? undefined,
+            }
+          : session.phase === 'self_elsewhere'
+            ? { key: 'uwLockBannerSelfElsewhere' }
+            : { key: 'uwLockBannerFree' }
+    return {
+      line1: { key: 'uwLockReadOnlyExplain' },
+      line2,
+      actions:
+        session.phase === 'other' ||
+        (session.phase === 'lost' && isTerminalLockLostReason(session.lostReason))
+          ? []
+          : [{ id: 'edit-here', labelKey: 'uwLockEditHere' }],
+    }
+  }
 
   // refused before anything was queued: the reason is the whole message
   if (isStoreRefusal(status)) {

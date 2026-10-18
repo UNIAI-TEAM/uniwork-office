@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import type { UniworkDocStatus } from '../../shared/home-api'
+import type { UniworkDocEditLock, UniworkDocStatus } from '../../shared/home-api'
 import type { Binding, BindingStore, BoundDocument } from './binding-store'
 import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
@@ -177,6 +177,17 @@ export interface SaveCoordinatorDeps {
    * key the queue is already running (G506-be-1).
    */
   dispatcherBusy?(docKey: string): boolean
+  /**
+   * EL-1(b) Q2: acquire before the first queued commit when the session is
+   * 'unreachable'. 'park' = 423 — fail as edit_locked, send no commit.
+   */
+  prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
+  /** EL-1(b): lock id of a held path, sent as commit `edit_lock_id` */
+  editLockId?(path: string): string | null
+  /** EL-1(b) B8: holder summary for a synthesised park 423 */
+  editLockHolder?(path: string): UniworkDocEditLock | null
+  /** EL-1(b): 423 on commit while held — session becomes 'lost' */
+  onCommitEditLocked?(path: string, error: UniworkDocError): void
 }
 
 /**
@@ -965,11 +976,22 @@ export class SaveCoordinator {
         if (!this.deps.isSignedIn() || !this.deps.ownsBinding(doc)) {
           throw new UniworkDocError('not_signed_in')
         }
+        const prepared = (await this.deps.prepareEditLock?.(doc.path)) ?? 'proceed'
+        if (prepared === 'park') {
+          const holder = this.deps.editLockHolder?.(doc.path)
+          throw new UniworkDocError('edit_locked', {
+            status: 423,
+            serverCode: 'document_locked',
+            ...(holder ? { editLock: holder } : {}),
+          })
+        }
+        const editLockId = this.deps.editLockId?.(doc.path) ?? null
         return await this.deps.client.commit({
           documentId: intent.documentId,
           uploadId: upload.uploadId,
           baseRevision: intent.baseRevision,
           idempotencyKey: intent.idempotencyKey,
+          ...(editLockId ? { editLockId } : {}),
         })
       } catch (error) {
         const inFlight =
@@ -1061,6 +1083,8 @@ export class SaveCoordinator {
         // timer: park the intent in `failed` with `lastError: 'edit_locked'` so
         // the recovery snapshot is kept on disk until the user explicitly saves
         // again or closes the document.
+        // EL-1(b): a 423 while we held also flips the session to 'lost'.
+        this.deps.onCommitEditLocked?.(doc.path, error)
         this.pendingNext.delete(doc.path)
         await this.settleRecord(intents, doc, intent, {
           type: 'commitFailed',
