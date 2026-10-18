@@ -1705,7 +1705,7 @@ export class UniworkDocsService {
     ) {
       const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
       this.lastOwner = owner
-      void this.store.writeLastOwner(owner).catch(() => undefined)
+      this.store.writeLastOwner(owner)
     }
     return identity
   }

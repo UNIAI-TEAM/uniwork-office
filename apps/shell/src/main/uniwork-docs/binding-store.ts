@@ -1,4 +1,13 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import { mkdir, readFile, unlink } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -533,12 +542,20 @@ export class BindingStore {
     }
   }
 
-  async writeLastOwner(owner: LastOwner): Promise<void> {
-    await mkdir(this.root, { recursive: true })
-    await atomicWriteFile(
-      join(this.root, LAST_OWNER_FILE),
-      new TextEncoder().encode(`${JSON.stringify(owner)}\n`),
-    )
+  writeLastOwner(owner: LastOwner): void {
+    const target = join(this.root, LAST_OWNER_FILE)
+    const tmp = join(this.root, `.${LAST_OWNER_FILE}.${randomBytes(6).toString('hex')}.tmp`)
+    try {
+      mkdirSync(this.root, { recursive: true })
+      writeFileSync(tmp, `${JSON.stringify(owner)}\n`, 'utf8')
+      renameSync(tmp, target)
+    } catch {
+      try {
+        unlinkSync(tmp)
+      } catch {
+        // ignore cleanup failure
+      }
+    }
   }
 
   /** the path lies under the working-copy root (bound or not) */
