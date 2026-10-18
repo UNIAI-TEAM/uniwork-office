@@ -7,7 +7,7 @@ import type { UniworkDocStatus, UniworkQueuePopoverRequest } from '../src/shared
 import type { DocumentDetail } from '../src/main/uniwork-docs/parse'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
 import type { UniworkDocsClient } from '../src/main/uniwork-docs/client'
-import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import { errorFromResponse, UniworkDocError } from '../src/main/uniwork-docs/errors'
 import type {
   EditLockState,
   EditLockTenure,
@@ -136,6 +136,8 @@ afterEach(() => {
 
 function setupService(opts: {
   myLevel?: 'edit' | 'view'
+  /** the live account; mutate `.id` to switch it */
+  account?: { id: string }
   getState?: UniworkEditLockClient['getState']
   acquire?: UniworkEditLockClient['acquire']
   heartbeat?: UniworkEditLockClient['heartbeat']
@@ -214,7 +216,11 @@ function setupService(opts: {
     }),
     channel: () => 'stable' as const,
     applyProfile: async () => 'unchanged' as const,
-    identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+    identity: () => ({
+      accountId: opts.account?.id ?? 'acc_1',
+      deviceSessionId: 'dev_1',
+      deploymentId: 'default',
+    }),
     selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
     authorized: <T>(call: (token: string) => Promise<T>) => call('tok'),
     openPath: () => true,
@@ -889,4 +895,246 @@ describe('EL-1(b) fix10 (EL1B-BE-R3-4): an explicit denied reacquire invalidates
       expect(ctx.service.isReadOnly(path)).toBe(true)
     },
   )
+})
+
+// EL-1(b) fix12 (EL1B-BE-R3D-1..6): a denied explicit reacquire is read-only IN MEMORY. Only a
+// coded denial counts; nothing is persisted, so the stored access (view / recovery) is untouched.
+describe('EL-1(b) fix12: a coded denial of the edit lock is an in-memory read-only, never a revocation', () => {
+  const HOLDER = {
+    holderName: 'Charles Babbage',
+    since: '2026-10-15T03:12:00Z',
+    expiresAt: '2026-10-15T03:14:00Z',
+    heldByMe: false,
+  }
+  const locked = () =>
+    new UniworkDocError('edit_locked', {
+      status: 423,
+      serverCode: 'document_locked',
+      editLock: HOLDER,
+    })
+  const coded = (status: 403 | 404) =>
+    errorFromResponse(status, { error: { code: status === 403 ? 'forbidden' : 'not_found' } })
+  const bindingOf = (path: string) =>
+    JSON.parse(readFileSync(join(path, '..', 'binding.json'), 'utf8')) as {
+      access: string
+      state: string
+      error?: string
+      level?: string
+    }
+  const sessionsOf = (service: UniworkDocsService) =>
+    (service as unknown as { editLocks: Map<string, EditLockSession> }).editLocks
+
+  async function openWith(ctx: ReturnType<typeof setupService>) {
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    await vi.advanceTimersByTimeAsync(10)
+    return opened.value.path
+  }
+
+  // R3D-1/8/9: a gateway page (no envelope) is as transient as a 5xx
+  it.each([
+    ['gateway HTML 403', 403, '<html><body>403 Forbidden</body></html>'],
+    ['envelope-less 404', 404, undefined],
+  ] as const)(
+    '%s on an explicit reacquire: no denial, the phase is kept',
+    async (_name, status, body) => {
+      vi.useFakeTimers()
+      let mode: 'other' | 'bare' | 'grant' = 'other'
+      const ctx = setupService({
+        acquire: async () => {
+          if (mode === 'other') throw locked()
+          if (mode === 'bare') throw errorFromResponse(status, body)
+          return TENURE
+        },
+      })
+      const path = await openWith(ctx)
+      expect(ctx.statuses.at(-1)?.lockSession?.phase).toBe('other')
+
+      mode = 'bare'
+      expect(await ctx.service.editHere(path)).toBeNull()
+      await vi.advanceTimersByTimeAsync(10)
+      expect(ctx.statuses.at(-1)?.lockSession?.phase).toBe('other')
+      expect(ctx.service.isLocked(path)).toBe(false)
+      expect(bindingOf(path)).toMatchObject({ access: 'edit' })
+      expect(bindingOf(path).state).not.toBe('blocked')
+
+      // the door is still open: a granted reacquire edits again
+      mode = 'grant'
+      expect((await ctx.service.editHere(path))?.lockSession?.phase).toBe('held')
+      expect(ctx.service.isReadOnly(path)).toBe(false)
+    },
+  )
+
+  it('a bare 403 on the open-time acquire is unreachable, not a dropped session or a lock', async () => {
+    vi.useFakeTimers()
+    const ctx = setupService({
+      acquire: async () => {
+        throw errorFromResponse(403, '<html>blocked by a proxy</html>')
+      },
+    })
+    const path = await openWith(ctx)
+    expect(ctx.statuses.at(-1)?.lockSession?.phase).toBe('unreachable')
+    expect(ctx.service.isLocked(path)).toBe(false)
+    expect(bindingOf(path).state).not.toBe('blocked')
+  })
+
+  // R3D-2: an edit denial is not the loss of the document
+  it.each([403, 404] as const)(
+    'a coded %i after an edit->view downgrade: read-only to edit, view and export stay allowed, access untouched',
+    async (status) => {
+      vi.useFakeTimers()
+      const level = { current: 'edit' as 'edit' | 'view' }
+      let mode: 'other' | 'denied' = 'other'
+      const ctx = setupService({
+        get myLevel() {
+          return level.current
+        },
+        acquire: async () => {
+          if (mode === 'other') throw locked()
+          throw coded(status)
+        },
+      })
+      const path = await openWith(ctx)
+      const before = bindingOf(path)
+
+      level.current = 'view'
+      mode = 'denied'
+      await ctx.service.editHere(path)
+      await vi.advanceTimersByTimeAsync(10)
+
+      expect(ctx.service.isReadOnly(path)).toBe(true)
+      // not a revocation: the export / print gate and the stored binding are as they were
+      expect(ctx.service.isLocked(path)).toBe(false)
+      expect(bindingOf(path)).toEqual(before)
+
+      // the authoritative read still says view: a reopen keeps the view/recovery path open
+      await ctx.service.openDocument(DOC)
+      await vi.advanceTimersByTimeAsync(10)
+      expect(ctx.service.isLocked(path)).toBe(false)
+      expect(bindingOf(path).state).not.toBe('blocked')
+      expect(bindingOf(path).access).toBe('view')
+    },
+  )
+
+  // R3D-3: account A's late denial never reaches account B's copy
+  it('A denied after B is live: the B copy is unaffected, nothing is blocked or remembered for B', async () => {
+    vi.useFakeTimers()
+    const account = { id: 'acc_1' }
+    let mode: 'other' | 'defer' | 'grant' = 'other'
+    let refuse: (error: unknown) => void = () => undefined
+    const ctx = setupService({
+      account,
+      acquire: async () => {
+        if (mode === 'other') throw locked()
+        if (mode === 'defer') {
+          return new Promise<EditLockTenure>((_, reject) => {
+            refuse = reject
+          })
+        }
+        return TENURE
+      },
+    })
+    const pathA = await openWith(ctx)
+
+    mode = 'defer'
+    const pending = ctx.service.editHere(pathA)
+    await vi.advanceTimersByTimeAsync(10)
+
+    account.id = 'acc_2'
+    mode = 'grant'
+    const pathB = await openWith(ctx)
+    expect(pathB).not.toBe(pathA)
+    expect(ctx.service.isReadOnly(pathB)).toBe(false)
+
+    refuse(coded(403))
+    await pending
+    await vi.advanceTimersByTimeAsync(10)
+
+    expect(ctx.service.isReadOnly(pathB)).toBe(false)
+    expect(ctx.service.isLocked(pathB)).toBe(false)
+    expect(bindingOf(pathB).state).not.toBe('blocked')
+    expect(bindingOf(pathB).access).toBe('edit')
+    expect(bindingOf(pathA).state).not.toBe('blocked')
+    // A's own copy was not marked either: the denial belonged to an identity that was gone
+    account.id = 'acc_1'
+    expect(ctx.service.isReadOnly(pathA)).toBe(false)
+  })
+
+  // R3D-6: an older attempt finishing after a newer one finalizes nothing
+  it('an older denial finishing after a newer grant keeps the grant', async () => {
+    vi.useFakeTimers()
+    let mode: 'other' | 'denied' | 'grant' = 'other'
+    const ctx = setupService({
+      acquire: async () => {
+        if (mode === 'other') throw locked()
+        if (mode === 'denied') throw coded(403)
+        return TENURE
+      },
+    })
+    const path = await openWith(ctx)
+    const session = [...sessionsOf(ctx.service).values()][0]!
+    // the first attempt's continuation runs only after a second one was granted
+    const original = session.editHere.bind(session)
+    let calls = 0
+    vi.spyOn(session, 'editHere').mockImplementation(async () => {
+      calls += 1
+      if (calls > 1) return original()
+      mode = 'denied'
+      const first = await original()
+      mode = 'grant'
+      await original()
+      return first
+    })
+
+    const settled = await ctx.service.editHere(path)
+    await vi.advanceTimersByTimeAsync(10)
+
+    expect(session.view().phase).toBe('held')
+    expect(settled?.lockSession?.phase).toBe('held')
+    expect(ctx.service.isReadOnly(path)).toBe(false)
+    expect([...sessionsOf(ctx.service).values()]).toEqual([session])
+  })
+
+  // item 6: the denial is spent by a grant or by an authoritative read that allows edit
+  it('a later grant clears the denial', async () => {
+    vi.useFakeTimers()
+    let mode: 'other' | 'denied' | 'grant' = 'other'
+    const ctx = setupService({
+      acquire: async () => {
+        if (mode === 'other') throw locked()
+        if (mode === 'denied') throw coded(403)
+        return TENURE
+      },
+    })
+    const path = await openWith(ctx)
+    mode = 'denied'
+    await ctx.service.editHere(path)
+    expect(ctx.service.isReadOnly(path)).toBe(true)
+
+    mode = 'grant'
+    expect((await ctx.service.editHere(path))?.lockSession?.phase).toBe('held')
+    expect(ctx.service.isReadOnly(path)).toBe(false)
+  })
+
+  it('an authoritative read that allows edit clears the denial', async () => {
+    vi.useFakeTimers()
+    let mode: 'other' | 'denied' | 'unreachable' = 'other'
+    const ctx = setupService({
+      acquire: async () => {
+        if (mode === 'other') throw locked()
+        if (mode === 'denied') throw coded(403)
+        throw new UniworkDocError('server_error', { status: 500, retried: true })
+      },
+    })
+    const path = await openWith(ctx)
+    mode = 'denied'
+    await ctx.service.editHere(path)
+    expect(ctx.service.isReadOnly(path)).toBe(true)
+
+    // the reopen reads the document (edit allowed) and its lock probe is merely unreachable
+    mode = 'unreachable'
+    await ctx.service.openDocument(DOC)
+    await vi.advanceTimersByTimeAsync(10)
+    expect(ctx.service.isReadOnly(path)).toBe(false)
+  })
 })

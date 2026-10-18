@@ -2168,3 +2168,82 @@ describe('BIGUP-A1: the service wires the chunked version path', () => {
     ).toBe(true)
   })
 })
+
+// EL-1(b) fix12 (EL1B-BE-R3D-4): a coded denial of the edit lock is an in-memory read-only that
+// gates every Save and replay, so an existing offline intent is neither uploaded nor committed and
+// stays exactly as it is (no binding write is involved, so no write failure can lift the gate).
+describe('EL-1(b) fix12: a denied edit lock and an existing offline intent', () => {
+  /** the documents server plus the edit-lock route: every acquire answers a coded 403 */
+  function denyingLock(real: ReturnType<typeof fakeServer>) {
+    const fetch = vi.fn(async (url: string, init: RequestInit): Promise<Response> => {
+      if (new URL(url).pathname.includes('/edit-lock')) {
+        return new Response(JSON.stringify({ error: { code: 'forbidden', message: 'x' } }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return real.fetch(url, init)
+    })
+    return { ...real, fetch } as ReturnType<typeof fakeServer>
+  }
+
+  it('Save, the user-save hook and the queue replay send nothing and keep the intent intact', async () => {
+    const real = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(denyingLock(real))
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4 unsent')
+    ctx.setCapabilityOffline(true)
+    await ctx.service.save(path)
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'paused_offline' })
+    const intent = await storedIntent(ctx, path)
+    expect(intent).not.toBeNull()
+    const sent = { uploads: uploads(real).length, commits: commits(real).length }
+    const moduleSaves = vi.mocked(ctx.deps.requestModuleSave as () => boolean).mock.calls.length
+
+    // "Sửa ở đây" is refused with the server's coded 403
+    await ctx.service.editHere(path)
+    expect(ctx.service.isReadOnly(path)).toBe(true)
+
+    // the network comes back and everything that could send is asked to
+    ctx.setCapabilityOffline(false)
+    await ctx.service.setQueueOnline(true)
+    await ctx.service.save(path)
+    ctx.service.onUserSave(path)
+    await ctx.service.pollSaveQueue()
+    await ctx.service.pollSaveQueue()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(uploads(real).length).toBe(sent.uploads)
+    expect(commits(real).length).toBe(sent.commits)
+    expect(vi.mocked(ctx.deps.requestModuleSave as () => boolean).mock.calls.length).toBe(
+      moduleSaves,
+    )
+    const after = await storedIntent(ctx, path)
+    expect(after).not.toBeNull()
+    expect(after?.intent.intentId).toBe(intent?.intent.intentId)
+    expect(after?.intent.checksum).toBe(intent?.intent.checksum)
+    expect(after?.payload).toEqual(intent?.payload)
+    expect(binding(path)).toMatchObject({ access: 'edit' })
+    expect(binding(path).state).not.toBe('blocked')
+    expect(readFileSync(path, 'utf8')).toBe('v4 unsent')
+  })
+
+  it('a user-save hook that fires on a denied dirty copy mints and sends nothing', async () => {
+    const real = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(denyingLock(real))
+    const path = await openDoc(ctx)
+    await ctx.service.editHere(path)
+    expect(ctx.service.isReadOnly(path)).toBe(true)
+
+    // a module write that raced the denial still reaches the user-save hook
+    writeFileSync(path, 'v4 raced')
+    ctx.service.onUserSave(path)
+    await ctx.service.pollSaveQueue()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(uploads(real)).toHaveLength(0)
+    expect(commits(real)).toHaveLength(0)
+    expect(await storedIntent(ctx, path)).toBeNull()
+    expect(binding(path).state).not.toBe('blocked')
+  })
+})
