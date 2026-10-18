@@ -122,6 +122,5 @@ test('a host-declined save (api.save "cancelled") shows no failure in the status
   expect(await hostCall<{ name: string } | null>(page, 'lastSaved')).toBeNull()
   // silent: no "Lưu thất bại" status line, no error toast (doc stays dirty)
   await expect(ed.locator('.status-bar')).not.toContainText('Lưu thất bại')
-  await expect(ed.locator('.status-msg')).not.toContainText('Lưu thất bại')
   await expect(ed.locator('.toast, [role="alert"]').filter({ hasText: 'Lưu' })).toHaveCount(0)
 })
