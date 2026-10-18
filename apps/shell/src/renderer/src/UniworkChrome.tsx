@@ -1205,6 +1205,13 @@ export function UniworkRemoteBar({
   const act = useCallback(
     (kind: RemoteBarAction['kind']) => {
       if (!status) return
+      if (kind === 'open-center') {
+        // renderer-local action: the same uniwork:open-settings event the queue popover sends
+        window.dispatchEvent(
+          new CustomEvent('uniwork:open-settings', { detail: { section: 'sync' } }),
+        )
+        return
+      }
       if (kind === 'later' || kind === 'close') hide()
       setBusy(true)
       void window.aiOffice

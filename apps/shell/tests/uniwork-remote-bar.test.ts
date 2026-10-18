@@ -91,7 +91,19 @@ describe('remoteBarModelOf', () => {
     expect(commit.actions[0]!.disabledReasonKey).toBe('uwRemoteWaitCommit')
     const stuck = remoteBarModelOf(status({ kind: 'newer-dirty', version: 4, wait: 'stuck' }))!
     expect(stuck.actions[0]!.disabledReasonKey).toBe('uwRemoteWaitStuck')
-    expect(stuck.actions[1]!.disabledReasonKey).toBeUndefined()
+    expect(stuck.actions[2]!.disabledReasonKey).toBeUndefined()
+  })
+
+  it('newer-dirty stuck: Open sync center joins Reload and Later; other waits do not offer it', () => {
+    const stuck = remoteBarModelOf(status({ kind: 'newer-dirty', version: 4, wait: 'stuck' }))!
+    expect(stuck.actions.map((a) => a.kind)).toEqual(['reload', 'open-center', 'later'])
+    expect(stuck.actions[1]).toMatchObject({ labelKey: 'uwQueueOpenCenter' })
+    for (const wait of [undefined, 'commit'] as const) {
+      const kinds = remoteBarModelOf(
+        status({ kind: 'newer-dirty', version: 4, ...(wait ? { wait } : {}) }),
+      )!.actions.map((a) => a.kind)
+      expect(kinds, String(wait)).toEqual(['reload', 'later'])
+    }
   })
 
   it('newer-ai: Reload is disabled until a stop channel exists (D3)', () => {
@@ -457,6 +469,23 @@ describe('UniworkRemoteBar: actions', () => {
       text('en', 'uwRemoteNewerDirty', { n: 5 }),
     )
     watch.stop()
+  })
+
+  it('stuck: Open sync center asks the shell for the sync section and leaves the bar up', async () => {
+    const opened: CustomEvent[] = []
+    const onOpen = (e: Event) => opened.push(e as CustomEvent)
+    window.addEventListener('uniwork:open-settings', onOpen)
+    try {
+      await mount(status({ kind: 'newer-dirty', version: 4, wait: 'stuck' }))
+      await click(button('open-center'))
+      expect(opened).toHaveLength(1)
+      expect(opened[0]!.detail).toEqual({ section: 'sync' })
+      // a navigation action, not a bridge call: the bar and the notice stay
+      expect(remoteAction).not.toHaveBeenCalled()
+      expect(bar()).not.toBeNull()
+    } finally {
+      window.removeEventListener('uniwork:open-settings', onOpen)
+    }
   })
 
   it('Close (updated, revoked) calls the bridge and hides the bar', async () => {
