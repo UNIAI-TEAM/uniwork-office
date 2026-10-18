@@ -24,8 +24,20 @@ import { ID } from '../src/main/uniwork-sync/feed/http'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import type { LeaseClient, OfficeOfflineLeaseSDO } from '../src/main/uniwork-sync/lease/client'
 import { LeaseManager } from '../src/main/uniwork-sync/lease/manager'
-import { LEASE_STORE_REGISTRATION, createLeaseStore } from '../src/main/uniwork-sync/lease/store'
+import {
+  LEASE_STORE_REGISTRATION,
+  createLeaseStore,
+  type LeaseStore,
+} from '../src/main/uniwork-sync/lease/store'
+import {
+  DOC_INDEX_REGISTRATION,
+  FEED_CURSORS_REGISTRATION,
+  SyncRuntime,
+} from '../src/main/uniwork-sync/runtime'
+import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import { createStoreLayer } from '../src/main/uniwork-sync/store'
+import { NEVER_READ_CAPABILITIES } from '../src/main/uniwork-sync/capability/cache'
+import type { FeedClient } from '../src/main/uniwork-sync/feed/client'
 import { createLockableSafeStorage } from '../src/main/uniwork-sync/test-kit/compliance'
 import {
   OFFLINE_COPY_KEY_MAX,
@@ -52,6 +64,8 @@ import {
 const fsFault = vi.hoisted(() => ({
   rmGate: null as null | ((path: string) => Promise<void> | void),
   rmFault: null as null | ((path: string) => boolean),
+  /** runs after a path was made writable (chmod 0o600), before the removal moves on */
+  chmodGate: null as null | ((path: string) => Promise<void> | void),
   probeFault: null as null | ((path: string) => boolean),
 }))
 
@@ -67,6 +81,10 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       await fsFault.rmGate?.(path)
       if (fsFault.rmFault?.(path)) fail('EBUSY')
       return actual.rm(...args)
+    },
+    chmod: async (...args: Parameters<typeof actual.chmod>) => {
+      await actual.chmod(...args)
+      if (args[1] === 0o600) await fsFault.chmodGate?.(String(args[0]))
     },
     stat: async (...args: Parameters<typeof actual.stat>) => {
       if (fsFault.probeFault?.(String(args[0]))) fail('EACCES')
@@ -254,16 +272,120 @@ const SANITIZED_KEY = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$/
 const pin = (h: Harness, documentId = 'doc_1') =>
   h.manager.pin({ documentId, orgId: ORG, workspaceId: WS })
 
+const LEASE_T0 = 1_760_000_000_000
+const LEASE_HOUR = 60 * 60 * 1000
+
+function leaseSdoAt(wallMs: number, generation: number, renewed: boolean): OfficeOfflineLeaseSDO {
+  return {
+    lease: `ofl1.token-at-${wallMs}`,
+    lease_id: '01J8X4LEASE1P2Q3R4S5T6U7V8',
+    document_id: 'doc_1',
+    organization_id: ORG,
+    workspace_id: WS,
+    version_id: 'ver_1',
+    version: 1,
+    revision: '10',
+    level: 'view',
+    policy_epoch: 0,
+    generation,
+    renewed,
+    issued_at: new Date(wallMs).toISOString(),
+    expires_at: new Date(wallMs + 24 * LEASE_HOUR).toISOString(),
+    renew_after: new Date(wallMs + 12 * LEASE_HOUR).toISOString(),
+    server_time: new Date(wallMs).toISOString(),
+  }
+}
+
+/**
+ * A REAL `LeaseManager` over a real encrypted lease store (temp dir), with a
+ * seam around the store's `put`: a renewal's commit can be held or made to throw.
+ */
+function realLease(base: string) {
+  const clock = { wallMs: LEASE_T0, monoMs: 5_000 }
+  /** every renewal commits a record of its own generation: the seam below targets one */
+  let generation = 1
+  const client: LeaseClient = {
+    grant: async () => leaseSdoAt(clock.wallMs, 1, false),
+    renew: async () => leaseSdoAt(clock.wallMs, ++generation, true),
+    release: async () => undefined,
+  }
+  const layer = createStoreLayer({
+    root: join(base, 'records'),
+    keys: createSafeStorageKeyProvider({
+      safeStorage: createLockableSafeStorage(),
+      dir: join(base, 'keys'),
+    }),
+    budgetBytes: 1 << 20,
+    clock: () => clock.wallMs,
+  })
+  layer.register(LEASE_STORE_REGISTRATION)
+  const real = createLeaseStore({ layer, scope: () => ({ ...SCOPE }) })
+  // the seam only touches the commit of the next renewal: a read that re-writes the
+  // record's clock bookkeeping goes through untouched
+  const put: {
+    generation: number
+    gate: Promise<void> | null
+    entered: () => void
+    fail: Error | null
+  } = { generation: 0, gate: null, entered: () => undefined, fail: null }
+  const store: LeaseStore = {
+    ...real,
+    put: async (record) => {
+      if (record.generation === put.generation) {
+        put.entered()
+        if (put.gate) await put.gate
+        if (put.fail) throw put.fail
+      }
+      return real.put(record)
+    },
+  }
+  const lease = new LeaseManager({
+    store,
+    client: () => client,
+    clock: { wallNow: () => clock.wallMs, monotonicNow: () => clock.monoMs },
+    scope: () => ({ ...SCOPE }),
+    session: () => 'dev_1',
+  })
+  return {
+    lease,
+    advance(ms: number) {
+      clock.wallMs += ms
+      clock.monoMs += ms
+    },
+    /** the next lease commit waits in `put` until `release()` */
+    holdPut(): { entered: Promise<void>; release: () => void } {
+      put.generation = generation + 1
+      let release: () => void = () => undefined
+      put.gate = new Promise<void>((resolve) => {
+        release = () => {
+          put.gate = null
+          resolve()
+        }
+      })
+      const entered = new Promise<void>((resolve) => {
+        put.entered = resolve
+      })
+      return { entered, release }
+    },
+    failPut(error: Error | null) {
+      put.generation = generation + 1
+      put.fail = error
+    },
+  }
+}
+
 let dirs: string[] = []
 beforeEach(() => {
   dirs = []
   fsFault.rmGate = null
   fsFault.rmFault = null
+  fsFault.chmodGate = null
   fsFault.probeFault = null
 })
 afterEach(() => {
   fsFault.rmGate = null
   fsFault.rmFault = null
+  fsFault.chmodGate = null
   fsFault.probeFault = null
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true })
 })
@@ -645,60 +767,16 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
   it('(G703-R7-1) a renewal committing while the native removal is pending keeps the copy: bytes back at the path, no lock, open stays true', async () => {
     const base = mkdtempSync(join(tmpdir(), 'uw-offline-r71-'))
     dirs.push(base)
-    const T0 = 1_760_000_000_000
-    const HOUR = 60 * 60 * 1000
-    let wallMs = T0
-    let monoMs = 5_000
-    const sdoAt = (generation: number, renewed: boolean): OfficeOfflineLeaseSDO => ({
-      lease: `ofl1.token-at-${wallMs}`,
-      lease_id: '01J8X4LEASE1P2Q3R4S5T6U7V8',
-      document_id: 'doc_1',
-      organization_id: ORG,
-      workspace_id: WS,
-      version_id: 'ver_1',
-      version: 1,
-      revision: '10',
-      level: 'view',
-      policy_epoch: 0,
-      generation,
-      renewed,
-      issued_at: new Date(wallMs).toISOString(),
-      expires_at: new Date(wallMs + 24 * HOUR).toISOString(),
-      renew_after: new Date(wallMs + 12 * HOUR).toISOString(),
-      server_time: new Date(wallMs).toISOString(),
-    })
-    const client: LeaseClient = {
-      grant: async () => sdoAt(1, false),
-      renew: async () => sdoAt(2, true),
-      release: async () => undefined,
-    }
-    const layer = createStoreLayer({
-      root: join(base, 'records'),
-      keys: createSafeStorageKeyProvider({
-        safeStorage: createLockableSafeStorage(),
-        dir: join(base, 'keys'),
-      }),
-      budgetBytes: 1 << 20,
-      clock: () => wallMs,
-    })
-    layer.register(LEASE_STORE_REGISTRATION)
-    const lease = new LeaseManager({
-      store: createLeaseStore({ layer, scope: () => ({ ...SCOPE }) }),
-      client: () => client,
-      clock: { wallNow: () => wallMs, monotonicNow: () => monoMs },
-      scope: () => ({ ...SCOPE }),
-      session: () => 'dev_1',
-    })
-    const o = openHarness({ lease })
+    const rl = realLease(base)
+    const o = openHarness({ lease: rl.lease })
     dirs.push(o.userDataDir)
-    o.clock.now = T0
+    o.clock.now = LEASE_T0
     const path = await openCopy(o)
     const bytes = await readFile(path)
     const dir = copyDir(o)
     // the lease lapses; the sweep decides the lock and its native removal starts
-    wallMs += 25 * HOUR
-    monoMs += 25 * HOUR
-    expect((await lease.effectiveState('doc_1')).state).toBe('expired')
+    rl.advance(25 * LEASE_HOUR)
+    expect((await rl.lease.effectiveState('doc_1')).state).toBe('expired')
     let removalStarted: () => void = () => undefined
     const started = new Promise<void>((resolve) => {
       removalStarted = resolve
@@ -715,13 +793,13 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     const sweep = o.copies.sweep()
     await started
     // the renewal commits while the removal is still pending
-    expect((await lease.renew('doc_1')).kind).toBe('renewed')
-    expect((await lease.effectiveState('doc_1')).usable).toBe(true)
+    expect((await rl.lease.renew('doc_1')).kind).toBe('renewed')
+    expect((await rl.lease.effectiveState('doc_1')).usable).toBe(true)
     fsFault.rmGate = null
     releaseRemoval()
     await sweep
     expect(o.locks).toEqual([])
-    expect((await lease.effectiveState('doc_1')).usable).toBe(true)
+    expect((await rl.lease.effectiveState('doc_1')).usable).toBe(true)
     expect(existsSync(path)).toBe(true)
     expect(Buffer.compare(await readFile(path), bytes)).toBe(0)
     expect(existsSync(join(dir, BINDING_FILE))).toBe(true)
@@ -733,62 +811,187 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     expect(existsSync(path)).toBe(true)
   })
 
-  it('(G703-R8-3) a timer-triggered expiry of an already-due copy arms no zero-delay timer and removes once before the retry grace', async () => {
+  it('(G703-R8-4) the real manager keeps the stamp odd while a commit is pending, advances it after a success and after a thrown write, and the copy lock defers while it is odd', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-r84-'))
+    dirs.push(base)
+    const rl = realLease(base)
+    const o = openHarness({ lease: rl.lease })
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    const path = await openCopy(o)
+    const idle = rl.lease.commitStamp('doc_1')
+    expect(idle % 2).toBe(0)
+
+    // a renewal's commit is pending in the store write while the lease is already expired
+    rl.advance(25 * LEASE_HOUR)
+    const hold = rl.holdPut()
+    const renewing = rl.lease.renew('doc_1')
+    await hold.entered
+    expect(rl.lease.commitStamp('doc_1') % 2).toBe(1)
+    await o.copies.sweep()
+    // the consumer defers: the plaintext stays and no lock is raised
+    expect(o.locks).toEqual([])
+    expect(existsSync(path)).toBe(true)
+    hold.release()
+    expect((await renewing).kind).toBe('renewed')
+    const afterSuccess = rl.lease.commitStamp('doc_1')
+    expect(afterSuccess % 2).toBe(0)
+    expect(afterSuccess).toBeGreaterThan(idle)
+
+    // a write that throws leaves the stamp even and advanced as well
+    rl.advance(25 * LEASE_HOUR)
+    rl.failPut(new Error('disk full'))
+    const hold2 = rl.holdPut()
+    const failing = rl.lease.renew('doc_1').catch(() => 'threw')
+    await hold2.entered
+    expect(rl.lease.commitStamp('doc_1') % 2).toBe(1)
+    hold2.release()
+    await failing
+    const afterThrow = rl.lease.commitStamp('doc_1')
+    expect(afterThrow % 2).toBe(0)
+    expect(afterThrow).toBeGreaterThan(afterSuccess)
+
+    // the lease is still expired and nothing is in flight: the lock now goes through
+    rl.failPut(null)
+    await o.copies.sweep()
+    expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+    expect(existsSync(copyDir(o))).toBe(false)
+  })
+
+  it('(G703-R8-5) a renewal landing after the copy was made writable calls the removal off: bytes kept, mode back to 0444, no lock, open stays true', async () => {
     const o = openHarness()
     dirs.push(o.userDataDir)
-    o.clock.now = 1_760_000_000_000
-    addDoc(o.h, 'doc_1', 1)
-    await pin(o.h)
-    o.h.leases.states.set('doc_1', {
-      ...leaseState('valid'),
-      record: { expires_at: new Date(o.clock.now + 40).toISOString() } as never,
-      remainingMs: 40,
-    })
-    const path = (await openCopyOf(o)).path
+    const path = await openCopy(o)
+    const bytes = await readFile(path)
     const dir = copyDir(o)
-    // the lease lapses before the copy's own expiry timer (40 ms) fires; the capability
-    // read is slow and the plaintext will not go (EBUSY)
-    o.clock.now += 50
-    o.h.leases.states.set('doc_1', {
-      ...leaseState('expired'),
-      record: { expires_at: new Date(o.clock.now - 10).toISOString() } as never,
-    })
-    o.capability.delayMs = 60
+    o.h.leases.states.set('doc_1', leaseState('expired'))
+    let writable = false
+    // the removal itself is called off: no native removal of the folder is ever started
     let removals = 0
     fsFault.rmGate = (target) => {
       if (target === dir) removals += 1
     }
-    fsFault.rmFault = (target) => target === dir
-    const delays: number[] = []
-    const realSetTimeout = globalThis.setTimeout
-    const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
-      fn: () => void,
-      ms?: number,
-    ) => {
-      delays.push(ms ?? 0)
-      return realSetTimeout(fn, ms)
-    }) as typeof setTimeout)
-    try {
-      // the real expiry timer fires, its sweep waits on the capability read and fails to remove
-      await vi.waitFor(() => expect(removals).toBe(1))
-      await new Promise((resolve) => realSetTimeout(resolve, 200))
-      expect(removals).toBe(1)
-      expect(o.locks).toEqual([])
-      expect(existsSync(path)).toBe(true)
-      // only the capability read (60 ms) and positive retries were armed - never a zero delay
-      const armed = delays.filter((ms) => ms !== 60)
-      expect(armed.length).toBeGreaterThan(0)
-      expect(armed.every((ms) => ms >= 30_000)).toBe(true)
-    } finally {
-      spy.mockRestore()
+    fsFault.chmodGate = (target) => {
+      if (writable || !target.startsWith(dir)) return
+      writable = true
+      // the copy is writable now and the removal is not yet started: the renewal commits
+      o.h.leases.states.set('doc_1', leaseState('valid'))
+      o.leaseStamp.value += 2
     }
-    // the retry after the grace removes it once the folder lets go
-    fsFault.rmFault = null
-    o.clock.now += 31_000
     await o.copies.sweep()
-    expect(removals).toBe(2)
-    expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
-    expect(existsSync(dir)).toBe(false)
+    expect(writable).toBe(true)
+    expect(removals).toBe(0)
+    expect(o.locks).toEqual([])
+    expect(existsSync(path)).toBe(true)
+    expect(Buffer.compare(await readFile(path), bytes)).toBe(0)
+    expect(((await stat(path)).mode & 0o777).toString(8)).toBe('444')
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
+  })
+
+  it('(G703-R7-4) production registration: a pass with a blocked renewal reports the queue and listeners first, and the copy sweep runs only after the renewal, so the tracked copy survives', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-r74-'))
+    dirs.push(base)
+    let wallMs = LEASE_T0
+    let monoMs = 5_000
+    const events: string[] = []
+    let renewGate: Promise<void> | null = null
+    let renewEntered: () => void = () => undefined
+    let releaseRenewal: () => void = () => undefined
+    const leaseClient: LeaseClient = {
+      grant: async () => leaseSdoAt(wallMs, 1, false),
+      renew: async () => {
+        events.push('renew-enter')
+        renewEntered()
+        if (renewGate) await renewGate
+        events.push('renew-exit')
+        return leaseSdoAt(wallMs, 2, true)
+      },
+      release: async () => undefined,
+    }
+    const feed: FeedClient = {
+      async listChanges() {
+        return {
+          phase: 'snapshot',
+          hasMore: false,
+          expiresAt: '2026-10-14T00:00:00Z',
+          changes: [],
+          nextCursor: 'c1',
+        }
+      },
+    }
+    const layer = createStoreLayer({
+      root: join(base, 'records'),
+      keys: createSafeStorageKeyProvider({
+        safeStorage: createLockableSafeStorage(),
+        dir: join(base, 'keys'),
+      }),
+      budgetBytes: 1 << 20,
+      clock: () => wallMs,
+    })
+    layer.register(FEED_CURSORS_REGISTRATION)
+    layer.register(DOC_INDEX_REGISTRATION)
+    layer.register(LEASE_STORE_REGISTRATION)
+    const runtime = new SyncRuntime({
+      store: createSyncStoreAccess({ layer, scope: () => ({ ...SCOPE }) }),
+      targets: { orgs: () => [ORG], workspaces: async () => [WS] },
+      capability: async () => ({
+        kind: 'ok',
+        capabilities: { ...NEVER_READ_CAPABILITIES, sync_feed: true },
+        source: 'fresh',
+      }),
+      client: () => feed,
+      keepDraft: async () => false,
+      onPoll: async () => {
+        events.push('queue')
+      },
+      clock: { now: () => wallMs },
+      schedule: () => () => undefined,
+      lease: { client: () => leaseClient, session: () => 'dev_1', monotonicNow: () => monoMs },
+    })
+    const o = openHarness({ lease: runtime.leases })
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    const path = await openCopy(o)
+    const bytes = await readFile(path)
+    // the registration of wiring.ts: the copy sweep after the pass's lease renewal
+    runtime.onAfterLeasePass(() => {
+      events.push('sweep')
+      void o.copies.sweep().then(() => events.push('sweep-done'))
+    })
+    runtime.onPollVerdict(() => events.push('listener'))
+    // the lease has lapsed by the time the pass renews it
+    wallMs += 25 * LEASE_HOUR
+    monoMs += 25 * LEASE_HOUR
+    o.clock.now = wallMs
+    renewGate = new Promise<void>((resolve) => {
+      releaseRenewal = resolve
+    })
+    const entered = new Promise<void>((resolve) => {
+      renewEntered = resolve
+    })
+    const pass = runtime.tick()
+    await entered
+    // the renewal is blocked: the queue and the listeners already progressed, the sweep did not
+    expect(events).toEqual(['queue', 'listener', 'renew-enter'])
+    expect(o.locks).toEqual([])
+    expect(existsSync(path)).toBe(true)
+    renewGate = null
+    releaseRenewal()
+    await pass
+    await vi.waitFor(() => expect(events).toContain('sweep-done'))
+    expect(events).toEqual([
+      'queue',
+      'listener',
+      'renew-enter',
+      'renew-exit',
+      'sweep',
+      'sweep-done',
+    ])
+    // the sweep read the renewed lease: the tracked copy survives with its bytes
+    expect(o.locks).toEqual([])
+    expect((await runtime.leases.effectiveState('doc_1')).usable).toBe(true)
+    expect(Buffer.compare(await readFile(path), bytes)).toBe(0)
+    expect(await o.h.manager.row('doc_1')).toMatchObject({ open: true })
   })
 
   it('(G703-R7-2) a locked copy whose tab closes and reopens before the next sweep keeps one open-tab count, and the final close releases it', async () => {
