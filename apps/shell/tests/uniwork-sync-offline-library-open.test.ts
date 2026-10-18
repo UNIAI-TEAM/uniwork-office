@@ -19,6 +19,12 @@ import {
   type ConflictUi,
   type OfflineCopyOpen,
 } from '../src/main/uniwork-docs/service'
+import {
+  createCredentialStore,
+  type SafeStorageLike,
+  type StoredCredential,
+} from '../src/main/uniwork-auth/credentials'
+import { AccountManager } from '../src/main/uniwork-auth/manager'
 import { BINDING_FILE, scopeWorkingCopyDirs } from '../src/main/uniwork-docs/binding-store'
 import { ID } from '../src/main/uniwork-sync/feed/http'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
@@ -519,6 +525,106 @@ describe('G703B-P3 (FL-09) a pinned open with the keychain locked and no restore
     expect(o.locks).toEqual([expect.objectContaining({ reason: 'keystore_locked' })])
     // the panel names a path under the store: the tab that never opened has no folder yet
     expect(o.locks[0]!.path.startsWith(o.service.store.root)).toBe(true)
+  })
+
+  describe('FL-09 the keychain state comes from the real credential store through the account manager', () => {
+    const saved: StoredCredential = {
+      deploymentId: 'default',
+      apiOrigin: 'https://uniwork.example',
+      clientId: 'uniwork-office',
+      accountId: 'acc_1',
+      deviceSessionId: 'dev_1',
+      sessionId: 'sess_1',
+      refreshToken: 'rt_saved',
+      refreshExpiresAt: 1_900_000_000_000,
+    }
+    const reversible = (overrides: Partial<SafeStorageLike> = {}): SafeStorageLike => ({
+      isEncryptionAvailable: () => true,
+      encryptString: (text) => Buffer.from(`enc:${text}`),
+      decryptString: (buf) => buf.toString().slice(4),
+      ...overrides,
+    })
+
+    /** the wiring's reading: `keystoreLocked: () => account.status().state === 'keystore-locked'` */
+    async function restoreWith(safeStorage: SafeStorageLike, withSavedFile: boolean) {
+      const userData = mkdtempSync(join(tmpdir(), 'uw-offline-fl09-'))
+      dirs.push(userData)
+      if (withSavedFile) {
+        createCredentialStore({ userDataDir: userData, safeStorage: reversible() }).save(saved)
+      }
+      const account = new AccountManager({
+        resolveProfile: () => ({
+          deploymentId: 'default',
+          apiOrigin: 'https://uniwork.example',
+          clientId: 'uniwork-office',
+          channel: 'stable',
+        }),
+        createTransport: () => ({}) as never,
+        credentials: createCredentialStore({ userDataDir: userData, safeStorage }),
+        openBrowser: async () => undefined,
+        readSelectedOrgId: () => undefined,
+        persistSelectedOrgId: () => undefined,
+      })
+      await account.restore()
+      return account.status().state
+    }
+
+    const lockedGnome = reversible({
+      isEncryptionAvailable: () => false,
+      getSelectedStorageBackend: () => 'gnome_libsecret',
+    })
+
+    it('gnome-keyring locked (encryption unavailable) with a saved sign-in: the account is keystore-locked and the offline open answers keystore_locked with the S11 lock', async () => {
+      const state = await restoreWith(lockedGnome, true)
+      expect(state).toBe('keystore-locked')
+      const o = openHarness()
+      dirs.push(o.userDataDir)
+      addDoc(o.h, 'doc_1', 1)
+      await pin(o.h)
+      o.account.signedIn = false
+      o.account.keystoreLocked = state === 'keystore-locked'
+      expect(await o.api.open('doc_1')).toMatchObject({
+        ok: false,
+        code: 'keystore_locked',
+        lockReason: 'keystore_locked',
+      })
+      expect(o.locks).toEqual([expect.objectContaining({ reason: 'keystore_locked' })])
+    })
+
+    it('basic_text, no saved file and a plain signed-out machine keep their own states', async () => {
+      expect(
+        await restoreWith(
+          reversible({
+            isEncryptionAvailable: () => false,
+            getSelectedStorageBackend: () => 'basic_text',
+          }),
+          true,
+        ),
+      ).toBe('keyring-unavailable')
+      expect(
+        await restoreWith(
+          reversible({
+            isEncryptionAvailable: () => false,
+            getSelectedStorageBackend: () => 'gnome_libsecret',
+          }),
+          false,
+        ),
+      ).toBe('keyring-unavailable')
+      const plain = await restoreWith(reversible(), false)
+      expect(plain).toBe('signed-out')
+      const o = openHarness()
+      dirs.push(o.userDataDir)
+      addDoc(o.h, 'doc_1', 1)
+      await pin(o.h)
+      o.account.signedIn = false
+      o.account.keystoreLocked = false
+      expect(await o.api.open('doc_1')).toMatchObject({
+        ok: false,
+        code: 'no_session',
+        lockReason: 'signed_out',
+      })
+      expect(o.locks).toEqual([])
+    })
   })
 
   it('a plain signed-out machine (keychain fine) still answers no_session / signed_out, no lock', async () => {

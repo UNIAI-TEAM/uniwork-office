@@ -140,6 +140,43 @@ describe('uniwork credential store', () => {
     }
   })
 
+  describe('FL-09 a locked OS keyring with a saved credential', () => {
+    const codeOf = (store: ReturnType<typeof createCredentialStore>): string | null => {
+      try {
+        store.load()
+        return null
+      } catch (error) {
+        return (error as CredentialStoreError).code
+      }
+    }
+    const lockedStore = (backend: string | undefined) =>
+      createCredentialStore({
+        userDataDir: dir,
+        safeStorage: fakeSafeStorage({
+          isEncryptionAvailable: () => false,
+          ...(backend ? { getSelectedStorageBackend: () => backend } : {}),
+        }),
+      })
+    const saveCredential = () =>
+      createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() }).save(credential())
+
+    it.each(['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6'])(
+      'encryption unavailable on the real %s keyring with the file present is keystore_locked, and the file stays',
+      (backend) => {
+        saveCredential()
+        expect(codeOf(lockedStore(backend))).toBe('keystore_locked')
+        expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual(['session.bin'])
+      },
+    )
+
+    it('keeps keyring_unavailable for basic_text, a host with no backend, and a real keyring with no saved file', () => {
+      expect(codeOf(lockedStore('gnome_libsecret'))).toBe('keyring_unavailable')
+      saveCredential()
+      expect(codeOf(lockedStore('basic_text'))).toBe('keyring_unavailable')
+      expect(codeOf(lockedStore(undefined))).toBe('keyring_unavailable')
+    })
+  })
+
   it('a keychain that locks at save time reports keystore_locked, never io', () => {
     let locked = false
     const base = fakeSafeStorage()

@@ -130,6 +130,38 @@ describe('uniwork sync store key provider', () => {
     expect(readdirSync(dir)).toEqual([])
   })
 
+  it('FL-09: a real keyring that is locked (encryption unavailable) with a saved key file is keystore_locked, otherwise keyring_unavailable', async () => {
+    await createSafeStorageKeyProvider({ safeStorage: fakeSafeStorage(), dir }).key(scope())
+    const codeOf = async (overrides: Partial<SafeStorageLike>, forScope = scope()) => {
+      try {
+        await createSafeStorageKeyProvider({ safeStorage: fakeSafeStorage(overrides), dir }).key(
+          forScope,
+        )
+        return null
+      } catch (error) {
+        return (error as CredentialStoreError).code
+      }
+    }
+    const locked = { isEncryptionAvailable: () => false }
+    expect(await codeOf({ ...locked, getSelectedStorageBackend: () => 'gnome_libsecret' })).toBe(
+      'keystore_locked',
+    )
+    expect(await codeOf({ ...locked, getSelectedStorageBackend: () => 'kwallet6' })).toBe(
+      'keystore_locked',
+    )
+    expect(await codeOf({ ...locked, getSelectedStorageBackend: () => 'basic_text' })).toBe(
+      'keyring_unavailable',
+    )
+    expect(await codeOf(locked)).toBe('keyring_unavailable')
+    // no key file of that scope: nothing was saved, so the keyring is simply unusable
+    expect(
+      await codeOf(
+        { ...locked, getSelectedStorageBackend: () => 'gnome_libsecret' },
+        scope('dep_1', 'acc_other'),
+      ),
+    ).toBe('keyring_unavailable')
+  })
+
   it('reports io when the wrapped key decrypts to something that is not a key', async () => {
     const provider = createSafeStorageKeyProvider({ safeStorage: fakeSafeStorage(), dir })
     await provider.key(scope())
