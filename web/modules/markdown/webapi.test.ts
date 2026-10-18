@@ -295,6 +295,43 @@ describe('markdownApi: a .txt opens in plain mode and stays .txt', () => {
   })
 })
 
+// UNI-1905 fix1 (2a120de89 regression): the save-as else-branch must append the document's
+// extension, never cut the last dotted segment the user typed — 'Báo cáo 2026.10.18' is the
+// whole name, not 'Báo cáo 2026.10' plus a stripped '.18'.
+describe('markdownApi: a dotted save-as name is kept whole', () => {
+  it('on a .md document user-typed dotted names save as <name>.md in full', async () => {
+    const { api, mock } = setup()
+    const { text } = await open(api)
+    api.onSaveRequest((mode) => void api.save({ text, imageSources: [], mode }))
+    expect(await mock.host.saveAs({ name: 'Báo cáo 2026.10.18' })).toMatchObject({
+      ok: true,
+      file: { name: 'Báo cáo 2026.10.18.md' },
+    })
+    expect(await mock.host.saveAs({ name: 'v1.2 notes' })).toMatchObject({
+      ok: true,
+      file: { name: 'v1.2 notes.md' },
+    })
+  })
+
+  it('on a .txt document a dotted name gets .txt whole; *.md / *.txt names pass through', async () => {
+    const { api, mock } = setup({ name: 'notes.txt' })
+    const { text } = await open(api)
+    api.onSaveRequest((mode) => void api.save({ text, imageSources: [], mode }))
+    expect(await mock.host.saveAs({ name: 'Báo cáo 2026.10.18' })).toMatchObject({
+      ok: true,
+      file: { name: 'Báo cáo 2026.10.18.txt' },
+    })
+    expect(await mock.host.saveAs({ name: 'x.md' })).toMatchObject({
+      ok: true,
+      file: { name: 'x.md' },
+    })
+    expect(await mock.host.saveAs({ name: 'notes.txt' })).toMatchObject({
+      ok: true,
+      file: { name: 'notes.txt' },
+    })
+  })
+})
+
 describe('markdownApi: save conflicts', () => {
   async function conflicted() {
     const s = setup()
