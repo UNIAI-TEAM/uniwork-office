@@ -109,6 +109,8 @@ export class EditLockSession {
   private op = 0
   private releaseWarned = false
   private acquiring = false
+  /** the 403/404 that ended the last acquire at `none`; null for every other outcome */
+  private deniedBy: unknown = null
   /** in-flight acquire; ensureHeldBeforeCommit awaits this instead of returning mid-flight */
   private acquireInFlight: Promise<boolean> | null = null
   constructor(opts: EditLockSessionOptions) {
@@ -142,6 +144,14 @@ export class EditLockSession {
 
   isReadOnly(): boolean {
     return !this.isEditable()
+  }
+
+  /**
+   * The terminal 403/404 the last acquire ended on (phase `none`), else null.
+   * `none` alone is not proof of edit access: the owner applies its denial path.
+   */
+  denial(): unknown {
+    return this.deniedBy
   }
 
   async acquire(moveFromSelf = false): Promise<void> {
@@ -184,6 +194,7 @@ export class EditLockSession {
     }
     const op = ++this.op
     this.acquiring = true
+    this.deniedBy = null
     this.clearTimers()
     this.setState({
       phase: 'acquiring',
@@ -328,6 +339,7 @@ export class EditLockSession {
           error.status === 404)
       ) {
         this.clearTimers()
+        this.deniedBy = error
         this.setState({ phase: 'none', holderName: null, since: null })
         return true
       }

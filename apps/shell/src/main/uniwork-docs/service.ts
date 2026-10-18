@@ -1526,10 +1526,17 @@ export class UniworkDocsService {
     if (!session) return this.statusOf(doc)
     const ok = await session.editHere()
     // a denied re-acquire (403/404) ends the session at 'none', a phase onChange never pushes:
-    // drop it like the initial acquire does, so the open editor re-queries its read-only state
+    // drop it like the initial acquire does, so the open editor re-queries its read-only state.
+    // `none` is not proof of edit access (the binding may still say `edit`): the denial is
+    // applied first, so the answer the push invites is read-only (EL1B-BE-R3C-1)
     if (session.view().phase === 'none' && this.editLocks.get(pathKey(path)) === session) {
-      this.editLocks.delete(pathKey(path))
-      session.dispose()
+      const denial = session.denial()
+      if (denial !== null)
+        await this.lockFromServer(doc.binding.documentId, lockVerdict(denial) ?? 'revoked')
+      if (this.editLocks.get(pathKey(path)) === session) {
+        this.editLocks.delete(pathKey(path))
+        session.dispose()
+      }
       this.notifyDocStateChanged(path)
     }
     if (!ok) return null

@@ -144,6 +144,8 @@ function setupService(opts: {
   const statuses: UniworkDocStatus[] = []
   const popovers: UniworkQueuePopoverRequest[] = []
   const docStatePushes: string[] = []
+  // what a subscribed editor would read the moment each push lands
+  const docStateReadOnly: boolean[] = []
   const uploads: number[] = []
   const commits: number[] = []
   const ui: ConflictUi = {
@@ -225,7 +227,10 @@ function setupService(opts: {
     ui,
     pushStatus: (status: UniworkDocStatus) => statuses.push(status),
     pushQueuePopover: (req: UniworkQueuePopoverRequest) => popovers.push(req),
-    pushDocStateChanged: (path: string) => docStatePushes.push(path),
+    pushDocStateChanged: (path: string) => {
+      docStatePushes.push(path)
+      docStateReadOnly.push(service.isReadOnly(path))
+    },
     pushSignOutProgress: () => undefined,
     pushConflict: () => undefined,
     pushConflictClosed: () => undefined,
@@ -234,8 +239,8 @@ function setupService(opts: {
     reveal: () => undefined,
     sleep: async () => undefined,
   }
-  const service = new UniworkDocsService(deps)
-  return { service, statuses, popovers, docStatePushes, uploads, commits }
+  const service: UniworkDocsService = new UniworkDocsService(deps)
+  return { service, statuses, popovers, docStatePushes, docStateReadOnly, uploads, commits }
 }
 
 describe('Item 1 (VEL-2): UNIWORK_DOC_STATE_CHANGED_CHANNEL and doc-state broadcast', () => {
@@ -806,7 +811,7 @@ describe('Item 4 (VEL-3): explicit editHere failure keeps previous phase and res
 
 describe('EL-1(b) fix10 (EL1B-BE-R3-4): an explicit denied reacquire invalidates the editors state', () => {
   it.each([403, 404])(
-    'editHere from other -> %i ends the session and pushes doc-state-changed once',
+    'editHere from other -> %i ends the session and pushes doc-state-changed',
     async (status) => {
       vi.useFakeTimers()
       let mode: 'other' | 'denied' = 'other'
@@ -838,7 +843,50 @@ describe('EL-1(b) fix10 (EL1B-BE-R3-4): an explicit denied reacquire invalidates
       // the denial resolves the settled status (no lock session left), and the open editor is told
       const settled = await ctx.service.editHere(path)
       expect(settled?.lockSession).toBeUndefined()
-      expect(ctx.docStatePushes.filter((p) => p === path).length).toBe(before + 1)
+      // fix11: the applied denial also moves the published access, so more than one push is fine
+      expect(ctx.docStatePushes.filter((p) => p === path).length).toBeGreaterThanOrEqual(before + 1)
+    },
+  )
+
+  // EL-1(b) fix11 (EL1B-BE-R3C-1/2): the denial's `none` is never proof of edit access, so the
+  // answer the push invites (isReadOnly) is the denied one, not the stale binding's `edit`
+  it.each([403, 404])(
+    'editHere from other -> %i: the pushed state reads read-only, and stays read-only',
+    async (status) => {
+      vi.useFakeTimers()
+      let mode: 'other' | 'denied' = 'other'
+      const ctx = setupService({
+        acquire: async () => {
+          if (mode === 'other') {
+            throw new UniworkDocError('edit_locked', {
+              status: 423,
+              serverCode: 'document_locked',
+              editLock: {
+                holderName: 'Charles Babbage',
+                since: '2026-10-15T03:12:00Z',
+                expiresAt: '2026-10-15T03:14:00Z',
+                heldByMe: false,
+              },
+            })
+          }
+          throw new UniworkDocError(status === 403 ? 'forbidden' : 'not_found', { status })
+        },
+      })
+      const opened = await ctx.service.openDocument(DOC)
+      if (!opened.ok) throw new Error(opened.error)
+      const path = opened.value.path
+      await vi.advanceTimersByTimeAsync(10)
+      expect(ctx.service.isReadOnly(path)).toBe(true)
+      const before = ctx.docStatePushes.length
+
+      mode = 'denied'
+      await ctx.service.editHere(path)
+      await vi.advanceTimersByTimeAsync(10)
+
+      expect(ctx.docStatePushes.length).toBeGreaterThan(before)
+      // every push after the denial invites a read-only answer
+      expect(ctx.docStateReadOnly.slice(before).every((readOnly) => readOnly)).toBe(true)
+      expect(ctx.service.isReadOnly(path)).toBe(true)
     },
   )
 })
