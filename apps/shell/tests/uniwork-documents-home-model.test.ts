@@ -115,7 +115,7 @@ describe('DH1-W2 documents-home-model', () => {
     })
   })
 
-  it('collects deduplicated Modified-by options only from rows with updatedById (DH1-R1-4)', () => {
+  it('collects deduplicated Modified-by options only from rows with an updatedById AND a resolved name (DH1-R1-4, DH1-BE-10)', () => {
     const docs: DocumentsHomeDoc[] = [
       makeDoc({ id: 'd1', updatedById: 'u-1', updatedByName: 'Minh Trần' }),
       makeDoc({ id: 'd2', updatedById: 'u-2', updatedByName: 'Lan Nguyễn' }),
@@ -125,10 +125,29 @@ describe('DH1-W2 documents-home-model', () => {
       makeDoc({ id: 'd6', updatedById: 'u-3' }),
       makeDoc({ id: 'd7' }),
     ]
+    // u-3 carries an updater id but no resolved name on any row: the raw id must
+    // never reach the "Người sửa" dropdown as a label, so the option is omitted.
     expect(collectUpdatedByOptions(docs)).toEqual([
       { id: 'u-1', name: 'Minh Trần' },
       { id: 'u-2', name: 'Lan Nguyễn' },
-      { id: 'u-3', name: 'u-3' },
+    ])
+  })
+
+  it('lets a later named row win over an earlier unnamed row for the same updater id (DH1-BE-10)', () => {
+    const docs: DocumentsHomeDoc[] = [
+      makeDoc({ id: 'd1', updatedById: 'u-1', updatedByName: 'Minh Trần' }),
+      makeDoc({ id: 'd2', updatedById: 'u-late' }),
+      makeDoc({ id: 'd3', updatedById: 'u-2', updatedByName: 'Lan Nguyễn' }),
+      makeDoc({ id: 'd4', updatedById: 'u-late', updatedByName: 'Hải Lê' }),
+      makeDoc({ id: 'd5', updatedById: 'u-ghost' }),
+      makeDoc({ id: 'd6', updatedById: 'u-ghost', updatedByName: '   ' }),
+    ]
+    // u-late's slot keeps its first id occurrence (d2) while d4 supplies the
+    // name; u-ghost never resolves a name anywhere -> no option at all.
+    expect(collectUpdatedByOptions(docs)).toEqual([
+      { id: 'u-1', name: 'Minh Trần' },
+      { id: 'u-late', name: 'Hải Lê' },
+      { id: 'u-2', name: 'Lan Nguyễn' },
     ])
   })
 
