@@ -178,4 +178,5 @@ export const zhTW = {
   uwLockLostAccessLost: '您不再擁有此文件的編輯權限。您未儲存的變更仍在這裡。',
   uwLockLostGeneric: '您不再擁有編輯權限。您未儲存的變更仍在這裡。',
   uwLockLostHeldBy: '{name} 正在編輯。您未儲存的變更仍在這裡。',
+  uwLockAcquireFailed: '暫時無法取得編輯權限。請幾分鐘後再試。',
 } satisfies Record<keyof typeof zh, string>

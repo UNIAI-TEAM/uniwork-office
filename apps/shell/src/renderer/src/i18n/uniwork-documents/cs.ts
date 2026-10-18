@@ -183,4 +183,5 @@ export const cs = {
     'Nemáte už oprávnění upravovat tento dokument. Vaše neuložené změny tu stále jsou.',
   uwLockLostGeneric: 'Již neupravujete. Vaše neuložené změny tu stále jsou.',
   uwLockLostHeldBy: '{name} nyní upravuje. Vaše neuložené změny tu stále jsou.',
+  uwLockAcquireFailed: 'Nepodařilo se získat práva k úpravám. Zkuste to znovu za pár minut.',
 } satisfies Record<keyof typeof zh, string>

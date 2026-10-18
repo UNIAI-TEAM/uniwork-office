@@ -180,4 +180,5 @@ export const ar = {
   uwLockLostAccessLost: 'لم تعد تملك إذن تعديل هذا المستند. تغييراتك غير المحفوظة ما زالت هنا.',
   uwLockLostGeneric: 'لم تعد تعدّل. تغييراتك غير المحفوظة ما زالت هنا.',
   uwLockLostHeldBy: '{name} يعدّل الآن. تغييراتك غير المحفوظة ما زالت هنا.',
+  uwLockAcquireFailed: 'تعذّر الحصول على صلاحية التعديل. حاول مرة أخرى بعد بضع دقائق.',
 } satisfies Record<keyof typeof zh, string>

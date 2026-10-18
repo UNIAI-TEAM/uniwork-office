@@ -191,4 +191,6 @@ export const nl = {
   uwLockLostGeneric:
     'Je bent niet meer aan het bewerken. Je niet-opgeslagen wijzigingen zijn er nog.',
   uwLockLostHeldBy: '{name} bewerkt nu. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockAcquireFailed:
+    'Kon geen bewerkingstoegang krijgen. Probeer het over een paar minuten opnieuw.',
 } satisfies Record<keyof typeof zh, string>

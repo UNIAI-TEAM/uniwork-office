@@ -427,7 +427,7 @@ async function mountBar(s: UniworkDocStatus | null, lang: 'en' | 'vi' = 'en'): P
     root.render(
       createElement(
         LocaleProvider,
-        { initial: lang },
+        { key: lang, initial: lang },
         createElement(UniworkRemoteBar, { status: s, onStatus }),
       ),
     )

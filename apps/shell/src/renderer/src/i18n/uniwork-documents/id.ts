@@ -188,4 +188,5 @@ export const id = {
   uwLockLostGeneric: 'Anda tidak lagi mengedit. Perubahan Anda yang belum disimpan masih di sini.',
   uwLockLostHeldBy:
     '{name} sedang mengedit sekarang. Perubahan Anda yang belum disimpan masih di sini.',
+  uwLockAcquireFailed: 'Tidak dapat memperoleh akses pengeditan. Coba lagi dalam beberapa menit.',
 } satisfies Record<keyof typeof zh, string>

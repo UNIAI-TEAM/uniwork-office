@@ -188,4 +188,6 @@ export const es = {
     'Ya no tienes permiso para editar este documento. Tus cambios sin guardar siguen aquí.',
   uwLockLostGeneric: 'Ya no estás editando. Tus cambios sin guardar siguen aquí.',
   uwLockLostHeldBy: '{name} está editando ahora. Tus cambios sin guardar siguen aquí.',
+  uwLockAcquireFailed:
+    'No se pudo obtener el acceso de edición. Inténtalo de nuevo en unos minutos.',
 } satisfies Record<keyof typeof zh, string>

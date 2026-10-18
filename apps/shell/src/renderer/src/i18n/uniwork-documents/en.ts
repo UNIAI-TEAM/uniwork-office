@@ -183,4 +183,5 @@ export const en = {
     'You no longer have permission to edit this document. Your unsaved changes are still here.',
   uwLockLostGeneric: 'You’re no longer editing. Your unsaved changes are still here.',
   uwLockLostHeldBy: '{name} is editing now. Your unsaved changes are still here.',
+  uwLockAcquireFailed: 'Couldn’t get editing access. Try again in a few minutes.',
 } satisfies Record<keyof typeof zh, string>

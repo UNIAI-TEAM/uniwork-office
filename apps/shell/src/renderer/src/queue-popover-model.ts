@@ -10,6 +10,7 @@ import {
   blockedReasonKey,
   formatSaveTime,
   isEditLockReadOnlyPhase,
+  lostHolderNameOf,
   lostReasonKeyOf,
 } from './uniwork-docs-model'
 
@@ -192,14 +193,17 @@ export function queuePopoverModelOf(
   // way on until EL-2 (request / take-over dialogs are its scope).
   const session = status.lockSession
   if (session && isEditLockReadOnlyPhase(session.phase)) {
+    const heldBy = lostHolderNameOf(session)
     const line2: PopoverLine =
       session.phase === 'lost'
-        ? {
-            key: lostReasonKeyOf(session.lostReason),
-            ...(session.lostReason === 'taken_over' || session.lostReason === 'handed_over'
-              ? { name: session.byName ?? undefined }
-              : {}),
-          }
+        ? heldBy
+          ? { key: 'uwLockLostHeldBy', name: heldBy }
+          : {
+              key: lostReasonKeyOf(session.lostReason),
+              ...(session.lostReason === 'taken_over' || session.lostReason === 'handed_over'
+                ? { name: session.byName ?? undefined }
+                : {}),
+            }
         : session.phase === 'other'
           ? {
               key: 'uwLockBannerOther',

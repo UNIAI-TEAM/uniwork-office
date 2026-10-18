@@ -190,4 +190,6 @@ export const pt = {
   uwLockLostGeneric: 'Já não está a editar. As suas alterações não guardadas ainda estão aqui.',
   uwLockLostHeldBy:
     '{name} está a editar agora. As suas alterações não guardadas ainda estão aqui.',
+  uwLockAcquireFailed:
+    'Não foi possível obter acesso de edição. Tente novamente dentro de alguns minutos.',
 } satisfies Record<keyof typeof zh, string>

@@ -188,4 +188,5 @@ export const th = {
   uwLockLostGeneric: 'คุณไม่ได้แก้ไขอีกต่อไป การเปลี่ยนแปลงที่ยังไม่บันทึกของคุณยังอยู่ที่นี่',
   uwLockLostHeldBy:
     '{name} กำลังแก้ไขอยู่ในขณะนี้ การเปลี่ยนแปลงที่ยังไม่บันทึกของคุณยังอยู่ที่นี่',
+  uwLockAcquireFailed: 'ไม่สามารถรับสิทธิ์แก้ไขได้ ลองอีกครั้งในอีกไม่กี่นาที',
 } satisfies Record<keyof typeof zh, string>

@@ -454,6 +454,7 @@ function isUrgent(status: UniworkDocStatus, labelKey: StringKey): boolean {
     labelKey === 'uwChipBlocked' ||
     labelKey === 'uwChipConflict' ||
     // EL-1(b): the lock was lost while we held it — unsaved work stops uploading
+    status.lockSession?.phase === 'lost' ||
     labelKey === 'uwLockLostTitle'
   )
 }
@@ -767,10 +768,18 @@ ${action ? t(action.labelKey) : ''}`,
               window.aiOffice.uniworkEditHere(status.path)
             : window.aiOffice.uniworkResolveConflict(status.path)
     void call
-      .then((next) => {
-        if (next) onStatus(next)
-      })
-      .catch(() => undefined)
+      .then(
+        (next) => {
+          if (next) {
+            onStatus(next)
+            return
+          }
+          if (kind === 'edit-here') announce(t('uwLockAcquireFailed'))
+        },
+        () => {
+          if (kind === 'edit-here') announce(t('uwLockAcquireFailed'))
+        },
+      )
       .finally(() => setBusy(false))
   }
 
@@ -1223,6 +1232,7 @@ export function UniworkRemoteBar({
   const [busy, setBusy] = useState(false)
   const [say, setSay] = useState<RemoteSay | null>(null)
   const [lockSay, setLockSay] = useState<{ text: string; n: number } | null>(null)
+  const [lockFailedSign, setLockFailedSign] = useState<string | null>(null)
   const stackRef = useRef<HTMLDivElement>(null)
   const heightRef = useRef(0)
 
@@ -1291,6 +1301,8 @@ export function UniworkRemoteBar({
   const lockAnnounceRef = useRef<string | null>(null)
   const lockModelRef = useRef(lockModel)
   lockModelRef.current = lockModel
+  const tRef = useRef(t)
+  tRef.current = t
   const lockSign =
     path !== null && lockModel
       ? `${path}\n${lockModel.phase}\n${JSON.stringify(lockModel.params)}`
@@ -1314,14 +1326,29 @@ export function UniworkRemoteBar({
   const editHere = useCallback(() => {
     if (!status || lockBusy || shownLock?.busy) return
     setLockBusy(true)
+    setLockFailedSign(null)
     void window.aiOffice
       .uniworkEditHere(status.path)
-      .then((next) => {
-        if (next) onStatus(next)
-      })
-      .catch(() => undefined)
+      .then(
+        (next) => {
+          if (next) {
+            onStatus(next)
+            return
+          }
+          if (lockModelRef.current?.phase === 'other') return
+          setLockFailedSign(lockSign)
+          const text = tRef.current('uwLockAcquireFailed')
+          setLockSay((prev) => ({ text, n: (prev?.n ?? 0) + 1 }))
+        },
+        () => {
+          if (lockModelRef.current?.phase === 'other') return
+          setLockFailedSign(lockSign)
+          const text = tRef.current('uwLockAcquireFailed')
+          setLockSay((prev) => ({ text, n: (prev?.n ?? 0) + 1 }))
+        },
+      )
       .finally(() => setLockBusy(false))
-  }, [status, lockBusy, shownLock?.busy, onStatus])
+  }, [status, lockBusy, shownLock?.busy, lockSign, onStatus])
 
   const actRef = useRef(act)
   actRef.current = act
@@ -1374,6 +1401,7 @@ export function UniworkRemoteBar({
   useEffect(() => () => report(0), [report])
 
   const messageId = `${id}-msg`
+  const lockMessageId = `${id}-lock-msg`
   const reasonId = `${id}-reason`
   const reasonKey = model?.actions.find((a) => a.disabledReasonKey)?.disabledReasonKey
   const showReason = Boolean(reasonKey) && reasonKey !== model?.messageKey
@@ -1452,7 +1480,14 @@ export function UniworkRemoteBar({
               <span className="uw-remote-dot" aria-hidden="true" />
               <div className="uw-editlock-text" aria-hidden="true">
                 {shownLock.titleKey && <p className="uw-editlock-title">{t(shownLock.titleKey)}</p>}
-                <p className="uw-editlock-message">{t(shownLock.messageKey, shownLock.params)}</p>
+                <p id={lockMessageId} className="uw-editlock-message">
+                  {t(shownLock.messageKey, shownLock.params)}
+                </p>
+                {lockFailedSign !== null &&
+                  lockFailedSign === lockSign &&
+                  shownLock.phase !== 'other' && (
+                    <p className="uw-editlock-message">{t('uwLockAcquireFailed')}</p>
+                  )}
               </div>
               {shownLock.editHere && (
                 <div className="uw-editlock-actions">
@@ -1460,11 +1495,12 @@ export function UniworkRemoteBar({
                     type="button"
                     className="uw-remote-action uw-editlock-action"
                     data-lock-action="edit-here"
+                    aria-describedby={lockMessageId}
                     aria-disabled={shownLock.busy || lockBusy ? 'true' : undefined}
                     aria-busy={shownLock.busy || lockBusy ? 'true' : undefined}
                     onClick={editHere}
                   >
-                    {shownLock.busy && <Spinner />}
+                    {(shownLock.busy || lockBusy) && <Spinner />}
                     {t('uwLockEditHere')}
                   </button>
                 </div>

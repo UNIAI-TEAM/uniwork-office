@@ -181,5 +181,6 @@ export const vi = {
   uwLockLostAccessLost:
     'Bạn không còn quyền sửa tài liệu này. Thay đổi chưa lưu của bạn vẫn ở đây.',
   uwLockLostGeneric: 'Bạn không còn giữ quyền sửa. Thay đổi chưa lưu của bạn vẫn ở đây.',
-  uwLockLostHeldBy: '{name} đang sửa. Các thay đổi chưa lưu của bạn vẫn còn ở đây.',
+  uwLockLostHeldBy: '{name} đang sửa. Thay đổi chưa lưu của bạn vẫn ở đây.',
+  uwLockAcquireFailed: 'Chưa lấy được quyền sửa. Thử lại sau ít phút.',
 } satisfies Record<keyof typeof zh, string>

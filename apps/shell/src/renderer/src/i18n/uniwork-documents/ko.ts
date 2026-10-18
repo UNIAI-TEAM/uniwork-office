@@ -185,4 +185,5 @@ export const ko = {
     '이 문서를 편집할 권한이 더 이상 없습니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
   uwLockLostGeneric: '더 이상 편집하고 있지 않습니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
   uwLockLostHeldBy: '{name} 님이 지금 편집 중입니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
+  uwLockAcquireFailed: '편집 액세스 권한을 가져올 수 없습니다. 몇 분 후에 다시 시도하세요.',
 } satisfies Record<keyof typeof zh, string>

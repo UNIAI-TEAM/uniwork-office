@@ -177,4 +177,5 @@ export const zh = {
   uwLockLostAccessLost: '你不再拥有此文档的编辑权限。你未保存的更改仍在这里。',
   uwLockLostGeneric: '你不再拥有编辑权限。你未保存的更改仍在这里。',
   uwLockLostHeldBy: '{name} 正在编辑。你未保存的更改仍在这里。',
+  uwLockAcquireFailed: '暂时无法获取编辑权限。请几分钟后再试。',
 }

@@ -165,9 +165,9 @@ export function UniworkQueuePopover({
   const line1Text = lineText(model.line1)
 
   // keep the newest callbacks reachable from the long-lived listeners
-  const live = useRef({ onClose, onFocusEditor, openerEl, anchorEl, opener, confirming })
+  const live = useRef({ onClose, onFocusEditor, openerEl, anchorEl, opener, confirming, status })
   useLayoutEffect(() => {
-    live.current = { onClose, onFocusEditor, openerEl, anchorEl, opener, confirming }
+    live.current = { onClose, onFocusEditor, openerEl, anchorEl, opener, confirming, status }
   })
 
   // the dialog's x follows the pill: right-aligned to its right edge, inside the window. The band spans
@@ -361,13 +361,28 @@ export function UniworkQueuePopover({
         // EL-1(b): "Sửa ở đây" — re-acquire the lock (move_from_self when self_elsewhere)
         if (busy !== null) return
         setBusy('edit-here')
-        void window.aiOffice
-          .uniworkEditHere(status.path)
-          .then((next) => {
-            if (next) onStatus(next)
-          })
-          .catch(() => undefined)
-          .finally(() => close('action'))
+        setError(null)
+        void window.aiOffice.uniworkEditHere(status.path).then(
+          (next) => {
+            if (!mountedRef.current) return
+            setBusy(null)
+            if (next) {
+              onStatus(next)
+              close('action')
+              return
+            }
+            if (live.current.status.lockSession?.phase === 'other') return
+            setError('uwLockAcquireFailed')
+            announce(t('uwLockAcquireFailed'))
+          },
+          () => {
+            if (!mountedRef.current) return
+            setBusy(null)
+            if (live.current.status.lockSession?.phase === 'other') return
+            setError('uwLockAcquireFailed')
+            announce(t('uwLockAcquireFailed'))
+          },
+        )
         return
       }
       case 'recheck':

@@ -189,4 +189,5 @@ export const ms = {
     'Anda tidak lagi menyunting. Perubahan anda yang belum disimpan masih di sini.',
   uwLockLostHeldBy:
     '{name} sedang menyunting sekarang. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockAcquireFailed: 'Tidak dapat memperoleh akses penyuntingan. Cuba lagi dalam beberapa minit.',
 } satisfies Record<keyof typeof zh, string>

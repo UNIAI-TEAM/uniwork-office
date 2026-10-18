@@ -195,4 +195,6 @@ export const fr = {
   uwLockLostGeneric: 'Vous ne modifiez plus. Vos changements non enregistrés sont toujours là.',
   uwLockLostHeldBy:
     '{name} modifie actuellement. Vos changements non enregistrés sont toujours là.',
+  uwLockAcquireFailed:
+    'Impossible d’obtenir l’accès en modification. Réessayez dans quelques minutes.',
 } satisfies Record<keyof typeof zh, string>

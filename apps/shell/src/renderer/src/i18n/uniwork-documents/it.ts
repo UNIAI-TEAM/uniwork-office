@@ -186,4 +186,5 @@ export const it = {
     'Non hai più l’autorizzazione a modificare questo documento. Le tue modifiche non salvate sono ancora qui.',
   uwLockLostGeneric: 'Non stai più modificando. Le tue modifiche non salvate sono ancora qui.',
   uwLockLostHeldBy: '{name} sta modificando ora. Le tue modifiche non salvate sono ancora qui.',
+  uwLockAcquireFailed: 'Impossibile ottenere l’accesso in modifica. Riprova tra qualche minuto.',
 } satisfies Record<keyof typeof zh, string>

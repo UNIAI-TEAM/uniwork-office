@@ -8,6 +8,7 @@ import type {
   UniworkDocSummary,
   UniworkEditLockLostReason,
   UniworkEditLockPhase,
+  UniworkEditLockSessionView,
   UniworkLockReason,
   UniworkRemoteAction,
   UniworkLaunchEvent,
@@ -289,12 +290,11 @@ export function chipModelOf(
   // nothing else can happen until the lock is settled.
   if (session?.phase === 'lost') {
     const reasonKey = lostReasonKeyOf(session.lostReason)
-    const byName = session.byName?.trim() ? session.byName : null
-    const heldBy = reasonKey === 'uwLockLostGeneric' && byName !== null
+    const heldBy = lostHolderNameOf(session)
     return {
       tone: 'warn',
       labelKey: heldBy ? 'uwChipEditLocked' : 'uwLockLostTitle',
-      holderName: session.byName ?? null,
+      holderName: heldBy ?? session.byName ?? null,
       tipKey: heldBy ? 'uwLockLostHeldBy' : reasonKey,
       action: { kind: 'edit-here', labelKey: 'uwLockEditHere' },
     }
@@ -805,6 +805,19 @@ export function lostReasonKeyOf(reason: UniworkEditLockLostReason | undefined): 
 }
 
 /**
+ * EL-1(b) (EL1B-W3-2 / EL1B-FE-1): when a session is 'lost' with a non-empty `byName`
+ * and an unnamed reason (`unknown`, `released`, `document_archived`, or none — the
+ * commit-423 path), all three surfaces (pill, strip, and Ctrl/Cmd+S popover) name the
+ * holder via `uwLockLostHeldBy` instead of the generic lost sentence.
+ */
+export function lostHolderNameOf(session: UniworkEditLockSessionView | undefined): string | null {
+  if (!session || session.phase !== 'lost') return null
+  if (lostReasonKeyOf(session.lostReason) !== 'uwLockLostGeneric') return null
+  const byName = session.byName?.trim() ? session.byName : null
+  return byName
+}
+
+/**
  * A lock time as the web banner writes it (`formatLockTime`): today by its time alone,
  * any other day with the date too; an unreadable or missing value reads empty — the
  * caller falls back to '—' so the sentence never keeps a hole.
@@ -904,15 +917,15 @@ export function lockBannerModelOf(
       }
     case 'lost': {
       const reasonKey = lostReasonKeyOf(session.lostReason)
+      const heldBy = lostHolderNameOf(session)
       const byName = session.byName?.trim() ? session.byName : null
-      const heldBy = reasonKey === 'uwLockLostGeneric' && byName !== null
       return {
         phase: 'lost',
         tone: 'warn',
         titleKey: 'uwLockLostTitle',
         messageKey: heldBy ? 'uwLockLostHeldBy' : reasonKey,
         params: heldBy
-          ? { name: byName }
+          ? { name: heldBy }
           : session.lostReason === 'taken_over' || session.lostReason === 'handed_over'
             ? { name: byName ?? t('uwEditLockSomeone') }
             : {},

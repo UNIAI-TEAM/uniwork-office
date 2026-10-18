@@ -194,4 +194,6 @@ export const de = {
     'Sie dürfen dieses Dokument nicht mehr bearbeiten. Ihre ungespeicherten Änderungen sind noch da.',
   uwLockLostGeneric: 'Sie bearbeiten nicht mehr. Ihre ungespeicherten Änderungen sind noch da.',
   uwLockLostHeldBy: '{name} bearbeitet gerade. Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockAcquireFailed:
+    'Bearbeitungszugriff konnte nicht angefordert werden. Versuchen Sie es in ein paar Minuten erneut.',
 } satisfies Record<keyof typeof zh, string>
