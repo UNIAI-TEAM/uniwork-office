@@ -11,7 +11,7 @@ const harness = vi.hoisted(() => ({
     onText?: (text: string) => void
     onNotice?: (notice: unknown) => void
     onDone?: (result: { text: string; cancelled: boolean; turnLimit: boolean }) => void
-    onError?: (error: string) => void
+    onError?: (error: string, errorKey?: string) => void
   },
   run: vi.fn(),
 }))
