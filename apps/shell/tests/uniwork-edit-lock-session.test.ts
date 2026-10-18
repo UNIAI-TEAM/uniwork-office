@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
-import {
-  EditLockSession,
-  type EditLockTransport,
-} from '../src/main/uniwork-edit-lock/session'
-import type { EditLockHeartbeat, EditLockState, EditLockTenure } from '../src/main/uniwork-edit-lock/client'
+import { EditLockSession, type EditLockTransport } from '../src/main/uniwork-edit-lock/session'
+import type {
+  EditLockHeartbeat,
+  EditLockState,
+  EditLockTenure,
+} from '../src/main/uniwork-edit-lock/client'
 
 const DOC = '01J8X4DOC0N1P2Q3R4S5T6U7'
 const LOCK = '01J8X4LOCK0N1P2Q3R4S5T6U7V'
@@ -134,11 +135,9 @@ describe('EditLockSession', () => {
   })
 
   it('acquire 423 held_by_me=true retries once after a short wait; still held -> self_elsewhere', async () => {
-    let n = 0
     const t = transport({
       async acquire() {
         t.calls.push('R2')
-        n += 1
         throw locked(true)
       },
     })
@@ -223,22 +222,27 @@ describe('EditLockSession', () => {
     s.dispose()
   })
 
-  it.each(['released', 'expired', 'taken_over', 'handed_over', 'access_lost', 'document_archived', 'moved_here'] as const)(
-    '409 reason %s is kept',
-    async (reason) => {
-      const t = transport({
-        async heartbeat() {
-          t.calls.push('R3')
-          throw lost(reason)
-        },
-      })
-      const s = session(t)
-      await s.acquire()
-      await vi.advanceTimersByTimeAsync(30_000)
-      expect(s.view().lostReason).toBe(reason)
-      s.dispose()
-    },
-  )
+  it.each([
+    'released',
+    'expired',
+    'taken_over',
+    'handed_over',
+    'access_lost',
+    'document_archived',
+    'moved_here',
+  ] as const)('409 reason %s is kept', async (reason) => {
+    const t = transport({
+      async heartbeat() {
+        t.calls.push('R3')
+        throw lost(reason)
+      },
+    })
+    const s = session(t)
+    await s.acquire()
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(s.view().lostReason).toBe(reason)
+    s.dispose()
+  })
 
   it('wake() (resume / network back) beats at once while held', async () => {
     const t = transport()

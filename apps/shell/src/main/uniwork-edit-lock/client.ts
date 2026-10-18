@@ -1,9 +1,5 @@
 import { UniworkDocError } from '../uniwork-docs/errors'
-import {
-  createUniworkSend,
-  uniworkId,
-  type UniworkDocsClientOptions,
-} from '../uniwork-docs/client'
+import { createUniworkSend, uniworkId, type UniworkDocsClientOptions } from '../uniwork-docs/client'
 
 /**
  * R1-R4 of the document edit lock (UNI-1645 EL-1(b)). Uses the same send
