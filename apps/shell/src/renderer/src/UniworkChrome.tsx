@@ -35,6 +35,7 @@ import {
   chipCopy,
   chipModelOf,
   focusTipRoomOf,
+  isEditLockReadOnlyPhase,
   launchNoticeOf,
   lockBannerModelOf,
   miniGlyphOf,
@@ -724,7 +725,8 @@ ${action ? t(action.labelKey) : ''}`,
   useEffect(() => {
     if (ctrlS === 0) return
     const current = statusRef.current
-    if (current.state === 'conflict') {
+    // a copy read-only by the lock gets the lock explanation first: its Save is not a conflict choice
+    if (current.state === 'conflict' && !isEditLockReadOnlyPhase(current.lockSession?.phase)) {
       setBusy(true)
       void window.aiOffice
         .uniworkResolveConflict(current.path)

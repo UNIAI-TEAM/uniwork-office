@@ -833,6 +833,37 @@ describe('UniworkStatusChip: edit-lock session', () => {
     expect(host.querySelector('.uw-queue-pop')).toBeNull()
   })
 
+  it(`Ctrl/Cmd+S on a conflicted copy that is read-only by the lock explains the lock instead of resolving (EL1B-BE-R3-7)`, async () => {
+    const resolveConflict = vi.fn(async () => null)
+    ;(window.aiOffice as unknown as Record<string, unknown>).uniworkResolveConflict =
+      resolveConflict
+    await mountChip(status(lock('lost', { lostReason: 'expired' }), { state: 'conflict' }))
+    await act(async () => {
+      ctrlSRequest!({ path: PATH })
+    })
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve()
+    })
+    expect(resolveConflict).not.toHaveBeenCalled()
+    const pop = host.querySelector<HTMLElement>('.uw-queue-pop')!
+    expect(pop).not.toBeNull()
+    expect(pop.textContent).toContain('Nothing was saved')
+  })
+
+  it(`Ctrl/Cmd+S on an editable conflicted copy still opens the conflict resolution`, async () => {
+    const resolveConflict = vi.fn(async () => null)
+    ;(window.aiOffice as unknown as Record<string, unknown>).uniworkResolveConflict =
+      resolveConflict
+    await mountChip(status(lock('held'), { state: 'conflict' }))
+    await act(async () => {
+      ctrlSRequest!({ path: PATH })
+    })
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve()
+    })
+    expect(resolveConflict).toHaveBeenCalledWith(PATH)
+  })
+
   it(`Ctrl/Cmd+S on 'other' explains and offers no edit-here`, async () => {
     await mountChip(status(lock('other')))
     await act(async () => {
