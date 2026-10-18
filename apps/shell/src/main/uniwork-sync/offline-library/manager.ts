@@ -115,6 +115,12 @@ export interface PinRow {
   headVersion: number | null
   /** ISO expiry of the lease behind the copy */
   leaseUntil: string | null
+  /**
+   * What the lease manager's own clock (server time at receipt + monotonic
+   * elapsed, not the wall clock) says is left of the lease at this read. Absent
+   * when the lease has no clock reading.
+   */
+  leaseRemainingMs?: number
   leaseLevel: 'view' | 'edit' | null
   /** why an update was kept instead of applied (`too_large` / `corrupt` / `store_full`) */
   updateKeptReason: string | null
@@ -471,6 +477,7 @@ export class OfflineLibraryManager {
       sizeBytes,
       headVersion: record.manifest?.main.version ?? null,
       leaseUntil: lease.record?.expires_at ?? null,
+      ...(lease.remainingMs !== undefined ? { leaseRemainingMs: lease.remainingMs } : {}),
       leaseLevel: lease.level,
       updateKeptReason: record.updateKept ? (record.failure ?? null) : null,
       ...((state === 'disk-full' || keptUpdate) && needed > 0 ? { diskNeededBytes: needed } : {}),

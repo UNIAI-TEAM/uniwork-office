@@ -349,6 +349,10 @@ function realLease(base: string) {
       clock.wallMs += ms
       clock.monoMs += ms
     },
+    /** the wall clock runs ahead of the lease clock (the lease clock is server time at receipt + monotonic) */
+    skewWall(ms: number) {
+      clock.wallMs += ms
+    },
     /** the next lease commit waits in `put` until `release()` */
     holdPut(): { entered: Promise<void>; release: () => void } {
       put.generation = generation + 1
@@ -1067,6 +1071,125 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     o.clock.now += 31_000
     await o.copies.sweep()
     expect(await o.h.manager.row('doc_1')).toMatchObject({ open: false })
+  })
+
+  /**
+   * Virtual time for the copy module's timers (those of 100 ms or more): a timer is held
+   * back instead of armed, and `advance` fires the due ones in order, moving `onStep`
+   * (the clocks the test owns) to each timer's moment first.
+   */
+  function virtualTimers(onStep: (ms: number) => void) {
+    const realSetTimeout = globalThis.setTimeout
+    const held = new Map<unknown, { at: number; fn: () => void }>()
+    const armed: number[] = []
+    let virtualNow = 0
+    const setSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      fn: () => void,
+      ms?: number,
+    ) => {
+      if ((ms ?? 0) < 100) return realSetTimeout(fn, ms)
+      armed.push(ms ?? 0)
+      const handle = realSetTimeout(() => undefined, 0)
+      held.set(handle, { at: virtualNow + (ms ?? 0), fn })
+      return handle
+    }) as typeof setTimeout)
+    const realClearTimeout = globalThis.clearTimeout
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout').mockImplementation(((handle: never) => {
+      held.delete(handle)
+      realClearTimeout(handle)
+    }) as typeof clearTimeout)
+    const settle = () => new Promise((resolve) => realSetTimeout(resolve, 60))
+    return {
+      armed,
+      async advance(ms: number): Promise<void> {
+        const target = virtualNow + ms
+        for (;;) {
+          let next: [unknown, { at: number; fn: () => void }] | null = null
+          for (const entry of held)
+            if (entry[1].at <= target && (!next || entry[1].at < next[1].at)) next = entry
+          if (!next) break
+          held.delete(next[0])
+          onStep(next[1].at - virtualNow)
+          virtualNow = next[1].at
+          next[1].fn()
+          await settle()
+        }
+        onStep(target - virtualNow)
+        virtualNow = target
+        await settle()
+      },
+      restore() {
+        setSpy.mockRestore()
+        clearSpy.mockRestore()
+      },
+    }
+  }
+
+  it('(FL-04a, G703B-P1) a lease clock 800 ms behind the wall clock locks the copy within a second of the lease-clock expiry, not 30 s later', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'uw-offline-fl04a-'))
+    dirs.push(base)
+    const rl = realLease(base)
+    const o = openHarness({ lease: rl.lease })
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    // the wall clock now runs 800 ms ahead of the lease clock
+    rl.skewWall(800)
+    o.clock.now += 800
+    const timers = virtualTimers((ms) => {
+      rl.advance(ms)
+      o.clock.now += ms
+    })
+    try {
+      const outcome = await o.copies.open('doc_1')
+      if (outcome.kind !== 'opened') throw new Error(`expected an open, got ${outcome.kind}`)
+      const path = outcome.path
+      // the lease clock still has a second to go when the wall clock says expired: no lock yet
+      await timers.advance(24 * LEASE_HOUR - 1_000)
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      // one second past the lease-clock expiry the lock has landed (it used to take the 30 s grace)
+      await timers.advance(2_000)
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(path)).toBe(false)
+    } finally {
+      timers.restore()
+    }
+  })
+
+  it('(FL-04a, G703B-P1) a due copy whose lease still reads usable is re-checked within a second, not after the 30 s grace', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    o.clock.now = LEASE_T0
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    o.h.leases.states.set('doc_1', {
+      ...leaseState('valid'),
+      record: { expires_at: new Date(o.clock.now + 1_000).toISOString() } as never,
+    })
+    const timers = virtualTimers((ms) => {
+      o.clock.now += ms
+    })
+    try {
+      const path = (await openCopyOf(o)).path
+      expect(timers.armed).toEqual([1_000])
+      // the expiry timer fires with the lease read still usable: nothing locks yet
+      await timers.advance(1_000)
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      // the lease read now says expired: the short re-check, well inside a second, locks it
+      o.h.leases.states.set('doc_1', {
+        ...leaseState('expired'),
+        record: { expires_at: new Date(LEASE_T0 + 1_000).toISOString() } as never,
+      })
+      await timers.advance(1_000)
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(path)).toBe(false)
+      expect(timers.armed.every((ms) => ms <= 1_000 || ms === 30_000)).toBe(true)
+    } finally {
+      timers.restore()
+    }
   })
 
   it('(G703-R9-4) a timer-triggered expiry with a slow capability read arms no zero-delay timer: one removal attempt, one retry after the grace', async () => {

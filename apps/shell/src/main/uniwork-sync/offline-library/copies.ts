@@ -180,10 +180,35 @@ export function offlineCopyKey(documentId: string): string {
 
 const MAX_TIMEOUT_MS = 2_147_483_647
 
+/**
+ * FL-04a: a copy that is due by its own clock while the lease clock still reads the
+ * lease usable (the lease clock runs up to about a second behind the wall clock) is
+ * looked at again after this short, positive delay - never at once, never the grace.
+ */
+const OFFLINE_COPY_RECHECK_MS = 750
+/** an expiry that moved less than this between two reads is the same expiry (read jitter) */
+const EXPIRY_MOVED_MS = 1_000
+
+/** how a copy's expiry check is armed */
+type Arming = 'expiry' | 'retry' | 'recheck'
+
 function parseExpiryMs(leaseUntil: string | null | undefined): number | null {
   if (!leaseUntil) return null
   const ms = Date.parse(leaseUntil)
   return Number.isFinite(ms) ? ms : null
+}
+
+/**
+ * When the lease runs out, on this module's clock. The lease manager's own remaining
+ * time wins (FL-04a): the row's lock reason comes from that clock, which can run
+ * behind the wall clock, so a timer set from the wall-clock expiry fires before the
+ * row is expired. A row with no clock reading falls back to its expiry timestamp.
+ */
+function expiryOf(row: PinRow, at: number): number | null {
+  if (row.leaseRemainingMs !== undefined && Number.isFinite(row.leaseRemainingMs)) {
+    return at + Math.max(0, row.leaseRemainingMs)
+  }
+  return parseExpiryMs(row.leaseUntil)
 }
 
 interface TrackedCopy {
@@ -245,15 +270,23 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
    * grace (G703-R7-5). An expiry that is already due is enforced by the sweep
    * that got here, so it never arms a zero-delay timer either (G703-R8-3): the
    * sweep's own outcome (removed, failed, cancelled, deferred) decides what follows.
+   * `recheck` (FL-04a): the copy is due by its own clock but the lease clock still
+   * reads it usable - the short re-check delay, not the grace.
    */
-  const scheduleExpiry = (documentId: string, retry = false): void => {
+  const scheduleExpiry = (documentId: string, arming: Arming = 'expiry'): void => {
     const copy = copies.get(documentId)
     clearTimer(copy)
     if (!copy || copy.locked) return
     const untilExpiry =
-      copy.leaseUntilMs !== null && !retry ? copy.leaseUntilMs - now() : Number.NEGATIVE_INFINITY
+      copy.leaseUntilMs !== null && arming !== 'retry'
+        ? copy.leaseUntilMs - now()
+        : Number.NEGATIVE_INFINITY
     const delay =
-      untilExpiry > 0 ? Math.min(MAX_TIMEOUT_MS, untilExpiry) : OFFLINE_COPY_CLOSE_GRACE_MS
+      untilExpiry > 0
+        ? Math.min(MAX_TIMEOUT_MS, untilExpiry)
+        : arming === 'recheck'
+          ? OFFLINE_COPY_RECHECK_MS
+          : OFFLINE_COPY_CLOSE_GRACE_MS
     const timer = setTimeout(() => {
       if (copies.get(documentId) === copy) copy.timer = null
       void serial(sweepOne).catch(() => undefined)
@@ -279,7 +312,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     // a folder that would not go stays on the record: the next sweep retries
     // instead of forgetting a plaintext leftover (BE-R1-2, BE-R2-8, BE-R2-11)
     if (!(await dropDir(copy.dir))) {
-      scheduleExpiry(documentId, true)
+      scheduleExpiry(documentId, 'retry')
       return false
     }
     copies.delete(documentId)
@@ -301,7 +334,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     clearTimer(copy)
     const outcome = await dropDirOutcome(copy.dir, stillDue)
     if (outcome !== 'removed') {
-      scheduleExpiry(documentId, true)
+      scheduleExpiry(documentId, 'retry')
       return outcome
     }
     copy.locked = true
@@ -389,7 +422,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     if (onScreen && !shownBefore.locked) {
       if (row) {
         shownBefore.orgId = row.orgId
-        shownBefore.leaseUntilMs = parseExpiryMs(row.leaseUntil)
+        shownBefore.leaseUntilMs = expiryOf(row, now())
         scheduleExpiry(documentId)
       }
       return {
@@ -431,7 +464,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
       openedAt: now(),
       locked: false,
       orgId: row.orgId,
-      leaseUntilMs: parseExpiryMs(row.leaseUntil),
+      leaseUntilMs: expiryOf(row, now()),
       timer: null,
       counted: true,
     })
@@ -450,20 +483,27 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     copy: TrackedCopy,
     row: PinRow | null | undefined,
   ): OfflineBlockedReason | null => {
+    let rearm = false
     if (row) {
       copy.orgId = row.orgId
-      const nextExpiry = parseExpiryMs(row.leaseUntil)
-      if (nextExpiry !== copy.leaseUntilMs || copy.timer === null) {
-        copy.leaseUntilMs = nextExpiry
-        scheduleExpiry(documentId)
-      }
+      const nextExpiry = expiryOf(row, now())
+      const moved =
+        nextExpiry === null || copy.leaseUntilMs === null
+          ? nextExpiry !== copy.leaseUntilMs
+          : Math.abs(nextExpiry - copy.leaseUntilMs) >= EXPIRY_MOVED_MS
+      if (moved) copy.leaseUntilMs = nextExpiry
+      rearm = moved || copy.timer === null
     }
     const expiredOffline =
       !row && (copy.leaseUntilMs !== null ? now() >= copy.leaseUntilMs : deps.scope() === null)
     const reason: OfflineBlockedReason | null =
       row?.lockReason ??
       (expiredOffline ? (copy.leaseUntilMs !== null ? 'lease_expired' : 'signed_out') : null)
-    if (!reason && copy.timer === null) scheduleExpiry(documentId)
+    // due by the copy's own clock while the lease clock still reads it usable: look again shortly
+    const due = copy.leaseUntilMs !== null && copy.leaseUntilMs <= now()
+    if (rearm || (!reason && copy.timer === null)) {
+      scheduleExpiry(documentId, !reason && due ? 'recheck' : 'expiry')
+    }
     return reason
   }
 
@@ -486,7 +526,7 @@ export function createOfflineCopies(deps: OfflineCopiesDeps): OfflineCopies {
     // lands later changes the stamp, and the removal calls itself off
     const stamp = deps.leaseStamp?.(documentId) ?? 0
     if (stamp % 2 === 1) {
-      scheduleExpiry(documentId, true)
+      scheduleExpiry(documentId, 'retry')
       return
     }
     const rechecked = await deps
