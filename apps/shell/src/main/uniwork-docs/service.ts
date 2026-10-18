@@ -1129,13 +1129,6 @@ export class UniworkDocsService {
   private readonly ownEcho = new Map<string, Set<string>>()
   /** documents locked by a server verdict (403/404 revoked, 410 deleted) */
   private readonly remoteLocked = new Map<string, 'revoked' | 'deleted'>()
-  /**
-   * EL-1(b) fix12: documents whose edit lock the server refused with a coded 403/404 on an explicit
-   * "Sửa ở đây". Memory only, read-only for editing and nothing else: no binding write, the stored
-   * access (view / recovery) is untouched. Keyed by account + document, so another account's copy
-   * never reads it; value = the path it was seen for (the account boundary drops it by path).
-   */
-  private readonly editDenied = new Map<string, string>()
   /** documentId → real working-copy path; forgetLocksWhere cannot rehydrate via pathKey on Windows */
   private readonly remoteLockPath = new Map<string, string>()
   /** ADVISOR D4 (a): the parsed dev-only fixture and the mtime it was read at */
@@ -1289,7 +1282,6 @@ export class UniworkDocsService {
       prepareEditLock: (path) => this.prepareEditLock(path),
       editLockId: (path) => this.editLockIdOf(path),
       editLockHolder: (path) => this.editLockHolderOf(path),
-      isEditDenied: (doc) => this.isEditDenied(doc),
       onCommitEditLocked: (path, error) =>
         this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
@@ -1374,25 +1366,6 @@ export class UniworkDocsService {
     return this.editLocks.get(pathKey(path))?.isReadOnly() === true
   }
 
-  private editDeniedKey(doc: Pick<BoundDocument, 'deploymentId' | 'userId'>, documentId: string) {
-    return `${doc.deploymentId}/${doc.userId}/${documentId}`
-  }
-
-  /** the server refused this account's edit lock on this document (in memory, see `editDenied`) */
-  private isEditDenied(doc: BoundDocument): boolean {
-    return this.editDenied.has(this.editDeniedKey(doc, doc.binding.documentId))
-  }
-
-  /** the lock session reads read-only, or the server denied the edit lock */
-  private editLockReadOnlyFor(doc: BoundDocument): boolean {
-    return this.editLockReadOnly(doc.path) || this.isEditDenied(doc)
-  }
-
-  /** edit is allowed again (an authoritative access read or a grant): the denial is spent */
-  private clearEditDenied(scope: { deploymentId: string; userId: string }, documentId: string) {
-    this.editDenied.delete(this.editDeniedKey(scope, documentId))
-  }
-
   private toLockView(view: EditLockSessionView): UniworkEditLockSessionView | undefined {
     if (view.phase === 'none') return undefined
     return {
@@ -1437,9 +1410,6 @@ export class UniworkDocsService {
       isSignedIn: () => this.deps.identity() !== null,
       onChange: (view) => {
         if (view.phase === 'acquiring' || view.phase === 'none') return
-        if (view.phase === 'held' && this.editLocks.get(key) === session) {
-          this.clearEditDenied(doc, doc.binding.documentId)
-        }
         const now = this.store.lookup(doc.path)
         if (now) this.publish(this.statusOf(now))
         this.notifyDocStateChanged(doc.path)
@@ -1554,29 +1524,7 @@ export class UniworkDocsService {
       session = this.editLocks.get(pathKey(path))
     }
     if (!session) return this.statusOf(doc)
-    const epoch = this.sessionEpoch
-    const attempt = session.editHere()
-    // the attempt this call started (or joined) is the generation it may finalize
-    const generation = session.acquireGeneration()
-    const ok = await attempt
-    // a denied re-acquire (403/404) ends the session at 'none', a phase onChange never pushes:
-    // drop it like the initial acquire does, so the open editor re-queries its read-only state.
-    // `none` is not proof of edit access (the binding may still say `edit`): a CODED denial is
-    // remembered in memory first, so the answer the push invites is read-only (EL1B-BE-R3C-1).
-    // Nothing is persisted: the stored access is the document's, not this refusal's (R3D-2).
-    // A newer acquire attempt on this session owns its own result: this one finalizes nothing (R3D-6).
-    if (
-      session.view().phase === 'none' &&
-      session.acquireGeneration() === generation &&
-      this.editLocks.get(pathKey(path)) === session
-    ) {
-      if (session.denial() !== null && this.denialStillApplies(doc, session, epoch)) {
-        this.editDenied.set(this.editDeniedKey(doc, doc.binding.documentId), doc.path)
-      }
-      this.editLocks.delete(pathKey(path))
-      session.dispose()
-      this.notifyDocStateChanged(path)
-    }
+    const ok = await session.editHere()
     if (!ok) return null
     const now = this.store.lookup(path)
     if (!now) return null
@@ -1584,18 +1532,6 @@ export class UniworkDocsService {
     const status = this.statusOf(now)
     this.publish(status)
     return status
-  }
-
-  /**
-   * A denial of an identity that is gone is ignored: account A's refusal never lands on account B
-   * and nothing is remembered for a scope the boundary already cleaned (R3D-3).
-   */
-  private denialStillApplies(doc: BoundDocument, session: EditLockSession, epoch: number): boolean {
-    return (
-      this.sessionEpoch === epoch &&
-      this.owns(doc) &&
-      this.editLocks.get(pathKey(doc.path)) === session
-    )
   }
 
   private async maybeReplayRemoteAfterUnlock(path: string): Promise<void> {
@@ -2225,10 +2161,7 @@ export class UniworkDocsService {
           this.isQueueSessionCurrent({ id }) &&
           this.deps.identity() !== null &&
           bound !== null &&
-          this.owns(bound) &&
-          // an edit lock the server refused is read-only: an existing intent is neither
-          // uploaded nor committed, and stays as it is (EL1B-BE-R3D-4)
-          !this.isEditDenied(bound)
+          this.owns(bound)
         )
       },
       publish: (record) => {
@@ -2602,8 +2535,6 @@ export class UniworkDocsService {
       // it is spent, exactly as the reopen path spends it
       this.clearRemoteLock(doc.record.documentId, doc.path)
     }
-    const bound = this.store.lookup(doc.path)
-    if (bound) this.clearEditDenied(bound, doc.record.documentId)
     return state
   }
 
@@ -3381,10 +3312,6 @@ export class UniworkDocsService {
     this.ownEcho.clear()
     this.remoteLocked.clear()
     this.remoteLockPath.clear()
-    // a refused edit lock belongs to its account: it goes with that account's sessions
-    for (const key of [...this.editDenied.keys()]) {
-      if (key.startsWith(`${scopeToken}/`)) this.editDenied.delete(key)
-    }
     this.editorAi.clear()
     this.remoteReloads.clear()
     this.orgMemberNames.clear()
@@ -3907,9 +3834,6 @@ export class UniworkDocsService {
       this.remoteHeld.delete(doc.binding.documentId)
       this.remoteLockPath.delete(doc.binding.documentId)
     }
-    for (const [key, path] of [...this.editDenied]) {
-      if (match(path)) this.editDenied.delete(key)
-    }
     // pathKey lowercases the filename on Windows, so lookup(pathKey) misses
     // (`Plan.docx` !== `plan.docx`) and the bar loop cannot drop the verdict.
     // remoteLockPath keeps the real path lockFromServer saw.
@@ -4032,7 +3956,7 @@ export class UniworkDocsService {
       found.doc.binding.access === 'view' ||
       !this.ownsLocally(found.doc) ||
       this.coordinator.isOtherWindow(found.doc.key) ||
-      this.editLockReadOnlyFor(found.doc)
+      this.editLockReadOnly(found.doc.path)
     )
   }
 
@@ -5942,7 +5866,7 @@ export class UniworkDocsService {
   async save(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
-    if (this.editLockReadOnlyFor(doc)) {
+    if (this.editLockReadOnly(doc.path)) {
       const status = this.statusOf(doc)
       this.publish(status)
       if (this.deps.isShellTab?.(doc.path) ?? true) {
@@ -5978,7 +5902,7 @@ export class UniworkDocsService {
     // another window holds the document lock: this window is read-only and
     // never writes (EXPERIENCE - Second-window bar, :129)
     if (this.coordinator.isOtherWindow(doc.key)) return false
-    if (this.editLockReadOnlyFor(doc)) return false
+    if (this.editLockReadOnly(doc.path)) return false
     return !(b.state === 'blocked' && b.error !== 'quota_exceeded')
   }
 
@@ -6369,7 +6293,6 @@ export class UniworkDocsService {
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
-    if (reloaded.access === 'edit') this.clearEditDenied(fresh, notice.documentId)
     const done = await this.coordinator.commitState(fresh, next)
     const final = await this.editorState(done.path)
     const lateMove = final.aiEpoch !== before.aiEpoch
@@ -7755,13 +7678,6 @@ export class UniworkDocsService {
     const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
     const access: UniworkDocAccess =
       viewTicket || viewRequested ? 'view' : accessFor(detail.myLevel)
-    // an authoritative read that allows edit spends the edit-lock denial (EL-1(b) fix12)
-    if (access === 'edit') {
-      this.clearEditDenied(
-        { deploymentId: identity.deploymentId, userId: identity.accountId },
-        documentId,
-      )
-    }
     const dir = dirs[0]!
     const existing = await this.store.readDir(dir)
     const workspaceId = launch?.workspaceId ?? detail.workspaceId

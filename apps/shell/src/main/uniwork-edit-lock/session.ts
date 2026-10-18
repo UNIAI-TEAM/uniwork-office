@@ -109,8 +109,6 @@ export class EditLockSession {
   private op = 0
   private releaseWarned = false
   private acquiring = false
-  /** the 403/404 that ended the last acquire at `none`; null for every other outcome */
-  private deniedBy: unknown = null
   /** in-flight acquire; ensureHeldBeforeCommit awaits this instead of returning mid-flight */
   private acquireInFlight: Promise<boolean> | null = null
   constructor(opts: EditLockSessionOptions) {
@@ -144,22 +142,6 @@ export class EditLockSession {
 
   isReadOnly(): boolean {
     return !this.isEditable()
-  }
-
-  /**
-   * The terminal 403/404 the last acquire ended on (phase `none`), else null.
-   * `none` alone is not proof of edit access: the owner applies its denial path.
-   */
-  denial(): unknown {
-    return this.deniedBy
-  }
-
-  /**
-   * Moves with every acquire attempt. A caller that awaited one attempt compares it
-   * afterwards: a newer attempt owns the result, the older one finalizes nothing (R3D-6).
-   */
-  acquireGeneration(): number {
-    return this.op
   }
 
   async acquire(moveFromSelf = false): Promise<void> {
@@ -202,7 +184,6 @@ export class EditLockSession {
     }
     const op = ++this.op
     this.acquiring = true
-    this.deniedBy = null
     this.clearTimers()
     this.setState({
       phase: 'acquiring',
@@ -338,16 +319,15 @@ export class EditLockSession {
         if (!heldByMe) this.armPoll()
         return true
       }
-      // only the server's coded verdict is a denial: a bare 403/404 (a gateway page, no UniWork
-      // envelope) reaches the client as `server_error` and is as transient as a 5xx (R3D-1)
       if (
         isUniworkDocError(error) &&
         (error.code === 'forbidden' ||
           error.code === 'permission_revoked' ||
-          error.code === 'not_found')
+          error.status === 403 ||
+          error.code === 'not_found' ||
+          error.status === 404)
       ) {
         this.clearTimers()
-        this.deniedBy = error
         this.setState({ phase: 'none', holderName: null, since: null })
         return true
       }
