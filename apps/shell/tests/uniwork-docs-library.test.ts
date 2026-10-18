@@ -979,7 +979,9 @@ describe('member-name cache and org switch (S16)', () => {
           ],
         })
       }
-      const docsMatch = /^\/api\/v1\/workspaces\/(ws_[12])\/documents\/recent$/.exec(parsed.pathname)
+      const docsMatch = /^\/api\/v1\/workspaces\/(ws_[12])\/documents\/recent$/.exec(
+        parsed.pathname,
+      )
       if (docsMatch) {
         const ws = docsMatch[1]!
         return json(200, {

@@ -890,9 +890,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const raw = await send({
         method: 'GET',
         route:
-          q || flatRequired
-            ? `/workspaces/${ws}/documents`
-            : `/workspaces/${ws}/documents/recent`,
+          q || flatRequired ? `/workspaces/${ws}/documents` : `/workspaces/${ws}/documents/recent`,
         query: params,
         timeoutMs: metadataTimeout,
         read: json,
