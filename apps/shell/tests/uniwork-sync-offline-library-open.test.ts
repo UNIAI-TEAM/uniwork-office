@@ -1069,6 +1069,72 @@ describe('G703B-P1 (FL-04a) an open offline copy whose lease lapses is locked in
     expect(await o.h.manager.row('doc_1')).toMatchObject({ open: false })
   })
 
+  it('(G703-R9-4) a timer-triggered expiry with a slow capability read arms no zero-delay timer: one removal attempt, one retry after the grace', async () => {
+    const o = openHarness()
+    dirs.push(o.userDataDir)
+    o.clock.now = 1_760_000_000_000
+    addDoc(o.h, 'doc_1', 1)
+    await pin(o.h)
+    o.h.leases.states.set('doc_1', {
+      ...leaseState('valid'),
+      record: { expires_at: new Date(o.clock.now + 40).toISOString() } as never,
+      remainingMs: 40,
+    })
+    const realSetTimeout = globalThis.setTimeout
+    // every timer the copy module arms, and the close-grace ones held back so the test can fire them
+    const armed: number[] = []
+    const graceTimers: Array<() => void> = []
+    const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      fn: () => void,
+      ms?: number,
+    ) => {
+      armed.push(ms ?? 0)
+      if ((ms ?? 0) >= 30_000) {
+        graceTimers.push(fn)
+        return realSetTimeout(() => undefined, 1)
+      }
+      return realSetTimeout(fn, ms)
+    }) as typeof setTimeout)
+    let attempts = 0
+    try {
+      const path = (await openCopyOf(o)).path
+      const dir = copyDir(o)
+      expect(armed).toContain(40)
+      armed.length = 0
+      fsFault.rmGate = (target) => {
+        if (target === dir) attempts += 1
+      }
+      fsFault.rmFault = (target) => target === dir
+      // the lease lapses; the REAL expiry timer fires (40 ms) and clears copy.timer, then
+      // the capability read is held for 150 ms: an erroneous 0 ms rearm would queue a second pass
+      o.capability.delayMs = 150
+      o.clock.now += 50
+      o.h.leases.states.set('doc_1', {
+        ...leaseState('expired'),
+        record: { expires_at: new Date(o.clock.now - 10).toISOString() } as never,
+      })
+      await new Promise((resolve) => realSetTimeout(resolve, 500))
+      expect(attempts).toBe(1)
+      expect(o.locks).toEqual([])
+      expect(existsSync(path)).toBe(true)
+      // nothing but the capability read (150 ms) and 30 s close graces was armed: no 0 ms timer
+      const others = armed.filter((ms) => ms !== 150)
+      expect(others.length).toBeGreaterThan(0)
+      expect(others.every((ms) => ms === 30_000)).toBe(true)
+      // the grace elapses with the folder released: exactly one retry, and it locks
+      fsFault.rmFault = null
+      o.clock.now += 31_000
+      // (an earlier grace was replaced by the failed removal's own: the last one is live)
+      graceTimers[graceTimers.length - 1]()
+      await o.copies.sweep()
+      expect(attempts).toBe(2)
+      expect(o.locks).toEqual([expect.objectContaining({ path, reason: 'lease_expired' })])
+      expect(existsSync(dir)).toBe(false)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('(G703-R7-5) a failed expiry removal retries after a bounded delay and never spins on a zero-delay timer', async () => {
     const o = openHarness()
     dirs.push(o.userDataDir)
