@@ -91,6 +91,7 @@ function makeHarness(
   const renewCalls: Array<{ documentId: string; lease: string }> = []
   const releaseCalls: string[] = []
   const revokedNotices: LeaseRevokeNotice[] = []
+  const archivedNotices: Array<{ documentId: string; boundaryToken: string | null }> = []
   let sessionExpiredCount = 0
 
   const layer = createStoreLayer({
@@ -159,6 +160,9 @@ function makeHarness(
       sessionExpiredCount += 1
     },
   })
+  manager.onArchived((documentId, boundaryToken) => {
+    archivedNotices.push({ documentId, boundaryToken })
+  })
 
   return {
     layer,
@@ -169,6 +173,7 @@ function makeHarness(
     renewCalls,
     releaseCalls,
     revokedNotices,
+    archivedNotices,
     storeGets,
     loadedVersions,
     sessionExpiredCount: () => sessionExpiredCount,
@@ -413,6 +418,71 @@ describe('uniwork-sync lease manager (G5-08c)', () => {
     expect(afterExpiry.state).toBe('expired')
     expect(afterExpiry.reason).toBe('lease_expired')
     expect(afterExpiry.locked).toBe(true)
+  })
+
+  it('R1-4: an archived answer that resumes after an account switch emits no notice', async () => {
+    let atPut!: () => void
+    const entered = new Promise<void>((resolve) => {
+      atPut = resolve
+    })
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const h = makeHarness({
+      renewImpl: async () => {
+        throw new LeaseClientError({
+          kind: 'archived',
+          code: 'document_archived',
+          status: 403,
+        })
+      },
+      // the boundary moves while the archived record is being written: exactly
+      // the window between handleClientError's generation check and its emit
+      wrapStore: (store) => ({
+        ...store,
+        async put(record) {
+          if (record.archived === true) {
+            atPut()
+            await gate
+          }
+          return store.put(record)
+        },
+      }),
+    })
+
+    await h.manager.grant('doc_1')
+    h.advanceTime(13 * HOUR)
+    const pending = h.manager.renew('doc_1')
+    await entered
+
+    h.setScope({ ...OTHER_ACCOUNT })
+    expect(h.manager.lockBoundary({ ...SCOPE })).toBe('account_switch')
+    release()
+    expect((await pending).kind).toBe('none')
+
+    // the stale answer never reached the library listener
+    expect(h.archivedNotices).toEqual([])
+  })
+
+  it('R1-4: a fresh archived answer reaches the listener under its own boundary token', async () => {
+    const h = makeHarness({
+      renewImpl: async () => {
+        throw new LeaseClientError({
+          kind: 'archived',
+          code: 'document_archived',
+          status: 403,
+        })
+      },
+    })
+
+    await h.manager.grant('doc_1')
+    h.advanceTime(13 * HOUR)
+    expect((await h.manager.renew('doc_1')).kind).toBe('archived')
+
+    expect(h.archivedNotices).toEqual([
+      { documentId: 'doc_1', boundaryToken: 'dep_1/user_1#dev_1' },
+    ])
   })
 
   it('capability off keeps existing lease until expiry', async () => {
