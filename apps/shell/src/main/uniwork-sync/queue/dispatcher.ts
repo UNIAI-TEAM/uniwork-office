@@ -768,6 +768,7 @@ export class QueueDispatcher {
           format: doc.format,
           bytes: doc.payload,
           idempotencyKey: doc.record.idempotencyKey,
+          attempt: doc.record.attempt,
           limits: await this.resolveDocumentLimits(),
           ...(doc.record.uploadSession ? { resume: doc.record.uploadSession } : {}),
           signal: controller.signal,
@@ -840,6 +841,21 @@ export class QueueDispatcher {
 
   /** a failed upload/commit: the machine decides the state (never "failed" on a lost answer) */
   private async failCommit(doc: QueueDoc, error: unknown, now: number): Promise<void> {
+    // UNI-1918 (B69-lite): the server refused the COMMIT because the staged
+    // upload's claim expired. That is not "the upload is gone": the commit
+    // POST may have been resolved before the claim lapsed, so the intent is
+    // kept and exactly ONE lookup of the SAME commit key decides
+    // (committed → settle, not_committed → attempt+1 queued, in_flight →
+    // reconciling, unknown → reconciling-stuck). Never a dropped intent, never
+    // a new key minted behind the user's back.
+    if (
+      error instanceof UniworkDocError &&
+      error.serverCode === 'document_upload_invalid' &&
+      error.reason === 'file_claim_expired'
+    ) {
+      await this.settleInFlight(doc, now)
+      return
+    }
     const code = error instanceof UniworkDocError ? error.code : 'server_error'
     const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
     const maxBytes = error instanceof UniworkDocError ? error.maxBytes : undefined

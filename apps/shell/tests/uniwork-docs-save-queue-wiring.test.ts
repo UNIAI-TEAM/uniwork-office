@@ -22,6 +22,7 @@ import { createDocLock } from '../src/main/uniwork-sync/doc-lock'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits } from '../src/main/uniwork-docs/limits'
 import type { CapabilitySource } from '../src/main/uniwork-sync/capability/cache'
 import { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
+import { uploadKeyFor } from '../src/main/uniwork-sync/version-upload'
 import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
 import {
   createLockableSafeStorage,
@@ -1402,7 +1403,9 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(lookups(server)).toHaveLength(0)
     expect(uploads(server)).toHaveLength(1)
     expect(commits(server)).toHaveLength(1)
-    expect(uploads(server)[0]!.headers['idempotency-key']).toBe('key_stuck')
+    // the requeued record is attempt 2: the bytes stage under that attempt's
+    // upload key while the COMMIT key is unchanged (UNI-1918 B69-lite)
+    expect(uploads(server)[0]!.headers['idempotency-key']).toBe(uploadKeyFor('key_stuck', 2))
     expect(commits(server)[0]!.headers['idempotency-key']).toBe('key_stuck')
     expect(await storedIntent(ctx, path)).toBeNull()
   })
@@ -1833,7 +1836,9 @@ describe('G5-06 W4b save queue wiring', () => {
       server.calls.filter((c) => c.path.endsWith('/versions/commit') && c.method === 'GET'),
     ).toHaveLength(1)
     expect(uploads(server)).toHaveLength(1)
-    expect(uploads(server)[0]!.headers['idempotency-key']).toBe('key_reconcile')
+    // the lookup's not_committed minted attempt 2: the bytes stage under that
+    // attempt's upload key, the COMMIT key is the record's own (UNI-1918 B69-lite)
+    expect(uploads(server)[0]!.headers['idempotency-key']).toBe(uploadKeyFor('key_reconcile', 2))
     expect(commits(server)).toHaveLength(1)
     expect(commits(server)[0]!.headers['idempotency-key']).toBe('key_reconcile')
   })

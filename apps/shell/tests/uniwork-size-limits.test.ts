@@ -1004,6 +1004,7 @@ describe('SIZE-F1 desktop document size limits', () => {
       const userStatus = await h.coordinator.save(h.docPath, { userSave: true })
       expect(userStatus!.binding.error).not.toBe('too_large')
       expect(h.supersede).not.toHaveBeenCalled()
+      // no phase write either: this press never reached the network
       expect(h.put).not.toHaveBeenCalled()
       expect(h.stored.has(DOC_ID)).toBe(true)
 
@@ -1016,7 +1017,12 @@ describe('SIZE-F1 desktop document size limits', () => {
       expect(replayed!.binding.baseChecksum).toBe(sha256Hex(olderBytes))
       expect(h.stored.has(DOC_ID)).toBe(false)
       expect(h.supersede).not.toHaveBeenCalled()
-      expect(h.put).not.toHaveBeenCalled()
+      // the three phase writes of B70's commit leg, and NOT a fourth intent
+      // (the record is the SAME one: no new intent was minted)
+      expect(h.put).toHaveBeenCalledTimes(3)
+      expect(
+        new Set(h.put.mock.calls.map((call) => call[1].intentId)),
+      ).toEqual(new Set(['old']))
       expect(h.statuses.some((push) => push.error === 'too_large')).toBe(false)
     })
 
@@ -1069,7 +1075,10 @@ describe('SIZE-F1 desktop document size limits', () => {
         first!.binding.state,
         `published: ${JSON.stringify(h.statuses.map((status) => `${status.state}${status.error ? `:${status.error}` : ''}`))}`,
       ).toBe('saved')
-      expect(h.put).toHaveBeenCalledTimes(1)
+      // the intent write plus the three phase writes B70 persists before the
+      // commit POST (`dispatch` -> `uploaded` -> `uploaded`): the record ends
+      // `committing`, never the `queued` the next poll would re-POST blindly
+      expect(h.put).toHaveBeenCalledTimes(4)
       expect(warnPayloads()).toContainEqual({ sizeBytes: 950, maxBytes: 1000 })
 
       // a second warn-band save in the same session says nothing new

@@ -80,6 +80,8 @@ type Fault = {
   code?: string
   /** `fields.reason` of a coded refusal (e.g. `file_claim_expired`) */
   reason?: string
+  /** a `lookup` route's answer, when the server must say more than the store does */
+  outcome?: 'committed' | 'not_committed' | 'in_flight' | 'unknown'
 }
 
 /** a small UniWork documents server: idempotent uploads and commits, revisions, ACL level */
@@ -175,6 +177,9 @@ function fakeServer(initial: {
     if (u.pathname === `/api/v1/documents/${DOC}/versions/commit` && call.method === 'GET') {
       const fault = takeFault('lookup')
       if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
+      if (fault?.outcome === 'in_flight') return json(200, { outcome: 'in_flight' })
+      if (fault?.outcome === 'unknown') return error(410, 'commit_intent_unknown')
+      if (fault?.outcome === 'not_committed') return json(200, { outcome: 'not_committed' })
       const stored = commits.get(key)
       if (stored) {
         const result = stored as { version: { id: string; version: number } }
@@ -194,7 +199,13 @@ function fakeServer(initial: {
       if (fault?.kind === 'network' || fault?.kind === 'dropped') {
         throw new TypeError('fetch failed')
       }
-      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
+      if (typeof fault?.kind === 'number') {
+        return error(
+          fault.kind,
+          fault.code ?? 'x',
+          fault.reason ? { reason: fault.reason } : undefined,
+        )
+      }
       const stored = commits.get(key)
       let result = stored
       if (!result) {
@@ -1073,19 +1084,137 @@ describe('review r1 save fixes', () => {
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
   })
 
-  it('an expired staged upload drops the intent, stays dirty, and the next save mints a new key on the same base (A1.2)', async () => {
+  it('an expired staged upload keeps the intent, looks the SAME commit key up once, and re-stages under a new upload key (B69-lite)', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
     const path = await openDoc(ctx)
     writeFileSync(path, 'v4')
-    server.faults.push({ route: 'commit', kind: 409, code: 'document_upload_invalid' })
+    // the claim of the staged upload is gone; the intent row is NOT (not_committed)
+    server.faults.push({
+      route: 'commit',
+      kind: 409,
+      code: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    server.faults.push({ route: 'lookup', outcome: 'not_committed' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'queued' })
+    // the intent is KEPT (never dropped, never a fresh key minted behind it)
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent was dropped')
+    expect(intent.attempt).toBe(1)
+    expect(intent.state).toBe('queued')
+    // exactly ONE lookup, with the COMMIT key
+    expect(lookups(server).map((c) => c.headers['idempotency-key'])).toEqual([
+      intent.idempotencyKey,
+    ])
+    // the next save stages the same bytes under a NEW upload key, same commit key
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    const uploadKeys = uploads(server).map((c) => c.headers['idempotency-key'])
+    expect(uploadKeys).toEqual([intent.idempotencyKey, `${intent.idempotencyKey}:u1`])
+    expect(commits(server).map((c) => c.headers['idempotency-key'])).toEqual([
+      intent.idempotencyKey,
+      intent.idempotencyKey,
+    ])
+    expect(server.state.version).toBe(4)
+  })
+
+  it('an expired claim whose lookup proves the commit settles with the receipt, no second POST (B69-lite)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    // the commit landed, then the staged claim expired before the answer arrived
+    server.faults.push({ route: 'commit', kind: 'lost' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'reconciling' })
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent is missing from the store')
+    // the replay re-uploads under the SAME key (attempt 0) and is refused with the expiry
+    server.faults.push({
+      route: 'commit',
+      kind: 409,
+      code: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(binding(path)).toMatchObject({
+      state: 'saved',
+      baseRevision: '42',
+      baseChecksum: hex(enc('v4')),
+    })
+    // the lookup answered committed: the two POSTs are the lost first attempt
+    // and the refused replay - the expiry never mints a THIRD one, and the
+    // version moved exactly once
+    expect(commits(server).map((c) => c.headers['idempotency-key'])).toEqual([
+      intent.idempotencyKey,
+      intent.idempotencyKey,
+    ])
+    expect(lookups(server).map((c) => c.headers['idempotency-key'])).toEqual([
+      intent.idempotencyKey,
+    ])
+    expect(await intentOf(ctx, path)).toBeNull()
+    expect(server.state.version).toBe(4)
+  })
+
+  it('an expired claim whose lookup says in_flight keeps reconciling (B69-lite)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({
+      route: 'commit',
+      kind: 409,
+      code: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    server.faults.push({ route: 'lookup', outcome: 'in_flight' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'reconciling' })
+    const intent = (await intentOf(ctx, path))?.intent
+    expect(intent?.state).toBe('reconciling')
+    expect(intent?.attempt).toBe(0)
+    expect(lookups(server)).toHaveLength(1)
+    expect(commits(server)).toHaveLength(1)
+    expect(uploads(server)).toHaveLength(1)
+  })
+
+  it('an expired claim whose lookup cannot say (410) parks the intent stuck, never a blind resend (B69-lite)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({
+      route: 'commit',
+      kind: 409,
+      code: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    server.faults.push({ route: 'lookup', outcome: 'unknown' })
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'reconciling-stuck',
+      error: 'intent_unknown',
+    })
+    expect((await intentOf(ctx, path))?.intent.state).toBe('reconciling-stuck')
+    // never a second upload or POST on an unknown
+    expect(uploads(server)).toHaveLength(1)
+    expect(commits(server)).toHaveLength(1)
+    expect(lookups(server)).toHaveLength(1)
+  })
+
+  it('another document_upload_invalid reason keeps today\'s recheck (B69-lite)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({
+      route: 'commit',
+      kind: 409,
+      code: 'document_upload_invalid',
+      reason: 'upload_canceled',
+    })
+    // not an expiry: the document is checked, its bytes are v3, so the intent is
+    // dropped and the copy stays dirty (today's behaviour, unchanged)
     expect(await ctx.service.save(path)).toMatchObject({ state: 'dirty', error: 'server_error' })
     expect(await intentOf(ctx, path)).toBeNull()
-    const firstKey = uploads(server)[0]?.headers['idempotency-key']
-    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
-    const lastCommit = commits(server).at(-1)
-    expect(lastCommit?.headers['idempotency-key']).not.toBe(firstKey)
-    expect(lastCommit?.body).toMatchObject({ base_revision: '41' })
+    expect(lookups(server)).toHaveLength(0)
   })
 
   it('a 404 on commit is checked against the document: still there -> dirty, gone -> not_found (A1.2)', async () => {

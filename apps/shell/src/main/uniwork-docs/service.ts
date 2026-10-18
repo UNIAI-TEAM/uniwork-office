@@ -1163,6 +1163,9 @@ export class UniworkDocsService {
         upload: (input) => this.api().upload(input),
         commit: (input) => this.api().commit(input),
         getDocument: (documentId) => this.api().getDocument(documentId),
+        // UNI-1918 (B69-lite): the one lookup the inline pipeline runs when the
+        // server refuses a staged upload whose claim expired
+        lookupCommit: (input) => this.api().lookupCommit(input),
         // BIGUP-A1: a version payload above `chunked_upload_threshold_bytes`
         // goes through an upload session instead of one multipart POST
         uploadSession: {

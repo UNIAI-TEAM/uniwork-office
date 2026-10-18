@@ -6,7 +6,7 @@ import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
 import { sha256Hex } from './formats'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits, type DocumentLimitsCache } from './limits'
-import type { CommitReceipt, DocumentDetail } from './parse'
+import type { CommitLookup, CommitReceipt, DocumentDetail } from './parse'
 import type { SavedUploadSession } from './upload-session'
 import {
   abortVersionUploadSession,
@@ -145,6 +145,14 @@ export interface SaveCoordinatorDeps {
   client: Pick<UniworkDocsClient, 'upload' | 'commit' | 'getDocument'> & {
     /** BIGUP-A1: the upload-session routes for a version payload above the chunked threshold */
     uploadSession?: DocumentUploadSessionClient
+    /**
+     * UNI-1918 (B69-lite): the commit-intent lookup. The inline pipeline runs
+     * exactly ONE lookup when the server refuses a staged upload because its
+     * claim expired: only that answer (committed / not_committed / in_flight /
+     * unknown) decides what happens to the intent. Absent = the refusal keeps
+     * today's recheck (a caller without the route never resumes).
+     */
+    lookupCommit?(input: { documentId: string; idempotencyKey: string }): Promise<CommitLookup>
   }
   isSignedIn(): boolean
   /** the binding belongs to the signed-in account and the active deployment */
@@ -743,6 +751,17 @@ export class SaveCoordinator {
       try {
         receipt = await this.uploadAndCommit(saving, intent, payload as Uint8Array, intents)
       } catch (error) {
+        // B69-lite: the server refused the staged upload because its claim
+        // expired. That is NOT "the upload is gone": the intent is kept and
+        // exactly ONE lookup decides what happens to it (never a dropped intent,
+        // never a fresh key minted behind the user's back).
+        if (
+          error instanceof UniworkDocError &&
+          error.serverCode === 'document_upload_invalid' &&
+          error.reason === 'file_claim_expired'
+        ) {
+          return await this.resumeExpiredClaim(saving, intent, intents)
+        }
         if (needsRecheck(error)) {
           return await this.recheckAgainstDocument(
             saving,
@@ -932,6 +951,76 @@ export class SaveCoordinator {
   }
 
   /**
+   * UNI-1918 (B69-lite): the server refused the staged upload with
+   * `document_upload_invalid` / `reason=file_claim_expired`. The claim of the
+   * upload this attempt staged under is gone, but the COMMIT is not thereby
+   * known to have happened: exactly ONE lookup of the intent's commit key
+   * decides, and only its answer moves the record.
+   *
+   * - `committed` → settle with the receipt;
+   * - `not_committed` → attempt n+1 under the SAME commit key (the next upload
+   *   stages under a fresh upload key, `uploadKeyFor`);
+   * - `in_flight` → `reconciling` (the next poll's tick looks again);
+   * - `unknown` → `reconciling-stuck` (never a blind resend).
+   *
+   * The lookup itself must never fail a save that could still be alive: a
+   * transport failure (or a missing route on a caller without one) leaves the
+   * record reconciling, where the poll's own lookup picks it up.
+   */
+  private async resumeExpiredClaim(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    intents: IntentStore,
+  ): Promise<BoundDocument> {
+    const lookup = this.deps.client.lookupCommit
+    if (!lookup) {
+      await this.settleRecord(intents, doc, intent, { type: 'commitFailed', error: 'network' })
+      return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+    }
+    let answer: CommitLookup
+    try {
+      answer = await lookup({ documentId: intent.documentId, idempotencyKey: intent.idempotencyKey })
+    } catch (error) {
+      // the lookup could not be answered (offline, a locked store, a 5xx):
+      // nothing proves either way, so the intent reconciles and the poll retries
+      const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+      await this.settleRecord(intents, doc, intent, {
+        type: 'lookup',
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+        error: error instanceof UniworkDocError ? error.code : 'server_error',
+      })
+      return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+    }
+    if (answer.outcome === 'committed') {
+      return await this.settle(
+        doc,
+        intent,
+        {
+          revision: answer.receipt.revision,
+          version: answer.receipt.version,
+          versionId: answer.receipt.versionId,
+        },
+        intents,
+      )
+    }
+    // the machine's own lookup rules: `not_committed` → attempt+1 `queued` (the
+    // next attempt stages under a NEW upload key), `in_flight` → reconciling
+    // with a retryAt, `unknown` → reconciling-stuck
+    await this.settleRecord(intents, doc, intent, { type: 'lookup', outcome: answer.outcome })
+    if (answer.outcome === 'unknown') {
+      return this.commitState(doc, {
+        ...doc.binding,
+        state: 'reconciling-stuck',
+        error: 'intent_unknown',
+      })
+    }
+    if (answer.outcome === 'not_committed') {
+      return this.commitState(doc, withoutError({ ...doc.binding, state: 'queued' }))
+    }
+    return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+  }
+
+  /**
    * The intent can no longer be replayed or its receipt does not verify: the
    * document's current checksum decides. Equal -> these bytes are the current
    * version (an earlier attempt committed them); 404/410 -> the document is
@@ -984,6 +1073,7 @@ export class SaveCoordinator {
           format: doc.binding.format,
           bytes: payload,
           idempotencyKey: intent.idempotencyKey,
+          attempt: intent.attempt,
           limits,
           ...(intent.uploadSession ? { resume: intent.uploadSession } : {}),
           signal: controller.signal,
