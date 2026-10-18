@@ -123,6 +123,12 @@ export interface TextModuleConfig {
   ext: string
   /** extensions stripped from a suggested name before `ext` is added */
   extPattern: RegExp
+  /**
+   * extensions of files the module also opens without converting: they stay put on Save As
+   * (markdown's '.txt' must never become '.txt.md'), and a bare save-as name on such a document
+   * defaults to the opened file's extension rather than `ext` (UNI-1905)
+   */
+  keepExtPattern?: RegExp
   /** MIME type of the document (downloads) */
   mimeType: string
 }
@@ -180,7 +186,23 @@ export function createTextWebApi(
   config: TextModuleConfig,
   opts: TextWebApiOptions = {},
 ) {
-  const withExt = (name: string): string => name.replace(config.extPattern, '') + config.ext
+  /** the trailing extension, dotted and lower-cased ('notes.TXT' -> '.txt'); null when none */
+  const extOf = (name: string | null | undefined): string | null =>
+    /\.[^.\\/]+$/.exec(name ?? '')?.[0]?.toLowerCase() ?? null
+  /** the extension a saved-as document takes: the opened file's own when the module keeps it */
+  const saveExt = (file: FileMeta | null): string => {
+    const opened = extOf(file?.name)
+    return opened && (config.keepExtPattern?.test(opened) ?? false) ? opened : config.ext
+  }
+  /**
+   * Complete a save-as name: a name that already ends in a document extension this module knows
+   * (its own, or one it opens without converting) keeps it; anything else, and bare names, gets
+   * the extension the open document saves under — 'notes.txt' saves as .txt, never .txt.md.
+   */
+  const withExt = (name: string, file: FileMeta | null): string =>
+    config.extPattern.test(name) || (config.keepExtPattern?.test(name) ?? false)
+      ? name
+      : name.replace(/\.[^.\\/]+$/, '') + saveExt(file)
 
   /** fileId -> latest server metadata (etag = If-Match base of the next save) */
   const files = new Map<string, FileMeta>()
@@ -693,6 +715,7 @@ export function createTextWebApi(
         request.defaultName ||
         request.suggestedName ||
         'Untitled',
+      prev,
     )
     const bytes = encodeText(request.text)
     const host = pending ?? hostSave
@@ -740,7 +763,10 @@ export function createTextWebApi(
     const r = await (opts.print ?? printHtmlDocument)(printable)
     hostPrint?.settle({ printed: r.ok })
     return r.ok
-      ? { ok: true, path: `${withExt(name || 'document').replace(config.extPattern, '')}.pdf` }
+      ? {
+          ok: true,
+          path: `${withExt(name || 'document', currentFile()).replace(config.extPattern, '')}.pdf`,
+        }
       : { ok: false, error: r.error ?? 'print failed' }
   }
 
