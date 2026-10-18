@@ -553,6 +553,10 @@ const editHereButton = () => host.querySelector<HTMLButtonElement>('[data-lock-a
 const lockStatusNode = () => host.querySelector<HTMLElement>('[data-lock-status]')
 
 beforeEach(() => {
+  // the components format `since` against the real clock: pin only Date so the
+  // suite does not depend on the day it runs (timers stay real)
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(NOW)
   resetLiveForTests()
   host = document.createElement('div')
   document.body.append(host)
@@ -576,6 +580,7 @@ afterEach(() => {
   act(() => root.unmount())
   host.remove()
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 describe('UniworkRemoteBar: edit-lock strip', () => {
