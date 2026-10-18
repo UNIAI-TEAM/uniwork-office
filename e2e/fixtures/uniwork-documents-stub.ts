@@ -145,10 +145,31 @@ export interface StubCall {
   baseRevision?: string
   /** upload calls: sha256 of the uploaded bytes */
   checksum?: string
+  /** commit calls: the body's edit_lock_id (EL-1(b)); absent when none was sent */
+  editLockId?: string
+  /** edit-lock calls: the tenure id (path id on heartbeat/release, granted id on acquire) */
+  lockId?: string
+  /** acquire calls: the body's client (desktop) */
+  client?: string
 }
 
 export type CommitDrop = 'before' | 'after'
 
+/**
+ * EL-1(b): one live edit-lock tenure a document carries. `mine` = the caller
+ * acquired it (DELETE/heartbeat then speak for it); `heldByMe` = the caller's
+ * account holds it in another session (the 423's `held_by_me`).
+ */
+export interface StubEditLock {
+  lockId: string
+  holderId: string
+  holderName: string
+  since: string
+  expiresAt: string
+  client: string
+  heldByMe: boolean
+  mine: boolean
+}
 export interface UniworkDocumentsStub extends UniworkAuthStub {
   addDocument(init: StubDocumentInit): StubDocumentState
   addFolder(init: StubFolderInit): StubFolderState
@@ -200,6 +221,19 @@ export interface UniworkDocumentsStub extends UniworkAuthStub {
    * no-seat, BE-12-201).
    */
   denyCopies(denied?: boolean): void
+  /**
+   * EL-1(b): the document is edit-locked. `heldByMe` = the caller's own other
+   * session; otherwise `name` is another person. Acquires answer 423
+   * `document_locked` and commits answer the same until `releaseHeldLock`.
+   */
+  lockHeldBy(documentId: string, holder: { name: string; since?: string; heldByMe?: boolean }): void
+  /** EL-1(b): the held edit lock ends (the next GET reports none, acquires grant again) */
+  releaseHeldLock(documentId: string): void
+  /**
+   * EL-1(b): the next heartbeat answers 409 `edit_lock_lost` with `reason`
+   * (and `by_name` for a take-over), then the flag clears.
+   */
+  loseOnNextHeartbeat(reason: string, byName?: string): void
   /** the copies made from a document, oldest first */
   copiesOf(sourceId: string): StubCopyState[]
   /** every documents-route request so far, oldest first */
@@ -335,6 +369,10 @@ export async function startUniworkDocumentsStub(
   let copiesDenied = false
   let copyCommitFailures = 0
   const copyByKey = new Map<string, string>()
+  /** EL-1(b): the live edit-lock tenure of a document (absent = free) */
+  const heldLocks = new Map<string, StubEditLock>()
+  /** EL-1(b): the next heartbeat answers 409 edit_lock_lost once, then clears */
+  let lostBeat: { reason: string; byName?: string } | null = null
 
   const latest = (doc: StubDocument): StubVersion => doc.versions[doc.versions.length - 1]!
 
@@ -532,6 +570,38 @@ export async function startUniworkDocumentsStub(
   const log = (ctx: StubRouteContext, call: Omit<StubCall, 'method' | 'route'>): void => {
     calls.push({ method: ctx.req.method ?? '', route: ctx.route.split('?')[0]!, ...call })
   }
+
+  /**
+   * EL-1(b): far-future timing by default - a heartbeat/deadline must never fire
+   * inside a case (a fired beat would show up in call deltas). A short poll or
+   * heartbeat lives in the stub's own values when a case needs one.
+   */
+  const LOCK_HEARTBEAT_MS = 3_600_000
+  const LOCK_TTL_MS = 7_200_000
+
+  /**
+   * EL-1(b): the 423 `document_locked` body (service errDocumentLocked):
+   * holder_id, holder_name, since, expires_at, held_by_me, current_revision -
+   * never the lock id.
+   */
+  const editLockLockedBody = (doc: StubDocument, lock: StubEditLock) =>
+    envelope('document_locked', {
+      holder_id: lock.holderId,
+      holder_name: lock.holderName,
+      since: lock.since,
+      expires_at: lock.expiresAt,
+      held_by_me: lock.mine || lock.heldByMe,
+      current_revision: String(doc.revision),
+    })
+
+  /** EL-1(b): the 409 `edit_lock_lost` body (service errEditLockLost) */
+  const editLockLostBody = (reason: string, byName?: string) =>
+    envelope('edit_lock_lost', {
+      reason,
+      ...((reason === 'taken_over' || reason === 'handed_over') && byName
+        ? { by_id: 'usr_e2e_lock', by_name: byName }
+        : {}),
+    })
 
   function bytesResponse(res: ServerResponse, doc: StubDocument, version: StubVersion): void {
     res.writeHead(200, {
@@ -982,6 +1052,134 @@ export async function startUniworkDocumentsStub(
       return true
     }
 
+    // EL-1(b): the document edit lock (R1-R4). Grants by default so every open
+    // keeps its save path; `lockHeldBy` / `loseOnNextHeartbeat` steer refusal.
+    m = /^\/documents\/([^/]+)\/edit-lock(?:\/([^/]+)(\/heartbeat)?)?$/.exec(route)
+    if (m) {
+      const doc = documents.get(m[1]!)
+      const pathLockId = m[2] ?? ''
+      const isHeartbeat = m[3] === '/heartbeat'
+      const known =
+        (method === 'GET' && !pathLockId && !isHeartbeat) ||
+        (method === 'POST' && !pathLockId && !isHeartbeat) ||
+        (method === 'POST' && Boolean(pathLockId) && isHeartbeat) ||
+        (method === 'DELETE' && Boolean(pathLockId) && !isHeartbeat)
+      if (!known) return false
+      const held = doc ? heldLocks.get(doc.id) : undefined
+
+      if (method === 'GET') {
+        if (!doc) {
+          log(ctx, { status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        log(ctx, { status: 200 })
+        // DocumentEditLockStateSDO: `lock` (a DocumentEditLockSummarySDO) + server_time
+        ctx.send(200, {
+          lock: held
+            ? {
+                holder_id: held.holderId,
+                holder_name: held.holderName,
+                since: held.since,
+                expires_at: held.expiresAt,
+                reserved: false,
+                held_by_me: held.mine || held.heldByMe,
+              }
+            : null,
+          server_time: new Date().toISOString(),
+        })
+        return true
+      }
+
+      if (isHeartbeat) {
+        if (!doc) {
+          log(ctx, { status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        // a live tenure of another account has no reason: the generic lost
+        if (lostBeat || !held || !held.mine || held.lockId !== pathLockId) {
+          const lost = lostBeat
+          lostBeat = null
+          log(ctx, { status: 409 })
+          ctx.send(409, editLockLostBody(lost?.reason ?? '', lost?.byName))
+          return true
+        }
+        held.expiresAt = new Date(Date.now() + LOCK_TTL_MS).toISOString()
+        log(ctx, { status: 200, lockId: held.lockId })
+        ctx.send(200, {
+          lock_id: held.lockId,
+          expires_at: held.expiresAt,
+          server_time: new Date().toISOString(),
+        })
+        return true
+      }
+
+      if (method === 'POST') {
+        const raw = await ctx.readBody()
+        let body: { move_from_self?: unknown; client?: unknown } = {}
+        try {
+          body = JSON.parse(raw.toString('utf8')) as typeof body
+        } catch {
+          body = {}
+        }
+        if (!doc) {
+          log(ctx, { status: 404 })
+          ctx.send(404, envelope('not_found'))
+          return true
+        }
+        const client = typeof body.client === 'string' ? body.client : undefined
+        // the lock is held: by me elsewhere (one retry, then self_elsewhere) or
+        // by someone else; move_from_self takes my other session's tenure
+        if (held && !held.mine && !(held.heldByMe && body.move_from_self === true)) {
+          log(ctx, { status: 423, ...(client ? { client } : {}) })
+          ctx.send(423, editLockLockedBody(doc, held))
+          return true
+        }
+        const tenure =
+          held && held.mine
+            ? held
+            : {
+                lockId: ulid('lock'),
+                holderId: STUB_ACCOUNT.id,
+                holderName: STUB_ACCOUNT.displayName,
+                since: new Date().toISOString(),
+                expiresAt: new Date(Date.now() + LOCK_TTL_MS).toISOString(),
+                client: client ?? 'desktop',
+                heldByMe: true,
+                mine: true,
+              }
+        heldLocks.set(doc.id, tenure)
+        log(ctx, { status: 201, lockId: tenure.lockId, ...(client ? { client } : {}) })
+        // DocumentEditLockSDO: the tenure the caller holds
+        ctx.send(201, {
+          lock_id: tenure.lockId,
+          document_id: doc.id,
+          holder_id: tenure.holderId,
+          client: tenure.client,
+          acquired_at: tenure.since,
+          expires_at: tenure.expiresAt,
+          granted_via: 'acquire',
+          heartbeat_interval_ms: LOCK_HEARTBEAT_MS,
+          ttl_ms: LOCK_TTL_MS,
+          server_time: new Date().toISOString(),
+        })
+        return true
+      }
+
+      // DELETE: idempotent (204 either way); releases only a tenure of this caller
+      if (!doc) {
+        log(ctx, { status: 404 })
+        ctx.send(404, envelope('not_found'))
+        return true
+      }
+      if (held?.mine && held.lockId === pathLockId) heldLocks.delete(doc.id)
+      log(ctx, { status: 204, lockId: pathLockId })
+      res.writeHead(204, { 'Cache-Control': 'no-store' })
+      res.end()
+      return true
+    }
+
     m =
       /^\/documents\/([^/]+)(\/download|\/uploads|\/versions\/commit|\/copies|\/archive|\/move)?$/.exec(
         route,
@@ -1311,16 +1509,18 @@ export async function startUniworkDocumentsStub(
 
       if (method === 'POST' && tail === '/versions/commit') {
         const raw = await ctx.readBody()
-        let body: { upload_id?: unknown; base_revision?: unknown } = {}
+        let body: { upload_id?: unknown; base_revision?: unknown; edit_lock_id?: unknown } = {}
         try {
           body = JSON.parse(raw.toString('utf8')) as typeof body
         } catch {
           body = {}
         }
         const baseRevision = typeof body.base_revision === 'string' ? body.base_revision : undefined
+        const editLockId = typeof body.edit_lock_id === 'string' ? body.edit_lock_id : undefined
         const base: Omit<StubCall, 'method' | 'route' | 'status'> = {
           ...(idempotencyKey ? { idempotencyKey } : {}),
           ...(baseRevision ? { baseRevision } : {}),
+          ...(editLockId ? { editLockId } : {}),
         }
         const dropMode = commitDrops[0] ?? null
         if (dropMode === 'before') {
@@ -1373,6 +1573,15 @@ export async function startUniworkDocumentsStub(
         if (doc.myLevel !== 'edit' && doc.myLevel !== 'manage') {
           log(ctx, { ...base, status: 403 })
           ctx.send(403, envelope('forbidden'))
+          return true
+        }
+        // EL-1(b): a live edit lock decides before the base check (the server's
+        // order): another holder, a stale lock, or a missing edit_lock_id where
+        // our grant stands all answer 423.
+        const heldLock = heldLocks.get(doc.id)
+        if (heldLock && (!heldLock.mine || heldLock.lockId !== body.edit_lock_id)) {
+          log(ctx, { ...base, status: 423 })
+          ctx.send(423, editLockLockedBody(doc, heldLock))
           return true
         }
         if (String(doc.revision) !== body.base_revision) {
@@ -1628,6 +1837,26 @@ export async function startUniworkDocumentsStub(
     },
     failCopyCommits(count) {
       copyCommitFailures = count
+    },
+    lockHeldBy(documentId, holder) {
+      const doc = need(documentId)
+      const heldByMe = holder.heldByMe === true
+      heldLocks.set(doc.id, {
+        lockId: ulid('lock'),
+        holderId: heldByMe ? STUB_ACCOUNT.id : 'usr_e2e_other',
+        holderName: holder.name,
+        since: holder.since ?? new Date().toISOString(),
+        expiresAt: new Date(Date.now() + LOCK_TTL_MS).toISOString(),
+        client: 'web_office',
+        heldByMe,
+        mine: false,
+      })
+    },
+    releaseHeldLock(documentId) {
+      heldLocks.delete(need(documentId).id)
+    },
+    loseOnNextHeartbeat(reason, byName) {
+      lostBeat = { reason, ...(byName ? { byName } : {}) }
     },
     copiesOf: (sourceId) =>
       [...documents.values()]

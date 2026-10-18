@@ -21,6 +21,8 @@ import type {
   UniworkDocRenamedEvent,
   UniworkDocSummary,
   UniworkDocStatus,
+  UniworkDocEditLock,
+  UniworkEditLockSessionView,
   UniworkFirstSaveInput,
   UniworkFolderChildren,
   UniworkFolderNode,
@@ -75,7 +77,18 @@ import {
   type UniworkDocsClient,
   createUniworkDocsClient,
 } from './client'
+import {
+  createUniworkEditLockClient,
+  type UniworkEditLockClient,
+} from '../uniwork-edit-lock/client'
+import {
+  EditLockSession,
+  asEditLockTransport,
+  newEditorId,
+  type EditLockSessionView,
+} from '../uniwork-edit-lock/session'
 import { UniworkDocError } from './errors'
+import { EDIT_LOCK_QUIT_CAP_MS } from './edit-lock-quit'
 import {
   copyTitleFor,
   formatForMime,
@@ -337,6 +350,11 @@ export interface UniworkDocsServiceDeps {
   /** G5-06u: ask the shell renderer to open the queue popover of a path */
   pushQueuePopover?(request: UniworkQueuePopoverRequest): void
   /**
+   * EL-1(b) fix6 (VEL-2): broadcast `{ path }` on `uniwork:doc-state-changed`
+   * when `isReadOnly(path)` or `isBound(path)` may have changed.
+   */
+  pushDocStateChanged?(path: string): void
+  /**
    * G5-06u: whether `path` is a tab of the shell window (the only window with
    * a pill and a queue popover). False for a detached editor window, whose
    * Ctrl/Cmd+S keeps the inline replay. Absent = every path is a shell tab.
@@ -404,6 +422,8 @@ export interface UniworkDocsServiceDeps {
   notifySaved?(path: string, versionId: string): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
+  /** EL-1(b): test seam for the edit-lock client (absent = no acquire in injected-client tests) */
+  editLockClient?: UniworkEditLockClient
   /** SIZE-F1: overrides `documents.limits` (`GET /api/v1/config`); a test seam */
   limits?: () => Promise<DocumentLimits> | DocumentLimits
   sleep?(ms: number): Promise<void>
@@ -468,6 +488,9 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
  * never reaches the user-save hook.
  */
 export const CLOSE_SAVE_WAIT_MS = 30_000
+
+/** back-off before a failed last-account.json write is retried */
+const LAST_OWNER_RETRY_MS = 2000
 
 /** shared-with-me aggregation bounds (one workspace page, total rows, total pages) */
 const SHARED_PAGE_SIZE = 50
@@ -982,10 +1005,27 @@ export class UniworkDocsService {
   private readonly appVersion: () => string
   private client: UniworkDocsClient | null
   private clientOrigin: string | null = null
+  private editLockHttp: UniworkEditLockClient | null = null
+  private editLockOrigin: string | null = null
+  /** pathKey -> live edit-lock session of this window */
+  private readonly editLocks = new Map<string, EditLockSession>()
+  /**
+   * EL1B-BE-R2-1: fire-and-forget drop DELETEs (window closed / removeTab /
+   * detached teardown) still in flight. will-quit joins these under the same
+   * cap as held sessions. Settled promises leave the set.
+   */
+  private readonly inFlightDropReleases = new Set<Promise<unknown>>()
+  /** pathKey -> editor_id for this process + path */
+  private readonly editorIds = new Map<string, string>()
   private lastOwner: LastOwner | null
+  /** the owner last-account.json holds: a failed write leaves it behind `lastOwner` and is retried */
+  private lastOwnerOnDisk: LastOwner | null
+  private lastOwnerRetryAt = 0
   private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
   /** path key -> the newer-store lock currently shown for it (S11) */
   private readonly locks = new Map<string, UniworkDocLock>()
+  /** pathKey -> last published access/lock signature so access flips broadcast once */
+  private readonly lastPublishedAccess: Record<string, string> = Object.create(null)
   /** path -> checksum of the file as of its mtime/size (the sync close check) */
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
   /** working copies whose editor holds edits not written to the file yet */
@@ -1089,6 +1129,8 @@ export class UniworkDocsService {
   private readonly ownEcho = new Map<string, Set<string>>()
   /** documents locked by a server verdict (403/404 revoked, 410 deleted) */
   private readonly remoteLocked = new Map<string, 'revoked' | 'deleted'>()
+  /** documentId → real working-copy path; forgetLocksWhere cannot rehydrate via pathKey on Windows */
+  private readonly remoteLockPath = new Map<string, string>()
   /** ADVISOR D4 (a): the parsed dev-only fixture and the mtime it was read at */
   private devFixture: {
     file: string
@@ -1144,6 +1186,7 @@ export class UniworkDocsService {
       this.heldByMigration(dir),
     )
     this.lastOwner = this.store.readLastOwner()
+    this.lastOwnerOnDisk = this.lastOwner
     this.limitsCache = createDocumentLimitsCache({
       origin: () => this.deps.profile()?.apiOrigin ?? null,
       fetchLimits: async (startedOrigin) => {
@@ -1236,6 +1279,11 @@ export class UniworkDocsService {
       // the queue engine exposes no public in-flight state, so the service
       // reports the keys its own poll pass is running right now (G506-be-1)
       dispatcherBusy: (key) => this.queueInFlight.has(key),
+      prepareEditLock: (path) => this.prepareEditLock(path),
+      editLockId: (path) => this.editLockIdOf(path),
+      editLockHolder: (path) => this.editLockHolderOf(path),
+      onCommitEditLocked: (path, error) =>
+        this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
     })
     this.launch = new LaunchController({
@@ -1275,11 +1323,258 @@ export class UniworkDocsService {
     return this.client
   }
 
+  /** EL-1(b): lock client of this profile; null when tests inject only a docs client */
+  private editLockApi(): UniworkEditLockClient | null {
+    if (this.deps.editLockClient) return this.deps.editLockClient
+    if (this.deps.client) return null
+    const profile = this.deps.profile()
+    if (!profile) return null
+    if (!this.editLockHttp || this.editLockOrigin !== profile.apiOrigin) {
+      this.editLockHttp = createUniworkEditLockClient({
+        apiOrigin: profile.apiOrigin,
+        authorized: (call) => this.deps.authorized(call),
+        isSignedIn: () => this.deps.identity() !== null,
+        ...(this.deps.fetch ? { fetch: this.deps.fetch } : {}),
+      })
+      this.editLockOrigin = profile.apiOrigin
+    }
+    return this.editLockHttp
+  }
+
+  private editLockIdOf(path: string): string | null {
+    return this.editLocks.get(pathKey(path))?.lockId() ?? null
+  }
+
+  private editLockHolderOf(path: string): UniworkDocEditLock | null {
+    const view = this.editLocks.get(pathKey(path))?.view()
+    if (!view) return null
+    return {
+      holderName: view.holderName,
+      since: view.since,
+      expiresAt: null,
+      heldByMe: view.phase === 'self_elsewhere',
+    }
+  }
+
+  private async prepareEditLock(path: string): Promise<'held' | 'park' | 'proceed'> {
+    const session = this.editLocks.get(pathKey(path))
+    if (!session) return 'proceed'
+    return session.ensureHeldBeforeCommit()
+  }
+
+  private editLockReadOnly(path: string): boolean {
+    return this.editLocks.get(pathKey(path))?.isReadOnly() === true
+  }
+
+  private toLockView(view: EditLockSessionView): UniworkEditLockSessionView | undefined {
+    if (view.phase === 'none') return undefined
+    return {
+      phase: view.phase,
+      holderName: view.holderName,
+      since: view.since,
+      ...(view.phase === 'lost'
+        ? { lostReason: view.lostReason ?? 'unknown', byName: view.byName ?? null }
+        : {}),
+    }
+  }
+
+  private startEditLock(doc: BoundDocument): void {
+    if (doc.binding.access !== 'edit') {
+      void this.stopEditLock(doc.path, true)
+      return
+    }
+    if (this.coordinator.isOtherWindow(doc.key)) return
+    const api = this.editLockApi()
+    if (!api) return
+    const key = pathKey(doc.path)
+    const existing = this.editLocks.get(key)
+    if (
+      existing &&
+      existing.documentId === doc.binding.documentId &&
+      existing.view().phase !== 'acquiring'
+    ) {
+      return
+    }
+    if (existing) void this.stopEditLock(doc.path, true)
+    let editorId = this.editorIds.get(key)
+    if (!editorId) {
+      editorId = newEditorId()
+      this.editorIds.set(key, editorId)
+    }
+    const session = new EditLockSession({
+      documentId: doc.binding.documentId,
+      path: doc.path,
+      editorId,
+      transport: asEditLockTransport(api),
+      isOnline: () => this.queueOnline !== false,
+      isSignedIn: () => this.deps.identity() !== null,
+      onChange: (view) => {
+        if (view.phase === 'acquiring' || view.phase === 'none') return
+        const now = this.store.lookup(doc.path)
+        if (now) this.publish(this.statusOf(now))
+        this.notifyDocStateChanged(doc.path)
+        void this.maybeReplayRemoteAfterUnlock(doc.path)
+      },
+    })
+    this.editLocks.set(key, session)
+    void session.acquire().then(() => {
+      const view = session.view()
+      if (view.phase === 'none') {
+        if (this.editLocks.get(key) === session) {
+          this.editLocks.delete(key)
+          session.dispose()
+          this.notifyDocStateChanged(doc.path)
+        }
+        return
+      }
+      const now = this.store.lookup(doc.path)
+      if (now) this.publish(this.statusOf(now))
+      void this.maybeReplayRemoteAfterUnlock(doc.path)
+    })
+  }
+
+  private async stopEditLock(path: string, release: boolean): Promise<void> {
+    const key = pathKey(path)
+    const session = this.editLocks.get(key)
+    if (!session) return
+    if (this.editLocks.get(key) === session) this.editLocks.delete(key)
+    if (release) await this.capped(session.release(), EDIT_LOCK_QUIT_CAP_MS)
+    session.dispose()
+    this.notifyDocStateChanged(path)
+  }
+
+  async releaseAllEditLocks(capMs?: number): Promise<void> {
+    const sessions = [...this.editLocks.values()]
+    const paths = sessions
+      .map((s) => s.path)
+      .filter((p): p is string => typeof p === 'string' && p.length > 0)
+    this.editLocks.clear()
+    const drops = [...this.inFlightDropReleases]
+    const work = Promise.all([...sessions.map((s) => s.release().catch(() => undefined)), ...drops])
+    if (capMs !== undefined) {
+      await this.capped(work, capMs)
+    } else {
+      await work
+    }
+    for (const s of sessions) s.dispose()
+    for (const p of paths) this.notifyDocStateChanged(p)
+  }
+
+  /** will-quit holds the quit only while a held lock or a drop release is outstanding */
+  hasEditLocksToRelease(): boolean {
+    return this.editLocks.size > 0 || this.inFlightDropReleases.size > 0
+  }
+
+  /** will-quit: best-effort, 1.5 s cap; the quit gate awaits this then re-quits */
+  releaseEditLocksOnQuit(): Promise<void> {
+    return this.releaseAllEditLocks(EDIT_LOCK_QUIT_CAP_MS)
+  }
+
+  /**
+   * EL-1(b) fix3 B2: MCP closeTabWithoutPrompt / removeTab and a macOS
+   * clean-window close drop bound paths without confirmClose. One hook,
+   * best-effort, capped like quit. Callers stay fire-and-forget; will-quit
+   * joins the in-flight DELETE under the same single cap (EL1B-BE-R2-1).
+   */
+  async notePathsDropped(paths: string[]): Promise<void> {
+    const sessions: EditLockSession[] = []
+    const droppedPaths: string[] = []
+    for (const path of paths) {
+      if (typeof path !== 'string' || !path) continue
+      const key = pathKey(path)
+      const session = this.editLocks.get(key)
+      if (!session) continue
+      this.editLocks.delete(key)
+      sessions.push(session)
+      droppedPaths.push(path)
+    }
+    if (sessions.length === 0) return
+    const work = Promise.all(sessions.map((s) => s.release().catch(() => undefined)))
+    this.inFlightDropReleases.add(work)
+    void work.finally(() => {
+      this.inFlightDropReleases.delete(work)
+    })
+    await this.capped(work, EDIT_LOCK_QUIT_CAP_MS)
+    for (const s of sessions) s.dispose()
+    for (const p of droppedPaths) this.notifyDocStateChanged(p)
+  }
+
+  private async capped(work: Promise<unknown>, capMs: number): Promise<void> {
+    await Promise.race([work.catch(() => undefined), this.sleepMs(capMs)])
+  }
+
+  notePowerResume(): void {
+    for (const session of this.editLocks.values()) void session.wake()
+  }
+
+  noteWindowFocus(): void {
+    for (const session of this.editLocks.values()) {
+      if (session.view().phase === 'other') void session.wake()
+    }
+  }
+
+  /** EL-1(b): "Sửa ở đây" */
+  async editHere(path: string): Promise<UniworkDocStatus | null> {
+    if (typeof path !== 'string') return null
+    const doc = this.store.lookup(path)
+    if (!doc || !this.ownsLocally(doc)) return null
+    let session = this.editLocks.get(pathKey(path))
+    if (!session) {
+      this.startEditLock(doc)
+      session = this.editLocks.get(pathKey(path))
+    }
+    if (!session) return this.statusOf(doc)
+    const ok = await session.editHere()
+    if (!ok) return null
+    const now = this.store.lookup(path)
+    if (!now) return null
+    void this.maybeReplayRemoteAfterUnlock(path)
+    const status = this.statusOf(now)
+    this.publish(status)
+    return status
+  }
+
+  private async maybeReplayRemoteAfterUnlock(path: string): Promise<void> {
+    const doc = this.store.lookup(path)
+    if (!doc) return
+    const phase = this.editLocks.get(pathKey(path))?.view().phase
+    // granted / lock free — leave edit_locked and edit_lock read-only
+    if (phase !== 'held' && phase !== 'free') return
+    const documentId = doc.binding.documentId
+    const held = this.remoteHeld.get(documentId)
+    try {
+      const detail = await this.api().getDocument(documentId)
+      if (held) await this.redecideHeld(documentId)
+      if (compareRevision(detail.revision, doc.binding.baseRevision) > 0) {
+        await this.noteRemoteChange({
+          documentId,
+          revision: detail.revision,
+          version: detail.file.version,
+          versionId: detail.file.versionId ?? null,
+        })
+      }
+    } catch {
+      if (held) await this.redecideHeld(documentId).catch(() => undefined)
+    }
+  }
+
+  private notifyDocStateChanged(path: string): void {
+    if (typeof path !== 'string' || !path) return
+    this.deps.pushDocStateChanged?.(path)
+  }
+
   /** every status push: the shell window, then in-process waiters (close prompt) */
   private publish(status: UniworkDocStatus): void {
-    const full = this.withRemote(this.present(status))
+    const full = this.withRemote(this.present(this.withLockSession(status)))
     this.deps.pushStatus(full)
     for (const listener of [...this.statusListeners]) listener(full)
+    const accessSig = `${full.access}:${full.state === 'blocked' ? (full.error ?? '') : ''}`
+    const sigKey = pathKey(full.path)
+    const prevSig = this.lastPublishedAccess[sigKey]
+    this.lastPublishedAccess[sigKey] = accessSig
+    if (prevSig !== undefined && prevSig !== accessSig) {
+      this.notifyDocStateChanged(full.path)
+    }
     const open = this.conflictPrompt
     if (open && !open.controller.signal.aborted && samePath(open.path, full.path)) {
       if (full.state === 'blocked') {
@@ -1400,7 +1695,24 @@ export class UniworkDocsService {
   }
 
   private statusOf(doc: BoundDocument): UniworkDocStatus {
-    return this.withRemote(this.present(toStatus(doc)))
+    return this.withRemote(this.present(this.withLockSession(toStatus(doc))))
+  }
+
+  /** live lock view on every status (B6: one place, including non-statusOf publishes) */
+  private withLockSession(status: UniworkDocStatus): UniworkDocStatus {
+    const lockSession = this.toLockView(
+      this.editLocks.get(pathKey(status.path))?.view() ?? {
+        phase: 'none',
+        holderName: null,
+        since: null,
+      },
+    )
+    if (!lockSession) {
+      if (!status.lockSession) return status
+      const { lockSession: _dropped, ...rest } = status
+      return rest
+    }
+    return { ...status, lockSession }
   }
 
   /**
@@ -1461,15 +1773,19 @@ export class UniworkDocsService {
   private liveIdentity(): SessionIdentity | null {
     const identity = this.deps.identity()
     if (!identity) return null
-    const last = this.lastOwner
-    if (
-      !last ||
-      last.accountId !== identity.accountId ||
-      last.deploymentId !== identity.deploymentId
-    ) {
-      const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
+    const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
+    const sameOwner = (known: LastOwner | null) =>
+      !!known && known.accountId === owner.accountId && known.deploymentId === owner.deploymentId
+    if (!sameOwner(this.lastOwner)) {
       this.lastOwner = owner
-      void this.store.writeLastOwner(owner).catch(() => undefined)
+      // the back-off belongs to the owner whose write failed, not to the next one
+      this.lastOwnerRetryAt = 0
+    }
+    // a failed write is not remembered as persisted: a later observation retries it,
+    // at most once per back-off so a stuck disk does not stall every status read
+    if (!sameOwner(this.lastOwnerOnDisk) && Date.now() >= this.lastOwnerRetryAt) {
+      if (this.store.writeLastOwner(owner)) this.lastOwnerOnDisk = owner
+      else this.lastOwnerRetryAt = Date.now() + LAST_OWNER_RETRY_MS
     }
     return identity
   }
@@ -1852,6 +2168,11 @@ export class UniworkDocsService {
         if (this.deadQueueSessions.has(id)) return
         this.publishRecord(record)
       },
+      prepareEditLock: (path) => this.prepareEditLock(path),
+      editLockId: (path) => this.editLockIdOf(path),
+      editLockHolder: (path) => this.editLockHolderOf(path),
+      onCommitEditLocked: (path, error) =>
+        this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
     })
     this.queueSession = { id, token, dispatcher, lock, intents, drafts, pause }
     return { kind: 'ok', ...this.queueSession }
@@ -2228,6 +2549,10 @@ export class UniworkDocsService {
     // remembered for the blocked re-probe: a pass that reported offline never
     // sends an access check either
     this.queueOnline = online
+    // EL-1(b): network-back wake (same signal the feed poll / queue uses)
+    if (online) {
+      for (const session of this.editLocks.values()) void session.wake()
+    }
     const access = await this.queueEngine()
     if (access.kind !== 'ok') return
     if (!this.isQueueSessionCurrent(access)) return
@@ -2248,6 +2573,7 @@ export class UniworkDocsService {
 
   /** "Hủy lần lưu" of one document; `closed` = its tab is closed -> kept draft */
   async cancelSave(path: string, closed = false): Promise<void> {
+    if (closed) await this.stopEditLock(path, true)
     if (closed && this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
       this.endConflictByMain(this.conflictPrompt)
     }
@@ -2601,6 +2927,9 @@ export class UniworkDocsService {
     // scope (or a later lock) can never reuse it
     const planned = this.plannedRamOnly.get(scopeToken)
     this.plannedRamOnly.delete(scopeToken)
+
+    // EL-1(b): release held locks BEFORE the token / runtime go (capped)
+    await this.releaseAllEditLocks(EDIT_LOCK_QUIT_CAP_MS)
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.sessionEpoch += 1
@@ -2982,6 +3311,7 @@ export class UniworkDocsService {
     this.remoteHeld.clear()
     this.ownEcho.clear()
     this.remoteLocked.clear()
+    this.remoteLockPath.clear()
     this.editorAi.clear()
     this.remoteReloads.clear()
     this.orgMemberNames.clear()
@@ -3222,13 +3552,16 @@ export class UniworkDocsService {
 
   private clearSignedOutLocks(): void {
     let cleared = false
+    const clearedPaths: string[] = []
     for (const [key, lock] of [...this.locks]) {
       if (lock.reason === 'signed_out') {
         this.locks.delete(key)
         cleared = true
+        clearedPaths.push(lock.path)
       }
     }
     if (cleared) this.deps.pushLocks?.()
+    for (const p of clearedPaths) this.notifyDocStateChanged(p)
   }
 
   /** whether the durable store holds an intent for `doc`; 'locked' = unreachable now */
@@ -3442,15 +3775,18 @@ export class UniworkDocsService {
   /** the store opened (again): the keystore_locked panels are stale */
   private clearKeystoreLocks(): void {
     let cleared = false
+    const clearedPaths: string[] = []
     for (const [key, lock] of [...this.locks]) {
       if (lock.reason === 'keystore_locked') {
         this.locks.delete(key)
         cleared = true
+        clearedPaths.push(lock.path)
       }
     }
     // the renderer's list is its own: it must be told the list changed, or a
     // Retry that worked leaves the S11 panel up until some other push
     if (cleared) this.deps.pushLocks?.()
+    for (const p of clearedPaths) this.notifyDocStateChanged(p)
   }
 
   /**
@@ -3496,6 +3832,16 @@ export class UniworkDocsService {
       if (!doc) continue
       this.remoteLocked.delete(doc.binding.documentId)
       this.remoteHeld.delete(doc.binding.documentId)
+      this.remoteLockPath.delete(doc.binding.documentId)
+    }
+    // pathKey lowercases the filename on Windows, so lookup(pathKey) misses
+    // (`Plan.docx` !== `plan.docx`) and the bar loop cannot drop the verdict.
+    // remoteLockPath keeps the real path lockFromServer saw.
+    for (const [documentId, path] of [...this.remoteLockPath]) {
+      if (!match(path)) continue
+      this.remoteLocked.delete(documentId)
+      this.remoteHeld.delete(documentId)
+      this.remoteLockPath.delete(documentId)
     }
   }
 
@@ -3512,6 +3858,7 @@ export class UniworkDocsService {
     }
     this.locks.set(pathKey(lock.path), lock)
     this.deps.pushLock?.(lock)
+    this.notifyDocStateChanged(lock.path)
   }
 
   /**
@@ -3608,7 +3955,8 @@ export class UniworkDocsService {
     return (
       found.doc.binding.access === 'view' ||
       !this.ownsLocally(found.doc) ||
-      this.coordinator.isOtherWindow(found.doc.key)
+      this.coordinator.isOtherWindow(found.doc.key) ||
+      this.editLockReadOnly(found.doc.path)
     )
   }
 
@@ -3666,6 +4014,22 @@ export class UniworkDocsService {
     // Only a shell tab has the pill and popover: a detached editor window keeps
     // the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
     void this.coordinator.save(path, { userSave: this.deps.isShellTab?.(path) ?? true })
+  }
+
+  /**
+   * EL-1(b) fix6 (VEL-1): an editor module's explicit Save while the bound
+   * working copy is read-only. Never writes and never fires the user-save
+   * hook; asks the shell renderer to open the explain popover for that path.
+   */
+  onReadOnlySave(path: string): void {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc)) return
+    if (!this.isReadOnly(doc.path)) return
+    const status = this.statusOf(doc)
+    this.publish(status)
+    if (this.deps.isShellTab?.(doc.path) ?? true) {
+      this.deps.pushQueuePopover?.({ path: doc.path })
+    }
   }
 
   // ---- renderer API ----------------------------------------------------------
@@ -4809,7 +5173,10 @@ export class UniworkDocsService {
       }
       try {
         const doc = this.store.lookup(path)
-        if (doc) this.publish(toStatus(doc))
+        if (doc) {
+          if (doc.binding.access === 'edit') this.startEditLock(doc)
+          this.publish(toStatus(doc))
+        }
       } catch (error) {
         console.warn('uniwork docs: first-save: the status push failed:', error)
       }
@@ -5499,6 +5866,14 @@ export class UniworkDocsService {
   async save(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
+    if (this.editLockReadOnly(doc.path)) {
+      const status = this.statusOf(doc)
+      this.publish(status)
+      if (this.deps.isShellTab?.(doc.path) ?? true) {
+        this.deps.pushQueuePopover?.({ path: doc.path })
+      }
+      return status
+    }
     if (!this.canSave(doc)) return this.statusOf(doc)
     // a copy whose pre-store intent the sweep has not moved yet is left alone:
     // a save would rewrite its binding and drop that intent (R1-be-5)
@@ -5527,6 +5902,7 @@ export class UniworkDocsService {
     // another window holds the document lock: this window is read-only and
     // never writes (EXPERIENCE - Second-window bar, :129)
     if (this.coordinator.isOtherWindow(doc.key)) return false
+    if (this.editLockReadOnly(doc.path)) return false
     return !(b.state === 'blocked' && b.error !== 'quota_exceeded')
   }
 
@@ -5554,6 +5930,13 @@ export class UniworkDocsService {
       case 'ignore':
         if (decision.reason === 'malformed') {
           console.warn(`uniwork docs: ignoring a malformed feed revision for ${notice.documentId}`)
+        }
+        // EL1A-R2-1: keep a notice ignored because of edit_locked / edit_lock
+        if (
+          decision.reason === 'locked' &&
+          (doc.binding.state === 'edit_locked' || this.editLockReadOnly(doc.path))
+        ) {
+          this.remoteHeld.set(notice.documentId, notice)
         }
         return
       case 'hold':
@@ -5586,7 +5969,10 @@ export class UniworkDocsService {
       // commits are the newer versions, and reloading over a copy someone else is
       // editing would fight the lock (the pill names the holder instead)
       locked:
-        this.lockedFor(doc.binding) ?? (doc.binding.state === 'edit_locked' ? 'edit_locked' : null),
+        this.lockedFor(doc.binding) ??
+        (doc.binding.state === 'edit_locked' || this.editLockReadOnly(doc.path)
+          ? 'edit_locked'
+          : null),
     }
   }
 
@@ -5777,6 +6163,7 @@ export class UniworkDocsService {
     this.remoteLocked.set(documentId, verdict)
     const doc = await this.boundDocFor(documentId)
     if (!doc) return
+    this.remoteLockPath.set(documentId, doc.path)
     this.remoteBars.set(pathKey(doc.path), { kind: verdict })
     const next: Binding = {
       ...doc.binding,
@@ -5803,6 +6190,7 @@ export class UniworkDocsService {
     const verdict = this.remoteLocked.get(documentId)
     if (!verdict) return
     this.remoteLocked.delete(documentId)
+    this.remoteLockPath.delete(documentId)
     const key = pathKey(path)
     if (this.remoteBars.get(key)?.kind !== verdict) return
     this.remoteBars.delete(key)
@@ -6028,18 +6416,22 @@ export class UniworkDocsService {
    * computer); "Cancel" keeps it open. True = may close.
    */
   async confirmClose(path: string): Promise<boolean> {
+    const release = async (): Promise<true> => {
+      await this.stopEditLock(path, true)
+      return true
+    }
     for (;;) {
       let doc = this.store.lookup(path)
-      if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return true
+      if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return release()
       // a Save from the module's own close prompt may still be uploading
       if (this.coordinator.isSaving(doc.path)) {
         await this.coordinator.settled(doc.path)
         doc = this.store.lookup(path)
-        if (!doc) return true
+        if (!doc) return release()
       }
       doc = await this.refreshDirty(doc)
       const b = doc.binding
-      if (!UNSENT_STATES.has(b.state)) return true
+      if (!UNSENT_STATES.has(b.state)) return release()
       const kind: UnsavedCloseKind =
         b.state === 'conflict'
           ? 'conflict'
@@ -6051,12 +6443,17 @@ export class UniworkDocsService {
         if (this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
           this.endConflictByMain(this.conflictPrompt)
         }
-        return true
+        return release()
       }
-      if (kind === 'unsent' && choice === 'save') return this.saveForClose(path)
+      if (kind === 'unsent' && choice === 'save') {
+        const ok = await this.saveForClose(path)
+        if (ok) await this.stopEditLock(path, true)
+        return ok
+      }
       if (kind === 'conflict' && choice === 'resolve') {
         const outcome = await this.resolveForClose(path)
         if (outcome === 'again') continue
+        if (outcome === 'closed') await this.stopEditLock(path, true)
         return outcome === 'closed'
       }
       return false
@@ -7462,6 +7859,7 @@ export class UniworkDocsService {
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     const doc = this.store.lookup(path)
     if (doc) this.publish(toStatus(doc))
+    if (doc && doc.binding.access === 'edit') this.startEditLock(doc)
     return { path, title: binding?.title ?? doc?.binding.title ?? basename(path) }
   }
 }

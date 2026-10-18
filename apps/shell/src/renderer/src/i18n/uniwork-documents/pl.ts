@@ -169,4 +169,22 @@ export const pl = {
   uwTipEditLockedSelf: 'Edytujesz ten dokument w innym oknie.',
   uwErrEditLocked: 'Ktoś inny edytuje ten dokument.',
   uwReasonEditLocked: 'ktoś inny edytuje',
+  uwLockBannerOther: '{name} edytuje od {time}. Przeglądasz w trybie tylko do odczytu.',
+  uwLockBannerSelfElsewhere: 'Edytujesz ten dokument w innym oknie.',
+  uwLockBannerFree: 'Nikt teraz nie edytuje tego dokumentu.',
+  uwLockEditHere: 'Edytuj tutaj',
+  uwLockAcquiring: 'Uzyskiwanie dostępu do edycji…',
+  uwLockReadOnlyExplain: 'Nic nie zostało zapisane — dokument jest tylko do odczytu.',
+  uwLockLostTitle: 'Już nie edytujesz',
+  uwLockLostTakenOver: '{name} przejął(-ęła) edycję. Twoje niezapisane zmiany wciąż tu są.',
+  uwLockLostHandedOver: 'Przekazałeś(-aś) edycję {name}. Twoje niezapisane zmiany wciąż tu są.',
+  uwLockLostExpired:
+    'Edycja wygasła, bo przez jakiś czas nie udało się połączyć z serwerem (brak sieci albo urządzenie uśpione). Twoje niezapisane zmiany wciąż tu są.',
+  uwLockLostMovedHere:
+    'Edytujesz teraz ten dokument w innym oknie. Niezapisane zmiany w tym oknie wciąż tu są.',
+  uwLockLostAccessLost:
+    'Nie masz już uprawnienia do edycji tego dokumentu. Twoje niezapisane zmiany wciąż tu są.',
+  uwLockLostGeneric: 'Już nie edytujesz. Twoje niezapisane zmiany wciąż tu są.',
+  uwLockLostHeldBy: '{name} teraz edytuje. Twoje niezapisane zmiany wciąż tu są.',
+  uwLockAcquireFailed: 'Nie udało się uzyskać dostępu do edycji. Spróbuj ponownie za kilka minut.',
 } satisfies Record<keyof typeof zh, string>

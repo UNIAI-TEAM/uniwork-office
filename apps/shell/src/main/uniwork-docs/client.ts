@@ -280,6 +280,8 @@ export interface UniworkDocsClient {
     uploadId: string
     baseRevision: string
     idempotencyKey: string
+    /** EL-1(b): the held lock of this path; omitted on the copy flow */
+    editLockId?: string
   }): Promise<CommitReceipt>
   /**
    * What became of a commit intent (G5-07). A 410 `commit_intent_unknown` is
@@ -1100,7 +1102,11 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const raw = await send({
         method: 'POST',
         route: `/documents/${id(input.documentId)}/versions/commit`,
-        json: { upload_id: input.uploadId, base_revision: input.baseRevision },
+        json: {
+          upload_id: input.uploadId,
+          base_revision: input.baseRevision,
+          ...(input.editLockId ? { edit_lock_id: input.editLockId } : {}),
+        },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,
         read: json,

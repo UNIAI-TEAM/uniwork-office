@@ -63,6 +63,11 @@ import {
 import { CropOverlay } from './CropOverlay'
 import { createImageLoader } from './image-loader'
 import { runHeadlessPdfExport } from './headless-export'
+import {
+  slidesExplainReadOnlySave,
+  useSlidesUniworkState,
+  type SlidesUniworkSeam,
+} from './uniwork-state'
 import { syncPrivateFonts } from './doc-fonts'
 import { toPickerHex } from './color-input'
 import { InkOverlay } from './InkOverlay'
@@ -507,25 +512,9 @@ export function App() {
   // UniWork working copy: AutoSave is forced off (UniWork only takes explicit saves) and a
   // view-only document opens in Reading view with Save disabled. Re-queried per path
   // (open, Save As, rename); the stored AutoSave preference itself is left untouched.
-  const [uniwork, setUniwork] = useState({ bound: false, readOnly: false })
+  const uniwork = useSlidesUniworkState(window.slidesApi as SlidesUniworkSeam, path)
   const uniworkRef = useRef(uniwork)
   uniworkRef.current = uniwork
-  useEffect(() => {
-    let live = true
-    if (!path) {
-      setUniwork({ bound: false, readOnly: false })
-      return
-    }
-    void window.slidesApi
-      .uniworkState?.()
-      .then((s) => {
-        if (live && s) setUniwork({ bound: !!s.bound, readOnly: !!s.readOnly })
-      })
-      .catch(() => {})
-    return () => {
-      live = false
-    }
-  }, [path])
   const [commentsContext, setCommentsContext] = useState<SlidesCommentsContext | null>(null)
   const commentsBridgeApi = useMemo(() => commentsBridge(), [])
   useEffect(() => {
@@ -1046,14 +1035,15 @@ export function App() {
   /** Set while the AI annotation popover is open (assigned below, next to askState) */
   const askOpenRef = useRef(false)
 
-  const save = useCallback(
-    (quiet = false, origin: 'user' | 'auto' = 'user'): Promise<boolean> =>
-      // a view-only UniWork document has no Save (the main process refuses it too)
-      uniworkRef.current.readOnly
-        ? Promise.resolve(false)
-        : fileActions.save(() => ctxRef.current, quiet, origin),
-    [],
-  )
+  const save = useCallback((quiet = false, origin: 'user' | 'auto' = 'user'): Promise<boolean> => {
+    // a view-only UniWork document has no Save (the main process refuses it too);
+    // an explicit Save on a bound read-only deck asks main to explain the lock
+    if (uniworkRef.current.readOnly) {
+      slidesExplainReadOnlySave(window.slidesApi as SlidesUniworkSeam, uniworkRef.current, origin)
+      return Promise.resolve(false)
+    }
+    return fileActions.save(() => ctxRef.current, quiet, origin)
+  }, [])
 
   // Close guard (closing tab/window) chose "Save": run the full save flow and report the result
   useEffect(() => {
@@ -2229,8 +2219,16 @@ export function App() {
     setSelectedIds([])
     setCtxMenu(null)
   }, [])
+  const prevReadOnlyRef = useRef(false)
   useEffect(() => {
-    if (!uniwork.readOnly) return
+    const wasReadOnly = prevReadOnlyRef.current
+    prevReadOnlyRef.current = uniwork.readOnly
+    if (!uniwork.readOnly) {
+      // EL-1(b): the deck became editable again (e.g. "Edit here" acquired the
+      // lock) — leave the Reading view that read-only forced on it
+      if (wasReadOnly) setViewMode((m) => (m === 'reading' ? 'normal' : m))
+      return
+    }
     setViewMode('reading')
     setEditing(null)
     setEditingCell(null)

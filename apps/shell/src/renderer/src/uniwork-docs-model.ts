@@ -6,9 +6,12 @@ import type {
   UniworkDocProperties,
   UniworkDocStatus,
   UniworkDocSummary,
-  UniworkLaunchEvent,
+  UniworkEditLockLostReason,
+  UniworkEditLockPhase,
+  UniworkEditLockSessionView,
   UniworkLockReason,
   UniworkRemoteAction,
+  UniworkLaunchEvent,
   UniworkResult,
   UniworkSaveState,
   UniworkWorkspaceRef,
@@ -172,8 +175,16 @@ export type ChipTone = 'ok' | 'neutral' | 'info' | 'busy' | 'warn' | 'error'
  * `stop-ai` stops the AI run a save waits for; the rest keep their earlier meaning.
  */
 export type ChipActionKind =
-  'retry' | 'sign-in' | 'resolve' | 'reload' | 'view-queue' | 'details' | 'stop-ai'
+  'retry' | 'sign-in' | 'resolve' | 'reload' | 'view-queue' | 'details' | 'stop-ai' | 'edit-here'
 
+/**
+ * EL-1(b) (UNI-1645c): the lock-session phases that put the open document in read-only
+ * (`other` / `self_elsewhere` / `free` / `lost` — main's `isReadOnly` 'edit_lock' reason).
+ * 'acquiring' and 'held' keep editing; 'unreachable' is the interim below.
+ */
+export function isEditLockReadOnlyPhase(phase: UniworkEditLockPhase | undefined): boolean {
+  return phase === 'other' || phase === 'self_elsewhere' || phase === 'free' || phase === 'lost'
+}
 export interface ChipModel {
   tone: ChipTone
   labelKey: StringKey
@@ -271,6 +282,25 @@ export function chipModelOf(
   const { state, access, error } = status
   const lock = status.editLock
   const limitBytes = ctx.maxBytes ?? status.maxBytes
+  const session = status.lockSession
+  // EL-1(b): a lost lock session stops saving (the edits stay local); the pill names the
+  // lost state (or the holder via uwChipEditLocked when lost with byName and no named
+  // reason — the commit-423 path, EL1B-W3-2), says who took/holds it, and its one button
+  // re-acquires ("Sửa ở đây"). It outranks remote / lockWhileOpen and every save state:
+  // nothing else can happen until the lock is settled.
+  if (session?.phase === 'lost') {
+    const reasonKey = lostReasonKeyOf(session.lostReason)
+    const heldBy = lostHolderNameOf(session)
+    return {
+      tone: 'warn',
+      labelKey: heldBy ? 'uwChipEditLocked' : 'uwLockLostTitle',
+      holderName: heldBy ?? session.byName ?? null,
+      tipKey: heldBy ? 'uwLockLostHeldBy' : reasonKey,
+      action: isTerminalLockLostReason(session.lostReason)
+        ? undefined
+        : { kind: 'edit-here', labelKey: 'uwLockEditHere' },
+    }
+  }
   // 1 blocked
   if (state === 'blocked' || isStoreRefusal(status)) {
     const baseReason = blockedReasonKey(error)
@@ -366,6 +396,31 @@ export function chipModelOf(
       }
     default:
       break
+  }
+  // EL-1(b): the lock session's read-only phases are a marker, not a save state: 'other'
+  // and 'self_elsewhere' name the holder, 'free' says the lock is gone, 'acquiring' is a
+  // quiet busy pill (the "Sửa ở đây" busy state). 'held' falls through unchanged; the
+  // 'unreachable' interim (user decision 2026-10-18, until EL-2) is treated as no
+  // session — the existing offline / queued chip says enough.
+  if (session?.phase === 'acquiring') {
+    return { tone: 'busy', labelKey: 'uwLockAcquiring', tipKey: 'uwLockAcquiring' }
+  }
+  if (
+    session !== undefined &&
+    (session.phase === 'other' || session.phase === 'self_elsewhere' || session.phase === 'free')
+  ) {
+    return {
+      tone: 'neutral',
+      labelKey: 'uwChipViewOnly',
+      tipKey:
+        session.phase === 'other'
+          ? 'uwLockBannerOther'
+          : session.phase === 'self_elsewhere'
+            ? 'uwLockBannerSelfElsewhere'
+            : 'uwLockBannerFree',
+      ...(session.phase === 'other' ? { holderName: session.holderName ?? null } : {}),
+      ...(session.since ? { savedAt: session.since } : {}),
+    }
   }
   // 8 remote-newer: the Reload of the bar is not available yet (a save in flight, a stuck one, an
   // AI run): no button, the tooltip says why the document didn't reload
@@ -626,6 +681,10 @@ export function remoteBarModelOf(
   status: UniworkDocStatus,
   who: { author?: string; time?: string } = {},
 ): RemoteBarModel | null {
+  // EL-1(b): a lost lock session outranks remote / lockWhileOpen — its banner replaces
+  // the S6 band for as long as the session stays lost (the next commit goes through the
+  // normal base check after "Sửa ở đây" re-acquires).
+  if (status.lockSession?.phase === 'lost') return null
   // G5-08c: a lock while open outranks every new-version notice; the spine names no action for it
   if (status.lockWhileOpen) {
     return {
@@ -720,6 +779,187 @@ export function remoteBarModelOf(
         params: {},
         actions: [{ kind: 'close', labelKey: 'uwRemoteClose' }],
       }
+  }
+}
+
+// ── Edit-lock session strip (EL-1b, UNI-1645c) ─────────
+
+/**
+ * The lost-lock sentence for an `edit_lock_lost` reason (the web's `lostCopyKey`): a
+ * reason the desktop does not name on its own (released, document_archived, unknown,
+ * or none sent) reads the generic sentence — the unsaved edits are always named kept.
+ */
+export function lostReasonKeyOf(reason: UniworkEditLockLostReason | undefined): StringKey {
+  if (isTerminalLockLostReason(reason)) return 'uwLockLostAccessLost'
+  switch (reason) {
+    case 'taken_over':
+      return 'uwLockLostTakenOver'
+    case 'handed_over':
+      return 'uwLockLostHandedOver'
+    case 'moved_here':
+      return 'uwLockLostMovedHere'
+    case 'expired':
+      return 'uwLockLostExpired'
+    case 'access_lost':
+      return 'uwLockLostAccessLost'
+    default:
+      return 'uwLockLostGeneric'
+  }
+}
+
+/**
+ * Amendment A1 (B9, UNI-1645c): the four server end reasons a lock session cannot
+ * come back from — the session was revoked, the member deactivated, the
+ * organization suspended, or the document deleted. They read the access-lost
+ * sentence on every surface and offer no "Sửa ở đây": re-acquiring cannot
+ * succeed. They are named reasons, so the heldBy rule never applies to them.
+ */
+export function isTerminalLockLostReason(reason: UniworkEditLockLostReason | undefined): boolean {
+  switch (reason) {
+    case 'session_revoked':
+    case 'member_deactivated':
+    case 'organization_suspended':
+    case 'document_deleted':
+      return true
+    default:
+      return false
+  }
+}
+
+/**
+ * EL-1(b) (EL1B-W3-2 / EL1B-FE-1): when a session is 'lost' with a non-empty `byName`
+ * and an unnamed reason (`unknown`, `released`, `document_archived`, or none — the
+ * commit-423 path), all three surfaces (pill, strip, and Ctrl/Cmd+S popover) name the
+ * holder via `uwLockLostHeldBy` instead of the generic lost sentence.
+ */
+export function lostHolderNameOf(session: UniworkEditLockSessionView | undefined): string | null {
+  if (!session || session.phase !== 'lost') return null
+  if (lostReasonKeyOf(session.lostReason) !== 'uwLockLostGeneric') return null
+  const byName = session.byName?.trim() ? session.byName : null
+  return byName
+}
+
+/**
+ * A lock time as the web banner writes it (`formatLockTime`): today by its time alone,
+ * any other day with the date too; an unreadable or missing value reads empty — the
+ * caller falls back to '—' so the sentence never keeps a hole.
+ */
+export function formatEditLockTime(
+  iso: string | null | undefined,
+  locale: string,
+  now: Date = new Date(),
+): string {
+  if (!iso) return ''
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return ''
+  const sameDay =
+    at.getFullYear() === now.getFullYear() &&
+    at.getMonth() === now.getMonth() &&
+    at.getDate() === now.getDate()
+  return new Intl.DateTimeFormat(
+    locale,
+    sameDay ? { hour: '2-digit', minute: '2-digit' } : { dateStyle: 'medium', timeStyle: 'short' },
+  ).format(at)
+}
+
+export type LockBannerTone = 'info' | 'warn' | 'success'
+
+export interface LockBannerModel {
+  /** the phase this model answers (the component keeps it for the acquiring keep-alive) */
+  phase: UniworkEditLockPhase
+  tone: LockBannerTone
+  /** 'lost' only: the bold first line (the "Bạn không còn quyền sửa" title) */
+  titleKey?: StringKey
+  messageKey: StringKey
+  params: Record<string, string | number>
+  /** the "Sửa ở đây" button (self_elsewhere / free / lost, and busy while acquiring) */
+  editHere: boolean
+  /** acquiring in flight: the button stays visible and waits */
+  busy: boolean
+}
+
+/**
+ * The edit-lock strip under the tab strip for a bound document (EL-1(b), the desktop
+ * states A–D of the board). 'other' / 'self_elsewhere' / 'free' are read-only and say
+ * so in the sentence; 'lost' adds its title line; 'acquiring' is the quiet busy state
+ * of "Sửa ở đây". `null` for 'held', 'unreachable' (the EL-1(b) interim until EL-2:
+ * treated as no session — the document stays editable and the offline / queued pill
+ * says enough) and for a document without a lock session.
+ *
+ * The web's `formatLockTime` fills {time}; a holder the server left unnamed reads the
+ * web's `lostSomeone` ('Người khác' / 'Someone'), a missing time '—' instead of a hole.
+ */
+export function lockBannerModelOf(
+  status: UniworkDocStatus,
+  t: TFunc,
+  dateLocale: string,
+  now: Date = new Date(),
+): LockBannerModel | null {
+  const session = status.lockSession
+  if (!session) return null
+  switch (session.phase) {
+    case 'other':
+      return {
+        phase: 'other',
+        tone: 'info',
+        messageKey: 'uwLockBannerOther',
+        params: {
+          name: session.holderName?.trim() ? session.holderName : t('uwEditLockSomeone'),
+          time: formatEditLockTime(session.since, dateLocale, now) || '—',
+        },
+        editHere: false,
+        busy: false,
+      }
+    case 'self_elsewhere':
+      return {
+        phase: 'self_elsewhere',
+        tone: 'info',
+        messageKey: 'uwLockBannerSelfElsewhere',
+        params: {},
+        editHere: true,
+        busy: false,
+      }
+    case 'free':
+      return {
+        phase: 'free',
+        tone: 'success',
+        messageKey: 'uwLockBannerFree',
+        params: {},
+        editHere: true,
+        busy: false,
+      }
+    case 'acquiring':
+      return {
+        phase: 'acquiring',
+        tone: 'info',
+        messageKey: 'uwLockAcquiring',
+        params: {},
+        editHere: true,
+        busy: true,
+      }
+    case 'lost': {
+      const reasonKey = lostReasonKeyOf(session.lostReason)
+      const heldBy = lostHolderNameOf(session)
+      const byName = session.byName?.trim() ? session.byName : null
+      return {
+        phase: 'lost',
+        tone: 'warn',
+        titleKey: 'uwLockLostTitle',
+        messageKey: heldBy ? 'uwLockLostHeldBy' : reasonKey,
+        params: heldBy
+          ? { name: heldBy }
+          : session.lostReason === 'taken_over' || session.lostReason === 'handed_over'
+            ? { name: byName ?? t('uwEditLockSomeone') }
+            : {},
+        editHere: !isTerminalLockLostReason(session.lostReason),
+        busy: false,
+      }
+    }
+    // 'held' / 'unreachable' (and anything main adds later): nothing new is rendered —
+    // 'unreachable' is the user-decided interim until EL-2 (the document stays editable
+    // and the existing offline / queued pill says enough).
+    default:
+      return null
   }
 }
 
