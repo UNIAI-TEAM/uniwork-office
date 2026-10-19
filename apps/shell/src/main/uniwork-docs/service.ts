@@ -1176,6 +1176,8 @@ export class UniworkDocsService {
    * session boundary cancels it.
    */
   private readonly firstSaveOps = new Map<string, FirstSaveOp>()
+  /** UNI-1959: told the path key of every naming op that ends (a close-save wait re-arms on it) */
+  private readonly firstSaveOpEnded = new Set<(key: string) => void>()
   /**
    * G5-03a (S6): the bar of each path as this session knows it, keyed by path.
    * An entry (even `null`, an explicitly hidden bar) is authoritative over the
@@ -4258,7 +4260,7 @@ export class UniworkDocsService {
       this.editorDirty.add(doc.path)
       void this.askFirstSaveName(op, doc).then((answer) => {
         const live = this.firstSaveOpLive(op)
-        if (this.firstSaveOps.get(key) === op) this.firstSaveOps.delete(key)
+        if (this.firstSaveOps.get(key) === op) this.endFirstSaveOp(key)
         // a verdict that lands after the tab closed or the session ended resumes nothing
         if (!live) return
         if (answer === 'cancel') {
@@ -4331,7 +4333,7 @@ export class UniworkDocsService {
   private cancelFirstSaveOp(op: FirstSaveOp): void {
     if (op.cancelled) return
     op.cancelled = true
-    for (const [key, held] of this.firstSaveOps) if (held === op) this.firstSaveOps.delete(key)
+    for (const [key, held] of this.firstSaveOps) if (held === op) this.endFirstSaveOp(key)
     if (op.requestId) {
       try {
         this.deps.dismissFirstSaveName?.(op.requestId)
@@ -4339,6 +4341,12 @@ export class UniworkDocsService {
         // the dialog host is gone with the window; there is nothing to drop
       }
     }
+  }
+
+  /** the op of `key` is over: the path is free, and a waiting close starts its upload window */
+  private endFirstSaveOp(key: string): void {
+    this.firstSaveOps.delete(key)
+    for (const listener of [...this.firstSaveOpEnded]) listener(key)
   }
 
   /** a tab or window of `path` is gone: its naming operation goes with it */
@@ -7047,26 +7055,34 @@ export class UniworkDocsService {
   ): { promise: Promise<UniworkDocStatus | null>; cancel: () => void } {
     let finish: (status: UniworkDocStatus | null) => void = () => undefined
     const promise = new Promise<UniworkDocStatus | null>((resolveWait) => {
+      const key = pathKey(path)
       const listener = (status: UniworkDocStatus) => {
         if (status.path === path && !ignore.has(status.state)) finish(status)
       }
-      let timer: ReturnType<typeof setTimeout>
+      let timer: ReturnType<typeof setTimeout> | undefined
       const arm = () => {
+        clearTimeout(timer)
         timer = setTimeout(() => {
-          // UNI-1959: a person still naming the document is not a stalled upload -
-          // the settlement deadline starts once the dialog is answered
-          if (this.firstSaveOps.has(pathKey(path))) arm()
-          else finish(null)
+          // UNI-1959: a person still naming the document is not a stalled upload:
+          // the wait goes on, and the dialog's answer arms a fresh window
+          if (!this.firstSaveOps.has(key)) finish(null)
         }, timeoutMs)
         ;(timer as { unref?: () => void }).unref?.()
+      }
+      // the upload a naming op held starts when the op ends: it gets the whole
+      // deadline from that moment, however long the person took to answer
+      const opEnded = (ended: string) => {
+        if (ended === key) arm()
       }
       arm()
       finish = (status) => {
         clearTimeout(timer)
         this.statusListeners.delete(listener)
+        this.firstSaveOpEnded.delete(opEnded)
         resolveWait(status)
       }
       this.statusListeners.add(listener)
+      this.firstSaveOpEnded.add(opEnded)
     })
     return { promise, cancel: () => finish(null) }
   }
