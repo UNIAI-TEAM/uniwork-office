@@ -384,7 +384,7 @@ const FILE_ASSOCIATIONS = [
     mimeType: 'text/tab-separated-values',
   },
   {
-    // import-only: opens as a converted .xlsx copy, GenOffice never writes ODF
+    // import-only: opens as a converted .xlsx copy, UniWork Office never writes ODF
     ext: 'ods',
     name: 'OpenDocument Spreadsheet',
     role: 'Editor',
@@ -399,7 +399,7 @@ const FILE_ASSOCIATIONS = [
     mimeType: 'application/vnd.oasis.opendocument.spreadsheet-template',
   },
   {
-    // import-only: opens as a converted .docx copy, GenOffice never writes ODF
+    // import-only: opens as a converted .docx copy, UniWork Office never writes ODF
     ext: 'odt',
     name: 'OpenDocument Text',
     role: 'Editor',
@@ -414,7 +414,7 @@ const FILE_ASSOCIATIONS = [
     mimeType: 'application/vnd.oasis.opendocument.text-template',
   },
   {
-    // import-only: opens as a converted .pptx copy, GenOffice never writes ODF
+    // import-only: opens as a converted .pptx copy, UniWork Office never writes ODF
     ext: 'odp',
     name: 'OpenDocument Presentation',
     role: 'Editor',
@@ -791,7 +791,7 @@ const config = {
     // audio-input entitlement, and macOS asks for it with this text
     extendInfo: {
       NSMicrophoneUsageDescription:
-        'GenOffice records your narration when you record a slide show.',
+        'UniWork Office records your narration when you record a slide show.',
     },
     notarize: true,
     extraResources: [

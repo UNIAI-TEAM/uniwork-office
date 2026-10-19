@@ -23,7 +23,7 @@ Tiga pilihan ialah Cerah, Gelap, dan Ikut Sistem. Mod Ikut Sistem mengikut rupa 
 - **Kedudukan bar sisi AI** (kiri atau kanan), **Saiz teks panel AI** dan **Semakan ejaan dalam sembang AI**.
 - **Buka panel AI dalam dokumen baharu** — dimatikan, dokumen baharu bermula dengan panel tertutup, sekali klik sahaja.
 - **Simpan automatik semua dokumen** membolehkan AutoSave secara lalai dalam setiap editor; anda masih boleh mematikannya untuk satu tetingkap sahaja.
-- **Lokasi simpanan** dengan butang **Tukar**, dan **Apl lalai untuk dokumen Office** untuk menuntut .docx / .xlsx / .pptx bagi GenOffice.
+- **Lokasi simpanan** dengan butang **Tukar**, dan **Apl lalai untuk dokumen Office** untuk menuntut .docx / .xlsx / .pptx bagi UniWork Office.
 
 ## Media & Carian AI
 
@@ -39,17 +39,17 @@ Ia bukan suis — setiap keupayaan memilih pembekal yang menyediakannya, dan kun
 
 ## Penetapan sebagai aplikasi lalai
 
-Tetapan boleh mendaftar GenOffice sebagai aplikasi yang mengendalikan fail .docx, .xlsx, .pptx, .pdf, dan yang lain. Pendaftaran ini dilakukan pada peringkat sistem, dan pengesahan diperlukan apabila diminta.
+Tetapan boleh mendaftar UniWork Office sebagai aplikasi yang mengendalikan fail .docx, .xlsx, .pptx, .pdf, dan yang lain. Pendaftaran ini dilakukan pada peringkat sistem, dan pengesahan diperlukan apabila diminta.
 
 ## Notis perisian pihak ketiga dan kemas kini
 
 - Bantuan ▸ Notis Perisian Pihak Kedua memaparkan senarai penuh lesen perisian sumber terbuka yang disertakan dengan aplikasi.
 - Bantuan ▸ Semak Kemas Kini memulakan pemeriksaan secara manual. Jika terdapat versi yang lebih baharu, aplikasi akan meminta anda memasangnya.
 
-## Log masuk ke Genspark
+## Log masuk ke UniWork
 
-- Kemasukan log masuk, sama ada melalui tetapan atau senarai projek awan, menggunakan aliran **kod peranti**. GenOffice memaparkan kod tersebut dan membuka halaman log masuk dalam pelayar, dan aliran ini akan diteruskan secara automatik selepas selesai.
-- Log masuk hanya digunakan untuk dua perkara, iaitu senarai projek awan dan model yang dihoskan oleh Genspark. Tanpa log masuk, setiap fungsi setempat dan model tersuai akan terus berfungsi.
+- Kemasukan log masuk, sama ada melalui tetapan atau senarai projek awan, menggunakan aliran **kod peranti**. UniWork Office memaparkan kod tersebut dan membuka halaman log masuk dalam pelayar, dan aliran ini akan diteruskan secara automatik selepas selesai.
+- Log masuk hanya digunakan untuk dua perkara, iaitu senarai projek awan dan model yang dihoskan oleh UniWork. Tanpa log masuk, setiap fungsi setempat dan model tersuai akan terus berfungsi.
 - Log keluar boleh dilakukan dengan satu klik dalam tetapan.
 
 ## Integrasi MCP

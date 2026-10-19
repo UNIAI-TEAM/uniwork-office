@@ -1,6 +1,6 @@
 # Ligar um agente de programação
 
-O GenOffice fala o Model Context Protocol, por isso um agente de programação consegue ler, escrever e renderizar os seus documentos através dos mesmos motores que a aplicação usa. O agente não está a adivinhar um formato de ficheiro: recebe os esquemas tipados das operações a partir das mesmas definições contra as quais o executor valida.
+O UniWork Office fala o Model Context Protocol, por isso um agente de programação consegue ler, escrever e renderizar os seus documentos através dos mesmos motores que a aplicação usa. O agente não está a adivinhar um formato de ficheiro: recebe os esquemas tipados das operações a partir das mesmas definições contra as quais o executor valida.
 
 ## Registá-lo a partir da aplicação
 
@@ -70,7 +70,7 @@ Um agente que não conhece o vocabulário das operações vai adivinhar. A skill
 
 ## O que consegue alcançar na aplicação
 
-O servidor não se limita aos ficheiros em disco. Enquanto o GenOffice estiver a correr, o agente também pode trabalhar através da janela:
+O servidor não se limita aos ficheiros em disco. Enquanto o UniWork Office estiver a correr, o agente também pode trabalhar através da janela:
 
 - **`open_in_genoffice`** abre um ficheiro num separador e dá-lhe o foco.
 - **`open_documents`** lista todos os documentos que tem abertos — id, tipo, caminho e se têm alterações por guardar —, e depois lê o conteúdo atual de um deles, guarda-o no próprio sítio ou fecha-o, guardando primeiro, a não ser que lhe peça para descartar.

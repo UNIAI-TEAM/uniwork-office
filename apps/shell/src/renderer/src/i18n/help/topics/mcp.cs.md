@@ -1,6 +1,6 @@
 # Připojení programového agenta
 
-GenOffice mluví protokolem Model Context Protocol, takže programový agent může číst, zapisovat a vykreslovat vaše dokumenty stejnými enginy, jaké používá aplikace. Agent netuší formát souboru: dostane typovaná schémata op ze stejných definic, proti kterým executor validuje.
+UniWork Office mluví protokolem Model Context Protocol, takže programový agent může číst, zapisovat a vykreslovat vaše dokumenty stejnými enginy, jaké používá aplikace. Agent netuší formát souboru: dostane typovaná schémata op ze stejných definic, proti kterým executor validuje.
 
 ## Registrace v aplikaci
 
@@ -70,7 +70,7 @@ Agent, který nezná slovní zásobu op, bude hádat. Skill přináší referen�
 
 ## Čeho se v aplikaci dostane
 
-Server není omezen na soubory na disku. Dokud GenOffice běží, může agent pracovat i přes okno:
+Server není omezen na soubory na disku. Dokud UniWork Office běží, může agent pracovat i přes okno:
 
 - **`open_in_genoffice`** otevře soubor v kartě a dá jí fokus.
 - **`open_documents`** vypíše každý dokument, který máte otevřený — id, typ, cestu a zda v něm jsou neuložené změny — a pak přečte aktuální obsah jednoho z nich, uloží ho na místě, nebo ho zavře, přičemž nejdřív uloží, pokud mu neřeknete, aby změny zahodil.

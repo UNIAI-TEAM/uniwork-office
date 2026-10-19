@@ -636,7 +636,7 @@ export class TabManager {
     const id = `t${this.nextId++}`
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
-    this.tabs.push({ id, kind: 'help', view, title: this.untitled('help', 'GenOffice Help') })
+    this.tabs.push({ id, kind: 'help', view, title: this.untitled('help', 'UniWork Office Help') })
     this.activateTab(id)
     return id
   }

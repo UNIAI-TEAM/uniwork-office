@@ -23,7 +23,7 @@ Světlý / Tmavý / Podle systému. Volba Podle systému sleduje vzhled operačn
 - **Pozice postranního panelu AI** (vlevo nebo vpravo), **Velikost textu panelu AI** a **Kontrola pravopisu v chatu AI**.
 - **Otevírat panel AI v nových dokumentech** — vypnuto, nový dokument začíná se složeným panelem, na jedno kliknutí.
 - **Automaticky ukládat všechny dokumenty** zapne ve výchozím stavu automatické ukládání v každém editoru; pro jedno okno ho můžete i nadále vypnout.
-- **Umístění pro ukládání** s tlačítkem **Změnit** a **Výchozí aplikace pro dokumenty Office**, aby GenOffice přebíral .docx / .xlsx / .pptx.
+- **Umístění pro ukládání** s tlačítkem **Změnit** a **Výchozí aplikace pro dokumenty Office**, aby UniWork Office přebíral .docx / .xlsx / .pptx.
 
 ## AI média a vyhledávání
 
@@ -39,17 +39,17 @@ Nejsou to přepínače — každá schopnost si vybere dodavatele, který ji pos
 
 ## Přiřazení jako výchozí aplikace
 
-Nastavení může zaregistrovat GenOffice jako aplikaci pro soubory .docx / .xlsx / .pptx / .pdf a podobné (registrace výchozí aplikace na úrovni systému; potvrzení, když o něj systém požádá).
+Nastavení může zaregistrovat UniWork Office jako aplikaci pro soubory .docx / .xlsx / .pptx / .pdf a podobné (registrace výchozí aplikace na úrovni systému; potvrzení, když o něj systém požádá).
 
 ## Informace o softwaru třetích stran a aktualizace
 
 - Nápověda ▸ Informace o softwaru třetích stran: úplný přehled licencí open source dodávaných s aplikací.
 - Nápověda ▸ Zkontrolovat aktualizace…: spustí ruční kontrolu; novější verze vyzve k instalaci.
 
-## Přihlášení ke Genspark
+## Přihlášení ke UniWork
 
-- Místo přihlášení (v nastavení nebo v seznamu cloudových projektů) používá postup s **kódem zařízení**: GenOffice zobrazí kód a otevře přihlašovací stránku v prohlížeči; po dokončení postup pokračuje automaticky.
-- Přihlášení slouží pouze k: seznamu cloudových projektů a modelům hostovaným Gensparkem. Bez něj fungují dál všechny místní funkce i vlastní modely.
+- Místo přihlášení (v nastavení nebo v seznamu cloudových projektů) používá postup s **kódem zařízení**: UniWork Office zobrazí kód a otevře přihlašovací stránku v prohlížeči; po dokončení postup pokračuje automaticky.
+- Přihlášení slouží pouze k: seznamu cloudových projektů a modelům hostovaným UniWorkem. Bez něj fungují dál všechny místní funkce i vlastní modely.
 - Odhlášení je jedno kliknutí v nastavení.
 
 ## Integrace MCP (pro pokročilé uživatele a klienty AI)
