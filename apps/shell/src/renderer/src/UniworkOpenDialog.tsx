@@ -192,8 +192,9 @@ export function UniworkOpenDialog({
   const clearToast = useCallback(() => setToast(null), [])
   /** G5-05u: the row menu's offline item (not in pin mode, where choosing already pins) */
   const offline = useOfflineToggle()
+  // a UniNote page has no file to keep offline, whatever its title ends in
   const offlineOf = (doc: LibraryDocRow) =>
-    onPick || !isOpenable(doc) ? null : offline.menuOf(doc.id)
+    onPick || doc.kind === 'page' || !isOpenable(doc) ? null : offline.menuOf(doc.id)
   /** FD-11: the workspace's Recent list, or the folder browser's contents */
   const [view, setView] = useState<'recent' | 'folder'>('recent')
   /** the committed title search of the folder view (the recent list keeps state.query) */
@@ -985,6 +986,7 @@ export function UniworkOpenDialog({
               mainOverride={folderView ? undefined : pickBody}
               offlineOf={(doc) => rowActionsOf(doc, offlineOf(doc)).offline}
               onOffline={(doc) => onRowAction(doc, 'offline')}
+              hidePages={Boolean(onPick)}
             />
           ) : (
             pickBody
