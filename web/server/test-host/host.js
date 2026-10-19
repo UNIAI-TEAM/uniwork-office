@@ -40,6 +40,8 @@
 //   bumpRemote(id)   -> simulate a concurrent server-side save (next frame save conflicts)
 //   saveCalls()      -> how many api.save requests arrived (the refused ones too)
 //   failNextSave()   -> the next api.save answers a 500 (the save-failure state of the host header)
+//   delayNextSave(ms) -> the next api.save is held for ms before it answers, so a test can press Save again
+//                       while the first one is still writing (UNI-1984)
 //   cancelNextSave() -> the next api.save is declined {code:'cancelled'} (the host runs its own
 //                       name dialog; UNI-1909 S01-V2)
 //   rename(id, name)  -> rename in the store and emit file.renamed (UNI-1909 S01B-V1)
@@ -70,6 +72,7 @@ let lastExport = null
 let cancelSaves = 0 // api.save calls still to answer "cancelled" (__host.cancelNextSave)
 let saveCalls = 0 // api.save requests received, failed ones included
 let failSaves = 0 // api.save calls still to refuse with a 500 (__host.failNextSave)
+let saveDelayMs = 0 // hold the next api.save answer this long (__host.delayNextSave)
 const events = []
 const uploads = [] // api.images.upload requests: {fileId, name, mimeType, bytes}
 const downloads = [] // api.download requests: {bytes}
@@ -120,8 +123,13 @@ const handlers = {
       ...(LIMITS ? { limits: LIMITS } : {}),
     }
   },
-  'api.save': ({ fileId, data, etag }) => {
+  'api.save': async ({ fileId, data, etag }) => {
     saveCalls += 1
+    if (saveDelayMs > 0) {
+      const ms = saveDelayMs
+      saveDelayMs = 0
+      await new Promise((r) => setTimeout(r, ms))
+    }
     if (failSaves > 0) {
       failSaves -= 1
       return { ok: false, error: apiError('internal', 'Internal Server Error', 500) }
@@ -414,6 +422,10 @@ async function boot() {
     },
     failNextSave: () => {
       failSaves += 1
+    },
+    /** the next api.save answers only after ms, so the frame's Save stays in flight meanwhile */
+    delayNextSave: (ms) => {
+      saveDelayMs = ms
     },
     /** the next api.save is declined with code "cancelled" (host opens its own dialog) */
     cancelNextSave: () => {

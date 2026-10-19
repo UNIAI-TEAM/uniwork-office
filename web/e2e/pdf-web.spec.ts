@@ -537,6 +537,63 @@ test.describe('pdf module on the web', () => {
   }
 })
 
+// UNI-1984 PDF-SAVE-NOOP: a Save with nothing new to write commits nothing. A second Save pressed while
+// the first is still writing is queued by the frame and must not re-send what the first one wrote
+// (the duplicate version carried the same edit again).
+test.describe('pdf module on the web: a second Save commits nothing', () => {
+  test.skip(!built(), 'no dist-web/pdf build: npm run build:web -- --module pdf')
+
+  async function insertHello(page: Page, frame: Frame): Promise<void> {
+    await frame
+      .locator('.rb-big', { hasText: /^Insert text$/ })
+      .first()
+      .click()
+    await expect(frame.locator('.pdf-modal-textarea')).toBeFocused()
+    await page.keyboard.type('Hello')
+    await frame.locator('.pdf-modal-actions .primary').click()
+    await expect(frame.locator('.pdf-modal-textarea')).toHaveCount(0)
+    const off = await frameOffset(page)
+    const pb = await pageBox(frame)
+    await page.mouse.click(off.x + pb.x + pb.width * 0.4, off.y + pb.y + 300)
+    await expect(
+      frame.locator('.pdf-textinsert-preview', { hasText: 'Hello' }).first(),
+    ).toBeVisible()
+  }
+
+  test('Save, wait, Save again: the second Save commits nothing', async ({ page }) => {
+    const problems = await watch(page)
+    const frame = await openPdf(page)
+    await waitRendered(frame)
+    await insertHello(page, frame)
+    await clickSave(frame)
+    await waitVersion(page, 'v2')
+    await page.waitForTimeout(2500)
+    await clickSave(frame)
+    await page.waitForTimeout(2500)
+    expect(await host<number>(page, 'saveCalls')).toBe(1)
+    expect((await lastSaved(page))?.versionId).toBe('v2')
+    await noProblems(page, frame, problems)
+  })
+
+  test('second Save pressed while the first is still saving commits nothing', async ({ page }) => {
+    const problems = await watch(page)
+    const frame = await openPdf(page)
+    await waitRendered(frame)
+    await insertHello(page, frame)
+    // hold the first answer so the second press lands while the write is in flight (queued)
+    await host(page, 'delayNextSave', 1500)
+    await clickSave(frame)
+    await expect.poll(() => host<number>(page, 'saveCalls')).toBe(1)
+    await page.keyboard.press('Control+s')
+    await waitVersion(page, 'v2')
+    // settle: the drained second Save would upload a v3 well inside this window
+    await page.waitForTimeout(4000)
+    expect(await host<number>(page, 'saveCalls')).toBe(1)
+    expect((await lastSaved(page))?.versionId).toBe('v2')
+    await noProblems(page, frame, problems)
+  })
+})
+
 // A7 / B: what the web build does not have says so (never hidden), and the zoom floor at 390 px
 test.describe('pdf module on the web: use-the-app messages and narrow zoom', () => {
   test.skip(!built(), 'no dist-web/pdf build: npm run build:web -- --module pdf')
