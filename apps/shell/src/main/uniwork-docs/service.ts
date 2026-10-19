@@ -112,6 +112,13 @@ import {
   type UploadSessionTarget,
 } from './upload-session'
 import {
+  createFirstSaveStore,
+  firstSaveKey,
+  FIRST_SAVES_STORE_REGISTRATION,
+  type FirstSaveRecord,
+  type FirstSaveStore,
+} from '../uniwork-sync/first-saves'
+import {
   createUploadSessionStore,
   uploadSessionKey,
   UPLOAD_SESSIONS_STORE_REGISTRATION,
@@ -193,6 +200,19 @@ export function refuseLockedOpenPath(
 /** the slice of the service the open funnel needs */
 export interface LockRefuser {
   refuseLockedPath(path: string): boolean
+}
+
+/**
+ * S01-R2-4: one first-save attempt's Idempotency-Key and its durable record
+ * (`store` is null when the account has no store to keep it in). `restored`:
+ * the key came from the record of an earlier run, not from this process.
+ */
+interface FirstSaveAttempt {
+  store: FirstSaveStore | null
+  recordKey: string
+  idempotencyKey: string
+  fingerprint: string
+  restored: boolean
 }
 
 export interface SessionIdentity {
@@ -4754,6 +4774,8 @@ export class UniworkDocsService {
     // copy, so a retry from the old path finds a plain file and would create
     // a twin (S01-R1-3)
     if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
+    // S01-R2-4: the same refusal across a restart, from the account's durable record
+    await this.refuseBoundFirstSave(session, owner, tabPath)
     const title = requireName(input.title)
     const filename = basename(tabPath)
     if (!filename || !formatForName(filename)) {
@@ -4882,37 +4904,33 @@ export class UniworkDocsService {
         : 'my_folder'
     const bytesChecksum = sha256Hex(bytes)
     const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
-    const idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
-    this.firstSaveKeys.set(keyFp, idempotencyKey)
+    // S01-R2-4: the attempt's key and its durable record, written `pending`
+    // BEFORE the request exists - a restart finds the key the create used
+    const attempt = await this.beginFirstSaveAttempt(session, owner, key, keyFp)
     // one client per save: the create + the bind read share it, so a
     // session landing mid-flight does not turn the second call into a
     // fresh not_signed_in on the same action
     const api = this.api()
-    const created = await api
-      .createFile({
-        workspaceId,
-        bytes,
-        filename,
-        title,
-        idempotencyKey,
-        ...createTarget,
-      })
-      .catch((error: unknown) => {
-        // S01-R2-3: D answered the fingerprint mismatch verdict for this
-        // create - the retained key is wrong for this body and must not pin
-        // the path until restart; drop it so the next retry mints a fresh key,
-        // then answer with the typed (retryable) verdict
-        if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
-          this.firstSaveKeys.delete(keyFp)
-        }
-        // S01-R4-3: the server's own size refusal, after the local preflight
-        // passed - re-wrapped exactly as the upload path does, so the renderer
-        // gets the basename, the size and the cap, never a bare too_large
-        if (error instanceof UniworkDocError && error.code === 'too_large') {
-          rethrowServerTooLarge(error, filename, bytes.byteLength, limits)
-        }
-        throw error
-      })
+    const created = await this.runFirstSaveCreate(attempt, keyFp, (idempotencyKey) =>
+      api
+        .createFile({
+          workspaceId,
+          bytes,
+          filename,
+          title,
+          idempotencyKey,
+          ...createTarget,
+        })
+        .catch((error: unknown) => {
+          // S01-R4-3: the server's own size refusal, after the local preflight
+          // passed - re-wrapped exactly as the upload path does, so the renderer
+          // gets the basename, the size and the cap, never a bare too_large
+          if (error instanceof UniworkDocError && error.code === 'too_large') {
+            rethrowServerTooLarge(error, filename, bytes.byteLength, limits)
+          }
+          throw error
+        }),
+    )
     return await this.bindFirstSaveDocument({
       session,
       owner,
@@ -4924,6 +4942,7 @@ export class UniworkDocsService {
       api,
       created,
       bytesChecksum,
+      attempt,
       onBindFailure: () => this.firstSaveKeys.delete(keyFp),
       writeWorkingCopy: (dir, name) => this.store.writeWorkingCopy(dir, name, bytes),
     })
@@ -4973,8 +4992,9 @@ export class UniworkDocsService {
     // the path may have been bound while the checksum streamed
     if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
     const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
-    let idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
-    this.firstSaveKeys.set(keyFp, idempotencyKey)
+    // S01-R2-4: see the buffered path - the durable record carries the key
+    const attempt = await this.beginFirstSaveAttempt(session, owner, key, keyFp)
+    let idempotencyKey = attempt.idempotencyKey
     const api = this.api()
     const probe = await readLocalFileProbe({ path: tabPath }, size, filename)
     const parentId = await this.uploadSessionParentId(api, {
@@ -5007,9 +5027,14 @@ export class UniworkDocsService {
         // server no longer knows) restarts under a NEW key, and the rejected
         // one is dropped so no later retry of these bytes reuses it
         freshIdempotencyKey: () => this.newIdempotencyKey(),
-        onIdempotencyKey: (fresh) => {
+        onIdempotencyKey: async (fresh) => {
           this.firstSaveKeys.set(keyFp, fresh)
           idempotencyKey = fresh
+          // S01-R2-4: the record follows the key the run adopted (a restored key
+          // D no longer knows, or one it refused, is replaced for good)
+          attempt.idempotencyKey = fresh
+          attempt.restored = false
+          await this.saveFirstSaveRecord(attempt, { state: 'pending' })
         },
         onSessionState: async (state) => {
           await store?.put(resumeKey, {
@@ -5038,6 +5063,11 @@ export class UniworkDocsService {
       if (error instanceof UniworkDocError && error.code === 'too_large') {
         rethrowServerTooLarge(error, filename, size, input.limits)
       }
+      if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
+        // S01-R2-4: the key D refused is spent - not for this process, not for the next
+        this.firstSaveKeys.delete(keyFp)
+        await this.dropFirstSaveRecord(attempt)
+      }
       throw error
     }
     await store?.remove(resumeKey)
@@ -5063,6 +5093,7 @@ export class UniworkDocsService {
       api,
       created,
       bytesChecksum,
+      attempt,
       onBindFailure: () => this.firstSaveKeys.delete(keyFp),
       writeWorkingCopy: (dir, name) => this.store.copyIntoWorkingCopy(dir, name, tabPath),
       verifyWorkingCopy: async (copiedPath, serverChecksum) => {
@@ -5099,6 +5130,8 @@ export class UniworkDocsService {
     api: UniworkDocsClient
     created: UniworkDocSummary
     bytesChecksum: string
+    /** S01-R2-4: the durable record of this attempt, kept in step with the bind */
+    attempt: FirstSaveAttempt
     writeWorkingCopy(dir: string, name: string): Promise<string>
     /** R1-BE-04: proves the copied working copy matches the uploaded bytes, or throws */
     verifyWorkingCopy?(copiedPath: string, serverChecksum: string): Promise<void>
@@ -5166,6 +5199,12 @@ export class UniworkDocsService {
       // retry of this path is refused by firstSaveDone above.
       this.firstSaveDone.add(`${owner}${key}`)
       input.onBindFailure()
+      // S01-R2-4: the same fact, durably: a restart refuses the original too
+      await this.saveFirstSaveRecord(input.attempt, {
+        state: 'bound',
+        documentId: created.id,
+        workingCopyPath: path,
+      })
       try {
         this.deps.notifyPathRenamed?.(tabPath, path)
       } catch (error) {
@@ -5226,11 +5265,195 @@ export class UniworkDocsService {
       // compensated: the attempt's key is spent - a retry re-creates (binding
       // the trashed row would resurrect it without its own save)
       input.onBindFailure()
+      await this.dropFirstSaveRecord(input.attempt)
       const raced = error instanceof UniworkDocError && error.code === 'conflict'
       throw new UniworkDocError(
         (raced ? 'conflict' : 'first_save_bind_failed') as UniworkDocErrorCode,
         { documentId: created.id, documentTitle: createdTitle },
       )
+    }
+  }
+
+  /**
+   * S01-R2-4: the durable first-save record store of the live session, or null
+   * when there is none to use (no store, a locked keychain, or the session moved
+   * off the account the action started under: a record is never read or written
+   * for another owner).
+   */
+  private async firstSaveStore(session: {
+    identity: SessionIdentity
+  }): Promise<FirstSaveStore | null> {
+    const open = await this.openSyncStore().catch(() => null)
+    if (!open || open.kind !== 'ok') return null
+    const live = this.deps.syncStore?.scope()
+    if (
+      !live ||
+      live.deploymentId !== session.identity.deploymentId ||
+      live.accountId !== session.identity.accountId
+    ) {
+      return null
+    }
+    return createFirstSaveStore(open.records(FIRST_SAVES_STORE_REGISTRATION.name))
+  }
+
+  /**
+   * S01-R2-4: a restart forgets `firstSaveDone`, and the original file is still
+   * plain. A `bound` record whose binding is still ready on this machine means
+   * the original already is a UniWork document: refuse with the same `conflict`
+   * the in-process guard answers, before any flush, read or request. A record
+   * whose binding is gone (the working copy or the store folder was removed, the
+   * store wiped) is stale and never blocks a legitimate first save: it is dropped.
+   */
+  private async refuseBoundFirstSave(
+    session: { identity: SessionIdentity },
+    owner: string,
+    tabPath: string,
+  ): Promise<void> {
+    const store = await this.firstSaveStore(session)
+    if (!store) return
+    const recordKey = firstSaveKey(owner, pathKey(tabPath))
+    const saved = await store.get(recordKey).catch(() => null)
+    if (saved?.state !== 'bound') return
+    if (await this.firstSaveBindingReady(session.identity, saved)) {
+      throw new UniworkDocError('conflict')
+    }
+    await store.remove(recordKey).catch(() => undefined)
+  }
+
+  /** the document the record names still has a ready binding and its working copy */
+  private async firstSaveBindingReady(
+    identity: SessionIdentity,
+    saved: FirstSaveRecord,
+  ): Promise<boolean> {
+    if (!saved.documentId) return false
+    const binding = await this.store.readDir(
+      this.store.dirFor(identity.deploymentId, identity.accountId, saved.documentId),
+    )
+    if (!binding || binding.state !== 'ready' || binding.documentId !== saved.documentId) {
+      return false
+    }
+    if (!saved.workingCopyPath) return true
+    try {
+      return (await stat(saved.workingCopyPath)).isFile()
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * S01-R2-4: the Idempotency-Key of this attempt and its durable `pending`
+   * record, written BEFORE the create request. In process the key is the one
+   * `firstSaveKeys` holds; after a restart it is the key of a `pending` record
+   * of the SAME fingerprint (workspace, title, destination, bytes) - D replays
+   * a create it committed to the same document, so the retry binds that one
+   * instead of minting a twin. Another fingerprint is another attempt: a new key.
+   */
+  private async beginFirstSaveAttempt(
+    session: { identity: SessionIdentity },
+    owner: string,
+    key: string,
+    keyFp: string,
+  ): Promise<FirstSaveAttempt> {
+    const store = await this.firstSaveStore(session)
+    const recordKey = firstSaveKey(owner, key)
+    const fingerprint = sha256Hex(new TextEncoder().encode(keyFp))
+    let idempotencyKey = this.firstSaveKeys.get(keyFp)
+    let restored = false
+    if (!idempotencyKey) {
+      const saved = await store?.get(recordKey).catch(() => null)
+      if (saved?.state === 'pending' && saved.fingerprint === fingerprint) {
+        idempotencyKey = saved.idempotencyKey
+        restored = true
+      }
+    }
+    idempotencyKey ??= this.newIdempotencyKey()
+    this.firstSaveKeys.set(keyFp, idempotencyKey)
+    const attempt: FirstSaveAttempt = { store, recordKey, idempotencyKey, fingerprint, restored }
+    await this.saveFirstSaveRecord(attempt, { state: 'pending' })
+    return attempt
+  }
+
+  /**
+   * S01-R2-4: one first-save create under the attempt's key. A key restored from
+   * the durable record is a REPLAY of an earlier run: D answers the document it
+   * committed, and for a create it never committed (409 document_upload_invalid,
+   * the staged claim expired) or whose document is gone (404) nothing exists
+   * under the key any more - the record is dropped and the create is made ONCE
+   * more under a new key (the person asked to save now). A fingerprint mismatch
+   * (the key is for another body) drops the record and the retained key, and the
+   * typed, retryable verdict answers: the next try mints a fresh key.
+   */
+  private async runFirstSaveCreate<T>(
+    attempt: FirstSaveAttempt,
+    keyFp: string,
+    create: (idempotencyKey: string) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await create(attempt.idempotencyKey)
+    } catch (error) {
+      if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
+        // S01-R2-3: the retained key is wrong for this body and must not pin
+        // the path until restart
+        this.firstSaveKeys.delete(keyFp)
+        await this.dropFirstSaveRecord(attempt)
+      } else if (
+        attempt.restored &&
+        error instanceof UniworkDocError &&
+        (error.status === 404 ||
+          (error.status === 409 && error.serverCode === 'document_upload_invalid'))
+      ) {
+        await this.dropFirstSaveRecord(attempt)
+        attempt.idempotencyKey = this.newIdempotencyKey()
+        attempt.restored = false
+        this.firstSaveKeys.set(keyFp, attempt.idempotencyKey)
+        await this.saveFirstSaveRecord(attempt, { state: 'pending' })
+        return await create(attempt.idempotencyKey).catch(async (again: unknown) => {
+          if (again instanceof UniworkDocError && again.code === 'idempotency_mismatch') {
+            this.firstSaveKeys.delete(keyFp)
+            await this.dropFirstSaveRecord(attempt)
+          }
+          throw again
+        })
+      }
+      throw error
+    }
+  }
+
+  /**
+   * S01-R2-4: writes the attempt's record. The record is bookkeeping for the next
+   * start: a store that is missing, locked or full never fails the save itself.
+   */
+  private async saveFirstSaveRecord(
+    attempt: FirstSaveAttempt,
+    state: { state: 'pending' } | { state: 'bound'; documentId: string; workingCopyPath: string },
+  ): Promise<void> {
+    if (!attempt.store) return
+    try {
+      const written = await attempt.store.put(attempt.recordKey, {
+        idempotencyKey: attempt.idempotencyKey,
+        fingerprint: attempt.fingerprint,
+        ...state,
+        at: new Date().toISOString(),
+      })
+      if (written.kind !== 'ok') {
+        console.warn('uniwork docs: first-save: the restart record was not stored:', written.kind)
+      }
+    } catch {
+      console.warn('uniwork docs: first-save: the restart record was not stored')
+    }
+  }
+
+  /** S01-R2-4: removes the attempt's own `pending` record, never a newer attempt's or a bound one */
+  private async dropFirstSaveRecord(attempt: FirstSaveAttempt): Promise<void> {
+    const store = attempt.store
+    if (!store) return
+    try {
+      const saved = await store.get(attempt.recordKey)
+      if (saved?.state === 'pending' && saved.idempotencyKey === attempt.idempotencyKey) {
+        await store.remove(attempt.recordKey)
+      }
+    } catch {
+      // bookkeeping only: a stale record is dropped by the next reconcile
     }
   }
 

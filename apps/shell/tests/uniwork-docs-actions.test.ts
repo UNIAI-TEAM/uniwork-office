@@ -4399,18 +4399,13 @@ describe('SAVE-01 first save r4 (S01-R2-4 restart dedupe)', () => {
     const server = fakeServer()
     const file = join(dir, 'Draft.docx')
     writeFileSync(file, 'bytes')
-    // fail the first bind at the binding.json write (migration-hold fixture)
-    mkdirSync(docDir('up_1'), { recursive: true })
-    writeFileSync(
-      join(docDir('up_1'), BINDING_FILE),
-      JSON.stringify({ schema: 1, pendingIntent: {} }),
-    )
-    writeFileSync(join(docDir('up_1'), INTENT_PAYLOAD_FILE), 'x')
     const first = setup(server, { syncStore: true })
+    // fail the first bind at the binding.json write; the created row is archived
+    // (the migration-hold fixture would be swept as soon as the sync store opens)
+    vi.spyOn(first.service.store, 'write').mockRejectedValueOnce(new Error('disk full'))
     const failed = await first.service.firstSave(input(file))
     expect(failed.ok).toBe(false)
     expect(server.state.documents.get('up_1')?.archived).toBe(true)
-    rmSync(docDir('up_1'), { recursive: true, force: true })
 
     const restarted = setup(server, { syncStore: true })
     const retried = await restarted.service.firstSave(input(file))

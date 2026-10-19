@@ -471,6 +471,7 @@ describe('uniwork sync store layer', () => {
       ['DOC_INDEX_REGISTRATION', 'doc-index'],
       ['LEASE_STORE_REGISTRATION', 'offline-leases'],
       ['UPLOAD_SESSIONS_STORE_REGISTRATION', 'upload-sessions'],
+      ['FIRST_SAVES_STORE_REGISTRATION', 'first-saves'],
     ])
     const testFiles = readdirSync(__dirname).filter(
       (name) => name.startsWith('uniwork-sync-') && name.endsWith('.test.ts'),
