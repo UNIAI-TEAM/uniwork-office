@@ -21,7 +21,7 @@ import {
   type Binding,
   type BindingStore,
 } from '../src/main/uniwork-docs/binding-store'
-import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import { errorFromResponse, UniworkDocError } from '../src/main/uniwork-docs/errors'
 import type { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
 import type { DocumentDetail } from '../src/main/uniwork-docs/parse'
@@ -140,7 +140,10 @@ interface Harness {
     detail: DocumentDetail
     error: UniworkDocError | null
     downloadError: UniworkDocError | null
-    calls: { getDocument: number; download: number }
+    /** when set, the next download parks on it (and calls `downloadEntered`) */
+    downloadGate: Promise<void> | null
+    downloadEntered: (() => void) | null
+    calls: { getDocument: number; download: number; commit: number }
   }
   editorStates: EditorState[]
   syncStore: SyncStoreAccess
@@ -197,7 +200,9 @@ function setup(
     detail: detailOf('10', 4, HEAD_BYTES),
     error: null as UniworkDocError | null,
     downloadError: null as UniworkDocError | null,
-    calls: { getDocument: 0, download: 0 },
+    downloadGate: null as Promise<void> | null,
+    downloadEntered: null as (() => void) | null,
+    calls: { getDocument: 0, download: 0, commit: 0 },
   }
   const api = {
     async documentRef() {
@@ -210,8 +215,37 @@ function setup(
     },
     async download(): Promise<DownloadResult> {
       client.calls.download += 1
+      const gate = client.downloadGate
+      if (gate) {
+        client.downloadGate = null
+        client.downloadEntered?.()
+        await gate
+      }
       if (client.downloadError) throw client.downloadError
       return { bytes: HEAD_BYTES }
+    },
+    // a save's upload + commit: the server head is client.detail, so a commit
+    // on an older base is the server's version conflict
+    async upload(input: { bytes: Uint8Array }) {
+      return {
+        uploadId: 'upl_1',
+        checksumSha256: hex(input.bytes),
+        sizeBytes: input.bytes.byteLength,
+        claimExpiresAt: '2026-10-17T00:00:00Z',
+      }
+    },
+    async commit(input: { baseRevision: string }) {
+      client.calls.commit += 1
+      if (input.baseRevision !== client.detail.revision) {
+        throw errorFromResponse(409, {
+          error: {
+            code: 'document_version_conflict',
+            message: 'x',
+            fields: { current_revision: client.detail.revision },
+          },
+        })
+      }
+      throw new Error('this harness commits only onto an older base')
     },
   }
   const uiState = { conflict: 'later' as UniworkConflictChoice, discard: false }
@@ -1124,5 +1158,86 @@ describe('UNI-1959 a pending first-save ask is local unsent work', () => {
     expect(bindingOf().baseRevision).toBe('9')
     expect(h.client.calls.download).toBe(0)
     expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+  })
+
+  /** a clean version-1 blank copy whose naming answers are in the test's hands */
+  function blankCopy() {
+    seedCopy({ title: 'Untitled document.docx', baseVersion: 1, state: 'ready' }, BASE_BYTES)
+    const asked: Array<{ requestId: string; path: string }> = []
+    let answer: (verdict: 'continue' | 'cancel') => void = () => undefined
+    const h = setup({
+      requestFirstSaveName: (request) =>
+        new Promise((resolve) => {
+          asked.push(request)
+          answer = resolve
+        }),
+    })
+    // the head still carries the blank title the notice's metadata read brings along
+    h.client.detail = { ...detailOf('10', 4, HEAD_BYTES), title: 'Untitled document.docx' }
+    return { h, asked, answer: (verdict: 'continue' | 'cancel') => answer(verdict) }
+  }
+
+  it('UWNM-BE-R2-1: a reload already downloading when the first Save lands never writes over the held bytes', async () => {
+    const { h, asked, answer } = blankCopy()
+    let release!: () => void
+    h.client.downloadGate = new Promise<void>((resolve) => (release = resolve))
+    const entered = new Promise<void>((resolve) => (h.client.downloadEntered = resolve))
+    // the copy is clean when the notice is decided: the reload starts its download
+    notice(h)
+    await entered
+    // the person saves while the download is parked: the naming ask holds the upload
+    writeFileSync(docPath(), UNSENT)
+    h.service.onUserSave(docPath())
+    await vi.waitFor(() => expect(asked).toHaveLength(1))
+    release()
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+
+    // the answer releases the held edits into the normal save, which meets the
+    // newer head as a version conflict - the bytes are still the person's
+    const coordinator = (h.service as unknown as { coordinator: SaveCoordinator }).coordinator
+    const realSave = coordinator.save.bind(coordinator)
+    const saves: Array<Promise<unknown>> = []
+    coordinator.save = (path, options) => {
+      const run = realSave(path, options)
+      saves.push(run)
+      return run
+    }
+    answer('continue')
+    await vi.waitFor(() => expect(saves).toHaveLength(1))
+    await saves[0]
+    expect(bindingOf().state).toBe('conflict')
+    expect(h.client.calls.commit).toBe(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+    expect(h.reloaded).toEqual([])
+  })
+
+  it('UWNM-BE-R2-1: a first Save that lands after the reload wrote keeps its bytes; the base goes back', async () => {
+    const { h, asked } = blankCopy()
+    // the module's Save lands between the reload's file write and its last read
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    let saved = false
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      const written = await realWrite(target, filename, bytes)
+      if (!saved && hex(bytes) === hex(HEAD_BYTES)) {
+        saved = true
+        writeFileSync(docPath(), UNSENT)
+        h.service.onUserSave(docPath())
+      }
+      return written
+    }
+    notice(h)
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(saved).toBe(true)
+    expect(asked).toHaveLength(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
   })
 })
