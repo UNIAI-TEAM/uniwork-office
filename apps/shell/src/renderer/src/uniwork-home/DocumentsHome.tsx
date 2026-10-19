@@ -214,6 +214,10 @@ export interface DocumentsHomeProps {
   onOpenDocument: (doc: UniworkDocSummary) => void
   openingId?: string | null
   sidebarHost?: HTMLElement | null
+  /** the host shows another surface (My AI / Workbench) in the main pane: no nav item reads as current */
+  sidebarIdle?: boolean
+  /** a sidebar nav item or folder was picked (lets the host leave My AI / Workbench) */
+  onSidebarNavigate?: () => void
   initialFolderId?: string | null
   /** sub-view to mount with (kept by the host so an area switch can restore it — VDH-7) */
   initialSubView?: DocumentsHomeSubViewId
@@ -242,6 +246,8 @@ export function DocumentsHome({
   onOpenDocument,
   openingId,
   sidebarHost,
+  sidebarIdle = false,
+  onSidebarNavigate,
   initialFolderId = null,
   initialSubView = 'workspace',
   onSubViewChange,
@@ -1074,16 +1080,18 @@ export function DocumentsHome({
   const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : t('ufNoResults', { query })
 
   const treeSelectedKey = useMemo(() => {
+    if (sidebarIdle) return ' none'
     if (subView === 'my-folder' && resolvedMyFolderId) return resolvedMyFolderId
     if (subView === 'workspace') return folderId ?? ROOT_KEY
     return '\u0000none'
-  }, [subView, resolvedMyFolderId, folderId])
+  }, [sidebarIdle, subView, resolvedMyFolderId, folderId])
 
   const sidebarContent = (
     <div className="dh-sidebar-wrap">
       <nav className="dh-subnav home-area-nav" aria-label={t('ufAreaUniwork')}>
         {navEntries.map((entry) => {
-          const isActive = subView === entry.id && (entry.id !== 'workspace' || folderId === null)
+          const isActive =
+            !sidebarIdle && subView === entry.id && (entry.id !== 'workspace' || folderId === null)
           return (
             <button
               key={entry.id}
@@ -1091,7 +1099,10 @@ export function DocumentsHome({
               className={`dh-nav-item nav-item${isActive ? ' active' : ''}`}
               data-nav={entry.id}
               aria-current={isActive ? 'page' : undefined}
-              onClick={() => selectSubView(entry.id)}
+              onClick={() => {
+                onSidebarNavigate?.()
+                selectSubView(entry.id)
+              }}
             >
               <SubNavIcon id={entry.id} />
               <span className="dh-nav-label">{t(entry.labelKey)}</span>
@@ -1150,7 +1161,10 @@ export function DocumentsHome({
               expanded={expanded}
               onExpandedChange={setExpanded}
               selectedKey={treeSelectedKey}
-              onOpen={openFolderInWorkspace}
+              onOpen={(id) => {
+                onSidebarNavigate?.()
+                openFolderInWorkspace(id)
+              }}
               menuFor={treeMenuFor}
               rename={folderActions.treeRename}
               onRenameSave={(id, value) =>
