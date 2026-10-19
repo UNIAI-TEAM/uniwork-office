@@ -6874,23 +6874,7 @@ export class UniworkDocsService {
       }
     }
 
-    let intent: UniworkConflictIntentBlock = 'none'
-    const access = await this.intentAccess()
-    if (access.kind === 'ok') {
-      const stored = await access.intents.read(session.doc.key, {
-        orgId: b.orgId,
-        workspaceId: b.workspaceId,
-        baseVersion: b.baseVersion,
-        length: 0,
-      })
-      const st = stored?.intent.state
-      if (st === 'committing' || st === 'reconciling' || st === 'reconciling-stuck') {
-        intent = st
-      }
-    }
-    if (intent === 'none' && this.coordinator.isSaving(session.path)) {
-      intent = 'committing'
-    }
+    const intent = await this.conflictIntentBlock(session.doc, session.path)
 
     const keepDraft = await this.probeKeepDraft(session, session.doc)
     const moduleKind: UniworkConflictView['module'] =
@@ -6934,6 +6918,36 @@ export class UniworkDocsService {
       notice: opts.notice ?? null,
       noticeArg: opts.noticeArg ?? null,
     }
+  }
+
+  /**
+   * The conflict dialog's uncertain-intent block for `doc`: `committing` /
+   * `reconciling` / `reconciling-stuck` from the durable store, or `committing`
+   * while a Save of the path is in flight in memory.
+   */
+  private async conflictIntentBlock(
+    doc: BoundDocument,
+    savingPath = doc.path,
+  ): Promise<UniworkConflictIntentBlock> {
+    const b = doc.binding
+    let intent: UniworkConflictIntentBlock = 'none'
+    const access = await this.intentAccess()
+    if (access.kind === 'ok') {
+      const stored = await access.intents.read(doc.key, {
+        orgId: b.orgId,
+        workspaceId: b.workspaceId,
+        baseVersion: b.baseVersion,
+        length: 0,
+      })
+      const st = stored?.intent.state
+      if (st === 'committing' || st === 'reconciling' || st === 'reconciling-stuck') {
+        intent = st
+      }
+    }
+    if (intent === 'none' && this.coordinator.isSaving(savingPath)) {
+      intent = 'committing'
+    }
+    return intent
   }
 
   private async probeKeepDraft(
@@ -7103,6 +7117,9 @@ export class UniworkDocsService {
     }
     try {
       const done = await this.replaceWithLatest(chosen)
+      if (!done) {
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
       if (open.remoteNotice) {
         this.remoteBars.set(pathKey(done.path), {
           kind: 'updated',
@@ -7669,7 +7686,7 @@ export class UniworkDocsService {
   // ---- flows -----------------------------------------------------------------
 
   /** "Discard my changes and open the latest": download, replace, reload the tab */
-  private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument> {
+  private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument | null> {
     // A Save of this path may still be in flight: the module's own Save landing
     // in the keep-draft flush window, or a Ctrl/Cmd+S racing the dialog. Its
     // durable intent must never be superseded or deleted under it - the record
@@ -7678,6 +7695,10 @@ export class UniworkDocsService {
     // commit. Wait for the attempt to settle first, exactly as the close flow
     // does, and only then replace the base.
     if (this.coordinator.isSaving(doc.path)) await this.coordinator.settled(doc.path)
+    // N2: `settled` only proves the runner returned; if its commit lost its
+    // answer and left the durable record `committing` / `reconciling` /
+    // `reconciling-stuck`, do not supersede, drop, download or replace.
+    if ((await this.conflictIntentBlock(doc)) !== 'none') return null
     const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
     // "Tải lại": the old intent is superseded BEFORE the base is replaced, so
     // it is spent (cancelled/superseded), never replayed against the new base

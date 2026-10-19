@@ -1330,6 +1330,46 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
       await vi.waitFor(() => expect(commits(server)).toBeGreaterThan(before))
     })
 
+    it('N2: the two-hook save whose commit answer is lost keeps its reconciling intent and blocks reload replacement', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      server.faults.push({ route: 'commit', kind: 'network' })
+      vi.mocked(ctx.deps.requestModuleSave).mockImplementation((targetPath: string) => {
+        queueMicrotask(() => {
+          writeFileSync(targetPath, 'flushed bytes')
+          ctx.setEditorDirty(false)
+          ctx.service.onUserSave(targetPath)
+          ctx.service.onUserSave(targetPath)
+        })
+        return true
+      })
+      const reply = await ctx.service.conflictAct(view.sessionId, {
+        kind: 'reload',
+        keep: 'draft',
+        stopAi: false,
+      })
+      expect(reply).toMatchObject({
+        kind: 'view',
+        view: { intent: 'reconciling' },
+      })
+      const postKey = server.calls
+        .find((c) => c.path.endsWith('/versions/commit') && c.method === 'POST')
+        ?.headers['idempotency-key']
+      expect(postKey).toBeTruthy()
+      const after = await storedIntent(ctx, path)
+      expect(after?.intent).toMatchObject({
+        state: 'reconciling',
+        idempotencyKey: postKey,
+      })
+      expect(readFileSync(path, 'utf8')).toBe('flushed bytes')
+      expect(binding(path).state).not.toBe('saved')
+      expect((await ctx.service.docStatus(path))?.state).not.toBe('saved')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
     it('BE-403: a dialog aborted while drafts.keep runs does not reload the tab; the kept draft stays', async () => {
       const server = fakeServer()
       const ctx = setup(server)
