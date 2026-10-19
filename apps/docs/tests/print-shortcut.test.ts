@@ -30,6 +30,12 @@ describe('isNoDocumentPrintKey', () => {
     expect(isNoDocumentPrintKey(key(init), false, true)).toBe(false)
   })
 
+  it('a press already handled (the web accelerator prevented it) is not handled twice', () => {
+    const e = key({ ctrlKey: true, cancelable: true })
+    e.preventDefault()
+    expect(isNoDocumentPrintKey(e, false, true)).toBe(false)
+  })
+
   it('another key is not the print shortcut', () => {
     expect(isNoDocumentPrintKey(key({ key: 'o', ctrlKey: true }), false, true)).toBe(false)
   })
