@@ -211,15 +211,39 @@
   flex: 1;
 }
 
-/* UNI-1979: an open folder's toolbar leads with the breadcrumb (its leaf is the
-   page title); it takes the free width, the search gives up width before it */
+/* UNI-1979: an open folder's toolbar is one header row that is a size container:
+   the app and documents sidebars decide its width, not the window. The crumbs
+   (their leaf is the page title) and the actions share row one; the search box
+   has its own row below them until the row is 60rem wide, then sits inline. */
+.dh-toolbar.dh-toolbar-folder {
+  container-type: inline-size;
+  flex-wrap: wrap;
+}
+
 .dh-toolbar-folder > .uwf-crumbs {
-  flex: 1 1 280px;
+  flex: 1 1 18rem;
   min-width: 0;
 }
 
+.dh-toolbar-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+
 .dh-toolbar-folder .dh-search-box {
-  flex: 0 4 auto;
+  order: 1;
+  flex: 0 0 100%;
+  width: auto;
+}
+
+@container (min-width: 60rem) {
+  .dh-toolbar-folder .dh-search-box {
+    order: 0;
+    flex: 0 0 auto;
+    width: 14rem;
+  }
 }
 
 .dh-search-box {
@@ -842,6 +866,10 @@
 @media (min-width: 1101px) {
   .dh-toolbar {
     flex-wrap: nowrap;
+  }
+
+  .dh-toolbar.dh-toolbar-folder {
+    flex-wrap: wrap;
   }
 }
 

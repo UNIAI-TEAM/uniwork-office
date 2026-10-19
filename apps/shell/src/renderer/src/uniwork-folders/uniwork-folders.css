@@ -391,18 +391,20 @@
 
 /* UNI-1979: the open folder's header row. The crumbs share the toolbar with the
    search and the create actions, never wrap, and give up width in order: the
-   ancestors first (they truncate down to a floor), the leaf last. */
+   home crumb and the ancestors first (shrink 1000 against the leaf's 1, down to
+   a floor), the leaf last. */
 .dh-toolbar .uwf-crumbs ol {
   flex-wrap: nowrap;
 }
 
 .uwf-crumb-root {
-  flex: none;
+  flex: 0 1000 auto;
+  min-width: 2.25rem;
 }
 
 .uwf-crumb-ancestor {
   flex: 0 1000 auto;
-  min-width: 44px;
+  min-width: 2.5rem;
 }
 
 .uwf-crumb-ancestor .uwf-crumb-btn {
@@ -412,12 +414,18 @@
 
 .uwf-crumb-leaf {
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 2.5rem;
+}
+
+/* in the header row the leaf also keeps room for the pencil and the "…" menu
+   (2 x 28px + gaps), so they never slide under a neighbour */
+.dh-toolbar .uwf-crumb-leaf {
+  min-width: calc(2.5rem + 60px);
 }
 
 .uwf-crumb-heading {
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 2.5rem;
   max-width: none;
   margin: 0;
   font-size: inherit;
