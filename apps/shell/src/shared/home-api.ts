@@ -243,7 +243,8 @@ export interface UniworkDocSummary {
   archived?: boolean
   /**
    * FD-11: what the row is. Always present on `listChildren` and search rows;
-   * `'file'` on the library (`listDocuments`) and shared-with-me routes.
+   * `'file'` on the library (`listDocuments`) and shared-with-me routes, which
+   * add `'page'` only when asked (`includePages`).
    */
   kind?: UniworkEntryKind
   /** FD-11: the folder/page holding the document; null = the workspace root */
@@ -350,6 +351,11 @@ export interface UniworkDocListQuery extends UniworkListFilters {
   query?: string
   cursor?: string
   limit?: number
+  /**
+   * UNI-1953: also list UniNote pages (the Documents home). Unset = files only,
+   * which every picker and every list that downloads keeps.
+   */
+  includePages?: boolean
 }
 
 export type UniworkResult<T> = { ok: true; value: T } | { ok: false; error: UniworkDocErrorCode }
@@ -365,6 +371,8 @@ export interface UniworkSharedQuery {
   cursor?: string
   /** page size, default 50, max 100 */
   limit?: number
+  /** UNI-1953: also list UniNote pages (the Documents home); unset = files only */
+  includePages?: boolean
 }
 
 export type UniworkSharedPage = UniworkDocListPage
@@ -456,8 +464,8 @@ export type UniworkDocActionResult<T> =
       documentTitle?: string
     }
 
-/** the formats the New document dialog offers (D accepts more; these three are the Office ones) */
-export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx'
+/** the file formats D's blank route generates (UNI-1953: the Office three plus md / html / pdf) */
+export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'html' | 'pdf'
 
 export interface UniworkCreateDocInput {
   workspaceId: string
@@ -465,6 +473,14 @@ export interface UniworkCreateDocInput {
   folderId: string | null
   name: string
   format: UniworkDocNewFormat
+}
+
+/** UNI-1953: a UniNote is a page, not a file format: it has its own create call */
+export interface UniworkCreatePageInput {
+  workspaceId: string
+  /** ULID of the parent folder/page; null = the caller's My Folder */
+  folderId: string | null
+  name: string
 }
 
 export interface UniworkUploadDocInput {
@@ -1202,6 +1218,10 @@ export interface HomeApi {
   uniworkCreateDocument(
     input: UniworkCreateDocInput,
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** UNI-1953: create a UniNote (a page) in a workspace/folder; the app opens it on the web */
+  uniworkCreatePage(
+    input: UniworkCreatePageInput,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: main shows the native open dialog; null when the person cancelled */
   uniworkPickUploadFile(): Promise<{ path: string; name: string } | null>
   /** S18: upload a local file into a workspace/folder as one UniWork document */
@@ -1839,6 +1859,8 @@ export const UNIWORK_DOC_CHANNELS = {
   documentProperties: 'uniwork-doc:document-properties',
   /** invoke(input) -> create a blank document (S18) */
   createDocument: 'uniwork-doc:create-document',
+  /** invoke(input) -> create a UniNote page (UNI-1953) */
+  createPage: 'uniwork-doc:create-page',
   /** invoke() -> the native open dialog's pick, or null when cancelled (S18) */
   pickUploadFile: 'uniwork-doc:pick-upload-file',
   /** invoke(input) -> upload a local file as one document (S18) */

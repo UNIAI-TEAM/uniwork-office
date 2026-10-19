@@ -70,6 +70,13 @@ export interface CreateDocInput {
   format: NewDocFormat
 }
 
+/** UNI-1953: a UniNote is a page, created through its own call and opened on the web */
+export interface CreatePageInput {
+  workspaceId: string
+  folderId: string | null
+  name: string
+}
+
 export interface UploadDocInput {
   workspaceId: string
   folderId: string | null
@@ -96,6 +103,7 @@ export interface DocRenamedEvent {
 
 interface ActionsBridge {
   uniworkCreateDocument?(input: CreateDocInput): Promise<DocActionResult<UniworkDocSummary>>
+  uniworkCreatePage?(input: CreatePageInput): Promise<DocActionResult<UniworkDocSummary>>
   uniworkPickUploadFile?(): Promise<{ path: string; name: string } | null>
   uniworkUploadDocument?(input: UploadDocInput): Promise<DocActionResult<UniworkDocSummary>>
   uniworkCancelUploadDocument?(uploadId: string): Promise<void>
@@ -124,6 +132,10 @@ function actions(): ActionsBridge {
 
 export function createDocument(input: CreateDocInput): Promise<DocActionResult<UniworkDocSummary>> {
   return actions().uniworkCreateDocument?.(input) ?? Promise.resolve(unavailable)
+}
+
+export function createPage(input: CreatePageInput): Promise<DocActionResult<UniworkDocSummary>> {
+  return actions().uniworkCreatePage?.(input) ?? Promise.resolve(unavailable)
 }
 
 export function pickUploadFile(): Promise<{ path: string; name: string } | null> {

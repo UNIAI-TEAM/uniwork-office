@@ -143,6 +143,7 @@ export const en = {
   uwDocNameTooLong: 'The name is too long (500 characters at most).',
   uwDocRenamedAnnounce: 'The document was renamed to {name}.',
   uwDocActionFailed: 'That didn’t work. Try again.',
+  uwUniNoteOpenFailed: 'The UniNote was created but couldn’t be opened. Open it from the list.',
   uwDocActionsFor: 'More actions for “{name}”',
   uwDocCreate: 'Create',
   uwDocUploadPick: 'Choose a file',

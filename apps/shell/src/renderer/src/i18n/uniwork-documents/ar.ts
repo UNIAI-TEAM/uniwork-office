@@ -141,6 +141,7 @@ export const ar = {
   uwDocNameTooLong: 'الاسم طويل جدًا (500 حرف كحد أقصى).',
   uwDocRenamedAnnounce: 'تمت إعادة تسمية المستند إلى {name}.',
   uwDocActionFailed: 'لم ينجح ذلك. حاول مرة أخرى.',
+  uwUniNoteOpenFailed: 'تم إنشاء UniNote لكن تعذّر فتحه. افتحه من القائمة.',
   uwDocActionsFor: 'مزيد من الإجراءات لـ “{name}”',
   uwDocCreate: 'إنشاء',
   uwDocUploadPick: 'اختيار ملف',

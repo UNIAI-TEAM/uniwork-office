@@ -7442,15 +7442,20 @@ html[dir='rtl'] .quick-title-row {
 
 .uw-act-types {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .uw-act-type {
   position: relative;
   display: grid;
-  flex: 1;
+  flex: 1 1 84px;
   place-items: center;
+  align-content: center;
+  gap: 4px;
   min-height: 34px;
+  padding: 8px 6px;
+  text-align: center;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);

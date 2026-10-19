@@ -885,3 +885,76 @@ describe('401: one shared refresh, one retry (real account session)', () => {
     ])
   })
 })
+
+/**
+ * UNI-1953 CT1-1: Recent and Shared with me list UniNote pages for the
+ * Documents home (`includePages`), while every other caller (the picker, the
+ * overview, the tray) keeps the files-only list.
+ */
+describe('UniNote pages on the library lists (UNI-1953 CT1-1)', () => {
+  const rows = [
+    {
+      id: 'f1',
+      kind: 'file',
+      workspace_id: 'ws_1',
+      title: 'A.docx',
+      updated_at: '2026-10-17T01:00:00Z',
+    },
+    {
+      id: 'p1',
+      kind: 'page',
+      workspace_id: 'ws_1',
+      title: 'Ghi chú',
+      updated_at: '2026-10-17T02:00:00Z',
+    },
+    {
+      id: 'd1',
+      kind: 'folder',
+      workspace_id: 'ws_1',
+      title: 'Folder',
+      updated_at: '2026-10-17T03:00:00Z',
+    },
+  ]
+  const serve = () => {
+    const seen: string[] = []
+    const fetch = vi.fn<FetchLike>(async (url) => {
+      seen.push(url)
+      return json(200, { documents: rows, next_cursor: null })
+    })
+    return { api: client(fetch), seen }
+  }
+
+  it('listDocuments stays files-only by default (kind=file, no page row)', async () => {
+    const { api, seen } = serve()
+    const list = await api.listDocuments({ workspaceId: 'ws_1' })
+    expect(list.documents.map((d) => d.id)).toEqual(['f1'])
+    expect(seen[0]).toContain('kind=file')
+  })
+
+  it('listDocuments with includePages keeps files and pages, never a folder', async () => {
+    const { api, seen } = serve()
+    const list = await api.listDocuments({ workspaceId: 'ws_1', includePages: true })
+    expect(list.documents.map((d) => [d.id, d.kind])).toEqual([
+      ['f1', 'file'],
+      ['p1', 'page'],
+    ])
+    expect(seen[0]).not.toContain('kind=file')
+    // a page has no document format, whatever its title ends in
+    expect(list.documents[1]!.format).toBeNull()
+  })
+
+  it('listSharedWithMe stays files-only by default', async () => {
+    const { api } = serve()
+    const shared = await api.listSharedWithMe({ workspaceId: 'ws_1' })
+    expect(shared.documents.map((d) => d.id)).toEqual(['f1'])
+  })
+
+  it('listSharedWithMe with includePages keeps the page row as a page', async () => {
+    const { api } = serve()
+    const shared = await api.listSharedWithMe({ workspaceId: 'ws_1', includePages: true })
+    expect(shared.documents.map((d) => [d.id, d.kind])).toEqual([
+      ['f1', 'file'],
+      ['p1', 'page'],
+    ])
+  })
+})

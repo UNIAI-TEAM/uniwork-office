@@ -418,7 +418,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     // Recent -> uniworkListDocuments (returns { documents, nextCursor }) and renders rows
     await clickNav('recent')
     expect(api.uniworkListDocuments).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1' }),
+      expect.objectContaining({ workspaceId: 'ws-1', includePages: true }),
     )
     expect(host.textContent).toContain('Báo cáo kết quả kinh doanh Q3-2026.docx')
     expect(host.textContent).toContain('Kế hoạch ngân sách 2027.xlsx')
@@ -483,7 +483,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       }),
     )
     await clickNav('shared-with-me')
-    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({})
+    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ includePages: true })
     expect(host.querySelectorAll('.dh-filter-select')).toHaveLength(0)
     expect(host.querySelector('.dh-filter-clear')).toBeNull()
     expect(host.textContent).toContain('Đề xuất đối tác.docx')
@@ -517,7 +517,10 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       loadMoreBtn!.click()
     })
     await flush()
-    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ cursor: 'swm-cur-2' })
+    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({
+      cursor: 'swm-cur-2',
+      includePages: true,
+    })
     expect(host.textContent).toContain('Biên bản họp.docx')
 
     // Shared by me -> uniworkListSharedByMe (filter bar visible again and forwards active filters)
