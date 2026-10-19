@@ -597,8 +597,37 @@ describe('every export / Save As / print entry point refuses a locked source', (
     writeFileSync(pdfPath, '%PDF-1.4\n')
     createPdfView(pdfPath)
     const wc = env.state.lastWc!
-    // grant a Save As target while still unlocked, then lock the document: the
-    // save handler's own lock guard refuses writing to the granted target
+    setPdfPolicy({
+      isBound: () => true,
+      isReadOnly: () => false,
+      isLocked: (path) => path === pdfPath,
+    })
+
+    // A4 (UNI-1362): the locked block runs before any Save As was granted, so no
+    // waiter is pending and no redaction flow is open: a refusal here can only
+    // come from the lock guard, never from the one-flow-at-a-time rule. The
+    // redaction copy is the case that matters: without the guard the handler
+    // would open its own save dialog and answer `false` for the cancel, which is
+    // why the dialog count is asserted too.
+    wc.send.mockClear()
+    const dialogs = env.dialogCalls.showSaveDialog.mock.calls.length
+    sendPdfPrintRequest(wc as never)
+    expect(wc.send).not.toHaveBeenCalled()
+    expect(await requestPdfSaveAs(wc as never, join(dir, 'Copy2.pdf'))).toBe(false)
+    expect(wc.send).not.toHaveBeenCalled()
+    expect(await invoke(PDF_CHANNELS.requestRedactionCopy, wc, pdfPath)).toBe(false)
+    expect(env.dialogCalls.showSaveDialog).toHaveBeenCalledTimes(dialogs)
+    expect(wc.send).not.toHaveBeenCalled()
+    expect(
+      await invoke(PDF_CHANNELS.exportImages, wc, {
+        images: ['AAAA'],
+        pageNumbers: [1],
+        baseName: 'Doc',
+      }),
+    ).toEqual({ ok: true, canceled: true })
+
+    // grant a Save As target while unlocked, then lock again: the save handler's
+    // own lock guard refuses writing to the granted target
     const copyTarget = join(dir, 'Copy.pdf')
     setPdfPolicy({
       isBound: () => true,
@@ -607,25 +636,12 @@ describe('every export / Save As / print entry point refuses a locked source', (
     })
     void requestPdfSaveAs(wc as never, copyTarget)
     expect(wc.send).toHaveBeenCalledWith(PDF_CHANNELS.saveAsRequest, copyTarget)
-
     setPdfPolicy({
       isBound: () => true,
       isReadOnly: () => false,
       isLocked: (path) => path === pdfPath,
     })
 
-    wc.send.mockClear()
-    sendPdfPrintRequest(wc as never)
-    expect(wc.send).not.toHaveBeenCalled()
-    expect(await requestPdfSaveAs(wc as never, join(dir, 'Copy2.pdf'))).toBe(false)
-    expect(await invoke(PDF_CHANNELS.requestRedactionCopy, wc, pdfPath)).toBe(false)
-    expect(
-      await invoke(PDF_CHANNELS.exportImages, wc, {
-        images: ['AAAA'],
-        pageNumbers: [1],
-        baseName: 'Doc',
-      }),
-    ).toEqual({ ok: true, canceled: true })
     expect(
       await invoke(PDF_CHANNELS.save, wc, {
         path: pdfPath,
