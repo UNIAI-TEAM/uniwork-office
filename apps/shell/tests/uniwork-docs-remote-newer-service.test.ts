@@ -758,12 +758,27 @@ describe('G5-03a S6 service: hold, later and the persisted rebuild', () => {
   it('a second notice replaces the version: one bar, no stacking', async () => {
     seedCopy({ state: 'dirty' })
     const h = setup()
+    // the bar is in the session's map before its binding write lands, and the
+    // push only follows that write: a slow write (a loaded Windows box) shows
+    // the bar to docStatus with nothing pushed yet, so wait for the push itself
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.write.bind(store)
+    store.write = async (dir, binding) => {
+      await drain(200)
+      return realWrite(dir, binding)
+    }
+    const pushedOf = () => h.statuses.filter((status) => status.path === docPath())
     notice(h, '10', 4)
     await waitForBar(h, { kind: 'newer-dirty', version: 4 })
     notice(h, '11', 5)
     await waitForBar(h, { kind: 'newer-dirty', version: 5 })
-    const pushed = h.statuses.filter((status) => status.path === docPath())
-    expect(pushed.length).toBeGreaterThan(0)
+    await vi.waitFor(() =>
+      expect(pushedOf().map((status) => status.remote)).toContainEqual({
+        kind: 'newer-dirty',
+        version: 5,
+      }),
+    )
+    const pushed = pushedOf()
     expect(pushed.every((status) => status.remote?.kind === 'newer-dirty')).toBe(true)
   })
 
