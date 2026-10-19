@@ -1308,6 +1308,53 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(mine.record.state).toBe('queued')
   })
 
+  it('R5: an automatic tick lookup runs under the document lock and canCommit, and writes nothing when refused', async () => {
+    const seedReconciling = async (h: Harness): Promise<QueueDoc> => {
+      const doc = h.makeDoc()
+      doc.record = {
+        ...doc.record,
+        state: 'reconciling',
+        attempt: 1,
+        reconcileSince: new Date(h.clock.now).toISOString(),
+      }
+      await h.intents.put(doc.key, doc.record, doc.payload)
+      return doc
+    }
+
+    // (a) another window holds a FRESH lease: the automatic tick sends no GET
+    // and leaves the shared record exactly as it was
+    const other = await harness()
+    const held = await seedReconciling(other)
+    other.lockTable.leases.set(held.key, {
+      owner: 'win1',
+      generation: 1,
+      heartbeatAt: other.clock.now,
+    })
+    const before = await stored(other.intents, held)
+    const loser = other.newDispatcher('win2')
+    await loser.tick([held])
+    expect(other.server.state.counts.lookup).toBe(0)
+    expect(await stored(other.intents, held)).toEqual(before)
+    expect(held.record.state).toBe('reconciling')
+
+    // (b) canCommit false (a torn-down / switched session): no GET, no write
+    const off = await harness()
+    const torn = await seedReconciling(off)
+    const beforeTorn = await stored(off.intents, torn)
+    const dead = off.newDispatcherWith({ canCommit: () => false })
+    await dead.tick([torn])
+    expect(off.server.state.counts.lookup).toBe(0)
+    expect(await stored(off.intents, torn)).toEqual(beforeTorn)
+
+    // (c) the holder runs the same record: exactly one GET, settled normally
+    const holder = await harness()
+    const mine = await seedReconciling(holder)
+    holder.server.state.lookupOutcome = 'not_committed'
+    await holder.dispatcher.tick([mine])
+    expect(holder.server.state.counts.lookup).toBe(1)
+    expect(mine.record.state).toBe('queued')
+  })
+
   it('lock holder crash -> the other window acquires after goneMs', async () => {
     const h = await harness()
     const doc = h.makeDoc()

@@ -437,12 +437,34 @@ export class QueueDispatcher {
       if (doc.record.state !== 'reconciling' && doc.record.state !== 'reconciling-stuck') {
         continue
       }
-      const result = await this.apply(doc, { type: 'tick', now }, now)
-      outcomes.set(doc.key, doc.record.state)
-      if (result.effects.some((effect) => effect.kind === 'lookup')) {
-        await this.reconcile(doc, now)
+      // R5: the automatic pass obeys the same guards as a full dispatch - the
+      // document lock and `canCommit` - BEFORE its tick transition and its
+      // lookup. A window that does not own the document (or whose session no
+      // longer commits) sends no GET and writes nothing to the shared record:
+      // the holder ages the record and performs the lookup itself.
+      const lock = await this.deps.lock.acquire(doc.key)
+      if (lock.kind === 'other_window') {
+        this.otherWindow.add(doc.key)
+        this.publishOtherWindow(doc)
         outcomes.set(doc.key, doc.record.state)
-        dispatched += 1
+        continue
+      }
+      this.otherWindow.delete(doc.key)
+      const generation = lock.generation
+      try {
+        if (!this.sessionAllows(doc)) {
+          outcomes.set(doc.key, doc.record.state)
+          continue
+        }
+        const result = await this.apply(doc, { type: 'tick', now }, now)
+        outcomes.set(doc.key, doc.record.state)
+        if (result.effects.some((effect) => effect.kind === 'lookup')) {
+          await this.reconcile(doc, now)
+          outcomes.set(doc.key, doc.record.state)
+          dispatched += 1
+        }
+      } finally {
+        await this.deps.lock.release(doc.key, generation)
       }
     }
     return { dispatched, parked: 0, outcomes }
