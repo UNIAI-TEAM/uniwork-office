@@ -80,9 +80,13 @@ let moveAnswer: () => Promise<UniworkDocActionResult<UniworkMoveResult>>
 let host: HTMLDivElement
 let root: Root
 let push: (request: UniworkFirstSaveNameRequest) => void
+let dismiss: (requestId: string) => void
+/** the requests the dialog host acknowledged as shown (main's delivery clock) */
+let acks: string[]
 
 function installApi() {
   let listener: ((r: UniworkFirstSaveNameRequest) => void) | null = null
+  let dismissListener: ((requestId: string) => void) | null = null
   const fns = {
     onUniworkFirstSaveName: vi.fn((cb: (r: UniworkFirstSaveNameRequest) => void) => {
       listener = cb
@@ -91,10 +95,17 @@ function installApi() {
       }
     }),
     uniworkFirstSaveNameAnswer: vi.fn(
-      async (input: { requestId: string; answer: 'continue' | 'cancel' }) => {
-        calls.push(`answer:${input.requestId}:${input.answer}`)
+      async (input: { requestId: string; answer: 'continue' | 'cancel' | 'shown' }) => {
+        if (input.answer === 'shown') acks.push(input.requestId)
+        else calls.push(`answer:${input.requestId}:${input.answer}`)
       },
     ),
+    onUniworkFirstSaveNameDismiss: vi.fn((cb: (requestId: string) => void) => {
+      dismissListener = cb
+      return () => {
+        dismissListener = null
+      }
+    }),
     uniworkRenameDocument: vi.fn(async (id: string, title: string) => {
       calls.push(`rename:${id}:${title}`)
       return renameAnswer()
@@ -114,6 +125,7 @@ function installApi() {
     },
   })
   push = (request) => listener?.(request)
+  dismiss = (requestId) => dismissListener?.(requestId)
   return fns
 }
 
@@ -179,6 +191,7 @@ beforeEach(() => {
     node('f-proj', 'Dự án', [node('f-proj-q4', 'Quý 4')]),
   ]
   calls = []
+  acks = []
   renameAnswer = async () => ok(summary('d1', 'renamed.docx', 'f-mine'))
   moveAnswer = async () => ok({ summary: summary('d1', 'renamed.docx', 'f-proj'), renamedTo: null })
   // jsdom's localStorage is not always a full Storage here (Node's own experimental one wins)
@@ -202,7 +215,13 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  await act(async () => root.unmount())
+  await act(async () => {
+    try {
+      root.unmount()
+    } catch {
+      // a test that unmounted the host itself
+    }
+  })
   host.remove()
   document.body.innerHTML = ''
   vi.restoreAllMocks()
@@ -410,5 +429,75 @@ describe('UNI-1959 first save: Name the document + Location', () => {
     expect(nameInput().value).toBe('Tài liệu chưa đặt tên')
     await save()
     expect(calls).toEqual(['answer:r1:continue', 'answer:r2:continue'])
+  })
+})
+
+describe('UNI-1959 r2: the dialog host and the ask it holds (FE-1, BE-3, BE-4, BE-11)', () => {
+  const second: UniworkFirstSaveNameRequest = {
+    ...REQUEST,
+    requestId: 'r2',
+    documentId: 'd2',
+    title: 'Tài liệu chưa đặt tên.docx',
+  }
+
+  it('acknowledges each push once, the moment it is received (main stops its delivery clock)', async () => {
+    await render()
+    await request()
+    await request(second)
+    expect(acks).toEqual(['r1', 'r2'])
+  })
+
+  it('unmounting the host answers cancel for the open ask and every queued one', async () => {
+    await render()
+    await request()
+    await request(second)
+    await act(async () => root.unmount())
+    expect(calls).toEqual(['answer:r1:cancel', 'answer:r2:cancel'])
+  })
+
+  it('an ask already answered is not answered again by the unmount', async () => {
+    await render()
+    await request()
+    await save()
+    await act(async () => root.unmount())
+    expect(calls).toEqual(['answer:r1:continue'])
+  })
+
+  it('a dismiss from main drops the open dialog without answering (main already settled it)', async () => {
+    await render()
+    await request()
+    expect(dialog()).not.toBeNull()
+    await act(async () => dismiss('r1'))
+    await flush()
+    expect(dialog()).toBeNull()
+    expect(calls).toEqual([])
+  })
+
+  it('a dismiss for a queued ask removes its slot: the next dialog never shows', async () => {
+    await render()
+    await request()
+    await request(second)
+    await act(async () => dismiss('r2'))
+    await flush()
+    await save()
+    expect(dialog()).toBeNull()
+    expect(calls).toEqual(['answer:r1:continue'])
+  })
+
+  it('a dismiss of the open ask shows the queued one next', async () => {
+    await render()
+    await request()
+    await request(second)
+    await act(async () => dismiss('r1'))
+    await flush()
+    expect(nameInput().value).toBe('Tài liệu chưa đặt tên')
+  })
+
+  it('a dismiss for an unknown id changes nothing', async () => {
+    await render()
+    await request()
+    await act(async () => dismiss('nope'))
+    await flush()
+    expect(dialog()).not.toBeNull()
   })
 })
