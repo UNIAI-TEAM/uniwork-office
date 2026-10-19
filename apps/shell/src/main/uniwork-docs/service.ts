@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { open, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import { open, readdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -60,15 +60,18 @@ import {
 } from '../uniwork-auth/deployment'
 import type { ProfileOutcome } from '../uniwork-auth/profile-store'
 import {
+  BINDING_FILE,
   type Binding,
   BindingStore,
   type BoundDocument,
+  bindingKindOf,
   docLevelOf,
   documentNameIn,
   hasLegacyIntentFiles,
   type LastOwner,
   type NewerStore,
   type PathBinding,
+  parseBinding,
   scopeWorkingCopyDirs,
 } from './binding-store'
 import {
@@ -848,6 +851,31 @@ function isDocumentProbeReason(
   )
 }
 
+/**
+ * S01-R2-4 fix2: the binding errors that mean the account no longer holds the
+ * document (archived, deleted, access lost): a first-save record of such a
+ * document is stale. The same words the blocked-document paths already use.
+ */
+const FIRST_SAVE_ENDED_ERRORS: ReadonlySet<string> = new Set([
+  'document_archived',
+  'document_deleted',
+  'deleted',
+  'not_found',
+  'permission_revoked',
+  'forbidden',
+])
+
+function errorCodeOf(error: unknown): string | undefined {
+  const code = (error as { code?: unknown } | null)?.code
+  return typeof code === 'string' ? code : undefined
+}
+
+/** a path that is not there (a missing file, or a file where a folder should be) - not an I/O failure */
+function isAbsentPath(error: unknown): boolean {
+  const code = errorCodeOf(error)
+  return code === 'ENOENT' || code === 'ENOTDIR'
+}
+
 /** no revision of this app's own has been seen for a document yet */
 const NO_ECHO: ReadonlySet<string> = new Set()
 
@@ -1191,6 +1219,12 @@ export class UniworkDocsService {
    * the old path is refused `conflict` instead of creating a second document.
    */
   private readonly firstSaveDone = new Set<string>()
+  /**
+   * S01-R2-4 fix2: Idempotency-Keys the server refused (a payload mismatch) or
+   * that were replaced. Kept in process whatever the durable delete did, so a
+   * key that is known spent is never restored from a record again.
+   */
+  private readonly spentFirstSaveKeys = new Set<string>()
   /**
    * bumped on lockSession and on an organization change so an own action
    * started before sign-out/switch/org-change never pushes treeChanged after
@@ -5093,6 +5127,8 @@ export class UniworkDocsService {
         freshIdempotencyKey: () => this.newIdempotencyKey(),
         onIdempotencyKey: async (fresh) => {
           this.firstSaveKeys.set(keyFp, fresh)
+          // the key this run leaves (refused, expired or unknown to D) is spent
+          this.spentFirstSaveKeys.add(attempt.idempotencyKey)
           idempotencyKey = fresh
           // S01-R2-4: the record follows the key the run adopted (a restored key
           // D no longer knows, or one it refused, is replaced for good)
@@ -5130,6 +5166,7 @@ export class UniworkDocsService {
       if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
         // S01-R2-4: the key D refused is spent - not for this process, not for the next
         this.firstSaveKeys.delete(keyFp)
+        this.spentFirstSaveKeys.add(attempt.idempotencyKey)
         await this.dropFirstSaveRecord(attempt)
       }
       throw error
@@ -5203,23 +5240,25 @@ export class UniworkDocsService {
   }): Promise<UniworkDocSummary> {
     const { session, owner, tabPath, key, title, filename, api, created, bytesChecksum } = input
     const createdTitle = created.title || title
-    // S01-R2-4 fix1: a REPLAYED key (a restored one) answers the document an earlier
-    // run already bound - the crash fell between binding.json and the `bound`
-    // record. Its working copy may hold edits since: nothing is written, nothing
-    // is archived (this is outside the compensating try on purpose), the record
-    // catches up to `bound` and the existing `conflict` verdict answers.
-    if (input.attempt.restored) {
-      const copy = await this.readyFirstSaveCopy(session.identity, created.id)
-      if (copy) {
-        this.firstSaveDone.add(`${owner}${key}`)
-        input.onBindFailure()
-        await this.saveFirstSaveRecord(input.attempt, {
-          state: 'bound',
-          documentId: created.id,
-          workingCopyPath: copy,
-        })
-        throw new UniworkDocError('conflict')
-      }
+    // S01-R2-4 fix2: ONE overwrite guard, whatever the key's provenance (fresh,
+    // restored, cached across a retry) and whatever the copy's save state. A key
+    // that answers a document whose store folder holds anything - a binding of any
+    // state or schema, an unreadable one, any file - or whose folder cannot be
+    // inspected has been bound before: its copy may hold edits. Nothing is
+    // written, nothing is archived (outside the compensating try on purpose), the
+    // record catches up to `bound` and the existing `conflict` verdict answers.
+    // Only an absent or empty folder binds; a fresh key yields a fresh document id,
+    // so the guard costs nothing on the ordinary path.
+    const held = await this.inspectFirstSaveFolder(session.identity, created.id)
+    if (held.kind === 'held') {
+      this.firstSaveDone.add(`${owner}${key}`)
+      input.onBindFailure()
+      await this.saveFirstSaveRecord(input.attempt, {
+        state: 'bound',
+        documentId: created.id,
+        ...(held.copy ? { workingCopyPath: held.copy } : {}),
+      })
+      throw new UniworkDocError('conflict')
     }
     // S01-R2-6: the written working copy is tracked so the compensation catch
     // can remove it on EVERY bind failure - a store.write that throws strands
@@ -5365,26 +5404,38 @@ export class UniworkDocsService {
   private async firstSaveStore(session: {
     identity: SessionIdentity
   }): Promise<FirstSaveStore | null> {
-    const open = await this.openSyncStore().catch(() => null)
-    if (!open || open.kind !== 'ok') return null
-    const live = this.deps.syncStore?.scope()
-    if (
-      !live ||
-      live.deploymentId !== session.identity.deploymentId ||
-      live.accountId !== session.identity.accountId
-    ) {
-      return null
+    const sync = this.deps.syncStore
+    if (!sync) return null
+    const scoped = (): boolean => {
+      const live = sync.scope()
+      return (
+        !!live &&
+        live.deploymentId === session.identity.deploymentId &&
+        live.accountId === session.identity.accountId
+      )
     }
-    return createFirstSaveStore(open.records(FIRST_SAVES_STORE_REGISTRATION.name))
+    if (!scoped()) return null
+    // S01-R2-4 fix2 (R1-23): the service-level open runs the one-time legacy sweep,
+    // and it is ONE promise every caller joins - its handle can be the account that
+    // started it while the session has since moved on. It is awaited for the sweep
+    // only; the records come from the access itself, which opens the live scope's
+    // own handle, checked against the scope this action started under.
+    const swept = await this.openSyncStore().catch(() => null)
+    if (!swept || swept.kind !== 'ok' || !scoped()) return null
+    const own = await sync.open().catch(() => null)
+    if (!own || own.kind !== 'ok' || !scoped()) return null
+    return createFirstSaveStore(own.records(FIRST_SAVES_STORE_REGISTRATION.name))
   }
 
   /**
    * S01-R2-4: a restart forgets `firstSaveDone`, and the original file is still
-   * plain. A `bound` record whose binding is still ready on this machine means
+   * plain. A `bound` record whose document this machine still holds (a binding of
+   * any non-terminal state and its working copy, see `firstSaveCopyState`) means
    * the original already is a UniWork document: refuse with the same `conflict`
    * the in-process guard answers, before any flush, read or request. A record
-   * whose binding is gone (the working copy or the store folder was removed, the
-   * store wiped) is stale and never blocks a legitimate first save: it is dropped.
+   * whose document is gone (the working copy or the store folder was removed, the
+   * store wiped, the document archived or lost) is stale and never blocks a
+   * legitimate first save: it is dropped.
    */
   private async refuseBoundFirstSave(
     session: { identity: SessionIdentity },
@@ -5395,34 +5446,95 @@ export class UniworkDocsService {
     if (!store) return
     const recordKey = firstSaveKey(owner, pathKey(tabPath))
     const saved = await store.get(recordKey).catch(() => null)
-    if (saved?.state !== 'bound') return
-    if (
-      saved.documentId &&
-      (await this.readyFirstSaveCopy(session.identity, saved.documentId, saved.workingCopyPath))
-    ) {
+    if (saved?.state !== 'bound' || !saved.documentId) return
+    const copy = await this.firstSaveCopyState(session.identity, saved.documentId)
+    if (copy.live) {
+      // a rename of the document moves its closed copy: the record follows the binding
+      if (copy.path && copy.path !== saved.workingCopyPath) {
+        await store
+          .put(recordKey, { ...saved, workingCopyPath: copy.path, at: new Date().toISOString() })
+          .catch(() => undefined)
+      }
       throw new UniworkDocError('conflict')
     }
     await store.remove(recordKey).catch(() => undefined)
   }
 
   /**
-   * The working copy of `documentId` when this machine still holds it bound and
-   * ready (its binding.json and the file), else null. `workingCopyPath` is the
-   * recorded one; without it the binding's own file name names the copy.
+   * Is `documentId` still held on this machine? The binding.json of its store
+   * folder decides, and its CURRENT file name (not the path the record was made
+   * with) names the working copy. Live unless the account lost the document:
+   * a binding in any state but a terminal one (archived / deleted / access lost)
+   * whose copy exists. Only a missing binding.json or copy says it is gone; any
+   * other answer (an unreadable binding, a newer schema, a stat or read error)
+   * is unknown, and unknown is live - a record is never dropped on a guess.
    */
-  private async readyFirstSaveCopy(
+  private async firstSaveCopyState(
     identity: SessionIdentity,
     documentId: string,
-    workingCopyPath?: string,
-  ): Promise<string | null> {
-    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
-    const binding = await this.store.readDir(dir)
-    if (!binding || binding.state !== 'ready' || binding.documentId !== documentId) return null
-    const copy = workingCopyPath ?? join(dir, binding.filename)
+  ): Promise<{ live: false } | { live: true; path?: string }> {
+    let dir: string
     try {
-      return (await stat(copy)).isFile() ? copy : null
+      dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
     } catch {
-      return null
+      return { live: false }
+    }
+    let raw: unknown
+    try {
+      raw = JSON.parse(await readFile(join(dir, BINDING_FILE), 'utf8'))
+    } catch (error) {
+      return isAbsentPath(error) ? { live: false } : { live: true }
+    }
+    if (bindingKindOf(raw) === 'newer') return { live: true }
+    const binding = parseBinding(raw)
+    if (!binding) return { live: true }
+    if (binding.documentId !== documentId) return { live: false }
+    if (
+      binding.state === 'blocked' &&
+      binding.error &&
+      FIRST_SAVE_ENDED_ERRORS.has(binding.error)
+    ) {
+      return { live: false }
+    }
+    const path = join(dir, binding.filename)
+    try {
+      return (await stat(path)).isFile() ? { live: true, path } : { live: false }
+    } catch (error) {
+      return isAbsentPath(error) ? { live: false } : { live: true, path }
+    }
+  }
+
+  /**
+   * S01-R2-4 fix2: what the store folder of a created or replayed document holds
+   * before the bind writes into it. Only a folder that is confirmed absent (ENOENT)
+   * or empty is `free`; any entry (a binding of any state or schema, an unreadable
+   * one, a working copy, a stray file) and any failure to look (EIO, EPERM: unknown)
+   * is `held`, and `copy` is the working copy the CURRENT binding names when it reads.
+   */
+  private async inspectFirstSaveFolder(
+    identity: SessionIdentity,
+    documentId: string,
+  ): Promise<{ kind: 'free' } | { kind: 'held'; copy?: string }> {
+    let dir: string
+    try {
+      dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    } catch {
+      // not a folder name at all: the bind refuses it and compensates as before
+      return { kind: 'free' }
+    }
+    let names: string[]
+    try {
+      names = await readdir(dir)
+    } catch (error) {
+      return errorCodeOf(error) === 'ENOENT' ? { kind: 'free' } : { kind: 'held' }
+    }
+    if (names.length === 0) return { kind: 'free' }
+    const binding = await this.store.readDir(dir)
+    return {
+      kind: 'held',
+      ...(binding && binding.documentId === documentId
+        ? { copy: join(dir, binding.filename) }
+        : {}),
     }
   }
 
@@ -5447,7 +5559,11 @@ export class UniworkDocsService {
     let restored = false
     if (!idempotencyKey) {
       const saved = await store?.get(recordKey).catch(() => null)
-      if (saved?.state === 'pending' && saved.fingerprint === fingerprint) {
+      if (
+        saved?.state === 'pending' &&
+        saved.fingerprint === fingerprint &&
+        !this.spentFirstSaveKeys.has(saved.idempotencyKey)
+      ) {
         idempotencyKey = saved.idempotencyKey
         restored = true
       }
@@ -5481,6 +5597,7 @@ export class UniworkDocsService {
         // S01-R2-3: the retained key is wrong for this body and must not pin
         // the path until restart
         this.firstSaveKeys.delete(keyFp)
+        this.spentFirstSaveKeys.add(attempt.idempotencyKey)
         await this.dropFirstSaveRecord(attempt)
       } else if (
         attempt.restored &&
@@ -5488,6 +5605,7 @@ export class UniworkDocsService {
         (error.status === 404 ||
           (error.status === 409 && error.serverCode === 'document_upload_invalid'))
       ) {
+        this.spentFirstSaveKeys.add(attempt.idempotencyKey)
         await this.dropFirstSaveRecord(attempt)
         attempt.idempotencyKey = this.newIdempotencyKey()
         attempt.restored = false
@@ -5496,6 +5614,7 @@ export class UniworkDocsService {
         return await create(attempt.idempotencyKey).catch(async (again: unknown) => {
           if (again instanceof UniworkDocError && again.code === 'idempotency_mismatch') {
             this.firstSaveKeys.delete(keyFp)
+            this.spentFirstSaveKeys.add(attempt.idempotencyKey)
             await this.dropFirstSaveRecord(attempt)
           }
           throw again
@@ -5511,7 +5630,7 @@ export class UniworkDocsService {
    */
   private async saveFirstSaveRecord(
     attempt: FirstSaveAttempt,
-    state: { state: 'pending' } | { state: 'bound'; documentId: string; workingCopyPath: string },
+    state: { state: 'pending' } | { state: 'bound'; documentId: string; workingCopyPath?: string },
   ): Promise<void> {
     if (!attempt.store) return
     try {
@@ -5652,8 +5771,26 @@ export class UniworkDocsService {
       if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
       await this.requireManage(documentId)
-      return this.api().archive(documentId, this.newIdempotencyKey())
+      const session = this.captureActionSession()
+      const archived = await this.api().archive(documentId, this.newIdempotencyKey())
+      // S01-R2-4 fix2: an archived document is no longer the one its original was
+      // first-saved into; the record ends, the user's bytes are not touched
+      await this.endFirstSaveRecords(session, documentId)
+      return archived
     })
+  }
+
+  /** S01-R2-4 fix2: removes this account's first-save records of `documentId`; bookkeeping only, never fails the caller */
+  private async endFirstSaveRecords(
+    session: { identity: SessionIdentity },
+    documentId: string,
+  ): Promise<void> {
+    try {
+      const store = await this.firstSaveStore(session)
+      await store?.removeForDocument(documentId)
+    } catch {
+      // a record left behind is only a stale one: nothing is lost by it
+    }
   }
 
   /** S18: restore an archived document (only its own archive batch comes back) */

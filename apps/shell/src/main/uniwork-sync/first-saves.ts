@@ -53,6 +53,12 @@ export interface FirstSaveStore {
   get(key: string): Promise<FirstSaveRecord | null>
   put(key: string, record: FirstSaveRecord): Promise<StoreWriteResult>
   remove(key: string): Promise<void>
+  /**
+   * Removes every record of this account that names `documentId` (a document the
+   * account archived is no longer one its original is bound to) and answers how
+   * many went. Never touches another account's store or a record without a document.
+   */
+  removeForDocument(documentId: string): Promise<number>
 }
 
 const isStr = (value: unknown): value is string => typeof value === 'string' && value.length > 0
@@ -103,13 +109,35 @@ export function createFirstSaveStore(
     async put(key, record) {
       const records = await resolveRecords()
       if (!records) return { kind: 'refused' }
-      return records.write(key, Buffer.from(JSON.stringify(record), 'utf8'))
+      // the record carries its own (hashed) key: the store lists payloads, not names,
+      // and removeForDocument must reach the record it found by its document
+      return records.write(key, Buffer.from(JSON.stringify({ ...record, key }), 'utf8'))
     },
 
     async remove(key) {
       const records = await resolveRecords()
       if (!records) return
       await records.delete(key)
+    },
+
+    async removeForDocument(documentId) {
+      const records = await resolveRecords()
+      if (!records?.values) return 0
+      let removed = 0
+      for (const value of await records.values()) {
+        let raw: unknown
+        try {
+          raw = JSON.parse(Buffer.from(value).toString('utf8'))
+        } catch {
+          continue
+        }
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue
+        const { key, documentId: named } = raw as Record<string, unknown>
+        if (!isStr(key) || named !== documentId) continue
+        const gone = await records.delete(key)
+        if (gone.kind === 'ok') removed += 1
+      }
+      return removed
     },
   }
 }
