@@ -5,13 +5,12 @@
  * seam) and each module's export / Save As / print entry point asks it before
  * it opens a dialog, writes bytes or prints.
  *
- * The per-module helpers, the seam forwarding and the service's own verdict run
- * for real here; the entry points live in modules that pull Electron, so their
- * guard is pinned on the source (the same approach
- * uniwork-docs-module-open-guard.test.ts takes).
+ * The per-module helpers, the seam forwarding, the service's own verdict, and
+ * every module's export / Save As / print entry points run for real here with
+ * Electron stubbed (A4, UNI-1362).
  */
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -42,45 +41,195 @@ import {
 import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
 
-// modules.ts fans the seam out to all six editor mains. Their entry points pull
-// Electron and module-level timers, so this test replaces them with recording
-// setters: only the forwarding logic under test runs.
-const setters = vi.hoisted(() => {
-  const policies: unknown[] = []
-  const hooks: unknown[] = []
-  const recordingMain = () => ({
-    setUniworkDocumentPolicy: (policy: unknown) => void policies.push(policy),
-  })
-  return { policies, hooks, recordingMain }
+type IpcHandler = (event: unknown, ...args: unknown[]) => unknown
+
+interface FakeWebContents {
+  id: number
+  once: ReturnType<typeof vi.fn>
+  on: ReturnType<typeof vi.fn>
+  send: ReturnType<typeof vi.fn>
+  isDestroyed: () => boolean
+  setWindowOpenHandler: ReturnType<typeof vi.fn>
+  loadURL: ReturnType<typeof vi.fn>
+  loadFile: ReturnType<typeof vi.fn>
+  print: ReturnType<typeof vi.fn>
+  printToPDF: ReturnType<typeof vi.fn>
+}
+
+const env = vi.hoisted(() => {
+  const handlers = new Map<string, IpcHandler>()
+  const dialogCalls = {
+    showSaveDialog: vi.fn(async () => ({ canceled: true, filePath: undefined })),
+    showOpenDialog: vi.fn(async () => ({ canceled: true, filePaths: [] as string[] })),
+    showMessageBox: vi.fn(async () => ({ response: 0 })),
+  }
+  const state = {
+    userDataDir: '',
+    nextWcId: 100,
+    lastWc: null as FakeWebContents | null,
+  }
+  const makeWc = (): FakeWebContents => {
+    const wc: FakeWebContents = {
+      id: state.nextWcId++,
+      once: vi.fn(),
+      on: vi.fn(),
+      send: vi.fn(),
+      isDestroyed: () => false,
+      setWindowOpenHandler: vi.fn(),
+      loadURL: vi.fn(async () => undefined),
+      loadFile: vi.fn(async () => undefined),
+      print: vi.fn(),
+      printToPDF: vi.fn(async () => Buffer.from('pdf')),
+    }
+    state.lastWc = wc
+    return wc
+  }
+  return { handlers, dialogCalls, state, makeWc }
 })
 
-vi.mock('../../docs/src/main/docs-main', () => ({
-  ...setters.recordingMain(),
-  setDocsUserSaveHook: (hook: unknown) => void setters.hooks.push(hook),
-}))
-vi.mock('../../sheets/src/main/sheets-main', () => ({
-  ...setters.recordingMain(),
-  setSheetsUserSaveHook: (hook: unknown) => void setters.hooks.push(hook),
-}))
-vi.mock('../../slides/src/main/slides-main', () => ({
-  ...setters.recordingMain(),
-  setSlidesUserSaveHook: (hook: unknown) => void setters.hooks.push(hook),
-}))
-vi.mock('../../pdf/src/main/pdf-main', () => ({
-  ...setters.recordingMain(),
-  setPdfUserSaveHook: (hook: unknown) => void setters.hooks.push(hook),
-}))
-vi.mock('../../markdown/src/main/markdown-main', () => ({
-  ...setters.recordingMain(),
-  setMarkdownUserSaveHook: (hook: unknown) => void setters.hooks.push(hook),
-}))
-vi.mock('../../html/src/main/html-main', () => ({
-  ...setters.recordingMain(),
-  setHtmlUserSaveHook: (hook: unknown) => void setters.hooks.push(hook),
+vi.mock('electron', () => ({
+  app: {
+    getPath: vi.fn(() => env.state.userDataDir || tmpdir()),
+    getAppPath: vi.fn(() => tmpdir()),
+    getSystemLocale: vi.fn(() => 'en-US'),
+    on: vi.fn(),
+    quit: vi.fn(),
+    whenReady: vi.fn(() => Promise.withResolvers<void>().promise),
+    isPackaged: false,
+    getVersion: () => '0.0.0',
+    getName: () => 'test',
+  },
+  BrowserWindow: class {
+    webContents = env.makeWc()
+    static fromWebContents() {
+      return null
+    }
+    static getFocusedWindow() {
+      return null
+    }
+    static getAllWindows() {
+      return []
+    }
+  },
+  WebContentsView: class {
+    webContents = env.makeWc()
+  },
+  dialog: {
+    showSaveDialog: (...args: unknown[]) => env.dialogCalls.showSaveDialog(...args),
+    showOpenDialog: (...args: unknown[]) => env.dialogCalls.showOpenDialog(...args),
+    showMessageBox: (...args: unknown[]) => env.dialogCalls.showMessageBox(...args),
+  },
+  ipcMain: {
+    handle: vi.fn((channel: string, handler: IpcHandler) => {
+      env.handlers.set(channel, handler)
+    }),
+    on: vi.fn((channel: string, handler: IpcHandler) => {
+      env.handlers.set(channel, handler)
+    }),
+    once: vi.fn(),
+    removeHandler: vi.fn((channel: string) => {
+      env.handlers.delete(channel)
+    }),
+    removeAllListeners: vi.fn(),
+  },
+  shell: { openExternal: vi.fn(), showItemInFolder: vi.fn(), openPath: vi.fn(async () => '') },
+  session: { defaultSession: { protocol: {}, setDisplayMediaRequestHandler: () => {} } },
+  net: { fetch: vi.fn() },
+  protocol: { handle: vi.fn(), registerSchemesAsPrivileged: vi.fn() },
+  screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1000, height: 800 } }) },
+  Menu: { buildFromTemplate: vi.fn(() => ({})), setApplicationMenu: vi.fn() },
+  nativeTheme: { on: vi.fn(), shouldUseDarkColors: false },
+  nativeImage: {},
+  clipboard: { writeBuffer: vi.fn() },
+  desktopCapturer: { getSources: async () => [] },
+  systemPreferences: {},
+  webContents: { getAllWebContents: () => [], fromId: () => null },
 }))
 
+vi.mock('@genoffice/ai-search', () => ({
+  gskSlideGenerate: vi.fn(),
+  generateImageTool: vi.fn(),
+  documentMediaRoots: () => [],
+  localMediaRoots: () => [],
+}))
+
+vi.mock('../../slides/src/main/shaped-metrics', () => ({
+  shapedMetricsReady: async () => {},
+  refineComplexWidths: async () => {},
+  complexScriptOf: () => null,
+  initShapedMetrics: () => {},
+  gtMeasure: (t: string) => ({ width: t.length * 8 }),
+  shapedFamily: () => null,
+  shapedMeasure: () => ({ width: 0 }),
+}))
+
+vi.mock('../../sheets/src/main/xlsx-sidecar-client', () => ({
+  XlsxSidecarClient: class {
+    start() {}
+    onProcessExit() {}
+    async open(path: string) {
+      return {
+        sessionId: '00000000-0000-4000-8000-000000000001',
+        name: path.split(/[\\/]/).pop(),
+        path,
+        entryCount: 1,
+        sheets: [
+          {
+            id: 'sheet-1',
+            name: 'Sheet1',
+            rowCount: 10,
+            columnCount: 5,
+            columnWidths: [],
+            defaultRowHeight: null,
+            defaultColumnWidth: null,
+            freeze: null,
+            hidden: false,
+            tabColor: null,
+            showGridLines: true,
+            tables: [],
+            comments: [],
+            pivotRanges: [],
+          },
+        ],
+        styles: [],
+        dxfStyles: [],
+        visuals: [],
+        definedNames: [],
+      }
+    }
+    async close() {}
+  },
+}))
+
+import {
+  docsFileRenamed,
+  registerDocsIpc,
+} from '../../docs/src/main/docs-main'
+import { createSheetsView } from '../../sheets/src/main/sheets-main'
+import { IPC_CHANNELS as SHEETS_CHANNELS } from '../../sheets/src/shared/ipc-channels'
+import { createBlankPptx } from '@genoffice/pptx-engine'
+import { registerSlidesIpc } from '../../slides/src/main/slides-main'
+import { sessions as slidesSessions } from '../../slides/src/main/session-state'
+import {
+  createPdfView,
+  requestPdfSaveAs,
+  sendPdfPrintRequest,
+} from '../../pdf/src/main/pdf-main'
+import { PDF_CHANNELS } from '../../pdf/src/shared/ipc'
+import { PDF_UNIWORK_VIEW_ONLY } from '../../pdf/src/shared/uniwork-refusal'
+import {
+  createMarkdownView,
+  sendMarkdownExportRequest,
+  sendMarkdownPrintRequest,
+} from '../../markdown/src/main/markdown-main'
+import { MARKDOWN_CHANNELS } from '../../markdown/src/shared/ipc'
+import {
+  createHtmlView,
+  sendHtmlExportRequest,
+  sendHtmlPrintRequest,
+} from '../../html/src/main/html-main'
+import { HTML_CHANNELS } from '../../html/src/shared/ipc'
 import { installUniworkModuleSeams } from '../src/main/uniwork-docs/modules'
-
 const LOCKED = 'C:/u/uniwork-documents/dep/acc/doc1/Plan.docx'
 const LOCAL = 'C:/Users/me/Documents/notes.txt'
 
@@ -105,25 +254,11 @@ afterEach(() => {
   for (const [, setPolicy] of MODULES) setPolicy(null)
 })
 
-const readRepo = (relative: string) =>
-  readFileSync(join(__dirname, '../../..', relative), 'utf8').replace(/\r\n/g, '\n')
-
-/** the text from `marker` to the next ipcMain registration: one handler's own code */
-function handlerBody(source: string, marker: RegExp): string {
-  const found = source.match(marker)
-  expect(found, `marker ${marker} not found`).not.toBeNull()
-  const at = source.indexOf(found![0])
-  const next = source.indexOf('ipcMain.', at + found![0].length)
-  return source.slice(at, next === -1 ? undefined : next)
+function invoke(channel: string, wc: FakeWebContents, ...args: unknown[]): Promise<unknown> {
+  const fn = env.handlers.get(channel)
+  if (!fn) throw new Error(`handler not registered: ${channel}`)
+  return Promise.resolve(fn({ sender: wc }, ...args))
 }
-
-/** the head of a named function: enough to see its first guards */
-function functionHead(source: string, name: string): string {
-  const at = source.indexOf(`export function ${name}(`)
-  expect(at, `${name} not found`).toBeGreaterThan(-1)
-  return source.slice(at, at + 700)
-}
-
 // ── the helper, one per module ─────────────────────────────
 
 describe('uniworkIsLocked (one helper per module)', () => {
@@ -165,7 +300,6 @@ describe('uniworkIsLocked (one helper per module)', () => {
 describe('installUniworkModuleSeams forwards the lock answer', () => {
   it('every module policy asks the seam through isLocked', () => {
     const isLocked = vi.fn((path: string) => path === LOCKED)
-    setters.policies.length = 0
     installUniworkModuleSeams({
       isBound: () => false,
       isReadOnly: () => false,
@@ -174,37 +308,28 @@ describe('installUniworkModuleSeams forwards the lock answer', () => {
       refuseLockedPath: () => false,
     })
     // docs, sheets, slides, pdf, markdown, html
-    expect(setters.policies).toHaveLength(6)
-    for (const policy of setters.policies) {
-      const forwarded = policy as { isLocked(path: string): boolean }
-      expect(forwarded.isLocked(LOCKED)).toBe(true)
-      expect(forwarded.isLocked(LOCAL)).toBe(false)
+    for (const [, , moduleIsLocked] of MODULES) {
+      expect(moduleIsLocked(LOCKED)).toBe(true)
+      expect(moduleIsLocked(LOCAL)).toBe(false)
     }
     expect(isLocked).toHaveBeenCalledTimes(12)
     // null restores genoffice behaviour: no policy, so nothing is locked
     installUniworkModuleSeams(null)
-    expect(setters.policies.slice(6)).toEqual([null, null, null, null, null, null])
+    for (const [, , moduleIsLocked] of MODULES) {
+      expect(moduleIsLocked(LOCKED)).toBe(false)
+    }
   })
 
   it('a seam without isLocked never locks, and modules.ts installs the forwarding', () => {
-    setters.policies.length = 0
     installUniworkModuleSeams({
       isBound: () => false,
       isReadOnly: () => false,
       onUserSave: () => undefined,
       refuseLockedPath: () => false,
     })
-    for (const policy of setters.policies) {
-      const forwarded = policy as { isLocked(path: string): boolean }
-      expect(forwarded.isLocked(LOCKED)).toBe(false)
+    for (const [, , moduleIsLocked] of MODULES) {
+      expect(moduleIsLocked(LOCKED)).toBe(false)
     }
-    expect(readRepo('apps/shell/src/main/uniwork-docs/modules.ts')).toMatch(
-      /isLocked: \(path: string\) => seam\.isLocked\?\.\(path\) === true/,
-    )
-    // the seam is the service itself, installed once by index.ts
-    expect(readRepo('apps/shell/src/main/index.ts')).toMatch(
-      /installUniworkModuleSeams\(\s*uniworkService,/,
-    )
   })
 })
 
@@ -218,8 +343,15 @@ const sha256Hex = (bytes: string) => createHash('sha256').update(bytes).digest('
 let dir: string
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-export-lock-'))
+  env.state.userDataDir = dir
+  env.dialogCalls.showSaveDialog.mockClear()
+  env.dialogCalls.showOpenDialog.mockClear()
+  env.dialogCalls.showMessageBox.mockClear()
 })
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
+afterEach(() => {
+  slidesSessions.clear()
+  rmSync(dir, { recursive: true, force: true })
+})
 
 /** the working copy of one document, with an optional blocked verdict */
 function seedCopy(documentId: string, over: Record<string, unknown> = {}): string {
@@ -306,14 +438,11 @@ describe('service.isLocked (the shell answer the modules ask)', () => {
     expect(service.isLocked(join(dir, 'missing.docx'))).toBe(false)
 
     // and the same answer reaches every module's policy through the one seam
-    setters.policies.length = 0
     installUniworkModuleSeams(service)
-    expect(setters.policies).toHaveLength(6)
-    for (const policy of setters.policies) {
-      const forwarded = policy as { isLocked(path: string): boolean }
-      expect(forwarded.isLocked(revoked)).toBe(true)
-      expect(forwarded.isLocked(healthy)).toBe(false)
-      expect(forwarded.isLocked(local)).toBe(false)
+    for (const [, , moduleIsLocked] of MODULES) {
+      expect(moduleIsLocked(revoked)).toBe(true)
+      expect(moduleIsLocked(healthy)).toBe(false)
+      expect(moduleIsLocked(local)).toBe(false)
     }
   })
 })
@@ -321,102 +450,299 @@ describe('service.isLocked (the shell answer the modules ask)', () => {
 // ── each module's entry points ask before they act ─────────
 
 describe('every export / Save As / print entry point refuses a locked source', () => {
-  it('docs: save-as, export-pdf/html, print, the buffered/merged PDF paths and the image exports', () => {
-    const source = readRepo('apps/docs/src/main/docs-main.ts')
-    // the tab's open document, unless the caller names one (Save As)
-    expect(source).toMatch(
-      /function uniworkRefusesExport\(wcId: number, sourcePath\?: string \| null\): boolean \{\s*return uniworkIsLocked\(sourcePath \?\? openDocByWc\.get\(wcId\) \?\? null\)/,
-    )
-    for (const channel of [
-      /'docs:save-as'/,
-      /'docs:save-new'/,
-      /'docs:save-to'/,
-      /'docs:export-pdf'/,
-      /'docs:export-html'/,
-      /'docs:print'/,
-      /'docs:print-pdf-buffer'/,
-      /'docs:save-merged-pdf'/,
-      /'docs:save-image-as'/,
-      /'docs:pick-export-images-target'/,
-      /'docs:write-export-image'/,
-    ]) {
-      expect(handlerBody(source, channel)).toContain('uniworkRefusesExport(')
-    }
+  it('docs: save-as, save-new, save-to, export-pdf/html, print, buffered/merged PDF and image exports refuse a locked document before any dialog or print', async () => {
+    registerDocsIpc()
+    const wc = env.makeWc()
+    docsFileRenamed(wc as never, LOCKED, LOCKED)
+    setDocsPolicy({
+      isBound: () => true,
+      isReadOnly: () => true,
+      isLocked: (path) => path === LOCKED,
+    })
+    const payload = new Uint8Array([1, 2, 3]).buffer
+
+    expect(await invoke('docs:save-as', wc, 'Plan.docx', payload, LOCKED)).toEqual({ ok: false })
+    expect(await invoke('docs:save-new', wc, 'Plan.docx', payload)).toEqual({ ok: false })
+    expect(await invoke('docs:save-to', wc, join(dir, 'out.docx'), payload, true)).toEqual({
+      ok: false,
+    })
+    expect(await invoke('docs:export-pdf', wc, 'Plan.docx', 12240, 15840)).toEqual({ ok: false })
+    expect(await invoke('docs:export-html', wc, 'Plan.docx', '<p>hi</p>')).toEqual({ ok: false })
+    expect(await invoke('docs:print', wc)).toEqual({ ok: false })
+    expect(await invoke('docs:print-pdf-buffer', wc, 12240, 15840)).toEqual({ ok: false })
+    expect(await invoke('docs:save-merged-pdf', wc, 'Plan.docx', [])).toEqual({ ok: false })
+    expect(await invoke('docs:save-image-as', wc, 'data:image/png;base64,AAAA')).toEqual({
+      ok: false,
+    })
+    expect(await invoke('docs:pick-export-images-target', wc)).toBeNull()
+    expect(await invoke('docs:write-export-image', wc, dir, 'page-1.png', 'AAAA')).toEqual({
+      ok: false,
+    })
+    expect(env.dialogCalls.showSaveDialog).not.toHaveBeenCalled()
+    expect(env.dialogCalls.showOpenDialog).not.toHaveBeenCalled()
+    expect(wc.print).not.toHaveBeenCalled()
+    expect(wc.printToPDF).not.toHaveBeenCalled()
   })
 
-  it('sheets: export-pdf, print, export-csv and a Save As ask every session the tab holds', () => {
-    const source = readRepo('apps/sheets/src/main/sheets-main.ts')
-    expect(source).toMatch(
-      /function tabHoldsLockedDocument\(entry: SheetsTabSession\): boolean \{[\s\S]*?uniworkIsLocked\(sessionDocumentPath\(session\)\)/,
-    )
-    for (const channel of [
-      /IPC_CHANNELS\.exportPdf[,)]/,
-      /IPC_CHANNELS\.printWorkbook[,)]/,
-      /IPC_CHANNELS\.exportCsv[,)]/,
-      /IPC_CHANNELS\.saveWorkbook[,)]/,
-    ]) {
-      expect(handlerBody(source, channel)).toContain('tabHoldsLockedDocument(')
-    }
+  it('sheets: export-pdf, print, export-csv and Save As refuse when any session on the tab holds a locked document', async () => {
+    const file = join(dir, 'Budget.xlsx')
+    writeFileSync(file, 'PK\u0003\u0004')
+    createSheetsView({ includeAiHandlers: false })
+    const wc = env.state.lastWc!
+    await invoke(SHEETS_CHANNELS.reopenWorkbook, wc, file)
+    setSheetsPolicy({
+      isBound: () => true,
+      isReadOnly: () => true,
+      isLocked: (path) => path === file,
+    })
+
+    expect(
+      await invoke(SHEETS_CHANNELS.exportPdf, wc, {
+        workbookName: 'Budget.xlsx',
+        sheets: [{ name: 'Sheet1', html: '<p>x</p>' }],
+      }),
+    ).toEqual({ canceled: true })
+    expect(
+      await invoke(SHEETS_CHANNELS.printWorkbook, wc, {
+        workbookName: 'Budget.xlsx',
+        sheets: [{ name: 'Sheet1', html: '<p>x</p>' }],
+      }),
+    ).toEqual({ ok: false })
+    expect(
+      await invoke(SHEETS_CHANNELS.exportCsv, wc, {
+        workbookName: 'Budget.xlsx',
+        sheetName: 'Sheet1',
+        csv: 'a,b',
+        hasFormulas: true,
+        sheetCount: 1,
+      }),
+    ).toEqual({ canceled: true })
+    expect(
+      await invoke(SHEETS_CHANNELS.saveWorkbook, wc, {
+        sessionId: '00000000-0000-4000-8000-000000000001',
+        mode: 'save-as',
+        edits: [],
+        structuralOps: [],
+        chartEdits: [],
+        visualEdits: [],
+        visualAdditions: [],
+        tableAdditions: [],
+        pivotAdditions: [],
+        sheetOps: [],
+        sheetOrder: [],
+        filterStates: [],
+        hyperlinkEdits: [],
+        cfStates: [],
+        dvStates: [],
+        pageSetupStates: [],
+        noteStates: [],
+        formulaValues: [],
+        pivotCacheRefreshPaths: [],
+        pivotRefreshUpdates: [],
+        sheetProtections: [],
+        sparklineAdditions: [],
+        definedNamesState: null,
+        protectedRangeStates: [],
+      }),
+    ).toEqual({ canceled: true })
+    expect(env.dialogCalls.showSaveDialog).not.toHaveBeenCalled()
+    expect(env.dialogCalls.showMessageBox).not.toHaveBeenCalled()
   })
 
-  it('slides: export-pdf, print, export-images, save-picture and save-as ask the session path', () => {
-    const source = readRepo('apps/slides/src/main/slides-main.ts')
-    for (const channel of [
-      /'slides:export-images'/,
-      /'slides:save-picture'/,
-      /'slides:export-pdf'/,
-      /'slides:print'/,
-    ]) {
-      expect(handlerBody(source, channel)).toContain('uniworkIsLocked(')
-    }
-    // the session core is environment-neutral and must not import main/, so the
-    // save-as handler asks the host seam; the desktop host answers with the same
-    // policy helper the four IPC guards above use
-    const history = readRepo('apps/slides/src/session/handlers/history-save.ts')
-    expect(handlerBody(history, /'slides:save-as'/)).toContain('ctx.host.isLocked?.(')
-    expect(readRepo('apps/slides/src/main/electron-host-io.ts')).toContain(
-      'isLocked: (path) => uniworkIsLocked(path)',
-    )
+  it('slides: export-pdf, print, export-images, save-picture and save-as refuse a locked session path', async () => {
+    registerSlidesIpc()
+    const wc = env.makeWc()
+    const deckPath = join(dir, 'Deck.pptx')
+    slidesSessions.set(wc.id, {
+      opened: await createBlankPptx(),
+      path: deckPath,
+      fitWidthPx: 1280,
+      undoStack: [],
+      redoStack: [],
+      journal: [],
+    })
+    setSlidesPolicy({
+      isBound: () => true,
+      isReadOnly: () => true,
+      isLocked: (path) => path === deckPath,
+    })
+
+    expect(
+      await invoke('slides:export-images', wc, {
+        dir,
+        baseName: 'Deck',
+        pngsBase64: ['AAAA'],
+      }),
+    ).toEqual({ ok: false })
+    expect(
+      await invoke('slides:save-picture', wc, {
+        defaultName: 'slide-1',
+        pngBase64: 'AAAA',
+      }),
+    ).toEqual({ ok: false })
+    expect(
+      await invoke('slides:export-pdf', wc, {
+        outPath: join(dir, 'Deck.pdf'),
+        widthPx: 960,
+        heightPx: 540,
+        pngsBase64: ['AAAA'],
+      }),
+    ).toEqual({ ok: false })
+    expect(
+      await invoke('slides:print', wc, {
+        widthPx: 960,
+        heightPx: 540,
+        pngsBase64: ['AAAA'],
+      }),
+    ).toEqual({ ok: false })
+    expect(await invoke('slides:save-as', wc, 'Deck.pptx')).toEqual({ ok: false })
+    expect(env.dialogCalls.showSaveDialog).not.toHaveBeenCalled()
   })
 
-  it('pdf: Save As (and the redaction copy), print, export-images and a save-as target', () => {
-    const source = readRepo('apps/pdf/src/main/pdf-main.ts')
-    expect(functionHead(source, 'requestPdfSaveAs')).toContain('uniworkIsLocked(')
-    expect(functionHead(source, 'sendPdfPrintRequest')).toContain('uniworkIsLocked(')
-    expect(handlerBody(source, /PDF_CHANNELS\.requestRedactionCopy[,)]/)).toContain(
-      'uniworkIsLocked(',
-    )
-    expect(handlerBody(source, /PDF_CHANNELS\.exportImages[,)]/)).toContain('uniworkIsLocked(')
-    expect(handlerBody(source, /PDF_CHANNELS\.save[,)]/)).toContain('uniworkIsLocked(')
+  it('pdf: Save As, redaction copy, print and export-images refuse a locked document before any dialog or write', async () => {
+    const pdfPath = join(dir, 'Doc.pdf')
+    writeFileSync(pdfPath, '%PDF-1.4\n')
+    createPdfView(pdfPath)
+    const wc = env.state.lastWc!
+    // grant a Save As target while still unlocked, then lock the document: the
+    // save handler's own lock guard refuses writing to the granted target
+    const copyTarget = join(dir, 'Copy.pdf')
+    setPdfPolicy({
+      isBound: () => true,
+      isReadOnly: () => false,
+      isLocked: () => false,
+    })
+    void requestPdfSaveAs(wc as never, copyTarget)
+    expect(wc.send).toHaveBeenCalledWith(PDF_CHANNELS.saveAsRequest, copyTarget)
+
+    setPdfPolicy({
+      isBound: () => true,
+      isReadOnly: () => false,
+      isLocked: (path) => path === pdfPath,
+    })
+
+    wc.send.mockClear()
+    sendPdfPrintRequest(wc as never)
+    expect(wc.send).not.toHaveBeenCalled()
+    expect(await requestPdfSaveAs(wc as never, join(dir, 'Copy2.pdf'))).toBe(false)
+    expect(await invoke(PDF_CHANNELS.requestRedactionCopy, wc, pdfPath)).toBe(false)
+    expect(
+      await invoke(PDF_CHANNELS.exportImages, wc, {
+        images: ['AAAA'],
+        pageNumbers: [1],
+        baseName: 'Doc',
+      }),
+    ).toEqual({ ok: true, canceled: true })
+    expect(
+      await invoke(PDF_CHANNELS.save, wc, {
+        path: pdfPath,
+        targetPath: copyTarget,
+        markups: [],
+        drawings: [],
+        formValues: [],
+        stamps: [],
+      }),
+    ).toEqual({ ok: false, error: PDF_UNIWORK_VIEW_ONLY })
+    expect(env.dialogCalls.showOpenDialog).not.toHaveBeenCalled()
+    expect(env.dialogCalls.showSaveDialog).not.toHaveBeenCalled()
   })
 
-  it('markdown: export-docx/pdf, image export, save-image-as, save-as and the menu entries', () => {
-    const source = readRepo('apps/markdown/src/main/markdown-main.ts')
-    for (const channel of [
-      /MARKDOWN_CHANNELS\.exportDocx[,)]/,
-      /MARKDOWN_CHANNELS\.exportPdf[,)]/,
-      /MARKDOWN_CHANNELS\.prepareImageExport[,)]/,
-      /MARKDOWN_CHANNELS\.saveImageAs[,)]/,
-      /MARKDOWN_CHANNELS\.save[,)]/,
-    ]) {
-      expect(handlerBody(source, channel)).toContain('uniworkIsLocked(')
-    }
-    expect(functionHead(source, 'sendMarkdownExportRequest')).toContain('uniworkIsLocked(')
-    expect(functionHead(source, 'sendMarkdownPrintRequest')).toContain('uniworkIsLocked(')
+  it('markdown: export-docx/pdf, image export, save-image-as, save-as and the menu entries refuse a locked document', async () => {
+    const mdPath = join(dir, 'Note.md')
+    writeFileSync(mdPath, '# hi\n')
+    createMarkdownView(mdPath)
+    const wc = env.state.lastWc!
+    setMarkdownPolicy({
+      isBound: () => true,
+      isReadOnly: () => false,
+      isLocked: (path) => path === mdPath,
+    })
+
+    wc.send.mockClear()
+    sendMarkdownExportRequest(wc as never, 'pdf')
+    sendMarkdownPrintRequest(wc as never)
+    expect(wc.send).not.toHaveBeenCalled()
+
+    expect(
+      await invoke(MARKDOWN_CHANNELS.exportDocx, wc, {
+        base64: 'AAAA',
+        suggestedName: 'Note',
+      }),
+    ).toEqual({ ok: false, error: 'markdown: this document is view only' })
+    expect(
+      await invoke(MARKDOWN_CHANNELS.exportPdf, wc, {
+        html: '<p>hi</p>',
+        suggestedName: 'Note',
+      }),
+    ).toEqual({ ok: false, error: 'markdown: this document is view only' })
+    expect(
+      await invoke(MARKDOWN_CHANNELS.prepareImageExport, wc, {
+        html: '<p>hi</p>',
+        suggestedName: 'Note',
+      }),
+    ).toEqual({ ok: false, error: 'markdown: this document is view only' })
+    expect(await invoke(MARKDOWN_CHANNELS.saveImageAs, wc, 'data:image/png;base64,AAAA')).toEqual({
+      ok: false,
+      error: 'markdown: this document is view only',
+    })
+    expect(
+      await invoke(MARKDOWN_CHANNELS.save, wc, {
+        text: '# hi',
+        imageSources: [],
+        mode: 'saveAs',
+      }),
+    ).toEqual({ ok: false, error: 'markdown: this document is view only' })
+    expect(env.dialogCalls.showSaveDialog).not.toHaveBeenCalled()
+    expect(env.dialogCalls.showOpenDialog).not.toHaveBeenCalled()
   })
 
-  it('html: export-docx/pdf/html, print-html, save-as and the menu entries', () => {
-    const source = readRepo('apps/html/src/main/html-main.ts')
-    for (const channel of [
-      /HTML_CHANNELS\.exportDocx[,)]/,
-      /HTML_CHANNELS\.exportPdf[,)]/,
-      /HTML_CHANNELS\.exportHtml[,)]/,
-      /HTML_CHANNELS\.printHtml[,)]/,
-      /HTML_CHANNELS\.save[,)]/,
-    ]) {
-      expect(handlerBody(source, channel)).toContain('uniworkIsLocked(')
-    }
-    expect(functionHead(source, 'sendHtmlExportRequest')).toContain('uniworkIsLocked(')
-    expect(functionHead(source, 'sendHtmlPrintRequest')).toContain('uniworkIsLocked(')
+  it('html: export-docx/pdf/html, print-html, save-as and the menu entries refuse a locked document', async () => {
+    const htmlPath = join(dir, 'Page.html')
+    writeFileSync(htmlPath, '<p>hi</p>')
+    createHtmlView(htmlPath)
+    const wc = env.state.lastWc!
+    setHtmlPolicy({
+      isBound: () => true,
+      isReadOnly: () => false,
+      isLocked: (path) => path === htmlPath,
+    })
+
+    wc.send.mockClear()
+    sendHtmlExportRequest(wc as never, 'pdf')
+    sendHtmlPrintRequest(wc as never)
+    expect(wc.send).not.toHaveBeenCalled()
+
+    expect(
+      await invoke(HTML_CHANNELS.exportDocx, wc, {
+        html: '<p>hi</p>',
+        suggestedName: 'Page',
+      }),
+    ).toEqual({ ok: false, error: 'html: this document is view only' })
+    expect(
+      await invoke(HTML_CHANNELS.exportPdf, wc, {
+        html: '<p>hi</p>',
+        suggestedName: 'Page',
+      }),
+    ).toEqual({ ok: false, error: 'html: this document is view only' })
+    expect(
+      await invoke(HTML_CHANNELS.exportHtml, wc, {
+        html: '<p>hi</p>',
+        suggestedName: 'Page',
+      }),
+    ).toEqual({ ok: false, error: 'html: this document is view only' })
+    expect(
+      await invoke(HTML_CHANNELS.printHtml, wc, {
+        html: '<p>hi</p>',
+      }),
+    ).toEqual({ ok: false, error: 'html: this document is view only' })
+    expect(
+      await invoke(HTML_CHANNELS.save, wc, {
+        text: '<p>hi</p>',
+        imageSources: [],
+        mode: 'saveAs',
+      }),
+    ).toEqual({ ok: false, error: 'html: this document is view only' })
+    expect(env.dialogCalls.showSaveDialog).not.toHaveBeenCalled()
+    expect(env.dialogCalls.showOpenDialog).not.toHaveBeenCalled()
   })
 })
