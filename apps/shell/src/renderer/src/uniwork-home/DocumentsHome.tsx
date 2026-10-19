@@ -29,6 +29,7 @@ import {
   formatWhen,
   isDocNameError,
   isDocTitleTooLong,
+  renameFormatOf,
   renameParts,
   workspaceLabel,
   type DocNameError,
@@ -768,6 +769,13 @@ export function DocumentsHome({
     }
   }
 
+  // CT1-4: the page exists already, so an opening that fails says that, not "failed"
+  const openCreatedPage = async (doc: UniworkDocSummary): Promise<void> => {
+    if (!(await openPageOnWeb(workspaces, doc.workspaceId || workspaceId, doc.id))) {
+      setToast({ message: t('uwUniNoteOpenFailed'), tone: 'error' })
+    }
+  }
+
   const handleCreateDoc = async (
     input: DocTarget & { name: string; format: NewDocKind },
   ): Promise<ActionOutcome> => {
@@ -798,7 +806,7 @@ export function DocumentsHome({
     if (res.ok) {
       setNewDocModal(null)
       refreshAll()
-      if (input.format === 'page') void openDoc(res.value)
+      if (input.format === 'page') void openCreatedPage(res.value)
       else onOpenDocument(res.value)
       return { ok: true }
     }
@@ -873,7 +881,7 @@ export function DocumentsHome({
   }
 
   const handleSaveDocRename = async (doc: DocumentsHomeDoc, rawBase: string) => {
-    const { ext } = renameParts(doc.title, doc.format)
+    const { ext } = renameParts(doc.title, renameFormatOf(doc))
     const checked = checkDocName(rawBase)
     if (!checked.ok) {
       setDocRename({ doc, error: checked.error, busy: false })
@@ -1713,7 +1721,7 @@ export function DocumentsHome({
                           />
                           {renaming ? (
                             <RenameField
-                              initial={renameParts(doc.title, doc.format).base}
+                              initial={renameParts(doc.title, renameFormatOf(doc)).base}
                               label={doc.title}
                               error={renaming.error}
                               busy={renaming.busy}

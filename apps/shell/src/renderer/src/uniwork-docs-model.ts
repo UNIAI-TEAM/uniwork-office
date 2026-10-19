@@ -1527,6 +1527,17 @@ export function renameParts(
   return { base: title, ext: '' }
 }
 
+/**
+ * The format `renameParts` sees for a row: a UniNote page has none (the parser
+ * derives one from a title like `Notes.md`, but a page is not a file), so its
+ * title is renamed as typed and no extension is put back.
+ */
+export function renameFormatOf(
+  doc: Pick<UniworkDocSummary, 'kind' | 'format'>,
+): UniworkDocSummary['format'] {
+  return doc.kind === 'page' ? null : doc.format
+}
+
 const NEW_DOC_EXTENSIONS = NEW_DOC_FORMATS.map((format) => `.${format}`)
 
 /**

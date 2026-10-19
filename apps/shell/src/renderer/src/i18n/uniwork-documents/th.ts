@@ -145,6 +145,7 @@ export const th = {
   uwDocNameTooLong: 'ชื่อยาวเกินไป (ไม่เกิน 500 อักขระ)',
   uwDocRenamedAnnounce: 'เปลี่ยนชื่อเอกสารเป็น {name} แล้ว',
   uwDocActionFailed: 'ดำเนินการไม่สำเร็จ โปรดลองอีกครั้ง',
+  uwUniNoteOpenFailed: 'สร้าง UniNote แล้ว แต่เปิดไม่ได้ โปรดเปิดจากรายการ',
   uwDocActionsFor: 'การทำงานเพิ่มเติมสำหรับ “{name}”',
   uwDocCreate: 'สร้าง',
   uwDocUploadPick: 'เลือกไฟล์',
