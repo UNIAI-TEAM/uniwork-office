@@ -284,8 +284,38 @@ describe('UNI-1979 open-folder header: one row, the folder name once', () => {
       homeCss.match(/@media\s*\(\s*min-width:\s*1101px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
     expect(ruleBody(wide, '.dh-toolbar.dh-toolbar-folder')).toMatch(/flex-wrap:\s*wrap/)
     const crumbs = ruleBody(homeCss, '.dh-toolbar-folder > .uwf-crumbs')
-    expect(crumbs).toMatch(/flex:\s*1\s+1\s+18rem/)
-    expect(ruleBody(homeCss, '.dh-toolbar-actions')).toMatch(/flex:\s*none/)
+    // the app row also holds the workspace select, so the crumbs' basis is below the web's 18rem
+    // (8rem): ~128 + select 96 + actions ~242 + 2 x 12 gap = ~490px stays on row one at 510px
+    expect(crumbs).toMatch(/flex:\s*1\s+1\s+8rem/)
+    expect(crumbs).toMatch(/min-width:\s*0\b/)
+    const actions = ruleBody(homeCss, '.dh-toolbar-actions')
+    expect(actions).toMatch(/flex:\s*none/)
+    // when the actions do wrap they stay at the inline end, never left under the crumbs
+    expect(actions).toMatch(/margin-inline-start:\s*auto/)
+  })
+
+  it('CSS: the workspace select shrinks with an ellipsis and is as tall as the search box and buttons', () => {
+    const select = ruleBody(homeCss, '.dh-ws-select')
+    expect(select).toMatch(/flex:\s*0\s+1\s+auto/)
+    expect(select).toMatch(/min-width:\s*96px/)
+    expect(select).toMatch(/text-overflow:\s*ellipsis/)
+    const height = (body: string): string => /height:\s*(\d+px)/.exec(body)?.[1] ?? ''
+    expect(height(select)).toBe('36px')
+    expect(height(select)).toBe(height(ruleBody(homeCss, '.dh-search-box')))
+    expect(height(select)).toBe(height(ruleBody(homeCss, '.dh-toolbar-btn')))
+  })
+
+  it('CSS: coarse pointer, the pencil and the "…" are 44 x 44 and the menu wrapper grows with its button', () => {
+    const coarse =
+      foldersCss.match(/@media\s*\(\s*pointer:\s*coarse\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(coarse, 'a (pointer: coarse) block').not.toBe('')
+    expect(ruleBody(coarse, '.uwf-crumb-rename')).toMatch(/min-width:\s*44px/)
+    expect(coarse).toMatch(/\.uwf-crumb-rename,[^{]*\{[^}]*min-height:\s*44px/)
+    const menu = ruleBody(coarse, '.uwf-crumb .uw-row-menu.uwf-menu')
+    expect(menu).toMatch(/width:\s*44px/)
+    expect(menu).toMatch(/height:\s*44px/)
+    // the leaf reserves room for both 44px targets (2 x 44 + 2px gap) in the header row
+    expect(ruleBody(coarse, '.dh-toolbar .uwf-crumb-leaf')).toMatch(/calc\(2\.5rem \+ 92px\)/)
   })
 
   it('CSS: the search box is on its own row below 60rem and inline from 60rem up', () => {
