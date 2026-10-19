@@ -44,8 +44,8 @@ import type { ArchiveEngine } from './save-plan'
 import { planRefresh, refreshFormulaValues } from './cached-values'
 import {
   engineCanReplaySave,
-  type CachedValue,
-  formulaCells,
+  type CachedEntry,
+  formulaCellsWithValues,
   savedValuesMayChange,
   worksheetPartsByName,
 } from './stale-values'
@@ -331,7 +331,7 @@ export function createWasmTransport(options: WasmTransportOptions): SheetsEngine
     request: WorkbookSaveRequest,
     s: Session,
     bytesEntrySource: typeof import('./save-plan').bytesEntrySource,
-  ): Promise<ReadonlyMap<string, ReadonlyMap<string, CachedValue>> | undefined> {
+  ): Promise<ReadonlyMap<string, ReadonlyMap<string, CachedEntry>> | undefined> {
     if (!savedValuesMayChange(request)) return undefined
     if (s.recalcCrashed || !engineCanReplaySave(request)) return new Map()
     try {
@@ -340,11 +340,12 @@ export function createWasmTransport(options: WasmTransportOptions): SheetsEngine
         await source.readText('xl/workbook.xml'),
         await source.readText('xl/_rels/workbook.xml.rels'),
       )
-      const fileFormulas = new Map<string, { row: number; column: number }[]>()
+      // the cached value the file holds for each formula: an untouched one is kept when it still stands
+      const fileFormulas = new Map<string, ReturnType<typeof formulaCellsWithValues>>()
       for (const name of s.sheetNames.values()) {
         const path = parts.get(name)
         if (path === undefined) return new Map()
-        fileFormulas.set(name, formulaCells(await source.readText(path)))
+        fileFormulas.set(name, formulaCellsWithValues(await source.readText(path)))
         source.releaseText?.(path)
       }
       const planned = planRefresh(request, s.sheetNames, s.bytes.byteLength, fileFormulas)
@@ -359,7 +360,7 @@ export function createWasmTransport(options: WasmTransportOptions): SheetsEngine
         cells.push(...result.cells)
       }
       // by worksheet part; a value the renderer sent for a cell wins (it comes later)
-      const keep = new Map<string, Map<string, CachedValue>>()
+      const keep = new Map<string, Map<string, CachedEntry>>()
       const partOf = new Map<string, string>()
       for (const [id, name] of s.sheetNames) {
         const path = parts.get(name)!
