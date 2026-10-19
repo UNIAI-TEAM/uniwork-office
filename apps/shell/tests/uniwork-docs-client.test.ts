@@ -814,6 +814,77 @@ describe('401: one shared refresh, one retry (real account session)', () => {
     })
   })
 
+  it('parses share_scope on list, recent, shared-with-me and shared-by-me rows; malformed values are absent, the row stays (UNI-1958 row 1)', async () => {
+    const scope = (extra: Record<string, unknown> = {}) => ({
+      home_workspace: false,
+      users: 2,
+      workspaces: 1,
+      organization: false,
+      public_link: true,
+      ...extra,
+    })
+    const row = (id: string, share_scope?: unknown) => ({
+      id,
+      workspace_id: 'ws_1',
+      title: `${id}.docx`,
+      kind: 'file',
+      updated_at: '2026-10-17T01:00:00Z',
+      ...(share_scope === undefined ? {} : { share_scope }),
+    })
+    const rows = [
+      row('ok', scope()),
+      row('home', scope({ home_workspace: true, users: 0, workspaces: 0, public_link: false })),
+      row('absent'),
+      row('null', null),
+      row('string', 'users'),
+      row('array', [scope()]),
+      row('neg-users', scope({ users: -1 })),
+      row('neg-ws', scope({ workspaces: -2 })),
+      row('frac', scope({ users: 1.5 })),
+      row('str-count', scope({ users: '2' })),
+      row('str-bool', scope({ organization: 'true' })),
+      row('missing-key', { home_workspace: true, users: 1 }),
+    ]
+    const fetch = vi.fn<FetchLike>(async () => json(200, { documents: rows, next_cursor: null }))
+    const api = client(fetch)
+    const expectParsed = (documents: { id: string; shareScope?: unknown }[]) => {
+      const byId = Object.fromEntries(documents.map((d) => [d.id, d.shareScope]))
+      expect(documents.map((d) => d.id)).toEqual(rows.map((r) => r.id))
+      expect(byId.ok).toEqual({
+        homeWorkspace: false,
+        users: 2,
+        workspaces: 1,
+        organization: false,
+        publicLink: true,
+      })
+      expect(byId.home).toEqual({
+        homeWorkspace: true,
+        users: 0,
+        workspaces: 0,
+        organization: false,
+        publicLink: false,
+      })
+      for (const id of [
+        'absent',
+        'null',
+        'string',
+        'array',
+        'neg-users',
+        'neg-ws',
+        'frac',
+        'str-count',
+        'str-bool',
+        'missing-key',
+      ]) {
+        expect(byId[id], id).toBeUndefined()
+        expect(documents.find((d) => d.id === id), id).not.toHaveProperty('shareScope')
+      }
+    }
+    expectParsed((await api.listDocuments({ workspaceId: 'ws_1' })).documents)
+    expectParsed((await api.listSharedWithMe({ workspaceId: 'ws_1' })).documents)
+    expectParsed((await api.listSharedByMe({ workspaceId: 'ws_1' })).documents)
+  })
+
   it('sends listSharedByMe, listTrash, listWorkspaceMembers and filter params only when set', async () => {
     const seen: string[] = []
     const fetch = vi.fn<FetchLike>(async (url) => {

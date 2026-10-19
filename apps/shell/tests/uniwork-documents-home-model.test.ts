@@ -173,47 +173,67 @@ describe('DH1-W2 documents-home-model', () => {
     ])
   })
 
-  it('formats the Truy cập (Access) column from visibility + myLevel and never guesses when fields are absent', () => {
-    expect(formatAccessCell(makeDoc({ visibility: 'private', myLevel: 'manage' }), tVi)).toEqual({
-      visibilityLabel: 'Riêng tư',
+  it('formats the Truy cập (Access) column from share_scope + myLevel and never guesses from visibility (UNI-1958 row 1)', () => {
+    const none = {
+      homeWorkspace: false,
+      users: 0,
+      workspaces: 0,
+      organization: false,
+      publicLink: false,
+    }
+    const cell = (shareScope: DocumentsHomeDoc['shareScope'], myLevel: DocumentsHomeDoc['myLevel']) =>
+      formatAccessCell(makeDoc({ visibility: 'restricted', shareScope, myLevel }), tVi, 'vi')
+
+    expect(cell({ ...none, users: 2 }, 'manage')).toEqual({
+      visibilityLabel: '2 người',
       levelLabel: 'Bạn: Quản lý',
       isEmpty: false,
-      tone: 'private',
+      tone: 'people',
     })
-    expect(formatAccessCell(makeDoc({ visibility: 'workspace', myLevel: 'edit' }), tVi)).toEqual({
+    expect(cell({ ...none, homeWorkspace: true }, 'edit')).toMatchObject({
       visibilityLabel: 'Workspace',
-      levelLabel: 'Bạn: Chỉnh sửa',
-      isEmpty: false,
       tone: 'workspace',
     })
-    expect(
-      formatAccessCell(makeDoc({ visibility: 'restricted', myLevel: 'comment' }), tVi),
-    ).toEqual({
+    expect(cell({ ...none, workspaces: 3 }, 'view')).toMatchObject({
+      visibilityLabel: '3 workspace',
+      tone: 'workspaces',
+    })
+    expect(cell({ ...none, organization: true }, 'view')).toMatchObject({
+      visibilityLabel: 'Tổ chức',
+      tone: 'organization',
+    })
+    expect(cell({ ...none, publicLink: true }, 'view')).toMatchObject({
+      visibilityLabel: 'Liên kết công khai',
+      tone: 'link',
+    })
+    expect(cell(none, 'comment')).toEqual({
       visibilityLabel: 'Riêng tư',
       levelLabel: 'Bạn: Nhận xét',
       isEmpty: false,
-      tone: 'restricted',
-    })
-    expect(formatAccessCell(makeDoc({ visibility: 'restricted', myLevel: 'view' }), tVi)).toEqual({
-      visibilityLabel: 'Riêng tư',
-      levelLabel: 'Bạn: Chỉ xem',
-      isEmpty: false,
-      tone: 'restricted',
-    })
-
-    // Partial or absent fields: never guessed from folder or sub-view
-    expect(formatAccessCell(makeDoc({ visibility: 'private', myLevel: undefined }), tVi)).toEqual({
-      visibilityLabel: 'Riêng tư',
-      levelLabel: null,
-      isEmpty: false,
       tone: 'private',
     })
-    expect(formatAccessCell(makeDoc({ visibility: undefined, myLevel: undefined }), tVi)).toEqual({
+    expect(cell({ ...none, users: 1, organization: true }, 'view')).toMatchObject({
+      visibilityLabel: 'Nhiều phạm vi',
+      tone: 'multiple',
+    })
+    // a public link rides along with another axis: the label stays that axis
+    expect(cell({ ...none, users: 1, publicLink: true }, 'view')).toMatchObject({
+      visibilityLabel: '1 người',
+    })
+
+    // no share_scope: no scope label (visibility is not read), the level stays
+    expect(cell(undefined, 'view')).toEqual({
       visibilityLabel: null,
-      levelLabel: null,
-      isEmpty: true,
+      levelLabel: 'Bạn: Chỉ xem',
+      isEmpty: false,
       tone: 'none',
     })
+    expect(
+      formatAccessCell(makeDoc({ visibility: 'private', myLevel: undefined }), tVi, 'vi'),
+    ).toEqual({ visibilityLabel: null, levelLabel: null, isEmpty: true, tone: 'none' })
+    expect(
+      formatAccessCell(makeDoc({ visibility: undefined, myLevel: undefined }), tVi, 'vi'),
+    ).toEqual({ visibilityLabel: null, levelLabel: null, isEmpty: true, tone: 'none' })
   })
 
   it('formats the Người sửa gần nhất (Last modified by) column with initial and returns null when updatedByName is absent', () => {
