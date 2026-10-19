@@ -1078,6 +1078,9 @@ export function createWebSlidesApi(
     // host's `save` grant is read-only: the renderer then stays in Reading view (no text, cell or
     // notes editing surface), the same path as a view-only working copy on the desktop
     uniworkState: async () => ({ bound: false, readOnly: viewOnly() || state.fatal !== null }),
+    // the desktop edit-lock seam (UNI-1645): the web frame has no working copy to follow or explain
+    onUniworkStateChanged: () => () => {},
+    uniworkReadOnlySave: async () => {},
     saveAs: async (defaultName) => {
       state.lastFailure = null
       const pending = hostSaveAs
