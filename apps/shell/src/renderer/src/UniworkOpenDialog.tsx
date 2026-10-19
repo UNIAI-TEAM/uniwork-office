@@ -741,7 +741,7 @@ export function UniworkOpenDialog({
                 // an archived row is a supported document that is parked; rows that cannot open are not listed
                 const updated = pickerRowMeta(doc, t, dateLocale)
                 const meta = archived
-                  ? [t('uwDocArchived'), updated].filter(Boolean).join(' · ')
+                  ? [t('uwBadgeArchived'), updated].filter(Boolean).join(' · ')
                   : updated
                 // shared rows come from several workspaces: name the one each lives in
                 const where =

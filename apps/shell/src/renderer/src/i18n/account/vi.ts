@@ -79,7 +79,7 @@ export const vi = {
   acctErrKeystoreLocked: 'Kho khóa của máy đang khóa. Hãy mở khóa rồi thử lại.',
   acctReplaceTitle: 'Thay thông tin đăng nhập đã lưu trên máy này?',
   acctReplaceBody:
-    'Máy này không mở được thông tin đăng nhập đã lưu. Đăng nhập lại sẽ thay thế nó. Các chỉnh sửa ngoại tuyến đang chờ đồng bộ vẫn được giữ trên máy này ở trạng thái khóa; không có gì bị xóa.',
+    'Máy này không mở được thông tin đăng nhập đã lưu. Đăng nhập lại sẽ thay thế nó. Các chỉnh sửa offline đang chờ đồng bộ vẫn được giữ trên máy này ở trạng thái khóa; không có gì bị xóa.',
   acctReplaceGo: 'Đăng nhập lại',
   acctErrServerError: 'UniWork đang gặp sự cố. Vui lòng thử lại sau.',
   acctErrMalformedResponse: 'UniWork trả về phản hồi không mong đợi. Vui lòng thử lại sau.',

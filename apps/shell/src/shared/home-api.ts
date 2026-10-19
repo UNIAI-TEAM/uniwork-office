@@ -219,6 +219,20 @@ export interface UniworkWorkspaceRef {
   myRole: string | null
 }
 
+/**
+ * UNI-1958 row 1: the server's list-row `share_scope` (who reaches the
+ * document), carried unchanged from the main parse to the Access cell.
+ */
+export interface UniworkDocShareScope {
+  homeWorkspace: boolean
+  /** live direct grants to people */
+  users: number
+  /** live direct grants to other workspaces */
+  workspaces: number
+  organization: boolean
+  publicLink: boolean
+}
+
 export interface UniworkDocSummary {
   id: string
   workspaceId: string
@@ -232,6 +246,8 @@ export interface UniworkDocSummary {
   visibility?: 'private' | 'workspace' | 'restricted'
   /** DESKTOP-HOME: server `my_level`; absent when omitted or unknown */
   myLevel?: 'view' | 'comment' | 'edit' | 'manage'
+  /** UNI-1958 row 1: server `share_scope`; absent when omitted (agent callers) or malformed */
+  shareScope?: UniworkDocShareScope
   /** shared-with-me rows only: the workspace the share lives in (name resolved by main) */
   workspaceName?: string
   /**

@@ -10,7 +10,7 @@ import { ORG, SCOPE, WS, addDoc, createHarness } from './uniwork-sync-offline-li
  * hidden while the org capability is off (OQ-UX11 a) while removing one stays.
  */
 
-const LABELS = { pin: 'Dùng khi không có mạng', unpin: 'Bỏ dùng khi không có mạng' }
+const LABELS = { pin: 'Lưu để dùng offline', unpin: 'Bỏ dùng offline' }
 const BOUND = { documentId: 'doc_1', workspaceId: 'ws_1', orgId: 'org_1' }
 
 const item = (over: {

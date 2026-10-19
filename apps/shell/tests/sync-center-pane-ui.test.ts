@@ -767,6 +767,21 @@ describe('SyncCenterPane live announcements (FE-1, FE-5, FE-6, FE-9)', () => {
     expect(status().textContent).toContain(vi_.uwSyncOffline!.split('{')[0]!.trim())
   })
 
+  it('UNI-1958 row 8: offline status line reads "Đang offline" (vi), with and without a sync time', async () => {
+    const off = snapshot()
+    off.header = { ...off.header, online: false, status: 'offline' }
+    await render(fakeApi(off))
+    expect(host.querySelector('.sc-status-line')!.textContent).toMatch(
+      /^Đang offline · lần đồng bộ cuối /,
+    )
+    const noTime = snapshot()
+    noTime.header = { ...noTime.header, online: false, status: 'offline', lastSyncAt: undefined }
+    act(() => root.unmount())
+    root = createRoot(host)
+    await render(fakeApi(noTime))
+    expect(host.querySelector('.sc-status-line')!.textContent).toBe('Đang offline')
+  })
+
   it('BE-2n-3: a session with no verdict yet shows the online line without a dangling time', async () => {
     const s = snapshot()
     s.header = { ...s.header, lastSyncAt: undefined }

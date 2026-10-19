@@ -1,12 +1,13 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, createElement } from 'react'
+import { Fragment, act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type {
+  UniworkDocShareScope,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkResult,
@@ -14,6 +15,7 @@ import type {
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
+import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { SaveDialog } from '../src/renderer/src/uniwork-folders/SaveDialog'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
 
@@ -21,6 +23,15 @@ const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONM
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const ok = <T>(value: T): UniworkResult<T> => ({ ok: true, value })
+
+/** the server's `share_scope` with every axis empty (the web's "Riêng tư") */
+const NO_SHARES: UniworkDocShareScope = {
+  homeWorkspace: false,
+  users: 0,
+  workspaces: 0,
+  organization: false,
+  publicLink: false,
+}
 
 async function flush(): Promise<void> {
   for (let i = 0; i < 6; i++) {
@@ -102,6 +113,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         kind: 'file',
         parentId: null,
         visibility: 'private',
+        shareScope: NO_SHARES,
         myLevel: 'manage',
         updatedById: 'u-minh',
         updatedByName: 'Minh Trần',
@@ -115,6 +127,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         kind: 'file',
         parentId: null,
         visibility: 'workspace',
+        shareScope: { ...NO_SHARES, homeWorkspace: true },
         myLevel: 'edit',
         updatedById: 'u-lan',
         updatedByName: 'Lan Nguyễn',
@@ -202,6 +215,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
               kind: 'file',
               parentId: null,
               visibility: 'restricted',
+              shareScope: { ...NO_SHARES, users: 2 },
               myLevel: 'edit',
               updatedById: 'u-hai',
               updatedByName: 'Hải Lê',
@@ -222,6 +236,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
               kind: 'file',
               parentId: null,
               visibility: 'restricted',
+              shareScope: { ...NO_SHARES, users: 3 },
               myLevel: 'comment',
               updatedById: 'u-minh',
               updatedByName: 'Minh Trần',
@@ -473,6 +488,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
             kind: 'file',
             parentId: null,
             visibility: 'restricted',
+            shareScope: { ...NO_SHARES, users: 2 },
             myLevel: 'edit',
             updatedById: 'u-hai',
             updatedByName: 'Hải Lê',
@@ -489,7 +505,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.querySelector('.dh-cell-name .dh-doc-subpath')?.textContent?.trim()).toBe(
       'Phòng Tài chính',
     )
-    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Hạn chế')
+    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('2 người')
     expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Chỉnh sửa')
 
     // Paging on shared-with-me forwards only { cursor } and appends documents
@@ -529,7 +545,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       expect.objectContaining({ workspaceId: 'ws-1', format: 'xlsx', updatedBy: 'u-minh' }),
     )
     expect(host.textContent).toContain('Bản thảo hợp đồng.docx')
-    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Hạn chế')
+    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('3 người')
     expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Nhận xét')
 
     // If shared-with-me is empty while filters are active from another sub-view, it shows uhEmptySharedWithMe (not uhEmptyFiltered)
@@ -2164,6 +2180,173 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'My Folder',
       'Alpha Folder',
     ])
+  })
+
+  const restrictedDoc = (): DocumentsHomeDoc => ({
+    id: 'doc-restricted',
+    workspaceId: 'ws-1',
+    title: 'Hợp đồng riêng.docx',
+    format: 'docx',
+    updatedAt: '2026-10-17T08:00:00.000Z',
+    kind: 'file',
+    parentId: null,
+    visibility: 'restricted',
+    shareScope: { ...NO_SHARES, users: 2 },
+    myLevel: 'edit',
+    canManage: true,
+  })
+
+  // UNI-1958 row 1 (CS1-1): the Access cell is the web's share-scope badge
+  // (document-share-scope-badge.tsx shareScopeView), never guessed from `visibility`.
+  const scopedDoc = (
+    id: string,
+    shareScope: UniworkDocShareScope | undefined,
+    extra: Partial<DocumentsHomeDoc> = {},
+  ): DocumentsHomeDoc => ({
+    id,
+    workspaceId: 'ws-1',
+    title: `${id}.docx`,
+    format: 'docx',
+    updatedAt: '2026-10-17T08:00:00.000Z',
+    kind: 'file',
+    parentId: null,
+    visibility: 'restricted',
+    ...(shareScope ? { shareScope } : {}),
+    myLevel: 'edit',
+    ...extra,
+  })
+  const badgeOf = (id: string) =>
+    host.querySelector(`.dh-doc-row[data-doc-id="${id}"] .dh-vis-badge`)?.textContent?.trim()
+  const SCOPE_CASES: [string, UniworkDocShareScope][] = [
+    ['users-1', { ...NO_SHARES, users: 1 }],
+    ['users-2', { ...NO_SHARES, users: 2 }],
+    ['home', { ...NO_SHARES, homeWorkspace: true }],
+    ['workspaces-1', { ...NO_SHARES, workspaces: 1 }],
+    ['workspaces-3', { ...NO_SHARES, workspaces: 3 }],
+    ['org', { ...NO_SHARES, organization: true }],
+    ['link', { ...NO_SHARES, publicLink: true }],
+    ['none', NO_SHARES],
+    ['two-axes', { ...NO_SHARES, users: 2, organization: true }],
+    ['home-users', { ...NO_SHARES, homeWorkspace: true, users: 1 }],
+    ['users-link', { ...NO_SHARES, users: 2, publicLink: true }],
+  ]
+
+  it('UNI-1958 row 1: each share_scope shape reads like the web Access cell (vi)', async () => {
+    rootItems = SCOPE_CASES.map(([id, scope]) => scopedDoc(id, scope))
+    await mountHome('vi')
+    expect(Object.fromEntries(SCOPE_CASES.map(([id]) => [id, badgeOf(id)]))).toEqual({
+      'users-1': '1 người',
+      'users-2': '2 người',
+      home: 'Workspace',
+      'workspaces-1': '1 workspace',
+      'workspaces-3': '3 workspace',
+      org: 'Tổ chức',
+      link: 'Liên kết công khai',
+      none: 'Riêng tư',
+      'two-axes': 'Nhiều phạm vi',
+      'home-users': 'Nhiều phạm vi',
+      'users-link': '2 người',
+    })
+  })
+
+  it('UNI-1958 row 1: each share_scope shape reads like the web Access cell (en, plural forms)', async () => {
+    rootItems = SCOPE_CASES.map(([id, scope]) => scopedDoc(id, scope))
+    await mountHome('en')
+    expect(Object.fromEntries(SCOPE_CASES.map(([id]) => [id, badgeOf(id)]))).toEqual({
+      'users-1': '1 person',
+      'users-2': '2 people',
+      home: 'Workspace',
+      'workspaces-1': '1 workspace',
+      'workspaces-3': '3 workspaces',
+      org: 'Organization',
+      link: 'Public link',
+      none: 'Private',
+      'two-axes': 'Multiple scopes',
+      'home-users': 'Multiple scopes',
+      'users-link': '2 people',
+    })
+  })
+
+  it('UNI-1958 row 1: a row without share_scope shows "—" for the scope and keeps the level, never "Riêng tư" (vi)', async () => {
+    rootItems = [scopedDoc('no-scope', undefined)]
+    await mountHome('vi')
+    const cell = host.querySelector('.dh-doc-row[data-doc-id="no-scope"] .dh-cell-access')!
+    expect(cell.querySelector('.dh-vis-badge')).toBeNull()
+    expect(cell.querySelector('.dh-cell-empty')?.textContent?.trim()).toBe('—')
+    expect(cell.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Chỉnh sửa')
+    expect(cell.textContent).not.toContain('Riêng tư')
+  })
+
+  it('UNI-1958 row 1: a restricted document shared with two people reads "2 người" (vi) / "2 people" (en), not "Riêng tư"', async () => {
+    rootItems = [restrictedDoc()]
+    await mountHome('vi')
+    expect(badgeOf('doc-restricted')).toBe('2 người')
+    await act(async () => {
+      root.unmount()
+    })
+    root = createRoot(host)
+    await mountHome('en')
+    expect(badgeOf('doc-restricted')).toBe('2 people')
+  })
+
+  it('UNI-1958 row 5: the doc-row archive action is the web "Chuyển vào thùng rác" (menu, confirm, announce)', async () => {
+    rootItems = [restrictedDoc()]
+    api.uniworkArchiveDocument = vi.fn(async () => ok({}))
+    resetLiveForTests()
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(
+            Fragment,
+            null,
+            createElement(UniworkLiveHost),
+            createElement(DocumentsHome, {
+              workspaceId: 'ws-1',
+              workspaces,
+              onWorkspaceChange: vi.fn(),
+              onOpenDocument: vi.fn(),
+              sidebarHost: sidebarSlot,
+            }),
+          ),
+        ),
+      )
+    })
+    await flush()
+    const kebab = host.querySelector<HTMLButtonElement>(
+      '.dh-doc-row[data-doc-id="doc-restricted"] .uw-row-menu-btn',
+    )!
+    await act(async () => {
+      kebab.click()
+    })
+    await flush()
+    const items = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
+    ).map((el) => el.textContent?.trim())
+    expect(items).toContain('Chuyển vào thùng rác')
+    expect(items).not.toContain('Lưu trữ')
+    const item = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
+    ).find((el) => el.textContent?.trim() === 'Chuyển vào thùng rác')!
+    await act(async () => {
+      item.click()
+    })
+    await flush()
+    const dialog = document.querySelector<HTMLElement>('.modal.uw-act')!
+    expect(dialog.textContent).toContain('Chuyển vào thùng rác · Hợp đồng riêng.docx')
+    expect(dialog.textContent).toContain(
+      '“Hợp đồng riêng.docx” và toàn bộ cây con sẽ được chuyển vào thùng rác trong 30 ngày trước khi bị xóa vĩnh viễn.',
+    )
+    expect(dialog.textContent).not.toContain('Lưu trữ')
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.btn-primary')!.click()
+    })
+    await flush()
+    expect(api.uniworkArchiveDocument).toHaveBeenCalledWith('doc-restricted')
+    expect(document.querySelector('[data-uw-live] [role="status"]')?.textContent).toBe(
+      'Đã chuyển vào thùng rác',
+    )
   })
 
   const docsHomeCss = () =>
