@@ -89,6 +89,7 @@ import { scopeWorkingCopyDirs } from './binding-store'
 import { tUniworkDocs } from './strings'
 import { createTreeChangedCoalescer } from './tree-changed'
 import { registerFirstSaveOpenAck } from './first-save-open'
+import { createFirstSaveNameBroker, registerFirstSaveNameAnswer } from './first-save-name'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
 import { createOfflineCopies } from '../uniwork-sync/offline-library/copies'
@@ -677,6 +678,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
+  // UNI-1959: the "Name the document" dialog's ask / verdict round trip
+  const firstSaveName = createFirstSaveNameBroker()
   const syncStore = syncStoreFor().access
   /**
    * FD-11: the one tree-changed push of this process. A feed page (through the
@@ -781,6 +784,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    requestFirstSaveName: (request) => firstSaveName.request(wiring.shellContents(), request),
     pushDocStateChanged: (path) => wiring.pushDocStateChanged?.(path),
     // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
     // discussionTarget already resolves); a detached editor window is not one
@@ -941,6 +945,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // SAVE-01 r2 (S01-R1-6): the renderer's "dialog is open" ack that releases a
   // File > Save's pending firstSaveOpen; a stale or foreign ack is a no-op
   registerFirstSaveOpenAck(ipcMain)
+  registerFirstSaveNameAnswer(ipcMain, firstSaveName)
   ipcMain.handle(UNIWORK_DOC_CHANNELS.saveLocalCopy, (_event, path: unknown) =>
     service.saveLocalCopy(path as string),
   )

@@ -58,6 +58,7 @@ import type {
   UniworkDocProperties,
   UniworkDocRenamedEvent,
   UniworkDocStatus,
+  UniworkFirstSaveNameRequest,
   UniworkDocSummary,
   UniworkFirstSaveInput,
   UniworkFolderChildren,
@@ -423,6 +424,31 @@ function asUniworkRemoteBar(raw: unknown): UniworkRemoteBar | null {
       return { kind: r.kind }
     default:
       return null
+  }
+}
+
+/** UNI-1959: a first-save-name push with every field of the right type, else null (dropped) */
+function asFirstSaveNameRequest(raw: unknown): UniworkFirstSaveNameRequest | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<Record<keyof UniworkFirstSaveNameRequest, unknown>>
+  if (
+    typeof r.requestId !== 'string' ||
+    !r.requestId ||
+    typeof r.path !== 'string' ||
+    typeof r.documentId !== 'string' ||
+    !r.documentId ||
+    typeof r.workspaceId !== 'string' ||
+    typeof r.title !== 'string'
+  ) {
+    return null
+  }
+  return {
+    requestId: r.requestId,
+    path: r.path,
+    documentId: r.documentId,
+    workspaceId: r.workspaceId,
+    title: r.title,
+    parentId: typeof r.parentId === 'string' && r.parentId ? r.parentId : null,
   }
 }
 
@@ -1273,6 +1299,17 @@ const homeApi: HomeApi = {
     }
     ipcRenderer.on(UNIWORK_DOC_CHANNELS.queuePopover, listener)
     return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.queuePopover, listener)
+  },
+  onUniworkFirstSaveName(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const request = asFirstSaveNameRequest(raw)
+      if (request) cb(request)
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.firstSaveName, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.firstSaveName, listener)
+  },
+  async uniworkFirstSaveNameAnswer(input) {
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.firstSaveNameAnswer, input)
   },
   async uniworkSave(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.save, path))

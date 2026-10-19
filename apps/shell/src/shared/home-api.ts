@@ -227,6 +227,12 @@ export interface UniworkDocSummary {
   updatedById?: string
   /** DESKTOP-HOME: server `visibility`; absent when omitted or unknown */
   visibility?: 'private' | 'workspace' | 'restricted'
+  /**
+   * UNI-1959: the server's `share_scope.home_workspace` (the folder has a grant
+   * for its home workspace); absent when the row carries no `share_scope`. When
+   * present it decides "shared with the workspace" over `visibility`.
+   */
+  shareScope?: { homeWorkspace: boolean }
   /** DESKTOP-HOME: server `my_level`; absent when omitted or unknown */
   myLevel?: 'view' | 'comment' | 'edit' | 'manage'
   /** shared-with-me rows only: the workspace the share lives in (name resolved by main) */
@@ -328,6 +334,7 @@ export interface UniworkCreateFolderInput {
   workspaceId: string
   parentId: string | null
   title: string
+  visibility?: UniworkCreateVisibility
 }
 
 /** FD-11: move a document/folder under another folder (null = the workspace root) */
@@ -462,10 +469,24 @@ export type UniworkDocActionResult<T> =
        */
       documentId?: string
       documentTitle?: string
+      /**
+       * UNI-1959: a create the server answered 404 / 501 - its route for this
+       * kind is not deployed - so the New menu disables that kind for the
+       * session. Set on create-document / create-page failures only.
+       */
+      endpointMissing?: boolean
     }
 
 /** the file formats D's blank route generates (UNI-1953: the Office three plus md / html / pdf) */
 export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'html' | 'pdf'
+
+/**
+ * UNI-1959: "Share with workspace" on a create. `workspace` is the only value
+ * the New menu sends (the request then carries `visibility: "workspace"`); the
+ * field is absent for a private create and inside a workspace-shared folder,
+ * where the server inherits from the parent.
+ */
+export type UniworkCreateVisibility = 'workspace'
 
 export interface UniworkCreateDocInput {
   workspaceId: string
@@ -473,6 +494,7 @@ export interface UniworkCreateDocInput {
   folderId: string | null
   name: string
   format: UniworkDocNewFormat
+  visibility?: UniworkCreateVisibility
 }
 
 /** UNI-1953: a UniNote is a page, not a file format: it has its own create call */
@@ -481,6 +503,7 @@ export interface UniworkCreatePageInput {
   /** ULID of the parent folder/page; null = the caller's My Folder */
   folderId: string | null
   name: string
+  visibility?: UniworkCreateVisibility
 }
 
 export interface UniworkUploadDocInput {
@@ -665,6 +688,30 @@ export interface UniworkDocStatus {
  */
 export interface UniworkQueuePopoverRequest {
   path: string
+}
+
+/**
+ * UNI-1959 (mirrors the web UNI-1960): main asks the shell renderer for the
+ * "Name the document" dialog on the first save of a document created blank. The
+ * save is held until the renderer answers `continue` (the name / folder step is
+ * done or unchanged) or `cancel` (no save).
+ */
+export interface UniworkFirstSaveNameRequest {
+  /** minted by main per ask; the answer names it */
+  requestId: string
+  /** the working copy the editor saved */
+  path: string
+  documentId: string
+  workspaceId: string
+  /** the document's current title, with its extension (e.g. `Untitled document.docx`) */
+  title: string
+  /** the folder holding it now; null = unknown / workspace root */
+  parentId: string | null
+}
+
+export interface UniworkFirstSaveNameAnswer {
+  requestId: string
+  answer: 'continue' | 'cancel'
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
@@ -1297,6 +1344,10 @@ export interface HomeApi {
    * live dialog from a dead renderer and would warn every time.
    */
   uniworkFirstSaveOpenAck(path: string): Promise<void>
+  /** UNI-1959: main asks for the "Name the document" dialog of a blank document's first save */
+  onUniworkFirstSaveName(cb: (request: UniworkFirstSaveNameRequest) => void): () => void
+  /** UNI-1959: the dialog's verdict; main continues or drops the held save */
+  uniworkFirstSaveNameAnswer(input: UniworkFirstSaveNameAnswer): Promise<void>
   /** MYFOLDER-01 (Q3): ensure the caller's personal My Folder (dialog open) */
   uniworkEnsureMyFolder(workspaceId: string): Promise<UniworkResult<UniworkDocSummary>>
   /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
@@ -1917,6 +1968,13 @@ export const UNIWORK_DOC_CHANNELS = {
    * no dialog is up and File > Save warns instead of reporting a phantom save.
    */
   firstSaveOpenAck: 'uniwork-doc:first-save-open-ack',
+  /**
+   * UNI-1959: main -> shell renderer: open "Name the document" for the first
+   * save of a blank-created document (UniworkFirstSaveNameRequest)
+   */
+  firstSaveName: 'uniwork-doc:first-save-name',
+  /** UNI-1959: invoke(UniworkFirstSaveNameAnswer) - the dialog's verdict on a held save */
+  firstSaveNameAnswer: 'uniwork-doc:first-save-name-answer',
   /** MYFOLDER-01 (Q3): invoke(workspaceId) -> the ensured My Folder row (DocumentSDO) */
   ensureMyFolder: 'uniwork-doc:ensure-my-folder',
   /** invoke(sessionId, action) -> UniworkConflictReply (G5-09) */

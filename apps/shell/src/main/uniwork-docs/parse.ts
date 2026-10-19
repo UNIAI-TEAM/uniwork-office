@@ -201,6 +201,17 @@ function visibilityOf(value: unknown): UniworkDocSummary['visibility'] {
 }
 
 /**
+ * UNI-1959: `share_scope.home_workspace` of a row, the web's
+ * `isParentWorkspaceShared` input; an absent or malformed `share_scope` is
+ * dropped at parse (the caller then falls back to `visibility`).
+ */
+function shareScopeOf(value: unknown): UniworkDocSummary['shareScope'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const home = (value as Record<string, unknown>).home_workspace
+  return typeof home === 'boolean' ? { homeWorkspace: home } : undefined
+}
+
+/**
  * DESKTOP-HOME: `my_level` on list rows (`view` | `comment` | `edit` |
  * `manage`); unknown or absent values are dropped at parse.
  */
@@ -219,6 +230,7 @@ function summaryRow(
   const title = str(row.title)
   const path = pathOf(row)
   const visibility = visibilityOf(row.visibility)
+  const shareScope = shareScopeOf(row.share_scope)
   const myLevel = rowMyLevelOf(row.my_level)
   const updatedById = optId(row.updated_by) ?? undefined
   return {
@@ -232,6 +244,7 @@ function summaryRow(
     updatedAt: str(row.updated_at, 64),
     ...(updatedById ? { updatedById } : {}),
     ...(visibility ? { visibility } : {}),
+    ...(shareScope ? { shareScope } : {}),
     ...(myLevel ? { myLevel } : {}),
     ...summaryFlags(row),
     kind,

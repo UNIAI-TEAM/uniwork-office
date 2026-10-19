@@ -1,4 +1,5 @@
 import type {
+  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkDocNewFormat,
@@ -189,6 +190,8 @@ export interface UniworkDocsClient {
     workspaceId: string
     parentId: string | null
     title: string
+    /** UNI-1959: "Share with workspace"; absent = the server's own default / parent inheritance */
+    visibility?: UniworkCreateVisibility
     idempotencyKey: string
   }): Promise<UniworkDocSummary>
   /** FD-11: one document's own fields, whatever its kind (rename/move read this) */
@@ -210,6 +213,8 @@ export interface UniworkDocsClient {
       workspaceId: string
       format: UniworkDocNewFormat
       title: string
+      /** UNI-1959: "Share with workspace"; absent = private (or the parent's, which the server inherits) */
+      visibility?: UniworkCreateVisibility
       idempotencyKey: string
     } & UniworkCreateTarget,
   ): Promise<UniworkDocSummary>
@@ -218,6 +223,8 @@ export interface UniworkDocsClient {
     input: {
       workspaceId: string
       title: string
+      /** UNI-1959: "Share with workspace"; absent = private (or the parent's, which the server inherits) */
+      visibility?: UniworkCreateVisibility
       idempotencyKey: string
     } & UniworkCreateTarget,
   ): Promise<UniworkDocSummary>
@@ -809,6 +816,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           // the root is the field's absence, never an empty string; an
           // empty/blank parent_id is refused outright (S01-R1-5)
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
+          ...(input.visibility ? { visibility: input.visibility } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,
@@ -864,6 +872,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           // never silently demoted to a root create (S01-R1-5)
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
           ...(input.destination ? { destination: input.destination } : {}),
+          ...(input.visibility ? { visibility: input.visibility } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,
@@ -882,6 +891,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           // the same exclusive placement as createBlank (S01-R1-5)
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
           ...(input.destination ? { destination: input.destination } : {}),
+          ...(input.visibility ? { visibility: input.visibility } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,

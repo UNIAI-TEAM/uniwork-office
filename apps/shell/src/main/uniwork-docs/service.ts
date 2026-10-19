@@ -10,6 +10,7 @@ import type {
   UniworkCreateDocInput,
   UniworkCreatePageInput,
   UniworkCreateFolderInput,
+  UniworkCreateVisibility,
   UniworkDocAccess,
   UniworkDocActionError,
   UniworkDocActionResult,
@@ -25,6 +26,7 @@ import type {
   UniworkDocEditLock,
   UniworkEditLockSessionView,
   UniworkFirstSaveInput,
+  UniworkFirstSaveNameRequest,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
@@ -100,6 +102,7 @@ import {
   workingCopyName,
 } from './formats'
 import { pathKey } from '../../shared/path-key'
+import { isBlankDefaultTitle } from '../../shared/blank-default-names'
 import { LaunchController } from './launch'
 import { createDocumentLimitsCache, type DocumentLimits, type DocumentLimitsCache } from './limits'
 import { tUniworkDocs } from './strings'
@@ -352,6 +355,13 @@ export interface UniworkDocsServiceDeps {
   pushStatus(status: UniworkDocStatus): void
   /** G5-06u: ask the shell renderer to open the queue popover of a path */
   pushQueuePopover?(request: UniworkQueuePopoverRequest): void
+  /**
+   * UNI-1959: ask the shell renderer for the "Name the document" dialog on the
+   * first save of a blank-created document and wait for its verdict:
+   * `continue` (named / moved / unchanged: the save goes on) or `cancel` (no
+   * save). Absent = the save never asks (a build without the dialog host).
+   */
+  requestFirstSaveName?(request: UniworkFirstSaveNameRequest): Promise<'continue' | 'cancel'>
   /**
    * EL-1(b) fix6 (VEL-2): broadcast `{ path }` on `uniwork:doc-state-changed`
    * when `isReadOnly(path)` or `isBound(path)` may have changed.
@@ -656,6 +666,16 @@ async function readFileRange(
 }
 
 /**
+ * UNI-1959: the one `visibility` a create may send. Only `workspace` ("Share
+ * with workspace") goes out; anything else a hand-typed invoke carries is
+ * dropped, so a private create and a create inside a shared folder (which the
+ * server inherits) send no field at all.
+ */
+function visibilityOf(input: { visibility?: unknown }): { visibility?: UniworkCreateVisibility } {
+  return input.visibility === 'workspace' ? { visibility: 'workspace' } : {}
+}
+
+/**
  * a trimmed, NFC-normalized name of 1..`max` runes (the server trims and
  * normalizes the same way, so the string the field shows is the one the server
  * stored). `max` defaults to the widest document cap; FD-11 passes the folder
@@ -683,7 +703,7 @@ function requireName(raw: string, max = MAX_DOC_NAME_RUNES): string {
  */
 async function actionResult<T>(
   run: () => Promise<T>,
-  options: { nameField?: boolean } = {},
+  options: { nameField?: boolean; flagMissingEndpoint?: boolean } = {},
 ): Promise<UniworkDocActionResult<T>> {
   try {
     return { ok: true, value: await run() }
@@ -705,12 +725,18 @@ async function actionResult<T>(
     // names the server document it left (compensated or not)
     const documentId = error instanceof UniworkDocError ? error.documentId : undefined
     const documentTitle = error instanceof UniworkDocError ? error.documentTitle : undefined
+    // UNI-1959: the server has no route for this create (the web's isEndpointMissing)
+    const endpointMissing =
+      options.flagMissingEndpoint === true &&
+      error instanceof UniworkDocError &&
+      (error.status === 404 || error.status === 501)
     return {
       ok: false,
       error: code,
       ...(max === undefined ? {} : { max }),
       ...(documentId === undefined ? {} : { documentId }),
       ...(documentTitle === undefined ? {} : { documentTitle }),
+      ...(endpointMissing ? { endpointMissing: true } : {}),
     }
   }
 }
@@ -1112,6 +1138,16 @@ export class UniworkDocsService {
    * set would swallow it) and is followed as usual.
    */
   private readonly selfRenamed = new Map<string, string>()
+  /**
+   * UNI-1959: documents this app created blank (`createDocument`) and has not
+   * had a first save for yet; their first user save asks name + folder. A
+   * document the dialog already answered is in `firstSaveNamed` instead.
+   */
+  private readonly createdBlank = new Set<string>()
+  /** UNI-1959: documents whose "Name the document" step was answered this session (never asked twice) */
+  private readonly firstSaveNamed = new Set<string>()
+  /** UNI-1959: a first-save ask in flight, by path key (a second save while it is open is covered by it) */
+  private readonly firstSaveAsking = new Set<string>()
   /**
    * G5-03a (S6): the bar of each path as this session knows it, keyed by path.
    * An entry (even `null`, an explicitly hidden bar) is authoritative over the
@@ -4075,11 +4111,81 @@ export class UniworkDocsService {
       this.refuseMigration(doc)
       return
     }
-    // G5-06u: the user's own Save: a pending intent is not replayed and no
-    // second one is minted; the coordinator asks for the queue popover instead.
-    // Only a shell tab has the pill and popover: a detached editor window keeps
-    // the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
+    // UNI-1959: the first save of a document created blank asks name + folder;
+    // the upload below waits for the verdict (a second Save while the dialog is
+    // open is covered by it: the save reads the file when it runs)
+    if (this.wantsFirstSaveName(doc)) {
+      const key = pathKey(doc.path)
+      if (this.firstSaveAsking.has(key)) return
+      this.firstSaveAsking.add(key)
+      void this.askFirstSaveName(doc)
+        .then((answer) => {
+          if (answer === 'continue') this.saveAfterFirstSaveName(path)
+        })
+        .finally(() => this.firstSaveAsking.delete(key))
+      return
+    }
+    this.saveAfterFirstSaveName(path)
+  }
+
+  /**
+   * G5-06u: the user's own Save: a pending intent is not replayed and no
+   * second one is minted; the coordinator asks for the queue popover instead.
+   * Only a shell tab has the pill and popover: a detached editor window keeps
+   * the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
+   */
+  private saveAfterFirstSaveName(path: string): void {
     void this.coordinator.save(path, { userSave: this.deps.isShellTab?.(path) ?? true })
+  }
+
+  /**
+   * UNI-1959 (the web's first-save-naming predicate): a document never saved -
+   * created blank by this app in this session, or, after a restart, file
+   * version 1 with one of the default blank titles - and not yet asked. A
+   * detached editor window has no dialog host, so it never asks.
+   */
+  private wantsFirstSaveName(doc: BoundDocument): boolean {
+    if (!this.deps.requestFirstSaveName) return false
+    if (this.deps.isShellTab?.(doc.path) === false) return false
+    const id = doc.binding.documentId
+    if (this.firstSaveNamed.has(id)) return false
+    return (
+      this.createdBlank.has(id) ||
+      (doc.binding.baseVersion === 1 && isBlankDefaultTitle(doc.binding.title))
+    )
+  }
+
+  /**
+   * Reads where the document sits now, asks the renderer for the dialog and
+   * answers its verdict. An unreadable document (offline, gone) or a missing /
+   * failing dialog host never blocks the save: it answers `continue` without
+   * marking the document named, so the next save asks again.
+   */
+  private async askFirstSaveName(doc: BoundDocument): Promise<'continue' | 'cancel'> {
+    const id = doc.binding.documentId
+    let ref: DocumentRef
+    try {
+      ref = await this.api().documentRef(id)
+    } catch {
+      return 'continue'
+    }
+    try {
+      const answer = await this.deps.requestFirstSaveName!({
+        requestId: `fsn-${randomUUID()}`,
+        path: doc.path,
+        documentId: id,
+        workspaceId: ref.workspaceId || doc.binding.workspaceId,
+        title: ref.title,
+        parentId: ref.parentId,
+      })
+      if (answer === 'continue') {
+        this.firstSaveNamed.add(id)
+        this.createdBlank.delete(id)
+      }
+      return answer
+    } catch {
+      return 'continue'
+    }
   }
 
   /**
@@ -4345,6 +4451,7 @@ export class UniworkDocsService {
           workspaceId,
           parentId: typeof input.parentId === 'string' && input.parentId ? input.parentId : null,
           title,
+          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
         // FD-11: the new folder is a row in its parent's tree and contents
@@ -4398,13 +4505,16 @@ export class UniworkDocsService {
           format: input.format,
           title: name,
           ...target.create,
+          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
+        // UNI-1959: never saved yet - its first user save asks name + folder
+        this.createdBlank.add(created.id)
         // FD-11: a new document changes the folder's contents for every view
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
       },
-      { nameField: true },
+      { nameField: true, flagMissingEndpoint: true },
     )
   }
 
@@ -4423,6 +4533,7 @@ export class UniworkDocsService {
           workspaceId: target.workspaceId,
           title: name,
           ...target.create,
+          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
         this.pushTreeChangedFor(session, target.workspaceId)
