@@ -20,9 +20,21 @@ export interface UniworkCloseGuard {
 }
 
 let guard: UniworkCloseGuard | null = null
+/** EL-1(b) B2: one service hook for MCP / removeTab / window-closed drops */
+let dropHook: ((paths: string[]) => void) | null = null
 
 export function setUniworkCloseGuard(next: UniworkCloseGuard | null): void {
   guard = next
+}
+
+export function setUniworkPathDropHook(next: ((paths: string[]) => void) | null): void {
+  dropHook = next
+}
+
+/** best-effort; the service caps the DELETE. Fire-and-forget from tab teardown. */
+export function notePathsDropped(paths: string[]): void {
+  if (!dropHook || paths.length === 0) return
+  dropHook(paths)
 }
 
 export function isUniworkCloseGuarded(path: string | undefined): boolean {

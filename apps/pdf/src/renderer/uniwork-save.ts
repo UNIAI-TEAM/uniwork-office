@@ -33,3 +33,26 @@ export function drainedOrigin(queued: readonly SaveOrigin[]): SaveOrigin {
       ? 'auto'
       : 'internal'
 }
+
+export interface PdfReadOnlySaveSeam {
+  uniworkReadOnlySave?(path?: string): Promise<void>
+}
+
+/**
+ * Explicit Save of a read-only bound PDF: asks main to explain the lock and
+ * returns true when the save must stop before writing. Autosave, internal
+ * flushes and local read-only files return false.
+ */
+export function pdfExplainReadOnlySave(
+  api: PdfReadOnlySaveSeam | null | undefined,
+  input: {
+    origin: SaveOrigin
+    bound: boolean
+    readOnly: boolean
+    filePath: string | null | undefined
+  },
+): boolean {
+  if (input.origin !== 'user' || !input.bound || !input.readOnly || !input.filePath) return false
+  void api?.uniworkReadOnlySave?.(input.filePath)?.catch(() => {})
+  return true
+}

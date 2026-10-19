@@ -49,7 +49,7 @@ import {
   type UniworkCommentsHandle,
 } from './comments-wiring'
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
-import { setUniworkCloseGuard } from './close-guard'
+import { setUniworkCloseGuard, setUniworkPathDropHook } from './close-guard'
 import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
 import {
   SyncRuntime,
@@ -124,6 +124,8 @@ export interface UniworkDocsWiring {
    */
   refuseLockedPath(path: string): boolean
   isPathOpen(path: string): boolean
+  /** EL-1(b) fix6 (VEL-2): broadcast `{ path }` to every renderer webContents */
+  pushDocStateChanged?(path: string): void
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
   reloadPath(path: string): void
   /**
@@ -778,6 +780,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    pushDocStateChanged: (path) => wiring.pushDocStateChanged?.(path),
     // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
     // discussionTarget already resolves); a detached editor window is not one
     isShellTab: (path) => (wiring.discussionTarget ? wiring.discussionTarget(path) !== null : true),
@@ -948,6 +951,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.remoteAction, (_event, path: unknown, action: unknown) =>
     service.remoteAction(path as string, action as UniworkRemoteAction),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.editHere, (_event, path: unknown) =>
+    service.editHere(path as string),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {
     if (typeof path === 'string') service.dismissLock(path)
@@ -967,6 +973,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pending.resolve(answer?.confirmed === true)
   })
   setUniworkCloseGuard(service)
+  setUniworkPathDropHook((paths) => {
+    void service.notePathsDropped(paths)
+  })
   const runtime = createSyncRuntime(service, {
     treeChanged: (workspaceId) => treeChanged.notify(workspaceId),
     libraryChanged: (documentId) => offlineRowChanged(documentId),

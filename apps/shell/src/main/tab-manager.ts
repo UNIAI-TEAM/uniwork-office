@@ -5,6 +5,7 @@ import type { Rectangle, WebContents, WebContentsView } from 'electron'
 import {
   confirmUniworkClose,
   isUniworkCloseGuarded,
+  notePathsDropped,
   uniworkNeedsClosePrompt,
 } from './uniwork-docs/close-guard'
 
@@ -1028,6 +1029,7 @@ export class TabManager {
     if (idx < 0) return
     if (this.htmlFullScreenId === id) this.htmlFullScreenId = null
     const [removed] = this.tabs.splice(idx, 1)
+    if (removed.filePath) notePathsDropped([removed.filePath])
     if (this.activeId === id) {
       const fallback = this.tabs[idx - 1] ?? this.tabs[0]
       this.activateTab(fallback.id)

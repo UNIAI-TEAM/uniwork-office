@@ -366,3 +366,24 @@ describe('pdf:save Save As onto the open file', () => {
     expect(hook).not.toHaveBeenCalled()
   })
 })
+
+describe('EL-1(b) fix6: pdf:uniwork-read-only-save', () => {
+  it('forwards a path granted to the sender to policy.readOnlySave and refuses ungranted paths', async () => {
+    const path = await makePdf('doc.pdf')
+    const other = await makePdf('other.pdf')
+    const readOnlySaves: string[] = []
+    const policy = {
+      isBound: (p: string) => p === path,
+      isReadOnly: (p: string) => p === path,
+      readOnlySave: (p: string) => void readOnlySaves.push(p),
+    }
+    setUniworkDocumentPolicy(policy)
+    const wc = openView(path)
+    const roSave = handlers.get('pdf:uniwork-read-only-save')
+    expect(typeof roSave).toBe('function')
+    if (!roSave) return
+    roSave({ sender: wc }, path)
+    roSave({ sender: wc }, other)
+    expect(readOnlySaves).toEqual([path])
+  })
+})

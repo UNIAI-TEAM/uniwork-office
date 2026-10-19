@@ -32,6 +32,21 @@ const api: MarkdownApi = {
   readFile: (path) => ipcRenderer.invoke(MARKDOWN_CHANNELS.readFile, path),
   save: (request) => ipcRenderer.invoke(MARKDOWN_CHANNELS.save, request),
   uniworkState: () => ipcRenderer.invoke(MARKDOWN_CHANNELS.uniworkState),
+  onUniworkStateChanged: (cb) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'path' in payload &&
+        typeof payload.path === 'string'
+      ) {
+        cb(payload.path)
+      }
+    }
+    ipcRenderer.on('uniwork:doc-state-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:doc-state-changed', listener)
+  },
+  uniworkReadOnlySave: (path) => ipcRenderer.invoke(MARKDOWN_CHANNELS.uniworkReadOnlySave, path),
   setDirty: (dirty) => ipcRenderer.send(MARKDOWN_CHANNELS.dirtyChanged, dirty),
   onSaveRequest: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, mode: SaveMode) => handler(mode)

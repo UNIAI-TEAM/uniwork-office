@@ -167,4 +167,24 @@ export const ko = {
   uwTipEditLockedSelf: '다른 창에서 이 문서를 편집 중입니다.',
   uwErrEditLocked: '다른 사용자가 이 문서를 편집 중입니다.',
   uwReasonEditLocked: '다른 사용자가 편집 중',
+  uwLockBannerOther: '{name} 님이 {time}부터 편집 중입니다. 읽기 전용으로 보고 있습니다.',
+  uwLockBannerSelfElsewhere: '다른 창에서 이 문서를 편집 중입니다.',
+  uwLockBannerFree: '지금 이 문서를 편집 중인 사람이 없습니다.',
+  uwLockEditHere: '여기서 편집',
+  uwLockAcquiring: '편집 액세스 권한을 가져오는 중…',
+  uwLockReadOnlyExplain: '저장된 내용이 없습니다 — 문서가 읽기 전용입니다.',
+  uwLockLostTitle: '더 이상 편집하고 있지 않습니다',
+  uwLockLostTakenOver:
+    '{name} 님이 편집을 가져갔습니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
+  uwLockLostHandedOver:
+    '편집을 {name} 님에게 넘겼습니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
+  uwLockLostExpired:
+    '한동안 서버에 연결할 수 없어(네트워크 없음 또는 기기 절전) 편집이 만료되었습니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
+  uwLockLostMovedHere:
+    '이 문서를 이제 다른 창에서 편집하고 있습니다. 이 창의 저장되지 않은 변경 사항은 그대로 있습니다.',
+  uwLockLostAccessLost:
+    '이 문서를 편집할 권한이 더 이상 없습니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
+  uwLockLostGeneric: '더 이상 편집하고 있지 않습니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
+  uwLockLostHeldBy: '{name} 님이 지금 편집 중입니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
+  uwLockAcquireFailed: '편집 액세스 권한을 가져올 수 없습니다. 몇 분 후에 다시 시도하세요.',
 } satisfies Record<keyof typeof zh, string>

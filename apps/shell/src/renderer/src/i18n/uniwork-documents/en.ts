@@ -167,4 +167,22 @@ export const en = {
   uwTipEditLockedSelf: 'You’re editing this document in another window.',
   uwErrEditLocked: 'Someone else is editing this document.',
   uwReasonEditLocked: 'someone else is editing',
+  uwLockBannerOther: '{name} has been editing since {time}. You’re viewing read‑only.',
+  uwLockBannerSelfElsewhere: 'You’re editing this document in another window.',
+  uwLockBannerFree: 'No one is editing this document now.',
+  uwLockEditHere: 'Edit here',
+  uwLockAcquiring: 'Getting editing access…',
+  uwLockReadOnlyExplain: 'Nothing was saved — the document is read‑only.',
+  uwLockLostTitle: 'You’re no longer editing',
+  uwLockLostTakenOver: '{name} took over editing. Your unsaved changes are still here.',
+  uwLockLostHandedOver: 'You handed editing to {name}. Your unsaved changes are still here.',
+  uwLockLostExpired:
+    'Editing expired because we couldn’t reach the server for a while (no network or the device slept). Your unsaved changes are still here.',
+  uwLockLostMovedHere:
+    'You’re now editing this document in another window. The unsaved changes in this window are still here.',
+  uwLockLostAccessLost:
+    'You no longer have permission to edit this document. Your unsaved changes are still here.',
+  uwLockLostGeneric: 'You’re no longer editing. Your unsaved changes are still here.',
+  uwLockLostHeldBy: '{name} is editing now. Your unsaved changes are still here.',
+  uwLockAcquireFailed: 'Couldn’t get editing access. Try again in a few minutes.',
 } satisfies Record<keyof typeof zh, string>

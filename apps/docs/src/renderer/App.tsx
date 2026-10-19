@@ -271,8 +271,12 @@ import {
   saveStateLabel,
   setEditorEditable,
   uniworkAllowsSave,
+  uniworkCloseDirty,
+  uniworkExplainReadOnlySave,
   uniworkStateFor,
+  useDirtyWhileEditable,
   useUniworkDocState,
+  type UniworkLockSeam,
 } from './uniwork-doc-state'
 import { SPELLCHECK_KEY, spellcheckEnabled } from './spellcheck-pref'
 import { cachedByDoc } from './doc-cache'
@@ -2428,8 +2432,12 @@ export function App() {
   const save = useCallback((saveAs: boolean, auto = false, newDocName?: string) => {
     if (!(saveAs ? cap('saveAs') : cap('save'))) return Promise.resolve(false)
     // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
-    const state = uniworkStateFor(uniworkRef.current, fileCtxRef.current.doc?.filePath)
-    if (!uniworkAllowsSave(state, saveAs, auto)) return Promise.resolve(false)
+    const filePath = fileCtxRef.current.doc?.filePath
+    const state = uniworkStateFor(uniworkRef.current, filePath)
+    if (!uniworkAllowsSave(state, saveAs, auto)) {
+      uniworkExplainReadOnlySave(window.desktop as UniworkLockSeam, state, saveAs, auto, filePath)
+      return Promise.resolve(false)
+    }
     return saveImpl(fileCtxRef.current, saveAs, auto, newDocName)
   }, [])
 
@@ -5384,13 +5392,25 @@ export function App() {
   const anyDirtyRef = useRef(false)
   const hasUnsavedChanges = isDocDirty(fileCtxRef.current)
   anyDirtyRef.current = hasUnsavedChanges
+  // edits held when the edit lock is lost in place must still prompt on close
+  const dirtyWhileEditableRef = useDirtyWhileEditable(
+    uniwork.readOnly,
+    hasUnsavedChanges || dirtyRef.current,
+  )
 
   // close guard: the main process queries dirty state before closing a tab/window; choosing "Save" runs a full save and reports back
   useEffect(() => {
     const offCheck = window.desktop.onCloseCheck?.(() => {
       window.desktop.reportCloseCheck({
-        // a view-only UniWork document cannot be saved in place: nothing to ask
-        dirty: !!doc && !uniwork.readOnly && (anyDirtyRef.current || dirtyRef.current),
+        // a view-only UniWork document cannot be saved in place: nothing to ask,
+        // unless it lost its lock while holding edits (those are kept, so ask)
+        dirty:
+          !!doc &&
+          uniworkCloseDirty(
+            uniwork.readOnly,
+            dirtyWhileEditableRef.current,
+            anyDirtyRef.current || dirtyRef.current,
+          ),
         autoSave: autoSaveActive && !!doc?.filePath,
         filePath: doc?.filePath ?? null,
       })
@@ -5414,7 +5434,7 @@ export function App() {
       offCheck?.()
       offSave?.()
     }
-  }, [doc, save, autoSaveActive, uniwork.readOnly])
+  }, [doc, save, autoSaveActive, uniwork.readOnly, dirtyWhileEditableRef])
 
   // autosave: every 30s and on window blur, silently persist pending changes
   useEffect(() => {
