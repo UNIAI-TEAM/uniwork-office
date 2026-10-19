@@ -4258,23 +4258,26 @@ export class UniworkDocsService {
       }
       this.firstSaveOps.set(key, op)
       this.editorDirty.add(doc.path)
-      void this.askFirstSaveName(op, doc).then((answer) => {
-        const live = this.firstSaveOpLive(op)
-        if (this.firstSaveOps.get(key) === op) this.endFirstSaveOp(key)
-        // a verdict that lands after the tab closed or the session ended resumes nothing
-        if (!live) return
-        if (answer === 'cancel') {
-          this.afterFirstSaveCancelled(path)
-          return
-        }
-        // only the person's own verdict marks the document named: an unavailable
-        // dialog host (nobody was asked) leaves the next Save to ask
-        if (answer === 'continue') this.markFirstSaveNamed(op)
-        const now = this.store.lookup(path)
-        if (!now || now.binding.documentId !== op.documentId || !this.ownsLocally(now)) return
-        this.editorDirty.delete(now.path)
-        this.saveAfterFirstSaveName(path)
-      })
+      void this.askFirstSaveName(op, doc)
+        .then((answer) => {
+          const live = this.firstSaveOpLive(op)
+          if (this.firstSaveOps.get(key) === op) this.endFirstSaveOp(key)
+          // a verdict that lands after the tab closed or the session ended resumes nothing
+          if (!live) return
+          if (answer === 'cancel') {
+            this.afterFirstSaveCancelled(path)
+            return
+          }
+          // only the person's own verdict marks the document named: an unavailable
+          // dialog host (nobody was asked) leaves the next Save to ask
+          if (answer === 'continue') this.markFirstSaveNamed(op)
+          const now = this.store.lookup(path)
+          if (!now || now.binding.documentId !== op.documentId || !this.ownsLocally(now)) return
+          this.editorDirty.delete(now.path)
+          this.saveAfterFirstSaveName(path)
+        })
+        // a store that throws here leaves the op ended and the edits unsent
+        .catch(() => undefined)
       return
     }
     this.saveAfterFirstSaveName(path)
