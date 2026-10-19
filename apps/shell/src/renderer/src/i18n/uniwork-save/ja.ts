@@ -12,6 +12,8 @@ export const ja = {
   usMyFolderPrivate: '非公開、あなただけが見られます',
   usChange: '変更',
   usSave: '保存',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: '閉じる',
   usPickTitle: '保存先を選択',
   usBack: '名前の入力に戻る',

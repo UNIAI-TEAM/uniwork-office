@@ -264,6 +264,114 @@
   white-space: nowrap;
 }
 
+/* UNI-1959 New menu (the web's CreateMenu): rows with icon, name and extension, then the share toggle */
+.dh-new-menu {
+  min-width: 270px;
+}
+
+.dh-new-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dh-new-item:hover,
+.dh-new-item:focus-visible {
+  background: var(--bg-hover-strong);
+  outline: none;
+}
+
+.dh-new-item[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dh-new-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.dh-new-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.dh-new-ext {
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.dh-new-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+
+.dh-new-share {
+  align-items: flex-start;
+  padding-block: 8px;
+}
+
+.dh-new-check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border: 1px solid var(--border-control);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.dh-new-share[aria-checked='true'] .dh-new-check {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dh-new-share-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dh-new-hint {
+  min-height: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.dh-quick-pill[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dh-quick-ext {
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+}
+
 /* Quick create row */
 .dh-quick-row {
   display: flex;

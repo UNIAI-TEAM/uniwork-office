@@ -11,6 +11,8 @@ export const vi = {
   usMyFolderPrivate: 'Riêng tư, chỉ bạn thấy',
   usChange: 'Đổi',
   usSave: 'Lưu',
+  usFirstTitle: 'Đặt tên tài liệu',
+  usFirstHint: 'Bạn có thể đổi tên hoặc di chuyển sau.',
   usClose: 'Đóng',
   usPickTitle: 'Chọn nơi lưu',
   usBack: 'Quay lại đặt tên',

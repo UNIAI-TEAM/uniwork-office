@@ -12,6 +12,8 @@ export const ru = {
   usMyFolderPrivate: 'Личное, видно только вам',
   usChange: 'Изменить',
   usSave: 'Сохранить',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Закрыть',
   usPickTitle: 'Выберите место сохранения',
   usBack: 'Назад к имени',

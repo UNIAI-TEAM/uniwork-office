@@ -12,6 +12,8 @@ export const es = {
   usMyFolderPrivate: 'Privado, solo tú puedes verlo',
   usChange: 'Cambiar',
   usSave: 'Guardar',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Cerrar',
   usPickTitle: 'Elegir dónde guardar',
   usBack: 'Volver al nombre',

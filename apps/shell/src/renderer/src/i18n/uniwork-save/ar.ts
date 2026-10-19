@@ -11,6 +11,8 @@ export const ar = {
   usMyFolderPrivate: 'خاص، لا يراه غيرك',
   usChange: 'تغيير',
   usSave: 'حفظ',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'إغلاق',
   usPickTitle: 'اختيار مكان الحفظ',
   usBack: 'العودة إلى التسمية',

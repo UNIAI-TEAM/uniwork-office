@@ -10,6 +10,8 @@ export const zh = {
   usMyFolderPrivate: '私有，仅你可见',
   usChange: '更改',
   usSave: '保存',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: '关闭',
   usPickTitle: '选择保存位置',
   usBack: '返回命名',

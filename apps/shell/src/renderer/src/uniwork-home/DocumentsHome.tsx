@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type {
+  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocSummary,
   UniworkFolderNode,
@@ -12,7 +13,6 @@ import {
   ActionToast,
   ArchiveConfirm,
   NEW_KIND_LABEL_KEY,
-  NewDocDialog,
   RenameField,
   UploadDocDialog,
   type ActionOutcome,
@@ -74,6 +74,7 @@ import {
   pickUploadFile,
   renameDocument,
   restoreDocument,
+  listFolderChildren,
   searchDocuments,
   uploadDocument,
 } from '../uniwork-library-api'
@@ -103,6 +104,13 @@ import {
   type DocumentsHomeViewMode,
   type UpdatedByOption,
 } from './documents-home-model'
+import { NewMenu } from './NewMenu'
+import {
+  CREATE_SPECIFIC_ERRORS,
+  NEW_DEFAULT_NAME_KEY,
+  NEW_KIND_EXT,
+  isFolderWorkspaceShared,
+} from './new-menu-model'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
 
@@ -230,6 +238,12 @@ export interface DocumentsHomeProps {
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
 }
 
+/** UNI-1959: what a listed folder says about being shared with the workspace */
+interface FolderShareMeta {
+  visibility?: string
+  shareScope?: { homeWorkspace: boolean }
+}
+
 type TreeState =
   | { status: 'loading'; nodes: UniworkFolderNode[] }
   | { status: 'ready'; nodes: UniworkFolderNode[] }
@@ -289,7 +303,16 @@ export function DocumentsHome({
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
 
   // Dialogs & inline actions
-  const [newDocModal, setNewDocModal] = useState<{ format: NewDocKind } | null>(null)
+  // UNI-1959: "Share with workspace" of the New menu and the strip: off by default, kept while
+  // this view is open, reset after a create from the strip (the web's page-view behaviour)
+  const [shareWithWorkspace, setShareWithWorkspace] = useState(false)
+  // UNI-1959: kinds the server answered 404 / 501 for: disabled for the session
+  const [unavailableKinds, setUnavailableKinds] = useState<ReadonlySet<NewDocKind>>(new Set())
+  const [creating, setCreating] = useState(false)
+  const creatingRef = useRef(false)
+  // UNI-1959: the folders this view has listed, by id: the open folder's visibility / share_scope
+  // decides whether the share toggle is inherited
+  const [folderMeta, setFolderMeta] = useState<Record<string, FolderShareMeta>>({})
   const [uploadModal, setUploadModal] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
@@ -776,47 +799,140 @@ export function DocumentsHome({
     }
   }
 
-  const handleCreateDoc = async (
-    input: DocTarget & { name: string; format: NewDocKind },
-  ): Promise<ActionOutcome> => {
-    let targetFolderId = input.folderId
-    if (!targetFolderId && typeof window.aiOffice?.uniworkEnsureMyFolder === 'function') {
-      const ensured = await window.aiOffice
-        .uniworkEnsureMyFolder(input.workspaceId)
-        .catch(() => ({ ok: false as const, error: 'network' as const }))
-      if (ensured.ok) {
-        targetFolderId = ensured.value.id
-        setMyFolderId(ensured.value.id)
+  // UNI-1959: the open folder (workspace view) is workspace-shared: the share toggle is inherited
+  const openFolderId = subView === 'workspace' ? folderId : null
+  const parentShared = openFolderId !== null && isFolderWorkspaceShared(folderMeta[openFolderId])
+  // what a create sends: only an own "Share with workspace" choice; a shared folder inherits
+  const createVisibility = (): UniworkCreateVisibility | undefined =>
+    shareWithWorkspace && !parentShared ? 'workspace' : undefined
+
+  // the listed folders' share state, read from the rows this view loads
+  useEffect(() => {
+    const seen: Record<string, FolderShareMeta> = {}
+    for (const item of page.items) {
+      if (item.kind !== 'folder') continue
+      seen[item.id] = {
+        ...(item.visibility ? { visibility: item.visibility } : {}),
+        ...(item.shareScope ? { shareScope: item.shareScope } : {}),
       }
     }
-    // UNI-1953: a UniNote is a page: its own create call, opened on the web
-    const res =
-      input.format === 'page'
-        ? await createPage({
-            workspaceId: input.workspaceId,
-            folderId: targetFolderId,
-            name: input.name,
-          })
-        : await createDocument({
-            workspaceId: input.workspaceId,
-            folderId: targetFolderId,
-            name: input.name,
-            format: input.format,
-          })
-    if (res.ok) {
-      setNewDocModal(null)
-      refreshAll()
-      if (input.format === 'page') void openCreatedPage(res.value)
-      else onOpenDocument(res.value)
-      return { ok: true }
+    if (Object.keys(seen).length === 0) return
+    setFolderMeta((prev) => {
+      const changed = Object.entries(seen).some(
+        ([id, meta]) => JSON.stringify(prev[id]) !== JSON.stringify(meta),
+      )
+      return changed ? { ...prev, ...seen } : prev
+    })
+  }, [page.items])
+
+  // a folder opened from the tree or a crumb, whose parent this view has not listed: read the
+  // parent's contents (a few pages at most) for the folder's own row
+  useEffect(() => {
+    if (openFolderId === null || folderMeta[openFolderId] || tree.status !== 'ready') return
+    const parentId = index.get(openFolderId)?.parentId ?? null
+    let live = true
+    void (async () => {
+      let cursor: string | undefined
+      for (let pageNo = 0; pageNo < 5; pageNo++) {
+        const res = await listFolderChildren({ workspaceId, parentId, cursor, limit: 100 })
+        if (!live || !res.ok) return
+        const own = res.value.items.find((row) => row.id === openFolderId)
+        if (own) {
+          setFolderMeta((prev) => ({
+            ...prev,
+            [openFolderId]: {
+              ...(own.visibility ? { visibility: own.visibility } : {}),
+              ...(own.shareScope ? { shareScope: own.shareScope } : {}),
+            },
+          }))
+          return
+        }
+        cursor = res.value.nextCursor ?? undefined
+        if (!cursor) return
+      }
+    })().catch(() => undefined)
+    return () => {
+      live = false
     }
-    if (isDocNameError(res.error) || res.error === 'unsupported_format') {
-      return { ok: false, error: res.error }
-    }
-    const key = UNIWORK_ERROR_KEYS[res.error as UniworkDocErrorCode]
-    setToast({ message: key ? t(key) : t('uwDocActionFailed'), tone: 'error' })
-    return { ok: false, error: 'failed' }
+    // one read per newly opened, still unknown folder
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openFolderId, workspaceId, tree.status])
+
+  /** My Folder when no folder is known yet: main also places a null-folder create there */
+  const ensureTargetFolder = async (target: DocTarget): Promise<string | null> => {
+    if (target.folderId) return target.folderId
+    if (typeof window.aiOffice?.uniworkEnsureMyFolder !== 'function') return null
+    const ensured = await window.aiOffice
+      .uniworkEnsureMyFolder(target.workspaceId)
+      .catch(() => ({ ok: false as const, error: 'network' as const }))
+    if (!ensured.ok) return null
+    setMyFolderId(ensured.value.id)
+    return ensured.value.id
   }
+
+  // UNI-1959: a menu / strip pick creates at once - the web's default name, the open place -
+  // then opens it. No name dialog: the name is asked on the first save.
+  const createNow = async (kind: NewDocKind, fromStrip: boolean): Promise<void> => {
+    if (creatingRef.current || unavailableKinds.has(kind)) return
+    creatingRef.current = true
+    setCreating(true)
+    const visibility = createVisibility()
+    if (fromStrip) setShareWithWorkspace(false)
+    try {
+      const target = activeTargetFolder
+      const folderIdToUse = await ensureTargetFolder(target)
+      const name = t(NEW_DEFAULT_NAME_KEY[kind])
+      // UNI-1953: a UniNote is a page: its own create call, opened on the web
+      const res =
+        kind === 'page'
+          ? await createPage({
+              workspaceId: target.workspaceId,
+              folderId: folderIdToUse,
+              name,
+              ...(visibility ? { visibility } : {}),
+            })
+          : await createDocument({
+              workspaceId: target.workspaceId,
+              folderId: folderIdToUse,
+              name,
+              format: kind,
+              ...(visibility ? { visibility } : {}),
+            })
+      if (res.ok) {
+        refreshAll()
+        if (kind === 'page') void openCreatedPage(res.value)
+        else onOpenDocument(res.value)
+        return
+      }
+      if (res.endpointMissing && kind !== 'page') {
+        setUnavailableKinds((prev) => new Set(prev).add(kind))
+        setToast({ message: t('uhCreateUnavailable'), tone: 'error' })
+        return
+      }
+      const specific = (CREATE_SPECIFIC_ERRORS as readonly string[]).includes(res.error)
+        ? UNIWORK_ERROR_KEYS[res.error as UniworkDocErrorCode]
+        : undefined
+      setToast({ message: specific ? t(specific) : t('uhCreateFailed'), tone: 'error' })
+    } finally {
+      creatingRef.current = false
+      setCreating(false)
+    }
+  }
+
+  // the New menu's Folder row: the app's own folder name prompt, the web's default name filled in
+  const createFolderHere = () => {
+    const parentId = activeTargetFolder.folderId
+    if (parentId === null) return
+    const visibility = createVisibility()
+    folderActions.openCreate(parentId, true, {
+      initial: t(NEW_DEFAULT_NAME_KEY.folder),
+      ...(visibility ? { visibility } : {}),
+    })
+  }
+
+  const hasFolderRow =
+    (subView === 'workspace' && folderId !== null) ||
+    (subView === 'my-folder' && resolvedMyFolderId !== null)
 
   const handleUploadDoc = async (
     input: DocTarget & { path: string; name: string },
@@ -1311,25 +1427,22 @@ export function DocumentsHome({
             </svg>
             {t('uhUpload')}
           </button>
-          <button
-            type="button"
-            className="btn btn-primary dh-toolbar-btn dh-btn-create"
-            onClick={() => setNewDocModal({ format: 'docx' })}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            {t('uhCreateNew')}
-          </button>
+          <NewMenu
+            label={t('uhCreateNew')}
+            hasFolderRow={hasFolderRow}
+            unavailable={unavailableKinds}
+            unavailableHint={t('uhCreateUnavailableHint')}
+            busy={creating}
+            share={{
+              checked: parentShared || shareWithWorkspace,
+              inherited: parentShared,
+              onChange: setShareWithWorkspace,
+            }}
+            onPick={(kind) => {
+              if (kind === 'folder') createFolderHere()
+              else void createNow(kind, false)
+            }}
+          />
         </div>
 
         {subView !== 'trash' && (
@@ -1341,10 +1454,13 @@ export function DocumentsHome({
                 type="button"
                 className="dh-quick-pill"
                 data-quick-format={kind}
-                onClick={() => setNewDocModal({ format: kind })}
+                aria-disabled={creating || unavailableKinds.has(kind) || undefined}
+                title={unavailableKinds.has(kind) ? t('uhCreateUnavailableHint') : undefined}
+                onClick={() => void createNow(kind, true)}
               >
                 <FileBadge ext={kind} size={18} />
                 <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
+                <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
               </button>
             ))}
             <span className="dh-quick-hint">
@@ -1843,18 +1959,6 @@ export function DocumentsHome({
         )}
       </div>
 
-      {newDocModal && (
-        <NewDocDialog
-          workspaces={workspaces}
-          kinds={NEW_DOC_KINDS}
-          initialKind={newDocModal.format}
-          initialTarget={activeTargetFolder}
-          loadTree={loadFolderTree}
-          onCreate={handleCreateDoc}
-          onCancel={() => setNewDocModal(null)}
-        />
-      )}
-
       {uploadModal && (
         <UploadDocDialog
           workspaces={workspaces}
@@ -1892,7 +1996,7 @@ export function DocumentsHome({
                 ? t('ufNewSubfolder')
                 : t('ufNewFolder')
           }
-          initial={nameDialog.mode === 'rename' ? nameDialog.title : ''}
+          initial={nameDialog.mode === 'rename' ? nameDialog.title : (nameDialog.initial ?? '')}
           submitLabel={nameDialog.mode === 'rename' ? t('ufSave') : t('ufCreate')}
           onSubmit={folderActions.submitName}
           onCancel={folderActions.closeNameDialog}

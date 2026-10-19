@@ -11,6 +11,8 @@ export const he = {
   usMyFolderPrivate: 'פרטי, רק לך גלוי',
   usChange: 'שינוי',
   usSave: 'שמירה',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'סגירה',
   usPickTitle: 'בחירת מקום השמירה',
   usBack: 'חזרה למתן שם',

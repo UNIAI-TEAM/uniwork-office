@@ -12,6 +12,8 @@ export const nl = {
   usMyFolderPrivate: 'Privé, alleen jij ziet het',
   usChange: 'Wijzigen',
   usSave: 'Opslaan',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Sluiten',
   usPickTitle: 'Kies waar je opslaat',
   usBack: 'Terug naar naam',
