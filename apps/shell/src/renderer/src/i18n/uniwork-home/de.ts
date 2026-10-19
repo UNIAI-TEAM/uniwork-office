@@ -70,4 +70,13 @@ export const de = {
   uhSourceShowInFolder: 'Im Ordner anzeigen',
   uhSourceDownloadFailed: 'Die Datei konnte nicht heruntergeladen werden. Versuchen Sie es erneut.',
   uhColSize: 'Größe',
+  uhGroupBy: 'Gruppieren nach',
+  uhGroupByFolder: 'Ordner',
+  uhGroupBySource: 'Quelle',
+  uhGroupByType: 'Dateityp',
+  uhGroupByNone: 'Keine Gruppierung',
+  uhGroupUnfiled: 'In keinem Ordner',
+  uhOriginUpload: 'Hochgeladen',
+  uhOriginCreated: 'Erstellt',
+  uhGroupTypeOther: 'Andere Dateien',
 } satisfies Record<keyof typeof zh, string>

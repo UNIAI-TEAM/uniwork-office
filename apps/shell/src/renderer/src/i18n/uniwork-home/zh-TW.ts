@@ -68,4 +68,13 @@ export const zhTW = {
   uhSourceShowInFolder: '在資料夾中顯示',
   uhSourceDownloadFailed: '無法下載該檔案。請再試一次。',
   uhColSize: '大小',
+  uhGroupBy: '分組方式',
+  uhGroupByFolder: '資料夾',
+  uhGroupBySource: '來源',
+  uhGroupByType: '檔案類型',
+  uhGroupByNone: '不分組',
+  uhGroupUnfiled: '不在資料夾中',
+  uhOriginUpload: '已上傳',
+  uhOriginCreated: '已建立',
+  uhGroupTypeOther: '其他檔案',
 } satisfies Record<keyof typeof zh, string>

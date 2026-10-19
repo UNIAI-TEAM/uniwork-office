@@ -68,4 +68,13 @@ export const he = {
   uhSourceShowInFolder: 'הצג בתיקייה',
   uhSourceDownloadFailed: 'לא ניתן להוריד את הקובץ. נסו שוב.',
   uhColSize: 'גודל',
+  uhGroupBy: 'קיבוץ לפי',
+  uhGroupByFolder: 'תיקייה',
+  uhGroupBySource: 'מקור',
+  uhGroupByType: 'סוג קובץ',
+  uhGroupByNone: 'ללא קיבוץ',
+  uhGroupUnfiled: 'לא בתיקייה',
+  uhOriginUpload: 'הועלו',
+  uhOriginCreated: 'נוצרו',
+  uhGroupTypeOther: 'קבצים אחרים',
 } satisfies Record<keyof typeof zh, string>

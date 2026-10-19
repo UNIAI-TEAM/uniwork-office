@@ -68,4 +68,13 @@ export const vi = {
   uhSourceShowInFolder: 'Hiện trong thư mục',
   uhSourceDownloadFailed: 'Không thể tải file xuống. Thử lại.',
   uhColSize: 'Dung lượng',
+  uhGroupBy: 'Nhóm theo',
+  uhGroupByFolder: 'Thư mục',
+  uhGroupBySource: 'Nguồn',
+  uhGroupByType: 'Loại file',
+  uhGroupByNone: 'Không nhóm',
+  uhGroupUnfiled: 'Chưa xếp thư mục',
+  uhOriginUpload: 'Tải lên',
+  uhOriginCreated: 'Tạo mới',
+  uhGroupTypeOther: 'File khác',
 } satisfies Record<keyof typeof zh, string>

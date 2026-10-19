@@ -68,4 +68,13 @@ export const id = {
   uhSourceShowInFolder: 'Tampilkan di folder',
   uhSourceDownloadFailed: 'Tidak dapat mengunduh file. Coba lagi.',
   uhColSize: 'Ukuran',
+  uhGroupBy: 'Kelompokkan menurut',
+  uhGroupByFolder: 'Folder',
+  uhGroupBySource: 'Sumber',
+  uhGroupByType: 'Jenis file',
+  uhGroupByNone: 'Tanpa pengelompokan',
+  uhGroupUnfiled: 'Tidak dalam folder',
+  uhOriginUpload: 'Diunggah',
+  uhOriginCreated: 'Dibuat',
+  uhGroupTypeOther: 'File lainnya',
 } satisfies Record<keyof typeof zh, string>

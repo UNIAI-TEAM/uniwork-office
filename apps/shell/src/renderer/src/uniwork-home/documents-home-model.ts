@@ -12,6 +12,7 @@ import type {
   UniworkSourceListQuery,
 } from '../../../shared/home-api'
 import type { StringKey, TFunc } from '../locale'
+import { folderPath, type FolderIndex } from '../uniwork-folders/uniwork-folders-model'
 
 export type UniworkDocVisibility = 'private' | 'workspace' | 'restricted'
 export type UniworkDocAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
@@ -629,4 +630,106 @@ export function formatShortDate(iso: string, locale: string): string {
   } catch {
     return date.toISOString().slice(0, 10)
   }
+}
+
+/** UNI-1961: the web's "Group by" options, in its order (D library-rows.ts `GROUP_BY`) */
+export const DOCUMENTS_HOME_GROUP_BY = ['folder', 'source', 'type', 'none'] as const
+export type DocumentsHomeGroupBy = (typeof DOCUMENTS_HOME_GROUP_BY)[number]
+
+/** the web's default (documents-page-view.tsx) */
+export const DEFAULT_DOCUMENTS_HOME_GROUP_BY: DocumentsHomeGroupBy = 'folder'
+
+export const DOCUMENTS_HOME_GROUP_BY_KEYS: Record<DocumentsHomeGroupBy, StringKey> = {
+  folder: 'uhGroupByFolder',
+  source: 'uhGroupBySource',
+  type: 'uhGroupByType',
+  none: 'uhGroupByNone',
+}
+
+/**
+ * UNI-1961: where the web offers "Group by" - its list views (Recent, Shared
+ * with me, Shared by me). The home root and a folder never group, and the
+ * trash has its own table.
+ */
+export function documentsHomeGroupable(subView: DocumentsHomeSubViewId): boolean {
+  return subView === 'recent' || subView === 'shared-with-me' || subView === 'shared-by-me'
+}
+
+export interface DocumentsHomeRowGroup {
+  /** stable id; also what the built-in groups are translated from */
+  key: string
+  /** a folder path (the only user-visible title); empty for the built-in groups */
+  title: string
+  rows: DocumentsHomeDoc[]
+}
+
+/** the format a row groups by: page, the file format, else its title's extension, else "file" */
+function groupFormatOf(doc: DocumentsHomeDoc): string {
+  if (doc.kind === 'page' || doc.kind === 'folder') return doc.kind
+  if (doc.format) return doc.format
+  const dot = doc.title.lastIndexOf('.')
+  return (dot > 0 ? doc.title.slice(dot + 1).toLowerCase() : '') || 'file'
+}
+
+/**
+ * UNI-1961: the web's `groupRows` (D library-rows.ts) over the table's rows,
+ * in first-seen order of the (already sorted) rows. Folder: the deepest folder
+ * above the row, titled by its path (My Folder takes its label), else
+ * `unfiled`; source: `origin:upload|created`, else `origin:documents`; type:
+ * `type:<format>`; none: one group, which draws no header.
+ */
+export function groupDocumentsHomeRows(
+  rows: readonly DocumentsHomeDoc[],
+  groupBy: DocumentsHomeGroupBy,
+  index: FolderIndex,
+  myFolder?: { id: string | null; label: string },
+): DocumentsHomeRowGroup[] {
+  if (groupBy === 'none') return [{ key: 'all', title: '', rows: [...rows] }]
+  const groups = new Map<string, DocumentsHomeRowGroup>()
+  const add = (key: string, title: string, row: DocumentsHomeDoc) => {
+    const group = groups.get(key) ?? { key, title, rows: [] }
+    group.rows.push(row)
+    groups.set(key, group)
+  }
+  for (const row of rows) {
+    if (groupBy === 'source') add(`origin:${row.origin ?? 'documents'}`, '', row)
+    else if (groupBy === 'type') add(`type:${groupFormatOf(row)}`, '', row)
+    else {
+      const path = folderPath(index, row.parentId ?? null)
+      const last = path.at(-1)
+      if (last) {
+        const title = path
+          .map((part) => (myFolder && part.id === myFolder.id ? myFolder.label : part.title))
+          .join(' / ')
+        add(`folder:${last.id}`, title, row)
+      } else add('unfiled', '', row)
+    }
+  }
+  return [...groups.values()]
+}
+
+/** the product names the web's type groups use in every language */
+const GROUP_TYPE_NAMES: Record<string, string> = {
+  page: 'UniNote',
+  docx: 'Docs',
+  xlsx: 'Sheets',
+  pptx: 'Slides',
+  pdf: 'PDF',
+  md: 'Markdown',
+  html: 'HTML',
+}
+
+/** UNI-1961: a group header's words (D documents-library-list.tsx `groupTitle`) */
+export function documentsHomeGroupLabel(group: DocumentsHomeRowGroup, t: TFunc): string {
+  if (group.title) return group.title
+  if (group.key === 'unfiled') return t('uhGroupUnfiled')
+  if (group.key === 'origin:upload') return t('uhOriginUpload')
+  if (group.key === 'origin:created') return t('uhOriginCreated')
+  if (group.key === 'origin:documents') return t('uhSectionDocuments')
+  if (group.key.startsWith('type:')) {
+    const format = group.key.slice(5)
+    if (format === 'folder') return t('uhSectionFolders')
+    return GROUP_TYPE_NAMES[format] ?? t('uhGroupTypeOther')
+  }
+  return ''
 }

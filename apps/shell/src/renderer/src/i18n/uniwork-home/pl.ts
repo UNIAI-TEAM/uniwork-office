@@ -69,4 +69,13 @@ export const pl = {
   uhSourceShowInFolder: 'Pokaż w folderze',
   uhSourceDownloadFailed: 'Nie udało się pobrać pliku. Spróbuj ponownie.',
   uhColSize: 'Rozmiar',
+  uhGroupBy: 'Grupuj według',
+  uhGroupByFolder: 'Folder',
+  uhGroupBySource: 'Źródło',
+  uhGroupByType: 'Typ pliku',
+  uhGroupByNone: 'Bez grupowania',
+  uhGroupUnfiled: 'Poza folderem',
+  uhOriginUpload: 'Przesłane',
+  uhOriginCreated: 'Utworzone',
+  uhGroupTypeOther: 'Inne pliki',
 } satisfies Record<keyof typeof zh, string>

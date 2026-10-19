@@ -68,4 +68,13 @@ export const pt = {
   uhSourceShowInFolder: 'Mostrar na pasta',
   uhSourceDownloadFailed: 'Não foi possível baixar o arquivo. Tente novamente.',
   uhColSize: 'Tamanho',
+  uhGroupBy: 'Agrupar por',
+  uhGroupByFolder: 'Pasta',
+  uhGroupBySource: 'Origem',
+  uhGroupByType: 'Tipo de arquivo',
+  uhGroupByNone: 'Sem agrupamento',
+  uhGroupUnfiled: 'Fora de pasta',
+  uhOriginUpload: 'Enviados',
+  uhOriginCreated: 'Criados',
+  uhGroupTypeOther: 'Outros arquivos',
 } satisfies Record<keyof typeof zh, string>

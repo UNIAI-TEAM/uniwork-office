@@ -68,4 +68,13 @@ export const ar = {
   uhSourceShowInFolder: 'إظهار في المجلد',
   uhSourceDownloadFailed: 'تعذّر تنزيل الملف. حاول مرة أخرى.',
   uhColSize: 'الحجم',
+  uhGroupBy: 'تجميع حسب',
+  uhGroupByFolder: 'المجلد',
+  uhGroupBySource: 'المصدر',
+  uhGroupByType: 'نوع الملف',
+  uhGroupByNone: 'بدون تجميع',
+  uhGroupUnfiled: 'ليس في مجلد',
+  uhOriginUpload: 'المرفوعة',
+  uhOriginCreated: 'المُنشأة',
+  uhGroupTypeOther: 'ملفات أخرى',
 } satisfies Record<keyof typeof zh, string>

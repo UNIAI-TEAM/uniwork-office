@@ -68,4 +68,13 @@ export const ms = {
   uhSourceShowInFolder: 'Tunjukkan dalam folder',
   uhSourceDownloadFailed: 'Tidak dapat memuat turun fail. Cuba lagi.',
   uhColSize: 'Saiz',
+  uhGroupBy: 'Kumpulkan mengikut',
+  uhGroupByFolder: 'Folder',
+  uhGroupBySource: 'Sumber',
+  uhGroupByType: 'Jenis fail',
+  uhGroupByNone: 'Tiada pengumpulan',
+  uhGroupUnfiled: 'Bukan dalam folder',
+  uhOriginUpload: 'Dimuat naik',
+  uhOriginCreated: 'Dicipta',
+  uhGroupTypeOther: 'Fail lain',
 } satisfies Record<keyof typeof zh, string>

@@ -69,4 +69,13 @@ export const ja = {
   uhSourceShowInFolder: 'フォルダーに表示',
   uhSourceDownloadFailed: 'ファイルをダウンロードできませんでした。もう一度お試しください。',
   uhColSize: 'サイズ',
+  uhGroupBy: 'グループ化',
+  uhGroupByFolder: 'フォルダー',
+  uhGroupBySource: 'ソース',
+  uhGroupByType: 'ファイルの種類',
+  uhGroupByNone: 'グループ化しない',
+  uhGroupUnfiled: 'フォルダーにないもの',
+  uhOriginUpload: 'アップロード',
+  uhOriginCreated: '作成',
+  uhGroupTypeOther: 'その他のファイル',
 } satisfies Record<keyof typeof zh, string>

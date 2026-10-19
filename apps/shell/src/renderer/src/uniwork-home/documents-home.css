@@ -368,7 +368,8 @@
   white-space: nowrap;
 }
 
-.dh-filter-select {
+.dh-filter-select,
+.dh-group-select {
   height: 28px;
   padding: 0 4px;
   border: 0;
@@ -381,7 +382,8 @@
   outline: none;
 }
 
-.dh-filter-select:focus-visible {
+.dh-filter-select:focus-visible,
+.dh-group-select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -614,6 +616,40 @@
 .dh-doc-row.opening {
   opacity: 0.65;
   cursor: progress;
+}
+
+/* UNI-1961: a Group by header (the web's group heading) spans the table */
+.dh-group-row {
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
+.dh-group-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 12px;
+}
+
+.dh-group-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-group-count {
+  color: var(--text-secondary);
+}
+
+.dh-doc-table.grid-mode .dh-group-row {
+  grid-column: 1 / -1;
+  border-bottom: 0;
+  border-radius: 8px;
 }
 
 /* Grid view mode for documents */

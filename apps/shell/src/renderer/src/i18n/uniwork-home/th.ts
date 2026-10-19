@@ -68,4 +68,13 @@ export const th = {
   uhSourceShowInFolder: 'แสดงในโฟลเดอร์',
   uhSourceDownloadFailed: 'ดาวน์โหลดไฟล์ไม่ได้ ลองอีกครั้ง',
   uhColSize: 'ขนาด',
+  uhGroupBy: 'จัดกลุ่มตาม',
+  uhGroupByFolder: 'โฟลเดอร์',
+  uhGroupBySource: 'แหล่งที่มา',
+  uhGroupByType: 'ชนิดไฟล์',
+  uhGroupByNone: 'ไม่จัดกลุ่ม',
+  uhGroupUnfiled: 'ไม่อยู่ในโฟลเดอร์',
+  uhOriginUpload: 'อัปโหลดแล้ว',
+  uhOriginCreated: 'สร้างแล้ว',
+  uhGroupTypeOther: 'ไฟล์อื่นๆ',
 } satisfies Record<keyof typeof zh, string>

@@ -67,4 +67,13 @@ export const zh = {
   uhSourceShowInFolder: '在文件夹中显示',
   uhSourceDownloadFailed: '无法下载该文件。请重试。',
   uhColSize: '大小',
+  uhGroupBy: '分组方式',
+  uhGroupByFolder: '文件夹',
+  uhGroupBySource: '来源',
+  uhGroupByType: '文件类型',
+  uhGroupByNone: '不分组',
+  uhGroupUnfiled: '不在文件夹中',
+  uhOriginUpload: '已上传',
+  uhOriginCreated: '已创建',
+  uhGroupTypeOther: '其他文件',
 }

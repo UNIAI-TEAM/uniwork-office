@@ -68,4 +68,13 @@ export const ko = {
   uhSourceShowInFolder: '폴더에서 보기',
   uhSourceDownloadFailed: '파일을 다운로드할 수 없습니다. 다시 시도하세요.',
   uhColSize: '크기',
+  uhGroupBy: '그룹화 기준',
+  uhGroupByFolder: '폴더',
+  uhGroupBySource: '출처',
+  uhGroupByType: '파일 형식',
+  uhGroupByNone: '그룹화 안 함',
+  uhGroupUnfiled: '폴더에 없음',
+  uhOriginUpload: '업로드됨',
+  uhOriginCreated: '생성됨',
+  uhGroupTypeOther: '기타 파일',
 } satisfies Record<keyof typeof zh, string>

@@ -68,4 +68,13 @@ export const ru = {
   uhSourceShowInFolder: 'Показать в папке',
   uhSourceDownloadFailed: 'Не удалось скачать файл. Повторите попытку.',
   uhColSize: 'Размер',
+  uhGroupBy: 'Группировать по',
+  uhGroupByFolder: 'Папка',
+  uhGroupBySource: 'Источник',
+  uhGroupByType: 'Тип файла',
+  uhGroupByNone: 'Без группировки',
+  uhGroupUnfiled: 'Не в папке',
+  uhOriginUpload: 'Загруженные',
+  uhOriginCreated: 'Созданные',
+  uhGroupTypeOther: 'Другие файлы',
 } satisfies Record<keyof typeof zh, string>

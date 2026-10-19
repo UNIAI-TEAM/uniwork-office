@@ -69,4 +69,13 @@ export const es = {
   uhSourceShowInFolder: 'Mostrar en la carpeta',
   uhSourceDownloadFailed: 'No se pudo descargar el archivo. Inténtalo de nuevo.',
   uhColSize: 'Tamaño',
+  uhGroupBy: 'Agrupar por',
+  uhGroupByFolder: 'Carpeta',
+  uhGroupBySource: 'Origen',
+  uhGroupByType: 'Tipo de archivo',
+  uhGroupByNone: 'Sin agrupar',
+  uhGroupUnfiled: 'Sin carpeta',
+  uhOriginUpload: 'Subidos',
+  uhOriginCreated: 'Creados',
+  uhGroupTypeOther: 'Otros archivos',
 } satisfies Record<keyof typeof zh, string>

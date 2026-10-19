@@ -68,4 +68,13 @@ export const en = {
   uhSourceShowInFolder: 'Show in folder',
   uhSourceDownloadFailed: 'Could not download the file. Try again.',
   uhColSize: 'Size',
+  uhGroupBy: 'Group by',
+  uhGroupByFolder: 'Folder',
+  uhGroupBySource: 'Source',
+  uhGroupByType: 'File type',
+  uhGroupByNone: 'No grouping',
+  uhGroupUnfiled: 'Not in a folder',
+  uhOriginUpload: 'Uploaded',
+  uhOriginCreated: 'Created',
+  uhGroupTypeOther: 'Other files',
 } satisfies Record<keyof typeof zh, string>

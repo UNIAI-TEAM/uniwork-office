@@ -68,4 +68,13 @@ export const it = {
   uhSourceShowInFolder: 'Mostra nella cartella',
   uhSourceDownloadFailed: 'Impossibile scaricare il file. Riprova.',
   uhColSize: 'Dimensione',
+  uhGroupBy: 'Raggruppa per',
+  uhGroupByFolder: 'Cartella',
+  uhGroupBySource: 'Origine',
+  uhGroupByType: 'Tipo di file',
+  uhGroupByNone: 'Nessun raggruppamento',
+  uhGroupUnfiled: 'Non in una cartella',
+  uhOriginUpload: 'Caricati',
+  uhOriginCreated: 'Creati',
+  uhGroupTypeOther: 'Altri file',
 } satisfies Record<keyof typeof zh, string>

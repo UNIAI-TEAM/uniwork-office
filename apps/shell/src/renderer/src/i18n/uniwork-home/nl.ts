@@ -68,4 +68,13 @@ export const nl = {
   uhSourceShowInFolder: 'Weergeven in map',
   uhSourceDownloadFailed: 'Kan het bestand niet downloaden. Probeer het opnieuw.',
   uhColSize: 'Grootte',
+  uhGroupBy: 'Groeperen op',
+  uhGroupByFolder: 'Map',
+  uhGroupBySource: 'Bron',
+  uhGroupByType: 'Bestandstype',
+  uhGroupByNone: 'Niet groeperen',
+  uhGroupUnfiled: 'Niet in een map',
+  uhOriginUpload: 'Geüpload',
+  uhOriginCreated: 'Gemaakt',
+  uhGroupTypeOther: 'Andere bestanden',
 } satisfies Record<keyof typeof zh, string>

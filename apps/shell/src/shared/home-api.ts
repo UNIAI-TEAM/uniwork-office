@@ -263,6 +263,8 @@ export interface UniworkDocSummary {
   editLock?: UniworkDocEditLock
   /** UNI-1961: a file row's `size_bytes` (the web's Size column); absent on pages/folders or 0 */
   sizeBytes?: number
+  /** UNI-1961: the server's `origin` when it is one the web names (Group by Source) */
+  origin?: 'upload' | 'created'
 }
 
 /** FD-11: the three entry kinds the folder tree holds */

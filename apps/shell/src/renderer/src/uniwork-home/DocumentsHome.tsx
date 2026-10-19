@@ -82,9 +82,14 @@ import { openPageOnWeb } from '../uniwork-page-web'
 import { announce } from '../uniwork-live'
 import {
   DEFAULT_DOCUMENTS_HOME_FILTERS,
+  DEFAULT_DOCUMENTS_HOME_GROUP_BY,
   DOCUMENTS_HOME_FORMAT_OPTIONS,
+  DOCUMENTS_HOME_GROUP_BY,
+  DOCUMENTS_HOME_GROUP_BY_KEYS,
   DOCUMENTS_HOME_UPDATED_OPTIONS,
   collectUpdatedByOptions,
+  documentsHomeGroupLabel,
+  documentsHomeGroupable,
   fetchDocumentsHomePage,
   fetchDocumentsHomeSources,
   formatAccessCell,
@@ -92,6 +97,7 @@ import {
   formatShortDate,
   formatUpdatedByCell,
   getDocumentsHomeNavEntry,
+  groupDocumentsHomeRows,
   hasActiveFilters,
   mergeNewestFirst,
   rowSizeBytes,
@@ -103,6 +109,8 @@ import {
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
   type DocumentsHomeFilterState,
+  type DocumentsHomeGroupBy,
+  type DocumentsHomeRowGroup,
   type DocumentsHomeSort,
   type DocumentsHomeSubViewId,
   type DocumentsHomeTableRow,
@@ -239,6 +247,10 @@ export interface DocumentsHomeProps {
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
 }
 
+/** UNI-1961: a table row, or the header of a Group by group */
+type DocumentsHomeTableItem =
+  DocumentsHomeTableRow | { type: 'group'; id: string; group: DocumentsHomeRowGroup }
+
 type TreeState =
   | { status: 'loading'; nodes: UniworkFolderNode[] }
   | { status: 'ready'; nodes: UniworkFolderNode[] }
@@ -287,6 +299,7 @@ export function DocumentsHome({
   const [filters, setFilters] = useState<DocumentsHomeFilterState>(DEFAULT_DOCUMENTS_HOME_FILTERS)
   const [sort, setSort] = useState<DocumentsHomeSort>('recent')
   const [viewMode, setViewMode] = useState<DocumentsHomeViewMode>('list')
+  const [groupBy, setGroupBy] = useState<DocumentsHomeGroupBy>(DEFAULT_DOCUMENTS_HOME_GROUP_BY)
   const [searchDraft, setSearchDraft] = useState('')
   const [page, setPage] = useState<PageState>({
     status: 'loading',
@@ -1176,6 +1189,19 @@ export function DocumentsHome({
     )
   }, [sourcesMerged, files, page.items, page.nextCursor, sources, wireFilters, sort, dateLocale])
 
+  // UNI-1961: the web's Group by, on its list views only (never the root, a
+  // folder or a search); a group header row precedes its rows
+  const grouping = documentsHomeGroupable(subView) && query.length === 0
+  const tableItems = useMemo<DocumentsHomeTableItem[]>(() => {
+    if (!grouping || groupBy === 'none') return tableRows
+    const docs = tableRows.flatMap((row) => (row.type === 'doc' ? [row.doc] : []))
+    const myFolder = { id: resolvedMyFolderId, label: myFolderLabel }
+    return groupDocumentsHomeRows(docs, groupBy, index, myFolder).flatMap((group) => [
+      { type: 'group' as const, id: `group:${group.key}`, group },
+      ...group.rows.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
+    ])
+  }, [grouping, groupBy, tableRows, index, resolvedMyFolderId, myFolderLabel])
+
   const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
 
   const currentHeadingSpec = useMemo<
@@ -1575,6 +1601,24 @@ export function DocumentsHome({
           )}
 
           <div className="dh-view-tools">
+            {grouping && (
+              <label className="dh-filter-chip">
+                <span className="dh-filter-k">{t('uhGroupBy')}</span>
+                <select
+                  className="dh-group-select"
+                  data-filter="groupBy"
+                  aria-label={t('uhGroupBy')}
+                  value={groupBy}
+                  onChange={(e) => setGroupBy(e.target.value as DocumentsHomeGroupBy)}
+                >
+                  {DOCUMENTS_HOME_GROUP_BY.map((id) => (
+                    <option key={id} value={id}>
+                      {t(DOCUMENTS_HOME_GROUP_BY_KEYS[id])}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <button
               type="button"
               className="dh-sort-btn"
@@ -1795,7 +1839,19 @@ export function DocumentsHome({
                     />
                   </div>
 
-                  {tableRows.map((row) => {
+                  {tableItems.map((row) => {
+                    if (row.type === 'group') {
+                      return (
+                        <div key={row.id} role="row" className="dh-group-row">
+                          <div role="rowheader" aria-colspan={6} className="dh-group-cell">
+                            <span className="dh-group-title">
+                              {documentsHomeGroupLabel(row.group, t)}
+                            </span>
+                            <span className="dh-group-count">{row.group.rows.length}</span>
+                          </div>
+                        </div>
+                      )
+                    }
                     if (row.type === 'source') {
                       return (
                         <DocumentsSourceRow

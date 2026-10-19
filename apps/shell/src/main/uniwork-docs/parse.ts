@@ -242,6 +242,7 @@ function summaryRow(
     ...(systemKindOf(row.system_kind) ? { systemKind: 'my_folder' as const } : {}),
     ...editLockOf(row.edit_lock),
     ...fileSizeOf(row, kind),
+    ...(row.origin === 'upload' || row.origin === 'created' ? { origin: row.origin } : {}),
   }
 }
 

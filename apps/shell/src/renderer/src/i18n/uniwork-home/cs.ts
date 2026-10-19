@@ -69,4 +69,13 @@ export const cs = {
   uhSourceShowInFolder: 'Zobrazit ve složce',
   uhSourceDownloadFailed: 'Soubor se nepodařilo stáhnout. Zkuste to znovu.',
   uhColSize: 'Velikost',
+  uhGroupBy: 'Seskupit podle',
+  uhGroupByFolder: 'Složka',
+  uhGroupBySource: 'Zdroj',
+  uhGroupByType: 'Typ souboru',
+  uhGroupByNone: 'Neseskupovat',
+  uhGroupUnfiled: 'Mimo složku',
+  uhOriginUpload: 'Nahrané',
+  uhOriginCreated: 'Vytvořené',
+  uhGroupTypeOther: 'Další soubory',
 } satisfies Record<keyof typeof zh, string>
