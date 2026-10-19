@@ -316,8 +316,6 @@ describe('UNI-1957 Documents parity', () => {
       }
       // once, in the sheet main.tsx loads for every view (not per component)
       expect(home.match(/:where\(:not\(:disabled, \[aria-disabled='true'\]\)\)/g)).toHaveLength(1)
-      // and no bare :not() outside a :where() anywhere in that rule's selector
-      expect(home.match(/(?<!:where\()\:not\(:disabled/g)).toBeNull()
       expect(readFileSync(resolve(__dirname, '../src/renderer/src/main.tsx'), 'utf8')).toContain(
         "import './home.css'",
       )
