@@ -19,6 +19,12 @@ import { format } from '@genoffice/i18n'
 import { useModalKeys } from '../modal-keys'
 import { AnchorLabel, type AnchorLabelStrings } from './AnchorLabel'
 import { CollabBody } from './CollabBody'
+import {
+  applyMentionEdit,
+  mentionDocFromBody,
+  mentionDocToBody,
+  type MentionDoc,
+} from './mention-query'
 import type {
   CollabActions,
   CollabConflict,
@@ -306,10 +312,11 @@ function EditBox({
   onSave(body: string): Promise<void>
   onClose(): void
 }) {
-  const [text, setText] = useState(initial)
+  const [doc, setDoc] = useState<MentionDoc>(() => mentionDocFromBody(initial))
   const [asking, setAsking] = useState(false)
   const [saving, setSaving] = useState(false)
   const areaRef = useRef<HTMLTextAreaElement>(null)
+  const pendingCaret = useRef<number | null>(null)
   const labelId = useId()
 
   useEffect(() => {
@@ -319,22 +326,32 @@ function EditBox({
     el.setSelectionRange(el.value.length, el.value.length)
   }, [])
 
+  /* a pasted token shows as '@Name' and is shorter than what was typed: restore the caret */
+  useLayoutEffect(() => {
+    const at = pendingCaret.current
+    if (at !== null && areaRef.current) {
+      areaRef.current.setSelectionRange(at, at)
+      pendingCaret.current = null
+    }
+  })
+
   useEffect(() => {
     const el = areaRef.current
     if (!el) return
     el.style.height = 'auto'
     if (el.scrollHeight > 0) el.style.height = `${Math.min(el.scrollHeight, 200)}px`
-  }, [text])
+  }, [doc.text])
 
   const cancel = () => {
-    if (text !== initial) setAsking(true)
+    /* dirty = the body that would be sent, not the '@Name' display text */
+    if (mentionDocToBody(doc) !== initial) setAsking(true)
     else onClose()
   }
   const save = async () => {
     if (saving) return
     setSaving(true)
     try {
-      await onSave(text)
+      await onSave(mentionDocToBody(doc))
     } finally {
       setSaving(false)
     }
@@ -349,8 +366,14 @@ function EditBox({
         ref={areaRef}
         className="collab-textarea"
         aria-labelledby={labelId}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
+        value={doc.text}
+        onChange={(e) => {
+          const edit = applyMentionEdit(doc, e.currentTarget.value, e.currentTarget.selectionStart)
+          if (edit.doc.text !== e.currentTarget.value) {
+            pendingCaret.current = edit.mapCaret(e.currentTarget.selectionStart)
+          }
+          setDoc(edit.doc)
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             e.preventDefault()

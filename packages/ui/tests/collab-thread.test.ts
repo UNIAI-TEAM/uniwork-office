@@ -640,5 +640,31 @@ describe('reply layout + action row (UNI-1970 C/D)', () => {
   })
 })
 
+describe('edit box mentions (UNI-1969, web d6aa9f82c)', () => {
+  const TOKEN = '[@Ann Lee](mention://member/01HF7YAT31JFKSMW2D3JRP4NQA)'
 
-
+  it('shows @Name, an untouched save is byte-identical, edits keep the id', async () => {
+    const body = `ping ${TOKEN} done`
+    const src = fakeSource(list([cm({ id: 'a', author_id: 'me', body })]))
+    await mount(src)
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    const area = $<HTMLTextAreaElement>('.collab-edit textarea')!
+    expect(area.value).toBe('ping @Ann Lee done')
+    // untouched save sends the token body verbatim
+    await click(btn(EN.collabSave))
+    expect(src.update).toHaveBeenCalledWith({ comment_id: 'a', body })
+    // appending text leaves the mention range intact -> same id back on the wire
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    await type($<HTMLTextAreaElement>('.collab-edit textarea')!, 'ping @Ann Lee done!')
+    await click(btn(EN.collabSave))
+    expect(src.update).toHaveBeenLastCalledWith({
+      comment_id: 'a',
+      body: `ping ${TOKEN} done!`,
+    })
+    // a mention cut short stays plain text (like chat)
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    await type($<HTMLTextAreaElement>('.collab-edit textarea')!, 'ping @Ann done')
+    await click(btn(EN.collabSave))
+    expect(src.update).toHaveBeenLastCalledWith({ comment_id: 'a', body: 'ping @Ann done' })
+  })
+})
