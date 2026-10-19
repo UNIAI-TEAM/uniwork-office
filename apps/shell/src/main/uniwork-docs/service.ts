@@ -1142,12 +1142,17 @@ export class UniworkDocsService {
   /** per path, the last editor state the poll reported (the AI settle edge) */
   private readonly editorAi = new Map<string, { aiRunning: boolean; aiEpoch: number }>()
   /**
-   * A3 (UNI-1362): how many remote decisions of a path are running right now,
-   * keyed by `pathKey`. `pruneClosedRemoteState` keeps `editorAi` while one is,
-   * so the bar a decision is about to publish still has the AI sample its own
-   * settle edge re-decides on.
+   * A3 (UNI-1362): the remote decisions of a path that are running right now,
+   * keyed by `pathKey`. Every decision registers into an identity-bearing entry
+   * (`{ n }`, captured at increment) and its `finally` decrements/deletes only
+   * while that very entry is still the map's: `lockSession` clears the map
+   * without awaiting the decisions it drops, so an old finalizer must never
+   * release the entry a decision of the next session registered.
+   * `pruneClosedRemoteState` keeps `editorAi` while any entry exists, so the bar
+   * a decision is about to publish still has the AI sample its own settle edge
+   * re-decides on.
    */
-  private readonly remoteDecisions = new Map<string, number>()
+  private readonly remoteDecisions = new Map<string, { n: number }>()
   /** one guarded reload per path at a time; a notice queued behind it runs after */
   private readonly remoteReloads = new Map<string, Promise<void>>()
   /**
@@ -6102,14 +6107,21 @@ export class UniworkDocsService {
     // settle edge (`noteEditorState`) re-decides the notice on. The next poll
     // after it settles prunes the closed path as usual.
     const key = pathKey(doc.path)
-    this.remoteDecisions.set(key, (this.remoteDecisions.get(key) ?? 0) + 1)
+    // the entry this decision owns: an old finalizer (a decision dropped by a
+    // session reset) must release only its own entry, never the one a decision
+    // of the next session registered under the same path
+    const entry = this.remoteDecisions.get(key) ?? { n: 0 }
+    entry.n += 1
+    this.remoteDecisions.set(key, entry)
     try {
       const decision = decideRemote(notice, await this.remoteLocalFor(doc))
       await this.applyRemoteDecision(doc, notice, decision)
     } finally {
-      const left = (this.remoteDecisions.get(key) ?? 1) - 1
-      if (left > 0) this.remoteDecisions.set(key, left)
-      else this.remoteDecisions.delete(key)
+      if (this.remoteDecisions.get(key) === entry) {
+        entry.n -= 1
+        if (entry.n > 0) this.remoteDecisions.set(key, entry)
+        else this.remoteDecisions.delete(key)
+      }
     }
   }
 

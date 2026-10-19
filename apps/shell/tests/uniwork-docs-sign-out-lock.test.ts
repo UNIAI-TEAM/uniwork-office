@@ -824,7 +824,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     ;(svc.ownEcho as Map<string, Set<string>>).set(DOC, new Set(['41']))
     ;(svc.remoteLocked as Map<string, string>).set(DOC, 'revoked')
     ;(svc.editorAi as Map<string, unknown>).set(path, { aiRunning: true, aiEpoch: 1 })
-    ;(svc.remoteDecisions as Map<string, number>).set(path, 1)
+    ;(svc.remoteDecisions as Map<string, { n: number }>).set(path, { n: 1 })
     ;(svc.remoteReloads as Map<string, Promise<void>>).set(path, Promise.resolve())
     ;(svc.orgMemberNames as Map<string, string>).set('usr_1', 'Alice')
     svc.orgMemberNamesOrg = 'org_a'

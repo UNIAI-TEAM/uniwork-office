@@ -976,6 +976,72 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
   })
 
+  it('A3 (UNI-1362): a decision dropped by the session reset never releases the counter entry the next session registered', async () => {
+    seedCopy()
+    const h = setup()
+    h.editorStates.splice(0, 1, AI_TURN)
+    const internals = h.service as unknown as {
+      editorAi: Map<string, unknown>
+      remoteDecisions: Map<string, { n: number }>
+    }
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+
+    // decision A of the outgoing session: a notice that resolves to `ignore`
+    // (not-newer), held after its editor-AI sample on the capability read
+    let enteredA!: () => void
+    const enteredAP = new Promise<void>((resolve) => (enteredA = resolve))
+    let releaseA!: () => void
+    const gateA = new Promise<void>((resolve) => (releaseA = resolve))
+    h.capability.hold = gateA
+    h.capability.entered = enteredA
+    notice(h, '9', 3)
+    await enteredAP
+    expect(internals.remoteDecisions.get(docPath())).toEqual({ n: 1 })
+
+    // the account boundary's step 5 clears the map without awaiting A (exactly
+    // what lockSession does), the same account signs in again and its editor
+    // reports the new session's AI turn
+    internals.remoteDecisions.clear()
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // decision B of the new session for the same path: held after its own
+    // editor-AI sample, before it publishes its `newer-ai` bar
+    let enteredB!: () => void
+    const enteredBP = new Promise<void>((resolve) => (enteredB = resolve))
+    let releaseB!: () => void
+    const gateB = new Promise<void>((resolve) => (releaseB = resolve))
+    h.capability.hold = gateB
+    h.capability.entered = enteredB
+    notice(h)
+    await enteredBP
+    const entryB = internals.remoteDecisions.get(docPath())
+    expect(entryB).toEqual({ n: 1 })
+
+    // A resumes and is ignored: its finalizer must release only its own entry,
+    // never B's replacement
+    releaseA()
+    await drain()
+    expect(internals.remoteDecisions.get(docPath())).toBe(entryB)
+
+    // the path closes while B is still in flight: the poll must keep the sample
+    // B's own bar re-decides on (B's entry is what keeps it)
+    h.openPaths.delete(docPath())
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // B publishes its bar, the turn ends after the reopen: the retained sample
+    // is what lets the settle edge re-decide the notice and reload the head
+    releaseB()
+    await waitForBar(h, { kind: 'newer-ai', version: 4 })
+    h.editorStates.splice(0, 1, CLEAN)
+    h.openPaths.add(docPath())
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+  })
+
   it('A3 (UNI-1362): prunes closed-path editor-AI memory on poll once no live bar needs it, and drops settled reload chains', async () => {
     seedCopy()
     const h = setup()
