@@ -99,7 +99,7 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
    * rule); `flip` changes it later on the same mounted panel. Returns a spy on
    * replaceAll: on a bound page no tool may rewrite the document.
    */
-  async function mount(initialBound: boolean, opts: { blank?: boolean } = {}) {
+  async function mount(initialBound: boolean, opts: { blank?: boolean; readOnly?: boolean } = {}) {
     let bound = initialBound
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     Element.prototype.scrollTo = () => {}
@@ -166,6 +166,7 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
             onQueueFocus: () => {},
             onQueueConsume: () => {},
             onCollapse: () => {},
+            ...(opts.readOnly ? { readOnly: true } : {}),
           }),
         ),
       )
@@ -200,12 +201,14 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
     expect(names).toContain('write_document')
   })
 
-  it('a bound turn refuses a forced write_document call; the document is never replaced', async () => {
+  it('a forced write_document call on a bound page errors and never replaces the document', async () => {
     const { replaceAll } = await mount(true)
     harness.reset('write')
     enqueueInComposer(container!, 'rewrite the whole page')
     await pumpUntil(() => harness.requests.length >= 2, 'follow-up turn request')
-    // the refused call stays inside the turn; the page writer is never asked
+    // the composed skill only routes names a sub-skill currently offers, and a bound page no
+    // longer offers write_document, so it answers "Unknown tool" itself: the html skill's
+    // refuseBound is not reached here (it stays covered by uni-1919-html-web-bound.test.ts)
     expect(harness.requests.some((r) => r.purpose === 'one-shot')).toBe(false)
     const followUp = harness.requests.find(
       (r) => !r.purpose && r.messages.some((m) => m.role === 'tool'),
@@ -214,7 +217,42 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
     const results = toolMessage && toolMessage.role === 'tool' ? toolMessage.results : []
     expect(results).toHaveLength(1)
     expect(results[0].isError).toBe(true)
+    expect(results[0].output).toMatch(/Unknown tool|unavailable/)
     expect(replaceAll).not.toHaveBeenCalled()
+  })
+
+  it('follows a bound flip on one mounted panel: writers offered, then gone, with the note', async () => {
+    const { flip } = await mount(false)
+    harness.reset('text')
+    enqueueInComposer(container!, 'improve the heading')
+    await pumpUntil(() => harness.requests.length >= 1, 'turn 1 request')
+    const turn1 = harness.requests[0]
+    expect(turn1.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(['plan_page', 'write_document']),
+    )
+    expect(turn1.system).not.toContain('plan_page and write_document are unavailable')
+
+    // let the first turn settle before the second message goes in
+    await pumpUntil(() => !container!.querySelector('.ai-chat[aria-busy="true"]'), 'turn 1 settled')
+    flip(true)
+    enqueueInComposer(container!, 'and the footer too')
+    await pumpUntil(() => harness.requests.length >= 2, 'turn 2 request')
+    const turn2 = harness.requests[1]
+    const names = turn2.tools.map((tool) => tool.name)
+    expect(names).not.toContain('plan_page')
+    expect(names).not.toContain('write_document')
+    expect(names).toContain('apply_ops')
+    expect(turn2.system).toContain('plan_page and write_document are unavailable')
+  })
+
+  it('a bound view-only page gets the narrow read list and no bound note', async () => {
+    await mount(true, { readOnly: true })
+    harness.reset('text')
+    enqueueInComposer(container!, 'what is on this page?')
+    await pumpUntil(() => harness.requests.length >= 1, 'first turn request')
+    const request = harness.requests[0]
+    expect(request.tools.map((tool) => tool.name)).not.toContain('apply_ops')
+    expect(request.system).not.toContain('plan_page and write_document are unavailable')
   })
 
   describe('blank bound page: the write intent is not offered (RHB-3)', () => {
