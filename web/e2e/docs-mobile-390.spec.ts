@@ -3,7 +3,8 @@
 //    must not be clipped by it, also with the row scrolled sideways), editable and view-only;
 //    1280 keeps the menu under the File tab
 //  - SVF-2: a status message (a failed save) shows as an auto-hiding toast above the status bar at 390
-//  - SVF-3: the print dialog keeps a usable preview and a one-line pager at 390
+//  - SVF-3: the print dialog keeps a usable preview and a one-line pager at 390 (opened at 1280 and then
+//    narrowed, so it is red on its own on a build without the SVF-1 fix)
 // (the no-document Ctrl+P message is covered by a vitest unit test: the test host always opens a document)
 import { test, expect, type Frame, type Page } from '@playwright/test'
 import { existsSync, readdirSync } from 'node:fs'
@@ -215,14 +216,26 @@ test('docs-mobile-390: a status message shows as a toast above the status bar', 
   await expect(ed.locator('.app-toast')).toHaveCount(0, { timeout: 10_000 })
 })
 
-test('docs-mobile-390: print dialog keeps a usable preview and a one-line pager', async ({
-  page,
-}) => {
-  await page.setViewportSize(narrow)
-  const ed = await openDoc(page)
+/**
+ * Open the print dialog at desktop width, where the File menu works on any build, then shrink the
+ * frame to the phone: the dialog's layout is then judged on its own, independent of the File menu
+ * (SVF-1) being fixed.
+ */
+async function openPrintDialogThenNarrow(page: Page, query = ''): Promise<Frame> {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  const ed = await openDoc(page, query)
   await ed.locator('.ribbon-tab-file').click()
   await ed.locator('.file-menu button', { hasText: /^Print/ }).click()
   await expect(ed.locator('.print-preview-nav')).toBeVisible({ timeout: 30_000 })
+  await page.setViewportSize(narrow)
+  await expect.poll(() => ed.evaluate(() => window.innerWidth)).toBe(narrow.width)
+  return ed
+}
+
+test('docs-mobile-390: print dialog keeps a usable preview and a one-line pager', async ({
+  page,
+}) => {
+  const ed = await openPrintDialogThenNarrow(page)
   const geo = await ed.evaluate(() => {
     const pane = document.querySelector('.print-preview-pane')!.getBoundingClientRect()
     const dlg = document.querySelector('.modal.print-dialog')!.getBoundingClientRect()
@@ -252,11 +265,7 @@ test('docs-mobile-390: print dialog keeps a usable preview and a one-line pager'
 })
 
 test('docs-mobile-390: print preview is usable in view-only too', async ({ page }) => {
-  await page.setViewportSize(narrow)
-  const ed = await openDoc(page, '&readonly=1')
-  await ed.locator('.ribbon-tab-file').click()
-  await ed.locator('.file-menu button', { hasText: /^Print/ }).click()
-  await expect(ed.locator('.print-preview-nav')).toBeVisible({ timeout: 30_000 })
+  const ed = await openPrintDialogThenNarrow(page, '&readonly=1')
   const paneH = await ed.evaluate(
     () => document.querySelector('.print-preview-pane')!.getBoundingClientRect().height,
   )
