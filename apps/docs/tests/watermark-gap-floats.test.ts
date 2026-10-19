@@ -231,34 +231,44 @@ const clickButton = (btn: HTMLElement | null, why: string) => {
   act(() => btn!.click())
 }
 
+const floatImages = () => document.querySelectorAll('.page-hf-float-img')
+/** Bounded poll: the docx load (fetch + zip + parse) has no tick count we can rely on. */
+const untilFloat = async (): Promise<void> => {
+  for (let i = 0; i < 200 && floatImages().length === 0; i++) await tick()
+}
+const openWatermarkMenu = () => {
+  clickButton(
+    [...document.querySelectorAll<HTMLElement>('.ribbon-tab')].find(
+      (b) => b.textContent === t('ribbonTabDesign'),
+    ) ?? null,
+    'Design ribbon tab',
+  )
+  clickButton(
+    [...document.querySelectorAll<HTMLElement>('.rb-big')].find(
+      (b) => b.getAttribute('data-tip') === t('ribbonWatermarkTip'),
+    ) ?? null,
+    'Watermark dropdown button',
+  )
+}
+const pickWatermarkItem = (label: string, why: string) =>
+  clickButton(
+    [...document.querySelectorAll<HTMLElement>('.layout-menu button')].find(
+      (b) => b.textContent === label,
+    ) ?? null,
+    why,
+  )
+
 describe('canvas watermark layer when the pending watermark changes', () => {
   it('dropping a new text watermark hides the parsed WordArt float on the page', async () => {
     // the mounted document shows its parsed watermark as a behind-text float
     expect(document.querySelector('.ProseMirror'), 'editor mounted').not.toBeNull()
-    await settle()
-    const floatImages = () => document.querySelectorAll('.page-hf-float-img')
+    await untilFloat()
     expect(floatImages().length, 'parsed watermark paints as a page float').toBeGreaterThan(0)
     expect(document.querySelector('.page-watermark'), 'no pending ghost yet').toBeNull()
 
     // Design → Watermark → preset: only App state changes (watermarkDirty → true)
-    clickButton(
-      [...document.querySelectorAll<HTMLElement>('.ribbon-tab')].find(
-        (b) => b.textContent === t('ribbonTabDesign'),
-      ) ?? null,
-      'Design ribbon tab',
-    )
-    clickButton(
-      [...document.querySelectorAll<HTMLElement>('.rb-big')].find(
-        (b) => b.getAttribute('data-tip') === t('ribbonWatermarkTip'),
-      ) ?? null,
-      'Watermark dropdown button',
-    )
-    clickButton(
-      [...document.querySelectorAll<HTMLElement>('.layout-menu button')].find(
-        (b) => b.textContent === t('ribbonWatermarkDraft'),
-      ) ?? null,
-      'DRAFT preset',
-    )
+    openWatermarkMenu()
+    pickWatermarkItem(t('ribbonWatermarkDraft'), 'DRAFT preset')
     await settle()
 
     // the ghost text overlay shows the pending watermark…
@@ -266,6 +276,18 @@ describe('canvas watermark layer when the pending watermark changes', () => {
     // …and the parsed WordArt shape must be filtered out of the float layer —
     // it stays a float until the next pagination rebuild, which the
     // watermarkDirty dep is there to schedule
+    expect(floatImages(), 'parsed watermark float dropped').toHaveLength(0)
+  })
+
+  it('removing the watermark drops the parsed WordArt float too', async () => {
+    await untilFloat()
+    expect(floatImages().length, 'parsed watermark paints as a page float').toBeGreaterThan(0)
+
+    openWatermarkMenu()
+    pickWatermarkItem(t('ribbonWatermarkRemove'), 'Remove watermark item')
+    await settle()
+
+    expect(document.querySelector('.page-watermark'), 'no ghost after remove').toBeNull()
     expect(floatImages(), 'parsed watermark float dropped').toHaveLength(0)
   })
 })
