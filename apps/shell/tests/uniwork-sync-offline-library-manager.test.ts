@@ -1374,5 +1374,97 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
         expect(changes).toEqual([])
       })
     })
+
+    describe('FUSR-R2-3..6: the boundary guards each have their own permanent pin', () => {
+      const interrupted = { kind: 'refused', code: 'interrupted' }
+
+      /** every file of the scope with its exact (encrypted) bytes */
+      const snapshotOf = (h: Harness, scope: StoreScope) =>
+        new Map(filesOf(h, scope).map((path) => [path, Buffer.from(h.fs.files.get(path)!)]))
+
+      /** account B holds its own usable copy of doc_1; account A (the active one) pins it too */
+      async function populatedB(h: Harness) {
+        switchTo(h, SCOPE_B, 'sess_B1')
+        rowOf(await pinDoc(h))
+        switchTo(h, SCOPE, 'sess_A1')
+        rowOf(await pinDoc(h))
+        const before = snapshotOf(h, SCOPE_B)
+        // index, row and the main blob
+        expect(before.size).toBe(3)
+        return before
+      }
+
+      it('FUSR-R2-3: an eviction queued behind the document lock across a switch to a populated B leaves B alone', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        const before = await populatedB(h)
+        // an archive of A holds A's document lock (lease projection); A's eviction queues behind it
+        const hold = holdLeaseView(h)
+        const archiving = h.manager.handleArchived('doc_1')
+        await hold.entered
+        const evicting = h.manager.evict('doc_1')
+        await flush()
+        await signOut(h)
+        switchTo(h, SCOPE_B, 'sess_B2')
+        hold.release()
+        await archiving
+        expect(await evicting).toEqual(interrupted)
+        expect(snapshotOf(h, SCOPE_B)).toEqual(before)
+      })
+
+      it("FUSR-R2-4: a refresh that purges after a revoke answer holds the boundary inside purgeRecord's deletions", async () => {
+        const changes: string[] = []
+        const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+        addDoc(h, 'doc_1', 1)
+        const before = await populatedB(h)
+        h.docs.getDocument = async () => {
+          throw new UniworkDocError('forbidden')
+        }
+        changes.length = 0
+        // getPin, then the purge's copy deletion (inside refresh -> purgeRecord -> wipeKeys) is held
+        const hold = holdVerify(h, 2)
+        const refreshing = h.manager.refresh('doc_1')
+        await hold.entered
+        await signOut(h)
+        switchTo(h, SCOPE_B, 'sess_B2')
+        hold.release()
+        expect(await refreshing).toEqual(interrupted)
+        expect(changes).toEqual([])
+        expect(filesOf(h, SCOPE)).toEqual([])
+        expect(snapshotOf(h, SCOPE_B)).toEqual(before)
+      })
+
+      it('FUSR-R2-5: cached bytes read before a sign-out that finishes during the verification write are not returned', async () => {
+        const { h } = await pinnedHarness()
+        const held = gate()
+        const real = h.store.putPin.bind(h.store)
+        h.store.putPin = async (record) => {
+          const result = await real(record)
+          held.reached()
+          await held.open
+          return result
+        }
+        const opening = h.manager.openCached('doc_1')
+        await held.entered
+        await signOut(h)
+        held.release()
+        expect(await opening).toEqual(interrupted)
+        expect(h.storeFiles()).toEqual([])
+      })
+
+      it('FUSR-R2-6: a session change alone (no other manager call) interrupts a held refresh', async () => {
+        const { h, changes } = await pinnedHarness()
+        const hold = holdGetDocument(h)
+        const refreshing = h.manager.refresh('doc_1')
+        await hold.entered
+        const before = snapshotOf(h, SCOPE)
+        // the same account signs in again: only the session id moved, nothing else is called
+        h.session.id = 'sess_2'
+        hold.release()
+        expect(await refreshing).toEqual(interrupted)
+        expect(snapshotOf(h, SCOPE)).toEqual(before)
+        expect(changes).toEqual([])
+      })
+    })
   })
 })
