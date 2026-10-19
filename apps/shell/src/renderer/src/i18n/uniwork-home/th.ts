@@ -46,7 +46,7 @@ export const th = {
   uhColActions: 'การทำงาน',
   uhVisPrivate: 'ส่วนตัว',
   uhVisWorkspace: 'เวิร์กสเปซ',
-  uhVisRestricted: 'จำกัด',
+  uhVisRestricted: 'ส่วนตัว',
   uhLevelPrefix: 'คุณ: {level}',
   uhLevelManage: 'จัดการ',
   uhLevelEdit: 'แก้ไข',

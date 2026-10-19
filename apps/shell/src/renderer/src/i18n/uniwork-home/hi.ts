@@ -46,7 +46,7 @@ export const hi = {
   uhColActions: 'कार्रवाइयाँ',
   uhVisPrivate: 'निजी',
   uhVisWorkspace: 'कार्यस्थान',
-  uhVisRestricted: 'प्रतिबंधित',
+  uhVisRestricted: 'निजी',
   uhLevelPrefix: 'आप: {level}',
   uhLevelManage: 'प्रबंधन',
   uhLevelEdit: 'संपादन',

@@ -46,7 +46,7 @@ export const it = {
   uhColActions: 'Azioni',
   uhVisPrivate: 'Privato',
   uhVisWorkspace: 'Spazio di lavoro',
-  uhVisRestricted: 'Limitato',
+  uhVisRestricted: 'Privato',
   uhLevelPrefix: 'Tu: {level}',
   uhLevelManage: 'Gestisci',
   uhLevelEdit: 'Modifica',

@@ -2243,7 +2243,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     const dialog = document.querySelector<HTMLElement>('.modal.uw-act')!
     expect(dialog.textContent).toContain('Chuyển vào thùng rác · Hợp đồng riêng.docx')
     expect(dialog.textContent).toContain(
-      'Tài liệu và toàn bộ cây con sẽ được chuyển vào thùng rác trong 30 ngày trước khi bị xóa vĩnh viễn.',
+      '“Hợp đồng riêng.docx” và toàn bộ cây con sẽ được chuyển vào thùng rác trong 30 ngày trước khi bị xóa vĩnh viễn.',
     )
     expect(dialog.textContent).not.toContain('Lưu trữ')
     await act(async () => {

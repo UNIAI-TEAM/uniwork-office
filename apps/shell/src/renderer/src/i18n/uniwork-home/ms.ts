@@ -46,7 +46,7 @@ export const ms = {
   uhColActions: 'Tindakan',
   uhVisPrivate: 'Peribadi',
   uhVisWorkspace: 'Ruang kerja',
-  uhVisRestricted: 'Terhad',
+  uhVisRestricted: 'Peribadi',
   uhLevelPrefix: 'Anda: {level}',
   uhLevelManage: 'Urus',
   uhLevelEdit: 'Edit',

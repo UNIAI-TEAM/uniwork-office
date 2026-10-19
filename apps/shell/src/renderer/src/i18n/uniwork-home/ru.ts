@@ -46,7 +46,7 @@ export const ru = {
   uhColActions: 'Действия',
   uhVisPrivate: 'Личный',
   uhVisWorkspace: 'Рабочее пространство',
-  uhVisRestricted: 'Ограниченный',
+  uhVisRestricted: 'Личный',
   uhLevelPrefix: 'Вы: {level}',
   uhLevelManage: 'Управление',
   uhLevelEdit: 'Редактирование',

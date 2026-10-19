@@ -46,7 +46,7 @@ export const pt = {
   uhColActions: 'Ações',
   uhVisPrivate: 'Privado',
   uhVisWorkspace: 'Espaço de trabalho',
-  uhVisRestricted: 'Restrito',
+  uhVisRestricted: 'Privado',
   uhLevelPrefix: 'Você: {level}',
   uhLevelManage: 'Gerenciar',
   uhLevelEdit: 'Editar',

@@ -46,7 +46,7 @@ export const ja = {
   uhColActions: '操作',
   uhVisPrivate: '非公開',
   uhVisWorkspace: 'ワークスペース',
-  uhVisRestricted: '制限付き',
+  uhVisRestricted: '非公開',
   uhLevelPrefix: 'あなた: {level}',
   uhLevelManage: '管理',
   uhLevelEdit: '編集',

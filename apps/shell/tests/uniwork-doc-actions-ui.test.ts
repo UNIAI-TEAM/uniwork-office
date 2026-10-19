@@ -698,7 +698,7 @@ describe('S18 row menu', () => {
     // UNI-1958 row 5: the web's move-to-trash wording (documents.archive.archive_description)
     expect(dialog.textContent).toContain('Move to trash · Old.docx')
     expect(dialog.textContent).toContain(
-      'The document and its whole subtree will stay in the trash for 30 days before permanent deletion. Managers can restore them during this window.',
+      '“Old.docx” and its whole subtree will stay in the trash for 30 days before permanent deletion. Managers can restore them during this window.',
     )
     expect(dialog.textContent).not.toMatch(/archive/i)
     expect(api.uniworkArchiveDocument).not.toHaveBeenCalled()
@@ -851,7 +851,7 @@ describe('S18 archived row and archive confirm (FX4)', () => {
     await render([archivedRow(), row('u', 'Notes.txt', { format: null })])
     const archived = rowOf('Old.docx')
     const meta = archived.querySelector('.uw-pick-row-meta')!.textContent!
-    expect(meta).toContain(en.uwDocArchived)
+    expect(meta).toContain('In trash')
     // an archived row is parked, not unsupported
     expect(meta).not.toContain('Not supported')
     // FD-14: a really unsupported format is not listed at all

@@ -46,7 +46,7 @@ export const zhTW = {
   uhColActions: '操作',
   uhVisPrivate: '私人',
   uhVisWorkspace: '工作區',
-  uhVisRestricted: '受限',
+  uhVisRestricted: '私人',
   uhLevelPrefix: '你：{level}',
   uhLevelManage: '管理',
   uhLevelEdit: '編輯',

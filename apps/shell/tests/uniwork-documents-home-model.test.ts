@@ -189,13 +189,13 @@ describe('DH1-W2 documents-home-model', () => {
     expect(
       formatAccessCell(makeDoc({ visibility: 'restricted', myLevel: 'comment' }), tVi),
     ).toEqual({
-      visibilityLabel: 'Hạn chế',
+      visibilityLabel: 'Riêng tư',
       levelLabel: 'Bạn: Nhận xét',
       isEmpty: false,
       tone: 'restricted',
     })
     expect(formatAccessCell(makeDoc({ visibility: 'restricted', myLevel: 'view' }), tVi)).toEqual({
-      visibilityLabel: 'Hạn chế',
+      visibilityLabel: 'Riêng tư',
       levelLabel: 'Bạn: Chỉ xem',
       isEmpty: false,
       tone: 'restricted',

@@ -46,7 +46,7 @@ export const id = {
   uhColActions: 'Tindakan',
   uhVisPrivate: 'Pribadi',
   uhVisWorkspace: 'Ruang kerja',
-  uhVisRestricted: 'Terbatas',
+  uhVisRestricted: 'Pribadi',
   uhLevelPrefix: 'Anda: {level}',
   uhLevelManage: 'Kelola',
   uhLevelEdit: 'Edit',

@@ -46,7 +46,7 @@ export const cs = {
   uhColActions: 'Akce',
   uhVisPrivate: 'Soukromé',
   uhVisWorkspace: 'Pracovní prostor',
-  uhVisRestricted: 'Omezené',
+  uhVisRestricted: 'Soukromé',
   uhLevelPrefix: 'Vy: {level}',
   uhLevelManage: 'Správa',
   uhLevelEdit: 'Úpravy',

@@ -46,7 +46,7 @@ export const ko = {
   uhColActions: '작업',
   uhVisPrivate: '비공개',
   uhVisWorkspace: '워크스페이스',
-  uhVisRestricted: '제한됨',
+  uhVisRestricted: '비공개',
   uhLevelPrefix: '나: {level}',
   uhLevelManage: '관리',
   uhLevelEdit: '편집',

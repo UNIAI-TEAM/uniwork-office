@@ -46,7 +46,7 @@ export const he = {
   uhColActions: 'פעולות',
   uhVisPrivate: 'פרטי',
   uhVisWorkspace: 'סביבת עבודה',
-  uhVisRestricted: 'מוגבל',
+  uhVisRestricted: 'פרטי',
   uhLevelPrefix: 'את/ה: {level}',
   uhLevelManage: 'ניהול',
   uhLevelEdit: 'עריכה',
