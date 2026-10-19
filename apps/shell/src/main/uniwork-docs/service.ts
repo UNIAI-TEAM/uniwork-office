@@ -1274,6 +1274,9 @@ export class UniworkDocsService {
         upload: (input) => this.api().upload(input),
         commit: (input) => this.api().commit(input),
         getDocument: (documentId) => this.api().getDocument(documentId),
+        // UNI-1918 (B69-lite): the one lookup the inline pipeline runs when the
+        // server refuses a staged upload whose claim expired
+        lookupCommit: (input) => this.api().lookupCommit(input),
         // BIGUP-A1: a version payload above `chunked_upload_threshold_bytes`
         // goes through an upload session instead of one multipart POST
         uploadSession: {
@@ -1339,6 +1342,14 @@ export class UniworkDocsService {
           const engine = await this.queueEngineOrNull()
           const st = (await engine?.supersede(doc)) ?? doc.record.state
           return st
+        },
+        supersedeDeferRelease: async (doc) => {
+          const engine = await this.queueEngineOrNull()
+          if (engine?.supersedeDeferRelease) return engine.supersedeDeferRelease(doc)
+          return {
+            state: (await engine?.supersede(doc)) ?? doc.record.state,
+            release: async () => {},
+          }
         },
         tombstone: async (doc) =>
           (await this.queueEngineOrNull())?.tombstone(doc) ?? doc.record.state,
@@ -2801,6 +2812,17 @@ export class UniworkDocsService {
   private async supersedePending(doc: BoundDocument): Promise<void> {
     const queueDoc = await this.queueDocFromStore(doc)
     if (queueDoc) await this.coordinator.supersede(queueDoc)
+  }
+
+  /**
+   * `supersedePending` for the conflict actions: the old intent is persisted
+   * `cancelled` now, but the retained upload session's network DELETE is
+   * returned for the caller to run AFTER its local destructive steps, so no
+   * network sits between `saveRacedReplacement` and the last store write.
+   */
+  private async supersedePendingDeferRelease(doc: BoundDocument): Promise<() => Promise<void>> {
+    const queueDoc = await this.queueDocFromStore(doc)
+    return queueDoc ? await this.coordinator.supersedeDeferRelease(queueDoc) : async () => {}
   }
 
   /** the document's stored intent as a queue doc, or null when there is none */
@@ -7405,23 +7427,7 @@ export class UniworkDocsService {
       }
     }
 
-    let intent: UniworkConflictIntentBlock = 'none'
-    const access = await this.intentAccess()
-    if (access.kind === 'ok') {
-      const stored = await access.intents.read(session.doc.key, {
-        orgId: b.orgId,
-        workspaceId: b.workspaceId,
-        baseVersion: b.baseVersion,
-        length: 0,
-      })
-      const st = stored?.intent.state
-      if (st === 'committing' || st === 'reconciling' || st === 'reconciling-stuck') {
-        intent = st
-      }
-    }
-    if (intent === 'none' && this.coordinator.isSaving(session.path)) {
-      intent = 'committing'
-    }
+    const intent = await this.conflictIntentBlock(session.doc, session.path)
 
     const keepDraft = await this.probeKeepDraft(session, session.doc)
     const moduleKind: UniworkConflictView['module'] =
@@ -7465,6 +7471,58 @@ export class UniworkDocsService {
       notice: opts.notice ?? null,
       noticeArg: opts.noticeArg ?? null,
     }
+  }
+
+  /**
+   * The conflict dialog's uncertain-intent block for `doc`: `committing` /
+   * `reconciling` / `reconciling-stuck` from the durable store, or `committing`
+   * while a Save of the path is in flight in memory.
+   */
+  private async conflictIntentBlock(
+    doc: BoundDocument,
+    savingPath = doc.path,
+  ): Promise<UniworkConflictIntentBlock> {
+    const b = doc.binding
+    let intent: UniworkConflictIntentBlock = 'none'
+    const access = await this.intentAccess()
+    if (access.kind === 'ok') {
+      const stored = await access.intents.read(doc.key, {
+        orgId: b.orgId,
+        workspaceId: b.workspaceId,
+        baseVersion: b.baseVersion,
+        length: 0,
+      })
+      const st = stored?.intent.state
+      if (st === 'committing' || st === 'reconciling' || st === 'reconciling-stuck') {
+        intent = st
+      }
+    }
+    if (intent === 'none' && this.coordinator.isSaving(savingPath)) {
+      intent = 'committing'
+    }
+    return intent
+  }
+
+  /**
+   * N1: did a Save land between the action's view check and its first
+   * destructive step? The only await here is the drain of an in-flight
+   * attempt; the caller must keep this immediately before its
+   * `supersedePending` / `writeWorkingCopy` / `dropIntent`. True = a Save ran
+   * (its durable intent is not `none`, or the base the action started from
+   * moved): the replacement must supersede, drop and overwrite nothing.
+   */
+  private async saveRacedReplacement(
+    doc: BoundDocument,
+    start: { baseRevision: string; baseChecksum: string },
+  ): Promise<boolean> {
+    if (this.coordinator.isSaving(doc.path)) await this.coordinator.settled(doc.path)
+    if ((await this.conflictIntentBlock(doc)) !== 'none') return true
+    const now = this.store.lookup(doc.path)
+    if (!now) return true
+    return (
+      now.binding.baseRevision !== start.baseRevision ||
+      now.binding.baseChecksum !== start.baseChecksum
+    )
   }
 
   private async probeKeepDraft(
@@ -7634,6 +7692,9 @@ export class UniworkDocsService {
     }
     try {
       const done = await this.replaceWithLatest(chosen)
+      if (!done) {
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
       if (open.remoteNotice) {
         this.remoteBars.set(pathKey(done.path), {
           kind: 'updated',
@@ -8100,12 +8161,33 @@ export class UniworkDocsService {
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
+    // N1: the view this action decided on was built earlier (its keep-draft
+    // probe and capability read await). A Save admitted since then - the user's
+    // Ctrl/Cmd+S - must not have its intent superseded or deleted under it, and
+    // the base it committed must not be overwritten by this one. Drain it and
+    // re-check right before the first destructive step, with no other await in
+    // between; a Save that ran leaves the decision to the conflict view.
+    if (
+      await this.saveRacedReplacement(chosen, {
+        baseRevision: chosen.binding.baseRevision,
+        baseChecksum: chosen.binding.baseChecksum,
+      })
+    ) {
+      return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+    }
     // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
     // user's snapshot is spent (superseded), never replayed against the new base
-    await this.supersedePending(chosen)
-    // the old base's intent is invalid on the server's revision
-    await this.dropIntent(chosen)
-    const ready = await this.coordinator.commitState(chosen, next)
+    const releaseSession = await this.supersedePendingDeferRelease(chosen)
+    let ready: BoundDocument
+    try {
+      // the old base's intent is invalid on the server's revision
+      await this.dropIntent(chosen)
+      ready = await this.coordinator.commitState(chosen, next)
+    } finally {
+      // the superseded intent's upload session is released after the local steps, and also
+      // when one of them fails, so the server session is never leaked
+      await releaseSession()
+    }
     if (!currentView.online) {
       await this.coordinator.save(ready.path, { forceOffline: true })
       open.controller.abort()
@@ -8203,38 +8285,62 @@ export class UniworkDocsService {
   // ---- flows -----------------------------------------------------------------
 
   /** "Discard my changes and open the latest": download, replace, reload the tab */
-  private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument> {
+  private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument | null> {
+    // A Save of this path may still be in flight: the module's own Save landing
+    // in the keep-draft flush window, or a Ctrl/Cmd+S racing the dialog. Its
+    // durable intent must never be superseded or deleted under it - the record
+    // is what authorizes the commit POST (R2), so deleting it refuses the POST
+    // and orphans the staged upload, and the base read below would race the
+    // commit.
+    // N1: a Save can also be admitted DURING this action (the user's Ctrl/Cmd+S
+    // while the download runs). So the drain + re-check runs immediately before
+    // the first destructive step - `supersedePending` / `writeWorkingCopy` /
+    // `dropIntent` - with no other await in between: a Save that ran (its
+    // durable intent is not `none`, or the base this action started from moved)
+    // leaves the replacement to the dialog's conflict view instead.
+    const start = {
+      baseRevision: doc.binding.baseRevision,
+      baseChecksum: doc.binding.baseChecksum,
+    }
     const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
+    if (await this.saveRacedReplacement(doc, start)) return null
     // "Tải lại": the old intent is superseded BEFORE the base is replaced, so
     // it is spent (cancelled/superseded), never replayed against the new base
-    await this.supersedePending(doc)
-    await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
-    // the local work (and its intent) is discarded: nothing is left to replay
-    await this.dropIntent(doc)
-    const fresh: Binding = {
-      ...doc.binding,
-      title: detail.title,
-      access: accessFor(detail.myLevel),
-      baseRevision: detail.revision,
-      baseVersion: detail.file.version,
-      baseChecksum: sha256Hex(bytes),
-      // the old intent is superseded below; the copy reads saved
-      state: 'saved',
+    const releaseSession = await this.supersedePendingDeferRelease(doc)
+    let done: BoundDocument
+    try {
+      await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
+      // the local work (and its intent) is discarded: nothing is left to replay
+      await this.dropIntent(doc)
+      const fresh: Binding = {
+        ...doc.binding,
+        title: detail.title,
+        access: accessFor(detail.myLevel),
+        baseRevision: detail.revision,
+        baseVersion: detail.file.version,
+        baseChecksum: sha256Hex(bytes),
+        // the old intent is superseded below; the copy reads saved
+        state: 'saved',
+      }
+      // the base moved: the old version id must not survive an unknown new one
+      delete fresh.baseVersionId
+      const next = withServerContext(fresh, detail)
+      delete next.error
+      delete next.serverRevision
+      delete next.serverVersion
+      // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
+      this.lastUserSave.set(doc.path, ++this.saveCounter)
+      this.editorDirty.delete(doc.path)
+      done = await this.coordinator.commitState(doc, next)
+      // the bar belonged to the replaced base: the copy is at the head now
+      this.remoteBars.delete(pathKey(doc.path))
+      this.remoteNotices.delete(pathKey(doc.path))
+      this.deps.reloadPath(doc.path)
+    } finally {
+      // the superseded intent's upload session is released after the local steps, and also
+      // when one of them fails, so the server session is never leaked
+      await releaseSession()
     }
-    // the base moved: the old version id must not survive an unknown new one
-    delete fresh.baseVersionId
-    const next = withServerContext(fresh, detail)
-    delete next.error
-    delete next.serverRevision
-    delete next.serverVersion
-    // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
-    this.lastUserSave.set(doc.path, ++this.saveCounter)
-    this.editorDirty.delete(doc.path)
-    const done = await this.coordinator.commitState(doc, next)
-    // the bar belonged to the replaced base: the copy is at the head now
-    this.remoteBars.delete(pathKey(doc.path))
-    this.remoteNotices.delete(pathKey(doc.path))
-    this.deps.reloadPath(doc.path)
     return done
   }
 
