@@ -770,3 +770,111 @@ describe('T5-5 restore and a quota refusal at reconnect', () => {
     expect(await h.manager.downloadNow('doc_1')).toMatchObject({ row: { state: 'ready' } })
   })
 })
+
+describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recreates a row', () => {
+  /**
+   * The `nth` key verification of the library layer from now on waits for
+   * `release()`; `reached` resolves once the call is waiting there.
+   */
+  function holdVerify(h: Harness, nth: number) {
+    let release!: () => void
+    let reached!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const entered = new Promise<void>((resolve) => (reached = resolve))
+    const real = h.layer.verifyKey.bind(h.layer)
+    let calls = 0
+    h.layer.verifyKey = async (scope) => {
+      calls += 1
+      if (calls === nth) {
+        reached()
+        await gate
+      }
+      return real(scope)
+    }
+    return { release, entered }
+  }
+
+  /** sign-out the way the wiring does it: lock the manager, then wipe the library scope */
+  async function signOut(h: Harness) {
+    h.manager.lockBoundary()
+    h.session.scope = null
+    await h.layer.lockAndWipe(SCOPE)
+  }
+
+  const revokeNotice = {
+    documentId: 'doc_1',
+    reason: 'offline_lease_revoked',
+    deleteCommittedCache: true,
+    keepDrafts: true,
+  } as const
+
+  async function pinnedHarness() {
+    const changes: string[] = []
+    const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+    addDoc(h, 'doc_1', 1)
+    rowOf(await pinDoc(h))
+    changes.length = 0
+    return { h, changes }
+  }
+
+  it('handleArchived held in putPin across sign-out: no row recreated, no notice, null', async () => {
+    const { h, changes } = await pinnedHarness()
+    // getPin verifies first, putPin second
+    const hold = holdVerify(h, 2)
+    const archiving = h.manager.handleArchived('doc_1')
+    await hold.entered
+    await signOut(h)
+    hold.release()
+    expect(await archiving).toBeNull()
+    expect(changes).toEqual([])
+    expect(h.storeFiles()).toEqual([])
+    h.session.scope = SCOPE
+    h.session.id = 'sess_2'
+    expect(await h.manager.row('doc_1')).toBeNull()
+  })
+
+  it('handleArchived held in putPin across a new session of the same account: no row recreated', async () => {
+    const { h, changes } = await pinnedHarness()
+    const hold = holdVerify(h, 2)
+    const archiving = h.manager.handleArchived('doc_1')
+    await hold.entered
+    // the same account signs in again: the session change is the boundary
+    h.session.id = 'sess_2'
+    h.manager.markOpen('doc_other')
+    await h.layer.lockAndWipe(SCOPE)
+    hold.release()
+    expect(await archiving).toBeNull()
+    expect(changes).toEqual([])
+    expect(h.storeFiles()).toEqual([])
+    expect(await h.manager.row('doc_1')).toBeNull()
+  })
+
+  it('handleLeaseRevoked held in the final row write across sign-out: no revoked row', async () => {
+    const { h, changes } = await pinnedHarness()
+    // getPin, the copy's one delete, then the revoked row
+    const hold = holdVerify(h, 3)
+    const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+    await hold.entered
+    await signOut(h)
+    hold.release()
+    expect(await revoking).toBeNull()
+    expect(changes).toEqual([])
+    expect(h.storeFiles()).toEqual([])
+  })
+
+  it('handleLeaseRevoked held in wipeKeys across sign-out: the row write after it is refused', async () => {
+    const { h, changes } = await pinnedHarness()
+    // getPin, then the copy's delete is held: the row write starts after the boundary
+    const hold = holdVerify(h, 2)
+    const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+    await hold.entered
+    await signOut(h)
+    hold.release()
+    expect(await revoking).toBeNull()
+    expect(changes).toEqual([])
+    expect(h.storeFiles()).toEqual([])
+    h.session.scope = SCOPE
+    h.session.id = 'sess_2'
+    expect(await h.manager.row('doc_1')).toBeNull()
+  })
+})

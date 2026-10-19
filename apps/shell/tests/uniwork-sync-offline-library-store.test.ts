@@ -5,12 +5,14 @@ import {
   OFFLINE_LIBRARY_MAX_PINS,
   OFFLINE_LIBRARY_QUOTA_BYTES,
   OFFLINE_LIBRARY_STORE_REGISTRATION,
+  PIN_RECORD_SCHEMA,
   blobKey,
   createOfflineLibraryStore,
   isBlobKey,
   pinKey,
+  type PinRecord,
 } from '../src/main/uniwork-sync/offline-library'
-import { createStoreLayer } from '../src/main/uniwork-sync/store'
+import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
 import {
   runStoreCompliance,
   type ComplianceEnv,
@@ -25,6 +27,27 @@ import {
   plaintext,
   recordFile,
 } from './uniwork-sync-offline-library-fakes'
+
+function pinRow(documentId: string): PinRecord {
+  return {
+    schema: PIN_RECORD_SCHEMA,
+    documentId,
+    scope: { orgId: 'org_1', workspaceId: 'ws_1' },
+    manifest: null,
+    readyManifest: null,
+    readyGeneration: null,
+    readyVersion: null,
+    state: 'waiting-network',
+    progress: null,
+    bytes: 0,
+    pinnedAt: 1,
+    lastVerifiedAt: null,
+    staging: null,
+    updateAvailable: false,
+    updateKept: false,
+    archived: false,
+  }
+}
 
 describe('offline library store', () => {
   it('registers as offline-library, schema 1; the quota values are U-01', () => {
@@ -120,6 +143,57 @@ describe('offline library store', () => {
     index[index.length - 1] ^= 0xff
     expect(await store.readIndex()).toEqual({ kind: 'refused' })
   })
+})
+
+describe('R4F-2 (UNI-1362): a call in flight at sign-out never writes into the wiped scope', () => {
+  /** the first `step` call of the layer waits for `release()`; `reached` says it is waiting */
+  function holdFirst(layer: StoreLayer, step: 'verifyKey' | 'open') {
+    let release!: () => void
+    let reached!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const entered = new Promise<void>((resolve) => (reached = resolve))
+    let armed = true
+    const held: StoreLayer = {
+      ...layer,
+      [step]: async (scope: typeof SCOPE) => {
+        if (armed) {
+          armed = false
+          reached()
+          await gate
+        }
+        return layer[step](scope)
+      },
+    }
+    return { held, release, entered }
+  }
+
+  /** the state a record can be found in by a handle opened after the wipe */
+  async function pinAfterWipe(layer: StoreLayer, documentId: string) {
+    const opened = await layer.open(SCOPE)
+    if (opened.kind !== 'ok') throw new Error(`did not open: ${opened.kind}`)
+    return opened.store.records(OFFLINE_LIBRARY_STORE_REGISTRATION.name).read(pinKey(documentId))
+  }
+
+  for (const step of ['verifyKey', 'open'] as const) {
+    it(`${step} held across forget() + lockAndWipe: interrupted, no record, the next call works`, async () => {
+      const fs = createMemoryFs()
+      const layer = createLibraryLayer(fs, createFakeKeys())
+      const { held, release, entered } = holdFirst(layer, step)
+      const store = createOfflineLibraryStore({ layer: held, scope: SCOPE })
+      const writing = store.putPin(pinRow('doc_1'))
+      await entered
+      // sign-out: the manager forgets the handle synchronously, then the wiring wipes
+      store.forget()
+      await layer.lockAndWipe(SCOPE)
+      release()
+      expect(await writing).toEqual({ kind: 'interrupted' })
+      expect(await pinAfterWipe(layer, 'doc_1')).toEqual({ kind: 'missing' })
+      expect(fs.listFiles()).toEqual([])
+      // the boundary passed: a fresh call opens the scope again and works
+      expect(await store.putPin(pinRow('doc_1'))).toEqual({ kind: 'ok' })
+      expect(await store.getPin('doc_1')).toMatchObject({ kind: 'ok' })
+    })
+  }
 })
 
 runStoreCompliance('uniwork-sync offline-library', async (env: ComplianceEnv) => {
