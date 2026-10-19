@@ -14,8 +14,10 @@
  *   1. refresh: when the engine can replay the save (no structural / sheet / pivot / name change,
  *      file <= 64 MB, <= 10 000 edits, IronCalc imports the workbook), every formula cell of the
  *      file is recalculated by `recalc_cells` and written with its new result (cached-values.ts).
- *      An error the engine cannot be trusted with on a formula the user did not touch (IronCalc
- *      lacks a function Excel has) is written as no value instead of as a wrong error.
+ *      A formula the user did not touch keeps the cached value the file already holds (KEEP) unless
+ *      the engine's answer really differs; an error the engine cannot be trusted with (IronCalc
+ *      lacks a function Excel has) is written as no value instead of as a wrong error
+ *      (cached-values.ts has the table).
  *   2. sweep: in every other case (structural change pending, a sheet added or removed this
  *      session, bulk fills, pivot output, defined-name change, > 64 MB, > 10 000 edits,
  *      > 200 000 formulas, strict importer failure, engine crash) the cached `<v>` of every
@@ -118,32 +120,62 @@ function columnIndex(letters: string): number {
   return n - 1
 }
 
-/** 0-based row and column of every formula cell of a worksheet part (shared followers included) */
-export function formulaCells(worksheetXml: string): { row: number; column: number }[] {
-  const cells: { row: number; column: number }[] = []
+/** the `<v>` of a formula cell as the gateway types it, `undefined` when the cell holds no usable value */
+function cachedValueOf(attrs: string, body: string): CachedValue | undefined {
+  const text = /<v\b[^>]*>([\s\S]*?)<\/v>/.exec(body)?.[1]
+  if (text === undefined || text.trim() === '') return undefined
+  switch (attr(attrs, 't')) {
+    case 'e':
+      return { error: decodeXml(text) }
+    case 'b':
+      return text === '1' ? true : text === '0' ? false : undefined
+    case 'str':
+      return decodeXml(text)
+    case undefined:
+    case 'n': {
+      const number = Number(text)
+      return Number.isFinite(number) ? number : undefined
+    }
+    default:
+      return undefined
+  }
+}
+
+/**
+ * 0-based row and column of every formula cell of a worksheet part (shared followers included),
+ * with the cached value the file holds for it (`original`, absent when the cell has none)
+ */
+export function formulaCellsWithValues(
+  worksheetXml: string,
+): { row: number; column: number; original?: CachedValue }[] {
+  const cells: { row: number; column: number; original?: CachedValue }[] = []
   for (const match of worksheetXml.matchAll(CELL)) {
     const body = match[2]
     if (body === undefined || !HAS_FORMULA.test(body)) continue
     const ref = /\br="([A-Z]{1,3})(\d+)"/.exec(match[1] ?? '')
     if (!ref) continue
-    cells.push({ row: Number(ref[2]) - 1, column: columnIndex(ref[1] ?? 'A') })
+    const original = cachedValueOf(match[1] ?? '', body)
+    cells.push({
+      row: Number(ref[2]) - 1,
+      column: columnIndex(ref[1] ?? 'A'),
+      ...(original === undefined ? {} : { original }),
+    })
   }
   return cells
+}
+
+/** 0-based row and column of every formula cell of a worksheet part (shared followers included) */
+export function formulaCells(worksheetXml: string): { row: number; column: number }[] {
+  return formulaCellsWithValues(worksheetXml).map(({ row, column }) => ({ row, column }))
 }
 
 /** a formula's result as the gateway types it: number, text, boolean, `{ error }`, or null = none */
 export type CachedValue = string | number | boolean | null | { readonly error: string }
 
-/** red-commit stub (UNI-1989): the keep marker and the originals reader arrive with the fix */
+/** leave the cell exactly as the file has it (cached value, type and attribute order) */
 export const KEEP = Symbol('keep-cached')
+/** what a save writes for one formula cell: a result, none (null) or KEEP */
 export type CachedEntry = CachedValue | typeof KEEP
-
-/** 0-based row and column of every formula cell with the cached value the file holds for it */
-export function formulaCellsWithValues(
-  _worksheetXml: string,
-): { row: number; column: number; original?: CachedValue }[] {
-  return []
-}
 
 const escapeText = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -168,8 +200,8 @@ const FORMULA_ELEMENT = /<f\b[^>]*\/>|<f\b[^>]*>[\s\S]*?<\/f>/
 /**
  * The worksheet with the cached value of every formula cell rewritten: `valueAt(row, column)`
  * (0-based) gives the result to write, anything else (undefined, null, empty text) removes the
- * `<v>` and the `t` attribute that typed it. The `<f>` stays verbatim. Returns the input string
- * itself when nothing changed.
+ * `<v>` and the `t` attribute that typed it, KEEP leaves the whole cell as it is. The `<f>` stays
+ * verbatim. Returns the input string itself when nothing changed.
  */
 export function rewriteFormulaCachedValues(
   worksheetXml: string,
@@ -182,7 +214,8 @@ export function rewriteFormulaCachedValues(
       const ref = /\br="([A-Z]{1,3})(\d+)"/.exec(attrs)
       if (ref) value = valueAt(Number(ref[2]) - 1, columnIndex(ref[1] ?? 'A'))
     }
-    const { type, valueXml } = serializeCached(value as CachedValue | undefined)
+    if (value === KEEP) return whole
+    const { type, valueXml } = serializeCached(value)
     if (valueXml === '' && !HAS_VALUE.test(body)) return whole
     const kept = body.replace(VALUE_ELEMENT, '')
     const withValue =

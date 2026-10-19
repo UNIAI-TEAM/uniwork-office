@@ -7,6 +7,7 @@ import {
   KEEP,
   formulaCellsWithValues,
   rewriteFormulaCachedValues,
+  type CachedEntry,
   type CachedValue,
 } from './stale-values'
 
@@ -282,7 +283,7 @@ describe('a save that edits a constant on another sheet (UNI-1989)', () => {
     const values = refreshFormulaValues(plan, answers as never, NAMES)
     return Object.fromEntries(
       Object.entries(sheets).map(([name, xml]) => {
-        const mine = new Map(
+        const mine = new Map<string, CachedEntry>(
           values
             .filter((v) => v.sheetId === idOf(name))
             .map((v) => [`${v.row}:${v.column}`, v.value]),

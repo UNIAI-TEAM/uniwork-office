@@ -24,7 +24,7 @@ import { normalizeOoxmlPartPrefix } from '../../../../packages/xlsx-gateway/src/
 import type { SheetEditPlan } from '../../../../packages/xlsx-gateway/src/gateway/xlsx-sheets'
 import { MAX_PATCH_ENTRY_BYTES } from '../../../../packages/xlsx-gateway/src/shared/edit-schemas'
 import type { WorkbookSaveRequest } from '../../../../apps/sheets/src/shared/desktop-api'
-import { rewriteFormulaCachedValues, type CachedValue } from './stale-values'
+import { rewriteFormulaCachedValues, type CachedEntry } from './stale-values'
 
 type PlanArgs = Parameters<typeof planCellEditsToXlsx>
 
@@ -379,7 +379,7 @@ const textEncoder = new TextEncoder()
 async function rewriteCachedValues(
   plan: MutationPlan,
   source: EntrySource,
-  keep: ReadonlyMap<string, ReadonlyMap<string, CachedValue>>,
+  keep: ReadonlyMap<string, ReadonlyMap<string, CachedEntry>>,
 ): Promise<MutationPlan> {
   const isSheet = (path: string) => /^xl\/worksheets\/[^/]+\.xml$/i.test(path)
   const rewrite = (path: string, xml: string) => {
@@ -419,9 +419,9 @@ export async function saveWorkbookBytes(input: {
   /**
    * stale-values.ts: the ONLY cached values the saved file may carry. Every formula cell of every
    * worksheet part gets its entry (worksheet part path -> "row:column", 0-based) or loses its `<v>`;
-   * an empty map is the sweep. Absent: cached values stay as they are.
+   * KEEP leaves the cell as the file has it. An empty map is the sweep. Absent: cached values stay as they are.
    */
-  cachedValues?: ReadonlyMap<string, ReadonlyMap<string, CachedValue>>
+  cachedValues?: ReadonlyMap<string, ReadonlyMap<string, CachedEntry>>
 }): Promise<{ data: Uint8Array; plan: MutationPlan }> {
   const { engine, sourcePath, workDir, save } = input
   const manifest = await engine.manifest(sourcePath)
