@@ -8,9 +8,10 @@ import {
   rmSync,
   statSync,
   truncateSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { deflateRawSync } from 'node:zlib'
@@ -18,11 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkDocSummary, UniworkDocStatus } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
-import {
-  BINDING_FILE,
-  INTENT_PAYLOAD_FILE,
-  LAST_OWNER_FILE,
-} from '../src/main/uniwork-docs/binding-store'
+import { BINDING_FILE, LAST_OWNER_FILE } from '../src/main/uniwork-docs/binding-store'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
 import {
@@ -102,6 +99,11 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       }
       return actual.readFile(...args)
     }),
+    // S01-R2-4 fix2: the first-save folder inspection reads the directory; a test
+    // injects a non-ENOENT failure here (the real module otherwise)
+    readdir: vi.fn((...args: unknown[]) =>
+      (actual.readdir as (...a: unknown[]) => Promise<unknown>)(...args),
+    ),
   }
 })
 
@@ -249,6 +251,16 @@ function fakeServer(
     sessionCreateMismatch?: boolean
     /** R1-BE-02: the session DELETE answers 500, so the abort is not reported clean */
     sessionDeleteRefused?: boolean
+    /**
+     * S01-R2-4: answers a first-save create BEFORE D's dedupe, by Idempotency-Key
+     * (null falls through). Models a key D never committed (503, expired claim)
+     * or one whose document is gone (404) without seeding a row.
+     */
+    createKeyAnswer?: (idempotencyKey: string) => Response | null
+    /** S01-R2-4: the same hook for the upload-session open of a chunked first save */
+    sessionOpenAnswer?: (idempotencyKey: string) => Response | null
+    /** S01-R2-4: the FIRST session `complete` answers 410 `upload_session_expired` */
+    sessionCompleteExpiredOnce?: boolean
   } = {},
 ) {
   const state = {
@@ -274,8 +286,12 @@ function fakeServer(
       sizeBytes: number
       parentId: string | null
       title: string | null
+      /** the Idempotency-Key the session was opened with */
+      key: string
     } | null,
     sessionSeq: 0,
+    /** S01-R2-4 fix1: D replays an open key to the document its first run completed */
+    docByOpenKey: new Map<string, string>(),
     completedParts: [] as Array<{ part_number: number; etag: string }>,
     /** BIGUP-A1: the parts a `partFailsOnceAt` run has already refused */
     failedParts: new Set<number>(),
@@ -401,6 +417,8 @@ function fakeServer(
       if (options.invalidDestination) {
         return json(400, { error: { code: 'invalid_destination', message: 'x' } })
       }
+      const keyAnswer = options.createKeyAnswer?.(call.idempotencyKey)
+      if (keyAnswer) return keyAnswer
       // SAVE-01 r4 (S01-R4-3): D refuses the bytes itself - after the caller's
       // preflight passed - and no row is created. The envelope names only the
       // code, so the filename and the payload length can come from the caller.
@@ -690,6 +708,8 @@ function fakeServer(
         title?: string
       }
       call.body = body
+      const openAnswer = options.sessionOpenAnswer?.(call.idempotencyKey)
+      if (openAnswer) return openAnswer
       if (options.sessionTooSmall) {
         return json(422, { error: { code: 'upload_session_too_small', message: 'x' } })
       }
@@ -712,6 +732,7 @@ function fakeServer(
         parentId: body.parent_id ?? null,
         title: body.title ?? null,
         sessionId: `ups_${++state.sessionSeq}`,
+        key: call.idempotencyKey,
       }
       state.completedParts = []
       state.sessionBytes = new Uint8Array(body.size_bytes)
@@ -770,8 +791,24 @@ function fakeServer(
         // R1-BE-04: holds the validation open so a test can change the source
         // while the server is checking the uploaded bytes
         if (options.sessionCompleteGate) await options.sessionCompleteGate()
+        if (options.sessionCompleteExpiredOnce) {
+          options.sessionCompleteExpiredOnce = false
+          state.session = null
+          return json(410, { error: { code: 'upload_session_expired', message: 'x' } })
+        }
         state.completedParts = body.parts
+        const replayed = state.docByOpenKey.get(session.key)
+        if (replayed) {
+          return json(200, {
+            document: {
+              ...docJson(replayed),
+              title: session.title ?? session.filename,
+              file: { ...docJson(replayed).file, filename: session.filename },
+            },
+          })
+        }
         const id = `new_${++seq}`
+        state.docByOpenKey.set(session.key, id)
         // R1-BE-04: the created document's bytes are what the storage actually
         // assembled (when the fake keeps them), so its checksum_sha256 is the
         // truth the app's post-upload verification compares against
@@ -925,6 +962,7 @@ afterEach(async () => {
 
 /** the fake UniWork documents server a setup() wires the service's client to */
 type FakeServer = ReturnType<typeof fakeServer>
+type FakeServerOptions = NonNullable<Parameters<typeof fakeServer>[0]>
 
 function setup(
   server: FakeServer,
@@ -1093,6 +1131,7 @@ function setup(
     uploadFile,
     treeChanged,
     moduleSaveCalls,
+    syncStore,
     setShellTab: (next: boolean) => {
       shellTab = next
     },
@@ -3852,6 +3891,7 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
         filename: 'Resume.docx',
         parentId: null,
         title: null,
+        key: 'resume-fixture',
       }
       second.state.completedParts = [{ part_number: 1, etag: 'etag-1' }]
       const ctxB = setup(second, { syncStore: true })
@@ -4559,15 +4599,10 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
       } else if ('writeWorkingCopy' in mode) {
         vi.spyOn(ctx.service.store, 'writeWorkingCopy').mockRejectedValue(new Error('disk full'))
       } else {
-        // the migration sweep holds the document's folder: a schema-1 binding
-        // with pending-upload.bin in the dir the bind will use
-        const docDirPath = docDir('up_1')
-        mkdirSync(docDirPath, { recursive: true })
-        writeFileSync(
-          join(docDirPath, BINDING_FILE),
-          JSON.stringify({ schema: 1, pendingIntent: {} }),
-        )
-        writeFileSync(join(docDirPath, INTENT_PAYLOAD_FILE), 'x')
+        // the binding.json write fails. (S01-R2-4 fix2: a folder that already
+        // holds files - the old migration-hold fixture - is now refused before any
+        // write, so the failure is injected at the write itself.)
+        vi.spyOn(ctx.service.store, 'write').mockRejectedValue(new Error('disk full'))
       }
 
       const saved = await ctx.service.firstSave(input(file))
@@ -4598,11 +4633,8 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
     const ctx = setup(server)
     const file = join(dir, 'Draft.docx')
     writeFileSync(file, 'bytes')
-    // force the bind failure at the binding write (migration-hold fixture)
-    const docDirPath = docDir('up_1')
-    mkdirSync(docDirPath, { recursive: true })
-    writeFileSync(join(docDirPath, BINDING_FILE), JSON.stringify({ schema: 1, pendingIntent: {} }))
-    writeFileSync(join(docDirPath, INTENT_PAYLOAD_FILE), 'x')
+    // force the bind failure at the binding write
+    vi.spyOn(ctx.service.store, 'write').mockRejectedValue(new Error('disk full'))
 
     const saved = await ctx.service.firstSave(input(file))
 
@@ -4874,19 +4906,15 @@ describe('SAVE-01 first save r3 (S01-R2 fixes)', () => {
     const ctx = setup(server)
     const file = join(dir, 'Draft.docx')
     writeFileSync(file, 'bytes')
-    // fail the first bind at the binding.json write (migration-hold fixture)
-    const docDirPath = docDir('up_1')
-    mkdirSync(docDirPath, { recursive: true })
-    writeFileSync(join(docDirPath, BINDING_FILE), JSON.stringify({ schema: 1, pendingIntent: {} }))
-    writeFileSync(join(docDirPath, INTENT_PAYLOAD_FILE), 'x')
+    // fail the first bind at the binding.json write (once: the retry binds cleanly;
+    // S01-R2-4 fix2 refuses a folder that already holds files, so no fixture is seeded)
+    vi.spyOn(ctx.service.store, 'write').mockRejectedValueOnce(new Error('disk full'))
 
     const failed = await ctx.service.firstSave(input(file))
     expect(failed.ok).toBe(false)
     if (!failed.ok) expect(failed.error).toBe('first_save_bind_failed')
     expect(server.state.documents.get('up_1')?.archived).toBe(true)
 
-    // clear the migration hold so the retry binds cleanly
-    rmSync(docDirPath, { recursive: true, force: true })
     const retried = await ctx.service.firstSave(input(file))
     expect(retried.ok).toBe(true)
 
@@ -4985,6 +5013,882 @@ describe('SAVE-01 first save r3 (S01-R2 fixes)', () => {
       cleanupError,
     )
     warn.mockRestore()
+  })
+})
+
+// S01-R2-4 (UNI-1847): a restart never turns one first Save into two UniWork
+// documents. "Restart" = a NEW service instance over the same store root, the
+// same encrypted sync store and the same server; the first instance is dropped.
+// The first save leaves the ORIGINAL file plain (by design), so after a restart
+// only a durable per-account record can tell that file was already saved.
+describe('SAVE-01 first save r4 (S01-R2-4 restart dedupe)', () => {
+  const input = (file: string) => ({
+    tabPath: file,
+    title: 'Draft.docx',
+    workspaceId: WS,
+    target: { kind: 'my_folder' } as never,
+  })
+  const fileCreates = (server: FakeServer) =>
+    server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/documents/files'))
+  const sessionOpens = (server: FakeServer) =>
+    server.calls.filter(
+      (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents/upload-sessions`,
+    )
+  const createdRows = (server: FakeServer, prefix: string) =>
+    [...server.state.documents.keys()].filter((id) => id.startsWith(prefix)).sort()
+  const boundId = (documentId: string): string | undefined =>
+    (
+      JSON.parse(readFileSync(join(docDir(documentId), BINDING_FILE), 'utf8')) as {
+        documentId?: string
+      }
+    ).documentId
+  const unavailable = () => envelope(503, 'unavailable')
+  // the caller's options object is the one the fake reads: a test flips a hook on it later
+  const chunkedServer = (options: FakeServerOptions = {}) =>
+    fakeServer(
+      Object.assign(options, {
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 1024 * 1024,
+        sessionPartSize: 1024 * 1024,
+        sessionAssemblesParts: true,
+      }),
+    )
+  const chunkedFile = (name: string): string => {
+    const file = join(dir, name)
+    writeFileSync(file, buildDocxBytes(2 * 1024 * 1024))
+    return file
+  }
+
+  it('(a) a first-saved original refuses a second first Save after a restart: conflict, no create', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    const saved = await first.service.firstSave(input(file))
+    expect(saved.ok).toBe(true)
+    expect(fileCreates(server)).toHaveLength(1)
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave(input(file))
+
+    // the existing verdict, unchanged shape (no new string, no renderer change)
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(fileCreates(server)).toHaveLength(1)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+  })
+
+  it('(a) the same holds for a chunked first save: no session is opened after a restart', async () => {
+    const server = chunkedServer()
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    const saved = await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+    expect(saved.ok).toBe(true)
+    expect(sessionOpens(server)).toHaveLength(1)
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(sessionOpens(server)).toHaveLength(1)
+    expect(createdRows(server, 'new_')).toHaveLength(1)
+  })
+
+  it('(a) the original is refused whatever title the second Save names', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(true)
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave({ ...input(file), title: 'Another name.docx' })
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(fileCreates(server)).toHaveLength(1)
+  })
+
+  it('(b) a record whose binding is gone is stale: the next first Save creates exactly once', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(true)
+    // the working copy and its binding are removed (a wiped store folder)
+    rmSync(docDir('up_1'), { recursive: true, force: true })
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave(input(file))
+
+    expect(again.ok).toBe(true)
+    expect(fileCreates(server)).toHaveLength(2)
+    // the stale record's key was spent: the second create is a new attempt
+    expect(fileCreates(server)[1]!.idempotencyKey).not.toBe(fileCreates(server)[0]!.idempotencyKey)
+    expect(again.ok ? again.value.id : '').toBe('up_2')
+    expect(boundId('up_2')).toBe('up_2')
+  })
+
+  it('(c) a crash after the create answered but before the bind: the retry replays the SAME key and binds the same document', async () => {
+    const server = fakeServer({ createAnswerLost: true })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    // the row exists on D, the answer never reached the app: nothing is bound
+    const lost = await first.service.firstSave(input(file))
+    expect(lost.ok).toBe(false)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(2)
+    expect(creates[0]!.idempotencyKey).toBeTruthy()
+    expect(creates[1]!.idempotencyKey).toBe(creates[0]!.idempotencyKey)
+    // one server document, bound under the id the first create produced
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+    expect(retried.ok ? retried.value.id : '').toBe('up_1')
+    expect(boundId('up_1')).toBe('up_1')
+  })
+
+  it('(c) the same for a chunked first save whose session answer was lost', async () => {
+    const opts: FakeServerOptions = { sessionOpenAnswer: () => unavailable() }
+    const server = chunkedServer(opts)
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    const lost = await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+    expect(lost.ok).toBe(false)
+    expect(sessionOpens(server)).toHaveLength(1)
+
+    opts.sessionOpenAnswer = undefined
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(retried.ok).toBe(true)
+    const opens = sessionOpens(server)
+    expect(opens).toHaveLength(2)
+    expect(opens[0]!.idempotencyKey).toBeTruthy()
+    expect(opens[1]!.idempotencyKey).toBe(opens[0]!.idempotencyKey)
+    expect(createdRows(server, 'new_')).toHaveLength(1)
+  })
+
+  it('(c) a pending record with another fingerprint (edited bytes) mints a NEW key after a restart', async () => {
+    const server = fakeServer({ createAnswerLost: true })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes v1')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(false)
+
+    writeFileSync(file, 'bytes v2 edited')
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(2)
+    expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    expect(server.state.documents.get('up_2')?.bytes).toEqual(enc('bytes v2 edited'))
+  })
+
+  it('(d) another account on the same machine is unaffected by this account record', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(true)
+
+    const other = setup(server, { syncStore: true })
+    other.setIdentity({ accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' })
+    const saved = await other.service.firstSave(input(file))
+
+    expect(saved.ok).toBe(true)
+    expect(fileCreates(server)).toHaveLength(2)
+    expect(saved.ok ? saved.value.id : '').toBe('up_2')
+  })
+
+  it('(e) a post-create failure that archives removes the record: the retry after a restart creates once', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    // fail the first bind at the binding.json write; the created row is archived
+    // (the migration-hold fixture would be swept as soon as the sync store opens)
+    vi.spyOn(first.service.store, 'write').mockRejectedValueOnce(new Error('disk full'))
+    const failed = await first.service.firstSave(input(file))
+    expect(failed.ok).toBe(false)
+    expect(server.state.documents.get('up_1')?.archived).toBe(true)
+
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    // the archived row's key was spent: a replay would answer the trashed row
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(2)
+    expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    expect(createdRows(server, 'up_')).toEqual(['up_1', 'up_2'])
+    expect(retried.ok ? retried.value.id : '').toBe('up_2')
+    expect(boundId('up_2')).toBe('up_2')
+  })
+
+  // S01-R2-4 fix1 (Jev 140 L1): a crash between binding.json (ready) and the `bound`
+  // record leaves a `pending` record next to a ready binding. The replayed key
+  // answers the SAME document; re-binding it would rewrite the working copy and
+  // binding.json and lose edits made in the bound copy. It must refuse instead.
+  const skipBoundRecord = (service: UniworkDocsService): void => {
+    const target = service as unknown as {
+      saveFirstSaveRecord(attempt: unknown, state: { state: string }): Promise<void>
+    }
+    const original = target.saveFirstSaveRecord.bind(target)
+    vi.spyOn(target, 'saveFirstSaveRecord').mockImplementation((attempt, state) =>
+      state.state === 'bound' ? Promise.resolve() : original(attempt, state),
+    )
+  }
+
+  it('fix1: a replayed key never re-binds over a ready binding: edits survive, conflict, then no request', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    skipBoundRecord(first.service)
+    expect((await first.service.firstSave(input(file))).ok).toBe(true)
+    // the crash window: the binding is ready, the record is still `pending`
+    const copy = join(docDir('up_1'), 'Draft.docx')
+    writeFileSync(copy, 'edited in the bound copy')
+    const bindingBefore = readFileSync(join(docDir('up_1'), BINDING_FILE), 'utf8')
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave(input(file))
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    // the replay may be sent (same key); the bound document is never touched
+    expect(readFileSync(copy, 'utf8')).toBe('edited in the bound copy')
+    expect(readFileSync(join(docDir('up_1'), BINDING_FILE), 'utf8')).toBe(bindingBefore)
+    expect(server.calls.filter((c) => c.path.endsWith('/archive'))).toEqual([])
+    expect(server.state.documents.get('up_1')?.archived).toBeUndefined()
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+
+    // the record is now `bound`: a third Save is refused before any request
+    const sent = server.calls.length
+    const third = await setup(server, { syncStore: true }).service.firstSave(input(file))
+    expect(third).toEqual({ ok: false, error: 'conflict' })
+    expect(server.calls).toHaveLength(sent)
+  })
+
+  it('fix1: the same for a chunked first save replayed onto a ready binding', async () => {
+    const server = chunkedServer()
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    skipBoundRecord(first.service)
+    expect((await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })).ok).toBe(true)
+    const documentId = [...server.state.documents.keys()].find((id) => id.startsWith('new_'))!
+    const copy = join(docDir(documentId), 'Chunked.docx')
+    writeFileSync(copy, 'edited in the bound copy')
+    const bindingBefore = readFileSync(join(docDir(documentId), BINDING_FILE), 'utf8')
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(readFileSync(copy, 'utf8')).toBe('edited in the bound copy')
+    expect(readFileSync(join(docDir(documentId), BINDING_FILE), 'utf8')).toBe(bindingBefore)
+    expect(server.calls.filter((c) => c.path.endsWith('/archive'))).toEqual([])
+    expect(createdRows(server, 'new_')).toEqual([documentId])
+
+    const sent = server.calls.length
+    const third = await setup(server, { syncStore: true }).service.firstSave({
+      ...input(file),
+      title: 'Chunked.docx',
+    })
+    expect(third).toEqual({ ok: false, error: 'conflict' })
+    expect(server.calls).toHaveLength(sent)
+  })
+
+  it('(f) a reused key answered 409 document_upload_invalid (file_claim_expired): new key, one create', async () => {
+    const opts: FakeServerOptions = { createKeyAnswer: () => unavailable() }
+    const server = fakeServer(opts)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    // nothing was committed: D never seeded a row for this key
+    expect((await first.service.firstSave(input(file))).ok).toBe(false)
+    const spent = fileCreates(server)[0]!.idempotencyKey
+    expect(createdRows(server, 'up_')).toEqual([])
+
+    // the staged claim passed its 24 h ClaimTTL
+    opts.createKeyAnswer = (key) =>
+      key === spent
+        ? json(409, {
+            error: {
+              code: 'document_upload_invalid',
+              message: 'x',
+              fields: { reason: 'file_claim_expired' },
+            },
+          })
+        : null
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(3)
+    // the replay of the spent key, then ONE create under a new key
+    expect(creates[1]!.idempotencyKey).toBe(spent)
+    expect(creates[2]!.idempotencyKey).toBeTruthy()
+    expect(creates[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+    expect(boundId('up_1')).toBe('up_1')
+  })
+
+  it('(f) a chunked reused key whose session complete answers 410 upload_session_expired: new key, one create', async () => {
+    const opts: FakeServerOptions = { sessionOpenAnswer: () => unavailable() }
+    const server = chunkedServer(opts)
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })).ok).toBe(
+      false,
+    )
+    const spent = sessionOpens(server)[0]!.idempotencyKey
+
+    opts.sessionOpenAnswer = undefined
+    opts.sessionCompleteExpiredOnce = true
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(retried.ok).toBe(true)
+    const opens = sessionOpens(server)
+    expect(opens).toHaveLength(3)
+    expect(opens[1]!.idempotencyKey).toBe(spent)
+    expect(opens[2]!.idempotencyKey).toBeTruthy()
+    expect(opens[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'new_')).toHaveLength(1)
+
+    // the record follows the key the run adopted: a further restart is refused
+    const again = await setup(server, { syncStore: true }).service.firstSave({
+      ...input(file),
+      title: 'Chunked.docx',
+    })
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(sessionOpens(server)).toHaveLength(3)
+  })
+
+  it('(g) a reused key answered 404 (the document is gone): new key, one create', async () => {
+    const opts: FakeServerOptions = { createKeyAnswer: () => unavailable() }
+    const server = fakeServer(opts)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(false)
+    const spent = fileCreates(server)[0]!.idempotencyKey
+
+    // trashed / purged / access lost since: the ledger row answers 404
+    opts.createKeyAnswer = (key) => (key === spent ? envelope(404, 'not_found') : null)
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(3)
+    expect(creates[1]!.idempotencyKey).toBe(spent)
+    expect(creates[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+    expect(boundId('up_1')).toBe('up_1')
+  })
+
+  it('(g) a chunked reused key whose session open answers 404: new key, one create', async () => {
+    const opts: FakeServerOptions = { sessionOpenAnswer: () => unavailable() }
+    const server = chunkedServer(opts)
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })).ok).toBe(
+      false,
+    )
+    const spent = sessionOpens(server)[0]!.idempotencyKey
+
+    opts.sessionOpenAnswer = (key) => (key === spent ? envelope(404, 'not_found') : null)
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(retried.ok).toBe(true)
+    const opens = sessionOpens(server)
+    expect(opens).toHaveLength(3)
+    expect(opens[1]!.idempotencyKey).toBe(spent)
+    expect(opens[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'new_')).toHaveLength(1)
+  })
+
+  it('(h) a reused key answered 409 idempotency_payload_mismatch: typed refusal, the record is dropped, the next try mints a new key', async () => {
+    const opts: FakeServerOptions = { createKeyAnswer: () => unavailable() }
+    const server = fakeServer(opts)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(false)
+    const spent = fileCreates(server)[0]!.idempotencyKey
+
+    // D holds the key for another body: the replay is refused
+    opts.createKeyAnswer = (key) =>
+      key === spent ? envelope(409, 'idempotency_payload_mismatch') : null
+    const refused = await setup(server, { syncStore: true }).service.firstSave(input(file))
+    expect(refused).toEqual({ ok: false, error: 'idempotency_mismatch' })
+    expect(fileCreates(server)[1]!.idempotencyKey).toBe(spent)
+
+    // a stuck record would replay the refused key for ever
+    const retried = await setup(server, { syncStore: true }).service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(3)
+    expect(creates[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+  })
+
+  // ---- S01-R2-4 fix2 (reviewer_be r1, Jev 141 G1-G7, R1-19, R1-23) -------------
+  // One rule: a replayed or created document's store folder is never written over,
+  // whatever the key's provenance or the copy's save state. Each pin runs on both
+  // transports where the path exists.
+  const kinds = ['buffered', 'chunked'] as const
+  type Kind = (typeof kinds)[number]
+  const archives = (server: FakeServer) => server.calls.filter((c) => c.path.endsWith('/archive'))
+  const arrange = (kind: Kind, options: FakeServerOptions = {}) => {
+    const server = kind === 'chunked' ? chunkedServer(options) : fakeServer(options)
+    const title = kind === 'chunked' ? 'Chunked.docx' : 'Draft.docx'
+    const file = kind === 'chunked' ? chunkedFile('Chunked.docx') : join(dir, 'Draft.docx')
+    if (kind === 'buffered') writeFileSync(file, 'bytes')
+    const prefix = kind === 'chunked' ? 'new_' : 'up_'
+    return {
+      server,
+      options,
+      file,
+      title,
+      save: (service: UniworkDocsService) => service.firstSave({ ...input(file), title }),
+      creates: () => (kind === 'chunked' ? sessionOpens(server) : fileCreates(server)),
+      /** a hook that answers the create (or session open) of one key, null falls through */
+      answer: (hook: ((key: string) => Response | null) | undefined) => {
+        if (kind === 'chunked') options.sessionOpenAnswer = hook
+        else options.createKeyAnswer = hook
+      },
+      rows: () => createdRows(server, prefix),
+      copyOf: (id: string) => join(docDir(id), title),
+      bindingOf: (id: string) => join(docDir(id), BINDING_FILE),
+    }
+  }
+  type Arranged = ReturnType<typeof arrange>
+  /** a first save whose `bound` record never lands: binding ready, record `pending` (the crash window) */
+  const crashWindow = async (t: Arranged) => {
+    const first = setup(t.server, { syncStore: true })
+    skipBoundRecord(first.service)
+    expect((await t.save(first.service)).ok).toBe(true)
+    const id = t.rows()[0]!
+    return { first, id, copy: t.copyOf(id), binding: t.bindingOf(id) }
+  }
+  const eio = () => Object.assign(new Error('EIO: i/o error'), { code: 'EIO' })
+
+  it.each(kinds)(
+    '(a) R1-1 %s: a copy made dirty through docStatus survives a replay: conflict, bytes + binding unchanged, no archive',
+    async (kind) => {
+      const t = arrange(kind)
+      const { first, id, copy, binding } = await crashWindow(t)
+      writeFileSync(copy, 'edited in the bound copy')
+      expect((await first.service.docStatus(copy))?.state).toBe('dirty')
+      const bindingBefore = readFileSync(binding, 'utf8')
+
+      const again = await t.save(setup(t.server, { syncStore: true }).service)
+
+      expect(again).toEqual({ ok: false, error: 'conflict' })
+      expect(readFileSync(copy, 'utf8')).toBe('edited in the bound copy')
+      expect(readFileSync(binding, 'utf8')).toBe(bindingBefore)
+      expect(archives(t.server)).toEqual([])
+      expect(t.rows()).toEqual([id])
+    },
+  )
+
+  it.each(['dirty', 'saved', 'offline', 'conflict', 'queued', 'paused_user', 'failed'])(
+    '(a) R1-4/8/15: a bound copy in state %s still refuses a restart first Save (no twin)',
+    async (state) => {
+      const t = arrange('buffered')
+      const first = setup(t.server, { syncStore: true })
+      expect((await t.save(first.service)).ok).toBe(true)
+      const bindingPath = t.bindingOf('up_1')
+      const raw = JSON.parse(readFileSync(bindingPath, 'utf8')) as Record<string, unknown>
+      writeFileSync(bindingPath, `${JSON.stringify({ ...raw, state }, null, 2)}\n`)
+
+      const again = await t.save(setup(t.server, { syncStore: true }).service)
+
+      expect(again).toEqual({ ok: false, error: 'conflict' })
+      expect(fileCreates(t.server)).toHaveLength(1)
+      expect(t.rows()).toEqual(['up_1'])
+    },
+  )
+
+  it.each(kinds)(
+    '(b) R1-2 %s: a replay that fails once and is retried by the same instance never rebinds over the copy',
+    async (kind) => {
+      const t = arrange(kind)
+      const { id, copy, binding } = await crashWindow(t)
+      writeFileSync(copy, 'edited in the bound copy')
+      const bindingBefore = readFileSync(binding, 'utf8')
+      let failed = false
+      t.answer(() => {
+        if (failed) return null
+        failed = true
+        return unavailable()
+      })
+
+      const restarted = setup(t.server, { syncStore: true })
+      expect((await t.save(restarted.service)).ok).toBe(false)
+      const again = await t.save(restarted.service)
+
+      expect(again).toEqual({ ok: false, error: 'conflict' })
+      expect(readFileSync(copy, 'utf8')).toBe('edited in the bound copy')
+      expect(readFileSync(binding, 'utf8')).toBe(bindingBefore)
+      expect(archives(t.server)).toEqual([])
+      expect(t.rows()).toEqual([id])
+    },
+  )
+
+  it.each(kinds)(
+    '(c) R1-18 %s: a schema-3 binding folder is never written: copy + binding.json byte-identical, conflict',
+    async (kind) => {
+      const t = arrange(kind)
+      const { id, copy, binding } = await crashWindow(t)
+      const raw = JSON.parse(readFileSync(binding, 'utf8')) as Record<string, unknown>
+      writeFileSync(binding, `${JSON.stringify({ ...raw, schema: 3 }, null, 2)}\n`)
+      writeFileSync(copy, 'newer application edits')
+      const bindingBefore = readFileSync(binding, 'utf8')
+
+      const again = await t.save(setup(t.server, { syncStore: true }).service)
+
+      expect(again).toEqual({ ok: false, error: 'conflict' })
+      expect(readFileSync(copy, 'utf8')).toBe('newer application edits')
+      expect(readFileSync(binding, 'utf8')).toBe(bindingBefore)
+      expect(JSON.parse(bindingBefore).schema).toBe(3)
+      expect(archives(t.server)).toEqual([])
+      expect(t.rows()).toEqual([id])
+      // the record is `bound` now: the next Save is refused before any request
+      const sent = t.server.calls.length
+      const third = await t.save(setup(t.server, { syncStore: true }).service)
+      expect(third).toEqual({ ok: false, error: 'conflict' })
+      expect(t.server.calls).toHaveLength(sent)
+    },
+  )
+
+  it.each(kinds)(
+    '(c) %s: a folder that holds any file (no readable binding) is never written',
+    async (kind) => {
+      const t = arrange(kind)
+      const { id, copy, binding } = await crashWindow(t)
+      rmSync(binding)
+      writeFileSync(copy, 'edits next to a lost binding')
+
+      const again = await t.save(setup(t.server, { syncStore: true }).service)
+
+      expect(again).toEqual({ ok: false, error: 'conflict' })
+      expect(readFileSync(copy, 'utf8')).toBe('edits next to a lost binding')
+      expect(existsSync(binding)).toBe(false)
+      expect(archives(t.server)).toEqual([])
+      expect(t.rows()).toEqual([id])
+    },
+  )
+
+  it('(d) R1-20: a stat error on the bound copy is unknown, not absent: refused, the record kept', async () => {
+    const t = arrange('buffered')
+    expect((await t.save(setup(t.server, { syncStore: true }).service)).ok).toBe(true)
+    const copy = t.copyOf('up_1')
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    vi.mocked(stat).mockImplementation(((path: unknown, ...rest: unknown[]) =>
+      String(path) === copy
+        ? Promise.reject(eio())
+        : (real.stat as (...a: unknown[]) => Promise<unknown>)(path, ...rest)) as never)
+    try {
+      const refused = await t.save(setup(t.server, { syncStore: true }).service)
+      expect(refused).toEqual({ ok: false, error: 'conflict' })
+    } finally {
+      vi.mocked(stat).mockImplementation((async (...args: Parameters<typeof real.stat>) => {
+        statGate.entered?.()
+        if (statGate.held) await statGate.held
+        return real.stat(...args)
+      }) as never)
+    }
+    expect(fileCreates(t.server)).toHaveLength(1)
+
+    // the error cleared: the record was not dropped on the unknown
+    const later = await t.save(setup(t.server, { syncStore: true }).service)
+    expect(later).toEqual({ ok: false, error: 'conflict' })
+    expect(fileCreates(t.server)).toHaveLength(1)
+    expect(readFileSync(copy, 'utf8')).toBe('bytes')
+  })
+
+  it('(d) a folder that cannot be inspected is unknown: a replay writes nothing and archives nothing', async () => {
+    const server = fakeServer({ createAnswerLost: true })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    expect((await setup(server, { syncStore: true }).service.firstSave(input(file))).ok).toBe(false)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+    const folder = docDir('up_1')
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    vi.mocked(readdir).mockImplementation(((path: unknown, ...rest: unknown[]) =>
+      String(path) === folder
+        ? Promise.reject(eio())
+        : (real.readdir as (...a: unknown[]) => Promise<unknown>)(path, ...rest)) as never)
+    try {
+      const again = await setup(server, { syncStore: true }).service.firstSave(input(file))
+      expect(again).toEqual({ ok: false, error: 'conflict' })
+    } finally {
+      vi.mocked(readdir).mockImplementation(((...args: unknown[]) =>
+        (real.readdir as (...a: unknown[]) => Promise<unknown>)(...args)) as never)
+    }
+    // nothing was written into the folder and the replayed document was kept
+    expect(existsSync(folder)).toBe(false)
+    expect(archives(server)).toEqual([])
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+  })
+
+  it.each(kinds)(
+    '(e) R1-5 %s: a bound copy renamed on the machine still refuses the original after a restart',
+    async (kind) => {
+      const t = arrange(kind)
+      const first = setup(t.server, { syncStore: true })
+      expect((await t.save(first.service)).ok).toBe(true)
+      const id = t.rows()[0]!
+      // the document is renamed on the web: the closed copy follows its title
+      t.server.state.documents.get(id)!.title = 'Renamed on web.docx'
+      await first.service.refreshMetadataFor(id)
+      const names = copiesIn(id)
+      expect(names).toHaveLength(1)
+      expect(names).not.toContain(t.title)
+      const sent = t.creates().length
+
+      const again = await t.save(setup(t.server, { syncStore: true }).service)
+
+      expect(again).toEqual({ ok: false, error: 'conflict' })
+      expect(t.creates()).toHaveLength(sent)
+      expect(t.rows()).toEqual([id])
+    },
+  )
+
+  it.each(kinds)(
+    '(f) R1-14 %s: archiving the document ends its first-save record: the next Save of the original creates once',
+    async (kind) => {
+      const t = arrange(kind)
+      const first = setup(t.server, { syncStore: true })
+      expect((await t.save(first.service)).ok).toBe(true)
+      const id = t.rows()[0]!
+      const copyBefore = readFileSync(t.copyOf(id))
+      const fileBefore = readFileSync(t.file)
+      expect((await first.service.archiveDocument(id)).ok).toBe(true)
+      expect(t.server.state.documents.get(id)?.archived).toBe(true)
+
+      const again = await t.save(setup(t.server, { syncStore: true }).service)
+
+      expect(again.ok).toBe(true)
+      expect(t.creates()).toHaveLength(2)
+      expect(t.rows()).toHaveLength(2)
+      // the archived document's local copy and the user's original: untouched
+      expect(readFileSync(t.copyOf(id)).equals(copyBefore)).toBe(true)
+      expect(readFileSync(t.file).equals(fileBefore)).toBe(true)
+    },
+  )
+
+  it.each(['document_archived', 'document_deleted'])(
+    '(f) a binding marked blocked %s is stale: the next Save creates once',
+    async (error) => {
+      const t = arrange('buffered')
+      expect((await t.save(setup(t.server, { syncStore: true }).service)).ok).toBe(true)
+      const bindingPath = t.bindingOf('up_1')
+      const raw = JSON.parse(readFileSync(bindingPath, 'utf8')) as Record<string, unknown>
+      writeFileSync(
+        bindingPath,
+        `${JSON.stringify({ ...raw, state: 'blocked', error }, null, 2)}\n`,
+      )
+
+      const again = await t.save(setup(t.server, { syncStore: true }).service)
+
+      expect(again.ok).toBe(true)
+      expect(fileCreates(t.server)).toHaveLength(2)
+      expect(again.ok ? again.value.id : '').toBe('up_2')
+    },
+  )
+
+  it.each(kinds.flatMap((kind) => [[kind, 'refused'] as const, [kind, 'thrown'] as const]))(
+    '(g) R1-10 %s/%s: a failing first-save bookkeeping write never fails the save',
+    async (kind, mode) => {
+      const t = arrange(kind)
+      const ctx = setup(t.server, { syncStore: true })
+      const target = ctx.service as unknown as {
+        firstSaveStore(session: unknown): Promise<Record<string, unknown> | null>
+      }
+      const original = target.firstSaveStore.bind(target)
+      const put = () =>
+        mode === 'refused' ? Promise.resolve({ kind: 'refused' as const }) : Promise.reject(eio())
+      vi.spyOn(target, 'firstSaveStore').mockImplementation(async (session) => {
+        const store = await original(session)
+        return store ? { ...store, put } : store
+      })
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+      const saved = await t.save(ctx.service)
+
+      warn.mockRestore()
+      expect(saved.ok).toBe(true)
+      const id = t.rows()[0]!
+      expect(JSON.parse(readFileSync(t.bindingOf(id), 'utf8')).state).toBe('ready')
+      expect(existsSync(t.copyOf(id))).toBe(true)
+      expect(ctx.pathRenames).toHaveLength(1)
+      expect(archives(t.server)).toEqual([])
+      // the in-process guard still answers
+      expect(await t.save(ctx.service)).toEqual({ ok: false, error: 'conflict' })
+    },
+  )
+
+  it('(h) R1-11 buffered: a lost replacement-create response after a 404 rotation is replayed with the replacement key', async () => {
+    const opts: FakeServerOptions = { createKeyAnswer: () => unavailable() }
+    const t = arrange('buffered', opts)
+    expect((await t.save(setup(t.server, { syncStore: true }).service)).ok).toBe(false)
+    const spent = fileCreates(t.server)[0]!.idempotencyKey
+
+    // the first key is gone (404); the replacement create commits, its answer is lost
+    opts.createKeyAnswer = (key) => (key === spent ? envelope(404, 'not_found') : null)
+    opts.createAnswerLost = true
+    expect((await t.save(setup(t.server, { syncStore: true }).service)).ok).toBe(false)
+    const replacement = fileCreates(t.server)[2]!.idempotencyKey
+    expect(replacement).not.toBe(spent)
+    expect(createdRows(t.server, 'up_')).toEqual(['up_1'])
+
+    const retried = await t.save(setup(t.server, { syncStore: true }).service)
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(t.server)
+    expect(creates).toHaveLength(4)
+    expect(creates[3]!.idempotencyKey).toBe(replacement)
+    expect(createdRows(t.server, 'up_')).toEqual(['up_1'])
+    expect(boundId('up_1')).toBe('up_1')
+  })
+
+  it('(h) R1-11 chunked: a lost replacement session open after a 404 rotation is replayed with the replacement key', async () => {
+    const opts: FakeServerOptions = { sessionOpenAnswer: () => unavailable() }
+    const t = arrange('chunked', opts)
+    expect((await t.save(setup(t.server, { syncStore: true }).service)).ok).toBe(false)
+    const spent = sessionOpens(t.server)[0]!.idempotencyKey
+
+    opts.sessionOpenAnswer = (key) => (key === spent ? envelope(404, 'not_found') : unavailable())
+    expect((await t.save(setup(t.server, { syncStore: true }).service)).ok).toBe(false)
+    const replacement = sessionOpens(t.server)[2]!.idempotencyKey
+    expect(replacement).not.toBe(spent)
+
+    opts.sessionOpenAnswer = (key) => (key === spent ? envelope(404, 'not_found') : null)
+    const retried = await t.save(setup(t.server, { syncStore: true }).service)
+
+    expect(retried.ok).toBe(true)
+    const opens = sessionOpens(t.server)
+    expect(opens).toHaveLength(4)
+    expect(opens[3]!.idempotencyKey).toBe(replacement)
+    expect(t.rows()).toHaveLength(1)
+  })
+
+  it.each(kinds)(
+    '(i) R1-12 %s: bind and compensation archive both fail: the orphan keeps its key, a restart reuses key + document',
+    async (kind) => {
+      const t = arrange(kind, { archiveFailsFor: [kind === 'chunked' ? 'new_1' : 'up_1'] })
+      const first = setup(t.server, { syncStore: true })
+      vi.spyOn(first.service.store, 'write').mockRejectedValueOnce(new Error('disk full'))
+      const orphaned = await t.save(first.service)
+      expect(orphaned.ok ? '' : orphaned.error).toBe('first_save_orphaned')
+      const keyOfFirst = t.creates()[0]!.idempotencyKey
+      expect(t.rows()).toHaveLength(1)
+      const id = t.rows()[0]!
+
+      const restarted = await t.save(setup(t.server, { syncStore: true }).service)
+
+      expect(restarted.ok).toBe(true)
+      expect(t.creates()).toHaveLength(2)
+      expect(t.creates()[1]!.idempotencyKey).toBe(keyOfFirst)
+      expect(t.rows()).toEqual([id])
+      expect(JSON.parse(readFileSync(t.bindingOf(id), 'utf8')).documentId).toBe(id)
+      expect(t.server.state.documents.get(id)?.archived).toBeUndefined()
+    },
+  )
+
+  it.each(kinds)(
+    '(j) R1-13 %s: only the working-copy file is gone: the next Save creates fresh under a new key',
+    async (kind) => {
+      const t = arrange(kind)
+      expect((await t.save(setup(t.server, { syncStore: true }).service)).ok).toBe(true)
+      const id = t.rows()[0]!
+      const keyOfFirst = t.creates()[0]!.idempotencyKey
+      // binding.json and the record stay; the file is deleted
+      unlinkSync(t.copyOf(id))
+      expect(existsSync(t.bindingOf(id))).toBe(true)
+
+      const again = await t.save(setup(t.server, { syncStore: true }).service)
+
+      expect(again.ok).toBe(true)
+      expect(t.creates()).toHaveLength(2)
+      expect(t.creates()[1]!.idempotencyKey).not.toBe(keyOfFirst)
+      expect(t.rows()).toHaveLength(2)
+    },
+  )
+
+  it('(k) R1-19: a refused key is spent in process: a failed durable delete never brings it back', async () => {
+    const opts: FakeServerOptions = { createKeyAnswer: () => unavailable() }
+    const t = arrange('buffered', opts)
+    expect((await t.save(setup(t.server, { syncStore: true }).service)).ok).toBe(false)
+    const spent = fileCreates(t.server)[0]!.idempotencyKey
+    opts.createKeyAnswer = (key) =>
+      key === spent ? envelope(409, 'idempotency_payload_mismatch') : null
+
+    const ctx = setup(t.server, { syncStore: true })
+    // the durable delete of the refused record fails (bookkeeping is best effort)
+    const target = ctx.service as unknown as {
+      dropFirstSaveRecord(attempt: unknown): Promise<void>
+    }
+    vi.spyOn(target, 'dropFirstSaveRecord').mockResolvedValue(undefined)
+    expect(await t.save(ctx.service)).toEqual({ ok: false, error: 'idempotency_mismatch' })
+
+    const retried = await t.save(ctx.service)
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(t.server)
+    expect(creates).toHaveLength(3)
+    expect(creates[1]!.idempotencyKey).toBe(spent)
+    expect(creates[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(t.server, 'up_')).toEqual(['up_1'])
+  })
+
+  it('(l) R1-23: account B restarts while the shared store open of account A is still sweeping: the record of B still refuses', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const accountB = { accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' }
+    // account B first-saved the file: its bound record is in B's own store scope
+    const firstB = setup(server, { syncStore: true })
+    firstB.setIdentity(accountB)
+    expect((await firstB.service.firstSave(input(file))).ok).toBe(true)
+    expect(fileCreates(server)).toHaveLength(1)
+
+    // restart as account A: its service-level open is still inside the legacy sweep
+    // when B becomes live, so B's first Save joins that one shared open
+    const restarted = setup(server, { syncStore: true })
+    const sweep = latch()
+    const target = restarted.service as unknown as {
+      migrateLegacyState(...args: unknown[]): Promise<void>
+    }
+    const original = target.migrateLegacyState.bind(target)
+    vi.spyOn(target, 'migrateLegacyState').mockImplementationOnce(async (...args) => {
+      sweep.entered()
+      await sweep.held
+      return original(...args)
+    })
+    const opening = restarted.service.openSyncStore()
+    await sweep.reached
+    restarted.setIdentity(accountB)
+    const saving = restarted.service.firstSave(input(file))
+    sweep.release()
+    await opening
+    const again = await saving
+
+    // A's handle never answers for B: B's record is read from B's own scope
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(fileCreates(server)).toHaveLength(1)
   })
 })
 

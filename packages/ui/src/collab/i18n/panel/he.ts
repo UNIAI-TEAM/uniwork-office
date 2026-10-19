@@ -44,6 +44,7 @@ export const he = {
   collabDeleteConfirm: 'מחיקה לצמיתות',
   collabDeleted: 'התוכן הזה נמחק',
   collabEdited: 'נערך · {time}',
+  collabEditedMark: '(נערך)',
   collabFormerMember: 'חבר לשעבר',
   collabHistory: 'הצגת היסטוריית עריכות',
   collabHistoryTitle: 'היסטוריית עריכות',

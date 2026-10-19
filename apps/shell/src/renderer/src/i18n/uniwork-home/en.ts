@@ -44,8 +44,6 @@ export const en = {
   uhCreateUnavailable: "This server can't create this file type yet.",
   uhCreateUnavailableHint: 'Not available on this server yet',
   uhCreateFailed: 'Could not create the document. Try again.',
-  uhQuickHintPrefix: 'Creating and uploading here saves to',
-  uhQuickHintSuffix: ', visible only to you. Share or Move when needed.',
   uhFilterType: 'Type:',
   uhFilterTypeAll: 'All',
   uhFilterModifiedBy: 'Modified by:',
@@ -85,7 +83,6 @@ export const en = {
   uhEmptyTrash: 'Trash is empty.',
   uhEmptyFiltered: 'No documents match the current filters.',
   uhTrashNote: 'Items in Trash can be restored if you have Manage access.',
-  uhMyFolderNote: 'Private — only you have access unless you share or move to a shared folder.',
   uhLoadMore: 'Load more',
   uhRowActions: 'More actions',
 } satisfies Record<keyof typeof zh, string>

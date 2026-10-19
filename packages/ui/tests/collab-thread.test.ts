@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { format } from '@genoffice/i18n'
 import { CollabComposer } from '../src/collab/CollabComposer'
 import { CollabPanel } from '../src/collab/CollabPanel'
+import { formatCollabTime } from '../src/collab/CollabThread'
 import { useCollabThreads, type CollabController } from '../src/collab/use-collab-threads'
 import type { CollabHostState, CollabSource } from '../src/collab/types'
 import { COLLAB_LIVE_REGION_ID } from '../src/collab/live-region'
@@ -102,7 +104,7 @@ describe('tombstone', () => {
 
 describe('actions menu', () => {
   it('opens with focus on the first item; Esc closes and returns focus', async () => {
-    const src = fakeSource(list([cm({ id: 'a', author_id: 'me' })]))
+    const src = fakeSource(list([cm({ id: 'a', author_id: 'me', revision: 2 })]))
     await mount(src)
     const menu = await openMenu('a')
     const items = [...menu.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent)
@@ -115,13 +117,12 @@ describe('actions menu', () => {
     expect(document.activeElement?.getAttribute('aria-haspopup')).toBe('menu')
   })
 
-  it('view only keeps copy + history, hides edit/delete/reply/resolve', async () => {
+  it('view only keeps copy, hides edit/delete/reply/resolve and history on an unedited post', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me' })]))
     await mount(src, host({ level: 'view' }))
     const menu = await openMenu('a')
     expect([...menu.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent)).toEqual([
       EN.collabCopyText,
-      EN.collabHistory,
     ])
     expect(btn(EN.collabReply, el)).toBeUndefined()
     expect(btn(EN.collabResolve, el)).toBeUndefined()
@@ -263,13 +264,11 @@ describe('history', () => {
     created_at: '2026-10-12T09:00:00Z',
   })
 
-  it('opens from Edited, newest first after Current version; closing returns focus', async () => {
+  it('opens from the (edited) mark, newest first after Current version; closing returns focus', async () => {
     const src = fakeSource(list([cm({ id: 'a', revision: 3, body: 'three' })]))
     src.revisions.mockResolvedValueOnce({ revisions: [rev(1, 'one'), rev(2, 'two')] })
     await mount(src, host({ level: 'view' }))
-    const edited = [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
-      b.textContent?.startsWith('Edited · '),
-    )!
+    const edited = btn(EN.collabEditedMark, el)!
     edited.focus()
     await click(edited)
     const hist = $('.collab-hist')!
@@ -286,7 +285,7 @@ describe('history', () => {
   })
 
   it('empty -> sentence; error -> sentence + retry', async () => {
-    const src = fakeSource(list([cm({ id: 'a' })]))
+    const src = fakeSource(list([cm({ id: 'a', revision: 2 })]))
     await mount(src)
     await click(btn(EN.collabHistory, await openMenu('a')))
     expect($('.collab-hist')!.textContent).toContain(EN.collabHistoryEmpty)
@@ -300,7 +299,7 @@ describe('history', () => {
   })
 
   it('tombstone (409 comment_deleted) -> no history, the deleted frame shows', async () => {
-    const src = fakeSource(list([cm({ id: 'a' })]))
+    const src = fakeSource(list([cm({ id: 'a', revision: 2 })]))
     src.revisions.mockRejectedValueOnce(err('conflict', 'comment_deleted'))
     await mount(src)
     src.list.mockResolvedValueOnce(
@@ -540,5 +539,166 @@ describe('visual r1 fixes (panel / thread)', () => {
     expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*min-width:\s*0/)
     expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*text-overflow:\s*ellipsis/)
     expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*white-space:\s*nowrap/)
+  })
+})
+
+/* UNI-1970 (web dbc054a69) + UNI-1969 edit box (web d6aa9f82c): thread parity rows */
+
+/** the declarations of a single-selector collab.css rule; the selector must appear exactly once */
+const cssRule = (sel: string): string => {
+  const text = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+  const at = text.indexOf(`${sel} {`)
+  expect(at, `rule ${sel}`).toBeGreaterThanOrEqual(0)
+  return text.slice(at, text.indexOf('}', at))
+}
+
+describe('avatars (UNI-1970 A)', () => {
+  it('avatar_url renders a hidden img; initials otherwise; replies are smaller', async () => {
+    const src = fakeSource(
+      list([
+        cm({ id: 'a', display_name: 'Ann Lee', avatar_url: 'https://x/ann.png' }),
+        cm({ id: 'r', parent_id: 'a', display_name: 'Bo Han' }),
+      ]),
+    )
+    await mount(src)
+    const av = $('[data-comment-id="a"] .collab-av')!
+    expect(av.getAttribute('aria-hidden')).toBe('true')
+    const img = av.querySelector('img')!
+    expect(img.getAttribute('src')).toBe('https://x/ann.png')
+    expect(img.getAttribute('alt')).toBe('')
+    expect(img.getAttribute('referrerpolicy')).toBe('no-referrer')
+    const replyAv = $('[data-comment-id="r"] .collab-av')!
+    expect(replyAv.querySelector('img')).toBeNull()
+    expect(replyAv.textContent).toBe('BH')
+    // web lg/md sizes: root 32px, reply 24px — only on thread rows (data-comment-id);
+    // the base rule keeps the old 22px so in-file lists stay unchanged
+    expect(cssRule('.collab-av')).toMatch(/width:\s*22px/)
+    expect(cssRule('.collab-av')).toMatch(/height:\s*22px/)
+    expect(cssRule('.collab-av')).toMatch(/font-size:\s*10px/)
+    expect(cssRule('.collab-cm[data-comment-id] .collab-av')).toMatch(/width:\s*32px/)
+    expect(cssRule('.collab-cm[data-comment-id] .collab-av')).toMatch(/height:\s*32px/)
+    expect(cssRule('.collab-cm--reply[data-comment-id] .collab-av')).toMatch(/width:\s*24px/)
+    expect(cssRule('.collab-cm--reply[data-comment-id] .collab-av')).toMatch(/height:\s*24px/)
+    expect(cssRule('.collab-av img')).toMatch(/object-fit:\s*cover/)
+  })
+
+  it('a photo that fails to load falls back to initials (CSP blocks remote img-src)', async () => {
+    const src = fakeSource(
+      list([cm({ id: 'a', display_name: 'Ann Lee', avatar_url: 'https://x/ann.png' })]),
+    )
+    await mount(src)
+    const av = $('[data-comment-id="a"] .collab-av')!
+    const img = av.querySelector('img')!
+    await act(async () => {
+      img.dispatchEvent(new Event('error'))
+      await flush()
+    })
+    expect(av.querySelector('img')).toBeNull()
+    expect(av.textContent).toBe('AL')
+  })
+})
+
+describe('edited mark + history gate (UNI-1970 B)', () => {
+  it('edited post: muted (edited) mark toggles history, full Edited · time in title', async () => {
+    const c = cm({ id: 'a', revision: 2 })
+    const src = fakeSource(list([c]))
+    await mount(src)
+    const item = $('[data-comment-id="a"]')!
+    const mark = btn(EN.collabEditedMark, item)!
+    expect(mark).toBeTruthy()
+    expect(mark.className).toContain('collab-edited')
+    // the full stamp is the tooltip/aria, not the text
+    expect(mark.getAttribute('title')).toBe(
+      format(EN.collabEdited, { time: formatCollabTime(c.updated_at, 'en') }),
+    )
+    expect(cssRule('.collab-cmh .collab-edited')).toMatch(/color:\s*var\(--text-secondary\)/)
+    mark.focus()
+    await click(mark)
+    expect(mark.getAttribute('aria-expanded')).toBe('true')
+    expect($('.collab-hist')).not.toBeNull()
+    await click(btn('Close Edit history'))
+    expect(document.activeElement).toBe(mark)
+    // the menu still offers History for an edited post
+    const menu = await openMenu('a')
+    expect(btn(EN.collabHistory, menu)).toBeTruthy()
+  })
+
+  it('never-edited post: no mark, no History menu item', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })]))
+    await mount(src, host({ level: 'manage' }))
+    expect(btn(EN.collabEditedMark, el)).toBeUndefined()
+    const menu = await openMenu('a')
+    expect(btn(EN.collabCopyText, menu)).toBeTruthy()
+    expect(btn(EN.collabHistory, menu)).toBeUndefined()
+  })
+})
+
+describe('reply layout + action row (UNI-1970 C/D)', () => {
+  it('replies sit under one left rule; per-reply border/card padding gone; body indents', async () => {
+    const src = fakeSource(
+      list([cm({ id: 'a' }), cm({ id: 'r', parent_id: 'a' }), cm({ id: 'r2', parent_id: 'a' })]),
+    )
+    await mount(src)
+    // the rule lives on the list, web: ul = ml-7 mr-3 space-y-1 border-l pl-3
+    expect(cssRule('.collab-replies')).toMatch(/border-left:\s*1px solid var\(--border\)/)
+    const reply = cssRule('.collab-replies .collab-cm--reply')
+    expect(reply).toMatch(/border-left:\s*0/)
+    expect(reply).toMatch(/margin-left:\s*0/)
+    expect(reply).toMatch(/padding:\s*4px 0/)
+    // web pl-10 root / pl-8 reply: the body column indents under the author name
+    expect(cssRule('.collab-cm-indent')).toMatch(/padding-left:\s*40px/)
+    expect(cssRule('.collab-cm--reply .collab-cm-indent')).toMatch(/padding-left:\s*32px/)
+    const rc = $('[data-comment-id="r"]')!
+    expect(rc.querySelector(':scope > .collab-cm-indent .collab-bd')).not.toBeNull()
+    expect(rc.querySelector(':scope > .collab-cm-indent .collab-acts')).not.toBeNull()
+  })
+
+  it('in-file rows (no data-comment-id, no .collab-replies) keep the old look', () => {
+    // docs/sheets/slides render li.collab-thread > .collab-cm + .collab-cm.collab-cm--reply
+    // siblings: the root/reply separator, the reply indent and the right-aligned date
+    // come from these rules, so the web-parity overrides must not reach them
+    expect(cssRule('.collab-cm + .collab-cm')).toMatch(/border-top:\s*1px solid var\(--border\)/)
+    const inFileReply = cssRule('.collab-cm--reply')
+    expect(inFileReply).toMatch(/margin-left:\s*14px/)
+    expect(inFileReply).toMatch(/padding-left:\s*10px/)
+    expect(inFileReply).toMatch(/border-left:\s*2px solid var\(--border\)/)
+    expect(cssRule('.collab-dt')).toMatch(/margin-left:\s*auto/)
+    // only thread rows (they carry data-comment-id) get the left-hugging time
+    expect(cssRule('.collab-cm[data-comment-id] .collab-dt')).toMatch(/margin-left:\s*0/)
+  })
+
+  it('the action row matches the web compact spacing (mt-1 -ml-2)', () => {
+    const acts = cssRule('.collab-acts')
+    expect(acts).toMatch(/margin-top:\s*1px/)
+    expect(acts).toMatch(/margin-left:\s*-8px/)
+  })
+})
+
+describe('edit box mentions (UNI-1969, web d6aa9f82c)', () => {
+  const TOKEN = '[@Ann Lee](mention://member/01HF7YAT31JFKSMW2D3JRP4NQA)'
+
+  it('shows @Name, an untouched save is byte-identical, edits keep the id', async () => {
+    const body = `ping ${TOKEN} done`
+    const src = fakeSource(list([cm({ id: 'a', author_id: 'me', body })]))
+    await mount(src)
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    const area = $<HTMLTextAreaElement>('.collab-edit textarea')!
+    expect(area.value).toBe('ping @Ann Lee done')
+    // untouched save sends the token body verbatim
+    await click(btn(EN.collabSave))
+    expect(src.update).toHaveBeenCalledWith({ comment_id: 'a', body })
+    // appending text leaves the mention range intact -> same id back on the wire
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    await type($<HTMLTextAreaElement>('.collab-edit textarea')!, 'ping @Ann Lee done!')
+    await click(btn(EN.collabSave))
+    expect(src.update).toHaveBeenLastCalledWith({
+      comment_id: 'a',
+      body: `ping ${TOKEN} done!`,
+    })
+    // a mention cut short stays plain text (like chat)
+    await click(btn(EN.collabEdit, await openMenu('a')))
+    await type($<HTMLTextAreaElement>('.collab-edit textarea')!, 'ping @Ann done')
+    await click(btn(EN.collabSave))
+    expect(src.update).toHaveBeenLastCalledWith({ comment_id: 'a', body: 'ping @Ann done' })
   })
 })

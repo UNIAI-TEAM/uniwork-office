@@ -43,8 +43,6 @@ export const zh = {
   uhCreateUnavailable: "This server can't create this file type yet.",
   uhCreateUnavailableHint: 'Not available on this server yet',
   uhCreateFailed: 'Could not create the document. Try again.',
-  uhQuickHintPrefix: '在此页面新建和上传将保存到',
-  uhQuickHintSuffix: '，仅你可见。按需共享或移动。',
   uhFilterType: '类型：',
   uhFilterTypeAll: '全部',
   uhFilterModifiedBy: '修改人：',
@@ -84,7 +82,6 @@ export const zh = {
   uhEmptyTrash: '回收站为空。',
   uhEmptyFiltered: '没有符合筛选条件的文档。',
   uhTrashNote: '如果你拥有管理权限，可以恢复回收站中的项目。',
-  uhMyFolderNote: '私有 — 除非你共享或移动到共享文件夹，否则只有你可以访问。',
   uhLoadMore: '加载更多',
   uhRowActions: '更多操作',
 }
