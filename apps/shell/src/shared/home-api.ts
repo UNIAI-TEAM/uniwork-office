@@ -184,6 +184,9 @@ export type UniworkDocErrorCode =
   | 'document_too_deep'
   | 'document_cycle'
   | 'document_parent_kind'
+  // UNI-1975: the server's 422 `folder_not_shareable` - a folder can't be shared,
+  // only documents are (user-facing, never retried)
+  | 'folder_not_shareable'
   // the account's durable sync store could not be opened (locked keychain) or
   // refused the pending intent (budget full)
   | 'keystore_locked'

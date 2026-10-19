@@ -16,7 +16,6 @@ export const hi = {
   usPickTitle: 'सहेजने की जगह चुनें',
   usBack: 'नाम देने पर वापस जाएँ',
   usSearchFolders: 'फ़ोल्डर खोजें',
-  usSharedNote: 'साझा फ़ोल्डर में सहेजने पर दस्तावेज़ को उस फ़ोल्डर की अनुमतियाँ मिलती हैं।',
   usChooseFolder: '"{folder}" चुनें',
   usSelected: 'चुना गया',
   usRootBlocked: 'कोई फ़ोल्डर चुनें',

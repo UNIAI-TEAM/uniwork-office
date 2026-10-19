@@ -25,6 +25,7 @@ export const vi = {
   ufTooDeep: 'Cây tài liệu tối đa {max} cấp.',
   ufCycle: 'Không thể chuyển thư mục vào chính nó hoặc thư mục con của nó.',
   ufParentKind: 'Thư mục chỉ nằm ở gốc hoặc trong thư mục khác.',
+  ufNotShareable: 'Thư mục không chia sẻ được. Hãy chia sẻ từng tài liệu.',
   ufFolderGone: 'Thư mục này không còn ở đây.',
   ufFolderNoAccess: 'Bạn không còn quyền truy cập thư mục này.',
   ufNoPermission: 'Bạn không có quyền thay đổi thư mục này.',
