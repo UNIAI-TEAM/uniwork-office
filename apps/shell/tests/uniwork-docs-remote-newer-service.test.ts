@@ -631,12 +631,25 @@ describe('G5-03a S6 service: the lock', () => {
       remoteLockPath: Map<string, unknown>
       remoteBars: Map<string, unknown>
     }
+    const store = (h.service as unknown as { store: BindingStore }).store
+    // a sharing violation right after the service's atomic rename must not
+    // replace the dump with the raw fs error, and the store's own verdict goes
+    // next to the disk: "disk says blocked, classify says plain" is exactly a
+    // swallowed read error in lookup/classify
+    const diskBinding = () => {
+      try {
+        return existsSync(join(docDir(), BINDING_FILE)) ? bindingOf() : null
+      } catch (error) {
+        return `read failed: ${(error as NodeJS.ErrnoException).code ?? String(error)}`
+      }
+    }
     const state = (step: string) =>
       `${step}: ${JSON.stringify({
         remoteLocked: [...internals.remoteLocked],
         remoteLockPath: [...internals.remoteLockPath],
         remoteBars: [...internals.remoteBars],
-        binding: existsSync(join(docDir(), BINDING_FILE)) ? bindingOf() : null,
+        binding: diskBinding(),
+        classify: store.classify(docPath()).kind,
       })}`
     await h.service.noteFeedGone(DOC)
     expect(h.service.isLocked(docPath()), state('locked by the 404')).toBe(true)
