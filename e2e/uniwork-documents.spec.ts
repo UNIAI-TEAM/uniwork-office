@@ -1550,10 +1550,17 @@ test.describe.serial('UniWork documents', () => {
       const pill = document.querySelector('.uw-pill:not(.uw-notice)') as HTMLElement | null
       const label = pill?.querySelector('.uw-pill-label') as HTMLElement | null
       if (!pill || !label) return null
-      const range = document.createRange()
-      range.selectNodeContents(label)
-      const text = range.getBoundingClientRect()
+      // only the drawn words count: the compact and short pills keep the whole sentence in a
+      // clipped sr-only span inside the label, which is read, not painted
       const box = label.getBoundingClientRect()
+      const range = document.createRange()
+      let textRight = box.left
+      for (const node of Array.from(label.childNodes)) {
+        if (node instanceof Element && node.classList.contains('uw-sr-only')) continue
+        range.selectNodeContents(node)
+        const r = range.getBoundingClientRect()
+        if (r.width > 0) textRight = Math.max(textRight, r.right)
+      }
       const outer = pill.getBoundingClientRect()
       // the nearest ancestor that clips its content is where a pill gets cut off
       let clipRight = window.innerWidth
@@ -1575,10 +1582,16 @@ test.describe.serial('UniWork documents', () => {
           covered.push(`${top.tagName.toLowerCase()}.${String(top.className)} at ${Math.round(x)}`)
         }
       }
-      // padding: the first and last things in the pill sit the same distance from its border
-      const first = pill.firstElementChild?.getBoundingClientRect()
-      const lastEl = pill.lastElementChild as HTMLElement | null
-      const last = lastEl?.getBoundingClientRect()
+      // padding: the first and last things in the pill sit the same distance from its border;
+      // only children laid out in the row count (not the sr-only text or the hidden focus tip)
+      const inRow = Array.from(pill.children).filter((el) => {
+        const style = getComputedStyle(el)
+        return (
+          style.display !== 'none' && style.position !== 'absolute' && style.position !== 'fixed'
+        )
+      })
+      const first = inRow[0]?.getBoundingClientRect()
+      const last = inRow[inRow.length - 1]?.getBoundingClientRect()
       const hasButton = !!pill.querySelector('.uw-pill-action, .uw-pill-close')
       return {
         hasButton,
@@ -1591,7 +1604,7 @@ test.describe.serial('UniWork documents', () => {
         title: pill.getAttribute('title') ?? '',
         labelScroll: label.scrollWidth,
         labelClient: label.clientWidth,
-        textRight: text.right,
+        textRight,
         boxRight: box.right,
         pillScroll: pill.scrollWidth,
         pillClient: pill.clientWidth,
