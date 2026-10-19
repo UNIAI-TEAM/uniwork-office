@@ -220,9 +220,9 @@ describe('write_document tool', () => {
     expect(texts(editor)).toEqual([''])
   })
 
-  // UNI-1923 (B): a discarded streamed draft must not reach UniWork — the save seam
-  // (window.markdownApi.save) sees nothing at all
-  it('a discarded streamed draft fires no save', async () => {
+  // UNI-1923 (B): scope is the AI tool path only (executeTool with a stub writer): it issues
+  // no window.markdownApi.save. The product-level proof is web/e2e/ai-save-confirm.spec.ts.
+  it('the tool path of a discarded streamed draft issues no save', async () => {
     const editor = createEditor('original')
     const save = vi.fn()
     const win = window as unknown as { markdownApi?: { save?: unknown } }

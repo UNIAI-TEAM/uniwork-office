@@ -38,6 +38,7 @@ async function ask(frame: Frame, text: string) {
 /** the test-host seam this spec reads: the api.save counter and the last saved bytes */
 interface HostApi {
   saveCalls(): number
+  uploads(): unknown[]
   lastSaved(): { bytes: number[] } | null
 }
 type HostMethod = keyof HostApi
@@ -52,6 +53,9 @@ function hostCall<T>(page: Page, name: HostMethod): Promise<T> {
 /** how many api.save requests reached the host (the "reached UniWork" counter) */
 const saveCalls = (page: Page): Promise<number> => hostCall<number>(page, 'saveCalls')
 
+/** the api.images.upload requests the host recorded (an image upload is also a write to UniWork) */
+const uploads = (page: Page): Promise<unknown[]> => hostCall<unknown[]>(page, 'uploads')
+
 const lastSaved = (page: Page): Promise<{ bytes: number[] } | null> =>
   hostCall(page, 'lastSaved')
 
@@ -60,6 +64,7 @@ async function settleThenStillUnsaved(page: Page) {
   await page.waitForTimeout(3_000)
   expect(await saveCalls(page)).toBe(0)
   expect(await lastSaved(page)).toBeNull()
+  expect(await uploads(page)).toEqual([])
 }
 
 /** kill the document frame: host close without a save, or the port/renderer going away */
@@ -171,10 +176,13 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
     await watch(page)
     const { frame, wb } = await openSheets(page)
     await appliedTurn(request, frame, wb)
+    // a save after the frame is gone cannot arrive (the host checks e.source === frame.contentWindow);
+    // (a)'s settle covers the apply-to-kill window
     await killFrame(page)
     await page.waitForTimeout(2_000)
     expect(await saveCalls(page)).toBe(0)
     expect(await lastSaved(page)).toBeNull()
+    expect(await uploads(page)).toEqual([])
   })
 
   test('(c) stopping the turn mid-stream sends nothing', async ({ page, request }) => {
@@ -205,6 +213,7 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
     await page.waitForTimeout(1_000)
     expect(await saveCalls(page)).toBe(0)
     expect(await lastSaved(page)).toBeNull()
+    expect(await uploads(page)).toEqual([])
   })
 
   test('(e) the explicit Save sends exactly one save that carries the AI edit', async ({
@@ -284,10 +293,13 @@ test.describe('docs: an AI write reaches UniWork only on the explicit Save (UNI-
     await watch(page)
     const frame = await openDocs(page)
     await appliedTurn(request, frame)
+    // a save after the frame is gone cannot arrive (the host checks e.source === frame.contentWindow);
+    // (a)'s settle covers the apply-to-kill window
     await killFrame(page)
     await page.waitForTimeout(2_000)
     expect(await saveCalls(page)).toBe(0)
     expect(await lastSaved(page)).toBeNull()
+    expect(await uploads(page)).toEqual([])
   })
 
   test('(c) stopping the turn mid-stream sends nothing', async ({ page, request }) => {
@@ -317,6 +329,7 @@ test.describe('docs: an AI write reaches UniWork only on the explicit Save (UNI-
     await page.waitForTimeout(1_000)
     expect(await saveCalls(page)).toBe(0)
     expect(await lastSaved(page)).toBeNull()
+    expect(await uploads(page)).toEqual([])
   })
 
   test('(e) the explicit Save sends exactly one save that carries the AI edit', async ({

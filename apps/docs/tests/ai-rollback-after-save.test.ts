@@ -150,8 +150,9 @@ describe('Roll back after a mid-run Save (docs)', () => {
   })
 
   // UNI-1923 (B): Roll back after AI edits restores editor state only — nothing reaches UniWork.
-  // The seam is window.desktop.saveDocx*: a save the panel never asks for stays uncalled.
-  it('a rollback after AI edits fires no save', async () => {
+  // Scope: the mounted AI panel only. It proves the panel's rollback path never calls
+  // window.desktop.saveDocx*; the product-level proof is web/e2e/ai-save-confirm.spec.ts.
+  it('a rollback after AI edits issues no save from the AI panel', async () => {
     const f = await mountWired()
     const saveDocx = vi.fn()
     const saveDocxAs = vi.fn()
