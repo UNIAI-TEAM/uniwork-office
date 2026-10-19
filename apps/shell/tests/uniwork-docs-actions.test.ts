@@ -1911,47 +1911,128 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     expect(win.asked).toHaveLength(1)
   })
 
+  /**
+   * The close-save deadline timers (closeSaveWaitMs = `ms`) are held for the test
+   * to fire by hand, so a "tick" lands exactly where the schedule needs it.
+   */
+  function heldDeadlines(ms: number) {
+    const realSetTimeout = globalThis.setTimeout
+    const armed: Array<{ fire: () => void }> = []
+    const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      fn: (...args: unknown[]) => void,
+      delay?: number,
+      ...args: unknown[]
+    ) => {
+      if (delay !== ms) return realSetTimeout(fn, delay, ...args)
+      let fired = false
+      armed.push({
+        fire: () => {
+          if (fired) return
+          fired = true
+          fn()
+        },
+      })
+      return realSetTimeout(() => undefined, 0)
+    }) as typeof setTimeout)
+    return { armed, restore: () => spy.mockRestore() }
+  }
+  const DEADLINE_MS = 4321
+
   it('BE-13: naming time is not part of the close-save deadline - one coherent close, no orphaned save', async () => {
-    const server = fakeServer()
-    const win = dialogWindow()
-    const ctx = setup(server, {
-      syncStore: true,
-      closeChoice: 'save',
-      closeSaveWaitMs: 1500,
-      moduleSaveWrites: 'bytes v2',
-      requestFirstSaveName: win.request,
-    })
-    const doc = await createdAndOpened(ctx)
-    // unsent edits: the file differs from its base
-    writeFileSync(doc.path, 'edited before close')
-    const closing = ctx.service.confirmClose(doc.path)
-    await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
-    // the person takes longer to name it than the settlement deadline
-    await new Promise((resolve) => setTimeout(resolve, 2200))
-    win.answers[0]!('continue')
-    await expect(closing).resolves.toBe(true)
-    expect(commitsOf(server)).toHaveLength(1)
+    const deadlines = heldDeadlines(DEADLINE_MS)
+    try {
+      const server = fakeServer()
+      const win = dialogWindow()
+      const ctx = setup(server, {
+        syncStore: true,
+        closeChoice: 'save',
+        closeSaveWaitMs: DEADLINE_MS,
+        moduleSaveWrites: 'bytes v2',
+        requestFirstSaveName: win.request,
+      })
+      const doc = await createdAndOpened(ctx)
+      // unsent edits: the file differs from its base
+      writeFileSync(doc.path, 'edited before close')
+      const closing = ctx.service.confirmClose(doc.path)
+      await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
+      // the person takes longer to name it than the settlement deadline: every
+      // deadline armed so far runs out while the dialog is open
+      for (let tick = 0; tick < 3; tick += 1) {
+        for (const timer of [...deadlines.armed]) timer.fire()
+      }
+      win.answers[0]!('continue')
+      await expect(closing).resolves.toBe(true)
+      expect(commitsOf(server)).toHaveLength(1)
+    } finally {
+      deadlines.restore()
+    }
+  })
+
+  it('UWNM-BE-R2-2: an answer just before a deadline tick still gives the upload a full window', async () => {
+    const deadlines = heldDeadlines(DEADLINE_MS)
+    try {
+      let release: () => void = () => undefined
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      const server = fakeServer({ versionUploadGate: () => gate })
+      const win = dialogWindow()
+      const ctx = setup(server, {
+        syncStore: true,
+        closeChoice: 'save',
+        closeSaveWaitMs: DEADLINE_MS,
+        moduleSaveWrites: 'bytes v2',
+        requestFirstSaveName: win.request,
+      })
+      const doc = await createdAndOpened(ctx)
+      writeFileSync(doc.path, 'edited before close')
+      const closing = ctx.service.confirmClose(doc.path)
+      await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
+      // one deadline runs out while the person is still naming
+      for (const timer of [...deadlines.armed]) timer.fire()
+      const beforeAnswer = deadlines.armed.length
+      win.answers[0]!('continue')
+      // the upload is in flight (held at the gate) ...
+      await vi.waitFor(
+        () => expect(server.calls.some((c) => c.path.endsWith('/uploads'))).toBe(true),
+        { timeout: 8000 },
+      )
+      // ... when every deadline armed before the answer runs out: the answer
+      // landed just before a tick, and the upload has had no time at all
+      for (const timer of deadlines.armed.slice(0, beforeAnswer)) timer.fire()
+      release()
+      await expect(closing).resolves.toBe(true)
+      expect(commitsOf(server)).toHaveLength(1)
+      // the answer armed one fresh, full window for the upload
+      expect(deadlines.armed.length).toBe(beforeAnswer + 1)
+    } finally {
+      deadlines.restore()
+    }
   })
 
   it('BE-13: cancelling the name ends the close attempt without waiting out the deadline', async () => {
-    const server = fakeServer()
-    const win = dialogWindow()
-    const ctx = setup(server, {
-      syncStore: true,
-      closeChoice: 'save',
-      closeSaveWaitMs: 5000,
-      moduleSaveWrites: 'bytes v2',
-      requestFirstSaveName: win.request,
-    })
-    const doc = await createdAndOpened(ctx)
-    writeFileSync(doc.path, 'edited before close')
-    const closing = ctx.service.confirmClose(doc.path)
-    await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
-    win.answers[0]!('cancel')
-    const started = Date.now()
-    await expect(closing).resolves.toBe(false)
-    expect(Date.now() - started).toBeLessThan(2000)
-    expect(commitsOf(server)).toHaveLength(0)
+    // no deadline is ever fired: a close that waited it out would never resolve
+    const deadlines = heldDeadlines(DEADLINE_MS)
+    try {
+      const server = fakeServer()
+      const win = dialogWindow()
+      const ctx = setup(server, {
+        syncStore: true,
+        closeChoice: 'save',
+        closeSaveWaitMs: DEADLINE_MS,
+        moduleSaveWrites: 'bytes v2',
+        requestFirstSaveName: win.request,
+      })
+      const doc = await createdAndOpened(ctx)
+      writeFileSync(doc.path, 'edited before close')
+      const closing = ctx.service.confirmClose(doc.path)
+      await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
+      win.answers[0]!('cancel')
+      await expect(closing).resolves.toBe(false)
+      expect(commitsOf(server)).toHaveLength(0)
+    } finally {
+      deadlines.restore()
+    }
   })
 
   it('the Vietnamese default name asks too, an ordinary name never does', async () => {
