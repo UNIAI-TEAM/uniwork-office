@@ -79,16 +79,12 @@ export const nl = {
   aiUniworkImagesNotSent:
     'Afbeeldingen worden niet naar UniWork AI gestuurd; alleen je tekst is verstuurd.',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'Beschikbaar',
   cloudStateNotEntitled: 'Niet in je abonnement',
   cloudStateExhausted: 'AI-tegoed op',
   cloudStateUnavailable: 'Niet beschikbaar',
-  cloudStateSignedOut: 'Niet aangemeld',
   cloudStateInactive: 'Abonnement inactief',
-  cloudCredits: 'AI-tegoed',
   cloudCreditsLeft: '{remaining} / {limit} over',
   cloudCreditsUnlimited: 'Onbeperkt',
-  cloudCreditsRenews: 'Vernieuwt op {date}',
   cloudInactiveBody:
     'Het UniWork-abonnement van je organisatie is niet actief, dus cloud-AI is gepauzeerd. Vraag een beheerder het te verlengen; je eigen providers hieronder blijven werken.',
   acctSignIn: 'Inloggen',

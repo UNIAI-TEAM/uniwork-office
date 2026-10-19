@@ -1158,6 +1158,9 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     isUntitled: async () => false,
     // the frame is the UniWork document: no desktop working-copy state, view-only comes from the host grant
     uniworkState: async () => ({ bound: false, readOnly: !canEdit() || fatal !== null }),
+    // the desktop edit-lock seam (UNI-1645): the web frame has no working copy to follow or explain
+    onUniworkStateChanged: () => () => {},
+    uniworkReadOnlySave: async () => {},
     // null = "no OCR engine on this platform": the viewer stops trying
     ocrPage: async () => null,
     convertOffice: async () => {},

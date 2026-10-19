@@ -46,6 +46,22 @@ export class UniworkDocError extends Error {
    * resumed with a fresh upload key after ONE lookup.
    */
   readonly reason?: string
+  /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.reason */
+  readonly lostReason?:
+    | 'released'
+    | 'expired'
+    | 'taken_over'
+    | 'handed_over'
+    | 'access_lost'
+    | 'document_archived'
+    | 'moved_here'
+    | 'session_revoked'
+    | 'member_deactivated'
+    | 'organization_suspended'
+    | 'document_deleted'
+    | 'unknown'
+  /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.by_name */
+  readonly byName?: string | null
 
   constructor(
     code: UniworkDocErrorCode,
@@ -63,6 +79,8 @@ export class UniworkDocError extends Error {
       holderId?: string | null
       editLock?: UniworkDocEditLock
       reason?: string
+      lostReason?: UniworkDocError['lostReason']
+      byName?: string | null
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -81,7 +99,29 @@ export class UniworkDocError extends Error {
     this.holderId = extra.holderId
     this.editLock = extra.editLock
     this.reason = extra.reason
+    this.lostReason = extra.lostReason
+    this.byName = extra.byName
   }
+}
+
+const EDIT_LOCK_LOST_REASONS = new Set([
+  'released',
+  'expired',
+  'taken_over',
+  'handed_over',
+  'access_lost',
+  'document_archived',
+  'moved_here',
+  'session_revoked',
+  'member_deactivated',
+  'organization_suspended',
+  'document_deleted',
+])
+
+function lostReasonOf(value: unknown): NonNullable<UniworkDocError['lostReason']> {
+  return typeof value === 'string' && EDIT_LOCK_LOST_REASONS.has(value)
+    ? (value as NonNullable<UniworkDocError['lostReason']>)
+    : 'unknown'
 }
 
 function boundedLockString(value: unknown, max: number): string | null {
@@ -223,6 +263,15 @@ export function errorFromResponse(
       holderId,
       editLock,
       ...(isDecimalString(current) ? { currentRevision: current } : {}),
+    })
+  }
+  // EL-1(b) (UNI-1645c): 409 edit_lock_lost on a heartbeat — keep reason / by_name.
+  if (status === 409 && serverCode === 'edit_lock_lost') {
+    const fields = envelope?.fields
+    return new UniworkDocError('server_error', {
+      ...at,
+      lostReason: lostReasonOf(fields?.reason),
+      byName: boundedLockString(fields?.by_name, 256),
     })
   }
   if (serverCode && CONFLICT_CODES.has(serverCode)) {

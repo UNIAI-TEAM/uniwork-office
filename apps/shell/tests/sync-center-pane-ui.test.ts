@@ -292,6 +292,90 @@ describe('SyncCenterPane', () => {
     expect(onSignIn).toHaveBeenCalledTimes(1)
   })
 
+  it('guide/details disclosures link their trigger to the revealed text (aria-expanded + aria-controls)', async () => {
+    await render(
+      fakeApi(
+        snapshot({
+          tabs: {
+            attention: [
+              row('st', 'reconciling', { reconcileAttempts: 2 }),
+              row('f', 'failed', { failedReason: 'quota' }),
+            ],
+            pending: [],
+            recent: [],
+          },
+        }),
+      ),
+    )
+    const guide = button(vi_.uwActGuide!, rowEl('st'))
+    expect(guide.getAttribute('aria-expanded')).toBe('false')
+    expect(guide.hasAttribute('aria-controls')).toBe(false)
+    await click(guide)
+    const region = rowEl('st').querySelector('.sc-more-text')!
+    expect(region.textContent).toBe(vi_.uwTipReconciling)
+    expect(region.id).toBeTruthy()
+    expect(guide.getAttribute('aria-expanded')).toBe('true')
+    expect(guide.getAttribute('aria-controls')).toBe(region.id)
+
+    const details = button(vi_.uwActDetails!, rowEl('f'))
+    await click(details)
+    const detailText = rowEl('f').querySelector('.sc-more-text')!
+    expect(detailText.id).toBeTruthy()
+    expect(details.getAttribute('aria-controls')).toBe(detailText.id)
+    // the first disclosure closes when the second opens: its link is dropped
+    expect(rowEl('st').querySelector('.sc-more-text')).toBeNull()
+    expect(guide.getAttribute('aria-expanded')).toBe('false')
+    expect(guide.hasAttribute('aria-controls')).toBe(false)
+  })
+
+  it('narrow: the "…" menu disclosure entries carry expanded/controls for the same region', async () => {
+    stubNarrow()
+    await render(
+      fakeApi(
+        snapshot({
+          tabs: {
+            attention: [row('st', 'reconciling', { reconcileAttempts: 2 })],
+            pending: [],
+            recent: [],
+          },
+        }),
+      ),
+    )
+    const cell = rowEl('st').querySelector('.sc-actions')!
+    await click(button(fill(vi_.uwSyncMoreActions!, { doc: 'Tài liệu st' }), cell))
+    const items = Array.from(host.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+    expect(items.map((el) => el.textContent)).toEqual([vi_.uwActGuide])
+    const guide = items[0]!
+    expect(guide.getAttribute('aria-expanded')).toBe('false')
+    await click(guide)
+    const region = rowEl('st').querySelector('.sc-more-text')!
+    expect(region.id).toBeTruthy()
+    // reopened, the menu reports the open disclosure and points at its text
+    await click(button(fill(vi_.uwSyncMoreActions!, { doc: 'Tài liệu st' }), rowEl('st')))
+    const guide2 = host.querySelector<HTMLElement>('[role="menuitem"]')!
+    expect(guide2.getAttribute('aria-expanded')).toBe('true')
+    expect(guide2.getAttribute('aria-controls')).toBe(region.id)
+  })
+
+  it('an unknown upload total is an indeterminate progressbar, not a zero maximum', async () => {
+    await render(
+      fakeApi(
+        snapshot({
+          tabs: {
+            attention: [row('up', 'uploading', { progress: { done: 0, total: 0 } })],
+            pending: [],
+            recent: [],
+          },
+        }),
+      ),
+    )
+    const bar = rowEl('up').querySelector('[role="progressbar"]')!
+    expect(bar).not.toBeNull()
+    expect(bar.hasAttribute('aria-valuemax')).toBe(false)
+    expect(bar.hasAttribute('aria-valuenow')).toBe(false)
+    expect(bar.hasAttribute('aria-valuetext')).toBe(false)
+  })
+
   it('Gửi ngay offline stays in the Tab order, aria-disabled with its reason, and does not run', async () => {
     const s = snapshot({ tabs: { attention: [], pending: [row('q', 'queued')], recent: [] } })
     s.header = { ...s.header, online: false, status: 'offline' }

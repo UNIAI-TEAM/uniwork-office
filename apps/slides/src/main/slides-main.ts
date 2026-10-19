@@ -11,6 +11,7 @@ import {
   uniworkIsLocked,
   uniworkIsReadOnly,
   uniworkRefusesOpen,
+  uniworkReadOnlySave,
   uniworkSaveDecision,
   type UniworkSaveOrigin,
 } from './uniwork-policy'
@@ -61,10 +62,8 @@ import {
   recoveryEpochKey,
 } from '@genoffice/electron-utils'
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
-import {
-  answerUniworkAiFlagOff,
-  answerUniworkCloudStatusOff,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
 import { sniffImageMime } from './media-mime'
 import { canWriteElementClipboardImage, writeElementClipboardImage } from './element-clipboard'
@@ -1063,6 +1062,12 @@ export function registerSlidesIpc(): void {
   ipcMain.handle('slides:uniwork-state', (e) => {
     const path = sessions.get(e.sender.id)?.path || null
     return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+  ipcMain.handle('slides:uniwork-read-only-save', (e, filePath?: unknown) => {
+    const path = sessions.get(e.sender.id)?.path || null
+    if (!path) return
+    if (typeof filePath === 'string' && filePath.length > 0 && filePath !== path) return
+    uniworkReadOnlySave(path)
   })
 
   // Document session handlers (../session): main is a thin adapter — the calling

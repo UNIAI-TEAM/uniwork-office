@@ -169,3 +169,81 @@ describe('user:display-name (registered handler, BE-7)', () => {
     expect(invoked.at(-1)).toEqual([IPC_CHANNELS.userDisplayName, 'session-7'])
   })
 })
+
+describe('EL-1(b) fix6: sheets:uniwork-state and sheets:uniwork-read-only-save', () => {
+  it('answers { bound, readOnly } for the sender workbook path and forwards read-only save only for a path the sender owns', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sheets-uniwork-state-'))
+    const bound = workbook(dir, 'Budget.xlsx')
+    const other = workbook(dir, 'Other.xlsx')
+    let readOnly = true
+    const readOnlySaves: string[] = []
+    const policy = {
+      isBound: (p: string) => p === bound,
+      isReadOnly: (p: string) => p === bound && readOnly,
+      readOnlySave: (p: string) => void readOnlySaves.push(p),
+    }
+    setUniworkDocumentPolicy(policy)
+
+    createSheetsView({ includeAiHandlers: false })
+    const event = { sender: { id: views.lastId, isDestroyed: () => false } }
+    const unknownEvent = { sender: { id: 99999, isDestroyed: () => false } }
+    const open = handlers.get(IPC_CHANNELS.reopenWorkbook)!
+    const stateHandler = handlers.get('sheets:uniwork-state')
+    const roSaveHandler = handlers.get('sheets:uniwork-read-only-save')
+    expect(typeof stateHandler).toBe('function')
+    expect(typeof roSaveHandler).toBe('function')
+    if (!stateHandler || !roSaveHandler) return
+
+    // Before opening a workbook -> unbound, editable
+    expect(stateHandler(event)).toEqual({ bound: false, readOnly: false })
+    expect(stateHandler(unknownEvent)).toEqual({ bound: false, readOnly: false })
+
+    await open(event, bound)
+    expect(stateHandler(event)).toEqual({ bound: true, readOnly: true })
+
+    readOnly = false
+    expect(stateHandler(event)).toEqual({ bound: true, readOnly: false })
+
+    // Read-only save with sender's path or pathless -> forwards; foreign path or unknown sender -> ignored
+    roSaveHandler(event, bound)
+    roSaveHandler(event)
+    roSaveHandler(event, other)
+    roSaveHandler(unknownEvent, bound)
+    expect(readOnlySaves).toEqual([bound, bound])
+  })
+})
+
+describe('EL-1(b) fix10 (EL1B-BE-R3-1): the state / read-only-save handlers follow the displayed workbook', () => {
+  it('a later merge-source session never answers for, or takes the read-only save of, the displayed workbook', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sheets-uniwork-displayed-'))
+    const displayed = workbook(dir, 'Budget.xlsx')
+    const source = workbook(dir, 'Source.xlsx')
+    let displayedReadOnly = false
+    const readOnlySaves: string[] = []
+    setUniworkDocumentPolicy({
+      isBound: (p) => p === displayed,
+      isReadOnly: (p) => p === displayed && displayedReadOnly,
+      readOnlySave: (p) => void readOnlySaves.push(p),
+    })
+
+    createSheetsView({ includeAiHandlers: false })
+    const event = { sender: { id: views.lastId, isDestroyed: () => false } }
+    const open = handlers.get(IPC_CHANNELS.reopenWorkbook)!
+    const merge = handlers.get(IPC_CHANNELS.openWorkbooksForMerge)!
+    const state = handlers.get(IPC_CHANNELS.uniworkState)!
+    const roSave = handlers.get(IPC_CHANNELS.uniworkReadOnlySave)!
+
+    const shown = (await open(event, displayed)) as { sessionId: string }
+    await merge(event, [source])
+    expect(state(event)).toEqual({ bound: true, readOnly: false })
+
+    displayedReadOnly = true // the displayed workbook loses its edit lock
+    expect(state(event)).toEqual({ bound: true, readOnly: true })
+    roSave(event)
+    expect(readOnlySaves).toEqual([displayed])
+
+    const closeSession = handlers.get(IPC_CHANNELS.closeWorkbook)!
+    await closeSession(event, shown.sessionId)
+    expect(state(event)).toEqual({ bound: false, readOnly: false })
+  })
+})

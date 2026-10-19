@@ -119,7 +119,9 @@ describe('UniWork AI chip wiring (pdf panel)', () => {
     await flush()
   }
   const failWith = async (_code: string, errKey: string): Promise<void> => {
-    await act(async () => harness.events.onError(ui(errKey as Parameters<typeof aiUniworkText>[1])))
+    await act(async () =>
+      harness.events.onError(ui(errKey as Parameters<typeof aiUniworkText>[1]), errKey),
+    )
   }
   const failRaw = async (text: string): Promise<void> => {
     await act(async () => harness.events.onError(text))

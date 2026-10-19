@@ -277,11 +277,15 @@ export interface SyncRuntimeOptions {
   /**
    * Runs after every pass (sign-in and each interval tick), for the durable
    * save queue the same poll drives. `online` is the pass's connectivity
-   * verdict: `false` only when a capability or feed round trip actually failed
-   * (a network/timeout error or a consumer backoff), `true` when a request
-   * reached the server, and `undefined` when the pass simply had nothing to do
-   * (no chosen org, no scope) - a no-op is neither, so it must not park the
-   * queue (G506-be-3). It dispatches the pending intents and advances their
+   * verdict: `false` only when a feed round trip actually failed (a
+   * network/timeout error), `true` when a request reached the server, and
+   * `undefined` when the pass simply had nothing to do (no chosen org, no
+   * scope) - a no-op is neither, so it must not park the queue (G506-be-3).
+   * A consumer backoff is not a failure: it either follows a refused resync (a
+   * round trip that reached the server) or skips the request inside the
+   * consumer's own retry window, so it reports the device online and leaves the
+   * `resync_failed` condition visible in the header (B47 / UNI-1362). It
+   * dispatches the pending intents and advances their
    * reconciling clocks. Awaited, so a slow dispatch cannot overlap the next pass.
    */
   onPoll?(online: boolean | undefined): Promise<void>
@@ -364,6 +368,7 @@ export class SyncRuntime {
   private generation = 0
   /** told after every pass's onPoll, with the same verdict (G5-10 sync center) */
   private readonly pollListeners = new Set<(online: boolean | undefined) => void>()
+  private readonly leasePassListeners = new Set<(online: boolean | undefined) => void>()
   /** the feed verdict of the last completed pass (G5-10 header conditions 7 and 9) */
   private lastFeedVerdict = { resynced: false, resyncFailed: false }
   /** the last pass's connectivity verdict; false keeps every lease request home */
@@ -480,6 +485,17 @@ export class SyncRuntime {
   }
 
   /**
+   * G703-R7-3: listen to every pass once its lease renewal pass settled (an
+   * offline or verdict-less pass renews nothing and reports at once). Unlike
+   * `onPollVerdict` it runs after the renewal, so a listener reads the leases a
+   * renewal just wrote. Returns the unsubscribe.
+   */
+  onAfterLeasePass(listener: (online: boolean | undefined) => void): () => void {
+    this.leasePassListeners.add(listener)
+    return () => this.leasePassListeners.delete(listener)
+  }
+
+  /**
    * G5-10: whether the last completed pass rebuilt a feed from a full resync,
    * and whether a feed's resync is refused past FEED_RESYNC_FAILED_AFTER. A
    * stop() (sign-out, account switch) forgets both.
@@ -514,6 +530,17 @@ export class SyncRuntime {
     }
   }
 
+  /** the listeners that run once a pass's lease renewal settled (they see the renewed leases) */
+  private reportLeasePass(online: boolean | undefined): void {
+    for (const listener of [...this.leasePassListeners]) {
+      try {
+        listener(online)
+      } catch {
+        // a listener never breaks the pass
+      }
+    }
+  }
+
   private async run(): Promise<void> {
     const generation = this.generation
     const current = () => this.generation === generation
@@ -524,6 +551,8 @@ export class SyncRuntime {
       // no session to reach the server: nothing was attempted, so there is no
       // connectivity verdict to report (G506-be-3)
       await this.reportPoll(undefined)
+      if (!current()) return
+      this.reportLeasePass(undefined)
       return
     }
     const open = await this.options.store.open()
@@ -533,6 +562,8 @@ export class SyncRuntime {
       // Nothing was attempted, so there is no verdict either (G506-be-3)
       this.running.clear()
       await this.reportPoll(undefined)
+      if (!current()) return
+      this.reportLeasePass(undefined)
       return
     }
     /** whether any capability or feed round trip was attempted at all */
@@ -567,8 +598,14 @@ export class SyncRuntime {
         const result = await consumer.sync()
         if (!current()) return
         if (result.kind === 'session_expired') sessionExpired = true
-        // a failed or backed-off feed round trip is a real transport failure
-        if (result.kind === 'failed' || result.kind === 'backoff') transportFailed = true
+        // B47 (UNI-1362): only a round trip that actually FAILED is a transport
+        // failure. A consumer backoff is a scheduling state, not evidence of an
+        // offline device: either the server refused the resync - a round trip
+        // that did reach the server - or the consumer skipped the request inside
+        // its own retry window. Counting it as a failure parked the queue
+        // offline and let the header's `offline` (prio 5) mask `resync_failed`
+        // (prio 7), hiding the state the person has to see and act on.
+        if (result.kind === 'failed') transportFailed = true
         if (result.kind === 'synced' && result.resynced) resynced = true
       }
     }
@@ -594,6 +631,10 @@ export class SyncRuntime {
     // pass renews the held leases that are due, an offline one sends nothing
     if (verdict !== undefined) this.online = verdict
     await this.leases.onOnlinePass(verdict).catch(() => undefined)
+    // G703-R7-3: what must see the renewed leases (the offline-copy sweep) runs
+    // here, so the queue and the listeners above never wait on a renewal request
+    if (!current()) return
+    this.reportLeasePass(verdict)
     // G5-05: a reached server downloads the pins that waited for the network
     if (verdict === true && current()) await this.library?.onReconnect().catch(() => undefined)
   }

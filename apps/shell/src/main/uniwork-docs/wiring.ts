@@ -49,7 +49,7 @@ import {
   type UniworkCommentsHandle,
 } from './comments-wiring'
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
-import { setUniworkCloseGuard } from './close-guard'
+import { setUniworkCloseGuard, setUniworkPathDropHook } from './close-guard'
 import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
 import {
   SyncRuntime,
@@ -124,6 +124,8 @@ export interface UniworkDocsWiring {
    */
   refuseLockedPath(path: string): boolean
   isPathOpen(path: string): boolean
+  /** EL-1(b) fix6 (VEL-2): broadcast `{ path }` to every renderer webContents */
+  pushDocStateChanged?(path: string): void
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
   reloadPath(path: string): void
   /**
@@ -778,6 +780,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    pushDocStateChanged: (path) => wiring.pushDocStateChanged?.(path),
     // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
     // discussionTarget already resolves); a detached editor window is not one
     isShellTab: (path) => (wiring.discussionTarget ? wiring.discussionTarget(path) !== null : true),
@@ -948,6 +951,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.remoteAction, (_event, path: unknown, action: unknown) =>
     service.remoteAction(path as string, action as UniworkRemoteAction),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.editHere, (_event, path: unknown) =>
+    service.editHere(path as string),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {
     if (typeof path === 'string') service.dismissLock(path)
@@ -967,6 +973,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pending.resolve(answer?.confirmed === true)
   })
   setUniworkCloseGuard(service)
+  setUniworkPathDropHook((paths) => {
+    void service.notePathsDropped(paths)
+  })
   const runtime = createSyncRuntime(service, {
     treeChanged: (workspaceId) => treeChanged.notify(workspaceId),
     libraryChanged: (documentId) => offlineRowChanged(documentId),
@@ -993,6 +1002,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     },
     show: (path) => service.showOfflineCopy(path),
     isPathOpen: (path) => wiring.isPathOpen(path),
+    lockOpened: (lock) => service.recordOfflineLock(lock),
+    leaseStamp: (documentId) => runtime.leases.commitStamp(documentId),
     appVersion: () => app.getVersion(),
   })
   // the service opens its cached copy through the same module (B5)
@@ -1009,12 +1020,14 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       (await runtime.capabilityRead(orgId)).capabilities.offline_library,
     signedOut: () => uniworkAccount().status().state !== 'signed-in',
     lastOwner: () => service.store.readLastOwner(),
+    activeDeploymentId: () => uniworkDeploymentProfile()?.deploymentId ?? null,
     libraryLayer: () => libraryLayerFor(),
     openDocument: (documentId) => service.openDocument(documentId),
     openCopy: (documentId) => offlineCopies.open(documentId),
     revealLibraryFolder: async () =>
       (await shell.openPath(join(app.getPath('userData'), 'uniwork-sync', 'library'))) === '',
     lockRefused: (lock) => service.recordOfflineLock(lock),
+    keystoreLock: (documentId) => service.offlineKeystoreLock(documentId),
     changed: () => offlinePush(),
   })
   /** stops the feed pass and remembers it, so the next status push restarts it */
@@ -1121,6 +1134,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     service,
     store: syncStoreFor(),
     accountStatus: () => uniworkAccount().status(),
+    activeDeploymentId: () => uniworkDeploymentProfile()?.deploymentId ?? null,
     capabilityRead: (orgId) => runtime.capabilityRead(orgId),
     feedVerdict: () => runtime.feedVerdict(),
     resetFeedResync: () => runtime.resetFeedResync(),
@@ -1154,8 +1168,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   offlinePush = () => syncCenter.controller.notifyChanged()
   offlineRowChanged = (documentId) => offlineApi.rowChanged(documentId)
   registerOfflineLibraryIpc(ipcMain, offlineApi)
-  // a copy no window shows any more goes at the next pass (the offline twin of the draft sweep)
-  runtime.onPollVerdict(() => void offlineCopies.sweep())
+  // a copy no window shows any more goes at the next pass (the offline twin of the draft
+  // sweep); it runs after the pass's lease renewal so it reads the renewed lease (G703-R7-3)
+  runtime.onAfterLeasePass(() => void offlineCopies.sweep())
   changeListeners.push(() => syncCenter.controller.notifyChanged())
   // every feed pass's connectivity verdict: the offline header, its refusals and lastSyncAt
   runtime.onPollVerdict((online) => void syncCenter.notePoll(online))
@@ -1199,6 +1214,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         // BE-R1-2: an account activation is the startup sweep - the last
         // session's read-only `@offline` plaintext goes before anything opens one
         void offlineCopies.recover().catch(() => undefined)
+        void offlineCopies.sweep().catch(() => undefined)
         // G8-16 S16: changing the organization reloads the library data. An
         // org-less push carrying orgsError is a transient /orgs failure; an
         // org-less push without it (deactivation, the picker) is a lasting

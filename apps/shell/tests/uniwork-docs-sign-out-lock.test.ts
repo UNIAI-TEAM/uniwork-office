@@ -1102,6 +1102,49 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect(plan.count).toBe(0)
   })
 
+  // A62 (UNI-1362): the plan enumerates `owner`'s folders, so its intents must
+  // come from `owner`'s own store. After a switch the next account is already
+  // live, and reading through the live scope planned the leaving account's
+  // copies against the wrong account's intents.
+  it('17b. planSignOut reads the intents of the OWNER after a switch, not the live account’s', async () => {
+    const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
+    const ctx = setup({ openPaths: [path] })
+    // acc_1 holds a pending intent for its clean-looking copy: the only local work
+    const opened = await ctx.layer.open(ownerA)
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    const payload = enc('v4 queued')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      DOC,
+      {
+        v: 2,
+        intentId: 'int_1',
+        idempotencyKey: 'idem_1',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(payload),
+        length: payload.byteLength,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: '2026-04-17T00:00:00.000Z',
+        updatedAt: '2026-04-17T00:00:00.000Z',
+      },
+      payload,
+    )
+    // acc_2 signs in: its own store is live and holds nothing for this document
+    ctx.setAccount('acc_2')
+
+    // the leaving account's copy is still counted, from ITS store
+    expect((await ctx.service.planSignOut(ownerA)).count).toBe(1)
+    // and the live account's own plan sees no such copy (it owns none of these folders)
+    expect(
+      (await ctx.service.planSignOut({ deploymentId: 'default', accountId: 'acc_2' })).count,
+    ).toBe(0)
+  })
+
   it('18. d1-5: refusedParkedKeys drops the refusal when newerStoreIn(dir) turns false', async () => {
     const path = seedWorkingCopy({ bytes: 'v5 n+1', baseBytes: 'v3 base', state: 'dirty' })
     const ctx = setup({ openPaths: [path] })

@@ -3013,6 +3013,12 @@ export interface DesktopApi {
   /// sign-out, session expiry); the renderer re-asks getUserDisplayName.
   /// Absent outside the shell, where the author never changes.
   onCommentAuthorChanged?(handler: () => void): () => void
+  /// EL-1(b) fix6: whether the open workbook is bound to UniWork and read-only
+  uniworkState?(): Promise<{ bound: boolean; readOnly: boolean }>
+  /// EL-1(b) fix6: pushed (`{ path }`) when `isReadOnly(path)` or `isBound(path)` may have changed
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  /// EL-1(b) fix6: explicit Save on a read-only bound workbook asks main to explain
+  uniworkReadOnlySave?(path?: string): Promise<void>
   getAiSettings(): Promise<AiSettings>
   setAiSettings(settings: AiSettings, options?: AiSettingsSaveOptions): Promise<void>
   /// ai-settings.json was rewritten by any renderer; re-read it

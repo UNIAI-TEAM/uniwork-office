@@ -77,6 +77,10 @@ import { cleanDraftName } from '../shared/draft-name'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
+interface MarkdownUniworkLockSeam {
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  uniworkReadOnlySave?(path?: string): Promise<void>
+}
 
 const MIN_ZOOM = 50
 const MAX_ZOOM = 200
@@ -396,15 +400,25 @@ export default function App() {
       return
     }
     // the browser harness may not expose the method: a missing or failed answer is a plain local file
-    void Promise.resolve(window.markdownApi.uniworkState?.())
-      .then((state) => {
-        if (live) setUniwork({ bound: state?.bound === true, readOnly: state?.readOnly === true })
-      })
-      .catch(() => {
-        if (live) setUniwork({ bound: false, readOnly: false })
-      })
+    const query = () => {
+      void Promise.resolve(window.markdownApi.uniworkState?.())
+        .then((state) => {
+          if (live) setUniwork({ bound: state?.bound === true, readOnly: state?.readOnly === true })
+        })
+        .catch(() => {
+          if (live) setUniwork({ bound: false, readOnly: false })
+        })
+    }
+    query()
+    // EL-1(b) VEL-2: the edit lock makes readOnly change while the document stays open
+    const unsubscribe = (window.markdownApi as MarkdownUniworkLockSeam).onUniworkStateChanged?.(
+      (p) => {
+        if (p === filePath) query()
+      },
+    )
     return () => {
       live = false
+      unsubscribe?.()
     }
   }, [filePath])
 
@@ -516,6 +530,10 @@ export default function App() {
   const doSaveSource = useCallback(async (mode: SaveMode, origin?: 'auto'): Promise<boolean> => {
     const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
     if (statusRef.current !== 'ready' || savingRef.current || !allowed) return false
+    if (mode === 'save' && !origin && uniworkRef.current.bound && uniworkRef.current.readOnly) {
+      void (window.markdownApi as MarkdownUniworkLockSeam).uniworkReadOnlySave?.()?.catch(() => {})
+      return false
+    }
     savingRef.current = true
     setSaveState('saving')
     const textAtSave = sourceTextRef.current
@@ -664,6 +682,15 @@ export default function App() {
       const current = editorRef.current
       const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
       if (!current || statusRef.current !== 'ready' || savingRef.current || !allowed) return false
+      // EL-1(b) VEL-1: an explicit Save on a read-only bound copy asks main to
+      // explain the lock instead of writing (Save As and unbound files keep
+      // today's path)
+      if (mode === 'save' && !origin && uniworkRef.current.bound && uniworkRef.current.readOnly) {
+        void (window.markdownApi as MarkdownUniworkLockSeam)
+          .uniworkReadOnlySave?.()
+          ?.catch(() => {})
+        return false
+      }
       savingRef.current = true
       setSaveState('saving')
       try {

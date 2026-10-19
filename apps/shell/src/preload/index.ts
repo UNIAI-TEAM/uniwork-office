@@ -16,10 +16,7 @@ import type {
 } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
-import {
-  installUniworkAiFlagBridge,
-  installUniworkCloudStatusBridge,
-} from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
 import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
@@ -1006,7 +1003,12 @@ const homeApi: HomeApi = {
       system: input.system,
       user: input.user,
     })
-    const raw = (result ?? {}) as { ok?: unknown; content?: unknown; error?: unknown }
+    const raw = (result ?? {}) as {
+      ok?: unknown
+      content?: unknown
+      error?: unknown
+      uniworkCode?: unknown
+    }
     if (raw.ok === true) {
       return {
         ok: true,
@@ -1016,6 +1018,7 @@ const homeApi: HomeApi = {
     return {
       ok: false,
       error: typeof raw.error === 'string' ? raw.error : 'AI request failed',
+      ...(typeof raw.uniworkCode === 'string' ? { uniworkCode: raw.uniworkCode } : {}),
     }
   },
   aiStream(request: AiStreamRequest) {
@@ -1326,6 +1329,9 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.remoteAction, path, action),
     )
   },
+  async uniworkEditHere(path) {
+    return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.editHere, path))
+  },
   async uniworkSetBarInset(heightPx) {
     if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.barInset, Math.max(0, Math.round(heightPx)))
@@ -1390,7 +1396,6 @@ void ipcRenderer
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
 // window.uniworkAiFlag: the home renderer's provider list mirrors the shell's UniWork AI flag
 installUniworkAiFlagBridge()
-installUniworkCloudStatusBridge()
 
 const projectApi: ProjectHomeApi = {
   async listProjects() {

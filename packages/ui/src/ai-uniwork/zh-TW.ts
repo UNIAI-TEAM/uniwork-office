@@ -62,16 +62,12 @@ export const zhTW = {
   aiErrQuestionRejected: 'UniWork AI 無法接受此要求。請修改後再傳送。',
   aiUniworkImagesNotSent: '圖片不會傳送給 UniWork AI，只傳送了你的文字。',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: '可用',
   cloudStateNotEntitled: '方案未包含此功能',
   cloudStateExhausted: 'AI 額度已用完',
   cloudStateUnavailable: '暫時無法使用',
-  cloudStateSignedOut: '尚未登入',
   cloudStateInactive: '訂閱未生效',
-  cloudCredits: 'AI 額度',
   cloudCreditsLeft: '剩餘 {remaining} / {limit}',
   cloudCreditsUnlimited: '不限量',
-  cloudCreditsRenews: '{date} 重置',
   cloudInactiveBody:
     '你所在組織的 UniWork 訂閱未生效，雲端 AI 已暫停。請聯絡管理員續訂；下方自己的服務商不受影響。',
   acctSignIn: '登入',

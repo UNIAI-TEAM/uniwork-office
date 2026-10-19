@@ -11,7 +11,7 @@ const harness = vi.hoisted(() => ({
     onText?: (text: string) => void
     onNotice?: (notice: unknown) => void
     onDone?: (result: { text: string; cancelled: boolean; turnLimit: boolean }) => void
-    onError?: (error: string) => void
+    onError?: (error: string, errorKey?: string) => void
   },
   run: vi.fn(),
 }))
@@ -168,7 +168,7 @@ describe('UniWork AI chip wiring (slides panel)', () => {
   }
   const failWith = async (_code: string, errKey: string): Promise<void> => {
     await act(async () =>
-      harness.events!.onError?.(ui(errKey as Parameters<typeof aiUniworkText>[1])),
+      harness.events!.onError?.(ui(errKey as Parameters<typeof aiUniworkText>[1]), errKey),
     )
   }
   const failRaw = async (text: string): Promise<void> => {

@@ -42,6 +42,12 @@ export default defineConfig({
       '@genoffice/electron-utils/uniwork-ai-flag': local(
         '../../packages/electron-utils/src/uniwork-ai-flag.ts',
       ),
+      '@genoffice/electron-utils/uniwork-cloud-status-bridge': local(
+        '../../packages/electron-utils/src/uniwork-cloud-status-bridge.ts',
+      ),
+      '@genoffice/electron-utils/uniwork-cloud-status': local(
+        '../../packages/electron-utils/src/uniwork-cloud-status.ts',
+      ),
       '@genoffice/electron-utils/draft-preview': local(
         '../../packages/electron-utils/src/draft-preview.ts',
       ),

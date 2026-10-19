@@ -479,6 +479,10 @@ export interface DesktopApi {
    *  autosave off) and whether the user may only view it (absent on the web bridge,
    *  which the renderer treats as unbound) */
   uniworkState(path: string): Promise<{ bound: boolean; readOnly: boolean }>
+  /** EL-1(b) fix6: pushed (`{ path }`) when `isReadOnly(path)` or `isBound(path)` may have changed */
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  /** EL-1(b) fix6: explicit Save on a read-only bound document asks main to explain */
+  uniworkReadOnlySave?(path?: string): Promise<void>
   /** web bridge only (absent on desktop): the renderer registers a serializer of the
    *  live document so a server-side PDF export includes unsaved edits; returns an unregister */
   provideDocBytes?(provider: () => Promise<ArrayBuffer | null>): () => void

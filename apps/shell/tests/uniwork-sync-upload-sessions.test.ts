@@ -61,7 +61,7 @@ const record = (overrides: Partial<UploadSessionRecord> = {}): UploadSessionReco
     { partNumber: 1, etag: '"e1"' },
     { partNumber: 2, etag: '"e2"' },
   ],
-  expiresAt: '2026-10-19T00:00:00Z',
+  expiresAt: '2099-01-01T00:00:00Z',
   updatedAt: '2026-10-18T00:00:00Z',
   ...overrides,
 })

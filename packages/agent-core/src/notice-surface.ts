@@ -34,36 +34,6 @@ export function classifyDroppedToolReason(
   return 'other'
 }
 
-export interface LegacyDroppedNoticeNote {
-  readonly kind: 'dropped'
-  readonly key: 'aiNoticeDroppedTool'
-  readonly params: Readonly<{ name: string }>
-  readonly reason?: string
-  readonly module?: string
-}
-
-export function noticeToPanelNote(event: {
-  readonly kind: string
-  readonly calls?: ReadonlyArray<{
-    readonly name: string
-    readonly reason?: string
-    readonly module?: string
-  }>
-}): LegacyDroppedNoticeNote | null {
-  if (event.kind === 'dropped_tool_calls' || event.kind === 'dropped-tool-calls') {
-    const first = event.calls?.[0]
-    if (!first) return null
-    return {
-      kind: 'dropped',
-      key: 'aiNoticeDroppedTool',
-      params: { name: first.name },
-      ...(first.reason ? { reason: first.reason } : {}),
-      ...(first.module ? { module: first.module } : {}),
-    }
-  }
-  return null
-}
-
 export interface PanelNote {
   kind: 'restarted' | 'boundary' | 'dropped' | 'off' | 'images'
   text: string

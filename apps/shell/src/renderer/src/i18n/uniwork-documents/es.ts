@@ -172,4 +172,23 @@ export const es = {
   uwTipEditLockedSelf: 'Estás editando este documento en otra ventana.',
   uwErrEditLocked: 'Otra persona está editando este documento.',
   uwReasonEditLocked: 'otra persona está editando',
+  uwLockBannerOther: '{name} está editando desde {time}. Estás viendo en modo de solo lectura.',
+  uwLockBannerSelfElsewhere: 'Estás editando este documento en otra ventana.',
+  uwLockBannerFree: 'Nadie está editando este documento ahora.',
+  uwLockEditHere: 'Editar aquí',
+  uwLockAcquiring: 'Obteniendo acceso de edición…',
+  uwLockReadOnlyExplain: 'No se guardó nada — el documento es de solo lectura.',
+  uwLockLostTitle: 'Ya no estás editando',
+  uwLockLostTakenOver: '{name} tomó la edición. Tus cambios sin guardar siguen aquí.',
+  uwLockLostHandedOver: 'Cediste la edición a {name}. Tus cambios sin guardar siguen aquí.',
+  uwLockLostExpired:
+    'La edición expiró porque no pudimos llegar al servidor durante un tiempo (sin red o el dispositivo se suspendió). Tus cambios sin guardar siguen aquí.',
+  uwLockLostMovedHere:
+    'Ahora estás editando este documento en otra ventana. Los cambios sin guardar de esta ventana siguen aquí.',
+  uwLockLostAccessLost:
+    'Ya no tienes permiso para editar este documento. Tus cambios sin guardar siguen aquí.',
+  uwLockLostGeneric: 'Ya no estás editando. Tus cambios sin guardar siguen aquí.',
+  uwLockLostHeldBy: '{name} está editando ahora. Tus cambios sin guardar siguen aquí.',
+  uwLockAcquireFailed:
+    'No se pudo obtener el acceso de edición. Inténtalo de nuevo en unos minutos.',
 } satisfies Record<keyof typeof zh, string>

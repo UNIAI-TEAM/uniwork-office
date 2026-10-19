@@ -68,16 +68,12 @@ export const en = {
   aiErrQuestionRejected: 'UniWork AI couldn’t accept this request. Change it, then send it again.',
   aiUniworkImagesNotSent: 'Images aren’t sent to UniWork AI; only your text was sent.',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'Available',
   cloudStateNotEntitled: 'Not in your plan',
   cloudStateExhausted: 'Out of AI credits',
   cloudStateUnavailable: 'Unavailable',
-  cloudStateSignedOut: 'Not signed in',
   cloudStateInactive: 'Subscription inactive',
-  cloudCredits: 'AI credits',
   cloudCreditsLeft: '{remaining} / {limit} left',
   cloudCreditsUnlimited: 'Unlimited',
-  cloudCreditsRenews: 'Renews {date}',
   cloudInactiveBody:
     'Your organization’s UniWork subscription is not active, so cloud AI is paused. Ask an admin to renew it; your own providers below keep working.',
   acctSignIn: 'Sign in',

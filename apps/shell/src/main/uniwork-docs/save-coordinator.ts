@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import type { UniworkDocStatus } from '../../shared/home-api'
+import type { UniworkDocEditLock, UniworkDocStatus } from '../../shared/home-api'
 import type { Binding, BindingStore, BoundDocument } from './binding-store'
 import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
@@ -168,6 +168,7 @@ export type SaveQueueEngine = Pick<
   | 'supersede'
   | 'tombstone'
   | 'isOtherWindow'
+  | 'holdsOtherWindow'
 >
 
 export interface SaveCoordinatorDeps {
@@ -230,6 +231,17 @@ export interface SaveCoordinatorDeps {
    * key the queue is already running (G506-be-1).
    */
   dispatcherBusy?(docKey: string): boolean
+  /**
+   * EL-1(b) Q2: acquire before the first queued commit when the session is
+   * 'unreachable'. 'park' = 423 — fail as edit_locked, send no commit.
+   */
+  prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
+  /** EL-1(b): lock id of a held path, sent as commit `edit_lock_id` */
+  editLockId?(path: string): string | null
+  /** EL-1(b) B8: holder summary for a synthesised park 423 */
+  editLockHolder?(path: string): UniworkDocEditLock | null
+  /** EL-1(b): 423 on commit while held — session becomes 'lost' */
+  onCommitEditLocked?(path: string, error: UniworkDocError): void
 }
 
 /**
@@ -1302,6 +1314,18 @@ export class SaveCoordinator {
         if (!this.deps.isSignedIn() || !this.deps.ownsBinding(doc)) {
           throw new UniworkDocError('not_signed_in')
         }
+        // the edit lock decides first: a parked save never reaches the durable
+        // `committing` phase below, so it is replayed, not reconciled
+        const prepared = (await this.deps.prepareEditLock?.(doc.path)) ?? 'proceed'
+        if (prepared === 'park') {
+          const holder = this.deps.editLockHolder?.(doc.path)
+          throw new UniworkDocError('edit_locked', {
+            status: 423,
+            serverCode: 'document_locked',
+            ...(holder ? { editLock: holder } : {}),
+          })
+        }
+        const editLockId = this.deps.editLockId?.(doc.path) ?? null
         // B70 + R2: the commit is about to be POSTed, so the durable record
         // must say `committing` BEFORE the request leaves - a crash or a lost
         // answer then reads `committing`, never `queued` (which the next poll
@@ -1324,6 +1348,7 @@ export class SaveCoordinator {
             uploadId: upload.uploadId,
             baseRevision: intent.baseRevision,
             idempotencyKey: intent.idempotencyKey,
+            ...(editLockId ? { editLockId } : {}),
           })
         } catch (error) {
           // only the COMMIT leg is tagged, and only for an answer the server
@@ -1430,6 +1455,8 @@ export class SaveCoordinator {
         // timer: park the intent in `failed` with `lastError: 'edit_locked'` so
         // the recovery snapshot is kept on disk until the user explicitly saves
         // again or closes the document.
+        // EL-1(b): a 423 while we held also flips the session to 'lost'.
+        this.deps.onCommitEditLocked?.(doc.path, error)
         this.pendingNext.delete(doc.path)
         await this.settleRecord(intents, doc, intent, {
           type: 'commitFailed',
@@ -1640,6 +1667,15 @@ export class SaveCoordinator {
   /** whether another window holds the document lock (this one is read-only) */
   isOtherWindow(docKey: string): boolean {
     return this.deps.dispatcher?.isOtherWindow(docKey) === true
+  }
+
+  /**
+   * A32 (UNI-1362): whether the durable document lock is held by another window
+   * right now. `isOtherWindow` above is this process's own verdict and only a
+   * dispatch clears it, so the status front revalidates with this one instead.
+   */
+  async holdsOtherWindow(docKey: string): Promise<boolean> {
+    return (await this.deps.dispatcher?.holdsOtherWindow(docKey)) === true
   }
 
   /** push a queue record's state as the document's status (W4b maps the doc) */

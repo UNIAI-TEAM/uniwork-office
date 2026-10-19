@@ -246,6 +246,8 @@ export interface AiChatResponse {
   error?: string
   /** Same codes as stream errors — e.g. OpenRouter HTTP 402 */
   errorCode?: 'timeout' | 'credits' | 'network' | 'overloaded'
+  /** a UniWork AI refusal/failure carries the server's code (e.g. ai_disabled); errorCode stays unset */
+  uniworkCode?: string
 }
 
 export interface AiStreamRequest {

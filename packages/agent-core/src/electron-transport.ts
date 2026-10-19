@@ -81,11 +81,14 @@ export interface IpcTransportOptions<S> {
   /** localized message for capacity/rate-limit failures (errorCode 'overloaded') */
   overloadedErrorText?(): string
   /**
-   * localized message for a UniWork AI failure, chosen by the server's `code` (never by the error
-   * text); undefined falls back to the chunk's own text. `retryAfterSec` is the Retry-After the
-   * server sent, when it did.
+   * localized message + its S9 key for a UniWork AI failure, chosen by the server's `code` (never
+   * by the error text); undefined falls back to the chunk's own text. `retryAfterSec` is the
+   * Retry-After the server sent, when it did.
    */
-  uniworkErrorText?(code: string, retryAfterSec?: number): string | undefined
+  uniworkError?(
+    code: string,
+    retryAfterSec?: number,
+  ): { text: string; errorKey: string } | undefined
   /** the AI turn tracker the stream reports to; default: the window's shared one (see desktopAiRun) */
   aiRun?: AiRunTracker
 }
@@ -132,10 +135,10 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
         // every ending path (done, error, stop, watchdog, rejected start) lands here: one idle
         aiRun.end(requestId)
       }
-      const fail = (error: string) => {
+      const fail = (error: string, errorKey?: string) => {
         if (settled) return
         settle()
-        cb.onError(error)
+        cb.onError(error, errorKey)
       }
       const armSilence = () => {
         clearTimeout(silenceTimer)
@@ -174,12 +177,14 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
           if (chunk.stopReason) cb.onStopReason?.(chunk.stopReason)
           cb.onDone()
         } else if (chunk.type === 'error') {
+          const uniwork =
+            chunk.uniworkCode !== undefined
+              ? options.uniworkError?.(chunk.uniworkCode, chunk.retryAfterSec)
+              : undefined
           settle()
           cb.onError(
             chunk.uniworkCode !== undefined
-              ? (options.uniworkErrorText?.(chunk.uniworkCode, chunk.retryAfterSec) ??
-                  chunk.error ??
-                  options.unknownErrorText())
+              ? (uniwork?.text ?? chunk.error ?? options.unknownErrorText())
               : chunk.errorCode === 'timeout'
                 ? timeoutText()
                 : chunk.errorCode === 'credits'
@@ -191,6 +196,7 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
                         chunk.error ??
                         options.unknownErrorText())
                       : (chunk.error ?? options.unknownErrorText()),
+            uniwork?.errorKey,
           )
         } else {
           // A chunk kind this build predates must not kill the run; traffic proves it is alive.

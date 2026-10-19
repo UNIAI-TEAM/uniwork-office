@@ -1,6 +1,6 @@
 import {
   aiUniworkText,
-  isUniworkQuestionRefusal,
+  isUniworkRefusalErrorKey,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiSaveDraftCard,
@@ -33,7 +33,7 @@ import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import type {
   UniworkCloudStatusBridge,
   UniworkCloudStatusSnapshot,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+} from '@genoffice/electron-utils/uniwork-cloud-status'
 import { platform } from '../capabilities'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
@@ -51,8 +51,7 @@ import {
   AiUsageChip,
   addTokenUsage,
   Markdown,
-  uniworkErrorForChip,
-  uniworkErrorKeyOfText,
+  uniworkErrorForEntry,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
@@ -251,6 +250,8 @@ interface ChatEntry {
   text: string
   streaming?: boolean
   isError?: boolean
+  /** the S9 key the transport chose for this UniWork AI error; absent for any other failure */
+  errorKey?: string
   /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
   waitLine?: string | undefined
   /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
@@ -902,12 +903,12 @@ export function AiPanel({
           queueRunRef.current = false
           setBusy(false)
         },
-        onError: (error) => {
+        onError: (error, errorKey) => {
           // once a tool ran the message was delivered; a later turn failing is not a send failure
           // a setup state (no key / no model) is not a send failure either: no "not sent" pill
           // a refused question (too long, rejected) is no send failure to retry as is: it goes back
           // into the composer to be shortened or fixed, as the message says
-          const refused = isUniworkQuestionRefusal(error)
+          const refused = isUniworkRefusalErrorKey(errorKey)
           if (refused) setPrompt((current) => current || runDisplayRef.current)
           const undelivered = runToolsRef.current.length === 0 && !aiNoticeKind(error) && !refused
           setChat((prev) => {
@@ -926,6 +927,7 @@ export function AiPanel({
                 streaming: false,
                 waitLine: undefined,
                 text: error,
+                errorKey,
                 isError: true,
                 tools: last.tools?.filter((tl) => !tl.running),
               }
@@ -1379,11 +1381,12 @@ export function AiPanel({
                   stopped: Boolean(lastEntry.stopped),
                   hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
                   clarifyAsked: receipts.some((r) => Boolean(r.qa)),
-                  notes: lastEntry.notes,
                   droppedToolCalls: droppedCallsOfNotes(lastEntry.notes),
                   toolExecutions: lastEntry.tools,
                   isError: Boolean(lastEntry.isError),
-                  error: lastEntry.isError ? uniworkErrorForChip(lastEntry.text) : null,
+                  error: lastEntry.isError
+                    ? uniworkErrorForEntry(lastEntry.errorKey, lastEntry.text)
+                    : null,
                 }
               : null,
         })
@@ -1517,9 +1520,7 @@ export function AiPanel({
             // it), so the "not sent" bubble adds no Retry of its own; failures of other providers keep it
             const next = chat[i + 1]
             const uniworkErrorFollows =
-              next?.role === 'assistant' &&
-              Boolean(next.isError) &&
-              uniworkErrorKeyOfText(next.text) !== null
+              next?.role === 'assistant' && Boolean(next.isError) && next.errorKey !== undefined
             const own = receipts.filter((r) => r.afterIdx === i)
             return (
               <div key={i} className="ai-msg ai-msg-user">
@@ -1598,11 +1599,10 @@ export function AiPanel({
               stopped: Boolean(entry.stopped),
               hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
               clarifyAsked: receipts.some((r) => Boolean(r.qa)),
-              notes: entry.notes,
               droppedToolCalls: droppedCallsOfNotes(entry.notes),
               toolExecutions: entry.tools,
               isError: Boolean(entry.isError),
-              error: entry.isError ? uniworkErrorForChip(entry.text) : null,
+              error: entry.isError ? uniworkErrorForEntry(entry.errorKey, entry.text) : null,
             },
           )
           const chip = chipView?.chip ?? null
