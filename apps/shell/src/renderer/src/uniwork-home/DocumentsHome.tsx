@@ -926,7 +926,11 @@ export function DocumentsHome({
       {
         id: 'new',
         label: row.id ? t('ufNewSubfolder') : t('ufNewFolder'),
-        onSelect: () => folderActions.openCreate(row.id, row.id !== null),
+        onSelect: () => {
+          // the dialog renders inside this pane, which is hidden while My AI / Workbench owns the view
+          onSidebarNavigate?.()
+          folderActions.openCreate(row.id, row.id !== null)
+        },
       },
     ]
     if (!row.id || !folderEditActionsOffered(row)) return items
@@ -937,7 +941,10 @@ export function DocumentsHome({
       {
         id: 'move',
         label: t('ufMoveTo'),
-        onSelect: () => folderActions.startMove({ id, kind: 'folder', parentId, title: row.title }),
+        onSelect: () => {
+          onSidebarNavigate?.()
+          folderActions.startMove({ id, kind: 'folder', parentId, title: row.title })
+        },
       },
     )
     return items
@@ -1118,12 +1125,13 @@ export function DocumentsHome({
             className="dh-sidebar-add"
             aria-label={t('uhNewFolder')}
             title={t('uhNewFolder')}
-            onClick={() =>
+            onClick={() => {
+              onSidebarNavigate?.()
               folderActions.openCreate(
                 subView === 'workspace' ? folderId : null,
                 subView === 'workspace' && folderId !== null,
               )
-            }
+            }}
           >
             <svg
               width="14"
