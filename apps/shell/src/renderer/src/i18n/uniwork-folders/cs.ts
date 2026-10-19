@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const cs = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Dokumenty (kořen)',
   ufTreeLabel: 'Složky',
   ufContentsLabel: 'Obsah složky',
   ufRecent: 'Nedávné',
@@ -31,7 +31,7 @@ export const cs = {
   ufNoPermission: 'Nemáte oprávnění tuto složku měnit.',
   ufEmptyFolder: 'Tato složka je prázdná',
   ufLocation: 'Umístění',
-  ufLocationRoot: 'UniWork (nejvyšší úroveň)',
+  ufLocationRoot: 'Dokumenty (kořen)',
   ufSameFolder: 'Stejná složka jako originál',
   ufChooseLocation: 'Vybrat umístění',
   ufChoose: 'Vybrat',

@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const pt = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Documentos (raiz)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Pastas',
   ufContentsLabel: 'Conteúdo da pasta',
@@ -31,7 +31,7 @@ export const pt = {
   ufNoPermission: 'Você não tem permissão para alterar esta pasta.',
   ufEmptyFolder: 'Esta pasta está vazia',
   ufLocation: 'Local',
-  ufLocationRoot: 'UniWork (nível superior)',
+  ufLocationRoot: 'Documentos (raiz)',
   ufSameFolder: 'Mesma pasta do original',
   ufChooseLocation: 'Escolher local',
   ufChoose: 'Escolher',

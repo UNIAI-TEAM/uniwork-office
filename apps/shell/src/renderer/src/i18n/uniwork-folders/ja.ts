@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ja = {
-  ufRoot: 'UniWork',
+  ufRoot: 'ドキュメント（ルート）',
   ufTreeLabel: 'フォルダー',
   ufContentsLabel: 'フォルダーの内容',
   ufRecent: '最近',
@@ -31,7 +31,7 @@ export const ja = {
   ufNoPermission: 'このフォルダーを変更する権限がありません。',
   ufEmptyFolder: 'このフォルダーは空です',
   ufLocation: '場所',
-  ufLocationRoot: 'UniWork（最上位）',
+  ufLocationRoot: 'ドキュメント（ルート）',
   ufSameFolder: '元のファイルと同じフォルダー',
   ufChooseLocation: '場所を選択',
   ufChoose: '選択',

@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const id = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Dokumen (root)',
   ufTreeLabel: 'Folder',
   ufContentsLabel: 'Isi folder',
   ufRecent: 'Terbaru',
@@ -31,7 +31,7 @@ export const id = {
   ufNoPermission: 'Anda tidak memiliki izin untuk mengubah folder ini.',
   ufEmptyFolder: 'Folder ini kosong',
   ufLocation: 'Lokasi',
-  ufLocationRoot: 'UniWork (tingkat teratas)',
+  ufLocationRoot: 'Dokumen (root)',
   ufSameFolder: 'Folder yang sama dengan aslinya',
   ufChooseLocation: 'Pilih lokasi',
   ufChoose: 'Pilih',

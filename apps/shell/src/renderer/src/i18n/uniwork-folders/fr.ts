@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const fr = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Documents (racine)',
   ufTreeLabel: 'Dossiers',
   ufContentsLabel: 'Contenu du dossier',
   ufRecent: 'Récents',
@@ -31,7 +31,7 @@ export const fr = {
   ufNoPermission: "Vous n'avez pas l'autorisation de modifier ce dossier.",
   ufEmptyFolder: 'Ce dossier est vide',
   ufLocation: 'Emplacement',
-  ufLocationRoot: 'UniWork (racine)',
+  ufLocationRoot: 'Documents (racine)',
   ufSameFolder: 'Même dossier que l’original',
   ufChooseLocation: 'Choisir un emplacement',
   ufChoose: 'Choisir',

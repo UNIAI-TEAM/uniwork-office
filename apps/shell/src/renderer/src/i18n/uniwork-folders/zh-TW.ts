@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const zhTW = {
-  ufRoot: 'UniWork',
+  ufRoot: '文件（根目錄）',
   ufTreeLabel: '資料夾',
   ufContentsLabel: '資料夾內容',
   ufRecent: '最近',
@@ -30,7 +30,7 @@ export const zhTW = {
   ufNoPermission: '你沒有權限變更此資料夾。',
   ufEmptyFolder: '此資料夾是空的',
   ufLocation: '位置',
-  ufLocationRoot: 'UniWork（最上層）',
+  ufLocationRoot: '文件（根目錄）',
   ufSameFolder: '與原檔案相同的資料夾',
   ufChooseLocation: '選擇位置',
   ufChoose: '選擇',

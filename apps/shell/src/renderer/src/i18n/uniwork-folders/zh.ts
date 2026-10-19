@@ -1,6 +1,6 @@
 /** FD-11 UniWork folder tree: browser, tree, picker, folder actions; zh defines the key set */
 export const zh = {
-  ufRoot: 'UniWork',
+  ufRoot: '文档（根目录）',
   ufTreeLabel: '文件夹',
   ufContentsLabel: '文件夹内容',
   ufRecent: '最近',
@@ -29,7 +29,7 @@ export const zh = {
   ufNoPermission: '你没有权限更改此文件夹。',
   ufEmptyFolder: '此文件夹为空',
   ufLocation: '位置',
-  ufLocationRoot: 'UniWork（顶层）',
+  ufLocationRoot: '文档（根目录）',
   ufSameFolder: '与原文件相同的文件夹',
   ufChooseLocation: '选择位置',
   ufChoose: '选择',

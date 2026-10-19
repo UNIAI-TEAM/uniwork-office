@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const es = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Documentos (raíz)',
   ufTreeLabel: 'Carpetas',
   ufContentsLabel: 'Contenido de la carpeta',
   ufRecent: 'Recientes',
@@ -31,7 +31,7 @@ export const es = {
   ufNoPermission: 'No tienes permiso para cambiar esta carpeta.',
   ufEmptyFolder: 'Esta carpeta está vacía',
   ufLocation: 'Ubicación',
-  ufLocationRoot: 'UniWork (nivel superior)',
+  ufLocationRoot: 'Documentos (raíz)',
   ufSameFolder: 'La misma carpeta que el original',
   ufChooseLocation: 'Elegir ubicación',
   ufChoose: 'Elegir',

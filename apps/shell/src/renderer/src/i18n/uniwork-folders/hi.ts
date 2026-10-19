@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const hi = {
-  ufRoot: 'UniWork',
+  ufRoot: 'दस्तावेज़ (रूट)',
   ufTreeLabel: 'फ़ोल्डर',
   ufContentsLabel: 'फ़ोल्डर की सामग्री',
   ufRecent: 'हाल के',
@@ -30,7 +30,7 @@ export const hi = {
   ufNoPermission: 'आपको इस फ़ोल्डर को बदलने की अनुमति नहीं है।',
   ufEmptyFolder: 'यह फ़ोल्डर खाली है',
   ufLocation: 'स्थान',
-  ufLocationRoot: 'UniWork (शीर्ष स्तर)',
+  ufLocationRoot: 'दस्तावेज़ (रूट)',
   ufSameFolder: 'मूल के समान फ़ोल्डर',
   ufChooseLocation: 'स्थान चुनें',
   ufChoose: 'चुनें',

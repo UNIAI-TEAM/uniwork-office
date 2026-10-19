@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const pl = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Dokumenty (katalog główny)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Foldery',
   ufContentsLabel: 'Zawartość folderu',
@@ -32,7 +32,7 @@ export const pl = {
   ufNoPermission: 'Nie masz uprawnień do zmiany tego folderu.',
   ufEmptyFolder: 'Ten folder jest pusty',
   ufLocation: 'Lokalizacja',
-  ufLocationRoot: 'UniWork (najwyższy poziom)',
+  ufLocationRoot: 'Dokumenty (katalog główny)',
   ufSameFolder: 'Ten sam folder co oryginał',
   ufChooseLocation: 'Wybierz lokalizację',
   ufChoose: 'Wybierz',

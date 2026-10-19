@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ru = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Документы (корень)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Папки',
   ufContentsLabel: 'Содержимое папки',
@@ -32,7 +32,7 @@ export const ru = {
   ufNoPermission: 'У вас нет прав на изменение этой папки.',
   ufEmptyFolder: 'Эта папка пуста',
   ufLocation: 'Расположение',
-  ufLocationRoot: 'UniWork (верхний уровень)',
+  ufLocationRoot: 'Документы (корень)',
   ufSameFolder: 'Та же папка, что и у оригинала',
   ufChooseLocation: 'Выбрать расположение',
   ufChoose: 'Выбрать',

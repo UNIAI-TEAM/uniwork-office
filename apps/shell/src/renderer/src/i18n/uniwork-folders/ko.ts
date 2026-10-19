@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ko = {
-  ufRoot: 'UniWork',
+  ufRoot: '문서(루트)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: '폴더',
   ufContentsLabel: '폴더 내용',
@@ -31,7 +31,7 @@ export const ko = {
   ufNoPermission: '이 폴더를 변경할 권한이 없습니다.',
   ufEmptyFolder: '이 폴더는 비어 있습니다',
   ufLocation: '위치',
-  ufLocationRoot: 'UniWork(최상위)',
+  ufLocationRoot: '문서(루트)',
   ufSameFolder: '원본과 같은 폴더',
   ufChooseLocation: '위치 선택',
   ufChoose: '선택',

@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const th = {
-  ufRoot: 'UniWork',
+  ufRoot: 'เอกสาร (รูท)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'โฟลเดอร์',
   ufContentsLabel: 'เนื้อหาโฟลเดอร์',
@@ -31,7 +31,7 @@ export const th = {
   ufNoPermission: 'คุณไม่มีสิทธิ์เปลี่ยนแปลงโฟลเดอร์นี้',
   ufEmptyFolder: 'โฟลเดอร์นี้ว่างเปล่า',
   ufLocation: 'ตำแหน่ง',
-  ufLocationRoot: 'UniWork (ระดับบนสุด)',
+  ufLocationRoot: 'เอกสาร (รูท)',
   ufSameFolder: 'โฟลเดอร์เดียวกับต้นฉบับ',
   ufChooseLocation: 'เลือกตำแหน่ง',
   ufChoose: 'เลือก',

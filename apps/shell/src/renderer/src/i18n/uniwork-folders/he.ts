@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const he = {
-  ufRoot: 'UniWork',
+  ufRoot: 'מסמכים (שורש)',
   ufTreeLabel: 'תיקיות',
   ufContentsLabel: 'תוכן התיקייה',
   ufRecent: 'אחרונים',
@@ -30,7 +30,7 @@ export const he = {
   ufNoPermission: 'אין לך הרשאה לשנות את התיקייה הזו.',
   ufEmptyFolder: 'התיקייה הזו ריקה',
   ufLocation: 'מיקום',
-  ufLocationRoot: 'UniWork (הרמה העליונה)',
+  ufLocationRoot: 'מסמכים (שורש)',
   ufSameFolder: 'אותה תיקייה כמו המקור',
   ufChooseLocation: 'בחירת מיקום',
   ufChoose: 'בחירה',

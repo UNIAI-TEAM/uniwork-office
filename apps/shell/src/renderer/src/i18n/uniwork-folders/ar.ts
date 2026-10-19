@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ar = {
-  ufRoot: 'UniWork',
+  ufRoot: 'المستندات (الجذر)',
   ufTreeLabel: 'المجلدات',
   ufContentsLabel: 'محتوى المجلد',
   ufRecent: 'الأخيرة',
@@ -30,7 +30,7 @@ export const ar = {
   ufNoPermission: 'ليس لديك إذن لتغيير هذا المجلد.',
   ufEmptyFolder: 'هذا المجلد فارغ',
   ufLocation: 'الموقع',
-  ufLocationRoot: 'UniWork (المستوى الأعلى)',
+  ufLocationRoot: 'المستندات (الجذر)',
   ufSameFolder: 'نفس مجلد المستند الأصلي',
   ufChooseLocation: 'اختيار موقع',
   ufChoose: 'اختيار',

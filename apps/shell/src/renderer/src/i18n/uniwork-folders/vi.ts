@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const vi = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Tài liệu (gốc)',
   ufTreeLabel: 'Thư mục',
   ufContentsLabel: 'Nội dung thư mục',
   ufRecent: 'Gần đây',
@@ -30,7 +30,7 @@ export const vi = {
   ufNoPermission: 'Bạn không có quyền thay đổi thư mục này.',
   ufEmptyFolder: 'Thư mục trống',
   ufLocation: 'Vị trí',
-  ufLocationRoot: 'UniWork (gốc)',
+  ufLocationRoot: 'Tài liệu (gốc)',
   ufSameFolder: 'Cùng thư mục với bản gốc',
   ufChooseLocation: 'Chọn vị trí',
   ufChoose: 'Chọn',

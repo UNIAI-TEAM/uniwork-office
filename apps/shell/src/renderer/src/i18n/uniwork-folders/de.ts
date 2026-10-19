@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const de = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Dokumente (Stamm)',
   ufTreeLabel: 'Ordner',
   ufContentsLabel: 'Ordnerinhalt',
   ufRecent: 'Zuletzt',
@@ -31,7 +31,7 @@ export const de = {
   ufNoPermission: 'Du hast keine Berechtigung, diesen Ordner zu ändern.',
   ufEmptyFolder: 'Dieser Ordner ist leer',
   ufLocation: 'Speicherort',
-  ufLocationRoot: 'UniWork (oberste Ebene)',
+  ufLocationRoot: 'Dokumente (Stamm)',
   ufSameFolder: 'Gleicher Ordner wie das Original',
   ufChooseLocation: 'Speicherort wählen',
   ufChoose: 'Auswählen',
