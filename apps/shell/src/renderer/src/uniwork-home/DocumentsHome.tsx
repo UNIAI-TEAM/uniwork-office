@@ -1087,7 +1087,7 @@ export function DocumentsHome({
   const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : t('ufNoResults', { query })
 
   const treeSelectedKey = useMemo(() => {
-    if (sidebarIdle) return ' none'
+    if (sidebarIdle) return '\u0000none'
     if (subView === 'my-folder' && resolvedMyFolderId) return resolvedMyFolderId
     if (subView === 'workspace') return folderId ?? ROOT_KEY
     return '\u0000none'
