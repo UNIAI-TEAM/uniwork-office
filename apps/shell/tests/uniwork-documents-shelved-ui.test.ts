@@ -230,7 +230,7 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
     )
     // the live views' quick-create row, filter bar and folder cards are not on the shelf
     expect(host.querySelector('.dh-quick-row')).toBeNull()
-    expect(host.querySelector('.dh-filter-bar')).toBeNull()
+    expect(host.querySelector('.dh-filter-bar:not([hidden])')).toBeNull()
     expect(host.querySelector('.dh-folders-section')).toBeNull()
     expect(host.querySelector('.dh-shelved-sort')?.textContent?.trim()).toBe('Lưu trữ gần nhất')
 

@@ -909,6 +909,16 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
     service.restoreDocument(documentId as string),
   )
+  // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf, Bỏ lưu trữ and trash from Lưu trữ
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listShelved, (_event, query: unknown) =>
+    service.listShelved((query ?? {}) as UniworkDocListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.unshelveDocument, (_event, documentId: unknown) =>
+    service.unshelveDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.trashShelvedDocument, (_event, documentId: unknown) =>
+    service.trashShelvedDocument(documentId as string),
+  )
   // FD-11: the folder-tree surface
   ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, (_event, workspaceId: unknown) =>
     service.folderTree(workspaceId as string),

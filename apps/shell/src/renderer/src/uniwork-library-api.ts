@@ -15,6 +15,7 @@ import type {
   UniworkSharedQuery,
   UniworkTreeChangedEvent,
 } from '../../shared/home-api'
+import type { UniworkDocShelveResult } from '../../shared/home-api'
 import type { DocNameError, NewDocFormat } from './uniwork-docs-model'
 
 /**
@@ -228,4 +229,31 @@ export function onDocRenamed(cb: (event: DocRenamedEvent) => void): () => void {
 /** SIZE-F1: save the bound document's working copy to a user-chosen local path */
 export function saveLocalCopy(path: string): Promise<boolean> {
   return actions().uniworkSaveLocalCopy?.(path) ?? Promise.resolve(false)
+}
+
+// ── UNI-1961: the Lưu trữ (Archive) shelf ───────────────
+// The shelf list itself is read through the Documents home adapter
+// (fetchDocumentsHomePage); these are its two row commands.
+
+interface ShelvedBridge {
+  uniworkUnshelveDocument?(documentId: string): Promise<DocActionResult<UniworkDocShelveResult>>
+  uniworkTrashShelvedDocument?(documentId: string): Promise<DocActionResult<UniworkDocSummary>>
+}
+
+function shelvedActions(): ShelvedBridge {
+  return window.aiOffice as unknown as ShelvedBridge
+}
+
+/** Bỏ lưu trữ: the item and its same-batch descendants the caller manages */
+export function unshelveDocument(
+  documentId: string,
+): Promise<DocActionResult<UniworkDocShelveResult>> {
+  return settleAct(shelvedActions().uniworkUnshelveDocument?.(documentId))
+}
+
+/** Chuyển vào thùng rác from Lưu trữ, for a shelved item of any kind */
+export function trashShelvedDocument(
+  documentId: string,
+): Promise<DocActionResult<UniworkDocSummary>> {
+  return settleAct(shelvedActions().uniworkTrashShelvedDocument?.(documentId))
 }

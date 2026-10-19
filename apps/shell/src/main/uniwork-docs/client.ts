@@ -42,6 +42,8 @@ import type {
   UploadSessionState,
 } from './parse'
 import { parseUploadSession, parseUploadSessionComplete } from './parse'
+import { parseDocumentManageRef, parseDocumentShelveResult, type DocumentManageRef } from './parse'
+import type { UniworkDocShelveResult } from '../../shared/home-api'
 
 /**
  * Main-process client for the UniWork documents routes this app uses, and
@@ -258,6 +260,20 @@ export interface UniworkDocsClient {
   archive(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /** restore an archived document (S18) */
   restore(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
+  /**
+   * UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (`shelved=true`,
+   * shelved_at DESC, the flat list's cursor); only the type filter applies
+   */
+  listShelved(input: {
+    workspaceId: string
+    cursor?: string
+    limit?: number
+    format?: UniworkDocFormat
+  }): Promise<DocumentListResult>
+  /** UNI-1961: the level fields of one document of any kind (folder/page/file) */
+  documentManageRef(documentId: string): Promise<DocumentManageRef>
+  /** UNI-1961: bring a shelved item (and its same-batch descendants the caller manages) back */
+  unshelve(documentId: string, idempotencyKey: string): Promise<UniworkDocShelveResult>
   /**
    * one page of org members (id + display name) for resolving the properties
    * panel's names; `cursor` is D's opaque `next_cursor` and `limit` is capped
@@ -965,6 +981,48 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         read: json,
       })
       return parseDocumentSummary(raw)
+    },
+
+    async listShelved(input) {
+      const params = new URLSearchParams()
+      params.set('shelved', 'true')
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      // the shelf never sends parent_id or archived (shelved+archived is 400)
+      applyListFilters(params, { format: input.format })
+      const ws = id(input.workspaceId)
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${ws}/documents`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async documentManageRef(documentId) {
+      const raw = await send({
+        method: 'GET',
+        route: `/documents/${id(documentId)}`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      const ref = parseDocumentManageRef(raw)
+      if (ref.id !== documentId) throw new UniworkDocError('malformed_response')
+      return ref
+    },
+
+    async unshelve(documentId, idempotencyKey) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/unshelve`,
+        idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentShelveResult(raw)
     },
 
     async listOrgMembers(input) {

@@ -103,6 +103,13 @@ import {
   type DocumentsHomeViewMode,
   type UpdatedByOption,
 } from './documents-home-model'
+import { trashShelvedDocument, unshelveDocument } from '../uniwork-library-api'
+import {
+  ShelvedTable,
+  ShelvedToolbar,
+  filterByShelver,
+  shelvedDescendantIds,
+} from './ShelvedDocumentsView'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
 
@@ -189,6 +196,24 @@ function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
           <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" />
           <polyline points="16 6 12 2 8 6" />
           <line x1="12" y1="2" x2="12" y2="15" />
+        </svg>
+      )
+    case 'archive':
+      // UNI-1961: the Lưu trữ shelf (an archive box)
+      return (
+        <svg
+          className="dh-nav-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="3" y="4" width="18" height="4" rx="1" />
+          <path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+          <path d="M10 12h4" />
         </svg>
       )
     case 'trash':
@@ -944,6 +969,66 @@ export function DocumentsHome({
     setToast({ message: key ? t(key) : t('uwDocActionFailed'), tone: 'error' })
   }
 
+  // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf's member filter and row commands.
+  // The filter narrows the loaded pages only (the server has no shelved_by).
+  const shelfView = subView === 'archive' && query.length === 0
+  const pageShown = page.status !== 'error' && (page.status === 'ready' || page.items.length > 0)
+  const [shelvedBy, setShelvedBy] = useState<string | null>(null)
+  useEffect(() => {
+    setShelvedBy(null)
+  }, [workspaceId, subView])
+  const [shelvedTrashTarget, setShelvedTrashTarget] = useState<DocumentsHomeDoc | null>(null)
+  // the ref answers a second click that lands before React re-renders
+  const unshelvingRef = useRef<Set<string>>(new Set())
+  const [unshelving, setUnshelving] = useState<ReadonlySet<string>>(() => new Set())
+  const trackUnshelving = (documentId: string, on: boolean) => {
+    if (on) unshelvingRef.current.add(documentId)
+    else unshelvingRef.current.delete(documentId)
+    setUnshelving(new Set(unshelvingRef.current))
+  }
+
+  const handleUnshelve = async (doc: DocumentsHomeDoc) => {
+    if (unshelvingRef.current.has(doc.id)) return
+    trackUnshelving(doc.id, true)
+    // the descendants a folder unshelve may leave are the rows shown BEFORE it
+    const left = doc.kind === 'folder' ? shelvedDescendantIds(doc, page.items) : new Set<string>()
+    const res = await unshelveDocument(doc.id)
+    trackUnshelving(doc.id, false)
+    if (res.ok) {
+      const title = res.value.document.title || doc.title
+      const base = t('uhShelvedToastUnshelved', { title })
+      const partial = [...left].some((id) => !res.value.affected.includes(id))
+      const message = partial ? `${base}. ${t('uhShelvedToastLeftShelved')}` : base
+      announce(message)
+      setToast({ message, tone: 'ok' })
+      refreshAll()
+      return
+    }
+    setToast({
+      message:
+        res.error === 'forbidden' ? t('uhShelvedNoPermission') : t('uhShelvedUnshelveFailed'),
+      tone: 'error',
+    })
+  }
+
+  const handleConfirmShelvedTrash = async () => {
+    const doc = shelvedTrashTarget
+    if (!doc) return
+    setShelvedTrashTarget(null)
+    const res = await trashShelvedDocument(doc.id)
+    if (res.ok) {
+      const message = t('uhShelvedToastTrashed', { title: res.value.title || doc.title })
+      announce(message)
+      setToast({ message, tone: 'ok' })
+      refreshAll()
+      return
+    }
+    setToast({
+      message: res.error === 'forbidden' ? t('uhShelvedNoPermission') : t('uhShelvedTrashFailed'),
+      tone: 'error',
+    })
+  }
+
   const treeMenuFor = (row: TreeRow): FolderMenuItem[] => {
     const items: FolderMenuItem[] = [
       {
@@ -1355,7 +1440,7 @@ export function DocumentsHome({
           </button>
         </div>
 
-        {subView !== 'trash' && (
+        {subView !== 'trash' && subView !== 'archive' && (
           <div className="dh-quick-row">
             <span className="dh-quick-label">{t('uhQuickCreate')}</span>
             {NEW_DOC_KINDS.map((kind) => (
@@ -1380,7 +1465,18 @@ export function DocumentsHome({
           </p>
         )}
 
-        <div className="dh-filter-bar">
+        {/* UNI-1961: the shelf has its own toolbar (type + Lưu trữ bởi + fixed sort) */}
+        {shelfView && (
+          <ShelvedToolbar
+            items={page.items}
+            format={filters.format}
+            onFormat={(format) => setFilters((prev) => ({ ...prev, format }))}
+            shelvedBy={shelvedBy}
+            onShelvedBy={setShelvedBy}
+          />
+        )}
+
+        <div className="dh-filter-bar" hidden={shelfView || undefined}>
           {subView !== 'shared-with-me' && (
             <>
               <label className="dh-filter-chip">
@@ -1571,7 +1667,26 @@ export function DocumentsHome({
           </div>
         )}
 
-        {page.status !== 'error' && (page.status === 'ready' || page.items.length > 0) && (
+        {shelfView && pageShown && (
+          <ShelvedTable
+            items={filterByShelver(page.items, shelvedBy)}
+            filtered={filters.format !== 'all' || shelvedBy !== null}
+            dateLocale={dateLocale}
+            openingId={openingId}
+            nextCursor={page.nextCursor}
+            loadingMore={page.loadingMore}
+            moreError={page.moreError}
+            onLoadMore={loadMore}
+            isUnshelving={(documentId) => unshelving.has(documentId)}
+            onOpen={(doc) => void openDoc(doc)}
+            onUnshelve={(doc) => void handleUnshelve(doc)}
+            onTrash={setShelvedTrashTarget}
+            openMenuId={openMenuId}
+            onOpenMenuChange={setOpenMenuId}
+          />
+        )}
+
+        {pageShown && !shelfView && (
           <>
             {folders.length > 0 && (
               <section className="dh-section dh-folders-section" aria-label={t('uhSectionFolders')}>
@@ -1877,6 +1992,14 @@ export function DocumentsHome({
           name={archiveTarget.title}
           onConfirm={() => void handleConfirmArchive()}
           onCancel={() => setArchiveTarget(null)}
+        />
+      )}
+
+      {shelvedTrashTarget && (
+        <ArchiveConfirm
+          name={shelvedTrashTarget.title}
+          onConfirm={() => void handleConfirmShelvedTrash()}
+          onCancel={() => setShelvedTrashTarget(null)}
         />
       )}
 

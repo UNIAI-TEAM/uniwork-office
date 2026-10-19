@@ -46,6 +46,7 @@ import type {
   UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
+import type { UniworkDocShelveResult } from '../../shared/home-api'
 import type {
   UniworkConflictAction,
   UniworkConflictIntentBlock,
@@ -6206,6 +6207,88 @@ export class UniworkDocsService {
       const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
       return { documents, nextCursor: page.nextCursor }
     })
+  }
+
+  /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (paged, shelved_at DESC) */
+  listShelved(q: {
+    workspaceId: string
+    cursor?: string
+    limit?: number
+    format?: UniworkDocFormat
+  }): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const { format } = this.listFiltersOf(q)
+      const page = await this.api().listShelved({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...(format ? { format } : {}),
+      })
+      const documents = await this.enrichShelvedRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /**
+   * UNI-1961: the updater and the shelver by name. An id the member list does
+   * not hold is a former member; with no member list at all nothing is
+   * guessed (the renderer shows "—").
+   */
+  private async enrichShelvedRows(
+    workspaceId: string,
+    rows: UniworkDocSummary[],
+  ): Promise<UniworkDocSummary[]> {
+    const names = await this.memberNamesForWorkspace(workspaceId)
+    if (names.size === 0) return rows
+    return rows.map((row) => {
+      const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
+      const shelvedByName = row.shelvedById ? names.get(row.shelvedById)?.trim() : undefined
+      return {
+        ...row,
+        ...(updatedByName ? { updatedByName } : {}),
+        ...(shelvedByName
+          ? { shelvedByName }
+          : row.shelvedById && !names.has(row.shelvedById)
+            ? { shelvedByFormer: true }
+            : {}),
+      }
+    })
+  }
+
+  /** UNI-1961: Bỏ lưu trữ, for a shelved item of any kind the caller manages */
+  unshelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId)
+      return this.api().unshelve(documentId, this.newIdempotencyKey())
+    })
+  }
+
+  /**
+   * UNI-1961: Chuyển vào thùng rác from Lưu trữ - the same trash route as
+   * `archiveDocument`, gated by the kind-agnostic manage read so a shelved
+   * folder or page can go too (`archiveDocument` itself stays file-only).
+   */
+  trashShelvedDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId)
+      const session = this.captureActionSession()
+      const archived = await this.api().archive(documentId, this.newIdempotencyKey())
+      await this.endFirstSaveRecords(session, documentId)
+      return archived
+    })
+  }
+
+  /** UNI-1961: manage (or admin_scope, the web's canManageTrashed) on a row of any kind */
+  private async requireManageAnyKind(documentId: string): Promise<void> {
+    const ref = await this.api().documentManageRef(documentId)
+    if (ref.myLevel !== 'manage' && !ref.adminScope) throw new UniworkDocError('forbidden')
   }
 
   openDocument(documentId: string): Promise<UniworkResult<{ path: string }>> {

@@ -44,6 +44,7 @@ export type DocumentsHomeDataSource =
   | 'shared-with-me'
   | 'shared-by-me'
   | 'trash'
+  | 'shelved'
   | 'none'
 
 export interface DocumentsHomeNavEntry {
@@ -99,8 +100,9 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
     id: 'archive',
     labelKey: 'uhNavArchive',
-    available: false,
-    source: 'none',
+    // UNI-1961: the Lưu trữ shelf (ARCHIVE-01), as the web's sidebar lists it
+    available: true,
+    source: 'shelved',
   },
   {
     id: 'trash',
@@ -373,6 +375,13 @@ export interface DocumentsHomeApiAdapter {
   uniworkListTrash?: (
     q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
   ) => Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-1961: the Lưu trữ shelf (only the type filter applies there) */
+  uniworkListShelved?: (q: {
+    workspaceId: string
+    cursor?: string
+    limit?: number
+    format?: UniworkDocFormat
+  }) => Promise<UniworkResult<UniworkDocListPage>>
 }
 
 function mapDocListPageResult(
@@ -508,5 +517,104 @@ export async function fetchDocumentsHomePage(
     }
   }
 
+  if (subView === 'archive') {
+    if (typeof api.uniworkListShelved !== 'function') {
+      return { result: { ok: true, value: { items: [], nextCursor: null } } }
+    }
+    // UNI-1961: the shelf takes the type filter only (the web sends `format`
+    // alone; the live views' updater/date filters never reach it)
+    const res = await api.uniworkListShelved({
+      workspaceId,
+      ...(cursor ? { cursor } : {}),
+      ...(filters.format ? { format: filters.format } : {}),
+    })
+    return {
+      result: mapDocListPageResult(res),
+    }
+  }
+
   return { result: { ok: true, value: { items: [], nextCursor: null } } }
+}
+
+// ── UNI-1961: the Lưu trữ (Archive) shelf ──────────────────────────────
+
+/** the "Lưu trữ bởi" value of rows shelved by nobody (`shelved_by` null) */
+export const SHELVED_BY_SYSTEM = ' system'
+/** the "Lưu trữ bởi" value of rows whose shelver left the workspace */
+export const SHELVED_BY_FORMER = ' former'
+
+/** the "Lưu trữ bởi" key of one row: a member id, former or system; null = unknown (no member list) */
+export function shelverKeyOf(doc: DocumentsHomeDoc): string | null {
+  if (!doc.shelvedById) return SHELVED_BY_SYSTEM
+  if (doc.shelvedByName?.trim()) return doc.shelvedById
+  if (doc.shelvedByFormer) return SHELVED_BY_FORMER
+  return null
+}
+
+/** the "Lưu trữ bởi" cell: the member's name, the former-member / system line, or null ("—") */
+export function shelverLabelOf(doc: DocumentsHomeDoc, t: TFunc): string | null {
+  const key = shelverKeyOf(doc)
+  if (key === SHELVED_BY_SYSTEM) return t('uhShelvedBySystem')
+  if (key === SHELVED_BY_FORMER) return t('uhShelvedByFormer')
+  return key ? (doc.shelvedByName?.trim() ?? null) : null
+}
+
+/**
+ * The "Lưu trữ bởi" options the loaded rows name, in first-seen order: the
+ * members, then one former-member entry, then the system (the web lists the
+ * same three groups; the shelf has no `shelved_by` parameter, so the filter
+ * narrows the loaded pages only).
+ */
+export function shelvedByOptionsOf(
+  docs: readonly DocumentsHomeDoc[],
+  t: TFunc,
+): readonly UpdatedByOption[] {
+  const members = new Map<string, string>()
+  let former = false
+  let system = false
+  for (const doc of docs) {
+    const key = shelverKeyOf(doc)
+    if (key === SHELVED_BY_SYSTEM) system = true
+    else if (key === SHELVED_BY_FORMER) former = true
+    else if (key && !members.has(key)) members.set(key, doc.shelvedByName!.trim())
+  }
+  return [
+    ...Array.from(members.entries()).map(([id, name]) => ({ id, name })),
+    ...(former ? [{ id: SHELVED_BY_FORMER, name: t('uhShelvedByFormer') }] : []),
+    ...(system ? [{ id: SHELVED_BY_SYSTEM, name: t('uhShelvedBySystem') }] : []),
+  ]
+}
+
+/** the web's canManageTrashed: `my_level` manage, or the admin_scope of a restricted row */
+export function canManageShelved(doc: DocumentsHomeDoc): boolean {
+  return doc.canManage === true || doc.myLevel === 'manage' || doc.adminScope === true
+}
+
+/**
+ * The web's `formatShortWhen` (D documents/document-format.ts): the time for
+ * today, else a short day (+ year when not this year); vi is written out
+ * dd/MM[/yyyy] because ICU versions disagree on its separator.
+ */
+export function formatShortWhen(
+  at: string | null | undefined,
+  locale: string,
+  now: Date = new Date(),
+): string {
+  if (!at) return ''
+  const date = new Date(at)
+  if (Number.isNaN(date.getTime())) return ''
+  const sameYear = date.getFullYear() === now.getFullYear()
+  if (sameYear && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()) {
+    return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date)
+  }
+  if (locale.toLowerCase().startsWith('vi')) {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const day = `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`
+    return sameYear ? day : `${day}/${date.getFullYear()}`
+  }
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  }).format(date)
 }

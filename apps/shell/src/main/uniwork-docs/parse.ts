@@ -1,5 +1,6 @@
 import type {
   UniworkDocFormat,
+  UniworkDocShelveResult,
   UniworkDocSummary,
   UniworkEntryKind,
   UniworkFolderNode,
@@ -239,6 +240,7 @@ function summaryRow(
     ...(path ? { path } : {}),
     ...(systemKindOf(row.system_kind) ? { systemKind: 'my_folder' as const } : {}),
     ...editLockOf(row.edit_lock),
+    ...shelvedFieldsOf(row),
   }
 }
 
@@ -814,4 +816,65 @@ export function parseRenamedTitle(raw: unknown): string | null {
   const doc = record(record(raw).document)
   const title = doc.title
   return typeof title === 'string' && title.length > 0 && title.length <= 512 ? title : null
+}
+
+/**
+ * UNI-1961 (ARCHIVE-01): the shelved pair and `admin_scope` a list row may
+ * carry. Lenient: an odd value drops the field, never the row (a null
+ * `shelved_by` is the system, so it stays absent too).
+ */
+function shelvedFieldsOf(
+  row: Record<string, unknown>,
+): Pick<UniworkDocSummary, 'shelvedAt' | 'shelvedById' | 'adminScope'> {
+  const at = row.shelved_at
+  const by = optId(row.shelved_by)
+  return {
+    ...(typeof at === 'string' && at.length > 0 && at.length <= 64 ? { shelvedAt: at } : {}),
+    ...(by ? { shelvedById: by } : {}),
+    ...(row.admin_scope === true ? { adminScope: true } : {}),
+  }
+}
+
+/**
+ * UNI-1961: what the kind-agnostic manage gate needs from `GET /documents/{id}`
+ * - a folder or page has no `file` block, so `parseDetail` cannot serve it.
+ */
+export interface DocumentManageRef {
+  id: string
+  kind: UniworkEntryKind
+  myLevel: string | null
+  adminScope: boolean
+}
+
+export function parseDocumentManageRef(raw: unknown): DocumentManageRef {
+  const doc = record(record(raw).document)
+  const kind = kindOf(doc.kind)
+  if (!kind) bad()
+  const myLevel = doc.my_level
+  if (myLevel !== undefined && myLevel !== null && typeof myLevel !== 'string') bad()
+  return {
+    id: str(doc.id, 128),
+    kind,
+    myLevel: typeof myLevel === 'string' ? myLevel : null,
+    adminScope: doc.admin_scope === true,
+  }
+}
+
+/**
+ * UNI-1961: the `{document, batch_id, affected}` answer of shelve/unshelve.
+ * The document fails closed like any summary; `affected` is lenient (an odd
+ * list reads as empty, an odd entry is dropped).
+ */
+export function parseDocumentShelveResult(raw: unknown): UniworkDocShelveResult {
+  const document = parseDocumentSummary(raw)
+  const affected = record(raw).affected
+  return {
+    document,
+    affected: Array.isArray(affected)
+      ? affected.filter(
+          (value): value is string =>
+            typeof value === 'string' && value.length > 0 && value.length <= 128,
+        )
+      : [],
+  }
 }

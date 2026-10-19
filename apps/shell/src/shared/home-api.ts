@@ -261,6 +261,32 @@ export interface UniworkDocSummary {
   path?: { id: string; title: string }[]
   /** EL-1(b): list-row edit_lock summary (DH-2); absent when the server sent none */
   editLock?: UniworkDocEditLock
+  /**
+   * UNI-1961 (ARCHIVE-01): the row sits in Lưu trữ (the server's `shelved_at`).
+   * Read leniently: an odd value drops the field, never the row.
+   */
+  shelvedAt?: string
+  /** UNI-1961: the server's `shelved_by` id; absent when null (the system shelved it) */
+  shelvedById?: string
+  /** UNI-1961: the shelver's display name, resolved by main from the workspace members */
+  shelvedByName?: string
+  /** UNI-1961: `shelved_by` names someone the workspace member list no longer holds */
+  shelvedByFormer?: boolean
+  /**
+   * UNI-1961: the server's `admin_scope` - a workspace admin on a restricted row
+   * administers it without a `my_level` (the web's canManageTrashed)
+   */
+  adminScope?: boolean
+}
+
+/**
+ * UNI-1961 (ARCHIVE-01): the answer of an unshelve or shelve - the item, and
+ * the ids the batch touched (a folder unshelve may leave descendants the
+ * caller does not manage on the shelf).
+ */
+export interface UniworkDocShelveResult {
+  document: UniworkDocSummary
+  affected: string[]
 }
 
 /** FD-11: the three entry kinds the folder tree holds */
@@ -1272,6 +1298,21 @@ export interface HomeApi {
   onUniworkTreeChanged(cb: (event: UniworkTreeChangedEvent) => void): () => void
   /** a document was renamed (here or elsewhere); returns an unsubscribe */
   onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void): () => void
+  /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf, shelved_at newest first (paged) */
+  uniworkListShelved(q: {
+    workspaceId: string
+    cursor?: string
+    limit?: number
+    format?: UniworkDocFormat
+  }): Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-1961: Bỏ lưu trữ - the item and its same-batch descendants the caller manages */
+  uniworkUnshelveDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<UniworkDocShelveResult>>
+  /** UNI-1961: Chuyển vào thùng rác from Lưu trữ (any kind: file, page or folder) */
+  uniworkTrashShelvedDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
@@ -1946,6 +1987,12 @@ export const UNIWORK_DOC_CHANNELS = {
   signOutPromptAnswer: 'uniwork-doc:sign-out-prompt-answer',
   /** invoke(path) -> save the bound working copy to a user-chosen local path ("Lưu bản sao về máy") */
   saveLocalCopy: 'uniwork-doc:save-local-copy',
+  /** invoke(q) -> the workspace's Lưu trữ shelf, shelved_at DESC (UNI-1961) */
+  listShelved: 'uniwork-doc:list-shelved',
+  /** invoke(documentId) -> Bỏ lưu trữ (UNI-1961) */
+  unshelveDocument: 'uniwork-doc:unshelve-document',
+  /** invoke(documentId) -> move a shelved item of any kind to the trash (UNI-1961) */
+  trashShelvedDocument: 'uniwork-doc:trash-shelved-document',
 } as const
 
 export const PROJECT_CHANNELS = {
