@@ -711,6 +711,15 @@ describe('S3 capability off, signed out, empty', () => {
     expect(host.textContent).not.toContain('.docx')
   })
 
+  it('UNI-1958 row 8: the vi tab, caption and empty state say "offline"', async () => {
+    await openS3(library({ rows: [] }))
+    expect(tabs().some((t) => t.textContent?.startsWith('Dùng offline'))).toBe(true)
+    expect(tabNamed('Dùng offline').getAttribute('aria-selected')).toBe('true')
+    expect(panel().querySelector('.sc-empty')!.textContent).toBe(
+      'Chưa có tài liệu nào dùng offline.',
+    )
+  })
+
   it('empty: uwOfflineEmpty under the usage line', async () => {
     await openS3(library({ rows: [] }))
     expect(panel().querySelector('.sc-empty')!.textContent).toBe(VI.uwOfflineEmpty)

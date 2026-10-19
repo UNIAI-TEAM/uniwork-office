@@ -16,7 +16,6 @@ export const ko = {
   usPickTitle: '저장 위치 선택',
   usBack: '이름 지정으로 돌아가기',
   usSearchFolders: '폴더 검색',
-  usSharedNote: '공유 폴더에 저장하면 문서는 해당 폴더의 권한을 따릅니다.',
   usChooseFolder: '"{folder}" 선택',
   usSelected: '선택됨',
   usRootBlocked: '폴더를 선택하세요',

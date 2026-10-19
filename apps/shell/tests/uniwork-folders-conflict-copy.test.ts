@@ -61,12 +61,12 @@ async function flush() {
   })
 }
 
-async function render(view: UniworkConflictView) {
+async function render(view: UniworkConflictView, lang: 'en' | 'vi' = 'en') {
   await act(async () => {
     root.render(
       createElement(
         LocaleProvider,
-        { initial: 'en' },
+        { initial: lang },
         createElement(UniworkConflictDialog, {
           view,
           onAct,
@@ -132,6 +132,20 @@ describe('Save a copy: Location (S5)', () => {
     expect(location.textContent).toBe('UniWork › Alpha')
     await click($('[data-conflict-action="save-copy-go"]'))
     expect(onAct).toHaveBeenCalledWith('s1', { kind: 'save-copy', stopAi: false })
+  })
+
+  it('UNI-1958 row 9: the root location reads as the web "Workspace root" (en)', async () => {
+    await render(makeView({ workspaceId: 'w1', parentId: null }))
+    await toSaveCopyStep()
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe('Workspace root')
+  })
+
+  it('UNI-1958 row 9: the root location reads as the web "Thư mục gốc của workspace" (vi)', async () => {
+    await render(makeView({ workspaceId: 'w1', parentId: null }), 'vi')
+    await toSaveCopyStep()
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe(
+      'Thư mục gốc của workspace',
+    )
   })
 
   it('a chosen folder goes out as targetFolder', async () => {

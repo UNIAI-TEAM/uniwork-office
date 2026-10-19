@@ -923,8 +923,8 @@ const tMain = createI18n({
     menuFile: 'Tệp',
     menuSectionNew: 'Mới',
     menuOpenInNewWindow: 'Mở trong cửa sổ mới',
-    uwOfflinePin: 'Dùng khi không có mạng',
-    uwOfflineUnpin: 'Bỏ dùng khi không có mạng',
+    uwOfflinePin: 'Lưu để dùng offline',
+    uwOfflineUnpin: 'Bỏ dùng offline',
     uwOfflineUnpinConfirm:
       'Bản tải về sẽ được xóa khỏi máy này. Nháp và lần lưu đang chờ được giữ lại.',
     uwOfflineUnpinShort: 'Bỏ ghim',

@@ -26,6 +26,7 @@ export const ja = {
   ufTooDeep: 'ドキュメントの階層は最大 {max} レベルです。',
   ufCycle: 'フォルダーをそれ自身やそのサブフォルダーに移動することはできません。',
   ufParentKind: 'フォルダーはルートか別のフォルダーの中にのみ置けます。',
+  ufNotShareable: 'フォルダーは共有できません。ドキュメントを個別に共有してください。',
   ufFolderGone: 'このフォルダーはもうここにありません。',
   ufFolderNoAccess: 'このフォルダーへのアクセス権がなくなりました。',
   ufNoPermission: 'このフォルダーを変更する権限がありません。',

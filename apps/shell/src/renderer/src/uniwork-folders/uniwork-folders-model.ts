@@ -406,6 +406,8 @@ export function folderActionFailure(
       return { key: 'ufCycle' }
     case 'document_parent_kind':
       return { key: 'ufParentKind' }
+    case 'folder_not_shareable':
+      return { key: 'ufNotShareable' }
     case 'forbidden':
     case 'permission_revoked':
       return { key: 'ufNoPermission' }
@@ -468,7 +470,7 @@ export function entryTitleOf(doc: UniworkDocSummary, label: string): string {
   return isMyFolder(doc) ? label : doc.title
 }
 
-/** rename / move / archive / share are offered on every row but My Folder (Q2) */
+/** rename / move / archive are offered on every row but My Folder (Q2) */
 export function folderEditActionsOffered(entry: { systemKind?: UniworkSystemKind }): boolean {
   return !isMyFolder(entry)
 }

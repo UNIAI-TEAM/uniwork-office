@@ -16,7 +16,6 @@ export const ru = {
   usPickTitle: 'Выберите место сохранения',
   usBack: 'Назад к имени',
   usSearchFolders: 'Поиск папок',
-  usSharedNote: 'При сохранении в общую папку документ получает права этой папки.',
   usChooseFolder: 'Выбрать «{folder}»',
   usSelected: 'Выбрано',
   usRootBlocked: 'Выберите папку',

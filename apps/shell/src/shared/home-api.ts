@@ -184,6 +184,9 @@ export type UniworkDocErrorCode =
   | 'document_too_deep'
   | 'document_cycle'
   | 'document_parent_kind'
+  // UNI-1975: the server's 422 `folder_not_shareable` - a folder can't be shared,
+  // only documents are (user-facing, never retried)
+  | 'folder_not_shareable'
   // the account's durable sync store could not be opened (locked keychain) or
   // refused the pending intent (budget full)
   | 'keystore_locked'
@@ -216,6 +219,20 @@ export interface UniworkWorkspaceRef {
   myRole: string | null
 }
 
+/**
+ * UNI-1958 row 1: the server's list-row `share_scope` (who reaches the
+ * document), carried unchanged from the main parse to the Access cell.
+ */
+export interface UniworkDocShareScope {
+  homeWorkspace: boolean
+  /** live direct grants to people */
+  users: number
+  /** live direct grants to other workspaces */
+  workspaces: number
+  organization: boolean
+  publicLink: boolean
+}
+
 export interface UniworkDocSummary {
   id: string
   workspaceId: string
@@ -229,6 +246,8 @@ export interface UniworkDocSummary {
   visibility?: 'private' | 'workspace' | 'restricted'
   /** DESKTOP-HOME: server `my_level`; absent when omitted or unknown */
   myLevel?: 'view' | 'comment' | 'edit' | 'manage'
+  /** UNI-1958 row 1: server `share_scope`; absent when omitted (agent callers) or malformed */
+  shareScope?: UniworkDocShareScope
   /** shared-with-me rows only: the workspace the share lives in (name resolved by main) */
   workspaceName?: string
   /**
