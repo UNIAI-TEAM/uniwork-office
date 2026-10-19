@@ -1445,6 +1445,11 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
 
     win.answers[0]!('continue')
     await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
+    // the first save settles before the next one starts (a Save that lands while one is
+    // finishing is the coordinator's own coalescing, not what this test is about)
+    await vi.waitFor(() => expect(ctx.statuses.at(-1)).toMatchObject({ state: 'saved' }), {
+      timeout: 8000,
+    })
 
     // a second save never asks
     writeFileSync(doc.path, 'bytes v3')
