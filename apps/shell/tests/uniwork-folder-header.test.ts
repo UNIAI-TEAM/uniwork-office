@@ -326,10 +326,43 @@ describe('UNI-1979 open-folder header: one row, the folder name once', () => {
     expect(container, 'an @container (min-width: 60rem) rule').not.toBeNull()
     const inline = ruleBody(container?.[1] ?? '', '.dh-toolbar-folder .dh-search-box')
     expect(inline).toMatch(/order:\s*0\b/)
-    expect(inline).toMatch(/flex:\s*0\s+0\s+auto/)
-    expect(inline).toMatch(/width:\s*14rem/)
+    expect(inline).toMatch(/flex:\s*0\s+1\s+auto/)
+    // V1979-2: the inline search is 14rem at most and gives room back down to 12rem
+    expect(inline).toMatch(/width:\s*clamp\(12rem,\s*18cqw,\s*14rem\)/)
+    expect(inline).toMatch(/min-width:\s*12rem/)
     // never a viewport media query for the search position: the sidebars decide the width
     expect(homeCss).not.toMatch(/@media[^{]*\{\s*\.dh-toolbar-folder \.dh-search-box/)
+  })
+
+  it('CSS: the crumbs box never shrinks below the sum of its children floors (V1979-1)', () => {
+    const crumbs = ruleBody(homeCss, '.dh-toolbar-folder > .uwf-crumbs')
+    // the box floor = home 2.25rem + ancestors 2.5rem each + leaf (2.5rem + 60px pencil/menu
+    // reserve) + the ol's 2px gaps, by crumb count; min-width: 0 let the children overflow
+    // under the workspace select
+    expect(crumbs).not.toMatch(/min-width:\s*0\b/)
+    expect(crumbs).toMatch(/min-width:\s*calc\(2\.25rem \+ 2\.5rem \+ 60px \+ 2px\)/)
+    const floor = (css: string, n: number): string =>
+      ruleBody(css, `.dh-toolbar.dh-toolbar-folder > .uwf-crumbs:has(li:nth-child(${n}))`)
+    expect(floor(foldersCss, 3)).toMatch(/min-width:\s*calc\(2\.25rem \+ 5rem \+ 60px \+ 4px\)/)
+    expect(floor(foldersCss, 4)).toMatch(/min-width:\s*calc\(2\.25rem \+ 7\.5rem \+ 60px \+ 6px\)/)
+    // coarse pointer: the leaf reserves 92px, so every floor grows by 32px
+    const coarse =
+      foldersCss.match(/@media\s*\(\s*pointer:\s*coarse\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(ruleBody(coarse, '.dh-toolbar.dh-toolbar-folder > .uwf-crumbs')).toMatch(
+      /min-width:\s*calc\(2\.25rem \+ 2\.5rem \+ 92px \+ 2px\)/,
+    )
+    expect(floor(coarse, 3)).toMatch(/min-width:\s*calc\(2\.25rem \+ 5rem \+ 92px \+ 4px\)/)
+    expect(floor(coarse, 4)).toMatch(/min-width:\s*calc\(2\.25rem \+ 7\.5rem \+ 92px \+ 6px\)/)
+  })
+
+  it('CSS: the workspace select gives room back before the crumbs and the search do (V1979-1, V1979-2)', () => {
+    // a share of the row (cqw), floored at 96px and capped at 220px: 20cqw while the search has its
+    // own row, 14cqw once the search is inline
+    const select = ruleBody(homeCss, '.dh-toolbar-folder .dh-ws-select')
+    expect(select).toMatch(/max-width:\s*clamp\(96px,\s*20cqw,\s*220px\)/)
+    const container = homeCss.match(/@container\s*\(\s*min-width:\s*60rem\s*\)\s*\{([\s\S]*?)\n\}/)
+    const inline = ruleBody(container?.[1] ?? '', '.dh-toolbar-folder .dh-ws-select')
+    expect(inline).toMatch(/max-width:\s*clamp\(96px,\s*14cqw,\s*220px\)/)
   })
 
   it('CSS: no raw colour is added', () => {
