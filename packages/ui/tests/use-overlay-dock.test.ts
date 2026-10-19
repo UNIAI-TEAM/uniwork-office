@@ -261,7 +261,7 @@ describe('useOverlayDock', () => {
     await settle()
     key('Tab', {}, document.body)
     expect(dock().contains(document.activeElement)).toBe(false)
-    // the app passes open=false while the frame hides the dock: no dialog semantics at all
+    // the panel hands the hook open=false while the frame hides the dock (apps pass dockHidden): no dialog semantics at all
     render(false)
     expect(dock().getAttribute('role')).toBeNull()
     expect(dock().hasAttribute('data-overlay-dock')).toBe(false)
