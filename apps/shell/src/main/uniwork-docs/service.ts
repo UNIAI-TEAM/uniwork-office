@@ -358,10 +358,16 @@ export interface UniworkDocsServiceDeps {
   /**
    * UNI-1959: ask the shell renderer for the "Name the document" dialog on the
    * first save of a blank-created document and wait for its verdict:
-   * `continue` (named / moved / unchanged: the save goes on) or `cancel` (no
-   * save). Absent = the save never asks (a build without the dialog host).
+   * `continue` (named / moved / unchanged: the save goes on), `cancel` (no
+   * save) or `unavailable` (no dialog host was ever up: the save goes on, but
+   * nothing was confirmed). Absent = the save never asks (a build without the
+   * dialog host).
    */
-  requestFirstSaveName?(request: UniworkFirstSaveNameRequest): Promise<'continue' | 'cancel'>
+  requestFirstSaveName?(
+    request: UniworkFirstSaveNameRequest,
+  ): Promise<'continue' | 'cancel' | 'unavailable'>
+  /** UNI-1959: takes a pending ask back (its tab closed, its session ended): cancel + drop its dialog */
+  dismissFirstSaveName?(requestId: string): void
   /**
    * EL-1(b) fix6 (VEL-2): broadcast `{ path }` on `uniwork:doc-state-changed`
    * when `isReadOnly(path)` or `isBound(path)` may have changed.
@@ -506,6 +512,16 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
  * never reaches the user-save hook.
  */
 export const CLOSE_SAVE_WAIT_MS = 30_000
+
+/** UNI-1959: one first-save naming operation (see `firstSaveOps`) */
+interface FirstSaveOp {
+  /** the session that started it: its identity and epoch are revalidated before every step */
+  session: { identity: SessionIdentity; epoch: number }
+  documentId: string
+  /** the id of the ask pushed to the renderer, once there is one (dismissed with it) */
+  requestId: string | null
+  cancelled: boolean
+}
 
 /** back-off before a failed last-account.json write is retried */
 const LAST_OWNER_RETRY_MS = 2000
@@ -1144,15 +1160,22 @@ export class UniworkDocsService {
    */
   private readonly selfRenamed = new Map<string, string>()
   /**
-   * UNI-1959: documents this app created blank (`createDocument`) and has not
-   * had a first save for yet; their first user save asks name + folder. A
-   * document the dialog already answered is in `firstSaveNamed` instead.
+   * UNI-1959: documents this app created blank from the menu / strip / default
+   * name (`createDocument`) and has not had a first save for yet; their first
+   * user save asks name + folder. Keyed by account + document
+   * (`firstSaveKeyOf`), and emptied at every session boundary. A document the
+   * dialog already answered is in `firstSaveNamed` instead.
    */
   private readonly createdBlank = new Set<string>()
-  /** UNI-1959: documents whose "Name the document" step was answered this session (never asked twice) */
+  /** UNI-1959: documents whose "Name the document" step the person answered this session (never asked twice) */
   private readonly firstSaveNamed = new Set<string>()
-  /** UNI-1959: a first-save ask in flight, by path key (a second save while it is open is covered by it) */
-  private readonly firstSaveAsking = new Set<string>()
+  /**
+   * UNI-1959: the naming operation in flight per path key - the metadata read,
+   * the pushed ask and the held save are one unit owned by the session that
+   * started it. A second Save while it is open only waits; a closed tab or a
+   * session boundary cancels it.
+   */
+  private readonly firstSaveOps = new Map<string, FirstSaveOp>()
   /**
    * G5-03a (S6): the bar of each path as this session knows it, keyed by path.
    * An entry (even `null`, an explicitly hidden bar) is authoritative over the
@@ -1543,6 +1566,8 @@ export class UniworkDocsService {
     const droppedPaths: string[] = []
     for (const path of paths) {
       if (typeof path !== 'string' || !path) continue
+      // UNI-1959: a name dialog still open for a closed tab is dismissed with it
+      this.cancelFirstSaveFor(path)
       const key = pathKey(path)
       const session = this.editLocks.get(key)
       if (!session) continue
@@ -3096,6 +3121,7 @@ export class UniworkDocsService {
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.sessionEpoch += 1
+    this.endFirstSaveNaming()
     this.deps.stopRuntime?.()
     if (this.queueSession) {
       this.stoppingQueueSessions.add(this.queueSession.id)
@@ -3836,11 +3862,13 @@ export class UniworkDocsService {
       this.sessionOrgId = orgId
       if (prevOrgId !== null && prevOrgId !== orgId) {
         this.sessionEpoch += 1
+        this.endFirstSaveNaming()
       }
     } else if (orgGone) {
       this.sessionOrgId = null
       if (prevOrgId !== null) {
         this.sessionEpoch += 1
+        this.endFirstSaveNaming()
       }
     } else if (this.sessionOrgId === undefined) {
       this.sessionOrgId = prevOrgId
@@ -4214,21 +4242,37 @@ export class UniworkDocsService {
     // hold (BE-2). While it is open the edits the module just wrote are unsent
     // work, so the copy stays dirty (BE-1) and a second Save only waits.
     const key = pathKey(doc.path)
-    if (this.firstSaveAsking.has(key)) {
+    if (this.firstSaveOps.has(key)) {
       this.editorDirty.add(doc.path)
       return
     }
-    if (this.wantsFirstSaveName(doc)) {
-      this.firstSaveAsking.add(key)
+    const session = this.wantsFirstSaveName(doc) ? this.captureActionSessionOrNull() : null
+    if (session) {
+      const op: FirstSaveOp = {
+        session,
+        documentId: doc.binding.documentId,
+        requestId: null,
+        cancelled: false,
+      }
+      this.firstSaveOps.set(key, op)
       this.editorDirty.add(doc.path)
-      void this.askFirstSaveName(doc)
-        .then((answer) => {
-          if (answer === 'continue') {
-            this.editorDirty.delete(doc.path)
-            this.saveAfterFirstSaveName(path)
-          }
-        })
-        .finally(() => this.firstSaveAsking.delete(key))
+      void this.askFirstSaveName(op, doc).then((answer) => {
+        const live = this.firstSaveOpLive(op)
+        if (this.firstSaveOps.get(key) === op) this.firstSaveOps.delete(key)
+        // a verdict that lands after the tab closed or the session ended resumes nothing
+        if (!live) return
+        if (answer === 'cancel') {
+          this.afterFirstSaveCancelled(path)
+          return
+        }
+        // only the person's own verdict marks the document named: an unavailable
+        // dialog host (nobody was asked) leaves the next Save to ask
+        if (answer === 'continue') this.markFirstSaveNamed(op)
+        const now = this.store.lookup(path)
+        if (!now || now.binding.documentId !== op.documentId || !this.ownsLocally(now)) return
+        this.editorDirty.delete(now.path)
+        this.saveAfterFirstSaveName(path)
+      })
       return
     }
     this.saveAfterFirstSaveName(path)
@@ -4246,51 +4290,115 @@ export class UniworkDocsService {
 
   /**
    * UNI-1959 (the web's first-save-naming predicate): a document never saved -
-   * created blank by this app in this session, or, after a restart, file
-   * version 1 with one of the default blank titles - and not yet asked. A
-   * detached editor window has no dialog host, so it never asks.
+   * file version 1 - that this app created blank from the menu in this session
+   * or, after a restart, that still carries one of the default blank titles,
+   * and has not been asked yet. Version 1 is the one invariant: a document that
+   * reached version 2 by any save (a detached window, the chip) is never asked.
+   * A detached editor window has no dialog host, so it never asks.
    */
   private wantsFirstSaveName(doc: BoundDocument): boolean {
     if (!this.deps.requestFirstSaveName) return false
     if (this.deps.isShellTab?.(doc.path) === false) return false
-    const id = doc.binding.documentId
-    if (this.firstSaveNamed.has(id)) return false
-    return (
-      this.createdBlank.has(id) ||
-      (doc.binding.baseVersion === 1 && isBlankDefaultTitle(doc.binding.title))
-    )
+    const key = this.firstSaveKeyOf(doc.binding.documentId)
+    if (!key) return false
+    if (doc.binding.baseVersion !== 1) {
+      this.createdBlank.delete(key)
+      return false
+    }
+    if (this.firstSaveNamed.has(key)) return false
+    return this.createdBlank.has(key) || isBlankDefaultTitle(doc.binding.title)
+  }
+
+  /** `firstSaveNamed` / `createdBlank` are keyed by account too: a shared document is another account's own question */
+  private firstSaveKeyOf(documentId: string): string | null {
+    const identity = this.deps.identity()
+    return identity ? `${identity.deploymentId}/${identity.accountId}/${documentId}` : null
+  }
+
+  private markFirstSaveNamed(op: FirstSaveOp): void {
+    const key = this.firstSaveKeyOf(op.documentId)
+    if (!key) return
+    this.firstSaveNamed.add(key)
+    this.createdBlank.delete(key)
+  }
+
+  /** the operation may still act: not cancelled, and its session is the live one */
+  private firstSaveOpLive(op: FirstSaveOp): boolean {
+    return !op.cancelled && this.sessionLive(op.session)
+  }
+
+  /** cancel one operation and take its dialog off the renderer's queue */
+  private cancelFirstSaveOp(op: FirstSaveOp): void {
+    if (op.cancelled) return
+    op.cancelled = true
+    for (const [key, held] of this.firstSaveOps) if (held === op) this.firstSaveOps.delete(key)
+    if (op.requestId) {
+      try {
+        this.deps.dismissFirstSaveName?.(op.requestId)
+      } catch {
+        // the dialog host is gone with the window; there is nothing to drop
+      }
+    }
+  }
+
+  /** a tab or window of `path` is gone: its naming operation goes with it */
+  private cancelFirstSaveFor(path: string): void {
+    const op = this.firstSaveOps.get(pathKey(path))
+    if (op) this.cancelFirstSaveOp(op)
+  }
+
+  /** a session boundary: every operation is cancelled and dismissed, and nothing remembered about naming survives */
+  private endFirstSaveNaming(): void {
+    for (const op of [...this.firstSaveOps.values()]) this.cancelFirstSaveOp(op)
+    this.firstSaveOps.clear()
+    this.createdBlank.clear()
+    this.firstSaveNamed.clear()
+  }
+
+  /**
+   * The person gave up naming: nothing is sent and the edits the editor wrote
+   * stay unsent work. The chip is published so a waiting close attempt hears it.
+   */
+  private afterFirstSaveCancelled(path: string): void {
+    const doc = this.store.lookup(path)
+    if (!doc || !this.ownsLocally(doc)) return
+    this.editorDirty.add(doc.path)
+    this.publish(this.statusOf(doc))
+    void this.refreshDirty(doc).catch(() => undefined)
   }
 
   /**
    * Reads where the document sits now, asks the renderer for the dialog and
-   * answers its verdict. An unreadable document (offline, gone) or a missing /
-   * failing dialog host never blocks the save: it answers `continue` without
-   * marking the document named, so the next save asks again.
+   * answers its outcome. Every step is revalidated against the session that
+   * started the operation: metadata that lands after a sign-out, an account or
+   * organization change, or after the tab closed is never shown. An unreadable
+   * document (offline, gone) or a missing / failing dialog host is
+   * `unavailable`: the save is not blocked, but nothing was confirmed.
    */
-  private async askFirstSaveName(doc: BoundDocument): Promise<'continue' | 'cancel'> {
-    const id = doc.binding.documentId
+  private async askFirstSaveName(
+    op: FirstSaveOp,
+    doc: BoundDocument,
+  ): Promise<'continue' | 'cancel' | 'unavailable'> {
     let ref: DocumentRef
     try {
-      ref = await this.api().documentRef(id)
+      ref = await this.api().documentRef(op.documentId)
     } catch {
-      return 'continue'
+      return 'unavailable'
     }
+    if (!this.firstSaveOpLive(op)) return 'cancel'
+    const requestId = `fsn-${randomUUID()}`
+    op.requestId = requestId
     try {
-      const answer = await this.deps.requestFirstSaveName!({
-        requestId: `fsn-${randomUUID()}`,
+      return await this.deps.requestFirstSaveName!({
+        requestId,
         path: doc.path,
-        documentId: id,
+        documentId: op.documentId,
         workspaceId: ref.workspaceId || doc.binding.workspaceId,
         title: ref.title,
         parentId: ref.parentId,
       })
-      if (answer === 'continue') {
-        this.firstSaveNamed.add(id)
-        this.createdBlank.delete(id)
-      }
-      return answer
     } catch {
-      return 'continue'
+      return 'unavailable'
     }
   }
 
@@ -4526,21 +4634,24 @@ export class UniworkDocsService {
     return session
   }
 
+  /** the session that started an async action is still the live one (same epoch, same device session) */
+  private sessionLive(started: { identity: SessionIdentity; epoch: number }): boolean {
+    if (this.sessionEpoch !== started.epoch) return false
+    const current = this.deps.identity()
+    const owner = started.identity
+    return (
+      !!current &&
+      current.accountId === owner.accountId &&
+      current.deploymentId === owner.deploymentId &&
+      current.deviceSessionId === owner.deviceSessionId
+    )
+  }
+
   private pushTreeChangedFor(
     started: { identity: SessionIdentity; epoch: number },
     workspaceId: string,
   ): void {
-    if (this.sessionEpoch !== started.epoch) return
-    const current = this.deps.identity()
-    const owner = started.identity
-    if (
-      !current ||
-      current.accountId !== owner.accountId ||
-      current.deploymentId !== owner.deploymentId ||
-      current.deviceSessionId !== owner.deviceSessionId
-    ) {
-      return
-    }
+    if (!this.sessionLive(started)) return
     this.deps.pushTreeChanged?.({ workspaceId })
   }
 
@@ -4613,8 +4724,12 @@ export class UniworkDocsService {
           ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
-        // UNI-1959: never saved yet - its first user save asks name + folder
-        this.createdBlank.add(created.id)
+        // UNI-1959: a default-named blank (the menu / strip) is never saved yet - its
+        // first user save asks name + folder. A document the person named in the
+        // retained dialog is placed already and never asks (BE-6); a response that
+        // lands after the session ended marks nothing (BE-9).
+        const marked = isBlankDefaultTitle(name) ? this.firstSaveKeyOf(created.id) : null
+        if (marked && this.sessionLive(session)) this.createdBlank.add(marked)
         // FD-11: a new document changes the folder's contents for every view
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
@@ -6323,7 +6438,7 @@ export class UniworkDocsService {
         doc.binding.state === 'dirty' ||
         this.editorDirty.has(doc.path) ||
         // UNI-1959: the bytes the editor saved while the name dialog is open are not sent yet
-        this.firstSaveAsking.has(pathKey(doc.path)) ||
+        this.firstSaveOps.has(pathKey(doc.path)) ||
         editor.dirty === true,
       aiRunning: editor.aiRunning,
       queue: record && !isTerminalQueueState(record.state) ? record.state : null,
@@ -6915,8 +7030,17 @@ export class UniworkDocsService {
       const listener = (status: UniworkDocStatus) => {
         if (status.path === path && !ignore.has(status.state)) finish(status)
       }
-      const timer = setTimeout(() => finish(null), timeoutMs)
-      ;(timer as { unref?: () => void }).unref?.()
+      let timer: ReturnType<typeof setTimeout>
+      const arm = () => {
+        timer = setTimeout(() => {
+          // UNI-1959: a person still naming the document is not a stalled upload -
+          // the settlement deadline starts once the dialog is answered
+          if (this.firstSaveOps.has(pathKey(path))) arm()
+          else finish(null)
+        }, timeoutMs)
+        ;(timer as { unref?: () => void }).unref?.()
+      }
+      arm()
       finish = (status) => {
         clearTimeout(timer)
         this.statusListeners.delete(listener)
