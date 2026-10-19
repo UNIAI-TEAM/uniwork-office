@@ -46,6 +46,7 @@ export const nl = {
   collabDeleteConfirm: 'Definitief verwijderen',
   collabDeleted: 'Deze inhoud is verwijderd',
   collabEdited: 'Bewerkt · {time}',
+  collabEditedMark: '(bewerkt)',
   collabFormerMember: 'Voormalig lid',
   collabHistory: 'Bewerkingsgeschiedenis bekijken',
   collabHistoryTitle: 'Bewerkingsgeschiedenis',

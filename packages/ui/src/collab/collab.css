@@ -472,11 +472,21 @@ h3.collab-cmh {
   white-space: nowrap;
 }
 
+.collab-cmh .collab-edited {
+  color: var(--text-secondary);
+}
+
 .collab-dt {
   margin-left: auto;
   color: var(--text-secondary);
   flex: none;
   white-space: nowrap;
+}
+
+/* in the collab thread the time sits in the head row before the (edited) mark (web order);
+   standalone in-file comment lists keep the right-aligned date via .collab-dt's own margin */
+.collab-thread .collab-dt {
+  margin-left: 0;
 }
 
 .collab-bd {

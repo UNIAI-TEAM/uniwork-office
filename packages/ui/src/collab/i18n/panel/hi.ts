@@ -45,6 +45,7 @@ export const hi = {
   collabDeleteConfirm: 'हमेशा के लिए हटाएँ',
   collabDeleted: 'यह सामग्री हटा दी गई है',
   collabEdited: 'संपादित · {time}',
+  collabEditedMark: '(संपादित)',
   collabFormerMember: 'पूर्व सदस्य',
   collabHistory: 'संपादन इतिहास देखें',
   collabHistoryTitle: 'संपादन इतिहास',

@@ -48,6 +48,7 @@ export const it = {
   collabDeleteConfirm: 'Elimina definitivamente',
   collabDeleted: 'Questo contenuto è stato eliminato',
   collabEdited: 'Modificato · {time}',
+  collabEditedMark: '(modificato)',
   collabFormerMember: 'Ex membro',
   collabHistory: 'Visualizza cronologia modifiche',
   collabHistoryTitle: 'Cronologia modifiche',

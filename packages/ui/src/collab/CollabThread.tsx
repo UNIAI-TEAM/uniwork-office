@@ -640,6 +640,7 @@ function CollabThreadImpl(p: CollabThreadProps) {
 
   const renderItem = (c: CollabComment, isRoot: boolean) => {
     const deleted = !!c.deleted_at
+    const edited = (c.revision ?? 1) > 1
     const authorId = isRoot ? rootAuthorId : `${base}a-${c.id}`
     const headRow = deleted ? null : (
       <>
@@ -649,11 +650,13 @@ function CollabThreadImpl(p: CollabThreadProps) {
         <span className="collab-au" id={authorId}>
           {nameOf(c)}
         </span>
-        {(c.revision ?? 1) > 1 && (
+        <span className="collab-dt">{fmt(c.created_at)}</span>
+        {edited && editing !== c.id && (
           <button
             type="button"
-            className="collab-link"
+            className="collab-link collab-edited"
             aria-expanded={historyFor === c.id}
+            title={format(strings.collabEdited ?? '', { time: fmt(c.updated_at) })}
             onClick={(e) => {
               if (historyFor === c.id) {
                 setHistoryFor(null)
@@ -663,10 +666,9 @@ function CollabThreadImpl(p: CollabThreadProps) {
               setHistoryFor(c.id)
             }}
           >
-            {format(strings.collabEdited ?? '', { time: fmt(c.updated_at) })}
+            {strings.collabEditedMark}
           </button>
         )}
-        <span className="collab-dt">{fmt(c.created_at)}</span>
       </>
     )
     const asHeading = isRoot && !comment
@@ -699,14 +701,18 @@ function CollabThreadImpl(p: CollabThreadProps) {
               ]
             : []),
           { key: 'copy', label: strings.collabCopyText ?? '', onSelect: () => copyText(c.body) },
-          {
-            key: 'history',
-            label: strings.collabHistory ?? '',
-            onSelect: () => {
-              openerRef.current = menuRef.current
-              setHistoryFor(c.id)
-            },
-          },
+          ...(edited
+            ? [
+                {
+                  key: 'history',
+                  label: strings.collabHistory ?? '',
+                  onSelect: () => {
+                    openerRef.current = menuRef.current
+                    setHistoryFor(c.id)
+                  },
+                },
+              ]
+            : []),
         ]
     return (
       <div className={isRoot ? 'collab-cm' : 'collab-cm collab-cm--reply'} data-comment-id={c.id}>
@@ -799,7 +805,7 @@ function CollabThreadImpl(p: CollabThreadProps) {
             )}
           </div>
         )}
-        {historyFor === c.id && (
+        {edited && historyFor === c.id && (
           <History
             comment={c}
             strings={strings}

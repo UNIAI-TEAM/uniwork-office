@@ -52,6 +52,7 @@ export const zh = {
   collabDeleteConfirm: '永久删除',
   collabDeleted: '此内容已被删除',
   collabEdited: '已编辑 · {time}',
+  collabEditedMark: '(已编辑)',
   collabFormerMember: '前成员',
   collabHistory: '查看编辑历史',
   collabHistoryTitle: '编辑历史',

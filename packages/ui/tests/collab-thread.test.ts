@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { format } from '@genoffice/i18n'
 import { CollabComposer } from '../src/collab/CollabComposer'
 import { CollabPanel } from '../src/collab/CollabPanel'
+import { formatCollabTime } from '../src/collab/CollabThread'
 import { useCollabThreads, type CollabController } from '../src/collab/use-collab-threads'
 import type { CollabHostState, CollabSource } from '../src/collab/types'
 import { COLLAB_LIVE_REGION_ID } from '../src/collab/live-region'
@@ -102,7 +104,7 @@ describe('tombstone', () => {
 
 describe('actions menu', () => {
   it('opens with focus on the first item; Esc closes and returns focus', async () => {
-    const src = fakeSource(list([cm({ id: 'a', author_id: 'me' })]))
+    const src = fakeSource(list([cm({ id: 'a', author_id: 'me', revision: 2 })]))
     await mount(src)
     const menu = await openMenu('a')
     const items = [...menu.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent)
@@ -115,13 +117,12 @@ describe('actions menu', () => {
     expect(document.activeElement?.getAttribute('aria-haspopup')).toBe('menu')
   })
 
-  it('view only keeps copy + history, hides edit/delete/reply/resolve', async () => {
+  it('view only keeps copy, hides edit/delete/reply/resolve and history on an unedited post', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me' })]))
     await mount(src, host({ level: 'view' }))
     const menu = await openMenu('a')
     expect([...menu.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent)).toEqual([
       EN.collabCopyText,
-      EN.collabHistory,
     ])
     expect(btn(EN.collabReply, el)).toBeUndefined()
     expect(btn(EN.collabResolve, el)).toBeUndefined()
@@ -263,13 +264,11 @@ describe('history', () => {
     created_at: '2026-10-12T09:00:00Z',
   })
 
-  it('opens from Edited, newest first after Current version; closing returns focus', async () => {
+  it('opens from the (edited) mark, newest first after Current version; closing returns focus', async () => {
     const src = fakeSource(list([cm({ id: 'a', revision: 3, body: 'three' })]))
     src.revisions.mockResolvedValueOnce({ revisions: [rev(1, 'one'), rev(2, 'two')] })
     await mount(src, host({ level: 'view' }))
-    const edited = [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
-      b.textContent?.startsWith('Edited · '),
-    )!
+    const edited = btn(EN.collabEditedMark, el)!
     edited.focus()
     await click(edited)
     const hist = $('.collab-hist')!
@@ -286,7 +285,7 @@ describe('history', () => {
   })
 
   it('empty -> sentence; error -> sentence + retry', async () => {
-    const src = fakeSource(list([cm({ id: 'a' })]))
+    const src = fakeSource(list([cm({ id: 'a', revision: 2 })]))
     await mount(src)
     await click(btn(EN.collabHistory, await openMenu('a')))
     expect($('.collab-hist')!.textContent).toContain(EN.collabHistoryEmpty)
@@ -300,7 +299,7 @@ describe('history', () => {
   })
 
   it('tombstone (409 comment_deleted) -> no history, the deleted frame shows', async () => {
-    const src = fakeSource(list([cm({ id: 'a' })]))
+    const src = fakeSource(list([cm({ id: 'a', revision: 2 })]))
     src.revisions.mockRejectedValueOnce(err('conflict', 'comment_deleted'))
     await mount(src)
     src.list.mockResolvedValueOnce(
@@ -578,4 +577,40 @@ describe('avatars (UNI-1970 A)', () => {
     expect(cssRule('.collab-av img')).toMatch(/object-fit:\s*cover/)
   })
 })
+
+describe('edited mark + history gate (UNI-1970 B)', () => {
+  it('edited post: muted (edited) mark toggles history, full Edited · time in title', async () => {
+    const c = cm({ id: 'a', revision: 2 })
+    const src = fakeSource(list([c]))
+    await mount(src)
+    const item = $('[data-comment-id="a"]')!
+    const mark = btn(EN.collabEditedMark, item)!
+    expect(mark).toBeTruthy()
+    expect(mark.className).toContain('collab-edited')
+    // the full stamp is the tooltip/aria, not the text
+    expect(mark.getAttribute('title')).toBe(
+      format(EN.collabEdited, { time: formatCollabTime(c.updated_at, 'en') }),
+    )
+    expect(cssRule('.collab-cmh .collab-edited')).toMatch(/color:\s*var\(--text-secondary\)/)
+    mark.focus()
+    await click(mark)
+    expect(mark.getAttribute('aria-expanded')).toBe('true')
+    expect($('.collab-hist')).not.toBeNull()
+    await click(btn('Close Edit history'))
+    expect(document.activeElement).toBe(mark)
+    // the menu still offers History for an edited post
+    const menu = await openMenu('a')
+    expect(btn(EN.collabHistory, menu)).toBeTruthy()
+  })
+
+  it('never-edited post: no mark, no History menu item', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })]))
+    await mount(src, host({ level: 'manage' }))
+    expect(btn(EN.collabEditedMark, el)).toBeUndefined()
+    const menu = await openMenu('a')
+    expect(btn(EN.collabCopyText, menu)).toBeTruthy()
+    expect(btn(EN.collabHistory, menu)).toBeUndefined()
+  })
+})
+
 
