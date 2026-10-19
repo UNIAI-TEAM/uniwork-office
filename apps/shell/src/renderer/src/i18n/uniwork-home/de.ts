@@ -18,9 +18,6 @@ export const de = {
   uhQuickDocx: 'Dokument',
   uhQuickXlsx: 'Tabelle',
   uhQuickPptx: 'Präsentation',
-  uhQuickHintPrefix: 'Hier erstellte und hochgeladene Dateien werden in',
-  uhQuickHintSuffix:
-    ' gespeichert und sind nur für Sie sichtbar. Bei Bedarf teilen oder verschieben.',
   uhFilterType: 'Typ:',
   uhFilterTypeAll: 'Alle',
   uhFilterModifiedBy: 'Geändert von:',

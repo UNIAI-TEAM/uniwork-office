@@ -18,8 +18,6 @@ export const nl = {
   uhQuickDocx: 'Document',
   uhQuickXlsx: 'Spreadsheet',
   uhQuickPptx: 'Presentatie',
-  uhQuickHintPrefix: 'Hier maken en uploaden slaat op in',
-  uhQuickHintSuffix: ', alleen zichtbaar voor jou. Deel of verplaats indien nodig.',
   uhFilterType: 'Type:',
   uhFilterTypeAll: 'Alle',
   uhFilterModifiedBy: 'Gewijzigd door:',

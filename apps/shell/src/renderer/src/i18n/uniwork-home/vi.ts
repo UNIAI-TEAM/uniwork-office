@@ -18,8 +18,6 @@ export const vi = {
   uhQuickDocx: 'Văn bản',
   uhQuickXlsx: 'Bảng tính',
   uhQuickPptx: 'Trình chiếu',
-  uhQuickHintPrefix: 'Tạo mới và tải lên ở trang này vào',
-  uhQuickHintSuffix: ', chỉ bạn thấy. Chia sẻ hoặc Di chuyển khi cần.',
   uhFilterType: 'Loại:',
   uhFilterTypeAll: 'Tất cả',
   uhFilterModifiedBy: 'Người sửa:',

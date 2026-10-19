@@ -18,8 +18,6 @@ export const id = {
   uhQuickDocx: 'Dokumen',
   uhQuickXlsx: 'Spreadsheet',
   uhQuickPptx: 'Presentasi',
-  uhQuickHintPrefix: 'Membuat dan mengunggah di sini disimpan ke',
-  uhQuickHintSuffix: ', hanya terlihat oleh Anda. Bagikan atau Pindahkan bila perlu.',
   uhFilterType: 'Jenis:',
   uhFilterTypeAll: 'Semua',
   uhFilterModifiedBy: 'Diubah oleh:',

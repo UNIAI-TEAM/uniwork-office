@@ -18,8 +18,6 @@ export const ru = {
   uhQuickDocx: 'Документ',
   uhQuickXlsx: 'Таблица',
   uhQuickPptx: 'Презентация',
-  uhQuickHintPrefix: 'Созданные и загруженные здесь файлы сохраняются в',
-  uhQuickHintSuffix: ', видимы только вам. Поделитесь или переместите при необходимости.',
   uhFilterType: 'Тип:',
   uhFilterTypeAll: 'Все',
   uhFilterModifiedBy: 'Кем изменено:',

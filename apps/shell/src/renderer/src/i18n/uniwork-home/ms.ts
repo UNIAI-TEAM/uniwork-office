@@ -18,8 +18,6 @@ export const ms = {
   uhQuickDocx: 'Dokumen',
   uhQuickXlsx: 'Hamparan',
   uhQuickPptx: 'Pembentangan',
-  uhQuickHintPrefix: 'Mencipta dan memuat naik di sini disimpan ke',
-  uhQuickHintSuffix: ', hanya dilihat oleh anda. Kongsi atau Alihkan apabila perlu.',
   uhFilterType: 'Jenis:',
   uhFilterTypeAll: 'Semua',
   uhFilterModifiedBy: 'Diubah suai oleh:',

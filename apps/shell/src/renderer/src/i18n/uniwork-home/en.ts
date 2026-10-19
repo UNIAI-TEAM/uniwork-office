@@ -18,8 +18,6 @@ export const en = {
   uhQuickDocx: 'Document',
   uhQuickXlsx: 'Spreadsheet',
   uhQuickPptx: 'Presentation',
-  uhQuickHintPrefix: 'Creating and uploading here saves to',
-  uhQuickHintSuffix: ', visible only to you. Share or Move when needed.',
   uhFilterType: 'Type:',
   uhFilterTypeAll: 'All',
   uhFilterModifiedBy: 'Modified by:',

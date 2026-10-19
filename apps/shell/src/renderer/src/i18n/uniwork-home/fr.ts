@@ -18,8 +18,6 @@ export const fr = {
   uhQuickDocx: 'Document',
   uhQuickXlsx: 'Feuille de calcul',
   uhQuickPptx: 'Présentation',
-  uhQuickHintPrefix: 'La création et le téléversement ici enregistrent dans',
-  uhQuickHintSuffix: ', visible uniquement par vous. Partagez ou déplacez si nécessaire.',
   uhFilterType: 'Type :',
   uhFilterTypeAll: 'Tous',
   uhFilterModifiedBy: 'Modifié par :',

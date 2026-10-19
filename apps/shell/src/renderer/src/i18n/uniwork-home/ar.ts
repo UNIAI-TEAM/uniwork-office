@@ -18,8 +18,6 @@ export const ar = {
   uhQuickDocx: 'مستند',
   uhQuickXlsx: 'جدول بيانات',
   uhQuickPptx: 'عرض تقديمي',
-  uhQuickHintPrefix: 'يتم حفظ الإنشاء والرفع هنا في',
-  uhQuickHintSuffix: '، ويكون مرئيًا لك فقط. شاركه أو انقله عند الحاجة.',
   uhFilterType: 'النوع:',
   uhFilterTypeAll: 'الكل',
   uhFilterModifiedBy: 'تم التعديل بواسطة:',

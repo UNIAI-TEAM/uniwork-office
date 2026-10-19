@@ -18,8 +18,6 @@ export const th = {
   uhQuickDocx: 'เอกสาร',
   uhQuickXlsx: 'สเปรดชีต',
   uhQuickPptx: 'งานนำเสนอ',
-  uhQuickHintPrefix: 'การสร้างและอัปโหลดที่นี่จะบันทึกใน',
-  uhQuickHintSuffix: ' ซึ่งคุณเท่านั้นที่เห็น แชร์หรือย้ายได้เมื่อต้องการ',
   uhFilterType: 'ประเภท:',
   uhFilterTypeAll: 'ทั้งหมด',
   uhFilterModifiedBy: 'แก้ไขโดย:',

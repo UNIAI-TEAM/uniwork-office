@@ -325,37 +325,6 @@
   outline-offset: 1px;
 }
 
-.dh-quick-hint {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin-inline-start: auto;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.dh-quick-hint-icon {
-  flex: none;
-  color: var(--text-tertiary);
-}
-
-.dh-quick-hint-link {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.dh-quick-hint-link:hover {
-  color: var(--accent);
-}
-
 .dh-subview-banner {
   display: flex;
   align-items: center;

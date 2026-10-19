@@ -18,8 +18,6 @@ export const cs = {
   uhQuickDocx: 'Dokument',
   uhQuickXlsx: 'Tabulka',
   uhQuickPptx: 'Prezentace',
-  uhQuickHintPrefix: 'Vytvoření a nahrání zde se uloží do',
-  uhQuickHintSuffix: ', viditelné pouze pro vás. Sdílejte nebo přesuňte podle potřeby.',
   uhFilterType: 'Typ:',
   uhFilterTypeAll: 'Vše',
   uhFilterModifiedBy: 'Upravil:',

@@ -18,8 +18,6 @@ export const pl = {
   uhQuickDocx: 'Dokument',
   uhQuickXlsx: 'Arkusz kalkulacyjny',
   uhQuickPptx: 'Prezentacja',
-  uhQuickHintPrefix: 'Tworzenie i przesyłanie tutaj zapisuje w',
-  uhQuickHintSuffix: ', widocznym tylko dla Ciebie. Udostępnij lub przenieś w razie potrzeby.',
   uhFilterType: 'Typ:',
   uhFilterTypeAll: 'Wszystkie',
   uhFilterModifiedBy: 'Zmodyfikowano przez:',
