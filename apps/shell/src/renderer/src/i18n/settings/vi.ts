@@ -58,7 +58,7 @@ export const vi = {
   bkCloudNeedsPlan: 'Cần gói sao lưu',
   bkPlansHeading: 'Gói sao lưu',
   bkPacksHeading: 'Dung lượng bổ sung',
-  bkClearSimulated: 'Xoá giao dịch mô phỏng (dev)',
+  bkClearSimulated: 'Xóa giao dịch mô phỏng (dev)',
   bkActive: 'Đang dùng',
   bkRetentionDays: 'giữ {n} ngày',
   bkManage: 'Quản lý',
@@ -80,7 +80,7 @@ export const vi = {
     'Sao lưu cloud chưa sẵn sàng. Gói của bạn đã được kích hoạt và sẽ bắt đầu sao lưu ngay khi có.',
   bkSimActivated: 'Đã kích hoạt giao dịch mô phỏng.',
   bkSimPack: 'Đã thêm gói dung lượng mô phỏng.',
-  bkSimCleared: 'Đã xoá giao dịch mô phỏng.',
+  bkSimCleared: 'Đã xóa giao dịch mô phỏng.',
 
   uaiTitle: 'UniAI trên web',
   uaiLead:

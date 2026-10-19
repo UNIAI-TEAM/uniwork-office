@@ -69,3 +69,20 @@ describe('the vi UniWork copy', () => {
     expect(vi).toContain('Tệp trên máy của bạn được giữ lại.')
   })
 })
+
+/**
+ * UNI-1958 row 8: the native tab menu reads the vi labels out of the main table
+ * itself (uniwork-offline-tab-menu.test.ts hardcodes its LABELS, so it cannot
+ * prove the table): "offline" stays English, as on the web.
+ */
+describe('the vi native tab-menu offline labels (UNI-1958 row 8)', () => {
+  it('reads the pin and unpin labels from the vi block', () => {
+    const vi = localeBlock('vi')
+    expect(vi.match(/uwOfflinePin: '([^']*)'/)?.[1]).toBe('Lưu để dùng offline')
+    expect(vi.match(/uwOfflineUnpin: '([^']*)'/)?.[1]).toBe('Bỏ dùng offline')
+  })
+
+  it('never says "ngoại tuyến" for the mode', () => {
+    expect(localeBlock('vi')).not.toContain('ngoại tuyến')
+  })
+})

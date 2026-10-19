@@ -15,13 +15,12 @@ export const vi = {
   usPickTitle: 'Chọn nơi lưu',
   usBack: 'Quay lại đặt tên',
   usSearchFolders: 'Tìm thư mục',
-  usSharedNote: 'Lưu vào thư mục chung thì tài liệu nhận quyền của thư mục đó.',
   usChooseFolder: 'Chọn “{folder}”',
   usSelected: 'Đang chọn',
   usRootBlocked: 'Hãy chọn một thư mục',
   usErrInvalidDestination: 'Không lưu được vào nơi này. Hãy chọn thư mục khác.',
   usErrMyFolderLocked:
-    'Thư mục của tôi là thư mục hệ thống cá nhân và không thể đổi tên, chia sẻ, di chuyển hoặc lưu trữ.',
+    'Thư mục của tôi là thư mục hệ thống cá nhân và không thể đổi tên, chia sẻ, di chuyển hoặc chuyển vào thùng rác.',
   usErrFlushFailed: 'Chưa ghi được tài liệu xuống máy. Hãy lưu tài liệu trước rồi thử lại.',
   usErrBindFailed:
     'Đã tạo “{title}” (mã {id}) nhưng không gắn được vào thẻ này. Tài liệu đã được chuyển vào thùng rác và có thể khôi phục.',

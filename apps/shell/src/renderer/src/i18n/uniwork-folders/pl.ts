@@ -27,6 +27,7 @@ export const pl = {
   ufTooDeep: 'Drzewo dokumentów ma maksymalnie {max} poziomów.',
   ufCycle: 'Folderu nie można przenieść do niego samego ani do jego podfolderu.',
   ufParentKind: 'Folder znajduje się w katalogu głównym lub w innym folderze.',
+  ufNotShareable: 'Folderów nie można udostępniać. Udostępniaj poszczególne dokumenty.',
   ufFolderGone: 'Tego folderu już tu nie ma.',
   ufFolderNoAccess: 'Nie masz już dostępu do tego folderu.',
   ufNoPermission: 'Nie masz uprawnień do zmiany tego folderu.',

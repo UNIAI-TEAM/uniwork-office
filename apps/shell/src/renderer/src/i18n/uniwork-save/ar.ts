@@ -15,7 +15,6 @@ export const ar = {
   usPickTitle: 'اختيار مكان الحفظ',
   usBack: 'العودة إلى التسمية',
   usSearchFolders: 'البحث عن مجلد',
-  usSharedNote: 'عند الحفظ في مجلد مشترك يأخذ المستند أذونات ذلك المجلد.',
   usChooseFolder: 'اختيار «{folder}»',
   usSelected: 'محدد',
   usRootBlocked: 'اختر مجلدًا',

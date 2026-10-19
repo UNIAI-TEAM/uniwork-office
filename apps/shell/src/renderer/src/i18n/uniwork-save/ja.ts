@@ -16,7 +16,6 @@ export const ja = {
   usPickTitle: '保存先を選択',
   usBack: '名前の入力に戻る',
   usSearchFolders: 'フォルダーを検索',
-  usSharedNote: '共有フォルダーに保存すると、ドキュメントにはそのフォルダーの権限が適用されます。',
   usChooseFolder: '「{folder}」を選択',
   usSelected: '選択中',
   usRootBlocked: 'フォルダーを選んでください',

@@ -42,7 +42,7 @@ export const vi = {
   uwReasonSession: 'cần đăng nhập lại',
   uwReasonSignedOut: 'đã đăng xuất',
   uwReasonForeign: 'thuộc tài khoản khác',
-  uwReasonArchived: 'tài liệu đã được lưu trữ',
+  uwReasonArchived: 'tài liệu đang ở trong thùng rác',
   uwReasonSuspended: 'tổ chức đang bị tạm ngưng',
   uwReasonDeactivated: 'tài khoản của bạn đã bị vô hiệu hóa trong tổ chức',
   uwReasonLease: 'quyền offline đã hết hạn',
@@ -70,7 +70,7 @@ export const vi = {
   uwBadgeSaved: 'Đã lưu',
   uwBadgeKeptDraft: 'Nháp đã giữ',
   uwBadgeMoved: 'Đã chuyển',
-  uwBadgeArchived: 'Đã lưu trữ',
+  uwBadgeArchived: 'Trong thùng rác',
 
   // S2 queue-row details
   uwRowQueued: 'Lưu lúc {time} · dựa trên phiên bản {base} · {size}',
@@ -90,7 +90,7 @@ export const vi = {
   uwRowCommitted: 'Phiên bản {n} · {time}',
   uwRowKeptDraft: 'Giữ từ lần tải lại lúc {time}',
   uwRowMoved: 'Tài liệu đã được chuyển tới {workspace}',
-  uwRowArchived: 'Tài liệu đã được lưu trữ trên UniWork',
+  uwRowArchived: 'Tài liệu đã được chuyển vào thùng rác trên UniWork',
 
   // S2 row actions
   uwActDiscard: 'Bỏ',
@@ -133,9 +133,9 @@ export const vi = {
   uwSyncTitle: 'Trung tâm đồng bộ',
   uwSyncOpenFromSettings: 'Trung tâm đồng bộ',
   uwSyncOnline: 'Đã kết nối UniWork · đồng bộ lúc {time}',
-  uwSyncOffline: 'Không có mạng · lần đồng bộ cuối {time}',
+  uwSyncOffline: 'Đang offline · lần đồng bộ cuối {time}',
   uwSyncOnlineNoTime: 'Đã kết nối UniWork',
-  uwSyncOfflineNoTime: 'Không có mạng',
+  uwSyncOfflineNoTime: 'Đang offline',
   uwSyncPaused: 'Đã tạm dừng gửi — lần lưu mới sẽ chờ',
   uwSyncAdminPaused: 'Quản trị viên đang tạm dừng việc gửi. Các lần lưu được giữ trên máy này.',
   uwSyncFeedOff:
@@ -155,7 +155,7 @@ export const vi = {
   uwSyncNowOffline: 'Cần có mạng để đồng bộ.',
   uwSyncTabAttention: 'Cần xử lý',
   uwSyncTabQueue: 'Đang chờ lưu',
-  uwSyncTabOffline: 'Dùng khi không có mạng',
+  uwSyncTabOffline: 'Dùng offline',
   uwSyncTabRecent: 'Đã lưu gần đây',
   uwSyncTabCount: '{label}, {count} mục',
   uwSyncColDoc: 'Tài liệu',
@@ -170,12 +170,12 @@ export const vi = {
   uwSyncRowAnnounce: '{doc}: {state}',
 
   // S3 offline library
-  uwOfflinePin: 'Dùng khi không có mạng',
-  uwOfflineUnpin: 'Bỏ dùng khi không có mạng',
+  uwOfflinePin: 'Lưu để dùng offline',
+  uwOfflineUnpin: 'Bỏ dùng offline',
   uwOfflineUnpinShort: 'Bỏ ghim',
   uwOfflineAdd: 'Thêm tài liệu…',
   uwOfflineUsage: 'Đang dùng {used} / {cap} trên máy này',
-  uwOfflineEmpty: 'Chưa có tài liệu nào dùng khi không có mạng.',
+  uwOfflineEmpty: 'Chưa có tài liệu nào dùng offline.',
   uwOfflineCapReached:
     'Thư viện offline trên máy này đã đạt giới hạn ({cap}, tối đa {maxDocs} tài liệu). Bỏ ghim một tài liệu để thêm tài liệu khác.',
   uwOfflineReady: 'Sẵn sàng offline',
@@ -204,7 +204,8 @@ export const vi = {
     'Bạn không còn quyền với tài liệu này. Bản tải về đã được xóa khỏi máy; nháp được giữ khóa.',
   uwOfflineRowDeleted:
     'Tài liệu đã bị xóa trên UniWork. Bản tải về đã được xóa khỏi máy; nháp được giữ khóa.',
-  uwOfflineRowArchived: 'Tài liệu đã được lưu trữ; bản trên máy vẫn mở được tới hết quyền offline.',
+  uwOfflineRowArchived:
+    'Tài liệu đã được chuyển vào thùng rác; bản trên máy vẫn mở được tới hết quyền offline.',
   uwOfflineRowMoved: 'Đã chuyển tới {workspace}; bản trên máy vẫn dùng được.',
   uwOfflineRowViewOnly: 'Phiên bản {n} · chỉ xem · quyền offline tới {datetime}',
   uwOfflineReadyAnnounce: 'Sẵn sàng offline: {doc}',
@@ -224,7 +225,7 @@ export const vi = {
   uwLockOrgTitle: 'Không mở được trong tổ chức này',
   uwLockExpired: 'Quyền offline đã hết hạn. Nội dung được giữ mã hóa; kết nối để mở lại.',
   uwLockLibraryOff:
-    'Quản trị viên đã tắt tài liệu dùng khi không có mạng nên quyền offline không được gia hạn. Nháp được giữ khóa trong trung tâm đồng bộ.',
+    'Quản trị viên đã tắt tài liệu dùng offline nên quyền offline không được gia hạn. Nháp được giữ khóa trong trung tâm đồng bộ.',
   uwLockKeystore:
     'Kho khóa của máy đang khóa nên không mở được nội dung đã mã hóa. Mở khóa máy rồi thử lại; dữ liệu không bị xóa.',
   uwLockClock:
@@ -284,7 +285,7 @@ export const vi = {
     'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại bản mới nhất hoặc Ghi đè.',
   uwConflictDownloadFailedDesktop: 'Chưa lưu được tệp. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
   uwConflictSaveCopyOffline:
-    'Không có mạng. Tạo bản sao cần kết nối; thay đổi của bạn vẫn được giữ.',
+    'Đang offline. Tạo bản sao cần kết nối; thay đổi của bạn vẫn được giữ.',
   uwConflictReloadFailed:
     'Không tải được bản mới nhất. Tài liệu của bạn chưa thay đổi; hãy thử lại.',
   uwConflictOverwriteFailed: 'Chưa ghi đè được. Tài liệu của bạn chưa thay đổi; hãy thử lại.',
@@ -298,7 +299,7 @@ export const vi = {
   uwConflictCancel: 'Hủy',
   uwConflictKeepUnavailable: 'Máy chưa giữ được nháp (bộ nhớ đồng bộ đầy hoặc kho khóa đang khóa).',
   uwConflictOfflineDesktop:
-    'Không có mạng và bản mới nhất chưa có trên máy này nên chưa tải lại được.',
+    'Đang offline và bản mới nhất chưa có trên máy này nên chưa tải lại được.',
   uwConflictReloadDesktopBody: 'Chọn điều xảy ra với thay đổi của bạn trước khi tải phiên bản {n}.',
   uwConflictKeepDraft: 'Giữ bản của tôi làm nháp',
   uwConflictDiscard: 'Bỏ thay đổi của tôi',

@@ -26,6 +26,7 @@ export const cs = {
   ufTooDeep: 'Strom dokumentů má nejvýše {max} úrovní.',
   ufCycle: 'Složku nelze přesunout do sebe samé ani do některé z jejích podsložek.',
   ufParentKind: 'Složka je v kořeni nebo v jiné složce.',
+  ufNotShareable: 'Složky nelze sdílet. Sdílejte raději jednotlivé dokumenty.',
   ufFolderGone: 'Tato složka tu už není.',
   ufFolderNoAccess: 'K této složce již nemáte přístup.',
   ufNoPermission: 'Nemáte oprávnění tuto složku měnit.',

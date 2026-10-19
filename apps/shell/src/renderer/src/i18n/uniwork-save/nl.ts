@@ -16,7 +16,6 @@ export const nl = {
   usPickTitle: 'Kies waar je opslaat',
   usBack: 'Terug naar naam',
   usSearchFolders: 'Mappen zoeken',
-  usSharedNote: 'Opgeslagen in een gedeelde map krijgt het document de rechten van die map.',
   usChooseFolder: '‘{folder}’ kiezen',
   usSelected: 'Geselecteerd',
   usRootBlocked: 'Kies een map',

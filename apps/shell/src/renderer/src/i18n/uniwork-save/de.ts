@@ -16,8 +16,6 @@ export const de = {
   usPickTitle: 'Speicherort wählen',
   usBack: 'Zurück zur Benennung',
   usSearchFolders: 'Ordner suchen',
-  usSharedNote:
-    'In einem freigegebenen Ordner erhält das Dokument die Berechtigungen dieses Ordners.',
   usChooseFolder: '„{folder}“ wählen',
   usSelected: 'Ausgewählt',
   usRootBlocked: 'Wählen Sie einen Ordner',

@@ -477,7 +477,7 @@ describe('SaveDialog State 2 "Chọn nơi lưu" (AC-3)', () => {
     await click($('.uws-loc'))
   }
 
-  it('renders the board: back, Thư mục mới, Tìm thư mục, tags, check on the current target, note, confirm', async () => {
+  it('renders the board: back, Thư mục mới, Tìm thư mục, tags, check on the current target, confirm (no shared-folder note)', async () => {
     await openPicker()
     expect($('.uws-dialog')).toBeNull()
     const picker = $('.uws-pick')!
@@ -496,7 +496,9 @@ describe('SaveDialog State 2 "Chọn nơi lưu" (AC-3)', () => {
     // no visibility is known for other rows: no tag, never a guess
     expect(treeItem('Hợp đồng').querySelector('.uwf-tree-tag')).toBeNull()
     expect($$('.uwf-tree-check')).toHaveLength(1)
-    expect($('.uwf-picker-note')?.textContent).toBe(vi_.usSharedNote)
+    // UNI-1975: folders are not shared, so the picker carries no shared-folder note
+    expect($('.uwf-picker-note')).toBeNull()
+    expect(picker.textContent).not.toContain('thư mục chung')
     expect($('.uwf-picker-confirm')?.textContent).toBe('Chọn “Thư mục của tôi”')
     // no Cancel in State 2 (back / Esc go back)
     expect(buttonByText(uniworkFolderStrings.vi.ufChoose)).toBeUndefined()
