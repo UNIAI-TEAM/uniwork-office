@@ -80,6 +80,31 @@
   box-sizing: border-box;
 }
 
+/* Everything clickable shows the hand. Buttons and the clickable ARIA roles default to the
+ * arrow, so a row that opens a document felt dead. `:where()` keeps this at zero specificity:
+ * any component rule that sets its own `cursor` (progress, grab, not-allowed, ...) still wins,
+ * and a disabled control keeps the default arrow. */
+:where(
+  button,
+  a[href],
+  summary,
+  select,
+  label[for],
+  [role='button'],
+  [role='link'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='menuitemcheckbox'],
+  [role='menuitemradio'],
+  [role='option'],
+  [role='treeitem'],
+  [role='checkbox'],
+  [role='radio'],
+  [role='switch']
+):not(:disabled, [aria-disabled='true']) {
+  cursor: pointer;
+}
+
 /* UI CJK fonts per language (documentElement.lang is set at bootstrap and on switch);
  * the zh expansion must keep the historical stack byte-identical */
 :root {

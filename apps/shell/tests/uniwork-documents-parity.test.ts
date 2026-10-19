@@ -299,7 +299,7 @@ describe('UNI-1957 Documents parity', () => {
 
     it('is one zero-specificity rule in the global renderer sheet, disabled controls excluded', () => {
       expect(rule).not.toBeNull()
-      const list = rule![1]!
+      const list = rule![1]!.replace(/'/g, '"')
       for (const target of [
         'button',
         'a[href]',
@@ -313,9 +313,11 @@ describe('UNI-1957 Documents parity', () => {
       ]) {
         expect(list, target).toContain(target)
       }
-      // the sheet main.tsx loads for every view carries it, once
-      expect(home.match(/:where\(/g)?.length).toBeGreaterThanOrEqual(1)
-      expect(home.split('summary, select, label[for]').length).toBe(2)
+      // once, in the sheet main.tsx loads for every view (not per component)
+      expect(home.match(/:not\(:disabled, \[aria-disabled='true'\]\)/g)).toHaveLength(1)
+      expect(readFileSync(resolve(__dirname, '../src/renderer/src/main.tsx'), 'utf8')).toContain(
+        "import './home.css'",
+      )
     })
 
     it('every clickable element of the Documents home matches that selector set', async () => {
