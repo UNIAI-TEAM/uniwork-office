@@ -1118,6 +1118,65 @@ describe('review r1 save fixes', () => {
     expect(server.state.version).toBe(4)
   })
 
+  it('R1: a non-user Save over a reconciling record looks the SAME key up, never a second POST', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    // the commit landed on the server, its answer never arrived
+    server.faults.push({ route: 'commit', kind: 'lost' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'reconciling' })
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent is missing from the store')
+    expect(commits(server)).toHaveLength(1)
+    // the record says the commit may already have been POSTed: the second Save
+    // uploads nothing and POSTs nothing, and ONE lookup of the same key decides
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(commits(server)).toHaveLength(1)
+    expect(uploads(server)).toHaveLength(1)
+    expect(lookups(server).map((c) => c.headers['idempotency-key'])).toEqual([
+      intent.idempotencyKey,
+    ])
+    expect(
+      server.calls.filter((c) => c.path.endsWith('/versions/commit')).map((c) => c.method),
+    ).toEqual(['POST', 'GET'])
+    expect(binding(path)).toMatchObject({
+      state: 'saved',
+      baseRevision: '42',
+      baseChecksum: hex(enc('v4')),
+    })
+    expect(await intentOf(ctx, path)).toBeNull()
+    expect(server.state.version).toBe(4)
+  })
+
+  it('R1: a non-user Save over a stuck record sends nothing and publishes the stuck state', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { queueStores: true })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 'dropped' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'reconciling' })
+    // the server holds no intent row for this key: the poll parks it stuck
+    server.faults.push({ route: 'lookup', kind: 410, code: 'commit_intent_unknown' })
+    await ctx.service.pollSaveQueue()
+    await vi.waitFor(() =>
+      expect(binding(path)).toMatchObject({ state: 'reconciling-stuck' }),
+    )
+    const before = {
+      uploads: uploads(server).length,
+      commits: commits(server).length,
+      lookups: lookups(server).length,
+    }
+    // a record the queue already gave up on is never looked up again inline
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'reconciling-stuck',
+      error: 'intent_unknown',
+    })
+    expect(uploads(server)).toHaveLength(before.uploads)
+    expect(commits(server)).toHaveLength(before.commits)
+    expect(lookups(server)).toHaveLength(before.lookups)
+  })
+
   it('an expired claim whose lookup proves the commit settles with the receipt, no second POST (B69-lite)', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
@@ -1128,26 +1187,20 @@ describe('review r1 save fixes', () => {
     expect(await ctx.service.save(path)).toMatchObject({ state: 'reconciling' })
     const intent = (await intentOf(ctx, path))?.intent
     if (!intent) throw new Error('the intent is missing from the store')
-    // the replay re-uploads under the SAME key (attempt 0) and is refused with the expiry
-    server.faults.push({
-      route: 'commit',
-      kind: 409,
-      code: 'document_upload_invalid',
-      reason: 'file_claim_expired',
-    })
+    // R1: a reconciling record is never re-uploaded and never re-POSTed, so the
+    // refused replay of B69-lite is not reachable from here: the ONE lookup of
+    // the SAME key settles the record with the receipt
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
     expect(binding(path)).toMatchObject({
       state: 'saved',
       baseRevision: '42',
       baseChecksum: hex(enc('v4')),
     })
-    // the lookup answered committed: the two POSTs are the lost first attempt
-    // and the refused replay - the expiry never mints a THIRD one, and the
-    // version moved exactly once
+    // exactly the lost first attempt, and the lookup answered committed
     expect(commits(server).map((c) => c.headers['idempotency-key'])).toEqual([
       intent.idempotencyKey,
-      intent.idempotencyKey,
     ])
+    expect(uploads(server)).toHaveLength(1)
     expect(lookups(server).map((c) => c.headers['idempotency-key'])).toEqual([
       intent.idempotencyKey,
     ])
@@ -1231,7 +1284,7 @@ describe('review r1 save fixes', () => {
     expect(readFileSync(path, 'utf8')).toBe('v4')
   })
 
-  it('a replay whose upload is gone settles when an earlier attempt already committed the bytes', async () => {
+  it('a Save over a reconciling record whose bytes already committed settles by lookup, no second POST', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
     const path = await openDoc(ctx)
@@ -1239,11 +1292,18 @@ describe('review r1 save fixes', () => {
     server.faults.push({ route: 'commit', kind: 'lost' })
     // B70: the lost answer reconciles; the bytes are already on the server
     expect(await ctx.service.save(path)).toMatchObject({ state: 'reconciling' })
-    // a replay of the SAME key whose upload is gone is checked against the
-    // document: the checksum matches, so these bytes are the current version
-    server.faults.push({ route: 'commit', kind: 409, code: 'upload_missing' })
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent is missing from the store')
+    // R1: the record may already have POSTed, so the second Save looks the SAME
+    // key up instead of re-uploading and re-POSTing it: the lookup proves the
+    // commit, so these bytes are the current version
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
     expect(binding(path)).toMatchObject({ baseRevision: '42', baseChecksum: hex(enc('v4')) })
+    expect(commits(server)).toHaveLength(1)
+    expect(uploads(server)).toHaveLength(1)
+    expect(lookups(server).map((c) => c.headers['idempotency-key'])).toEqual([
+      intent.idempotencyKey,
+    ])
     expect(server.state.version).toBe(4)
   })
 
@@ -1578,9 +1638,16 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     expect(retried?.error).toBeUndefined()
     expect(binding(path)).toMatchObject({ state: 'saved', baseChecksum: hex(enc('v4')) })
     expect(await intentOf(ctx, path)).toBeNull()
+    // R1: the reconciling record may already have POSTed: the retry looks the
+    // same key up instead of POSTing it a second time
+    expect(commits(server)).toHaveLength(1)
+    expect(uploads(server)).toHaveLength(1)
     expect(new Set(commits(server).map((c) => c.headers['idempotency-key']))).toEqual(
       new Set([intent.idempotencyKey]),
     )
+    expect(lookups(server).map((c) => c.headers['idempotency-key'])).toEqual([
+      intent.idempotencyKey,
+    ])
     expect(new TextDecoder().decode(server.state.bytes)).toBe('v4')
     expect(readFileSync(path, 'utf8')).toBe('v4')
   })

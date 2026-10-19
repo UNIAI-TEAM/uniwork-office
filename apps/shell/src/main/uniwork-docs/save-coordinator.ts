@@ -728,6 +728,23 @@ export class SaveCoordinator {
         // (pendingNext = an unsent N+1) and the SAME record and key are replayed
         // below; a save that lands settles this very intent
         this.pendingNext.add(doc.path)
+        // R1: only a record the queue would really re-send may be replayed
+        // inline. A record whose commit may ALREADY be on the wire
+        // (`committing` / `reconciling`) is never uploaded and never POSTed
+        // again: exactly ONE lookup of the SAME key decides, exactly as the
+        // poll's own tick does. A record the queue already gave up on
+        // (`reconciling-stuck`) sends nothing at all and publishes the state the
+        // record really has.
+        if (intent.state === 'committing' || intent.state === 'reconciling') {
+          return await this.lookupInFlightRecord(doc, intent, intents)
+        }
+        if (intent.state === 'reconciling-stuck') {
+          return await this.commitState(doc, {
+            ...doc.binding,
+            state: 'reconciling-stuck',
+            error: 'intent_unknown',
+          })
+        }
       }
       binding = withoutError({ ...binding, state: 'saving' })
       // the binding is persisted before the first network call: a crash or quit
@@ -947,6 +964,62 @@ export class SaveCoordinator {
       error: error.code,
       ...(error.retryAfterMs === undefined ? {} : { retryAfterMs: error.retryAfterMs }),
     })
+    return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+  }
+
+  /**
+   * R1: a Save met a record whose commit may already be on the wire
+   * (`committing` / `reconciling`). Nothing is uploaded and nothing is POSTed:
+   * exactly ONE lookup of the record's own commit key decides, and only its
+   * answer moves the record - the same verdicts `resumeExpiredClaim` applies to
+   * the same machine event. A lookup that cannot be answered leaves the record
+   * `reconciling` for the next poll's tick.
+   */
+  private async lookupInFlightRecord(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    intents: IntentStore,
+  ): Promise<BoundDocument> {
+    const lookup = this.deps.client.lookupCommit
+    if (!lookup) {
+      await this.settleRecord(intents, doc, intent, { type: 'commitFailed', error: 'network' })
+      return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+    }
+    let answer: CommitLookup
+    try {
+      answer = await lookup({ documentId: intent.documentId, idempotencyKey: intent.idempotencyKey })
+    } catch (error) {
+      const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+      await this.settleRecord(intents, doc, intent, {
+        type: 'lookup',
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+        error: error instanceof UniworkDocError ? error.code : 'server_error',
+      })
+      return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+    }
+    if (answer.outcome === 'committed') {
+      return await this.settle(
+        doc,
+        intent,
+        {
+          revision: answer.receipt.revision,
+          version: answer.receipt.version,
+          versionId: answer.receipt.versionId,
+        },
+        intents,
+      )
+    }
+    await this.settleRecord(intents, doc, intent, { type: 'lookup', outcome: answer.outcome })
+    if (answer.outcome === 'unknown') {
+      return this.commitState(doc, {
+        ...doc.binding,
+        state: 'reconciling-stuck',
+        error: 'intent_unknown',
+      })
+    }
+    if (answer.outcome === 'not_committed') {
+      return this.commitState(doc, withoutError({ ...doc.binding, state: 'queued' }))
+    }
     return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
   }
 
