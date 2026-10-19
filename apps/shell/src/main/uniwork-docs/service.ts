@@ -1854,6 +1854,9 @@ export class UniworkDocsService {
       return false
     }
     if (await this.isSameWorkingCopy(current.path, target)) return false
+    // A106 (UNI-1362): the working-copy root is the app's own folder; a user-picked
+    // export path may never land inside it
+    if (this.store.isInside(target)) return false
     try {
       const localBytes = new Uint8Array(await readFile(current.path))
       await writeFile(target, localBytes)
@@ -2127,7 +2130,9 @@ export class UniworkDocsService {
     const id = randomUUID()
     const dispatcher = new QueueDispatcher({
       intents: async () =>
-        this.deadQueueSessions.has(id) ? { kind: 'unavailable' } : { kind: 'ok', intents },
+        this.queueSession?.id !== id || this.deadQueueSessions.has(id)
+          ? { kind: 'unavailable' }
+          : { kind: 'ok', intents },
       client: {
         upload: (input) =>
           this.api().upload({ ...input, format: input.format as UniworkDocFormat }),
@@ -2173,7 +2178,7 @@ export class UniworkDocsService {
         )
       },
       publish: (record) => {
-        if (this.deadQueueSessions.has(id)) return
+        if (this.queueSession?.id !== id || this.deadQueueSessions.has(id)) return
         this.publishRecord(record)
       },
       prepareEditLock: (path) => this.prepareEditLock(path),
@@ -2414,6 +2419,9 @@ export class UniworkDocsService {
    * wiring's `onPoll`), never on its own timer.
    */
   async pollSaveQueue(): Promise<void> {
+    // A3 (UNI-1362): the poll is the lifecycle hook a closed path gets: prune
+    // the ephemeral per-path state no view holds any more before the pass runs
+    this.pruneClosedRemoteState()
     const pass = this.runQueuePass()
     // teardownSaveQueue awaits this very pass, so it must be observable while it runs
     this.queuePass = pass
@@ -2421,6 +2429,32 @@ export class UniworkDocsService {
       await pass
     } finally {
       if (this.queuePass === pass) this.queuePass = null
+    }
+  }
+
+  /**
+   * A3 (UNI-1362): the ephemeral per-path S6 state of a document no view shows
+   * any more. Closing is the shell's (`tab-manager` / `closePathNow`), so the
+   * poll - the one lifecycle the service runs on its own - is where a closed
+   * path's entries go.
+   *
+   * - `editorAi`: the last editor answer of the path (a stale `aiRunning` /
+   *   `aiEpoch`). Kept while a bar is on screen: a `newer-ai` bar re-decides its
+   *   notice on this very memory when the turn ends, and a hidden (`null`) bar
+   *   or no bar at all can never reach that edge.
+   * - `remoteReloads`: a per-path reload chain that has already settled. An
+   *   in-flight one is the promise a queued notice waits on and stays.
+   *
+   * The bars, notices, held notices and lock verdicts are authoritative (a
+   * `null` bar is the session's own `later`/`close` decision and a revoke/delete
+   * verdict must outlive the close), so they are left to their own writers and
+   * to the account boundary.
+   */
+  private pruneClosedRemoteState(): void {
+    for (const path of [...this.editorAi.keys()]) {
+      if (this.deps.isPathOpen(path)) continue
+      if (this.remoteBars.get(pathKey(path))) continue
+      this.editorAi.delete(path)
     }
   }
 
@@ -2787,6 +2821,25 @@ export class UniworkDocsService {
       this.deadQueueSessions.add(session.id)
     }
     this.queueSession = null
+    if (session) this.pruneQueueSessionTombstones(session.id)
+  }
+
+  /**
+   * A30 (UNI-1362): once a session is detached from `queueSession` and every
+   * pass/publish closure has drained, its `id` can never match `queueSession?.id`
+   * again, so the tombstone sets may drop it while stale callbacks stay refused.
+   */
+  private pruneQueueSessionTombstones(id: string): void {
+    const drain = async (): Promise<void> => {
+      await this.queuePass?.catch(() => undefined)
+      if (this.pendingApplyRecords.size > 0) {
+        await Promise.all([...this.pendingApplyRecords])
+      }
+      if (this.queueSession?.id === id) return
+      this.stoppingQueueSessions.delete(id)
+      this.deadQueueSessions.delete(id)
+    }
+    void drain()
   }
 
   /**
@@ -2807,6 +2860,13 @@ export class UniworkDocsService {
     // is already running to unwind (and release its locks) before the records go
     await this.queuePass?.catch(() => undefined)
     this.stopQueue()
+    if (this.pendingApplyRecords.size > 0) {
+      await Promise.all([...this.pendingApplyRecords])
+    }
+    if (session && this.queueSession?.id !== session.id) {
+      this.stoppingQueueSessions.delete(session.id)
+      this.deadQueueSessions.delete(session.id)
+    }
   }
 
   private sleepMs(ms: number): Promise<void> {
@@ -2920,8 +2980,22 @@ export class UniworkDocsService {
     }
   }
 
-  /** Alias for `planSignOut` used by IPC handler (`UNIWORK_DOC_CHANNELS.signOutPlan`). */
+  /**
+   * Alias for `planSignOut` used by IPC handler (`UNIWORK_DOC_CHANNELS.signOutPlan`).
+   * A87 (UNI-1362): an interactive sign-out plan is always for the live session's
+   * scope (`owner` omitted -> `target` = live identity / lastOwner), so any
+   * entry left behind by a previously cancelled plan of another scope cannot
+   * still be paired with a pending lock and is pruned here without disturbing
+   * `AccountBoundary`'s interleaved `planSignOut(previous)` switch accounting.
+   */
   async signOutPlan(owner?: LastOwner | null): Promise<SignOutPlan> {
+    if (!owner) {
+      const target = this.liveIdentity() ?? this.lastOwner
+      const keepToken = target ? `${target.deploymentId}/${target.accountId}` : null
+      for (const token of [...this.plannedRamOnly.keys()]) {
+        if (token !== keepToken) this.plannedRamOnly.delete(token)
+      }
+    }
     return this.planSignOut(owner)
   }
 
@@ -6301,13 +6375,15 @@ export class UniworkDocsService {
       () => this.guardedReload(path, notice),
       () => this.guardedReload(path, notice),
     )
-    this.remoteReloads.set(
-      key,
-      run.then(
-        () => undefined,
-        () => undefined,
-      ),
+    const chain: Promise<void> = run.then(
+      () => {
+        if (this.remoteReloads.get(key) === chain) this.remoteReloads.delete(key)
+      },
+      () => {
+        if (this.remoteReloads.get(key) === chain) this.remoteReloads.delete(key)
+      },
     )
+    this.remoteReloads.set(key, chain)
     return run
   }
 
@@ -6368,6 +6444,17 @@ export class UniworkDocsService {
     const previousBytes = await readFile(fresh.path)
       .then((bytes) => new Uint8Array(bytes))
       .catch(() => null)
+    // A5 (UNI-1362): the previous bytes are the only way back from a late edit
+    // or AI turn that starts after the write. If they cannot be read, the
+    // replacement would be unrecoverable, so refuse the reload here with the
+    // existing `reload-failed` bar instead of writing the fetched head.
+    if (previousBytes === null) {
+      await this.showRemoteBar(fresh, notice, {
+        kind: 'reload-failed',
+        version: notice.version,
+      })
+      return
+    }
     const previousBinding = fresh.binding
     await this.store.writeWorkingCopy(fresh.dir, fresh.binding.filename, fetched.bytes)
     const reloaded: Binding = {
@@ -6413,11 +6500,9 @@ export class UniworkDocsService {
   private async restoreWorkingCopy(
     doc: BoundDocument,
     binding: Binding,
-    bytes: Uint8Array | null,
+    bytes: Uint8Array,
   ): Promise<void> {
-    if (bytes) {
-      await this.store.writeWorkingCopy(doc.dir, binding.filename, bytes).catch(() => undefined)
-    }
+    await this.store.writeWorkingCopy(doc.dir, binding.filename, bytes).catch(() => undefined)
     // the coordinator's chain, so the restore cannot interleave with a save's
     // own binding write for the same document
     await this.coordinator.commitState(doc, binding)
@@ -7479,6 +7564,9 @@ export class UniworkDocsService {
       open.finish()
       return { kind: 'closed' }
     }
+    // A106 (UNI-1362): reject a target picked inside the app's working-copy root
+    // before writing, using the existing download_failed refusal outcome.
+    if (this.store.isInside(target)) return failed()
     try {
       await writeFile(target, localBytes)
     } catch {

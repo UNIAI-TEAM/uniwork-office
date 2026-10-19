@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,6 +32,8 @@ import {
   type IntentStore,
 } from '../src/main/uniwork-sync/intent-store'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
+import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
+import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
 import { NEVER_READ_CAPABILITIES } from '../src/main/uniwork-sync/capability/cache'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import {
@@ -152,6 +162,8 @@ function setup(): Harness {
   layer.register(INTENT_STORE_REGISTRATION)
   layer.register(FEED_CURSORS_REGISTRATION)
   layer.register(DOC_INDEX_REGISTRATION)
+  layer.register(DRAFTS_STORE_REGISTRATION)
+  layer.register(PAUSE_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({ layer, scope: () => ({ ...SCOPE }) })
 
   const statuses: UniworkDocStatus[] = []
@@ -888,5 +900,42 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     expect(status?.remote).toEqual({ kind: 'newer-dirty', version: 4 })
     expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
     expect(h.reloaded).toEqual([])
+  })
+
+  it('A5 (UNI-1362): refuses the reload with reload-failed when the previous working-copy bytes cannot be read', async () => {
+    seedCopy()
+    const h = setup()
+    unlinkSync(docPath())
+    notice(h)
+    await waitForBar(h, { kind: 'reload-failed', version: 4 })
+    expect(existsSync(docPath())).toBe(false)
+    expect(h.reloaded).toEqual([])
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', state: 'saved' })
+    expect(h.client.calls.download).toBe(1)
+  })
+
+  it('A3 (UNI-1362): prunes closed-path editor-AI memory on poll once no live bar needs it, and drops settled reload chains', async () => {
+    seedCopy()
+    const h = setup()
+    const internals = h.service as unknown as {
+      editorAi: Map<string, unknown>
+      remoteReloads: Map<string, unknown>
+    }
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    expect(internals.editorAi.has(docPath())).toBe(true)
+    notice(h)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(internals.remoteReloads.size).toBe(0)
+
+    // while the updated bar is still on screen, closing the path keeps the memory
+    h.openPaths.delete(docPath())
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // once the session hides the bar (close) and the path is closed, the poll prunes it
+    await h.service.remoteAction(docPath(), 'close')
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(false)
   })
 })

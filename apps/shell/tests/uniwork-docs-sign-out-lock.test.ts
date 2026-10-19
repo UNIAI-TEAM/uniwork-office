@@ -1646,4 +1646,33 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     const taken = await parked.take(DOC)
     expect(new TextDecoder().decode(taken?.bytes)).toBe('newest docx candidate')
   })
+
+  it('29. A87 (UNI-1362): an interactive signOutPlan prunes cancelled plans of non-live scopes while preserving interleaved boundary plans', async () => {
+    const pathA = seedWorkingCopy({ bytes: 'A unsaved a87', baseBytes: 'v3 base' })
+    const pathB = seedWorkingCopy({
+      docId: '01J8X4DOCBBBBBBBBBBBBBBBBB',
+      accountId: 'acc_2',
+      bytes: 'B unsaved a87',
+      baseBytes: 'v3 base',
+    })
+    const ctx = setup({
+      keystoreLocked: true,
+      openPaths: [pathA, pathB],
+    })
+    // white-box read of private plannedRamOnly map to verify lifetime bound
+    const internals: { plannedRamOnly: Map<string, Set<string>> } = ctx.service as never
+    const planned = internals.plannedRamOnly
+
+    // Account A runs an interactive signOutPlan() and cancels (never locks or restores)
+    await ctx.service.signOutPlan()
+    expect(planned.has('default/acc_1')).toBe(true)
+
+    // Session moves to acc_2 and runs an interactive signOutPlan(): acc_1's stale
+    // cancelled plan is pruned so never-locked scopes cannot accumulate
+    ctx.setAccount('acc_2')
+    ctx.service.noteSessionIdentity()
+    await ctx.service.signOutPlan()
+    expect(planned.has('default/acc_1')).toBe(false)
+    expect(planned.has('default/acc_2')).toBe(true)
+  })
 })
