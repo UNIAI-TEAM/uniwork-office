@@ -6742,9 +6742,14 @@ export class UniworkDocsService {
     }
     const fresh = this.store.lookup(doc.path)
     if (!fresh) return
-    // a save or the schema 1 -> 2 sweep took the copy while it was fetching:
-    // the fetched bytes may not be written over it
-    if (this.coordinator.isSaving(fresh.path) || this.heldByMigration(fresh.dir)) {
+    // a save, a first-save naming hold (UNI-1959: the module already wrote the
+    // bytes the upload waits on) or the schema 1 -> 2 sweep took the copy while
+    // it was fetching: the fetched bytes may not be written over it
+    if (
+      this.coordinator.isSaving(fresh.path) ||
+      this.firstSaveOps.has(pathKey(fresh.path)) ||
+      this.heldByMigration(fresh.dir)
+    ) {
       await this.showRemoteBar(fresh, notice, { kind: 'newer-dirty', version: notice.version })
       return
     }
@@ -6790,10 +6795,15 @@ export class UniworkDocsService {
     const done = await this.coordinator.commitState(fresh, next)
     const final = await this.editorState(done.path)
     const lateMove = final.aiEpoch !== before.aiEpoch
-    if (final.dirty === true || final.aiRunning || lateMove) {
+    // UNI-1959: a first Save that landed after the pre-write check is held by its naming op
+    const lateSave = this.firstSaveOps.has(pathKey(done.path))
+    if (final.dirty === true || final.aiRunning || lateMove || lateSave) {
       // a turn (or an edit) started after the write: the previous copy goes back
-      // byte for byte, binding included, and the bar says why
-      await this.restoreWorkingCopy(done, previousBinding, previousBytes)
+      // byte for byte, binding included, and the bar says why. A late Save may
+      // already have written the person's bytes over the fetched head: those
+      // stay, and only the binding goes back
+      const ownBytes = lateSave && !(await this.holdsBytes(done.path, fetched.bytes))
+      await this.restoreWorkingCopy(done, previousBinding, ownBytes ? null : previousBytes)
       const restored = this.store.lookup(path)
       if (restored) {
         await this.showRemoteBar(restored, notice, {
@@ -6810,16 +6820,24 @@ export class UniworkDocsService {
     if (shown) this.publish(toStatus(shown))
   }
 
-  /** undo the write of a reload the last read refused */
+  /** undo the write of a reload the last read refused (`bytes` null: the file is not touched) */
   private async restoreWorkingCopy(
     doc: BoundDocument,
     binding: Binding,
-    bytes: Uint8Array,
+    bytes: Uint8Array | null,
   ): Promise<void> {
-    await this.store.writeWorkingCopy(doc.dir, binding.filename, bytes).catch(() => undefined)
+    if (bytes) {
+      await this.store.writeWorkingCopy(doc.dir, binding.filename, bytes).catch(() => undefined)
+    }
     // the coordinator's chain, so the restore cannot interleave with a save's
     // own binding write for the same document
     await this.coordinator.commitState(doc, binding)
+  }
+
+  /** whether the file at `path` still holds exactly `bytes` (an unreadable file does not) */
+  private async holdsBytes(path: string, bytes: Uint8Array): Promise<boolean> {
+    const current = await readFile(path).catch(() => null)
+    return current !== null && sha256Hex(new Uint8Array(current)) === sha256Hex(bytes)
   }
 
   /** the rule order again for a notice whose bar needs a fresh verdict (an AI turn ended) */
