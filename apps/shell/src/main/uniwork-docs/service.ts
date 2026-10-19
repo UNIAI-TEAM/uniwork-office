@@ -4162,7 +4162,12 @@ export class UniworkDocsService {
           let pages = 0
           do {
             const page: Awaited<ReturnType<typeof api.listSharedWithMe>> =
-              await api.listSharedWithMe({ workspaceId: ws.id, cursor, limit: SHARED_PAGE_SIZE })
+              await api.listSharedWithMe({
+                workspaceId: ws.id,
+                cursor,
+                limit: SHARED_PAGE_SIZE,
+                ...(query.includePages === true ? { includePages: true } : {}),
+              })
             for (const doc of page.documents) {
               if (!merged.has(doc.id)) {
                 merged.set(doc.id, {
@@ -5685,6 +5690,7 @@ export class UniworkDocsService {
         ...(typeof query.query === 'string' ? { query: query.query } : {}),
         ...(typeof query.cursor === 'string' ? { cursor: query.cursor } : {}),
         ...(typeof query.limit === 'number' ? { limit: query.limit } : {}),
+        ...(query.includePages === true ? { includePages: true } : {}),
         ...this.listFiltersOf(query),
       })
       const documents = await this.enrichWorkspaceRows(query.workspaceId, page.documents)

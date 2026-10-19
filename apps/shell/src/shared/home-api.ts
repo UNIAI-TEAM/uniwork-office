@@ -243,7 +243,8 @@ export interface UniworkDocSummary {
   archived?: boolean
   /**
    * FD-11: what the row is. Always present on `listChildren` and search rows;
-   * `'file'` on the library (`listDocuments`) and shared-with-me routes.
+   * `'file'` on the library (`listDocuments`) and shared-with-me routes, which
+   * add `'page'` only when asked (`includePages`).
    */
   kind?: UniworkEntryKind
   /** FD-11: the folder/page holding the document; null = the workspace root */
@@ -350,6 +351,11 @@ export interface UniworkDocListQuery extends UniworkListFilters {
   query?: string
   cursor?: string
   limit?: number
+  /**
+   * UNI-1953: also list UniNote pages (the Documents home). Unset = files only,
+   * which every picker and every list that downloads keeps.
+   */
+  includePages?: boolean
 }
 
 export type UniworkResult<T> = { ok: true; value: T } | { ok: false; error: UniworkDocErrorCode }
@@ -365,6 +371,8 @@ export interface UniworkSharedQuery {
   cursor?: string
   /** page size, default 50, max 100 */
   limit?: number
+  /** UNI-1953: also list UniNote pages (the Documents home); unset = files only */
+  includePages?: boolean
 }
 
 export type UniworkSharedPage = UniworkDocListPage
