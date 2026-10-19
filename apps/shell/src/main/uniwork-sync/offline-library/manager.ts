@@ -199,6 +199,8 @@ export interface OfflineLibraryManagerOptions {
 interface Job {
   controller: AbortController
   done: Promise<unknown>
+  /** the download is stopped for a discard: from now on it publishes and persists nothing */
+  silence(): void
 }
 
 /** one download: the row it started from and the staging generation it writes */
@@ -208,6 +210,8 @@ interface DownloadJob {
   generation: string
   keys: string[]
   controller: AbortController
+  /** set only by the discarding pin's stop (FUSR-R4-3, UNI-1362) */
+  silenced: boolean
   /** false once a boundary (sign-out, account switch) passed */
   live(): boolean
 }
@@ -551,10 +555,15 @@ export class OfflineLibraryManager {
     return this.unsaved.get(record.documentId) ?? record
   }
 
-  /** stop a download of the document and wait until it cleaned its staging */
-  private async stopJob(documentId: string): Promise<void> {
+  /**
+   * stop a download of the document and wait until it cleaned its staging. A
+   * `silence` stop is the discarding pin's: the row the job would settle is
+   * deleted a moment later, so the job must not announce or write it.
+   */
+  private async stopJob(documentId: string, options: { silence?: boolean } = {}): Promise<void> {
     const job = this.jobs.get(documentId)
     if (!job) return
+    if (options.silence) job.silence()
     job.controller.abort()
     await job.done.catch(() => undefined)
   }
@@ -712,12 +721,26 @@ export class OfflineLibraryManager {
     this.progress.set(documentId, { receivedBytes: 0, totalBytes: total })
     this.changed(documentId)
     const controller = new AbortController()
-    const job: DownloadJob = { record, manifest, generation, keys, controller, live }
+    const job: DownloadJob = {
+      record,
+      manifest,
+      generation,
+      keys,
+      controller,
+      silenced: false,
+      live,
+    }
     const done = this.transfer(job).finally(() => {
       if (this.jobs.get(documentId)?.controller === controller) this.jobs.delete(documentId)
       this.progress.delete(documentId)
     })
-    this.jobs.set(documentId, { controller, done })
+    this.jobs.set(documentId, {
+      controller,
+      done,
+      silence: () => {
+        job.silenced = true
+      },
+    })
     return { kind: 'started', done }
   }
 
@@ -738,13 +761,13 @@ export class OfflineLibraryManager {
       signal: job.controller.signal,
       live,
       onProgress: (progress) => {
-        if (!live()) return
+        if (!live() || job.silenced) return
         this.progress.set(documentId, progress)
         this.changed(documentId)
       },
       onVerifying: () =>
         this.withDoc(documentId, async () => {
-          if (!live()) return
+          if (!live() || job.silenced) return
           const current = await this.options.store.getPin(documentId)
           if (current.kind !== 'ok' || current.record.staging?.generation !== generation) return
           await this.writePin({ ...current.record, state: 'verifying' }, live)
@@ -770,6 +793,12 @@ export class OfflineLibraryManager {
       state: 'interrupted',
       staging: null,
       progress: null,
+    }
+    // stopped for a discard: the pin deletes the row, so only this job's own staging
+    // goes, and nothing is written or announced (FUSR-R4-3, UNI-1362)
+    if (job.silenced) {
+      await wipeKeys(this.options.store, keys, live)
+      return stopped
     }
     // the scope was wiped or switched: nothing of it is kept, nothing is written
     // (not even a delete: it would re-open the wiped scope and re-create its
@@ -1002,7 +1031,7 @@ export class OfflineLibraryManager {
       }
       // a transfer still runs for the row this pin discards: it stops outside the
       // document lock (its settle takes that lock), then the pin looks again
-      await this.stopJob(documentId)
+      await this.stopJob(documentId, { silence: true })
       if (!live()) return refused('interrupted')
     }
     // the transfer runs outside the document lock (T5-2)
