@@ -7641,11 +7641,16 @@ export class UniworkDocsService {
     // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
     // user's snapshot is spent (superseded), never replayed against the new base
     const releaseSession = await this.supersedePendingDeferRelease(chosen)
-    // the old base's intent is invalid on the server's revision
-    await this.dropIntent(chosen)
-    const ready = await this.coordinator.commitState(chosen, next)
-    // the superseded intent's upload session is released now that the local steps are done
-    await releaseSession()
+    let ready: BoundDocument
+    try {
+      // the old base's intent is invalid on the server's revision
+      await this.dropIntent(chosen)
+      ready = await this.coordinator.commitState(chosen, next)
+    } finally {
+      // the superseded intent's upload session is released after the local steps, and also
+      // when one of them fails, so the server session is never leaked
+      await releaseSession()
+    }
     if (!currentView.online) {
       await this.coordinator.save(ready.path, { forceOffline: true })
       open.controller.abort()
@@ -7765,35 +7770,40 @@ export class UniworkDocsService {
     // "Tải lại": the old intent is superseded BEFORE the base is replaced, so
     // it is spent (cancelled/superseded), never replayed against the new base
     const releaseSession = await this.supersedePendingDeferRelease(doc)
-    await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
-    // the local work (and its intent) is discarded: nothing is left to replay
-    await this.dropIntent(doc)
-    const fresh: Binding = {
-      ...doc.binding,
-      title: detail.title,
-      access: accessFor(detail.myLevel),
-      baseRevision: detail.revision,
-      baseVersion: detail.file.version,
-      baseChecksum: sha256Hex(bytes),
-      // the old intent is superseded below; the copy reads saved
-      state: 'saved',
+    let done: BoundDocument
+    try {
+      await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
+      // the local work (and its intent) is discarded: nothing is left to replay
+      await this.dropIntent(doc)
+      const fresh: Binding = {
+        ...doc.binding,
+        title: detail.title,
+        access: accessFor(detail.myLevel),
+        baseRevision: detail.revision,
+        baseVersion: detail.file.version,
+        baseChecksum: sha256Hex(bytes),
+        // the old intent is superseded below; the copy reads saved
+        state: 'saved',
+      }
+      // the base moved: the old version id must not survive an unknown new one
+      delete fresh.baseVersionId
+      const next = withServerContext(fresh, detail)
+      delete next.error
+      delete next.serverRevision
+      delete next.serverVersion
+      // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
+      this.lastUserSave.set(doc.path, ++this.saveCounter)
+      this.editorDirty.delete(doc.path)
+      done = await this.coordinator.commitState(doc, next)
+      // the bar belonged to the replaced base: the copy is at the head now
+      this.remoteBars.delete(pathKey(doc.path))
+      this.remoteNotices.delete(pathKey(doc.path))
+      this.deps.reloadPath(doc.path)
+    } finally {
+      // the superseded intent's upload session is released after the local steps, and also
+      // when one of them fails, so the server session is never leaked
+      await releaseSession()
     }
-    // the base moved: the old version id must not survive an unknown new one
-    delete fresh.baseVersionId
-    const next = withServerContext(fresh, detail)
-    delete next.error
-    delete next.serverRevision
-    delete next.serverVersion
-    // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
-    this.lastUserSave.set(doc.path, ++this.saveCounter)
-    this.editorDirty.delete(doc.path)
-    const done = await this.coordinator.commitState(doc, next)
-    // the bar belonged to the replaced base: the copy is at the head now
-    this.remoteBars.delete(pathKey(doc.path))
-    this.remoteNotices.delete(pathKey(doc.path))
-    this.deps.reloadPath(doc.path)
-    // the superseded intent's upload session is released now that the local steps are done
-    await releaseSession()
     return done
   }
 

@@ -1665,6 +1665,42 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
       await flow
     })
 
+    it('N1 residual: Reload whose local working-copy write fails still releases the superseded upload session', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      await seedRetainedSession(ctx, path, 'bytes of the paused intent')
+      const store = (ctx.service as unknown as { store: { writeWorkingCopy: () => Promise<void> } })
+        .store
+      vi.spyOn(store, 'writeWorkingCopy').mockRejectedValue(new Error('ENOSPC: no space left'))
+      const sessionDeletes = () =>
+        server.calls.filter(
+          (c) => c.method === 'DELETE' && c.path === '/api/v1/upload-sessions/ups_old',
+        )
+      // the DELETE is a fire-and-await closure; let the gated mock answer it
+      const origFetch = server.fetch.getMockImplementation()!
+      server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+        const u = new URL(url)
+        if (u.pathname === '/api/v1/upload-sessions/ups_old' && init.method === 'DELETE') {
+          server.calls.push({ method: 'DELETE', path: u.pathname, headers: {} })
+          return new Response(null, { status: 204 })
+        }
+        return origFetch(url, init)
+      })
+
+      const result = await ctx.service.conflictAct(view.sessionId, {
+        kind: 'reload',
+        keep: 'discard',
+        stopAi: false,
+      })
+
+      expect(result.kind).toBe('view')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      expect(sessionDeletes()).toHaveLength(1)
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
     it('BE-403: a dialog aborted while drafts.keep runs does not reload the tab; the kept draft stays', async () => {
       const server = fakeServer()
       const ctx = setup(server)
