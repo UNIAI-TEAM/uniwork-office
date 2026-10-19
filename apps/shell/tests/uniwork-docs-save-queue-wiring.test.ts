@@ -49,6 +49,8 @@ const profile: DeploymentProfile = {
 const DOC = '01J8X4DOC0N1P2Q3R4S5T6U7'
 const enc = (text: string) => new TextEncoder().encode(text)
 const hex = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+/** a presigned URL / claim expiry always one hour ahead: a fixed date turns every URL "expired" the day it passes */
+const expiresAt = (): string => new Date(Date.now() + 60 * 60 * 1000).toISOString()
 
 interface Call {
   method: string
@@ -217,7 +219,7 @@ function fakeServer(initial: {
           method: 'PUT',
           url: `${ORIGIN}/storage/part/${id}/${n}`,
           headers: {},
-          expires_at: '2026-10-19T00:00:00Z',
+          expires_at: expiresAt(),
         })
       }
       return out
@@ -238,7 +240,7 @@ function fakeServer(initial: {
         session_id: id,
         part_size: sessionPartSize,
         total_parts: sessions.get(id)!.totalParts,
-        expires_at: '2026-10-19T00:00:00Z',
+        expires_at: expiresAt(),
         parts: missingParts(id),
       })
     }
@@ -258,7 +260,7 @@ function fakeServer(initial: {
           size: s.parts.get(n)!.byteLength,
         })),
         parts: missingParts(sessionId),
-        expires_at: '2026-10-19T00:00:00Z',
+        expires_at: expiresAt(),
       })
     }
     if (sessionId && init.method === 'DELETE') {
@@ -279,7 +281,7 @@ function fakeServer(initial: {
         upload_id: upload.id,
         checksum_sha256: upload.checksum,
         size_bytes: bytes.byteLength,
-        claim_expires_at: '2026-10-19T00:00:00Z',
+        claim_expires_at: expiresAt(),
       })
     }
     const partId = u.pathname.match(/^\/storage\/part\/([^/]+)\/(\d+)$/)
