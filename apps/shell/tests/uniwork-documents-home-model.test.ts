@@ -80,15 +80,10 @@ describe('DH1-W2 documents-home-model', () => {
     expect(starred.available).toBe(false)
     expect(archive.available).toBe(false)
 
+    // UNI-1957: My Folder is the tree row (or its stand-in), not a sub-nav entry
+    expect(getDocumentsHomeNavEntry('my-folder').available).toBe(false)
     const visibleIds = visibleDocumentsHomeNavEntries().map((e) => e.id)
-    expect(visibleIds).toEqual([
-      'workspace',
-      'my-folder',
-      'recent',
-      'shared-with-me',
-      'shared-by-me',
-      'trash',
-    ])
+    expect(visibleIds).toEqual(['workspace', 'recent', 'shared-with-me', 'shared-by-me', 'trash'])
     expect(visibleIds).not.toContain('starred')
     expect(visibleIds).not.toContain('archive')
   })

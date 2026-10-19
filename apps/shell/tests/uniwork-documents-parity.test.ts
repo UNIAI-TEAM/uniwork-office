@@ -43,8 +43,7 @@ const mineNode: UniworkFolderNode = {
   parentId: null,
   title: 'My Folder',
   position: 0,
-  kind: 'my_folder',
-  isSystem: true,
+  systemKind: 'my_folder',
   children: [],
 }
 const boardNode: UniworkFolderNode = {

@@ -530,6 +530,8 @@ export function DocumentsHome({
         if (listSeqRef.current !== seq) return
         if (ensuredMyFolder) {
           setMyFolderId(ensuredMyFolder.id)
+          // the tree row takes the stand-in's place
+          setTreeTick((n) => n + 1)
         }
         if (result.ok) {
           const items = result.value.items
@@ -1093,6 +1095,8 @@ export function DocumentsHome({
     return '\u0000none'
   }, [sidebarIdle, subView, resolvedMyFolderId, folderId])
 
+  const myFolderStandInCurrent = !sidebarIdle && subView === 'my-folder'
+
   const sidebarContent = (
     <div className="dh-sidebar-wrap">
       <nav className="dh-subnav home-area-nav" aria-label={t('ufAreaUniwork')}>
@@ -1148,6 +1152,25 @@ export function DocumentsHome({
           </button>
         </div>
         <div className="dh-sidebar-tree">
+          {/* My Folder lives in the tree; until the server has created it, this row stands in its place and creates it. */}
+          {tree.status !== 'loading' && !myFolderIdOf(tree.nodes) && (
+            <button
+              type="button"
+              data-my-folder-standin=""
+              className={`uwf-tree-row dh-my-folder-standin${myFolderStandInCurrent ? ' selected' : ''}`}
+              aria-current={myFolderStandInCurrent ? 'page' : undefined}
+              onClick={() => {
+                onSidebarNavigate?.()
+                selectSubView('my-folder')
+              }}
+            >
+              <span className="uwf-twisty" aria-hidden="true" />
+              <MyFolderGlyph />
+              <span className="uwf-tree-text">
+                <span className="uwf-tree-title">{myFolderLabel}</span>
+              </span>
+            </button>
+          )}
           {tree.status === 'loading' && (
             <p className="uwf-side-state" role="status">
               {t('uwPickLoading')}
@@ -1629,6 +1652,7 @@ export function DocumentsHome({
                               label={t('ufActionsFor', { name: title })}
                               items={menuItems}
                               dataFor={folder.id}
+                              tabbable
                               open={openMenuId === folder.id}
                               onOpenChange={(o) => setOpenMenuId(o ? folder.id : null)}
                             />

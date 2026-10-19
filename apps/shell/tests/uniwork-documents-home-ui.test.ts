@@ -298,7 +298,6 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     )
     expect(navButtons.map((b) => b.getAttribute('data-nav'))).toEqual([
       'workspace',
-      'my-folder',
       'recent',
       'shared-with-me',
       'shared-by-me',
@@ -306,7 +305,6 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     ])
     expect(navButtons.map((b) => b.textContent?.trim())).toEqual([
       'Tài liệu của workspace',
-      'Thư mục của tôi',
       'Gần đây',
       'Được chia sẻ với tôi',
       'Tôi đã chia sẻ',

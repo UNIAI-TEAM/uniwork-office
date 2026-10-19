@@ -119,6 +119,26 @@
   overflow-y: auto;
 }
 
+/* UNI-1957: the My Folder stand-in is a tree row (same box, glyph and selected look), indented as one */
+.dh-my-folder-standin {
+  width: 100%;
+  padding-block: 0;
+  padding-inline-start: 18px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+}
+
+.dh-my-folder-standin:hover {
+  background: var(--hover);
+}
+
+.dh-my-folder-standin.selected {
+  background: var(--accent-soft);
+}
+
 /* Main workspace pane */
 .dh-main {
   display: flex;
@@ -820,6 +840,11 @@
   .dh-view-btn {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  /* the card's "…" is 44px here (.uw-pick-info-btn) + the actions box's 12px: keep the name clear of both */
+  .dh-folder-open {
+    padding-right: 60px;
   }
 }
 
