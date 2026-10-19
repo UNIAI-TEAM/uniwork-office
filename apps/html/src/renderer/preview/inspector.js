@@ -975,6 +975,8 @@
         e.key.toLowerCase() === 'p'
       ) {
         e.preventDefault()
+        // a run being typed lives only in this DOM: commit it first so the host serializes it
+        finishEdit(true)
         post({ type: 'gx:keyCommand', command: 'print' })
         return
       }

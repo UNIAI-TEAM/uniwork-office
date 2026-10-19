@@ -128,21 +128,23 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
     messages.length = 0
     expect(pressP()).toBe(true)
     expect(pressP({ key: 'P', ctrlKey: false, metaKey: true })).toBe(true)
+    // the first press ends the (unchanged) edit as a cancel, the second finds no edit
     expect(messages).toEqual([
+      { type: 'gx:textEditCancel', version: 1 },
       { type: 'gx:keyCommand', command: 'print', version: 1 },
       { type: 'gx:keyCommand', command: 'print', version: 1 },
     ])
     // a held press is suppressed (no second browser dialog beside the module's) but runs nothing
     expect(pressP({ repeat: true })).toBe(true)
-    expect(messages).toHaveLength(2)
+    expect(messages).toHaveLength(3)
     // Shift or Alt variants stay the browser's
     expect(pressP({ shiftKey: true })).toBe(false)
     expect(pressP({ altKey: true })).toBe(false)
-    expect(messages).toHaveLength(2)
+    expect(messages).toHaveLength(3)
 
     send({ type: 'gx:printKey', claim: false })
     expect(pressP()).toBe(false)
-    expect(messages).toHaveLength(2)
+    expect(messages).toHaveLength(3)
   })
 
   // UNI-1919 (RC-1): the typed run lives only in the preview DOM; it must reach the host before
