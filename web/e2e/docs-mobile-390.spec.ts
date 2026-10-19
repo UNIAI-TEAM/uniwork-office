@@ -83,6 +83,30 @@ for (const [name, query] of [
   })
 }
 
+/**
+ * Scroll the tab row sideways and wait until the scroll has settled: a programmatic scroll fires its
+ * `scroll` event on the next rendering update, which would otherwise land after a click that opens
+ * the File menu and close it again (the row closes the menu on scroll).
+ */
+async function scrollTabRow(ed: Frame, left: number): Promise<number> {
+  return ed.evaluate(
+    (x) =>
+      new Promise<number>((done) => {
+        const row = document.querySelector('.ribbon-tabs') as HTMLElement
+        const settle = () =>
+          requestAnimationFrame(() => requestAnimationFrame(() => done(row.scrollLeft)))
+        const before = row.scrollLeft
+        row.addEventListener('scroll', settle, { once: true })
+        row.scrollLeft = x
+        if (row.scrollLeft === before) {
+          row.removeEventListener('scroll', settle)
+          settle()
+        }
+      }),
+    left,
+  )
+}
+
 for (const [name, query] of [
   ['editable', ''],
   ['view-only', '&readonly=1'],
@@ -92,12 +116,7 @@ for (const [name, query] of [
   }) => {
     await page.setViewportSize(narrow)
     const ed = await openDoc(page, query)
-    const scrolled = await ed.evaluate(() => {
-      const row = document.querySelector('.ribbon-tabs') as HTMLElement
-      row.scrollLeft = 30
-      return row.scrollLeft
-    })
-    expect(scrolled).toBeGreaterThan(0)
+    expect(await scrollTabRow(ed, 30)).toBeGreaterThan(0)
     // press the File tab itself (a DOM click: Playwright would scroll the row back first)
     await ed.evaluate(() => (document.querySelector('.ribbon-tab-file') as HTMLElement).click())
     await expect(ed.locator('.file-menu')).toBeVisible()
@@ -108,35 +127,53 @@ for (const [name, query] of [
     })
     // painted under the File tab where it now is, and hit-testable
     expect(geo.menuTop).toBeGreaterThanOrEqual(geo.tabBottom - 1)
-    expect(Math.abs(geo.menuLeft - geo.tabLeft)).toBeLessThanOrEqual(2)
+    expect(geo.menuTop - geo.tabBottom).toBeLessThanOrEqual(8)
+    expect(Math.abs(geo.menuLeft - Math.max(geo.tabLeft, 8))).toBeLessThanOrEqual(2)
     const items = await hitTestMenu(ed)
     expect(items.length).toBeGreaterThan(0)
-    expect(items[0], items[0]!.label).toEqual({
-      label: items[0]!.label,
-      inViewport: true,
-      hitInMenu: true,
-    })
-
-    // scrolling the row afterwards never leaves a menu floating away from its tab
-    await ed.evaluate(() => {
-      ;(document.querySelector('.ribbon-tabs') as HTMLElement).scrollLeft = 80
-    })
-    await page.waitForTimeout(200)
-    if ((await ed.locator('.file-menu').count()) > 0) {
-      const after = await ed.evaluate(() => {
-        const m = document.querySelector('.file-menu')!.getBoundingClientRect()
-        const tab = document.querySelector('.ribbon-tab-file')!.getBoundingClientRect()
-        return { menuLeft: m.left, tabLeft: tab.left }
-      })
-      expect(Math.abs(after.menuLeft - after.tabLeft)).toBeLessThanOrEqual(2)
+    for (const item of items) {
+      expect(item, item.label).toEqual({ label: item.label, inViewport: true, hitInMenu: true })
     }
+
+    // scrolling the row afterwards closes the menu: it never floats away from its tab
+    await scrollTabRow(ed, 80)
+    await expect(ed.locator('.file-menu')).toHaveCount(0)
     // scrolled back, the File tab opens the menu again
-    await ed.evaluate(() => {
-      ;(document.querySelector('.ribbon-tabs') as HTMLElement).scrollLeft = 0
-    })
+    await scrollTabRow(ed, 0)
     await ed.locator('.ribbon-tab-file').click()
     await expect(ed.locator('.file-menu')).toBeVisible()
     for (const item of await hitTestMenu(ed)) expect(item.hitInMenu, item.label).toBe(true)
+  })
+
+  test(`docs-mobile-390: File menu clamps to the viewport edge with the File tab scrolled off (${name})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(narrow)
+    const ed = await openDoc(page, query)
+    // as far as the row scrolls: the File tab (first in the row) is then fully off the left edge
+    await scrollTabRow(ed, 100_000)
+    const tab = await ed.evaluate(() => {
+      const r = document.querySelector('.ribbon-tab-file')!.getBoundingClientRect()
+      return { left: r.left, right: r.right, bottom: r.bottom }
+    })
+    expect(tab.right).toBeLessThanOrEqual(0)
+    await ed.evaluate(() => (document.querySelector('.ribbon-tab-file') as HTMLElement).click())
+    await expect(ed.locator('.file-menu')).toBeVisible()
+    const geo = await ed.evaluate(() => {
+      const m = document.querySelector('.file-menu')!.getBoundingClientRect()
+      return { top: m.top, left: m.left, right: m.right, vw: window.innerWidth }
+    })
+    // intended: the menu hangs under the tab row at the viewport's left edge (8px margin), whole
+    // inside the phone frame and hit-testable, not at the off-screen tab position
+    expect(geo.top).toBeGreaterThanOrEqual(tab.bottom - 1)
+    expect(geo.left).toBeGreaterThanOrEqual(0)
+    expect(Math.abs(geo.left - 8)).toBeLessThanOrEqual(2)
+    expect(geo.right).toBeLessThanOrEqual(geo.vw)
+    const items = await hitTestMenu(ed)
+    expect(items.length).toBeGreaterThan(0)
+    for (const item of items) {
+      expect(item, item.label).toEqual({ label: item.label, inViewport: true, hitInMenu: true })
+    }
   })
 }
 
