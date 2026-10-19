@@ -308,7 +308,7 @@ export function AccountPane({ account }: { account: AccountController }) {
       )}
 
       {account.signOutTimedOut && (
-        <div className="acct-notice warn" role="status" aria-live="polite">
+        <div className="acct-notice info" role="status" aria-live="polite">
           <div className="acct-notice-text">
             <div className="acct-notice-body">{t('uwSignOutTimedOut')}</div>
           </div>
