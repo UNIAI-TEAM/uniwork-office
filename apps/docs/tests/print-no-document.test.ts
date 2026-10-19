@@ -3,6 +3,11 @@
 // print dialog and sets no message.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { printDoc, type FileActionContext } from '../src/renderer/file-actions'
+import {
+  setToastEmitter,
+  toastStatusLine,
+  type ToastData,
+} from '../src/renderer/components/toast-bus'
 import { setModuleLang, t } from '../src/renderer/i18n/locale'
 
 function ctxWith(doc: unknown) {
@@ -22,6 +27,8 @@ function ctxWith(doc: unknown) {
 afterEach(() => {
   document.body.innerHTML = ''
   setModuleLang('en')
+  setToastEmitter(null)
+  vi.unstubAllGlobals()
 })
 
 describe('printDoc with no document', () => {
@@ -36,6 +43,41 @@ describe('printDoc with no document', () => {
     expect(t('appPrintNoDocument')).toBe(text)
     expect(setShowPrintDialog).not.toHaveBeenCalled()
     expect(setShowPagePreview).not.toHaveBeenCalled()
+  })
+})
+
+// UNI-1931 (FE1-3): a phone-width frame shows the message as a toast. A repeat sets the identical
+// status (React bails out, App's status effect does not run), so printDoc toasts it itself.
+describe('printDoc with no document at phone width', () => {
+  it('toasts on every press, and the status toast does not double a press', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    const seen: ToastData[] = []
+    setToastEmitter((toast) => seen.push(toast))
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const { ctx, setStatus } = ctxWith(null)
+    // App's status effect runs after the render that followed the first press, i.e. after printDoc
+    let pending: unknown = null
+    setStatus.mockImplementation((line) => (pending = line))
+    printDoc(ctx)
+    toastStatusLine(pending as string, t)
+    expect(seen).toEqual([{ text: 'Open a document to print it.', kind: 'info' }])
+    // second press: same status string, no effect run, still a toast
+    setStatus.mockImplementation(() => {})
+    vi.advanceTimersByTime(1000)
+    printDoc(ctx)
+    expect(seen).toHaveLength(2)
+    vi.useRealTimers()
+  })
+
+  it('does not toast on a wide frame (the status bar shows the message)', () => {
+    const seen: ToastData[] = []
+    setToastEmitter((toast) => seen.push(toast))
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const { ctx, setStatus } = ctxWith(null)
+    printDoc(ctx)
+    expect(setStatus).toHaveBeenCalledOnce()
+    expect(seen).toEqual([])
   })
 })
 
