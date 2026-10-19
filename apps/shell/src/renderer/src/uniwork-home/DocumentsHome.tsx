@@ -74,7 +74,6 @@ import {
   pickUploadFile,
   renameDocument,
   restoreDocument,
-  listFolderChildren,
   searchDocuments,
   uploadDocument,
 } from '../uniwork-library-api'
@@ -105,12 +104,7 @@ import {
   type UpdatedByOption,
 } from './documents-home-model'
 import { NewMenu } from './NewMenu'
-import {
-  CREATE_SPECIFIC_ERRORS,
-  NEW_DEFAULT_NAME_KEY,
-  NEW_KIND_EXT,
-  isFolderWorkspaceShared,
-} from './new-menu-model'
+import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
 
@@ -238,12 +232,6 @@ export interface DocumentsHomeProps {
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
 }
 
-/** UNI-1959: what a listed folder says about being shared with the workspace */
-interface FolderShareMeta {
-  visibility?: string
-  shareScope?: { homeWorkspace: boolean }
-}
-
 type TreeState =
   | { status: 'loading'; nodes: UniworkFolderNode[] }
   | { status: 'ready'; nodes: UniworkFolderNode[] }
@@ -310,9 +298,6 @@ export function DocumentsHome({
   const [unavailableKinds, setUnavailableKinds] = useState<ReadonlySet<NewDocKind>>(new Set())
   const [creating, setCreating] = useState(false)
   const creatingRef = useRef(false)
-  // UNI-1959: the folders this view has listed, by id: the open folder's visibility / share_scope
-  // decides whether the share toggle is inherited
-  const [folderMeta, setFolderMeta] = useState<Record<string, FolderShareMeta>>({})
   const [uploadModal, setUploadModal] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
@@ -799,64 +784,9 @@ export function DocumentsHome({
     }
   }
 
-  // UNI-1959: the open folder (workspace view) is workspace-shared: the share toggle is inherited
-  const openFolderId = subView === 'workspace' ? folderId : null
-  const parentShared = openFolderId !== null && isFolderWorkspaceShared(folderMeta[openFolderId])
-  // what a create sends: only an own "Share with workspace" choice; a shared folder inherits
+  // what a create sends: the "Share with workspace" choice, for documents only (a folder is never shared)
   const createVisibility = (): UniworkCreateVisibility | undefined =>
-    shareWithWorkspace && !parentShared ? 'workspace' : undefined
-
-  // the listed folders' share state, read from the rows this view loads
-  useEffect(() => {
-    const seen: Record<string, FolderShareMeta> = {}
-    for (const item of page.items) {
-      if (item.kind !== 'folder') continue
-      seen[item.id] = {
-        ...(item.visibility ? { visibility: item.visibility } : {}),
-        ...(item.shareScope ? { shareScope: item.shareScope } : {}),
-      }
-    }
-    if (Object.keys(seen).length === 0) return
-    setFolderMeta((prev) => {
-      const changed = Object.entries(seen).some(
-        ([id, meta]) => JSON.stringify(prev[id]) !== JSON.stringify(meta),
-      )
-      return changed ? { ...prev, ...seen } : prev
-    })
-  }, [page.items])
-
-  // a folder opened from the tree or a crumb, whose parent this view has not listed: read the
-  // parent's contents (a few pages at most) for the folder's own row
-  useEffect(() => {
-    if (openFolderId === null || folderMeta[openFolderId] || tree.status !== 'ready') return
-    const parentId = index.get(openFolderId)?.parentId ?? null
-    let live = true
-    void (async () => {
-      let cursor: string | undefined
-      for (let pageNo = 0; pageNo < 5; pageNo++) {
-        const res = await listFolderChildren({ workspaceId, parentId, cursor, limit: 100 })
-        if (!live || !res.ok) return
-        const own = res.value.items.find((row) => row.id === openFolderId)
-        if (own) {
-          setFolderMeta((prev) => ({
-            ...prev,
-            [openFolderId]: {
-              ...(own.visibility ? { visibility: own.visibility } : {}),
-              ...(own.shareScope ? { shareScope: own.shareScope } : {}),
-            },
-          }))
-          return
-        }
-        cursor = res.value.nextCursor ?? undefined
-        if (!cursor) return
-      }
-    })().catch(() => undefined)
-    return () => {
-      live = false
-    }
-    // one read per newly opened, still unknown folder
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openFolderId, workspaceId, tree.status])
+    shareWithWorkspace ? 'workspace' : undefined
 
   /** My Folder when no folder is known yet: main also places a null-folder create there */
   const ensureTargetFolder = async (target: DocTarget): Promise<string | null> => {
@@ -923,11 +853,7 @@ export function DocumentsHome({
   const createFolderHere = () => {
     const parentId = activeTargetFolder.folderId
     if (parentId === null) return
-    const visibility = createVisibility()
-    folderActions.openCreate(parentId, true, {
-      initial: t(NEW_DEFAULT_NAME_KEY.folder),
-      ...(visibility ? { visibility } : {}),
-    })
+    folderActions.openCreate(parentId, true, { initial: t(NEW_DEFAULT_NAME_KEY.folder) })
   }
 
   const hasFolderRow =
@@ -1433,11 +1359,7 @@ export function DocumentsHome({
             unavailable={unavailableKinds}
             unavailableHint={t('uhCreateUnavailableHint')}
             busy={creating}
-            share={{
-              checked: parentShared || shareWithWorkspace,
-              inherited: parentShared,
-              onChange: setShareWithWorkspace,
-            }}
+            share={{ checked: shareWithWorkspace, onChange: setShareWithWorkspace }}
             onPick={(kind) => {
               if (kind === 'folder') createFolderHere()
               else void createNow(kind, false)

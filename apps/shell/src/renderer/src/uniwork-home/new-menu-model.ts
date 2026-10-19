@@ -4,7 +4,7 @@ import type { NewDocKind } from '../uniwork-docs-model'
 /**
  * UNI-1959: the pieces of the Documents home "New" menu and Quick create strip
  * that are data, not markup - the web's rows (documents-home-create.tsx), their
- * extension text, the web's default names and the "shared folder" rule.
+ * extension text and the web's default names.
  */
 
 /** the menu's rows in the web's order; Folder is added in front inside an open folder */
@@ -43,20 +43,6 @@ export const NEW_DEFAULT_NAME_KEY: Record<NewMenuKind, StringKey> = {
   html: 'uhDefaultNameHtml',
   pdf: 'uhDefaultNamePdf',
   folder: 'uhDefaultNameFolder',
-}
-
-/**
- * The web's `isParentWorkspaceShared`: the open folder already has a grant for
- * its home workspace (`share_scope.home_workspace`), or - when the row carries
- * no `share_scope` - its `visibility` is `workspace`. Under a shared folder the
- * toggle is locked on and the create sends no `visibility` (the server inherits).
- */
-export function isFolderWorkspaceShared(
-  folder: { visibility?: string; shareScope?: { homeWorkspace: boolean } } | null | undefined,
-): boolean {
-  if (!folder) return false
-  if (folder.shareScope) return folder.shareScope.homeWorkspace
-  return folder.visibility === 'workspace'
 }
 
 /** the errors a create shows as themselves; every other failure reads the generic create_failed */

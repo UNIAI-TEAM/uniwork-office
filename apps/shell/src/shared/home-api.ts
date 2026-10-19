@@ -227,12 +227,6 @@ export interface UniworkDocSummary {
   updatedById?: string
   /** DESKTOP-HOME: server `visibility`; absent when omitted or unknown */
   visibility?: 'private' | 'workspace' | 'restricted'
-  /**
-   * UNI-1959: the server's `share_scope.home_workspace` (the folder has a grant
-   * for its home workspace); absent when the row carries no `share_scope`. When
-   * present it decides "shared with the workspace" over `visibility`.
-   */
-  shareScope?: { homeWorkspace: boolean }
   /** DESKTOP-HOME: server `my_level`; absent when omitted or unknown */
   myLevel?: 'view' | 'comment' | 'edit' | 'manage'
   /** shared-with-me rows only: the workspace the share lives in (name resolved by main) */
@@ -334,7 +328,6 @@ export interface UniworkCreateFolderInput {
   workspaceId: string
   parentId: string | null
   title: string
-  visibility?: UniworkCreateVisibility
 }
 
 /** FD-11: move a document/folder under another folder (null = the workspace root) */
@@ -483,8 +476,8 @@ export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'html' | 'pd
 /**
  * UNI-1959: "Share with workspace" on a create. `workspace` is the only value
  * the New menu sends (the request then carries `visibility: "workspace"`); the
- * field is absent for a private create and inside a workspace-shared folder,
- * where the server inherits from the parent.
+ * field is absent for a private create. Documents only: a folder is never
+ * shared (D answers 422 `folder_not_shareable`), so a folder create has no field.
  */
 export type UniworkCreateVisibility = 'workspace'
 

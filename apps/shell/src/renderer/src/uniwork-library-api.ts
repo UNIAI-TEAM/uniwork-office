@@ -71,7 +71,7 @@ export interface CreateDocInput {
   folderId: string | null
   name: string
   format: NewDocFormat
-  /** UNI-1959: "Share with workspace"; absent = private (or inherited from a shared folder) */
+  /** UNI-1959: "Share with workspace"; absent = the server's default (a document only) */
   visibility?: UniworkCreateVisibility
 }
 

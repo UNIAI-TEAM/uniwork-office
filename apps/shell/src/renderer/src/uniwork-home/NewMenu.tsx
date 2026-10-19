@@ -10,10 +10,7 @@ import { NEW_KIND_EXT, NEW_MENU_LABEL_KEY, type NewMenuKind } from './new-menu-m
 
 /** the share toggle as the menu shows it (state lives in the home view, shared with the strip) */
 export interface NewMenuShare {
-  /** shown checked: the person's choice, or inherited from a shared folder */
   checked: boolean
-  /** inside a workspace-shared folder: checked, aria-disabled, nothing is sent */
-  inherited: boolean
   onChange: (next: boolean) => void
 }
 
@@ -118,11 +115,7 @@ export function NewMenu({
   }
 
   const kinds: NewMenuKind[] = hasFolderRow ? ['folder', ...NEW_DOC_KINDS] : [...NEW_DOC_KINDS]
-  const hint = share.inherited
-    ? t('uhNewShareInherited')
-    : share.checked
-      ? t('uhNewShareHint', { level: t('uhNewShareLevelView') })
-      : ''
+  const hint = share.checked ? t('uhNewShareHint', { level: t('uhNewShareLevelView') }) : ''
 
   const row = (kind: NewMenuKind) => {
     const off = kind !== 'folder' && unavailable.has(kind)
@@ -226,10 +219,10 @@ export function NewMenu({
               tabIndex={-1}
               className="dh-new-item dh-new-share"
               aria-checked={share.checked}
-              aria-disabled={share.inherited || busy || undefined}
+              aria-disabled={busy || undefined}
               aria-describedby={hintId}
               onClick={() => {
-                if (share.inherited || busy) return
+                if (busy) return
                 share.onChange(!share.checked)
               }}
             >

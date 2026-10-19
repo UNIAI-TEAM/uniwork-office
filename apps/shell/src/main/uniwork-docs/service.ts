@@ -4542,7 +4542,6 @@ export class UniworkDocsService {
           workspaceId,
           parentId: typeof input.parentId === 'string' && input.parentId ? input.parentId : null,
           title,
-          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
         // FD-11: the new folder is a row in its parent's tree and contents

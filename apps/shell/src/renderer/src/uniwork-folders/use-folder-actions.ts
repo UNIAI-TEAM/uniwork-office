@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { UniworkCreateVisibility, UniworkDocSummary } from '../../../shared/home-api'
+import type { UniworkDocSummary } from '../../../shared/home-api'
 import { useI18n } from '../locale'
 import { announce } from '../uniwork-live'
 import { publishLocalRename } from '../uniwork-notice-bus'
@@ -17,8 +17,6 @@ export type NameDialogState =
       sub: boolean
       /** UNI-1959: the New menu's default name, filled in (the person may change it) */
       initial?: string
-      /** UNI-1959: "Share with workspace" on: the folder is created shared; absent = nothing is sent */
-      visibility?: UniworkCreateVisibility
     }
   | { mode: 'rename'; id: string; title: string }
 
@@ -65,17 +63,10 @@ export function useFolderActions({
     error: 'network',
   }
 
-  const create = async (
-    parentId: string | null,
-    name: string,
-    visibility?: UniworkCreateVisibility,
-  ): Promise<FolderNameOutcome> => {
-    const result = await createFolder({
-      workspaceId,
-      parentId,
-      title: name,
-      ...(visibility ? { visibility } : {}),
-    }).catch(() => networkFailure)
+  const create = async (parentId: string | null, name: string): Promise<FolderNameOutcome> => {
+    const result = await createFolder({ workspaceId, parentId, title: name }).catch(
+      () => networkFailure,
+    )
     if (!result.ok) {
       const field = failed(result.error, result.max)
       if (!field) setNameDialog(null)
@@ -103,8 +94,7 @@ export function useFolderActions({
   /** submit of the name dialog */
   const submitName = (name: string): Promise<FolderNameOutcome> => {
     if (!nameDialog) return Promise.resolve({ ok: true })
-    if (nameDialog.mode === 'create')
-      return create(nameDialog.parentId, name, nameDialog.visibility)
+    if (nameDialog.mode === 'create') return create(nameDialog.parentId, name)
     if (name === nameDialog.title) {
       setNameDialog(null)
       return Promise.resolve({ ok: true })
@@ -154,17 +144,12 @@ export function useFolderActions({
 
   return {
     nameDialog,
-    openCreate: (
-      parentId: string | null,
-      sub = false,
-      options?: { initial?: string; visibility?: UniworkCreateVisibility },
-    ) =>
+    openCreate: (parentId: string | null, sub = false, options?: { initial?: string }) =>
       setNameDialog({
         mode: 'create',
         parentId,
         sub,
         ...(options?.initial ? { initial: options.initial } : {}),
-        ...(options?.visibility ? { visibility: options.visibility } : {}),
       }),
     openRename: (doc: Pick<UniworkDocSummary, 'id' | 'title'>) =>
       setNameDialog({ mode: 'rename', id: doc.id, title: doc.title }),

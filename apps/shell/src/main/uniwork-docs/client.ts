@@ -190,8 +190,6 @@ export interface UniworkDocsClient {
     workspaceId: string
     parentId: string | null
     title: string
-    /** UNI-1959: "Share with workspace"; absent = the server's own default / parent inheritance */
-    visibility?: UniworkCreateVisibility
     idempotencyKey: string
   }): Promise<UniworkDocSummary>
   /** FD-11: one document's own fields, whatever its kind (rename/move read this) */
@@ -213,7 +211,7 @@ export interface UniworkDocsClient {
       workspaceId: string
       format: UniworkDocNewFormat
       title: string
-      /** UNI-1959: "Share with workspace"; absent = private (or the parent's, which the server inherits) */
+      /** UNI-1959: "Share with workspace"; absent = the server's default (a document only; a folder is never shared) */
       visibility?: UniworkCreateVisibility
       idempotencyKey: string
     } & UniworkCreateTarget,
@@ -223,7 +221,7 @@ export interface UniworkDocsClient {
     input: {
       workspaceId: string
       title: string
-      /** UNI-1959: "Share with workspace"; absent = private (or the parent's, which the server inherits) */
+      /** UNI-1959: "Share with workspace"; absent = the server's default (a document only; a folder is never shared) */
       visibility?: UniworkCreateVisibility
       idempotencyKey: string
     } & UniworkCreateTarget,
@@ -816,7 +814,6 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           // the root is the field's absence, never an empty string; an
           // empty/blank parent_id is refused outright (S01-R1-5)
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
-          ...(input.visibility ? { visibility: input.visibility } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,

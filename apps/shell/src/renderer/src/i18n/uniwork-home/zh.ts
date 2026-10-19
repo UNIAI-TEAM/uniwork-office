@@ -32,7 +32,6 @@ export const zh = {
   uhNewShare: 'Share with workspace',
   uhNewShareHint: 'Everyone in this workspace can {level} new documents',
   uhNewShareLevelView: 'view',
-  uhNewShareInherited: 'This folder is shared with the workspace, so new documents are too',
   uhDefaultNameDocx: 'Untitled document.docx',
   uhDefaultNameXlsx: 'Untitled spreadsheet.xlsx',
   uhDefaultNamePptx: 'Untitled presentation.pptx',

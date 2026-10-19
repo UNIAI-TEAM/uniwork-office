@@ -33,7 +33,6 @@ export const vi = {
   uhNewShare: 'Chia sẻ với workspace',
   uhNewShareHint: 'Mọi thành viên của workspace này sẽ {level} tài liệu mới',
   uhNewShareLevelView: 'chỉ xem',
-  uhNewShareInherited: 'Thư mục này đang chia sẻ với workspace nên tài liệu mới cũng vậy',
   uhDefaultNameDocx: 'Tài liệu chưa đặt tên.docx',
   uhDefaultNameXlsx: 'Bảng tính chưa đặt tên.xlsx',
   uhDefaultNamePptx: 'Bản trình chiếu chưa đặt tên.pptx',
