@@ -134,7 +134,11 @@ const AI_TURN: EditorState = { dirty: false, aiRunning: true, aiEpoch: 2 }
 interface Harness {
   service: UniworkDocsService
   statuses: UniworkDocStatus[]
+  /** the first pushed status (already pushed, or the next one) that matches */
+  statusWhere(match: (status: UniworkDocStatus) => boolean): Promise<UniworkDocStatus>
   reloaded: string[]
+  /** resolves with the path of the next reloadPath call */
+  nextReload(): Promise<string>
   openPaths: Set<string>
   client: {
     detail: DocumentDetail
@@ -186,8 +190,10 @@ function setup(
   const syncStore = createSyncStoreAccess({ layer, scope: () => ({ ...SCOPE }) })
 
   const statuses: UniworkDocStatus[] = []
+  const statusWaiters = new Set<(status: UniworkDocStatus) => void>()
   const views: UniworkConflictView[] = []
   const reloaded: string[] = []
+  const reloadWaiters: Array<(path: string) => void> = []
   const openPaths = new Set<string>([docPath()])
   const editorStates: EditorState[] = [CLEAN]
   let editorCalls = 0
@@ -276,7 +282,10 @@ function setup(
     isPathOpen: (path: string) => openPaths.has(path),
     requestModuleSave: vi.fn(() => false),
     requestFirstSaveName: options.requestFirstSaveName as never,
-    reloadPath: (path: string) => reloaded.push(path),
+    reloadPath: (path: string) => {
+      reloaded.push(path)
+      for (const waiter of reloadWaiters.splice(0)) waiter(path)
+    },
     activePath: () => docPath(),
     editorStateOf: async () => {
       const state = editorStates[Math.min(editorCalls, editorStates.length - 1)] ?? CLEAN
@@ -302,7 +311,10 @@ function setup(
     },
     client: api as unknown as UniworkDocsClient,
     ui,
-    pushStatus: (status) => statuses.push(status),
+    pushStatus: (status) => {
+      statuses.push(status)
+      for (const waiter of [...statusWaiters]) waiter(status)
+    },
     pushConflict: (view) => views.push(view),
     pushLaunch: vi.fn(),
     reveal: vi.fn(),
@@ -310,7 +322,20 @@ function setup(
   return {
     service,
     statuses,
+    statusWhere: (match) => {
+      const seen = statuses.find(match)
+      if (seen) return Promise.resolve(seen)
+      return new Promise((resolve) => {
+        const waiter = (status: UniworkDocStatus) => {
+          if (!match(status)) return
+          statusWaiters.delete(waiter)
+          resolve(status)
+        }
+        statusWaiters.add(waiter)
+      })
+    },
     reloaded,
+    nextReload: () => new Promise((resolve) => reloadWaiters.push(resolve)),
     openPaths,
     client,
     editorStates,
@@ -912,13 +937,17 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     h.editorStates.splice(0, 1, AI_TURN)
     h.service.noteEditorState(docPath(), AI_TURN, 0)
     notice(h)
-    await waitForBar(h, { kind: 'newer-ai', version: 4 })
+    // awaited on the pushes themselves (no polling deadline): load cannot time it out
+    await h.statusWhere((status) => status.remote?.kind === 'newer-ai')
+    expect(await barOf(h)).toEqual({ kind: 'newer-ai', version: 4 })
 
     // the turn is over: the fresh read now answers a clean, idle editor
     h.editorStates.splice(0, 1, CLEAN)
+    const reload = h.nextReload()
     h.service.noteEditorState(docPath(), CLEAN, 0)
-    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
-    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(await reload).toBe(docPath())
+    expect(h.reloaded).toEqual([docPath()])
+    expect(await barOf(h)).toEqual({ kind: 'updated', version: 4 })
     expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
   })
 
