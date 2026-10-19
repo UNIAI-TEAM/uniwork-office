@@ -1138,18 +1138,18 @@ describe('UniworkConflictDialog UI (G5-09 S5 desktop)', () => {
 
     it('the primary is aria-disabled while busy (rules unchanged) and the vi/en strings are the agreed copy', async () => {
       expect(viStrings.uwConflictSaveCopyNoSeat).toBe(
-        'Không tạo được bản sao vì bạn không phải thành viên của không gian làm việc chứa tài liệu này. Thay đổi của bạn vẫn an toàn; bạn có thể tải bản của mình về máy.',
+        'Không tạo được bản sao vì bạn không phải thành viên của workspace chứa tài liệu này. Thay đổi của bạn vẫn an toàn; bạn có thể tải bản của mình về máy.',
       )
       expect(viStrings.uwConflictDownloadDone).toBe(
-        'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại hoặc Ghi đè.',
+        'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại bản mới nhất hoặc Ghi đè.',
       )
       expect(viStrings.uwConflictDownloadFailedDesktop).toBe(
         'Chưa lưu được tệp. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
       )
       expect(viStrings.uwConflictSaveCopyFolderRefused).toBe(
-        'Bạn không thể tạo tài liệu trong thư mục này. Hãy tải bản của bạn về máy.',
+        'Bạn không thể tạo tài liệu trong thư mục này. Hãy tải bản của bạn về.',
       )
-      expect(en.uwConflictSaveCopyNoSeat).toContain('not a member of the workspace')
+      expect(en.uwConflictSaveCopyNoSeat).toContain('not a member of this document’s workspace')
       const dialog = await openStep2()
       nextReply = { kind: 'view', view: makeView({ notice: 'save_copy_no_seat' }) }
       await act(async () => {

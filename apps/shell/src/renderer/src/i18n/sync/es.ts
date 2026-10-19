@@ -7,9 +7,10 @@ export const es = {
   uwChipPausedAdmin: 'Guardado en cola · envío en pausa',
   uwChipReconciling: 'Comprobando el último guardado…',
   uwChipReconcileStuck: 'Se necesita soporte para confirmar el guardado',
+  uwErrReconcileStuck: 'Se necesita soporte para confirmar el guardado.',
   uwChipRemoteNewer: 'Versión más reciente en UniWork',
   uwTipQueued:
-    'Tu guardado de las {time} se conserva de forma segura en este equipo y se enviará cuando tengas conexión.',
+    'Tu guardado de las {time} se conserva de forma segura en este equipo y se enviará en cuanto sea posible.',
   uwTipQueuedNewer:
     'El guardado de las {time} está esperando para enviarse. Los cambios posteriores no forman parte de él.',
   uwTipPausedAdmin: 'Tu administrador ha pausado el envío. El guardado se conserva en este equipo.',
@@ -125,6 +126,8 @@ export const es = {
   uwSignOutWaiting: 'Terminando el guardado en curso antes de cerrar sesión…',
   uwSignOutCaptureFailed:
     'Algunos cambios sin guardar no pudieron capturarse a tiempo; se conserva la versión guardada o guardada automáticamente más reciente para tu cuenta.',
+  uwSignOutTimedOut:
+    'No se pudo confirmar el cierre de sesión a tiempo; la cuenta podría seguir iniciada. Inténtalo de nuevo.',
   uwSwitchLostTitle: 'Se perdieron algunos cambios sin guardar de la cuenta anterior',
   uwSwitchLostBody:
     'Otra cuenta inició sesión en este equipo, así que la cuenta anterior se bloqueó. Documentos cuyos cambios sin guardar no se pudieron conservar: {count}. Todo lo demás sigue bloqueado en este equipo para esa cuenta.',
@@ -333,7 +336,7 @@ export const es = {
     'Has deshecho todos los cambios. La versión {n} en UniWork es más reciente que la copia abierta.',
   uwRemoteStopAiConfirm:
     '¿Detener la ejecución de UniWork AI para recargar? Los cambios que ya hizo la IA pertenecen a la copia abierta.',
-  uwRemoteWaitCommit: 'Esperando a que termine el guardado en curso; después podrás recargar.',
+  uwRemoteWaitCommit: 'Esperando a que termine el guardado en curso; después podrás continuar.',
   uwRemoteReload: 'Recargar la última versión…',
   uwRemoteLater: 'Más tarde',
   uwRemoteClose: 'Cerrar',

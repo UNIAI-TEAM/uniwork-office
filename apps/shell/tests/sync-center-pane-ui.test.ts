@@ -849,6 +849,66 @@ describe('SyncCenterPane live announcements (FE-1, FE-5, FE-6, FE-9)', () => {
     )
   })
 
+  it('B54: an unrelated snapshot keeps the mark — the row own change is not re-announced', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    await click(button(vi_.uwActRecheck!, rowEl('stuck')))
+    // an unrelated push (header time moved, row badge unchanged) arrives first
+    const unrelated = snapshot()
+    unrelated.header = { ...unrelated.header, lastSyncAt: '2026-10-15T08:45:00.000Z' }
+    await act(async () => api.push(unrelated))
+    expect(status().textContent).toBe('')
+    // then the row's own state change arrives: still the user's own, not announced
+    await act(async () =>
+      api.push(
+        withAttention(
+          row('stuck', 'failed', { failedReason: 'quota' }),
+          row('draft', 'kept_draft'),
+        ),
+      ),
+    )
+    expect(status().textContent).toBe('')
+    // the mark ended with the row's own transition: the next change announces again
+    await act(async () =>
+      api.push(
+        withAttention(
+          row('stuck', 'blocked', { blockedReason: 'session_expired' }),
+          row('draft', 'kept_draft'),
+        ),
+      ),
+    )
+    expect(status().textContent).toBe(
+      fill(vi_.uwSyncRowAnnounce!, { doc: 'Tài liệu stuck', state: vi_.uwBadgeBlocked! }),
+    )
+  })
+
+  it('B52: Sync now and Pause are guarded while a header call is pending', async () => {
+    const api = fakeApi(snapshot())
+    let finish!: () => void
+    api.syncNow.mockImplementationOnce(
+      () => new Promise<SyncCenterActionResult>((res) => (finish = () => res({ ok: true }))),
+    )
+    await render(api)
+    const nowBtn = button(vi_.uwSyncNow!)
+    await act(async () => nowBtn.click())
+    expect(api.syncNow).toHaveBeenCalledTimes(1)
+    expect(nowBtn.getAttribute('aria-disabled')).toBe('true')
+    expect(nowBtn.getAttribute('aria-busy')).toBe('true')
+    const pauseBtn = button(vi_.uwSyncPause!)
+    expect(pauseBtn.getAttribute('aria-disabled')).toBe('true')
+    // rapid clicks while the call is pending do nothing
+    await act(async () => nowBtn.click())
+    await act(async () => pauseBtn.click())
+    expect(api.syncNow).toHaveBeenCalledTimes(1)
+    expect(api.setSendingPaused).not.toHaveBeenCalled()
+    await act(async () => finish())
+    await flush()
+    expect(button(vi_.uwSyncNow!).getAttribute('aria-disabled')).toBeNull()
+    await click(button(vi_.uwSyncPause!))
+    expect(api.setSendingPaused).toHaveBeenCalledTimes(1)
+    expect(api.setSendingPaused).toHaveBeenCalledWith(true)
+  })
+
   it('the same refusal twice in a row is announced twice', async () => {
     const api = fakeApi(withAttention(row('bad', 'failed', { failedReason: 'quota' })))
     api.saveAgain.mockResolvedValue({ ok: false, code: 'store_full' })

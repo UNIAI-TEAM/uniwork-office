@@ -7,9 +7,10 @@ export const cs = {
   uwChipPausedAdmin: 'Uložení ve frontě · odesílání pozastaveno',
   uwChipReconciling: 'Kontrola posledního uložení…',
   uwChipReconcileStuck: 'K potvrzení uložení je potřeba podpora',
+  uwErrReconcileStuck: 'K potvrzení uložení je potřeba podpora.',
   uwChipRemoteNewer: 'Novější verze v UniWork',
   uwTipQueued:
-    'Uložení z {time} je bezpečně uchováno v tomto počítači a odešle se, až budete online.',
+    'Uložení z {time} je bezpečně uchováno v tomto počítači a odešle se, jakmile to půjde.',
   uwTipQueuedNewer: 'Uložení z {time} čeká na odeslání. Pozdější úpravy do něj nepatří.',
   uwTipPausedAdmin: 'Správce pozastavil odesílání. Uložení zůstává v tomto počítači.',
   uwTipPausedUser:
@@ -122,6 +123,8 @@ export const cs = {
   uwSignOutWaiting: 'Dokončování probíhajícího uložení před odhlášením…',
   uwSignOutCaptureFailed:
     'Některé neuložené změny se nepodařilo včas zachytit; pro váš účet je ponechána poslední uložená nebo automaticky uložená verze.',
+  uwSignOutTimedOut:
+    'Odhlášení se nepodařilo včas potvrdit; účet může být stále přihlášen. Zkuste to znovu.',
   uwSwitchLostTitle: 'Některé neuložené změny předchozího účtu byly ztraceny',
   uwSwitchLostBody:
     'Na tomto počítači se přihlásil jiný účet, takže předchozí účet byl uzamčen. Dokumenty, jejichž neuložené změny nešlo zachovat: {count}. Vše ostatní zůstává pro tento účet na tomto počítači uzamčeno.',
@@ -324,7 +327,7 @@ export const cs = {
     'Vrátili jste všechny změny. Verze {n} v UniWork je novější než otevřená kopie.',
   uwRemoteStopAiConfirm:
     'Zastavit běžící UniWork AI a znovu načíst? Změny, které AI už provedla, patří k otevřené kopii.',
-  uwRemoteWaitCommit: 'Čeká se na dokončení probíhajícího uložení; potom můžete znovu načíst.',
+  uwRemoteWaitCommit: 'Čeká se na dokončení probíhajícího uložení; potom můžete pokračovat.',
   uwRemoteReload: 'Načíst nejnovější…',
   uwRemoteLater: 'Později',
   uwRemoteClose: 'Zavřít',

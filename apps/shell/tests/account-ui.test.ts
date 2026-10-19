@@ -654,11 +654,11 @@ describe('Settings → Account pane', () => {
     )
     await click(button(en.acctRetry))
     expect(api.accountRetry).toHaveBeenCalledTimes(1)
-    // the state's own actions row (the server row above has its own footer)
+    // the state's own actions row (the Change server footer below has no primary)
     const footer = Array.from(
       Array.from(host.querySelectorAll('.acct-pane > .set-pane-footer.acct-actions'))
-        .at(-1)!
-        .querySelectorAll('button'),
+        .find((f) => f.querySelector('.set-btn.primary'))
+        ?.querySelectorAll('button') ?? [],
     )
     expect(footer.map((b) => b.textContent)).toEqual([en.acctRetry, en.acctSignInAgain])
     // Retry stays the primary action; the way out is secondary
@@ -741,8 +741,8 @@ describe('Settings → Account pane', () => {
     const footerText = () =>
       Array.from(
         Array.from(host.querySelectorAll('.acct-pane > .set-pane-footer.acct-actions'))
-          .at(-1)!
-          .querySelectorAll('button'),
+          .find((f) => f.querySelector('.set-btn.primary'))
+          ?.querySelectorAll('button') ?? [],
       ).map((b) => b.textContent)
 
     /** confirm the replace prompt, the attempt runs in the browser, then fails the way main reports it */

@@ -26,7 +26,7 @@ export const en = {
   uwPickNoResults: 'No documents match “{query}”.',
   uwPickNoWorkspaces: 'You don’t have any workspaces yet.',
   uwPickNoWorkspacesHint: 'Create or join a workspace in UniWork first.',
-  uwPickHiddenFormats: 'Hidden because UniWork Office cannot open their format: {count}',
+  uwPickHiddenFormats: 'Hidden because UniWork Office can’t open these formats: {count}',
   uwPickOpening: 'Opening “{title}”…',
 
   uwErrNotSignedIn: 'Sign in to UniWork to continue.',
@@ -40,13 +40,13 @@ export const en = {
   uwErrTooLarge: 'This file is too large for UniWork.',
   uwErrUnsupportedFormat: 'This file type isn’t supported in UniWork Office.',
   uwErrEngineIncompatible: 'This version of UniWork Office can’t open this document.',
-  uwErrIdempotencyMismatch: 'The save was interrupted. Save again to retry.',
+  uwErrIdempotencyMismatch: 'The save was interrupted. Try saving again.',
   uwErrTicketInvalid: 'This link is no longer valid. Open the document again from UniWork.',
   uwErrTicketExpired: 'This link expired. Open the document again from UniWork.',
   uwErrNetwork: 'Can’t reach UniWork. Check your connection and try again.',
   uwErrTimeout: 'UniWork took too long to answer. Try again.',
   uwErrServerError: 'UniWork ran into a problem. Try again in a moment.',
-  uwErrMalformedResponse: 'UniWork sent an unexpected reply. Try again.',
+  uwErrMalformedResponse: 'Received an invalid response from UniWork. Try again.',
 
   uwChipAria: 'UniWork save status',
   uwChipSaved: 'Saved to UniWork',
@@ -110,7 +110,8 @@ export const en = {
   uwOrgSettingsLabel: 'Working organization',
   uwLibShared: 'Shared with me',
   uwLibSharedEmpty: 'Nothing has been shared with you directly yet.',
-  uwLibSharedPartial: 'Only the documents loaded so far were searched. Load more to keep looking.',
+  uwLibSharedPartial:
+    'Only the documents loaded so far were searched. Choose Load more to keep looking.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Details',
   uwDocInfoFor: 'Details for “{name}”',
@@ -177,7 +178,7 @@ export const en = {
   uwLockLostTakenOver: '{name} took over editing. Your unsaved changes are still here.',
   uwLockLostHandedOver: 'You handed editing to {name}. Your unsaved changes are still here.',
   uwLockLostExpired:
-    'Editing expired because we couldn’t reach the server for a while (no network or the device slept). Your unsaved changes are still here.',
+    'Editing access expired while disconnected (offline or the computer slept). Your unsaved changes are still here.',
   uwLockLostMovedHere:
     'You’re now editing this document in another window. The unsaved changes in this window are still here.',
   uwLockLostAccessLost:

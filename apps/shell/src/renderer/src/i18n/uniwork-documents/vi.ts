@@ -26,7 +26,7 @@ export const vi = {
   uwPickNoResults: 'Không có tài liệu nào khớp với “{query}”.',
   uwPickNoWorkspaces: 'Bạn chưa có không gian làm việc nào.',
   uwPickNoWorkspacesHint: 'Hãy tạo hoặc tham gia một không gian làm việc trong UniWork trước.',
-  uwPickHiddenFormats: 'Đã ẩn vì UniWork Office chưa mở được định dạng: {count}',
+  uwPickHiddenFormats: 'Đã ẩn {count} mục có định dạng UniWork Office chưa mở được',
   uwPickOpening: 'Đang mở “{title}”…',
 
   uwErrNotSignedIn: 'Hãy đăng nhập UniWork để tiếp tục.',
@@ -40,13 +40,13 @@ export const vi = {
   uwErrTooLarge: 'Tệp này quá lớn để lưu vào UniWork.',
   uwErrUnsupportedFormat: 'UniWork Office chưa hỗ trợ loại tệp này.',
   uwErrEngineIncompatible: 'Phiên bản UniWork Office này không mở được tài liệu này.',
-  uwErrIdempotencyMismatch: 'Lần lưu bị gián đoạn. Hãy lưu lại.',
+  uwErrIdempotencyMismatch: 'Lần lưu bị gián đoạn. Hãy thử lưu lại.',
   uwErrTicketInvalid: 'Liên kết này không còn hiệu lực. Hãy mở lại tài liệu từ UniWork.',
   uwErrTicketExpired: 'Liên kết này đã hết hạn. Hãy mở lại tài liệu từ UniWork.',
   uwErrNetwork: 'Không kết nối được UniWork. Hãy kiểm tra mạng rồi thử lại.',
   uwErrTimeout: 'UniWork phản hồi quá lâu. Hãy thử lại.',
   uwErrServerError: 'UniWork đang gặp sự cố. Hãy thử lại sau ít phút.',
-  uwErrMalformedResponse: 'UniWork trả về dữ liệu không mong đợi. Hãy thử lại.',
+  uwErrMalformedResponse: 'Phản hồi từ UniWork không hợp lệ. Hãy thử lại.',
 
   uwChipAria: 'Trạng thái lưu UniWork',
   uwChipSaved: 'Đã lưu vào UniWork',
@@ -109,7 +109,7 @@ export const vi = {
   uwOrgSettingsLabel: 'Tổ chức làm việc',
   uwLibShared: 'Được chia sẻ với tôi',
   uwLibSharedEmpty: 'Chưa có tài liệu nào được chia sẻ trực tiếp với bạn.',
-  uwLibSharedPartial: 'Mới chỉ tìm trong các tài liệu đã tải. Tải thêm để tiếp tục tìm.',
+  uwLibSharedPartial: 'Chỉ mới tìm trong các tài liệu đã tải. Bấm "Tải thêm" để tìm tiếp.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Thông tin',
   uwDocInfoFor: 'Thông tin về “{name}”',
@@ -176,7 +176,7 @@ export const vi = {
   uwLockLostTakenOver: '{name} đã lấy quyền sửa. Thay đổi chưa lưu của bạn vẫn ở đây.',
   uwLockLostHandedOver: 'Bạn đã nhường quyền sửa cho {name}. Thay đổi chưa lưu của bạn vẫn ở đây.',
   uwLockLostExpired:
-    'Quyền sửa đã hết hạn vì một lúc lâu không liên lạc được với máy chủ (mất mạng hoặc máy ngủ). Thay đổi chưa lưu của bạn vẫn ở đây.',
+    'Quyền sửa đã hết hạn do mất kết nối một lúc (mất mạng hoặc máy ngủ). Thay đổi chưa lưu của bạn vẫn ở đây.',
   uwLockLostMovedHere:
     'Bạn đang sửa tài liệu này ở cửa sổ khác. Thay đổi chưa lưu ở cửa sổ này vẫn ở đây.',
   uwLockLostAccessLost:
