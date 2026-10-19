@@ -13,6 +13,7 @@ import type {
   UniworkWorkspaceRef,
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { NEW_DOC_KINDS } from '../src/renderer/src/uniwork-docs-model'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 
 /**
@@ -389,12 +390,11 @@ describe('UNI-1957 Documents parity', () => {
       expect(host.querySelector('.dh-quick-hint-icon')).toBeNull()
       const row = host.querySelector<HTMLElement>('.dh-quick-row')
       if (row) {
-        // the label and the three format pills, nothing else: no lock glyph, no link
+        // the label and one pill per create kind (UNI-1953: UniNote + the six file formats),
+        // nothing else: no lock glyph, no link
         expect(Array.from(row.children).map((el) => el.tagName)).toEqual([
           'SPAN',
-          'BUTTON',
-          'BUTTON',
-          'BUTTON',
+          ...NEW_DOC_KINDS.map(() => 'BUTTON'),
         ])
         expect(row.querySelector('[data-quick-format]')).not.toBeNull()
       }
