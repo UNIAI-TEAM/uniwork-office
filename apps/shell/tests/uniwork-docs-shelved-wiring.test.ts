@@ -455,3 +455,42 @@ describe('UNI-1961 preload', () => {
     }
   })
 })
+
+describe('UNI-1961 live-row Lưu trữ (shelve)', () => {
+  it('registers the shelve channel and the preload exposes it', async () => {
+    const { handlers } = await setup()
+    expect(UNIWORK_DOC_CHANNELS.shelveDocument).toBeTypeOf('string')
+    expect(handlers.has(UNIWORK_DOC_CHANNELS.shelveDocument)).toBe(true)
+    const source = readFileSync(resolve(__dirname, '../src/preload/index.ts'), 'utf8')
+    expect(source).toMatch(
+      /async uniworkShelveDocument\([^)]*\)\s*\{[\s\S]*?UNIWORK_DOC_CHANNELS\.shelveDocument\b/,
+    )
+  })
+
+  it('shelves a page the caller manages through POST /shelve with an Idempotency-Key', async () => {
+    const { call } = await setup()
+    const seen = stubServer()
+    const res = (await call(UNIWORK_DOC_CHANNELS.shelveDocument, 'page_live')) as {
+      ok: boolean
+      value: { document: Record<string, unknown>; affected: string[] }
+    }
+    expect(res.ok).toBe(true)
+    expect(res.value.document).toMatchObject({ id: 'page_live', kind: 'page' })
+    expect(res.value.affected).toEqual(['page_live'])
+    expect(seen.map((s) => `${s.method} ${s.url.pathname}`)).toEqual([
+      'GET /api/v1/documents/page_live',
+      'POST /api/v1/documents/page_live/shelve',
+    ])
+    expect(seen.find((s) => s.method === 'POST')!.idempotencyKey).not.toBe('')
+  })
+
+  it('refuses a below-manage shelve without a write', async () => {
+    const { call } = await setup()
+    const seen = stubServer()
+    expect(await call(UNIWORK_DOC_CHANNELS.shelveDocument, 'doc_view')).toEqual({
+      ok: false,
+      error: 'forbidden',
+    })
+    expect(posts(seen)).toEqual([])
+  })
+})
