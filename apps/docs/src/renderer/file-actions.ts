@@ -1399,9 +1399,10 @@ export function printDoc(ctx: FileActionContext): void {
     const msg = t('appPrintNoDocument')
     ctx.setStatus(msg)
     // a repeat sets the identical status, which does not re-render, so App's status toast would
-    // stay silent the second time: toast here (phone width only, the bar shows it otherwise).
+    // stay silent the second time: toast here (phone width, where the bar hides its message, and
+    // the open-refused screen, which hides it at every width; the bar shows it otherwise).
     // The same text just toasted keeps App's own status toast from doubling it.
-    if (isNarrowStatusFrame()) showToast(msg, 'info')
+    if (isNarrowStatusFrame() || ctx.refusedMessage) showToast(msg, 'info')
     return
   }
   // the print sheet prints the live preview pages: needs the whole document mounted
