@@ -285,9 +285,10 @@ describe('UNI-1957 Documents parity', () => {
       /\r\n/g,
       '\n',
     )
-    // :where(<selector list>):not(:disabled, [aria-disabled='true']) { cursor: pointer }
+    // :where(<selector list>):where(:not(:disabled, [aria-disabled='true'])) { cursor: pointer }
+    // (the exclusion sits inside its own :where(), a bare :not() would add (0,1,0) specificity)
     const rule =
-      /:where\(([^)]*)\)\s*:not\(:disabled,\s*\[aria-disabled=["']true["']\]\)\s*\{\s*cursor:\s*pointer;?\s*\}/.exec(
+      /:where\(([^)]*)\)\s*:where\(\s*:not\(:disabled,\s*\[aria-disabled=["']true["']\]\)\s*\)\s*\{\s*cursor:\s*pointer;?\s*\}/.exec(
         home,
       )
     const click = async (el: Element) => {
@@ -314,7 +315,9 @@ describe('UNI-1957 Documents parity', () => {
         expect(list, target).toContain(target)
       }
       // once, in the sheet main.tsx loads for every view (not per component)
-      expect(home.match(/:not\(:disabled, \[aria-disabled='true'\]\)/g)).toHaveLength(1)
+      expect(home.match(/:where\(:not\(:disabled, \[aria-disabled='true'\]\)\)/g)).toHaveLength(1)
+      // and no bare :not() outside a :where() anywhere in that rule's selector
+      expect(home.match(/(?<!:where\()\:not\(:disabled/g)).toBeNull()
       expect(readFileSync(resolve(__dirname, '../src/renderer/src/main.tsx'), 'utf8')).toContain(
         "import './home.css'",
       )
