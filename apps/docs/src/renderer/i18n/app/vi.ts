@@ -543,9 +543,13 @@ export const vi = {
   appOnlyEncrypted: '"{name}" được bảo vệ bằng mật khẩu và không thể mở ở đây.',
   appFileExportPdf: 'Xuất dưới dạng PDF…',
   appFilePrint: 'In…',
+  appPrintNoDocument: 'Hãy mở một tài liệu để in.',
   appPrintNoPrinter:
     'Máy tính này không có máy in. Bạn có thể lưu tài liệu thành tệp PDF thay thế.',
   appPrintFailedPdfHint:
     'In không thành công: {error}. Bạn có thể lưu tài liệu thành tệp PDF thay thế.',
   appPrintSaveAsPdf: 'Lưu thành PDF…',
+  appFileSaveCopy: 'Lưu thành bản sao…',
+  appCopySaved: 'Đã lưu bản của bạn thành tài liệu mới: {title}.',
+  appCopySaveFailed: 'Chưa tạo được bản sao. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
 } satisfies Record<keyof typeof zh, string>

@@ -49,6 +49,7 @@ import type {
   UniworkConflictReply,
   UniworkConflictView,
   UniworkCreateDocInput,
+  UniworkCreatePageInput,
   UniworkCreateFolderInput,
   UniworkDocActionResult,
   UniworkDocErrorCode,
@@ -1167,6 +1168,11 @@ const homeApi: HomeApi = {
   async uniworkCreateDocument(input: UniworkCreateDocInput) {
     return asUniworkActionResult<UniworkDocSummary>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.createDocument, input),
+    )
+  },
+  async uniworkCreatePage(input: UniworkCreatePageInput) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.createPage, input),
     )
   },
   async uniworkPickUploadFile() {

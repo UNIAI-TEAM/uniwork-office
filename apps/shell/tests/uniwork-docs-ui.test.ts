@@ -384,7 +384,7 @@ describe('G5-06 error codes -> sentence and reason', () => {
 
   it.each<[UniworkDocErrorCode, StringKey, StringKey]>([
     ['capability_off', 'uwTipPausedAdmin', 'uwReasonOther'],
-    ['intent_unknown', 'uwChipReconcileStuck', 'uwReasonOther'],
+    ['intent_unknown', 'uwErrReconcileStuck', 'uwReasonOther'],
     ['document_deleted', 'uwErrDeleted', 'uwReasonDeleted'],
     ['document_archived', 'uwReasonArchived', 'uwReasonArchived'],
     ['permission_revoked', 'uwErrForbidden', 'uwReasonForbidden'],

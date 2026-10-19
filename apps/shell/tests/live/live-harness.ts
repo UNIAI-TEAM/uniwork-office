@@ -5,9 +5,12 @@
  * feed and capability modules against a REAL D server whose origin arrives in
  * `UNIWORK_LIVE_ORIGIN`, and it skips unless that variable is set, so the
  * normal shell suite neither needs a server nor changes behaviour. The seeding
- * calls are the ones the D harness makes in
- * `scripts/office/g5g6g7/harness/document-step.mjs` (H1 API, pinned by the D
- * repo's `api-contract.mjs`).
+ * calls reuse the D H1 endpoints the harness
+ * `scripts/office/g5g6g7/harness/document-step.mjs` calls. Its page documents
+ * come from the JSON `POST /api/v1/workspaces/{workspaceId}/documents` route,
+ * which the D repo's `api-contract.mjs` does NOT pin: that contract declares
+ * only the multipart file-document create `document-step.mjs` itself seeds, so
+ * a page-create regression is not caught there.
  *
  * Nothing here fakes HTTP: every request goes through the global `fetch`. The
  * only substitutions are the ones the product itself takes as seams - the

@@ -29,6 +29,9 @@
 //     toolCalls?: [{ name, input }]                    scripted tool calls (openai-compatible stream):
 //                                                      the next streamed turns answer one each; the
 //                                                      turn after them is the plain `reply`
+//     hold?: boolean                                   stream a chunk, then pause between chunks until
+//                                                      { hold: false } (or reset): for mid-stream abort
+//                                                      and frame/port-loss cases (UNI-1923)
 //     credentials?: [{ provider, api_key, base_url? }] seed stored keys }
 // Real vendor for local verification only (env, no defaults; nothing is read from or written to a
 // file): with FAKE_AI_UPSTREAM_URL (an OpenAI-compatible base, e.g. http://host:port/v1) and
@@ -98,6 +101,9 @@ function freshState() {
     unauthorizedOnce: null,
     reply: 'Hello from the UniWork AI proxy.',
     toolCalls: [],
+    hold: false,
+    // res.resolve of streams paused between chunks on `hold`
+    held: [],
     cloud: {
       enabled: true,
       tools: {
@@ -156,6 +162,11 @@ function json(res, status, body, headers = {}) {
 const fail = (res, status, code, message, headers) =>
   json(res, status, { error: { code, message: message ?? code } }, headers)
 
+/** wake every paused stream (release or reset) */
+function releaseHeld() {
+  for (const r of state.held.splice(0)) r()
+}
+
 async function readBody(req) {
   const chunks = []
   for await (const c of req) chunks.push(c)
@@ -184,6 +195,14 @@ async function sse(res, events) {
   })
   for (const e of events) {
     res.write(e)
+    // `hold` parks the stream after each chunk so a test can stop the turn or
+    // drop the frame mid-stream; the client going away just releases it
+    if (state.hold) {
+      await new Promise((r) => {
+        state.held.push(r)
+        res.once('close', r)
+      })
+    }
     await sleep(60)
   }
   res.end()
@@ -386,6 +405,7 @@ export async function handleFakeAiControl(req, res, pathname) {
     return true
   }
   if (pathname === '/__fake-ai/reset') {
+    releaseHeld()
     state = freshState()
     json(res, 200, { ok: true })
     return true
@@ -399,6 +419,11 @@ export async function handleFakeAiControl(req, res, pathname) {
       state.unauthorizedOnce = { path: typeof path === 'string' ? path : '' }
     }
     if (typeof body.reply === 'string') state.reply = body.reply
+    if (body.hold === true) state.hold = true
+    if (body.hold === false) {
+      state.hold = false
+      releaseHeld()
+    }
     if (Array.isArray(body.toolCalls)) state.toolCalls.push(...body.toolCalls)
     if (body.cloud)
       state.cloud = {

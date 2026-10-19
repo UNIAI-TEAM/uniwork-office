@@ -123,6 +123,8 @@ export interface UniworkDocsClient {
       query?: string
       cursor?: string
       limit?: number
+      /** UNI-1953: keep UniNote pages too (the Documents home); default files only */
+      includePages?: boolean
     } & UniworkListFilters,
   ): Promise<DocumentListResult>
   /** documents shared directly with the caller in one workspace (paged) */
@@ -130,6 +132,8 @@ export interface UniworkDocsClient {
     workspaceId: string
     cursor?: string
     limit?: number
+    /** UNI-1953: keep UniNote pages too (the Documents home); default files only */
+    includePages?: boolean
   }): Promise<DocumentListResult>
   /** DESKTOP-HOME: documents shared by the caller in one workspace (paged) */
   listSharedByMe(
@@ -205,6 +209,14 @@ export interface UniworkDocsClient {
     input: {
       workspaceId: string
       format: UniworkDocNewFormat
+      title: string
+      idempotencyKey: string
+    } & UniworkCreateTarget,
+  ): Promise<UniworkDocSummary>
+  /** UNI-1953: create a UniNote (`kind: 'page'`) on the documents route, placed like a blank file */
+  createPage(
+    input: {
+      workspaceId: string
       title: string
       idempotencyKey: string
     } & UniworkCreateTarget,
@@ -669,7 +681,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         timeoutMs: metadataTimeout,
         read: json,
       })
-      return parseSharedWithMe(raw, input.workspaceId)
+      return parseSharedWithMe(raw, input.workspaceId, input.includePages === true)
     },
 
     async listSharedByMe(input) {
@@ -860,6 +872,24 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return parseDocumentSummary(raw)
     },
 
+    async createPage(input) {
+      const raw = await send({
+        method: 'POST',
+        route: `/workspaces/${id(input.workspaceId)}/documents`,
+        json: {
+          kind: 'page',
+          title: input.title,
+          // the same exclusive placement as createBlank (S01-R1-5)
+          ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
+          ...(input.destination ? { destination: input.destination } : {}),
+        },
+        idempotencyKey: input.idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
     async createFile(input) {
       const form = new FormData()
       // the text fields precede the file part: the server streams the file part
@@ -963,7 +993,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
-      params.set('kind', 'file')
+      // UNI-1953: the Documents home also lists pages (`document` = files and
+      // pages, no folders); every other caller stays files only
+      params.set('kind', input.includePages ? 'document' : 'file')
       // DH1-BE-1: `/documents/recent` forwards `format` (server
       // document_search.go:650,665-675), so a format-only Recent keeps the
       // caller's recent scope. `q` and the non-forwardable updater/date filters
@@ -980,9 +1012,13 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       })
       const page = parseDocumentList(raw, input.workspaceId)
       // FD-11: the reader now carries folders and pages as well (the children
-      // route needs them); this library list is files only
+      // route needs them); this library list is files only, plus pages when the
+      // Documents home asks (`/documents/recent` ignores `kind`, so a folder is
+      // dropped here too)
       return {
-        documents: page.documents.filter((doc) => doc.kind === 'file'),
+        documents: page.documents.filter(
+          (doc) => doc.kind === 'file' || (input.includePages === true && doc.kind === 'page'),
+        ),
         nextCursor: page.nextCursor,
       }
     },

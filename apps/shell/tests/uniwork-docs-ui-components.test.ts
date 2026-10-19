@@ -19,6 +19,7 @@ import type {
 } from '../src/shared/home-api'
 import type { TabSummary } from '../src/shared/tabs-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { en as enDocs } from '../src/renderer/src/i18n/uniwork-documents/en'
 import { UniworkOpenCard } from '../src/renderer/src/UniworkOpenCard'
 import {
   UniworkNotice,
@@ -244,7 +245,7 @@ describe('picker dialog', () => {
     ])
     expect(dialog()!.textContent).not.toContain('Photo.png')
     expect(host.querySelector('.uw-pick-hidden')!.textContent).toBe(
-      'Hidden because UniWork Office cannot open their format: 1',
+      enDocs.uwPickHiddenFormats.replace('{count}', '1'),
     )
     expect(rows()[0]!.getAttribute('aria-disabled')).toBe('false')
     expect(rows()[0]!.textContent).toMatch(/Updated/)
@@ -514,7 +515,7 @@ describe('picker dialog', () => {
       await chooseShared()
       expect(rows()).toHaveLength(0)
       expect(dialog()!.textContent).toContain('Nothing has been shared with you directly yet.')
-      expect(hint()!.textContent).toBe('Hidden because UniWork Office cannot open their format: 1')
+      expect(hint()!.textContent).toBe(enDocs.uwPickHiddenFormats.replace('{count}', '1'))
       await click(buttonByText('Load more'))
       expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ cursor: 'sh-1', limit: 50 })
       expect(rows().map((r) => r.querySelector('.uw-pick-row-title')!.textContent)).toEqual([

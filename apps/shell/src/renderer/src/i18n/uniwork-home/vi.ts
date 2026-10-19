@@ -18,8 +18,10 @@ export const vi = {
   uhQuickDocx: 'Văn bản',
   uhQuickXlsx: 'Bảng tính',
   uhQuickPptx: 'Trình chiếu',
-  uhQuickHintPrefix: 'Tạo mới và tải lên ở trang này vào',
-  uhQuickHintSuffix: ', chỉ bạn thấy. Chia sẻ hoặc Di chuyển khi cần.',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'Tệp Markdown',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhFilterType: 'Loại:',
   uhFilterTypeAll: 'Tất cả',
   uhFilterModifiedBy: 'Người sửa:',
@@ -59,8 +61,6 @@ export const vi = {
   uhEmptyTrash: 'Thùng rác trống.',
   uhEmptyFiltered: 'Không có tài liệu nào khớp bộ lọc.',
   uhTrashNote: 'Mục trong thùng rác có thể khôi phục nếu bạn có quyền Quản lý.',
-  uhMyFolderNote:
-    'Riêng tư — chỉ bạn có quyền truy cập trừ khi bạn chia sẻ hoặc di chuyển ra thư mục chung.',
   uhLoadMore: 'Tải thêm',
   uhRowActions: 'Thao tác khác',
 } satisfies Record<keyof typeof zh, string>

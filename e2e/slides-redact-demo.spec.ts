@@ -150,6 +150,18 @@ test('a reader can withhold a picture from the model without losing it', async (
     await expect(confirm).toBeEnabled()
     await confirm.click()
     await expect(dialog).toHaveCount(0)
+
+    // the modal unmounts before the setRedaction op finishes its main-process
+    // roundtrip, so a save fired here can still serialize the unmarked deck
+    // (CI run 39169867586). isDirty reads the same flags the save consults —
+    // the mark sets slide.structureDirty — so it only turns true once the
+    // redact is in the model the save writes
+    await expect
+      .poll(() => page.evaluate(() => window.slidesApi.isDirty()), {
+        timeout: 15_000,
+        intervals: [250, 500, 1000],
+      })
+      .toBe(true)
     await shot('5-marked')
 
     // save through the app's own API rather than the keyboard shortcut: a

@@ -61,6 +61,8 @@ import type { Capabilities } from '../protocol/types'
  * | recents         | recent-files lookups (on only with the host's `recents` grant)      |
  * | desktopOpen     | the "Open in app" action of the "use the app" messages (Zotero group,|
  * |                 | open-password row, password-protected open); on only with the grant |
+ * | saveCopy        | File > Save as a copy — the locked-out tab's one write (save:false +  |
+ * |                 | saveCopy:true, not readOnly); on only with the host's saveCopy grant  |
  * | readOnlyProfile | marker, not an entry: the host's `readOnly` profile hides the document's|
  * |                 | own comments panel (set by createCapabilityObject, never by a grant) |
  */
@@ -82,6 +84,7 @@ export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.f
   desktopOpen: false,
   save: false,
   saveAs: false,
+  saveCopy: false,
   print: false,
   exportPdf: false,
   exportHtml: false,
@@ -98,7 +101,15 @@ export function hostGrants(
 ): Required<
   Pick<
     DesktopCapabilities,
-    'open' | 'recents' | 'desktopOpen' | 'save' | 'saveAs' | 'print' | 'exportPdf' | 'exportHtml'
+    | 'open'
+    | 'recents'
+    | 'desktopOpen'
+    | 'save'
+    | 'saveAs'
+    | 'saveCopy'
+    | 'print'
+    | 'exportPdf'
+    | 'exportHtml'
   >
 > {
   return {
@@ -107,6 +118,7 @@ export function hostGrants(
     desktopOpen: granted?.desktopOpen === true,
     save: granted?.save === true,
     saveAs: granted?.saveAs === true,
+    saveCopy: granted?.saveCopy === true,
     print: granted?.print === true,
     exportPdf: granted?.exportPdf === true,
     exportHtml: granted?.exportHtml === true,

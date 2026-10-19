@@ -131,6 +131,24 @@ describe('uniwork-work IPC', () => {
     ])
   })
 
+  it('openWeb builds the document page of a UniNote from slugs and the id', async () => {
+    const { call, openExternal } = setup()
+    expect(
+      await call(C.openWeb, { kind: 'document', orgSlug: 'acme', wsSlug: 'eng', id: '01J8X4DOC' }),
+    ).toBe(true)
+    expect(openExternal.mock.calls.map(([url]) => url)).toEqual([
+      'https://uniwork.example/acme/eng/documents/01J8X4DOC',
+    ])
+    for (const target of [
+      { kind: 'document', orgSlug: 'acme', wsSlug: 'eng' },
+      { kind: 'document', orgSlug: 'acme', wsSlug: 'eng', id: '../x' },
+      { kind: 'document', orgSlug: 'a/b', wsSlug: 'eng', id: 'd_1' },
+    ]) {
+      expect(await call(C.openWeb, target)).toBe(false)
+    }
+    expect(openExternal).toHaveBeenCalledTimes(1)
+  })
+
   it('openWeb refuses a bad slug, a missing id, an unknown kind or a URL', async () => {
     const { call, openExternal } = setup()
     for (const target of [

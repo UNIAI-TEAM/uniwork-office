@@ -2021,3 +2021,94 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
     expect(await mock.host.print({ mode: 'dialog' })).toEqual({ printed: true })
   })
 })
+
+describe('RFSH-5: File > Save a copy on a locked-out tab (UNI-1920)', () => {
+  /** the new web-only DesktopApi member (absent until the green commit) */
+  type WithSaveCopy = WebApi & {
+    saveDocxCopy?(): Promise<
+      { ok: true; title: string } | { ok: false; error?: string; reason?: 'cancelled' }
+    >
+  }
+  const copy = () => (api as WithSaveCopy).saveDocxCopy!()
+
+  it('sends api.saveCopy with the live document bytes and the localized "<name> (copy)" title', async () => {
+    await bootWith('Report.docx', { saveCopy: true })
+    api.provideDocBytes(async () => buf([3, 1, 4]))
+    await expect(copy()).resolves.toEqual({ ok: true, title: 'Report (copy)' })
+    const calls = mock.calls.filter((c) => c.type === 'api.saveCopy')
+    expect(calls).toHaveLength(1)
+    const sent = calls[0]!.payload as { data: ArrayBuffer; name: string }
+    expect(new Uint8Array(sent.data)).toEqual(new Uint8Array([3, 1, 4]))
+    expect(sent.name).toBe('Report (copy)')
+    // the open document is not re-pointed and nothing else was written
+    expect(mock.saved).toEqual([])
+    expect(mock.bytesOf('f1')).toEqual(DOCX)
+  })
+
+  it('is not gated on save or writable: a locked-out tab and a writable:false file still copy', async () => {
+    // save:false + saveCopy:true (the locked-out grant) — isViewOnly() is true here by design
+    await bootWith('Report.docx', { save: false, saveCopy: true })
+    api.provideDocBytes(async () => buf([9]))
+    await expect(copy()).resolves.toMatchObject({ ok: true })
+    expect(mock.calls.filter((c) => c.type === 'api.saveCopy')).toHaveLength(1)
+
+    // a host-marked non-writable file under an editing tab keeps the same gate
+    setup()
+    const meta = mock.seed('Locked.docx', DOCX)
+    mock.rename(meta.fileId, 'Locked.docx', { writable: false })
+    mock.init({ documentId: meta.fileId, capabilities: { save: true, saveCopy: true } })
+    await api.consumePendingOpenDocx()
+    api.provideDocBytes(async () => buf([8]))
+    await expect(copy()).resolves.toMatchObject({ ok: true })
+  })
+
+  it('refuses under the readOnly profile even when the host granted saveCopy', async () => {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({
+      documentId: meta.fileId,
+      profile: 'readOnly',
+      capabilities: { save: true, saveCopy: true },
+    })
+    await api.consumePendingOpenDocx()
+    api.provideDocBytes(async () => buf([1]))
+    await expect(copy()).resolves.toEqual({ ok: false, error: 'read-only document' })
+    expect(mock.calls.some((c) => c.type === 'api.saveCopy')).toBe(false)
+  })
+
+  it('refuses without the saveCopy grant and when the live document cannot be serialized', async () => {
+    await bootWith('Report.docx', { save: false })
+    await expect(copy()).resolves.toEqual({ ok: false, error: 'unsupported' })
+    expect(mock.calls.some((c) => c.type === 'api.saveCopy')).toBe(false)
+
+    // granted, but the renderer never registered provideDocBytes: no bytes, no request
+    setup()
+    await bootWith('Report.docx', { saveCopy: true })
+    await expect(copy()).resolves.toMatchObject({ ok: false })
+    expect(mock.calls.some((c) => c.type === 'api.saveCopy')).toBe(false)
+  })
+})
+
+describe('UNI-1920 item B: Ctrl/Cmd+P inside the Docs frame runs File > Print', () => {
+  const pressP = (init: KeyboardEventInit = {}): KeyboardEvent => {
+    const ev = new KeyboardEvent('keydown', { key: 'p', cancelable: true, ...init })
+    window.dispatchEvent(ev)
+    return ev
+  }
+
+  it('mod+P dispatches the renderer\'s "print" menu command (the in-frame print dialog)', async () => {
+    await bootWith('Report.docx', { save: true, print: true })
+    const commands: string[] = []
+    api.onMenuCommand((cmd) => commands.push(cmd))
+    pressP({ ctrlKey: true })
+    pressP({ metaKey: true })
+    expect(commands).toEqual(['print', 'print'])
+  })
+
+  it('does nothing while the print grant is withheld (the browser keeps its default)', async () => {
+    await bootWith('Report.docx', { save: true })
+    const commands: string[] = []
+    api.onMenuCommand((cmd) => commands.push(cmd))
+    pressP({ ctrlKey: true })
+    expect(commands).toEqual([])
+  })
+})

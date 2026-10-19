@@ -554,8 +554,12 @@ export const it = {
   appOnlyEncrypted: '"{name}" è protetto da password e non può essere aperto qui.',
   appFileExportPdf: 'Esporta come PDF…',
   appFilePrint: 'Stampa…',
+  appPrintNoDocument: 'Apri un documento per stamparlo.',
   appPrintNoPrinter:
     'Nessuna stampante disponibile su questo computer. Puoi salvare il documento come PDF.',
   appPrintFailedPdfHint: 'Stampa non riuscita: {error}. Puoi salvare il documento come PDF.',
   appPrintSaveAsPdf: 'Salva come PDF…',
+  appFileSaveCopy: 'Salva come copia…',
+  appCopySaved: 'La tua versione è stata salvata come nuovo documento: {title}.',
+  appCopySaveFailed: 'Impossibile creare la copia. Le modifiche sono ancora al sicuro; riprova.',
 } satisfies Record<keyof typeof zh, string>

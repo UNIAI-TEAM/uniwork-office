@@ -45,6 +45,7 @@ export const ko = {
   collabDeleteConfirm: '영구 삭제',
   collabDeleted: '삭제된 내용입니다',
   collabEdited: '수정됨 · {time}',
+  collabEditedMark: '(수정됨)',
   collabFormerMember: '이전 멤버',
   collabHistory: '수정 기록 보기',
   collabHistoryTitle: '수정 기록',

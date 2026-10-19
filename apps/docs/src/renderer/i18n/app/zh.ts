@@ -554,7 +554,13 @@ export const zh = {
   appOnlyEncrypted: '“{name}”受密码保护，无法在此处打开。',
   appFileExportPdf: '导出为 PDF…',
   appFilePrint: '打印…',
+  appPrintNoDocument: '请先打开文档再打印。',
   appPrintNoPrinter: '此电脑没有可用的打印机。可以改为将文档保存为 PDF。',
   appPrintFailedPdfHint: '打印没有成功:{error}。可以改为将文档保存为 PDF。',
   appPrintSaveAsPdf: '另存为 PDF…',
+  // UNI-1920 (RFSH-5): File > Save as a copy on a locked-out web tab; labels reuse the
+  // conflict-dialog copy wording of each locale
+  appFileSaveCopy: '另存为副本…',
+  appCopySaved: '你的版本已另存为新文档：{title}。',
+  appCopySaveFailed: '无法创建副本。你的更改仍然安全；请重试。',
 }

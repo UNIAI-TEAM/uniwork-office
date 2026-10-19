@@ -16,6 +16,7 @@ import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
 import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwork-sync/intent-store'
 import { DRAFTS_STORE_REGISTRATION, createDraftStore } from '../src/main/uniwork-sync/queue/drafts'
 import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
+import { PARKED_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/parked'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import { createDocLock } from '../src/main/uniwork-sync/doc-lock'
@@ -33,6 +34,13 @@ import {
   type LockableSafeStorage,
 } from '../src/main/uniwork-sync/test-kit/compliance'
 
+import { AccountBoundary } from '../src/main/uniwork-docs/account-boundary'
+import {
+  OFFLINE_LIBRARY_LAYER_BUDGET_BYTES,
+  OFFLINE_LIBRARY_STORE_REGISTRATION,
+  createOfflineLibraryManager,
+  createOfflineLibraryStore,
+} from '../src/main/uniwork-sync/offline-library'
 /**
  * G5-06 W4b: the durable save queue wired into the service (production path, no
  * electron). The service builds one QueueDispatcher per signed-in session over
@@ -372,6 +380,7 @@ function setup(
   layer.register(INTENT_STORE_REGISTRATION)
   layer.register(DRAFTS_STORE_REGISTRATION)
   layer.register(PAUSE_STORE_REGISTRATION)
+  layer.register(PARKED_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({
     layer: opts.wrapRecords
       ? {
@@ -1959,28 +1968,179 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(commits(server)[0]!.headers['idempotency-key']).toBe('key_reconcile')
   })
 
-  it('G506-be-d1-1 / G5-11: the account-boundary lock stops runtime and awaits lockSession', () => {
-    // the wiring source pins the order: the feed pass stops before
-    // service.lockSession (which waits for in-flight saves, parks N+1, and locks
-    // the store without wiping). The behavioural pin - an account switch stops
-    // the runtime and runs lockSession - lives in uniwork-docs-lock-wiring.
-    const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
-    const lockIdx = source.indexOf('lockStore: async (owner')
-    expect(lockIdx).toBeGreaterThan(-1)
-    const lockBlock = source.slice(lockIdx)
-    const stopIdx = lockBlock.indexOf('stopFeed()')
-    const sessionIdx = lockBlock.indexOf('await service.lockSession(')
-    expect(stopIdx).toBeGreaterThan(-1)
-    expect(sessionIdx).toBeGreaterThan(-1)
-    expect(stopIdx).toBeLessThan(sessionIdx)
-    // the sync store is never wiped at the boundary; the only wipe is the
-    // pinned offline library (G5-05), after lockSession, its lock before stopFeed
-    const wipes = source.split('lockAndWipe(').length - 1
-    expect(wipes).toBe(source.split('libraryLayerFor().lockAndWipe(').length - 1)
-    const libLockIdx = lockBlock.indexOf('runtime.library?.lockBoundary()')
-    expect(libLockIdx).toBeGreaterThan(-1)
-    expect(libLockIdx).toBeLessThan(stopIdx)
-    expect(lockBlock.indexOf('libraryLayerFor().lockAndWipe(')).toBeGreaterThan(sessionIdx)
+  it('A30 (UNI-1362): teardown prunes dead/stopping queue-session tombstones once the pass drains while stale callbacks stay refused', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const engine = await ctx.service.syncCenterEngine()
+    if (engine.kind !== 'ok') throw new Error('the live queue did not open')
+    const stale = engine.dispatcher
+    // white-box read of private tombstone sets to verify lifetime bound
+    const internals: {
+      deadQueueSessions: Set<string>
+      stoppingQueueSessions: Set<string>
+    } = ctx.service as never
+
+    await ctx.service.teardownSaveQueue()
+    expect(internals.deadQueueSessions.size).toBe(0)
+    expect(internals.stoppingQueueSessions.size).toBe(0)
+
+    // stale callbacks on the detached dispatcher remain refused even after its id was pruned
+    writeFileSync(path, 'v4')
+    const key = basename(dirname(path))
+    const beforeCalls = server.calls.length
+    await stale.dispatchAll(
+      [
+        {
+          key,
+          path,
+          filename: 'Q4 plan.docx',
+          format: 'docx',
+          orgId: 'org_a',
+          workspaceId: 'ws_1',
+          baseVersion: 3,
+          record: {
+            v: 2,
+            intentId: `intent_${key}`,
+            idempotencyKey: 'key_stale',
+            documentId: DOC,
+            orgId: 'org_a',
+            workspaceId: 'ws_1',
+            baseRevision: '41',
+            baseVersion: 3,
+            checksum: hex(enc('v4')),
+            length: enc('v4').byteLength,
+            generation: 1,
+            state: 'queued',
+            attempt: 0,
+            createdAt: '2026-10-13T00:00:00.000Z',
+            updatedAt: '2026-10-13T00:00:00.000Z',
+          },
+          payload: enc('v4'),
+        },
+      ],
+      Date.now(),
+    )
+    expect(server.calls.length).toBe(beforeCalls)
+  })
+
+  it('B23 (UNI-1362): G506-be-d1-1 / G5-11: a reconstructed account-boundary callback over the real library layer stops runtime, awaits lockSession, keeps sync work, and wipes that layer', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    ctx.setCapabilityOffline(true)
+    await ctx.service.save(path)
+    expect(await storedIntent(ctx, path)).not.toBeNull()
+
+    // build the offline library's own encrypted layer exactly as wiring.ts does.
+    // NOTE: the `AccountBoundary` below is reconstructed here with a hand-written
+    // `lockSession` callback over a real library layer; the production sign-out
+    // callback installed by `createUniworkDocs()` (wiring.ts) is NOT exercised by
+    // this test, so it proves the layer wipe, not the production wiring.
+    const scope = { deploymentId: 'default', accountId: 'acc_1' }
+    const libRoot = join(dir, 'uniwork-sync', 'library')
+    const libKeys = createSafeStorageKeyProvider({
+      safeStorage: createLockableSafeStorage(),
+      dir: join(libRoot, 'keys'),
+    })
+    const libraryLayer = createStoreLayer({
+      root: join(libRoot, 'store'),
+      keys: libKeys,
+      budgetBytes: OFFLINE_LIBRARY_LAYER_BUDGET_BYTES,
+      clock: () => 1_700_000_000_000,
+    })
+    libraryLayer.register(OFFLINE_LIBRARY_STORE_REGISTRATION)
+    const libOpened = await libraryLayer.open(scope)
+    if (libOpened.kind !== 'ok') throw new Error(libOpened.kind)
+    const libRecords = libOpened.store.records(OFFLINE_LIBRARY_STORE_REGISTRATION.name)
+    await libRecords.write('pin:doc_1', enc('pinned library bytes'))
+    const libraryStore = createOfflineLibraryStore({
+      layer: libraryLayer,
+      scope: () => {
+        const accountId = ctx.account()
+        return accountId ? { deploymentId: 'default', accountId } : null
+      },
+    })
+    await libraryStore.writeIndex({ pins: [DOC], cleanup: {} })
+    const library = createOfflineLibraryManager({
+      store: libraryStore,
+      scope: () => {
+        const accountId = ctx.account()
+        return accountId ? { deploymentId: 'default', accountId } : null
+      },
+      session: () => (ctx.account() ? 'dev_1' : null),
+      docs: () => null,
+      leases: {
+        effectiveState: async () => ({ allowed: true, reason: 'ok' }) as never,
+        grant: async () => ({ kind: 'ok', lease: {} }) as never,
+        release: async () => undefined,
+      },
+      capability: async () => true,
+      hasLocalWork: async (documentId) => ctx.service.hasLocalDraft(documentId),
+      clock: { now: () => 1_700_000_000_000 },
+    })
+    const order: string[] = []
+    const stopFeed = vi.fn(() => {
+      order.push('stopFeed')
+    })
+    const boundary = new AccountBoundary({
+      root: join(dir, 'uniwork-documents'),
+      openPaths: () => [path],
+      closeDocument: async () => true,
+      confirmClose: async () => true,
+      closeNow: () => undefined,
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+      forgetLocks: (match) => ctx.service.forgetLocksWhere(match),
+      closeConflictPrompt: () => ctx.service.closeConflictPrompt(),
+      sessionOwner: () => {
+        const accountId = ctx.account()
+        return accountId ? { accountId, deploymentId: 'default' } : null
+      },
+      confirmSignOut: async () => true,
+      lockSession: async (owner, _onWaiting, options) => {
+        library.lockBoundary()
+        order.push('lib.lockBoundary')
+        stopFeed()
+        const res = await ctx.service.lockSession(owner, undefined, {
+          switch: options?.switch === true,
+        })
+        order.push('service.lockSession')
+        if (res.ok && owner) {
+          await libraryLayer.lockAndWipe({
+            deploymentId: owner.deploymentId,
+            accountId: owner.accountId,
+          })
+          order.push('libraryLayer.lockAndWipe')
+        }
+        return { ok: res.ok, lost: res.lost?.length ?? 0 }
+      },
+    })
+    await boundary.enforce({ deploymentId: 'default', accountId: 'acc_1' })
+
+    expect(await boundary.beforeSignOut({ confirmed: true })).toBe(true)
+    ctx.signOut()
+    boundary.afterSignOut()
+
+    expect(order).toEqual([
+      'lib.lockBoundary',
+      'stopFeed',
+      'service.lockSession',
+      'libraryLayer.lockAndWipe',
+    ])
+    // the library layer's scope bytes and key are wiped, and the pre-lock handle is interrupted
+    expect(await libRecords.read('pin:doc_1')).toEqual({ kind: 'interrupted' })
+    expect(existsSync(join(libRoot, 'store', 'default', 'acc_1'))).toBe(false)
+    // reopening the library layer for the same account sees an empty store (nothing survived the wipe)
+    ctx.signInAs('acc_1')
+    expect(await libraryStore.readIndex()).toEqual({
+      kind: 'ok',
+      index: { pins: [], cleanup: {} },
+    })
+    // meanwhile the sync store's queued intent is locked-and-kept (never wiped)
+    expect(existsSync(join(dir, 'uniwork-sync', 'store', 'default', 'acc_1'))).toBe(true)
+    expect((await storedIntent(ctx, path))?.intent.documentId).toBe(DOC)
   })
 })
 

@@ -143,6 +143,8 @@ export const cs = {
   uwDocNameTooLong: 'Název je příliš dlouhý (nejvýše 500 znaků).',
   uwDocRenamedAnnounce: 'Dokument byl přejmenován na {name}.',
   uwDocActionFailed: 'Nepodařilo se. Zkuste to znovu.',
+  uwUniNoteOpenFailed:
+    'UniNote byla vytvořena, ale nepodařilo se ji otevřít. Otevřete ji ze seznamu.',
   uwDocActionsFor: 'Další akce pro „{name}“',
   uwDocCreate: 'Vytvořit',
   uwDocUploadPick: 'Vybrat soubor',

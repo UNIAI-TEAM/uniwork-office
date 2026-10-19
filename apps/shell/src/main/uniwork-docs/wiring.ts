@@ -20,6 +20,7 @@ import {
   type SignOutPromptRequest,
   type UniworkConflictAction,
   type UniworkCreateDocInput,
+  type UniworkCreatePageInput,
   type UniworkCreateFolderInput,
   type UniworkFirstSaveInput,
   type UniworkDocListQuery,
@@ -413,7 +414,8 @@ function syncStoreFor(): { layer: StoreLayer; access: SyncStoreAccess } {
  * `userData/uniwork-sync/library/` - its own root, safeStorage-wrapped key per
  * scope and budget, so pinned bytes never count against the sync store budget
  * (lead decision on W5 "A"). Wiped at the account boundary beside the sync
- * scope. Residual: moves into G5-11's SYNC_STORE_REGISTRATIONS when it lands.
+ * scope. It stays its own layer, never a `SYNC_STORE_REGISTRATIONS` entry: the
+ * library's bytes and budget must not be folded into the sync layer's.
  */
 const libraryLayers = new Map<string, StoreLayer>()
 
@@ -883,6 +885,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.createDocument, (_event, input: unknown) =>
     service.createDocument((input ?? {}) as UniworkCreateDocInput),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.createPage, (_event, input: unknown) =>
+    service.createPage((input ?? {}) as UniworkCreatePageInput),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.pickUploadFile, () => service.pickUploadFile())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.uploadDocument, (_event, input: unknown) =>

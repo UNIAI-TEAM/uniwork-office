@@ -232,7 +232,9 @@ export function MentionPicker({
                   <span className="collab-mention-text">
                     <span className="collab-mention-name">{row.candidate.display_name}</span>
                     {row.candidate.email ? (
-                      <span className="collab-mention-email">{row.candidate.email}</span>
+                      <span className="collab-mention-email" title={row.candidate.email}>
+                        {row.candidate.email}
+                      </span>
                     ) : null}
                   </span>
                   {noAccess ? <NoAccessBadge label={noAccessBadge} /> : null}

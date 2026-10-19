@@ -44,6 +44,7 @@ export const id = {
   collabDeleteConfirm: 'Hapus permanen',
   collabDeleted: 'Konten ini telah dihapus',
   collabEdited: 'Diedit · {time}',
+  collabEditedMark: '(diedit)',
   collabFormerMember: 'Mantan anggota',
   collabHistory: 'Lihat riwayat edit',
   collabHistoryTitle: 'Riwayat edit',

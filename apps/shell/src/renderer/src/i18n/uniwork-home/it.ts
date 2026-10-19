@@ -18,8 +18,10 @@ export const it = {
   uhQuickDocx: 'Documento',
   uhQuickXlsx: 'Foglio di calcolo',
   uhQuickPptx: 'Presentazione',
-  uhQuickHintPrefix: 'La creazione e il caricamento qui salvano in',
-  uhQuickHintSuffix: ', visibile solo a te. Condividi o sposta quando necessario.',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'File Markdown',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhFilterType: 'Tipo:',
   uhFilterTypeAll: 'Tutti',
   uhFilterModifiedBy: 'Modificato da:',
@@ -59,8 +61,6 @@ export const it = {
   uhEmptyTrash: 'Il cestino è vuoto.',
   uhEmptyFiltered: 'Nessun documento corrisponde ai filtri attuali.',
   uhTrashNote: 'Gli elementi nel cestino possono essere ripristinati se hai accesso Gestisci.',
-  uhMyFolderNote:
-    'Privato — solo tu hai accesso a meno che tu non condivida o sposti in una cartella condivisa.',
   uhLoadMore: 'Carica altro',
   uhRowActions: 'Altre azioni',
 } satisfies Record<keyof typeof zh, string>

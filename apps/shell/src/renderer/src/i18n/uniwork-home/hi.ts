@@ -18,9 +18,10 @@ export const hi = {
   uhQuickDocx: 'दस्तावेज़',
   uhQuickXlsx: 'स्प्रेडशीट',
   uhQuickPptx: 'प्रस्तुति',
-  uhQuickHintPrefix: 'यहाँ बनाने और अपलोड करने पर',
-  uhQuickHintSuffix:
-    ' में सहेजा जाता है, जो केवल आपको दिखता है। आवश्यकतानुसार साझा या स्थानांतरित करें।',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'Markdown फ़ाइल',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhFilterType: 'प्रकार:',
   uhFilterTypeAll: 'सभी',
   uhFilterModifiedBy: 'संशोधितकर्ता:',
@@ -62,8 +63,6 @@ export const hi = {
   uhEmptyFiltered: 'कोई दस्तावेज़ वर्तमान फ़िल्टर से मेल नहीं खाता।',
   uhTrashNote:
     'यदि आपके पास प्रबंधन पहुँच है तो ट्रैश में मौजूद आइटम पुनर्स्थापित किए जा सकते हैं।',
-  uhMyFolderNote:
-    'निजी — जब तक आप साझा नहीं करते या साझा फ़ोल्डर में स्थानांतरित नहीं करते, केवल आपके पास पहुँच है।',
   uhLoadMore: 'और लोड करें',
   uhRowActions: 'अधिक कार्रवाइयाँ',
 } satisfies Record<keyof typeof zh, string>

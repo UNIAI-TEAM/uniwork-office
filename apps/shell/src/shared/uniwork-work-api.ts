@@ -172,7 +172,12 @@ export type WorkRecentDocument =
  * one (paths follow uniwork:packages/core/paths/paths.ts).
  */
 export type WorkWebTarget =
-  | { kind: 'task' | 'meeting' | 'room' | 'person'; orgSlug: string; wsSlug: string; id: string }
+  | {
+      kind: 'task' | 'meeting' | 'room' | 'person' | 'document'
+      orgSlug: string
+      wsSlug: string
+      id: string
+    }
   | { kind: 'my-tasks' | 'calendar' | 'inbox' | 'tasks'; orgSlug: string; wsSlug: string }
   | { kind: 'onboarding' }
 

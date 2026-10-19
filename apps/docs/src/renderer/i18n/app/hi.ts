@@ -547,9 +547,13 @@ export const hi = {
   appOnlyEncrypted: '"{name}" पासवर्ड से सुरक्षित है और यहाँ नहीं खोला जा सकता।',
   appFileExportPdf: 'PDF के रूप में निर्यात करें…',
   appFilePrint: 'प्रिंट करें…',
+  appPrintNoDocument: 'प्रिंट करने के लिए कोई दस्तावेज़ खोलें।',
   appPrintNoPrinter:
     'इस कंप्यूटर पर कोई प्रिंटर उपलब्ध नहीं है। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
   appPrintFailedPdfHint:
     'प्रिंट नहीं हो सका: {error}। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
   appPrintSaveAsPdf: 'PDF के रूप में सहेजें…',
+  appFileSaveCopy: 'प्रति के रूप में सहेजें…',
+  appCopySaved: 'आपका संस्करण नए दस्तावेज़ के रूप में सहेजा गया: {title}।',
+  appCopySaveFailed: 'प्रति नहीं बन सकी। आपके बदलाव अब भी सुरक्षित हैं; फिर से कोशिश करें।',
 } satisfies Record<keyof typeof zh, string>

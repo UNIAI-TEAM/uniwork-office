@@ -18,8 +18,10 @@ export const cs = {
   uhQuickDocx: 'Dokument',
   uhQuickXlsx: 'Tabulka',
   uhQuickPptx: 'Prezentace',
-  uhQuickHintPrefix: 'Vytvoření a nahrání zde se uloží do',
-  uhQuickHintSuffix: ', viditelné pouze pro vás. Sdílejte nebo přesuňte podle potřeby.',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'Soubor Markdown',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhFilterType: 'Typ:',
   uhFilterTypeAll: 'Vše',
   uhFilterModifiedBy: 'Upravil:',
@@ -60,8 +62,6 @@ export const cs = {
   uhEmptyTrash: 'Koš je prázdný.',
   uhEmptyFiltered: 'Žádné dokumenty neodpovídají aktuálním filtrům.',
   uhTrashNote: 'Položky v koši lze obnovit, pokud máte oprávnění Správa.',
-  uhMyFolderNote:
-    'Soukromé — přístup máte pouze vy, pokud dokument nesdílíte nebo nepřesunete do sdílené složky.',
   uhLoadMore: 'Načíst další',
   uhRowActions: 'Další akce',
 } satisfies Record<keyof typeof zh, string>

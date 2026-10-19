@@ -542,9 +542,14 @@ export const en = {
   appOnlyEncrypted: '"{name}" is password protected and cannot be opened here.',
   appFileExportPdf: 'Export as PDF…',
   appFilePrint: 'Print…',
+  appPrintNoDocument: 'Open a document to print it.',
   appPrintNoPrinter:
     'No printer is available on this computer. You can save the document as a PDF instead.',
   appPrintFailedPdfHint:
     'Printing did not work: {error}. You can save the document as a PDF instead.',
   appPrintSaveAsPdf: 'Save as PDF…',
+  // UNI-1920 (RFSH-5): File > Save as a copy on a locked-out web tab (conflict-dialog copy wording)
+  appFileSaveCopy: 'Save as a copy…',
+  appCopySaved: 'Your version was saved as a new document: {title}.',
+  appCopySaveFailed: 'Couldn’t create the copy. Your changes are still safe; try again.',
 } satisfies Record<keyof typeof zh, string>

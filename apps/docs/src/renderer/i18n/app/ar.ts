@@ -536,7 +536,11 @@ export const ar = {
   appOnlyEncrypted: 'المستند "{name}" محمي بكلمة مرور ولا يمكن فتحه هنا.',
   appFileExportPdf: 'تصدير بتنسيق PDF…',
   appFilePrint: 'طباعة…',
+  appPrintNoDocument: 'افتح مستندًا لطباعته.',
   appPrintNoPrinter: 'لا تتوفر طابعة على هذا الكمبيوتر. يمكنك حفظ المستند كملف PDF بدلاً من ذلك.',
   appPrintFailedPdfHint: 'تعذّرت الطباعة: {error}. يمكنك حفظ المستند كملف PDF بدلاً من ذلك.',
   appPrintSaveAsPdf: 'حفظ بتنسيق PDF…',
+  appFileSaveCopy: 'الحفظ كنسخة…',
+  appCopySaved: 'حُفظت نسختك كمستند جديد: {title}.',
+  appCopySaveFailed: 'تعذّر إنشاء النسخة. لا تزال تغييراتك آمنة؛ حاول مرة أخرى.',
 } satisfies Record<keyof typeof zh, string>

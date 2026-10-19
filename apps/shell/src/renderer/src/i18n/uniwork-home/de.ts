@@ -18,9 +18,10 @@ export const de = {
   uhQuickDocx: 'Dokument',
   uhQuickXlsx: 'Tabelle',
   uhQuickPptx: 'Präsentation',
-  uhQuickHintPrefix: 'Hier erstellte und hochgeladene Dateien werden in',
-  uhQuickHintSuffix:
-    ' gespeichert und sind nur für Sie sichtbar. Bei Bedarf teilen oder verschieben.',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'Markdown-Datei',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhFilterType: 'Typ:',
   uhFilterTypeAll: 'Alle',
   uhFilterModifiedBy: 'Geändert von:',
@@ -62,8 +63,6 @@ export const de = {
   uhEmptyFiltered: 'Keine Dokumente entsprechen den aktuellen Filtern.',
   uhTrashNote:
     'Elemente im Papierkorb können wiederhergestellt werden, wenn Sie Verwaltungszugriff haben.',
-  uhMyFolderNote:
-    'Privat — nur Sie haben Zugriff, es sei denn, Sie geben Dateien frei oder verschieben sie in einen gemeinsamen Ordner.',
   uhLoadMore: 'Mehr laden',
   uhRowActions: 'Weitere Aktionen',
 } satisfies Record<keyof typeof zh, string>

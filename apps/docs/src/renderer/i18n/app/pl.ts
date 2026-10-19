@@ -554,9 +554,13 @@ export const pl = {
   appOnlyEncrypted: 'Dokument „{name}” jest chroniony hasłem i nie można go tu otworzyć.',
   appFileExportPdf: 'Eksportuj jako PDF…',
   appFilePrint: 'Drukuj…',
+  appPrintNoDocument: 'Otwórz dokument, aby go wydrukować.',
   appPrintNoPrinter:
     'Na tym komputerze nie ma dostępnej drukarki. Możesz zamiast tego zapisać dokument jako PDF.',
   appPrintFailedPdfHint:
     'Drukowanie nie powiodło się: {error}. Możesz zamiast tego zapisać dokument jako PDF.',
   appPrintSaveAsPdf: 'Zapisz jako PDF…',
+  appFileSaveCopy: 'Zapisz jako kopię…',
+  appCopySaved: 'Twoja wersja została zapisana jako nowy dokument: {title}.',
+  appCopySaveFailed: 'Nie udało się utworzyć kopii. Zmiany są nadal bezpieczne; spróbuj ponownie.',
 } satisfies Record<keyof typeof zh, string>

@@ -1,4 +1,6 @@
 /** @vitest-environment jsdom */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -117,6 +119,24 @@ describe('MentionPicker (presentational listbox)', () => {
       opt.dispatchEvent(ev)
     })
     expect(ev.defaultPrevented).toBe(true)
+  })
+
+  it('keeps the name readable and truncates the email to one line with a title (UNI-1972)', () => {
+    render()
+    const email = host.querySelector('.collab-mention-email')!
+    expect(email.getAttribute('title')).toBe('minhanh@x.vn')
+    const css = readFileSync(
+      resolve(import.meta.dirname, '../src/collab/collab-composer.css'),
+      'utf8',
+    )
+    const body = (sel: string): string =>
+      new RegExp(`${sel.replace('.', '\\.')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? ''
+    const emailRule = body('.collab-mention-email')
+    expect(emailRule).toMatch(/white-space:\s*nowrap/)
+    expect(emailRule).toMatch(/text-overflow:\s*ellipsis/)
+    expect(emailRule).toMatch(/overflow:\s*hidden/)
+    const nameRule = body('.collab-mention-name')
+    expect(nameRule).not.toMatch(/nowrap|ellipsis/)
   })
 
   it('shows the lock icon and collabMentionNoAccessBadge on candidates with can_view=false (G8-18)', () => {

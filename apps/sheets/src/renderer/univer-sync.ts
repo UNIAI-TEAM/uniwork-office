@@ -7888,6 +7888,14 @@ export function modelCellValue(cell: {
 /// Reads a cell's current content for AI previews and drift checks.
 export function lazyCellReader(worksheet: UniverWorksheet): (address: string) => CellState {
   return (address) => {
+    // Cells outside the worksheet's current grid (but inside MAX_GRID_*,
+    // which the DSL schema already enforces) read as empty at propose and
+    // drift-check time without mutating the workbook; apply grows the grid
+    // before writing.
+    const coords = parseAddress(address)
+    if (coords.row >= worksheet.getMaxRows() || coords.column >= worksheet.getMaxColumns()) {
+      return { value: null, rawValue: null }
+    }
     const range = worksheet.getRange(address)
     const formula = range.getFormula()
     const value = range.getValue() ?? null

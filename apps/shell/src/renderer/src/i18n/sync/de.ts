@@ -7,9 +7,10 @@ export const de = {
   uwChipPausedAdmin: 'Speichern eingereiht · Senden pausiert',
   uwChipReconciling: 'Letztes Speichern wird geprüft…',
   uwChipReconcileStuck: 'Support nötig, um das Speichern zu bestätigen',
+  uwErrReconcileStuck: 'Support nötig, um das Speichern zu bestätigen.',
   uwChipRemoteNewer: 'Neuere Version in UniWork',
   uwTipQueued:
-    'Ihr Speicherstand von {time} bleibt sicher auf diesem Computer und wird gesendet, sobald Sie online sind.',
+    'Ihr Speicherstand von {time} bleibt sicher auf diesem Computer und wird gesendet, sobald es möglich ist.',
   uwTipQueuedNewer:
     'Der Speicherstand von {time} wartet auf das Senden. Spätere Änderungen gehören nicht dazu.',
   uwTipPausedAdmin:
@@ -129,6 +130,8 @@ export const de = {
   uwSignOutWaiting: 'Laufendes Speichern wird vor dem Abmelden abgeschlossen…',
   uwSignOutCaptureFailed:
     'Einige ungespeicherte Änderungen konnten nicht rechtzeitig erfasst werden; die zuletzt gespeicherte oder automatisch gespeicherte Version bleibt für dein Konto erhalten.',
+  uwSignOutTimedOut:
+    'Die Abmeldung konnte nicht rechtzeitig bestätigt werden; das Konto ist möglicherweise noch angemeldet. Versuchen Sie es erneut.',
   uwSwitchLostTitle:
     'Einige nicht gespeicherte Änderungen des vorherigen Kontos sind verloren gegangen',
   uwSwitchLostBody:
@@ -341,7 +344,7 @@ export const de = {
   uwRemoteStopAiConfirm:
     'Den laufenden UniWork-AI-Lauf stoppen, um neu zu laden? Bereits von der KI vorgenommene Änderungen gehören zur geöffneten Kopie.',
   uwRemoteWaitCommit:
-    'Warten, bis das laufende Speichern abgeschlossen ist; danach können Sie neu laden.',
+    'Warten, bis das laufende Speichern abgeschlossen ist; danach können Sie fortfahren.',
   uwRemoteReload: 'Neueste Version laden…',
   uwRemoteLater: 'Später',
   uwRemoteClose: 'Schließen',

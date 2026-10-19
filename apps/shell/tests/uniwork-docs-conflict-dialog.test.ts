@@ -2890,4 +2890,25 @@ describe('G5-12 W-F2 "Download my version" (main)', () => {
     expect(await flow).toMatchObject({ state: 'conflict' })
     expect(() => readFileSync(target)).toThrow()
   })
+
+  it('A106 (UNI-1362): refuses a picked download target inside the working-copy root with download_failed and writes nothing', async () => {
+    const server = fakeServer({ bytes: enc('v3'), title: 'Q4 plan.docx' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { flow, view } = await openDialog(ctx, path)
+    const insideTarget = join(ctx.service.store.root, 'default', 'acc_1', 'stray-copy.docx')
+    pick(ctx).mockResolvedValue(insideTarget)
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'download_failed', noticeArg: null },
+    })
+    expect(existsSync(insideTarget)).toBe(false)
+    expect(await ctx.service.saveLocalCopy(path)).toBe(false)
+    expect(existsSync(insideTarget)).toBe(false)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
+  })
 })

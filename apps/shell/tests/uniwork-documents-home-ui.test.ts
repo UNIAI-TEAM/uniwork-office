@@ -298,7 +298,6 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     )
     expect(navButtons.map((b) => b.getAttribute('data-nav'))).toEqual([
       'workspace',
-      'my-folder',
       'recent',
       'shared-with-me',
       'shared-by-me',
@@ -306,7 +305,6 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     ])
     expect(navButtons.map((b) => b.textContent?.trim())).toEqual([
       'Tài liệu của workspace',
-      'Thư mục của tôi',
       'Gần đây',
       'Được chia sẻ với tôi',
       'Tôi đã chia sẻ',
@@ -326,15 +324,16 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.textContent).toContain('Tải lên')
     expect(host.textContent).toContain('Tạo mới')
 
-    // 3. Quick-create row ("Tạo nhanh"): Văn bản, Bảng tính, Trình chiếu + lock hint with clickable "Thư mục của tôi"
+    // 3. Quick-create row ("Tạo nhanh"): Văn bản, Bảng tính, Trình chiếu; no My Folder notice (UNI-1957 item 4)
     const quickBar = host.querySelector<HTMLElement>('.dh-quick-row')
     expect(quickBar).not.toBeNull()
     expect(quickBar!.textContent).toContain('Tạo nhanh')
     expect(quickBar!.textContent).toContain('Văn bản')
     expect(quickBar!.textContent).toContain('Bảng tính')
     expect(quickBar!.textContent).toContain('Trình chiếu')
-    const hintLink = quickBar!.querySelector<HTMLButtonElement>('.dh-quick-hint-link')
-    expect(hintLink?.textContent).toBe('Thư mục của tôi')
+    expect(quickBar!.querySelector('.dh-quick-hint, .dh-quick-hint-link')).toBeNull()
+    expect(quickBar!.textContent).not.toContain('chỉ bạn thấy')
+    expect(quickBar!.textContent).not.toContain('Thư mục của tôi')
 
     // 4. Folder cards section ("Thư mục" + count badge)
     const folderCards = host.querySelectorAll('.dh-folder-card')
@@ -377,9 +376,9 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       expect.objectContaining({ id: 'doc-1', title: 'Báo cáo kết quả kinh doanh Q3-2026.docx' }),
     )
 
-    // Clicking "Thư mục của tôi" link in the quick-create hint switches to the my-folder sub-view
+    // The sidebar's My Folder entry (a stand-in row here: the fixture tree has no My Folder node) opens the my-folder sub-view
     await act(async () => {
-      hintLink!.click()
+      sidebarSlot.querySelector<HTMLButtonElement>('[data-my-folder-standin]')!.click()
     })
     await flush()
     expect(api.uniworkListChildren).toHaveBeenCalledWith(
@@ -418,7 +417,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     // Recent -> uniworkListDocuments (returns { documents, nextCursor }) and renders rows
     await clickNav('recent')
     expect(api.uniworkListDocuments).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1' }),
+      expect.objectContaining({ workspaceId: 'ws-1', includePages: true }),
     )
     expect(host.textContent).toContain('Báo cáo kết quả kinh doanh Q3-2026.docx')
     expect(host.textContent).toContain('Kế hoạch ngân sách 2027.xlsx')
@@ -483,7 +482,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       }),
     )
     await clickNav('shared-with-me')
-    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({})
+    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ includePages: true })
     expect(host.querySelectorAll('.dh-filter-select')).toHaveLength(0)
     expect(host.querySelector('.dh-filter-clear')).toBeNull()
     expect(host.textContent).toContain('Đề xuất đối tác.docx')
@@ -517,7 +516,10 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       loadMoreBtn!.click()
     })
     await flush()
-    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ cursor: 'swm-cur-2' })
+    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({
+      cursor: 'swm-cur-2',
+      includePages: true,
+    })
     expect(host.textContent).toContain('Biên bản họp.docx')
 
     // Shared by me -> uniworkListSharedByMe (filter bar visible again and forwards active filters)

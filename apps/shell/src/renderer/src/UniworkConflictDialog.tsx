@@ -406,24 +406,26 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
     })
   }
 
-  // Deduplicate step 1 disabled reason lines while linking each disabled button via aria-describedby
+  // A100: each disabled reason renders right under the first action it disables;
+  // identical reasons are still deduplicated and aria-describedby stays valid.
   const step1Reasons: Array<{
     reasonId: string
     reasonKey: NonNullable<(typeof step1Model.actions)[number]['reasonKey']>
     showOpenCenter: boolean
+    /** the action id the reason follows in the DOM */
+    after: string
   }> = []
   const reasonIdByKey = new Map<string, string>()
   for (const actItem of step1Model.actions) {
-    if (actItem.disabled && actItem.reasonKey) {
-      if (!reasonIdByKey.has(actItem.reasonKey)) {
-        const rId = `${uid}-reason-${actItem.reasonKey}`
-        reasonIdByKey.set(actItem.reasonKey, rId)
-        step1Reasons.push({
-          reasonId: rId,
-          reasonKey: actItem.reasonKey,
-          showOpenCenter: actItem.showOpenCenter,
-        })
-      }
+    if (actItem.disabled && actItem.reasonKey && !reasonIdByKey.has(actItem.reasonKey)) {
+      const rId = `${uid}-reason-${actItem.reasonKey}`
+      reasonIdByKey.set(actItem.reasonKey, rId)
+      step1Reasons.push({
+        reasonId: rId,
+        reasonKey: actItem.reasonKey,
+        showOpenCenter: actItem.showOpenCenter,
+        after: actItem.id,
+      })
     }
   }
 
@@ -580,19 +582,19 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
         </div>
 
         {state.step === 'step1' && (
-          <>
-            <div className="uw-conflict-actions">
-              {step1Model.actions.map((item) => {
-                const reasonId = item.reasonKey ? reasonIdByKey.get(item.reasonKey) : undefined
-                const styleClass =
-                  item.style === 'primary'
-                    ? ' uw-conflict-btn--primary'
-                    : item.style === 'danger'
-                      ? ' uw-conflict-btn--danger'
-                      : ''
-                return (
+          <div className="uw-conflict-actions">
+            {step1Model.actions.map((item) => {
+              const reasonId = item.reasonKey ? reasonIdByKey.get(item.reasonKey) : undefined
+              const styleClass =
+                item.style === 'primary'
+                  ? ' uw-conflict-btn--primary'
+                  : item.style === 'danger'
+                    ? ' uw-conflict-btn--danger'
+                    : ''
+              const anchored = step1Reasons.find((r) => r.after === item.id)
+              return (
+                <React.Fragment key={item.id}>
                   <button
-                    key={item.id}
                     type="button"
                     className={`uw-conflict-btn${styleClass}`}
                     data-conflict-action={item.id}
@@ -602,25 +604,25 @@ export const UniworkConflictDialog: React.FC<UniworkConflictDialogProps> = ({
                   >
                     {t(item.labelKey)}
                   </button>
-                )
-              })}
-            </div>
-            {step1Reasons.map((r) => (
-              <p key={r.reasonId} id={r.reasonId} className="uw-conflict-reason">
-                <span>{t(r.reasonKey)}</span>
-                {r.showOpenCenter && (
-                  <button
-                    type="button"
-                    className="uw-conflict-link"
-                    data-conflict-open-center="true"
-                    onClick={() => void handleOpenSyncCenter()}
-                  >
-                    {t('uwQueueOpenCenter')}
-                  </button>
-                )}
-              </p>
-            ))}
-          </>
+                  {anchored && (
+                    <p id={anchored.reasonId} className="uw-conflict-reason">
+                      <span>{t(anchored.reasonKey)}</span>
+                      {anchored.showOpenCenter && (
+                        <button
+                          type="button"
+                          className="uw-conflict-link"
+                          data-conflict-open-center="true"
+                          onClick={() => void handleOpenSyncCenter()}
+                        >
+                          {t('uwQueueOpenCenter')}
+                        </button>
+                      )}
+                    </p>
+                  )}
+                </React.Fragment>
+              )
+            })}
+          </div>
         )}
 
         {state.step === 'stop-ai' && (

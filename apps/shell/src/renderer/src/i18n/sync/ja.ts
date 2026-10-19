@@ -7,9 +7,10 @@ export const ja = {
   uwChipPausedAdmin: '保存待ち · 送信は一時停止中',
   uwChipReconciling: '前回の保存を確認しています…',
   uwChipReconcileStuck: '保存の確認にサポートが必要です',
+  uwErrReconcileStuck: '保存の確認にサポートが必要です。',
   uwChipRemoteNewer: 'UniWork に新しいバージョンがあります',
   uwTipQueued:
-    '{time} の保存はこのコンピューターに安全に保持され、オンラインになると送信されます。',
+    '{time} の保存はこのコンピューターに安全に保持され、送信できるようになり次第送信されます。',
   uwTipQueuedNewer: '{time} の保存は送信待ちです。それ以降の編集は含まれていません。',
   uwTipPausedAdmin:
     '管理者が送信を一時停止しています。保存内容はこのコンピューターに保持されます。',
@@ -125,6 +126,8 @@ export const ja = {
   uwSignOutWaiting: 'ログアウトする前に進行中の保存を完了しています…',
   uwSignOutCaptureFailed:
     '一部の未保存の変更を時間内に取得できませんでした。最新の保存済みまたは自動保存版がアカウント用に保持されます。',
+  uwSignOutTimedOut:
+    '時間内にサインアウトを確認できませんでした。アカウントがまだサインインしている可能性があります。もう一度お試しください。',
   uwSwitchLostTitle: '前のアカウントの未保存の変更の一部が失われました',
   uwSwitchLostBody:
     '別のアカウントがこのコンピューターにサインインしたため、前のアカウントはロックされました。未保存の変更を保持できなかったドキュメント: {count}。それ以外はすべて、そのアカウント用にこのコンピューターでロックされたまま保持されます。',
@@ -332,7 +335,7 @@ export const ja = {
     'すべての変更を元に戻しました。UniWork のバージョン {n} は開いているコピーより新しいです。',
   uwRemoteStopAiConfirm:
     '再読み込みのために実行中の UniWork AI を停止しますか？AI がすでに行った変更は開いているコピーのものです。',
-  uwRemoteWaitCommit: '進行中の保存が終わるのを待っています。その後で再読み込みできます。',
+  uwRemoteWaitCommit: '進行中の保存が終わるのを待っています。その後で続行できます。',
   uwRemoteReload: '最新版を再読み込み…',
   uwRemoteLater: '後で',
   uwRemoteClose: '閉じる',
