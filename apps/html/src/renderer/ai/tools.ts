@@ -59,6 +59,8 @@ export interface HtmlDocAccess {
   listAttachmentNames?(): string[]
   /** sids an element-scoped turn may edit (Ask AI on the selection, edit queue); null = the whole page */
   getEditFence?(): readonly number[] | null
+  /** live predicate: the page is a UniWork working copy (hides the whole-page writers, C-BOUND) */
+  uniworkBound?(): boolean
 }
 
 export type PlanMode = 'new' | 'redesign' | 'restyle' | 'extract'
@@ -559,7 +561,11 @@ export async function expandAttachmentRefs(
   return { ops: expanded, errors }
 }
 
-export function createHtmlSkillCore(access: HtmlDocAccess): {
+export function createHtmlSkillCore(
+  access: HtmlDocAccess,
+  /** live predicate: a view-only frame offers no edit tool, so the hint must not name one */
+  isReadOnly?: () => boolean,
+): {
   buildContext(): string
   executeTool(call: AgentToolCall, signal?: AbortSignal): ToolExecution | Promise<ToolExecution>
 } {
@@ -631,7 +637,11 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
         title ? `title: ${title}` : '',
         view.trim()
           ? ''
-          : 'The document is empty: plan_page (mode new) or write_document creates it.',
+          : isReadOnly?.()
+            ? 'The document is empty.'
+            : access.uniworkBound?.() === true
+              ? 'The document is empty: fill it in place with apply_ops edits.'
+              : 'The document is empty: plan_page (mode new) or write_document creates it.',
       ].filter(Boolean)
       let outline = buildOutline(proj, map, { depth: 2, maxLines: 60 })
       const selectedSid = access.getSelectedSid()
@@ -991,8 +1001,29 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
 /** the only tools a view-only UniWork document keeps: they read the page, none writes it */
 export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['get_outline', 'read_source'])
 
+/**
+ * Tools that replace the whole document as a generated page (plan_page modes
+ * new/redesign write through access.writePage + replaceAll; write_document the
+ * same for prose). A UniWork-bound page never offers them: wholesale
+ * replacement is a new document's content, not an edit of the bound one
+ * (C-BOUND; the same bound rule as the other apps' file-level tools).
+ */
+export const BOUND_HIDDEN_TOOLS: ReadonlySet<string> = new Set(['plan_page', 'write_document'])
+
+function refuseBound(name: string): ToolExecution {
+  return {
+    output: `${name} is unavailable: this is a UniWork document, so the AI cannot replace it wholesale.`,
+    isError: true,
+    mutated: false,
+    summary: name,
+  }
+}
+
 const VIEW_ONLY_NOTE =
   '\n\nNote: this document is view-only. You can read it and answer questions about it, but you cannot edit it: no edit tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
+
+const BOUND_NOTE =
+  '\n\nNote: this is a UniWork document. plan_page and write_document are unavailable on it; do not call or promise them. Do restyles, theme changes and structural edits with apply_ops on the existing page (incl. the --brief-* CSS variables); never replace the whole document.'
 
 /** A live prompt is read on every request, so it can follow the document. */
 export function createHtmlSkill(
@@ -1001,19 +1032,30 @@ export function createHtmlSkill(
   /** live predicate: a view-only UniWork document, where the assistant may read but never edit */
   isReadOnly?: () => boolean,
 ): AgentSkill {
-  const core = createHtmlSkillCore(access)
+  const core = createHtmlSkillCore(access, isReadOnly)
   return {
     id: 'html',
     // live: the predicate is re-read before every model request
     get systemPrompt() {
       const prompt = typeof systemPrompt === 'string' ? systemPrompt : systemPrompt.systemPrompt
-      return isReadOnly?.() ? prompt + VIEW_ONLY_NOTE : prompt
+      return (
+        prompt +
+        (isReadOnly?.() ? VIEW_ONLY_NOTE : '') +
+        (access.uniworkBound?.() && !isReadOnly?.() ? BOUND_NOTE : '')
+      )
     },
     get tools() {
-      return isReadOnly?.() ? AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name)) : AGENT_TOOLS
+      // a bound page keeps the editing tools but loses the whole-page writers;
+      // a view-only bound page still reads only (the narrower list wins)
+      if (isReadOnly?.()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
+      if (access.uniworkBound?.() === true)
+        return AGENT_TOOLS.filter((t) => !BOUND_HIDDEN_TOOLS.has(t.name))
+      return AGENT_TOOLS
     },
     buildContext: () => core.buildContext(),
     executeTool: (call, signal) => {
+      if (access.uniworkBound?.() === true && BOUND_HIDDEN_TOOLS.has(call.name))
+        return refuseBound(call.name)
       if (isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)) {
         return {
           output: 'This document is view-only; it cannot be edited.',
