@@ -361,6 +361,7 @@ export function AiPanel({
   readOnly = false,
   onCollapse,
   open = true,
+  dockHidden = false,
   onExpand,
 }: {
   deps: HtmlAiDeps
@@ -378,6 +379,8 @@ export function AiPanel({
   onCollapse: () => void
   /** false while the dock is collapsed (the panel stays mounted, hidden) */
   open?: boolean
+  /** the dock is hidden by the frame (presenting): it is not an active dialog, whatever `open` says */
+  dockHidden?: boolean
   /** expand the dock: a send refused while collapsed opens it so the reason can be shown */
   onExpand?: () => void
 }): ReactElement {
@@ -580,7 +583,7 @@ export function AiPanel({
   // under 900 px the dock overlays the document: modal dialog, composer focus, Esc, focus return
   useOverlayDock({
     rootRef: asideRef,
-    open,
+    open: open && !dockHidden,
     onClose: onCollapse,
     label: 'UniAI',
   })

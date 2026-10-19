@@ -422,6 +422,8 @@ interface AiPanelProps {
   preset?: { text: string; nonce: number; autoRun?: boolean } | null
   /** false shows only the collapsed rail; the component stays mounted so panel state survives */
   open?: boolean
+  /** the dock is hidden by the frame (Read Mode): it is not an active dialog, whatever `open` says */
+  dockHidden?: boolean
   /** true suppresses even the collapsed rail (the "show the AI sidebar" setting is off) */
   hideRail?: boolean
   /** expand from the collapsed rail */
@@ -479,6 +481,7 @@ export function AiPanel({
   numIdFallback,
   preset,
   open = true,
+  dockHidden = false,
   hideRail = false,
   onExpand,
   onCollapse,
@@ -642,7 +645,7 @@ export function AiPanel({
   // under 900 px the dock overlays the document: modal dialog, composer focus, Esc, focus return
   useOverlayDock({
     rootRef: asideRef,
-    open,
+    open: open && !dockHidden,
     onClose: () => onCollapse?.(),
     label: t('aiPanelTitle'),
   })

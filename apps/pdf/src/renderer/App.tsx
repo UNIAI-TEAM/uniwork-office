@@ -6380,7 +6380,7 @@ export default function App() {
           stampDlg ||
           propsDlg ||
           document.querySelector(
-            '[role="dialog"], [role="menu"], [aria-modal="true"], [data-esc-local]',
+            '[role="dialog"]:not([data-overlay-dock]), [role="menu"], [aria-modal="true"]:not([data-overlay-dock]), [data-esc-local]',
           )
         )
           return

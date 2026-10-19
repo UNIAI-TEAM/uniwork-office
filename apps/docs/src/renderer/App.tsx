@@ -7382,6 +7382,7 @@ export function App() {
               }
               preset={aiPreset}
               open={showAi}
+              dockHidden={readMode}
               hideRail={!aiSidebarEnabled}
               onExpand={() => setShowAi(true)}
               onCollapse={() => setShowAi(false)}
