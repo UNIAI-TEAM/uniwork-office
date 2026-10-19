@@ -7166,6 +7166,17 @@ export class UniworkDocsService {
       })
       return
     }
+    // UWNM-BE-R3-1: a Save (or its naming hold) that took the copy while the
+    // previous bytes were read: they may already be the person's bytes the
+    // upload waits on. No await between this check and the write below
+    if (
+      this.coordinator.isSaving(fresh.path) ||
+      this.firstSaveOps.has(pathKey(fresh.path)) ||
+      this.heldByMigration(fresh.dir)
+    ) {
+      await this.showRemoteBar(fresh, notice, { kind: 'newer-dirty', version: notice.version })
+      return
+    }
     const previousBinding = fresh.binding
     await this.store.writeWorkingCopy(fresh.dir, fresh.binding.filename, fetched.bytes)
     const reloaded: Binding = {
@@ -7196,6 +7207,14 @@ export class UniworkDocsService {
       // stay, and only the binding goes back
       const ownBytes = lateSave && !(await this.holdsBytes(done.path, fetched.bytes))
       await this.restoreWorkingCopy(done, previousBinding, ownBytes ? null : previousBytes)
+      if (lateSave && !ownBytes) {
+        // UWNM-BE-R3-1: the Save wrote before the head landed over it (or wrote
+        // the head's own bytes), so the person's bytes are only in the editor.
+        // The copy stays unsent work and the module writes them again: that
+        // Save lands under the still-open naming op, and the verdict uploads it
+        this.editorDirty.add(done.path)
+        this.deps.requestModuleSave(done.path)
+      }
       const restored = this.store.lookup(path)
       if (restored) {
         await this.showRemoteBar(restored, notice, {
