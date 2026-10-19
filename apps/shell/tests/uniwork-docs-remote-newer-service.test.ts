@@ -1278,4 +1278,172 @@ describe('UNI-1959 a pending first-save ask is local unsent work', () => {
     expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
     expect(h.reloaded).toEqual([])
   })
+
+  /**
+   * The module seam: a requested Save writes what the editor still holds
+   * (`editorBytes`) and fires the user-save hook, as a tab's module does. Each
+   * call's landing is a promise the test awaits (no wall-clock wait).
+   */
+  function moduleSaves(h: Harness, editorBytes: Uint8Array): Array<Promise<void>> {
+    const landed: Array<Promise<void>> = []
+    const deps = (h.service as unknown as { deps: { requestModuleSave: ReturnType<typeof vi.fn> } })
+      .deps
+    deps.requestModuleSave.mockImplementation((path: string) => {
+      landed.push(
+        Promise.resolve().then(() => {
+          writeFileSync(path, editorBytes)
+          h.service.onUserSave(path)
+        }),
+      )
+      return true
+    })
+    return landed
+  }
+
+  /** every coordinator save the service starts, so a test awaits the one `continue` releases */
+  function coordinatorSaves(h: Harness): Array<Promise<unknown>> {
+    const coordinator = (h.service as unknown as { coordinator: SaveCoordinator }).coordinator
+    const realSave = coordinator.save.bind(coordinator)
+    const saves: Array<Promise<unknown>> = []
+    coordinator.save = (path, options) => {
+      const run = realSave(path, options)
+      saves.push(run)
+      return run
+    }
+    return saves
+  }
+
+  it('UWNM-BE-R3-1: a first Save landing inside the reload write is saved again over the restored base; continue meets the version conflict', async () => {
+    const { h, asked, answer } = blankCopy()
+    const resaves = moduleSaves(h, UNSENT)
+    // PROBE-c: the module's Save lands after the reload read the previous bytes
+    // but before its own write replaces the file, so the head lands over it
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    let saved = false
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      if (!saved && hex(bytes) === hex(HEAD_BYTES)) {
+        saved = true
+        writeFileSync(docPath(), UNSENT)
+        h.service.onUserSave(docPath())
+      }
+      return realWrite(target, filename, bytes)
+    }
+    notice(h)
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(saved).toBe(true)
+    // the person's bytes were only in the editor: the module is asked to write them again
+    await vi.waitFor(() => expect(resaves).toHaveLength(1))
+    await resaves[0]
+    expect(asked).toHaveLength(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+    expect(await barOf(h)).toEqual({ kind: 'newer-dirty', version: 4 })
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+
+    const saves = coordinatorSaves(h)
+    answer('continue')
+    await vi.waitFor(() => expect(saves).toHaveLength(1))
+    await saves[0]
+    expect(bindingOf().state).toBe('conflict')
+    expect(h.client.calls.commit).toBe(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+    expect(h.reloaded).toEqual([])
+  })
+
+  it('UWNM-BE-R3-1: a late first Save whose bytes equal the fetched head never reads saved with nothing sent', async () => {
+    const { h, asked, answer } = blankCopy()
+    // PROBE-d: the person's saved bytes happen to be the head's bytes
+    const resaves = moduleSaves(h, HEAD_BYTES)
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    let saved = false
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      const written = await realWrite(target, filename, bytes)
+      if (!saved && hex(bytes) === hex(HEAD_BYTES)) {
+        saved = true
+        writeFileSync(docPath(), HEAD_BYTES)
+        h.service.onUserSave(docPath())
+      }
+      return written
+    }
+    notice(h)
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    await vi.waitFor(() => expect(resaves).toHaveLength(1))
+    await resaves[0]
+    expect(asked).toHaveLength(1)
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+
+    const saves = coordinatorSaves(h)
+    answer('continue')
+    await vi.waitFor(() => expect(saves).toHaveLength(1))
+    await saves[0]
+    // the edits went up and met the newer head: never a silent `saved`
+    expect(bindingOf().state).toBe('conflict')
+    expect(h.client.calls.commit).toBe(1)
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+  })
+
+  it('UWNM-BE-R3-1: a first Save landing while the reload reads the previous bytes stops it before any head write', async () => {
+    const { h, asked } = blankCopy()
+    const resaves = moduleSaves(h, UNSENT)
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    const headWrites: string[] = []
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      if (hex(bytes) === hex(HEAD_BYTES)) headWrites.push(filename)
+      return realWrite(target, filename, bytes)
+    }
+    // the reload's pre-write check is the first save-state read after the
+    // download: the module's Save is queued there, so it lands while the reload
+    // awaits its read of the previous bytes (a microtask runs before any file I/O).
+    // Nothing else reads the save state until the reload settles: the test awaits
+    // the reload chain itself, never a status poll (docStatus reads it too)
+    const coordinator = (h.service as unknown as { coordinator: SaveCoordinator }).coordinator
+    const realIsSaving = coordinator.isSaving.bind(coordinator)
+    let armed = false
+    let landed!: () => void
+    const saved = new Promise<void>((resolve) => (landed = resolve))
+    coordinator.isSaving = (path) => {
+      if (armed) {
+        armed = false
+        queueMicrotask(() => {
+          writeFileSync(docPath(), UNSENT)
+          h.service.onUserSave(docPath())
+          landed()
+        })
+      }
+      return realIsSaving(path)
+    }
+    const reloads = (h.service as unknown as { remoteReloads: Map<string, Promise<void>> })
+      .remoteReloads
+    let release!: () => void
+    h.client.downloadGate = new Promise<void>((resolve) => (release = resolve))
+    const entered = new Promise<void>((resolve) => (h.client.downloadEntered = resolve))
+    notice(h)
+    await entered
+    const reload = [...reloads.values()]
+    expect(reload).toHaveLength(1)
+    armed = true
+    release()
+    await saved
+    await reload[0]
+
+    expect(armed).toBe(false)
+    expect(headWrites).toEqual([])
+    expect(await barOf(h)).toEqual({ kind: 'newer-dirty', version: 4 })
+    await vi.waitFor(() => expect(asked).toHaveLength(1))
+    expect(resaves).toHaveLength(0)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+  })
 })
