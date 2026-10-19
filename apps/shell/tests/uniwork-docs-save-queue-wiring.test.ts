@@ -2019,7 +2019,7 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(server.calls.length).toBe(beforeCalls)
   })
 
-  it('B23 (UNI-1362): G506-be-d1-1 / G5-11: the account-boundary lock stops runtime, awaits lockSession, keeps sync work, and wipes the offline library layer', async () => {
+  it('B23 (UNI-1362): G506-be-d1-1 / G5-11: a reconstructed account-boundary callback over the real library layer stops runtime, awaits lockSession, keeps sync work, and wipes that layer', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
     const path = await openDoc(ctx)
@@ -2028,7 +2028,11 @@ describe('G5-06 W4b save queue wiring', () => {
     await ctx.service.save(path)
     expect(await storedIntent(ctx, path)).not.toBeNull()
 
-    // build the offline library's own encrypted layer exactly as wiring.ts does
+    // build the offline library's own encrypted layer exactly as wiring.ts does.
+    // NOTE: the `AccountBoundary` below is reconstructed here with a hand-written
+    // `lockSession` callback over a real library layer; the production sign-out
+    // callback installed by `createUniworkDocs()` (wiring.ts) is NOT exercised by
+    // this test, so it proves the layer wipe, not the production wiring.
     const scope = { deploymentId: 'default', accountId: 'acc_1' }
     const libRoot = join(dir, 'uniwork-sync', 'library')
     const libKeys = createSafeStorageKeyProvider({
