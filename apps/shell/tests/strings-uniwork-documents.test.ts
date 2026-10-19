@@ -138,7 +138,7 @@ describe('uniwork documents string shards', () => {
     expect(uniworkDocumentStrings.en.uwChipViewOnly).toBe('View only')
     expect(uniworkDocumentStrings.vi.uwChipViewOnly).toBe('Chỉ xem')
     expect(uniworkDocumentStrings.en.uwPickHiddenFormats).toBe(
-      'Hid {count} items in formats UniWork Office can’t open',
+      'Hidden, in formats UniWork Office can’t open: {count}',
     )
     expect(uniworkDocumentStrings.vi.uwPickHiddenFormats).toBe(
       'Đã ẩn {count} mục vì UniWork Office chưa hỗ trợ định dạng này',

@@ -82,7 +82,7 @@ export const en = {
   uwRowCommitting: 'Creating the version',
   uwRowReconciling: 'The result of the send at {time} isn’t clear yet. Checking with UniWork.',
   uwRowReconcileStuck:
-    'Checked {count} times with no result yet. The app won’t resend; send the support code to your admin.',
+    'Checks so far: {count}, no result yet. The app won’t resend; send the support code to your admin.',
   uwStuckDiscardConfirm:
     'Discard this save? If it already reached UniWork, that version stays; your copy is kept as a draft in the sync center.',
   uwRowConflict: 'Version {n} was saved by {author} at {time}',
@@ -116,7 +116,7 @@ export const en = {
   // Sign-out prompt
   uwSignOutTitle: 'Sign out of UniWork?',
   uwSignOutBody:
-    'You have {count} documents with unsaved changes or queued saves. They stay locked on this computer and only your account can open them again.',
+    'Documents with unsaved changes or queued saves: {count}. They stay locked on this computer and only your account can open them again.',
   uwSignOutKeystore:
     'The computer’s keychain is locked, so unsaved changes exist only in open windows. Signing out now discards them; anything already kept encrypted stays. To keep them, unlock the computer first.',
   uwSignOutGo: 'Sign out',
@@ -127,7 +127,7 @@ export const en = {
     'Couldn’t confirm sign-out in time; your account may still be signed in. Try again.',
   uwSwitchLostTitle: 'Some unsaved changes of the previous account were lost',
   uwSwitchLostBody:
-    'Another account signed in on this computer, so the previous account was locked. Unsaved changes in {count} documents couldn’t be kept. Everything else stays locked on this computer for that account.',
+    'Another account signed in on this computer, so the previous account was locked. Documents whose unsaved changes couldn’t be kept: {count}. Everything else stays locked on this computer for that account.',
   uwSwitchLostOk: 'OK',
 
   // S2 sync center
@@ -144,7 +144,7 @@ export const en = {
   uwSyncResynced: 'Fully resynced at {time}',
   uwSyncResyncFailed:
     'Couldn’t resync after several tries. New-version notices are paused; UniWork still checks for conflicts when you save.',
-  uwSyncSignedOut: 'You’re signed out. {count} items stay locked on this computer.',
+  uwSyncSignedOut: 'You’re signed out. Items still locked on this computer: {count}.',
   uwSyncSignedOutEmpty: 'You’re signed out.',
   uwSyncSessionExpired: 'Your session expired. Sign in again to keep sending.',
   uwSyncOtherOrg: 'Saves waiting in another organization: {count}',
