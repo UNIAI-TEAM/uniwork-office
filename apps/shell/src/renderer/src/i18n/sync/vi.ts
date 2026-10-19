@@ -121,7 +121,7 @@ export const vi = {
   uwSignOutGo: 'Đăng xuất',
   uwSignOutWaiting: 'Đang hoàn tất lần lưu đang gửi trước khi đăng xuất…',
   uwSignOutCaptureFailed:
-    'Chưa giữ kịp một số thay đổi chưa lưu; bản lưu hoặc tự lưu gần nhất vẫn được giữ cho tài khoản của bạn.',
+    'Không kịp giữ một số thay đổi chưa lưu; bản lưu hoặc tự lưu gần nhất vẫn được giữ cho tài khoản của bạn.',
   uwSignOutTimedOut:
     'Chưa xác nhận kịp việc đăng xuất; tài khoản có thể vẫn đang đăng nhập. Hãy thử lại.',
   uwSwitchLostTitle: 'Một số thay đổi chưa lưu của tài khoản trước đã mất',

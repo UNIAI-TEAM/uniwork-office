@@ -650,7 +650,7 @@ describe('Settings → Account sign-out prompt (S3)', () => {
       'Couldn’t keep some unsaved changes in time; the latest saved or autosaved version is kept for your account.'
     expect(syncEn.uwSignOutCaptureFailed).toBe(expectedEn)
     expect(syncVi.uwSignOutCaptureFailed).toBe(
-      'Chưa giữ kịp một số thay đổi chưa lưu; bản lưu hoặc tự lưu gần nhất vẫn được giữ cho tài khoản của bạn.',
+      'Không kịp giữ một số thay đổi chưa lưu; bản lưu hoặc tự lưu gần nhất vẫn được giữ cho tài khoản của bạn.',
     )
     expect(pane()?.textContent ?? '').not.toContain(expectedEn)
 

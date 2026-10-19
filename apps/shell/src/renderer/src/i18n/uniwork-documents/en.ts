@@ -26,7 +26,7 @@ export const en = {
   uwPickNoResults: 'No documents match “{query}”.',
   uwPickNoWorkspaces: 'You don’t have any workspaces yet.',
   uwPickNoWorkspacesHint: 'Create or join a workspace in UniWork first.',
-  uwPickHiddenFormats: 'Hidden, in formats UniWork Office can’t open: {count}',
+  uwPickHiddenFormats: 'Hidden because UniWork Office can’t open their format: {count}',
   uwPickOpening: 'Opening “{title}”…',
 
   uwErrNotSignedIn: 'Sign in to UniWork to continue.',
@@ -110,7 +110,8 @@ export const en = {
   uwOrgSettingsLabel: 'Working organization',
   uwLibShared: 'Shared with me',
   uwLibSharedEmpty: 'Nothing has been shared with you directly yet.',
-  uwLibSharedPartial: 'Searched only loaded documents so far. Choose Load more to keep looking.',
+  uwLibSharedPartial:
+    'Only the documents loaded so far were searched. Choose Load more to keep looking.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Details',
   uwDocInfoFor: 'Details for “{name}”',

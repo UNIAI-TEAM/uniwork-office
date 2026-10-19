@@ -26,7 +26,7 @@ export const vi = {
   uwPickNoResults: 'Không có tài liệu nào khớp với “{query}”.',
   uwPickNoWorkspaces: 'Bạn chưa có không gian làm việc nào.',
   uwPickNoWorkspacesHint: 'Hãy tạo hoặc tham gia một không gian làm việc trong UniWork trước.',
-  uwPickHiddenFormats: 'Đã ẩn {count} mục vì UniWork Office chưa hỗ trợ định dạng này',
+  uwPickHiddenFormats: 'Đã ẩn {count} mục có định dạng UniWork Office chưa mở được',
   uwPickOpening: 'Đang mở “{title}”…',
 
   uwErrNotSignedIn: 'Hãy đăng nhập UniWork để tiếp tục.',
