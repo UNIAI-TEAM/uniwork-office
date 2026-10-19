@@ -492,6 +492,8 @@ function fakeServer(
           document: {
             ...docJson(id),
             kind: body.kind === 'page' ? 'page' : 'folder',
+            // a page has no file block, so no format (D sends none for a folder either)
+            ...(body.kind === 'page' ? { file: undefined } : {}),
             title: body.title ?? 'folder',
             parent_id: body.parent_id ?? null,
           },
@@ -1199,19 +1201,22 @@ describe('create a blank document', () => {
 // UNI-1953 UW-CREATE-TYPES: the New document dialog offers md / html / pdf as
 // well as the Office formats, and UniNote (a page) as its own create kind.
 describe('UW-CREATE-TYPES create kinds', () => {
-  it.each(['md', 'html', 'pdf'] as const)('passes %s through to the blank route', async (format) => {
-    const server = fakeServer()
-    const ctx = setup(server)
-    const created = await ctx.service.createDocument({
-      workspaceId: WS,
-      folderId: 'fold_1',
-      name: `Notes.${format}`,
-      format,
-    })
-    expect(created.ok).toBe(true)
-    const blank = server.calls.find((c) => c.path.endsWith('/documents/files/blank'))!
-    expect(blank.body).toMatchObject({ format, title: `Notes.${format}`, parent_id: 'fold_1' })
-  })
+  it.each(['md', 'html', 'pdf'] as const)(
+    'passes %s through to the blank route',
+    async (format) => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const created = await ctx.service.createDocument({
+        workspaceId: WS,
+        folderId: 'fold_1',
+        name: `Notes.${format}`,
+        format,
+      })
+      expect(created.ok).toBe(true)
+      const blank = server.calls.find((c) => c.path.endsWith('/documents/files/blank'))!
+      expect(blank.body).toMatchObject({ format, title: `Notes.${format}`, parent_id: 'fold_1' })
+    },
+  )
 
   it('creates a UniNote as a page in the open folder (parent_id, kind page, own idempotency key)', async () => {
     const server = fakeServer()
@@ -1224,7 +1229,9 @@ describe('UW-CREATE-TYPES create kinds', () => {
     expect(created.ok).toBe(true)
     if (!created.ok) return
     expect(created.value).toMatchObject({ title: 'Meeting notes', kind: 'page', format: null })
-    const post = server.calls.find((c) => c.method === 'POST' && c.path.endsWith(`/${WS}/documents`))!
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith(`/${WS}/documents`),
+    )!
     expect(post.body).toEqual({ kind: 'page', title: 'Meeting notes', parent_id: 'fold_1' })
     expect(post.idempotencyKey).not.toBe('')
   })
@@ -1233,7 +1240,9 @@ describe('UW-CREATE-TYPES create kinds', () => {
     const server = fakeServer()
     const ctx = setup(server)
     await ctx.service.createPage({ workspaceId: WS, folderId: null, name: 'Ghi chú' })
-    const post = server.calls.find((c) => c.method === 'POST' && c.path.endsWith(`/${WS}/documents`))!
+    const post = server.calls.find(
+      (c) => c.method === 'POST' && c.path.endsWith(`/${WS}/documents`),
+    )!
     expect(post.body).toEqual({ kind: 'page', title: 'Ghi chú', destination: 'my_folder' })
   })
 

@@ -52,6 +52,8 @@ function webPathOf(target: unknown): string | null {
       return `${base}/meetings/${t.id}/room`
     case 'person':
       return `${base}/people/${t.id}`
+    case 'document':
+      return `${base}/documents/${t.id}`
     default:
       return null
   }

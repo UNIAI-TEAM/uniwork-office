@@ -209,6 +209,14 @@ export interface UniworkDocsClient {
       idempotencyKey: string
     } & UniworkCreateTarget,
   ): Promise<UniworkDocSummary>
+  /** UNI-1953: create a UniNote (`kind: 'page'`) on the documents route, placed like a blank file */
+  createPage(
+    input: {
+      workspaceId: string
+      title: string
+      idempotencyKey: string
+    } & UniworkCreateTarget,
+  ): Promise<UniworkDocSummary>
   /** create one file document from local bytes (S18 upload); `signal` aborts the POST */
   createFile(
     input: {
@@ -850,6 +858,24 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           // MYFOLDER-01: mutually exclusive with destination (the input type
           // cannot carry both); an empty/blank parent_id is refused outright,
           // never silently demoted to a root create (S01-R1-5)
+          ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
+          ...(input.destination ? { destination: input.destination } : {}),
+        },
+        idempotencyKey: input.idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
+    async createPage(input) {
+      const raw = await send({
+        method: 'POST',
+        route: `/workspaces/${id(input.workspaceId)}/documents`,
+        json: {
+          kind: 'page',
+          title: input.title,
+          // the same exclusive placement as createBlank (S01-R1-5)
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
           ...(input.destination ? { destination: input.destination } : {}),
         },
