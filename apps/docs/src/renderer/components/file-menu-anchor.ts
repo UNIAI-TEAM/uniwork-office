@@ -22,3 +22,17 @@ export function fileMenuAnchor(
   const left = Math.max(EDGE, Math.min(tab.left, viewportWidth - menuWidth - EDGE))
   return { left, top: tab.bottom + GAP }
 }
+
+/**
+ * The anchor is measured once when the menu opens, so a viewport change while it is open (rotation,
+ * split-view drag, window resize) would leave it at stale offsets, or, past the breakpoint, at
+ * viewport coordinates inside a now-absolute box. Close it on `resize`, like it closes on scroll.
+ * Returns the cleanup.
+ */
+export function closeOnResize(
+  target: Pick<EventTarget, 'addEventListener' | 'removeEventListener'>,
+  close: () => void,
+): () => void {
+  target.addEventListener('resize', close)
+  return () => target.removeEventListener('resize', close)
+}

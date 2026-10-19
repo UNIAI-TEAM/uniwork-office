@@ -2,7 +2,7 @@
 // rectangle; the tab row can be scrolled sideways, so the anchor follows the tab and is clamped into
 // the viewport.
 import { describe, expect, it } from 'vitest'
-import { fileMenuAnchor } from '../src/renderer/components/file-menu-anchor'
+import { closeOnResize, fileMenuAnchor } from '../src/renderer/components/file-menu-anchor'
 
 const VW = 390
 const MENU_W = 210
@@ -31,5 +31,18 @@ describe('fileMenuAnchor', () => {
 
   it('a menu wider than the viewport starts at the left margin', () => {
     expect(fileMenuAnchor({ left: 50, bottom: 34 }, 500, VW).left).toBe(8)
+  })
+})
+
+describe('closeOnResize', () => {
+  it('closes on a resize of the target and stops listening after cleanup', () => {
+    const target = new EventTarget()
+    let closed = 0
+    const stop = closeOnResize(target, () => closed++)
+    target.dispatchEvent(new Event('resize'))
+    expect(closed).toBe(1)
+    stop()
+    target.dispatchEvent(new Event('resize'))
+    expect(closed).toBe(1)
   })
 })

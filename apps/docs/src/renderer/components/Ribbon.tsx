@@ -131,7 +131,7 @@ import {
 import { RibbonColorPalette } from './ribbon-color-palette'
 import { HeaderFooterTab, type HfAction, type HfEditingInfo } from './ribbon-hf-tab'
 import { PasteSpecialDialog } from './PasteSpecialDialog'
-import { FILE_MENU_FIXED_QUERY, fileMenuAnchor } from './file-menu-anchor'
+import { FILE_MENU_FIXED_QUERY, closeOnResize, fileMenuAnchor } from './file-menu-anchor'
 import { cap } from '../capabilities'
 import { fontFamiliesFor, isEastAsianFontName, systemFamiliesBesidesCandidates } from '../font-list'
 import {
@@ -852,6 +852,11 @@ function RibbonInner({
     )
     menu.style.left = `${left}px`
     menu.style.top = `${top}px`
+  }, [dropdown])
+  // the measured anchor goes stale when the viewport changes under the open menu: close it
+  useEffect(() => {
+    if (dropdown !== 'file') return
+    return closeOnResize(window, () => setDropdown((v) => (v === 'file' ? null : v)))
   }, [dropdown])
   // null = Automatic: the pen button clears the run colour instead of writing one
   const [penColor, setPenColor] = useState<string | null>('FF0000')
