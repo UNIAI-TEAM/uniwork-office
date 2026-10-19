@@ -619,7 +619,12 @@ test('html: Ctrl+P during an inline text edit prints the typed text', async ({ p
   const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en' })
   await ready(page, frame, /UniWork HTML web fixture/)
   await stubPrintHtml(frame)
-  await frame.locator('iframe.preview-frame').contentFrame().locator('h1').click()
+  // the click must land on the text itself (not the empty right of the block h1) to start the edit
+  await frame
+    .locator('iframe.preview-frame')
+    .contentFrame()
+    .locator('h1')
+    .click({ position: { x: 20, y: 10 } })
   const marker = 'PrintMarkerZq1919'
   await page.keyboard.type(marker)
   await page.keyboard.press('Control+p')
