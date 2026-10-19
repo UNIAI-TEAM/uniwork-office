@@ -11,6 +11,7 @@ import {
   useAiModelNeedHint,
   type AiModelPickerBridge,
   UniAiMark,
+  useOverlayDock,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
@@ -372,6 +373,13 @@ export function AiPanel({
   const [panelWidth, setPanelWidth] = useState(() => clampPanelWidth(preferredWidthRef.current))
   const [resizing, setResizing] = useState(false)
   const asideRef = useRef<HTMLElement>(null)
+  // under 900 px the dock overlays the document: modal dialog, composer focus, Esc, focus return
+  useOverlayDock({
+    rootRef: asideRef,
+    open,
+    onClose: onCollapse,
+    label: 'UniAI',
+  })
 
   // The .ai-dock wrapper owns the animated width (docs-style 180ms slide);
   // it tracks the resizable panel width through this variable, set one level up (.app-main) so the

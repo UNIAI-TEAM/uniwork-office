@@ -823,56 +823,10 @@ html.genoffice-popover-open .ribbon-tabs {
   }
 }
 
-/* Narrow viewports (the web frame on a phone or tablet): the open AI dock overlays the page instead
-   of squeezing it. It keeps its 34 px rail slot in the row, the expanded panel floats over the
-   workspace, and on a phone it takes the whole row (the rail stays reachable to collapse it) -
-   the same behaviour as the Docs frame. */
-@media (max-width: 900px) {
-  .app-main {
-    position: relative;
-  }
-
-  .app-main:has(> .ai-dock) {
-    padding-left: 34px;
-  }
-
-  html[data-ai-panel-side='right'] .app-main:has(> .ai-dock) {
-    padding-left: 0;
-    padding-right: 34px;
-  }
-
-  .ai-dock {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 40;
-    width: min(var(--ai-panel-width, 360px), 100%);
-    background: var(--surface);
-  }
-
-  .ai-dock.collapsed {
-    width: 34px;
-  }
-
-  .ai-dock:not(.collapsed) {
-    box-shadow: var(--shadow-menu);
-  }
-
-  html[data-ai-panel-side='right'] .ai-dock {
-    left: auto;
-    right: 0;
-  }
-
-  .ai-dock .ai-panel-resizer {
-    display: none;
-  }
-}
-
-@media (max-width: 520px) {
-  .ai-dock:not(.collapsed) {
-    width: 100%;
-  }
+/* the no-key hint link: this module's accent is near-black / near-white, so on the accent it read as
+   plain text; the info blue marks it as a link (shared rule: @genoffice/ui ai-model-picker.css) */
+.ai-input-need-link {
+  color: var(--info);
 }
 
 /* collapsed AI sidebar: thin rail on the left edge (same as docs) */

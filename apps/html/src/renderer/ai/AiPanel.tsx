@@ -9,6 +9,7 @@ import {
   type AiModelPickerBridge,
   UniAiMark,
   composerNoteFor,
+  useOverlayDock,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -576,6 +577,13 @@ export function AiPanel({
   const [panelWidth, setPanelWidth] = useState(() => clampPanelWidth(preferredWidthRef.current))
   const [resizing, setResizing] = useState(false)
   const asideRef = useRef<HTMLElement>(null)
+  // under 900 px the dock overlays the document: modal dialog, composer focus, Esc, focus return
+  useOverlayDock({
+    rootRef: asideRef,
+    open,
+    onClose: onCollapse,
+    label: 'UniAI',
+  })
   const mountedRef = useRef(true)
 
   useEffect(() => {

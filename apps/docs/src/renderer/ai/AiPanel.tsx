@@ -17,6 +17,7 @@ import {
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
+  useOverlayDock,
 } from '@genoffice/ui'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -638,6 +639,13 @@ export function AiPanel({
   const [panelWidth, setPanelWidth] = useState(() => clampPanelWidth(preferredWidthRef.current))
   const [resizing, setResizing] = useState(false)
   const asideRef = useRef<HTMLElement>(null)
+  // under 900 px the dock overlays the document: modal dialog, composer focus, Esc, focus return
+  useOverlayDock({
+    rootRef: asideRef,
+    open,
+    onClose: () => onCollapse?.(),
+    label: t('aiPanelTitle'),
+  })
 
   // The .ai-dock wrapper owns the animated width (Excel-parity 180ms slide);
   // it tracks the resizable panel width through this variable

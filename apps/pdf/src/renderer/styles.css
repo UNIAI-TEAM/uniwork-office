@@ -920,14 +920,17 @@ button {
   bottom: 112px;
 }
 
-/* with the AI panel open the toasts centre on the document area: centred on the window they
-   covered the panel's composer */
-.app-main:has(.ai-dock:not(.collapsed)) .pdf-toast {
-  left: calc(50% + var(--ai-panel-width, 360px) / 2);
-}
+/* with the side-by-side AI panel open the toasts centre on the document area: centred on the window
+   they covered the panel's composer. Under 900 px the dock overlays the document (ai-dock-narrow.css)
+   and takes no width from it, so the toasts keep the window centre there */
+@media (min-width: 901px) {
+  .app-main:has(.ai-dock:not(.collapsed)) .pdf-toast {
+    left: calc(50% + var(--ai-panel-width, 360px) / 2);
+  }
 
-.app-main:has(.ai-dock:not(.collapsed)) .pdf-toast-notice {
-  max-width: min(560px, calc((100vw - var(--ai-panel-width, 360px)) * 0.9));
+  .app-main:has(.ai-dock:not(.collapsed)) .pdf-toast-notice {
+    max-width: min(560px, calc((100vw - var(--ai-panel-width, 360px)) * 0.9));
+  }
 }
 
 /* ── AcroForm form overlay ── */
