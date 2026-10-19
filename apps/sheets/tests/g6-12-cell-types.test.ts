@@ -119,7 +119,13 @@ function univerWith(cell: { display: string; raw: Scalar; format: string; lazyVi
     getFormula: () => '',
     getCellDatas: () => [[{ v: cell.raw }]],
   }
-  const worksheet = { getSheetId: () => 'sheet-1', getRange: () => range }
+  // The lazy reader bounds-checks against the grid like a real FWorksheet.
+  const worksheet = {
+    getSheetId: () => 'sheet-1',
+    getMaxRows: () => 1000,
+    getMaxColumns: () => 26,
+    getRange: () => range,
+  }
   return {
     current: {
       univerAPI: {
