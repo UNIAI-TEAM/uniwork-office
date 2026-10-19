@@ -8,6 +8,7 @@ import type {
   SignOutProgress,
   UniworkConflictChoice,
   UniworkCreateDocInput,
+  UniworkCreatePageInput,
   UniworkCreateFolderInput,
   UniworkDocAccess,
   UniworkDocActionError,
@@ -4161,7 +4162,12 @@ export class UniworkDocsService {
           let pages = 0
           do {
             const page: Awaited<ReturnType<typeof api.listSharedWithMe>> =
-              await api.listSharedWithMe({ workspaceId: ws.id, cursor, limit: SHARED_PAGE_SIZE })
+              await api.listSharedWithMe({
+                workspaceId: ws.id,
+                cursor,
+                limit: SHARED_PAGE_SIZE,
+                ...(query.includePages === true ? { includePages: true } : {}),
+              })
             for (const doc of page.documents) {
               if (!merged.has(doc.id)) {
                 merged.set(doc.id, {
@@ -4375,7 +4381,7 @@ export class UniworkDocsService {
   }
 
   /**
-   * Create a blank document (docx/xlsx/pptx) in a workspace/folder. The name is
+   * Create a blank document (docx/xlsx/pptx/md/html/pdf) in a workspace/folder. The name is
    * validated before any call (empty -> `name_empty`, over 500 runes ->
    * `name_too_long`, no request), and the answer is the server document; the
    * caller opens it by id, so no second local copy exists. A duplicate name is
@@ -4395,6 +4401,30 @@ export class UniworkDocsService {
           idempotencyKey: this.newIdempotencyKey(),
         })
         // FD-11: a new document changes the folder's contents for every view
+        this.pushTreeChangedFor(session, target.workspaceId)
+        return created
+      },
+      { nameField: true },
+    )
+  }
+
+  /**
+   * UNI-1953: create a UniNote (a `page`) the way createDocument creates a blank
+   * file: same name check, same My Folder / parent rule, same tree-changed
+   * push. The app has no page editor, so the caller opens the answer on the web.
+   */
+  createPage(input: UniworkCreatePageInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(
+      async () => {
+        const session = this.captureActionSession()
+        const target = this.docTarget(input)
+        const name = requireName(input.name)
+        const created = await this.api().createPage({
+          workspaceId: target.workspaceId,
+          title: name,
+          ...target.create,
+          idempotencyKey: this.newIdempotencyKey(),
+        })
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
       },
@@ -5660,6 +5690,7 @@ export class UniworkDocsService {
         ...(typeof query.query === 'string' ? { query: query.query } : {}),
         ...(typeof query.cursor === 'string' ? { cursor: query.cursor } : {}),
         ...(typeof query.limit === 'number' ? { limit: query.limit } : {}),
+        ...(query.includePages === true ? { includePages: true } : {}),
         ...this.listFiltersOf(query),
       })
       const documents = await this.enrichWorkspaceRows(query.workspaceId, page.documents)

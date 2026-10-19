@@ -145,6 +145,8 @@ export const pl = {
   uwDocNameTooLong: 'Nazwa jest za długa (maksymalnie 500 znaków).',
   uwDocRenamedAnnounce: 'Nazwa dokumentu została zmieniona na {name}.',
   uwDocActionFailed: 'Nie udało się. Spróbuj ponownie.',
+  uwUniNoteOpenFailed:
+    'UniNote została utworzona, ale nie udało się jej otworzyć. Otwórz ją z listy.',
   uwDocActionsFor: 'Więcej działań dla „{name}”',
   uwDocCreate: 'Utwórz',
   uwDocUploadPick: 'Wybierz plik',

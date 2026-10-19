@@ -662,8 +662,16 @@ export function parseProperties(raw: unknown): DocumentProperties {
   }
 }
 
-/** GET /workspaces/{ws}/documents/shared-with-me (a list page like `documents`) */
-export function parseSharedWithMe(raw: unknown, workspaceId: string): DocumentListResult {
+/**
+ * GET /workspaces/{ws}/documents/shared-with-me (a list page like `documents`).
+ * Files only unless `includePages` (UNI-1953: the Documents home lists a shared
+ * UniNote too).
+ */
+export function parseSharedWithMe(
+  raw: unknown,
+  workspaceId: string,
+  includePages = false,
+): DocumentListResult {
   const body = record(raw)
   if (!Array.isArray(body.documents)) bad()
   const next = body.next_cursor
@@ -671,7 +679,11 @@ export function parseSharedWithMe(raw: unknown, workspaceId: string): DocumentLi
   const documents: UniworkDocSummary[] = []
   for (const value of body.documents) {
     const row = record(value)
-    // "shared with me" is the library: files only, a folder is never shared
+    // "shared with me" is the library: files (and pages when asked), a folder is never shared
+    if (row.kind === 'page' && includePages) {
+      documents.push(summaryRow(row, workspaceId, 'page'))
+      continue
+    }
     if (row.kind !== 'file') continue
     documents.push(summaryRow(row, workspaceId, 'file'))
   }

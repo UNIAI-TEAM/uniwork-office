@@ -224,7 +224,7 @@ export function BrowserContents({
                     <FolderGlyph />
                   </span>
                 ) : (
-                  <FileBadge ext={docExtension(doc)} size={24} />
+                  <FileBadge ext={doc.kind === 'page' ? 'page' : docExtension(doc)} size={24} />
                 )}
                 <span className="uw-pick-row-text">
                   <span className="uw-pick-row-title">{title}</span>

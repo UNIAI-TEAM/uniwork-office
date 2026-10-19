@@ -141,6 +141,7 @@ export const he = {
   uwDocNameTooLong: 'השם ארוך מדי (עד 500 תווים).',
   uwDocRenamedAnnounce: 'שם המסמך שונה ל-{name}.',
   uwDocActionFailed: 'הפעולה לא הצליחה. נסו שוב.',
+  uwUniNoteOpenFailed: 'ה-UniNote נוצרה, אך לא ניתן היה לפתוח אותה. פתחו אותה מהרשימה.',
   uwDocActionsFor: 'פעולות נוספות עבור “{name}”',
   uwDocCreate: 'יצירה',
   uwDocUploadPick: 'בחירת קובץ',

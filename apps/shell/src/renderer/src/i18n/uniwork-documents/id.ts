@@ -145,6 +145,7 @@ export const id = {
   uwDocNameTooLong: 'Nama terlalu panjang (maksimal 500 karakter).',
   uwDocRenamedAnnounce: 'Dokumen diganti namanya menjadi {name}.',
   uwDocActionFailed: 'Tidak berhasil. Coba lagi.',
+  uwUniNoteOpenFailed: 'UniNote sudah dibuat, tetapi tidak bisa dibuka. Buka dari daftar.',
   uwDocActionsFor: 'Tindakan lain untuk “{name}”',
   uwDocCreate: 'Buat',
   uwDocUploadPick: 'Pilih file',

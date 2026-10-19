@@ -66,6 +66,7 @@ export function UniworkBrowser({
   onHiddenHintChange,
   offlineOf,
   onOffline,
+  hidePages = false,
 }: {
   workspaceId: string
   variant: 'dialog' | 'pane'
@@ -92,6 +93,8 @@ export function UniworkBrowser({
   /** G5-05u F5: optional offline item for a file row's "…" menu */
   offlineOf?: (doc: UniworkDocSummary) => 'pin' | 'unpin' | null
   onOffline?: (doc: UniworkDocSummary) => void
+  /** UNI-1953: a picker cannot take a UniNote page, so its rows are left out (not counted as hidden) */
+  hidePages?: boolean
 }) {
   const { t, dateLocale } = useI18n()
   const uid = useId()
@@ -198,7 +201,11 @@ export function UniworkBrowser({
 
   const searching = query.length > 0
   const list = searching ? browser.results : browser.contents
-  const view = contentsView(list.items, searching ? null : sort, dateLocale)
+  const view = contentsView(
+    hidePages ? list.items.filter((doc) => doc.kind !== 'page') : list.items,
+    searching ? null : sort,
+    dateLocale,
+  )
   const showHiddenHint = !mainOverride && list.status === 'ready' && view.hiddenCount > 0
   const hiddenHintId = onHiddenHintChange ? BROWSER_HIDDEN_HINT_ID : `${uid}-hidden`
 

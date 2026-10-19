@@ -140,6 +140,7 @@ export const zh = {
   uwDocNameTooLong: '名称过长（最多 500 个字符）。',
   uwDocRenamedAnnounce: '文档已重命名为 {name}。',
   uwDocActionFailed: '操作未完成，请重试。',
+  uwUniNoteOpenFailed: 'UniNote 已创建，但无法打开。请从列表中打开。',
   uwDocActionsFor: '“{name}”的更多操作',
   uwDocCreate: '创建',
   uwDocUploadPick: '选择文件',

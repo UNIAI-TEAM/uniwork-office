@@ -145,6 +145,7 @@ export const ms = {
   uwDocNameTooLong: 'Nama terlalu panjang (maksimum 500 aksara).',
   uwDocRenamedAnnounce: 'Dokumen telah dinamakan semula kepada {name}.',
   uwDocActionFailed: 'Tidak berjaya. Cuba lagi.',
+  uwUniNoteOpenFailed: 'UniNote telah dicipta tetapi tidak dapat dibuka. Buka dari senarai.',
   uwDocActionsFor: 'Lagi tindakan untuk “{name}”',
   uwDocCreate: 'Cipta',
   uwDocUploadPick: 'Pilih fail',

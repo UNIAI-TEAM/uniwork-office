@@ -232,10 +232,10 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
     expect(api.uniworkListChildren).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: 'w1', parentId: null }),
     )
-    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Report.docx'])
-    // the page and the zip are hidden with one count line (F11-L2: shared uwPickHiddenFormats)
+    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Meeting notes', 'Report.docx'])
+    // the zip is hidden with one count line (F11-L2: shared uwPickHiddenFormats); the page (UniNote) is listed (UNI-1953)
     const hiddenLine = $('.uwf-hidden')!
-    expect(hiddenLine.textContent).toBe(docEn.uwPickHiddenFormats.replace('{count}', '2'))
+    expect(hiddenLine.textContent).toBe(docEn.uwPickHiddenFormats.replace('{count}', '1'))
     // R2-3: hidden-formats count line has an id referenced by aria-describedby on the contents listbox and search box
     expect(hiddenLine.id).toBeTruthy()
     expect($('[role="listbox"]')?.getAttribute('aria-describedby')).toBe(hiddenLine.id)
@@ -263,7 +263,7 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
     expect($$('.uwf-crumb-btn').map((b) => b.textContent)).toEqual(['UniWork', 'Alpha'])
     expect($('.uwf-crumb-current')?.textContent).toBe('Contracts')
     await click($$('.uwf-crumb-btn')[0])
-    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Report.docx'])
+    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Meeting notes', 'Report.docx'])
   })
 
   it('opens a file with Enter on its row (the host opens it)', async () => {
@@ -580,7 +580,7 @@ describe('UniworkBrowser: search (S2)', () => {
     await type(input, 'bud')
     await key(input, 'Escape')
     expect(input.value).toBe('')
-    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Report.docx'])
+    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Meeting notes', 'Report.docx'])
   })
 
   it('ignores a stale search answer, paginates search hits, and keeps search off skeleton on soft refresh (R1-1, R1-8)', async () => {

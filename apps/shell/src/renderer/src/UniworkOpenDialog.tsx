@@ -20,6 +20,7 @@ import { useI18n } from './locale'
 import { needsSignIn, type AccountView } from './account-model'
 import { publishLocalRename, publishUniworkNotice } from './uniwork-notice-bus'
 import {
+  NEW_DOC_FORMATS,
   PICKER_PAGE_SIZE,
   PICKER_SEARCH_DEBOUNCE_MS,
   SHARED_SOURCE_VALUE,
@@ -50,6 +51,7 @@ import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspac
 import { useOfflineToggle } from './OfflineToggle'
 import { BROWSER_HIDDEN_HINT_ID } from './uniwork-folders/BrowserContents'
 import { UniworkBrowser } from './uniwork-folders/UniworkBrowser'
+import { openPageOnWeb } from './uniwork-page-web'
 import type { PathPart } from './uniwork-folders/uniwork-folders-model'
 import {
   archiveDocument,
@@ -190,8 +192,9 @@ export function UniworkOpenDialog({
   const clearToast = useCallback(() => setToast(null), [])
   /** G5-05u: the row menu's offline item (not in pin mode, where choosing already pins) */
   const offline = useOfflineToggle()
+  // a UniNote page has no file to keep offline, whatever its title ends in
   const offlineOf = (doc: LibraryDocRow) =>
-    onPick || !isOpenable(doc) ? null : offline.menuOf(doc.id)
+    onPick || doc.kind === 'page' || !isOpenable(doc) ? null : offline.menuOf(doc.id)
   /** FD-11: the workspace's Recent list, or the folder browser's contents */
   const [view, setView] = useState<'recent' | 'folder'>('recent')
   /** the committed title search of the folder view (the recent list keeps state.query) */
@@ -337,7 +340,21 @@ export function UniworkOpenDialog({
   }
 
   /** open a document by its id (a listed row, or the one just created / uploaded) */
-  const openById = (doc: { id: string; title: string; workspaceId?: string }) => {
+  const openById = (doc: { id: string; title: string; workspaceId?: string; kind?: string }) => {
+    // UNI-1953: a UniNote has no file to open; it opens on the web (never to a picker's caller)
+    if (doc.kind === 'page') {
+      const workspaceId =
+        doc.workspaceId ??
+        (stateRef.current.source === 'workspace' ? stateRef.current.workspaceId : null)
+      if (onPick || !workspaceId) {
+        setToast(t('uwDocActionFailed'))
+        return
+      }
+      void openPageOnWeb(stateRef.current.workspaces.items, workspaceId, doc.id).then((opened) => {
+        if (!opened && mounted.current) setToast(t('uwDocActionFailed'))
+      })
+      return
+    }
     if (onPick) {
       const workspaceId = (
         doc.workspaceId ??
@@ -969,6 +986,7 @@ export function UniworkOpenDialog({
               mainOverride={folderView ? undefined : pickBody}
               offlineOf={(doc) => rowActionsOf(doc, offlineOf(doc)).offline}
               onOffline={(doc) => onRowAction(doc, 'offline')}
+              hidePages={Boolean(onPick)}
             />
           ) : (
             pickBody
@@ -1007,6 +1025,7 @@ export function UniworkOpenDialog({
         {form === 'new' && (
           <NewDocDialog
             workspaces={state.workspaces.items}
+            kinds={NEW_DOC_FORMATS}
             initialTarget={defaultTarget()}
             loadTree={loadFolderTree}
             onCreate={createDoc}
