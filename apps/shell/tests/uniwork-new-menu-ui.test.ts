@@ -716,6 +716,53 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
     })
   })
 
+  describe('r3: the live share hint replaces the static My Folder line (UWNM-FE-R2-1)', () => {
+    const stripToggle = () => host.querySelector<HTMLElement>('.dh-quick-row [role="switch"]')
+    const stripHint = () => host.querySelector<HTMLElement>('.dh-quick-row [role="status"]')
+    const staticLine = () => host.querySelector('.dh-quick-row .dh-quick-hint')
+
+    it('toggle on: the static "visible only to you" line is gone and the live hint is there; off: it is back', async () => {
+      await mount('vi')
+      expect(staticLine()?.textContent).toContain('chỉ bạn')
+      expect(staticLine()?.querySelector('.dh-quick-hint-link')?.textContent).toBe(
+        'Thư mục của tôi',
+      )
+      expect(stripHint()?.textContent).toBe('')
+      await click(stripToggle())
+      expect(staticLine()).toBeNull()
+      expect(host.querySelector('.dh-quick-row')?.textContent).not.toContain('chỉ bạn')
+      expect(stripHint()?.textContent).toBe(
+        'Mọi thành viên của workspace này sẽ chỉ xem tài liệu mới',
+      )
+      await click(stripToggle())
+      expect(staticLine()?.textContent).toContain('chỉ bạn')
+      expect(staticLine()?.querySelector('.dh-quick-hint-link')?.textContent).toBe(
+        'Thư mục của tôi',
+      )
+      expect(stripHint()?.textContent).toBe('')
+    })
+
+    it('ticked in the menu hides the static line on the strip too (en), and the pills stay put', async () => {
+      await mount('en')
+      const pillsBefore = host.querySelectorAll('.dh-quick-pill').length
+      await openMenu()
+      await click(toggle())
+      await key(menu(), 'Escape')
+      expect(staticLine()).toBeNull()
+      expect(host.querySelectorAll('.dh-quick-pill')).toHaveLength(pillsBefore)
+      // the status line stays mounted (it reserves its line) whatever the state
+      expect(stripHint()?.textContent).toBe('Everyone in this workspace can view new documents')
+    })
+
+    it('the static line is back after the create resets the toggle', async () => {
+      await mount('vi')
+      await click(stripToggle())
+      expect(staticLine()).toBeNull()
+      await click(host.querySelector('.dh-quick-pill[data-quick-format="docx"]'))
+      expect(staticLine()).not.toBeNull()
+    })
+  })
+
   describe('r2: a UniNote the server cannot create disables its row and pill (FE-3)', () => {
     it.each([['menu'], ['strip']])('a 404 / 501 from the %s pick', async (from) => {
       api.uniworkCreatePage.mockResolvedValueOnce({
@@ -820,6 +867,95 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
       await flush()
       await click(host.querySelector('.dh-btn-create'))
       expect(menu()).not.toBeNull()
+    })
+  })
+
+  describe('r3: keyboard from a row outside the usable ones, and the busy gaps (UWNM-FE-R2-3, R2-5)', () => {
+    const disableUniNote = async () => {
+      api.uniworkCreatePage.mockResolvedValueOnce({
+        ok: false,
+        error: 'server_error',
+        endpointMissing: true,
+      })
+      await mount('en')
+      await openMenu()
+      await click(row('page'))
+      await openMenu()
+      expect(row('page')?.getAttribute('aria-disabled')).toBe('true')
+    }
+    const hold = () => {
+      let release: () => void = () => undefined
+      api.uniworkCreateDocument.mockImplementationOnce(
+        (input: { name: string; format: string }) =>
+          new Promise((resolve) => {
+            release = () =>
+              resolve(
+                ok({
+                  id: 'new-file',
+                  workspaceId: 'ws-1',
+                  title: input.name,
+                  format: input.format,
+                  updatedAt: '',
+                  kind: 'file',
+                  parentId: 'f-mine',
+                }),
+              )
+          }),
+      )
+      return () => act(async () => release())
+    }
+    const stripToggle = () => host.querySelector<HTMLElement>('.dh-quick-row [role="switch"]')
+    const stripHint = () => host.querySelector<HTMLElement>('.dh-quick-row [role="status"]')
+
+    it('ArrowUp from a mouse-focused disabled row goes to the last usable row, ArrowDown to the first', async () => {
+      await disableUniNote()
+      // a click on a disabled row focuses it, yet it is not one of the usable rows
+      await act(async () => row('page')!.focus())
+      expect(document.activeElement).toBe(row('page'))
+      await key(menu(), 'ArrowUp')
+      expect(document.activeElement).toBe(toggle())
+      await act(async () => row('page')!.focus())
+      await key(menu(), 'ArrowDown')
+      expect(document.activeElement).toBe(row('docx'))
+    })
+
+    it('the strip toggle is aria-disabled and does not flip while a create is in flight', async () => {
+      const release = hold()
+      await mount('vi')
+      await click(host.querySelector('.dh-quick-pill[data-quick-format="docx"]'))
+      expect(stripToggle()?.getAttribute('aria-disabled')).toBe('true')
+      expect(stripToggle()?.getAttribute('aria-checked')).toBe('false')
+      await click(stripToggle())
+      expect(stripToggle()?.getAttribute('aria-checked')).toBe('false')
+      await release()
+      await flush()
+      expect(stripToggle()?.getAttribute('aria-disabled')).toBeNull()
+      await click(stripToggle())
+      expect(stripToggle()?.getAttribute('aria-checked')).toBe('true')
+    })
+
+    it('ArrowDown on the New button does not open the menu while a create is in flight', async () => {
+      const release = hold()
+      await mount('vi')
+      await openMenu()
+      await click(row('docx'))
+      await key(host.querySelector('.dh-btn-create'), 'ArrowDown')
+      expect(menu()).toBeNull()
+      await release()
+      await flush()
+      await key(host.querySelector('.dh-btn-create'), 'ArrowDown')
+      expect(menu()).not.toBeNull()
+    })
+
+    it('a FAILED strip create still resets the toggle (web parity): unticked, hint empty', async () => {
+      api.uniworkCreateDocument.mockResolvedValueOnce({ ok: false, error: 'server_error' })
+      await mount('vi')
+      await click(stripToggle())
+      expect(stripToggle()?.getAttribute('aria-checked')).toBe('true')
+      await click(host.querySelector('.dh-quick-pill[data-quick-format="docx"]'))
+      expect(api.uniworkCreateDocument).toHaveBeenCalledTimes(1)
+      expect(stripToggle()?.getAttribute('aria-checked')).toBe('false')
+      expect(stripHint()?.textContent).toBe('')
     })
   })
 })
