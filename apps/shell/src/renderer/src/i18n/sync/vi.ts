@@ -277,7 +277,7 @@ export const vi = {
   uwConflictSaveCopyNoSeat:
     'Không tạo được bản sao vì bạn không phải thành viên của không gian làm việc chứa tài liệu này. Thay đổi của bạn vẫn an toàn; bạn có thể tải bản của mình về máy.',
   uwConflictSaveCopyFolderRefused:
-    'Bạn không thể tạo tài liệu trong thư mục này. Hãy tải bản của bạn về máy.',
+    'Bạn không thể tạo tài liệu trong thư mục này. Hãy tải bản của bạn về.',
   uwConflictDownloadDone:
     'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại bản mới nhất hoặc Ghi đè.',
   uwConflictDownloadFailedDesktop: 'Chưa lưu được tệp. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
