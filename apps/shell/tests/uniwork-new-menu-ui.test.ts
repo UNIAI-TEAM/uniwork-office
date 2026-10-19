@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -665,5 +667,202 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
       await openMenu()
       expect(row('pdf')?.getAttribute('aria-disabled')).toBe('true')
     })
+  })
+
+  describe('r2: the strip shows the share state it sends (FE-2)', () => {
+    const stripToggle = () =>
+      host.querySelector<HTMLElement>(
+        '.dh-quick-row [role="checkbox"], .dh-quick-row [role="switch"]',
+      )
+    const stripHint = () => host.querySelector<HTMLElement>('.dh-quick-row [role="status"]')
+
+    it('renders the Share toggle (off) and an empty live hint next to the pills', async () => {
+      await mount('vi')
+      expect(stripToggle()).not.toBeNull()
+      expect(stripToggle()?.getAttribute('aria-checked')).toBe('false')
+      expect(stripHint()?.textContent).toBe('')
+      expect(host.querySelector('.dh-quick-row')?.textContent).toContain('Chia sẻ với workspace')
+    })
+
+    it('toggle on: the hint says it, and a pill sends visibility workspace', async () => {
+      await mount('vi')
+      await click(stripToggle())
+      expect(stripToggle()?.getAttribute('aria-checked')).toBe('true')
+      expect(stripHint()?.textContent).toBe(
+        'Mọi thành viên của workspace này sẽ chỉ xem tài liệu mới',
+      )
+      await click(host.querySelector('.dh-quick-pill[data-quick-format="docx"]'))
+      expect(api.uniworkCreateDocument.mock.calls[0]![0]).toMatchObject({ visibility: 'workspace' })
+      // reset after the create, with the hint following
+      expect(stripToggle()?.getAttribute('aria-checked')).toBe('false')
+      expect(stripHint()?.textContent).toBe('')
+    })
+
+    it('shares one state with the menu: ticked in the menu shows ticked on the strip', async () => {
+      await mount('en')
+      await openMenu()
+      await click(toggle())
+      await key(menu(), 'Escape')
+      expect(stripToggle()?.getAttribute('aria-checked')).toBe('true')
+      expect(stripHint()?.textContent).toBe('Everyone in this workspace can view new documents')
+    })
+
+    it('a strip toggle off again sends no visibility', async () => {
+      await mount('vi')
+      await click(stripToggle())
+      await click(stripToggle())
+      await click(host.querySelector('.dh-quick-pill[data-quick-format="md"]'))
+      expect(api.uniworkCreateDocument.mock.calls[0]![0]).not.toHaveProperty('visibility')
+    })
+  })
+
+  describe('r2: a UniNote the server cannot create disables its row and pill (FE-3)', () => {
+    it.each([['menu'], ['strip']])('a 404 / 501 from the %s pick', async (from) => {
+      api.uniworkCreatePage.mockResolvedValueOnce({
+        ok: false,
+        error: 'server_error',
+        endpointMissing: true,
+      })
+      await mount('en')
+      if (from === 'menu') {
+        await openMenu()
+        await click(row('page'))
+      } else {
+        await click(host.querySelector('.dh-quick-pill[data-quick-format="page"]'))
+      }
+      expect(document.body.textContent).toContain("This server can't create this file type yet.")
+      await openMenu()
+      expect(row('page')?.getAttribute('aria-disabled')).toBe('true')
+      expect(
+        host
+          .querySelector('.dh-quick-pill[data-quick-format="page"]')
+          ?.getAttribute('aria-disabled'),
+      ).toBe('true')
+      await click(row('page'))
+      expect(api.uniworkCreatePage).toHaveBeenCalledTimes(1)
+    })
+
+    it('an ordinary failure (no flag, a 500) leaves the UniNote row usable', async () => {
+      api.uniworkCreatePage.mockResolvedValueOnce({ ok: false, error: 'server_error' })
+      await mount('en')
+      await openMenu()
+      await click(row('page'))
+      await openMenu()
+      expect(row('page')?.getAttribute('aria-disabled')).toBeNull()
+    })
+
+    it('a disabled kind never disables the Folder row inside an open folder', async () => {
+      api.uniworkCreatePage.mockResolvedValueOnce({
+        ok: false,
+        error: 'server_error',
+        endpointMissing: true,
+      })
+      await mount('en')
+      await openFolder('f-plain')
+      await openMenu()
+      await click(row('page'))
+      await openMenu()
+      expect(row('folder')).not.toBeNull()
+      expect(row('folder')?.getAttribute('aria-disabled')).toBeNull()
+    })
+  })
+
+  describe('r2: keyboard order and the trigger (FE-6, FE-8)', () => {
+    it('skips a disabled row: initial focus and the arrows never land on it', async () => {
+      api.uniworkCreatePage.mockResolvedValueOnce({
+        ok: false,
+        error: 'server_error',
+        endpointMissing: true,
+      })
+      await mount('en')
+      await openMenu()
+      await click(row('page'))
+      await openMenu()
+      expect(row('page')?.getAttribute('aria-disabled')).toBe('true')
+      // focus starts on the first usable row
+      expect(document.activeElement).toBe(row('docx'))
+      await key(menu(), 'Home')
+      expect(document.activeElement).toBe(row('docx'))
+      await key(menu(), 'End')
+      await key(menu(), 'ArrowDown')
+      // wraps past the disabled UniNote
+      expect(document.activeElement).toBe(row('docx'))
+      await key(menu(), 'ArrowUp')
+      expect(document.activeElement).toBe(toggle())
+    })
+
+    it('the New button does not open the menu while a create is in flight', async () => {
+      let release: () => void = () => undefined
+      api.uniworkCreateDocument.mockImplementationOnce(
+        (input: { name: string; format: string }) =>
+          new Promise((resolve) => {
+            release = () =>
+              resolve(
+                ok({
+                  id: 'new-file',
+                  workspaceId: 'ws-1',
+                  title: input.name,
+                  format: input.format,
+                  updatedAt: '',
+                  kind: 'file',
+                  parentId: 'f-mine',
+                }),
+              )
+          }),
+      )
+      await mount('vi')
+      await openMenu()
+      await click(row('docx'))
+      expect(menu()).toBeNull()
+      await click(host.querySelector('.dh-btn-create'))
+      expect(menu()).toBeNull()
+      await act(async () => release())
+      await flush()
+      await click(host.querySelector('.dh-btn-create'))
+      expect(menu()).not.toBeNull()
+    })
+  })
+})
+
+/**
+ * VNM-1 / VNM-2 (the visual pass): rules of the menu stylesheet, read as data.
+ * jsdom does not lay out the imported CSS, so the declarations themselves are
+ * what a contrast / focus-ring regression would change.
+ */
+describe('UW-NEW-MENU r2: row hover and keyboard focus (VNM-1, VNM-2)', () => {
+  const css = readFileSync(
+    join(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
+    'utf8',
+  )
+  /** the declarations of every rule whose selector list names `selector` exactly */
+  const rulesFor = (selector: string): Array<{ selectors: string[]; body: string }> => {
+    const found: Array<{ selectors: string[]; body: string }> = []
+    for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selectors = match[1]!.split(',').map((x) => x.trim())
+      if (selectors.includes(selector)) found.push({ selectors, body: match[2]! })
+    }
+    return found
+  }
+
+  it('a keyboard-focused row gets its own accent ring, not only the hover fill', () => {
+    const rules = rulesFor('.dh-new-item:focus-visible')
+    expect(rules.length).toBeGreaterThan(0)
+    for (const rule of rules) {
+      // not shared with :hover (a mouse over a row must not draw the ring)
+      expect(rule.selectors.some((x) => x.includes(':hover'))).toBe(false)
+    }
+    const body = rules.map((r) => r.body).join(';')
+    expect(body).toMatch(/outline:\s*2px solid var\(--accent\)/)
+    expect(body).not.toMatch(/outline:\s*none/)
+  })
+
+  it('the hint and the extension of a hovered or focused row use the primary text token', () => {
+    for (const state of [':hover', ':focus-visible']) {
+      for (const part of ['.dh-new-hint', '.dh-new-ext']) {
+        const rules = rulesFor(`.dh-new-item${state} ${part}`)
+        expect(rules.length, `${state} ${part}`).toBeGreaterThan(0)
+        expect(rules.map((r) => r.body).join(';')).toMatch(/color:\s*var\(--text\)/)
+      }
+    }
   })
 })

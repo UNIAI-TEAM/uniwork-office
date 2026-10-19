@@ -175,6 +175,10 @@ function fakeServer(
     invalidDestination?: boolean
     /** UNI-1959: the blank route answers this bare status (a server without the route: 404 / 501) */
     blankStatus?: number
+    /** UNI-1959: the UniNote create answers this bare status (a server without the pages route) */
+    pageStatus?: number
+    /** UNI-1959: the folder create answers this bare status */
+    folderStatus?: number
     /** UNI-1959: the bound save's version upload waits on this latch (the first save stays in flight) */
     versionUploadGate?: () => Promise<void>
     /** UNI-1959: a detail GET waits on this latch while it answers a promise (the naming metadata read) */
@@ -479,6 +483,12 @@ function fakeServer(
           parent_id?: string
         }
         call.body = body
+        if (options.pageStatus && body.kind === 'page') {
+          return new Response('', { status: options.pageStatus })
+        }
+        if (options.folderStatus && body.kind === 'folder') {
+          return new Response('', { status: options.folderStatus })
+        }
         if (options.folderNameTaken) return envelope(409, 'folder_name_taken')
         // MYFOLDER-01: destination on a folder create is refused the same way
         if (options.invalidDestination) {
@@ -1376,6 +1386,47 @@ describe('UNI-1959 share with workspace on create', () => {
     })
     expect(result).toMatchObject({ ok: false, endpointMissing: true })
   })
+
+  it.each([404, 501])(
+    'BE-8: a %s on the UniNote create says the endpoint is missing too',
+    async (status) => {
+      const server = fakeServer({ pageStatus: status })
+      const ctx = setup(server)
+      const result = await ctx.service.createPage({
+        workspaceId: WS,
+        folderId: 'fold_1',
+        name: 'New UniNote',
+      })
+      expect(result).toMatchObject({ ok: false, endpointMissing: true })
+    },
+  )
+
+  it('BE-8: a 500 on the UniNote create is a plain failure, not a missing endpoint', async () => {
+    const server = fakeServer({ pageStatus: 500 })
+    const ctx = setup(server)
+    const result = await ctx.service.createPage({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      name: 'New UniNote',
+    })
+    expect(result.ok).toBe(false)
+    expect(result).not.toHaveProperty('endpointMissing')
+  })
+
+  it.each([404, 501])(
+    'BE-8: a %s on a folder create never carries the flag (folder rows are never disabled)',
+    async (status) => {
+      const server = fakeServer({ kind: 'folder', folderStatus: status })
+      const ctx = setup(server)
+      const result = await ctx.service.createFolder({
+        workspaceId: WS,
+        parentId: 'fold_1',
+        title: 'New folder',
+      })
+      expect(result.ok).toBe(false)
+      expect(result).not.toHaveProperty('endpointMissing')
+    },
+  )
 
   it('a 500 on the blank route is a plain failure, not a missing endpoint', async () => {
     const server = fakeServer({ blankStatus: 500 })
