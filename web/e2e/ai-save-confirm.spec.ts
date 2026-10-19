@@ -56,8 +56,7 @@ const saveCalls = (page: Page): Promise<number> => hostCall<number>(page, 'saveC
 /** the api.images.upload requests the host recorded (an image upload is also a write to UniWork) */
 const uploads = (page: Page): Promise<unknown[]> => hostCall<unknown[]>(page, 'uploads')
 
-const lastSaved = (page: Page): Promise<{ bytes: number[] } | null> =>
-  hostCall(page, 'lastSaved')
+const lastSaved = (page: Page): Promise<{ bytes: number[] } | null> => hostCall(page, 'lastSaved')
 
 /** a settle window in which any queued save would have landed */
 async function settleThenStillUnsaved(page: Page) {
@@ -119,8 +118,8 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
     await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
     const frame = (await (await page.waitForSelector('#frame')).contentFrame())!
     const state = () =>
-      frame.evaluate(
-        () => (window as unknown as { __sheetsWebState: SheetsWebState }).__sheetsWebState.workbook(),
+      frame.evaluate(() =>
+        (window as unknown as { __sheetsWebState: SheetsWebState }).__sheetsWebState.workbook(),
       )
     await expect.poll(async () => (await state()) !== null, { timeout: 60_000 }).toBe(true)
     await expect(frame.locator('canvas[id^="univer-sheet-main-canvas"]').first()).toBeVisible()
@@ -143,11 +142,7 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
   /** a scripted C2=7 turn that completed its follow-up answer and landed in the grid: the panel's
    * auto-applied chip carries the C2 footprint — readWorkbookRange only sees the engine session
    * (i.e. saved state), so the live grid is proven by the apply UI and the dirty event */
-  async function appliedTurn(
-    request: APIRequestContext,
-    frame: Frame,
-    wb: ShownWorkbook,
-  ) {
+  async function appliedTurn(request: APIRequestContext, frame: Frame, wb: ShownWorkbook) {
     await fake(request, setC2(wb.sheets[0]!.id))
     await ask(frame, 'Put 7 in C2')
     await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
@@ -155,6 +150,10 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
     })
     await expect(frame.locator('.ai-auto-applied').first()).toBeVisible({ timeout: 30_000 })
     await expect(frame.locator('.ai-apply-footprint').first()).toContainText('C2')
+    // the run's SSE must be fully consumed before a later `hold` is armed: the fake
+    // parks between chunks, and a hold set while this turn still streams wedges it
+    // (streaming stays set, the next ask times out waiting for it to clear)
+    await expect(frame.locator('.ai-msg-streaming')).toHaveCount(0, { timeout: 30_000 })
   }
 
   test('(a) the write lands in the grid; no save goes to the host after a settle wait', async ({
@@ -272,6 +271,8 @@ test.describe('docs: an AI write reaches UniWork only on the explicit Save (UNI-
       timeout: 60_000,
     })
     await expect(frame.locator(DOCS_EDITOR)).toContainText(MARKER, { timeout: 30_000 })
+    // same hold race as the sheets block: only arm `hold` once the stream is done
+    await expect(frame.locator('.ai-msg-streaming')).toHaveCount(0, { timeout: 30_000 })
   }
 
   test('(a) the write lands in the document; no save goes to the host after a settle wait', async ({
