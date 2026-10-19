@@ -24,6 +24,7 @@ import {
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import type { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
+import { pathKey } from '../src/shared/path-key'
 import type { DocumentDetail } from '../src/main/uniwork-docs/parse'
 import type { DownloadResult, UniworkDocsClient } from '../src/main/uniwork-docs/client'
 import {
@@ -1011,7 +1012,7 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     h.capability.entered = enteredA
     notice(h, '9', 3)
     await enteredAP
-    expect(internals.remoteDecisions.get(docPath())).toEqual({ n: 1 })
+    expect(internals.remoteDecisions.get(pathKey(docPath()))).toEqual({ n: 1 })
 
     // the account boundary's step 5 clears the map without awaiting A (exactly
     // what lockSession does), the same account signs in again and its editor
@@ -1030,14 +1031,14 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     h.capability.entered = enteredB
     notice(h)
     await enteredBP
-    const entryB = internals.remoteDecisions.get(docPath())
+    const entryB = internals.remoteDecisions.get(pathKey(docPath()))
     expect(entryB).toEqual({ n: 1 })
 
     // A resumes and is ignored: its finalizer must release only its own entry,
     // never B's replacement
     releaseA()
     await drain()
-    expect(internals.remoteDecisions.get(docPath())).toBe(entryB)
+    expect(internals.remoteDecisions.get(pathKey(docPath()))).toBe(entryB)
 
     // the path closes while B is still in flight: the poll must keep the sample
     // B's own bar re-decides on (B's entry is what keeps it)
