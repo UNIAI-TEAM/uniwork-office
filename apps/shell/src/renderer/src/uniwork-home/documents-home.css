@@ -563,7 +563,8 @@
   white-space: nowrap;
 }
 
-/* Documents table (5 columns: Tên | Truy cập | Người sửa gần nhất | Cập nhật | Thao tác) */
+/* Documents table (6 columns: Tên | Truy cập | Người sửa gần nhất | Cập nhật | Dung lượng | Thao tác;
+   UNI-1961: the web's Size column, right aligned) */
 .dh-doc-table {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -579,6 +580,7 @@
     minmax(130px, 1fr)
     minmax(150px, 1.1fr)
     minmax(110px, 0.9fr)
+    90px
     72px;
   align-items: center;
   gap: 12px;
@@ -739,6 +741,17 @@
   color: var(--text-secondary);
 }
 
+.dh-col-size,
+.dh-cell-size {
+  text-align: right;
+}
+
+.dh-cell-size {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
 .dh-cell-actions {
   display: flex;
   align-items: center;
@@ -834,14 +847,16 @@
   }
 }
 
-/* VDH-4: below ~1100 px the five columns cannot fit — collapse the two
-   lowest-priority columns (Truy cập + Người sửa) so Tên / Cập nhật / Thao tác
-   always stay visible; grid cards keep every cell */
+/* VDH-4: below ~1100 px the columns cannot fit — collapse the lowest-priority
+   ones (Truy cập + Người sửa, and Dung lượng, which the web drops before the
+   editor) so Tên / Cập nhật / Thao tác always stay visible; grid cards keep every cell */
 @media (max-width: 1100px) {
   .dh-doc-table:not(.grid-mode) .dh-col-access,
   .dh-doc-table:not(.grid-mode) .dh-col-person,
+  .dh-doc-table:not(.grid-mode) .dh-col-size,
   .dh-doc-table:not(.grid-mode) .dh-cell-access,
-  .dh-doc-table:not(.grid-mode) .dh-cell-person {
+  .dh-doc-table:not(.grid-mode) .dh-cell-person,
+  .dh-doc-table:not(.grid-mode) .dh-cell-size {
     display: none;
   }
 

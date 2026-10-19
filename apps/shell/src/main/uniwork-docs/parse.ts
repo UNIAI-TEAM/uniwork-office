@@ -241,7 +241,22 @@ function summaryRow(
     ...(path ? { path } : {}),
     ...(systemKindOf(row.system_kind) ? { systemKind: 'my_folder' as const } : {}),
     ...editLockOf(row.edit_lock),
+    ...fileSizeOf(row, kind),
   }
+}
+
+/**
+ * UNI-1961: the web's Size column reads a file row's `size_bytes`; a page or
+ * folder, a zero, and a mistyped value show no size (never a guess).
+ */
+function fileSizeOf(
+  row: Record<string, unknown>,
+  kind: UniworkEntryKind,
+): { sizeBytes: number } | Record<string, never> {
+  const size = row.size_bytes
+  return kind === 'file' && typeof size === 'number' && Number.isSafeInteger(size) && size > 0
+    ? { sizeBytes: size }
+    : {}
 }
 
 /** EL-1(b): optional list-row `edit_lock` summary. Malformed objects are dropped, not the row. */

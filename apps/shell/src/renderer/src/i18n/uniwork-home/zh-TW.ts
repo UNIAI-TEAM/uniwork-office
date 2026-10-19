@@ -67,4 +67,5 @@ export const zhTW = {
   uhSourceDownloaded: '已下載 {name}',
   uhSourceShowInFolder: '在資料夾中顯示',
   uhSourceDownloadFailed: '無法下載該檔案。請再試一次。',
+  uhColSize: '大小',
 } satisfies Record<keyof typeof zh, string>

@@ -68,4 +68,5 @@ export const ja = {
   uhSourceDownloaded: '{name} をダウンロードしました',
   uhSourceShowInFolder: 'フォルダーに表示',
   uhSourceDownloadFailed: 'ファイルをダウンロードできませんでした。もう一度お試しください。',
+  uhColSize: 'サイズ',
 } satisfies Record<keyof typeof zh, string>

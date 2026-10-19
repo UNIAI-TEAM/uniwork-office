@@ -67,4 +67,5 @@ export const ms = {
   uhSourceDownloaded: '{name} dimuat turun',
   uhSourceShowInFolder: 'Tunjukkan dalam folder',
   uhSourceDownloadFailed: 'Tidak dapat memuat turun fail. Cuba lagi.',
+  uhColSize: 'Saiz',
 } satisfies Record<keyof typeof zh, string>

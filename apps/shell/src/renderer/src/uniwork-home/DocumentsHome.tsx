@@ -27,7 +27,6 @@ import {
   checkDocName,
   docExtension,
   errorActionOf,
-  formatWhen,
   isDocNameError,
   isDocTitleTooLong,
   renameFormatOf,
@@ -89,10 +88,13 @@ import {
   fetchDocumentsHomePage,
   fetchDocumentsHomeSources,
   formatAccessCell,
+  formatBytes,
+  formatShortDate,
   formatUpdatedByCell,
   getDocumentsHomeNavEntry,
   hasActiveFilters,
   mergeNewestFirst,
+  rowSizeBytes,
   sourceMatchesFilters,
   splitAndSortItems,
   toUniworkListFilters,
@@ -1783,6 +1785,9 @@ export function DocumentsHome({
                     <div className="dh-col-time" role="columnheader">
                       {t('uhColUpdatedAt')}
                     </div>
+                    <div className="dh-col-size" role="columnheader">
+                      {t('uhColSize')}
+                    </div>
                     <div
                       className="dh-col-actions"
                       role="columnheader"
@@ -1911,7 +1916,11 @@ export function DocumentsHome({
                         </div>
 
                         <div className="dh-cell-time" role="cell">
-                          {formatWhen(doc.updatedAt, dateLocale)}
+                          {formatShortDate(doc.updatedAt, dateLocale)}
+                        </div>
+
+                        <div className="dh-cell-size" role="cell">
+                          {formatBytes(rowSizeBytes(row), dateLocale)}
                         </div>
 
                         <div

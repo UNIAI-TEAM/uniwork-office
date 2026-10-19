@@ -67,4 +67,5 @@ export const ar = {
   uhSourceDownloaded: 'تم تنزيل {name}',
   uhSourceShowInFolder: 'إظهار في المجلد',
   uhSourceDownloadFailed: 'تعذّر تنزيل الملف. حاول مرة أخرى.',
+  uhColSize: 'الحجم',
 } satisfies Record<keyof typeof zh, string>

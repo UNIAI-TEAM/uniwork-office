@@ -67,4 +67,5 @@ export const id = {
   uhSourceDownloaded: '{name} diunduh',
   uhSourceShowInFolder: 'Tampilkan di folder',
   uhSourceDownloadFailed: 'Tidak dapat mengunduh file. Coba lagi.',
+  uhColSize: 'Ukuran',
 } satisfies Record<keyof typeof zh, string>

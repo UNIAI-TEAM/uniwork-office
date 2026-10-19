@@ -68,4 +68,5 @@ export const pl = {
   uhSourceDownloaded: 'Pobrano {name}',
   uhSourceShowInFolder: 'Pokaż w folderze',
   uhSourceDownloadFailed: 'Nie udało się pobrać pliku. Spróbuj ponownie.',
+  uhColSize: 'Rozmiar',
 } satisfies Record<keyof typeof zh, string>

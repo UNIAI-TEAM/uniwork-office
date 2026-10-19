@@ -1,8 +1,8 @@
 import type { UniworkSourceFile } from '../../../shared/home-api'
 import { FileBadge } from '../FileBadge'
 import { useI18n } from '../locale'
-import { formatWhen } from '../uniwork-docs-model'
 import { FolderMenu } from '../uniwork-folders/FolderMenu'
+import { formatBytes, formatShortDate } from './documents-home-model'
 
 /** UNI-1961: a source file's badge format: its extension, else its name's */
 function sourceExtension(source: UniworkSourceFile): string {
@@ -70,7 +70,11 @@ export function DocumentsSourceRow({
       </div>
 
       <div className="dh-cell-time" role="cell">
-        {formatWhen(source.updatedAt, dateLocale)}
+        {formatShortDate(source.updatedAt, dateLocale)}
+      </div>
+
+      <div className="dh-cell-size" role="cell">
+        {formatBytes(source.sizeBytes, dateLocale)}
       </div>
 
       <div className="dh-cell-actions" role="cell" onClick={(e) => e.stopPropagation()}>

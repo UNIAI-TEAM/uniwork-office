@@ -67,4 +67,5 @@ export const vi = {
   uhSourceDownloaded: 'Đã tải xuống {name}',
   uhSourceShowInFolder: 'Hiện trong thư mục',
   uhSourceDownloadFailed: 'Không thể tải file xuống. Thử lại.',
+  uhColSize: 'Dung lượng',
 } satisfies Record<keyof typeof zh, string>

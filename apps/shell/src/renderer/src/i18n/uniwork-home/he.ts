@@ -67,4 +67,5 @@ export const he = {
   uhSourceDownloaded: '{name} הורד',
   uhSourceShowInFolder: 'הצג בתיקייה',
   uhSourceDownloadFailed: 'לא ניתן להוריד את הקובץ. נסו שוב.',
+  uhColSize: 'גודל',
 } satisfies Record<keyof typeof zh, string>

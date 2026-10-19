@@ -67,4 +67,5 @@ export const pt = {
   uhSourceDownloaded: '{name} baixado',
   uhSourceShowInFolder: 'Mostrar na pasta',
   uhSourceDownloadFailed: 'Não foi possível baixar o arquivo. Tente novamente.',
+  uhColSize: 'Tamanho',
 } satisfies Record<keyof typeof zh, string>

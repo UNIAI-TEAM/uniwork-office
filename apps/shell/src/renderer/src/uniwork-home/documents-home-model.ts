@@ -593,3 +593,40 @@ export async function fetchDocumentsHomeSources(
     ...(params.cursor ? { cursor: params.cursor } : {}),
   })
 }
+
+/**
+ * UNI-1961: the web's Size cell (D library-rows.ts `rowSizeBytes`): a file
+ * document's bytes when it has any, every source file's; pages and folders
+ * say nothing.
+ */
+export function rowSizeBytes(row: DocumentsHomeTableRow): number | null {
+  if (row.type === 'source') return row.source.sizeBytes
+  return row.doc.kind === 'file' && (row.doc.sizeBytes ?? 0) > 0
+    ? (row.doc.sizeBytes ?? null)
+    : null
+}
+
+/** UNI-1961: the web's byte formatter (D library-rows.ts `formatBytes`): "318 KB", "1.2 MB" */
+export function formatBytes(bytes: number | null | undefined, locale: string): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes < 0) return ''
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  const digits = unit === 0 || value >= 10 ? 0 : 1
+  return `${new Intl.NumberFormat(locale || undefined, { maximumFractionDigits: digits }).format(value)} ${units[unit]}`
+}
+
+/** UNI-1961: the web's library date (documents-library-row.tsx): Intl dateStyle short */
+export function formatShortDate(iso: string, locale: string): string {
+  const date = new Date(iso)
+  if (!iso || Number.isNaN(date.getTime())) return ''
+  try {
+    return new Intl.DateTimeFormat(locale || undefined, { dateStyle: 'short' }).format(date)
+  } catch {
+    return date.toISOString().slice(0, 10)
+  }
+}

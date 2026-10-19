@@ -69,4 +69,5 @@ export const hi = {
   uhSourceDownloaded: '{name} डाउनलोड हो गया',
   uhSourceShowInFolder: 'फ़ोल्डर में दिखाएँ',
   uhSourceDownloadFailed: 'फ़ाइल डाउनलोड नहीं हो सकी। फिर से कोशिश करें।',
+  uhColSize: 'आकार',
 } satisfies Record<keyof typeof zh, string>

@@ -67,4 +67,5 @@ export const th = {
   uhSourceDownloaded: 'ดาวน์โหลด {name} แล้ว',
   uhSourceShowInFolder: 'แสดงในโฟลเดอร์',
   uhSourceDownloadFailed: 'ดาวน์โหลดไฟล์ไม่ได้ ลองอีกครั้ง',
+  uhColSize: 'ขนาด',
 } satisfies Record<keyof typeof zh, string>

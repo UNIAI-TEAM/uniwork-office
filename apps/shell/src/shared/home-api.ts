@@ -261,6 +261,8 @@ export interface UniworkDocSummary {
   path?: { id: string; title: string }[]
   /** EL-1(b): list-row edit_lock summary (DH-2); absent when the server sent none */
   editLock?: UniworkDocEditLock
+  /** UNI-1961: a file row's `size_bytes` (the web's Size column); absent on pages/folders or 0 */
+  sizeBytes?: number
 }
 
 /** FD-11: the three entry kinds the folder tree holds */

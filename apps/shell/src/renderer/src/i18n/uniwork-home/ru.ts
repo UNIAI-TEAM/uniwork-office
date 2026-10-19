@@ -67,4 +67,5 @@ export const ru = {
   uhSourceDownloaded: 'Файл {name} скачан',
   uhSourceShowInFolder: 'Показать в папке',
   uhSourceDownloadFailed: 'Не удалось скачать файл. Повторите попытку.',
+  uhColSize: 'Размер',
 } satisfies Record<keyof typeof zh, string>

@@ -67,4 +67,5 @@ export const nl = {
   uhSourceDownloaded: '{name} gedownload',
   uhSourceShowInFolder: 'Weergeven in map',
   uhSourceDownloadFailed: 'Kan het bestand niet downloaden. Probeer het opnieuw.',
+  uhColSize: 'Grootte',
 } satisfies Record<keyof typeof zh, string>

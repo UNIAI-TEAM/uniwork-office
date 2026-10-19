@@ -68,4 +68,5 @@ export const cs = {
   uhSourceDownloaded: 'Staženo: {name}',
   uhSourceShowInFolder: 'Zobrazit ve složce',
   uhSourceDownloadFailed: 'Soubor se nepodařilo stáhnout. Zkuste to znovu.',
+  uhColSize: 'Velikost',
 } satisfies Record<keyof typeof zh, string>

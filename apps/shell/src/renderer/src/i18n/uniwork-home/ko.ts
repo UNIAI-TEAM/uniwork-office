@@ -67,4 +67,5 @@ export const ko = {
   uhSourceDownloaded: '{name} 다운로드됨',
   uhSourceShowInFolder: '폴더에서 보기',
   uhSourceDownloadFailed: '파일을 다운로드할 수 없습니다. 다시 시도하세요.',
+  uhColSize: '크기',
 } satisfies Record<keyof typeof zh, string>

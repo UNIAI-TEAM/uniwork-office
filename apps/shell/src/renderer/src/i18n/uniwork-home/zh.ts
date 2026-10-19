@@ -66,4 +66,5 @@ export const zh = {
   uhSourceDownloaded: '已下载 {name}',
   uhSourceShowInFolder: '在文件夹中显示',
   uhSourceDownloadFailed: '无法下载该文件。请重试。',
+  uhColSize: '大小',
 }
