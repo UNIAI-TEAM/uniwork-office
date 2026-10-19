@@ -1413,32 +1413,35 @@ export function DocumentsHome({
               </span>
               <span>{t('uhNewShare')}</span>
             </button>
-            <span className="dh-quick-hint">
-              <svg
-                className="dh-quick-hint-icon"
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="4" y="11" width="16" height="10" rx="2" />
-                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-              <span>{t('uhQuickHintPrefix')}</span>
-              <button
-                type="button"
-                className="dh-quick-hint-link"
-                onClick={() => selectSubView('my-folder')}
-              >
-                {t('uhNavMyFolder')}
-              </button>
-              <span>{t('uhQuickHintSuffix')}</span>
-            </span>
+            {/* while the share toggle is on, the live hint below replaces this "only you" line */}
+            {!shareWithWorkspace && (
+              <span className="dh-quick-hint">
+                <svg
+                  className="dh-quick-hint-icon"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="4" y="11" width="16" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                </svg>
+                <span>{t('uhQuickHintPrefix')}</span>
+                <button
+                  type="button"
+                  className="dh-quick-hint-link"
+                  onClick={() => selectSubView('my-folder')}
+                >
+                  {t('uhNavMyFolder')}
+                </button>
+                <span>{t('uhQuickHintSuffix')}</span>
+              </span>
+            )}
             {/* always mounted and one line tall, so the toggle neither moves the pills nor goes unannounced */}
             <p id={quickShareHintId} role="status" className="dh-quick-share-hint">
               {shareWithWorkspace ? t('uhNewShareHint', { level: t('uhNewShareLevelView') }) : ''}
