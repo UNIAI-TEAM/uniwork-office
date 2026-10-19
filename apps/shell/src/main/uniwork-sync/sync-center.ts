@@ -1109,6 +1109,8 @@ export interface WiredSyncCenterDeps {
   service: WiredSyncCenterService
   store: { layer: StoreLayer; access: SyncStoreAccess }
   accountStatus(): AccountStatus
+  /** the deployment this build runs against: another deployment's last owner is not counted (G703B-P4) */
+  activeDeploymentId(): string | null
   capabilityRead(orgId: string): Promise<{
     kind: string
     capabilities: { sync_write: boolean; sync_feed?: boolean; offline_library?: boolean }
@@ -1245,7 +1247,9 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
       const org = status.org ? { id: status.org.id, name: status.org.name } : undefined
 
       if (sessionState === 'signed_out') {
-        const lastOwner = deps.service.store.readLastOwner()
+        // G703B-P4: only the active deployment's last owner has copies to count here
+        const last = deps.service.store.readLastOwner()
+        const lastOwner = last && last.deploymentId === deps.activeDeploymentId() ? last : null
         let lockedCount = 0
         if (lastOwner) {
           for (const dir of scopeWorkingCopyDirs(deps.service.store.root, lastOwner)) {

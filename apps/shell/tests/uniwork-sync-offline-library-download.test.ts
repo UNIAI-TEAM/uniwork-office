@@ -127,6 +127,60 @@ describe('G5-05 download: disk full on re-download keeps old ready', () => {
   })
 })
 
+describe('G703B-P2 download: a full disk that also refuses the settle row (FL-02)', () => {
+  /** ENOSPC from the first byte on: the content AND the settled row both fail to write */
+  async function fullDiskFirstDownload(h: Harness) {
+    addDoc(h, 'doc_1', 1)
+    h.docs.beforeChunk = () => {
+      h.fs.failWrite = () => true
+    }
+    return rowOf(await pinDoc(h))
+  }
+
+  it('the row read from the store after the settle failed still says disk-full, not downloading', async () => {
+    const h = createHarness()
+    expect(await fullDiskFirstDownload(h)).toMatchObject({ state: 'disk-full' })
+    expect(await h.manager.row('doc_1')).toMatchObject({
+      state: 'disk-full',
+      readyVersion: null,
+      failure: 'store_full',
+    })
+    expect((await h.manager.list()).map((row) => row.state)).toEqual(['disk-full'])
+  })
+
+  it('space back + retry -> ready (the recovery path is unchanged)', async () => {
+    const h = createHarness()
+    await fullDiskFirstDownload(h)
+    h.fs.failWrite = null
+    h.docs.beforeChunk = null
+    expect(await h.manager.downloadNow('doc_1')).toMatchObject({
+      kind: 'ok',
+      row: { state: 'ready', readyVersion: 1 },
+    })
+    expect(await h.manager.row('doc_1')).toMatchObject({ state: 'ready', readyVersion: 1 })
+    expect(await opened(h)).toMatchObject({ kind: 'ok' })
+  })
+
+  it('a held copy whose update-kept row cannot be written reads update-kept, old copy served', async () => {
+    const h = createHarness()
+    const { v1 } = await readyThenNewer(h)
+    h.docs.beforeChunk = () => {
+      h.fs.failWrite = () => true
+    }
+    expect(await h.manager.downloadNow('doc_1')).toMatchObject({
+      kind: 'ok',
+      row: { state: 'update-kept', readyVersion: 1 },
+    })
+    h.fs.failWrite = null
+    expect(await h.manager.row('doc_1')).toMatchObject({
+      state: 'update-kept',
+      readyVersion: 1,
+      failure: 'store_full',
+    })
+    expect(same((await opened(h)).bytes, v1.bytes)).toBe(true)
+  })
+})
+
 describe('G5-05 download: corrupt cache never ready', () => {
   it('main checksum mismatch on a first download -> corrupt, never ready', async () => {
     const h = createHarness()
