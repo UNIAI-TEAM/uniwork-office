@@ -578,4 +578,8 @@ export const ja = {
   appPrintFailedPdfHint:
     '印刷できませんでした: {error}。代わりにドキュメントを PDF として保存できます。',
   appPrintSaveAsPdf: 'PDF として保存…',
+  appFileSaveCopy: 'コピーとして保存…',
+  appCopySaved: 'あなたのバージョンを新しいドキュメントとして保存しました：{title}。',
+  appCopySaveFailed:
+    'コピーを作成できませんでした。変更は引き続き安全です。もう一度お試しください。',
 } satisfies Record<keyof typeof zh, string>

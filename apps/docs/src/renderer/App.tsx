@@ -2874,6 +2874,20 @@ export function App() {
     return printDocImpl(fileCtxRef.current)
   }, [])
 
+  // File > Save as a copy (web only): the locked-out tab's copy via the bridge's api.saveCopy.
+  // Feedback mirrors the conflict dialog's copy outcome — a status line naming the new title,
+  // an error toast on failure, silence on a host-side cancel.
+  const saveCopyDoc = useCallback(async () => {
+    if (typeof window.desktop.saveDocxCopy !== 'function') return
+    const r = await window.desktop.saveDocxCopy()
+    if (r.ok) {
+      setStatus(t('appCopySaved', { title: r.title }))
+      return
+    }
+    if (r.reason === 'cancelled') return
+    showToast(t('appCopySaveFailed'), 'error')
+  }, [])
+
   // for real-device verification: trigger export directly via CDP (same as __pageDebug)
   useEffect(() => {
     ;(window as unknown as Record<string, unknown>).__exportPdf = exportPdf
@@ -6876,6 +6890,7 @@ export function App() {
     onSave: () => void save(false),
     onSaveAs: () => void save(true),
     onExportPdf: () => void exportPdf(),
+    onSaveCopy: () => void saveCopyDoc(),
     onPrint: () => void printDoc(),
     onToggleAi: () => setShowAi((v) => !v),
     onSection: (next: SectionSettings) => {

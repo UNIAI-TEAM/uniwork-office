@@ -310,6 +310,9 @@ export interface DesktopCapabilities {
   save?: boolean
   /** File > Save As / Ctrl+Shift+S (web: only when the host grants `saveAs` and not in `readOnly` profile) */
   saveAs?: boolean
+  /** File > Save as a copy (web only): only when the host grants `saveCopy`, `save` is withheld, and
+   *  the profile is not `readOnly` — the one write a locked-out tab has. Hidden everywhere else. */
+  saveCopy?: boolean
   /** File > Print / Ctrl+P (web: only when the host grants `print`) */
   print?: boolean
   /** File > Export as PDF (web: only when the host grants `exportPdf`) */
@@ -535,6 +538,12 @@ export interface DesktopApi {
     passwordIntentPending?: boolean
     dataUrl?: string
   }>
+  /** web bridge only (UNI-1920, RFSH-5): File > Save as a copy on a locked-out tab — the host stores
+   *  the live document bytes as a NEW document ("<name> (copy)" title) without re-pointing the open
+   *  one. `reason: 'cancelled'` = the host's own flow was dismissed; other failures carry `error`. */
+  saveDocxCopy?(): Promise<
+    { ok: true; title: string } | { ok: false; error?: string; reason?: 'cancelled' }
+  >
   /** MCP-driven output: write the current document to an explicit absolute path
    *  with no dialog; refuses to replace an existing file unless overwrite is true */
   saveDocxTo(path: string, data: ArrayBuffer, overwrite: boolean): Promise<McpSaveResult>

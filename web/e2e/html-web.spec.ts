@@ -477,3 +477,103 @@ test('html: a phone shows the AI panel over the page and a status bar that fits'
   expect(clipped).toBe(false)
   await page.screenshot({ path: screenshotPath('html', 'narrow-390-light-en') })
 })
+
+// UNI-1920 (item B): Ctrl/Cmd+P with focus inside the HTML frame runs the module's print path —
+// the same one File > Print / the host `print` request take (htmlApi.printHtml over the static
+// copy) — instead of the browser's own dialog. Without the `print` grant nothing runs and the
+// key keeps its default.
+interface HtmlPrintArg {
+  html: string
+}
+
+/** the renderer calls window.htmlApi.printHtml(...) for every print; count and stub it — the real
+ * bridge opens the print iframe whose win.print() would block headless Chromium */
+const stubPrintHtml = (frame: Frame): Promise<void> =>
+  frame.evaluate(() => {
+    const w = window as unknown as {
+      htmlApi: { printHtml: (arg: HtmlPrintArg) => Promise<{ ok: boolean }> }
+      __prints: string[]
+    } // e2e: __prints records each print the module started
+    w.__prints = []
+    w.htmlApi.printHtml = async (arg) => {
+      w.__prints.push(arg.html)
+      return { ok: true }
+    }
+  })
+
+/** records whether each mod+P keydown kept its default: a document-capture listener runs after
+ * the accelerator's window-capture one, so e.defaultPrevented is already final */
+const watchCtrlP = (frame: Frame): Promise<void> =>
+  frame.evaluate(() => {
+    const w = window as unknown as { __ctrlPDefaultPrevented: boolean[] } // e2e scratch flag
+    w.__ctrlPDefaultPrevented = []
+    document.addEventListener(
+      'keydown',
+      (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p')
+          w.__ctrlPDefaultPrevented.push(e.defaultPrevented)
+      },
+      true,
+    )
+  })
+
+const ctrlPDefaults = (frame: Frame): Promise<boolean[]> =>
+  frame.evaluate(() => {
+    const w = window as unknown as { __ctrlPDefaultPrevented: boolean[] } // e2e scratch flag
+    return w.__ctrlPDefaultPrevented
+  })
+
+const prints = (frame: Frame): Promise<string[]> =>
+  frame.evaluate(() => {
+    const w = window as unknown as { __prints: string[] } // e2e print counter
+    return w.__prints
+  })
+
+test('html: Ctrl+P inside the frame runs the module print path once per press', async ({
+  page,
+}) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en' })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  await watchCtrlP(frame)
+
+  // focus inside the frame (the source editor): the keystroke belongs to the frame
+  await view(frame, /^Source$/, 'source')
+  await frame.locator('.cm-content').click()
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(1)
+  // a second press runs the path once more — never twice per press
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(2)
+  expect(await ctrlPDefaults(frame), 'both presses claimed (browser default prevented)').toEqual([
+    true,
+    true,
+  ])
+  // the module printed the document: the serialized page reached htmlApi.printHtml
+  expect((await prints(frame))[0]).toContain('UniWork HTML web fixture')
+  await expectClean(page, frame, problems)
+})
+
+test('html: Ctrl+P without the print grant runs nothing and keeps the browser default', async ({
+  page,
+}) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', {
+    open: PAGE_PATH,
+    lang: 'en',
+    noprint: '1',
+  })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  await watchCtrlP(frame)
+  await view(frame, /^Source$/, 'source')
+  await frame.locator('.cm-content').click()
+  await page.keyboard.press('Control+p')
+  await page.waitForTimeout(500)
+  expect(await prints(frame), 'no print grant -> the module print path never ran').toEqual([])
+  expect(await ctrlPDefaults(frame), 'the press was not claimed').toEqual([false])
+  await expectClean(page, frame, problems)
+})

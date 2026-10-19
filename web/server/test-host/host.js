@@ -13,6 +13,13 @@
 //        name starting with "gone" is left out; the requests are kept (__host.resolves()) (UNI-1232 A1b)
 //        &desktopopen=1 (or &desktopOpen=1) grants `desktopOpen` (A7): the frame's "Open in app" sends `app.open`,
 //        kept in __host.appOpens() and answered &appOpen=<launched|installer|unavailable> (default launched)
+//        &saveCopy=1 grants `saveCopy` and answers api.saveCopy (the calls are in
+//        __host.saveCopies() as {name, bytes} — the byte count) with a new document id;
+//        readonly=1&saveCopy=1 models a locked-out editor (save withheld, saveCopy granted,
+//        no profile): File > Save as a copy… (UNI-1920, RFSH-5)
+//        &profile=readOnly sends init.profile: 'readOnly' (a readOnly-profile viewer never gets
+//        saveCopy, even granted); &noprint=1 withholds the `print` grant (Ctrl/Cmd+P keeps the
+//        browser default)
 //
 // module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
 // the site root, as before), `init.module` names the module, and the host refuses a frame whose
@@ -42,6 +49,8 @@
 //   addFile(url)     -> fetch a fixture into the store, resolves with its meta (GO-B4)
 //   queuePick(id)    -> the next file.pick answers this file (nothing queued = the user cancelled);
 //                       file.pick is granted with ?pick=1
+//   saveCopies()     -> the api.saveCopy requests so far ({name, bytes: byteLength}), granted
+//                       with ?saveCopy=1 (UNI-1920, RFSH-5)
 //   newSessionKey()  -> replace the persisted recovery key by a new one (the old drafts stay but cannot be
 //                       read any more); the next init carries it
 //   signOut()        -> delete the whole frame-drafts database (what the real host does on sign-out)
@@ -65,6 +74,7 @@ const events = []
 const uploads = [] // api.images.upload requests: {fileId, name, mimeType, bytes}
 const downloads = [] // api.download requests: {bytes}
 const appOpens = [] // app.open requests: {feature}
+const saveCopies = [] // api.saveCopy requests: {name, bytes: byteLength}
 const resolves = [] // api.assets.resolve requests: {fileId, paths}
 const picks = [] // fileIds the next file.pick requests answer, in order
 const pending = new Map() // id -> {resolve, reject}
@@ -134,6 +144,12 @@ const handlers = {
     const meta = put(name, new Uint8Array(data))
     lastSaved = { ...meta, bytes: new Uint8Array(data) }
     return { ok: true, file: meta, versionId: meta.versionId }
+  },
+  // locked-out editor ("Save as a copy…", UNI-1920): a new document, no re-point of the open one
+  'api.saveCopy': ({ name, data }) => {
+    saveCopies.push({ name, bytes: new Uint8Array(data).byteLength })
+    const meta = put(name, new Uint8Array(data))
+    return { documentId: meta.fileId, title: name }
   },
   'api.recents': ({ limit }) => ({
     files: [...files.values()]
@@ -261,6 +277,9 @@ const initPayload = {
   ...(MODULE !== 'docs' ? { module: MODULE, user: { displayName: 'Test User' } } : {}),
 }
 if (params.get('readonly') === '1') delete initPayload.capabilities.save
+if (params.get('saveCopy') === '1') initPayload.capabilities.saveCopy = true
+if (params.get('noprint') === '1') delete initPayload.capabilities.print
+if (params.get('profile') === 'readOnly') initPayload.profile = 'readOnly'
 // ai=1: grant the web AI (CONTRACT C16) and its cloud tools; the frame then calls the fake
 // frame-token AI routes of web/server/fake-ai.mjs. Absent = no AI grant (AI hidden, as before).
 if (params.get('ai') === '1') {
@@ -374,6 +393,7 @@ async function boot() {
     uploads: () => uploads.map((u) => ({ ...u })),
     downloads: () => downloads.map((d) => ({ ...d })),
     appOpens: () => appOpens.map((a) => ({ ...a })),
+    saveCopies: () => saveCopies.map((c) => ({ ...c })),
     resolves: () => resolves.map((r) => ({ ...r })),
     events,
     files: () => [...files.values()].map((f) => ({ ...f.meta, size: f.bytes.byteLength })),

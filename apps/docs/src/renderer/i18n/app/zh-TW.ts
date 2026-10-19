@@ -531,4 +531,7 @@ export const zhTW = {
   appPrintNoPrinter: '這台電腦沒有可用的印表機。可以改為將文件儲存為 PDF。',
   appPrintFailedPdfHint: '列印沒有成功:{error}。可以改為將文件儲存為 PDF。',
   appPrintSaveAsPdf: '另存為 PDF…',
+  appFileSaveCopy: '另存為副本…',
+  appCopySaved: '你的版本已另存為新文件：{title}。',
+  appCopySaveFailed: '無法建立副本。你的變更仍然安全；請重試。',
 } satisfies Record<keyof typeof zh, string>
