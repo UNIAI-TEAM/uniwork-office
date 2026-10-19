@@ -613,4 +613,32 @@ describe('edited mark + history gate (UNI-1970 B)', () => {
   })
 })
 
+describe('reply layout + action row (UNI-1970 C/D)', () => {
+  it('replies sit under one left rule; per-reply border/card padding gone; body indents', async () => {
+    const src = fakeSource(
+      list([cm({ id: 'a' }), cm({ id: 'r', parent_id: 'a' }), cm({ id: 'r2', parent_id: 'a' })]),
+    )
+    await mount(src)
+    // the rule lives on the list, web: ul = ml-7 mr-3 space-y-1 border-l pl-3
+    expect(cssRule('.collab-replies')).toMatch(/border-left:\s*1px solid var\(--border\)/)
+    const reply = cssRule('.collab-cm--reply')
+    expect(reply).not.toMatch(/border-left/)
+    expect(reply).not.toMatch(/margin-left/)
+    expect(reply).toMatch(/padding:\s*4px 0/)
+    // web pl-10 root / pl-8 reply: the body column indents under the author name
+    expect(cssRule('.collab-cm-indent')).toMatch(/padding-left:\s*40px/)
+    expect(cssRule('.collab-cm--reply .collab-cm-indent')).toMatch(/padding-left:\s*32px/)
+    const rc = $('[data-comment-id="r"]')!
+    expect(rc.querySelector(':scope > .collab-cm-indent .collab-bd')).not.toBeNull()
+    expect(rc.querySelector(':scope > .collab-cm-indent .collab-acts')).not.toBeNull()
+  })
+
+  it('the action row matches the web compact spacing (mt-1 -ml-2)', () => {
+    const acts = cssRule('.collab-acts')
+    expect(acts).toMatch(/margin-top:\s*1px/)
+    expect(acts).toMatch(/margin-left:\s*-8px/)
+  })
+})
+
+
 

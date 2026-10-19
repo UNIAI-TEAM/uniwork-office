@@ -389,14 +389,16 @@
   padding: 4px 12px 8px;
 }
 
-.collab-cm + .collab-cm {
-  border-top: 1px solid var(--border);
-}
-
+/* replies sit under one thin left rule inside the thread card; per-reply border/padding stay off */
 .collab-replies {
   list-style: none;
-  margin: 0;
-  padding: 0;
+  margin: 0 12px 8px 28px;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--border);
+}
+
+.collab-replies li + li {
+  margin-top: 4px;
 }
 
 .collab-replies[hidden] {
@@ -404,9 +406,16 @@
 }
 
 .collab-cm--reply {
-  margin-left: 14px;
-  padding-left: 10px;
-  border-left: 2px solid var(--border);
+  padding: 4px 0;
+}
+
+/* the body column indents under the author name (web pl-10); a reply's avatar is 8px narrower */
+.collab-cm-indent {
+  padding-left: 40px;
+}
+
+.collab-cm--reply .collab-cm-indent {
+  padding-left: 32px;
 }
 
 .collab-cmh {
@@ -498,7 +507,8 @@ h3.collab-cmh {
   flex-wrap: nowrap;
   align-items: center;
   gap: 0 2px;
-  margin-top: 2px;
+  margin-top: 1px;
+  margin-left: -8px;
 }
 
 .collab-acts .collab-link {

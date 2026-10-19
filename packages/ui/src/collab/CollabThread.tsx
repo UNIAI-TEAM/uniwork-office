@@ -739,88 +739,92 @@ function CollabThreadImpl(p: CollabThreadProps) {
         ) : (
           <div className="collab-cmh">{headRow}</div>
         )}
-        {!deleted &&
-          (editing === c.id ? (
-            <EditBox
-              initial={c.body}
-              strings={strings}
-              onSave={async (body) => {
-                setFailed(false)
-                try {
-                  await actions.edit(c.id, body)
+        {!deleted && (
+          /* everything below the head row indents under the author name: web pl-10 root / pl-8 reply */
+          <div className="collab-cm-indent">
+            {editing === c.id ? (
+              <EditBox
+                initial={c.body}
+                strings={strings}
+                onSave={async (body) => {
+                  setFailed(false)
+                  try {
+                    await actions.edit(c.id, body)
+                    setEditing(null)
+                    restore(c.id)
+                  } catch {
+                    setFailed(true)
+                  }
+                }}
+                onClose={() => {
                   setEditing(null)
                   restore(c.id)
-                } catch {
-                  setFailed(true)
-                }
-              }}
-              onClose={() => {
-                setEditing(null)
-                restore(c.id)
-              }}
-            />
-          ) : (
-            <div className="collab-bd">{renderBody(c, mentions)}</div>
-          ))}
-        {!deleted && editing !== c.id && (
-          <div className="collab-acts">
-            {can.canWrite && !thread.deleted && p.renderComposer && (
-              <button
-                ref={isRoot ? replyBtnRef : undefined}
-                type="button"
-                className="collab-link"
-                onClick={() => setReplyOpen(true)}
-              >
-                {strings.collabReply}
-              </button>
-            )}
-            {isRoot && comment && root.anchor && p.adapter && thread.anchorState !== 'lost' && (
-              <button
-                type="button"
-                className="collab-link"
-                onClick={() => p.adapter?.goTo(root.anchor!)}
-              >
-                {strings.collabGoToAnchor}
-              </button>
-            )}
-            <ActionsMenu
-              label={strings.collabActions ?? ''}
-              items={menuItems}
-              buttonRef={menuRef}
-            />
-            {isRoot && can.canResolve(root) && (
-              <button
-                type="button"
-                className="collab-link collab-resolve"
-                data-resolve-for={root.id}
-                onClick={() => {
-                  p.onKeepFocus?.(root.id)
-                  void run(() =>
-                    thread.resolved ? actions.reopen(root.id) : actions.resolve(root.id),
-                  )
                 }}
-              >
-                {thread.resolved ? strings.collabReopen : strings.collabResolve}
-              </button>
+              />
+            ) : (
+              <div className="collab-bd">{renderBody(c, mentions)}</div>
+            )}
+            {editing !== c.id && (
+              <div className="collab-acts">
+                {can.canWrite && !thread.deleted && p.renderComposer && (
+                  <button
+                    ref={isRoot ? replyBtnRef : undefined}
+                    type="button"
+                    className="collab-link"
+                    onClick={() => setReplyOpen(true)}
+                  >
+                    {strings.collabReply}
+                  </button>
+                )}
+                {isRoot && comment && root.anchor && p.adapter && thread.anchorState !== 'lost' && (
+                  <button
+                    type="button"
+                    className="collab-link"
+                    onClick={() => p.adapter?.goTo(root.anchor!)}
+                  >
+                    {strings.collabGoToAnchor}
+                  </button>
+                )}
+                <ActionsMenu
+                  label={strings.collabActions ?? ''}
+                  items={menuItems}
+                  buttonRef={menuRef}
+                />
+                {isRoot && can.canResolve(root) && (
+                  <button
+                    type="button"
+                    className="collab-link collab-resolve"
+                    data-resolve-for={root.id}
+                    onClick={() => {
+                      p.onKeepFocus?.(root.id)
+                      void run(() =>
+                        thread.resolved ? actions.reopen(root.id) : actions.resolve(root.id),
+                      )
+                    }}
+                  >
+                    {thread.resolved ? strings.collabReopen : strings.collabResolve}
+                  </button>
+                )}
+              </div>
+            )}
+            {edited && historyFor === c.id && (
+              <History
+                comment={c}
+                strings={strings}
+                lang={host.lang}
+                load={() => actions.history(c.id)}
+                nameOf={revisionName(c)}
+                renderBody={renderBody}
+                mentions={mentions}
+                formatTime={fmt}
+                onClose={() => {
+                  setHistoryFor(null)
+                  restore(c.id)
+                }}
+                onDeleted={() => setHistoryFor(null)}
+              />
             )}
           </div>
-        )}
-        {edited && historyFor === c.id && (
-          <History
-            comment={c}
-            strings={strings}
-            lang={host.lang}
-            load={() => actions.history(c.id)}
-            nameOf={revisionName(c)}
-            renderBody={renderBody}
-            mentions={mentions}
-            formatTime={fmt}
-            onClose={() => {
-              setHistoryFor(null)
-              restore(c.id)
-            }}
-            onDeleted={() => setHistoryFor(null)}
-          />
         )}
         {deleting === c.id && (
           <CollabConfirmDialog
