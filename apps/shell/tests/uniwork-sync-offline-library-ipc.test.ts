@@ -168,6 +168,104 @@ describe('G5-05u B4 offlinePin', () => {
   })
 })
 
+describe('FUSR-R4-3 (UNI-1362): stopping the unlisted row’s transfer for a discard does not answer the pin', () => {
+  const MiB = 1024 * 1024
+
+  /**
+   * An unlisted row (the first pin's reservation row was written, then a
+   * boundary that wipes nothing passed before the index entry) with a fresh
+   * downloadNow held on its second chunk.
+   */
+  async function orphanWithHeldTransfer(b: Bridge) {
+    const { h } = b
+    const doc = addDoc(h, 'doc_1', 1, 4096)
+    h.docs.chunkSize = 1024
+    const written = Promise.withResolvers<void>()
+    const cut = Promise.withResolvers<void>()
+    const real = h.store.putPin.bind(h.store)
+    let armed = true
+    h.store.putPin = async (record) => {
+      const result = await real(record)
+      if (armed) {
+        armed = false
+        written.resolve()
+        await cut.promise
+      }
+      return result
+    }
+    const pinning = h.manager.pin({ documentId: 'doc_1', orgId: ORG, workspaceId: WS })
+    await written.promise
+    h.manager.lockBoundary()
+    cut.resolve()
+    expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+    h.store.putPin = real
+    expect((await h.store.getPin('doc_1')).kind).toBe('ok')
+    const slow = slowDownload(h, 'doc_1', 1)
+    const downloading = h.manager.downloadNow('doc_1')
+    await slow.waiting
+    return { doc, slow, downloading }
+  }
+
+  async function expectNothingPinned(h: Harness) {
+    expect(await h.manager.row('doc_1')).toBeNull()
+    const index = await h.store.readIndex()
+    expect(index.kind === 'ok' && index.index.pins).toEqual([])
+    // no row, no staging, no copy: only the index record is left
+    expect(h.storeFiles()).toHaveLength(1)
+  }
+
+  it('a replacement refused as too_large is reported as refused, not accepted by the stopped transfer', async () => {
+    const b = wiredBridge()
+    const { doc, slow, downloading } = await orphanWithHeldTransfer(b)
+    // the head grew past the single-file limit; the held stream is untouched
+    doc.declaredSize = 256 * MiB + 1
+    const pinning = pin(b)
+    await flushTasks()
+    slow.release()
+    expect(await pinning).toEqual({ ok: false, code: 'too_large' })
+    await downloading
+    await expectNothingPinned(b.h)
+  })
+
+  it('a replacement refused over the byte quota is reported offline_cap_reached', async () => {
+    const b = wiredBridge({ limits: { maxBytes: 8192 } })
+    const { doc, slow, downloading } = await orphanWithHeldTransfer(b)
+    doc.declaredSize = 8193
+    const pinning = pin(b)
+    await flushTasks()
+    slow.release()
+    expect(await pinning).toMatchObject({ ok: false, code: 'offline_cap_reached' })
+    await downloading
+    await expectNothingPinned(b.h)
+  })
+
+  it('an accepted replacement is still answered ok at its own acceptance, with one transfer that commits ready', async () => {
+    const b = wiredBridge()
+    const { slow, downloading } = await orphanWithHeldTransfer(b)
+    const pinning = pin(b)
+    await flushTasks()
+    slow.release()
+    expect(await pinning).toEqual({ ok: true })
+    await downloading
+    await flushTasks()
+    // the stopped transfer and the replacement: no third
+    expect(b.h.docs.downloads).toEqual(['doc_1@1', 'doc_1@1'])
+    expect(await b.h.manager.row('doc_1')).toMatchObject({ state: 'ready' })
+    expect((await b.h.manager.openCached('doc_1')).kind).toBe('ok')
+  })
+
+  it('an ordinary cancel of the same transfer still publishes, so a pin that races it is answered', async () => {
+    const b = wiredBridge()
+    const { slow, downloading } = await orphanWithHeldTransfer(b)
+    const notices = vi.spyOn(b.api, 'rowChanged')
+    expect(b.h.manager.cancel('doc_1')).toBe(true)
+    slow.release()
+    await downloading
+    expect(notices).toHaveBeenCalledWith('doc_1')
+    expect(await b.h.manager.row('doc_1')).toMatchObject({ state: 'interrupted' })
+  })
+})
+
 describe('G5-05u B4 offlineUnpin / offlineCancel / offlineDownloadNow', () => {
   it('needs_confirm while the document has local work, then unpins when confirmed', async () => {
     const h = createHarness()

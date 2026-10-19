@@ -1534,6 +1534,56 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
         expect(h.storeFiles()).toHaveLength(filesOfReadyPins(1))
       })
 
+      describe('FUSR-R4-3: a transfer stopped for a discard is silent', () => {
+        /** an unlisted row with a fresh downloadNow held on its second chunk */
+        async function heldOrphanTransfer(onChange: (documentId: string) => void) {
+          const h = createHarness({ onChange })
+          const doc = addDoc(h, 'doc_1', 1)
+          await abortReservation(h, [])
+          const hold = slowDownload(h, 'doc_1', 1)
+          const downloading = h.manager.downloadNow('doc_1')
+          await hold.waiting
+          return { h, doc, hold, downloading }
+        }
+
+        it('writes no row, announces nothing and leaves no staging while the discarding pin stops it', async () => {
+          const notices: string[] = []
+          const { h, doc, hold, downloading } = await heldOrphanTransfer((id) => notices.push(id))
+          // the replacement is refused before it writes anything: every row write or
+          // notice from here on is the stopped transfer's
+          doc.declaredSize = 256 * MiB + 1
+          const rows: PinRecord[] = []
+          const real = h.store.putPin.bind(h.store)
+          h.store.putPin = (record) => {
+            rows.push(record)
+            return real(record)
+          }
+          notices.length = 0
+          const pinning = pinDoc(h)
+          await flush()
+          hold.release()
+          expect(await pinning).toEqual({ kind: 'refused', code: 'too_large' })
+          await downloading
+          expect(rows).toEqual([])
+          expect(notices).toEqual([])
+          expect(h.manager.cancel('doc_1')).toBe(false)
+          expect(await h.manager.row('doc_1')).toBeNull()
+          expect(h.storeFiles()).toHaveLength(1)
+        })
+
+        it('an ordinary cancel of the same transfer still settles interrupted and announces it', async () => {
+          const notices: string[] = []
+          const { h, hold, downloading } = await heldOrphanTransfer((id) => notices.push(id))
+          notices.length = 0
+          expect(h.manager.cancel('doc_1')).toBe(true)
+          hold.release()
+          await downloading
+          expect(notices).toContain('doc_1')
+          const stored = await h.store.getPin('doc_1')
+          expect(stored.kind === 'ok' && stored.record.state).toBe('interrupted')
+        })
+      })
+
       it('FUSR-R4-1: the settled state a full disk kept in memory for the discarded row does not outlive it', async () => {
         const h = createHarness()
         addDoc(h, 'doc_1', 1)
