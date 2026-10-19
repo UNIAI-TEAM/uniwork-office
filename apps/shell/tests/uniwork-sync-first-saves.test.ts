@@ -89,6 +89,32 @@ describe('createFirstSaveStore', () => {
     expect(await store.get('k')).toBeNull()
   })
 
+  it('removes the records naming one document, in this account only (archive ends them)', async () => {
+    const layer = makeLayer()
+    const opened = await layer.open(SCOPE)
+    const other = await layer.open({ deploymentId: 'dep_1', accountId: 'acc_2' })
+    if (opened.kind !== 'ok' || other.kind !== 'ok') throw new Error('store did not open')
+    const store = createFirstSaveStore(opened.store.records(FIRST_SAVES_STORE_REGISTRATION.name))
+    const otherStore = createFirstSaveStore(
+      other.store.records(FIRST_SAVES_STORE_REGISTRATION.name),
+    )
+    await store.put('k1', bound())
+    await store.put('k2', bound({ documentId: 'doc_2' }))
+    // one document first-saved from two originals, and a pending record (no document yet)
+    await store.put('k3', bound())
+    await store.put('k4', pending())
+    await otherStore.put('k1', bound())
+
+    expect(await store.removeForDocument('doc_1')).toBe(2)
+
+    expect(await store.get('k1')).toBeNull()
+    expect(await store.get('k3')).toBeNull()
+    expect(await store.get('k2')).toEqual(bound({ documentId: 'doc_2' }))
+    expect(await store.get('k4')).toEqual(pending())
+    expect(await otherStore.get('k1')).toEqual(bound())
+    expect(await store.removeForDocument('doc_1')).toBe(0)
+  })
+
   it('drops a record this build cannot act on instead of guessing', async () => {
     const layer = makeLayer()
     const opened = await layer.open(SCOPE)
