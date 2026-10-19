@@ -22,6 +22,8 @@ import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
  *   the existing ensure (the same call the old sub-nav row made).
  * - The folder card's "…" sits inside the card, as a sibling of the card button;
  *   on coarse pointers its 44px target gets room on the card too.
+ * - Item 4: the toolbar row carries no "saves to My Folder" notice in any sub-view;
+ *   Tạo mới / Tải lên / Tạo nhanh still target My Folder exactly as before.
  */
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -115,6 +117,28 @@ describe('UNI-1957 Documents parity', () => {
         }),
       ),
       uniworkListDocuments: vi.fn(async () => ok({ documents: [], nextCursor: null })),
+      uniworkListSharedWithMe: vi.fn(async () => ok({ documents: [], nextCursor: null })),
+      uniworkListSharedByMe: vi.fn(async () => ok({ documents: [], nextCursor: null })),
+      uniworkListTrash: vi.fn(async () => ok({ documents: [], nextCursor: null })),
+      uniworkCreateDocument: vi.fn(async (input: { name: string; format: string }) =>
+        ok({
+          id: 'new-1',
+          workspaceId: 'ws-1',
+          title: `${input.name}.${input.format}`,
+          format: input.format,
+          updatedAt: '2026-10-19T10:00:00.000Z',
+        }),
+      ),
+      uniworkPickUploadFile: vi.fn(async () => ({ path: '/home/me/Q3.xlsx', name: 'Q3.xlsx' })),
+      uniworkUploadDocument: vi.fn(async () =>
+        ok({
+          id: 'up-1',
+          workspaceId: 'ws-1',
+          title: 'Q3.xlsx',
+          format: 'xlsx',
+          updatedAt: '2026-10-19T10:00:00.000Z',
+        }),
+      ),
       uniworkSearchDocuments: vi.fn(async () => ok({ items: [], nextCursor: null })),
       onUniworkTreeChanged: vi.fn(() => () => {}),
       onUniworkDocRenamed: vi.fn(() => () => {}),
@@ -226,6 +250,120 @@ describe('UNI-1957 Documents parity', () => {
       const open = coarse.match(/\.dh-folder-open\s*\{([^}]*)\}/)?.[1] ?? ''
       const pad = open.match(/padding-right:\s*(\d+)px/)?.[1]
       expect(Number(pad ?? 0)).toBeGreaterThanOrEqual(56)
+    })
+  })
+
+  describe('item 4: no My Folder notice on the toolbar row', () => {
+    const click = async (el: Element) => {
+      await act(async () => {
+        ;(el as HTMLElement).click()
+      })
+      await flush()
+    }
+    const NOTICE_VI = [
+      'chỉ bạn thấy',
+      'Tạo mới và tải lên ở trang này vào',
+      'Chia sẻ hoặc Di chuyển',
+    ]
+
+    const expectNoNotice = () => {
+      expect(host.querySelector('.dh-quick-hint')).toBeNull()
+      expect(host.querySelector('.dh-quick-hint-link')).toBeNull()
+      expect(host.querySelector('.dh-quick-hint-icon')).toBeNull()
+      const row = host.querySelector<HTMLElement>('.dh-quick-row')
+      if (row) {
+        // the label and the three format pills, nothing else: no lock glyph, no link
+        expect(Array.from(row.children).map((el) => el.tagName)).toEqual([
+          'SPAN',
+          'BUTTON',
+          'BUTTON',
+          'BUTTON',
+        ])
+        expect(row.querySelector('[data-quick-format]')).not.toBeNull()
+      }
+      for (const text of NOTICE_VI) expect(host.textContent).not.toContain(text)
+    }
+
+    it('is absent in every sub-view', async () => {
+      await mount()
+      expectNoNotice()
+      const nav = (id: string) =>
+        sidebarSlot.querySelector<HTMLElement>(`.home-area-nav .nav-item[data-nav="${id}"]`)!
+      for (const id of ['recent', 'shared-with-me', 'shared-by-me', 'trash', 'workspace']) {
+        await click(nav(id))
+        expectNoNotice()
+      }
+      // My Folder is the tree row now
+      const treeRow = myFolderTitles()[0]!.closest<HTMLElement>('[role="treeitem"]')!
+      await click(treeRow)
+      expect(host.querySelector('.dh-subview-banner')).not.toBeNull()
+      expectNoNotice()
+    })
+
+    const dialog = () => document.querySelector<HTMLElement>('.modal.uw-act')!
+    const setName = async (value: string) => {
+      const input = dialog().querySelector<HTMLInputElement>('input[type="text"]')!
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+        setter.call(input, value)
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      await flush()
+    }
+    const byText = (root: ParentNode, text: string) =>
+      Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
+        (b) => b.textContent?.trim() === text,
+      )!
+
+    const views: Array<[string, (() => Promise<void>) | null]> = [
+      ['workspace root', null],
+      [
+        'recent',
+        async () =>
+          click(sidebarSlot.querySelector('.home-area-nav .nav-item[data-nav="recent"]')!),
+      ],
+      [
+        'shared-with-me',
+        async () =>
+          click(sidebarSlot.querySelector('.home-area-nav .nav-item[data-nav="shared-with-me"]')!),
+      ],
+      [
+        'my-folder',
+        async () => click(myFolderTitles()[0]!.closest<HTMLElement>('[role="treeitem"]')!),
+      ],
+    ]
+
+    it.each(views)('Tạo nhanh in %s still creates in My Folder', async (_name, go) => {
+      await mount()
+      if (go) await go()
+      await click(host.querySelector('.dh-quick-row [data-quick-format="docx"]')!)
+      expect(dialog().querySelector('.uwf-location-btn')?.textContent).toContain(MY_FOLDER)
+      await setName('Plan')
+      await click(byText(dialog(), 'Tạo'))
+      expect(api.uniworkCreateDocument).toHaveBeenCalledTimes(1)
+      expect(api.uniworkCreateDocument).toHaveBeenCalledWith({
+        workspaceId: 'ws-1',
+        folderId: 'f-mine',
+        name: 'Plan.docx',
+        format: 'docx',
+      })
+    })
+
+    it.each(views)('Tải lên in %s still uploads into My Folder', async (_name, go) => {
+      await mount()
+      if (go) await go()
+      await click(byText(host, 'Tải lên'))
+      expect(dialog().querySelector('.uwf-location-btn')?.textContent).toContain(MY_FOLDER)
+      await click(byText(dialog(), 'Chọn tệp'))
+      await click(dialog().querySelector('.btn-primary')!)
+      expect(api.uniworkUploadDocument).toHaveBeenCalledTimes(1)
+      expect(api.uniworkUploadDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspaceId: 'ws-1',
+          folderId: 'f-mine',
+          path: '/home/me/Q3.xlsx',
+        }),
+      )
     })
   })
 })
