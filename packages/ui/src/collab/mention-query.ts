@@ -259,3 +259,54 @@ export function pickMention(
     caret: out.caret,
   }
 }
+
+interface UniqueLabelEntry {
+  userId: string
+  label: string
+  email?: string
+}
+
+const labelKey = (label: string) =>
+  label
+    .replace(/[\]\n\r]/g, ' ')
+    .trim()
+    .toLowerCase()
+
+/** Append ` (suffix)` to every label two or more entries share (labels compare case-insensitively). */
+function suffixSharedLabels(
+  entries: UniqueLabelEntry[],
+  suffix: (e: UniqueLabelEntry) => string,
+): void {
+  const counts = new Map<string, number>()
+  for (const e of entries) counts.set(labelKey(e.label), (counts.get(labelKey(e.label)) ?? 0) + 1)
+  for (const e of entries) {
+    if ((counts.get(labelKey(e.label)) ?? 0) > 1) e.label = `${e.label} (${suffix(e)})`
+  }
+}
+
+/**
+ * The label a picked person gets (web `withUniqueLabel`, 302a45d4f on `chat-mention-utils`):
+ * when someone else already in the doc goes by the same name, the label gains chat's
+ * suffix — the email local part, then the user id when that still collides — so `@Name`
+ * spells one person. The same person twice (same id) keeps the plain label.
+ */
+export function uniqueMentionLabel(
+  candidate: { user_id: string; display_name: string; email?: string },
+  doc: MentionDoc,
+): string {
+  const base = candidate.display_name || candidate.user_id
+  const list: UniqueLabelEntry[] = [
+    ...doc.ranges
+      .filter((r) => r.id.toUpperCase() !== candidate.user_id.toUpperCase())
+      .map((r) => ({ userId: r.id, label: r.label || r.id })),
+    {
+      userId: candidate.user_id,
+      label: base,
+      ...(candidate.email ? { email: candidate.email } : {}),
+    },
+  ]
+  const suffix = (e: UniqueLabelEntry) => e.email?.split('@')[0]?.trim() || e.userId
+  suffixSharedLabels(list, suffix)
+  suffixSharedLabels(list, (e) => e.userId)
+  return list[list.length - 1]!.label
+}

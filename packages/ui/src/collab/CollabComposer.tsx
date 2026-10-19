@@ -49,6 +49,7 @@ import {
   mentionDocFromBody,
   mentionDocToBody,
   pickMention,
+  uniqueMentionLabel,
 } from './mention-query'
 import { toCollabError, type CollabHostState, type CollabSource } from './types'
 
@@ -230,7 +231,9 @@ export function CollabComposer(props: CollabComposerProps) {
     const at = taRef.current?.selectionStart ?? caret
     const t = findMentionTrigger(text, at)
     if (!t) return
-    const { user_id: id, display_name: label, can_view: canView } = row.candidate
+    const { user_id: id, can_view: canView } = row.candidate
+    // another person in the draft may share this name: the label takes the web's suffix
+    const label = uniqueMentionLabel(row.candidate, doc)
     const out = pickMention(doc, t, at, {
       id,
       label,

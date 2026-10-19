@@ -45,6 +45,7 @@ export const ms = {
   collabDeleteConfirm: 'Padam secara kekal',
   collabDeleted: 'Kandungan ini telah dipadam',
   collabEdited: 'Disunting · {time}',
+  collabEditedMark: '(disunting)',
   collabFormerMember: 'Bekas ahli',
   collabHistory: 'Lihat sejarah suntingan',
   collabHistoryTitle: 'Sejarah suntingan',

@@ -44,6 +44,7 @@ export const ar = {
   collabDeleteConfirm: 'حذف نهائي',
   collabDeleted: 'تم حذف هذا المحتوى',
   collabEdited: 'تم التعديل · {time}',
+  collabEditedMark: '(تم التعديل)',
   collabFormerMember: 'عضو سابق',
   collabHistory: 'عرض سجل التعديلات',
   collabHistoryTitle: 'سجل التعديلات',
