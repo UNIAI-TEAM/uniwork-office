@@ -1282,15 +1282,20 @@ describe('UNI-1959 a pending first-save ask is local unsent work', () => {
   /**
    * The module seam: a requested Save writes what the editor still holds
    * (`editorBytes`) and fires the user-save hook, as a tab's module does. Each
-   * call's landing is a promise the test awaits (no wall-clock wait).
+   * call's landing is a promise the test awaits (no wall-clock wait); with a
+   * `gate` the write waits on it, so a test can read the chip in between.
    */
-  function moduleSaves(h: Harness, editorBytes: Uint8Array): Array<Promise<void>> {
+  function moduleSaves(
+    h: Harness,
+    editorBytes: Uint8Array,
+    gate: Promise<void> = Promise.resolve(),
+  ): Array<Promise<void>> {
     const landed: Array<Promise<void>> = []
     const deps = (h.service as unknown as { deps: { requestModuleSave: ReturnType<typeof vi.fn> } })
       .deps
     deps.requestModuleSave.mockImplementation((path: string) => {
       landed.push(
-        Promise.resolve().then(() => {
+        gate.then(() => {
           writeFileSync(path, editorBytes)
           h.service.onUserSave(path)
         }),
@@ -1315,7 +1320,8 @@ describe('UNI-1959 a pending first-save ask is local unsent work', () => {
 
   it('UWNM-BE-R3-1: a first Save landing inside the reload write is saved again over the restored base; continue meets the version conflict', async () => {
     const { h, asked, answer } = blankCopy()
-    const resaves = moduleSaves(h, UNSENT)
+    let releaseResave!: () => void
+    const resaves = moduleSaves(h, UNSENT, new Promise((resolve) => (releaseResave = resolve)))
     // PROBE-c: the module's Save lands after the reload read the previous bytes
     // but before its own write replaces the file, so the head lands over it
     const store = (h.service as unknown as { store: BindingStore }).store
@@ -1326,6 +1332,8 @@ describe('UNI-1959 a pending first-save ask is local unsent work', () => {
         saved = true
         writeFileSync(docPath(), UNSENT)
         h.service.onUserSave(docPath())
+        // the editor's next poll reports it clean: it believes the Save is done
+        h.service.noteEditorDirty(docPath(), false)
       }
       return realWrite(target, filename, bytes)
     }
@@ -1335,6 +1343,10 @@ describe('UNI-1959 a pending first-save ask is local unsent work', () => {
     expect(saved).toBe(true)
     // the person's bytes were only in the editor: the module is asked to write them again
     await vi.waitFor(() => expect(resaves).toHaveLength(1))
+    // until that write lands the disk holds the base bytes: the chip still reads unsent work
+    expect(Buffer.from(copyBytes()).toString()).toBe('working copy bytes')
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+    releaseResave()
     await resaves[0]
     expect(asked).toHaveLength(1)
     expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
