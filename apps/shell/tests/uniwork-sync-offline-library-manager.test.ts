@@ -1612,6 +1612,89 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
           expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
         })
 
+        it("FUPS-R1-2: a boundary crossed while the stop is pending leaves the next account's blobs at the job's keys alone and recreates nothing of the old scope", async () => {
+          const notices: string[] = []
+          const { h, hold, downloading } = await heldOrphanTransfer((id) => notices.push(id))
+          const orphan = await h.store.getPin('doc_1')
+          const keys = orphan.kind === 'ok' ? (orphan.record.staging?.keys ?? []) : []
+          expect(keys).toHaveLength(1)
+          const pinning = pinDoc(h)
+          await flush()
+          // the stop is pending: the transfer is silenced and aborted, held in its stream
+          await lockAndWipeOutgoing(h)
+          switchTo(h, SCOPE_B, 'sess_B1')
+          for (const key of keys) {
+            expect((await h.store.putBlob(key, plaintext('b-owned', 64))).kind).toBe('ok')
+          }
+          const snapshot = () =>
+            new Map(filesOf(h, SCOPE_B).map((path) => [path, Buffer.from(h.fs.files.get(path)!)]))
+          const before = snapshot()
+          expect(before.size).toBe(keys.length)
+          notices.length = 0
+          hold.release()
+          expect(await pinning).toEqual(interrupted)
+          await downloading
+          expect(snapshot()).toEqual(before)
+          expect(filesOf(h, SCOPE)).toEqual([])
+          expect(notices).toEqual([])
+        })
+
+        it("FUPS-R1-2: a boundary crossed after the stop's first key deletion completed deletes no further key under the next account", async () => {
+          const notices: string[] = []
+          const asset = plaintext('asset', 1024)
+          const h = createHarness({
+            onChange: (id) => notices.push(id),
+            fetchAsset: async () => asset,
+            manifestOf: (detail) => ({
+              ...manifestFromDetail(detail),
+              assets: [{ path: 'media/a.png', sha256: sha(asset), sizeBytes: 1024 }],
+            }),
+          })
+          addDoc(h, 'doc_1', 1)
+          await abortReservation(h, [])
+          const stream = slowDownload(h, 'doc_1', 1)
+          const downloading = h.manager.downloadNow('doc_1')
+          await stream.waiting
+          // the job's own keys are on the row now: its settlement deletes both, one after the other
+          const orphan = await h.store.getPin('doc_1')
+          const keys = orphan.kind === 'ok' ? (orphan.record.staging?.keys ?? []) : []
+          expect(keys).toHaveLength(2)
+          const held = gate()
+          const realDelete = h.store.deleteBlob.bind(h.store)
+          let deletes = 0
+          h.store.deleteBlob = async (key) => {
+            deletes += 1
+            const result = await realDelete(key)
+            if (deletes === 1) {
+              held.reached()
+              await held.open
+            }
+            return result
+          }
+          const pinning = pinDoc(h)
+          await flush()
+          stream.release()
+          await held.entered
+          expect(deletes).toBe(1)
+          await lockAndWipeOutgoing(h)
+          switchTo(h, SCOPE_B, 'sess_B1')
+          for (const key of keys) {
+            expect((await h.store.putBlob(key, plaintext('b-owned', 64))).kind).toBe('ok')
+          }
+          const snapshot = () =>
+            new Map(filesOf(h, SCOPE_B).map((path) => [path, Buffer.from(h.fs.files.get(path)!)]))
+          const before = snapshot()
+          expect(before.size).toBe(2)
+          notices.length = 0
+          held.release()
+          expect(await pinning).toEqual(interrupted)
+          await downloading
+          expect(deletes).toBe(1)
+          expect(snapshot()).toEqual(before)
+          expect(filesOf(h, SCOPE)).toEqual([])
+          expect(notices).toEqual([])
+        })
+
         it('an ordinary cancel of the same transfer still settles interrupted and announces it', async () => {
           const notices: string[] = []
           const { h, hold, downloading } = await heldOrphanTransfer((id) => notices.push(id))
