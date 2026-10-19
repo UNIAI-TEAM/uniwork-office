@@ -10711,13 +10711,16 @@ body.docs-crop-active
   color: var(--text-dim);
 }
 
-/* a phone: the options stack under the page preview (side by side the preview shrinks to a
-   strip), the preview keeps a usable height, and the dialog scrolls instead of overflowing */
-@media (max-width: 640px) {
+/* a phone (screen only: the dialog is gone before a print job runs): the options stack under the
+   page preview (side by side the preview shrinks to a strip), the preview keeps a usable height,
+   and the dialog scrolls instead of overflowing. dvh follows the visible area when the browser
+   bar shows; vh is the fallback for engines without it */
+@media screen and (max-width: 640px) {
   .modal.print-dialog {
     box-sizing: border-box;
     width: calc(100vw - 24px);
     max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -10735,6 +10738,7 @@ body.docs-crop-active
   .print-preview-pane {
     flex: none;
     height: clamp(240px, 42vh, 360px);
+    height: clamp(240px, 42dvh, 360px);
   }
 
   .print-preview-nav {
@@ -13451,8 +13455,9 @@ tr > .page-gap-cut {
 }
 
 /* a phone: the status bar drops its message, so toasts sit just above the bar (24px) where the
-   message would have been, and wrap instead of clipping at 60vw */
-@media (max-width: 640px) {
+   message would have been, and wrap instead of clipping at 60vw (screen only: a paper narrower than
+   640px during a print job is not a phone) */
+@media screen and (max-width: 640px) {
   .app-toast {
     top: auto;
     bottom: 32px;
