@@ -288,6 +288,69 @@ describe('UW-CREATE-TYPES (UNI-1953) DocumentsHome', () => {
     expect(openWeb).toHaveBeenCalledTimes(1)
   })
 
+  // CT1-4: the page exists, only the opening failed: say so, not the generic failure
+  it('a UniNote created but not opened (openWeb false) says so in its own toast', async () => {
+    openWeb.mockResolvedValue(false)
+    await mount('en')
+    const dialog = await openDialog()
+    await click(dialog.querySelector('.uw-act-types input[value="page"]'))
+    await typeName(dialog, 'Biên bản')
+    await submit(dialog)
+    expect(api.uniworkCreatePage).toHaveBeenCalledTimes(1)
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('The UniNote was created but couldn’t be opened.')
+    expect(text).not.toContain('That didn’t work. Try again.')
+  })
+
+  it('the same toast reads in Vietnamese', async () => {
+    openWeb.mockResolvedValue(false)
+    await mount('vi')
+    const dialog = await openDialog()
+    await click(dialog.querySelector('.uw-act-types input[value="page"]'))
+    await typeName(dialog, 'Biên bản')
+    await submit(dialog)
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('Đã tạo UniNote nhưng chưa mở được.')
+    expect(text).not.toContain('Không thực hiện được. Hãy thử lại.')
+  })
+
+  // CT1-5: a page keeps its title as typed, never a file extension
+  it('renaming a page titled like a file keeps the typed title, no extension re-added', async () => {
+    rootItems = [
+      {
+        id: 'page-md',
+        workspaceId: 'ws-1',
+        title: 'Notes.md',
+        // the parser derives a format from a non-file title
+        format: 'md',
+        updatedAt: '2026-10-18T08:00:00.000Z',
+        kind: 'page',
+        parentId: null,
+        myLevel: 'manage',
+        canEdit: true,
+      },
+    ]
+    api.uniworkRenameDocument = vi.fn(async (id: string, title: string) =>
+      ok({ id, workspaceId: 'ws-1', title, format: null, updatedAt: '', kind: 'page' }),
+    )
+    await mount('en')
+    await click(host.querySelector('[data-folder-menu-for="page-md"]'))
+    await click(document.querySelector('[data-folder-action="rename"]'))
+    const input = host.querySelector<HTMLInputElement>('.uw-rename-input')!
+    // the field starts with the whole title
+    expect(input.value).toBe('Notes.md')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      setter.call(input, 'Ideas')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    await flush()
+    expect(api.uniworkRenameDocument).toHaveBeenCalledWith('page-md', 'Ideas')
+  })
+
   it('an openWeb that answers false shows the failure toast', async () => {
     openWeb.mockResolvedValue(false)
     await mount('en')
