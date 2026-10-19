@@ -2424,9 +2424,10 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 /* a phone, or a pane the open AI panel squeezed to ~120px: the right group (zoom -, slider, zoom +,
- * value) keeps its natural width (flex-shrink: 0) and pushed the whole frame sideways. The slider and
- * the save text go so the zoom buttons get the room; the bar tightens its padding and clips
- * (overflow: hidden) what still does not fit, instead of widening the page. */
+ * value) keeps its natural width (flex-shrink: 0) and pushed the whole frame sideways. The slider
+ * goes so the zoom buttons get the room; the save text stays (it is the only place a failed save
+ * shows) and shrinks with an ellipsis. The bar tightens its padding and clips (overflow: hidden)
+ * what still does not fit, instead of widening the page. */
 @media (max-width: 600px) {
   .status-bar {
     padding: 0 6px;
@@ -2435,10 +2436,20 @@ html.genoffice-popover-open .ribbon-tabs {
 
   .status-right {
     gap: 2px;
+    flex-shrink: 1;
+    min-width: 0;
   }
 
   .status-save {
-    display: none;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .zoom-btn,
+  .zoom-value {
+    flex-shrink: 0;
   }
 
   .zoom-slider {
