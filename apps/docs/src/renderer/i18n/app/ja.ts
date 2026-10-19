@@ -573,9 +573,14 @@ export const ja = {
   appOnlyEncrypted: '「{name}」はパスワードで保護されているため、ここでは開けません。',
   appFileExportPdf: 'PDF としてエクスポート…',
   appFilePrint: '印刷…',
+  appPrintNoDocument: 'ドキュメントを開いてから印刷してください。',
   appPrintNoPrinter:
     'このコンピューターで使えるプリンターがありません。代わりにドキュメントを PDF として保存できます。',
   appPrintFailedPdfHint:
     '印刷できませんでした: {error}。代わりにドキュメントを PDF として保存できます。',
   appPrintSaveAsPdf: 'PDF として保存…',
+  appFileSaveCopy: 'コピーとして保存…',
+  appCopySaved: 'あなたのバージョンを新しいドキュメントとして保存しました：{title}。',
+  appCopySaveFailed:
+    'コピーを作成できませんでした。変更は引き続き安全です。もう一度お試しください。',
 } satisfies Record<keyof typeof zh, string>

@@ -148,6 +148,7 @@ export const ru = {
   uwDocNameTooLong: 'Имя слишком длинное (не более 500 символов).',
   uwDocRenamedAnnounce: 'Документ переименован в {name}.',
   uwDocActionFailed: 'Не получилось. Попробуйте ещё раз.',
+  uwUniNoteOpenFailed: 'UniNote создана, но открыть её не удалось. Откройте её из списка.',
   uwDocActionsFor: 'Другие действия для «{name}»',
   uwDocCreate: 'Создать',
   uwDocUploadPick: 'Выбрать файл',

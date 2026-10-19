@@ -7,9 +7,10 @@ export const en = {
   uwChipPausedAdmin: 'Save queued · sending paused',
   uwChipReconciling: 'Checking the last save…',
   uwChipReconcileStuck: 'Support needed to confirm the save',
+  uwErrReconcileStuck: 'Support is needed to confirm the save.',
   uwChipRemoteNewer: 'Newer version on UniWork',
   uwTipQueued:
-    'Your save from {time} is kept safely on this computer and will be sent when you’re online.',
+    'Your save from {time} is kept safely on this computer and will be sent as soon as possible.',
   uwTipQueuedNewer: 'The save from {time} is waiting to be sent. Later edits aren’t part of it.',
   uwTipPausedAdmin: 'Your admin has paused sending. The save is kept on this computer.',
   uwTipPausedUser:
@@ -81,7 +82,7 @@ export const en = {
   uwRowCommitting: 'Creating the version',
   uwRowReconciling: 'The result of the send at {time} isn’t clear yet. Checking with UniWork.',
   uwRowReconcileStuck:
-    'Reconcile attempts: {count}, no result yet. The app won’t resend; send the support code to your admin.',
+    'Checks so far: {count}, no result yet. The app won’t resend; send the support code to your admin.',
   uwStuckDiscardConfirm:
     'Discard this save? If it already reached UniWork, that version stays; your copy is kept as a draft in the sync center.',
   uwRowConflict: 'Version {n} was saved by {author} at {time}',
@@ -121,10 +122,12 @@ export const en = {
   uwSignOutGo: 'Sign out',
   uwSignOutWaiting: 'Finishing the save in progress before signing out…',
   uwSignOutCaptureFailed:
-    'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.',
+    'Couldn’t keep some unsaved changes in time; the latest saved or autosaved version is kept for your account.',
+  uwSignOutTimedOut:
+    'Couldn’t confirm sign-out in time; your account may still be signed in. Try again.',
   uwSwitchLostTitle: 'Some unsaved changes of the previous account were lost',
   uwSwitchLostBody:
-    'Another account signed in on this computer, so the previous account was locked. Documents whose unsaved changes could not be kept: {count}. Everything else stays locked on this computer for that account.',
+    'Another account signed in on this computer, so the previous account was locked. Documents whose unsaved changes couldn’t be kept: {count}. Everything else stays locked on this computer for that account.',
   uwSwitchLostOk: 'OK',
 
   // S2 sync center
@@ -141,7 +144,7 @@ export const en = {
   uwSyncResynced: 'Fully resynced at {time}',
   uwSyncResyncFailed:
     'Couldn’t resync after several tries. New-version notices are paused; UniWork still checks for conflicts when you save.',
-  uwSyncSignedOut: 'You’re signed out. Items kept locked on this computer: {count}.',
+  uwSyncSignedOut: 'You’re signed out. Items still locked on this computer: {count}.',
   uwSyncSignedOutEmpty: 'You’re signed out.',
   uwSyncSessionExpired: 'Your session expired. Sign in again to keep sending.',
   uwSyncOtherOrg: 'Saves waiting in another organization: {count}',
@@ -175,7 +178,7 @@ export const en = {
   uwOfflineUsage: 'Using {used} of {cap} on this computer',
   uwOfflineEmpty: 'No documents are available offline yet.',
   uwOfflineCapReached:
-    'The offline library on this computer is at its limit: storage {cap}; maximum documents: {maxDocs}. Remove an offline copy to add another.',
+    'The offline library on this computer has reached its limit ({cap}, up to {maxDocs} documents). Remove an offline copy to add another.',
   uwOfflineReady: 'Available offline',
   uwOfflineBadgeWaiting: 'Waiting for network',
   uwOfflineBadgeDownloading: 'Downloading',
@@ -276,7 +279,7 @@ export const en = {
     'Your version was saved as a new document: {title}. This document hasn’t changed; you can still reload or overwrite.',
   uwConflictSaveCopyFailed: 'Couldn’t create the copy. Your changes are still safe; try again.',
   uwConflictSaveCopyNoSeat:
-    'Couldn’t create the copy because you’re not a member of the workspace this document is in. Your changes are still safe; you can download your version.',
+    'Can’t create a copy because you’re not a member of this document’s workspace. Your changes are still safe; you can download your version.',
   uwConflictSaveCopyFolderRefused:
     'You can’t create documents in this folder. Download your version instead.',
   uwConflictDownloadDone:
@@ -306,7 +309,7 @@ export const en = {
   uwConflictKeepDraftHint:
     'The draft stays in the sync center to view or copy; it’s never applied to the new version automatically.',
   uwConflictDraftCapReached:
-    'This document has reached the maximum number of kept drafts: {cap}. Discard an old draft in the sync center to keep another.',
+    'This document has reached the limit of {cap} kept drafts. Discard an old draft in the sync center to keep another.',
 
   // S6 new-version bar
   uwRemoteRegion: 'New version',
@@ -319,8 +322,8 @@ export const en = {
   uwRemoteNowClean:
     'You’ve undone all changes. Version {n} on UniWork is newer than the open copy.',
   uwRemoteStopAiConfirm:
-    'Stop the running UniWork AI run to reload? Changes AI already made belong to the open copy.',
-  uwRemoteWaitCommit: 'Waiting for the save in progress to finish; you can reload after that.',
+    'Stop UniWork AI to reload? Changes AI already made stay in the open copy.',
+  uwRemoteWaitCommit: 'Waiting for the save in progress to finish; you can continue when it does.',
   uwRemoteReload: 'Reload latest…',
   uwRemoteLater: 'Later',
   uwRemoteClose: 'Close',

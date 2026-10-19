@@ -55,7 +55,7 @@ export interface DocumentsHomeNavEntry {
 
 /**
  * DESKTOP-HOME DH-1 sub-navigation entry table in exact board order (Desktop.dc.html:20-27).
- * Entries with `available: false` (Starred / Gắn sao, Archive / Lưu trữ) are hidden and not rendered.
+ * Entries with `available: false` (Starred / Gắn sao, Archive / Lưu trữ, My Folder: a tree row) are hidden and not rendered.
  */
 export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
@@ -67,7 +67,9 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
     id: 'my-folder',
     labelKey: 'uhNavMyFolder',
-    available: true,
+    // UNI-1957: My Folder is listed once, as the tree row under Folders (a stand-in row
+    // until the server has created it); the view itself is still reachable by id.
+    available: false,
     source: 'my-folder-children',
   },
   {
@@ -363,6 +365,7 @@ export interface DocumentsHomeApiAdapter {
   uniworkListSharedWithMe?: (q?: {
     cursor?: string
     limit?: number
+    includePages?: boolean
   }) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSharedByMe?: (
     q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
@@ -452,10 +455,12 @@ export async function fetchDocumentsHomePage(
     if (typeof api.uniworkListDocuments !== 'function') {
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
+    // UNI-1953: the Documents home Recent also lists UniNote pages
     const res = await api.uniworkListDocuments({
       workspaceId,
       cursor,
       ...filters,
+      includePages: true,
     })
     return {
       result: mapDocListPageResult(res),
@@ -466,7 +471,10 @@ export async function fetchDocumentsHomePage(
     if (typeof api.uniworkListSharedWithMe !== 'function') {
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
-    const res = await api.uniworkListSharedWithMe(cursor ? { cursor } : {})
+    // UNI-1953: a shared UniNote is listed too
+    const res = await api.uniworkListSharedWithMe(
+      cursor ? { cursor, includePages: true } : { includePages: true },
+    )
     return {
       result: mapDocListPageResult(res),
     }

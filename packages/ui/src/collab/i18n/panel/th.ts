@@ -42,6 +42,7 @@ export const th = {
   collabDeleteConfirm: 'ลบถาวร',
   collabDeleted: 'เนื้อหานี้ถูกลบแล้ว',
   collabEdited: 'แก้ไขแล้ว · {time}',
+  collabEditedMark: '(แก้ไขแล้ว)',
   collabFormerMember: 'อดีตสมาชิก',
   collabHistory: 'ดูประวัติการแก้ไข',
   collabHistoryTitle: 'ประวัติการแก้ไข',

@@ -18,8 +18,10 @@ export const id = {
   uhQuickDocx: 'Dokumen',
   uhQuickXlsx: 'Spreadsheet',
   uhQuickPptx: 'Presentasi',
-  uhQuickHintPrefix: 'Membuat dan mengunggah di sini disimpan ke',
-  uhQuickHintSuffix: ', hanya terlihat oleh Anda. Bagikan atau Pindahkan bila perlu.',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'File Markdown',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhFilterType: 'Jenis:',
   uhFilterTypeAll: 'Semua',
   uhFilterModifiedBy: 'Diubah oleh:',
@@ -59,8 +61,6 @@ export const id = {
   uhEmptyTrash: 'Sampah kosong.',
   uhEmptyFiltered: 'Tidak ada dokumen yang cocok dengan filter.',
   uhTrashNote: 'Item di Sampah dapat dipulihkan jika Anda memiliki akses Kelola.',
-  uhMyFolderNote:
-    'Pribadi — hanya Anda yang memiliki akses kecuali dibagikan atau dipindahkan ke folder bersama.',
   uhLoadMore: 'Muat lainnya',
   uhRowActions: 'Tindakan lainnya',
 } satisfies Record<keyof typeof zh, string>

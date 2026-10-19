@@ -46,6 +46,7 @@ export const ru = {
   collabDeleteConfirm: 'Удалить безвозвратно',
   collabDeleted: 'Это содержимое удалено',
   collabEdited: 'Изменено · {time}',
+  collabEditedMark: '(изменено)',
   collabFormerMember: 'Бывший участник',
   collabHistory: 'Показать историю правок',
   collabHistoryTitle: 'История правок',

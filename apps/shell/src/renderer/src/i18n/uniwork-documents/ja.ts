@@ -147,6 +147,7 @@ export const ja = {
   uwDocNameTooLong: '名前が長すぎます（最大500文字）。',
   uwDocRenamedAnnounce: 'ドキュメントの名前が {name} に変更されました。',
   uwDocActionFailed: '操作できませんでした。もう一度お試しください。',
+  uwUniNoteOpenFailed: 'UniNote は作成されましたが、開けませんでした。一覧から開いてください。',
   uwDocActionsFor: '「{name}」のその他の操作',
   uwDocCreate: '作成',
   uwDocUploadPick: 'ファイルを選択',

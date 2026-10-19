@@ -552,9 +552,13 @@ export const ms = {
   appOnlyEncrypted: '"{name}" dilindungi kata laluan dan tidak boleh dibuka di sini.',
   appFileExportPdf: 'Eksport sebagai PDF…',
   appFilePrint: 'Cetak…',
+  appPrintNoDocument: 'Buka dokumen untuk mencetaknya.',
   appPrintNoPrinter:
     'Tiada pencetak tersedia pada komputer ini. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
   appPrintFailedPdfHint:
     'Pencetakan gagal: {error}. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
   appPrintSaveAsPdf: 'Simpan sebagai PDF…',
+  appFileSaveCopy: 'Simpan sebagai salinan…',
+  appCopySaved: 'Versi anda disimpan sebagai dokumen baharu: {title}.',
+  appCopySaveFailed: 'Tidak dapat mencipta salinan. Perubahan anda masih selamat; cuba lagi.',
 } satisfies Record<keyof typeof zh, string>

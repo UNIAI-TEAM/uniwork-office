@@ -18,8 +18,10 @@ export const ru = {
   uhQuickDocx: 'Документ',
   uhQuickXlsx: 'Таблица',
   uhQuickPptx: 'Презентация',
-  uhQuickHintPrefix: 'Созданные и загруженные здесь файлы сохраняются в',
-  uhQuickHintSuffix: ', видимы только вам. Поделитесь или переместите при необходимости.',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'Файл Markdown',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhFilterType: 'Тип:',
   uhFilterTypeAll: 'Все',
   uhFilterModifiedBy: 'Кем изменено:',
@@ -59,8 +61,6 @@ export const ru = {
   uhEmptyTrash: 'Корзина пуста.',
   uhEmptyFiltered: 'Нет документов, соответствующих фильтрам.',
   uhTrashNote: 'Элементы в корзине можно восстановить при наличии прав управления.',
-  uhMyFolderNote:
-    'Личное — доступ есть только у вас, пока вы не поделитесь или не переместите в общую папку.',
   uhLoadMore: 'Загрузить ещё',
   uhRowActions: 'Другие действия',
 } satisfies Record<keyof typeof zh, string>

@@ -30,6 +30,7 @@ import {
 } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import type { ApplyOutcome, ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { offsetFormulaRefs } from '@genoffice/xlsx-gateway/domain/formula-shift'
+import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '@genoffice/xlsx-gateway/shared/grid-bounds'
 import {
   qualifierMatches,
   shiftCellArea,
@@ -303,16 +304,28 @@ export function proposeOperations(
                 write.startColumn <= bounds.endColumn &&
                 write.endColumn >= bounds.startColumn,
             )
-            const values = targetSheet.getRange(operation.dataRange).getRawValues() as (
-              string | number | boolean | null | undefined
-            )[][]
-            if (rangeLoaded && !writtenThisBatch && !chartDataFromValues(values)) {
-              return {
-                ok: false,
-                error:
-                  'The chart dataRange needs at least one numeric column. ' +
-                  'set_cell/set_range data lands after charts within a batch — write the data in ' +
-                  'one batch, then add the chart in the next.',
+            if (rangeLoaded && !writtenThisBatch) {
+              const maxRow = targetSheet.getMaxRows() - 1
+              const maxCol = targetSheet.getMaxColumns() - 1
+              const values =
+                bounds.startRow <= maxRow && bounds.startColumn <= maxCol
+                  ? (targetSheet
+                      .getRange(
+                        bounds.startRow,
+                        bounds.startColumn,
+                        Math.min(bounds.endRow, maxRow) - bounds.startRow + 1,
+                        Math.min(bounds.endColumn, maxCol) - bounds.startColumn + 1,
+                      )
+                      .getRawValues() as (string | number | boolean | null | undefined)[][])
+                  : []
+              if (!chartDataFromValues(values)) {
+                return {
+                  ok: false,
+                  error:
+                    'The chart dataRange needs at least one numeric column. ' +
+                    'set_cell/set_range data lands after charts within a batch — write the data in ' +
+                    'one batch, then add the chart in the next.',
+                }
               }
             }
           }
@@ -444,15 +457,12 @@ export function proposeOperations(
             operation.op === 'copy_range' && operation.filterColumn !== undefined
               ? { ...bounds, endRow: bounds.startRow }
               : bounds
-          if (
-            gridBounds.endRow >= targetSheet.getMaxRows() ||
-            gridBounds.endColumn >= targetSheet.getMaxColumns()
-          ) {
+          if (gridBounds.endRow >= MAX_GRID_ROWS || gridBounds.endColumn >= MAX_GRID_COLUMNS) {
             return {
               ok: false,
               error:
-                `The target range extends beyond the sheet grid (${targetSheet.getMaxRows()} rows × ` +
-                `${targetSheet.getMaxColumns()} columns) — stay within it, or insert rows/columns first.`,
+                `The target range extends beyond the sheet grid (${MAX_GRID_ROWS} rows × ` +
+                `${MAX_GRID_COLUMNS} columns) — stay within XFD1048576.`,
             }
           }
           if (
@@ -530,10 +540,16 @@ export function proposeOperations(
               state.file.sheets.find((sheet) => sheet.id === operation.sheetId)?.name ??
               workbook?.getSheetBySheetId(operation.sheetId)?.getSheetName() ??
               ''
-            for (let row = sourceBounds.startRow; row <= sourceBounds.endRow; row += 1) {
+            const sourceMaxRows = sourceSheet.getMaxRows()
+            const sourceMaxCols = sourceSheet.getMaxColumns()
+            for (
+              let row = sourceBounds.startRow;
+              row <= Math.min(sourceBounds.endRow, sourceMaxRows - 1);
+              row += 1
+            ) {
               for (
                 let column = sourceBounds.startColumn;
-                column <= sourceBounds.endColumn;
+                column <= Math.min(sourceBounds.endColumn, sourceMaxCols - 1);
                 column += 1
               ) {
                 const formula = sourceSheet.getRange(formatAddress(row, column)).getFormula()

@@ -589,6 +589,55 @@ describe('the sign-out sweep against the autosave tick (G5-11f d3-1, d3-3)', () 
     const bound = `${createHash('sha1').update(deckPath).digest('hex').slice(0, 16)}.pptx`
     expect(existsSync(join(dir, bound))).toBe(false)
   })
+
+  it('A82 (UNI-1362): closing the last session of a swept path drops its mark on close, while an aliased session keeps it', async () => {
+    bindPolicy({})
+    const once1 = new Map<string, () => void>()
+    const wc1 = {
+      id: WC,
+      on: () => wc1,
+      once: (event: string, fn: () => void) => {
+        once1.set(event, fn)
+        return wc1
+      },
+      setWindowOpenHandler: () => {},
+    }
+    trackSlidesWebContents(wc1 as never)
+    const PEER_WC = 2
+    const once2 = new Map<string, () => void>()
+    const wc2 = {
+      id: PEER_WC,
+      on: () => wc2,
+      once: (event: string, fn: () => void) => {
+        once2.set(event, fn)
+        return wc2
+      },
+      setWindowOpenHandler: () => {},
+    }
+    trackSlidesWebContents(wc2 as never)
+    sessions.set(PEER_WC, session)
+    session.metaDirty = true
+    clearSlidesRecovery(deckPath)
+
+    // closing one of two aliased sessions keeps the swept mark for the remaining one
+    const dir = join(env.dir, 'slides-autosave')
+    const bound = `${createHash('sha1').update(deckPath).digest('hex').slice(0, 16)}.pptx`
+    once1.get('destroyed')?.()
+    vi.advanceTimersByTime(30_000)
+    await Promise.resolve()
+    expect(recoveryCopyMtime(deckPath)).toBeNull()
+    expect(existsSync(join(dir, bound))).toBe(false)
+
+    // closing the last session drops the mark on close, so a session that
+    // reopens the same path before any tick runs can write its recovery copy
+    once2.get('destroyed')?.()
+    sessions.set(WC, {
+      ...session,
+      metaDirty: true,
+    })
+    vi.advanceTimersByTime(30_000)
+    await vi.waitFor(() => expect(existsSync(join(dir, bound))).toBe(true))
+  })
 })
 
 describe('EL-1(b) fix6: slides:uniwork-read-only-save', () => {

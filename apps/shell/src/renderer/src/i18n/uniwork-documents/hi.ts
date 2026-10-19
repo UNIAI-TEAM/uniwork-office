@@ -143,6 +143,7 @@ export const hi = {
   uwDocNameTooLong: 'नाम बहुत लंबा है (अधिकतम 500 अक्षर)।',
   uwDocRenamedAnnounce: 'दस्तावेज़ का नाम बदलकर {name} कर दिया गया।',
   uwDocActionFailed: 'यह नहीं हो सका। फिर से कोशिश करें।',
+  uwUniNoteOpenFailed: 'UniNote बन गया, लेकिन खुल नहीं सका। इसे सूची से खोलें।',
   uwDocActionsFor: '“{name}” के लिए और कार्रवाइयाँ',
   uwDocCreate: 'बनाएँ',
   uwDocUploadPick: 'फ़ाइल चुनें',

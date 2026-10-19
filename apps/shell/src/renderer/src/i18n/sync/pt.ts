@@ -7,9 +7,10 @@ export const pt = {
   uwChipPausedAdmin: 'Salvamento na fila · envio pausado',
   uwChipReconciling: 'Verificando o último salvamento…',
   uwChipReconcileStuck: 'É preciso suporte para confirmar o salvamento',
+  uwErrReconcileStuck: 'É preciso suporte para confirmar o salvamento.',
   uwChipRemoteNewer: 'Versão mais recente no UniWork',
   uwTipQueued:
-    'Seu salvamento das {time} fica guardado com segurança neste computador e será enviado quando você estiver online.',
+    'Seu salvamento das {time} fica guardado com segurança neste computador e será enviado assim que possível.',
   uwTipQueuedNewer:
     'O salvamento das {time} está aguardando envio. Edições posteriores não fazem parte dele.',
   uwTipPausedAdmin:
@@ -127,6 +128,8 @@ export const pt = {
   uwSignOutWaiting: 'Concluindo o salvamento em andamento antes de sair…',
   uwSignOutCaptureFailed:
     'Algumas alterações não salvas não puderam ser capturadas a tempo; a versão salva ou salva automaticamente mais recente é mantida para sua conta.',
+  uwSignOutTimedOut:
+    'Não foi possível confirmar a saída a tempo; a conta pode ainda estar conectada. Tente novamente.',
   uwSwitchLostTitle: 'Algumas alterações não salvas da conta anterior foram perdidas',
   uwSwitchLostBody:
     'Outra conta entrou neste computador, então a conta anterior foi bloqueada. Documentos cujas alterações não salvas não puderam ser mantidas: {count}. Todo o resto continua bloqueado neste computador para essa conta.',
@@ -336,7 +339,7 @@ export const pt = {
   uwRemoteStopAiConfirm:
     'Parar a execução do UniWork AI para recarregar? As alterações que a IA já fez pertencem à cópia aberta.',
   uwRemoteWaitCommit:
-    'Aguardando o salvamento em andamento terminar; depois você poderá recarregar.',
+    'Aguardando o salvamento em andamento terminar; depois você poderá continuar.',
   uwRemoteReload: 'Recarregar a mais recente…',
   uwRemoteLater: 'Depois',
   uwRemoteClose: 'Fechar',

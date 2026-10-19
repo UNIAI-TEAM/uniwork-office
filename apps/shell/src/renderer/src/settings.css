@@ -1390,6 +1390,12 @@
   flex: 1 1 14rem;
 }
 
+/* A75: the prompt title is a dialog heading, not a field label (scoped; other
+   Settings labels keep weight 400) */
+.acct-signout-confirm .set-field-label {
+  font-weight: 600;
+}
+
 .acct-signout-wait:empty {
   display: none;
 }

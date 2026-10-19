@@ -542,7 +542,11 @@ export const th = {
   appOnlyEncrypted: '"{name}" ถูกป้องกันด้วยรหัสผ่านและไม่สามารถเปิดที่นี่ได้',
   appFileExportPdf: 'ส่งออกเป็น PDF…',
   appFilePrint: 'พิมพ์…',
+  appPrintNoDocument: 'เปิดเอกสารก่อนจึงจะพิมพ์ได้',
   appPrintNoPrinter: 'ไม่มีเครื่องพิมพ์ในคอมพิวเตอร์เครื่องนี้ คุณบันทึกเอกสารเป็น PDF แทนได้',
   appPrintFailedPdfHint: 'พิมพ์ไม่สำเร็จ: {error} คุณบันทึกเอกสารเป็น PDF แทนได้',
   appPrintSaveAsPdf: 'บันทึกเป็น PDF…',
+  appFileSaveCopy: 'บันทึกเป็นสำเนา…',
+  appCopySaved: 'บันทึกเวอร์ชันของคุณเป็นเอกสารใหม่แล้ว: {title}',
+  appCopySaveFailed: 'สร้างสำเนาไม่ได้ การเปลี่ยนแปลงของคุณยังปลอดภัย โปรดลองอีกครั้ง',
 } satisfies Record<keyof typeof zh, string>

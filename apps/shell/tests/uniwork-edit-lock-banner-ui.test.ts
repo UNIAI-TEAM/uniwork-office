@@ -1053,10 +1053,10 @@ describe('EL-1(b) copy: uwLock* keys in every shard', () => {
       '{name} took over editing. Your unsaved changes are still here.',
     )
     expect(viDict.uwLockLostExpired).toBe(
-      'Quyền sửa đã hết hạn vì một lúc lâu không liên lạc được với máy chủ (mất mạng hoặc máy ngủ). Thay đổi chưa lưu của bạn vẫn ở đây.',
+      'Quyền sửa đã hết hạn do mất kết nối một lúc (mất mạng hoặc máy ngủ). Thay đổi chưa lưu của bạn vẫn ở đây.',
     )
     expect(enDict.uwLockLostExpired).toBe(
-      'Editing expired because we couldn’t reach the server for a while (no network or the device slept). Your unsaved changes are still here.',
+      'Editing access expired while disconnected (offline or the computer slept). Your unsaved changes are still here.',
     )
     expect(viDict.uwLockLostHandedOver).toBe(
       'Bạn đã nhường quyền sửa cho {name}. Thay đổi chưa lưu của bạn vẫn ở đây.',

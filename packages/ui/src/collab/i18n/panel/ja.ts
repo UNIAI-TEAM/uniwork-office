@@ -45,6 +45,7 @@ export const ja = {
   collabDeleteConfirm: '完全に削除',
   collabDeleted: 'この内容は削除されました',
   collabEdited: '編集済み · {time}',
+  collabEditedMark: '(編集済み)',
   collabFormerMember: '元メンバー',
   collabHistory: '編集履歴を表示',
   collabHistoryTitle: '編集履歴',

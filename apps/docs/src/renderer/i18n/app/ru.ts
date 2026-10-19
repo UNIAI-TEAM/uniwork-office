@@ -553,9 +553,13 @@ export const ru = {
   appOnlyEncrypted: '«{name}» защищён паролем и не может быть открыт здесь.',
   appFileExportPdf: 'Экспорт в PDF…',
   appFilePrint: 'Печать…',
+  appPrintNoDocument: 'Откройте документ, чтобы распечатать его.',
   appPrintNoPrinter:
     'На этом компьютере нет доступного принтера. Вместо этого можно сохранить документ в PDF.',
   appPrintFailedPdfHint:
     'Не удалось напечатать: {error}. Вместо этого можно сохранить документ в PDF.',
   appPrintSaveAsPdf: 'Сохранить как PDF…',
+  appFileSaveCopy: 'Сохранить как копию…',
+  appCopySaved: 'Ваша версия сохранена как новый документ: {title}.',
+  appCopySaveFailed: 'Не удалось создать копию. Ваши изменения в безопасности; повторите попытку.',
 } satisfies Record<keyof typeof zh, string>

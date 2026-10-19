@@ -736,7 +736,7 @@ describe('Ctrl/Cmd+S and the queue popover (T8)', () => {
       failedReason: 'quota',
     }
     const snap = {
-      header: { status: 'online' },
+      header: { status: 'online', online: true },
       storeError: false,
       tabs: { attention: [row], pending: [], recent: [] },
       defaultTab: 'attention',

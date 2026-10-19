@@ -42,6 +42,7 @@ export const zhTW = {
   collabDeleteConfirm: '永久刪除',
   collabDeleted: '此內容已被刪除',
   collabEdited: '已編輯 · {time}',
+  collabEditedMark: '(已編輯)',
   collabFormerMember: '前成員',
   collabHistory: '檢視編輯記錄',
   collabHistoryTitle: '編輯記錄',

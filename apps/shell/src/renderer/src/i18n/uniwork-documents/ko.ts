@@ -143,6 +143,7 @@ export const ko = {
   uwDocNameTooLong: '이름이 너무 깁니다(최대 500자).',
   uwDocRenamedAnnounce: '문서 이름이 {name}(으)로 바뀌었습니다.',
   uwDocActionFailed: '작업을 완료하지 못했습니다. 다시 시도하세요.',
+  uwUniNoteOpenFailed: 'UniNote를 만들었지만 열지 못했습니다. 목록에서 여세요.',
   uwDocActionsFor: '“{name}” 추가 작업',
   uwDocCreate: '만들기',
   uwDocUploadPick: '파일 선택',

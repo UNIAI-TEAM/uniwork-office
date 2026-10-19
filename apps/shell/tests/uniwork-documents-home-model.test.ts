@@ -80,15 +80,10 @@ describe('DH1-W2 documents-home-model', () => {
     expect(starred.available).toBe(false)
     expect(archive.available).toBe(false)
 
+    // UNI-1957: My Folder is the tree row (or its stand-in), not a sub-nav entry
+    expect(getDocumentsHomeNavEntry('my-folder').available).toBe(false)
     const visibleIds = visibleDocumentsHomeNavEntries().map((e) => e.id)
-    expect(visibleIds).toEqual([
-      'workspace',
-      'my-folder',
-      'recent',
-      'shared-with-me',
-      'shared-by-me',
-      'trash',
-    ])
+    expect(visibleIds).toEqual(['workspace', 'recent', 'shared-with-me', 'shared-by-me', 'trash'])
     expect(visibleIds).not.toContain('starred')
     expect(visibleIds).not.toContain('archive')
   })
@@ -366,18 +361,20 @@ describe('DH1-W2 documents-home-model', () => {
       myFolderId: null,
       filters,
     })
+    // UNI-1953 CT1-1: the Documents-home Recent also lists UniNote pages
     expect(api.uniworkListDocuments).toHaveBeenCalledWith({
       workspaceId: 'ws-1',
       cursor: undefined,
       format: 'docx',
       updatedBy: 'u-1',
+      includePages: true,
     })
     expect(recentRes.result).toEqual({
       ok: true,
       value: { items: [listDoc], nextCursor: 'list-next' },
     })
 
-    // shared-with-me is org-wide: sends {} when no cursor and { cursor } when paging, never workspaceId or filters
+    // shared-with-me is org-wide: sends { includePages } when no cursor and { cursor, includePages } when paging, never workspaceId or filters
     const swmRes = await fetchDocumentsHomePage(api, {
       subView: 'shared-with-me',
       workspaceId: 'ws-1',
@@ -385,7 +382,7 @@ describe('DH1-W2 documents-home-model', () => {
       myFolderId: null,
       filters,
     })
-    expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith({})
+    expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith({ includePages: true })
     expect(swmRes.result).toEqual({
       ok: true,
       value: { items: [listDoc], nextCursor: 'list-next' },
@@ -399,7 +396,10 @@ describe('DH1-W2 documents-home-model', () => {
       cursor: 'swm-cur-2',
       filters,
     })
-    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ cursor: 'swm-cur-2' })
+    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({
+      cursor: 'swm-cur-2',
+      includePages: true,
+    })
 
     const sbmRes = await fetchDocumentsHomePage(api, {
       subView: 'shared-by-me',

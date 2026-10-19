@@ -51,3 +51,17 @@ export function createCapabilityReader<K extends string>(
     },
   }
 }
+
+/**
+ * The bound answer the AI layer reads (the skills' C-BOUND filter), shared by
+ * every app so they agree. A web frame IS the UniWork document, but its adapter
+ * still answers `bound: false` because the save path, server comments and the
+ * Save button key off the working-copy state — so the frame's `platform: 'web'`
+ * capability marks the document UniWork-owned for the AI without touching those
+ * consumers. `platform` is the app's capability reader `platform()` (the reader
+ * is per-app, so the value is passed in): undefined on the desktop, where the
+ * adapter answer is used verbatim.
+ */
+export function uniworkBoundForAi(bound: boolean, platform: string | undefined): boolean {
+  return bound || platform === 'web'
+}

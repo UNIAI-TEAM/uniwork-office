@@ -18,8 +18,10 @@ export const pt = {
   uhQuickDocx: 'Documento',
   uhQuickXlsx: 'Planilha',
   uhQuickPptx: 'Apresentação',
-  uhQuickHintPrefix: 'Criar e enviar aqui salva em',
-  uhQuickHintSuffix: ', visível apenas para você. Compartilhe ou mova quando necessário.',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'Arquivo Markdown',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhFilterType: 'Tipo:',
   uhFilterTypeAll: 'Todos',
   uhFilterModifiedBy: 'Modificado por:',
@@ -59,8 +61,6 @@ export const pt = {
   uhEmptyTrash: 'A lixeira está vazia.',
   uhEmptyFiltered: 'Nenhum documento corresponde aos filtros atuais.',
   uhTrashNote: 'Os itens na lixeira podem ser restaurados se você tiver acesso de Gerenciamento.',
-  uhMyFolderNote:
-    'Privado — só você tem acesso, a menos que compartilhe ou mova para uma pasta compartilhada.',
   uhLoadMore: 'Carregar mais',
   uhRowActions: 'Mais ações',
 } satisfies Record<keyof typeof zh, string>

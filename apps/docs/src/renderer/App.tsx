@@ -339,7 +339,8 @@ import {
   type TableDialogKind,
 } from './components/TableDialogs'
 import { TablePropertiesDialog } from './components/TablePropertiesDialog'
-import { showToast } from './components/toast-bus'
+import { showToast, toastStatusLine } from './components/toast-bus'
+import { isNoDocumentPrintKey } from './print-shortcut'
 import { setTableAutoFit, toggleRepeatHeaderRows } from './editor/table-properties'
 import { distributeSelectedColumns } from './editor/table-sizing'
 import {
@@ -849,6 +850,11 @@ export function App() {
   )
   const [status, setStatus] = useState<StatusLine>('')
   const [refusedMessage, setRefusedMessage] = useState<StatusLine>('')
+  // a phone-width frame hides the status message in the bar (styles.css, max-width 640px): raise an
+  // outcome as a toast instead (progress lines stay in the bar). `t` stays out of the deps.
+  useEffect(() => {
+    toastStatusLine(status, t)
+  }, [status])
   // A key + params line re-translates at render time, so only a ready
   // (already translated) string goes stale on a UI language switch.
   const clearStaleStatus = useCallback(
@@ -2872,6 +2878,20 @@ export function App() {
   const printDoc = useCallback(() => {
     if (!cap('print')) return Promise.resolve()
     return printDocImpl(fileCtxRef.current)
+  }, [])
+
+  // File > Save as a copy (web only): the locked-out tab's copy via the bridge's api.saveCopy.
+  // Feedback mirrors the conflict dialog's copy outcome — a status line naming the new title,
+  // an error toast on failure, silence on a host-side cancel.
+  const saveCopyDoc = useCallback(async () => {
+    if (typeof window.desktop.saveDocxCopy !== 'function') return
+    const r = await window.desktop.saveDocxCopy()
+    if (r.ok) {
+      setStatus(t('appCopySaved', { title: r.title }))
+      return
+    }
+    if (r.reason === 'cancelled') return
+    showToast(t('appCopySaveFailed'), 'error')
   }, [])
 
   // for real-device verification: trigger export directly via CDP (same as __pageDebug)
@@ -5482,6 +5502,12 @@ export function App() {
         e.preventDefault()
         if (cap('open')) void openFile()
       }
+      // Print: with a document the native menu / browser owns the shortcut; with none it must
+      // not vanish silently (printDoc answers with the "open a document" message)
+      if (isNoDocumentPrintKey(e, !!doc, cap('print'))) {
+        e.preventDefault()
+        void printDoc()
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
         if (doc) {
@@ -5719,6 +5745,7 @@ export function App() {
     insertField,
     runAiProofread,
     trackChangesForced,
+    printDoc,
   ])
 
   // double-click an inline equation / click an equation block's edit button (ones with LaTeX source) → reopen the equation dialog for editing
@@ -5922,7 +5949,7 @@ export function App() {
           void exportImages()
           break
         case 'print':
-          if (doc) void printDoc()
+          void printDoc()
           break
       }
     })
@@ -6876,6 +6903,7 @@ export function App() {
     onSave: () => void save(false),
     onSaveAs: () => void save(true),
     onExportPdf: () => void exportPdf(),
+    onSaveCopy: () => void saveCopyDoc(),
     onPrint: () => void printDoc(),
     onToggleAi: () => setShowAi((v) => !v),
     onSection: (next: SectionSettings) => {

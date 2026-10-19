@@ -11,6 +11,7 @@ import { useI18n, type StringKey } from '../locale'
 import {
   ActionToast,
   ArchiveConfirm,
+  NEW_KIND_LABEL_KEY,
   NewDocDialog,
   RenameField,
   UploadDocDialog,
@@ -20,6 +21,7 @@ import {
 } from '../UniworkDocActions'
 import {
   DOC_NAME_ERROR_KEYS,
+  NEW_DOC_KINDS,
   UNIWORK_ERROR_KEYS,
   checkDocName,
   docExtension,
@@ -27,10 +29,11 @@ import {
   formatWhen,
   isDocNameError,
   isDocTitleTooLong,
+  renameFormatOf,
   renameParts,
   workspaceLabel,
   type DocNameError,
-  type NewDocFormat,
+  type NewDocKind,
 } from '../uniwork-docs-model'
 import { BrowserCrumbs } from '../uniwork-folders/BrowserCrumbs'
 import { useOfflineToggle } from '../OfflineToggle'
@@ -63,6 +66,7 @@ import {
   archiveDocument,
   cancelUploadDocument,
   createDocument,
+  createPage,
   loadFolderTree,
   onDocRenamed,
   onTreeChanged,
@@ -73,6 +77,7 @@ import {
   searchDocuments,
   uploadDocument,
 } from '../uniwork-library-api'
+import { openPageOnWeb } from '../uniwork-page-web'
 import { announce } from '../uniwork-live'
 import {
   DEFAULT_DOCUMENTS_HOME_FILTERS,
@@ -214,6 +219,10 @@ export interface DocumentsHomeProps {
   onOpenDocument: (doc: UniworkDocSummary) => void
   openingId?: string | null
   sidebarHost?: HTMLElement | null
+  /** the host shows another surface (My AI / Workbench) in the main pane: no nav item reads as current */
+  sidebarIdle?: boolean
+  /** a sidebar nav item or folder was picked (lets the host leave My AI / Workbench) */
+  onSidebarNavigate?: () => void
   initialFolderId?: string | null
   /** sub-view to mount with (kept by the host so an area switch can restore it — VDH-7) */
   initialSubView?: DocumentsHomeSubViewId
@@ -242,6 +251,8 @@ export function DocumentsHome({
   onOpenDocument,
   openingId,
   sidebarHost,
+  sidebarIdle = false,
+  onSidebarNavigate,
   initialFolderId = null,
   initialSubView = 'workspace',
   onSubViewChange,
@@ -278,7 +289,7 @@ export function DocumentsHome({
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
 
   // Dialogs & inline actions
-  const [newDocModal, setNewDocModal] = useState<{ format: NewDocFormat } | null>(null)
+  const [newDocModal, setNewDocModal] = useState<{ format: NewDocKind } | null>(null)
   const [uploadModal, setUploadModal] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
@@ -524,6 +535,8 @@ export function DocumentsHome({
         if (listSeqRef.current !== seq) return
         if (ensuredMyFolder) {
           setMyFolderId(ensuredMyFolder.id)
+          // the tree row takes the stand-in's place
+          setTreeTick((n) => n + 1)
         }
         if (result.ok) {
           const items = result.value.items
@@ -668,17 +681,6 @@ export function DocumentsHome({
       })
   }
 
-  // Pre-select the requested format when NewDocDialog opens from a quick-create pill
-  useEffect(() => {
-    if (!newDocModal || newDocModal.format === 'docx') return
-    const radio = document.querySelector<HTMLInputElement>(
-      `.modal.uw-act input[type="radio"][value="${newDocModal.format}"]`,
-    )
-    if (radio && !radio.checked) {
-      radio.click()
-    }
-  }, [newDocModal])
-
   // Subscribe to upload progress while upload modal is open
   useEffect(() => {
     if (!uploadModal) return
@@ -758,8 +760,26 @@ export function DocumentsHome({
     }
   }, [workspaceId, subView, folderId, resolvedMyFolderId, myFolderLabel, shownPath])
 
+  // UNI-1953: a page row (UniNote) opens as its web page, every other row through the file flow
+  const openDoc = async (doc: UniworkDocSummary): Promise<void> => {
+    if (doc.kind !== 'page') {
+      onOpenDocument(doc)
+      return
+    }
+    if (!(await openPageOnWeb(workspaces, doc.workspaceId || workspaceId, doc.id))) {
+      setToast({ message: t('uwDocActionFailed'), tone: 'error' })
+    }
+  }
+
+  // CT1-4: the page exists already, so an opening that fails says that, not "failed"
+  const openCreatedPage = async (doc: UniworkDocSummary): Promise<void> => {
+    if (!(await openPageOnWeb(workspaces, doc.workspaceId || workspaceId, doc.id))) {
+      setToast({ message: t('uwUniNoteOpenFailed'), tone: 'error' })
+    }
+  }
+
   const handleCreateDoc = async (
-    input: DocTarget & { name: string; format: NewDocFormat },
+    input: DocTarget & { name: string; format: NewDocKind },
   ): Promise<ActionOutcome> => {
     let targetFolderId = input.folderId
     if (!targetFolderId && typeof window.aiOffice?.uniworkEnsureMyFolder === 'function') {
@@ -771,16 +791,25 @@ export function DocumentsHome({
         setMyFolderId(ensured.value.id)
       }
     }
-    const res = await createDocument({
-      workspaceId: input.workspaceId,
-      folderId: targetFolderId,
-      name: input.name,
-      format: input.format,
-    })
+    // UNI-1953: a UniNote is a page: its own create call, opened on the web
+    const res =
+      input.format === 'page'
+        ? await createPage({
+            workspaceId: input.workspaceId,
+            folderId: targetFolderId,
+            name: input.name,
+          })
+        : await createDocument({
+            workspaceId: input.workspaceId,
+            folderId: targetFolderId,
+            name: input.name,
+            format: input.format,
+          })
     if (res.ok) {
       setNewDocModal(null)
       refreshAll()
-      onOpenDocument(res.value)
+      if (input.format === 'page') void openCreatedPage(res.value)
+      else onOpenDocument(res.value)
       return { ok: true }
     }
     if (isDocNameError(res.error) || res.error === 'unsupported_format') {
@@ -854,7 +883,7 @@ export function DocumentsHome({
   }
 
   const handleSaveDocRename = async (doc: DocumentsHomeDoc, rawBase: string) => {
-    const { ext } = renameParts(doc.title, doc.format)
+    const { ext } = renameParts(doc.title, renameFormatOf(doc))
     const checked = checkDocName(rawBase)
     if (!checked.ok) {
       setDocRename({ doc, error: checked.error, busy: false })
@@ -920,7 +949,11 @@ export function DocumentsHome({
       {
         id: 'new',
         label: row.id ? t('ufNewSubfolder') : t('ufNewFolder'),
-        onSelect: () => folderActions.openCreate(row.id, row.id !== null),
+        onSelect: () => {
+          // the dialog renders inside this pane, which is hidden while My AI / Workbench owns the view
+          onSidebarNavigate?.()
+          folderActions.openCreate(row.id, row.id !== null)
+        },
       },
     ]
     if (!row.id || !folderEditActionsOffered(row)) return items
@@ -931,7 +964,10 @@ export function DocumentsHome({
       {
         id: 'move',
         label: t('ufMoveTo'),
-        onSelect: () => folderActions.startMove({ id, kind: 'folder', parentId, title: row.title }),
+        onSelect: () => {
+          onSidebarNavigate?.()
+          folderActions.startMove({ id, kind: 'folder', parentId, title: row.title })
+        },
       },
     )
     return items
@@ -981,9 +1017,10 @@ export function DocumentsHome({
     items.push({
       id: 'open',
       label: t('open'),
-      onSelect: () => onOpenDocument(doc),
+      onSelect: () => void openDoc(doc),
     })
-    const offlineLabel = offlineToggle.labelOf(doc.id)
+    // a page has no file to keep offline
+    const offlineLabel = doc.kind === 'page' ? null : offlineToggle.labelOf(doc.id)
     if (offlineLabel) {
       items.push({
         id: 'offline',
@@ -1074,16 +1111,20 @@ export function DocumentsHome({
   const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : t('ufNoResults', { query })
 
   const treeSelectedKey = useMemo(() => {
+    if (sidebarIdle) return '\u0000none'
     if (subView === 'my-folder' && resolvedMyFolderId) return resolvedMyFolderId
     if (subView === 'workspace') return folderId ?? ROOT_KEY
     return '\u0000none'
-  }, [subView, resolvedMyFolderId, folderId])
+  }, [sidebarIdle, subView, resolvedMyFolderId, folderId])
+
+  const myFolderStandInCurrent = !sidebarIdle && subView === 'my-folder'
 
   const sidebarContent = (
     <div className="dh-sidebar-wrap">
       <nav className="dh-subnav home-area-nav" aria-label={t('ufAreaUniwork')}>
         {navEntries.map((entry) => {
-          const isActive = subView === entry.id && (entry.id !== 'workspace' || folderId === null)
+          const isActive =
+            !sidebarIdle && subView === entry.id && (entry.id !== 'workspace' || folderId === null)
           return (
             <button
               key={entry.id}
@@ -1091,7 +1132,10 @@ export function DocumentsHome({
               className={`dh-nav-item nav-item${isActive ? ' active' : ''}`}
               data-nav={entry.id}
               aria-current={isActive ? 'page' : undefined}
-              onClick={() => selectSubView(entry.id)}
+              onClick={() => {
+                onSidebarNavigate?.()
+                selectSubView(entry.id)
+              }}
             >
               <SubNavIcon id={entry.id} />
               <span className="dh-nav-label">{t(entry.labelKey)}</span>
@@ -1107,12 +1151,13 @@ export function DocumentsHome({
             className="dh-sidebar-add"
             aria-label={t('uhNewFolder')}
             title={t('uhNewFolder')}
-            onClick={() =>
+            onClick={() => {
+              onSidebarNavigate?.()
               folderActions.openCreate(
                 subView === 'workspace' ? folderId : null,
                 subView === 'workspace' && folderId !== null,
               )
-            }
+            }}
           >
             <svg
               width="14"
@@ -1129,6 +1174,25 @@ export function DocumentsHome({
           </button>
         </div>
         <div className="dh-sidebar-tree">
+          {/* My Folder lives in the tree; until the server has created it, this row stands in its place and creates it. */}
+          {tree.status !== 'loading' && !myFolderIdOf(tree.nodes) && (
+            <button
+              type="button"
+              data-my-folder-standin=""
+              className={`uwf-tree-row dh-my-folder-standin${myFolderStandInCurrent ? ' selected' : ''}`}
+              aria-current={myFolderStandInCurrent ? 'page' : undefined}
+              onClick={() => {
+                onSidebarNavigate?.()
+                selectSubView('my-folder')
+              }}
+            >
+              <span className="uwf-twisty" aria-hidden="true" />
+              <MyFolderGlyph />
+              <span className="uwf-tree-text">
+                <span className="uwf-tree-title">{myFolderLabel}</span>
+              </span>
+            </button>
+          )}
           {tree.status === 'loading' && (
             <p className="uwf-side-state" role="status">
               {t('uwPickLoading')}
@@ -1150,7 +1214,10 @@ export function DocumentsHome({
               expanded={expanded}
               onExpandedChange={setExpanded}
               selectedKey={treeSelectedKey}
-              onOpen={openFolderInWorkspace}
+              onOpen={(id) => {
+                onSidebarNavigate?.()
+                openFolderInWorkspace(id)
+              }}
               menuFor={treeMenuFor}
               rename={folderActions.treeRename}
               onRenameSave={(id, value) =>
@@ -1291,63 +1358,21 @@ export function DocumentsHome({
         {subView !== 'trash' && (
           <div className="dh-quick-row">
             <span className="dh-quick-label">{t('uhQuickCreate')}</span>
-            <button
-              type="button"
-              className="dh-quick-pill"
-              data-quick-format="docx"
-              onClick={() => setNewDocModal({ format: 'docx' })}
-            >
-              <FileBadge ext="docx" size={18} />
-              <span>{t('uhQuickDocx')}</span>
-            </button>
-            <button
-              type="button"
-              className="dh-quick-pill"
-              data-quick-format="xlsx"
-              onClick={() => setNewDocModal({ format: 'xlsx' })}
-            >
-              <FileBadge ext="xlsx" size={18} />
-              <span>{t('uhQuickXlsx')}</span>
-            </button>
-            <button
-              type="button"
-              className="dh-quick-pill"
-              data-quick-format="pptx"
-              onClick={() => setNewDocModal({ format: 'pptx' })}
-            >
-              <FileBadge ext="pptx" size={18} />
-              <span>{t('uhQuickPptx')}</span>
-            </button>
-            <span className="dh-quick-hint">
-              <svg
-                className="dh-quick-hint-icon"
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="4" y="11" width="16" height="10" rx="2" />
-                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-              <span>{t('uhQuickHintPrefix')}</span>
+            {NEW_DOC_KINDS.map((kind) => (
               <button
+                key={kind}
                 type="button"
-                className="dh-quick-hint-link"
-                onClick={() => selectSubView('my-folder')}
+                className="dh-quick-pill"
+                data-quick-format={kind}
+                onClick={() => setNewDocModal({ format: kind })}
               >
-                {t('uhNavMyFolder')}
+                <FileBadge ext={kind} size={18} />
+                <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
               </button>
-              <span>{t('uhQuickHintSuffix')}</span>
-            </span>
+            ))}
           </div>
         )}
 
-        {subView === 'my-folder' && <p className="dh-subview-banner">{t('uhMyFolderNote')}</p>}
         {subView === 'trash' && <p className="dh-subview-banner">{t('uhTrashNote')}</p>}
         {folderNotice && (
           <p className="uwf-notice" role="status">
@@ -1607,6 +1632,7 @@ export function DocumentsHome({
                               label={t('ufActionsFor', { name: title })}
                               items={menuItems}
                               dataFor={folder.id}
+                              tabbable
                               open={openMenuId === folder.id}
                               onOpenChange={(o) => setOpenMenuId(o ? folder.id : null)}
                             />
@@ -1682,14 +1708,17 @@ export function DocumentsHome({
                         aria-busy={isOpening || undefined}
                         className={`dh-doc-row${isOpening ? ' opening' : ''}`}
                         onDoubleClick={() => {
-                          if (!renaming && !isFolderEntry(doc)) onOpenDocument(doc)
+                          if (!renaming && !isFolderEntry(doc)) void openDoc(doc)
                         }}
                       >
                         <div className="dh-cell-name" role="cell">
-                          <FileBadge ext={docExtension(doc)} size={28} />
+                          <FileBadge
+                            ext={doc.kind === 'page' ? 'page' : docExtension(doc)}
+                            size={28}
+                          />
                           {renaming ? (
                             <RenameField
-                              initial={renameParts(doc.title, doc.format).base}
+                              initial={renameParts(doc.title, renameFormatOf(doc)).base}
                               label={doc.title}
                               error={renaming.error}
                               busy={renaming.busy}
@@ -1706,7 +1735,7 @@ export function DocumentsHome({
                                 type="button"
                                 className="dh-doc-open"
                                 title={doc.title}
-                                onClick={() => onOpenDocument(doc)}
+                                onClick={() => void openDoc(doc)}
                               >
                                 {doc.title}
                               </button>
@@ -1814,6 +1843,8 @@ export function DocumentsHome({
       {newDocModal && (
         <NewDocDialog
           workspaces={workspaces}
+          kinds={NEW_DOC_KINDS}
+          initialKind={newDocModal.format}
           initialTarget={activeTargetFolder}
           loadTree={loadFolderTree}
           onCreate={handleCreateDoc}

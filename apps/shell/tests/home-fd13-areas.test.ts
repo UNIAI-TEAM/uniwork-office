@@ -466,7 +466,8 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
         expect.anything(),
         'ws-2',
       )
-      expect(main!.querySelector('.wb-work-skeleton')).toBeNull()
+      // the documents pane is its own element now (not the skeleton's <main> reused), so re-query
+      expect(host.querySelector('main.content .wb-work-skeleton')).toBeNull()
       expect(host.textContent).toContain('Marketing Plan.docx')
     } finally {
       afterSpy.mockRestore()
@@ -526,18 +527,11 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.querySelector('.folder-panel')).toBeNull()
     expect(host.textContent).toContain('Root Cloud Doc.docx')
 
-    // DocumentsHome sub-nav in UniWork area renders the 6 available entries and hides starred/archive
+    // DocumentsHome sub-nav in UniWork area renders the 5 available entries (My Folder is a tree row) and hides starred/archive
     const uwNavIds = Array.from(host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item')).map(
       (el) => el.getAttribute('data-nav'),
     )
-    expect(uwNavIds).toEqual([
-      'workspace',
-      'my-folder',
-      'recent',
-      'shared-with-me',
-      'shared-by-me',
-      'trash',
-    ])
+    expect(uwNavIds).toEqual(['workspace', 'recent', 'shared-with-me', 'shared-by-me', 'trash'])
 
     // Open "Alpha Folder" in the UniWork tree
     const alphaNode = Array.from(uwTree!.querySelectorAll<HTMLElement>('[role="treeitem"]')).find(

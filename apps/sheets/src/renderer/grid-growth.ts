@@ -1,7 +1,8 @@
+import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '@genoffice/xlsx-gateway/shared/grid-bounds'
 import { IRenderManagerService } from '@univerjs/engine-render'
 import { SheetSkeletonManagerService } from '@univerjs/sheets-ui'
 
-import type { UniverRuntime } from './univer-state'
+import type { UniverRuntime, UniverWorksheet } from './univer-state'
 
 /// Grows a worksheet's grid as the viewport approaches its edge.
 ///
@@ -21,11 +22,6 @@ import type { UniverRuntime } from './univer-state'
 /// past column F on a scroll must leave the Undo button disabled, or the first
 /// Ctrl+Z after typing at AA1 shrinks the grid back instead of undoing the
 /// edit.
-
-/// Univer's last valid column and row index (0-based). The .xlsx grid caps at
-/// 16384 x 1048576, so growth stops here rather than past it.
-const LAST_COLUMN_INDEX = 16_383
-const LAST_ROW_INDEX = 1_048_575
 
 /// How close the viewport's first column/row gets to the edge before the grid
 /// extends. The extension is only visible once the user reaches it, so a
@@ -62,12 +58,12 @@ export interface GridGrowth {
  */
 export function nextGridGrowth(edge: GridEdge): GridGrowth | null {
   let columnCount = edge.columnCount
-  if (columnCount < LAST_COLUMN_INDEX + 1 && edge.startColumn + COLUMN_LOOKAHEAD >= columnCount) {
-    columnCount = Math.min(columnCount + COLUMN_STEP, LAST_COLUMN_INDEX + 1)
+  if (columnCount < MAX_GRID_COLUMNS && edge.startColumn + COLUMN_LOOKAHEAD >= columnCount) {
+    columnCount = Math.min(columnCount + COLUMN_STEP, MAX_GRID_COLUMNS)
   }
   let rowCount = edge.rowCount
-  if (rowCount < LAST_ROW_INDEX + 1 && edge.startRow + ROW_LOOKAHEAD >= rowCount) {
-    rowCount = Math.min(rowCount + ROW_STEP, LAST_ROW_INDEX + 1)
+  if (rowCount < MAX_GRID_ROWS && edge.startRow + ROW_LOOKAHEAD >= rowCount) {
+    rowCount = Math.min(rowCount + ROW_STEP, MAX_GRID_ROWS)
   }
   if (columnCount === edge.columnCount && rowCount === edge.rowCount) return null
   return { columnCount, rowCount }
@@ -99,7 +95,75 @@ interface InjectorLike {
 /** Univer's scroll command: the one carrying the viewport's first row/column. */
 const SET_SCROLL_COMMAND = 'sheet.operation.set-scroll'
 const SET_ACTIVE_SHEET_OPERATION = 'sheet.operation.set-worksheet-active'
+const SET_COLUMN_COUNT_MUTATION = 'sheet.mutation.set-worksheet-column-count'
+const SET_ROW_COUNT_MUTATION = 'sheet.mutation.set-worksheet-row-count'
 
+function resolveSkeletonManager(
+  runtime: UniverRuntime,
+  unitId: string,
+): SkeletonManagerLike | null {
+  try {
+    const injector = (
+      runtime.univer as unknown as { __getInjector(): InjectorLike }
+    ).__getInjector()
+    const render = injector
+      .get<{ getRenderById(id: string): RenderUnitLike | null }>(IRenderManagerService)
+      .getRenderById(unitId)
+    if (!render) return null
+    return render.with<SkeletonManagerLike>(SheetSkeletonManagerService)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Grows `worksheet`'s grid to at least `needed` rows and columns (1-based counts,
+ * clamped to MAX_GRID_ROWS / MAX_GRID_COLUMNS) using the raw count mutations so no
+ * undo item is pushed, then recalculates the render skeleton when the size changed.
+ */
+export function growSheetToFit(
+  runtime: UniverRuntime,
+  worksheet: UniverWorksheet,
+  needed: { readonly rowCount?: number; readonly columnCount?: number },
+  skeletonManager?: SkeletonManagerLike | null,
+): boolean {
+  const currentColumns = worksheet.getMaxColumns()
+  const currentRows = worksheet.getMaxRows()
+  const nextColumns = Math.min(
+    MAX_GRID_COLUMNS,
+    Math.max(currentColumns, needed.columnCount ?? currentColumns),
+  )
+  const nextRows = Math.min(MAX_GRID_ROWS, Math.max(currentRows, needed.rowCount ?? currentRows))
+  if (nextColumns === currentColumns && nextRows === currentRows) return false
+  // Dispatch the mutations directly. The facade's setColumnCount/setRowCount
+  // run SetWorksheetColumnCountCommand / SetWorksheetRowCountCommand, and both
+  // handlers call undoRedoService.pushUndoRedo, so every growth step would
+  // otherwise leave an undo step behind. The mutation handlers call
+  // worksheet.setColumnCount / setRowCount and stop there, so the grid grows
+  // with the undo stack untouched.
+  const unitId = worksheet.getSheet().getUnitId()
+  const subUnitId = worksheet.getSheetId()
+  if (nextColumns !== currentColumns) {
+    runtime.univerAPI.syncExecuteCommand(SET_COLUMN_COUNT_MUTATION, {
+      unitId,
+      subUnitId,
+      columnCount: nextColumns,
+    })
+  }
+  if (nextRows !== currentRows) {
+    runtime.univerAPI.syncExecuteCommand(SET_ROW_COUNT_MUTATION, {
+      unitId,
+      subUnitId,
+      rowCount: nextRows,
+    })
+  }
+  // the skeleton caches the row/column sizes it was built with
+  ;(skeletonManager !== undefined
+    ? skeletonManager
+    : resolveSkeletonManager(runtime, unitId)
+  )?.reCalculate()
+  return true
+}
 /**
  * Grows the active sheet's grid as its viewport nears the edge.
  *
@@ -132,21 +196,10 @@ export function installGridGrowth(runtime: UniverRuntime): () => void {
 
   const currentSkeletonManager = (): SkeletonManagerLike | null => {
     if (skeletonManager) return skeletonManager
-    try {
-      const workbook = runtime.univerAPI.getActiveWorkbook()
-      if (!workbook) return null
-      const injector = (
-        runtime.univer as unknown as { __getInjector(): InjectorLike }
-      ).__getInjector()
-      const render = injector
-        .get<{ getRenderById(id: string): RenderUnitLike | null }>(IRenderManagerService)
-        .getRenderById(workbook.getId())
-      if (!render) return null
-      skeletonManager = render.with<SkeletonManagerLike>(SheetSkeletonManagerService)
-      return skeletonManager
-    } catch {
-      return null
-    }
+    const workbook = runtime.univerAPI.getActiveWorkbook()
+    if (!workbook) return null
+    skeletonManager = resolveSkeletonManager(runtime, workbook.getId())
+    return skeletonManager
   }
 
   const growIfNearEdge = (startColumn: number, startRow: number): void => {
@@ -160,30 +213,7 @@ export function installGridGrowth(runtime: UniverRuntime): () => void {
       rowCount: worksheet.getMaxRows(),
     })
     if (!growth) return
-    // Dispatch the mutations directly. The facade's setColumnCount/setRowCount
-    // run SetWorksheetColumnCountCommand / SetWorksheetRowCountCommand, and both
-    // handlers call undoRedoService.pushUndoRedo, so every lookahead step would
-    // otherwise leave an undo step behind. The mutation handlers call
-    // worksheet.setColumnCount / setRowCount and stop there, so the grid grows
-    // with the undo stack untouched.
-    const unitId = worksheet.getSheet().getUnitId()
-    const subUnitId = worksheet.getSheetId()
-    if (growth.columnCount !== worksheet.getMaxColumns()) {
-      runtime.univerAPI.syncExecuteCommand('sheet.mutation.set-worksheet-column-count', {
-        unitId,
-        subUnitId,
-        columnCount: growth.columnCount,
-      })
-    }
-    if (growth.rowCount !== worksheet.getMaxRows()) {
-      runtime.univerAPI.syncExecuteCommand('sheet.mutation.set-worksheet-row-count', {
-        unitId,
-        subUnitId,
-        rowCount: growth.rowCount,
-      })
-    }
-    // the skeleton caches the row/column sizes it was built with
-    currentSkeletonManager()?.reCalculate()
+    growSheetToFit(runtime, worksheet, growth, currentSkeletonManager())
   }
 
   let lastColumn = 0

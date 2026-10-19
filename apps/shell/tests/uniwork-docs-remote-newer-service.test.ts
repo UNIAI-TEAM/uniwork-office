@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,6 +32,8 @@ import {
   type IntentStore,
 } from '../src/main/uniwork-sync/intent-store'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
+import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
+import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
 import { NEVER_READ_CAPABILITIES } from '../src/main/uniwork-sync/capability/cache'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import {
@@ -135,7 +145,16 @@ interface Harness {
   editorStates: EditorState[]
   syncStore: SyncStoreAccess
   intents(): Promise<IntentStore>
-  capability: { syncFeed: boolean }
+  capability: {
+    syncFeed: boolean
+    /**
+     * When set, the capability read a remote decision makes parks on this
+     * promise, so a test can hold the decision open across a close.
+     */
+    hold: Promise<void> | null
+    /** called the first time a capability read parks on `hold` */
+    entered: (() => void) | null
+  }
   /** what the conflict dialog (the bar's `reload` action) answers */
   ui: { conflict: UniworkConflictChoice; discard: boolean }
   views: UniworkConflictView[]
@@ -152,6 +171,8 @@ function setup(): Harness {
   layer.register(INTENT_STORE_REGISTRATION)
   layer.register(FEED_CURSORS_REGISTRATION)
   layer.register(DOC_INDEX_REGISTRATION)
+  layer.register(DRAFTS_STORE_REGISTRATION)
+  layer.register(PAUSE_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({ layer, scope: () => ({ ...SCOPE }) })
 
   const statuses: UniworkDocStatus[] = []
@@ -160,7 +181,11 @@ function setup(): Harness {
   const openPaths = new Set<string>([docPath()])
   const editorStates: EditorState[] = [CLEAN]
   let editorCalls = 0
-  const capability = { syncFeed: true }
+  const capability = {
+    syncFeed: true,
+    hold: null as Promise<void> | null,
+    entered: null as (() => void) | null,
+  }
   const client = {
     detail: detailOf('10', 4, HEAD_BYTES),
     error: null as UniworkDocError | null,
@@ -214,11 +239,21 @@ function setup(): Harness {
       return state
     },
     capability: {
-      get: async () => ({
-        kind: 'ok' as const,
-        capabilities: { sync_write: true, sync_feed: capability.syncFeed },
-        source: 'fresh' as const,
-      }),
+      get: async () => {
+        // A3 regression seam: the FIRST read after `hold` is set parks on it,
+        // which lands the decision between its editor-AI sample and its bar
+        const held = capability.hold
+        if (held) {
+          capability.hold = null
+          capability.entered?.()
+          await held
+        }
+        return {
+          kind: 'ok' as const,
+          capabilities: { sync_write: true, sync_feed: capability.syncFeed },
+          source: 'fresh' as const,
+        }
+      },
     },
     client: api as unknown as UniworkDocsClient,
     ui,
@@ -888,5 +923,147 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     expect(status?.remote).toEqual({ kind: 'newer-dirty', version: 4 })
     expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
     expect(h.reloaded).toEqual([])
+  })
+
+  it('A5 (UNI-1362): refuses the reload with reload-failed when the previous working-copy bytes cannot be read', async () => {
+    seedCopy()
+    const h = setup()
+    unlinkSync(docPath())
+    notice(h)
+    await waitForBar(h, { kind: 'reload-failed', version: 4 })
+    expect(existsSync(docPath())).toBe(false)
+    expect(h.reloaded).toEqual([])
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', state: 'saved' })
+    expect(h.client.calls.download).toBe(1)
+  })
+
+  it('A3 (UNI-1362): keeps the editor-AI sample a closed path needs while its remote decision is still in flight', async () => {
+    seedCopy()
+    const h = setup()
+    h.editorStates.splice(0, 1, AI_TURN)
+    const internals = h.service as unknown as { editorAi: Map<string, unknown> }
+    // the running turn the session already reported: this is the sample the
+    // settle edge of a `newer-ai` bar is decided on
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+    expect(internals.editorAi.get(docPath())).toEqual({ aiRunning: true, aiEpoch: 2 })
+
+    // hold the decision between its editor-AI sample and the bar it publishes:
+    // remoteLocalFor reads the AI turn, then parks on the capability read
+    let entered!: () => void
+    const enteredP = new Promise<void>((resolve) => (entered = resolve))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    h.capability.hold = gate
+    h.capability.entered = entered
+    notice(h)
+    await enteredP
+
+    // the path closes while the decision is in flight: the poll must not drop
+    // the `aiRunning` sample the decision was made on
+    h.openPaths.delete(docPath())
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // the delayed bar lands after the close, then the path is reopened and the
+    // AI turn ends: the sample is what lets the settle edge re-decide the notice
+    release()
+    await waitForBar(h, { kind: 'newer-ai', version: 4 })
+    h.editorStates.splice(0, 1, CLEAN)
+    h.openPaths.add(docPath())
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+  })
+
+  it('A3 (UNI-1362): a decision dropped by the session reset never releases the counter entry the next session registered', async () => {
+    seedCopy()
+    const h = setup()
+    h.editorStates.splice(0, 1, AI_TURN)
+    const internals = h.service as unknown as {
+      editorAi: Map<string, unknown>
+      remoteDecisions: Map<string, { n: number }>
+    }
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+
+    // decision A of the outgoing session: a notice that resolves to `ignore`
+    // (not-newer), held after its editor-AI sample on the capability read
+    let enteredA!: () => void
+    const enteredAP = new Promise<void>((resolve) => (enteredA = resolve))
+    let releaseA!: () => void
+    const gateA = new Promise<void>((resolve) => (releaseA = resolve))
+    h.capability.hold = gateA
+    h.capability.entered = enteredA
+    notice(h, '9', 3)
+    await enteredAP
+    expect(internals.remoteDecisions.get(docPath())).toEqual({ n: 1 })
+
+    // the account boundary's step 5 clears the map without awaiting A (exactly
+    // what lockSession does), the same account signs in again and its editor
+    // reports the new session's AI turn
+    internals.remoteDecisions.clear()
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // decision B of the new session for the same path: held after its own
+    // editor-AI sample, before it publishes its `newer-ai` bar
+    let enteredB!: () => void
+    const enteredBP = new Promise<void>((resolve) => (enteredB = resolve))
+    let releaseB!: () => void
+    const gateB = new Promise<void>((resolve) => (releaseB = resolve))
+    h.capability.hold = gateB
+    h.capability.entered = enteredB
+    notice(h)
+    await enteredBP
+    const entryB = internals.remoteDecisions.get(docPath())
+    expect(entryB).toEqual({ n: 1 })
+
+    // A resumes and is ignored: its finalizer must release only its own entry,
+    // never B's replacement
+    releaseA()
+    await drain()
+    expect(internals.remoteDecisions.get(docPath())).toBe(entryB)
+
+    // the path closes while B is still in flight: the poll must keep the sample
+    // B's own bar re-decides on (B's entry is what keeps it)
+    h.openPaths.delete(docPath())
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // B publishes its bar, the turn ends after the reopen: the retained sample
+    // is what lets the settle edge re-decide the notice and reload the head
+    releaseB()
+    await waitForBar(h, { kind: 'newer-ai', version: 4 })
+    h.editorStates.splice(0, 1, CLEAN)
+    h.openPaths.add(docPath())
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+  })
+
+  it('A3 (UNI-1362): prunes closed-path editor-AI memory on poll once no live bar needs it, and drops settled reload chains', async () => {
+    seedCopy()
+    const h = setup()
+    const internals = h.service as unknown as {
+      editorAi: Map<string, unknown>
+      remoteReloads: Map<string, unknown>
+    }
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    expect(internals.editorAi.has(docPath())).toBe(true)
+    notice(h)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(internals.remoteReloads.size).toBe(0)
+
+    // while the updated bar is still on screen, closing the path keeps the memory
+    h.openPaths.delete(docPath())
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // once the session hides the bar (close) and the path is closed, the poll prunes it
+    await h.service.remoteAction(docPath(), 'close')
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(false)
   })
 })

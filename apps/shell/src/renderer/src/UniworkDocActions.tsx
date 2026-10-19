@@ -5,7 +5,6 @@ import type { UniworkFolderNode, UniworkResult, UniworkWorkspaceRef } from '../.
 import { useI18n, type StringKey } from './locale'
 import {
   DOC_NAME_ERROR_KEYS,
-  NEW_DOC_FORMATS,
   UNIWORK_ERROR_KEYS,
   checkDocName,
   isDocTitleTooLong,
@@ -13,9 +12,10 @@ import {
   uploadTooLargeTextOf,
   workspaceLabel,
   type DocNameError,
-  type NewDocFormat,
+  type NewDocKind,
   type RowActions,
 } from './uniwork-docs-model'
+import { FileBadge } from './FileBadge'
 import { UniworkFolderPicker } from './uniwork-folders/UniworkFolderPicker'
 import { MY_FOLDER_LABEL_KEY, type PathPart } from './uniwork-folders/uniwork-folders-model'
 
@@ -149,7 +149,16 @@ export function ActionModal({
   )
 }
 
-const FORMAT_LABEL: Record<NewDocFormat, string> = { docx: 'DOCX', xlsx: 'XLSX', pptx: 'PPTX' }
+/** the label of each kind the New document dialog and the Quick create strip offer (the web's names) */
+export const NEW_KIND_LABEL_KEY: Record<NewDocKind, StringKey> = {
+  page: 'uhQuickPage',
+  docx: 'uhQuickDocx',
+  xlsx: 'uhQuickXlsx',
+  pptx: 'uhQuickPptx',
+  md: 'uhQuickMd',
+  html: 'uhQuickHtml',
+  pdf: 'uhQuickPdf',
+}
 
 /**
  * The location fields shared by New document and Upload (FD-11 S4): the
@@ -277,23 +286,29 @@ export function FieldError({
  * New document: name (required), type, location. On success the library opens
  * the new document by its id; nothing is copied locally first.
  */
-export function NewDocDialog({
+export function NewDocDialog<K extends NewDocKind>({
   workspaces,
   initialTarget,
+  kinds,
+  initialKind,
   loadTree,
   onCreate,
   onCancel,
 }: {
   workspaces: UniworkWorkspaceRef[]
   initialTarget: DocTarget
+  /** the kinds the Type row offers, in order (UniNote is a page, not a file format) */
+  kinds: readonly K[]
+  /** the kind selected on open; the first one when absent */
+  initialKind?: K
   loadTree: LoadFolderTree
-  onCreate: (input: DocTarget & { name: string; format: NewDocFormat }) => Promise<ActionOutcome>
+  onCreate: (input: DocTarget & { name: string; format: K }) => Promise<ActionOutcome>
   onCancel: () => void
 }) {
   const { t } = useI18n()
   const id = useId()
   const [name, setName] = useState('')
-  const [format, setFormat] = useState<NewDocFormat>('docx')
+  const [format, setFormat] = useState<K>(initialKind ?? kinds[0]!)
   const [target, setTarget] = useState(initialTarget)
   const [error, setError] = useState<DocFieldError | null>(null)
   const [busy, setBusy] = useState(false)
@@ -364,7 +379,7 @@ export function NewDocDialog({
         <fieldset className="uw-act-field">
           <legend className="uw-act-label">{t('uwDocType')}</legend>
           <div className="uw-act-types">
-            {NEW_DOC_FORMATS.map((f) => (
+            {kinds.map((f) => (
               <label key={f} className={`uw-act-type${format === f ? ' on' : ''}`}>
                 <input
                   type="radio"
@@ -373,7 +388,8 @@ export function NewDocDialog({
                   checked={format === f}
                   onChange={() => setFormat(f)}
                 />
-                <span>{FORMAT_LABEL[f]}</span>
+                <FileBadge ext={f} size={22} />
+                <span>{t(NEW_KIND_LABEL_KEY[f])}</span>
               </label>
             ))}
           </div>

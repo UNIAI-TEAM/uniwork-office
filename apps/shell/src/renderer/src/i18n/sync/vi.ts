@@ -7,8 +7,9 @@ export const vi = {
   uwChipPausedAdmin: 'Đã xếp hàng lưu · tạm dừng gửi',
   uwChipReconciling: 'Đang kiểm tra lần lưu trước…',
   uwChipReconcileStuck: 'Cần hỗ trợ để xác nhận lần lưu',
+  uwErrReconcileStuck: 'Cần hỗ trợ để xác nhận lần lưu.',
   uwChipRemoteNewer: 'Có phiên bản mới hơn trên UniWork',
-  uwTipQueued: 'Bản lưu lúc {time} được giữ an toàn trên máy này và sẽ gửi khi có mạng.',
+  uwTipQueued: 'Bản lưu lúc {time} được giữ an toàn trên máy này và sẽ gửi ngay khi có thể.',
   uwTipQueuedNewer: 'Bản lúc {time} đang chờ gửi. Thay đổi sau đó chưa nằm trong lần lưu này.',
   uwTipPausedAdmin: 'Quản trị viên đang tạm dừng việc gửi. Bản lưu được giữ trên máy này.',
   uwTipPausedUser:
@@ -80,7 +81,7 @@ export const vi = {
   uwRowCommitting: 'Đang ghi phiên bản',
   uwRowReconciling: 'Chưa rõ kết quả lần gửi lúc {time}. Đang hỏi lại UniWork.',
   uwRowReconcileStuck:
-    'Số lần đã thử đối soát: {count}, chưa có kết quả. Ứng dụng sẽ không gửi lại; hãy gửi mã hỗ trợ cho quản trị viên.',
+    'Đã thử kiểm tra {count} lần nhưng chưa có kết quả. Ứng dụng sẽ không gửi lại; hãy gửi mã hỗ trợ cho quản trị viên.',
   uwStuckDiscardConfirm:
     'Bỏ lần lưu này? Nếu nó đã tới UniWork thì phiên bản đó vẫn còn; bản của bạn được giữ thành nháp trong trung tâm đồng bộ.',
   uwRowConflict: 'Phiên bản {n} đã được lưu bởi {author} lúc {time}',
@@ -114,16 +115,18 @@ export const vi = {
   // Sign-out prompt
   uwSignOutTitle: 'Đăng xuất khỏi UniWork?',
   uwSignOutBody:
-    'Tài liệu còn thay đổi chưa lưu hoặc lần lưu đang chờ: {count}. Chúng được giữ khóa trên máy này và chỉ tài khoản của bạn mở lại được.',
+    'Có {count} tài liệu còn thay đổi chưa lưu hoặc đang chờ lưu. Chúng được giữ khóa trên máy này và chỉ tài khoản của bạn mới mở lại được.',
   uwSignOutKeystore:
     'Kho khóa của máy đang khóa nên thay đổi chưa lưu chỉ còn trong cửa sổ đang mở. Đăng xuất bây giờ sẽ bỏ các thay đổi đó; những gì đã được giữ mã hóa vẫn còn. Muốn giữ chúng, hãy mở khóa máy trước.',
   uwSignOutGo: 'Đăng xuất',
   uwSignOutWaiting: 'Đang hoàn tất lần lưu đang gửi trước khi đăng xuất…',
   uwSignOutCaptureFailed:
-    'Một số thay đổi chưa lưu kịp; bản lưu hoặc tự lưu gần nhất được giữ cho tài khoản của bạn.',
+    'Không kịp giữ một số thay đổi chưa lưu; bản lưu hoặc tự lưu gần nhất vẫn được giữ cho tài khoản của bạn.',
+  uwSignOutTimedOut:
+    'Chưa xác nhận kịp việc đăng xuất; tài khoản có thể vẫn đang đăng nhập. Hãy thử lại.',
   uwSwitchLostTitle: 'Một số thay đổi chưa lưu của tài khoản trước đã mất',
   uwSwitchLostBody:
-    'Một tài khoản khác đã đăng nhập trên máy này nên tài khoản trước đã được khóa. Tài liệu có thay đổi chưa lưu không giữ lại được: {count}. Mọi thứ khác vẫn được giữ khóa trên máy này cho tài khoản đó.',
+    'Một tài khoản khác đã đăng nhập trên máy này nên tài khoản trước đã được khóa. Không giữ lại được thay đổi chưa lưu của {count} tài liệu. Mọi thứ khác vẫn được giữ khóa trên máy này cho tài khoản đó.',
   uwSwitchLostOk: 'Đã hiểu',
 
   // S2 sync center
@@ -140,7 +143,7 @@ export const vi = {
   uwSyncResynced: 'Đã đồng bộ lại toàn bộ lúc {time}',
   uwSyncResyncFailed:
     'Chưa đồng bộ lại được sau nhiều lần thử. Thông báo phiên bản mới tạm dừng; khi bạn lưu, UniWork vẫn kiểm tra xung đột.',
-  uwSyncSignedOut: 'Bạn đã đăng xuất. Số mục đang được giữ khóa trên máy này: {count}.',
+  uwSyncSignedOut: 'Bạn đã đăng xuất. Đang giữ khóa {count} mục trên máy này.',
   uwSyncSignedOutEmpty: 'Bạn đã đăng xuất.',
   uwSyncSessionExpired: 'Phiên đăng nhập đã hết hạn. Đăng nhập lại để tiếp tục gửi.',
   uwSyncOtherOrg: 'Lần lưu đang chờ ở tổ chức khác: {count}',
@@ -174,7 +177,7 @@ export const vi = {
   uwOfflineUsage: 'Đang dùng {used} / {cap} trên máy này',
   uwOfflineEmpty: 'Chưa có tài liệu nào dùng khi không có mạng.',
   uwOfflineCapReached:
-    'Thư viện offline trên máy này đã đạt giới hạn: dung lượng {cap}; số tài liệu tối đa: {maxDocs}. Bỏ ghim một tài liệu để thêm tài liệu khác.',
+    'Thư viện offline trên máy này đã đạt giới hạn ({cap}, tối đa {maxDocs} tài liệu). Bỏ ghim một tài liệu để thêm tài liệu khác.',
   uwOfflineReady: 'Sẵn sàng offline',
   uwOfflineBadgeWaiting: 'Chờ mạng',
   uwOfflineBadgeDownloading: 'Đang tải',
@@ -271,14 +274,14 @@ export const vi = {
     'UniWork sẽ tạo một tài liệu mới từ bản của bạn, cùng chủ sở hữu và quyền truy cập với tài liệu này. Tài liệu hiện tại và phiên bản {server} của {author} không đổi.',
   uwConflictSaveCopyGo: 'Tạo bản sao',
   uwConflictSaveCopyDone:
-    'Đã lưu bản của bạn thành tài liệu mới: {title}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại hoặc Ghi đè.',
+    'Đã lưu bản của bạn thành tài liệu mới: {title}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại bản mới nhất hoặc Ghi đè.',
   uwConflictSaveCopyFailed: 'Chưa tạo được bản sao. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
   uwConflictSaveCopyNoSeat:
-    'Không tạo được bản sao vì bạn không phải thành viên của không gian làm việc chứa tài liệu này. Thay đổi của bạn vẫn an toàn; bạn có thể tải bản của mình về máy.',
+    'Không tạo được bản sao vì bạn không phải thành viên của workspace chứa tài liệu này. Thay đổi của bạn vẫn an toàn; bạn có thể tải bản của mình về máy.',
   uwConflictSaveCopyFolderRefused:
-    'Bạn không thể tạo tài liệu trong thư mục này. Hãy tải bản của bạn về máy.',
+    'Bạn không thể tạo tài liệu trong thư mục này. Hãy tải bản của bạn về.',
   uwConflictDownloadDone:
-    'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại hoặc Ghi đè.',
+    'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại bản mới nhất hoặc Ghi đè.',
   uwConflictDownloadFailedDesktop: 'Chưa lưu được tệp. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
   uwConflictSaveCopyOffline:
     'Không có mạng. Tạo bản sao cần kết nối; thay đổi của bạn vẫn được giữ.',
@@ -302,7 +305,7 @@ export const vi = {
   uwConflictKeepDraftHint:
     'Nháp nằm trong trung tâm đồng bộ, mở để xem hoặc chép; không tự áp lên bản mới.',
   uwConflictDraftCapReached:
-    'Số nháp được giữ của tài liệu này đã đạt mức tối đa: {cap}. Bỏ một nháp cũ trong trung tâm đồng bộ để giữ thêm.',
+    'Tài liệu này đã đạt giới hạn {cap} nháp được giữ. Bỏ một nháp cũ trong trung tâm đồng bộ để giữ thêm.',
 
   // S6 new-version bar
   uwRemoteRegion: 'Phiên bản mới',
@@ -314,8 +317,8 @@ export const vi = {
     'Có phiên bản mới hơn trên UniWork (phiên bản {n}). UniWork AI đang chạy nên tài liệu không tự tải lại; kết quả AI chỉ áp dụng cho bản đang mở.',
   uwRemoteNowClean: 'Bạn đã hoàn tác hết thay đổi. Phiên bản {n} trên UniWork mới hơn bản đang mở.',
   uwRemoteStopAiConfirm:
-    'Dừng lượt UniWork AI đang chạy để tải lại? Thay đổi AI đã áp dụng sẽ theo bản đang mở.',
-  uwRemoteWaitCommit: 'Đang chờ lần lưu đang gửi hoàn tất; tải lại được sau đó.',
+    'Dừng UniWork AI đang chạy để tải lại? Thay đổi AI đã tạo sẽ thuộc về bản đang mở.',
+  uwRemoteWaitCommit: 'Đang chờ lần lưu đang gửi hoàn tất; có thể tiếp tục sau đó.',
   uwRemoteReload: 'Tải lại bản mới nhất…',
   uwRemoteLater: 'Để sau',
   uwRemoteClose: 'Đóng',

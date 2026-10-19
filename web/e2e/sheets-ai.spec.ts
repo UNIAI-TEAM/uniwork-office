@@ -50,6 +50,13 @@ async function fake(request: APIRequestContext, control?: Record<string, unknown
   expect((await request.post('/__fake-ai/control', { data: control })).ok()).toBe(true)
 }
 
+// the fake server is per-run and its state outlives this file: a credential or fail rule seeded here
+// would still be stored when the next spec's tests run (UNI-1930). Reset on the way out too, the same
+// endpoint every test below already calls on the way in.
+test.afterEach(async ({ request }) => {
+  await fake(request)
+})
+
 async function aiLog(request: APIRequestContext): Promise<LogEntry[]> {
   return (await (await request.get('/__fake-ai/log')).json()) as LogEntry[]
 }

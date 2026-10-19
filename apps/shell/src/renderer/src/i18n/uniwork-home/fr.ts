@@ -18,8 +18,10 @@ export const fr = {
   uhQuickDocx: 'Document',
   uhQuickXlsx: 'Feuille de calcul',
   uhQuickPptx: 'Présentation',
-  uhQuickHintPrefix: 'La création et le téléversement ici enregistrent dans',
-  uhQuickHintSuffix: ', visible uniquement par vous. Partagez ou déplacez si nécessaire.',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'Fichier Markdown',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhFilterType: 'Type :',
   uhFilterTypeAll: 'Tous',
   uhFilterModifiedBy: 'Modifié par :',
@@ -60,8 +62,6 @@ export const fr = {
   uhEmptyTrash: 'La corbeille est vide.',
   uhEmptyFiltered: 'Aucun document ne correspond aux filtres.',
   uhTrashNote: 'Les éléments de la corbeille peuvent être restaurés si vous avez l’accès Gérer.',
-  uhMyFolderNote:
-    'Privé — vous seul y avez accès, sauf si vous partagez ou déplacez vers un dossier partagé.',
   uhLoadMore: 'Charger plus',
   uhRowActions: 'Plus d’actions',
 } satisfies Record<keyof typeof zh, string>

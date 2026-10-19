@@ -7,9 +7,10 @@ export const nl = {
   uwChipPausedAdmin: 'Opslaan in wachtrij · verzenden gepauzeerd',
   uwChipReconciling: 'Laatste opslag controleren…',
   uwChipReconcileStuck: 'Ondersteuning nodig om de opslag te bevestigen',
+  uwErrReconcileStuck: 'Ondersteuning nodig om de opslag te bevestigen.',
   uwChipRemoteNewer: 'Nieuwere versie op UniWork',
   uwTipQueued:
-    'Je opslag van {time} blijft veilig op deze computer en wordt verzonden zodra je online bent.',
+    'Je opslag van {time} blijft veilig op deze computer en wordt verzonden zodra dat kan.',
   uwTipQueuedNewer:
     'De opslag van {time} wacht op verzending. Latere wijzigingen horen er niet bij.',
   uwTipPausedAdmin: 'Je beheerder heeft verzenden gepauzeerd. De opslag blijft op deze computer.',
@@ -126,6 +127,8 @@ export const nl = {
   uwSignOutWaiting: 'Lopende opslag wordt afgerond voordat je wordt afgemeld…',
   uwSignOutCaptureFailed:
     'Sommige niet-opgeslagen wijzigingen konden niet op tijd worden vastgelegd; de laatst opgeslagen of automatisch opgeslagen versie blijft bewaard voor je account.',
+  uwSignOutTimedOut:
+    'Kon het afmelden niet op tijd bevestigen; het account kan nog steeds aangemeld zijn. Probeer het opnieuw.',
   uwSwitchLostTitle:
     'Sommige niet-opgeslagen wijzigingen van het vorige account zijn verloren gegaan',
   uwSwitchLostBody:
@@ -333,7 +336,7 @@ export const nl = {
     'Je hebt alle wijzigingen ongedaan gemaakt. Versie {n} op UniWork is nieuwer dan de geopende kopie.',
   uwRemoteStopAiConfirm:
     'De lopende UniWork AI-run stoppen om opnieuw te laden? Wijzigingen die AI al heeft gemaakt horen bij de geopende kopie.',
-  uwRemoteWaitCommit: 'Wachten tot de lopende opslag klaar is; daarna kun je opnieuw laden.',
+  uwRemoteWaitCommit: 'Wachten tot de lopende opslag klaar is; daarna kun je verdergaan.',
   uwRemoteReload: 'Nieuwste opnieuw laden…',
   uwRemoteLater: 'Later',
   uwRemoteClose: 'Sluiten',
