@@ -18,6 +18,10 @@ export const hi = {
   uhQuickDocx: 'दस्तावेज़',
   uhQuickXlsx: 'स्प्रेडशीट',
   uhQuickPptx: 'प्रस्तुति',
+  uhQuickPage: 'UniNote',
+  uhQuickMd: 'Markdown फ़ाइल',
+  uhQuickHtml: 'HTML',
+  uhQuickPdf: 'PDF',
   uhQuickHintPrefix: 'यहाँ बनाने और अपलोड करने पर',
   uhQuickHintSuffix:
     ' में सहेजा जाता है, जो केवल आपको दिखता है। आवश्यकतानुसार साझा या स्थानांतरित करें।',

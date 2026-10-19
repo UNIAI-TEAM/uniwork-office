@@ -11,6 +11,7 @@ import { useI18n, type StringKey } from '../locale'
 import {
   ActionToast,
   ArchiveConfirm,
+  NEW_KIND_LABEL_KEY,
   NewDocDialog,
   RenameField,
   UploadDocDialog,
@@ -20,6 +21,7 @@ import {
 } from '../UniworkDocActions'
 import {
   DOC_NAME_ERROR_KEYS,
+  NEW_DOC_KINDS,
   UNIWORK_ERROR_KEYS,
   checkDocName,
   docExtension,
@@ -30,7 +32,7 @@ import {
   renameParts,
   workspaceLabel,
   type DocNameError,
-  type NewDocFormat,
+  type NewDocKind,
 } from '../uniwork-docs-model'
 import { BrowserCrumbs } from '../uniwork-folders/BrowserCrumbs'
 import { useOfflineToggle } from '../OfflineToggle'
@@ -63,6 +65,7 @@ import {
   archiveDocument,
   cancelUploadDocument,
   createDocument,
+  createPage,
   loadFolderTree,
   onDocRenamed,
   onTreeChanged,
@@ -73,6 +76,7 @@ import {
   searchDocuments,
   uploadDocument,
 } from '../uniwork-library-api'
+import { openPageOnWeb } from '../uniwork-page-web'
 import { announce } from '../uniwork-live'
 import {
   DEFAULT_DOCUMENTS_HOME_FILTERS,
@@ -284,7 +288,7 @@ export function DocumentsHome({
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
 
   // Dialogs & inline actions
-  const [newDocModal, setNewDocModal] = useState<{ format: NewDocFormat } | null>(null)
+  const [newDocModal, setNewDocModal] = useState<{ format: NewDocKind } | null>(null)
   const [uploadModal, setUploadModal] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
@@ -674,17 +678,6 @@ export function DocumentsHome({
       })
   }
 
-  // Pre-select the requested format when NewDocDialog opens from a quick-create pill
-  useEffect(() => {
-    if (!newDocModal || newDocModal.format === 'docx') return
-    const radio = document.querySelector<HTMLInputElement>(
-      `.modal.uw-act input[type="radio"][value="${newDocModal.format}"]`,
-    )
-    if (radio && !radio.checked) {
-      radio.click()
-    }
-  }, [newDocModal])
-
   // Subscribe to upload progress while upload modal is open
   useEffect(() => {
     if (!uploadModal) return
@@ -764,8 +757,19 @@ export function DocumentsHome({
     }
   }, [workspaceId, subView, folderId, resolvedMyFolderId, myFolderLabel, shownPath])
 
+  // UNI-1953: a page row (UniNote) opens as its web page, every other row through the file flow
+  const openDoc = async (doc: UniworkDocSummary): Promise<void> => {
+    if (doc.kind !== 'page') {
+      onOpenDocument(doc)
+      return
+    }
+    if (!(await openPageOnWeb(workspaces, doc.workspaceId || workspaceId, doc.id))) {
+      setToast({ message: t('uwDocActionFailed'), tone: 'error' })
+    }
+  }
+
   const handleCreateDoc = async (
-    input: DocTarget & { name: string; format: NewDocFormat },
+    input: DocTarget & { name: string; format: NewDocKind },
   ): Promise<ActionOutcome> => {
     let targetFolderId = input.folderId
     if (!targetFolderId && typeof window.aiOffice?.uniworkEnsureMyFolder === 'function') {
@@ -777,16 +781,25 @@ export function DocumentsHome({
         setMyFolderId(ensured.value.id)
       }
     }
-    const res = await createDocument({
-      workspaceId: input.workspaceId,
-      folderId: targetFolderId,
-      name: input.name,
-      format: input.format,
-    })
+    // UNI-1953: a UniNote is a page: its own create call, opened on the web
+    const res =
+      input.format === 'page'
+        ? await createPage({
+            workspaceId: input.workspaceId,
+            folderId: targetFolderId,
+            name: input.name,
+          })
+        : await createDocument({
+            workspaceId: input.workspaceId,
+            folderId: targetFolderId,
+            name: input.name,
+            format: input.format,
+          })
     if (res.ok) {
       setNewDocModal(null)
       refreshAll()
-      onOpenDocument(res.value)
+      if (input.format === 'page') void openDoc(res.value)
+      else onOpenDocument(res.value)
       return { ok: true }
     }
     if (isDocNameError(res.error) || res.error === 'unsupported_format') {
@@ -994,9 +1007,10 @@ export function DocumentsHome({
     items.push({
       id: 'open',
       label: t('open'),
-      onSelect: () => onOpenDocument(doc),
+      onSelect: () => void openDoc(doc),
     })
-    const offlineLabel = offlineToggle.labelOf(doc.id)
+    // a page has no file to keep offline
+    const offlineLabel = doc.kind === 'page' ? null : offlineToggle.labelOf(doc.id)
     if (offlineLabel) {
       items.push({
         id: 'offline',
@@ -1313,33 +1327,18 @@ export function DocumentsHome({
         {subView !== 'trash' && (
           <div className="dh-quick-row">
             <span className="dh-quick-label">{t('uhQuickCreate')}</span>
-            <button
-              type="button"
-              className="dh-quick-pill"
-              data-quick-format="docx"
-              onClick={() => setNewDocModal({ format: 'docx' })}
-            >
-              <FileBadge ext="docx" size={18} />
-              <span>{t('uhQuickDocx')}</span>
-            </button>
-            <button
-              type="button"
-              className="dh-quick-pill"
-              data-quick-format="xlsx"
-              onClick={() => setNewDocModal({ format: 'xlsx' })}
-            >
-              <FileBadge ext="xlsx" size={18} />
-              <span>{t('uhQuickXlsx')}</span>
-            </button>
-            <button
-              type="button"
-              className="dh-quick-pill"
-              data-quick-format="pptx"
-              onClick={() => setNewDocModal({ format: 'pptx' })}
-            >
-              <FileBadge ext="pptx" size={18} />
-              <span>{t('uhQuickPptx')}</span>
-            </button>
+            {NEW_DOC_KINDS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className="dh-quick-pill"
+                data-quick-format={kind}
+                onClick={() => setNewDocModal({ format: kind })}
+              >
+                <FileBadge ext={kind} size={18} />
+                <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
+              </button>
+            ))}
             <span className="dh-quick-hint">
               <svg
                 className="dh-quick-hint-icon"
@@ -1704,11 +1703,14 @@ export function DocumentsHome({
                         aria-busy={isOpening || undefined}
                         className={`dh-doc-row${isOpening ? ' opening' : ''}`}
                         onDoubleClick={() => {
-                          if (!renaming && !isFolderEntry(doc)) onOpenDocument(doc)
+                          if (!renaming && !isFolderEntry(doc)) void openDoc(doc)
                         }}
                       >
                         <div className="dh-cell-name" role="cell">
-                          <FileBadge ext={docExtension(doc)} size={28} />
+                          <FileBadge
+                            ext={doc.kind === 'page' ? 'page' : docExtension(doc)}
+                            size={28}
+                          />
                           {renaming ? (
                             <RenameField
                               initial={renameParts(doc.title, doc.format).base}
@@ -1728,7 +1730,7 @@ export function DocumentsHome({
                                 type="button"
                                 className="dh-doc-open"
                                 title={doc.title}
-                                onClick={() => onOpenDocument(doc)}
+                                onClick={() => void openDoc(doc)}
                               >
                                 {doc.title}
                               </button>
@@ -1836,6 +1838,8 @@ export function DocumentsHome({
       {newDocModal && (
         <NewDocDialog
           workspaces={workspaces}
+          kinds={NEW_DOC_KINDS}
+          initialKind={newDocModal.format}
           initialTarget={activeTargetFolder}
           loadTree={loadFolderTree}
           onCreate={handleCreateDoc}

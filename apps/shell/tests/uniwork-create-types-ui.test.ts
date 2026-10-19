@@ -158,9 +158,8 @@ describe('UW-CREATE-TYPES (UNI-1953) DocumentsHome', () => {
       uniworkListWorkspaces: vi.fn(async () => ok(workspaces)),
       uniworkFolderTree: vi.fn(async () => ok(tree)),
       uniworkEnsureMyFolder: vi.fn(async () => ok(tree[0]!)),
-      uniworkListChildren: vi.fn(
-        async (): Promise<UniworkResult<UniworkFolderChildren>> =>
-          ok({ items: rootItems, nextCursor: null }),
+      uniworkListChildren: vi.fn(async (): Promise<UniworkResult<UniworkFolderChildren>> =>
+        ok({ items: rootItems, nextCursor: null }),
       ),
       uniworkListDocuments: vi.fn(async () => ok({ documents: rootItems, nextCursor: null })),
       uniworkSearchDocuments: vi.fn(async () => ok({ items: [], nextCursor: null })),

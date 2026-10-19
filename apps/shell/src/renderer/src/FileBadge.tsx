@@ -17,8 +17,32 @@ const FILE_ICONS: Record<string, string> = {
   htm: iconHtml,
 }
 
-/** file-type icon by extension; an unknown extension gets a neutral letter tile */
+/** the UniNote mark (the web's page tile): the glyph in the blue tint pair, so it follows the theme */
+function UniNoteBadge({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="6.5" style={{ fill: 'var(--tint-blue)' }} />
+      <g transform="translate(7.5 7.5) scale(0.17)" style={{ color: 'var(--tint-blue-fg)' }}>
+        <path
+          d="M22 14 V56 A28 28 0 0 0 78 56"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="20"
+          strokeLinecap="round"
+        />
+        <path
+          d="M68 2 H88 V26 H68 Z M68 30 H88 L78 50 Z M77 33 H79 V43 H77 Z"
+          fill="currentColor"
+          fillRule="evenodd"
+        />
+      </g>
+    </svg>
+  )
+}
+
+/** file-type icon by extension ('page' = UniNote); an unknown extension gets a neutral letter tile */
 export function FileBadge({ ext, size }: { ext: string; size: number }) {
+  if (ext === 'page') return <UniNoteBadge size={size} />
   const icon = FILE_ICONS[ext]
   if (icon) {
     return <img src={icon} width={size} height={size} alt="" aria-hidden="true" />

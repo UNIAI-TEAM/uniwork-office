@@ -1418,9 +1418,16 @@ export function retryActionOf(state: PickerState): PickerAction {
 
 // ── Create, rename, archive (S18) ───────────────────────
 
-/** the formats a new blank document can have */
-export const NEW_DOC_FORMATS = ['docx', 'xlsx', 'pptx'] as const
+/** the file formats a new blank document can have (D's blank route; UNI-1953 adds md / html / pdf) */
+export const NEW_DOC_FORMATS = ['docx', 'xlsx', 'pptx', 'md', 'html', 'pdf'] as const
 export type NewDocFormat = (typeof NEW_DOC_FORMATS)[number]
+
+/**
+ * What the Documents home offers to create, in the web's order (UNI-1953): UniNote
+ * (`page`, a page rather than a file format, created through its own call) first.
+ */
+export const NEW_DOC_KINDS = ['page', ...NEW_DOC_FORMATS] as const
+export type NewDocKind = (typeof NEW_DOC_KINDS)[number]
 
 /**
  * A library row with what S18 reads beyond the summary: the action flags main
@@ -1520,17 +1527,19 @@ export function renameParts(
   return { base: title, ext: '' }
 }
 
-const OFFICE_EXTENSIONS = ['.docx', '.xlsx', '.pptx']
+const NEW_DOC_EXTENSIONS = NEW_DOC_FORMATS.map((format) => `.${format}`)
 
 /**
- * The name a blank document is created with: the chosen format's extension is
- * put on unless the typed name already ends in .docx / .xlsx / .pptx (any case,
- * and something before the dot), the same way rename keeps a title's extension.
+ * The name a new document is created with: the chosen format's extension is
+ * put on unless the typed name already ends in one of the creatable formats
+ * (any case, and something before the dot), the same way rename keeps a
+ * title's extension. A UniNote is a page: its name stays as typed.
  */
-export function nameWithExtension(name: string, format: NewDocFormat): string {
+export function nameWithExtension(name: string, kind: NewDocKind): string {
+  if (kind === 'page') return name
   const lower = name.toLowerCase()
-  const has = OFFICE_EXTENSIONS.some((ext) => lower.endsWith(ext) && name.length > ext.length)
-  return has ? name : `${name}.${format}`
+  const has = NEW_DOC_EXTENSIONS.some((ext) => lower.endsWith(ext) && name.length > ext.length)
+  return has ? name : `${name}.${kind}`
 }
 
 // ── Time ────────────────────────────────────────────────
