@@ -2236,6 +2236,102 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     },
   )
 
+  // UNI-1961 C-R1-2/3/4: the Move picker's start for a row with no parent. A row inside a folder view starts
+  // at that folder; a row anywhere else (a search hit, a list entered from a folder) starts at its own parent
+  const openFolderCard = async (folderCardId: string) => {
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>(
+          `.dh-folder-card[data-folder-id="${folderCardId}"] .dh-folder-open`,
+        )!
+        .click()
+    })
+    await flush()
+  }
+  const movePickerPathFor = async (docId: string) => {
+    const trigger = host.querySelector<HTMLButtonElement>(`[data-folder-menu-for="${docId}"]`)
+    expect(trigger).not.toBeNull()
+    await act(async () => {
+      trigger!.click()
+    })
+    await flush()
+    const move = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
+    ).find((el) => el.textContent?.trim() === 'Di chuyển tới…')
+    expect(move).toBeDefined()
+    await act(async () => {
+      move!.click()
+    })
+    await flush()
+    return document.querySelector('.uwf-picker-path')?.textContent
+  }
+
+  it('starts the Move picker at the hit’s own parent for a root-level search hit typed inside a folder (UNI-1961 C-R1-2)', async () => {
+    api.uniworkSearchDocuments.mockResolvedValue(
+      ok({
+        items: [
+          {
+            id: 'doc-root-hit',
+            workspaceId: 'ws-1',
+            title: 'budget-root.docx',
+            format: 'docx',
+            updatedAt: '2026-10-17T08:00:00.000Z',
+            kind: 'file',
+            parentId: null,
+            path: [],
+            myLevel: 'manage',
+          } satisfies DocumentsHomeDoc,
+        ],
+        nextCursor: null,
+      }),
+    )
+    await mountHome()
+    await openFolderCard('f-board')
+    const searchInput = host.querySelector<HTMLInputElement>('input.uwf-own-search')!
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(searchInput, 'budget')
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-root-hit"]')).not.toBeNull()
+    expect(await movePickerPathFor('doc-root-hit')).toBe('Đường dẫn: Tài liệu (gốc)')
+  })
+
+  it('starts the Move picker at the root, not the folder left, for a parentless row in the stand-in My Folder view (UNI-1961 C-R1-3)', async () => {
+    myFolderItems = [{ ...myFolderItems[0]!, parentId: null }]
+    // no My Folder node in the tree: the sidebar stand-in opens the my-folder view without resetting folderId,
+    // and the picker's tree has no My Folder to start at, so the row's start is the root
+    folderTree = folderTree.filter((n) => n.id !== 'f-mine')
+    await mountHome()
+    await openFolderCard('f-board')
+    await act(async () => {
+      sidebarSlot.querySelector<HTMLButtonElement>('[data-my-folder-standin]')!.click()
+    })
+    await flush()
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-mine-1"]')).not.toBeNull()
+    expect(await movePickerPathFor('doc-mine-1')).toBe('Đường dẫn: Tài liệu (gốc)')
+  })
+
+  it('starts the Move picker at the open folder for a parentless row inside a workspace folder view (UNI-1961 C-R1-4)', async () => {
+    await mountHome()
+    await openFolderCard('f-board')
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-1"]')).not.toBeNull()
+    expect(await movePickerPathFor('doc-1')).toBe('Đường dẫn: Tài liệu (gốc) › Báo cáo HĐQT Q4')
+  })
+
+  it('starts the Move picker at My Folder for a parentless row inside the My Folder view (UNI-1961 C-R1-4)', async () => {
+    myFolderItems = [{ ...myFolderItems[0]!, parentId: null }]
+    await mountHome()
+    await act(async () => {
+      sidebarSlot.querySelector<HTMLElement>('[role="treeitem"][data-key="f-mine"]')!.click()
+    })
+    await flush()
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-mine-1"]')).not.toBeNull()
+    expect(await movePickerPathFor('doc-mine-1')).toBe('Đường dẫn: Tài liệu (gốc) › My Folder')
+  })
+
   // UNI-1961 (UNI-1974): folders are never shared, so a folder row the server still returns for Shared by me
   // (the list reads the documents route, which carries every kind) is not listed
   it('lists no folder row in Shared by me, even when the server returns one (UNI-1961)', async () => {
