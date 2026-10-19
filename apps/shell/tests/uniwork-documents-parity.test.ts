@@ -390,13 +390,17 @@ describe('UNI-1957 Documents parity', () => {
       expect(host.querySelector('.dh-quick-hint-icon')).toBeNull()
       const row = host.querySelector<HTMLElement>('.dh-quick-row')
       if (row) {
-        // the label and one pill per create kind (UNI-1953: UniNote + the six file formats),
-        // nothing else: no lock glyph, no link
+        // the label, one pill per create kind (UNI-1953: UniNote + the six file formats),
+        // then UNI-1959's share switch and its live hint - nothing else: no lock glyph, no link
         expect(Array.from(row.children).map((el) => el.tagName)).toEqual([
           'SPAN',
           ...NEW_DOC_KINDS.map(() => 'BUTTON'),
+          'BUTTON',
+          'P',
         ])
         expect(row.querySelector('[data-quick-format]')).not.toBeNull()
+        expect(row.children[NEW_DOC_KINDS.length + 1]!.getAttribute('role')).toBe('switch')
+        expect(row.lastElementChild!.className).toBe('dh-quick-share-hint')
       }
       for (const text of NOTICE_VI) expect(host.textContent).not.toContain(text)
     }
@@ -417,15 +421,6 @@ describe('UNI-1957 Documents parity', () => {
     })
 
     const dialog = () => document.querySelector<HTMLElement>('.modal.uw-act')!
-    const setName = async (value: string) => {
-      const input = dialog().querySelector<HTMLInputElement>('input[type="text"]')!
-      await act(async () => {
-        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-        setter.call(input, value)
-        input.dispatchEvent(new Event('input', { bubbles: true }))
-      })
-      await flush()
-    }
     const byText = (root: ParentNode, text: string) =>
       Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
         (b) => b.textContent?.trim() === text,
@@ -452,15 +447,14 @@ describe('UNI-1957 Documents parity', () => {
     it.each(views)('Tạo nhanh in %s still creates in My Folder', async (_name, go) => {
       await mount()
       if (go) await go()
+      // UNI-1959: a pill creates at once with the default name (no name dialog), still in My Folder
       await click(host.querySelector('.dh-quick-row [data-quick-format="docx"]')!)
-      expect(dialog().querySelector('.uwf-location-btn')?.textContent).toContain(MY_FOLDER)
-      await setName('Plan')
-      await click(byText(dialog(), 'Tạo'))
+      expect(document.querySelector('.modal.uw-act')).toBeNull()
       expect(api.uniworkCreateDocument).toHaveBeenCalledTimes(1)
       expect(api.uniworkCreateDocument).toHaveBeenCalledWith({
         workspaceId: 'ws-1',
         folderId: 'f-mine',
-        name: 'Plan.docx',
+        name: 'Tài liệu chưa đặt tên.docx',
         format: 'docx',
       })
     })

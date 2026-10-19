@@ -11,6 +11,8 @@ export const th = {
   usMyFolderPrivate: 'ส่วนตัว เห็นได้เฉพาะคุณ',
   usChange: 'เปลี่ยน',
   usSave: 'บันทึก',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'ปิด',
   usPickTitle: 'เลือกที่บันทึก',
   usBack: 'กลับไปตั้งชื่อ',

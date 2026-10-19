@@ -12,6 +12,8 @@ export const id = {
   usMyFolderPrivate: 'Pribadi, hanya Anda yang bisa melihat',
   usChange: 'Ubah',
   usSave: 'Simpan',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Tutup',
   usPickTitle: 'Pilih lokasi simpan',
   usBack: 'Kembali ke penamaan',

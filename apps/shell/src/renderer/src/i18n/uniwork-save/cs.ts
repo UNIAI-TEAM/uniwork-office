@@ -11,6 +11,8 @@ export const cs = {
   usMyFolderPrivate: 'Soukromé, vidíte jen vy',
   usChange: 'Změnit',
   usSave: 'Uložit',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Zavřít',
   usPickTitle: 'Vyberte, kam uložit',
   usBack: 'Zpět k pojmenování',

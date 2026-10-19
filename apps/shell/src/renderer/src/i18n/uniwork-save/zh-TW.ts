@@ -11,6 +11,8 @@ export const zhTW = {
   usMyFolderPrivate: '私人，僅你可見',
   usChange: '變更',
   usSave: '儲存',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: '關閉',
   usPickTitle: '選擇儲存位置',
   usBack: '返回命名',
