@@ -958,3 +958,123 @@ describe('UniNote pages on the library lists (UNI-1953 CT1-1)', () => {
     ])
   })
 })
+
+// UNI-1961: the "other sources" list of the Documents home (files attached in
+// chat, tasks, meetings, email) and their download proxy, as the web reads
+// them (D packages/core/api/endpoints/documents-sources.ts, sources-schema.ts).
+describe('document sources (UNI-1961)', () => {
+  const sourceItem = (over: Record<string, unknown> = {}) => ({
+    id: 'src_1',
+    source: 'task',
+    parent: { kind: 'task', id: 'task_1', title: 'Chuẩn bị họp', message_id: '' },
+    name: 'Biên bản.docx',
+    mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    extension: 'docx',
+    size_bytes: 325632,
+    updated_at: '2026-10-19T08:00:00Z',
+    owner: { id: 'u_1', kind: 'user', name: 'Minh Trần' },
+    can_open_in_app: true,
+    can_save: true,
+    ...over,
+  })
+
+  it('lists sources with source/type/q/cursor/limit only when set', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, { items: [], next_cursor: null }))
+    const api = client(fetch)
+    await api.listSources({ workspaceId: 'ws_1' })
+    await api.listSources({
+      workspaceId: 'ws_1',
+      source: 'task',
+      type: 'docx',
+      q: ' plan ',
+      cursor: 'c_2',
+      limit: 500,
+    })
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources?limit=50`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources?source=task&type=docx&q=plan&cursor=c_2&limit=100`,
+    ])
+    expect(fetch.mock.calls[0]![1].method).toBe('GET')
+  })
+
+  it('parses the web shape leniently: optional fields take their defaults', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(200, {
+        items: [
+          sourceItem(),
+          {
+            id: 'src_2',
+            source: 'chat',
+            parent: { kind: 'chat_channel', id: 'room_1', title: 'Chung' },
+            name: 'notes.md',
+          },
+        ],
+        next_cursor: 'n_1',
+      }),
+    )
+    const page = await client(fetch).listSources({ workspaceId: 'ws_1' })
+    expect(page).toEqual({
+      items: [
+        {
+          id: 'src_1',
+          source: 'task',
+          parent: { kind: 'task', id: 'task_1', title: 'Chuẩn bị họp' },
+          name: 'Biên bản.docx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          extension: 'docx',
+          sizeBytes: 325632,
+          updatedAt: '2026-10-19T08:00:00Z',
+          owner: { id: 'u_1', name: 'Minh Trần' },
+          canOpenInApp: true,
+          canSave: true,
+        },
+        {
+          id: 'src_2',
+          source: 'chat',
+          parent: { kind: 'chat_channel', id: 'room_1', title: 'Chung' },
+          name: 'notes.md',
+          mimeType: '',
+          extension: '',
+          sizeBytes: 0,
+          updatedAt: '',
+          owner: null,
+          canOpenInApp: false,
+          canSave: false,
+        },
+      ],
+      nextCursor: 'n_1',
+    })
+  })
+
+  it('an untrustworthy list is malformed_response, never an empty list', async () => {
+    for (const body of [
+      {},
+      { items: null },
+      { items: [{ id: 'src_1' }] },
+      { items: [sourceItem({ parent: 'task_1' })] },
+      { items: [], next_cursor: 7 },
+    ]) {
+      const api = client(async () => json(200, body))
+      expect(await codeOf(api.listSources({ workspaceId: 'ws_1' }))).toBe('malformed_response')
+    }
+  })
+
+  it('a source route the server lacks answers its error code (the home skips the merge)', async () => {
+    const api = client(async () => envelope(404, 'not_found'))
+    expect(await codeOf(api.listSources({ workspaceId: 'ws_1' }))).toBe('not_found')
+  })
+
+  it('downloads a source file through its proxy route', async () => {
+    const fetch = vi.fn<FetchLike>(
+      async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }),
+    )
+    const api = client(fetch)
+    expect(await api.downloadSource('ws_1', 'src_1')).toEqual({
+      bytes: new Uint8Array([1, 2, 3]),
+    })
+    expect(fetch.mock.calls[0]![0]).toBe(
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/src_1/download`,
+    )
+    expect(await codeOf(api.downloadSource('ws_1', '../x'))).toBe('not_found')
+  })
+})

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,6 +25,8 @@ let identity: { accountId: string; deviceSessionId: string; deploymentId: string
 const dialogs = vi.hoisted(() => ({
   open: [] as unknown[],
   result: { canceled: true, filePaths: [] as string[] },
+  save: { canceled: true } as { canceled: boolean; filePath?: string },
+  saveOptions: [] as unknown[],
 }))
 
 vi.mock('electron', () => ({
@@ -36,7 +38,10 @@ vi.mock('electron', () => ({
       return dialogs.result
     }),
     showMessageBox: vi.fn(async () => ({ response: 1 })),
-    showSaveDialog: vi.fn(async () => ({ canceled: true })),
+    showSaveDialog: vi.fn(async (...args: unknown[]) => {
+      dialogs.saveOptions.push(args.at(-1))
+      return dialogs.save
+    }),
   },
   safeStorage: {
     isEncryptionAvailable: () => true,
@@ -78,6 +83,8 @@ beforeEach(() => {
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
   dialogs.open.length = 0
   dialogs.result = { canceled: true, filePaths: [] }
+  dialogs.save = { canceled: true }
+  dialogs.saveOptions.length = 0
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -618,6 +625,101 @@ describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
       expect(trashParams.get('format')).toBe('docx')
       expect(trashParams.get('updated_by')).toBe('u_9')
       expect(trashParams.get('updated_from')).toBe('2026-10-01T00:00:00Z')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+// UNI-1961: the Documents home's "other sources" rows (list + download) reach
+// main through their own channels.
+describe('the document sources IPC (UNI-1961)', () => {
+  const sourcesBody = {
+    items: [
+      {
+        id: 'src_1',
+        source: 'task',
+        parent: { kind: 'task', id: 'task_1', title: 'Chuẩn bị họp' },
+        name: 'Biên bản.docx',
+        size_bytes: 12,
+        updated_at: '2026-10-19T08:00:00Z',
+        owner: { id: 'u_1', kind: 'user', name: 'Minh Trần' },
+      },
+    ],
+    next_cursor: null,
+  }
+
+  it('routes listSources to the server with its filters', async () => {
+    const { handlers } = await setup()
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        seen.push(String(input))
+        return new Response(JSON.stringify(sourcesBody), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }),
+    )
+    try {
+      const page = (await handlers.get(UNIWORK_DOC_CHANNELS.listSources)!(null, {
+        workspaceId: 'ws_1',
+        type: 'docx',
+        cursor: 'c_1',
+      })) as { ok: boolean; value?: { items: Array<{ id: string }>; nextCursor: string | null } }
+      expect(page.ok).toBe(true)
+      expect(page.value?.items.map((item) => item.id)).toEqual(['src_1'])
+      expect(page.value?.nextCursor).toBeNull()
+      expect(seen).toEqual([
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources?type=docx&cursor=c_1&limit=50',
+      ])
+      // a call without a workspace never reaches the server
+      expect(await handlers.get(UNIWORK_DOC_CHANNELS.listSources)!(null, {})).toEqual({
+        ok: false,
+        error: 'not_found',
+      })
+      expect(seen).toHaveLength(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('downloads a source into the path the save dialog picked; a cancel writes nothing', async () => {
+    const { handlers } = await setup()
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        seen.push(String(input))
+        return new Response(new Uint8Array([7, 8, 9]), { status: 200 })
+      }),
+    )
+    try {
+      const cancelled = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'src_1',
+        name: 'Biên bản.docx',
+      })
+      expect(cancelled).toEqual({ ok: true, value: { path: null } })
+      expect(seen).toEqual([])
+
+      const target = join(dir, 'Biên bản.docx')
+      dialogs.save = { canceled: false, filePath: target }
+      const saved = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'src_1',
+        name: '../../Biên bản.docx',
+      })
+      // the suggested name is the file's own name, never a path out of the folder
+      const suggested = (dialogs.saveOptions.at(-1) as { defaultPath?: string }).defaultPath ?? ''
+      expect(suggested.endsWith('Biên bản.docx')).toBe(true)
+      expect(suggested).not.toContain('..')
+      expect(saved).toEqual({ ok: true, value: { path: target } })
+      expect(seen).toEqual([
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/src_1/download',
+      ])
+      expect([...readFileSync(target)]).toEqual([7, 8, 9])
     } finally {
       vi.unstubAllGlobals()
     }
