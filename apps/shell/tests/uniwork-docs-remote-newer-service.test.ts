@@ -160,7 +160,14 @@ interface Harness {
   views: UniworkConflictView[]
 }
 
-function setup(): Harness {
+function setup(
+  options: {
+    requestFirstSaveName?: (request: {
+      requestId: string
+      path: string
+    }) => Promise<'continue' | 'cancel'>
+  } = {},
+): Harness {
   const safeStorage = createLockableSafeStorage()
   const layer = createStoreLayer({
     root: join(dir, 'uniwork-sync', 'store'),
@@ -193,6 +200,9 @@ function setup(): Harness {
     calls: { getDocument: 0, download: 0 },
   }
   const api = {
+    async documentRef() {
+      return { id: DOC, workspaceId: 'ws_1', title: 'Untitled document.docx', parentId: 'f_mine' }
+    },
     async getDocument(): Promise<DocumentDetail> {
       client.calls.getDocument += 1
       if (client.error) throw client.error
@@ -231,6 +241,7 @@ function setup(): Harness {
     openPath: vi.fn(() => true),
     isPathOpen: (path: string) => openPaths.has(path),
     requestModuleSave: vi.fn(() => false),
+    requestFirstSaveName: options.requestFirstSaveName as never,
     reloadPath: (path: string) => reloaded.push(path),
     activePath: () => docPath(),
     editorStateOf: async () => {
@@ -1065,5 +1076,53 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     await h.service.remoteAction(docPath(), 'close')
     await h.service.pollSaveQueue()
     expect(internals.editorAi.has(docPath())).toBe(false)
+  })
+})
+
+describe('UNI-1959 a pending first-save ask is local unsent work', () => {
+  const UNSENT = enc('local saved edits awaiting naming')
+
+  /** a version-1 copy under the default blank title, whose editor just saved `UNSENT` */
+  async function askedCopy() {
+    seedCopy({ title: 'Untitled document.docx', baseVersion: 1, state: 'ready' }, BASE_BYTES)
+    const asked: Array<{ requestId: string; path: string }> = []
+    let answer: (verdict: 'continue' | 'cancel') => void = () => undefined
+    const h = setup({
+      requestFirstSaveName: (request) =>
+        new Promise((resolve) => {
+          asked.push(request)
+          answer = resolve
+        }),
+    })
+    writeFileSync(docPath(), UNSENT)
+    h.service.onUserSave(docPath())
+    await drain()
+    expect(asked).toHaveLength(1)
+    return { h, asked, answer: (verdict: 'continue' | 'cancel') => answer(verdict) }
+  }
+
+  it('a newer feed notice while the ask is open keeps the saved bytes and the base', async () => {
+    const { h } = await askedCopy()
+    notice(h)
+    await drain(120)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+    expect(bindingOf().baseVersion).toBe(1)
+    expect(h.client.calls.download).toBe(0)
+    expect(h.reloaded).toEqual([])
+    // the chip reads the copy as unsent while the dialog is open
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+  })
+
+  it('after a Cancel the unsent copy is still protected: dirty, bar newer-dirty, bytes kept', async () => {
+    const { h, answer } = await askedCopy()
+    answer('cancel')
+    await drain()
+    notice(h)
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+    expect(h.client.calls.download).toBe(0)
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
   })
 })

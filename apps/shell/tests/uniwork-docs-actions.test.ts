@@ -1522,6 +1522,59 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     expect(win.asked[0]).toMatchObject({ documentId: DOC, title: 'Untitled document.docx' })
   })
 
+  it('BE-2: a rename made while the ask is open does not release it - the next Save is held, a Cancel leaves zero commits', async () => {
+    const server = fakeServer({ title: 'Untitled document.docx' })
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      pathOpen: true,
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error('open failed')
+    writeFileSync(opened.value.path, 'bytes v2')
+    ctx.service.onUserSave(opened.value.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+
+    // the dialog's own rename lands (its move is refused, so the dialog stays open): the
+    // title is no longer a default one, which used to be what held the second Save
+    const renamed = await ctx.service.renameDocument(DOC, 'Quarterly report.docx')
+    expect(renamed.ok).toBe(true)
+    ctx.service.onUserSave(opened.value.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+    expect(commitsOf(server)).toHaveLength(0)
+
+    win.answers[0]!('cancel')
+    await idle()
+    expect(commitsOf(server)).toHaveLength(0)
+  })
+
+  it('BE-2: the same schedule ends in exactly one commit on a real continue', async () => {
+    const server = fakeServer({ title: 'Untitled document.docx' })
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      pathOpen: true,
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error('open failed')
+    writeFileSync(opened.value.path, 'bytes v2')
+    ctx.service.onUserSave(opened.value.path)
+    await idle()
+    await ctx.service.renameDocument(DOC, 'Quarterly report.docx')
+    ctx.service.onUserSave(opened.value.path)
+    await idle()
+    expect(commitsOf(server)).toHaveLength(0)
+    win.answers[0]!('continue')
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
+    expect(win.asked).toHaveLength(1)
+  })
+
   it('the Vietnamese default name asks too, an ordinary name never does', async () => {
     const viServer = fakeServer({ title: 'Tài liệu chưa đặt tên.docx' })
     const win1 = dialogWindow()
