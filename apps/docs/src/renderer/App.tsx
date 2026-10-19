@@ -5265,6 +5265,14 @@ export function App() {
     revisionDisplay,
     delSectBreaks,
     pendingWatermarkImage,
+    // watermarkDirty gates the parsed watermark out of the gap-strips' float
+    // layer (a pending edit replaces it with the ghost/picture preview): a
+    // text-watermark change reaches no other dep, so without this the layer
+    // keeps painting the old shape behind the new ghost. colMode/hasVertical
+    // are memos over `sections`, so listing them restarts nothing extra.
+    watermarkDirty,
+    colMode,
+    hasVertical,
   ])
 
   // section at the cursor: the target the Layout tab acts on
