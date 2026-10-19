@@ -546,6 +546,7 @@ export const cs = {
   appOnlyEncrypted: 'Dokument „{name}“ je chráněn heslem a nelze jej zde otevřít.',
   appFileExportPdf: 'Exportovat jako PDF…',
   appFilePrint: 'Tisk…',
+  appPrintNoDocument: 'Otevřete dokument, abyste ho mohli vytisknout.',
   appPrintNoPrinter:
     'Na tomto počítači není dostupná žádná tiskárna. Dokument můžete místo toho uložit jako PDF.',
   appPrintFailedPdfHint: 'Tisk se nepodařil: {error}. Dokument můžete místo toho uložit jako PDF.',

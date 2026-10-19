@@ -9890,7 +9890,8 @@ body.docs-crop-active
 
 /* A phone-width frame: keep the page counter, the save state and the zoom, drop the parts that
    only repeat a ribbon entry (Track Changes, the layout switcher) or are long (the word count,
-   the status message), so nothing sits half-clipped under the view buttons. */
+   the status message), so nothing sits half-clipped under the view buttons. The message itself
+   is not lost: App raises it as a toast above the bar (.app-toast, see below). */
 @media (max-width: 640px) {
   .status-track,
   .status-msg {
@@ -10708,6 +10709,46 @@ body.docs-crop-active
   padding: 2px 2px 0;
   font-size: 12px;
   color: var(--text-dim);
+}
+
+/* a phone (screen only: the dialog is gone before a print job runs): the options stack under the
+   page preview (side by side the preview shrinks to a strip), the preview keeps a usable height,
+   and the dialog scrolls instead of overflowing. dvh follows the visible area when the browser
+   bar shows; vh is the fallback for engines without it */
+@media screen and (max-width: 640px) {
+  .modal.print-dialog {
+    box-sizing: border-box;
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .print-dialog-body {
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 12px;
+    height: auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .print-preview-pane {
+    flex: none;
+    height: clamp(240px, 42vh, 360px);
+    height: clamp(240px, 42dvh, 360px);
+  }
+
+  .print-preview-nav {
+    white-space: nowrap;
+  }
+
+  .print-options {
+    width: auto;
+    overflow-y: visible;
+  }
 }
 
 /* provider tabs in AI settings */
@@ -13331,6 +13372,17 @@ tr > .page-gap-cut {
   .ribbon-tabs > * {
     flex-shrink: 0;
   }
+
+  /* the scrolling tab row clips an absolute menu below it (overflow-x: auto makes overflow-y
+     auto too), so the File menu leaves the row's paint: fixed. A fixed box ignores the row's
+     scroll offset, so Ribbon sets left/top from the File tab's measured rectangle
+     (file-menu-anchor.ts); auto is only the pre-measure fallback */
+  .ribbon-tabs .file-menu {
+    position: fixed;
+    top: auto;
+    left: auto;
+    max-width: calc(100vw - 16px);
+  }
 }
 
 .ai-msg-actions {
@@ -13394,6 +13446,25 @@ tr > .page-gap-cut {
 
 .app-toast.error {
   background: var(--docs-toast-error-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-toast {
+    transition: none;
+  }
+}
+
+/* a phone: the status bar drops its message, so toasts sit just above the bar (24px) where the
+   message would have been, and wrap instead of clipping at 60vw (screen only: a paper narrower than
+   640px during a print job is not a phone) */
+@media screen and (max-width: 640px) {
+  .app-toast {
+    top: auto;
+    bottom: 32px;
+    transform: translate(-50%, 8px);
+    max-width: calc(100vw - 24px);
+    white-space: normal;
+  }
 }
 
 .app-toast-icon {

@@ -3,6 +3,7 @@
 // Shift/Alt, repeat ignored, browser default suppressed only while the print path ran.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installPrintAccelerator } from './print-accelerator'
+import { isNoDocumentPrintKey } from '../../../apps/docs/src/renderer/print-shortcut'
 
 let off: (() => void) | null = null
 
@@ -70,4 +71,69 @@ describe('installPrintAccelerator (UNI-1920)', () => {
     pressP({ ctrlKey: true })
     expect(run).not.toHaveBeenCalled()
   })
+})
+
+// UNI-1931 + UNI-1920: in the Docs web frame both the bridge's accelerator (capture phase) and App's
+// no-document keydown branch (bubble phase on window) see Ctrl/Cmd+P. Wired as webapi.ts / App.tsx wire
+// them, one press must do exactly one thing: the dialog (document), the message (none), or nothing and
+// the browser default (no print capability).
+describe('Ctrl/Cmd+P in the Docs frame: one handler path (UNI-1931 x UNI-1920)', () => {
+  function frame(opts: { hasDoc: boolean; print: boolean }) {
+    const actions: string[] = []
+    // App's menu 'print' handler -> printDoc: the dialog with a document, the message without
+    const printCommand = () => actions.push(opts.hasDoc ? 'dialog' : 'message')
+    // webapi.ts: the accelerator runs the menu command only while the print grant is effective
+    const offAccelerator = installPrintAccelerator(window, () => {
+      if (!opts.print) return false
+      printCommand()
+      return true
+    })
+    // App.tsx: the no-document keydown branch
+    const onApp = (e: KeyboardEvent) => {
+      if (isNoDocumentPrintKey(e, opts.hasDoc, opts.print)) {
+        e.preventDefault()
+        printCommand()
+      }
+    }
+    window.addEventListener('keydown', onApp)
+    off = () => {
+      offAccelerator()
+      window.removeEventListener('keydown', onApp)
+    }
+    return actions
+  }
+
+  it.each([{ ctrlKey: true }, { metaKey: true }])(
+    'a document: one dialog per press (%o)',
+    (init) => {
+      const actions = frame({ hasDoc: true, print: true })
+      const ev = pressP(init)
+      expect(actions).toEqual(['dialog'])
+      expect(ev.defaultPrevented).toBe(true)
+      pressP(init)
+      expect(actions).toEqual(['dialog', 'dialog'])
+    },
+  )
+
+  it.each([{ ctrlKey: true }, { metaKey: true }])(
+    'no document: one message per press (%o)',
+    (init) => {
+      const actions = frame({ hasDoc: false, print: true })
+      const ev = pressP(init)
+      expect(actions).toEqual(['message'])
+      expect(ev.defaultPrevented).toBe(true)
+      pressP(init)
+      expect(actions).toEqual(['message', 'message'])
+    },
+  )
+
+  it.each([true, false])(
+    'without the print capability nothing runs and the key is not swallowed (doc: %s)',
+    (hasDoc) => {
+      const actions = frame({ hasDoc, print: false })
+      const ev = pressP({ ctrlKey: true })
+      expect(actions).toEqual([])
+      expect(ev.defaultPrevented).toBe(false)
+    },
+  )
 })

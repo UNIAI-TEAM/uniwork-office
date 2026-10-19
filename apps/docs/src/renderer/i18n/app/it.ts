@@ -554,6 +554,7 @@ export const it = {
   appOnlyEncrypted: '"{name}" è protetto da password e non può essere aperto qui.',
   appFileExportPdf: 'Esporta come PDF…',
   appFilePrint: 'Stampa…',
+  appPrintNoDocument: 'Apri un documento per stamparlo.',
   appPrintNoPrinter:
     'Nessuna stampante disponibile su questo computer. Puoi salvare il documento come PDF.',
   appPrintFailedPdfHint: 'Stampa non riuscita: {error}. Puoi salvare il documento come PDF.',
