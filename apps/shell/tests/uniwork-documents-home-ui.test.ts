@@ -271,7 +271,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     sidebarSlot.remove()
   })
 
-  it('renders the board sub-nav in sidebarHost (omitting Gắn sao & Lưu trữ), toolbar controls, Tạo nhanh pills + My Folder link, 3-col folder grid, and 5-column Tài liệu table with zero Đồng bộ / Kích thước columns', async () => {
+  it('renders the board sub-nav in sidebarHost (omitting Gắn sao; UNI-1961: Lưu trữ shown), toolbar controls, Tạo nhanh pills + My Folder link, 3-col folder grid, and 5-column Tài liệu table with zero Đồng bộ / Kích thước columns', async () => {
     const onWorkspaceChange = vi.fn()
     const onOpenDocument = vi.fn()
 
@@ -301,6 +301,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'recent',
       'shared-with-me',
       'shared-by-me',
+      'archive',
       'trash',
     ])
     expect(navButtons.map((b) => b.textContent?.trim())).toEqual([
@@ -308,10 +309,10 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'Gần đây',
       'Được chia sẻ với tôi',
       'Tôi đã chia sẻ',
+      'Lưu trữ',
       'Thùng rác',
     ])
     expect(sidebarSlot.textContent).not.toContain('Gắn sao')
-    expect(sidebarSlot.textContent).not.toContain('Lưu trữ')
 
     // 2. Top toolbar: h1 title, workspace switcher, search input, Tải lên, Tạo mới
     const h1 = host.querySelector<HTMLHeadingElement>('h1.dh-title')
