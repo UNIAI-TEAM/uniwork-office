@@ -307,6 +307,14 @@ export function AccountPane({ account }: { account: AccountController }) {
         </div>
       )}
 
+      {account.signOutTimedOut && (
+        <div className="acct-notice warn" role="status" aria-live="polite">
+          <div className="acct-notice-text">
+            <div className="acct-notice-body">{t('uwSignOutTimedOut')}</div>
+          </div>
+        </div>
+      )}
+
       {withProfile && orgChoice.loadError && (
         <div className="acct-notice warn uw-org-error" role="alert">
           <div className="acct-notice-text">
