@@ -302,7 +302,8 @@ describe('UNI-1959 first save: Name the document + Location', () => {
   })
 
   it('picking the folder it is already in sends no move', async () => {
-    await render()
+    // the picker names My Folder by its label: the English one is "My Folder"
+    await render('en')
     await request()
     await changeFolderTo('My Folder')
     await save()
