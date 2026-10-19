@@ -877,7 +877,10 @@ describe('401: one shared refresh, one retry (real account session)', () => {
         'missing-key',
       ]) {
         expect(byId[id], id).toBeUndefined()
-        expect(documents.find((d) => d.id === id), id).not.toHaveProperty('shareScope')
+        expect(
+          documents.find((d) => d.id === id),
+          id,
+        ).not.toHaveProperty('shareScope')
       }
     }
     expectParsed((await api.listDocuments({ workspaceId: 'ws_1' })).documents)

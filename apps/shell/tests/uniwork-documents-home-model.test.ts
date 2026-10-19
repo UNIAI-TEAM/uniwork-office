@@ -181,8 +181,10 @@ describe('DH1-W2 documents-home-model', () => {
       organization: false,
       publicLink: false,
     }
-    const cell = (shareScope: DocumentsHomeDoc['shareScope'], myLevel: DocumentsHomeDoc['myLevel']) =>
-      formatAccessCell(makeDoc({ visibility: 'restricted', shareScope, myLevel }), tVi, 'vi')
+    const cell = (
+      shareScope: DocumentsHomeDoc['shareScope'],
+      myLevel: DocumentsHomeDoc['myLevel'],
+    ) => formatAccessCell(makeDoc({ visibility: 'restricted', shareScope, myLevel }), tVi, 'vi')
 
     expect(cell({ ...none, users: 2 }, 'manage')).toEqual({
       visibilityLabel: '2 người',
