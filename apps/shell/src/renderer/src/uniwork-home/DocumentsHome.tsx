@@ -326,9 +326,6 @@ export function DocumentsHome({
     () => labelMyFolderPath(rawPath, resolvedMyFolderId, myFolderLabel),
     [rawPath, resolvedMyFolderId, myFolderLabel],
   )
-  // the Move picker's start for a row with no parent: the open folder, but only in a folder view
-  // (the other lists keep the folder they were left from, which is not where their rows are)
-  const moveFallbackFolderId = subView === 'workspace' || subView === 'my-folder' ? folderId : null
 
   const refreshAll = useCallback(() => {
     setTreeTick((n) => n + 1)
@@ -464,6 +461,17 @@ export function DocumentsHome({
   }, [subView])
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
+  // the Move picker's start for a row with no parent: the folder the list shows, but only in a folder view
+  // with no query (the other lists and a search keep the folder they were left from, which is not where
+  // their rows are; My Folder's rows are in My Folder whatever folder the workspace view was left at)
+  const moveFallbackFolderId =
+    query.length > 0
+      ? null
+      : subView === 'workspace'
+        ? folderId
+        : subView === 'my-folder'
+          ? resolvedMyFolderId
+          : null
   const listSeqRef = useRef(0)
   const wireFilters = useMemo(
     () => toUniworkListFilters(filters),
