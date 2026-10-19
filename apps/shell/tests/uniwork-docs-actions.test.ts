@@ -1644,9 +1644,9 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
   })
 
   it('BE-4: metadata still in flight when the session ends never reaches the next shell', async () => {
-    let hold: Promise<void> | undefined
+    const gate: { hold?: Promise<void> } = {}
     let release: () => void = () => undefined
-    const server = fakeServer({ getDocumentGate: () => hold })
+    const server = fakeServer({ getDocumentGate: () => gate.hold })
     const win = dialogWindow()
     const ctx = setup(server, {
       syncStore: true,
@@ -1655,7 +1655,7 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
       dismissFirstSaveName: win.dismiss,
     })
     const doc = await createdAndOpened(ctx)
-    hold = new Promise<void>((resolve) => {
+    gate.hold = new Promise<void>((resolve) => {
       release = resolve
     })
     writeFileSync(doc.path, 'bytes v2')
@@ -1671,9 +1671,9 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
   })
 
   it('BE-4/19: metadata that resolves for another account never reaches the shell (A -> B)', async () => {
-    let hold: Promise<void> | undefined
+    const gate: { hold?: Promise<void> } = {}
     let release: () => void = () => undefined
-    const server = fakeServer({ getDocumentGate: () => hold })
+    const server = fakeServer({ getDocumentGate: () => gate.hold })
     const win = dialogWindow()
     const ctx = setup(server, {
       syncStore: true,
@@ -1682,7 +1682,7 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
       dismissFirstSaveName: win.dismiss,
     })
     const doc = await createdAndOpened(ctx)
-    hold = new Promise<void>((resolve) => {
+    gate.hold = new Promise<void>((resolve) => {
       release = resolve
     })
     writeFileSync(doc.path, 'bytes v2')
@@ -1917,7 +1917,7 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     const ctx = setup(server, {
       syncStore: true,
       closeChoice: 'save',
-      closeSaveWaitMs: 150,
+      closeSaveWaitMs: 1500,
       moduleSaveWrites: 'bytes v2',
       requestFirstSaveName: win.request,
     })
@@ -1927,7 +1927,7 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     const closing = ctx.service.confirmClose(doc.path)
     await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
     // the person takes longer to name it than the settlement deadline
-    await new Promise((resolve) => setTimeout(resolve, 450))
+    await new Promise((resolve) => setTimeout(resolve, 2200))
     win.answers[0]!('continue')
     await expect(closing).resolves.toBe(true)
     expect(commitsOf(server)).toHaveLength(1)

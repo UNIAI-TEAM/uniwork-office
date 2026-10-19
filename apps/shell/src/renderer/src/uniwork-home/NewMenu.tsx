@@ -93,8 +93,6 @@ export function NewMenu({
   // initial focus: the first usable row
   useEffect(() => {
     if (open) focusables()[0]?.focus()
-    // focusables reads the DOM of the open menu only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const onMenuKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
