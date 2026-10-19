@@ -330,6 +330,12 @@ export interface UniworkDocsServiceDeps {
    * `onUserSave`.
    */
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
+  /**
+   * The shell itself rewrote the file at `path` behind its module: a module
+   * that refuses to write over another program's change (docs) forgets what
+   * it recorded, so the next Save writes. Absent / a no-op for the others.
+   */
+  noteShellRewrote?(path: string): void
   /** remounts the tab showing the path so it re-reads the file */
   reloadPath(path: string): void
   activePath(): string | undefined
@@ -1867,6 +1873,9 @@ export class UniworkDocsService {
     // a poll pass that began before the last Save still sees the pre-Save
     // edits: the next pass reads the editor again
     if (dirty && mark !== undefined && (this.lastUserSave.get(doc.path) ?? 0) > mark) return
+    // UWNM-BE-R4-2: while the naming ask holds a first Save its bytes are unsent
+    // work, however clean the editor that wrote them reads
+    if (!dirty && this.firstSaveOps.has(pathKey(doc.path))) return
     if (dirty === this.editorDirty.has(doc.path)) return
     const before = this.statusOf(doc).state
     if (dirty) this.editorDirty.add(doc.path)
@@ -7213,6 +7222,8 @@ export class UniworkDocsService {
         // The copy stays unsent work and the module writes them again: that
         // Save lands under the still-open naming op, and the verdict uploads it
         this.editorDirty.add(done.path)
+        // UWNM-BE-R4-1: the restore was the shell's own write, not another program's
+        this.deps.noteShellRewrote?.(done.path)
         this.deps.requestModuleSave(done.path)
       }
       const restored = this.store.lookup(path)

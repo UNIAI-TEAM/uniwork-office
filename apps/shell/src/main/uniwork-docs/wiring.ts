@@ -129,6 +129,8 @@ export interface UniworkDocsWiring {
   /** EL-1(b) fix6 (VEL-2): broadcast `{ path }` to every renderer webContents */
   pushDocStateChanged?(path: string): void
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
+  /** UWNM-BE-R4-1: the shell rewrote `path` itself (docs forgets its disk state) */
+  noteShellRewrote?(path: string): void
   reloadPath(path: string): void
   /**
    * G5-03a: the FRESH editor state of one path, summed over every view that
@@ -756,6 +758,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPathOpen: (path) => wiring.isPathOpen(path),
     requestModuleSave: (path, onNotWritten, mode) =>
       wiring.requestModuleSave(path, onNotWritten, mode),
+    noteShellRewrote: (path) => wiring.noteShellRewrote?.(path),
     reloadPath: (path) => wiring.reloadPath(path),
     // G5-03a: the fresh editor state of one path (W2's live read; the wiring
     // placeholder is what index.ts installs today)
