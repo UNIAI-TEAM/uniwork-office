@@ -161,6 +161,9 @@ html.genoffice-popover-open .ribbon-tabs {
   align-items: stretch;
   padding: 6px 12px;
   height: 80px;
+  /* the scroller is the containing block of the fit-level clipped labels (position: absolute): with
+   * .ribbon as their block they sat outside this clip and stretched the page sideways at phone width */
+  position: relative;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -2008,7 +2011,10 @@ html.genoffice-popover-open .ribbon-tabs {
   border: none;
   background: none;
   border-radius: var(--radius-16) var(--radius-16) 0 0;
-  padding: 12px 14px 4px;
+  /* vertical gaps live on margin, not padding (as docs/pdf): padding eats into the min-height, so a
+   * placeholder wrapped to two lines (narrow panel) ran under the hint below the box */
+  padding: 0 14px;
+  margin: 12px 0 4px;
   font-size: 16px;
   font-family: inherit;
   line-height: 24px;
