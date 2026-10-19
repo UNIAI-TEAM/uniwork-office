@@ -405,10 +405,9 @@ describe('G5-05 download: sign-out during download', () => {
     h.docs.beforeChunk = (_id, index) => {
       if (index === 4) wiped = signOut(h)
     }
-    const row = rowOf(await pinDoc(h))
+    // FUSR-R2-2: the pin answers for the outgoing session, so it returns no row of it
+    expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'interrupted' })
     await wiped
-    expect(row.state).toBe('interrupted')
-    expect(row.readyVersion).toBeNull()
     expect(h.storeFiles()).toEqual([])
     expect(filesContaining(h.fs, doc.bytes)).toEqual([])
     // the same account signs in again: nothing of the download is ready
@@ -446,7 +445,8 @@ describe('G5-05 download: sign-out during download', () => {
       }
       return false
     }
-    rowOf(await pinDoc(h))
+    // FUSR-R2-2: the boundary moved, so the pin returns no row of the old scope
+    expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'interrupted' })
     await wiped
     // the boundary moved: no delete of the unwinding job re-opens (and re-creates) the scope
     expect(await scopeExists()).toBe(false)
@@ -462,9 +462,9 @@ describe('G5-05 download: sign-out during download', () => {
       if (path.includes(staging) && !wiped) wiped = signOut(h)
       return false
     }
-    const row = rowOf(await pinDoc(h))
+    // FUSR-R2-2: the pin returns no row of the signed-out session
+    expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'interrupted' })
     await wiped
-    expect(row.state).toBe('interrupted')
     expect(h.storeFiles()).toEqual([])
     expect(filesContaining(h.fs, doc.bytes)).toEqual([])
     h.session.scope = SCOPE
