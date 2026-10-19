@@ -44,8 +44,6 @@ export const nl = {
   uhCreateUnavailable: "This server can't create this file type yet.",
   uhCreateUnavailableHint: 'Not available on this server yet',
   uhCreateFailed: 'Could not create the document. Try again.',
-  uhQuickHintPrefix: 'Hier maken en uploaden slaat op in',
-  uhQuickHintSuffix: ', alleen zichtbaar voor jou. Deel of verplaats indien nodig.',
   uhFilterType: 'Type:',
   uhFilterTypeAll: 'Alle',
   uhFilterModifiedBy: 'Gewijzigd door:',
@@ -85,8 +83,6 @@ export const nl = {
   uhEmptyTrash: 'Prullenbak is leeg.',
   uhEmptyFiltered: 'Geen documenten komen overeen met de huidige filters.',
   uhTrashNote: 'Items in de prullenbak kunnen worden hersteld als je Beheer-toegang hebt.',
-  uhMyFolderNote:
-    'Privé — alleen jij hebt toegang tenzij je deelt of verplaatst naar een gedeelde map.',
   uhLoadMore: 'Meer laden',
   uhRowActions: 'Meer acties',
 } satisfies Record<keyof typeof zh, string>

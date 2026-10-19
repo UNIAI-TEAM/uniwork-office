@@ -44,8 +44,6 @@ export const ms = {
   uhCreateUnavailable: "This server can't create this file type yet.",
   uhCreateUnavailableHint: 'Not available on this server yet',
   uhCreateFailed: 'Could not create the document. Try again.',
-  uhQuickHintPrefix: 'Mencipta dan memuat naik di sini disimpan ke',
-  uhQuickHintSuffix: ', hanya dilihat oleh anda. Kongsi atau Alihkan apabila perlu.',
   uhFilterType: 'Jenis:',
   uhFilterTypeAll: 'Semua',
   uhFilterModifiedBy: 'Diubah suai oleh:',
@@ -85,8 +83,6 @@ export const ms = {
   uhEmptyTrash: 'Sampah kosong.',
   uhEmptyFiltered: 'Tiada dokumen sepadan dengan penapis semasa.',
   uhTrashNote: 'Item dalam Sampah boleh dipulihkan jika anda mempunyai akses Urus.',
-  uhMyFolderNote:
-    'Peribadi — hanya anda mempunyai akses melainkan anda berkongsi atau mengalihkan ke folder bersama.',
   uhLoadMore: 'Muat lagi',
   uhRowActions: 'Tindakan lain',
 } satisfies Record<keyof typeof zh, string>

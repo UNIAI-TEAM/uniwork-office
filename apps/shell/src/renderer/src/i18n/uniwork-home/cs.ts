@@ -44,8 +44,6 @@ export const cs = {
   uhCreateUnavailable: "This server can't create this file type yet.",
   uhCreateUnavailableHint: 'Not available on this server yet',
   uhCreateFailed: 'Could not create the document. Try again.',
-  uhQuickHintPrefix: 'Vytvoření a nahrání zde se uloží do',
-  uhQuickHintSuffix: ', viditelné pouze pro vás. Sdílejte nebo přesuňte podle potřeby.',
   uhFilterType: 'Typ:',
   uhFilterTypeAll: 'Vše',
   uhFilterModifiedBy: 'Upravil:',
@@ -86,8 +84,6 @@ export const cs = {
   uhEmptyTrash: 'Koš je prázdný.',
   uhEmptyFiltered: 'Žádné dokumenty neodpovídají aktuálním filtrům.',
   uhTrashNote: 'Položky v koši lze obnovit, pokud máte oprávnění Správa.',
-  uhMyFolderNote:
-    'Soukromé — přístup máte pouze vy, pokud dokument nesdílíte nebo nepřesunete do sdílené složky.',
   uhLoadMore: 'Načíst další',
   uhRowActions: 'Další akce',
 } satisfies Record<keyof typeof zh, string>

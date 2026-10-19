@@ -44,8 +44,6 @@ export const ru = {
   uhCreateUnavailable: "This server can't create this file type yet.",
   uhCreateUnavailableHint: 'Not available on this server yet',
   uhCreateFailed: 'Could not create the document. Try again.',
-  uhQuickHintPrefix: 'Созданные и загруженные здесь файлы сохраняются в',
-  uhQuickHintSuffix: ', видимы только вам. Поделитесь или переместите при необходимости.',
   uhFilterType: 'Тип:',
   uhFilterTypeAll: 'Все',
   uhFilterModifiedBy: 'Кем изменено:',
@@ -85,8 +83,6 @@ export const ru = {
   uhEmptyTrash: 'Корзина пуста.',
   uhEmptyFiltered: 'Нет документов, соответствующих фильтрам.',
   uhTrashNote: 'Элементы в корзине можно восстановить при наличии прав управления.',
-  uhMyFolderNote:
-    'Личное — доступ есть только у вас, пока вы не поделитесь или не переместите в общую папку.',
   uhLoadMore: 'Загрузить ещё',
   uhRowActions: 'Другие действия',
 } satisfies Record<keyof typeof zh, string>

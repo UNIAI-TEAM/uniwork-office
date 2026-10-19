@@ -44,8 +44,6 @@ export const he = {
   uhCreateUnavailable: "This server can't create this file type yet.",
   uhCreateUnavailableHint: 'Not available on this server yet',
   uhCreateFailed: 'Could not create the document. Try again.',
-  uhQuickHintPrefix: 'יצירה והעלאה כאן נשמרות אל',
-  uhQuickHintSuffix: ', גלוי רק לך. שתף או העבר בעת הצורך.',
   uhFilterType: 'סוג:',
   uhFilterTypeAll: 'הכל',
   uhFilterModifiedBy: 'שונה על ידי:',
@@ -85,7 +83,6 @@ export const he = {
   uhEmptyTrash: 'האשפה ריקה.',
   uhEmptyFiltered: 'אין מסמכים התואמים למסננים הנוכחיים.',
   uhTrashNote: 'ניתן לשחזר פריטים באשפה אם יש לך הרשאת ניהול.',
-  uhMyFolderNote: 'פרטי — רק לך יש גישה אלא אם תשתף או תעביר לתיקייה משותפת.',
   uhLoadMore: 'טען עוד',
   uhRowActions: 'פעולות נוספות',
 } satisfies Record<keyof typeof zh, string>

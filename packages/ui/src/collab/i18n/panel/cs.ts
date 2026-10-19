@@ -45,6 +45,7 @@ export const cs = {
   collabDeleteConfirm: 'Smazat trvale',
   collabDeleted: 'Tento obsah byl smazán',
   collabEdited: 'Upraveno · {time}',
+  collabEditedMark: '(upraveno)',
   collabFormerMember: 'Bývalý člen',
   collabHistory: 'Zobrazit historii úprav',
   collabHistoryTitle: 'Historie úprav',

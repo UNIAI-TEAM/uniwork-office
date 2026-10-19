@@ -44,8 +44,6 @@ export const zhTW = {
   uhCreateUnavailable: "This server can't create this file type yet.",
   uhCreateUnavailableHint: 'Not available on this server yet',
   uhCreateFailed: 'Could not create the document. Try again.',
-  uhQuickHintPrefix: '在此頁面新增和上傳將儲存到',
-  uhQuickHintSuffix: '，僅你可見。按需共用或移動。',
   uhFilterType: '類型：',
   uhFilterTypeAll: '全部',
   uhFilterModifiedBy: '修改者：',
@@ -85,7 +83,6 @@ export const zhTW = {
   uhEmptyTrash: '垃圾桶為空。',
   uhEmptyFiltered: '沒有符合篩選條件的文件。',
   uhTrashNote: '如果你擁有管理權限，可以還原垃圾桶中的項目。',
-  uhMyFolderNote: '私人 — 除非你共用或移動到共用資料夾，否則只有你可以存取。',
   uhLoadMore: '載入更多',
   uhRowActions: '更多操作',
 } satisfies Record<keyof typeof zh, string>

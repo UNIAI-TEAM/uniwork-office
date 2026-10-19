@@ -63,6 +63,7 @@ const PANEL_KEYS = [
   'collabDeleteConfirm',
   'collabDeleted',
   'collabEdited',
+  'collabEditedMark',
   'collabFormerMember',
   'collabHistory',
   'collabHistoryTitle',

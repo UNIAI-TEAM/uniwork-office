@@ -44,9 +44,6 @@ export const de = {
   uhCreateUnavailable: "This server can't create this file type yet.",
   uhCreateUnavailableHint: 'Not available on this server yet',
   uhCreateFailed: 'Could not create the document. Try again.',
-  uhQuickHintPrefix: 'Hier erstellte und hochgeladene Dateien werden in',
-  uhQuickHintSuffix:
-    ' gespeichert und sind nur für Sie sichtbar. Bei Bedarf teilen oder verschieben.',
   uhFilterType: 'Typ:',
   uhFilterTypeAll: 'Alle',
   uhFilterModifiedBy: 'Geändert von:',
@@ -88,8 +85,6 @@ export const de = {
   uhEmptyFiltered: 'Keine Dokumente entsprechen den aktuellen Filtern.',
   uhTrashNote:
     'Elemente im Papierkorb können wiederhergestellt werden, wenn Sie Verwaltungszugriff haben.',
-  uhMyFolderNote:
-    'Privat — nur Sie haben Zugriff, es sei denn, Sie geben Dateien frei oder verschieben sie in einen gemeinsamen Ordner.',
   uhLoadMore: 'Mehr laden',
   uhRowActions: 'Weitere Aktionen',
 } satisfies Record<keyof typeof zh, string>

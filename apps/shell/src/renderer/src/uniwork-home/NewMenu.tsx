@@ -64,10 +64,6 @@ export function NewMenu({
   }, [open])
 
   useEffect(() => {
-    if (open) menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
-  }, [open])
-
-  useEffect(() => {
     if (!open) return
     const onOutside = (e: MouseEvent) => {
       const target = e.target as Node
@@ -105,7 +101,11 @@ export function NewMenu({
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       const step = event.key === 'ArrowDown' ? 1 : -1
-      nodes[(at + step + nodes.length) % nodes.length]?.focus()
+      // focus on a row that is not usable (a mouse-focused disabled row): Down starts at the
+      // first usable row, Up at the last
+      const next =
+        at === -1 ? (step === 1 ? 0 : nodes.length - 1) : (at + step + nodes.length) % nodes.length
+      nodes[next]?.focus()
     } else if (event.key === 'Home' || event.key === 'End') {
       event.preventDefault()
       nodes[event.key === 'Home' ? 0 : nodes.length - 1]?.focus()
