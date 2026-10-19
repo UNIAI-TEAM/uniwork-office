@@ -965,6 +965,17 @@ export function createTextWebApi(
       }
     },
 
+    /**
+     * web-only (UNI-1920): runs the renderer's print handlers — the same ones onPrintRequest
+     * mounts — when the `print` grant is effective. The Ctrl/Cmd+P accelerator's `run`; false
+     * means nobody printed (cap withheld or no listener) and the browser keeps its default.
+     */
+    requestPrint(): boolean {
+      if (!canPrint()) return false
+      for (const h of printHandlers) h()
+      return printHandlers.size > 0
+    },
+
     async exportPdf(request: { html: string; suggestedName: string }): Promise<ExportResult> {
       if (!hostPrint && !exportPdfGranted) return { ok: false, error: 'unsupported' }
       if (typeof request?.html !== 'string' || !request.html) {

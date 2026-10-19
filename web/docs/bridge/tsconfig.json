@@ -32,6 +32,8 @@
     "module-bridge.test.ts",
     "escape-forwarder.ts",
     "escape-forwarder.test.ts",
+    "print-accelerator.ts",
+    "print-accelerator.test.ts",
     "draft-recovery.ts",
     "draft-recovery.test.ts",
     "mock-port.test.ts",

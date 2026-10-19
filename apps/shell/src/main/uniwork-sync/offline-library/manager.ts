@@ -34,6 +34,7 @@ import {
   OFFLINE_LIBRARY_QUOTA_BYTES,
   blobKey,
   generationKeys,
+  type LibraryDeleteResult,
   type LibraryIndex,
   type LibraryWriteResult,
   type OfflineLibraryStore,
@@ -384,6 +385,21 @@ export class OfflineLibraryManager {
   }
 
   /**
+   * FUSR-R1 (UNI-1362): the boundary an operation started in. Taken at the
+   * operation's ENTRY, before its first await (right after `checkBoundary()`),
+   * and carried by the operation: it is never re-read from the current epoch
+   * after an await. The returned check is synchronous and runs immediately
+   * before every store write or delete, after a write resolves and before its
+   * notice, and before a view or row leaves the operation. False once a
+   * sign-out, an account switch or a new session passed.
+   */
+  private boundary(): () => boolean {
+    const epoch = this.epoch
+    const token = this.token()
+    return () => this.epoch === epoch && this.token() === token
+  }
+
+  /**
    * Sign-out / account switch: every download stops at once and none of them
    * commits; the wiring then wipes the library scope (OQ-UX11 a: the copies
    * go at sign-out). Synchronous, so it runs before the wipe.
@@ -409,12 +425,24 @@ export class OfflineLibraryManager {
     return next
   }
 
-  private withIndex<T>(run: (index: LibraryIndex) => Promise<{ write: boolean; value: T }>) {
+  /**
+   * `live` is checked when the task starts (it may have queued behind the lock
+   * across a boundary), after the read, and right before the index is written:
+   * an index read or changed under one boundary is never persisted under the
+   * next (FUSR-R1-6).
+   */
+  private withIndex<T>(
+    live: () => boolean,
+    run: (index: LibraryIndex) => Promise<{ write: boolean; value: T }>,
+  ) {
     const task = async (): Promise<T | Unavailable | { kind: 'refused' }> => {
+      if (!live()) return { kind: 'interrupted' }
       const read = await this.options.store.readIndex()
       if (read.kind !== 'ok') return read
+      if (!live()) return { kind: 'interrupted' }
       const outcome = await run(read.index)
       if (outcome.write) {
+        if (!live()) return { kind: 'interrupted' }
         const written = await this.options.store.writeIndex(read.index)
         if (written.kind !== 'ok') {
           return isUnavailable(written) ? written : { kind: 'refused' as const }
@@ -486,10 +514,35 @@ export class OfflineLibraryManager {
     }
   }
 
-  private async put(record: PinRecord): Promise<boolean> {
-    const written = await this.options.store.putPin(record)
+  /**
+   * The single choke points of the library store's writes and deletes: `live`
+   * (the boundary the operation started in, R4F-2 / FUSR-R1) is checked
+   * synchronously before the store call, so a moved boundary refuses with no
+   * store call at all.
+   */
+  private async writePin(record: PinRecord, live: () => boolean): Promise<LibraryWriteResult> {
+    if (!live()) return { kind: 'interrupted' }
+    return this.options.store.putPin(record)
+  }
+
+  private async deletePinRow(
+    documentId: string,
+    live: () => boolean,
+  ): Promise<LibraryDeleteResult> {
+    if (!live()) return { kind: 'interrupted' }
+    return this.options.store.deletePin(documentId)
+  }
+
+  /**
+   * A row read under a boundary is never written back after it, and a write that
+   * finished before one announces nothing after it (FUSR-R1-2): false, no notice.
+   */
+  private async put(record: PinRecord, live: () => boolean): Promise<boolean> {
+    const written = await this.writePin(record, live)
+    if (!live()) return false
     if (written.kind === 'ok') this.unsaved.delete(record.documentId)
-    this.changed(record.documentId)
+    // interrupted: the scope was wiped under the write, there is no row to announce
+    if (written.kind !== 'interrupted') this.changed(record.documentId)
     return written.kind === 'ok'
   }
 
@@ -538,9 +591,9 @@ export class OfflineLibraryManager {
    * the index lock, so concurrent pins of different documents can never pass
    * the 200-pin or the 2 GiB check together. Null = reserved.
    */
-  private async reserve(record: PinRecord): Promise<LibraryRefusal | null> {
+  private async reserve(record: PinRecord, live: () => boolean): Promise<LibraryRefusal | null> {
     const documentId = record.documentId
-    const outcome = await this.withIndex(async (index) => {
+    const outcome = await this.withIndex(live, async (index) => {
       const listed = index.pins.includes(documentId)
       const refuse = (code: LibraryRefusalCode) => ({ write: false, value: refused(code) })
       if (!listed && index.pins.length >= this.limits.maxPins) return refuse('offline_cap_reached')
@@ -550,7 +603,7 @@ export class OfflineLibraryManager {
         if (typeof used !== 'number') return refuse(used.kind)
         if (used + asked > this.limits.maxBytes) return refuse('offline_cap_reached')
       }
-      const written = await this.options.store.putPin(record)
+      const written = await this.writePin(record, live)
       if (written.kind !== 'ok') {
         return refuse(
           isUnavailable(written)
@@ -566,24 +619,29 @@ export class OfflineLibraryManager {
     if (outcome === null) return null
     if ('code' in outcome) return outcome
     // the index write failed after the row was written: the row goes again
-    await this.options.store.deletePin(documentId)
+    await this.deletePinRow(documentId, live)
     return refused(isUnavailable(outcome) ? outcome.kind : 'invalid')
   }
 
   /** a reservation whose pin did not go ahead (lease refused): row and index entry go */
-  private async releaseReservation(documentId: string): Promise<void> {
-    await this.withIndex(async (index) => {
+  private async releaseReservation(documentId: string, live: () => boolean): Promise<void> {
+    await this.withIndex(live, async (index) => {
       index.pins = index.pins.filter((id) => id !== documentId)
       return { write: true, value: undefined }
     })
-    await this.options.store.deletePin(documentId)
+    await this.deletePinRow(documentId, live)
   }
 
-  private async ensureLease(documentId: string): Promise<LibraryRefusal | null> {
+  private async ensureLease(
+    documentId: string,
+    live: () => boolean,
+  ): Promise<LibraryRefusal | null> {
     const state = await this.options.leases.effectiveState(documentId)
     if (state.usable) return null
     if (state.state === 'revoked') return refused('revoked')
     if (state.state !== 'none' && state.state !== 'expired') return null
+    // a lease is never taken for a document of the outgoing account
+    if (!live()) return refused('interrupted')
     const granted = await this.options.leases.grant(documentId)
     if (granted.kind === 'capability_off') return refused('capability_off')
     if (granted.kind === 'revoked') return refused('revoked')
@@ -603,12 +661,10 @@ export class OfflineLibraryManager {
   private async beginDownload(
     record: PinRecord,
     manifest: PinManifest,
+    live: () => boolean,
     options: { quota?: boolean } = {},
   ): Promise<DownloadStart> {
     const documentId = record.documentId
-    const epoch = this.epoch
-    const token = this.token()
-    const live = () => this.epoch === epoch && this.token() === token
     const generation = this.newGeneration()
     const keys = generationKeys(documentId, generation, manifest.assets.length)
     const total = manifestBytes(manifest)
@@ -622,9 +678,9 @@ export class OfflineLibraryManager {
     delete downloading.failure
     // the staging keys are on record before any byte is written, so a crash
     // still names every staging blob for recover() to delete
-    const write = () => this.options.store.putPin(downloading)
+    const write = () => this.writePin(downloading, live)
     const started: LibraryWriteResult | 'over_quota' = options.quota
-      ? await this.withIndex<LibraryWriteResult | 'over_quota'>(async (index) => {
+      ? await this.withIndex<LibraryWriteResult | 'over_quota'>(live, async (index) => {
           const used = await this.usedBytes(index, documentId)
           if (typeof used !== 'number') return { write: false, value: used }
           if (used + total > this.limits.maxBytes) {
@@ -644,6 +700,13 @@ export class OfflineLibraryManager {
               ? { kind: 'failed', code: 'refused' }
               : started
       return { kind: 'settled', record: await this.settleFailure(record, outcome, live) }
+    }
+    // the boundary passed while the row was being written: no job, no progress, no notice
+    if (!live()) {
+      return {
+        kind: 'settled',
+        record: { ...record, state: 'interrupted', staging: null, progress: null },
+      }
     }
     this.unsaved.delete(documentId)
     this.progress.set(documentId, { receivedBytes: 0, totalBytes: total })
@@ -684,8 +747,8 @@ export class OfflineLibraryManager {
           if (!live()) return
           const current = await this.options.store.getPin(documentId)
           if (current.kind !== 'ok' || current.record.staging?.generation !== generation) return
-          await this.options.store.putPin({ ...current.record, state: 'verifying' })
-          this.changed(documentId)
+          await this.writePin({ ...current.record, state: 'verifying' }, live)
+          if (live()) this.changed(documentId)
         }),
     })
     this.progress.delete(documentId)
@@ -713,13 +776,15 @@ export class OfflineLibraryManager {
     // folder; the staging keys are on the row, so the wipe or recover() takes them)
     if (!live()) return stopped
     const read = await this.options.store.getPin(documentId)
+    // the row was read across an await: a boundary since then is checked before anything below
+    if (!live()) return stopped
     if (read.kind !== 'ok' || read.record.staging?.generation !== generation) {
-      await wipeKeys(this.options.store, keys)
+      await wipeKeys(this.options.store, keys, live)
       return read.kind === 'ok' ? read.record : stopped
     }
     const current = read.record
     if (outcome.kind !== 'staged') {
-      await wipeKeys(this.options.store, keys)
+      await wipeKeys(this.options.store, keys, live)
       return this.settleFailure(current, outcome, live)
     }
     const committed: PinRecord = {
@@ -738,9 +803,9 @@ export class OfflineLibraryManager {
     }
     delete committed.failure
     // the one atomic commit: this row write is what makes the copy ready
-    const written = await this.options.store.putPin(committed)
+    const written = await this.writePin(committed, live)
     if (written.kind !== 'ok' || !live()) {
-      if (live()) await wipeKeys(this.options.store, keys)
+      if (live()) await wipeKeys(this.options.store, keys, live)
       const failure: StageOutcome =
         written.kind === 'store_full'
           ? { kind: 'store_full' }
@@ -753,9 +818,10 @@ export class OfflineLibraryManager {
       await wipeKeys(
         this.options.store,
         generationKeys(documentId, current.readyGeneration, current.readyManifest.assets.length),
+        live,
       )
     }
-    this.changed(documentId)
+    if (live()) this.changed(documentId)
     return committed
   }
 
@@ -776,7 +842,7 @@ export class OfflineLibraryManager {
       outcome.kind === 'failed' &&
       (outcome.code === 'deleted' || outcome.code === 'document_deleted')
     ) {
-      return (await this.purgeRecord(record, 'deleted')) ?? record
+      return (await this.purgeRecord(record, 'deleted', live)) ?? record
     }
     if (
       outcome.kind === 'failed' &&
@@ -784,7 +850,7 @@ export class OfflineLibraryManager {
         outcome.code === 'not_found' ||
         outcome.code === 'permission_revoked')
     ) {
-      return (await this.purgeRecord(record, 'revoked')) ?? record
+      return (await this.purgeRecord(record, 'revoked', live)) ?? record
     }
     const held = record.readyGeneration !== null
     const settled: PinRecord = { ...record, staging: null, progress: null }
@@ -822,7 +888,7 @@ export class OfflineLibraryManager {
     }
     // a full store refuses this row too: the user must still see the settled
     // state (disk-full / update-kept), so it is held in memory until a write lands
-    if (!(await this.put(settled))) this.unsaved.set(settled.documentId, settled)
+    if (!(await this.put(settled, live)) && live()) this.unsaved.set(settled.documentId, settled)
     return settled
   }
 
@@ -837,21 +903,30 @@ export class OfflineLibraryManager {
   private async purgeRecord(
     record: PinRecord,
     state: 'revoked' | 'deleted',
+    live: () => boolean,
   ): Promise<PinRecord | null> {
-    await wipeKeys(this.options.store, heldKeys(record))
+    await wipeKeys(this.options.store, heldKeys(record), live)
     const purged: PinRecord = { ...withoutCopy(record), state }
     delete purged.failure
-    return (await this.put(purged)) ? purged : null
+    return (await this.put(purged, live)) ? purged : null
   }
 
   private async purge(documentId: string, state: 'revoked' | 'deleted'): Promise<PinRow | null> {
     this.checkBoundary()
+    // R4F-2 / FUSR-R1-3 (UNI-1362): stop -> lock -> read -> delete -> write -> view
+    // spans many awaits, and the lock may queue it across a boundary: every
+    // continuation re-checks the boundary the revoke was raised in
+    const live = this.boundary()
     await this.stopJob(documentId)
+    if (!live()) return null
     return this.withDoc(documentId, async () => {
+      if (!live()) return null
       const read = await this.options.store.getPin(documentId)
-      if (read.kind !== 'ok') return null
-      const purged = await this.purgeRecord(read.record, state)
-      return purged ? this.view(purged) : null
+      if (read.kind !== 'ok' || !live()) return null
+      const purged = await this.purgeRecord(read.record, state, live)
+      if (!purged) return null
+      const row = await this.view(purged)
+      return live() ? row : null
     })
   }
 
@@ -893,12 +968,18 @@ export class OfflineLibraryManager {
   /** archived on the server: the row stays and opens until the lease ends */
   async handleArchived(documentId: string): Promise<PinRow | null> {
     this.checkBoundary()
+    // R4F-2 / FUSR-R1 (UNI-1362): the flag is written back, announced and returned
+    // only under the boundary it was read in
+    const live = this.boundary()
     return this.withDoc(documentId, async () => {
+      if (!live()) return null
       const read = await this.options.store.getPin(documentId)
-      if (read.kind !== 'ok') return null
+      if (read.kind !== 'ok' || !live()) return null
       const archived = { ...read.record, archived: true }
-      await this.put(archived)
-      return this.view(archived)
+      await this.put(archived, live)
+      if (!live()) return null
+      const row = await this.view(archived)
+      return live() ? row : null
     })
   }
 
@@ -907,16 +988,64 @@ export class OfflineLibraryManager {
   async pin(input: { documentId: string; orgId: string; workspaceId: string }): Promise<PinResult> {
     const scope = this.checkBoundary()
     if (!scope) return refused('no_session')
+    const live = this.boundary()
     const { documentId, orgId, workspaceId } = input
     if (!this.validIds(documentId, orgId, workspaceId)) return refused('invalid')
     // OQ-UX11 (a): with the capability off no new pin is taken
     if (!(await this.options.capability(orgId))) return refused('capability_off')
-    const outcome = await this.withDoc(documentId, async (): Promise<PinResult | Started> => {
+    let outcome: PinResult | Started
+    for (;;) {
+      const attempt = await this.pinUnderLock(documentId, orgId, workspaceId, live)
+      if (attempt.kind !== 'stop') {
+        outcome = attempt
+        break
+      }
+      // a transfer still runs for the row this pin discards: it stops outside the
+      // document lock (its settle takes that lock), then the pin looks again
+      await this.stopJob(documentId)
+      if (!live()) return refused('interrupted')
+    }
+    // the transfer runs outside the document lock (T5-2)
+    if (outcome.kind !== 'started') return outcome
+    const row = await this.view(await outcome.done)
+    return live() ? { kind: 'pinned', row } : refused('interrupted')
+  }
+
+  private pinUnderLock(
+    documentId: string,
+    orgId: string,
+    workspaceId: string,
+    live: () => boolean,
+  ): Promise<PinResult | Started | { kind: 'stop' }> {
+    return this.withDoc(documentId, async (): Promise<PinResult | Started | { kind: 'stop' }> => {
+      if (!live()) return refused('interrupted')
       const existing = await this.options.store.getPin(documentId)
       if (isUnavailable(existing)) return refused(existing.kind)
-      if (existing.kind === 'ok') return { kind: 'pinned', row: await this.view(existing.record) }
       const index = await this.options.store.readIndex()
       if (index.kind !== 'ok') return refused(isUnavailable(index) ? index.kind : 'invalid')
+      if (!live()) return refused('interrupted')
+      if (existing.kind === 'ok') {
+        if (index.index.pins.includes(documentId)) {
+          const row = await this.view(existing.record)
+          return live() ? { kind: 'pinned', row } : refused('interrupted')
+        }
+        // FUSR-R4 (UNI-1362): a row the index does not list is never a pin (an
+        // earlier pin or unpin was cut at a boundary): it is discarded, and this
+        // pin starts from nothing, with its own quota, lease and rollback
+        if (this.jobs.has(documentId)) return { kind: 'stop' }
+        const cleanup = index.index.cleanup
+        const owned = new Set(
+          Object.prototype.hasOwnProperty.call(cleanup, documentId) ? cleanup[documentId] : [],
+        )
+        const keys = heldKeys(existing.record).filter((key) => !owned.has(key))
+        await wipeKeys(this.options.store, keys, live)
+        if (!live()) return refused('interrupted')
+        const deleted = await this.deletePinRow(documentId, live)
+        if (deleted.kind !== 'ok') return refused(deleted.kind)
+        if (!live()) return refused('interrupted')
+        // the settled state a full disk kept in memory belonged to the row just discarded
+        this.unsaved.delete(documentId)
+      }
       if (index.index.pins.length >= this.limits.maxPins) return refused('offline_cap_reached')
 
       const base: PinRecord = {
@@ -966,27 +1095,28 @@ export class OfflineLibraryManager {
         archived: detail?.archivedAt != null,
       }
       // the quota is checked and the pin reserved in one step (T5-1)
-      const reservation = await this.reserve(record)
+      const reservation = await this.reserve(record, live)
       if (reservation) return reservation
+      if (!live()) return refused('interrupted')
       if (manifest) {
-        const lease = await this.ensureLease(documentId)
+        const lease = await this.ensureLease(documentId, live)
         if (lease) {
-          await this.releaseReservation(documentId)
+          await this.releaseReservation(documentId, live)
           return lease
         }
       }
+      if (!live()) return refused('interrupted')
       this.changed(documentId)
-      if (!manifest) return { kind: 'pinned', row: await this.view(record) }
-      const begun = await this.beginDownload(record, manifest)
-      if (begun.kind === 'started') return begun
-      return {
-        kind: 'pinned',
-        row: await this.view(begun.kind === 'settled' ? begun.record : record),
+      // FUSR-R2-2 (UNI-1362): a row is returned only under the boundary the pin started in
+      if (!manifest) {
+        const row = await this.view(record)
+        return live() ? { kind: 'pinned', row } : refused('interrupted')
       }
+      const begun = await this.beginDownload(record, manifest, live)
+      if (begun.kind === 'started') return begun
+      const row = await this.view(begun.kind === 'settled' ? begun.record : record)
+      return live() ? { kind: 'pinned', row } : refused('interrupted')
     })
-    // the transfer runs outside the document lock (T5-2)
-    if (outcome.kind !== 'started') return outcome
-    return { kind: 'pinned', row: await this.view(await outcome.done) }
   }
 
   /** "Hủy tải": the download stops, staging is wiped, the old copy (if any) stays */
@@ -1004,7 +1134,11 @@ export class OfflineLibraryManager {
    */
   async refresh(documentId: string, options: { download?: boolean } = {}): Promise<RowResult> {
     if (!this.checkBoundary()) return refused('no_session')
+    // FUSR-R1-6 (UNI-1362): the row, the metadata and the lease are read across
+    // several awaits; what is written from them is written under THIS boundary only
+    const live = this.boundary()
     const outcome = await this.withDoc(documentId, async (): Promise<RowResult | Started> => {
+      if (!live()) return refused('interrupted')
       const read = await this.options.store.getPin(documentId)
       if (isUnavailable(read)) return refused(read.kind)
       if (read.kind !== 'ok') return refused('not_pinned')
@@ -1018,22 +1152,28 @@ export class OfflineLibraryManager {
       try {
         detail = await docs.getDocument(documentId)
       } catch (error) {
+        if (!live()) return refused('interrupted')
         const kind = classify(error)
         if (kind === 'deleted' || kind === 'revoked') {
           // a download in flight stops; its settle finds the staging gone and keeps nothing
           this.jobs.get(documentId)?.controller.abort()
-          const purged = await this.purgeRecord(record, kind)
-          return purged ? { kind: 'ok', row: await this.view(purged) } : refused(kind)
+          const purged = await this.purgeRecord(record, kind, live)
+          if (!live()) return refused('interrupted')
+          if (!purged) return refused(kind)
+          const row = await this.view(purged)
+          return live() ? { kind: 'ok', row } : refused('interrupted')
         }
         if (kind === 'session') return refused('no_session')
         return refused('offline')
       }
+      if (!live()) return refused('interrupted')
       const manifest = this.manifestOf(detail)
       if (gone) {
         // T5-5 (EXPERIENCE "restored"): the server answers for the document
         // again, so the pin waits for the network (or downloads now). The old
         // lease was revoked with it: it is dropped so a fresh one is granted.
         const lease = await this.options.leases.effectiveState(documentId)
+        if (!live()) return refused('interrupted')
         if (lease.state === 'revoked') {
           await this.options.leases.release(documentId).catch(() => undefined)
         }
@@ -1058,17 +1198,19 @@ export class OfflineLibraryManager {
       }
       // a download already in flight is not started twice
       if (!options.download || !newer || this.jobs.has(documentId)) {
-        await this.put(record)
-        return { kind: 'ok', row: await this.view(record) }
+        await this.put(record, live)
+        const row = await this.view(record)
+        return live() ? { kind: 'ok', row } : refused('interrupted')
       }
       if (largestFileBytes(manifest) > this.limits.maxFileBytes) {
-        const kept = await this.settleFailure(record, { kind: 'too_large' }, () => true)
-        return { kind: 'ok', row: await this.view(kept) }
+        const kept = await this.settleFailure(record, { kind: 'too_large' }, live)
+        const row = await this.view(kept)
+        return live() ? { kind: 'ok', row } : refused('interrupted')
       }
-      const lease = await this.ensureLease(documentId)
+      const lease = await this.ensureLease(documentId, live)
       if (lease) return lease
       // the 2 GiB check and the downloading row are one step (T5-1)
-      const begun = await this.beginDownload(record, manifest, { quota: true })
+      const begun = await this.beginDownload(record, manifest, live, { quota: true })
       if (begun.kind === 'over_quota') {
         // T5-5: a pin with no copy is recorded as refused, so an online pass
         // does not retry it every time; "Thử lại" checks the quota again
@@ -1076,15 +1218,19 @@ export class OfflineLibraryManager {
           record.readyGeneration === null
             ? { ...record, state: 'interrupted', failure: 'offline_cap_reached' }
             : { ...record, manifest: read.record.manifest },
+          live,
         )
-        return refused('offline_cap_reached')
+        return live() ? refused('offline_cap_reached') : refused('interrupted')
       }
       if (begun.kind === 'started') return begun
-      return { kind: 'ok', row: await this.view(begun.record) }
+      const row = await this.view(begun.record)
+      return live() ? { kind: 'ok', row } : refused('interrupted')
     })
     // the transfer runs outside the document lock (T5-2)
     if (outcome.kind !== 'started') return outcome
-    return { kind: 'ok', row: await this.view(await outcome.done) }
+    // FUSR-R2-2 (UNI-1362): the settled row is returned only under the boundary refresh started in
+    const row = await this.view(await outcome.done)
+    return live() ? { kind: 'ok', row } : refused('interrupted')
   }
 
   /** "Tải ngay" / "Thử lại" */
@@ -1119,24 +1265,25 @@ export class OfflineLibraryManager {
    */
   async unpin(documentId: string, options: { confirmed?: boolean } = {}): Promise<UnpinResult> {
     if (!this.checkBoundary()) return refused('no_session')
-    const epoch = this.epoch
+    const live = this.boundary()
     if (!options.confirmed && (await this.options.hasLocalWork(documentId))) {
       if (!this.checkBoundary()) return refused('no_session')
-      if (this.epoch !== epoch) return refused('interrupted')
+      if (!live()) return refused('interrupted')
       return { kind: 'needsConfirm' }
     }
     if (!this.checkBoundary()) return refused('no_session')
-    if (this.epoch !== epoch) return refused('interrupted')
+    if (!live()) return refused('interrupted')
     await this.stopJob(documentId)
     return this.withDoc(documentId, async (): Promise<UnpinResult> => {
       if (!this.checkBoundary()) return refused('no_session')
-      if (this.epoch !== epoch) return refused('interrupted')
+      if (!live()) return refused('interrupted')
       const read = await this.options.store.getPin(documentId)
       if (isUnavailable(read)) return refused(read.kind)
       if (read.kind !== 'ok') return refused('not_pinned')
+      if (!live()) return refused('interrupted')
       const keys = heldKeys(read.record)
       const deferred = (this.openCounts.get(documentId) ?? 0) > 0
-      const listed = await this.withIndex(async (index) => {
+      const listed = await this.withIndex(live, async (index) => {
         index.pins = index.pins.filter((id) => id !== documentId)
         if (deferred && keys.length > 0) {
           index.cleanup[documentId] = [...(index.cleanup[documentId] ?? []), ...keys]
@@ -1144,12 +1291,14 @@ export class OfflineLibraryManager {
         return { write: true, value: true }
       })
       if (listed !== true) return refused((listed as Unavailable).kind ?? 'invalid')
-      if (!deferred) await wipeKeys(this.options.store, keys)
-      await this.options.store.deletePin(documentId)
+      if (!deferred) await wipeKeys(this.options.store, keys, live)
+      await this.deletePinRow(documentId, live)
+      // nothing below belongs to a boundary that already passed
+      if (!live()) return refused('interrupted')
       this.progress.delete(documentId)
       this.unsaved.delete(documentId)
       await this.options.leases.release(documentId).catch(() => undefined)
-      this.changed(documentId)
+      if (live()) this.changed(documentId)
       return { kind: 'unpinned', deferred }
     })
   }
@@ -1157,16 +1306,21 @@ export class OfflineLibraryManager {
   /** drop the committed copy (and any staging) but keep the pin: it downloads again */
   async evict(documentId: string): Promise<RowResult> {
     if (!this.checkBoundary()) return refused('no_session')
+    const live = this.boundary()
     await this.stopJob(documentId)
+    if (!live()) return refused('interrupted')
     return this.withDoc(documentId, async (): Promise<RowResult> => {
+      if (!live()) return refused('interrupted')
       const read = await this.options.store.getPin(documentId)
       if (isUnavailable(read)) return refused(read.kind)
       if (read.kind !== 'ok') return refused('not_pinned')
-      await wipeKeys(this.options.store, heldKeys(read.record))
+      if (!live()) return refused('interrupted')
+      await wipeKeys(this.options.store, heldKeys(read.record), live)
       const evicted: PinRecord = { ...withoutCopy(read.record), state: 'waiting-network' }
       delete evicted.failure
-      await this.put(evicted)
-      return { kind: 'ok', row: await this.view(evicted) }
+      await this.put(evicted, live)
+      const row = await this.view(evicted)
+      return live() ? { kind: 'ok', row } : refused('interrupted')
     })
   }
 
@@ -1179,20 +1333,21 @@ export class OfflineLibraryManager {
   /** a tab closed it: a deferred unpin cleanup runs once no tab is left */
   async markClosed(documentId: string): Promise<void> {
     this.checkBoundary()
+    const live = this.boundary()
     const count = (this.openCounts.get(documentId) ?? 0) - 1
     if (count > 0) {
       this.openCounts.set(documentId, count)
       return
     }
     this.openCounts.delete(documentId)
-    await this.finishCleanup(documentId)
+    await this.finishCleanup(documentId, live)
   }
 
-  private async finishCleanup(documentId: string): Promise<void> {
-    await this.withIndex(async (index) => {
+  private async finishCleanup(documentId: string, live: () => boolean): Promise<void> {
+    await this.withIndex(live, async (index) => {
       const keys = index.cleanup[documentId]
       if (!keys) return { write: false, value: undefined }
-      await wipeKeys(this.options.store, keys)
+      await wipeKeys(this.options.store, keys, live)
       delete index.cleanup[documentId]
       return { write: true, value: undefined }
     })
@@ -1205,24 +1360,33 @@ export class OfflineLibraryManager {
    */
   async recover(): Promise<void> {
     if (!this.checkBoundary()) return
+    // FUSR-R1-6 (UNI-1362): the index and every row are read across awaits; the
+    // cleanups and settled rows are written under the boundary recover() started in
+    const live = this.boundary()
     const index = await this.options.store.readIndex()
-    if (index.kind !== 'ok') return
+    if (index.kind !== 'ok' || !live()) return
     for (const documentId of Object.keys(index.index.cleanup)) {
-      if ((this.openCounts.get(documentId) ?? 0) === 0) await this.finishCleanup(documentId)
+      if (!live()) return
+      if ((this.openCounts.get(documentId) ?? 0) === 0) await this.finishCleanup(documentId, live)
     }
     for (const documentId of index.index.pins) {
+      if (!live()) return
       if (this.jobs.has(documentId)) continue
       await this.withDoc(documentId, async () => {
+        if (!live()) return
         const read = await this.options.store.getPin(documentId)
-        if (read.kind !== 'ok' || !read.record.staging) return
-        await wipeKeys(this.options.store, read.record.staging.keys)
+        if (read.kind !== 'ok' || !read.record.staging || !live()) return
+        await wipeKeys(this.options.store, read.record.staging.keys, live)
         const stale = read.record.state === 'downloading' || read.record.state === 'verifying'
-        await this.put({
-          ...read.record,
-          staging: null,
-          progress: null,
-          state: stale ? 'interrupted' : read.record.state,
-        })
+        await this.put(
+          {
+            ...read.record,
+            staging: null,
+            progress: null,
+            state: stale ? 'interrupted' : read.record.state,
+          },
+          live,
+        )
       })
     }
   }
@@ -1243,20 +1407,25 @@ export class OfflineLibraryManager {
 
   async row(documentId: string): Promise<PinRow | null> {
     if (!this.checkBoundary()) return null
+    const live = this.boundary()
     const read = await this.options.store.getPin(documentId)
-    return read.kind === 'ok' ? this.view(this.held(read.record)) : null
+    if (read.kind !== 'ok' || !live()) return null
+    const row = await this.view(this.held(read.record))
+    return live() ? row : null
   }
 
   async list(): Promise<PinRow[]> {
     if (!this.checkBoundary()) return []
+    const live = this.boundary()
     const index = await this.options.store.readIndex()
     if (index.kind !== 'ok') return []
     const rows: PinRow[] = []
     for (const documentId of index.index.pins) {
       const read = await this.options.store.getPin(documentId)
+      if (!live()) return []
       if (read.kind === 'ok') rows.push(await this.view(this.held(read.record)))
     }
-    return rows
+    return live() ? rows : []
   }
 
   async quota(): Promise<LibraryQuota | LibraryRefusal> {
@@ -1280,14 +1449,18 @@ export class OfflineLibraryManager {
    */
   async openCached(documentId: string): Promise<CachedDocument | LibraryRefusal> {
     if (!this.checkBoundary()) return refused('no_session')
+    const live = this.boundary()
     return this.withDoc(documentId, async (): Promise<CachedDocument | LibraryRefusal> => {
+      if (!live()) return refused('interrupted')
       const read = await this.options.store.getPin(documentId)
       if (isUnavailable(read)) return refused(read.kind)
       if (read.kind !== 'ok') return refused('not_pinned')
+      if (!live()) return refused('interrupted')
       const record = read.record
       if (record.state === 'revoked' || record.state === 'deleted') return refused(record.state)
       if (!record.readyGeneration || !record.readyManifest) return refused('not_ready')
       const lease = await this.options.leases.effectiveState(documentId)
+      if (!live()) return refused('interrupted')
       if (!lease.usable) return { kind: 'refused', code: 'lease_unusable', lease: lease.state }
       const manifest = record.readyManifest
       const generation = record.readyGeneration
@@ -1303,22 +1476,26 @@ export class OfflineLibraryManager {
       const assets: Array<{ path: string; bytes: Uint8Array }> = []
       for (const file of files) {
         const blob = await this.options.store.getBlob(file.key)
+        // a blob read across a boundary is the next scope's (or nothing): never judged corrupt
+        if (!live()) return refused('interrupted')
         if (isUnavailable(blob)) return refused(blob.kind)
         if (blob.kind !== 'ok' || verifyBytes(file.expected, blob.bytes) !== 'ok') {
           // never served from a bad cache: the copy is dropped, the row is corrupt
-          await wipeKeys(this.options.store, heldKeys(record))
+          await wipeKeys(this.options.store, heldKeys(record), live)
           const corrupt: PinRecord = {
             ...withoutCopy(record),
             state: 'corrupt',
             failure: blob.kind === 'ok' ? 'checksum_mismatch' : blob.kind,
           }
-          await this.put(corrupt)
+          await this.put(corrupt, live)
           return refused('corrupt')
         }
         if (file.path === null) main = blob.bytes
         else assets.push({ path: file.path, bytes: blob.bytes })
       }
-      await this.options.store.putPin({ ...record, lastVerifiedAt: this.options.clock.now() })
+      await this.writePin({ ...record, lastVerifiedAt: this.options.clock.now() }, live)
+      // the copy is served only under the boundary it was read in
+      if (!live()) return refused('interrupted')
       return {
         kind: 'ok',
         documentId,

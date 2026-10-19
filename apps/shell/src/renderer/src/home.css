@@ -7705,3 +7705,7 @@ html[dir='rtl'] .quick-title-row {
     padding-right: 108px;
   }
 }
+
+.content.home-uw-pane[hidden] {
+  display: none;
+}

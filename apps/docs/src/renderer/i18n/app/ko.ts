@@ -573,4 +573,7 @@ export const ko = {
     '이 컴퓨터에서 사용할 수 있는 프린터가 없습니다. 대신 문서를 PDF로 저장할 수 있습니다.',
   appPrintFailedPdfHint: '인쇄하지 못했습니다: {error}. 대신 문서를 PDF로 저장할 수 있습니다.',
   appPrintSaveAsPdf: 'PDF로 저장…',
+  appFileSaveCopy: '사본으로 저장…',
+  appCopySaved: '내 버전을 새 문서로 저장했습니다: {title}.',
+  appCopySaveFailed: '사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 다시 시도하세요.',
 } satisfies Record<keyof typeof zh, string>
