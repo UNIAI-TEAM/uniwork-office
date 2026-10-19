@@ -94,11 +94,13 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
   })
 
   /**
-   * Mounts the panel over a one-section document. `bound` is what App feeds
-   * deps.access.uniworkBound (the shared uniworkBoundForAi rule). Returns a spy
-   * on replaceAll: on a bound page no tool may rewrite the document.
+   * Mounts the panel over a one-section document (or a blank one). `bound` is
+   * what App feeds deps.access.uniworkBound (the shared uniworkBoundForAi
+   * rule); `flip` changes it later on the same mounted panel. Returns a spy on
+   * replaceAll: on a bound page no tool may rewrite the document.
    */
-  async function mount(bound: boolean) {
+  async function mount(initialBound: boolean, opts: { blank?: boolean } = {}) {
+    let bound = initialBound
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     Element.prototype.scrollTo = () => {}
     vi.stubGlobal('localStorage', {
@@ -123,7 +125,7 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
         },
       }),
     )
-    const text = '<!doctype html>\n<html><body><h1>Quarterly</h1></body></html>'
+    const text = opts.blank ? '' : '<!doctype html>\n<html><body><h1>Quarterly</h1></body></html>'
     const replaceAll = vi.fn()
     const deps: HtmlAiDeps = {
       access: {
@@ -168,7 +170,12 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
         ),
       )
     })
-    return { replaceAll }
+    return {
+      replaceAll,
+      flip(next: boolean) {
+        bound = next
+      },
+    }
   }
 
   it('a bound page is offered neither plan_page nor write_document on the wire', async () => {
@@ -208,5 +215,43 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
     expect(results).toHaveLength(1)
     expect(results[0].isError).toBe(true)
     expect(replaceAll).not.toHaveBeenCalled()
+  })
+
+  describe('blank bound page: the write intent is not offered (RHB-3)', () => {
+    const intentCards = () =>
+      Array.from(container!.querySelectorAll<HTMLElement>('.ai-intent-card')).map(
+        (el) => el.querySelector('.ai-intent-card-title')?.textContent ?? '',
+      )
+
+    it('an unbound blank page keeps both intent cards and the WRITE directive', async () => {
+      await mount(false, { blank: true })
+      expect(intentCards()).toHaveLength(2)
+      const write = container!.querySelectorAll<HTMLElement>('.ai-intent-card')[1]
+      act(() => write.click())
+      harness.reset('text')
+      enqueueInComposer(container!, 'draft a memo')
+      await pumpUntil(() => harness.requests.length >= 1, 'first turn request')
+      const first = harness.requests[0].messages.find((m) => m.role === 'user')
+      expect(first && first.role === 'user' ? first.text : '').toContain('WRITE CONTENT')
+    })
+
+    it('a bound blank page shows no intent bar at all', async () => {
+      await mount(true, { blank: true })
+      expect(container!.querySelector('.ai-intent-bar')).toBeNull()
+    })
+
+    it('a write intent picked before the page became bound is dropped from the next turn', async () => {
+      const { flip } = await mount(false, { blank: true })
+      const write = container!.querySelectorAll<HTMLElement>('.ai-intent-card')[1]
+      act(() => write.click())
+      flip(true)
+      harness.reset('text')
+      enqueueInComposer(container!, 'draft a memo')
+      await pumpUntil(() => harness.requests.length >= 1, 'first turn request')
+      const first = harness.requests[0].messages.find((m) => m.role === 'user')
+      const text = first && first.role === 'user' ? first.text : ''
+      expect(text).not.toContain('write_document')
+      expect(text).not.toContain('WRITE CONTENT')
+    })
   })
 })
