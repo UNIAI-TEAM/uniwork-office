@@ -1636,6 +1636,11 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
           await downloading
           expect(snapshot()).toEqual(before)
           expect(filesOf(h, SCOPE)).toEqual([])
+          await expect(
+            h.fs.list(`${ROOT}/${SCOPE.deploymentId}/${SCOPE.accountId}`),
+          ).rejects.toMatchObject({
+            code: 'ENOENT',
+          })
           expect(notices).toEqual([])
         })
 
@@ -1692,6 +1697,11 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
           expect(deletes).toBe(1)
           expect(snapshot()).toEqual(before)
           expect(filesOf(h, SCOPE)).toEqual([])
+          await expect(
+            h.fs.list(`${ROOT}/${SCOPE.deploymentId}/${SCOPE.accountId}`),
+          ).rejects.toMatchObject({
+            code: 'ENOENT',
+          })
           expect(notices).toEqual([])
         })
 
