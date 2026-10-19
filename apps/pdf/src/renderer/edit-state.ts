@@ -65,6 +65,12 @@ export interface EditSnapshot {
   metadata: MetadataInput | null
 }
 
+/** The id-carrying pending edit lists a save sends; what the last save wrote is kept in the same shape */
+export type PendingLists = Pick<
+  EditSnapshot,
+  'markups' | 'annotDeletes' | 'noteEdits' | 'drawings' | 'textEdits' | 'textInserts' | 'imageEdits'
+>
+
 /** What a running save wrote, captured when the save starts. The post-save reload
     subtracts exactly this instead of wiping all edit state, so anything the user did
     while the write was in flight stays pending on the reloaded document. */
