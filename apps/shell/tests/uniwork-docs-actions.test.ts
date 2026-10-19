@@ -786,7 +786,7 @@ function fakeServer(
         method: 'PUT',
         url: `https://storage.example/part/${partNumber}`,
         headers: {},
-        expires_at: '2026-10-19T00:00:00Z',
+        expires_at: '2099-01-01T00:00:00Z',
       })
     }
     return {
@@ -800,7 +800,7 @@ function fakeServer(
         size: partSize,
       })),
       parts,
-      expires_at: '2026-10-19T00:00:00Z',
+      expires_at: '2099-01-01T00:00:00Z',
     }
   }
 

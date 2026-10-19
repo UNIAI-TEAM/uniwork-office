@@ -134,7 +134,7 @@ describe('uniwork queue record', () => {
         { partNumber: 2, etag: '"e2"' },
         { partNumber: 3, etag: '"e3"' },
       ],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     const withSession = v2({ state: 'uploading', uploadSession })
     expect(readIntentRecord(withSession, FACTS)).toEqual(withSession)
