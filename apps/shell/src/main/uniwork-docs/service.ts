@@ -4759,7 +4759,9 @@ export class UniworkDocsService {
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
       },
-      { nameField: true },
+      // a server without the pages route (404 / 501) disables the UniNote kind like
+      // any other create; a folder create keeps ordinary errors (its row never disables)
+      { nameField: true, flagMissingEndpoint: true },
     )
   }
 

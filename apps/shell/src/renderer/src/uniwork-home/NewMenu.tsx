@@ -82,12 +82,20 @@ export function NewMenu({
     if (refocus) buttonRef.current?.focus()
   }
 
+  // a disabled row (a kind the server cannot create) is skipped, as the web's menu does
   const focusables = () =>
     Array.from(
       menuRef.current?.querySelectorAll<HTMLElement>(
         '[role="menuitem"], [role="menuitemcheckbox"]',
       ) ?? [],
-    )
+    ).filter((node) => node.getAttribute('aria-disabled') !== 'true')
+
+  // initial focus: the first usable row
+  useEffect(() => {
+    if (open) focusables()[0]?.focus()
+    // focusables reads the DOM of the open menu only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   const onMenuKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     event.stopPropagation()
@@ -165,9 +173,11 @@ export function NewMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-disabled={busy || undefined}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!busy) setOpen((v) => !v)
+        }}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowDown') {
+          if (e.key === 'ArrowDown' && !busy) {
             e.preventDefault()
             setOpen(true)
           }

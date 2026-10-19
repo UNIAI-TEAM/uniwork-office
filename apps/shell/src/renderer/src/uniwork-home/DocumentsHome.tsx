@@ -294,6 +294,7 @@ export function DocumentsHome({
   // UNI-1959: "Share with workspace" of the New menu and the strip: off by default, kept while
   // this view is open, reset after a create from the strip (the web's page-view behaviour)
   const [shareWithWorkspace, setShareWithWorkspace] = useState(false)
+  const quickShareHintId = useId()
   // UNI-1959: kinds the server answered 404 / 501 for: disabled for the session
   const [unavailableKinds, setUnavailableKinds] = useState<ReadonlySet<NewDocKind>>(new Set())
   const [creating, setCreating] = useState(false)
@@ -834,7 +835,7 @@ export function DocumentsHome({
         else onOpenDocument(res.value)
         return
       }
-      if (res.endpointMissing && kind !== 'page') {
+      if (res.endpointMissing) {
         setUnavailableKinds((prev) => new Set(prev).add(kind))
         setToast({ message: t('uhCreateUnavailable'), tone: 'error' })
         return
@@ -1385,6 +1386,33 @@ export function DocumentsHome({
                 <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
               </button>
             ))}
+            <button
+              type="button"
+              role="switch"
+              className="dh-quick-share"
+              aria-checked={shareWithWorkspace}
+              aria-disabled={creating || undefined}
+              aria-describedby={quickShareHintId}
+              onClick={() => {
+                if (!creating) setShareWithWorkspace(!shareWithWorkspace)
+              }}
+            >
+              <span className="dh-quick-check" aria-hidden="true">
+                {shareWithWorkspace && (
+                  <svg width="12" height="12" viewBox="0 0 16 16">
+                    <path
+                      d="m3.5 8.5 3 3 6-7"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </span>
+              <span>{t('uhNewShare')}</span>
+            </button>
             <span className="dh-quick-hint">
               <svg
                 className="dh-quick-hint-icon"
@@ -1411,6 +1439,10 @@ export function DocumentsHome({
               </button>
               <span>{t('uhQuickHintSuffix')}</span>
             </span>
+            {/* always mounted and one line tall, so the toggle neither moves the pills nor goes unannounced */}
+            <p id={quickShareHintId} role="status" className="dh-quick-share-hint">
+              {shareWithWorkspace ? t('uhNewShareHint', { level: t('uhNewShareLevelView') }) : ''}
+            </p>
           </div>
         )}
 

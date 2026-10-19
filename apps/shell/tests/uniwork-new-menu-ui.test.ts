@@ -837,7 +837,7 @@ describe('UW-NEW-MENU r2: row hover and keyboard focus (VNM-1, VNM-2)', () => {
   /** the declarations of every rule whose selector list names `selector` exactly */
   const rulesFor = (selector: string): Array<{ selectors: string[]; body: string }> => {
     const found: Array<{ selectors: string[]; body: string }> = []
-    for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const match of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       const selectors = match[1]!.split(',').map((x) => x.trim())
       if (selectors.includes(selector)) found.push({ selectors, body: match[2]! })
     }
