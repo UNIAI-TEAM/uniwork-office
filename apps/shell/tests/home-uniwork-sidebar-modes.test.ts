@@ -247,6 +247,58 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
     expect(uwPane()!.querySelector('.dh-title')!.textContent).toBe('Alpha Folder')
   })
 
+  // UNI-1932 SB1-1: a dialog opened from the sidebar must not render inside the hidden pane
+  const visibleDialog = () =>
+    Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]')).find(
+      (el) => el.closest('[hidden]') === null,
+    )
+  const alphaRow = () =>
+    Array.from(host.querySelectorAll<HTMLElement>('.home-uw-side-slot [role="treeitem"]')).find(
+      (el) => el.textContent?.includes('Alpha Folder'),
+    )
+
+  it.each([
+    ['My AI', enterMyAi],
+    ['Workbench', enterWorkbench],
+  ])('the + New folder button in %s leaves the mode and shows its dialog', async (_l, enter) => {
+    await mountHome()
+    await enter()
+
+    await click(host.querySelector('.home-uw-side-slot .dh-sidebar-add'))
+
+    expect(myAiNav()!.getAttribute('aria-current')).toBeNull()
+    expect(workbenchNav()!.getAttribute('aria-current')).toBeNull()
+    expect(uwPaneShown()).toBe(true)
+    expect(visibleDialog()).toBeTruthy()
+  })
+
+  it.each([
+    ['new', 'My AI', enterMyAi],
+    ['new', 'Workbench', enterWorkbench],
+    ['move', 'My AI', enterMyAi],
+  ])('tree row menu "%s" in %s leaves the mode and shows its dialog', async (action, _l, enter) => {
+    await mountHome()
+    await enter()
+
+    await click(alphaRow()!.querySelector('[data-folder-menu-for]'))
+    await click(document.querySelector(`[role="menuitem"][data-folder-action="${action}"]`))
+
+    expect(myAiNav()!.getAttribute('aria-current')).toBeNull()
+    expect(workbenchNav()!.getAttribute('aria-current')).toBeNull()
+    expect(uwPaneShown()).toBe(true)
+    expect(visibleDialog()).toBeTruthy()
+  })
+
+  it('inline tree rename in My AI stays in the mode', async () => {
+    await mountHome()
+    await enterMyAi()
+
+    await click(alphaRow()!.querySelector('[data-folder-menu-for]'))
+    await click(document.querySelector('[role="menuitem"][data-folder-action="rename"]'))
+
+    expect(myAiNav()!.getAttribute('aria-current')).toBe('page')
+  })
+
   it('does not refetch the folder tree or the list when entering and leaving My AI', async () => {
     await mountHome()
     const treeCalls = api.uniworkFolderTree!.mock.calls.length
