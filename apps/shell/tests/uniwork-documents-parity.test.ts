@@ -24,6 +24,9 @@ import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
  *   on coarse pointers its 44px target gets room on the card too.
  * - Item 4: the toolbar row carries no "saves to My Folder" notice in any sub-view;
  *   Tạo mới / Tải lên / Tạo nhanh still target My Folder exactly as before.
+ * - Item 4b: the My Folder view has no "Private - only you ..." banner; the Trash note stays.
+ * - Item 5: one global rule gives everything clickable the pointer cursor, and the Documents
+ *   home's clickable elements are all inside that rule's selector set.
  */
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -253,6 +256,117 @@ describe('UNI-1957 Documents parity', () => {
     })
   })
 
+  describe('item 4b: no banner in the My Folder view', () => {
+    const click = async (el: Element) => {
+      await act(async () => {
+        ;(el as HTMLElement).click()
+      })
+      await flush()
+    }
+    const TRASH_NOTE = 'Mục trong thùng rác có thể khôi phục nếu bạn có quyền Quản lý.'
+    const MY_FOLDER_NOTE = ['Riêng tư', 'chỉ bạn có quyền truy cập']
+
+    it('shows no banner and no private note in My Folder, while Trash keeps its note', async () => {
+      await mount()
+      await click(myFolderTitles()[0]!.closest<HTMLElement>('[role="treeitem"]')!)
+      expect(host.querySelector('.dh-subview-banner')).toBeNull()
+      for (const text of MY_FOLDER_NOTE) expect(host.textContent).not.toContain(text)
+      expect(host.textContent).not.toContain(TRASH_NOTE)
+
+      await click(sidebarSlot.querySelector('.home-area-nav .nav-item[data-nav="trash"]')!)
+      const banners = host.querySelectorAll('.dh-subview-banner')
+      expect(banners).toHaveLength(1)
+      expect(banners[0]!.textContent).toBe(TRASH_NOTE)
+    })
+  })
+
+  describe('item 5: pointer cursor on everything clickable', () => {
+    const home = readFileSync(resolve(__dirname, '../src/renderer/src/home.css'), 'utf8').replace(
+      /\r\n/g,
+      '\n',
+    )
+    // :where(<selector list>):not(:disabled, [aria-disabled='true']) { cursor: pointer }
+    const rule =
+      /:where\(([^)]*)\)\s*:not\(:disabled,\s*\[aria-disabled=["']true["']\]\)\s*\{\s*cursor:\s*pointer;?\s*\}/.exec(
+        home,
+      )
+    const click = async (el: Element) => {
+      await act(async () => {
+        ;(el as HTMLElement).click()
+      })
+      await flush()
+    }
+
+    it('is one zero-specificity rule in the global renderer sheet, disabled controls excluded', () => {
+      expect(rule).not.toBeNull()
+      const list = rule![1]!
+      for (const target of [
+        'button',
+        'a[href]',
+        'summary',
+        'select',
+        'label[for]',
+        ...['button', 'link', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option'].map(
+          (r) => `[role="${r}"]`,
+        ),
+        ...['treeitem', 'checkbox', 'radio', 'switch'].map((r) => `[role="${r}"]`),
+      ]) {
+        expect(list, target).toContain(target)
+      }
+      // the sheet main.tsx loads for every view carries it, once
+      expect(home.match(/:where\(/g)?.length).toBeGreaterThanOrEqual(1)
+      expect(home.split('summary, select, label[for]').length).toBe(2)
+    })
+
+    it('every clickable element of the Documents home matches that selector set', async () => {
+      const doc = {
+        id: 'd-1',
+        workspaceId: 'ws-1',
+        title: 'Kế hoạch Q4',
+        format: 'docx',
+        updatedAt: '2026-10-15T10:00:00.000Z',
+        kind: 'file',
+        parentId: null,
+      }
+      api.uniworkListChildren!.mockImplementation(async () =>
+        ok({
+          items: [
+            doc,
+            {
+              id: 'f-board',
+              workspaceId: 'ws-1',
+              title: 'Báo cáo HĐQT Q4',
+              format: 'docx',
+              updatedAt: '2026-10-15T10:00:00.000Z',
+              kind: 'folder',
+              parentId: null,
+            },
+          ],
+          nextCursor: null,
+        }),
+      )
+      await mount()
+      expect(rule).not.toBeNull()
+      // the rule's list is a valid selector; matches() runs it against the real DOM
+      const selector = rule![1]!
+      const clickable = (label: string, els: Element[]) => {
+        expect(els.length, label).toBeGreaterThan(0)
+        for (const el of els)
+          expect(el.matches(selector), `${label}: ${el.outerHTML.slice(0, 80)}`).toBe(true)
+      }
+      const all = (root: ParentNode, sel: string) => Array.from(root.querySelectorAll(sel))
+      clickable('document row (opens the file)', all(host, '.dh-doc-row .dh-doc-open'))
+      clickable('folder card', all(host, '.dh-folder-card .dh-folder-open'))
+      clickable('row / card menu trigger', all(host, '.uw-row-menu-btn'))
+      clickable('create strip pills', all(host, '.dh-quick-row button'))
+      clickable('sidebar tree rows', all(sidebarSlot, '[role="treeitem"]'))
+      clickable('sidebar nav', all(sidebarSlot, '.home-area-nav .nav-item'))
+
+      await click(host.querySelector('.dh-doc-row .uw-row-menu-btn')!)
+      clickable('menu items', all(document, '[role="menuitem"]'))
+    })
+  })
+
   describe('item 4: no My Folder notice on the toolbar row', () => {
     const click = async (el: Element) => {
       await act(async () => {
@@ -296,7 +410,6 @@ describe('UNI-1957 Documents parity', () => {
       // My Folder is the tree row now
       const treeRow = myFolderTitles()[0]!.closest<HTMLElement>('[role="treeitem"]')!
       await click(treeRow)
-      expect(host.querySelector('.dh-subview-banner')).not.toBeNull()
       expectNoNotice()
     })
 
