@@ -3,11 +3,14 @@
 // save already calls showToast with the same text and its error kind).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  isOutcomeStatus,
   setToastEmitter,
   showStatusToast,
   showToast,
+  toastStatusLine,
   type ToastData,
 } from '../src/renderer/components/toast-bus'
+import { setModuleLang, t, type StatusLine } from '../src/renderer/i18n/locale'
 
 let seen: ToastData[]
 
@@ -16,10 +19,12 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
   seen = []
   setToastEmitter((toast) => seen.push(toast))
+  setModuleLang('en')
 })
 
 afterEach(() => {
   setToastEmitter(null)
+  vi.unstubAllGlobals()
   vi.useRealTimers()
 })
 
@@ -45,5 +50,44 @@ describe('showStatusToast', () => {
     vi.advanceTimersByTime(6000)
     showStatusToast('Save failed: 500')
     expect(seen.map((s) => s.kind)).toEqual(['error', 'info'])
+  })
+})
+
+// UNI-1931 (FE1-2): only outcomes toast. Progress, autosave and opened lines stay in the bar.
+const QUIET: StatusLine[] = [
+  { key: 'appSaving' },
+  { key: 'appSavingAs' },
+  { key: 'appAutoSavedAt', params: { time: '10:00:00' } },
+  { key: 'appExportingPdf' },
+  { key: 'appExportingHtml' },
+  { key: 'appExportingImages' },
+  { key: 'appExportImagesProgress', params: { count: 12 } },
+  { key: 'appMixedExportOpening' },
+  { key: 'appOpenedFile', params: { name: 'a.docx' } },
+]
+
+describe('isOutcomeStatus', () => {
+  it.each(QUIET)('progress / housekeeping line %j is not an outcome', (line) => {
+    expect(isOutcomeStatus(line)).toBe(false)
+  })
+
+  it('an empty line is not an outcome', () => {
+    expect(isOutcomeStatus('')).toBe(false)
+  })
+
+  it('ready text and other keyed lines are outcomes', () => {
+    expect(isOutcomeStatus('Save failed: 500')).toBe(true)
+    expect(isOutcomeStatus({ key: 'appPrintNoDocument' })).toBe(true)
+    expect(isOutcomeStatus({ key: 'appSaveFailed', params: { error: 'x' } })).toBe(true)
+  })
+})
+
+describe('toastStatusLine at phone width', () => {
+  it('toasts an outcome, translated, and none of the progress lines', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    for (const line of QUIET) toastStatusLine(line, t)
+    expect(seen).toEqual([])
+    toastStatusLine({ key: 'appPrintNoDocument' }, t)
+    expect(seen).toEqual([{ text: 'Open a document to print it.', kind: 'info' }])
   })
 })

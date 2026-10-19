@@ -339,7 +339,7 @@ import {
   type TableDialogKind,
 } from './components/TableDialogs'
 import { TablePropertiesDialog } from './components/TablePropertiesDialog'
-import { showStatusToast, showToast } from './components/toast-bus'
+import { showToast, toastStatusLine } from './components/toast-bus'
 import { setTableAutoFit, toggleRepeatHeaderRows } from './editor/table-properties'
 import { distributeSelectedColumns } from './editor/table-sizing'
 import {
@@ -849,12 +849,10 @@ export function App() {
   )
   const [status, setStatus] = useState<StatusLine>('')
   const [refusedMessage, setRefusedMessage] = useState<StatusLine>('')
-  // a phone-width frame hides the status message in the bar (styles.css, max-width 640px): raise it
-  // as a toast instead. `t` stays out of the deps; the message is translated when it is set.
+  // a phone-width frame hides the status message in the bar (styles.css, max-width 640px): raise an
+  // outcome as a toast instead (progress lines stay in the bar). `t` stays out of the deps.
   useEffect(() => {
-    if (!status || !window.matchMedia('(max-width: 640px)').matches) return
-    showStatusToast(statusText(status, t))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    toastStatusLine(status, t)
   }, [status])
   // A key + params line re-translates at render time, so only a ready
   // (already translated) string goes stale on a UI language switch.

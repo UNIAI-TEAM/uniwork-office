@@ -1141,7 +1141,7 @@ async function saveOnce(
   ctx.saveIncompleteRef.current = false
   // visible progress for a manual save (Save As can wait on a dialog and an upload); every
   // outcome below replaces it, and an outcome without a message of its own clears it
-  const progress = auto ? null : t(saveAs ? 'appSavingAs' : 'appSaving')
+  const progress: StatusLine | null = auto ? null : { key: saveAs ? 'appSavingAs' : 'appSaving' }
   if (progress) ctx.setStatus(progress)
   const dropProgress = () => {
     if (progress) ctx.setStatus('')
@@ -1261,7 +1261,9 @@ async function saveOnce(
           : prev,
       )
       // a manual save leaves no message: the status bar's save state says it
-      ctx.setStatus(auto ? t('appAutoSavedAt', { time: new Date().toLocaleTimeString() }) : '')
+      ctx.setStatus(
+        auto ? { key: 'appAutoSavedAt', params: { time: new Date().toLocaleTimeString() } } : '',
+      )
       // No success toast: the doc is still dirty (state raced the save), and the
       // close-guard's saveUntilPersisted retries would repeat it on every pass —
       // the converging complete save below toasts once.
@@ -1370,7 +1372,9 @@ async function saveOnce(
     ctx.setRemovePersonalInfo(reparsed.removePersonalInfo)
     ctx.setRemovePersonalInfoDirty(false)
     ctx.dirtyRef.current = false
-    ctx.setStatus(auto ? t('appAutoSavedAt', { time: new Date().toLocaleTimeString() }) : '')
+    ctx.setStatus(
+      auto ? { key: 'appAutoSavedAt', params: { time: new Date().toLocaleTimeString() } } : '',
+    )
     if (!auto) showToast(t('appSaved'))
     return true
   } catch (err) {
@@ -1508,12 +1512,12 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
   if (!doc) return false
   await waitForFullContent()
   if (printJobActive) {
-    ctx.setStatus(t('appExportingPdf'))
+    ctx.setStatus({ key: 'appExportingPdf' })
     return false
   }
   printJobActive = true
   try {
-    ctx.setStatus(t('appExportingPdf'))
+    ctx.setStatus({ key: 'appExportingPdf' })
     // with the pagination preview open: group by actual pv-page size. Mixed paper →
     // print group by group (other pages hidden for printing), then merge in page order
     // with pdf-lib; each page keeps its section's paper size
@@ -1554,7 +1558,7 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
         // and merge (the failed attempt already authorized result.path)
         const retryPath = outPath ?? result.path
         if (pvPages.length > 1 && retryPath) {
-          ctx.setStatus(t('appExportingPdf'))
+          ctx.setStatus({ key: 'appExportingPdf' })
           return await printGroupsMerged(
             ctx,
             doc.fileName,
@@ -1603,7 +1607,7 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
         evenOddHf: ctx.evenOddHf,
       })
     ) {
-      if (mixedPaper) ctx.setStatus(t('appMixedExportOpening'))
+      if (mixedPaper) ctx.setStatus({ key: 'appMixedExportOpening' })
       return deferExportToPreview(ctx, outPath)
     }
     const major = [...counts.values()][0]
@@ -1641,7 +1645,7 @@ export async function exportImages(ctx: FileActionContext): Promise<boolean> {
   if (!doc) return false
   const target = await window.desktop.pickExportImagesTarget()
   if (!target) return false
-  ctx.setStatus(t('appExportingImages'))
+  ctx.setStatus({ key: 'appExportingImages' })
   const fail = (error: string) => {
     ctx.setStatus(t('appExportImagesFailed', { error }))
     return false
@@ -1678,7 +1682,7 @@ export async function exportImages(ctx: FileActionContext): Promise<boolean> {
     const pdfDoc = await task.promise
     try {
       const count = pdfDoc.numPages
-      ctx.setStatus(t('appExportImagesProgress', { count }))
+      ctx.setStatus({ key: 'appExportImagesProgress', params: { count } })
       const pad = count >= 100 ? 3 : 2
       const canvas = document.createElement('canvas')
       for (let i = 1; i <= count; i++) {
@@ -1718,7 +1722,7 @@ export async function exportHtml(ctx: FileActionContext, outPath?: string): Prom
   const { doc, editor } = ctx
   if (!doc || !editor) return false
   await waitForFullContent()
-  ctx.setStatus(t('appExportingHtml'))
+  ctx.setStatus({ key: 'appExportingHtml' })
   const root = editor.view.dom as HTMLElement
   const textWidthPx = Number.parseFloat(
     getComputedStyle(root).getPropertyValue('--section-content-w'),
