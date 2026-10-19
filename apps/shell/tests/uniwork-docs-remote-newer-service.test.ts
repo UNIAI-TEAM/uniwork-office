@@ -1458,4 +1458,99 @@ describe('UNI-1959 a pending first-save ask is local unsent work', () => {
     expect(h.reloaded).toEqual([])
     expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
   })
+
+  /**
+   * The docs module seam: docs main records the bytes it last wrote and, on a
+   * Save, refuses to write over a disk that no longer holds them ("changed by
+   * another program", answered Cancel: nothing written, no hook) unless the
+   * shell said it rewrote that file itself. `save` is the person's own Save.
+   */
+  function docsModuleSaves(h: Harness, editorBytes: Uint8Array) {
+    const deps = (
+      h.service as unknown as {
+        deps: {
+          requestModuleSave: ReturnType<typeof vi.fn>
+          noteShellRewrote?: (path: string) => void
+        }
+      }
+    ).deps
+    let recorded: string | null = null
+    const forgotten = new Set<string>()
+    const noted = vi.fn((path: string) => void forgotten.add(path))
+    deps.noteShellRewrote = noted
+    const save = (path: string) => {
+      writeFileSync(path, editorBytes)
+      recorded = hex(editorBytes)
+      forgotten.delete(path)
+      h.service.onUserSave(path)
+    }
+    const landed: Array<Promise<boolean>> = []
+    deps.requestModuleSave.mockImplementation((path: string) => {
+      landed.push(
+        Promise.resolve().then(() => {
+          const changed = recorded !== null && recorded !== hex(new Uint8Array(readFileSync(path)))
+          if (changed && !forgotten.has(path)) return false
+          save(path)
+          return true
+        }),
+      )
+      return true
+    })
+    return { save, landed, noted }
+  }
+
+  it('UWNM-BE-R4-1: the docs re-save over the restored base is never refused as a change by another program; continue meets the version conflict', async () => {
+    const { h, asked, answer } = blankCopy()
+    const docs = docsModuleSaves(h, UNSENT)
+    // PROBE-c with docs: the person's first Save lands after the reload read the
+    // previous bytes, and the head's write lands over it
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    let saved = false
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      if (!saved && hex(bytes) === hex(HEAD_BYTES)) {
+        saved = true
+        docs.save(docPath())
+      }
+      return realWrite(target, filename, bytes)
+    }
+    notice(h)
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(saved).toBe(true)
+    await vi.waitFor(() => expect(docs.landed).toHaveLength(1))
+    // docs writes the person's bytes again: the shell told it the base on disk is its own
+    expect(await docs.landed[0]).toBe(true)
+    expect(docs.noted).toHaveBeenCalledWith(docPath())
+    expect(asked).toHaveLength(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+
+    const saves = coordinatorSaves(h)
+    answer('continue')
+    await vi.waitFor(() => expect(saves).toHaveLength(1))
+    await saves[0]
+    expect(bindingOf().state).toBe('conflict')
+    expect(h.client.calls.commit).toBe(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+  })
+
+  it('UWNM-BE-R4-2: a clean editor poll while the naming ask is open never clears the unsent mark', async () => {
+    const { h, asked } = blankCopy()
+    // an ordinary held first Save, no reload: the editor had edits, the module wrote them
+    h.service.noteEditorDirty(docPath(), true)
+    expect(h.statuses.at(-1)?.state).toBe('dirty')
+    writeFileSync(docPath(), UNSENT)
+    h.service.onUserSave(docPath())
+    await vi.waitFor(() => expect(asked).toHaveLength(1))
+    const pushed = h.statuses.length
+    // the editor believes the Save is done: its next poll reports it clean
+    h.service.noteEditorDirty(docPath(), false)
+    expect(h.statuses.slice(pushed).map((status) => status.state)).not.toContain('ready')
+    expect(h.statuses.at(-1)?.state).toBe('dirty')
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+  })
 })
