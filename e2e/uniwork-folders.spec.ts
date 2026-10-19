@@ -494,7 +494,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
         contents.locator('.dh-doc-open', { hasText: 'rfc-folder-tree.docx' }),
       ).toBeVisible()
 
-      // Breadcrumb trail has ancestor buttons UniWork › Platform › Storage and current page RFCs
+      // Breadcrumb trail has ancestor buttons Documents (root) › Platform › Storage and current page RFCs
       await expect(crumbs.getByRole('button')).toHaveText([
         uniworkFoldersEn.ufRoot,
         'Platform',
@@ -637,9 +637,9 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       await conflictDialog.getByRole('button', { name: 'Save as a copy…', exact: true }).click()
       await expect(conflictDialog.getByRole('heading', { name: 'Save as a copy?' })).toBeVisible()
 
-      // Default location is the source document's folder (`UniWork › Origin Folder`)
+      // Default location is the source document's folder (`Documents (root) › Origin Folder`)
       const locationBtn = conflictDialog.getByRole('button', {
-        name: `${uniworkFoldersEn.ufLocation}: UniWork › Origin Folder`,
+        name: `${uniworkFoldersEn.ufLocation}: Documents (root) › Origin Folder`,
       })
       await expect(locationBtn).toBeVisible()
       await locationBtn.click()
@@ -654,10 +654,10 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       await picker.getByRole('button', { name: uniworkFoldersEn.ufChoose, exact: true }).click()
       await expect(picker).toBeHidden()
 
-      // Location button now reflects `UniWork › Archive Destination`
+      // Location button now reflects `Documents (root) › Archive Destination`
       await expect(
         conflictDialog.getByRole('button', {
-          name: `${uniworkFoldersEn.ufLocation}: UniWork › Archive Destination`,
+          name: `${uniworkFoldersEn.ufLocation}: Documents (root) › Archive Destination`,
         }),
       ).toBeVisible()
 
@@ -715,9 +715,9 @@ test.describe.serial('UniWork folders (FD-11)', () => {
         .getByRole('textbox', { name: uniworkDocsEn.uwDocName })
         .fill('new-in-chosen-folder')
 
-      // Default Location is the open folder (`UniWork › Start Folder`)
+      // Default Location is the open folder (`Documents (root) › Start Folder`)
       const newLocBtn = newDialog.getByRole('button', {
-        name: `${uniworkFoldersEn.ufLocation}: UniWork › Start Folder`,
+        name: `${uniworkFoldersEn.ufLocation}: Documents (root) › Start Folder`,
       })
       await expect(newLocBtn).toBeVisible()
       await newLocBtn.click()

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { LANGS } from '@genoffice/i18n'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
+import { uniworkHomeStrings } from '../src/renderer/src/i18n/strings-uniwork-home'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
 import { cloudStrings } from '../src/renderer/src/i18n/strings-cloud'
@@ -65,11 +66,28 @@ describe('uniwork folders string shards', () => {
       'Thư mục đích đã có quá nhiều thư mục trùng tên. Hãy đổi tên trước khi chuyển.',
     )
     expect(vi.ufFolderGone).toBe('Thư mục này không còn ở đây.')
-    expect(vi.ufLocationRoot).toBe('UniWork (gốc)')
+    expect(vi.ufLocationRoot).toBe('Tài liệu (gốc)')
     expect(vi.ufSameFolder).toBe('Cùng thư mục với bản gốc')
     expect(en.ufNameTaken).toBe('A folder with this name already exists here. Choose another name.')
     expect(en.ufTooDeep).toBe('The document tree is at most {max} levels deep.')
     expect(en.ufNoPermission).toBe("You don't have permission to change this folder.")
+  })
+
+  it('names the documents root as the web does, not the UniWork area (UNI-1961)', () => {
+    const vi = table('vi')
+    const en = table('en')
+    // web documents.* root label: vi "Tài liệu (gốc)", en "Documents (root)"
+    expect(vi.ufRoot).toBe('Tài liệu (gốc)')
+    expect(en.ufRoot).toBe('Documents (root)')
+    expect(en.ufLocationRoot).toBe('Documents (root)')
+    for (const lang of LANGS) {
+      const root = table(lang).ufRoot!
+      const home = uniworkHomeStrings[lang] as Record<string, string>
+      // every locale reads "<its word for Documents> (root)", never the bare area name
+      expect(root, lang).not.toBe('UniWork')
+      expect(root.startsWith(home.uhSectionDocuments!), lang).toBe(true)
+      expect(table(lang).ufLocationRoot, lang).toBe(root)
+    }
   })
 
   it('does not collide with any other renderer table', () => {

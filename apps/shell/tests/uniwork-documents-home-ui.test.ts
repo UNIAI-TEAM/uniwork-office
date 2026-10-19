@@ -1607,10 +1607,12 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(docRow).not.toBeNull()
     const docSubpath = docRow.querySelector<HTMLElement>('.dh-doc-subpath')!
     expect(docSubpath).not.toBeNull()
-    expect(docSubpath.getAttribute('title')).toBe('UniWork › Division › Region › Country › Branch')
+    expect(docSubpath.getAttribute('title')).toBe(
+      'Tài liệu (gốc) › Division › Region › Country › Branch',
+    )
     expect(docSubpath.querySelector('[aria-hidden="true"]')?.textContent).toBe('… › Branch ›')
     expect(docSubpath.querySelector('.uw-sr-only')?.textContent).toBe(
-      'Đường dẫn: UniWork › Division › Region › Country › Branch',
+      'Đường dẫn: Tài liệu (gốc) › Division › Region › Country › Branch',
     )
 
     // Folder search card also has aria-hidden short path + .uw-sr-only full path + title attribute
@@ -1620,10 +1622,10 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(folderCard).not.toBeNull()
     const folderSubpath = folderCard.querySelector<HTMLElement>('.dh-doc-subpath')!
     expect(folderSubpath).not.toBeNull()
-    expect(folderSubpath.getAttribute('title')).toBe('UniWork › Finance › FY2026')
+    expect(folderSubpath.getAttribute('title')).toBe('Tài liệu (gốc) › Finance › FY2026')
     expect(folderSubpath.querySelector('[aria-hidden="true"]')?.textContent).toBe('… › FY2026 ›')
     expect(folderSubpath.querySelector('.uw-sr-only')?.textContent).toBe(
-      'Đường dẫn: UniWork › Finance › FY2026',
+      'Đường dẫn: Tài liệu (gốc) › Finance › FY2026',
     )
   })
 
@@ -2192,6 +2194,47 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
   }
+
+  // UNI-1961 STALE-FOLDERID: leaving a folder for a list that is not a folder view must not keep the
+  // folder as the Move picker's start for a row without a (known) parent
+  it.each([
+    ['shared-with-me', 'doc-shared-in'],
+    ['shared-by-me', 'doc-shared-out'],
+  ])(
+    'starts the Move picker at the root for a %s row after entering the list from inside a folder (UNI-1961)',
+    async (navId, docId) => {
+      await mountHome()
+      await act(async () => {
+        host
+          .querySelector<HTMLButtonElement>(
+            '.dh-folder-card[data-folder-id="f-board"] .dh-folder-open',
+          )!
+          .click()
+      })
+      await flush()
+      await act(async () => {
+        sidebarSlot.querySelector<HTMLButtonElement>(`.nav-item[data-nav="${navId}"]`)!.click()
+      })
+      await flush()
+      const trigger = host.querySelector<HTMLButtonElement>(`[data-folder-menu-for="${docId}"]`)
+      expect(trigger).not.toBeNull()
+      await act(async () => {
+        trigger!.click()
+      })
+      await flush()
+      const move = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
+      ).find((el) => el.textContent?.trim() === 'Di chuyển tới…')
+      expect(move).toBeDefined()
+      await act(async () => {
+        move!.click()
+      })
+      await flush()
+      expect(document.querySelector('.uwf-picker-path')?.textContent).toBe(
+        'Đường dẫn: Tài liệu (gốc)',
+      )
+    },
+  )
 
   it('lays each document row on the table grid without the uw-pick-row flex class (VDH-1)', async () => {
     await mountHome()

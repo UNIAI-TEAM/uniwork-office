@@ -129,7 +129,7 @@ describe('Save a copy: Location (S5)', () => {
     await render(makeView({ workspaceId: 'w1', parentId: 'a' }))
     await toSaveCopyStep()
     const location = $('[data-conflict-action="copy-location"]')!
-    expect(location.textContent).toBe('UniWork › Alpha')
+    expect(location.textContent).toBe('Documents (root) › Alpha')
     await click($('[data-conflict-action="save-copy-go"]'))
     expect(onAct).toHaveBeenCalledWith('s1', { kind: 'save-copy', stopAi: false })
   })
@@ -149,7 +149,7 @@ describe('Save a copy: Location (S5)', () => {
       Array.from(picker.querySelectorAll('button')).find((b) => b.textContent === en.ufChoose),
     )
     expect($('.uwf-picker')).toBeNull()
-    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe('UniWork › Beta')
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe('Documents (root) › Beta')
     await click($('[data-conflict-action="save-copy-go"]'))
     expect(onAct).toHaveBeenCalledWith('s1', {
       kind: 'save-copy',
@@ -209,12 +209,14 @@ describe('Save a copy: Location (S5)', () => {
     await click(
       Array.from(picker.querySelectorAll('button')).find((b) => b.textContent === en.ufChoose),
     )
-    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe('UniWork › Beta')
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe('Documents (root) › Beta')
 
     // A new conflict session arrives on the same mounted dialog instance
     await render(makeView({ sessionId: 's2', workspaceId: 'w1', parentId: 'a' }))
     await toSaveCopyStep()
-    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe('UniWork › Alpha')
+    expect($('[data-conflict-action="copy-location"]')!.textContent).toBe(
+      'Documents (root) › Alpha',
+    )
     await click($('[data-conflict-action="save-copy-go"]'))
     expect(onAct).toHaveBeenCalledWith('s2', { kind: 'save-copy', stopAi: false })
   })
