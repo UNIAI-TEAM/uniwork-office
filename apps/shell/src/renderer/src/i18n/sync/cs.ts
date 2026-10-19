@@ -10,7 +10,7 @@ export const cs = {
   uwErrReconcileStuck: 'K potvrzení uložení je potřeba podpora.',
   uwChipRemoteNewer: 'Novější verze v UniWork',
   uwTipQueued:
-    'Uložení z {time} je bezpečně uchováno v tomto počítači a odešle se, až budete online.',
+    'Uložení z {time} je bezpečně uchováno v tomto počítači a odešle se, jakmile to půjde.',
   uwTipQueuedNewer: 'Uložení z {time} čeká na odeslání. Pozdější úpravy do něj nepatří.',
   uwTipPausedAdmin: 'Správce pozastavil odesílání. Uložení zůstává v tomto počítači.',
   uwTipPausedUser:

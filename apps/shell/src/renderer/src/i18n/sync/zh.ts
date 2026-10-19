@@ -17,7 +17,7 @@ export const zh = {
   uwChipReconcileStuck: '需要支持人员确认此次保存',
   uwErrReconcileStuck: '需要支持人员确认此次保存。',
   uwChipRemoteNewer: 'UniWork 上有更新的版本',
-  uwTipQueued: '你在 {time} 的保存已安全保留在这台电脑上，联网后会发送。',
+  uwTipQueued: '你在 {time} 的保存已安全保留在这台电脑上，会在可以发送时自动发送。',
   uwTipQueuedNewer: '{time} 的版本正在等待发送。之后的更改不包含在这次保存中。',
   uwTipPausedAdmin: '管理员已暂停发送。保存内容保留在这台电脑上。',
   uwTipPausedUser: '你已暂停发送。{time} 的保存保留在这台电脑上；请在同步中心选择“继续发送”。',

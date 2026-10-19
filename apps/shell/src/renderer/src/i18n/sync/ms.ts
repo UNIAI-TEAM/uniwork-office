@@ -10,7 +10,7 @@ export const ms = {
   uwErrReconcileStuck: 'Sokongan diperlukan untuk mengesahkan simpanan.',
   uwChipRemoteNewer: 'Versi lebih baharu di UniWork',
   uwTipQueued:
-    'Simpanan anda dari {time} disimpan dengan selamat pada komputer ini dan akan dihantar apabila anda dalam talian.',
+    'Simpanan anda dari {time} disimpan dengan selamat pada komputer ini dan akan dihantar sebaik sahaja boleh.',
   uwTipQueuedNewer:
     'Simpanan dari {time} sedang menunggu untuk dihantar. Suntingan selepas itu tidak termasuk.',
   uwTipPausedAdmin:

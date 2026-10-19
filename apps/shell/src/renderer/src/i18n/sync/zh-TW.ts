@@ -9,7 +9,7 @@ export const zhTW = {
   uwChipReconcileStuck: '需要支援人員確認此次儲存',
   uwErrReconcileStuck: '需要支援人員確認此次儲存。',
   uwChipRemoteNewer: 'UniWork 上有更新的版本',
-  uwTipQueued: '你在 {time} 的儲存已安全保留在這台電腦上，連上網路後會傳送。',
+  uwTipQueued: '你在 {time} 的儲存已安全保留在這台電腦上，會在可以傳送時自動傳送。',
   uwTipQueuedNewer: '{time} 的版本正在等待傳送。之後的變更不包含在這次儲存中。',
   uwTipPausedAdmin: '管理員已暫停傳送。儲存內容保留在這台電腦上。',
   uwTipPausedUser: '你已暫停傳送。{time} 的儲存保留在這台電腦上；請在同步中心選擇「繼續傳送」。',

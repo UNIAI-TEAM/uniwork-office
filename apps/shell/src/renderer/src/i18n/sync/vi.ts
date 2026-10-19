@@ -9,7 +9,7 @@ export const vi = {
   uwChipReconcileStuck: 'Cần hỗ trợ để xác nhận lần lưu',
   uwErrReconcileStuck: 'Cần hỗ trợ để xác nhận lần lưu.',
   uwChipRemoteNewer: 'Có phiên bản mới hơn trên UniWork',
-  uwTipQueued: 'Bản lưu lúc {time} được giữ an toàn trên máy này và sẽ gửi khi có mạng.',
+  uwTipQueued: 'Bản lưu lúc {time} được giữ an toàn trên máy này và sẽ gửi ngay khi có thể.',
   uwTipQueuedNewer: 'Bản lúc {time} đang chờ gửi. Thay đổi sau đó chưa nằm trong lần lưu này.',
   uwTipPausedAdmin: 'Quản trị viên đang tạm dừng việc gửi. Bản lưu được giữ trên máy này.',
   uwTipPausedUser:

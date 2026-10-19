@@ -10,7 +10,7 @@ export const id = {
   uwErrReconcileStuck: 'Perlu dukungan untuk mengonfirmasi penyimpanan.',
   uwChipRemoteNewer: 'Versi lebih baru di UniWork',
   uwTipQueued:
-    'Simpanan Anda dari {time} tersimpan aman di komputer ini dan akan dikirim saat Anda online.',
+    'Simpanan Anda dari {time} tersimpan aman di komputer ini dan akan dikirim segera setelah bisa.',
   uwTipQueuedNewer:
     'Simpanan dari {time} sedang menunggu dikirim. Editan setelahnya tidak termasuk.',
   uwTipPausedAdmin: 'Admin Anda menjeda pengiriman. Simpanan tetap ada di komputer ini.',

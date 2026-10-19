@@ -10,7 +10,7 @@ export const fr = {
   uwErrReconcileStuck: 'Assistance requise pour confirmer l’enregistrement.',
   uwChipRemoteNewer: 'Version plus récente sur UniWork',
   uwTipQueued:
-    'Votre enregistrement de {time} est conservé en sécurité sur cet ordinateur et sera envoyé dès que vous serez en ligne.',
+    'Votre enregistrement de {time} est conservé en sécurité sur cet ordinateur et sera envoyé dès que possible.',
   uwTipQueuedNewer:
     'L’enregistrement de {time} attend d’être envoyé. Les modifications ultérieures n’en font pas partie.',
   uwTipPausedAdmin:

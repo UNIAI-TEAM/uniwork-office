@@ -9,7 +9,7 @@ export const ko = {
   uwChipReconcileStuck: '저장 확인에 지원이 필요함',
   uwErrReconcileStuck: '저장 확인에 지원이 필요합니다.',
   uwChipRemoteNewer: 'UniWork에 최신 버전 있음',
-  uwTipQueued: '{time}의 저장 내용은 이 컴퓨터에 안전하게 보관되며 온라인이 되면 전송됩니다.',
+  uwTipQueued: '{time}의 저장 내용은 이 컴퓨터에 안전하게 보관되며 전송할 수 있는 대로 전송됩니다.',
   uwTipQueuedNewer: '{time}의 저장 내용이 전송을 기다리고 있습니다. 이후 편집은 포함되지 않습니다.',
   uwTipPausedAdmin: '관리자가 전송을 일시 중지했습니다. 저장 내용은 이 컴퓨터에 보관됩니다.',
   uwTipPausedUser:
