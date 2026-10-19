@@ -175,6 +175,8 @@ function fakeServer(
     invalidDestination?: boolean
     /** UNI-1959: the blank route answers this bare status (a server without the route: 404 / 501) */
     blankStatus?: number
+    /** UNI-1959: the bound save's version upload waits on this latch (the first save stays in flight) */
+    versionUploadGate?: () => Promise<void>
     /**
      * SAVE-01 r2 (S01-R1-4): the create POST waits on this latch, so a second
      * submit can be issued while the first is still in flight
@@ -615,6 +617,7 @@ function fakeServer(
     // for real in this suite
     const upload = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)\/uploads$/.exec(u.pathname)
     if (upload && call.method === 'POST') {
+      await options.versionUploadGate?.()
       const form = init.body as FormData
       const file = form.get('file') as File
       const bytes = new Uint8Array(await file.arrayBuffer())
@@ -1456,6 +1459,37 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     ctx.service.onUserSave(doc.path)
     await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(2), { timeout: 8000 })
     expect(win.asked).toHaveLength(1)
+  })
+
+  it('a Save while the first one is still uploading does not ask again (the answer stays given until it lands)', async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const server = fakeServer({ versionUploadGate: () => gate })
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+    win.answers[0]!('continue')
+    // the upload is in flight (the gate holds it): the document has no new version yet,
+    // so the restart rule (file version 1 + a default title) would still match it
+    await vi.waitFor(() => expect(server.calls.some((c) => c.path.endsWith('/uploads'))).toBe(true))
+
+    writeFileSync(doc.path, 'bytes v3')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+    release()
+    await vi.waitFor(() => expect(commitsOf(server).length).toBeGreaterThan(0), { timeout: 8000 })
   })
 
   it('Cancel runs no save, and the next save asks again', async () => {
