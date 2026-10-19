@@ -2012,6 +2012,9 @@ function RibbonInner({
       <div
         className={`ribbon-tabs ${IN_TAB ? '' : IS_MAC ? 'ribbon-tabs-mac' : 'ribbon-tabs-win'}`}
         onDoubleClick={collapse.onTabsDoubleClick}
+        // phone width: the tab row scrolls and the File menu is positioned from where the File
+        // tab was when it opened; scrolling the row moves the tab away, so the menu closes
+        onScroll={() => setDropdown((v) => (v === 'file' ? null : v))}
       >
         {!IS_MAC && (
           <div className="file-tab-wrap">
