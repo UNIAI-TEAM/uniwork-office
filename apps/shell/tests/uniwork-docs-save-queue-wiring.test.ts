@@ -217,7 +217,7 @@ function fakeServer(initial: {
           method: 'PUT',
           url: `${ORIGIN}/storage/part/${id}/${n}`,
           headers: {},
-          expires_at: '2026-10-19T00:00:00Z',
+          expires_at: '2099-01-01T00:00:00Z',
         })
       }
       return out
@@ -238,7 +238,7 @@ function fakeServer(initial: {
         session_id: id,
         part_size: sessionPartSize,
         total_parts: sessions.get(id)!.totalParts,
-        expires_at: '2026-10-19T00:00:00Z',
+        expires_at: '2099-01-01T00:00:00Z',
         parts: missingParts(id),
       })
     }
@@ -258,7 +258,7 @@ function fakeServer(initial: {
           size: s.parts.get(n)!.byteLength,
         })),
         parts: missingParts(sessionId),
-        expires_at: '2026-10-19T00:00:00Z',
+        expires_at: '2099-01-01T00:00:00Z',
       })
     }
     if (sessionId && init.method === 'DELETE') {
@@ -279,7 +279,7 @@ function fakeServer(initial: {
         upload_id: upload.id,
         checksum_sha256: upload.checksum,
         size_bytes: bytes.byteLength,
-        claim_expires_at: '2026-10-19T00:00:00Z',
+        claim_expires_at: '2099-01-01T00:00:00Z',
       })
     }
     const partId = u.pathname.match(/^\/storage\/part\/([^/]+)\/(\d+)$/)
