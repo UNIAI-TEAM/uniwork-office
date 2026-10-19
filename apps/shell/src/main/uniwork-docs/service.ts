@@ -448,6 +448,11 @@ export interface UniworkDocsServiceDeps {
    */
   firstSaveFlushTimeoutMs?: number
   /**
+   * How long "Save to UniWork" from the close prompt waits for the upload to
+   * settle (UNI-1959 test seam; production leaves CLOSE_SAVE_WAIT_MS).
+   */
+  closeSaveWaitMs?: number
+  /**
    * ADVISOR D4 (a): this build's packaging flag (the wiring passes
    * app.isPackaged), read only by the dev-only S6 display fixture. Absent reads
    * as packaged, so a test that does not install the wiring stays inert.
@@ -6839,7 +6844,7 @@ export class UniworkDocsService {
       this.refuseMigration(latest)
       return false
     }
-    const wait = this.waitForSettle(latest.path, CLOSE_SAVE_WAIT_MS)
+    const wait = this.waitForSettle(latest.path, this.deps.closeSaveWaitMs ?? CLOSE_SAVE_WAIT_MS)
     const notWritten = () => {
       if (!this.coordinator.isSaving(latest.path)) wait.cancel()
     }
