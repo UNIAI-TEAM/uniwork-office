@@ -382,7 +382,10 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(live.textContent).toBe(syncVi.uwSignOutWaiting)
     const busyGo = promptButton(syncVi.uwSignOutGo)!
     expect(busyGo.getAttribute('aria-disabled')).toBe('true')
-    expect(busyGo.disabled).toBe(false)
+    const busyBack = promptButton(syncVi.uwActBack)!
+    expect(busyBack.getAttribute('aria-disabled')).toBe('true')
+    expect(busyBack.getAttribute('aria-busy')).toBe('true')
+    expect(busyBack.disabled).toBe(false)
 
     // a second click while waiting does not fire another accountLogout call
     await act(async () => {
