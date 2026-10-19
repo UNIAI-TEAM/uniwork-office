@@ -1,0 +1,56 @@
+/* UNI-1959 "Name the document" on the first save: chrome tokens only, both themes */
+
+.ufs-loc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.ufs-loc-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--tint-yellow);
+  color: var(--tint-yellow-fg);
+}
+
+.ufs-loc-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ufs-loc-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.ufs-loc-value {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ufs-change[aria-disabled='true'],
+.ufs-cancel[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.ufs-hint {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}

@@ -18,6 +18,8 @@ export type ToInspector =
   | { type: 'gx:mark'; marks: Array<{ sid: number; label: string }> }
   /** restore the window scroll of the copy an edit just replaced */
   | { type: 'gx:scrollTo'; y: number }
+  /** claim = relay mod+P as the 'print' key command and suppress the browser's own dialog */
+  | { type: 'gx:printKey'; claim: boolean }
 
 /** effective styles of the selected element (px numbers without unit, colours as #rrggbb, '' when transparent) */
 export interface ComputedSnapshot {
@@ -117,6 +119,7 @@ export type FromInspectorBody =
         | 'zoomReset'
         | 'moveUp'
         | 'moveDown'
+        | 'print'
     }
   /** ctrl/meta + wheel inside the frame (trackpad pinch); the host owns the zoom level */
   | { type: 'gx:zoom'; delta: number }

@@ -11,6 +11,8 @@ export const pl = {
   usMyFolderPrivate: 'Prywatne, widoczne tylko dla Ciebie',
   usChange: 'Zmień',
   usSave: 'Zapisz',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Zamknij',
   usPickTitle: 'Wybierz miejsce zapisu',
   usBack: 'Wróć do nazwy',

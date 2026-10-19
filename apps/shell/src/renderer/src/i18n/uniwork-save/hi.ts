@@ -12,6 +12,8 @@ export const hi = {
   usMyFolderPrivate: 'निजी, सिर्फ़ आप देख सकते हैं',
   usChange: 'बदलें',
   usSave: 'सहेजें',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'बंद करें',
   usPickTitle: 'सहेजने की जगह चुनें',
   usBack: 'नाम देने पर वापस जाएँ',

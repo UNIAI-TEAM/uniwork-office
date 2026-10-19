@@ -1,4 +1,5 @@
 import type {
+  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkDocNewFormat,
@@ -210,6 +211,8 @@ export interface UniworkDocsClient {
       workspaceId: string
       format: UniworkDocNewFormat
       title: string
+      /** UNI-1959: "Share with workspace"; absent = the server's default (a document only; a folder is never shared) */
+      visibility?: UniworkCreateVisibility
       idempotencyKey: string
     } & UniworkCreateTarget,
   ): Promise<UniworkDocSummary>
@@ -218,6 +221,8 @@ export interface UniworkDocsClient {
     input: {
       workspaceId: string
       title: string
+      /** UNI-1959: "Share with workspace"; absent = the server's default (a document only; a folder is never shared) */
+      visibility?: UniworkCreateVisibility
       idempotencyKey: string
     } & UniworkCreateTarget,
   ): Promise<UniworkDocSummary>
@@ -864,6 +869,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           // never silently demoted to a root create (S01-R1-5)
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
           ...(input.destination ? { destination: input.destination } : {}),
+          ...(input.visibility ? { visibility: input.visibility } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,
@@ -882,6 +888,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           // the same exclusive placement as createBlank (S01-R1-5)
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
           ...(input.destination ? { destination: input.destination } : {}),
+          ...(input.visibility ? { visibility: input.visibility } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,

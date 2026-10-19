@@ -16,12 +16,13 @@ import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/document
 import { isShownEntry } from '../src/renderer/src/uniwork-folders/uniwork-folders-model'
 
 /**
- * UNI-1953 UW-CREATE-TYPES: the New document dialog's Type row and the Quick
- * create strip offer the web's seven kinds in the web's order (UniNote first,
- * then Văn bản, Bảng tính, Trình chiếu, Tệp Markdown, HTML, PDF). A file kind
- * goes to createDocument with its own format; UniNote is a page create, and a
- * page (created or listed) opens on the web through openWeb, never the file
- * open flow.
+ * UNI-1953 UW-CREATE-TYPES: the New menu and the Quick create strip offer the
+ * web's seven kinds in the web's order (UniNote first, then Văn bản, Bảng tính,
+ * Trình chiếu, Tệp Markdown, HTML, PDF). A file kind goes to createDocument
+ * with its own format; UniNote is a page create, and a page (created or
+ * listed) opens on the web through openWeb, never the file open flow.
+ * UNI-1959: a pick creates at once under the web's default name (no name
+ * dialog), so the type, the name and the open all happen on the click.
  */
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -39,11 +40,14 @@ async function flush(): Promise<void> {
 
 const KINDS = ['page', 'docx', 'xlsx', 'pptx', 'md', 'html', 'pdf']
 const LABELS_VI = ['UniNote', 'Văn bản', 'Bảng tính', 'Trình chiếu', 'Tệp Markdown', 'HTML', 'PDF']
-const LABELS_EN = [
+// the strip's pills: label, then the extension the pill shows
+const EXTS = ['UniWork', '.docx', '.xlsx', '.pptx', '.md', '.html', '.pdf']
+// the New menu's rows (the web's `documents.home.create.<type>.menu` names)
+const MENU_LABELS_EN = [
   'UniNote',
-  'Document',
-  'Spreadsheet',
-  'Presentation',
+  'Docs document',
+  'Sheets spreadsheet',
+  'Slides presentation',
   'Markdown file',
   'HTML',
   'PDF',
@@ -86,28 +90,35 @@ describe('UW-CREATE-TYPES (UNI-1953) DocumentsHome', () => {
     await flush()
   }
 
-  const openDialog = async () => {
+  const openMenu = async () => {
     await click(host.querySelector('.dh-btn-create'))
-    const dialog = document.querySelector<HTMLElement>('.modal.uw-act')
-    expect(dialog).not.toBeNull()
-    return dialog!
+    const menu = document.querySelector<HTMLElement>('[role="menu"].dh-new-menu')
+    expect(menu).not.toBeNull()
+    return menu!
   }
 
-  const typeName = async (dialog: HTMLElement, value: string) => {
-    const input = dialog.querySelector<HTMLInputElement>('input[type="text"]')!
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, value)
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-  }
-
-  const submit = async (dialog: HTMLElement) => {
-    await click(dialog.querySelector('button[type="submit"]'))
+  /** a pick in the New menu: it creates at once, there is no name dialog */
+  const pick = async (kind: string) => {
+    const menu = await openMenu()
+    await click(menu.querySelector(`[role="menuitem"][data-new-kind="${kind}"]`))
+    expect(document.querySelector('.modal.uw-act')).toBeNull()
   }
 
   beforeEach(() => {
-    localStorage.clear()
+    // jsdom's localStorage is not always a full Storage here (Node's own experimental one wins)
+    const map = new Map<string, string>()
+    const storage = {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, String(v)),
+      removeItem: (k: string) => void map.delete(k),
+      clear: () => map.clear(),
+      key: (i: number) => [...map.keys()][i] ?? null,
+      get length() {
+        return map.size
+      },
+    }
+    Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true })
+    Object.defineProperty(window, 'localStorage', { value: storage, configurable: true })
     workspaces = [
       { id: 'ws-1', name: 'UniWork', slug: 'uniwork', orgSlug: 'acme' } as UniworkWorkspaceRef,
     ]
@@ -191,62 +202,61 @@ describe('UW-CREATE-TYPES (UNI-1953) DocumentsHome', () => {
     document.querySelectorAll('.modal-backdrop, .uw-act').forEach((n) => n.remove())
   })
 
-  it('the Quick create strip lists the seven kinds in web order, UniNote first', async () => {
+  it('the Quick create strip lists the seven kinds in web order, UniNote first, with their extensions', async () => {
     await mount('vi')
     const pills = Array.from(host.querySelectorAll<HTMLElement>('.dh-quick-pill'))
     expect(pills.map((p) => p.getAttribute('data-quick-format'))).toEqual(KINDS)
-    expect(pills.map((p) => p.textContent?.trim())).toEqual(LABELS_VI)
+    expect(pills.map((p) => p.textContent?.trim())).toEqual(
+      LABELS_VI.map((label, i) => `${label}${EXTS[i]}`),
+    )
+    expect(pills.map((p) => p.querySelector('.dh-quick-ext')?.textContent)).toEqual(EXTS)
     // every pill carries its type icon (the same marks the rows use)
     for (const pill of pills) expect(pill.querySelector('img, svg')).not.toBeNull()
   })
 
-  it('the New document dialog Type row lists the same seven kinds, localized', async () => {
+  it('the New menu lists the same seven kinds in the same order, localized', async () => {
     await mount('en')
-    const dialog = await openDialog()
-    const radios = Array.from(dialog.querySelectorAll<HTMLInputElement>('.uw-act-types input'))
-    expect(radios.map((r) => r.value)).toEqual(KINDS)
-    const labels = Array.from(dialog.querySelectorAll('.uw-act-type')).map((l) =>
-      l.textContent?.trim(),
-    )
-    expect(labels).toEqual(LABELS_EN)
+    const menu = await openMenu()
+    const rows = Array.from(
+      menu.querySelectorAll<HTMLElement>('[role="menuitem"][data-new-kind]'),
+    ).filter((row) => row.getAttribute('data-new-kind') !== 'folder')
+    expect(rows.map((r) => r.getAttribute('data-new-kind'))).toEqual(KINDS)
+    expect(rows.map((r) => r.querySelector('.dh-new-label')?.textContent)).toEqual(MENU_LABELS_EN)
+    expect(rows.map((r) => r.querySelector('.dh-new-ext')?.textContent)).toEqual(EXTS)
   })
 
-  it('creating a Markdown file sends format md to createDocument and opens it like a docx', async () => {
+  it('picking Markdown creates at once: format md under the default name, in the same parent, opened like a docx', async () => {
     await mount('vi')
-    const dialog = await openDialog()
-    await click(dialog.querySelector('.uw-act-types input[value="md"]'))
-    await typeName(dialog, 'Ghi chú')
-    await submit(dialog)
+    await pick('md')
     expect(api.uniworkCreateDocument).toHaveBeenCalledTimes(1)
-    expect(api.uniworkCreateDocument).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', folderId: 'f-mine', format: 'md' }),
-    )
-    expect(api.uniworkCreateDocument.mock.calls[0]![0].name).toBe('Ghi chú.md')
+    expect(api.uniworkCreateDocument).toHaveBeenCalledWith({
+      workspaceId: 'ws-1',
+      folderId: 'f-mine',
+      name: 'Markdown chưa đặt tên.md',
+      format: 'md',
+    })
     expect(api.uniworkCreatePage).not.toHaveBeenCalled()
     expect(onOpenDocument).toHaveBeenCalledWith(expect.objectContaining({ id: 'new-file' }))
     expect(openWeb).not.toHaveBeenCalled()
   })
 
-  it.each(['html', 'pdf'])('creating a %s file sends that format', async (format) => {
+  it.each([
+    ['html', 'Trang HTML chưa đặt tên.html'],
+    ['pdf', 'PDF chưa đặt tên.pdf'],
+  ])('picking %s creates that format under its default name', async (format, name) => {
     await mount('vi')
-    const dialog = await openDialog()
-    await click(dialog.querySelector(`.uw-act-types input[value="${format}"]`))
-    await typeName(dialog, 'Tệp')
-    await submit(dialog)
+    await pick(format)
     expect(api.uniworkCreateDocument).toHaveBeenCalledWith(expect.objectContaining({ format }))
-    expect(api.uniworkCreateDocument.mock.calls[0]![0].name).toBe(`Tệp.${format}`)
+    expect(api.uniworkCreateDocument.mock.calls[0]![0].name).toBe(name)
   })
 
-  it('creating a UniNote sends the page create (same parent) and opens the web page, not the file flow', async () => {
+  it('picking UniNote sends the page create (same parent) and opens the web page, not the file flow', async () => {
     await mount('vi')
-    const dialog = await openDialog()
-    await click(dialog.querySelector('.uw-act-types input[value="page"]'))
-    await typeName(dialog, 'Biên bản')
-    await submit(dialog)
+    await pick('page')
     expect(api.uniworkCreatePage).toHaveBeenCalledWith({
       workspaceId: 'ws-1',
       folderId: 'f-mine',
-      name: 'Biên bản',
+      name: 'UniNote mới',
     })
     expect(api.uniworkCreateDocument).not.toHaveBeenCalled()
     expect(openWeb).toHaveBeenCalledWith({
@@ -258,11 +268,16 @@ describe('UW-CREATE-TYPES (UNI-1953) DocumentsHome', () => {
     expect(onOpenDocument).not.toHaveBeenCalled()
   })
 
-  it('a quick-create UniNote pill opens the dialog with UniNote selected', async () => {
+  it('a quick-create UniNote pill creates the page at once too', async () => {
     await mount('vi')
     await click(host.querySelector('.dh-quick-pill[data-quick-format="page"]'))
-    const checked = document.querySelector<HTMLInputElement>('.uw-act-types input:checked')
-    expect(checked?.value).toBe('page')
+    expect(document.querySelector('.modal.uw-act')).toBeNull()
+    expect(api.uniworkCreatePage).toHaveBeenCalledWith({
+      workspaceId: 'ws-1',
+      folderId: 'f-mine',
+      name: 'UniNote mới',
+    })
+    expect(openWeb).toHaveBeenCalledTimes(1)
   })
 
   it('lists a page row (UniNote) next to the files', async () => {
@@ -292,10 +307,7 @@ describe('UW-CREATE-TYPES (UNI-1953) DocumentsHome', () => {
   it('a UniNote created but not opened (openWeb false) says so in its own toast', async () => {
     openWeb.mockResolvedValue(false)
     await mount('en')
-    const dialog = await openDialog()
-    await click(dialog.querySelector('.uw-act-types input[value="page"]'))
-    await typeName(dialog, 'Biên bản')
-    await submit(dialog)
+    await pick('page')
     expect(api.uniworkCreatePage).toHaveBeenCalledTimes(1)
     const text = document.body.textContent ?? ''
     expect(text).toContain('The UniNote was created but couldn’t be opened.')
@@ -305,10 +317,7 @@ describe('UW-CREATE-TYPES (UNI-1953) DocumentsHome', () => {
   it('the same toast reads in Vietnamese', async () => {
     openWeb.mockResolvedValue(false)
     await mount('vi')
-    const dialog = await openDialog()
-    await click(dialog.querySelector('.uw-act-types input[value="page"]'))
-    await typeName(dialog, 'Biên bản')
-    await submit(dialog)
+    await pick('page')
     const text = document.body.textContent ?? ''
     expect(text).toContain('Đã tạo UniNote nhưng chưa mở được.')
     expect(text).not.toContain('Không thực hiện được. Hãy thử lại.')

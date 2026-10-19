@@ -50,6 +50,7 @@ import {
   type RemoteBarAction,
 } from './uniwork-docs-model'
 import { UniworkConflictHost } from './UniworkConflictDialog'
+import { FirstSaveNameHost } from './uniwork-folders/FirstSaveNameDialog'
 import { SaveDialogHost } from './uniwork-folders/SaveDialog'
 import { UniworkQueuePopover } from './UniworkQueuePopover'
 import {
@@ -1079,6 +1080,7 @@ export function UniworkNotice({ openDocumentIds }: { openDocumentIds: ReadonlySe
       <RenamedAnnouncer openDocumentIds={openDocumentIds} />
       <UniworkConflictHost />
       <SaveDialogHost />
+      <FirstSaveNameHost />
     </>
   )
 }

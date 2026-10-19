@@ -91,9 +91,11 @@ vi.mock('electron', () => ({
   WebContentsView: class {},
 }))
 
+import { dialog } from 'electron'
 import {
   authorizeMcpDocWrite,
   clearRecoveryCopy,
+  forgetDocsDiskState,
   registerDocsIpc,
   setDocsUserSaveHook,
   setUniworkDocumentPolicy,
@@ -163,6 +165,37 @@ describe('docs real handlers on a UniWork copy', () => {
     expect((await call('docs:save', wc, path, bytes('two'), true)).ok).toBe(false)
     expect(readFileSync(path, 'utf8')).toBe('one')
     expect(hook).toHaveBeenCalledTimes(1)
+  })
+
+  it('UWNM-BE-R4-1: a Save onto a file the shell rewrote is not asked as a change by another program once docs forgot its state', async () => {
+    const prompt = vi.mocked(dialog.showMessageBox)
+    prompt.mockReset()
+    // the person's Cancel on "changed by another program": nothing is written
+    prompt.mockResolvedValue({ response: 1, checkboxChecked: false } as never)
+    const { path, wc } = openDoc()
+    bound.add(path)
+    expect((await call('docs:save', wc, path, bytes('the person'))).ok).toBe(true)
+    // the shell puts other bytes on disk behind docs' back (a reload's undo)
+    writeFileSync(path, 'the restored base')
+    expect(await call('docs:save', wc, path, bytes('the person'))).toMatchObject({
+      ok: false,
+      reason: 'external-modified',
+    })
+    expect(readFileSync(path, 'utf8')).toBe('the restored base')
+    expect(hook).toHaveBeenCalledTimes(1)
+
+    prompt.mockClear()
+    forgetDocsDiskState(path)
+    expect((await call('docs:save', wc, path, bytes('the person'))).ok).toBe(true)
+    expect(prompt).not.toHaveBeenCalled()
+    expect(readFileSync(path, 'utf8')).toBe('the person')
+    expect(hook).toHaveBeenCalledTimes(2)
+    // the write recorded its state again: another program's later edit is still caught
+    writeFileSync(path, 'another program wrote this')
+    expect((await call('docs:save', wc, path, bytes('the person'))).ok).toBe(false)
+    expect(prompt).toHaveBeenCalledTimes(1)
+    expect(readFileSync(path, 'utf8')).toBe('another program wrote this')
+    prompt.mockReset()
   })
 
   it('docs:save refuses a view-only copy', async () => {
