@@ -16,7 +16,6 @@ export const id = {
   usPickTitle: 'Pilih lokasi simpan',
   usBack: 'Kembali ke penamaan',
   usSearchFolders: 'Cari folder',
-  usSharedNote: 'Jika disimpan di folder bersama, dokumen mengikuti izin folder tersebut.',
   usChooseFolder: 'Pilih “{folder}”',
   usSelected: 'Dipilih',
   usRootBlocked: 'Pilih sebuah folder',

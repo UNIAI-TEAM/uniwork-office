@@ -280,6 +280,9 @@ export function errorFromResponse(
   if (serverCode === 'document_parent_kind') {
     return new UniworkDocError('document_parent_kind', at)
   }
+  // UNI-1975: the server refuses sharing a folder (only documents are shared). The
+  // app never sends it today; a user-facing refusal, not retried, not terminal.
+  if (serverCode === 'folder_not_shareable') return new UniworkDocError('folder_not_shareable', at)
   // G5-06 (UNI-1352): the server's own verdicts, kept apart from the generic
   // forbidden/deleted a caller would otherwise act on. A capability kill
   // switch is a pause, not a permission denial; a swept intent is unknown,

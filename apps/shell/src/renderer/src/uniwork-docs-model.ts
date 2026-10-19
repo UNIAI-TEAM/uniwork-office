@@ -54,6 +54,7 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   document_too_deep: 'ufTooDeep',
   document_cycle: 'ufCycle',
   document_parent_kind: 'ufParentKind',
+  folder_not_shareable: 'ufNotShareable',
   // refusals before anything is queued: the keychain is locked, or the account's store is full
   keystore_locked: 'uwReasonKeystore',
   store_full: 'uwQueueFull',

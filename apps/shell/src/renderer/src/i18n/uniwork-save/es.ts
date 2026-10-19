@@ -16,8 +16,6 @@ export const es = {
   usPickTitle: 'Elegir dónde guardar',
   usBack: 'Volver al nombre',
   usSearchFolders: 'Buscar carpetas',
-  usSharedNote:
-    'Al guardar en una carpeta compartida, el documento recibe los permisos de esa carpeta.',
   usChooseFolder: 'Elegir «{folder}»',
   usSelected: 'Seleccionado',
   usRootBlocked: 'Elige una carpeta',

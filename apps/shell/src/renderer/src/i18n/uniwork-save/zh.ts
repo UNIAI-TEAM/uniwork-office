@@ -14,7 +14,6 @@ export const zh = {
   usPickTitle: '选择保存位置',
   usBack: '返回命名',
   usSearchFolders: '搜索文件夹',
-  usSharedNote: '保存到共享文件夹后，文档将继承该文件夹的权限。',
   usChooseFolder: '选择“{folder}”',
   usSelected: '已选择',
   usRootBlocked: '请选择一个文件夹',
