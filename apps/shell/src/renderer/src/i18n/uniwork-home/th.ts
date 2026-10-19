@@ -57,8 +57,6 @@ export const th = {
   uhEmptyTrash: 'ถังขยะว่างเปล่า',
   uhEmptyFiltered: 'ไม่มีเอกสารที่ตรงกับตัวกรอง',
   uhTrashNote: 'สามารถกู้คืนรายการในถังขยะได้หากคุณมีสิทธิ์จัดการ',
-  uhMyFolderNote:
-    'ส่วนตัว — มีเพียงคุณที่เข้าถึงได้เว้นแต่จะแชร์หรือย้ายไปยังโฟลเดอร์ที่ใช้ร่วมกัน',
   uhLoadMore: 'โหลดเพิ่มเติม',
   uhRowActions: 'การทำงานเพิ่มเติม',
 } satisfies Record<keyof typeof zh, string>

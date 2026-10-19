@@ -57,7 +57,6 @@ export const zhTW = {
   uhEmptyTrash: '垃圾桶為空。',
   uhEmptyFiltered: '沒有符合篩選條件的文件。',
   uhTrashNote: '如果你擁有管理權限，可以還原垃圾桶中的項目。',
-  uhMyFolderNote: '私人 — 除非你共用或移動到共用資料夾，否則只有你可以存取。',
   uhLoadMore: '載入更多',
   uhRowActions: '更多操作',
 } satisfies Record<keyof typeof zh, string>

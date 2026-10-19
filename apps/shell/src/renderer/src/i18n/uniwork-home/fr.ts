@@ -58,8 +58,6 @@ export const fr = {
   uhEmptyTrash: 'La corbeille est vide.',
   uhEmptyFiltered: 'Aucun document ne correspond aux filtres.',
   uhTrashNote: 'Les éléments de la corbeille peuvent être restaurés si vous avez l’accès Gérer.',
-  uhMyFolderNote:
-    'Privé — vous seul y avez accès, sauf si vous partagez ou déplacez vers un dossier partagé.',
   uhLoadMore: 'Charger plus',
   uhRowActions: 'Plus d’actions',
 } satisfies Record<keyof typeof zh, string>

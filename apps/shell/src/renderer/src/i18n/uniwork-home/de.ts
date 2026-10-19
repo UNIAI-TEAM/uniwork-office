@@ -59,8 +59,6 @@ export const de = {
   uhEmptyFiltered: 'Keine Dokumente entsprechen den aktuellen Filtern.',
   uhTrashNote:
     'Elemente im Papierkorb können wiederhergestellt werden, wenn Sie Verwaltungszugriff haben.',
-  uhMyFolderNote:
-    'Privat — nur Sie haben Zugriff, es sei denn, Sie geben Dateien frei oder verschieben sie in einen gemeinsamen Ordner.',
   uhLoadMore: 'Mehr laden',
   uhRowActions: 'Weitere Aktionen',
 } satisfies Record<keyof typeof zh, string>

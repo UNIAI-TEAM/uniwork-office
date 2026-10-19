@@ -1366,7 +1366,6 @@ export function DocumentsHome({
           </div>
         )}
 
-        {subView === 'my-folder' && <p className="dh-subview-banner">{t('uhMyFolderNote')}</p>}
         {subView === 'trash' && <p className="dh-subview-banner">{t('uhTrashNote')}</p>}
         {folderNotice && (
           <p className="uwf-notice" role="status">

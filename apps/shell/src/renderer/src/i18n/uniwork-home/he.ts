@@ -57,7 +57,6 @@ export const he = {
   uhEmptyTrash: 'האשפה ריקה.',
   uhEmptyFiltered: 'אין מסמכים התואמים למסננים הנוכחיים.',
   uhTrashNote: 'ניתן לשחזר פריטים באשפה אם יש לך הרשאת ניהול.',
-  uhMyFolderNote: 'פרטי — רק לך יש גישה אלא אם תשתף או תעביר לתיקייה משותפת.',
   uhLoadMore: 'טען עוד',
   uhRowActions: 'פעולות נוספות',
 } satisfies Record<keyof typeof zh, string>

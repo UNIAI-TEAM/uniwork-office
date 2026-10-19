@@ -58,8 +58,6 @@ export const pl = {
   uhEmptyTrash: 'Kosz jest pusty.',
   uhEmptyFiltered: 'Żaden dokument nie pasuje do bieżących filtrów.',
   uhTrashNote: 'Elementy w koszu można przywrócić, jeśli masz uprawnienia Zarządzanie.',
-  uhMyFolderNote:
-    'Prywatny — tylko Ty masz dostęp, chyba że udostępnisz lub przeniesiesz do wspólnego folderu.',
   uhLoadMore: 'Załaduj więcej',
   uhRowActions: 'Więcej akcji',
 } satisfies Record<keyof typeof zh, string>

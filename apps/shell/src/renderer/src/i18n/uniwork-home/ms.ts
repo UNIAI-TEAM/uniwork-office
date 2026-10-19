@@ -57,8 +57,6 @@ export const ms = {
   uhEmptyTrash: 'Sampah kosong.',
   uhEmptyFiltered: 'Tiada dokumen sepadan dengan penapis semasa.',
   uhTrashNote: 'Item dalam Sampah boleh dipulihkan jika anda mempunyai akses Urus.',
-  uhMyFolderNote:
-    'Peribadi — hanya anda mempunyai akses melainkan anda berkongsi atau mengalihkan ke folder bersama.',
   uhLoadMore: 'Muat lagi',
   uhRowActions: 'Tindakan lain',
 } satisfies Record<keyof typeof zh, string>

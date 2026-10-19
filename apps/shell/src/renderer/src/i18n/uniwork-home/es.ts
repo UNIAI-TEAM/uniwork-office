@@ -58,8 +58,6 @@ export const es = {
   uhEmptyFiltered: 'Ningún documento coincide con los filtros actuales.',
   uhTrashNote:
     'Los elementos en la papelera se pueden restaurar si tienes acceso de Administración.',
-  uhMyFolderNote:
-    'Privado — solo tú tienes acceso a menos que compartas o muevas a una carpeta compartida.',
   uhLoadMore: 'Cargar más',
   uhRowActions: 'Más acciones',
 } satisfies Record<keyof typeof zh, string>

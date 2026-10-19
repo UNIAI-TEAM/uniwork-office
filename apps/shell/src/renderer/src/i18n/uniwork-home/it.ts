@@ -57,8 +57,6 @@ export const it = {
   uhEmptyTrash: 'Il cestino è vuoto.',
   uhEmptyFiltered: 'Nessun documento corrisponde ai filtri attuali.',
   uhTrashNote: 'Gli elementi nel cestino possono essere ripristinati se hai accesso Gestisci.',
-  uhMyFolderNote:
-    'Privato — solo tu hai accesso a meno che tu non condivida o sposti in una cartella condivisa.',
   uhLoadMore: 'Carica altro',
   uhRowActions: 'Altre azioni',
 } satisfies Record<keyof typeof zh, string>

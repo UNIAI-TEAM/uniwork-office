@@ -57,8 +57,6 @@ export const vi = {
   uhEmptyTrash: 'Thùng rác trống.',
   uhEmptyFiltered: 'Không có tài liệu nào khớp bộ lọc.',
   uhTrashNote: 'Mục trong thùng rác có thể khôi phục nếu bạn có quyền Quản lý.',
-  uhMyFolderNote:
-    'Riêng tư — chỉ bạn có quyền truy cập trừ khi bạn chia sẻ hoặc di chuyển ra thư mục chung.',
   uhLoadMore: 'Tải thêm',
   uhRowActions: 'Thao tác khác',
 } satisfies Record<keyof typeof zh, string>

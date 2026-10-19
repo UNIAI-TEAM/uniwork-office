@@ -57,8 +57,6 @@ export const ru = {
   uhEmptyTrash: 'Корзина пуста.',
   uhEmptyFiltered: 'Нет документов, соответствующих фильтрам.',
   uhTrashNote: 'Элементы в корзине можно восстановить при наличии прав управления.',
-  uhMyFolderNote:
-    'Личное — доступ есть только у вас, пока вы не поделитесь или не переместите в общую папку.',
   uhLoadMore: 'Загрузить ещё',
   uhRowActions: 'Другие действия',
 } satisfies Record<keyof typeof zh, string>
