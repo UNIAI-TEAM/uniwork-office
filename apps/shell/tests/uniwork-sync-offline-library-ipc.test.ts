@@ -9,7 +9,10 @@ import {
   type OfflineLibraryApiDeps,
 } from '../src/main/uniwork-sync/offline-library/api'
 import type { OfflineCopyOutcome } from '../src/main/uniwork-sync/offline-library/copies'
-import type { OfflineLibraryManagerOptions } from '../src/main/uniwork-sync/offline-library'
+import type {
+  OfflineLibraryManagerOptions,
+  PinRecord,
+} from '../src/main/uniwork-sync/offline-library'
 import {
   ORG,
   SCOPE,
@@ -172,12 +175,10 @@ describe('FUSR-R4-3 (UNI-1362): stopping the unlisted row’s transfer for a dis
   const MiB = 1024 * 1024
 
   /**
-   * An unlisted row (the first pin's reservation row was written, then a
-   * boundary that wipes nothing passed before the index entry) with a fresh
-   * downloadNow held on its second chunk.
+   * An unlisted row: the first pin's reservation row was written, then a
+   * boundary that wipes nothing passed before the index entry.
    */
-  async function orphanWithHeldTransfer(b: Bridge) {
-    const { h } = b
+  async function unlistedRow(h: Harness) {
     const doc = addDoc(h, 'doc_1', 1, 4096)
     h.docs.chunkSize = 1024
     const written = Promise.withResolvers<void>()
@@ -200,6 +201,13 @@ describe('FUSR-R4-3 (UNI-1362): stopping the unlisted row’s transfer for a dis
     expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
     h.store.putPin = real
     expect((await h.store.getPin('doc_1')).kind).toBe('ok')
+    return doc
+  }
+
+  /** the unlisted row with a fresh downloadNow held on its second chunk */
+  async function orphanWithHeldTransfer(b: Bridge) {
+    const { h } = b
+    const doc = await unlistedRow(h)
     const slow = slowDownload(h, 'doc_1', 1)
     const downloading = h.manager.downloadNow('doc_1')
     await slow.waiting
@@ -225,6 +233,68 @@ describe('FUSR-R4-3 (UNI-1362): stopping the unlisted row’s transfer for a dis
     expect(await pinning).toEqual({ ok: false, code: 'too_large' })
     await downloading
     await expectNothingPinned(b.h)
+  })
+
+  it('FUPS-R1-1: a verifying report queued behind the discarding pin stays silent, so the refusal is what answers', async () => {
+    const b = wiredBridge()
+    const { h } = b
+    const doc = await unlistedRow(h)
+    // the transfer received every chunk and its first staging write succeeded; the write call is held
+    const written = Promise.withResolvers<void>()
+    const writing = Promise.withResolvers<void>()
+    const realPut = h.store.putBlob.bind(h.store)
+    let held = false
+    h.store.putBlob = async (key, bytes) => {
+      const result = await realPut(key, bytes)
+      if (!held) {
+        held = true
+        written.resolve()
+        await writing.promise
+      }
+      return result
+    }
+    const downloading = h.manager.downloadNow('doc_1')
+    await written.promise
+    // the pin's index read (inside its document lock) is held once the manager is entered
+    const reading = Promise.withResolvers<void>()
+    const read = Promise.withResolvers<void>()
+    const realRead = h.store.readIndex.bind(h.store)
+    let armed = false
+    h.store.readIndex = async () => {
+      if (armed) {
+        armed = false
+        reading.resolve()
+        await read.promise
+      }
+      return realRead()
+    }
+    const realManagerPin = h.manager.pin.bind(h.manager)
+    let refusal: ReturnType<typeof realManagerPin> | null = null
+    h.manager.pin = (input) => {
+      armed = true
+      refusal = realManagerPin(input)
+      return refusal
+    }
+    const rows: PinRecord[] = []
+    const realPutPin = h.store.putPin.bind(h.store)
+    h.store.putPin = (record) => {
+      rows.push(record)
+      return realPutPin(record)
+    }
+    const notices = vi.spyOn(b.api, 'rowChanged')
+    doc.declaredSize = 256 * MiB + 1
+    const pinning = pin(b)
+    await reading.promise
+    // the verifying report queues behind the pin's document lock, then the pin decides
+    writing.resolve()
+    await flushTasks()
+    read.resolve()
+    expect(await pinning).toEqual({ ok: false, code: 'too_large' })
+    expect(await refusal).toEqual({ kind: 'refused', code: 'too_large' })
+    await downloading
+    expect(rows).toEqual([])
+    expect(notices).not.toHaveBeenCalled()
+    await expectNothingPinned(h)
   })
 
   it('a replacement refused over the byte quota is reported offline_cap_reached', async () => {
