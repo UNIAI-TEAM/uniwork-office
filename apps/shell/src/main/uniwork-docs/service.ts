@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import { open, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -21,6 +21,8 @@ import type {
   UniworkDocRenamedEvent,
   UniworkDocSummary,
   UniworkDocStatus,
+  UniworkDocEditLock,
+  UniworkEditLockSessionView,
   UniworkFirstSaveInput,
   UniworkFolderChildren,
   UniworkFolderNode,
@@ -75,7 +77,18 @@ import {
   type UniworkDocsClient,
   createUniworkDocsClient,
 } from './client'
+import {
+  createUniworkEditLockClient,
+  type UniworkEditLockClient,
+} from '../uniwork-edit-lock/client'
+import {
+  EditLockSession,
+  asEditLockTransport,
+  newEditorId,
+  type EditLockSessionView,
+} from '../uniwork-edit-lock/session'
 import { UniworkDocError } from './errors'
+import { EDIT_LOCK_QUIT_CAP_MS } from './edit-lock-quit'
 import {
   copyTitleFor,
   formatForMime,
@@ -89,6 +102,23 @@ import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
 import { createDocumentLimitsCache, type DocumentLimits, type DocumentLimitsCache } from './limits'
 import { tUniworkDocs } from './strings'
+import {
+  abortUploadSession,
+  readLocalFileProbe,
+  runChunkedUpload,
+  sha256File,
+  shouldUseChunkedUpload,
+  type ChunkedUploadResult,
+  type SavedUploadSession,
+  type UploadSessionTarget,
+} from './upload-session'
+import {
+  createUploadSessionStore,
+  uploadSessionKey,
+  UPLOAD_SESSIONS_STORE_REGISTRATION,
+  type UploadSessionRecord,
+  type UploadSessionStore,
+} from '../uniwork-sync/upload-sessions'
 import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
 import { actionFlags, type DocumentDetail, type DocumentRef, type LaunchDescriptor } from './parse'
 import {
@@ -322,6 +352,11 @@ export interface UniworkDocsServiceDeps {
   /** G5-06u: ask the shell renderer to open the queue popover of a path */
   pushQueuePopover?(request: UniworkQueuePopoverRequest): void
   /**
+   * EL-1(b) fix6 (VEL-2): broadcast `{ path }` on `uniwork:doc-state-changed`
+   * when `isReadOnly(path)` or `isBound(path)` may have changed.
+   */
+  pushDocStateChanged?(path: string): void
+  /**
    * G5-06u: whether `path` is a tab of the shell window (the only window with
    * a pill and a queue popover). False for a detached editor window, whose
    * Ctrl/Cmd+S keeps the inline replay. Absent = every path is a shell tab.
@@ -389,6 +424,8 @@ export interface UniworkDocsServiceDeps {
   notifySaved?(path: string, versionId: string): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
+  /** EL-1(b): test seam for the edit-lock client (absent = no acquire in injected-client tests) */
+  editLockClient?: UniworkEditLockClient
   /** SIZE-F1: overrides `documents.limits` (`GET /api/v1/config`); a test seam */
   limits?: () => Promise<DocumentLimits> | DocumentLimits
   sleep?(ms: number): Promise<void>
@@ -454,6 +491,9 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
  */
 export const CLOSE_SAVE_WAIT_MS = 30_000
 
+/** back-off before a failed last-account.json write is retried */
+const LAST_OWNER_RETRY_MS = 2000
+
 /** shared-with-me aggregation bounds (one workspace page, total rows, total pages) */
 const SHARED_PAGE_SIZE = 50
 const SHARED_MAX_ROWS = 500
@@ -497,23 +537,27 @@ const MAX_DOC_NAME_RUNES = 500
 const MAX_FOLDER_NAME_RUNES = 255
 
 /**
- * D stages at most 50 MiB per upload part (`files/registry.go`), so a bigger
- * file is refused before it is read: main must not buffer a multi-GB pick only
- * to be told too_large. Exactly 50 MiB is still sent. This guard runs after the
- * `documents.limits` cap until chunked upload lifts it; its refusal names
- * min(max_bytes, 50 MiB) as the limit so the copy stays truthful.
+ * The interim single-request staging cap: D stages at most 50 MiB per upload
+ * part (`files/registry.go`), so one multipart POST cannot carry more. Since
+ * BIGUP-A1 this is the cap of the SINGLE-REQUEST path only: a file above the
+ * server's `chunked_upload_threshold_bytes` goes through an upload session
+ * instead and is bounded by `limits.max_bytes` alone. A deployment with no
+ * threshold (a `local` backend that cannot presign parts) keeps the old rule -
+ * refuse above 50 MiB before reading - and names `min(max_bytes, 50 MiB)`.
  */
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 /**
- * SIZE-F1 / SAVE-01 merge M-2 (D-S1): the ONE size preflight upload and first
- * save share. The server's `max_bytes` comes first and is named as itself, then
- * the interim 50 MiB staging cap, whose refusal names `min(max_bytes, 50 MiB)`
- * as the effective limit so the copy stays truthful. `filename` is the basename
- * sent as the upload `file` part; `size` is the payload's byte length at this
- * call's point - the stat's size before the read, the buffer's after it. Both
- * callers run it on both, so a file that grew between the two is refused too.
- * The refusal carries filename/sizeBytes/maxBytes to the renderer unchanged.
+ * SIZE-F1 / SAVE-01 merge M-2 (D-S1) / BIGUP-A1: the ONE size preflight upload
+ * and first save share. The server's `max_bytes` comes first and is named as
+ * itself; then the single-request staging cap, which applies only to a file the
+ * chunked path will not take (no threshold, or one above this size) and whose
+ * refusal names `min(max_bytes, 50 MiB)` so the copy stays truthful.
+ * `filename` is the basename sent as the upload `file` part; `size` is the
+ * payload's byte length at this call's point - the stat's size before the read,
+ * the buffer's after it. Both callers run it on both, so a file that grew
+ * between the two is refused too. The refusal carries
+ * filename/sizeBytes/maxBytes to the renderer unchanged.
  */
 function assertUploadSize(filename: string, size: number, limits: DocumentLimits): void {
   if (size > limits.max_bytes) {
@@ -523,7 +567,7 @@ function assertUploadSize(filename: string, size: number, limits: DocumentLimits
       maxBytes: limits.max_bytes,
     })
   }
-  if (size > MAX_UPLOAD_BYTES) {
+  if (size > MAX_UPLOAD_BYTES && !shouldUseChunkedUpload(size, limits)) {
     throw new UniworkDocError('too_large', {
       filename,
       sizeBytes: size,
@@ -574,6 +618,40 @@ function requireUploadId(raw: unknown): string {
 /** the upload a Cancel aborted: never part of UniworkDocErrorCode (see its action union) */
 function cancelledUpload(): UniworkDocError {
   return new UniworkDocError('upload_cancelled' as UniworkDocErrorCode)
+}
+
+/**
+ * BIGUP-A1: one part of a large file, read straight off the disk. A chunked
+ * upload never buffers the whole file: `runChunkedUpload` asks for
+ * `[offset, offset+length)` and the handle is opened and closed for that read,
+ * so peak memory is the parts in flight (4 x 8 MiB) whatever the file's size.
+ * A short read means the file changed under us - refused as `malformed_response`
+ * rather than uploaded as a part of the wrong length.
+ */
+async function readFileRange(
+  path: string,
+  offset: number,
+  length: number,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  if (signal?.aborted) throw cancelledUpload()
+  const handle = await open(path, 'r')
+  try {
+    const buffer = new Uint8Array(length)
+    let done = 0
+    while (done < length) {
+      if (signal?.aborted) throw cancelledUpload()
+      const step = await handle.read(buffer, done, length - done, offset + done)
+      if (step.bytesRead <= 0) break
+      done += step.bytesRead
+    }
+    if (done !== length) {
+      throw new UniworkDocError('malformed_response', { serverCode: 'upload_size_mismatch' })
+    }
+    return buffer
+  } finally {
+    await handle.close().catch(() => undefined)
+  }
 }
 
 /**
@@ -929,10 +1007,27 @@ export class UniworkDocsService {
   private readonly appVersion: () => string
   private client: UniworkDocsClient | null
   private clientOrigin: string | null = null
+  private editLockHttp: UniworkEditLockClient | null = null
+  private editLockOrigin: string | null = null
+  /** pathKey -> live edit-lock session of this window */
+  private readonly editLocks = new Map<string, EditLockSession>()
+  /**
+   * EL1B-BE-R2-1: fire-and-forget drop DELETEs (window closed / removeTab /
+   * detached teardown) still in flight. will-quit joins these under the same
+   * cap as held sessions. Settled promises leave the set.
+   */
+  private readonly inFlightDropReleases = new Set<Promise<unknown>>()
+  /** pathKey -> editor_id for this process + path */
+  private readonly editorIds = new Map<string, string>()
   private lastOwner: LastOwner | null
+  /** the owner last-account.json holds: a failed write leaves it behind `lastOwner` and is retried */
+  private lastOwnerOnDisk: LastOwner | null
+  private lastOwnerRetryAt = 0
   private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
   /** path key -> the newer-store lock currently shown for it (S11) */
   private readonly locks = new Map<string, UniworkDocLock>()
+  /** pathKey -> last published access/lock signature so access flips broadcast once */
+  private readonly lastPublishedAccess: Record<string, string> = Object.create(null)
   /** path -> checksum of the file as of its mtime/size (the sync close check) */
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
   /** working copies whose editor holds edits not written to the file yet */
@@ -1036,6 +1131,8 @@ export class UniworkDocsService {
   private readonly ownEcho = new Map<string, Set<string>>()
   /** documents locked by a server verdict (403/404 revoked, 410 deleted) */
   private readonly remoteLocked = new Map<string, 'revoked' | 'deleted'>()
+  /** documentId → real working-copy path; forgetLocksWhere cannot rehydrate via pathKey on Windows */
+  private readonly remoteLockPath = new Map<string, string>()
   /** ADVISOR D4 (a): the parsed dev-only fixture and the mtime it was read at */
   private devFixture: {
     file: string
@@ -1091,6 +1188,7 @@ export class UniworkDocsService {
       this.heldByMigration(dir),
     )
     this.lastOwner = this.store.readLastOwner()
+    this.lastOwnerOnDisk = this.lastOwner
     this.limitsCache = createDocumentLimitsCache({
       origin: () => this.deps.profile()?.apiOrigin ?? null,
       fetchLimits: async (startedOrigin) => {
@@ -1110,6 +1208,15 @@ export class UniworkDocsService {
         upload: (input) => this.api().upload(input),
         commit: (input) => this.api().commit(input),
         getDocument: (documentId) => this.api().getDocument(documentId),
+        // BIGUP-A1: a version payload above `chunked_upload_threshold_bytes`
+        // goes through an upload session instead of one multipart POST
+        uploadSession: {
+          createDocumentUploadSession: (input) => this.api().createDocumentUploadSession(input),
+          getUploadSession: (sessionId, signal) => this.api().getUploadSession(sessionId, signal),
+          completeUploadSession: (input) => this.api().completeUploadSession(input),
+          deleteUploadSession: (sessionId) => this.api().deleteUploadSession(sessionId),
+          putUploadPart: (input) => this.api().putUploadPart(input),
+        },
       },
       isSignedIn: () => deps.identity() !== null,
       ownsBinding: (doc) => this.owns(doc),
@@ -1174,6 +1281,11 @@ export class UniworkDocsService {
       // the queue engine exposes no public in-flight state, so the service
       // reports the keys its own poll pass is running right now (G506-be-1)
       dispatcherBusy: (key) => this.queueInFlight.has(key),
+      prepareEditLock: (path) => this.prepareEditLock(path),
+      editLockId: (path) => this.editLockIdOf(path),
+      editLockHolder: (path) => this.editLockHolderOf(path),
+      onCommitEditLocked: (path, error) =>
+        this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
     })
     this.launch = new LaunchController({
@@ -1213,11 +1325,258 @@ export class UniworkDocsService {
     return this.client
   }
 
+  /** EL-1(b): lock client of this profile; null when tests inject only a docs client */
+  private editLockApi(): UniworkEditLockClient | null {
+    if (this.deps.editLockClient) return this.deps.editLockClient
+    if (this.deps.client) return null
+    const profile = this.deps.profile()
+    if (!profile) return null
+    if (!this.editLockHttp || this.editLockOrigin !== profile.apiOrigin) {
+      this.editLockHttp = createUniworkEditLockClient({
+        apiOrigin: profile.apiOrigin,
+        authorized: (call) => this.deps.authorized(call),
+        isSignedIn: () => this.deps.identity() !== null,
+        ...(this.deps.fetch ? { fetch: this.deps.fetch } : {}),
+      })
+      this.editLockOrigin = profile.apiOrigin
+    }
+    return this.editLockHttp
+  }
+
+  private editLockIdOf(path: string): string | null {
+    return this.editLocks.get(pathKey(path))?.lockId() ?? null
+  }
+
+  private editLockHolderOf(path: string): UniworkDocEditLock | null {
+    const view = this.editLocks.get(pathKey(path))?.view()
+    if (!view) return null
+    return {
+      holderName: view.holderName,
+      since: view.since,
+      expiresAt: null,
+      heldByMe: view.phase === 'self_elsewhere',
+    }
+  }
+
+  private async prepareEditLock(path: string): Promise<'held' | 'park' | 'proceed'> {
+    const session = this.editLocks.get(pathKey(path))
+    if (!session) return 'proceed'
+    return session.ensureHeldBeforeCommit()
+  }
+
+  private editLockReadOnly(path: string): boolean {
+    return this.editLocks.get(pathKey(path))?.isReadOnly() === true
+  }
+
+  private toLockView(view: EditLockSessionView): UniworkEditLockSessionView | undefined {
+    if (view.phase === 'none') return undefined
+    return {
+      phase: view.phase,
+      holderName: view.holderName,
+      since: view.since,
+      ...(view.phase === 'lost'
+        ? { lostReason: view.lostReason ?? 'unknown', byName: view.byName ?? null }
+        : {}),
+    }
+  }
+
+  private startEditLock(doc: BoundDocument): void {
+    if (doc.binding.access !== 'edit') {
+      void this.stopEditLock(doc.path, true)
+      return
+    }
+    if (this.coordinator.isOtherWindow(doc.key)) return
+    const api = this.editLockApi()
+    if (!api) return
+    const key = pathKey(doc.path)
+    const existing = this.editLocks.get(key)
+    if (
+      existing &&
+      existing.documentId === doc.binding.documentId &&
+      existing.view().phase !== 'acquiring'
+    ) {
+      return
+    }
+    if (existing) void this.stopEditLock(doc.path, true)
+    let editorId = this.editorIds.get(key)
+    if (!editorId) {
+      editorId = newEditorId()
+      this.editorIds.set(key, editorId)
+    }
+    const session = new EditLockSession({
+      documentId: doc.binding.documentId,
+      path: doc.path,
+      editorId,
+      transport: asEditLockTransport(api),
+      isOnline: () => this.queueOnline !== false,
+      isSignedIn: () => this.deps.identity() !== null,
+      onChange: (view) => {
+        if (view.phase === 'acquiring' || view.phase === 'none') return
+        const now = this.store.lookup(doc.path)
+        if (now) this.publish(this.statusOf(now))
+        this.notifyDocStateChanged(doc.path)
+        void this.maybeReplayRemoteAfterUnlock(doc.path)
+      },
+    })
+    this.editLocks.set(key, session)
+    void session.acquire().then(() => {
+      const view = session.view()
+      if (view.phase === 'none') {
+        if (this.editLocks.get(key) === session) {
+          this.editLocks.delete(key)
+          session.dispose()
+          this.notifyDocStateChanged(doc.path)
+        }
+        return
+      }
+      const now = this.store.lookup(doc.path)
+      if (now) this.publish(this.statusOf(now))
+      void this.maybeReplayRemoteAfterUnlock(doc.path)
+    })
+  }
+
+  private async stopEditLock(path: string, release: boolean): Promise<void> {
+    const key = pathKey(path)
+    const session = this.editLocks.get(key)
+    if (!session) return
+    if (this.editLocks.get(key) === session) this.editLocks.delete(key)
+    if (release) await this.capped(session.release(), EDIT_LOCK_QUIT_CAP_MS)
+    session.dispose()
+    this.notifyDocStateChanged(path)
+  }
+
+  async releaseAllEditLocks(capMs?: number): Promise<void> {
+    const sessions = [...this.editLocks.values()]
+    const paths = sessions
+      .map((s) => s.path)
+      .filter((p): p is string => typeof p === 'string' && p.length > 0)
+    this.editLocks.clear()
+    const drops = [...this.inFlightDropReleases]
+    const work = Promise.all([...sessions.map((s) => s.release().catch(() => undefined)), ...drops])
+    if (capMs !== undefined) {
+      await this.capped(work, capMs)
+    } else {
+      await work
+    }
+    for (const s of sessions) s.dispose()
+    for (const p of paths) this.notifyDocStateChanged(p)
+  }
+
+  /** will-quit holds the quit only while a held lock or a drop release is outstanding */
+  hasEditLocksToRelease(): boolean {
+    return this.editLocks.size > 0 || this.inFlightDropReleases.size > 0
+  }
+
+  /** will-quit: best-effort, 1.5 s cap; the quit gate awaits this then re-quits */
+  releaseEditLocksOnQuit(): Promise<void> {
+    return this.releaseAllEditLocks(EDIT_LOCK_QUIT_CAP_MS)
+  }
+
+  /**
+   * EL-1(b) fix3 B2: MCP closeTabWithoutPrompt / removeTab and a macOS
+   * clean-window close drop bound paths without confirmClose. One hook,
+   * best-effort, capped like quit. Callers stay fire-and-forget; will-quit
+   * joins the in-flight DELETE under the same single cap (EL1B-BE-R2-1).
+   */
+  async notePathsDropped(paths: string[]): Promise<void> {
+    const sessions: EditLockSession[] = []
+    const droppedPaths: string[] = []
+    for (const path of paths) {
+      if (typeof path !== 'string' || !path) continue
+      const key = pathKey(path)
+      const session = this.editLocks.get(key)
+      if (!session) continue
+      this.editLocks.delete(key)
+      sessions.push(session)
+      droppedPaths.push(path)
+    }
+    if (sessions.length === 0) return
+    const work = Promise.all(sessions.map((s) => s.release().catch(() => undefined)))
+    this.inFlightDropReleases.add(work)
+    void work.finally(() => {
+      this.inFlightDropReleases.delete(work)
+    })
+    await this.capped(work, EDIT_LOCK_QUIT_CAP_MS)
+    for (const s of sessions) s.dispose()
+    for (const p of droppedPaths) this.notifyDocStateChanged(p)
+  }
+
+  private async capped(work: Promise<unknown>, capMs: number): Promise<void> {
+    await Promise.race([work.catch(() => undefined), this.sleepMs(capMs)])
+  }
+
+  notePowerResume(): void {
+    for (const session of this.editLocks.values()) void session.wake()
+  }
+
+  noteWindowFocus(): void {
+    for (const session of this.editLocks.values()) {
+      if (session.view().phase === 'other') void session.wake()
+    }
+  }
+
+  /** EL-1(b): "Sửa ở đây" */
+  async editHere(path: string): Promise<UniworkDocStatus | null> {
+    if (typeof path !== 'string') return null
+    const doc = this.store.lookup(path)
+    if (!doc || !this.ownsLocally(doc)) return null
+    let session = this.editLocks.get(pathKey(path))
+    if (!session) {
+      this.startEditLock(doc)
+      session = this.editLocks.get(pathKey(path))
+    }
+    if (!session) return this.statusOf(doc)
+    const ok = await session.editHere()
+    if (!ok) return null
+    const now = this.store.lookup(path)
+    if (!now) return null
+    void this.maybeReplayRemoteAfterUnlock(path)
+    const status = this.statusOf(now)
+    this.publish(status)
+    return status
+  }
+
+  private async maybeReplayRemoteAfterUnlock(path: string): Promise<void> {
+    const doc = this.store.lookup(path)
+    if (!doc) return
+    const phase = this.editLocks.get(pathKey(path))?.view().phase
+    // granted / lock free — leave edit_locked and edit_lock read-only
+    if (phase !== 'held' && phase !== 'free') return
+    const documentId = doc.binding.documentId
+    const held = this.remoteHeld.get(documentId)
+    try {
+      const detail = await this.api().getDocument(documentId)
+      if (held) await this.redecideHeld(documentId)
+      if (compareRevision(detail.revision, doc.binding.baseRevision) > 0) {
+        await this.noteRemoteChange({
+          documentId,
+          revision: detail.revision,
+          version: detail.file.version,
+          versionId: detail.file.versionId ?? null,
+        })
+      }
+    } catch {
+      if (held) await this.redecideHeld(documentId).catch(() => undefined)
+    }
+  }
+
+  private notifyDocStateChanged(path: string): void {
+    if (typeof path !== 'string' || !path) return
+    this.deps.pushDocStateChanged?.(path)
+  }
+
   /** every status push: the shell window, then in-process waiters (close prompt) */
   private publish(status: UniworkDocStatus): void {
-    const full = this.withRemote(this.present(status))
+    const full = this.withRemote(this.present(this.withLockSession(status)))
     this.deps.pushStatus(full)
     for (const listener of [...this.statusListeners]) listener(full)
+    const accessSig = `${full.access}:${full.state === 'blocked' ? (full.error ?? '') : ''}`
+    const sigKey = pathKey(full.path)
+    const prevSig = this.lastPublishedAccess[sigKey]
+    this.lastPublishedAccess[sigKey] = accessSig
+    if (prevSig !== undefined && prevSig !== accessSig) {
+      this.notifyDocStateChanged(full.path)
+    }
     const open = this.conflictPrompt
     if (open && !open.controller.signal.aborted && samePath(open.path, full.path)) {
       if (full.state === 'blocked') {
@@ -1338,7 +1697,24 @@ export class UniworkDocsService {
   }
 
   private statusOf(doc: BoundDocument): UniworkDocStatus {
-    return this.withRemote(this.present(toStatus(doc)))
+    return this.withRemote(this.present(this.withLockSession(toStatus(doc))))
+  }
+
+  /** live lock view on every status (B6: one place, including non-statusOf publishes) */
+  private withLockSession(status: UniworkDocStatus): UniworkDocStatus {
+    const lockSession = this.toLockView(
+      this.editLocks.get(pathKey(status.path))?.view() ?? {
+        phase: 'none',
+        holderName: null,
+        since: null,
+      },
+    )
+    if (!lockSession) {
+      if (!status.lockSession) return status
+      const { lockSession: _dropped, ...rest } = status
+      return rest
+    }
+    return { ...status, lockSession }
   }
 
   /**
@@ -1399,15 +1775,19 @@ export class UniworkDocsService {
   private liveIdentity(): SessionIdentity | null {
     const identity = this.deps.identity()
     if (!identity) return null
-    const last = this.lastOwner
-    if (
-      !last ||
-      last.accountId !== identity.accountId ||
-      last.deploymentId !== identity.deploymentId
-    ) {
-      const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
+    const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
+    const sameOwner = (known: LastOwner | null) =>
+      !!known && known.accountId === owner.accountId && known.deploymentId === owner.deploymentId
+    if (!sameOwner(this.lastOwner)) {
       this.lastOwner = owner
-      void this.store.writeLastOwner(owner).catch(() => undefined)
+      // the back-off belongs to the owner whose write failed, not to the next one
+      this.lastOwnerRetryAt = 0
+    }
+    // a failed write is not remembered as persisted: a later observation retries it,
+    // at most once per back-off so a stuck disk does not stall every status read
+    if (!sameOwner(this.lastOwnerOnDisk) && Date.now() >= this.lastOwnerRetryAt) {
+      if (this.store.writeLastOwner(owner)) this.lastOwnerOnDisk = owner
+      else this.lastOwnerRetryAt = Date.now() + LAST_OWNER_RETRY_MS
     }
     return identity
   }
@@ -1747,7 +2127,19 @@ export class UniworkDocsService {
           this.api().upload({ ...input, format: input.format as UniworkDocFormat }),
         commit: (input) => this.api().commit(input),
         lookupCommit: (input) => this.api().lookupCommit(input),
+        // BIGUP-A1: the same session routes the inline pipeline uses, so a
+        // replayed intent above the threshold takes the chunked path too
+        uploadSession: {
+          createDocumentUploadSession: (input) => this.api().createDocumentUploadSession(input),
+          getUploadSession: (sessionId, signal) => this.api().getUploadSession(sessionId, signal),
+          completeUploadSession: (input) => this.api().completeUploadSession(input),
+          deleteUploadSession: (sessionId) => this.api().deleteUploadSession(sessionId),
+          putUploadPart: (input) => this.api().putUploadPart(input),
+        },
       },
+      // BIGUP-A1: the deployment's `chunked_upload_threshold_bytes`, read from
+      // the same cache the coordinator uses
+      documentLimits: () => this.limitsCache.get(),
       capability: {
         get: (orgId, options) =>
           this.deps.capability
@@ -1778,6 +2170,11 @@ export class UniworkDocsService {
         if (this.deadQueueSessions.has(id)) return
         this.publishRecord(record)
       },
+      prepareEditLock: (path) => this.prepareEditLock(path),
+      editLockId: (path) => this.editLockIdOf(path),
+      editLockHolder: (path) => this.editLockHolderOf(path),
+      onCommitEditLocked: (path, error) =>
+        this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
     })
     this.queueSession = { id, token, dispatcher, lock, intents, drafts, pause }
     return { kind: 'ok', ...this.queueSession }
@@ -2154,6 +2551,10 @@ export class UniworkDocsService {
     // remembered for the blocked re-probe: a pass that reported offline never
     // sends an access check either
     this.queueOnline = online
+    // EL-1(b): network-back wake (same signal the feed poll / queue uses)
+    if (online) {
+      for (const session of this.editLocks.values()) void session.wake()
+    }
     const access = await this.queueEngine()
     if (access.kind !== 'ok') return
     if (!this.isQueueSessionCurrent(access)) return
@@ -2174,6 +2575,7 @@ export class UniworkDocsService {
 
   /** "Hủy lần lưu" of one document; `closed` = its tab is closed -> kept draft */
   async cancelSave(path: string, closed = false): Promise<void> {
+    if (closed) await this.stopEditLock(path, true)
     if (closed && this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
       this.endConflictByMain(this.conflictPrompt)
     }
@@ -2527,6 +2929,9 @@ export class UniworkDocsService {
     // scope (or a later lock) can never reuse it
     const planned = this.plannedRamOnly.get(scopeToken)
     this.plannedRamOnly.delete(scopeToken)
+
+    // EL-1(b): release held locks BEFORE the token / runtime go (capped)
+    await this.releaseAllEditLocks(EDIT_LOCK_QUIT_CAP_MS)
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.sessionEpoch += 1
@@ -2908,6 +3313,7 @@ export class UniworkDocsService {
     this.remoteHeld.clear()
     this.ownEcho.clear()
     this.remoteLocked.clear()
+    this.remoteLockPath.clear()
     this.editorAi.clear()
     this.remoteReloads.clear()
     this.orgMemberNames.clear()
@@ -3148,13 +3554,16 @@ export class UniworkDocsService {
 
   private clearSignedOutLocks(): void {
     let cleared = false
+    const clearedPaths: string[] = []
     for (const [key, lock] of [...this.locks]) {
       if (lock.reason === 'signed_out') {
         this.locks.delete(key)
         cleared = true
+        clearedPaths.push(lock.path)
       }
     }
     if (cleared) this.deps.pushLocks?.()
+    for (const p of clearedPaths) this.notifyDocStateChanged(p)
   }
 
   /** whether the durable store holds an intent for `doc`; 'locked' = unreachable now */
@@ -3368,15 +3777,18 @@ export class UniworkDocsService {
   /** the store opened (again): the keystore_locked panels are stale */
   private clearKeystoreLocks(): void {
     let cleared = false
+    const clearedPaths: string[] = []
     for (const [key, lock] of [...this.locks]) {
       if (lock.reason === 'keystore_locked') {
         this.locks.delete(key)
         cleared = true
+        clearedPaths.push(lock.path)
       }
     }
     // the renderer's list is its own: it must be told the list changed, or a
     // Retry that worked leaves the S11 panel up until some other push
     if (cleared) this.deps.pushLocks?.()
+    for (const p of clearedPaths) this.notifyDocStateChanged(p)
   }
 
   /**
@@ -3422,6 +3834,16 @@ export class UniworkDocsService {
       if (!doc) continue
       this.remoteLocked.delete(doc.binding.documentId)
       this.remoteHeld.delete(doc.binding.documentId)
+      this.remoteLockPath.delete(doc.binding.documentId)
+    }
+    // pathKey lowercases the filename on Windows, so lookup(pathKey) misses
+    // (`Plan.docx` !== `plan.docx`) and the bar loop cannot drop the verdict.
+    // remoteLockPath keeps the real path lockFromServer saw.
+    for (const [documentId, path] of [...this.remoteLockPath]) {
+      if (!match(path)) continue
+      this.remoteLocked.delete(documentId)
+      this.remoteHeld.delete(documentId)
+      this.remoteLockPath.delete(documentId)
     }
   }
 
@@ -3438,6 +3860,7 @@ export class UniworkDocsService {
     }
     this.locks.set(pathKey(lock.path), lock)
     this.deps.pushLock?.(lock)
+    this.notifyDocStateChanged(lock.path)
   }
 
   /**
@@ -3534,7 +3957,8 @@ export class UniworkDocsService {
     return (
       found.doc.binding.access === 'view' ||
       !this.ownsLocally(found.doc) ||
-      this.coordinator.isOtherWindow(found.doc.key)
+      this.coordinator.isOtherWindow(found.doc.key) ||
+      this.editLockReadOnly(found.doc.path)
     )
   }
 
@@ -3592,6 +4016,22 @@ export class UniworkDocsService {
     // Only a shell tab has the pill and popover: a detached editor window keeps
     // the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
     void this.coordinator.save(path, { userSave: this.deps.isShellTab?.(path) ?? true })
+  }
+
+  /**
+   * EL-1(b) fix6 (VEL-1): an editor module's explicit Save while the bound
+   * working copy is read-only. Never writes and never fires the user-save
+   * hook; asks the shell renderer to open the explain popover for that path.
+   */
+  onReadOnlySave(path: string): void {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc)) return
+    if (!this.isReadOnly(doc.path)) return
+    const status = this.statusOf(doc)
+    this.publish(status)
+    if (this.deps.isShellTab?.(doc.path) ?? true) {
+      this.deps.pushQueuePopover?.({ path: doc.path })
+    }
   }
 
   // ---- renderer API ----------------------------------------------------------
@@ -3904,16 +4344,20 @@ export class UniworkDocsService {
    * extension first (`unsupported_format` before any read when the formats table
    * does not know it - the picker's filter alone is not a contract), stats the
    * file (a pick past the configured `documents.limits.upload_max_bytes`, 200 MiB
-   * by default, is refused unread with `too_large`), reads the bytes and sends them
-   * as the multipart `file` part
-   * while reporting progress; the title is the file name (the server's own
-   * default). Nothing is written locally: the working copy is the download the
-   * open flow makes from the created document.
+   * by default, is refused unread with `too_large`), then sends it: a file above
+   * the server's `chunked_upload_threshold_bytes` (BIGUP-A1) goes through an
+   * upload session - parts straight to the storage's presigned URLs, never the
+   * whole file in RAM - and anything smaller through the one multipart POST.
+   * Progress is pushed with the bytes actually sent, and `phase: 'checking'`
+   * while the server validates a chunked upload; the title is the file name
+   * (the server's own default). Nothing is written locally: the working copy is
+   * the download the open flow makes from the created document.
    *
    * The upload is reachable for the dialog's Cancel through its own `uploadId`:
-   * `cancelUpload` aborts the read and the POST, and this call then answers
-   * `upload_cancelled`. An abort that lands after D already answered 2xx is
-   * ignored - the created document is returned as usual (never a hidden delete).
+   * `cancelUpload` aborts the read and the POST (or the in-flight part PUTs) and
+   * aborts the upload session, and this call then answers `upload_cancelled`. An
+   * abort that lands after D already answered 2xx is ignored - the created
+   * document is returned as usual (never a hidden delete).
    */
   uploadDocument(input: UniworkUploadDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(async () => {
@@ -3936,10 +4380,12 @@ export class UniworkDocsService {
       this.uploads.set(uploadId, controller)
       try {
         let size: number
+        let mtimeMs: number
         try {
           const info = await stat(input.path)
           if (!info.isFile()) throw new UniworkDocError('not_found')
           size = info.size
+          mtimeMs = info.mtimeMs
         } catch (error) {
           throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
         }
@@ -3948,38 +4394,39 @@ export class UniworkDocsService {
         const limits = await this.limitsCache.get()
         if (controller.signal.aborted) throw cancelledUpload()
         assertUploadSize(filename, size, limits)
-        let bytes: Uint8Array
-        try {
-          bytes = new Uint8Array(await readFile(input.path, { signal: controller.signal }))
-        } catch {
-          if (controller.signal.aborted) throw cancelledUpload()
-          throw new UniworkDocError('not_found')
-        }
-        // the read can also resolve just as the abort lands: no POST then
-        if (controller.signal.aborted) throw cancelledUpload()
-        const total = bytes.byteLength
-        assertUploadSize(filename, total, limits)
-        this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: 0, total })
-        const created = await this.api()
-          .createFile({
-            workspaceId: target.workspaceId,
-            bytes,
+        const singleRequest = (): Promise<UniworkDocSummary> =>
+          this.uploadSingleRequestDocument({
+            uploadId,
+            path: input.path,
             filename,
-            title: filename,
-            ...target.create,
-            idempotencyKey: this.newIdempotencyKey(),
-            signal: controller.signal,
+            size,
+            target,
+            limits,
+            controller,
           })
-          .catch((error: unknown) => {
-            // the person cancelled while the POST was in flight: that is the
-            // answer, not the network failure the abort surfaced as
-            if (controller.signal.aborted) throw cancelledUpload()
-            if (error instanceof UniworkDocError && error.code === 'too_large') {
-              rethrowServerTooLarge(error, filename, total, limits)
-            }
-            throw error
-          })
-        this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: total, total })
+        const created = shouldUseChunkedUpload(size, limits)
+          ? await this.uploadChunkedDocument({
+              uploadId,
+              path: input.path,
+              filename,
+              size,
+              mtimeMs,
+              target,
+              limits,
+              controller,
+            }).catch(async (error: unknown) => {
+              // BIGUP-A1: the server refused the session because the file is at
+              // or under its own threshold - the limits cache was stale. The
+              // file fits one request, so that is the path to take.
+              if (
+                error instanceof UniworkDocError &&
+                error.serverCode === 'upload_session_too_small'
+              ) {
+                return await singleRequest()
+              }
+              throw error
+            })
+          : await singleRequest()
         // FD-11: the uploaded document is a new row in its folder
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
@@ -3988,6 +4435,266 @@ export class UniworkDocsService {
         if (this.uploads.get(uploadId) === controller) this.uploads.delete(uploadId)
       }
     })
+  }
+
+  /**
+   * The one-request upload: main buffers the file and sends it as the multipart
+   * `file` part. Bounded by the 50 MiB staging cap, so the buffer is small; a
+   * file the server answers `too_large` for (a stale limits cache) is re-wrapped
+   * with the basename and the size main actually sent.
+   */
+  private async uploadSingleRequestDocument(input: {
+    uploadId: string
+    path: string
+    filename: string
+    size: number
+    target: { workspaceId: string; create: UniworkCreateTarget }
+    limits: DocumentLimits
+    controller: AbortController
+  }): Promise<UniworkDocSummary> {
+    const { uploadId, path, filename, target, limits, controller } = input
+    let bytes: Uint8Array
+    try {
+      bytes = new Uint8Array(await readFile(path, { signal: controller.signal }))
+    } catch {
+      if (controller.signal.aborted) throw cancelledUpload()
+      throw new UniworkDocError('not_found')
+    }
+    // the read can also resolve just as the abort lands: no POST then
+    if (controller.signal.aborted) throw cancelledUpload()
+    const total = bytes.byteLength
+    assertUploadSize(filename, total, limits)
+    this.deps.pushUploadProgress?.({ uploadId, path, loaded: 0, total })
+    const created = await this.api()
+      .createFile({
+        workspaceId: target.workspaceId,
+        bytes,
+        filename,
+        title: filename,
+        ...target.create,
+        idempotencyKey: this.newIdempotencyKey(),
+        signal: controller.signal,
+      })
+      .catch((error: unknown) => {
+        // the person cancelled while the POST was in flight: that is the
+        // answer, not the network failure the abort surfaced as
+        if (controller.signal.aborted) throw cancelledUpload()
+        if (error instanceof UniworkDocError && error.code === 'too_large') {
+          rethrowServerTooLarge(error, filename, total, limits)
+        }
+        throw error
+      })
+    this.deps.pushUploadProgress?.({ uploadId, path, loaded: total, total })
+    return created
+  }
+
+  /**
+   * BIGUP-A1: the chunked upload of one new document. The probe is read from
+   * the file's head and ZIP tail (bounded, never the whole file), a session is
+   * opened for the workspace, the parts go to the storage's presigned URLs four
+   * at a time, and `complete` creates the document. The session id and the
+   * finished parts are persisted in the `upload-sessions` store, so a restart
+   * (or a re-pick of the same, unmodified file) resumes instead of re-sending
+   * everything; the record is removed once the document exists or the person
+   * cancelled.
+   *
+   * A `422 upload_session_too_small` is the threshold having drifted under us
+   * (a cached limit, a server changed between the stat and the call): the file
+   * is small enough for one request, so the single-request path runs instead.
+   */
+  private async uploadChunkedDocument(input: {
+    uploadId: string
+    path: string
+    filename: string
+    size: number
+    mtimeMs: number
+    target: { workspaceId: string; create: UniworkCreateTarget }
+    limits: DocumentLimits
+    controller: AbortController
+  }): Promise<UniworkDocSummary> {
+    const { uploadId, path, filename, size, mtimeMs, target, limits, controller } = input
+    const format = formatForName(filename)!
+    // the probe refuses a file the server would refuse anyway (a macro package,
+    // a broken container) before one byte is sent
+    const probe = await readLocalFileProbe({ path }, size, filename)
+    const api = this.api()
+    const resumeKey = uploadSessionKey(path, size, mtimeMs)
+    const store = await this.uploadSessionStore()
+    // the session route names its folder by id only (there is no `destination`
+    // field), so a `my_folder` target is resolved to the caller's personal
+    // folder first - the same row `POST .../documents/files` would land in
+    const parentId = await this.uploadSessionParentId(api, target)
+    const title = filename
+    // R1-BE-03: resume only when the WHOLE create fingerprint still matches
+    // (workspace, effective parent, title, filename). A record left by a failed
+    // upload into folder A must never be resumed by a pick aimed at folder B -
+    // the old session is aborted (best effort) and this run starts fresh.
+    const saved = (await store?.get(resumeKey)) ?? null
+    const resume = await this.resumeForCreate(api, saved, {
+      workspaceId: target.workspaceId,
+      folderId: parentId,
+      title,
+      filename,
+    })
+    const targetForSession: UploadSessionTarget = {
+      kind: 'workspace',
+      workspaceId: target.workspaceId,
+      parentId,
+      title,
+    }
+    const pushProgress = (loaded: number, total: number, phase?: 'checking'): void => {
+      this.deps.pushUploadProgress?.({
+        uploadId,
+        path,
+        loaded,
+        total,
+        ...(phase ? { phase } : {}),
+      })
+    }
+    // R1-BE-02: the LIVE session id, held in memory for the whole operation so a
+    // Cancel can issue the DELETE even when the resume store never accepted the
+    // record (refused / full / unavailable). The store is a convenience, not the
+    // authority on what to abort.
+    let liveSessionId: string | null = null
+    const result = await runChunkedUpload(api, {
+      target: targetForSession,
+      filename,
+      size,
+      readRange: (offset, length) => readFileRange(path, offset, length, controller.signal),
+      probe,
+      idempotencyKey: this.newIdempotencyKey(),
+      ...(resume ? { resume } : {}),
+      signal: controller.signal,
+      freshIdempotencyKey: () => this.newIdempotencyKey(),
+      onProgress: (loaded, total) => pushProgress(loaded, total),
+      onPhase: (phase) => pushProgress(size, size, phase === 'checking' ? 'checking' : undefined),
+      onSessionState: async (state) => {
+        liveSessionId = state.sessionId
+        await store?.put(resumeKey, {
+          sessionId: state.sessionId,
+          workspaceId: target.workspaceId,
+          folderId: parentId,
+          title,
+          filename,
+          path,
+          size,
+          mtimeMs,
+          partSize: state.partSize,
+          totalParts: state.totalParts,
+          completedParts: state.completedParts,
+          expiresAt: state.expiresAt,
+          updatedAt: new Date().toISOString(),
+        })
+      },
+    }).catch(async (error: unknown) => {
+      if (controller.signal.aborted) {
+        await this.abortChunkedUpload(api, resumeKey, liveSessionId)
+        throw cancelledUpload()
+      }
+      if (error instanceof UniworkDocError && error.code === 'too_large') {
+        rethrowServerTooLarge(error, filename, size, limits)
+      }
+      throw error
+    })
+    await store?.remove(resumeKey)
+    if (result.kind === 'upload') {
+      // the workspace route answers the created document; a staged upload here
+      // would mean the server routed a create through the version shape
+      throw new UniworkDocError('malformed_response')
+    }
+    // the create answer may omit the format; the extension main already
+    // resolved is the same authority the open flow uses
+    const created = result.document
+    return created.format ? created : { ...created, format }
+  }
+
+  /** the resume store of the new-document chunked upload, or null without a store */
+  private async uploadSessionStore(): Promise<UploadSessionStore | null> {
+    const open = await this.openSyncStore()
+    if (open.kind !== 'ok') return null
+    return createUploadSessionStore(open.records(UPLOAD_SESSIONS_STORE_REGISTRATION.name))
+  }
+
+  /**
+   * R1-BE-03: the saved session this command may resume from, or undefined.
+   * Resume requires the WHOLE create fingerprint - workspace, effective parent
+   * folder, title and file name - to match the record the session was opened
+   * with. A record whose fingerprint differs (the same unchanged file re-picked
+   * for another folder, or a first save retried under another title) describes a
+   * DIFFERENT command, so the stale session is aborted best-effort and the run
+   * starts fresh; a record written before this build carries no fingerprint and
+   * is likewise never resumed.
+   */
+  private async resumeForCreate(
+    api: UniworkDocsClient,
+    saved: UploadSessionRecord | null,
+    want: { workspaceId: string; folderId: string | null; title: string; filename: string },
+  ): Promise<SavedUploadSession | undefined> {
+    if (!saved || !saved.sessionId) return undefined
+    const matches =
+      saved.workspaceId === want.workspaceId &&
+      (saved.folderId ?? null) === (want.folderId ?? null) &&
+      saved.title === want.title &&
+      saved.filename === want.filename
+    if (!matches) {
+      // the record is for another command: free its session so it cannot hold
+      // quota for 24 h, then start over (a failed DELETE is logged, not fatal)
+      await abortUploadSession(api, saved.sessionId).catch(() => undefined)
+      return undefined
+    }
+    return {
+      sessionId: saved.sessionId,
+      partSize: saved.partSize,
+      totalParts: saved.totalParts,
+      completedParts: saved.completedParts,
+      expiresAt: saved.expiresAt,
+    }
+  }
+
+  /**
+   * The folder id an upload session creates its document in. The session route
+   * takes `parent_id` only (never the one-request route's `destination`), so a
+   * `my_folder` target is resolved through the same idempotent `my-folder`
+   * route the save dialog already calls - never left to the server's default,
+   * which would put the document at the workspace root instead.
+   */
+  private async uploadSessionParentId(
+    api: UniworkDocsClient,
+    target: { workspaceId: string; create: UniworkCreateTarget },
+  ): Promise<string | null> {
+    if ('parentId' in target.create && target.create.parentId) return target.create.parentId
+    return (await api.ensureMyFolder(target.workspaceId)).id
+  }
+
+  /**
+   * Cancel a chunked upload: the session goes, and so does its saved record.
+   * R1-BE-02: the DELETE is issued from the in-memory session id the running
+   * operation holds - the resume store may have refused or never received the
+   * record, and a Cancel must still free the server session. A failed DELETE is
+   * NOT reported as clean: the typed code is logged and the saved record is
+   * KEPT, so the next start can retry the abort (its session id survives).
+   */
+  private async abortChunkedUpload(
+    api: UniworkDocsClient,
+    resumeKey: string,
+    liveSessionId: string | null,
+  ): Promise<void> {
+    const store = await this.uploadSessionStore().catch(() => null)
+    const saved = await store?.get(resumeKey).catch(() => null)
+    const sessionId = liveSessionId ?? saved?.sessionId ?? null
+    if (sessionId) {
+      try {
+        await abortUploadSession(api, sessionId)
+      } catch (error) {
+        // only the typed code: a store/filesystem error can carry a local path
+        console.warn(
+          'uniwork docs: the upload session could not be aborted:',
+          error instanceof UniworkDocError ? error.code : 'unknown',
+        )
+        return
+      }
+    }
+    await store?.remove(resumeKey).catch(() => undefined)
   }
 
   /**
@@ -4069,18 +4776,86 @@ export class UniworkDocsService {
     // S01-R1-9: a real regular file, stat'ed before anything is read - the
     // path that is a directory (or is gone) is `not_found`, never an upload
     let size: number
+    let mtimeMs: number
     try {
       const info = await stat(tabPath)
       if (!info.isFile()) throw new UniworkDocError('not_found')
       size = info.size
+      mtimeMs = info.mtimeMs
     } catch (error) {
       throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
     }
-    // S01-R1-9 / merge M-2 (D-S1): the upload path's OWN preflight, one shared
-    // guard - the server cap first, then the 50 MiB staging cap - so a first
-    // save is refused typed and unread exactly like an upload, details included
+    // S01-R1-9 / merge M-2 (D-S1) / BIGUP-A1: the upload path's OWN preflight,
+    // one shared guard - the server cap first, then the single-request staging
+    // cap for a file the chunked path will not take - so a first save is refused
+    // typed and unread exactly like an upload, details included
     const limits = await this.limitsCache.get()
     assertUploadSize(filename, size, limits)
+    // BIGUP-A1: above the server's threshold the file goes up in parts through
+    // an upload session. It is never buffered whole, so a 200 MiB first save no
+    // longer needs 200 MiB of RAM; the working copy is the file itself, written
+    // into the document's store folder below.
+    if (shouldUseChunkedUpload(size, limits)) {
+      return await this.runChunkedFirstSave({
+        session,
+        owner,
+        tabPath,
+        key,
+        title,
+        filename,
+        size,
+        mtimeMs,
+        workspaceId,
+        createTarget,
+        limits,
+        // the server may answer `upload_session_too_small` (a stale limits
+        // cache): the file then fits one request, which is the path below
+        onThresholdDrift: () =>
+          this.runBufferedFirstSave({
+            session,
+            owner,
+            tabPath,
+            key,
+            title,
+            filename,
+            workspaceId,
+            createTarget,
+            limits,
+          }),
+      })
+    }
+    return await this.runBufferedFirstSave({
+      session,
+      owner,
+      tabPath,
+      key,
+      title,
+      filename,
+      workspaceId,
+      createTarget,
+      limits,
+    })
+  }
+
+  /**
+   * SAVE-01's original first save: main buffers the file and sends it as the
+   * multipart `file` part (bounded by the 50 MiB staging cap), then binds the
+   * created document. BIGUP-A1 keeps it as the path for a small file and as the
+   * fallback when the server refuses a session as too small.
+   */
+  private async runBufferedFirstSave(input: {
+    session: { identity: SessionIdentity; epoch: number }
+    owner: string
+    tabPath: string
+    key: string
+    title: string
+    filename: string
+    workspaceId: string
+    createTarget: UniworkCreateTarget
+    limits: DocumentLimits
+  }): Promise<UniworkDocSummary> {
+    const { session, owner, tabPath, key, title, filename, workspaceId, createTarget, limits } =
+      input
     let bytes: Uint8Array
     try {
       bytes = new Uint8Array(await readFile(tabPath))
@@ -4140,6 +4915,198 @@ export class UniworkDocsService {
         }
         throw error
       })
+    return await this.bindFirstSaveDocument({
+      session,
+      owner,
+      tabPath,
+      key,
+      title,
+      filename,
+      limits,
+      api,
+      created,
+      bytesChecksum,
+      onBindFailure: () => this.firstSaveKeys.delete(keyFp),
+      writeWorkingCopy: (dir, name) => this.store.writeWorkingCopy(dir, name, bytes),
+    })
+  }
+
+  /**
+   * BIGUP-A1: the first save of a file above the server's chunked threshold. The
+   * same flow as the one-request path - one Idempotency-Key per attempt body, a
+   * create, then the bind - but the bytes never enter main: the probe reads the
+   * head and the ZIP tail, the parts go straight to the storage, and the working
+   * copy is written from the file itself. The attempt's fingerprint still names
+   * the file's sha256 (streamed once, 1 MiB at a time), so a retry after an
+   * edit mints a new key exactly as the buffered path does.
+   */
+  private async runChunkedFirstSave(input: {
+    session: { identity: SessionIdentity; epoch: number }
+    owner: string
+    tabPath: string
+    key: string
+    title: string
+    filename: string
+    size: number
+    mtimeMs: number
+    workspaceId: string
+    createTarget: UniworkCreateTarget
+    limits: DocumentLimits
+    /** the server refused the session as too small: the file fits one request */
+    onThresholdDrift(): Promise<UniworkDocSummary>
+  }): Promise<UniworkDocSummary> {
+    const {
+      session,
+      owner,
+      tabPath,
+      key,
+      title,
+      filename,
+      size,
+      mtimeMs,
+      workspaceId,
+      createTarget,
+    } = input
+    const destination =
+      'parentId' in createTarget && createTarget.parentId
+        ? `parent:${createTarget.parentId}`
+        : 'my_folder'
+    const bytesChecksum = await sha256File(tabPath)
+    // the path may have been bound while the checksum streamed
+    if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
+    const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
+    let idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
+    this.firstSaveKeys.set(keyFp, idempotencyKey)
+    const api = this.api()
+    const probe = await readLocalFileProbe({ path: tabPath }, size, filename)
+    const parentId = await this.uploadSessionParentId(api, {
+      workspaceId,
+      create: createTarget,
+    })
+    const resumeKey = uploadSessionKey(tabPath, size, mtimeMs)
+    const store = await this.uploadSessionStore()
+    // R1-BE-03: the same full-fingerprint rule as the new-document path - a
+    // first save retried under another title or destination must not finish the
+    // old command through the old session.
+    const saved = (await store?.get(resumeKey)) ?? null
+    const resume = await this.resumeForCreate(api, saved, {
+      workspaceId,
+      folderId: parentId,
+      title,
+      filename,
+    })
+    let result: ChunkedUploadResult
+    try {
+      result = await runChunkedUpload(api, {
+        target: { kind: 'workspace', workspaceId, parentId, title },
+        filename,
+        size,
+        readRange: (offset, length) => readFileRange(tabPath, offset, length),
+        probe,
+        idempotencyKey,
+        ...(resume ? { resume } : {}),
+        // R1-BE-08: a `409 idempotency_payload_mismatch` (or a session the
+        // server no longer knows) restarts under a NEW key, and the rejected
+        // one is dropped so no later retry of these bytes reuses it
+        freshIdempotencyKey: () => this.newIdempotencyKey(),
+        onIdempotencyKey: (fresh) => {
+          this.firstSaveKeys.set(keyFp, fresh)
+          idempotencyKey = fresh
+        },
+        onSessionState: async (state) => {
+          await store?.put(resumeKey, {
+            sessionId: state.sessionId,
+            workspaceId,
+            folderId: parentId,
+            title,
+            filename,
+            path: tabPath,
+            size,
+            mtimeMs,
+            partSize: state.partSize,
+            totalParts: state.totalParts,
+            completedParts: state.completedParts,
+            expiresAt: state.expiresAt,
+            updatedAt: new Date().toISOString(),
+          })
+        },
+      })
+    } catch (error) {
+      if (error instanceof UniworkDocError && error.serverCode === 'upload_session_too_small') {
+        // the limits cache was stale and the file fits one request
+        await store?.remove(resumeKey)
+        return await input.onThresholdDrift()
+      }
+      if (error instanceof UniworkDocError && error.code === 'too_large') {
+        rethrowServerTooLarge(error, filename, size, input.limits)
+      }
+      throw error
+    }
+    await store?.remove(resumeKey)
+    if (result.kind === 'upload') throw new UniworkDocError('malformed_response')
+    const created = result.document
+    // R1-BE-04: the chunked path copies the LIVE file after the server has
+    // validated the uploaded bytes. If the editor autosaved (or another process
+    // replaced the file) during the upload/checking interval, the copy would be
+    // a different generation than the document the server created, and binding
+    // it `ready` would silently declare those mismatched bytes as saved. The
+    // copied working copy is therefore stream-hashed and must equal BOTH the
+    // pre-upload hash and the server's own `checksum_sha256`; otherwise nothing
+    // is bound, the created row is compensated, and the user's file is left
+    // untouched (a disk copy, never a whole-file buffer).
+    return await this.bindFirstSaveDocument({
+      session,
+      owner,
+      tabPath,
+      key,
+      title,
+      filename,
+      limits: input.limits,
+      api,
+      created,
+      bytesChecksum,
+      onBindFailure: () => this.firstSaveKeys.delete(keyFp),
+      writeWorkingCopy: (dir, name) => this.store.copyIntoWorkingCopy(dir, name, tabPath),
+      verifyWorkingCopy: async (copiedPath, serverChecksum) => {
+        const copied = await sha256File(copiedPath)
+        if (copied !== bytesChecksum || serverChecksum !== copied) {
+          throw new UniworkDocError('malformed_response', {
+            serverCode: 'upload_checksum_mismatch',
+          })
+        }
+      },
+    })
+  }
+
+  /**
+   * The bind half of a first save, shared by both upload shapes: the document
+   * exists on the server and the local copy must become its working copy. Every
+   * failure after the create compensates the created row (archive, never a
+   * delete - no such route) so no server document is left without a binding.
+   * `writeWorkingCopy` is the only difference between the two callers: the
+   * buffered path writes the bytes it already holds, the chunked path copies
+   * the file it never read whole. That chunked copy also supplies
+   * `verifyWorkingCopy` (R1-BE-04), which runs on the copied path and throws
+   * when the copy is not the bytes the server validated - so a source that
+   * changed under the upload never binds.
+   */
+  private async bindFirstSaveDocument(input: {
+    session: { identity: SessionIdentity; epoch: number }
+    owner: string
+    tabPath: string
+    key: string
+    title: string
+    filename: string
+    limits: DocumentLimits
+    api: UniworkDocsClient
+    created: UniworkDocSummary
+    bytesChecksum: string
+    writeWorkingCopy(dir: string, name: string): Promise<string>
+    /** R1-BE-04: proves the copied working copy matches the uploaded bytes, or throws */
+    verifyWorkingCopy?(copiedPath: string, serverChecksum: string): Promise<void>
+    onBindFailure(): void
+  }): Promise<UniworkDocSummary> {
+    const { session, owner, tabPath, key, title, filename, api, created, bytesChecksum } = input
     const createdTitle = created.title || title
     // S01-R2-6: the written working copy is tracked so the compensation catch
     // can remove it on EVERY bind failure - a store.write that throws strands
@@ -4158,8 +5125,14 @@ export class UniworkDocsService {
         created.id,
       )
       const name = workingCopyName(title, detail.file.filename, formatForName(filename)!)
-      const path = await this.store.writeWorkingCopy(dir, name, bytes)
+      const path = await input.writeWorkingCopy(dir, name)
       workingCopy = { dir, name }
+      // R1-BE-04: the copy exists but is not yet declared ready - the chunked
+      // caller hashes it here (streamed) and refuses when the live source
+      // drifted from the bytes the server validated. The throw lands in the
+      // compensation catch below: the created row is archived and the user's
+      // own file is never touched.
+      await input.verifyWorkingCopy?.(path, detail.file.checksumSha256)
       const binding = withServerContext(
         {
           schema: 2,
@@ -4194,7 +5167,7 @@ export class UniworkDocsService {
       // notification whose failure is logged, never a retryable answer - a
       // retry of this path is refused by firstSaveDone above.
       this.firstSaveDone.add(`${owner}${key}`)
-      this.firstSaveKeys.delete(keyFp)
+      input.onBindFailure()
       try {
         this.deps.notifyPathRenamed?.(tabPath, path)
       } catch (error) {
@@ -4202,7 +5175,10 @@ export class UniworkDocsService {
       }
       try {
         const doc = this.store.lookup(path)
-        if (doc) this.publish(toStatus(doc))
+        if (doc) {
+          if (doc.binding.access === 'edit') this.startEditLock(doc)
+          this.publish(toStatus(doc))
+        }
       } catch (error) {
         console.warn('uniwork docs: first-save: the status push failed:', error)
       }
@@ -4251,7 +5227,7 @@ export class UniworkDocsService {
       }
       // compensated: the attempt's key is spent - a retry re-creates (binding
       // the trashed row would resurrect it without its own save)
-      this.firstSaveKeys.delete(keyFp)
+      input.onBindFailure()
       const raced = error instanceof UniworkDocError && error.code === 'conflict'
       throw new UniworkDocError(
         (raced ? 'conflict' : 'first_save_bind_failed') as UniworkDocErrorCode,
@@ -4912,6 +5888,14 @@ export class UniworkDocsService {
   async save(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
+    if (this.editLockReadOnly(doc.path)) {
+      const status = this.statusOf(doc)
+      this.publish(status)
+      if (this.deps.isShellTab?.(doc.path) ?? true) {
+        this.deps.pushQueuePopover?.({ path: doc.path })
+      }
+      return status
+    }
     if (!this.canSave(doc)) return this.statusOf(doc)
     // a copy whose pre-store intent the sweep has not moved yet is left alone:
     // a save would rewrite its binding and drop that intent (R1-be-5)
@@ -4940,6 +5924,7 @@ export class UniworkDocsService {
     // another window holds the document lock: this window is read-only and
     // never writes (EXPERIENCE - Second-window bar, :129)
     if (this.coordinator.isOtherWindow(doc.key)) return false
+    if (this.editLockReadOnly(doc.path)) return false
     return !(b.state === 'blocked' && b.error !== 'quota_exceeded')
   }
 
@@ -4967,6 +5952,13 @@ export class UniworkDocsService {
       case 'ignore':
         if (decision.reason === 'malformed') {
           console.warn(`uniwork docs: ignoring a malformed feed revision for ${notice.documentId}`)
+        }
+        // EL1A-R2-1: keep a notice ignored because of edit_locked / edit_lock
+        if (
+          decision.reason === 'locked' &&
+          (doc.binding.state === 'edit_locked' || this.editLockReadOnly(doc.path))
+        ) {
+          this.remoteHeld.set(notice.documentId, notice)
         }
         return
       case 'hold':
@@ -4999,7 +5991,10 @@ export class UniworkDocsService {
       // commits are the newer versions, and reloading over a copy someone else is
       // editing would fight the lock (the pill names the holder instead)
       locked:
-        this.lockedFor(doc.binding) ?? (doc.binding.state === 'edit_locked' ? 'edit_locked' : null),
+        this.lockedFor(doc.binding) ??
+        (doc.binding.state === 'edit_locked' || this.editLockReadOnly(doc.path)
+          ? 'edit_locked'
+          : null),
     }
   }
 
@@ -5190,6 +6185,7 @@ export class UniworkDocsService {
     this.remoteLocked.set(documentId, verdict)
     const doc = await this.boundDocFor(documentId)
     if (!doc) return
+    this.remoteLockPath.set(documentId, doc.path)
     this.remoteBars.set(pathKey(doc.path), { kind: verdict })
     const next: Binding = {
       ...doc.binding,
@@ -5216,6 +6212,7 @@ export class UniworkDocsService {
     const verdict = this.remoteLocked.get(documentId)
     if (!verdict) return
     this.remoteLocked.delete(documentId)
+    this.remoteLockPath.delete(documentId)
     const key = pathKey(path)
     if (this.remoteBars.get(key)?.kind !== verdict) return
     this.remoteBars.delete(key)
@@ -5441,18 +6438,22 @@ export class UniworkDocsService {
    * computer); "Cancel" keeps it open. True = may close.
    */
   async confirmClose(path: string): Promise<boolean> {
+    const release = async (): Promise<true> => {
+      await this.stopEditLock(path, true)
+      return true
+    }
     for (;;) {
       let doc = this.store.lookup(path)
-      if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return true
+      if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return release()
       // a Save from the module's own close prompt may still be uploading
       if (this.coordinator.isSaving(doc.path)) {
         await this.coordinator.settled(doc.path)
         doc = this.store.lookup(path)
-        if (!doc) return true
+        if (!doc) return release()
       }
       doc = await this.refreshDirty(doc)
       const b = doc.binding
-      if (!UNSENT_STATES.has(b.state)) return true
+      if (!UNSENT_STATES.has(b.state)) return release()
       const kind: UnsavedCloseKind =
         b.state === 'conflict'
           ? 'conflict'
@@ -5464,12 +6465,17 @@ export class UniworkDocsService {
         if (this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
           this.endConflictByMain(this.conflictPrompt)
         }
-        return true
+        return release()
       }
-      if (kind === 'unsent' && choice === 'save') return this.saveForClose(path)
+      if (kind === 'unsent' && choice === 'save') {
+        const ok = await this.saveForClose(path)
+        if (ok) await this.stopEditLock(path, true)
+        return ok
+      }
       if (kind === 'conflict' && choice === 'resolve') {
         const outcome = await this.resolveForClose(path)
         if (outcome === 'again') continue
+        if (outcome === 'closed') await this.stopEditLock(path, true)
         return outcome === 'closed'
       }
       return false
@@ -6875,6 +7881,7 @@ export class UniworkDocsService {
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     const doc = this.store.lookup(path)
     if (doc) this.publish(toStatus(doc))
+    if (doc && doc.binding.access === 'edit') this.startEditLock(doc)
     return { path, title: binding?.title ?? doc?.binding.title ?? basename(path) }
   }
 }

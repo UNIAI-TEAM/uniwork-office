@@ -102,7 +102,7 @@ describe('createIpcTransport', () => {
   it('maps error chunks to onError with the localized fallback', () => {
     const { cb, emit, unsubscribe } = setup()
     emit({ type: 'error' })
-    expect(cb.onError).toHaveBeenCalledWith('unknown error')
+    expect(cb.onError).toHaveBeenCalledWith('unknown error', undefined)
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
 
@@ -126,7 +126,7 @@ describe('createIpcTransport', () => {
   it('maps a timeout error code to the localized timeout message', () => {
     const { cb, emit } = setup()
     emit({ type: 'error', error: 'AI request timed out: no data received', errorCode: 'timeout' })
-    expect(cb.onError).toHaveBeenCalledWith('timed out')
+    expect(cb.onError).toHaveBeenCalledWith('timed out', undefined)
   })
 
   it('maps a credits error code to the localized credits message', () => {
@@ -136,7 +136,7 @@ describe('createIpcTransport', () => {
       error: 'Your credits have been exhausted.',
       errorCode: 'credits',
     })
-    expect(cb.onError).toHaveBeenCalledWith('credits used up')
+    expect(cb.onError).toHaveBeenCalledWith('credits used up', undefined)
   })
 
   it('maps a network error code to the localized network message', () => {
@@ -146,7 +146,7 @@ describe('createIpcTransport', () => {
       error: 'Claude fetch failed: fetch failed cause=ECONNRESET',
       errorCode: 'network',
     })
-    expect(cb.onError).toHaveBeenCalledWith('network problem')
+    expect(cb.onError).toHaveBeenCalledWith('network problem', undefined)
   })
 
   it('a network error code without networkErrorText falls back to the carried text', () => {
@@ -156,7 +156,10 @@ describe('createIpcTransport', () => {
       error: 'Claude fetch failed: fetch failed cause=ECONNRESET',
       errorCode: 'network',
     })
-    expect(cb.onError).toHaveBeenCalledWith('Claude fetch failed: fetch failed cause=ECONNRESET')
+    expect(cb.onError).toHaveBeenCalledWith(
+      'Claude fetch failed: fetch failed cause=ECONNRESET',
+      undefined,
+    )
   })
 
   it('a credits error code without creditsErrorText falls back to the carried text', () => {
@@ -166,7 +169,7 @@ describe('createIpcTransport', () => {
       error: 'Your credits have been exhausted.',
       errorCode: 'credits',
     })
-    expect(cb.onError).toHaveBeenCalledWith('Your credits have been exhausted.')
+    expect(cb.onError).toHaveBeenCalledWith('Your credits have been exhausted.', undefined)
   })
 
   it('maps an overloaded error code to the localized busy message', () => {
@@ -176,7 +179,7 @@ describe('createIpcTransport', () => {
       error: 'HTTP 429: {"error":{"type":"engine_overloaded_error"}}',
       errorCode: 'overloaded',
     })
-    expect(cb.onError).toHaveBeenCalledWith('service busy')
+    expect(cb.onError).toHaveBeenCalledWith('service busy', undefined)
   })
 
   it('an overloaded error code without overloadedErrorText falls back to the carried text', () => {
@@ -186,7 +189,7 @@ describe('createIpcTransport', () => {
       error: 'HTTP 429: engine overloaded',
       errorCode: 'overloaded',
     })
-    expect(cb.onError).toHaveBeenCalledWith('HTTP 429: engine overloaded')
+    expect(cb.onError).toHaveBeenCalledWith('HTTP 429: engine overloaded', undefined)
   })
 
   it('fails the run after prolonged silence; pings re-arm the watchdog', () => {
@@ -199,7 +202,7 @@ describe('createIpcTransport', () => {
       vi.advanceTimersByTime(IPC_STREAM_SILENCE_TIMEOUT_MS - 1)
       expect(cb.onError).not.toHaveBeenCalled()
       vi.advanceTimersByTime(IPC_STREAM_SILENCE_TIMEOUT_MS)
-      expect(cb.onError).toHaveBeenCalledWith('timed out')
+      expect(cb.onError).toHaveBeenCalledWith('timed out', undefined)
       expect(cancelled).toEqual([started[0]!.requestId])
     } finally {
       vi.useRealTimers()
@@ -222,7 +225,7 @@ describe('createIpcTransport', () => {
   it('a rejected start fails the run instead of leaving it pending', async () => {
     const { cb } = setup(() => Promise.reject(new Error('no handler registered')))
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(cb.onError).toHaveBeenCalledWith('no handler registered')
+    expect(cb.onError).toHaveBeenCalledWith('no handler registered', undefined)
     expect(cb.onDone).not.toHaveBeenCalled()
   })
 })

@@ -16,10 +16,8 @@ import type {
 } from '../shared/ipc'
 import type { ProjectApi } from '@genoffice/project-store'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
-import {
-  installUniworkAiFlagBridge,
-  installUniworkCloudStatusBridge,
-} from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkCloudStatusBridge } from '@genoffice/electron-utils/uniwork-cloud-status-bridge'
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 
@@ -129,6 +127,21 @@ const api: DesktopApi = {
   writeRecoveryCopy: (path: string, data: ArrayBuffer) =>
     ipcRenderer.invoke('docs:write-recovery', path, data),
   uniworkState: (path: string) => ipcRenderer.invoke('docs:uniwork-state', path),
+  onUniworkStateChanged: (cb) => {
+    const listener = (_event: IpcRendererEvent, payload: unknown) => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'path' in payload &&
+        typeof payload.path === 'string'
+      ) {
+        cb(payload.path)
+      }
+    }
+    ipcRenderer.on('uniwork:doc-state-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:doc-state-changed', listener)
+  },
+  uniworkReadOnlySave: (path?: string) => ipcRenderer.invoke('docs:uniwork-read-only-save', path),
   onTeardown: (handler) => {
     const listener = () => handler()
     ipcRenderer.on('docs:teardown', listener)

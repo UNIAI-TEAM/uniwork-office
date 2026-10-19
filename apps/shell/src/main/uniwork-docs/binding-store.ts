@@ -1,4 +1,16 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeSync,
+} from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import { mkdir, readFile, unlink } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -8,7 +20,7 @@ import type {
   UniworkDocFormat,
   UniworkSaveState,
 } from '../../shared/home-api'
-import { atomicWriteFile } from '../atomic-write'
+import { atomicCopyFile, atomicWriteFile } from '../atomic-write'
 import { APP_STORE_LEVEL, readStoreGate } from '../uniwork-sync/store-level'
 import { formatForName, isDecimalString } from './formats'
 
@@ -30,6 +42,18 @@ export const BINDING_FILE = 'binding.json'
 export const INTENT_PAYLOAD_FILE = 'pending-upload.bin'
 /** at the root: who last had a live session (see readLastOwner) */
 export const LAST_OWNER_FILE = 'last-account.json'
+
+const RETRYABLE_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY'])
+// a flush that a cloud-sync folder, AV lock or fsync-less filesystem refuses only weakens
+// power-loss durability (same policy as atomic-write.ts)
+const TOLERATED_SYNC_CODES = new Set(['EPERM', 'EACCES', 'EBUSY', 'EINVAL', 'ENOSYS'])
+const RENAME_RETRIES = 4
+// the owner write is synchronous on the main thread: 5+10+20+40 ms worst case, not atomic-write's 750 ms
+const RENAME_BACKOFF_MS = 5
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
 
 export interface LastOwner {
   accountId: string
@@ -499,6 +523,19 @@ export class BindingStore {
     return path
   }
 
+  /**
+   * BIGUP-A1: the same working copy, taken from a file on disk instead of from
+   * bytes main holds. A first save of a 200 MiB document never buffers it, so
+   * the copy is streamed (`atomicCopyFile` copies to a temp file and renames,
+   * exactly like `atomicWriteFile` does for a buffer).
+   */
+  async copyIntoWorkingCopy(dir: string, filename: string, source: string): Promise<string> {
+    await mkdir(dir, { recursive: true })
+    const path = join(dir, basename(filename))
+    await atomicCopyFile(source, path)
+    return path
+  }
+
   async removeWorkingCopy(dir: string, filename: string): Promise<void> {
     await unlink(join(dir, basename(filename))).catch(() => undefined)
   }
@@ -533,12 +570,73 @@ export class BindingStore {
     }
   }
 
-  async writeLastOwner(owner: LastOwner): Promise<void> {
-    await mkdir(this.root, { recursive: true })
-    await atomicWriteFile(
-      join(this.root, LAST_OWNER_FILE),
-      new TextEncoder().encode(`${JSON.stringify(owner)}\n`),
-    )
+  /**
+   * Synchronous on purpose (no late write after teardown). It keeps the
+   * guarantees of the async atomicWriteFile it replaced: the file is flushed
+   * before the rename, a transient Windows rename error is retried a bounded
+   * number of times, the directory is flushed after the rename (not on
+   * Windows) and a failure leaves the previous file intact with no temp file.
+   * Returns whether the owner reached the disk, so the caller can retry.
+   */
+  writeLastOwner(owner: LastOwner): boolean {
+    const target = join(this.root, LAST_OWNER_FILE)
+    const tmp = join(this.root, `.${LAST_OWNER_FILE}.${randomBytes(6).toString('hex')}.tmp`)
+    try {
+      mkdirSync(this.root, { recursive: true })
+      const fd = openSync(tmp, 'w')
+      try {
+        // writeSync may accept fewer bytes than asked: publish only a complete record
+        const data = Buffer.from(
+          `${JSON.stringify(owner)}
+`,
+          'utf8',
+        )
+        for (let offset = 0; offset < data.byteLength;) {
+          const written = writeSync(fd, data, offset, data.byteLength - offset)
+          if (written <= 0) throw new Error('last owner write made no progress')
+          offset += written
+        }
+        try {
+          fsyncSync(fd)
+        } catch (error) {
+          if (!TOLERATED_SYNC_CODES.has((error as NodeJS.ErrnoException).code ?? '')) throw error
+        }
+      } finally {
+        closeSync(fd)
+      }
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          renameSync(tmp, target)
+          break
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code ?? ''
+          if (!RETRYABLE_RENAME_CODES.has(code) || attempt >= RENAME_RETRIES) throw error
+          sleepSync(RENAME_BACKOFF_MS * 2 ** attempt)
+        }
+      }
+      // the rename is only durable once the directory entry is flushed; opening a
+      // directory fails on Windows, where NTFS journals the rename itself
+      if (process.platform !== 'win32') {
+        try {
+          const dirFd = openSync(this.root, 'r')
+          try {
+            fsyncSync(dirFd)
+          } finally {
+            closeSync(dirFd)
+          }
+        } catch {
+          // a refused directory flush only weakens power-loss durability
+        }
+      }
+      return true
+    } catch {
+      try {
+        unlinkSync(tmp)
+      } catch {
+        // ignore cleanup failure
+      }
+      return false
+    }
   }
 
   /** the path lies under the working-copy root (bound or not) */

@@ -24,11 +24,9 @@ export {
   droppedCallsOfNotes,
   endsQuietly,
   noticePatch,
-  noticeToPanelNote,
 } from './notice-surface'
 export type {
   DroppedToolReason,
-  LegacyDroppedNoticeNote,
   NoticeKey,
   NoticeSurface,
   NoticeTranslate,

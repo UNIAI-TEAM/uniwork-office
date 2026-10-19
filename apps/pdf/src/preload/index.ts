@@ -3,10 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Lang } from '@genoffice/i18n'
 import type { AiStreamChunk } from '@genoffice/ai-provider'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
-import {
-  installUniworkAiFlagBridge,
-  installUniworkCloudStatusBridge,
-} from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkCloudStatusBridge } from '@genoffice/electron-utils/uniwork-cloud-status-bridge'
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { AI_CHANNELS, PDF_CHANNELS } from '../shared/ipc'
@@ -29,6 +27,21 @@ const api: PdfApi = {
   autoRename: (path, baseName) => ipcRenderer.invoke(PDF_CHANNELS.autoRename, path, baseName),
   isUntitled: (path) => ipcRenderer.invoke(PDF_CHANNELS.isUntitled, path),
   uniworkState: (path) => ipcRenderer.invoke(PDF_CHANNELS.uniworkState, path),
+  onUniworkStateChanged: (cb) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'path' in payload &&
+        typeof payload.path === 'string'
+      ) {
+        cb(payload.path)
+      }
+    }
+    ipcRenderer.on('uniwork:doc-state-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:doc-state-changed', listener)
+  },
+  uniworkReadOnlySave: (path) => ipcRenderer.invoke(PDF_CHANNELS.uniworkReadOnlySave, path),
   validateTextEdits: (request) => ipcRenderer.invoke(PDF_CHANNELS.validateTextEdits, request),
   listEditFonts: () => ipcRenderer.invoke(PDF_CHANNELS.listEditFonts),
   canDrawText: (text, font, bold, italic) =>

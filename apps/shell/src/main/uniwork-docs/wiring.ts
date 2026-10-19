@@ -3,7 +3,6 @@ import {
   BrowserWindow,
   dialog,
   safeStorage,
-  session,
   shell,
   type IpcMain,
   type WebContents,
@@ -50,7 +49,7 @@ import {
   type UniworkCommentsHandle,
 } from './comments-wiring'
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
-import { setUniworkCloseGuard } from './close-guard'
+import { setUniworkCloseGuard, setUniworkPathDropHook } from './close-guard'
 import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
 import {
   SyncRuntime,
@@ -99,6 +98,13 @@ import {
 } from '../uniwork-sync/offline-library/api'
 import { offlineHeadIds } from '../uniwork-sync/offline-library/view'
 import { clipboard } from 'electron'
+import {
+  SPELLCHECK_DOWNLOAD_BLOCKED_URL,
+  SPELLCHECK_DOWNLOAD_DEFAULT_URL,
+  applySpellcheckDictionaryDownloadGate,
+  configureStartupHostResolver,
+  resetStartupHostResolverForTest,
+} from './spellcheck-gate'
 
 /**
  * Electron binding of the UniWork documents service: IPC handlers for every
@@ -118,6 +124,8 @@ export interface UniworkDocsWiring {
    */
   refuseLockedPath(path: string): boolean
   isPathOpen(path: string): boolean
+  /** EL-1(b) fix6 (VEL-2): broadcast `{ path }` to every renderer webContents */
+  pushDocStateChanged?(path: string): void
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
   reloadPath(path: string): void
   /**
@@ -772,6 +780,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    pushDocStateChanged: (path) => wiring.pushDocStateChanged?.(path),
     // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
     // discussionTarget already resolves); a detached editor window is not one
     isShellTab: (path) => (wiring.discussionTarget ? wiring.discussionTarget(path) !== null : true),
@@ -942,6 +951,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.remoteAction, (_event, path: unknown, action: unknown) =>
     service.remoteAction(path as string, action as UniworkRemoteAction),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.editHere, (_event, path: unknown) =>
+    service.editHere(path as string),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {
     if (typeof path === 'string') service.dismissLock(path)
@@ -961,6 +973,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pending.resolve(answer?.confirmed === true)
   })
   setUniworkCloseGuard(service)
+  setUniworkPathDropHook((paths) => {
+    void service.notePathsDropped(paths)
+  })
   const runtime = createSyncRuntime(service, {
     treeChanged: (workspaceId) => treeChanged.notify(workspaceId),
     libraryChanged: (documentId) => offlineRowChanged(documentId),
@@ -1169,6 +1184,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     offline: offlineApi,
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
+      let needsReload = !signedIn
       if (signedIn) applySpellcheckDictionaryDownloadGate(true)
       /** the org the feed currently runs for; null = no pass may run */
       let feedOrg: string | null = null
@@ -1217,7 +1233,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
             .catch(() => undefined)
         }
         const now = status.state === 'signed-in'
-        if (now !== signedIn) applySpellcheckDictionaryDownloadGate(now)
+        if (!status.loggedIn) needsReload = true
+        if (now !== signedIn) {
+          applySpellcheckDictionaryDownloadGate(now, now && needsReload)
+          if (now) needsReload = false
+        }
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
         syncFeed(status, identity)
@@ -1227,27 +1247,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   }
 }
 
-export const SPELLCHECK_DOWNLOAD_BLOCKED_URL = 'file:///nonexistent/'
-export const SPELLCHECK_DOWNLOAD_DEFAULT_URL = 'https://redirector.gvt1.com/edgedl/chrome/dict/'
-
-let hostResolverConfigured = false
-
-/**
- * NET-OFF-01: Disable Chromium's built-in DNS-over-HTTPS (secure DNS) probe at
- * startup, immediately after `app.whenReady()` and before any window or session
- * can issue a network request.
- */
-export function configureStartupHostResolver(): void {
-  if (hostResolverConfigured) return
-  hostResolverConfigured = true
-  app.configureHostResolver({ secureDnsMode: 'off' })
-}
-
-export function resetStartupHostResolverForTest(): void {
-  hostResolverConfigured = false
-}
-
-export function applySpellcheckDictionaryDownloadGate(signedIn: boolean): void {
-  const url = signedIn ? SPELLCHECK_DOWNLOAD_DEFAULT_URL : SPELLCHECK_DOWNLOAD_BLOCKED_URL
-  session.defaultSession.setSpellCheckerDictionaryDownloadURL(url)
+export {
+  SPELLCHECK_DOWNLOAD_BLOCKED_URL,
+  SPELLCHECK_DOWNLOAD_DEFAULT_URL,
+  applySpellcheckDictionaryDownloadGate,
+  configureStartupHostResolver,
+  resetStartupHostResolverForTest,
 }

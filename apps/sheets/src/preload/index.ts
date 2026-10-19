@@ -59,10 +59,8 @@ import {
   SAVE_EDITS_CHUNK_JSON_MAX,
 } from '../shared/ipc-channels'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
-import {
-  installUniworkAiFlagBridge,
-  installUniworkCloudStatusBridge,
-} from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkCloudStatusBridge } from '@genoffice/electron-utils/uniwork-cloud-status-bridge'
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { parseWorksheetComment } from './worksheet-comments'
@@ -506,6 +504,37 @@ const desktopApi: DesktopApi = {
     const listener = () => handler()
     ipcRenderer.on('uniwork:comment-author-changed', listener)
     return () => ipcRenderer.removeListener('uniwork:comment-author-changed', listener)
+  },
+  async uniworkState() {
+    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.uniworkState)
+    if (
+      result &&
+      typeof result === 'object' &&
+      'bound' in result &&
+      'readOnly' in result &&
+      typeof result.bound === 'boolean' &&
+      typeof result.readOnly === 'boolean'
+    ) {
+      return { bound: result.bound, readOnly: result.readOnly }
+    }
+    return { bound: false, readOnly: false }
+  },
+  onUniworkStateChanged(cb) {
+    const listener = (_event: unknown, payload: unknown) => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'path' in payload &&
+        typeof payload.path === 'string'
+      ) {
+        cb(payload.path)
+      }
+    }
+    ipcRenderer.on('uniwork:doc-state-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:doc-state-changed', listener)
+  },
+  async uniworkReadOnlySave(path?: string) {
+    await ipcRenderer.invoke(IPC_CHANNELS.uniworkReadOnlySave, path)
   },
   async getAiSettings() {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.aiGetSettings)

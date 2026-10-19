@@ -258,6 +258,8 @@ export interface UniworkDocSummary {
    * sends one (cut at the first unreadable ancestor).
    */
   path?: { id: string; title: string }[]
+  /** EL-1(b): list-row edit_lock summary (DH-2); absent when the server sent none */
+  editLock?: UniworkDocEditLock
 }
 
 /** FD-11: the three entry kinds the folder tree holds */
@@ -484,6 +486,8 @@ export interface UniworkUploadProgress {
   path: string
   loaded: number
   total: number
+  /** BIGUP-A1: 'checking' while the server verifies a chunked upload; absent = uploading */
+  phase?: 'uploading' | 'checking'
 }
 
 /** MYFOLDER-01 / SAVE-01: where the first Save to UniWork creates the document */
@@ -566,6 +570,34 @@ export interface UniworkDocEditLock {
   offlineHoldUntil?: string
 }
 
+/** EL-1(b): the desktop's own edit-lock session phase for an open bound document */
+export type UniworkEditLockPhase =
+  'acquiring' | 'held' | 'other' | 'self_elsewhere' | 'free' | 'lost' | 'unreachable'
+export type UniworkEditLockLostReason =
+  | 'released'
+  | 'expired'
+  | 'taken_over'
+  | 'handed_over'
+  | 'access_lost'
+  | 'document_archived'
+  | 'moved_here'
+  | 'session_revoked'
+  | 'member_deactivated'
+  | 'organization_suspended'
+  | 'document_deleted'
+  | 'unknown'
+export interface UniworkEditLockSessionView {
+  phase: UniworkEditLockPhase
+  /** 'other' | 'self_elsewhere': the holder's display name (null when the server sent none) */
+  holderName: string | null
+  /** 'other' | 'self_elsewhere': ISO time the holder started */
+  since: string | null
+  /** 'lost' only */
+  lostReason?: UniworkEditLockLostReason
+  /** 'lost' with taken_over / handed_over: who took it */
+  byName?: string | null
+}
+
 export interface UniworkDocStatus {
   path: string
   documentId: string
@@ -582,6 +614,8 @@ export interface UniworkDocStatus {
   error?: UniworkDocErrorCode
   /** EL-1(a) (UNI-1645c): populated while `state === 'edit_locked'`; absent otherwise. */
   editLock?: UniworkDocEditLock
+  /** EL-1(b): absent = no lock session (unbound, view access, version ticket, signed out) */
+  lockSession?: UniworkEditLockSessionView
   /** Payload size in bytes when known (e.g. when `error === 'too_large'`). */
   sizeBytes?: number
   /** Server/configured maximum document size in bytes when `error === 'too_large'`. */
@@ -1225,6 +1259,8 @@ export interface HomeApi {
   /** G5-06u: main asks for the queue popover of a path (Ctrl/Cmd+S with a pending save) */
   onUniworkQueuePopover(cb: (request: UniworkQueuePopoverRequest) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
+  /** EL-1(b): "Sửa ở đây" - acquire (move_from_self when self_elsewhere); resolves with the new status */
+  uniworkEditHere(path: string): Promise<UniworkDocStatus | null>
   /** Save a local copy of the bound working copy at `path` to a user-chosen path ("Lưu bản sao về máy"). */
   uniworkSaveLocalCopy?(path: string): Promise<boolean>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
@@ -1865,6 +1901,8 @@ export const UNIWORK_DOC_CHANNELS = {
   conflictAct: 'uniwork-doc:conflict-act',
   /** invoke(path, action) -> the S6 bar action (later/close/retry/reload/reload-now) */
   remoteAction: 'uniwork-doc:remote-action',
+  /** EL-1(b): invoke(path) -> "Sửa ở đây" acquire; UniworkDocStatus | null */
+  editHere: 'uniwork-doc:edit-here',
   /** invoke(heightPx) -> the S6 bar's height under the tab strip (active view inset) */
   barInset: 'uniwork-doc:bar-inset',
   launchEvent: 'uniwork-doc:launch-event',

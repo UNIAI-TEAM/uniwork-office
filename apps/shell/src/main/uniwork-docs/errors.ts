@@ -38,6 +38,22 @@ export class UniworkDocError extends Error {
   readonly holderId?: string | null
   /** EL-1(a) (UNI-1645c): lock holder metadata from 423 `document_locked` */
   readonly editLock?: UniworkDocEditLock
+  /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.reason */
+  readonly lostReason?:
+    | 'released'
+    | 'expired'
+    | 'taken_over'
+    | 'handed_over'
+    | 'access_lost'
+    | 'document_archived'
+    | 'moved_here'
+    | 'session_revoked'
+    | 'member_deactivated'
+    | 'organization_suspended'
+    | 'document_deleted'
+    | 'unknown'
+  /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.by_name */
+  readonly byName?: string | null
 
   constructor(
     code: UniworkDocErrorCode,
@@ -54,6 +70,8 @@ export class UniworkDocError extends Error {
       documentTitle?: string
       holderId?: string | null
       editLock?: UniworkDocEditLock
+      lostReason?: UniworkDocError['lostReason']
+      byName?: string | null
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -71,7 +89,29 @@ export class UniworkDocError extends Error {
     this.documentTitle = extra.documentTitle
     this.holderId = extra.holderId
     this.editLock = extra.editLock
+    this.lostReason = extra.lostReason
+    this.byName = extra.byName
   }
+}
+
+const EDIT_LOCK_LOST_REASONS = new Set([
+  'released',
+  'expired',
+  'taken_over',
+  'handed_over',
+  'access_lost',
+  'document_archived',
+  'moved_here',
+  'session_revoked',
+  'member_deactivated',
+  'organization_suspended',
+  'document_deleted',
+])
+
+function lostReasonOf(value: unknown): NonNullable<UniworkDocError['lostReason']> {
+  return typeof value === 'string' && EDIT_LOCK_LOST_REASONS.has(value)
+    ? (value as NonNullable<UniworkDocError['lostReason']>)
+    : 'unknown'
 }
 
 function boundedLockString(value: unknown, max: number): string | null {
@@ -144,13 +184,42 @@ export function errorFromResponse(
   const envelope = readEnvelope(body)
   const serverCode = envelope?.code
   const at = { status, ...(serverCode ? { serverCode } : {}) }
+  // BIGUP-A1: an upload-session refusal carries its delay in
+  // `fields.retry_after` (seconds) as well as in the `Retry-After` header the
+  // server sets for its 429s; either spelling gives the same wait, and the
+  // header wins when both are there.
+  const rawFieldRetry = envelope?.fields?.retry_after
+  const fieldRetryMs =
+    typeof rawFieldRetry === 'number' && Number.isFinite(rawFieldRetry) && rawFieldRetry >= 0
+      ? Math.floor(rawFieldRetry) * 1000
+      : undefined
   // only a throttled / temporarily unavailable answer and the in-flight
   // idempotency verdict carry a Retry-After; anywhere else the header is noise
-  const retried = retryAfterMs === undefined ? at : { ...at, retryAfterMs }
+  const delay = retryAfterMs ?? fieldRetryMs
+  const retried = delay === undefined ? at : { ...at, retryAfterMs: delay }
   // a feed cursor verdict must never reach the coded-410 -> `deleted` branch
   // below; the feed classifies it first with parseFeedError
   if (serverCode === CHANGE_CURSOR_EXPIRED || serverCode === CHANGE_CURSOR_INVALID) {
     return new UniworkDocError('server_error', at)
+  }
+  // BIGUP-A1: the upload-session verdicts, each its own answer.
+  // `upload_session_expired` (410) is NOT a document tombstone: the session is
+  // gone, so it reads `not_found` - the caller drops its saved session and
+  // starts a new one. `upload_session_busy` (409) is a wait, never the
+  // terminal 409 below, and keeps the server's own 5 s delay. A too-small
+  // answer (422) is the threshold-drift fallback signal, and the three 422
+  // part/probe verdicts each keep their serverCode for the caller to act on.
+  if (serverCode === 'upload_session_expired') return new UniworkDocError('not_found', at)
+  if (serverCode === 'upload_session_busy') return new UniworkDocError('server_error', retried)
+  if (serverCode === 'upload_session_too_small') return new UniworkDocError('server_error', at)
+  if (serverCode === 'upload_parts_invalid') return new UniworkDocError('server_error', at)
+  if (serverCode === 'upload_size_mismatch' || serverCode === 'upload_probe_mismatch') {
+    // the file changed under us: the same shape the app already answers an
+    // upload-checksum mismatch with, so nothing retries it silently
+    return new UniworkDocError('malformed_response', at)
+  }
+  if (serverCode === 'unsupported_media_type') {
+    return new UniworkDocError('unsupported_format', at)
   }
   // throttled (429) or temporarily down (503): retryable, never a terminal
   // refusal - the save queue backs off and can honour the Retry-After
@@ -174,6 +243,15 @@ export function errorFromResponse(
       holderId,
       editLock,
       ...(isDecimalString(current) ? { currentRevision: current } : {}),
+    })
+  }
+  // EL-1(b) (UNI-1645c): 409 edit_lock_lost on a heartbeat — keep reason / by_name.
+  if (status === 409 && serverCode === 'edit_lock_lost') {
+    const fields = envelope?.fields
+    return new UniworkDocError('server_error', {
+      ...at,
+      lostReason: lostReasonOf(fields?.reason),
+      byName: boundedLockString(fields?.by_name, 256),
     })
   }
   if (serverCode && CONFLICT_CODES.has(serverCode)) {

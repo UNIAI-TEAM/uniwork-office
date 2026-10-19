@@ -227,7 +227,10 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
     this: HTMLElement,
   ) {
-    const h = this.classList.contains('uw-remote-bar') ? barHeight : 0
+    const h =
+      this.classList.contains('uw-remote-bar') || this.classList.contains('uw-top-bars')
+        ? barHeight
+        : 0
     return {
       x: 0,
       y: 0,

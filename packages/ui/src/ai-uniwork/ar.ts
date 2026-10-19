@@ -67,16 +67,12 @@ export const ar = {
   aiErrQuestionRejected: 'تعذّر على UniWork AI قبول هذا الطلب. عدّله ثم أرسله مرة أخرى.',
   aiUniworkImagesNotSent: 'لا تُرسل الصور إلى UniWork AI؛ أُرسل النص فقط.',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'متاح',
   cloudStateNotEntitled: 'غير مضمّن في خطتك',
   cloudStateExhausted: 'نفدت أرصدة الذكاء الاصطناعي',
   cloudStateUnavailable: 'غير متاح',
-  cloudStateSignedOut: 'غير مسجّل الدخول',
   cloudStateInactive: 'الاشتراك غير نشط',
-  cloudCredits: 'أرصدة الذكاء الاصطناعي',
   cloudCreditsLeft: 'متبقٍ {remaining} / {limit}',
   cloudCreditsUnlimited: 'غير محدود',
-  cloudCreditsRenews: 'يتجدد في {date}',
   cloudInactiveBody:
     'اشتراك UniWork الخاص بمؤسستك غير نشط، لذا تم إيقاف الذكاء الاصطناعي السحابي مؤقتًا. اطلب من المسؤول تجديده؛ ستستمر مزوّداتك الخاصة أدناه في العمل.',
   acctSignIn: 'تسجيل الدخول',

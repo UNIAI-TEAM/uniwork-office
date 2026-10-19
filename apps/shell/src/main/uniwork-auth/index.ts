@@ -20,7 +20,7 @@ import {
   uniworkConversations,
 } from '@genoffice/ai-provider'
 import { safeExternalUrl } from '@genoffice/electron-utils'
-import type { UniworkCloudStatusSnapshot } from '@genoffice/electron-utils/uniwork-ai-flag'
+import type { UniworkCloudStatusSnapshot } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { getUiLang } from '@genoffice/i18n'
 import { HOME_CHANNELS, type AccountEntitlements, type AccountStatus } from '../../shared/home-api'
 import { readAppSettings, writeAppSetting } from '../app-settings'

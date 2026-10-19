@@ -38,6 +38,10 @@ vi.mock('electron', () => ({
   session: {
     defaultSession: {
       setSpellCheckerDictionaryDownloadURL: () => undefined,
+      getSpellCheckerLanguages: () => ['en-US'],
+      setSpellCheckerLanguages: () => undefined,
+      isSpellCheckerEnabled: () => true,
+      setSpellCheckerEnabled: () => undefined,
     },
   },
 }))

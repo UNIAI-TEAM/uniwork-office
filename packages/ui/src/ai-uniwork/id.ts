@@ -76,16 +76,12 @@ export const id = {
     'UniWork AI tidak dapat menerima permintaan ini. Ubah permintaannya, lalu kirim lagi.',
   aiUniworkImagesNotSent: 'Gambar tidak dikirim ke UniWork AI; hanya teks Anda yang dikirim.',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'Tersedia',
   cloudStateNotEntitled: 'Tidak termasuk dalam paket Anda',
   cloudStateExhausted: 'Kredit AI habis',
   cloudStateUnavailable: 'Tidak tersedia',
-  cloudStateSignedOut: 'Belum masuk',
   cloudStateInactive: 'Langganan tidak aktif',
-  cloudCredits: 'Kredit AI',
   cloudCreditsLeft: 'Sisa {remaining} / {limit}',
   cloudCreditsUnlimited: 'Tanpa batas',
-  cloudCreditsRenews: 'Diperbarui {date}',
   cloudInactiveBody:
     'Langganan UniWork organisasi Anda tidak aktif, sehingga AI cloud dijeda. Minta admin untuk memperpanjangnya; penyedia Anda sendiri di bawah tetap berfungsi.',
   acctSignIn: 'Masuk',

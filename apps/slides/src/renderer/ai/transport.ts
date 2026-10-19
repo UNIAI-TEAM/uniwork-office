@@ -17,9 +17,12 @@ export function createElectronTransport(getSettings: () => AiSettings): AgentTra
     networkErrorText: () => t('aiErrNetwork'),
     overloadedErrorText: () => t('aiErrOverloaded'),
     // a UniWork AI failure is worded by its code (S9), in the UI language, never by the chunk's text
-    uniworkErrorText: (code, retryAfterSec) =>
-      aiUniworkText(getLang(), uniworkErrorKey(code, 'desktop') as AiUniworkStringKey, {
-        seconds: retryAfterSec ?? 0,
-      }),
+    uniworkError: (code, retryAfterSec) => {
+      const errorKey = uniworkErrorKey(code, 'desktop') as AiUniworkStringKey
+      return {
+        text: aiUniworkText(getLang(), errorKey, { seconds: retryAfterSec ?? 0 }),
+        errorKey,
+      }
+    },
   })
 }

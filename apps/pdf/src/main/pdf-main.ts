@@ -6,6 +6,7 @@ import {
   uniworkIsLocked,
   uniworkIsReadOnly,
   uniworkMayRewriteInPlace,
+  uniworkReadOnlySave,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import { PDF_UNIWORK_VIEW_ONLY } from '../shared/uniwork-refusal'
@@ -38,10 +39,8 @@ import {
   registerRendererScheme,
   rendererUrl,
 } from '@genoffice/electron-utils'
-import {
-  answerUniworkAiFlagOff,
-  answerUniworkCloudStatusOff,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { PDF_CHANNELS } from '../shared/ipc'
@@ -1397,6 +1396,11 @@ function registerPdfIpc(): void {
       return { bound: false, readOnly: false }
     }
     return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
+  ipcMain.handle(PDF_CHANNELS.uniworkReadOnlySave, (e, path: unknown) => {
+    if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) return
+    uniworkReadOnlySave(path)
   })
 
   ipcMain.handle(

@@ -157,6 +157,7 @@ export const he = {
   uwErrUploadTooLarge:
     'גודלו של {name} הוא {size}, מעבר למגבלת {max}. הקטן את גודל התמונות או פצל את הקובץ והעלה שוב.',
   uwReasonTooLargeWithLimit: 'מעבר למגבלת {max}',
+  uwUploadChecking: 'בודק את הקובץ…',
   uwChipEditLocked: '{name} עורך',
   uwChipEditLockedSelf: 'נערך בחלון אחר',
   uwEditLockSomeone: 'מישהו אחר',
@@ -164,4 +165,21 @@ export const he = {
   uwTipEditLockedSelf: 'אתה עורך את המסמך הזה בחלון אחר.',
   uwErrEditLocked: 'מישהו אחר עורך את המסמך הזה.',
   uwReasonEditLocked: 'מישהו אחר עורך',
+  uwLockBannerOther: '{name} עורך מאז {time}. אתה מציג לקריאה בלבד.',
+  uwLockBannerSelfElsewhere: 'אתה עורך את המסמך הזה בחלון אחר.',
+  uwLockBannerFree: 'אף אחד לא עורך את המסמך הזה כעת.',
+  uwLockEditHere: 'ערוך כאן',
+  uwLockAcquiring: 'מקבל גישת עריכה…',
+  uwLockReadOnlyExplain: 'שום דבר לא נשמר — המסמך לקריאה בלבד.',
+  uwLockLostTitle: 'אתה כבר לא עורך',
+  uwLockLostTakenOver: '{name} השתלט על העריכה. השינויים שלך שלא נשמרו עדיין כאן.',
+  uwLockLostHandedOver: 'העברת את העריכה ל‑{name}. השינויים שלך שלא נשמרו עדיין כאן.',
+  uwLockLostExpired:
+    'העריכה פגה כי לא הצלחנו להגיע לשרת זמן מה (אין רשת או שהמכשיר נרדם). השינויים שלך שלא נשמרו עדיין כאן.',
+  uwLockLostMovedHere:
+    'אתה עורך כעת את המסמך הזה בחלון אחר. השינויים שלא נשמרו בחלון זה עדיין כאן.',
+  uwLockLostAccessLost: 'אין לך עוד הרשאה לערוך את המסמך הזה. השינויים שלך שלא נשמרו עדיין כאן.',
+  uwLockLostGeneric: 'אתה כבר לא עורך. השינויים שלך שלא נשמרו עדיין כאן.',
+  uwLockLostHeldBy: '{name} עורך כעת. השינויים שלך שלא נשמרו עדיין כאן.',
+  uwLockAcquireFailed: 'לא ניתן היה לקבל גישת עריכה. נסה שוב בעוד כמה דקות.',
 } satisfies Record<keyof typeof zh, string>

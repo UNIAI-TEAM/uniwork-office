@@ -1980,6 +1980,87 @@ describe('the comments context of a bound copy (G8-12 §3.1)', () => {
     expect(ctx.service.commentContext(path)).toBeNull()
   })
 
+  it('switching account and reading commentContext persists last-account.json synchronously with no late write after teardown (EL-1(b) fix8)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.signInAs('acc_2')
+    expect(ctx.service.commentContext(path)).toBeNull()
+    // The new owner must already be persisted synchronously when commentContext returns,
+    // and removing the directory immediately must not be raced by a late async write.
+    expect(ctx.service.store.readLastOwner()).toEqual({
+      accountId: 'acc_2',
+      deploymentId: 'default',
+    })
+    const lastOwnerPath = join(dir, 'uniwork-documents', 'last-account.json')
+    rmSync(lastOwnerPath, { force: true })
+    for (let i = 0; i < 30; i += 1) {
+      await readFile(path)
+    }
+    expect(existsSync(lastOwnerPath)).toBe(false)
+  })
+
+  it('a failed last-account.json write is retried on a later identity observation, not cached as persisted (EL1B-BE-R3-8)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await openDoc(ctx)
+      const store = ctx.service.store
+      const real = store.writeLastOwner.bind(store)
+      const write = vi.spyOn(store, 'writeLastOwner').mockImplementationOnce(() => false)
+      ctx.signInAs('acc_2')
+      expect(ctx.service.commentContext(path)).toBeNull()
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(store.readLastOwner()).not.toEqual({ accountId: 'acc_2', deploymentId: 'default' })
+
+      // right after the failure nothing hammers the disk again ...
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(1)
+      // ... but the next observation after the back-off retries it and persists
+      vi.advanceTimersByTime(5_000)
+      write.mockImplementation(real)
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(2)
+      expect(store.readLastOwner()).toEqual({ accountId: 'acc_2', deploymentId: 'default' })
+      // persisted: no further writes for the same owner
+      vi.advanceTimersByTime(5_000)
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('the failed-write back-off belongs to the owner that failed: a different owner on a recovered disk is written at once (EL1B-BE-R3C-8)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const path = await openDoc(ctx)
+      const store = ctx.service.store
+      const real = store.writeLastOwner.bind(store)
+      const write = vi.spyOn(store, 'writeLastOwner').mockImplementationOnce(() => false)
+      ctx.signInAs('acc_2')
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(store.readLastOwner()).not.toEqual({ accountId: 'acc_2', deploymentId: 'default' })
+
+      // the same failing owner stays throttled ...
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(1)
+      // ... but owner C, observed inside B's window on a recovered disk, is not
+      write.mockImplementation(real)
+      vi.advanceTimersByTime(500)
+      ctx.signInAs('acc_3')
+      ctx.service.commentContext(path)
+      expect(write).toHaveBeenCalledTimes(2)
+      expect(store.readLastOwner()).toEqual({ accountId: 'acc_3', deploymentId: 'default' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a settled Save moves the version id to the receipt and pushes it once', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)

@@ -3,7 +3,7 @@ import { LANGS } from '@genoffice/i18n'
 import {
   aiUniworkStrings,
   aiUniworkText,
-  isUniworkQuestionRefusal,
+  isUniworkRefusalErrorKey,
 } from '../src/strings-ai-uniwork'
 
 /**
@@ -178,9 +178,6 @@ describe('ai-uniwork string shards', () => {
     expect(aiUniworkText('en', 'cloudCreditsLeft', { remaining: 10, limit: 100 })).toBe(
       '10 / 100 left',
     )
-    expect(aiUniworkText('en', 'cloudCreditsRenews', { date: '2026-11-01' })).toBe(
-      'Renews 2026-11-01',
-    )
     expect(
       aiUniworkText('en', 'aiResultCellsMeta', {
         written: 4,
@@ -214,8 +211,6 @@ describe('ai-uniwork string shards', () => {
     expect(aiUniworkText('vi', 'acctSignIn')).toBe('Đăng nhập')
     expect(aiUniworkText('en', 'acctSignInAgain')).toBe('Sign in again')
     expect(aiUniworkText('vi', 'acctSignInAgain')).toBe('Đăng nhập lại')
-    expect(aiUniworkText('en', 'cloudStateReady')).toBe('Available')
-    expect(aiUniworkText('vi', 'cloudStateReady')).toBe('Sẵn sàng')
     expect(aiUniworkText('en', 'cloudInactiveBody')).toContain('subscription is not active')
     expect(aiUniworkText('vi', 'cloudInactiveBody')).toContain('không hoạt động')
     expect(aiUniworkText('en', 'aiUniworkLocalFileRestart')).toContain(
@@ -254,16 +249,13 @@ describe('ai-uniwork string shards', () => {
   })
 })
 
-describe('isUniworkQuestionRefusal', () => {
-  it.each([...LANGS])('knows the two refusal messages of %s', (lang) => {
-    expect(isUniworkQuestionRefusal(aiUniworkText(lang, 'aiErrQuestionTooLong'))).toBe(true)
-    expect(isUniworkQuestionRefusal(aiUniworkText(lang, 'aiErrQuestionRejected'))).toBe(true)
-  })
-
-  it('is false for every other message and for nothing', () => {
-    expect(isUniworkQuestionRefusal(aiUniworkText('vi', 'aiErrUnavailable'))).toBe(false)
-    expect(isUniworkQuestionRefusal('Network error')).toBe(false)
-    expect(isUniworkQuestionRefusal('')).toBe(false)
-    expect(isUniworkQuestionRefusal(undefined)).toBe(false)
+describe('isUniworkRefusalErrorKey', () => {
+  it('is true only for the two refusal keys', () => {
+    expect(isUniworkRefusalErrorKey('aiErrQuestionTooLong')).toBe(true)
+    expect(isUniworkRefusalErrorKey('aiErrQuestionRejected')).toBe(true)
+    expect(isUniworkRefusalErrorKey('aiErrUnavailable')).toBe(false)
+    expect(isUniworkRefusalErrorKey('Network error')).toBe(false)
+    expect(isUniworkRefusalErrorKey('')).toBe(false)
+    expect(isUniworkRefusalErrorKey(undefined)).toBe(false)
   })
 })

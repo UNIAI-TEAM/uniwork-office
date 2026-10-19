@@ -688,6 +688,7 @@ export function DocumentsHome({
           name: ev.path.split(/[\\/]/).pop() ?? '',
           loaded: ev.loaded,
           total: ev.total,
+          phase: ev.phase,
         })
       }
     })

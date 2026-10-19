@@ -307,8 +307,8 @@ describe('a refused UniWork AI question (too long, rejected): no Retry, the ques
   it.each([['aiErrQuestionTooLong'], ['aiErrQuestionRejected']] as const)(
     '%s ends the run with the error and the user message is not marked undelivered',
     (key) => {
-      const failed = markRunFailed([user, streaming], tr(key))
-      expect(failed[1]).toMatchObject({ isError: true, text: tr(key) })
+      const failed = markRunFailed([user, streaming], tr(key), key)
+      expect(failed[1]).toMatchObject({ isError: true, text: tr(key), errorKey: key })
       expect(failed[0]!.undelivered).toBeUndefined()
     },
   )
@@ -323,7 +323,7 @@ describe('a refused UniWork AI question (too long, rejected): no Retry, the ques
       'utf8',
     )
     expect(source).toMatch(
-      /if \(isUniworkQuestionRefusal\(error\)\)\s+setPrompt\(\(current\) => current \|\| runQuestionRef\.current\)/,
+      /if \(isUniworkRefusalErrorKey\(errorKey\)\)\s+setPrompt\(\(current\) => current \|\| runQuestionRef\.current\)/,
     )
   })
 
@@ -393,7 +393,9 @@ describe('a refused UniWork AI question (too long, rejected): no Retry, the ques
     }
 
     it('the refusal shows its error with no Retry; the composer holds the question', () => {
-      const c = mount(markRunFailed([user, streaming], tr('aiErrQuestionTooLong')))
+      const c = mount(
+        markRunFailed([user, streaming], tr('aiErrQuestionTooLong'), 'aiErrQuestionTooLong'),
+      )
       expect(c.textContent).toContain(tr('aiErrQuestionTooLong'))
       expect(c.querySelector('.ai-retry-btn')).toBeNull()
       expect(c.querySelector('textarea')?.value).toBe('sum column B')

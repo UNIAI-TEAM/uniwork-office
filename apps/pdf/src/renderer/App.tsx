@@ -142,8 +142,14 @@ import {
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
-import { drainedOrigin, forcesBoundSave, type SaveOrigin } from './uniwork-save'
-import { queryPdfUniworkState } from './uniwork-state'
+import {
+  drainedOrigin,
+  forcesBoundSave,
+  pdfExplainReadOnlySave,
+  type PdfReadOnlySaveSeam,
+  type SaveOrigin,
+} from './uniwork-save'
+import { openBoxesCountAsDirty, usePdfUniworkState, type PdfUniworkSeam } from './uniwork-state'
 import { collabStrings } from '@genoffice/ui/collab'
 import { PdfServerCommentsHost, type PdfServerComments } from './server-comments/PdfServerComments'
 import { commentFrameBox, rerunOnResize, scrollLeftToReveal } from './server-comments/reveal-view'
@@ -167,7 +173,6 @@ import type {
   PageImageRef,
   PdfConvertFormat,
   PdfSignatureInfo,
-  PdfUniworkState,
   SavePdfRequest,
   StaticFormFillRecord,
   StampInput,
@@ -1456,24 +1461,7 @@ export default function App() {
   }, [])
 
   /** UniWork document state of the open file (bound working copy / view only); all false for local files */
-  const [uniwork, setUniwork] = useState<PdfUniworkState>({ bound: false, readOnly: false })
-  useEffect(() => {
-    let live = true
-    if (!filePath) {
-      setUniwork({ bound: false, readOnly: false })
-      return
-    }
-    // Re-queried whenever the open path changes (open, rename, redaction copy). The
-    // previous answer stays until the new one arrives: a view-only copy must not turn
-    // editable, nor a bound one autosave, in the gap.
-    // A missing method or a failed query reads as a plain local file.
-    void queryPdfUniworkState(window.pdfApi, filePath).then((state) => {
-      if (live) setUniwork(state)
-    })
-    return () => {
-      live = false
-    }
-  }, [filePath])
+  const uniwork = usePdfUniworkState(window.pdfApi as PdfUniworkSeam, filePath)
 
   /** G8-15: a bound document with the comments bridge keeps its comments on UniWork (server mode) */
   const commentsBridge = useMemo(() => pdfCommentsBridge(), [])
@@ -3876,6 +3864,18 @@ export default function App() {
       `internal` = flush before a page tool. Main fires the UniWork user-save hook only for `user`. */
   const save = (origin: SaveOrigin = 'user', afterUserSave = false): Promise<boolean> => {
     if (redactionRequestInFlightRef.current) return Promise.resolve(false)
+    // EL-1(b) VEL-1: an explicit Save on a read-only bound PDF asks the shell to
+    // explain the lock and never writes (local read-only PDFs keep today's path)
+    if (
+      pdfExplainReadOnlySave(window.pdfApi as PdfReadOnlySaveSeam, {
+        origin,
+        bound: uniwork.bound,
+        readOnly: uniwork.readOnly,
+        filePath,
+      })
+    ) {
+      return Promise.resolve(false)
+    }
     // A save is already writing: queue behind it instead of reporting failure — the
     // close prompt's "Save" and ⌘S regularly collide with the blur-triggered autosave
     // (the prompt itself blurs the window). The ref is set synchronously, so this also
@@ -5494,8 +5494,12 @@ export default function App() {
     }
     return { textEdits: edits, noteFlush, newNotes, open }
   }
-  const openBoxesDirty =
-    !readOnly && (textDraft || noteEditDraft || noteDraft) ? pendingOpenBoxes().open : false
+  // platform read-only only: a draft typed before the edit lock was lost still counts (edits kept)
+  const openBoxesDirty = openBoxesCountAsDirty(
+    viewOnly || encryptedReadOnly,
+    !!(textDraft || noteEditDraft || noteDraft),
+    () => pendingOpenBoxes().open,
+  )
 
   // Mirror dirty state to the main process (close-tab/close-window guard). An open editor box with
   // typed changes counts: Save folds it in, and the web draft copy needs the frame to be dirty

@@ -762,7 +762,7 @@ describe('AgentLoop', () => {
     const loop = new AgentLoop({ transport, skill: makeSkill(), events: { onError } })
     loop.run('change all headings to red')
     await flush()
-    expect(onError).toHaveBeenCalledWith('Not signed in')
+    expect(onError).toHaveBeenCalledWith('Not signed in', undefined)
     // the failed instruction is gone, so it can't be re-executed by the next run
     expect(loop.messages).toHaveLength(0)
 
@@ -790,7 +790,7 @@ describe('AgentLoop', () => {
     loop.run('do more work')
     await flush()
     await flush()
-    expect(onError).toHaveBeenCalledWith('network dropped')
+    expect(onError).toHaveBeenCalledWith('network dropped', undefined)
     // history is back to the pre-run state: no dangling user/assistant/tool from the failed run
     expect(loop.messages).toEqual([
       { role: 'user', text: 'earlier question' },
@@ -842,7 +842,7 @@ describe('AgentLoop', () => {
       await vi.advanceTimersByTimeAsync(1_000)
       await vi.advanceTimersByTimeAsync(3_000)
       expect(transport.requests).toHaveLength(3)
-      expect(onError).toHaveBeenCalledWith('Claude returned no content (empty stream)')
+      expect(onError).toHaveBeenCalledWith('Claude returned no content (empty stream)', undefined)
       expect(loop.messages).toHaveLength(0)
       expect(loop.busy).toBe(false)
     } finally {
@@ -921,7 +921,7 @@ describe('AgentLoop', () => {
     loop.run('question')
     await flush()
     expect(transport.requests).toHaveLength(1)
-    expect(onError).toHaveBeenCalledWith('Claude returned no content (empty stream)')
+    expect(onError).toHaveBeenCalledWith('Claude returned no content (empty stream)', undefined)
   })
 
   it('a stop during the retry backoff finalizes as a cancel', async () => {

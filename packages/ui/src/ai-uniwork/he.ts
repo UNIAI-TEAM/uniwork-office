@@ -65,16 +65,12 @@ export const he = {
   aiErrQuestionRejected: 'UniWork AI לא יכול לקבל את הבקשה הזו. שנה אותה ושלח שוב.',
   aiUniworkImagesNotSent: 'תמונות לא נשלחות ל-UniWork AI; נשלח רק הטקסט שלך.',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'זמין',
   cloudStateNotEntitled: 'לא כלול בתוכנית שלך',
   cloudStateExhausted: 'נגמרו קרדיטי ה-AI',
   cloudStateUnavailable: 'לא זמין',
-  cloudStateSignedOut: 'לא מחובר',
   cloudStateInactive: 'המנוי אינו פעיל',
-  cloudCredits: 'קרדיטי AI',
   cloudCreditsLeft: 'נותרו {remaining} / {limit}',
   cloudCreditsUnlimited: 'ללא הגבלה',
-  cloudCreditsRenews: 'יתחדש ב-{date}',
   cloudInactiveBody:
     'מנוי UniWork של הארגון שלך אינו פעיל, ולכן ה-AI בענן מושהה. בקש ממנהל לחדש אותו; הספקים שלך למטה ממשיכים לעבוד.',
   acctSignIn: 'כניסה',

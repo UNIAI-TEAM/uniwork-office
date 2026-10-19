@@ -254,15 +254,26 @@ test.describe('docs selection bar and format painter', () => {
         await focusEditor(editor)
         const pos = await hitPos(editor, c)
         await editor.mouse.click(c.x, c.y)
-        await editor.waitForFunction(
-          (want) => {
-            const ed = (window as unknown as AidocsWindow).__aidocs!.editor as any
-            const s = ed.state.selection
-            return s.empty && s.from === want
-          },
-          pos,
-          { polling: 'raf' },
-        )
+        try {
+          await editor.waitForFunction(
+            (want) => {
+              const ed = (window as unknown as AidocsWindow).__aidocs!.editor as {
+                state: { selection: { empty: boolean; from: number } }
+              }
+              const s = ed.state.selection
+              return s.empty && s.from === want
+            },
+            pos,
+            { polling: 'raf', timeout: 15_000 },
+          )
+        } catch (err) {
+          const sel = await selection(editor)
+          throw new Error(
+            `clickWord(${word}): want caret at ${pos}, have ${sel.from}-${sel.to}` +
+              ` (focused=${sel.focused}, text=${JSON.stringify(sel.text)})`,
+            { cause: err },
+          )
+        }
       }
 
       // single click: one stroke, on the word (with its trailing space), not the sentence

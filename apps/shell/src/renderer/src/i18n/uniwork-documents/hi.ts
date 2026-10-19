@@ -159,6 +159,7 @@ export const hi = {
   uwErrUploadTooLarge:
     '{name} का आकार {size} है, जो {max} सीमा से अधिक है। छवियों का आकार घटाएँ या फ़ाइल को विभाजित करें, फिर दोबारा अपलोड करें।',
   uwReasonTooLargeWithLimit: '{max} सीमा से अधिक',
+  uwUploadChecking: 'फ़ाइल की जाँच हो रही है…',
   uwChipEditLocked: '{name} संपादन कर रहे हैं',
   uwChipEditLockedSelf: 'किसी अन्य विंडो में संपादन',
   uwEditLockSomeone: 'कोई और',
@@ -166,4 +167,22 @@ export const hi = {
   uwTipEditLockedSelf: 'आप इस दस्तावेज़ को किसी अन्य विंडो में संपादित कर रहे हैं।',
   uwErrEditLocked: 'कोई और इस दस्तावेज़ को संपादित कर रहा है।',
   uwReasonEditLocked: 'कोई और संपादित कर रहा है',
+  uwLockBannerOther: '{name} {time} से संपादित कर रहे हैं। आप केवल-पठन देख रहे हैं।',
+  uwLockBannerSelfElsewhere: 'आप यह दस्तावेज़ किसी अन्य विंडो में संपादित कर रहे हैं।',
+  uwLockBannerFree: 'अभी कोई यह दस्तावेज़ संपादित नहीं कर रहा।',
+  uwLockEditHere: 'यहाँ संपादित करें',
+  uwLockAcquiring: 'संपादन एक्सेस प्राप्त हो रहा है…',
+  uwLockReadOnlyExplain: 'कुछ भी सहेजा नहीं गया — दस्तावेज़ केवल-पठन है।',
+  uwLockLostTitle: 'आप अब संपादित नहीं कर रहे',
+  uwLockLostTakenOver: '{name} ने संपादन संभाल लिया। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
+  uwLockLostHandedOver: 'आपने संपादन {name} को सौंपा। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
+  uwLockLostExpired:
+    'कुछ समय तक सर्वर तक पहुँच न सके (नेटवर्क नहीं या डिवाइस सो गया) इसलिए संपादन समाप्त हो गया। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
+  uwLockLostMovedHere:
+    'आप अब यह दस्तावेज़ किसी अन्य विंडो में संपादित कर रहे हैं। इस विंडो के असहेजे बदलाव अभी भी यहाँ हैं।',
+  uwLockLostAccessLost:
+    'आपके पास अब इस दस्तावेज़ को संपादित करने की अनुमति नहीं है। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
+  uwLockLostGeneric: 'आप अब संपादित नहीं कर रहे। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
+  uwLockLostHeldBy: '{name} अभी संपादित कर रहे हैं। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
+  uwLockAcquireFailed: 'संपादन एक्सेस नहीं मिल सका। कुछ मिनट बाद फिर से प्रयास करें।',
 } satisfies Record<keyof typeof zh, string>

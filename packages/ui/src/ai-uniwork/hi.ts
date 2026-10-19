@@ -70,16 +70,12 @@ export const hi = {
   aiErrQuestionRejected: 'UniWork AI यह अनुरोध स्वीकार नहीं कर सका। इसे बदलकर फिर भेजें।',
   aiUniworkImagesNotSent: 'छवियाँ UniWork AI को नहीं भेजी जातीं; केवल आपका टेक्स्ट भेजा गया।',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: 'उपलब्ध',
   cloudStateNotEntitled: 'आपके प्लान में शामिल नहीं',
   cloudStateExhausted: 'AI क्रेडिट खत्म',
   cloudStateUnavailable: 'अभी उपलब्ध नहीं',
-  cloudStateSignedOut: 'साइन इन नहीं है',
   cloudStateInactive: 'सदस्यता सक्रिय नहीं है',
-  cloudCredits: 'AI क्रेडिट',
   cloudCreditsLeft: '{remaining} / {limit} शेष',
   cloudCreditsUnlimited: 'असीमित',
-  cloudCreditsRenews: '{date} को रीन्यू',
   cloudInactiveBody:
     'आपके संगठन की UniWork सदस्यता सक्रिय नहीं है, इसलिए क्लाउड AI रुका हुआ है। किसी एडमिन से इसे नवीनीकृत करवाएँ; नीचे आपके अपने प्रदाता काम करते रहेंगे।',
   acctSignIn: 'साइन इन करें',

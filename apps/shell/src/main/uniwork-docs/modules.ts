@@ -60,6 +60,12 @@ export interface UniworkModuleSeam {
   ): void
   onUserSave(path: string): void
   /**
+   * EL-1(b) fix6 (VEL-1): an editor module's explicit Save while the bound
+   * working copy is read-only. Requests the explain popover for `path`; never
+   * writes and never runs the user-save hook.
+   */
+  onReadOnlySave?(path: string): void
+  /**
    * G5-04g: true when the path's folder declares a store this build does not
    * read, so the module's open chokepoint must not read the file at all. The
    * service records and pushes the S11 lock as a side effect.
@@ -101,6 +107,13 @@ export function createCommentAuthorResolver(deps: {
  */
 export const COMMENT_AUTHOR_CHANGED_CHANNEL = 'uniwork:comment-author-changed'
 
+/**
+ * EL-1(b) fix6 (VEL-2): pushed (`{ path: string }`) to every renderer
+ * webContents whenever `isReadOnly(path)` or `isBound(path)` may have changed —
+ * on edit-lock session phase transitions and on access changes the service
+ * publishes.
+ */
+export const UNIWORK_DOC_STATE_CHANGED_CHANNEL = 'uniwork:doc-state-changed'
 /**
  * G8-02: calls `broadcast` whenever an account status push changes the display
  * name a bound document would take (null = signed out / no name). Token
@@ -150,6 +163,7 @@ export function installUniworkModuleSeams(
         consumeCapture: (path: string) => seam.consumeCapture?.(path) === true,
         refuseOpen: (path: string) => seam.refuseLockedPath(path),
         commentAuthor: (path: string) => author(path),
+        readOnlySave: (path: string) => seam.onReadOnlySave?.(path),
       }
     : null
   const hook = seam ? (path: string) => seam.onUserSave(path) : null

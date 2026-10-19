@@ -168,6 +168,7 @@ export const fr = {
   uwErrUploadTooLarge:
     '{name} fait {size}, ce qui dépasse la limite de {max}. Réduisez la taille des images ou divisez le fichier, puis importez-le à nouveau.',
   uwReasonTooLargeWithLimit: 'dépasse la limite de {max}',
+  uwUploadChecking: 'Vérification du fichier…',
   uwChipEditLocked: '{name} modifie',
   uwChipEditLockedSelf: 'Modification dans une autre fenêtre',
   uwEditLockSomeone: 'Quelqu’un',
@@ -175,4 +176,26 @@ export const fr = {
   uwTipEditLockedSelf: 'Vous modifiez ce document dans une autre fenêtre.',
   uwErrEditLocked: 'Une autre personne modifie ce document.',
   uwReasonEditLocked: 'une autre personne modifie',
+  uwLockBannerOther: '{name} modifie depuis {time}. Vous consultez en lecture seule.',
+  uwLockBannerSelfElsewhere: 'Vous modifiez ce document dans une autre fenêtre.',
+  uwLockBannerFree: 'Personne ne modifie ce document pour le moment.',
+  uwLockEditHere: 'Modifier ici',
+  uwLockAcquiring: 'Obtention de l’accès en modification…',
+  uwLockReadOnlyExplain: 'Rien n’a été enregistré — le document est en lecture seule.',
+  uwLockLostTitle: 'Vous ne modifiez plus',
+  uwLockLostTakenOver:
+    '{name} a pris la modification. Vos changements non enregistrés sont toujours là.',
+  uwLockLostHandedOver:
+    'Vous avez confié la modification à {name}. Vos changements non enregistrés sont toujours là.',
+  uwLockLostExpired:
+    'La modification a expiré car le serveur était injoignable depuis un moment (pas de réseau ou l’appareil s’est mis en veille). Vos changements non enregistrés sont toujours là.',
+  uwLockLostMovedHere:
+    'Vous modifiez maintenant ce document dans une autre fenêtre. Les changements non enregistrés de cette fenêtre sont toujours là.',
+  uwLockLostAccessLost:
+    'Vous n’avez plus l’autorisation de modifier ce document. Vos changements non enregistrés sont toujours là.',
+  uwLockLostGeneric: 'Vous ne modifiez plus. Vos changements non enregistrés sont toujours là.',
+  uwLockLostHeldBy:
+    '{name} modifie actuellement. Vos changements non enregistrés sont toujours là.',
+  uwLockAcquireFailed:
+    'Impossible d’obtenir l’accès en modification. Réessayez dans quelques minutes.',
 } satisfies Record<keyof typeof zh, string>

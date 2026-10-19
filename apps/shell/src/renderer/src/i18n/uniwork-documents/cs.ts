@@ -159,6 +159,7 @@ export const cs = {
   uwErrUploadTooLarge:
     '{name} má {size}, což překračuje limit {max}. Zmenšete obrázky nebo soubor rozdělte a nahrajte jej znovu.',
   uwReasonTooLargeWithLimit: 'přes limit {max}',
+  uwUploadChecking: 'Kontrola souboru…',
   uwChipEditLocked: '{name} upravuje',
   uwChipEditLockedSelf: 'Úprava v jiném okně',
   uwEditLockSomeone: 'Někdo',
@@ -166,4 +167,22 @@ export const cs = {
   uwTipEditLockedSelf: 'Tento dokument upravujete v jiném okně.',
   uwErrEditLocked: 'Tento dokument právě upravuje někdo jiný.',
   uwReasonEditLocked: 'upravuje někdo jiný',
+  uwLockBannerOther: '{name} upravuje od {time}. Prohlížíte si jen pro čtení.',
+  uwLockBannerSelfElsewhere: 'Tento dokument upravujete v jiném okně.',
+  uwLockBannerFree: 'Teď dokument nikdo neupravuje.',
+  uwLockEditHere: 'Upravit zde',
+  uwLockAcquiring: 'Získávají se práva k úpravám…',
+  uwLockReadOnlyExplain: 'Nic se neuložilo — dokument je jen pro čtení.',
+  uwLockLostTitle: 'Již neupravujete',
+  uwLockLostTakenOver: '{name} převzal(a) úpravy. Vaše neuložené změny tu stále jsou.',
+  uwLockLostHandedOver: 'Úpravy jste předal(a) {name}. Vaše neuložené změny tu stále jsou.',
+  uwLockLostExpired:
+    'Úpravy vypršely, protože jsme se nějakou dobu nemohli spojit se serverem (žádná síť nebo zařízení usnulo). Vaše neuložené změny tu stále jsou.',
+  uwLockLostMovedHere:
+    'Tento dokument teď upravujete v jiném okně. Neuložené změny v tomto okně tu stále jsou.',
+  uwLockLostAccessLost:
+    'Nemáte už oprávnění upravovat tento dokument. Vaše neuložené změny tu stále jsou.',
+  uwLockLostGeneric: 'Již neupravujete. Vaše neuložené změny tu stále jsou.',
+  uwLockLostHeldBy: '{name} nyní upravuje. Vaše neuložené změny tu stále jsou.',
+  uwLockAcquireFailed: 'Nepodařilo se získat práva k úpravám. Zkuste to znovu za pár minut.',
 } satisfies Record<keyof typeof zh, string>

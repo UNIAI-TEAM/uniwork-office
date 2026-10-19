@@ -163,6 +163,7 @@ export const pt = {
   uwErrUploadTooLarge:
     '{name} tem {size}, o que ultrapassa o limite de {max}. Reduza o tamanho das imagens ou divida o arquivo e envie novamente.',
   uwReasonTooLargeWithLimit: 'acima do limite de {max}',
+  uwUploadChecking: 'Verificando arquivo…',
   uwChipEditLocked: '{name} está editando',
   uwChipEditLockedSelf: 'Editando em outra janela',
   uwEditLockSomeone: 'Alguém',
@@ -170,4 +171,26 @@ export const pt = {
   uwTipEditLockedSelf: 'Você está editando este documento em outra janela.',
   uwErrEditLocked: 'Outra pessoa está editando este documento.',
   uwReasonEditLocked: 'outra pessoa está editando',
+  uwLockBannerOther: '{name} está a editar desde {time}. Está a ver em modo só de leitura.',
+  uwLockBannerSelfElsewhere: 'Está a editar este documento noutra janela.',
+  uwLockBannerFree: 'Ninguém está a editar este documento agora.',
+  uwLockEditHere: 'Editar aqui',
+  uwLockAcquiring: 'A obter acesso de edição…',
+  uwLockReadOnlyExplain: 'Nada foi guardado — o documento é só de leitura.',
+  uwLockLostTitle: 'Já não está a editar',
+  uwLockLostTakenOver:
+    '{name} assumiu a edição. As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostHandedOver:
+    'Passou a edição a {name}. As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostExpired:
+    'A edição expirou porque não conseguimos chegar ao servidor durante algum tempo (sem rede ou o dispositivo suspendeu). As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostMovedHere:
+    'Está agora a editar este documento noutra janela. As alterações não guardadas nesta janela ainda estão aqui.',
+  uwLockLostAccessLost:
+    'Já não tem permissão para editar este documento. As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostGeneric: 'Já não está a editar. As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostHeldBy:
+    '{name} está a editar agora. As suas alterações não guardadas ainda estão aqui.',
+  uwLockAcquireFailed:
+    'Não foi possível obter acesso de edição. Tente novamente dentro de alguns minutos.',
 } satisfies Record<keyof typeof zh, string>

@@ -4,6 +4,7 @@ import {
   uniworkIsBound,
   uniworkIsLocked,
   uniworkIsReadOnly,
+  uniworkReadOnlySave,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import {
@@ -50,10 +51,8 @@ import {
   printHtmlDocument,
   type PrintDialogOutcome,
 } from '@genoffice/electron-utils'
-import {
-  answerUniworkAiFlagOff,
-  answerUniworkCloudStatusOff,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
@@ -1397,6 +1396,19 @@ function registerHtmlIpc(): void {
   ipcMain.handle(HTML_CHANNELS.uniworkState, (e): UniworkViewState => {
     const path = savePathByWc.get(e.sender.id)
     return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
+  ipcMain.handle(HTML_CHANNELS.uniworkReadOnlySave, (e, filePath?: unknown) => {
+    const path = savePathByWc.get(e.sender.id)
+    if (!path) return
+    if (
+      typeof filePath === 'string' &&
+      filePath.length > 0 &&
+      !allowedByWc.get(e.sender.id)?.has(filePath)
+    ) {
+      return
+    }
+    uniworkReadOnlySave(typeof filePath === 'string' && filePath.length > 0 ? filePath : path)
   })
 
   ipcMain.handle(
