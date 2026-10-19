@@ -89,7 +89,8 @@ async function geometry(frame: Frame): Promise<Geometry> {
   })
 }
 
-/** the panel animates open (its width grows): measure only once two reads, 250 ms apart, agree */
+/** the panel animates open (its width grows): measure only once two reads, 250 ms apart, agree;
+ *  a panel that never settles is a failure, not a last-sample measurement */
 async function settled(frame: Frame): Promise<Geometry> {
   let prev = await geometry(frame)
   for (let i = 0; i < 20; i++) {
@@ -98,7 +99,7 @@ async function settled(frame: Frame): Promise<Geometry> {
     if (JSON.stringify(next) === JSON.stringify(prev)) return next
     prev = next
   }
-  return prev
+  throw new Error(`AI panel geometry did not settle in 5 s: ${JSON.stringify(prev)}`)
 }
 
 test.afterEach(async ({ request }) => {
@@ -122,16 +123,16 @@ for (const [width, lang] of [
         const frame = await openPanel(page, mod, lang)
         const g = await settled(frame)
         // SVR-3: the frame document fits its viewport
-        expect(g.scrollWidth, 'frame scrollWidth').toBeLessThanOrEqual(g.clientWidth)
+        // (soft: one failure must not hide the numbers of the other two)
+        expect.soft(g.scrollWidth, 'frame scrollWidth').toBeLessThanOrEqual(g.clientWidth)
         // SVR-4: hint and placeholder text share a left edge
-        expect(
-          Math.abs(g.linkLeft - g.placeholderLeft),
-          'hint left vs placeholder left',
-        ).toBeLessThanOrEqual(1)
+        expect
+          .soft(Math.abs(g.linkLeft - g.placeholderLeft), 'hint left vs placeholder left')
+          .toBeLessThanOrEqual(1)
         // SVR-2: the placeholder (one or two lines) ends above the hint
-        expect(g.placeholderBottom, 'placeholder bottom vs hint top').toBeLessThanOrEqual(
-          g.hintTop + 0.5,
-        )
+        expect
+          .soft(g.placeholderBottom, 'placeholder bottom vs hint top')
+          .toBeLessThanOrEqual(g.hintTop + 0.5)
       })
     })
   }
