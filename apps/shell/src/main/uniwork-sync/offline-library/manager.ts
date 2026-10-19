@@ -1033,13 +1033,18 @@ export class OfflineLibraryManager {
         // earlier pin or unpin was cut at a boundary): it is discarded, and this
         // pin starts from nothing, with its own quota, lease and rollback
         if (this.jobs.has(documentId)) return { kind: 'stop' }
-        const owned = new Set(index.index.cleanup[documentId] ?? [])
+        const cleanup = index.index.cleanup
+        const owned = new Set(
+          Object.prototype.hasOwnProperty.call(cleanup, documentId) ? cleanup[documentId] : [],
+        )
         const keys = heldKeys(existing.record).filter((key) => !owned.has(key))
         await wipeKeys(this.options.store, keys, live)
         if (!live()) return refused('interrupted')
         const deleted = await this.deletePinRow(documentId, live)
         if (deleted.kind !== 'ok') return refused(deleted.kind)
         if (!live()) return refused('interrupted')
+        // the settled state a full disk kept in memory belonged to the row just discarded
+        this.unsaved.delete(documentId)
       }
       if (index.index.pins.length >= this.limits.maxPins) return refused('offline_cap_reached')
 
