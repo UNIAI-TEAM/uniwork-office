@@ -491,7 +491,7 @@ function fakeServer(
         return json(201, {
           document: {
             ...docJson(id),
-            kind: 'folder',
+            kind: body.kind === 'page' ? 'page' : 'folder',
             title: body.title ?? 'folder',
             parent_id: body.parent_id ?? null,
           },
@@ -1193,6 +1193,58 @@ describe('create a blank document', () => {
       format: 'docx',
     })
     expect(result).toEqual({ ok: false, error: 'server_error' })
+  })
+})
+
+// UNI-1953 UW-CREATE-TYPES: the New document dialog offers md / html / pdf as
+// well as the Office formats, and UniNote (a page) as its own create kind.
+describe('UW-CREATE-TYPES create kinds', () => {
+  it.each(['md', 'html', 'pdf'] as const)('passes %s through to the blank route', async (format) => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const created = await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      name: `Notes.${format}`,
+      format,
+    })
+    expect(created.ok).toBe(true)
+    const blank = server.calls.find((c) => c.path.endsWith('/documents/files/blank'))!
+    expect(blank.body).toMatchObject({ format, title: `Notes.${format}`, parent_id: 'fold_1' })
+  })
+
+  it('creates a UniNote as a page in the open folder (parent_id, kind page, own idempotency key)', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const created = await ctx.service.createPage({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      name: 'Meeting notes',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    expect(created.value).toMatchObject({ title: 'Meeting notes', kind: 'page', format: null })
+    const post = server.calls.find((c) => c.method === 'POST' && c.path.endsWith(`/${WS}/documents`))!
+    expect(post.body).toEqual({ kind: 'page', title: 'Meeting notes', parent_id: 'fold_1' })
+    expect(post.idempotencyKey).not.toBe('')
+  })
+
+  it('creates a UniNote with destination my_folder when no folder is open, like the blank files', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.createPage({ workspaceId: WS, folderId: null, name: 'Ghi chú' })
+    const post = server.calls.find((c) => c.method === 'POST' && c.path.endsWith(`/${WS}/documents`))!
+    expect(post.body).toEqual({ kind: 'page', title: 'Ghi chú', destination: 'my_folder' })
+  })
+
+  it('refuses an empty UniNote name before any request', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    expect(await ctx.service.createPage({ workspaceId: WS, folderId: null, name: '  ' })).toEqual({
+      ok: false,
+      error: 'name_empty',
+    })
+    expect(server.calls).toHaveLength(0)
   })
 })
 
