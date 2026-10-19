@@ -1581,6 +1581,37 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
           expect(h.storeFiles()).toEqual([])
         })
 
+        it("wipes only its own generation's keys: another generation's blob of the document survives and the fresh copy settles ready", async () => {
+          const h = createHarness()
+          addDoc(h, 'doc_1', 1)
+          await abortReservation(h, [])
+          const foreign = blobKey('doc_1', '00000fff', 'main')
+          expect((await h.store.putBlob(foreign, plaintext('foreign', 64))).kind).toBe('ok')
+          // the transfer has staged its bytes and waits on the read-back
+          const held = gate()
+          const real = h.store.getBlob.bind(h.store)
+          let own = ''
+          h.store.getBlob = async (key) => {
+            if (!own) {
+              own = key
+              held.reached()
+              await held.open
+            }
+            return real(key)
+          }
+          const downloading = h.manager.downloadNow('doc_1')
+          await held.entered
+          expect(hasFile(h, own)).toBe(true)
+          const pinning = pinDoc(h)
+          await flush()
+          held.release()
+          expect(rowOf(await pinning).state).toBe('ready')
+          await downloading
+          expect(hasFile(h, own)).toBe(false)
+          expect(hasFile(h, foreign)).toBe(true)
+          expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        })
+
         it('an ordinary cancel of the same transfer still settles interrupted and announces it', async () => {
           const notices: string[] = []
           const { h, hold, downloading } = await heldOrphanTransfer((id) => notices.push(id))
