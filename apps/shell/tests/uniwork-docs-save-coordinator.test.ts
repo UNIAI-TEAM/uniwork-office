@@ -2325,6 +2325,41 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
     expect(h.server.state.counts.commit).toBe(1)
   })
 
+  it('R6: a fenced not_committed verdict durably drops the spent attempt session', async () => {
+    const h = await chunkedHarness()
+    const doc = h.makeBigDoc('doc_r6')
+    // attempt 1 staged bytes and completed its session; the commit POST then hit
+    // the expired staged claim and the ONE deciding lookup proved not_committed
+    doc.record = {
+      ...doc.record,
+      state: 'committing',
+      attempt: 1,
+      uploadSession: {
+        sessionId: 'ups_v1',
+        partSize: FAST_PART_SIZE,
+        totalParts: 6,
+        completedParts: [{ partNumber: 1, etag: '"e1"' }],
+        expiresAt: '2026-10-19T00:00:00.000Z',
+      },
+    }
+    await h.intents.put(doc.key, doc.record, doc.payload)
+    h.server.state.commitRefusal = new UniworkDocError('server_error', {
+      status: 409,
+      serverCode: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    h.server.state.lookupOutcome = 'not_committed'
+    await h.dispatcher.dispatchAll([doc])
+
+    const fenced = await stored(h.intents, doc)
+    expect(fenced?.intent.state).toBe('queued')
+    expect(fenced?.intent.attempt).toBe(2)
+    // the spent session is durably dropped: attempt 2 has nothing to resume, so
+    // it restages under its own upload key instead of handing back the old
+    // staged upload whose file claim already expired
+    expect(fenced?.intent.uploadSession).toBeUndefined()
+  })
+
   it('cancels and supersedes an intent with a saved uploadSession by sending DELETE', async () => {
     const h = await chunkedHarness()
     const doc = h.makeBigDoc('doc_cancel')

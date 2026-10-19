@@ -452,12 +452,23 @@ function onLookup(
           : ctx.syncWrite === false
             ? 'paused_admin'
             : 'queued'
+      // R6: the new attempt stages its bytes under its own upload key, so a
+      // session left by an attempt whose commit was already sent (or may have
+      // been) is spent - resuming it would hand back the old staged upload and
+      // its expired claim, and the retry would fail the same way forever. A
+      // record still mid-upload at rest keeps its session: that attempt never
+      // sent a commit and its parts are still worth resuming.
+      const spentSession =
+        record.state === 'committing' ||
+        record.state === 'reconciling' ||
+        record.state === 'reconciling-stuck'
       return {
         record: withState(record, ctx, state, {
           attempt: record.attempt + 1,
           retryAt: undefined,
           reconcileSince: undefined,
           lastError: undefined,
+          ...(spentSession ? { uploadSession: undefined } : {}),
         }),
         effects: [],
       }
