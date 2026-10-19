@@ -194,6 +194,35 @@ describe('R4F-2 (UNI-1362): a call in flight at sign-out never writes into the w
       expect(await store.getPin('doc_1')).toMatchObject({ kind: 'ok' })
     })
   }
+
+  it('open held across forget() alone (new session, no wipe): interrupted, nothing cached', async () => {
+    const fs = createMemoryFs()
+    const layer = createLibraryLayer(fs, createFakeKeys())
+    const { held, release, entered } = holdFirst(layer, 'open')
+    let opens = 0
+    const store = createOfflineLibraryStore({
+      layer: {
+        ...held,
+        open: (scope) => {
+          opens += 1
+          return held.open(scope)
+        },
+      },
+      scope: SCOPE,
+    })
+    const writing = store.putPin(pinRow('doc_1'))
+    await entered
+    // a new session crosses the boundary: the handle is forgotten, the scope is not wiped
+    store.forget()
+    release()
+    expect(await writing).toEqual({ kind: 'interrupted' })
+    expect(fs.listFiles()).toEqual([])
+    expect(opens).toBe(1)
+    // the handle the held call opened was not kept: the next call opens its own
+    expect(await store.putPin(pinRow('doc_1'))).toEqual({ kind: 'ok' })
+    expect(opens).toBe(2)
+    expect(await store.getPin('doc_1')).toMatchObject({ kind: 'ok' })
+  })
 })
 
 runStoreCompliance('uniwork-sync offline-library', async (env: ComplianceEnv) => {
