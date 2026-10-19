@@ -7,9 +7,10 @@ export const it = {
   uwChipPausedAdmin: 'Salvataggio in coda · invio in pausa',
   uwChipReconciling: 'Verifica dell’ultimo salvataggio…',
   uwChipReconcileStuck: 'Serve assistenza per confermare il salvataggio',
+  uwErrReconcileStuck: 'Serve assistenza per confermare il salvataggio.',
   uwChipRemoteNewer: 'Versione più recente su UniWork',
   uwTipQueued:
-    'Il salvataggio delle {time} è conservato al sicuro su questo computer e verrà inviato quando sarai online.',
+    'Il salvataggio delle {time} è conservato al sicuro su questo computer e verrà inviato appena possibile.',
   uwTipQueuedNewer:
     'Il salvataggio delle {time} è in attesa di invio. Le modifiche successive non ne fanno parte.',
   uwTipPausedAdmin:

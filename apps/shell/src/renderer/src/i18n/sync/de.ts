@@ -7,9 +7,10 @@ export const de = {
   uwChipPausedAdmin: 'Speichern eingereiht · Senden pausiert',
   uwChipReconciling: 'Letztes Speichern wird geprüft…',
   uwChipReconcileStuck: 'Support nötig, um das Speichern zu bestätigen',
+  uwErrReconcileStuck: 'Support nötig, um das Speichern zu bestätigen.',
   uwChipRemoteNewer: 'Neuere Version in UniWork',
   uwTipQueued:
-    'Ihr Speicherstand von {time} bleibt sicher auf diesem Computer und wird gesendet, sobald Sie online sind.',
+    'Ihr Speicherstand von {time} bleibt sicher auf diesem Computer und wird gesendet, sobald es möglich ist.',
   uwTipQueuedNewer:
     'Der Speicherstand von {time} wartet auf das Senden. Spätere Änderungen gehören nicht dazu.',
   uwTipPausedAdmin:

@@ -7,9 +7,10 @@ export const es = {
   uwChipPausedAdmin: 'Guardado en cola · envío en pausa',
   uwChipReconciling: 'Comprobando el último guardado…',
   uwChipReconcileStuck: 'Se necesita soporte para confirmar el guardado',
+  uwErrReconcileStuck: 'Se necesita soporte para confirmar el guardado.',
   uwChipRemoteNewer: 'Versión más reciente en UniWork',
   uwTipQueued:
-    'Tu guardado de las {time} se conserva de forma segura en este equipo y se enviará cuando tengas conexión.',
+    'Tu guardado de las {time} se conserva de forma segura en este equipo y se enviará cuando sea posible.',
   uwTipQueuedNewer:
     'El guardado de las {time} está esperando para enviarse. Los cambios posteriores no forman parte de él.',
   uwTipPausedAdmin: 'Tu administrador ha pausado el envío. El guardado se conserva en este equipo.',

@@ -7,9 +7,10 @@ export const pt = {
   uwChipPausedAdmin: 'Salvamento na fila · envio pausado',
   uwChipReconciling: 'Verificando o último salvamento…',
   uwChipReconcileStuck: 'É preciso suporte para confirmar o salvamento',
+  uwErrReconcileStuck: 'É preciso suporte para confirmar o salvamento.',
   uwChipRemoteNewer: 'Versão mais recente no UniWork',
   uwTipQueued:
-    'Seu salvamento das {time} fica guardado com segurança neste computador e será enviado quando você estiver online.',
+    'Seu salvamento das {time} fica guardado com segurança neste computador e será enviado quando possível.',
   uwTipQueuedNewer:
     'O salvamento das {time} está aguardando envio. Edições posteriores não fazem parte dele.',
   uwTipPausedAdmin:

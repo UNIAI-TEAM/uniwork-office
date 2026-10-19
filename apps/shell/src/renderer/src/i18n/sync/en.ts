@@ -7,9 +7,10 @@ export const en = {
   uwChipPausedAdmin: 'Save queued · sending paused',
   uwChipReconciling: 'Checking the last save…',
   uwChipReconcileStuck: 'Support needed to confirm the save',
+  uwErrReconcileStuck: 'Support is needed to confirm the save.',
   uwChipRemoteNewer: 'Newer version on UniWork',
   uwTipQueued:
-    'Your save from {time} is kept safely on this computer and will be sent when you’re online.',
+    'Your save from {time} is kept safely on this computer and will be sent when possible.',
   uwTipQueuedNewer: 'The save from {time} is waiting to be sent. Later edits aren’t part of it.',
   uwTipPausedAdmin: 'Your admin has paused sending. The save is kept on this computer.',
   uwTipPausedUser:

@@ -7,8 +7,9 @@ export const he = {
   uwChipPausedAdmin: 'השמירה בתור · השליחה מושהית',
   uwChipReconciling: 'בודק את השמירה האחרונה…',
   uwChipReconcileStuck: 'נדרשת תמיכה כדי לאשר את השמירה',
+  uwErrReconcileStuck: 'נדרשת תמיכה כדי לאשר את השמירה.',
   uwChipRemoteNewer: 'גרסה חדשה יותר ב-UniWork',
-  uwTipQueued: 'השמירה שלך מ-{time} נשמרת בבטחה במחשב הזה ותישלח כשתהיה מחובר.',
+  uwTipQueued: 'השמירה שלך מ-{time} נשמרת בבטחה במחשב הזה ותישלח כשהדבר יתאפשר.',
   uwTipQueuedNewer: 'השמירה מ-{time} ממתינה לשליחה. עריכות מאוחרות יותר אינן חלק ממנה.',
   uwTipPausedAdmin: 'מנהל המערכת השהה את השליחה. השמירה נשארת במחשב הזה.',
   uwTipPausedUser:

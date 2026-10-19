@@ -7,9 +7,10 @@ export const fr = {
   uwChipPausedAdmin: 'Enregistrement en file d’attente · envoi suspendu',
   uwChipReconciling: 'Vérification du dernier enregistrement…',
   uwChipReconcileStuck: 'Assistance requise pour confirmer l’enregistrement',
+  uwErrReconcileStuck: 'Assistance requise pour confirmer l’enregistrement.',
   uwChipRemoteNewer: 'Version plus récente sur UniWork',
   uwTipQueued:
-    'Votre enregistrement de {time} est conservé en sécurité sur cet ordinateur et sera envoyé dès que vous serez en ligne.',
+    'Votre enregistrement de {time} est conservé en sécurité sur cet ordinateur et sera envoyé dès que possible.',
   uwTipQueuedNewer:
     'L’enregistrement de {time} attend d’être envoyé. Les modifications ultérieures n’en font pas partie.',
   uwTipPausedAdmin:

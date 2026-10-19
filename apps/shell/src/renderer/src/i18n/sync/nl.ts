@@ -7,9 +7,10 @@ export const nl = {
   uwChipPausedAdmin: 'Opslaan in wachtrij · verzenden gepauzeerd',
   uwChipReconciling: 'Laatste opslag controleren…',
   uwChipReconcileStuck: 'Ondersteuning nodig om de opslag te bevestigen',
+  uwErrReconcileStuck: 'Ondersteuning nodig om de opslag te bevestigen.',
   uwChipRemoteNewer: 'Nieuwere versie op UniWork',
   uwTipQueued:
-    'Je opslag van {time} blijft veilig op deze computer en wordt verzonden zodra je online bent.',
+    'Je opslag van {time} blijft veilig op deze computer en wordt verzonden zodra dat kan.',
   uwTipQueuedNewer:
     'De opslag van {time} wacht op verzending. Latere wijzigingen horen er niet bij.',
   uwTipPausedAdmin: 'Je beheerder heeft verzenden gepauzeerd. De opslag blijft op deze computer.',

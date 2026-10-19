@@ -7,8 +7,9 @@ export const ar = {
   uwChipPausedAdmin: 'الحفظ في قائمة الانتظار · الإرسال متوقف مؤقتًا',
   uwChipReconciling: 'جارٍ التحقق من آخر حفظ…',
   uwChipReconcileStuck: 'يلزم الدعم لتأكيد الحفظ',
+  uwErrReconcileStuck: 'يلزم الدعم لتأكيد الحفظ.',
   uwChipRemoteNewer: 'إصدار أحدث على UniWork',
-  uwTipQueued: 'حفظك من {time} محفوظ بأمان على هذا الكمبيوتر وسيُرسل عند اتصالك بالإنترنت.',
+  uwTipQueued: 'حفظك من {time} محفوظ بأمان على هذا الكمبيوتر وسيُرسل عندما يكون ذلك ممكناً.',
   uwTipQueuedNewer: 'الحفظ من {time} في انتظار الإرسال. التعديلات اللاحقة ليست جزءًا منه.',
   uwTipPausedAdmin: 'أوقف المسؤول الإرسال مؤقتًا. يبقى الحفظ على هذا الكمبيوتر.',
   uwTipPausedUser:

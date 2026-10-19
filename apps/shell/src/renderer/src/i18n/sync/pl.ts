@@ -7,9 +7,10 @@ export const pl = {
   uwChipPausedAdmin: 'Zapis w kolejce · wysyłanie wstrzymane',
   uwChipReconciling: 'Sprawdzanie ostatniego zapisu…',
   uwChipReconcileStuck: 'Potrzebna pomoc, aby potwierdzić zapis',
+  uwErrReconcileStuck: 'Potrzebna pomoc, aby potwierdzić zapis.',
   uwChipRemoteNewer: 'Nowsza wersja w UniWork',
   uwTipQueued:
-    'Zapis z {time} jest bezpiecznie przechowywany na tym komputerze i zostanie wysłany, gdy będziesz online.',
+    'Zapis z {time} jest bezpiecznie przechowywany na tym komputerze i zostanie wysłany, gdy to możliwe.',
   uwTipQueuedNewer: 'Zapis z {time} czeka na wysłanie. Późniejsze zmiany nie są jego częścią.',
   uwTipPausedAdmin: 'Administrator wstrzymał wysyłanie. Zapis pozostaje na tym komputerze.',
   uwTipPausedUser:

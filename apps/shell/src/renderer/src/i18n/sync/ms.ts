@@ -7,9 +7,10 @@ export const ms = {
   uwChipPausedAdmin: 'Simpanan dalam baris gilir · penghantaran dijeda',
   uwChipReconciling: 'Menyemak simpanan terakhir…',
   uwChipReconcileStuck: 'Sokongan diperlukan untuk mengesahkan simpanan',
+  uwErrReconcileStuck: 'Sokongan diperlukan untuk mengesahkan simpanan.',
   uwChipRemoteNewer: 'Versi lebih baharu di UniWork',
   uwTipQueued:
-    'Simpanan anda dari {time} disimpan dengan selamat pada komputer ini dan akan dihantar apabila anda dalam talian.',
+    'Simpanan anda dari {time} disimpan dengan selamat pada komputer ini dan akan dihantar apabila dapat dilakukan.',
   uwTipQueuedNewer:
     'Simpanan dari {time} sedang menunggu untuk dihantar. Suntingan selepas itu tidak termasuk.',
   uwTipPausedAdmin:
