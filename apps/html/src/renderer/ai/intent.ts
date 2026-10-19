@@ -10,13 +10,20 @@ const WRITE_DIRECTIVE = [
   '- Put the substance in the plan and context; the page is the document, not a showcase for it.',
 ].join('\n')
 
-/** the intent only steers the first generation: once the page has content the default rules apply again */
-export function createIntentSkill(getIntent: () => PageIntent, isBlank: () => boolean): AgentSkill {
+/**
+ * the intent only steers the first generation: once the page has content the default rules apply again.
+ * A bound page has no write_document, so its WRITE directive would point the model at a missing tool.
+ */
+export function createIntentSkill(
+  getIntent: () => PageIntent,
+  isBlank: () => boolean,
+  isBound: () => boolean = () => false,
+): AgentSkill {
   return {
     id: 'intent',
     systemPrompt: '',
     tools: [],
-    buildContext: () => (getIntent() === 'write' && isBlank() ? WRITE_DIRECTIVE : ''),
+    buildContext: () => (getIntent() === 'write' && isBlank() && !isBound() ? WRITE_DIRECTIVE : ''),
     executeTool: async (call) => ({
       output: `unknown tool: ${call.name}`,
       isError: true,
