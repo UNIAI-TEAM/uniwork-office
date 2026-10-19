@@ -274,8 +274,12 @@ function fakeServer(
       sizeBytes: number
       parentId: string | null
       title: string | null
+      /** the Idempotency-Key the session was opened with */
+      key: string
     } | null,
     sessionSeq: 0,
+    /** S01-R2-4 fix1: D replays an open key to the document its first run completed */
+    docByOpenKey: new Map<string, string>(),
     completedParts: [] as Array<{ part_number: number; etag: string }>,
     /** BIGUP-A1: the parts a `partFailsOnceAt` run has already refused */
     failedParts: new Set<number>(),
@@ -705,6 +709,7 @@ function fakeServer(
         parentId: body.parent_id ?? null,
         title: body.title ?? null,
         sessionId: `ups_${++state.sessionSeq}`,
+        key: call.idempotencyKey,
       }
       state.completedParts = []
       state.sessionBytes = new Uint8Array(body.size_bytes)
@@ -769,7 +774,18 @@ function fakeServer(
           return json(410, { error: { code: 'upload_session_expired', message: 'x' } })
         }
         state.completedParts = body.parts
+        const replayed = state.docByOpenKey.get(session.key)
+        if (replayed) {
+          return json(200, {
+            document: {
+              ...docJson(replayed),
+              title: session.title ?? session.filename,
+              file: { ...docJson(replayed).file, filename: session.filename },
+            },
+          })
+        }
         const id = `new_${++seq}`
+        state.docByOpenKey.set(session.key, id)
         // R1-BE-04: the created document's bytes are what the storage actually
         // assembled (when the fake keeps them), so its checksum_sha256 is the
         // truth the app's post-upload verification compares against
@@ -3069,6 +3085,7 @@ describe('SAVE-01 first save r2 (S01-R1 fixes)', () => {
         filename: 'Resume.docx',
         parentId: null,
         title: null,
+        key: 'resume-fixture',
       }
       second.state.completedParts = [{ part_number: 1, etag: 'etag-1' }]
       const ctxB = setup(second, { syncStore: true })
@@ -4418,6 +4435,79 @@ describe('SAVE-01 first save r4 (S01-R2-4 restart dedupe)', () => {
     expect(createdRows(server, 'up_')).toEqual(['up_1', 'up_2'])
     expect(retried.ok ? retried.value.id : '').toBe('up_2')
     expect(boundId('up_2')).toBe('up_2')
+  })
+
+  // S01-R2-4 fix1 (Jev 140 L1): a crash between binding.json (ready) and the `bound`
+  // record leaves a `pending` record next to a ready binding. The replayed key
+  // answers the SAME document; re-binding it would rewrite the working copy and
+  // binding.json and lose edits made in the bound copy. It must refuse instead.
+  const skipBoundRecord = (service: UniworkDocsService): void => {
+    const target = service as unknown as {
+      saveFirstSaveRecord(attempt: unknown, state: { state: string }): Promise<void>
+    }
+    const original = target.saveFirstSaveRecord.bind(target)
+    vi.spyOn(target, 'saveFirstSaveRecord').mockImplementation((attempt, state) =>
+      state.state === 'bound' ? Promise.resolve() : original(attempt, state),
+    )
+  }
+
+  it('fix1: a replayed key never re-binds over a ready binding: edits survive, conflict, then no request', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    skipBoundRecord(first.service)
+    expect((await first.service.firstSave(input(file))).ok).toBe(true)
+    // the crash window: the binding is ready, the record is still `pending`
+    const copy = join(docDir('up_1'), 'Draft.docx')
+    writeFileSync(copy, 'edited in the bound copy')
+    const bindingBefore = readFileSync(join(docDir('up_1'), BINDING_FILE), 'utf8')
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave(input(file))
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    // the replay may be sent (same key); the bound document is never touched
+    expect(readFileSync(copy, 'utf8')).toBe('edited in the bound copy')
+    expect(readFileSync(join(docDir('up_1'), BINDING_FILE), 'utf8')).toBe(bindingBefore)
+    expect(server.calls.filter((c) => c.path.endsWith('/archive'))).toEqual([])
+    expect(server.state.documents.get('up_1')?.archived).toBeUndefined()
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+
+    // the record is now `bound`: a third Save is refused before any request
+    const sent = server.calls.length
+    const third = await setup(server, { syncStore: true }).service.firstSave(input(file))
+    expect(third).toEqual({ ok: false, error: 'conflict' })
+    expect(server.calls).toHaveLength(sent)
+  })
+
+  it('fix1: the same for a chunked first save replayed onto a ready binding', async () => {
+    const server = chunkedServer()
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    skipBoundRecord(first.service)
+    expect((await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })).ok).toBe(true)
+    const documentId = [...server.state.documents.keys()].find((id) => id.startsWith('new_'))!
+    const copy = join(docDir(documentId), 'Chunked.docx')
+    writeFileSync(copy, 'edited in the bound copy')
+    const bindingBefore = readFileSync(join(docDir(documentId), BINDING_FILE), 'utf8')
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(readFileSync(copy, 'utf8')).toBe('edited in the bound copy')
+    expect(readFileSync(join(docDir(documentId), BINDING_FILE), 'utf8')).toBe(bindingBefore)
+    expect(server.calls.filter((c) => c.path.endsWith('/archive'))).toEqual([])
+    expect(createdRows(server, 'new_')).toEqual([documentId])
+
+    const sent = server.calls.length
+    const third = await setup(server, { syncStore: true }).service.firstSave({
+      ...input(file),
+      title: 'Chunked.docx',
+    })
+    expect(third).toEqual({ ok: false, error: 'conflict' })
+    expect(server.calls).toHaveLength(sent)
   })
 
   it('(f) a reused key answered 409 document_upload_invalid (file_claim_expired): new key, one create', async () => {
