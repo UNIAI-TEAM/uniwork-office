@@ -6,17 +6,18 @@
    already shipped. */
 
 /* 521-900 px: the dock keeps its 34 px rail slot in the row, the expanded panel overlays the document
-   from the panel's edge, and the document keeps width - 34 */
+   from the panel's edge, and the document keeps width - 34;
+   a dock the user switched off (`ai-dock-off`, 0 wide) keeps no slot */
 @media (max-width: 900px) {
   .app-main {
     position: relative;
   }
 
-  .app-main:has(> .ai-dock) {
+  .app-main:has(> .ai-dock:not(.ai-dock-off)) {
     padding-left: 34px;
   }
 
-  html[data-ai-panel-side='right'] .app-main:has(> .ai-dock) {
+  html[data-ai-panel-side='right'] .app-main:has(> .ai-dock:not(.ai-dock-off)) {
     padding-left: 0;
     padding-right: 34px;
   }

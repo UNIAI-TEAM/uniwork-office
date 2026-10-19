@@ -26,7 +26,14 @@ describe('narrow layout of the HTML frame', () => {
   it('the open AI dock overlays the page below 900 px and fills the row on a phone', () => {
     const tablet = media('max-width: 900px', dockCss)
     expect(tablet).toMatch(/\.ai-dock \{[^}]*position: absolute;/)
-    expect(tablet).toMatch(/\.app-main:has\(> \.ai-dock\) \{\s*padding-left: 34px;/)
+    expect(tablet).toMatch(
+      /\.app-main:has\(> \.ai-dock:not\(\.ai-dock-off\)\) \{\s*padding-left: 34px;/,
+    )
+    // "show the AI sidebar" off: the dock is 0 wide, so the document must not keep a 34 px gutter (RP-2)
+    expect(tablet).not.toMatch(/has\(> \.ai-dock\)/)
+    expect(tablet).toMatch(
+      /has\(> \.ai-dock:not\(\.ai-dock-off\)\) \{\s*padding-left: 0;\s*padding-right: 34px;/,
+    )
     expect(tablet).toMatch(/\.ai-dock\.collapsed \{\s*width: 34px;/)
     expect(media('max-width: 520px', dockCss)).toMatch(
       /\.ai-dock:not\(\.collapsed\) \{\s*width: 100%;/,
