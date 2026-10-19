@@ -81,9 +81,10 @@
 }
 
 /* Everything clickable shows the hand. Buttons and the clickable ARIA roles default to the
- * arrow, so a row that opens a document felt dead. `:where()` keeps this at zero specificity:
- * any component rule that sets its own `cursor` (progress, grab, not-allowed, ...) still wins,
- * and a disabled control keeps the default arrow. */
+ * arrow, so a row that opens a document felt dead. Both the selector list and the disabled
+ * exclusion sit inside `:where()`, which keeps the whole rule at zero specificity (a bare
+ * `:not()` would count as (0,1,0)): any component rule that sets its own `cursor` (progress,
+ * grab, not-allowed, ...) still wins, and a disabled control keeps the default arrow. */
 :where(
   button,
   a[href],
@@ -101,7 +102,7 @@
   [role='checkbox'],
   [role='radio'],
   [role='switch']
-):not(:disabled, [aria-disabled='true']) {
+):where(:not(:disabled, [aria-disabled='true'])) {
   cursor: pointer;
 }
 
