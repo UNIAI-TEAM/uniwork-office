@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, createElement, useRef } from 'react'
+import { StrictMode, act, createElement, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -63,6 +63,16 @@ describe('overlay dock decisions', () => {
 let host: HTMLDivElement
 let root: Root
 let narrow = true
+/** the `change` listeners the hook registered on the (stubbed) media query list */
+let mqlListeners: Array<() => void> = []
+let addCalls = 0
+/** a viewport crossing: flip the match and fire `change` like the browser */
+const resizeTo = (isNarrow: boolean) => {
+  narrow = isNarrow
+  act(() => mqlListeners.slice().forEach((l) => l()))
+}
+/** jsdom has no layout: every element reports a box unless the test hides the dock */
+let dockHidden = false
 const onClose = vi.fn()
 
 /** a dock like the apps': rail while collapsed, the panel (collapse button + composer) while open */
@@ -101,12 +111,26 @@ const settle = () => act(() => new Promise<void>((r) => setTimeout(r, 30)))
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   narrow = true
+  mqlListeners = []
+  addCalls = 0
+  dockHidden = false
   onClose.mockReset()
   vi.stubGlobal('matchMedia', (q: string) => ({
-    matches: narrow && q === overlayDockQuery(),
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    get matches() {
+      return narrow && q === overlayDockQuery()
+    },
+    addEventListener: (_: string, l: () => void) => {
+      addCalls++
+      mqlListeners.push(l)
+    },
+    removeEventListener: (_: string, l: () => void) => {
+      mqlListeners = mqlListeners.filter((x) => x !== l)
+    },
   }))
+  vi.spyOn(Element.prototype, 'getClientRects').mockImplementation(function (this: Element) {
+    const hidden = dockHidden && !!this.closest('.ai-dock')
+    return (hidden ? [] : [{}]) as unknown as DOMRectList
+  })
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -115,6 +139,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -220,5 +245,88 @@ describe('useOverlayDock', () => {
     act(() => host.querySelector<HTMLElement>('textarea')!.focus())
     key('Escape')
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it("marks the overlay dock so the documents' own dialog guards can ignore it", async () => {
+    render(true)
+    await settle()
+    expect(dock().hasAttribute('data-overlay-dock')).toBe(true)
+    render(false)
+    expect(dock().hasAttribute('data-overlay-dock')).toBe(false)
+  })
+
+  it("a hidden dock (Read Mode, presenting) is not active: Tab from the body stays the page's", async () => {
+    dockHidden = true
+    render(true)
+    await settle()
+    key('Tab', {}, document.body)
+    expect(dock().contains(document.activeElement)).toBe(false)
+    // the app passes open=false while the frame hides the dock: no dialog semantics at all
+    render(false)
+    expect(dock().getAttribute('role')).toBeNull()
+    expect(dock().hasAttribute('data-overlay-dock')).toBe(false)
+  })
+
+  it('a panel that was already open at mount keeps the dialog and the trap but takes no focus', async () => {
+    render(true)
+    await settle()
+    expect(dock().getAttribute('role')).toBe('dialog')
+    expect(document.activeElement).toBe(document.body)
+    key('Tab', {}, document.body)
+    expect(dock().contains(document.activeElement)).toBe(true)
+    // closing and opening again is a user action: the composer is focused then
+    render(false)
+    render(true)
+    await settle()
+    expect(document.activeElement?.tagName).toBe('TEXTAREA')
+  })
+
+  it('crossing the breakpoint changes the dialog semantics but never moves focus', async () => {
+    narrow = false
+    render(false)
+    render(true)
+    await settle()
+    expect(dock().getAttribute('role')).toBeNull()
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    act(() => outside.focus())
+    resizeTo(true)
+    await settle()
+    expect(dock().getAttribute('role')).toBe('dialog')
+    expect(document.activeElement).toBe(outside)
+    act(() => host.querySelector<HTMLElement>('textarea')!.focus())
+    resizeTo(false)
+    await settle()
+    expect(dock().getAttribute('role')).toBeNull()
+    expect(document.activeElement?.tagName).toBe('TEXTAREA')
+    outside.remove()
+  })
+
+  it('subscribes to the media query once, not on every render', async () => {
+    render(false)
+    render(true)
+    render(false)
+    render(true)
+    await settle()
+    expect(addCalls).toBe(1)
+    expect(mqlListeners).toHaveLength(1)
+  })
+
+  it('survives a StrictMode double mount: one Esc listener, composer focused once opened', async () => {
+    act(() => root.render(createElement(StrictMode, null, createElement(Dock, { open: false }))))
+    act(() => root.render(createElement(StrictMode, null, createElement(Dock, { open: true }))))
+    await settle()
+    expect(dock().getAttribute('role')).toBe('dialog')
+    expect(document.activeElement?.tagName).toBe('TEXTAREA')
+    key('Escape')
+    expect(onClose).toHaveBeenCalledTimes(1)
+    // mounted open under StrictMode: still no focus grab
+    act(() => root.unmount())
+    root = createRoot(host)
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    act(() => root.render(createElement(StrictMode, null, createElement(Dock, { open: true }))))
+    await settle()
+    expect(dock().getAttribute('role')).toBe('dialog')
+    expect(document.activeElement).toBe(document.body)
   })
 })

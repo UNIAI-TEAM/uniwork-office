@@ -7,7 +7,7 @@
  * the five AiPanel mounts and the Sheets chat panel call this hook. Above the breakpoint the dock is a
  * plain side panel and the hook changes nothing (no role, no focus moves, Esc is left alone).
  */
-import { useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 import { isComposerPopupOpen } from './ai-uniwork-composer'
 import { focusableIn, trapTab } from './modal-keys'
 
@@ -57,8 +57,9 @@ const isTextField = (el: Element | null): boolean =>
     (el as HTMLElement).isContentEditable === true)
 
 function useMediaMatch(query: string): boolean {
-  return useSyncExternalStore(
-    (notify) => {
+  // stable per query: an inline function would resubscribe on every render (the panels re-render per streamed token)
+  const subscribe = useCallback(
+    (notify: () => void) => {
       let mql: MediaQueryList | null = null
       try {
         mql = window.matchMedia(query)
@@ -68,6 +69,10 @@ function useMediaMatch(query: string): boolean {
       mql.addEventListener('change', notify)
       return () => mql!.removeEventListener('change', notify)
     },
+    [query],
+  )
+  return useSyncExternalStore(
+    subscribe,
     () => {
       try {
         return window.matchMedia(query).matches
@@ -112,6 +117,8 @@ export function useOverlayDock({
   const openerRef = useRef<HTMLElement | null>(null)
   const dockRef = useRef<HTMLElement | null>(null)
   const wasOverlaidOpenRef = useRef(false)
+  /** `open` as of the previous commit: focus moves only when the panel was opened, not on mount or a breakpoint crossing */
+  const prevOpenRef = useRef(open)
   const active = open && overlaid
 
   useEffect(() => {
@@ -134,10 +141,13 @@ export function useOverlayDock({
     const last = lastOutsideRef.current
     openerRef.current = last?.isConnected ? last : null
 
-    // the dialog semantics live on the overlay only: removed again on close and above the breakpoint
+    // the dialog semantics live on the overlay only: removed again on close and above the breakpoint.
+    // `data-overlay-dock` lets the documents' own "is a dialog open" guards ignore this dialog: the
+    // document stays visible and clickable next to the sheet, so its Esc actions keep working
     dock.setAttribute('role', 'dialog')
     dock.setAttribute('aria-modal', 'true')
     dock.setAttribute('aria-label', labelRef.current)
+    dock.setAttribute('data-overlay-dock', '')
 
     // focus the composer once it exists (Slides mounts the panel lazily, the dock animates open)
     let frame = 0
@@ -161,7 +171,9 @@ export function useOverlayDock({
       }
       if (tries++ < 60) frame = requestAnimationFrame(focusComposer)
     }
-    focusComposer()
+    // a panel that was already open at mount (remembered open) or an overlay entered by resizing the
+    // window must not grab focus from a page nobody has touched (soft keyboard, moved focus)
+    if (prevOpenRef.current !== open) focusComposer()
 
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as Element | null
@@ -185,8 +197,12 @@ export function useOverlayDock({
       if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return
       if (inDock) {
         trapTab(dock, e)
-      } else if (target === document.body || target === null) {
+      } else if (
+        (target === document.body || target === null) &&
+        dock.getClientRects().length > 0
+      ) {
         // focus fell to the body: re-enter the dock instead of walking into the covered document
+        // (a dock the frame hides, e.g. Read Mode, has no boxes: Tab stays the page's)
         const items = focusableIn(dock)
         const next = e.shiftKey ? items[items.length - 1] : items[0]
         if (next) {
@@ -203,8 +219,14 @@ export function useOverlayDock({
       dock.removeAttribute('role')
       dock.removeAttribute('aria-modal')
       dock.removeAttribute('aria-label')
+      dock.removeAttribute('data-overlay-dock')
     }
+    // `open` is read for the first-run check only; `active` already changes with it
   }, [active, rootRef])
+
+  useEffect(() => {
+    prevOpenRef.current = open
+  }, [open])
 
   // the title can change language while the dock is open
   useEffect(() => {
