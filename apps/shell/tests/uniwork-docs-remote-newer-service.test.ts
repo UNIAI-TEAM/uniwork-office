@@ -24,6 +24,7 @@ import {
 import { errorFromResponse, UniworkDocError } from '../src/main/uniwork-docs/errors'
 import type { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
+import { pathKey } from '../src/shared/path-key'
 import type { DocumentDetail } from '../src/main/uniwork-docs/parse'
 import type { DownloadResult, UniworkDocsClient } from '../src/main/uniwork-docs/client'
 import {
@@ -368,10 +369,13 @@ async function barOf(h: Harness): Promise<unknown> {
 }
 
 /** wait until the notice's async work shows the expected bar */
-async function waitForBar(h: Harness, expected: unknown): Promise<void> {
-  await vi.waitFor(async () => {
-    expect(await barOf(h)).toEqual(expected)
-  })
+async function waitForBar(h: Harness, expected: unknown, timeout?: number): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      expect(await barOf(h)).toEqual(expected)
+    },
+    timeout === undefined ? undefined : { timeout },
+  )
 }
 
 describe('G5-03a S6 service: the guarded clean reload', () => {
@@ -689,8 +693,36 @@ describe('G5-03a S6 service: the lock', () => {
     seedCopy()
     const h = setup()
     h.client.error = new UniworkDocError('not_found', { status: 404 })
+    // FORK-RED-LOCKBAR: one unreproduced Windows red (0/300 local runs); every
+    // assertion carries the session's lock/bar state and the binding on disk so
+    // the next red names its cause
+    const internals = h.service as unknown as {
+      remoteLocked: Map<string, unknown>
+      remoteLockPath: Map<string, unknown>
+      remoteBars: Map<string, unknown>
+    }
+    const store = (h.service as unknown as { store: BindingStore }).store
+    // a sharing violation right after the service's atomic rename must not
+    // replace the dump with the raw fs error, and the store's own verdict goes
+    // next to the disk: "disk says blocked, classify says plain" is exactly a
+    // swallowed read error in lookup/classify
+    const diskBinding = () => {
+      try {
+        return existsSync(join(docDir(), BINDING_FILE)) ? bindingOf() : null
+      } catch (error) {
+        return `read failed: ${(error as NodeJS.ErrnoException).code ?? String(error)}`
+      }
+    }
+    const state = (step: string) =>
+      `${step}: ${JSON.stringify({
+        remoteLocked: [...internals.remoteLocked],
+        remoteLockPath: [...internals.remoteLockPath],
+        remoteBars: [...internals.remoteBars],
+        binding: diskBinding(),
+        classify: store.classify(docPath()).kind,
+      })}`
     await h.service.noteFeedGone(DOC)
-    expect(h.service.isLocked(docPath())).toBe(true)
+    expect(h.service.isLocked(docPath()), state('locked by the 404')).toBe(true)
 
     h.service.forgetLocksWhere(() => true)
 
@@ -700,9 +732,9 @@ describe('G5-03a S6 service: the lock', () => {
     // the next account's copy of the same document is not locked by it, and no
     // bar survives with it either.
     seedCopy({ state: 'dirty' })
-    expect(h.service.isLocked(docPath())).toBe(false)
-    expect(h.service.isReadOnly(docPath())).toBe(false)
-    expect(await barOf(h)).toBeUndefined()
+    expect(h.service.isLocked(docPath()), state('lock after the boundary')).toBe(false)
+    expect(h.service.isReadOnly(docPath()), state('read-only after the boundary')).toBe(false)
+    expect(await barOf(h), state('bar after the boundary')).toBeUndefined()
   })
 })
 
@@ -828,12 +860,36 @@ describe('G5-03a S6 service: hold, later and the persisted rebuild', () => {
   it('a second notice replaces the version: one bar, no stacking', async () => {
     seedCopy({ state: 'dirty' })
     const h = setup()
+    // the bar is in the session's map before its binding write lands, and the
+    // push only follows that write: a slow write (a loaded Windows box) shows
+    // the bar to docStatus with nothing pushed yet, so wait for the push itself
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.write.bind(store)
+    store.write = async (dir, binding) => {
+      await drain(200)
+      return realWrite(dir, binding)
+    }
+    const pushedOf = () => h.statuses.filter((status) => status.path === docPath())
+    // two writes of 200 ms each, serialized per document: every wait names its
+    // own timeout instead of vitest's 1000 ms default
+    const timeout = 3000
     notice(h, '10', 4)
-    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 }, timeout)
     notice(h, '11', 5)
-    await waitForBar(h, { kind: 'newer-dirty', version: 5 })
-    const pushed = h.statuses.filter((status) => status.path === docPath())
-    expect(pushed.length).toBeGreaterThan(0)
+    await waitForBar(h, { kind: 'newer-dirty', version: 5 }, timeout)
+    await vi.waitFor(
+      () =>
+        expect(pushedOf().map((status) => status.remote)).toContainEqual({
+          kind: 'newer-dirty',
+          version: 5,
+        }),
+      { timeout },
+    )
+    // notice 4's write already publishes the v5 bar; notice 5's own write is
+    // still inside the delay. Wait for it, or it lands after afterEach removed
+    // the directory and recreates it
+    await vi.waitFor(() => expect(bindingOf().serverVersion).toBe(5), { timeout })
+    const pushed = pushedOf()
     expect(pushed.every((status) => status.remote?.kind === 'newer-dirty')).toBe(true)
   })
 
@@ -1070,7 +1126,7 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     h.capability.entered = enteredA
     notice(h, '9', 3)
     await enteredAP
-    expect(internals.remoteDecisions.get(docPath())).toEqual({ n: 1 })
+    expect(internals.remoteDecisions.get(pathKey(docPath()))).toEqual({ n: 1 })
 
     // the account boundary's step 5 clears the map without awaiting A (exactly
     // what lockSession does), the same account signs in again and its editor
@@ -1089,14 +1145,14 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     h.capability.entered = enteredB
     notice(h)
     await enteredBP
-    const entryB = internals.remoteDecisions.get(docPath())
+    const entryB = internals.remoteDecisions.get(pathKey(docPath()))
     expect(entryB).toEqual({ n: 1 })
 
     // A resumes and is ignored: its finalizer must release only its own entry,
     // never B's replacement
     releaseA()
     await drain()
-    expect(internals.remoteDecisions.get(docPath())).toBe(entryB)
+    expect(internals.remoteDecisions.get(pathKey(docPath()))).toBe(entryB)
 
     // the path closes while B is still in flight: the poll must keep the sample
     // B's own bar re-decides on (B's entry is what keeps it)
