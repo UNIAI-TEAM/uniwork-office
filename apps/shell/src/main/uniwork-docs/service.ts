@@ -7670,6 +7670,14 @@ export class UniworkDocsService {
 
   /** "Discard my changes and open the latest": download, replace, reload the tab */
   private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument> {
+    // A Save of this path may still be in flight: the module's own Save landing
+    // in the keep-draft flush window, or a Ctrl/Cmd+S racing the dialog. Its
+    // durable intent must never be superseded or deleted under it - the record
+    // is what authorizes the commit POST (R2), so deleting it refuses the POST
+    // and orphans the staged upload, and the base read below would race the
+    // commit. Wait for the attempt to settle first, exactly as the close flow
+    // does, and only then replace the base.
+    if (this.coordinator.isSaving(doc.path)) await this.coordinator.settled(doc.path)
     const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
     // "Tải lại": the old intent is superseded BEFORE the base is replaced, so
     // it is spent (cancelled/superseded), never replayed against the new base
