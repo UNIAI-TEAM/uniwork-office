@@ -2035,6 +2035,44 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     }
   })
 
+  it('UWNM-BE-R2-3: a throwing store lookup in the naming continuation is no unhandled rejection', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
+
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => unhandled.push(reason)
+    process.on('unhandledRejection', onUnhandled)
+    const store = (ctx.service as unknown as { store: { lookup: (path: string) => unknown } })
+      .store
+    const realLookup = store.lookup
+    let lookups = 0
+    store.lookup = () => {
+      lookups += 1
+      throw new Error('binding store unreadable')
+    }
+    try {
+      win.answers[0]!('continue')
+      await vi.waitFor(() => expect(lookups).toBeGreaterThan(0), { timeout: 8000 })
+      // a rejection nobody handles is reported once the microtask queue drains
+      await new Promise((resolve) => setImmediate(resolve))
+      await new Promise((resolve) => setImmediate(resolve))
+    } finally {
+      store.lookup = realLookup
+      process.off('unhandledRejection', onUnhandled)
+    }
+    expect(unhandled).toEqual([])
+    expect(commitsOf(server)).toHaveLength(0)
+  })
+
   it('the Vietnamese default name asks too, an ordinary name never does', async () => {
     const viServer = fakeServer({ title: 'Tài liệu chưa đặt tên.docx' })
     const win1 = dialogWindow()
