@@ -12,6 +12,8 @@ export const ko = {
   usMyFolderPrivate: '비공개, 나만 볼 수 있음',
   usChange: '변경',
   usSave: '저장',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: '닫기',
   usPickTitle: '저장 위치 선택',
   usBack: '이름 지정으로 돌아가기',
