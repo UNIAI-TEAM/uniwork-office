@@ -262,18 +262,49 @@ function isOfflineLibrarySnapshot(value: unknown): value is OfflineLibrarySnapsh
 }
 
 /**
- * A snapshot the renderer's model can read without crashing: a header with a status
- * and the three tab arrays; when `offline` is missing or malformed, it is replaced
- * with the hidden empty offline library block without dropping the snapshot.
+ * The string fields the renderer's model reads off every tab row before it can
+ * render it (plus the boolean `canEdit`); a row missing one would throw inside
+ * the model, so the guard drops the whole snapshot rather than hand one over.
+ */
+const SYNC_CENTER_ROW_STRING_FIELDS = [
+  'id',
+  'documentId',
+  'documentKey',
+  'title',
+  'ext',
+  'state',
+  'savedAt',
+] as const
+
+/**
+ * A snapshot the renderer's model can read without crashing: a header with a
+ * status and `online`, and the three tab arrays holding well-formed rows; when
+ * `offline` is missing or malformed, it is replaced with the hidden empty
+ * offline library block without dropping the snapshot.
  */
 export function asSyncCenterSnapshot(value: unknown): SyncCenterSnapshot | null {
   if (!value || typeof value !== 'object') return null
   const snap = value as { header?: unknown; tabs?: unknown; offline?: unknown }
-  const header = snap.header as { status?: unknown } | null | undefined
+  const header = snap.header as { status?: unknown; online?: unknown } | null | undefined
   const tabs = snap.tabs as Record<string, unknown> | null | undefined
   if (!header || typeof header !== 'object' || typeof header.status !== 'string') return null
+  if (typeof header.online !== 'boolean') return null
   if (!tabs || typeof tabs !== 'object') return null
   if (!['attention', 'pending', 'recent'].every((tab) => Array.isArray(tabs[tab]))) return null
+  if (
+    !['attention', 'pending', 'recent'].every((tab) =>
+      (tabs[tab] as unknown[]).every((row) => {
+        if (!row || typeof row !== 'object') return false
+        const fields = row as Record<string, unknown>
+        return (
+          SYNC_CENTER_ROW_STRING_FIELDS.every((field) => typeof fields[field] === 'string') &&
+          typeof fields.canEdit === 'boolean'
+        )
+      }),
+    )
+  ) {
+    return null
+  }
   if (isOfflineLibrarySnapshot(snap.offline)) return value as SyncCenterSnapshot
   return { ...(value as SyncCenterSnapshot), offline: EMPTY_OFFLINE_LIBRARY_SNAPSHOT }
 }

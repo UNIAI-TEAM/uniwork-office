@@ -1021,8 +1021,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 }
 
 .uw-remote-action[aria-disabled='true'] {
-  /* busy or not available yet, not disabled: it keeps focus, so the ring stays */
-  opacity: 0.55;
+  /* busy or not available yet, not disabled: it keeps focus, so the ring stays.
+     Token-mixed colors keep the label readable where .55 opacity washed it out
+     on the warn bar (A10 / G5-13). */
+  background: color-mix(in srgb, var(--surface) 65%, var(--uw-remote-bg));
+  color: color-mix(in srgb, var(--uw-remote-text) 78%, var(--uw-remote-bg));
+  border-color: color-mix(in srgb, var(--uw-remote-border) 80%, var(--uw-remote-bg));
   cursor: not-allowed;
 }
 

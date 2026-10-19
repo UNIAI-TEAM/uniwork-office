@@ -1584,6 +1584,11 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
       }),
 
     writeCopyFile: async (targetPath, bytes) => {
+      // A106 (UNI-1362): reject a target picked inside the app's working-copy
+      // root before writing (saveMyCopy maps the thrown refusal to code 'other').
+      if (deps.service.store.isInside(targetPath)) {
+        throw new Error('target inside working-copy root')
+      }
       await writeFile(targetPath, bytes)
     },
 

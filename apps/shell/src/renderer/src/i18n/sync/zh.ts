@@ -15,8 +15,9 @@ export const zh = {
   uwChipPausedAdmin: '已排队保存 · 发送已暂停',
   uwChipReconciling: '正在核对上次保存…',
   uwChipReconcileStuck: '需要支持人员确认此次保存',
+  uwErrReconcileStuck: '需要支持人员确认此次保存。',
   uwChipRemoteNewer: 'UniWork 上有更新的版本',
-  uwTipQueued: '你在 {time} 的保存已安全保留在这台电脑上，联网后会发送。',
+  uwTipQueued: '你在 {time} 的保存已安全保留在这台电脑上，会在可以发送时自动发送。',
   uwTipQueuedNewer: '{time} 的版本正在等待发送。之后的更改不包含在这次保存中。',
   uwTipPausedAdmin: '管理员已暂停发送。保存内容保留在这台电脑上。',
   uwTipPausedUser: '你已暂停发送。{time} 的保存保留在这台电脑上；请在同步中心选择“继续发送”。',
@@ -125,6 +126,7 @@ export const zh = {
   uwSignOutWaiting: '正在完成发送中的保存，然后退出登录…',
   uwSignOutCaptureFailed:
     '部分未保存的更改未能及时捕获；已为你的账号保留最近的已保存或自动保存版本。',
+  uwSignOutTimedOut: '未能及时确认退出登录；账号可能仍处于登录状态。请重试。',
   uwSwitchLostTitle: '上一个账号的部分未保存更改已丢失',
   uwSwitchLostBody:
     '另一个账号已在这台电脑上登录，因此上一个账号已被锁定。未保存的更改无法保留的文档：{count}。其他内容仍为该账号锁定保存在这台电脑上。',
@@ -300,7 +302,7 @@ export const zh = {
   uwRemoteNowClean: '你已撤销所有更改。UniWork 上的版本 {n} 比当前打开的副本更新。',
   uwRemoteStopAiConfirm:
     '要停止正在运行的 UniWork AI 以重新加载吗？AI 已做出的更改属于当前打开的副本。',
-  uwRemoteWaitCommit: '正在等待发送中的保存完成；完成后即可重新加载。',
+  uwRemoteWaitCommit: '正在等待发送中的保存完成；完成后即可继续。',
   uwRemoteReload: '重新加载最新版本…',
   uwRemoteLater: '稍后',
   uwRemoteClose: '关闭',
