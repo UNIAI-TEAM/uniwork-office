@@ -22,8 +22,6 @@ export const ar = {
   uhQuickMd: 'ملف Markdown',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
-  uhQuickHintPrefix: 'يتم حفظ الإنشاء والرفع هنا في',
-  uhQuickHintSuffix: '، ويكون مرئيًا لك فقط. شاركه أو انقله عند الحاجة.',
   uhFilterType: 'النوع:',
   uhFilterTypeAll: 'الكل',
   uhFilterModifiedBy: 'تم التعديل بواسطة:',
@@ -63,7 +61,6 @@ export const ar = {
   uhEmptyTrash: 'سلة المهملات فارغة.',
   uhEmptyFiltered: 'لا توجد مستندات تطابق عوامل التصفية الحالية.',
   uhTrashNote: 'يمكن استعادة العناصر في المهملات إذا كان لديك صلاحية الإدارة.',
-  uhMyFolderNote: 'خاص — أنت وحدك لديك حق الوصول ما لم تشارك أو تنقل إلى مجلد مشترك.',
   uhLoadMore: 'تحميل المزيد',
   uhRowActions: 'مزيد من الإجراءات',
 } satisfies Record<keyof typeof zh, string>

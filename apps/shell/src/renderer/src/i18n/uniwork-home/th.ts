@@ -22,8 +22,6 @@ export const th = {
   uhQuickMd: 'ไฟล์ Markdown',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
-  uhQuickHintPrefix: 'การสร้างและอัปโหลดที่นี่จะบันทึกใน',
-  uhQuickHintSuffix: ' ซึ่งคุณเท่านั้นที่เห็น แชร์หรือย้ายได้เมื่อต้องการ',
   uhFilterType: 'ประเภท:',
   uhFilterTypeAll: 'ทั้งหมด',
   uhFilterModifiedBy: 'แก้ไขโดย:',
@@ -63,8 +61,6 @@ export const th = {
   uhEmptyTrash: 'ถังขยะว่างเปล่า',
   uhEmptyFiltered: 'ไม่มีเอกสารที่ตรงกับตัวกรอง',
   uhTrashNote: 'สามารถกู้คืนรายการในถังขยะได้หากคุณมีสิทธิ์จัดการ',
-  uhMyFolderNote:
-    'ส่วนตัว — มีเพียงคุณที่เข้าถึงได้เว้นแต่จะแชร์หรือย้ายไปยังโฟลเดอร์ที่ใช้ร่วมกัน',
   uhLoadMore: 'โหลดเพิ่มเติม',
   uhRowActions: 'การทำงานเพิ่มเติม',
 } satisfies Record<keyof typeof zh, string>

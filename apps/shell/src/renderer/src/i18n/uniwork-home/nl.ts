@@ -22,8 +22,6 @@ export const nl = {
   uhQuickMd: 'Markdownbestand',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
-  uhQuickHintPrefix: 'Hier maken en uploaden slaat op in',
-  uhQuickHintSuffix: ', alleen zichtbaar voor jou. Deel of verplaats indien nodig.',
   uhFilterType: 'Type:',
   uhFilterTypeAll: 'Alle',
   uhFilterModifiedBy: 'Gewijzigd door:',
@@ -63,8 +61,6 @@ export const nl = {
   uhEmptyTrash: 'Prullenbak is leeg.',
   uhEmptyFiltered: 'Geen documenten komen overeen met de huidige filters.',
   uhTrashNote: 'Items in de prullenbak kunnen worden hersteld als je Beheer-toegang hebt.',
-  uhMyFolderNote:
-    'Privé — alleen jij hebt toegang tenzij je deelt of verplaatst naar een gedeelde map.',
   uhLoadMore: 'Meer laden',
   uhRowActions: 'Meer acties',
 } satisfies Record<keyof typeof zh, string>

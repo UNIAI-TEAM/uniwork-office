@@ -22,8 +22,6 @@ export const es = {
   uhQuickMd: 'Archivo Markdown',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
-  uhQuickHintPrefix: 'Crear y subir aquí se guarda en',
-  uhQuickHintSuffix: ', solo visible para ti. Comparte o mueve cuando sea necesario.',
   uhFilterType: 'Tipo:',
   uhFilterTypeAll: 'Todos',
   uhFilterModifiedBy: 'Modificado por:',
@@ -64,8 +62,6 @@ export const es = {
   uhEmptyFiltered: 'Ningún documento coincide con los filtros actuales.',
   uhTrashNote:
     'Los elementos en la papelera se pueden restaurar si tienes acceso de Administración.',
-  uhMyFolderNote:
-    'Privado — solo tú tienes acceso a menos que compartas o muevas a una carpeta compartida.',
   uhLoadMore: 'Cargar más',
   uhRowActions: 'Más acciones',
 } satisfies Record<keyof typeof zh, string>

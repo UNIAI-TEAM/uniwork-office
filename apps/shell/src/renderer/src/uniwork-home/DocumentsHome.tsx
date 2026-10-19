@@ -535,6 +535,8 @@ export function DocumentsHome({
         if (listSeqRef.current !== seq) return
         if (ensuredMyFolder) {
           setMyFolderId(ensuredMyFolder.id)
+          // the tree row takes the stand-in's place
+          setTreeTick((n) => n + 1)
         }
         if (result.ok) {
           const items = result.value.items
@@ -1115,6 +1117,8 @@ export function DocumentsHome({
     return '\u0000none'
   }, [sidebarIdle, subView, resolvedMyFolderId, folderId])
 
+  const myFolderStandInCurrent = !sidebarIdle && subView === 'my-folder'
+
   const sidebarContent = (
     <div className="dh-sidebar-wrap">
       <nav className="dh-subnav home-area-nav" aria-label={t('ufAreaUniwork')}>
@@ -1170,6 +1174,25 @@ export function DocumentsHome({
           </button>
         </div>
         <div className="dh-sidebar-tree">
+          {/* My Folder lives in the tree; until the server has created it, this row stands in its place and creates it. */}
+          {tree.status !== 'loading' && !myFolderIdOf(tree.nodes) && (
+            <button
+              type="button"
+              data-my-folder-standin=""
+              className={`uwf-tree-row dh-my-folder-standin${myFolderStandInCurrent ? ' selected' : ''}`}
+              aria-current={myFolderStandInCurrent ? 'page' : undefined}
+              onClick={() => {
+                onSidebarNavigate?.()
+                selectSubView('my-folder')
+              }}
+            >
+              <span className="uwf-twisty" aria-hidden="true" />
+              <MyFolderGlyph />
+              <span className="uwf-tree-text">
+                <span className="uwf-tree-title">{myFolderLabel}</span>
+              </span>
+            </button>
+          )}
           {tree.status === 'loading' && (
             <p className="uwf-side-state" role="status">
               {t('uwPickLoading')}
@@ -1347,36 +1370,9 @@ export function DocumentsHome({
                 <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
               </button>
             ))}
-            <span className="dh-quick-hint">
-              <svg
-                className="dh-quick-hint-icon"
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="4" y="11" width="16" height="10" rx="2" />
-                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-              <span>{t('uhQuickHintPrefix')}</span>
-              <button
-                type="button"
-                className="dh-quick-hint-link"
-                onClick={() => selectSubView('my-folder')}
-              >
-                {t('uhNavMyFolder')}
-              </button>
-              <span>{t('uhQuickHintSuffix')}</span>
-            </span>
           </div>
         )}
 
-        {subView === 'my-folder' && <p className="dh-subview-banner">{t('uhMyFolderNote')}</p>}
         {subView === 'trash' && <p className="dh-subview-banner">{t('uhTrashNote')}</p>}
         {folderNotice && (
           <p className="uwf-notice" role="status">
@@ -1636,6 +1632,7 @@ export function DocumentsHome({
                               label={t('ufActionsFor', { name: title })}
                               items={menuItems}
                               dataFor={folder.id}
+                              tabbable
                               open={openMenuId === folder.id}
                               onOpenChange={(o) => setOpenMenuId(o ? folder.id : null)}
                             />
