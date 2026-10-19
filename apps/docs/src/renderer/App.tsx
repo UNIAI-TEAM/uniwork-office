@@ -7765,8 +7765,8 @@ export function App() {
                 })()}
               {status && !refusedMessage && (
                 <span className="status-msg" title={statusText(status, t)}>
-                  {' '}
-                  — {statusText(status, t)}
+                  <span className="status-msg-sep"> — </span>
+                  {statusText(status, t)}
                 </span>
               )}
             </div>

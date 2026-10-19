@@ -9889,11 +9889,24 @@ body.docs-crop-active
 }
 
 /* A phone-width frame: keep the page counter, the save state and the zoom, drop the parts that
-   only repeat a ribbon entry (Track Changes, the layout switcher) or are long (the word count,
-   the status message), so nothing sits half-clipped under the view buttons. */
+   only repeat a ribbon entry (Track Changes, the layout switcher) or are long (the word count),
+   so nothing sits half-clipped under the view buttons. A status message (a failed save, a hint)
+   is the one thing the person must not lose: for its lifetime it takes the left side of the bar. */
 @media (max-width: 640px) {
-  .status-track,
+  .status-track {
+    display: none;
+  }
+
+  .status-left:has(.status-msg) > :not(.status-msg) {
+    display: none;
+  }
+
   .status-msg {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .status-msg-sep {
     display: none;
   }
 }
