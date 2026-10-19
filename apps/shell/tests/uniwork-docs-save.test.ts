@@ -1177,6 +1177,37 @@ describe('review r1 save fixes', () => {
     expect(lookups(server)).toHaveLength(before.lookups)
   })
 
+  it('R3: an inline replay of a parked-offline record requeues it, so the phase sequence reaches committing', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    // no network: the Save parks the intent, nothing is sent
+    expect(await ctx.service.coordinator.save(path, { forceOffline: true })).toMatchObject({
+      binding: { state: 'paused_offline' },
+    })
+    const parked = (await intentOf(ctx, path))?.intent
+    if (!parked) throw new Error('the intent is missing from the store')
+    expect(parked.state).toBe('paused_offline')
+    expect(commits(server)).toHaveLength(0)
+    // the network is back and the answer to the commit POST is lost: the record
+    // must have reached `committing` BEFORE that POST, so the lost answer
+    // reconciles. A record left `paused_offline` never took the phase sequence.
+    server.faults.push({ route: 'commit', kind: 'lost' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'reconciling' })
+    expect((await intentOf(ctx, path))?.intent).toMatchObject({
+      state: 'reconciling',
+      idempotencyKey: parked.idempotencyKey,
+      attempt: 0,
+    })
+    expect(commits(server).map((c) => c.headers['idempotency-key'])).toEqual([
+      parked.idempotencyKey,
+    ])
+    expect(uploads(server).map((c) => c.headers['idempotency-key'])).toEqual([
+      parked.idempotencyKey,
+    ])
+  })
+
   it('an expired claim whose lookup proves the commit settles with the receipt, no second POST (B69-lite)', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)

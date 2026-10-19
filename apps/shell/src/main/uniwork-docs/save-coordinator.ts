@@ -745,6 +745,25 @@ export class SaveCoordinator {
             error: 'intent_unknown',
           })
         }
+        // R3: a parked-offline record is provably unsent, and the machine's own
+        // `online` event takes it back to `queued` (or leaves it `paused_user`
+        // while the user's own pause holds). That existing transition is applied
+        // first, so the phase sequence below really walks `dispatch` →
+        // `uploaded` → `uploaded` and the durable record reaches `committing`
+        // before the POST. When the requeue does not happen - the user's pause
+        // holds, the store refused the write, a newer generation owns the key -
+        // nothing is sent and the chip shows the state the record really has.
+        if (intent.state === 'paused_offline') {
+          const requeued = await this.requeueForReplay(doc, intent, intents)
+          if (!requeued) {
+            return await this.commitState(doc, {
+              ...doc.binding,
+              state: 'paused_offline',
+              error: 'network',
+            })
+          }
+          intent = requeued
+        }
       }
       binding = withoutError({ ...binding, state: 'saving' })
       // the binding is persisted before the first network call: a crash or quit
@@ -1021,6 +1040,40 @@ export class SaveCoordinator {
       return this.commitState(doc, withoutError({ ...doc.binding, state: 'queued' }))
     }
     return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+  }
+
+  /**
+   * R3: the machine's own requeue of a parked-offline record - the `online`
+   * event a connectivity flip drives (`paused_offline` → `queued`, or
+   * `paused_user` while the user's own pause holds), applied inline and
+   * persisted BEFORE the replay. The record is only returned when the store
+   * really took the write and the machine's verdict is `queued`; null means
+   * this record must not be replayed inline (a user/admin pause holds it, the
+   * store refused the write, or a newer generation owns the key).
+   */
+  private async requeueForReplay(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    intents: IntentStore,
+  ): Promise<IntentRecordV2 | null> {
+    if (intent.state !== 'paused_offline') return null
+    const stored = await intents.read(doc.key, factsOf(doc, intent.length))
+    if (
+      !stored ||
+      stored.intent.intentId !== intent.intentId ||
+      stored.intent.generation !== intent.generation
+    ) {
+      return null
+    }
+    const pausedUser = (await this.deps.pause?.isPaused().catch(() => false)) === true
+    const result = transition(
+      stored.intent,
+      { type: 'online', online: true },
+      { now: this.now().getTime(), pausedUser },
+    )
+    if (!result.record || result.record.state !== 'queued') return null
+    const written = await intents.put(doc.key, result.record, stored.payload)
+    return written.kind === 'ok' ? result.record : null
   }
 
   /**
