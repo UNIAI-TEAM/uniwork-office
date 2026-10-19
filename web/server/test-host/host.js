@@ -42,6 +42,10 @@
 //   failNextSave()   -> the next api.save answers a 500 (the save-failure state of the host header)
 //   delayNextSave(ms) -> the next api.save is held for ms before it answers, so a test can press Save again
 //                       while the first one is still writing (UNI-1984)
+//   holdNextReload(ms) -> the next window.pdfApi.readFile in the frame (the renderer's reload after a save
+//                       reads the working copy through it, no host request) answers only after ms, so a test
+//                       can press Save again inside the post-save reload window (UNI-1984)
+//   reloadHold()     -> 'none' | 'armed' | 'held' | 'released': where that hold is
 //   cancelNextSave() -> the next api.save is declined {code:'cancelled'} (the host runs its own
 //                       name dialog; UNI-1909 S01-V2)
 //   rename(id, name)  -> rename in the store and emit file.renamed (UNI-1909 S01B-V1)
@@ -73,6 +77,7 @@ let cancelSaves = 0 // api.save calls still to answer "cancelled" (__host.cancel
 let saveCalls = 0 // api.save requests received, failed ones included
 let failSaves = 0 // api.save calls still to refuse with a 500 (__host.failNextSave)
 let saveDelayMs = 0 // hold the next api.save answer this long (__host.delayNextSave)
+let reloadHold = 'none' // __host.holdNextReload: none -> armed -> held -> released
 const events = []
 const uploads = [] // api.images.upload requests: {fileId, name, mimeType, bytes}
 const downloads = [] // api.download requests: {bytes}
@@ -427,6 +432,23 @@ async function boot() {
     delayNextSave: (ms) => {
       saveDelayMs = ms
     },
+    /**
+     * the frame's next window.pdfApi.readFile answers only after ms. The frame is same-origin, so the
+     * wrapper is installed on its own pdfApi; it restores itself on the first call (one-shot).
+     */
+    holdNextReload: (ms) => {
+      const api = frame.contentWindow.pdfApi
+      const read = api.readFile
+      reloadHold = 'armed'
+      api.readFile = async (...args) => {
+        api.readFile = read
+        reloadHold = 'held'
+        await new Promise((r) => setTimeout(r, ms))
+        reloadHold = 'released'
+        return read.apply(api, args)
+      }
+    },
+    reloadHold: () => reloadHold,
     /** the next api.save is declined with code "cancelled" (host opens its own dialog) */
     cancelNextSave: () => {
       cancelSaves += 1

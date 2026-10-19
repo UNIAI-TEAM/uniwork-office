@@ -9,7 +9,7 @@
 //   4. screenshots of the main states, light + dark, vi + en -> docs/web-modules/screenshots/pdf/
 // Every test fails on a console error, page error or securitypolicyviolation in any frame.
 // Run: npx playwright test -c web/e2e pdf-web
-import { test, expect, type Frame, type Page } from '@playwright/test'
+import { test, expect, type APIRequestContext, type Frame, type Page } from '@playwright/test'
 import { existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { PDFArray, PDFDict, PDFDocument, PDFName } from 'pdf-lib'
@@ -560,6 +560,40 @@ test.describe('pdf module on the web: a second Save commits nothing', () => {
     ).toBeVisible()
   }
 
+  /** the fake AI route answers one edit_text on the first text line of the open page */
+  async function fakeAi(
+    request: APIRequestContext,
+    control: Record<string, unknown> | null,
+  ): Promise<void> {
+    const res = control
+      ? await request.post('/__fake-ai/control', { data: control })
+      : await request.post('/__fake-ai/reset')
+    expect(res.ok()).toBe(true)
+  }
+
+  async function aiEditFirstLine(request: APIRequestContext, frame: Frame): Promise<void> {
+    const line = await frame.evaluate(
+      () =>
+        [...document.querySelectorAll('.textLayer span')]
+          .map((x) => x.textContent ?? '')
+          .find((t) => t.trim().length > 6) ?? '',
+    )
+    expect(line).not.toBe('')
+    await fakeAi(request, {
+      toolCalls: [
+        { name: 'edit_text', input: { page: 1, old_text: line, new_text: 'Edited by AI' } },
+      ],
+    })
+    const box = frame.locator('.ai-input-box textarea').first()
+    await expect(box).toBeVisible({ timeout: 30_000 })
+    await box.fill('replace the first line')
+    await box.press('Enter')
+    await expect(frame.locator('.ai-msg-assistant').last()).toBeVisible({ timeout: 30_000 })
+    await expect(frame.locator('.ai-msg-streaming')).toHaveCount(0, { timeout: 30_000 })
+    // the edit is pending in the frame: Save is enabled
+    await expect(frame.locator('.qa-btn').first()).toBeEnabled()
+  }
+
   test('Save, wait, Save again: the second Save commits nothing', async ({ page }) => {
     const problems = await watch(page)
     const frame = await openPdf(page)
@@ -567,8 +601,11 @@ test.describe('pdf module on the web: a second Save commits nothing', () => {
     await insertHello(page, frame)
     await clickSave(frame)
     await waitVersion(page, 'v2')
+    // clean after the save: the Save button is disabled, so the second Save is the keyboard one
+    await expect(frame.locator('.qa-btn').first()).toBeDisabled()
+    await frame.locator('.pdf-page').first().click()
     await page.waitForTimeout(2500)
-    await clickSave(frame)
+    await page.keyboard.press('Control+s')
     await page.waitForTimeout(2500)
     expect(await host<number>(page, 'saveCalls')).toBe(1)
     expect((await lastSaved(page))?.versionId).toBe('v2')
@@ -589,6 +626,57 @@ test.describe('pdf module on the web: a second Save commits nothing', () => {
     // settle: the drained second Save would upload a v3 well inside this window
     await page.waitForTimeout(4000)
     expect(await host<number>(page, 'saveCalls')).toBe(1)
+    expect((await lastSaved(page))?.versionId).toBe('v2')
+    await noProblems(page, frame, problems)
+  })
+
+  // The window the bug lives in: the write is done (v2 stored) but the frame is still reloading the saved
+  // copy, so its Save is in flight and a second Ctrl+S is queued. The reload reads the working copy through
+  // pdfApi.readFile (no host request), so the host holds exactly that read. The edit is an AI edit_text, i.e.
+  // a pending textEdit: an inserted text (above) never showed the duplicate, a textEdit written by the first
+  // Save was sent again by the queued one (a v3 with the same edit applied twice).
+  test('second Save pressed while the saved copy reloads commits nothing', async ({
+    page,
+    request,
+  }) => {
+    await fakeAi(request, null)
+    await fakeAi(request, { credentials: [{ provider: 'openai', api_key: 'sk-test-openai-abcd' }] })
+    const problems = await watch(page)
+    const frame = await openPdf(page, { fixture: 'sample.pdf', ai: true })
+    await waitRendered(frame)
+    await aiEditFirstLine(request, frame)
+    await host(page, 'holdNextReload', 2500)
+    await frame.locator('.qa-btn').first().click()
+    await waitVersion(page, 'v2')
+    // the reload is held now: the first Save is still in flight, the Save button stays off
+    await expect.poll(() => host<string>(page, 'reloadHold')).toBe('held')
+    await expect(frame.locator('.qa-btn').first()).toBeDisabled()
+    await page.keyboard.press('Control+s')
+    // the press landed inside the window, not after it
+    expect(await host<string>(page, 'reloadHold')).toBe('held')
+    await expect.poll(() => host<string>(page, 'reloadHold')).toBe('released')
+    // settle: the drained second Save would upload a v3 well inside this window
+    await page.waitForTimeout(4000)
+    expect(await host<number>(page, 'saveCalls')).toBe(1)
+    expect((await lastSaved(page))?.versionId).toBe('v2')
+    await fakeAi(request, null)
+    await noProblems(page, frame, problems)
+  })
+
+  // a failed first Save keeps its edits pending: the Save queued behind it must still write them
+  test('second Save queued behind a failed Save still writes', async ({ page }) => {
+    const problems = await watch(page)
+    const frame = await openPdf(page)
+    await waitRendered(frame)
+    await insertHello(page, frame)
+    await host(page, 'delayNextSave', 1500)
+    await host(page, 'failNextSave')
+    await clickSave(frame)
+    await expect.poll(() => host<number>(page, 'saveCalls')).toBe(1)
+    await page.keyboard.press('Control+s')
+    await waitVersion(page, 'v2')
+    await page.waitForTimeout(1500)
+    expect(await host<number>(page, 'saveCalls')).toBe(2)
     expect((await lastSaved(page))?.versionId).toBe('v2')
     await noProblems(page, frame, problems)
   })
