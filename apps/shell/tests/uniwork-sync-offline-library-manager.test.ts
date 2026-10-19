@@ -1245,5 +1245,134 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
         })
       }
     })
+
+    describe('FUSR-R2-1: a reservation an aborted sign-out left unfinished is adopted by the next pin', () => {
+      /**
+       * The first pin's reservation row is written, then a boundary that wipes
+       * nothing (the sign-out hook was aborted) passes before the index entry:
+       * the old pin is refused and the row is left behind, unlisted.
+       */
+      async function abortReservation(h: Harness, others: string[]) {
+        const held = gate()
+        const real = h.store.putPin.bind(h.store)
+        let armed = true
+        h.store.putPin = async (record) => {
+          const result = await real(record)
+          if (armed) {
+            armed = false
+            held.reached()
+            await held.open
+          }
+          return result
+        }
+        const pinning = pinDoc(h)
+        await held.entered
+        h.manager.lockBoundary()
+        held.release()
+        expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+        const orphan = await h.store.getPin('doc_1')
+        expect(orphan.kind).toBe('ok')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual(others)
+      }
+
+      it('online: the fresh pin lists the document, holds a ready openable copy and keeps the others', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_2', 1)
+        const doc = addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h, 'doc_2'))
+        await abortReservation(h, ['doc_2'])
+        expect(rowOf(await pinDoc(h)).state).toBe('ready')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual(['doc_2', 'doc_1'])
+        expect((await h.manager.list()).map((row) => row.documentId)).toEqual(['doc_2', 'doc_1'])
+        const opened = await h.manager.openCached('doc_1')
+        expect(opened.kind).toBe('ok')
+        expect(opened.kind === 'ok' && Buffer.from(opened.bytes).equals(doc.bytes)).toBe(true)
+        expect(await h.manager.quota()).toEqual({
+          usedBytes: 2 * 4096,
+          maxBytes: 2 * GiB,
+          pins: 2,
+          maxPins: 200,
+        })
+        expect(await h.manager.row('doc_2')).toMatchObject({ state: 'ready' })
+      })
+
+      it('offline: the fresh pin lists the document and the reconnect downloads it', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        h.online.on = false
+        await abortReservation(h, [])
+        expect(rowOf(await pinDoc(h)).state).toBe('waiting-network')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual(['doc_1'])
+        expect((await h.manager.list()).map((row) => row.documentId)).toEqual(['doc_1'])
+        h.online.on = true
+        const results = await h.manager.onReconnect()
+        expect(results.get('doc_1')).toMatchObject({ kind: 'ok', row: { state: 'ready' } })
+        expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+      })
+    })
+
+    describe('FUSR-R2-2: a transfer that finishes across a boundary publishes no row of the old scope', () => {
+      it('a download whose old-version deletion completes across the sign-out is refused', async () => {
+        const { h, changes } = await pinnedHarness()
+        addDoc(h, 'doc_1', 2)
+        // the committed v2 replaces v1: the deletion of v1's blob completes, then waits
+        const held = gate()
+        const real = h.store.deleteBlob.bind(h.store)
+        h.store.deleteBlob = async (key) => {
+          const result = await real(key)
+          held.reached()
+          await held.open
+          return result
+        }
+        const downloading = h.manager.downloadNow('doc_1')
+        await held.entered
+        await signOut(h)
+        switchTo(h, SCOPE_B, 'sess_B')
+        changes.length = 0
+        held.release()
+        expect(await downloading).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(changes).toEqual([])
+        expect(filesOf(h, SCOPE)).toEqual([])
+        expect(filesOf(h, SCOPE_B)).toEqual([])
+      })
+
+      it('a download that settles into a revoke across the sign-out is refused, not downloading', async () => {
+        const changes: string[] = []
+        const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+        addDoc(h, 'doc_1', 1)
+        // from the stream failure on: the settle's getPin, its staging delete, the purge's delete (held)
+        const hold = holdVerifyAfter(h, 3)
+        h.docs.downloadStream = async () => {
+          hold.arm()
+          throw new UniworkDocError('permission_revoked')
+        }
+        const pinning = pinDoc(h)
+        await hold.entered
+        await lockAndWipeOutgoing(h)
+        changes.length = 0
+        hold.release()
+        expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(h.storeFiles()).toEqual([])
+        expect(changes).toEqual([])
+      })
+
+      it('an offline pin whose lease projection spans the sign-out is refused, not waiting', async () => {
+        const changes: string[] = []
+        const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+        h.online.on = false
+        const hold = holdLeaseView(h)
+        const pinning = pinDoc(h)
+        await hold.entered
+        await lockAndWipeOutgoing(h)
+        changes.length = 0
+        hold.release()
+        expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(h.storeFiles()).toEqual([])
+        expect(changes).toEqual([])
+      })
+    })
   })
 })
