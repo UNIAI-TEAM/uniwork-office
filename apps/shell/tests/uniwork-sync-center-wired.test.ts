@@ -115,6 +115,7 @@ function wired(
     offlineLibrary?: boolean
     /** the deployment this build runs against (default: the last owner's) */
     activeDeployment?: string | null
+    pickSaveDialog?: () => Promise<string | null>
   } = {},
 ) {
   const storeRoot = join(base, 'store')
@@ -230,6 +231,11 @@ function wired(
       readDir: async (dir: string) => bindings.get(basename(dir)) ?? null,
       readLastOwner: () => SCOPE,
       exists: () => true,
+      isInside: (targetPath: string) => {
+        const normalizedRoot = `${storeRoot.replace(/\\/g, '/')}/`
+        const normalizedTarget = targetPath.replace(/\\/g, '/')
+        return normalizedTarget.startsWith(normalizedRoot)
+      },
     },
     currentLocks: () => options.locks ?? [],
     syncCenterEngine: async () => ({
@@ -292,7 +298,7 @@ function wired(
     isPathOpen: (path) => openPaths.has(path),
     defaultSaveDir: () => base,
     writeClipboard: () => undefined,
-    pickSaveDialog: async () => null,
+    pickSaveDialog: options.pickSaveDialog ?? (async () => null),
     pushChanged: () => undefined,
     now: () => clock,
   })
@@ -891,5 +897,17 @@ describe('G703B-P4 (FL-08): the signed-out working-copy count belongs to the act
   it('counts nothing while no deployment profile is known', async () => {
     const h = wired({ docs: [{ key: 'doc-1' }], status: signedOut, activeDeployment: null })
     expect((await h.controller.getSnapshot()).signedOut).toEqual({ lockedCount: 0 })
+  })
+})
+
+describe('A106 (UNI-1362): wired Sync Center refuses saveMyCopy targets inside the working-copy root', () => {
+  it('returns code other and writes nothing when the picked path lies inside service.store.root', async () => {
+    const insideTarget = join(base, 'store', SCOPE.deploymentId, SCOPE.accountId, 'stray.docx')
+    const h = wired({
+      docs: [{ key: 'doc-1' }],
+      pickSaveDialog: async () => insideTarget,
+    })
+    expect(await h.controller.saveMyCopy('doc-1')).toEqual({ ok: false, code: 'other' })
+    expect(existsSync(insideTarget)).toBe(false)
   })
 })

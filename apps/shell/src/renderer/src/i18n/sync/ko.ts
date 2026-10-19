@@ -7,8 +7,9 @@ export const ko = {
   uwChipPausedAdmin: '저장 대기 중 · 전송 일시 중지됨',
   uwChipReconciling: '마지막 저장을 확인하는 중…',
   uwChipReconcileStuck: '저장 확인에 지원이 필요함',
+  uwErrReconcileStuck: '저장 확인에 지원이 필요합니다.',
   uwChipRemoteNewer: 'UniWork에 최신 버전 있음',
-  uwTipQueued: '{time}의 저장 내용은 이 컴퓨터에 안전하게 보관되며 온라인이 되면 전송됩니다.',
+  uwTipQueued: '{time}의 저장 내용은 이 컴퓨터에 안전하게 보관되며 전송할 수 있는 대로 전송됩니다.',
   uwTipQueuedNewer: '{time}의 저장 내용이 전송을 기다리고 있습니다. 이후 편집은 포함되지 않습니다.',
   uwTipPausedAdmin: '관리자가 전송을 일시 중지했습니다. 저장 내용은 이 컴퓨터에 보관됩니다.',
   uwTipPausedUser:
@@ -122,6 +123,8 @@ export const ko = {
   uwSignOutWaiting: '로그아웃하기 전에 진행 중인 저장을 마치는 중…',
   uwSignOutCaptureFailed:
     '일부 저장되지 않은 변경 사항을 제때 캡처하지 못했습니다. 계정에 대해 가장 최근의 저장 또는 자동 저장 버전이 유지됩니다.',
+  uwSignOutTimedOut:
+    '제때 로그아웃을 확인하지 못했습니다. 계정이 아직 로그인되어 있을 수 있습니다. 다시 시도하세요.',
   uwSwitchLostTitle: '이전 계정의 저장하지 않은 변경 사항 일부가 손실되었습니다',
   uwSwitchLostBody:
     '다른 계정이 이 컴퓨터에 로그인하여 이전 계정이 잠겼습니다. 저장하지 않은 변경 사항을 보존할 수 없었던 문서: {count}. 그 밖의 모든 항목은 해당 계정을 위해 이 컴퓨터에 잠긴 상태로 유지됩니다.',
@@ -324,7 +327,7 @@ export const ko = {
     '모든 변경 사항을 실행 취소했습니다. UniWork의 버전 {n}이(가) 열린 사본보다 최신입니다.',
   uwRemoteStopAiConfirm:
     '다시 불러오기 위해 실행 중인 UniWork AI를 중지할까요? AI가 이미 적용한 변경 사항은 열린 사본에 속합니다.',
-  uwRemoteWaitCommit: '진행 중인 저장이 끝나기를 기다리는 중입니다. 그 후 다시 불러올 수 있습니다.',
+  uwRemoteWaitCommit: '진행 중인 저장이 끝나기를 기다리는 중입니다. 그 후 계속할 수 있습니다.',
   uwRemoteReload: '최신 버전 다시 불러오기…',
   uwRemoteLater: '나중에',
   uwRemoteClose: '닫기',

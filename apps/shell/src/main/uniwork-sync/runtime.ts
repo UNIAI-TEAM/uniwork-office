@@ -39,7 +39,8 @@ export {
   type LeaseClient,
   type LeaseRevokeNotice,
 }
-// G5-05 (residual: moves into G5-11's SYNC_STORE_REGISTRATIONS when it lands)
+// G5-05: the offline library keeps its own encrypted layer (wiring.ts
+// `libraryLayerFor`), deliberately outside SYNC_STORE_REGISTRATIONS
 export { OFFLINE_LIBRARY_STORE_REGISTRATION, OfflineLibraryManager }
 
 /**

@@ -60,7 +60,7 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   // G5-06 save queue (EXPERIENCE l.144-171 blocked reasons, l.223 / l.230 / l.129 / l.304-321).
   // The sentence for a refusal or a lock; a {cap} / {time} in it is filled by the caller.
   capability_off: 'uwTipPausedAdmin',
-  intent_unknown: 'uwChipReconcileStuck',
+  intent_unknown: 'uwErrReconcileStuck',
   document_deleted: 'uwErrDeleted',
   // an archived document is not a deleted one: the archive is reversible, so the
   // chip says archived (the same phrase the Sync Center row shows)

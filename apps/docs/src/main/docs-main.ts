@@ -3554,11 +3554,6 @@ export function recoveryCopyMtime(filePath: string): number | null {
  * Keyed by the normalized path, held only while a write is in flight. */
 const recoveryClearEpochs = new RecoveryClearEpochs()
 
-/** open clear-epoch entries (tests): bounded by the recovery writes in flight */
-export function docsRecoveryEpochEntries(): number {
-  return recoveryClearEpochs.size
-}
-
 export function clearRecoveryCopy(filePath: string): void {
   recoveryClearEpochs.bump(filePath)
   try {

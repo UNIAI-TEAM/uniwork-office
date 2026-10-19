@@ -7,8 +7,9 @@ export const zhTW = {
   uwChipPausedAdmin: '已排入儲存佇列 · 傳送已暫停',
   uwChipReconciling: '正在核對上次儲存…',
   uwChipReconcileStuck: '需要支援人員確認此次儲存',
+  uwErrReconcileStuck: '需要支援人員確認此次儲存。',
   uwChipRemoteNewer: 'UniWork 上有更新的版本',
-  uwTipQueued: '你在 {time} 的儲存已安全保留在這台電腦上，連上網路後會傳送。',
+  uwTipQueued: '你在 {time} 的儲存已安全保留在這台電腦上，會在可以傳送時自動傳送。',
   uwTipQueuedNewer: '{time} 的版本正在等待傳送。之後的變更不包含在這次儲存中。',
   uwTipPausedAdmin: '管理員已暫停傳送。儲存內容保留在這台電腦上。',
   uwTipPausedUser: '你已暫停傳送。{time} 的儲存保留在這台電腦上；請在同步中心選擇「繼續傳送」。',
@@ -117,6 +118,7 @@ export const zhTW = {
   uwSignOutWaiting: '正在完成傳送中的儲存，然後登出…',
   uwSignOutCaptureFailed:
     '部分未儲存的變更未能及時擷取；已為你的帳號保留最近的已儲存或自動儲存版本。',
+  uwSignOutTimedOut: '未能及時確認登出；帳號可能仍處於登入狀態。請再試一次。',
   uwSwitchLostTitle: '上一個帳號的部分未儲存變更已遺失',
   uwSwitchLostBody:
     '另一個帳號已在這台電腦上登入，因此上一個帳號已被鎖定。未儲存的變更無法保留的文件：{count}。其他內容仍為該帳號鎖定保存在這台電腦上。',
@@ -292,7 +294,7 @@ export const zhTW = {
   uwRemoteNowClean: '你已復原所有變更。UniWork 上的版本 {n} 比目前開啟的副本更新。',
   uwRemoteStopAiConfirm:
     '要停止正在執行的 UniWork AI 以重新載入嗎？AI 已做出的變更屬於目前開啟的副本。',
-  uwRemoteWaitCommit: '正在等待傳送中的儲存完成；完成後即可重新載入。',
+  uwRemoteWaitCommit: '正在等待傳送中的儲存完成；完成後即可繼續。',
   uwRemoteReload: '重新載入最新版本…',
   uwRemoteLater: '稍後',
   uwRemoteClose: '關閉',

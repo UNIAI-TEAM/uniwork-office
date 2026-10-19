@@ -181,6 +181,8 @@ export function SignOutPrompt({
           ref={backBtnRef}
           type="button"
           className="set-btn primary"
+          aria-disabled={signOutBusy ? true : undefined}
+          aria-busy={signOutBusy ? true : undefined}
           onClick={() => {
             if (signOutBusy) return
             account.cancelSignOut?.()

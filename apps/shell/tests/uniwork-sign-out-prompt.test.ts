@@ -382,7 +382,10 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(live.textContent).toBe(syncVi.uwSignOutWaiting)
     const busyGo = promptButton(syncVi.uwSignOutGo)!
     expect(busyGo.getAttribute('aria-disabled')).toBe('true')
-    expect(busyGo.disabled).toBe(false)
+    const busyBack = promptButton(syncVi.uwActBack)!
+    expect(busyBack.getAttribute('aria-disabled')).toBe('true')
+    expect(busyBack.getAttribute('aria-busy')).toBe('true')
+    expect(busyBack.disabled).toBe(false)
 
     // a second click while waiting does not fire another accountLogout call
     await act(async () => {
@@ -644,10 +647,10 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     })
     await flush()
     const expectedEn =
-      'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.'
+      'Couldn’t keep some unsaved changes in time; the latest saved or autosaved version is kept for your account.'
     expect(syncEn.uwSignOutCaptureFailed).toBe(expectedEn)
     expect(syncVi.uwSignOutCaptureFailed).toBe(
-      'Một số thay đổi chưa lưu kịp; bản lưu hoặc tự lưu gần nhất được giữ cho tài khoản của bạn.',
+      'Không kịp giữ một số thay đổi chưa lưu; bản lưu hoặc tự lưu gần nhất vẫn được giữ cho tài khoản của bạn.',
     )
     expect(pane()?.textContent ?? '').not.toContain(expectedEn)
 
@@ -698,6 +701,22 @@ describe('Settings → Account sign-out prompt (S3)', () => {
 
       expect(promptDialog()).toBeNull()
       expect(api.accountStatus.mock.calls.length).toBeGreaterThan(statusCallsBefore)
+      // A72: the silent expiry reports its outcome instead of vanishing
+      const statusNodes = Array.from(
+        host.querySelectorAll<HTMLElement>('.acct-pane [role="status"]'),
+      )
+      expect(statusNodes.some((n) => n.textContent?.includes(syncVi.uwSignOutTimedOut))).toBe(true)
+      // a status push that shows the account signed out again settles the notice
+      await act(async () => {
+        api.pushStatus(statusFor('signed-out'))
+      })
+      await flush()
+      const statusNodesAfter = Array.from(
+        host.querySelectorAll<HTMLElement>('.acct-pane [role="status"]'),
+      )
+      expect(statusNodesAfter.some((n) => n.textContent?.includes(syncVi.uwSignOutTimedOut))).toBe(
+        false,
+      )
     } finally {
       vi.useRealTimers()
     }
@@ -834,7 +853,7 @@ describe('Settings → Account sign-out prompt (S3)', () => {
 
       // Notice is shown after captureFailed: 1
       const expectedEn =
-        'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.'
+        'Couldn’t keep some unsaved changes in time; the latest saved or autosaved version is kept for your account.'
       expect(pane()?.textContent ?? '').toContain(expectedEn)
 
       // Open a new prompt before the 40s mark and advance past 40s -> neither clobbered nor refreshed

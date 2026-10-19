@@ -71,7 +71,7 @@ function makeSnapshot(
   attention: SyncCenterRow[] = [],
 ): SyncCenterSnapshot {
   return {
-    header: { status: 'online' },
+    header: { status: 'online', online: true },
     storeError: false,
     tabs: { attention, pending, recent: [] },
     defaultTab: attention.length > 0 ? 'attention' : 'pending',

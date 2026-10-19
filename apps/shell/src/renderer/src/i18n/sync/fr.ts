@@ -7,9 +7,10 @@ export const fr = {
   uwChipPausedAdmin: 'Enregistrement en file d’attente · envoi suspendu',
   uwChipReconciling: 'Vérification du dernier enregistrement…',
   uwChipReconcileStuck: 'Assistance requise pour confirmer l’enregistrement',
+  uwErrReconcileStuck: 'Assistance requise pour confirmer l’enregistrement.',
   uwChipRemoteNewer: 'Version plus récente sur UniWork',
   uwTipQueued:
-    'Votre enregistrement de {time} est conservé en sécurité sur cet ordinateur et sera envoyé dès que vous serez en ligne.',
+    'Votre enregistrement de {time} est conservé en sécurité sur cet ordinateur et sera envoyé dès que possible.',
   uwTipQueuedNewer:
     'L’enregistrement de {time} attend d’être envoyé. Les modifications ultérieures n’en font pas partie.',
   uwTipPausedAdmin:
@@ -130,6 +131,8 @@ export const fr = {
   uwSignOutWaiting: 'Finalisation de l’enregistrement en cours avant la déconnexion…',
   uwSignOutCaptureFailed:
     'Certaines modifications non enregistrées n’ont pas pu être capturées à temps ; la version enregistrée ou enregistrée automatiquement la plus récente est conservée pour votre compte.',
+  uwSignOutTimedOut:
+    'Impossible de confirmer la déconnexion à temps ; le compte est peut-être toujours connecté. Réessayez.',
   uwSwitchLostTitle: 'Des modifications non enregistrées du compte précédent ont été perdues',
   uwSwitchLostBody:
     'Un autre compte s’est connecté sur cet ordinateur, le compte précédent a donc été verrouillé. Documents dont les modifications non enregistrées n’ont pas pu être conservées : {count}. Tout le reste reste verrouillé sur cet ordinateur pour ce compte.',
@@ -342,7 +345,7 @@ export const fr = {
   uwRemoteStopAiConfirm:
     'Arrêter l’exécution en cours d’UniWork AI pour recharger ? Les modifications déjà faites par l’IA appartiennent à la copie ouverte.',
   uwRemoteWaitCommit:
-    'En attente de la fin de l’enregistrement en cours ; vous pourrez recharger ensuite.',
+    'En attente de la fin de l’enregistrement en cours ; vous pourrez continuer ensuite.',
   uwRemoteReload: 'Recharger la dernière version…',
   uwRemoteLater: 'Plus tard',
   uwRemoteClose: 'Fermer',
