@@ -2236,6 +2236,49 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     },
   )
 
+  // UNI-1961 (UNI-1974): folders are never shared, so a folder row the server still returns for Shared by me
+  // (the list reads the documents route, which carries every kind) is not listed
+  it('lists no folder row in Shared by me, even when the server returns one (UNI-1961)', async () => {
+    api.uniworkListSharedByMe!.mockImplementation(async () =>
+      ok({
+        documents: [
+          {
+            id: 'f-legacy-shared',
+            workspaceId: 'ws-1',
+            title: 'Thư mục đã chia sẻ trước đây',
+            format: 'docx',
+            updatedAt: '2026-10-17T07:00:00.000Z',
+            kind: 'folder',
+            parentId: null,
+            visibility: 'restricted',
+            myLevel: 'manage',
+          } satisfies DocumentsHomeDoc,
+          {
+            id: 'doc-shared-out',
+            workspaceId: 'ws-1',
+            title: 'Bản thảo hợp đồng.docx',
+            format: 'docx',
+            updatedAt: '2026-10-17T06:00:00.000Z',
+            kind: 'file',
+            parentId: null,
+            visibility: 'restricted',
+            myLevel: 'comment',
+          } satisfies DocumentsHomeDoc,
+        ],
+        nextCursor: null,
+      }),
+    )
+    await mountHome()
+    await act(async () => {
+      sidebarSlot.querySelector<HTMLButtonElement>('.nav-item[data-nav="shared-by-me"]')!.click()
+    })
+    await flush()
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-shared-out"]')).not.toBeNull()
+    expect(host.querySelector('[data-doc-id="f-legacy-shared"]')).toBeNull()
+    expect(host.querySelector('[data-folder-id="f-legacy-shared"]')).toBeNull()
+    expect(host.textContent).not.toContain('Thư mục đã chia sẻ trước đây')
+  })
+
   it('lays each document row on the table grid without the uw-pick-row flex class (VDH-1)', async () => {
     await mountHome()
     const rows = Array.from(host.querySelectorAll<HTMLElement>('.dh-doc-row'))
