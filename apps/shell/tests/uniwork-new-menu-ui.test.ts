@@ -196,14 +196,6 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
     rootItems = [
       folder('f-plain', 'Riêng', { visibility: 'private' }),
       folder('f-shared', 'Chung', { visibility: 'workspace' }),
-      folder('f-scope-on', 'Phạm vi bật', {
-        visibility: 'private',
-        shareScope: { homeWorkspace: true },
-      }),
-      folder('f-scope-off', 'Phạm vi tắt', {
-        visibility: 'workspace',
-        shareScope: { homeWorkspace: false },
-      }),
     ]
     folderItems = {}
     const created = (id: string, title: string, format: string | null, kind: string) => ({
@@ -502,46 +494,39 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
       })
     })
 
-    it('inside a workspace-shared folder it is checked, aria-disabled, says it is inherited and sends nothing', async () => {
+    it('inside a workspace-shared folder it is free and off by default: nothing is inherited', async () => {
       await mount('vi')
       await openFolder('f-shared')
       await openMenu()
-      expect(toggle()?.getAttribute('aria-checked')).toBe('true')
-      expect(toggle()?.getAttribute('aria-disabled')).toBe('true')
-      expect(menu()!.querySelector('[role="status"]')?.textContent).toBe(
-        'Thư mục này đang chia sẻ với workspace nên tài liệu mới cũng vậy',
-      )
-      // a click on it changes nothing
-      await click(toggle())
-      expect(toggle()?.getAttribute('aria-checked')).toBe('true')
+      expect(toggle()?.getAttribute('aria-checked')).toBe('false')
+      expect(toggle()?.getAttribute('aria-disabled')).toBeNull()
+      expect(menu()!.querySelector('[role="status"]')?.textContent).toBe('')
       await click(row('docx'))
       expect(api.uniworkCreateDocument.mock.calls[0]![0]).toMatchObject({ folderId: 'f-shared' })
       expect(api.uniworkCreateDocument.mock.calls[0]![0]).not.toHaveProperty('visibility')
     })
 
-    it('inherited, in English', async () => {
+    it('inside a folder a ticked toggle sends visibility workspace and shows the hint, in any folder', async () => {
       await mount('en')
       await openFolder('f-shared')
       await openMenu()
-      expect(menu()!.querySelector('[role="status"]')?.textContent).toBe(
-        'This folder is shared with the workspace, so new documents are too',
-      )
-    })
-
-    it('share_scope.home_workspace decides when present (on although visibility is private)', async () => {
-      await mount('vi')
-      await openFolder('f-scope-on')
-      await openMenu()
-      expect(toggle()?.getAttribute('aria-disabled')).toBe('true')
+      await click(toggle())
       expect(toggle()?.getAttribute('aria-checked')).toBe('true')
+      expect(menu()!.querySelector('[role="status"]')?.textContent).toBe(
+        'Everyone in this workspace can view new documents',
+      )
+      await click(row('md'))
+      expect(api.uniworkCreateDocument.mock.calls[0]![0]).toMatchObject({
+        folderId: 'f-shared',
+        visibility: 'workspace',
+      })
     })
 
-    it('share_scope.home_workspace false is not inherited although visibility is workspace', async () => {
-      await mount('vi')
-      await openFolder('f-scope-off')
+    it('has no inherited hint in any folder (the string is gone)', async () => {
+      await mount('en')
+      await openFolder('f-shared')
       await openMenu()
-      expect(toggle()?.getAttribute('aria-disabled')).toBeNull()
-      expect(toggle()?.getAttribute('aria-checked')).toBe('false')
+      expect(document.body.textContent).not.toContain('This folder is shared with the workspace')
     })
 
     it('a folder that is not shared leaves the toggle free', async () => {
@@ -584,29 +569,34 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
       expect(sent).not.toHaveProperty('visibility')
     })
 
-    it('with the toggle on the folder is created shared', async () => {
+    it('a Folder pick with the toggle on still sends no visibility (folders are never shared)', async () => {
       await mount('en')
       await openFolder('f-plain')
       await openMenu()
       await click(toggle())
+      expect(toggle()?.getAttribute('aria-checked')).toBe('true')
       await click(row('folder'))
       expect(document.querySelector<HTMLInputElement>('.uw-act input[type="text"]')!.value).toBe(
         NAMES_EN.folder,
       )
       await click(document.querySelector('.uw-act button[type="submit"]'))
-      expect(api.uniworkCreateFolder.mock.calls[0]![0]).toMatchObject({
-        parentId: 'f-plain',
-        visibility: 'workspace',
-      })
+      expect(api.uniworkCreateFolder).toHaveBeenCalledTimes(1)
+      const sent = api.uniworkCreateFolder.mock.calls[0]![0]
+      expect(sent).toEqual({ workspaceId: 'ws-1', parentId: 'f-plain', title: NAMES_EN.folder })
+      expect(sent).not.toHaveProperty('visibility')
     })
 
-    it('inside a shared folder a new folder inherits: nothing is sent', async () => {
-      await mount('vi')
-      await openFolder('f-shared')
+    it('the toggle stays on after a Folder create and still shares the next document', async () => {
+      await mount('en')
+      await openFolder('f-plain')
       await openMenu()
+      await click(toggle())
       await click(row('folder'))
       await click(document.querySelector('.uw-act button[type="submit"]'))
-      expect(api.uniworkCreateFolder.mock.calls[0]![0]).not.toHaveProperty('visibility')
+      await openMenu()
+      expect(toggle()?.getAttribute('aria-checked')).toBe('true')
+      await click(row('docx'))
+      expect(api.uniworkCreateDocument.mock.calls[0]![0]).toMatchObject({ visibility: 'workspace' })
     })
   })
 

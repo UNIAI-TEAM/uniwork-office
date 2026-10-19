@@ -1322,27 +1322,18 @@ describe('UNI-1959 share with workspace on create', () => {
     expect(post(plain, `/${WS}/documents`).body).not.toHaveProperty('visibility')
   })
 
-  it('sends visibility workspace on a folder only when the input sets it', async () => {
+  it('never sends visibility on a folder, whatever the input carries (folders are not shareable)', async () => {
     const server = fakeServer({ kind: 'folder' })
     const ctx = setup(server)
     await ctx.service.createFolder({
       workspaceId: WS,
-      parentId: null,
-      title: 'Shared folder',
-      visibility: 'workspace',
-    })
-    expect(post(server, `/${WS}/documents`).body).toMatchObject({
-      kind: 'folder',
-      title: 'Shared folder',
-      visibility: 'workspace',
-    })
-    const plain = fakeServer({ kind: 'folder' })
-    await setup(plain).service.createFolder({
-      workspaceId: WS,
-      parentId: null,
+      parentId: 'fold_1',
       title: 'Own folder',
-    })
-    expect(post(plain, `/${WS}/documents`).body).not.toHaveProperty('visibility')
+      visibility: 'workspace',
+    } as never)
+    const body = post(server, `/${WS}/documents`).body as Record<string, unknown>
+    expect(body).toMatchObject({ kind: 'folder', title: 'Own folder', parent_id: 'fold_1' })
+    expect(body).not.toHaveProperty('visibility')
   })
 
   it('ignores any visibility other than workspace (a hand-typed invoke)', async () => {
