@@ -104,6 +104,18 @@
   text-underline-offset: 2px;
 }
 
+/* B57: the account sign-out is a quiet action, not the loud accent link;
+   the shared .sc-link style stays for interactive links */
+.sc-account .sc-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.sc-account .sc-link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
 .sc-link:focus-visible,
 .sc-doc-btn:focus-visible,
 .sc-tab:focus-visible,
@@ -336,6 +348,25 @@
 .sc .set-btn.sc-act-danger:focus-visible {
   outline: 2px solid var(--danger-text);
   outline-offset: 1px;
+}
+
+/* B56: while a row's confirm is open, an invisible copy of its action set holds
+   the cell's usual height so the row does not shrink; a taller confirm can still grow it */
+.sc-actions-confirm {
+  display: grid;
+}
+
+.sc-actions-ghost,
+.sc-actions-confirm .sc-confirm {
+  grid-area: 1 / 1;
+}
+
+.sc-actions-ghost {
+  visibility: hidden;
+}
+
+.sc-actions-confirm .sc-confirm {
+  align-content: center;
 }
 
 .sc-confirm {
