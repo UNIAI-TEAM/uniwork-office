@@ -299,10 +299,13 @@ async function barOf(h: Harness): Promise<unknown> {
 }
 
 /** wait until the notice's async work shows the expected bar */
-async function waitForBar(h: Harness, expected: unknown): Promise<void> {
-  await vi.waitFor(async () => {
-    expect(await barOf(h)).toEqual(expected)
-  })
+async function waitForBar(h: Harness, expected: unknown, timeout?: number): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      expect(await barOf(h)).toEqual(expected)
+    },
+    timeout === undefined ? undefined : { timeout },
+  )
 }
 
 describe('G5-03a S6 service: the guarded clean reload', () => {
@@ -784,16 +787,25 @@ describe('G5-03a S6 service: hold, later and the persisted rebuild', () => {
       return realWrite(dir, binding)
     }
     const pushedOf = () => h.statuses.filter((status) => status.path === docPath())
+    // two writes of 200 ms each, serialized per document: every wait names its
+    // own timeout instead of vitest's 1000 ms default
+    const timeout = 3000
     notice(h, '10', 4)
-    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 }, timeout)
     notice(h, '11', 5)
-    await waitForBar(h, { kind: 'newer-dirty', version: 5 })
-    await vi.waitFor(() =>
-      expect(pushedOf().map((status) => status.remote)).toContainEqual({
-        kind: 'newer-dirty',
-        version: 5,
-      }),
+    await waitForBar(h, { kind: 'newer-dirty', version: 5 }, timeout)
+    await vi.waitFor(
+      () =>
+        expect(pushedOf().map((status) => status.remote)).toContainEqual({
+          kind: 'newer-dirty',
+          version: 5,
+        }),
+      { timeout },
     )
+    // notice 4's write already publishes the v5 bar; notice 5's own write is
+    // still inside the delay. Wait for it, or it lands after afterEach removed
+    // the directory and recreates it
+    await vi.waitFor(() => expect(bindingOf().serverVersion).toBe(5), { timeout })
     const pushed = pushedOf()
     expect(pushed.every((status) => status.remote?.kind === 'newer-dirty')).toBe(true)
   })
