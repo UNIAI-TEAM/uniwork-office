@@ -658,12 +658,29 @@ export class QueueDispatcher {
 
   /** Overwrite / Reload / "Luu lai": the old intent is superseded BEFORE a new one */
   async supersede(doc: QueueDoc, now = this.deps.clock()): Promise<QueueState> {
+    const { state, release } = await this.supersedeDeferRelease(doc, now)
+    await release()
+    return state
+  }
+
+  /**
+   * Same supersession, but the upload-session DELETE (network) is handed back
+   * instead of awaited: a caller that validated its destructive stretch (a
+   * conflict action) must not wait on the network inside it. The local part of
+   * the release (aborting this document's in-flight part PUTs) happens now, so
+   * the returned closure never touches a later Save's controller.
+   */
+  async supersedeDeferRelease(
+    doc: QueueDoc,
+    now = this.deps.clock(),
+  ): Promise<{ state: QueueState; release: () => Promise<void> }> {
     const priorSession = doc.record.uploadSession
     const result = await this.apply(doc, { type: 'supersede' }, now)
-    if (result.record?.state === 'cancelled') {
-      await this.releaseUploadSession(doc.key, priorSession)
-    }
-    return result.record?.state ?? doc.record.state
+    const release =
+      result.record?.state === 'cancelled'
+        ? this.takeUploadRelease(doc.key, priorSession)
+        : async () => {}
+    return { state: result.record?.state ?? doc.record.state, release }
   }
 
   /**
@@ -1193,6 +1210,18 @@ export class QueueDispatcher {
     docKey: string,
     session: SavedUploadSession | undefined,
   ): Promise<void> {
+    await this.takeUploadRelease(docKey, session)()
+  }
+
+  /**
+   * The local half of the release (abort in-flight part PUTs, forget the live
+   * session) runs now; the returned closure is the network DELETE alone, bound
+   * to the session id captured here.
+   */
+  private takeUploadRelease(
+    docKey: string,
+    session: SavedUploadSession | undefined,
+  ): () => Promise<void> {
     const controller = this.uploadAborts.get(docKey)
     if (controller) {
       controller.abort()
@@ -1202,11 +1231,13 @@ export class QueueDispatcher {
     this.uploadLiveSessions.delete(docKey)
     const sessionId = session?.sessionId ?? liveSessionId
     const client = this.deps.client.uploadSession
-    if (!sessionId || !client) return
-    try {
-      await abortVersionUploadSession(client, sessionId)
-    } catch (error) {
-      console.warn('uniwork sync: the upload session could not be aborted', error)
+    if (!sessionId || !client) return async () => {}
+    return async () => {
+      try {
+        await abortVersionUploadSession(client, sessionId)
+      } catch (error) {
+        console.warn('uniwork sync: the upload session could not be aborted', error)
+      }
     }
   }
 

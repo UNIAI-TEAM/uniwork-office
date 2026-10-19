@@ -1354,9 +1354,9 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
         kind: 'view',
         view: { intent: 'reconciling' },
       })
-      const postKey = server.calls
-        .find((c) => c.path.endsWith('/versions/commit') && c.method === 'POST')
-        ?.headers['idempotency-key']
+      const postKey = server.calls.find(
+        (c) => c.path.endsWith('/versions/commit') && c.method === 'POST',
+      )?.headers['idempotency-key']
       expect(postKey).toBeTruthy()
       const after = await storedIntent(ctx, path)
       expect(after?.intent).toMatchObject({
@@ -1507,6 +1507,160 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
       expect(readFileSync(path, 'utf8')).toBe('bytes from the racing save')
       expect(binding(path).state).not.toBe('saved')
       expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
+    /**
+     * N1 residual: a `paused_offline` intent with a retained upload session. Superseding it
+     * persists `cancelled` and then used to AWAIT `DELETE /upload-sessions/{id}` inside the
+     * action's validated stretch; a Save admitted during that DELETE was wiped by the action's
+     * local destructive steps. The DELETE now runs after them, so no network sits between the
+     * final check and the last store write.
+     */
+    async function seedRetainedSession(
+      ctx: ReturnType<typeof setup>,
+      path: string,
+      bytes: string,
+    ): Promise<void> {
+      const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+      if (opened.kind !== 'ok') throw new Error('open store failed')
+      const intents = createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+      const payload = new TextEncoder().encode(bytes)
+      const now = new Date().toISOString()
+      const written = await intents.put(
+        basename(dirname(path)),
+        {
+          v: 2,
+          intentId: 'intent-seeded',
+          idempotencyKey: 'office-key-seeded',
+          documentId: DOC,
+          orgId: 'org_a',
+          workspaceId: 'ws_1',
+          baseRevision: '41',
+          baseVersion: 3,
+          checksum: createHash('sha256').update(payload).digest('hex'),
+          length: payload.byteLength,
+          generation: 1,
+          state: 'paused_offline',
+          attempt: 0,
+          createdAt: now,
+          updatedAt: now,
+          uploadSession: {
+            sessionId: 'ups_old',
+            partSize: 5 * 1024 * 1024,
+            totalParts: 6,
+            completedParts: [{ partNumber: 1, etag: '"e1"' }],
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        },
+        payload,
+      )
+      if (written.kind !== 'ok') throw new Error('seeding the intent failed')
+    }
+
+    /** gate the DELETE of the retained session; resolves `reached` once the action is waiting on it */
+    function gateSessionDelete(server: ReturnType<typeof fakeServer>) {
+      const origFetch = server.fetch.getMockImplementation()!
+      let reached!: () => void
+      const onReached = new Promise<void>((resolve) => {
+        reached = resolve
+      })
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+        const u = new URL(url)
+        if (u.pathname === '/api/v1/upload-sessions/ups_old' && init.method === 'DELETE') {
+          server.calls.push({ method: 'DELETE', path: u.pathname, headers: {} })
+          reached()
+          await gate
+          return new Response(null, { status: 204 })
+        }
+        return origFetch(url, init)
+      })
+      return { onReached, release }
+    }
+
+    const commitKeys = (server: ReturnType<typeof fakeServer>) =>
+      server.calls
+        .filter((c) => c.path.endsWith('/versions/commit') && c.method === 'POST')
+        .map((c) => c.headers['idempotency-key'])
+
+    it("N1 residual: a Save admitted during Reload's session DELETE keeps its reconciling intent and bytes (DELETE runs after the local steps)", async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      await seedRetainedSession(ctx, path, 'bytes of the paused intent')
+      server.faults.push({ route: 'commit', kind: 'network' })
+      const del = gateSessionDelete(server)
+
+      const act = ctx.service.conflictAct(view.sessionId, {
+        kind: 'reload',
+        keep: 'discard',
+        stopAi: false,
+      })
+      await del.onReached
+      // no network before the destructive steps: by the time the DELETE is on the wire the
+      // tab is already reloaded onto the replaced working copy (asserted below)
+      const reloadedBeforeDelete = vi.mocked(ctx.deps.reloadPath).mock.calls.length > 0
+      writeFileSync(path, 'new bytes of the racing save')
+      ctx.setEditorDirty(false)
+      ctx.service.onUserSave(path)
+      await vi.waitFor(() => expect(commitKeys(server)).toHaveLength(1))
+      const postKey = commitKeys(server)[0]
+      expect(postKey).toBeTruthy()
+      await vi.waitFor(async () =>
+        expect(await storedIntent(ctx, path)).toMatchObject({
+          intent: { state: 'reconciling', idempotencyKey: postKey },
+        }),
+      )
+      del.release()
+      await act
+
+      expect(await storedIntent(ctx, path)).toMatchObject({
+        intent: { state: 'reconciling', idempotencyKey: postKey },
+      })
+      expect(commitKeys(server)).toEqual([postKey])
+      expect(readFileSync(path, 'utf8')).toBe('new bytes of the racing save')
+      expect(binding(path).state).not.toBe('saved')
+      expect(reloadedBeforeDelete).toBe(true)
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
+    it("N1 residual: a Save admitted during Overwrite's session DELETE is never forgotten for a second commit key (DELETE runs after the local steps)", async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      await seedRetainedSession(ctx, path, 'bytes of the paused intent')
+      server.faults.push({ route: 'commit', kind: 'network' })
+      const del = gateSessionDelete(server)
+
+      const act = ctx.service.conflictAct(view.sessionId, { kind: 'overwrite', stopAi: false })
+      await del.onReached
+      writeFileSync(path, 'new bytes of the racing save')
+      ctx.setEditorDirty(false)
+      ctx.service.onUserSave(path)
+      await vi.waitFor(() => expect(commitKeys(server)).toHaveLength(1))
+      const postKey = commitKeys(server)[0]
+      expect(postKey).toBeTruthy()
+      await vi.waitFor(async () =>
+        expect(await storedIntent(ctx, path)).toMatchObject({
+          intent: { state: 'reconciling', idempotencyKey: postKey },
+        }),
+      )
+      del.release()
+      await act
+
+      // the first key survives: the action's trailing Save looked it up (the fake has no lookup
+      // route for the document, so it ends `blocked`, not `cancelled`/gone) instead of POSTing again
+      const kept = await storedIntent(ctx, path)
+      expect(kept?.intent.idempotencyKey).toBe(postKey)
+      expect(kept?.intent.state).not.toBe('cancelled')
+      expect([...new Set(commitKeys(server))]).toEqual([postKey])
+      expect(readFileSync(path, 'utf8')).toBe('new bytes of the racing save')
       ctx.service.closeConflictPrompt()
       await flow
     })

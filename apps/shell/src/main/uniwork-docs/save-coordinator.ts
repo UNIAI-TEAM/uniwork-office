@@ -108,7 +108,11 @@ function needsRecheck(error: unknown): error is UniworkDocError {
  */
 type PhaseWrite =
   | { ok: true; state: IntentRecordV2['state'] | null }
-  | { ok: false; refusal: 'store_full' | 'interrupted' | 'owner_lost'; state: IntentRecordV2['state'] | null }
+  | {
+      ok: false
+      refusal: 'store_full' | 'interrupted' | 'owner_lost'
+      state: IntentRecordV2['state'] | null
+    }
 
 /**
  * R2: the durable record could not be driven to `committing` before the commit
@@ -123,7 +127,13 @@ class PhaseWriteRefusedError extends UniworkDocError {
     refusal: 'store_full' | 'interrupted' | 'owner_lost',
     durableState: IntentRecordV2['state'] | null,
   ) {
-    super(refusal === 'store_full' ? 'store_full' : refusal === 'interrupted' ? 'not_signed_in' : 'server_error')
+    super(
+      refusal === 'store_full'
+        ? 'store_full'
+        : refusal === 'interrupted'
+          ? 'not_signed_in'
+          : 'server_error',
+    )
     this.refusal = refusal
     this.durableState = durableState
   }
@@ -169,7 +179,9 @@ export type SaveQueueEngine = Pick<
   | 'tombstone'
   | 'isOtherWindow'
   | 'holdsOtherWindow'
->
+> &
+  // optional so an engine without it keeps the awaited `supersede` (release included)
+  Partial<Pick<QueueDispatcher, 'supersedeDeferRelease'>>
 
 export interface SaveCoordinatorDeps {
   store: BindingStore
@@ -1116,7 +1128,10 @@ export class SaveCoordinator {
     }
     let answer: CommitLookup
     try {
-      answer = await lookup({ documentId: intent.documentId, idempotencyKey: intent.idempotencyKey })
+      answer = await lookup({
+        documentId: intent.documentId,
+        idempotencyKey: intent.idempotencyKey,
+      })
     } catch (error) {
       const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
       await this.settleRecord(intents, doc, intent, {
@@ -1223,7 +1238,10 @@ export class SaveCoordinator {
     }
     let answer: CommitLookup
     try {
-      answer = await lookup({ documentId: intent.documentId, idempotencyKey: intent.idempotencyKey })
+      answer = await lookup({
+        documentId: intent.documentId,
+        idempotencyKey: intent.idempotencyKey,
+      })
     } catch (error) {
       // the lookup could not be answered (offline, a locked store, a 5xx):
       // nothing proves either way, so the intent reconciles and the poll retries
@@ -1364,7 +1382,11 @@ export class SaveCoordinator {
         // key another generation now owns stops the save BEFORE the POST,
         // because nothing durable authorizes it.
         let phase: PhaseWrite = { ok: false, refusal: 'owner_lost', state: null }
-        for (const event of [{ type: 'dispatch' }, { type: 'uploaded' }, { type: 'uploaded' }] as const) {
+        for (const event of [
+          { type: 'dispatch' },
+          { type: 'uploaded' },
+          { type: 'uploaded' },
+        ] as const) {
           phase = await this.settleRecord(intents, doc, intent, event)
           if (!phase.ok) break
         }
@@ -1436,6 +1458,14 @@ export class SaveCoordinator {
     docKey: string,
     session: SavedUploadSession | undefined,
   ): Promise<void> {
+    await this.takeUploadRelease(docKey, session)()
+  }
+
+  /** local half now (abort part PUTs, forget the live session); the closure is the network DELETE alone */
+  private takeUploadRelease(
+    docKey: string,
+    session: SavedUploadSession | undefined,
+  ): () => Promise<void> {
     const controller = this.uploadAborts.get(docKey)
     if (controller) {
       controller.abort()
@@ -1445,11 +1475,13 @@ export class SaveCoordinator {
     this.uploadLiveSessions.delete(docKey)
     const sessionId = session?.sessionId ?? liveSessionId
     const client = this.deps.client.uploadSession
-    if (!sessionId || !client) return
-    try {
-      await abortVersionUploadSession(client, sessionId)
-    } catch (error) {
-      console.warn('uniwork docs: the upload session could not be aborted', error)
+    if (!sessionId || !client) return async () => {}
+    return async () => {
+      try {
+        await abortVersionUploadSession(client, sessionId)
+      } catch (error) {
+        console.warn('uniwork docs: the upload session could not be aborted', error)
+      }
     }
   }
 
@@ -1660,17 +1692,35 @@ export class SaveCoordinator {
    * terminal, so it never moves the chip itself (see publishQueueState).
    */
   async supersede(doc: QueueDoc): Promise<void> {
+    const release = await this.supersedeDeferRelease(doc)
+    await release()
+  }
+
+  /**
+   * `supersede` with the upload-session DELETE (network) returned instead of
+   * awaited. A conflict action runs it after its local destructive steps, so no
+   * network sits between its final validation and its last store write.
+   */
+  async supersedeDeferRelease(doc: QueueDoc): Promise<() => Promise<void>> {
     // a superseded record is always terminal: the machine never moves it to a
     // chip state, and the caller's Overwrite / Reload is what the binding shows
     // next. So this never publishes (publishQueueState would drop it anyway).
     const priorSession = doc.record.uploadSession
-    if (!this.deps.dispatcher) {
-      await this.releaseUploadSession(doc.key, priorSession)
-      return
+    if (!this.deps.dispatcher) return this.takeUploadRelease(doc.key, priorSession)
+    const engine = this.deps.dispatcher
+    if (!engine.supersedeDeferRelease) {
+      const state = await engine.supersede(doc)
+      if (state === 'cancelled') await this.releaseUploadSession(doc.key, undefined)
+      return async () => {}
     }
-    const state = await this.deps.dispatcher.supersede(doc)
-    if (state === 'cancelled') {
-      await this.releaseUploadSession(doc.key, undefined)
+    const { state, release } = await engine.supersedeDeferRelease(doc)
+    if (state !== 'cancelled') return release
+    // the dispatcher took its own release (retained session); the coordinator's
+    // own controller / live session is released locally now, DELETE deferred
+    const own = this.takeUploadRelease(doc.key, undefined)
+    return async () => {
+      await release()
+      await own()
     }
   }
 

@@ -1277,6 +1277,14 @@ export class UniworkDocsService {
           const st = (await engine?.supersede(doc)) ?? doc.record.state
           return st
         },
+        supersedeDeferRelease: async (doc) => {
+          const engine = await this.queueEngineOrNull()
+          if (engine?.supersedeDeferRelease) return engine.supersedeDeferRelease(doc)
+          return {
+            state: (await engine?.supersede(doc)) ?? doc.record.state,
+            release: async () => {},
+          }
+        },
         tombstone: async (doc) =>
           (await this.queueEngineOrNull())?.tombstone(doc) ?? doc.record.state,
         isOtherWindow: (key) => this.queueSession?.dispatcher.isOtherWindow(key) === true,
@@ -2700,6 +2708,17 @@ export class UniworkDocsService {
   private async supersedePending(doc: BoundDocument): Promise<void> {
     const queueDoc = await this.queueDocFromStore(doc)
     if (queueDoc) await this.coordinator.supersede(queueDoc)
+  }
+
+  /**
+   * `supersedePending` for the conflict actions: the old intent is persisted
+   * `cancelled` now, but the retained upload session's network DELETE is
+   * returned for the caller to run AFTER its local destructive steps, so no
+   * network sits between `saveRacedReplacement` and the last store write.
+   */
+  private async supersedePendingDeferRelease(doc: BoundDocument): Promise<() => Promise<void>> {
+    const queueDoc = await this.queueDocFromStore(doc)
+    return queueDoc ? await this.coordinator.supersedeDeferRelease(queueDoc) : async () => {}
   }
 
   /** the document's stored intent as a queue doc, or null when there is none */
@@ -7621,10 +7640,12 @@ export class UniworkDocsService {
     }
     // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
     // user's snapshot is spent (superseded), never replayed against the new base
-    await this.supersedePending(chosen)
+    const releaseSession = await this.supersedePendingDeferRelease(chosen)
     // the old base's intent is invalid on the server's revision
     await this.dropIntent(chosen)
     const ready = await this.coordinator.commitState(chosen, next)
+    // the superseded intent's upload session is released now that the local steps are done
+    await releaseSession()
     if (!currentView.online) {
       await this.coordinator.save(ready.path, { forceOffline: true })
       open.controller.abort()
@@ -7743,7 +7764,7 @@ export class UniworkDocsService {
     if (await this.saveRacedReplacement(doc, start)) return null
     // "Tải lại": the old intent is superseded BEFORE the base is replaced, so
     // it is spent (cancelled/superseded), never replayed against the new base
-    await this.supersedePending(doc)
+    const releaseSession = await this.supersedePendingDeferRelease(doc)
     await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
     // the local work (and its intent) is discarded: nothing is left to replay
     await this.dropIntent(doc)
@@ -7771,6 +7792,8 @@ export class UniworkDocsService {
     this.remoteBars.delete(pathKey(doc.path))
     this.remoteNotices.delete(pathKey(doc.path))
     this.deps.reloadPath(doc.path)
+    // the superseded intent's upload session is released now that the local steps are done
+    await releaseSession()
     return done
   }
 
