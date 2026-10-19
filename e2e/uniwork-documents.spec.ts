@@ -740,9 +740,9 @@ test.describe.serial('UniWork documents', () => {
         'Overwrite…',
         'Cancel',
       ])
-      // the ✕ in turn is addressed by role + name: it must be visible and come
-      // after Cancel in DOM (Tab) order - it is rendered last in the alertdialog
-      const closeX = dialog.getByRole('button', { name: 'Close', exact: true })
+      // the ✕ in turn is its header control (A49: scoped so the locked step's
+      // Close-named footer button can never be picked up instead)
+      const closeX = dialog.locator('button.uw-conflict-close')
       await expect(closeX).toBeVisible()
       const buttonOrder = await dialog
         .getByRole('button')
@@ -828,6 +828,23 @@ test.describe.serial('UniWork documents', () => {
       expect(drafts).toHaveLength(1)
       expect(drafts[0]!.title).toBe('conflict-latest.docx')
       expect(await zipEntry(drafts[0]!.snapshot, 'word/document.xml')).toContain(MARKER)
+
+      // A46: the kept draft is also a real Sync Center row — visible by name and openable
+      await shell.evaluate(() => {
+        window.dispatchEvent(
+          new CustomEvent('uniwork:open-settings', { detail: { section: 'sync' } }),
+        )
+      })
+      const settings = shell.getByRole('dialog', { name: 'Settings' })
+      const draftRow = settings.getByRole('row', {
+        name: 'conflict-latest.docx: Kept draft',
+        exact: true,
+      })
+      await expect(draftRow).toBeVisible()
+      const docsBefore = launched.app.windows()
+      await draftRow.getByRole('button', { name: 'Open draft', exact: true }).click()
+      const preview = await pageAfter(launched.app, '://docs/', docsBefore)
+      await expect.poll(async () => docsText(preview), { timeout: 30_000 }).toContain(MARKER)
     })
   })
 
@@ -928,7 +945,7 @@ test.describe.serial('UniWork documents', () => {
           .filter((c) => c.method === 'POST' && c.route === `/documents/${doc.id}/copies`),
       ).toEqual([expect.objectContaining({ status: 201, idempotencyKey: expect.any(String) })])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
 
       // no native message box or save dialog; the source stays in conflict with no new intent
@@ -975,7 +992,7 @@ test.describe.serial('UniWork documents', () => {
         expect.objectContaining({ status: 503 }),
       ])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
@@ -1034,7 +1051,7 @@ test.describe.serial('UniWork documents', () => {
           ),
         ).toEqual([expect.stringMatching(/conflict-noseat \(my version\)\.docx$/)])
 
-        await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+        await dialog.locator('button.uw-conflict-close').click()
         await expect(dialog).toBeHidden()
         // no copy, no upload, no intent change: the source is still in conflict
         expect(stub.copiesOf(doc.id)).toHaveLength(0)
@@ -1088,7 +1105,7 @@ test.describe.serial('UniWork documents', () => {
           ),
       ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
@@ -1138,7 +1155,7 @@ test.describe.serial('UniWork documents', () => {
           ),
       ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
@@ -1186,7 +1203,7 @@ test.describe.serial('UniWork documents', () => {
           ),
       ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
