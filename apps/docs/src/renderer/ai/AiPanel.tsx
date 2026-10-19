@@ -126,6 +126,7 @@ import fileDocumentIcon from '../assets/file-document.png'
 import fileGeneralIcon from '../assets/file-general.png'
 import { IconGear, IconNewChat, IconSidebarCollapse } from '../components/icons'
 import { cap } from '../capabilities'
+import { docsUniworkBoundForAi } from '../uniwork-doc-state'
 
 interface ToolActivity {
   name: string
@@ -1017,7 +1018,8 @@ export function AiPanel({
           () => notesAccessRef.current,
           () => mediaAnalysisAvailable(settingsRef.current, gskLoggedInRef.current),
           () => readOnlyRef.current,
-          () => boundRef.current,
+          // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
+          () => docsUniworkBoundForAi(boundRef.current ?? false),
           () => askClarification,
           () => protectionRef.current,
           // an image URL the AI inserts must come from this run's image_search / generate_image or

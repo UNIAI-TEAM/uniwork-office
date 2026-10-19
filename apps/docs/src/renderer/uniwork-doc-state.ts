@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react'
+import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
+import { platform } from './capabilities'
 import { noteEditableIntent } from './editor/editable-intent'
 
 /**
@@ -23,6 +25,17 @@ export function uniworkStateFor(
 ): { bound: boolean; readOnly: boolean } {
   if (!path || state.path !== path) return { bound: false, readOnly: false }
   return { bound: state.bound, readOnly: state.readOnly }
+}
+
+/**
+ * The bound answer the AI layer reads (the docs-skill C-BOUND filter): the
+ * shared `uniworkBoundForAi` rule with this app's capability platform. A web
+ * frame IS the UniWork document, but its adapter still answers `bound: false`:
+ * the save path, autosave and the Save button key off the working-copy state.
+ * Feed the AI only — `uniwork.bound` keeps its other (non-AI) meanings.
+ */
+export function docsUniworkBoundForAi(bound: boolean): boolean {
+  return uniworkBoundForAi(bound, platform())
 }
 
 /**

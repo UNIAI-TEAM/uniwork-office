@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
+import { platform } from './capabilities'
+
 import type { PdfUniworkState } from '../shared/ipc'
 
 /** A plain local file: not bound, editable */
@@ -19,6 +22,21 @@ export async function queryPdfUniworkState(
   } catch {
     return PLAIN_PDF_STATE
   }
+}
+
+/**
+ * The bound answer the AI layer reads (skill C-BOUND filter + guard): the
+ * shared `uniworkBoundForAi` rule with this app's capability platform. A web
+ * frame IS the UniWork document (web/modules/pdf/install.ts), but its adapter
+ * still answers `bound: false`: the save path, server comments and the Save
+ * button are keyed off the working-copy state, and the desktop semantics of
+ * `bound` (force a clean Save, drop file notes, autosave off) do not apply
+ * there. The frame's capabilities carry `platform: 'web'` (module-bridge.ts),
+ * marking the document UniWork-owned for the AI without touching those
+ * consumers.
+ */
+export function pdfUniworkBoundForAi(state: PdfUniworkState): boolean {
+  return uniworkBoundForAi(state.bound, platform())
 }
 
 /**

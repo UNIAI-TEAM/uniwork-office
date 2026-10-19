@@ -33,9 +33,14 @@ export function isReadOnlyProfile(): boolean {
   return capabilities().readOnlyProfile === true
 }
 
+/** 'web' inside a web frame, undefined on the desktop (the shared reader's convention) */
+export function platform(): string | undefined {
+  return capabilities().platform
+}
+
 /** the editor runs in a web frame (the host around it has its own chrome, e.g. a Comments drawer) */
 export function isWebFrame(): boolean {
-  return capabilities().platform === 'web'
+  return platform() === 'web'
 }
 
 /** test hook: forget the cached capabilities so the next `cap()` re-reads `window.desktop` */
