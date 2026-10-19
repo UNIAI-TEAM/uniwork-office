@@ -542,6 +542,7 @@ export const en = {
   appOnlyEncrypted: '"{name}" is password protected and cannot be opened here.',
   appFileExportPdf: 'Export as PDF…',
   appFilePrint: 'Print…',
+  appPrintNoDocument: 'Open a document to print it.',
   appPrintNoPrinter:
     'No printer is available on this computer. You can save the document as a PDF instead.',
   appPrintFailedPdfHint:

@@ -543,6 +543,7 @@ export const vi = {
   appOnlyEncrypted: '"{name}" được bảo vệ bằng mật khẩu và không thể mở ở đây.',
   appFileExportPdf: 'Xuất dưới dạng PDF…',
   appFilePrint: 'In…',
+  appPrintNoDocument: 'Hãy mở một tài liệu để in.',
   appPrintNoPrinter:
     'Máy tính này không có máy in. Bạn có thể lưu tài liệu thành tệp PDF thay thế.',
   appPrintFailedPdfHint:

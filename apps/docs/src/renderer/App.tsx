@@ -5482,6 +5482,12 @@ export function App() {
         e.preventDefault()
         if (cap('open')) void openFile()
       }
+      // Print: with a document the native menu / browser owns the shortcut; with none it must
+      // not vanish silently (printDoc answers with the "open a document" message)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === 'p' && !doc) {
+        e.preventDefault()
+        void printDoc()
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
         if (doc) {
@@ -5719,6 +5725,7 @@ export function App() {
     insertField,
     runAiProofread,
     trackChangesForced,
+    printDoc,
   ])
 
   // double-click an inline equation / click an equation block's edit button (ones with LaTeX source) → reopen the equation dialog for editing
@@ -5922,7 +5929,7 @@ export function App() {
           void exportImages()
           break
         case 'print':
-          if (doc) void printDoc()
+          void printDoc()
           break
       }
     })

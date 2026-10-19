@@ -553,6 +553,7 @@ export const ru = {
   appOnlyEncrypted: '«{name}» защищён паролем и не может быть открыт здесь.',
   appFileExportPdf: 'Экспорт в PDF…',
   appFilePrint: 'Печать…',
+  appPrintNoDocument: 'Откройте документ, чтобы распечатать его.',
   appPrintNoPrinter:
     'На этом компьютере нет доступного принтера. Вместо этого можно сохранить документ в PDF.',
   appPrintFailedPdfHint:

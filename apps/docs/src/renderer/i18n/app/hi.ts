@@ -547,6 +547,7 @@ export const hi = {
   appOnlyEncrypted: '"{name}" पासवर्ड से सुरक्षित है और यहाँ नहीं खोला जा सकता।',
   appFileExportPdf: 'PDF के रूप में निर्यात करें…',
   appFilePrint: 'प्रिंट करें…',
+  appPrintNoDocument: 'प्रिंट करने के लिए कोई दस्तावेज़ खोलें।',
   appPrintNoPrinter:
     'इस कंप्यूटर पर कोई प्रिंटर उपलब्ध नहीं है। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
   appPrintFailedPdfHint:

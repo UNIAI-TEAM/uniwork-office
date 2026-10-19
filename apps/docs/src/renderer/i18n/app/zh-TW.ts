@@ -528,6 +528,7 @@ export const zhTW = {
   appOnlyEncrypted: '「{name}」受密碼保護，無法在此處開啟。',
   appFileExportPdf: '匯出為 PDF…',
   appFilePrint: '列印…',
+  appPrintNoDocument: '請先開啟文件再列印。',
   appPrintNoPrinter: '這台電腦沒有可用的印表機。可以改為將文件儲存為 PDF。',
   appPrintFailedPdfHint: '列印沒有成功:{error}。可以改為將文件儲存為 PDF。',
   appPrintSaveAsPdf: '另存為 PDF…',

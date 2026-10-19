@@ -550,6 +550,7 @@ export const pt = {
   appOnlyEncrypted: '"{name}" está protegido por senha e não pode ser aberto aqui.',
   appFileExportPdf: 'Exportar como PDF…',
   appFilePrint: 'Imprimir…',
+  appPrintNoDocument: 'Abra um documento para imprimi-lo.',
   appPrintNoPrinter:
     'Não há nenhuma impressora disponível neste computador. Você pode salvar o documento como PDF.',
   appPrintFailedPdfHint: 'A impressão falhou: {error}. Você pode salvar o documento como PDF.',

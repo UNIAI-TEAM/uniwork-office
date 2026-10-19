@@ -1390,7 +1390,11 @@ async function saveOnce(
  * preview is mounted (visually hidden behind the dialog) as its print source.
  */
 export function printDoc(ctx: FileActionContext): void {
-  if (!ctx.doc) return
+  if (!ctx.doc) {
+    // Ctrl/Cmd+P with nothing open: say what to do instead of swallowing the shortcut
+    ctx.setStatus(t('appPrintNoDocument'))
+    return
+  }
   // the print sheet prints the live preview pages: needs the whole document mounted
   if (isPhasedContentPending()) {
     void waitForFullContent().then(() => printDoc(ctx))

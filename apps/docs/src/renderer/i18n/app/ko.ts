@@ -569,6 +569,7 @@ export const ko = {
   appOnlyEncrypted: '"{name}" 문서는 암호로 보호되어 있어 여기서는 열 수 없습니다.',
   appFileExportPdf: 'PDF로 내보내기…',
   appFilePrint: '인쇄…',
+  appPrintNoDocument: '인쇄하려면 먼저 문서를 여세요.',
   appPrintNoPrinter:
     '이 컴퓨터에서 사용할 수 있는 프린터가 없습니다. 대신 문서를 PDF로 저장할 수 있습니다.',
   appPrintFailedPdfHint: '인쇄하지 못했습니다: {error}. 대신 문서를 PDF로 저장할 수 있습니다.',

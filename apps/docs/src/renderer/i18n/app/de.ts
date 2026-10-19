@@ -563,6 +563,7 @@ export const de = {
   appOnlyEncrypted: '„{name}“ ist kennwortgeschützt und kann hier nicht geöffnet werden.',
   appFileExportPdf: 'Als PDF exportieren…',
   appFilePrint: 'Drucken…',
+  appPrintNoDocument: 'Öffnen Sie ein Dokument, um es zu drucken.',
   appPrintNoPrinter:
     'Auf diesem Computer ist kein Drucker verfügbar. Sie können das Dokument stattdessen als PDF speichern.',
   appPrintFailedPdfHint:
