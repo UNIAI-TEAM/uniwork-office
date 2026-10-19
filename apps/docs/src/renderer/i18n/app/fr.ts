@@ -564,4 +564,8 @@ export const fr = {
   appPrintFailedPdfHint:
     "L'impression a échoué : {error}. Vous pouvez enregistrer le document au format PDF à la place.",
   appPrintSaveAsPdf: 'Enregistrer en PDF…',
+  appFileSaveCopy: 'Enregistrer une copie…',
+  appCopySaved: 'Votre version a été enregistrée comme nouveau document : {title}.',
+  appCopySaveFailed:
+    'Impossible de créer la copie. Vos modifications sont toujours en sécurité ; réessayez.',
 } satisfies Record<keyof typeof zh, string>

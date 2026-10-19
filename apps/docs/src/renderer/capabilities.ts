@@ -28,6 +28,15 @@ export function appOpenAvailable(): boolean {
   return caps.platform === 'web' && caps.desktopOpen === true
 }
 
+/** File > Save as a copy: the locked-out tab's one write — `saveCopy` granted while `save` is
+ *  withheld, and not under the readOnly profile (createCapabilityObject already strips saveCopy
+ *  there; the check here keeps an object built without it honest). An unset key is not a grant —
+ *  cap() reads it as on, so this tests the value. */
+export function saveCopyAvailable(): boolean {
+  const caps = capabilities()
+  return caps.saveCopy === true && caps.save !== true && caps.readOnlyProfile !== true
+}
+
 /** the host's `readOnly` profile is on: the document's own comments stay hidden too (an unset key is off) */
 export function isReadOnlyProfile(): boolean {
   return capabilities().readOnlyProfile === true

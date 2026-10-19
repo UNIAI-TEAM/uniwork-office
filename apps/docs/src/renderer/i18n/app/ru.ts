@@ -558,4 +558,7 @@ export const ru = {
   appPrintFailedPdfHint:
     'Не удалось напечатать: {error}. Вместо этого можно сохранить документ в PDF.',
   appPrintSaveAsPdf: 'Сохранить как PDF…',
+  appFileSaveCopy: 'Сохранить как копию…',
+  appCopySaved: 'Ваша версия сохранена как новый документ: {title}.',
+  appCopySaveFailed: 'Не удалось создать копию. Ваши изменения в безопасности; повторите попытку.',
 } satisfies Record<keyof typeof zh, string>

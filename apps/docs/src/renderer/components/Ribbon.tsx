@@ -131,7 +131,7 @@ import {
 import { RibbonColorPalette } from './ribbon-color-palette'
 import { HeaderFooterTab, type HfAction, type HfEditingInfo } from './ribbon-hf-tab'
 import { PasteSpecialDialog } from './PasteSpecialDialog'
-import { cap } from '../capabilities'
+import { cap, saveCopyAvailable } from '../capabilities'
 import { fontFamiliesFor, isEastAsianFontName, systemFamiliesBesidesCandidates } from '../font-list'
 import {
   fontSizeLabel,
@@ -274,7 +274,8 @@ interface RibbonProps {
   onOpen: () => void
   onSave: () => void
   onSaveAs: () => void
-  /** File ▸ Export as PDF: a local file export through printToPDF, no system printer needed */
+  /** File ▸ Save as a copy: web bridge only — the locked-out tab's copy (UNI-1920); absent on desktop */
+  onSaveCopy?: () => void
   onExportPdf?: () => void
   onPrint?: () => void
   showAi: boolean
@@ -729,6 +730,7 @@ function RibbonInner({
   onOpen,
   onSave,
   onSaveAs,
+  onSaveCopy,
   onExportPdf,
   onPrint,
   showAi,
@@ -2053,6 +2055,17 @@ function RibbonInner({
                     }}
                   >
                     {t('ribbonSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                  </button>
+                )}
+                {saveCopyAvailable() && onSaveCopy && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setDropdown(null)
+                      onSaveCopy()
+                    }}
+                  >
+                    {t('appFileSaveCopy')}
                   </button>
                 )}
                 {cap('exportPdf') && onExportPdf && (
