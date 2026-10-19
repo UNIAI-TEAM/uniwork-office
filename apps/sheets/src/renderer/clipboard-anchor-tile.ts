@@ -24,7 +24,7 @@ import {
   getSheetCommandTarget,
 } from '@univerjs/sheets'
 import { COPY_TYPE, ISheetClipboardService } from '@univerjs/sheets-ui'
-
+import { MAX_GRID_COLUMNS, MAX_GRID_ROWS } from '@genoffice/xlsx-gateway/shared/grid-bounds'
 import type { UniverRuntime } from './univer-state'
 
 interface MatrixLike {
@@ -118,8 +118,8 @@ export function installClipboardAnchorTile(runtime: UniverRuntime): void {
           data.endRow - data.startRow + 1,
           data.endColumn - data.startColumn + 1,
           {
-            rowCount: target.worksheet.getRowCount(),
-            columnCount: target.worksheet.getColumnCount(),
+            rowCount: MAX_GRID_ROWS,
+            columnCount: MAX_GRID_COLUMNS,
           },
         )
         if (expanded) {

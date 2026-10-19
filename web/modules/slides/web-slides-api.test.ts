@@ -717,6 +717,8 @@ describe('view-only (no host save grant)', () => {
       exportPdf: true,
       exportHtml: true,
       desktopOpen: false,
+      // the shared hostGrants carries saveCopy since UNI-1920; no grant was passed here
+      saveCopy: false,
     })
     expect(slidesHostGrants({ desktopOpen: true }).desktopOpen).toBe(true)
     expect(slidesHostGrants({})).toEqual({
@@ -728,6 +730,7 @@ describe('view-only (no host save grant)', () => {
       exportPdf: false,
       exportHtml: false,
       desktopOpen: false,
+      saveCopy: false,
     })
   })
 })

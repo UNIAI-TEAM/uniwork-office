@@ -552,6 +552,7 @@ export const ms = {
   appOnlyEncrypted: '"{name}" dilindungi kata laluan dan tidak boleh dibuka di sini.',
   appFileExportPdf: 'Eksport sebagai PDF…',
   appFilePrint: 'Cetak…',
+  appPrintNoDocument: 'Buka dokumen untuk mencetaknya.',
   appPrintNoPrinter:
     'Tiada pencetak tersedia pada komputer ini. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
   appPrintFailedPdfHint:

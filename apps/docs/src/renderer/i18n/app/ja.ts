@@ -573,6 +573,7 @@ export const ja = {
   appOnlyEncrypted: '「{name}」はパスワードで保護されているため、ここでは開けません。',
   appFileExportPdf: 'PDF としてエクスポート…',
   appFilePrint: '印刷…',
+  appPrintNoDocument: 'ドキュメントを開いてから印刷してください。',
   appPrintNoPrinter:
     'このコンピューターで使えるプリンターがありません。代わりにドキュメントを PDF として保存できます。',
   appPrintFailedPdfHint:

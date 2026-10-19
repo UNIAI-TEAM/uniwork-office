@@ -125,7 +125,13 @@ function lazyCtx(state: LazyWorkbookState, cell: { f?: string; v: Scalar; displa
     getNumberFormat: () => 'General',
     getCellDatas: () => [[cell.f ? { f: cell.f, v: cell.v } : { v: cell.v }]],
   }
-  const worksheet = { getSheetId: () => 'sheet-1', getRange: () => range }
+  // The lazy reader bounds-checks against the grid like a real FWorksheet.
+  const worksheet = {
+    getSheetId: () => 'sheet-1',
+    getMaxRows: () => 1000,
+    getMaxColumns: () => 26,
+    getRange: () => range,
+  }
   return {
     univerRef: {
       current: {
