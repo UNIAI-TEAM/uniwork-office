@@ -569,11 +569,15 @@ describe('avatars (UNI-1970 A)', () => {
     const replyAv = $('[data-comment-id="r"] .collab-av')!
     expect(replyAv.querySelector('img')).toBeNull()
     expect(replyAv.textContent).toBe('BH')
-    // web lg/md sizes: root 32px, reply 24px
-    expect(cssRule('.collab-av')).toMatch(/width:\s*32px/)
-    expect(cssRule('.collab-av')).toMatch(/height:\s*32px/)
-    expect(cssRule('.collab-cm--reply .collab-av')).toMatch(/width:\s*24px/)
-    expect(cssRule('.collab-cm--reply .collab-av')).toMatch(/height:\s*24px/)
+    // web lg/md sizes: root 32px, reply 24px — only on thread rows (data-comment-id);
+    // the base rule keeps the old 22px so in-file lists stay unchanged
+    expect(cssRule('.collab-av')).toMatch(/width:\s*22px/)
+    expect(cssRule('.collab-av')).toMatch(/height:\s*22px/)
+    expect(cssRule('.collab-av')).toMatch(/font-size:\s*10px/)
+    expect(cssRule('.collab-cm[data-comment-id] .collab-av')).toMatch(/width:\s*32px/)
+    expect(cssRule('.collab-cm[data-comment-id] .collab-av')).toMatch(/height:\s*32px/)
+    expect(cssRule('.collab-cm--reply[data-comment-id] .collab-av')).toMatch(/width:\s*24px/)
+    expect(cssRule('.collab-cm--reply[data-comment-id] .collab-av')).toMatch(/height:\s*24px/)
     expect(cssRule('.collab-av img')).toMatch(/object-fit:\s*cover/)
   })
 })
@@ -621,9 +625,9 @@ describe('reply layout + action row (UNI-1970 C/D)', () => {
     await mount(src)
     // the rule lives on the list, web: ul = ml-7 mr-3 space-y-1 border-l pl-3
     expect(cssRule('.collab-replies')).toMatch(/border-left:\s*1px solid var\(--border\)/)
-    const reply = cssRule('.collab-cm--reply')
-    expect(reply).not.toMatch(/border-left/)
-    expect(reply).not.toMatch(/margin-left/)
+    const reply = cssRule('.collab-replies .collab-cm--reply')
+    expect(reply).toMatch(/border-left:\s*0/)
+    expect(reply).toMatch(/margin-left:\s*0/)
     expect(reply).toMatch(/padding:\s*4px 0/)
     // web pl-10 root / pl-8 reply: the body column indents under the author name
     expect(cssRule('.collab-cm-indent')).toMatch(/padding-left:\s*40px/)
@@ -631,6 +635,20 @@ describe('reply layout + action row (UNI-1970 C/D)', () => {
     const rc = $('[data-comment-id="r"]')!
     expect(rc.querySelector(':scope > .collab-cm-indent .collab-bd')).not.toBeNull()
     expect(rc.querySelector(':scope > .collab-cm-indent .collab-acts')).not.toBeNull()
+  })
+
+  it('in-file rows (no data-comment-id, no .collab-replies) keep the old look', () => {
+    // docs/sheets/slides render li.collab-thread > .collab-cm + .collab-cm.collab-cm--reply
+    // siblings: the root/reply separator, the reply indent and the right-aligned date
+    // come from these rules, so the web-parity overrides must not reach them
+    expect(cssRule('.collab-cm + .collab-cm')).toMatch(/border-top:\s*1px solid var\(--border\)/)
+    const inFileReply = cssRule('.collab-cm--reply')
+    expect(inFileReply).toMatch(/margin-left:\s*14px/)
+    expect(inFileReply).toMatch(/padding-left:\s*10px/)
+    expect(inFileReply).toMatch(/border-left:\s*2px solid var\(--border\)/)
+    expect(cssRule('.collab-dt')).toMatch(/margin-left:\s*auto/)
+    // only thread rows (they carry data-comment-id) get the left-hugging time
+    expect(cssRule('.collab-cm[data-comment-id] .collab-dt')).toMatch(/margin-left:\s*0/)
   })
 
   it('the action row matches the web compact spacing (mt-1 -ml-2)', () => {
