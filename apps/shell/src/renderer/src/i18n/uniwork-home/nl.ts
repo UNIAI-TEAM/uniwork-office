@@ -63,4 +63,8 @@ export const nl = {
   uhTrashNote: 'Items in de prullenbak kunnen worden hersteld als je Beheer-toegang hebt.',
   uhLoadMore: 'Meer laden',
   uhRowActions: 'Meer acties',
+  uhSourceDownload: 'Downloaden',
+  uhSourceDownloaded: '{name} gedownload',
+  uhSourceShowInFolder: 'Weergeven in map',
+  uhSourceDownloadFailed: 'Kan het bestand niet downloaden. Probeer het opnieuw.',
 } satisfies Record<keyof typeof zh, string>

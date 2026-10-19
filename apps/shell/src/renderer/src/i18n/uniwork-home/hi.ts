@@ -65,4 +65,8 @@ export const hi = {
     'यदि आपके पास प्रबंधन पहुँच है तो ट्रैश में मौजूद आइटम पुनर्स्थापित किए जा सकते हैं।',
   uhLoadMore: 'और लोड करें',
   uhRowActions: 'अधिक कार्रवाइयाँ',
+  uhSourceDownload: 'डाउनलोड करें',
+  uhSourceDownloaded: '{name} डाउनलोड हो गया',
+  uhSourceShowInFolder: 'फ़ोल्डर में दिखाएँ',
+  uhSourceDownloadFailed: 'फ़ाइल डाउनलोड नहीं हो सकी। फिर से कोशिश करें।',
 } satisfies Record<keyof typeof zh, string>

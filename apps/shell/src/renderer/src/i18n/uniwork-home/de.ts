@@ -65,4 +65,8 @@ export const de = {
     'Elemente im Papierkorb können wiederhergestellt werden, wenn Sie Verwaltungszugriff haben.',
   uhLoadMore: 'Mehr laden',
   uhRowActions: 'Weitere Aktionen',
+  uhSourceDownload: 'Herunterladen',
+  uhSourceDownloaded: '{name} heruntergeladen',
+  uhSourceShowInFolder: 'Im Ordner anzeigen',
+  uhSourceDownloadFailed: 'Die Datei konnte nicht heruntergeladen werden. Versuchen Sie es erneut.',
 } satisfies Record<keyof typeof zh, string>

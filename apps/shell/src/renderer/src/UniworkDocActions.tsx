@@ -832,6 +832,7 @@ export function ActionToast({
   message,
   onDone,
   tone = 'error',
+  action,
 }: {
   message: string
   onDone: () => void
@@ -840,6 +841,8 @@ export function ActionToast({
    * says it once through the shell's uniwork-live region instead.
    */
   tone?: 'error' | 'ok'
+  /** UNI-1961: one follow-up command beside the message (e.g. Show in folder) */
+  action?: { label: string; onSelect: () => void }
 }) {
   const { t } = useI18n()
   useEffect(() => {
@@ -863,6 +866,18 @@ export function ActionToast({
         <circle cx="8" cy="11.1" r="0.9" fill="currentColor" />
       </svg>
       <span className="uw-act-toast-text">{message}</span>
+      {action && (
+        <button
+          type="button"
+          className="uw-act-toast-action"
+          onClick={() => {
+            action.onSelect()
+            onDone()
+          }}
+        >
+          {action.label}
+        </button>
+      )}
       <button
         type="button"
         className="uw-act-toast-close"

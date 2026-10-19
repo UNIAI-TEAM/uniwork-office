@@ -63,4 +63,8 @@ export const it = {
   uhTrashNote: 'Gli elementi nel cestino possono essere ripristinati se hai accesso Gestisci.',
   uhLoadMore: 'Carica altro',
   uhRowActions: 'Altre azioni',
+  uhSourceDownload: 'Scarica',
+  uhSourceDownloaded: '{name} scaricato',
+  uhSourceShowInFolder: 'Mostra nella cartella',
+  uhSourceDownloadFailed: 'Impossibile scaricare il file. Riprova.',
 } satisfies Record<keyof typeof zh, string>

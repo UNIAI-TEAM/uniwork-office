@@ -64,4 +64,8 @@ export const cs = {
   uhTrashNote: 'Položky v koši lze obnovit, pokud máte oprávnění Správa.',
   uhLoadMore: 'Načíst další',
   uhRowActions: 'Další akce',
+  uhSourceDownload: 'Stáhnout',
+  uhSourceDownloaded: 'Staženo: {name}',
+  uhSourceShowInFolder: 'Zobrazit ve složce',
+  uhSourceDownloadFailed: 'Soubor se nepodařilo stáhnout. Zkuste to znovu.',
 } satisfies Record<keyof typeof zh, string>

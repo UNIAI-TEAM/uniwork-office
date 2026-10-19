@@ -73,6 +73,7 @@ import type {
   UniworkResult,
   UniworkSearchPage,
   UniworkSearchQuery,
+  UniworkSourceListPage,
   UniworkSharedPage,
   UniworkSharedQuery,
   UniworkTreeChangedEvent,
@@ -1158,6 +1159,16 @@ const homeApi: HomeApi = {
   async uniworkListTrash(q) {
     return asUniworkResult<UniworkDocListPage>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listTrash, q),
+    )
+  },
+  async uniworkListSources(q) {
+    return asUniworkResult<UniworkSourceListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listSources, q),
+    )
+  },
+  async uniworkDownloadSource(input) {
+    return asUniworkResult<{ path: string | null }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.downloadSource, input),
     )
   },
   async uniworkDocumentProperties(documentId: string) {

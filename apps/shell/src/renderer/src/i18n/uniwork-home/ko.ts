@@ -63,4 +63,8 @@ export const ko = {
   uhTrashNote: '관리 권한이 있는 경우 휴지통의 항목을 복원할 수 있습니다.',
   uhLoadMore: '더 보기',
   uhRowActions: '추가 작업',
+  uhSourceDownload: '다운로드',
+  uhSourceDownloaded: '{name} 다운로드됨',
+  uhSourceShowInFolder: '폴더에서 보기',
+  uhSourceDownloadFailed: '파일을 다운로드할 수 없습니다. 다시 시도하세요.',
 } satisfies Record<keyof typeof zh, string>

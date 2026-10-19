@@ -63,4 +63,8 @@ export const ru = {
   uhTrashNote: 'Элементы в корзине можно восстановить при наличии прав управления.',
   uhLoadMore: 'Загрузить ещё',
   uhRowActions: 'Другие действия',
+  uhSourceDownload: 'Скачать',
+  uhSourceDownloaded: 'Файл {name} скачан',
+  uhSourceShowInFolder: 'Показать в папке',
+  uhSourceDownloadFailed: 'Не удалось скачать файл. Повторите попытку.',
 } satisfies Record<keyof typeof zh, string>

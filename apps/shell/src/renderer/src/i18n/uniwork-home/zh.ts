@@ -62,4 +62,8 @@ export const zh = {
   uhTrashNote: '如果你拥有管理权限，可以恢复回收站中的项目。',
   uhLoadMore: '加载更多',
   uhRowActions: '更多操作',
+  uhSourceDownload: '下载',
+  uhSourceDownloaded: '已下载 {name}',
+  uhSourceShowInFolder: '在文件夹中显示',
+  uhSourceDownloadFailed: '无法下载该文件。请重试。',
 }

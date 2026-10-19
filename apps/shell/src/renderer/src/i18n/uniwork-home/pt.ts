@@ -63,4 +63,8 @@ export const pt = {
   uhTrashNote: 'Os itens na lixeira podem ser restaurados se você tiver acesso de Gerenciamento.',
   uhLoadMore: 'Carregar mais',
   uhRowActions: 'Mais ações',
+  uhSourceDownload: 'Baixar',
+  uhSourceDownloaded: '{name} baixado',
+  uhSourceShowInFolder: 'Mostrar na pasta',
+  uhSourceDownloadFailed: 'Não foi possível baixar o arquivo. Tente novamente.',
 } satisfies Record<keyof typeof zh, string>

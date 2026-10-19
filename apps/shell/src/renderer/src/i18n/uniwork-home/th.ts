@@ -63,4 +63,8 @@ export const th = {
   uhTrashNote: 'สามารถกู้คืนรายการในถังขยะได้หากคุณมีสิทธิ์จัดการ',
   uhLoadMore: 'โหลดเพิ่มเติม',
   uhRowActions: 'การทำงานเพิ่มเติม',
+  uhSourceDownload: 'ดาวน์โหลด',
+  uhSourceDownloaded: 'ดาวน์โหลด {name} แล้ว',
+  uhSourceShowInFolder: 'แสดงในโฟลเดอร์',
+  uhSourceDownloadFailed: 'ดาวน์โหลดไฟล์ไม่ได้ ลองอีกครั้ง',
 } satisfies Record<keyof typeof zh, string>

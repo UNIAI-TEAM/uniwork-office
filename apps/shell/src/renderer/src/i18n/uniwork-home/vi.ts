@@ -63,4 +63,8 @@ export const vi = {
   uhTrashNote: 'Mục trong thùng rác có thể khôi phục nếu bạn có quyền Quản lý.',
   uhLoadMore: 'Tải thêm',
   uhRowActions: 'Thao tác khác',
+  uhSourceDownload: 'Tải xuống',
+  uhSourceDownloaded: 'Đã tải xuống {name}',
+  uhSourceShowInFolder: 'Hiện trong thư mục',
+  uhSourceDownloadFailed: 'Không thể tải file xuống. Thử lại.',
 } satisfies Record<keyof typeof zh, string>

@@ -63,4 +63,8 @@ export const ar = {
   uhTrashNote: 'يمكن استعادة العناصر في المهملات إذا كان لديك صلاحية الإدارة.',
   uhLoadMore: 'تحميل المزيد',
   uhRowActions: 'مزيد من الإجراءات',
+  uhSourceDownload: 'تنزيل',
+  uhSourceDownloaded: 'تم تنزيل {name}',
+  uhSourceShowInFolder: 'إظهار في المجلد',
+  uhSourceDownloadFailed: 'تعذّر تنزيل الملف. حاول مرة أخرى.',
 } satisfies Record<keyof typeof zh, string>

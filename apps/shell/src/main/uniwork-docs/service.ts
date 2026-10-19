@@ -37,6 +37,9 @@ import type {
   UniworkRemoteAction,
   UniworkRemoteBar,
   UniworkResult,
+  UniworkSourceDownloadInput,
+  UniworkSourceListPage,
+  UniworkSourceListQuery,
   UniworkSearchPage,
   UniworkSearchQuery,
   UniworkSharedPage,
@@ -80,6 +83,7 @@ import {
   type UniworkCreateTarget,
   type UniworkDocsClient,
   createUniworkDocsClient,
+  uniworkId,
 } from './client'
 import {
   createUniworkEditLockClient,
@@ -538,6 +542,14 @@ function parseOffsetCursor(cursor: string | undefined): number {
   if (!cursor) return 0
   const match = /^shared:(\d+)$/.exec(cursor)
   return match ? Number(match[1]) : 0
+}
+
+/** UNI-1961: a source file's suggested save name: its last segment, never a path */
+function sourceFileName(name: unknown): string {
+  const last = typeof name === 'string' ? (name.split(/[\\/]/).pop() ?? '') : ''
+  // eslint-disable-next-line no-control-regex -- a file name never carries control characters
+  const clean = last.replace(/[<>:"|?*\u0000-\u001f]/g, '').trim()
+  return clean && clean !== '.' && clean !== '..' ? clean.slice(0, 200) : 'download'
 }
 
 async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
@@ -6205,6 +6217,48 @@ export class UniworkDocsService {
       })
       const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
       return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** UNI-1961: the Documents home's "other sources" files (owner names come from the server) */
+  listSources(q: UniworkSourceListQuery): Promise<UniworkResult<UniworkSourceListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      return this.api().listSources({
+        workspaceId: q.workspaceId,
+        ...(typeof q.source === 'string' ? { source: q.source } : {}),
+        ...(typeof q.type === 'string' ? { type: q.type } : {}),
+        ...(typeof q.q === 'string' ? { q: q.q } : {}),
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+      })
+    })
+  }
+
+  /**
+   * UNI-1961: a source row's Download (the web's primary action when it cannot
+   * view the file): the save dialog suggests the file's own name, then the
+   * bytes are read and written there. A cancelled dialog reads nothing.
+   */
+  downloadSource(
+    input: UniworkSourceDownloadInput,
+  ): Promise<UniworkResult<{ path: string | null }>> {
+    return result(async () => {
+      if (!input || typeof input.workspaceId !== 'string' || typeof input.sourceId !== 'string') {
+        throw new UniworkDocError('not_found')
+      }
+      // refused ids never open the dialog
+      uniworkId(input.workspaceId)
+      uniworkId(input.sourceId)
+      const target = (await this.deps.pickDownloadPath?.(sourceFileName(input.name))) ?? null
+      if (!target) return { path: null }
+      // A106 (UNI-1362): the working-copy root is the app's own folder
+      if (this.store.isInside(target)) throw new UniworkDocError('forbidden')
+      const { bytes } = await this.api().downloadSource(input.workspaceId, input.sourceId)
+      await writeFile(target, bytes)
+      return { path: target }
     })
   }
 

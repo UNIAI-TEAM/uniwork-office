@@ -63,4 +63,8 @@ export const ms = {
   uhTrashNote: 'Item dalam Sampah boleh dipulihkan jika anda mempunyai akses Urus.',
   uhLoadMore: 'Muat lagi',
   uhRowActions: 'Tindakan lain',
+  uhSourceDownload: 'Muat turun',
+  uhSourceDownloaded: '{name} dimuat turun',
+  uhSourceShowInFolder: 'Tunjukkan dalam folder',
+  uhSourceDownloadFailed: 'Tidak dapat memuat turun fail. Cuba lagi.',
 } satisfies Record<keyof typeof zh, string>

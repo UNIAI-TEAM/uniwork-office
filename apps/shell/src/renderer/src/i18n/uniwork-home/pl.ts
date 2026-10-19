@@ -64,4 +64,8 @@ export const pl = {
   uhTrashNote: 'Elementy w koszu można przywrócić, jeśli masz uprawnienia Zarządzanie.',
   uhLoadMore: 'Załaduj więcej',
   uhRowActions: 'Więcej akcji',
+  uhSourceDownload: 'Pobierz',
+  uhSourceDownloaded: 'Pobrano {name}',
+  uhSourceShowInFolder: 'Pokaż w folderze',
+  uhSourceDownloadFailed: 'Nie udało się pobrać pliku. Spróbuj ponownie.',
 } satisfies Record<keyof typeof zh, string>

@@ -63,4 +63,8 @@ export const en = {
   uhTrashNote: 'Items in Trash can be restored if you have Manage access.',
   uhLoadMore: 'Load more',
   uhRowActions: 'More actions',
+  uhSourceDownload: 'Download',
+  uhSourceDownloaded: 'Downloaded {name}',
+  uhSourceShowInFolder: 'Show in folder',
+  uhSourceDownloadFailed: 'Could not download the file. Try again.',
 } satisfies Record<keyof typeof zh, string>

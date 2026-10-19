@@ -3,6 +3,8 @@ import type {
   UniworkDocSummary,
   UniworkEntryKind,
   UniworkFolderNode,
+  UniworkSourceFile,
+  UniworkSourceListPage,
   UniworkSystemKind,
 } from '../../shared/home-api'
 import { UniworkDocError } from './errors'
@@ -406,6 +408,50 @@ export function parseDocumentList(raw: unknown, workspaceId: string): DocumentLi
     documents.push(summaryRow(row, workspaceId, kind))
   }
   return { documents, nextCursor: typeof next === 'string' && next ? next : null }
+}
+
+/**
+ * UNI-1961: `GET /workspaces/{ws}/documents/sources`, read the way the web reads
+ * it (D sources-schema.ts): the id, source, parent and name are required; every
+ * other field takes its default when absent or mistyped. A body that is not a
+ * list fails closed - an empty list would read as "no files".
+ */
+export function parseSourceList(raw: unknown): UniworkSourceListPage {
+  const body = record(raw)
+  if (!Array.isArray(body.items)) bad()
+  const next = body.next_cursor
+  if (next !== null && next !== undefined && typeof next !== 'string') bad()
+  const items = body.items.map(sourceFile)
+  return { items, nextCursor: typeof next === 'string' && next ? next : null }
+}
+
+function sourceFile(value: unknown): UniworkSourceFile {
+  const row = record(value)
+  const parent = record(row.parent)
+  const text = (field: unknown, max = 1024) =>
+    typeof field === 'string' && field.length <= max ? field : ''
+  const owner = isRecord(row.owner) ? row.owner : null
+  return {
+    id: str(row.id, 128),
+    source: str(row.source, 64),
+    parent: { kind: str(parent.kind, 64), id: str(parent.id, 128), title: text(parent.title) },
+    name: str(row.name),
+    mimeType: text(row.mime_type, 255),
+    extension: text(row.extension, 32),
+    sizeBytes:
+      typeof row.size_bytes === 'number' &&
+      Number.isSafeInteger(row.size_bytes) &&
+      row.size_bytes >= 0
+        ? row.size_bytes
+        : 0,
+    updatedAt: text(row.updated_at, 64),
+    owner:
+      owner && typeof owner.id === 'string' && owner.id && typeof owner.name === 'string'
+        ? { id: owner.id, name: owner.name }
+        : null,
+    canOpenInApp: row.can_open_in_app === true,
+    canSave: row.can_save === true,
+  }
 }
 
 export function parseUpload(raw: unknown): UploadReceipt {

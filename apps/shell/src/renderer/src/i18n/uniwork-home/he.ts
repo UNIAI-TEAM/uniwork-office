@@ -63,4 +63,8 @@ export const he = {
   uhTrashNote: 'ניתן לשחזר פריטים באשפה אם יש לך הרשאת ניהול.',
   uhLoadMore: 'טען עוד',
   uhRowActions: 'פעולות נוספות',
+  uhSourceDownload: 'הורדה',
+  uhSourceDownloaded: '{name} הורד',
+  uhSourceShowInFolder: 'הצג בתיקייה',
+  uhSourceDownloadFailed: 'לא ניתן להוריד את הקובץ. נסו שוב.',
 } satisfies Record<keyof typeof zh, string>

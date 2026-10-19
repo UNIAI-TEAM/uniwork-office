@@ -64,4 +64,8 @@ export const ja = {
   uhTrashNote: '管理権限がある場合、ごみ箱のアイテムを復元できます。',
   uhLoadMore: 'さらに読み込む',
   uhRowActions: 'その他の操作',
+  uhSourceDownload: 'ダウンロード',
+  uhSourceDownloaded: '{name} をダウンロードしました',
+  uhSourceShowInFolder: 'フォルダーに表示',
+  uhSourceDownloadFailed: 'ファイルをダウンロードできませんでした。もう一度お試しください。',
 } satisfies Record<keyof typeof zh, string>

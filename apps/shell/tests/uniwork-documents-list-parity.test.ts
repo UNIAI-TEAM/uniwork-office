@@ -298,7 +298,7 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
     expect(api.revealPath).toHaveBeenCalledWith('C:\\Users\\me\\Downloads\\Biên bản họp.docx')
   })
 
-  it('the row menu offers Download; a failed download says so; a cancel says nothing', async () => {
+  it('the row menu offers Download; a failed download says so', async () => {
     await renderHome()
     api.uniworkDownloadSource.mockResolvedValueOnce({ ok: false, error: 'network' })
     const row = host.querySelector<HTMLElement>('.dh-doc-row[data-source-id="src-2"]')!

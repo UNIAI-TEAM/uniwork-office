@@ -64,4 +64,8 @@ export const es = {
     'Los elementos en la papelera se pueden restaurar si tienes acceso de Administración.',
   uhLoadMore: 'Cargar más',
   uhRowActions: 'Más acciones',
+  uhSourceDownload: 'Descargar',
+  uhSourceDownloaded: '{name} descargado',
+  uhSourceShowInFolder: 'Mostrar en la carpeta',
+  uhSourceDownloadFailed: 'No se pudo descargar el archivo. Inténtalo de nuevo.',
 } satisfies Record<keyof typeof zh, string>

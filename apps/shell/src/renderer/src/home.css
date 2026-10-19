@@ -7699,6 +7699,29 @@ html[dir='rtl'] .quick-title-row {
   background: var(--bg-hover-strong);
 }
 
+/* UNI-1961: the toast's one follow-up command (Show in folder) */
+.uw-act-toast-action {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.uw-act-toast-action:hover {
+  background: var(--bg-hover-strong);
+}
+
+.uw-act-toast-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .uw-act-toast-close:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;

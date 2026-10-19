@@ -64,4 +64,8 @@ export const fr = {
   uhTrashNote: 'Les éléments de la corbeille peuvent être restaurés si vous avez l’accès Gérer.',
   uhLoadMore: 'Charger plus',
   uhRowActions: 'Plus d’actions',
+  uhSourceDownload: 'Télécharger',
+  uhSourceDownloaded: '{name} téléchargé',
+  uhSourceShowInFolder: 'Afficher dans le dossier',
+  uhSourceDownloadFailed: 'Impossible de télécharger le fichier. Réessayez.',
 } satisfies Record<keyof typeof zh, string>

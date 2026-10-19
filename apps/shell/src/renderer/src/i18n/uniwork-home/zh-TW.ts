@@ -63,4 +63,8 @@ export const zhTW = {
   uhTrashNote: '如果你擁有管理權限，可以還原垃圾桶中的項目。',
   uhLoadMore: '載入更多',
   uhRowActions: '更多操作',
+  uhSourceDownload: '下載',
+  uhSourceDownloaded: '已下載 {name}',
+  uhSourceShowInFolder: '在資料夾中顯示',
+  uhSourceDownloadFailed: '無法下載該檔案。請再試一次。',
 } satisfies Record<keyof typeof zh, string>

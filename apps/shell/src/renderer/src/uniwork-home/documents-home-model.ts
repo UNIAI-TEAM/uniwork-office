@@ -7,6 +7,9 @@ import type {
   UniworkFolderNode,
   UniworkFolderQuery,
   UniworkResult,
+  UniworkSourceFile,
+  UniworkSourceListPage,
+  UniworkSourceListQuery,
 } from '../../../shared/home-api'
 import type { StringKey, TFunc } from '../locale'
 
@@ -373,6 +376,7 @@ export interface DocumentsHomeApiAdapter {
   uniworkListTrash?: (
     q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
   ) => Promise<UniworkResult<UniworkDocListPage>>
+  uniworkListSources?: (q: UniworkSourceListQuery) => Promise<UniworkResult<UniworkSourceListPage>>
 }
 
 function mapDocListPageResult(
@@ -509,4 +513,83 @@ export async function fetchDocumentsHomePage(
   }
 
   return { result: { ok: true, value: { items: [], nextCursor: null } } }
+}
+
+/**
+ * UNI-1961: one row of the documents table: a workspace document or a file
+ * that lives in another module (chat, task, meeting, email), as the web's
+ * library rows (D library-rows.ts `LibraryRow`).
+ */
+export type DocumentsHomeTableRow =
+  | { type: 'doc'; id: string; doc: DocumentsHomeDoc }
+  | { type: 'source'; id: string; source: UniworkSourceFile }
+
+function rowTime(row: DocumentsHomeTableRow): number {
+  const time = Date.parse(row.type === 'doc' ? row.doc.updatedAt : row.source.updatedAt)
+  return Number.isNaN(time) ? 0 : time
+}
+
+/**
+ * UNI-1961: the web home root's merge (D library-rows.ts `mergeNewestFirst`):
+ * two independently paged lists as one newest-first table. A row shows only
+ * when it is at least as new as the oldest loaded row of every list that still
+ * has pages, so "Load more" never slots a row above what is on screen; a list
+ * that is exhausted (or empty) sets no bound. A row with no date sinks.
+ */
+export function mergeNewestFirst(
+  docs: readonly DocumentsHomeDoc[],
+  sources: readonly UniworkSourceFile[],
+  more: { docs: boolean; sources: boolean },
+): DocumentsHomeTableRow[] {
+  const rows: DocumentsHomeTableRow[] = [
+    ...docs.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
+    ...sources.map((source) => ({ type: 'source' as const, id: `source:${source.id}`, source })),
+  ]
+  const oldest = (list: DocumentsHomeTableRow[], paged: boolean): number =>
+    paged && list.length > 0 ? Math.min(...list.map(rowTime)) : Number.NEGATIVE_INFINITY
+  const cutoff = Math.max(
+    oldest(
+      rows.filter((row) => row.type === 'doc'),
+      more.docs,
+    ),
+    oldest(
+      rows.filter((row) => row.type === 'source'),
+      more.sources,
+    ),
+  )
+  return rows.filter((row) => rowTime(row) >= cutoff).sort((a, b) => rowTime(b) - rowTime(a))
+}
+
+/**
+ * UNI-1961: the home filters a source row cannot get from the server (the web
+ * runs them on merged source rows, use-documents-library.ts): the editor is the
+ * file's owner, the date its `updated_at`. The type went to the server as `type`.
+ */
+export function sourceMatchesFilters(
+  source: UniworkSourceFile,
+  filters: UniworkListFilters,
+): boolean {
+  if (filters.updatedBy && source.owner?.id !== filters.updatedBy) return false
+  if (filters.updatedFrom) {
+    const since = Date.parse(filters.updatedFrom)
+    const at = Date.parse(source.updatedAt)
+    if (!Number.isNaN(since) && (Number.isNaN(at) || at < since)) return false
+  }
+  return true
+}
+
+/**
+ * UNI-1961: one page of the root's source files, with the home's format filter
+ * as the sources `type`. Null when the bridge has no sources call.
+ */
+export async function fetchDocumentsHomeSources(
+  api: DocumentsHomeApiAdapter,
+  params: { workspaceId: string; filters: UniworkListFilters; cursor?: string },
+): Promise<UniworkResult<UniworkSourceListPage> | null> {
+  if (typeof api.uniworkListSources !== 'function') return null
+  return api.uniworkListSources({
+    workspaceId: params.workspaceId,
+    ...(params.filters.format ? { type: params.filters.format } : {}),
+    ...(params.cursor ? { cursor: params.cursor } : {}),
+  })
 }

@@ -63,4 +63,8 @@ export const id = {
   uhTrashNote: 'Item di Sampah dapat dipulihkan jika Anda memiliki akses Kelola.',
   uhLoadMore: 'Muat lainnya',
   uhRowActions: 'Tindakan lainnya',
+  uhSourceDownload: 'Unduh',
+  uhSourceDownloaded: '{name} diunduh',
+  uhSourceShowInFolder: 'Tampilkan di folder',
+  uhSourceDownloadFailed: 'Tidak dapat mengunduh file. Coba lagi.',
 } satisfies Record<keyof typeof zh, string>
