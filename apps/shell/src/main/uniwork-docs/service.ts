@@ -1141,6 +1141,13 @@ export class UniworkDocsService {
   } | null = null
   /** per path, the last editor state the poll reported (the AI settle edge) */
   private readonly editorAi = new Map<string, { aiRunning: boolean; aiEpoch: number }>()
+  /**
+   * A3 (UNI-1362): how many remote decisions of a path are running right now,
+   * keyed by `pathKey`. `pruneClosedRemoteState` keeps `editorAi` while one is,
+   * so the bar a decision is about to publish still has the AI sample its own
+   * settle edge re-decides on.
+   */
+  private readonly remoteDecisions = new Map<string, number>()
   /** one guarded reload per path at a time; a notice queued behind it runs after */
   private readonly remoteReloads = new Map<string, Promise<void>>()
   /**
@@ -2441,7 +2448,10 @@ export class UniworkDocsService {
    * - `editorAi`: the last editor answer of the path (a stale `aiRunning` /
    *   `aiEpoch`). Kept while a bar is on screen: a `newer-ai` bar re-decides its
    *   notice on this very memory when the turn ends, and a hidden (`null`) bar
-   *   or no bar at all can never reach that edge.
+   *   or no bar at all can never reach that edge. Also kept while a remote
+   *   decision for the path is still in flight: that decision already read the
+   *   sample into its verdict, so dropping it would leave the bar it is about to
+   *   publish with no memory for its own settle edge.
    * - `remoteReloads`: a per-path reload chain that has already settled. An
    *   in-flight one is the promise a queued notice waits on and stays.
    *
@@ -2453,6 +2463,7 @@ export class UniworkDocsService {
   private pruneClosedRemoteState(): void {
     for (const path of [...this.editorAi.keys()]) {
       if (this.deps.isPathOpen(path)) continue
+      if (this.remoteDecisions.has(pathKey(path))) continue
       if (this.remoteBars.get(pathKey(path))) continue
       this.editorAi.delete(path)
     }
@@ -3399,7 +3410,7 @@ export class UniworkDocsService {
       rmSync(accountDir, { recursive: true, force: true })
     }
 
-    // Step 5: clear all 15 in-memory caches on the service
+    // Step 5: clear all 16 in-memory caches on the service
     this.lockedScopes.add(scopeToken)
     // be-10: only the owner's own locks go (`forgetLocksWhere` already matched
     // this account): another account's S11 panel is not this sign-out's to drop
@@ -3418,6 +3429,7 @@ export class UniworkDocsService {
     this.remoteLocked.clear()
     this.remoteLockPath.clear()
     this.editorAi.clear()
+    this.remoteDecisions.clear()
     this.remoteReloads.clear()
     this.orgMemberNames.clear()
     this.orgMemberNamesOrg = null
@@ -6084,8 +6096,21 @@ export class UniworkDocsService {
   private async noteRemoteChange(notice: RemoteNotice): Promise<void> {
     const doc = await this.boundDocFor(notice.documentId)
     if (!doc || !this.deps.isPathOpen(doc.path)) return
-    const decision = decideRemote(notice, await this.remoteLocalFor(doc))
-    await this.applyRemoteDecision(doc, notice, decision)
+    // A3 (UNI-1362): this decision samples the editor's AI state into the verdict
+    // it acts on, so `editorAi` is kept until it has published its bar: a close
+    // plus a poll in that window must not drop the sample that very bar's own
+    // settle edge (`noteEditorState`) re-decides the notice on. The next poll
+    // after it settles prunes the closed path as usual.
+    const key = pathKey(doc.path)
+    this.remoteDecisions.set(key, (this.remoteDecisions.get(key) ?? 0) + 1)
+    try {
+      const decision = decideRemote(notice, await this.remoteLocalFor(doc))
+      await this.applyRemoteDecision(doc, notice, decision)
+    } finally {
+      const left = (this.remoteDecisions.get(key) ?? 1) - 1
+      if (left > 0) this.remoteDecisions.set(key, left)
+      else this.remoteDecisions.delete(key)
+    }
   }
 
   private async applyRemoteDecision(

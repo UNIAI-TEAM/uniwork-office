@@ -145,7 +145,16 @@ interface Harness {
   editorStates: EditorState[]
   syncStore: SyncStoreAccess
   intents(): Promise<IntentStore>
-  capability: { syncFeed: boolean }
+  capability: {
+    syncFeed: boolean
+    /**
+     * When set, the capability read a remote decision makes parks on this
+     * promise, so a test can hold the decision open across a close.
+     */
+    hold: Promise<void> | null
+    /** called the first time a capability read parks on `hold` */
+    entered: (() => void) | null
+  }
   /** what the conflict dialog (the bar's `reload` action) answers */
   ui: { conflict: UniworkConflictChoice; discard: boolean }
   views: UniworkConflictView[]
@@ -172,7 +181,11 @@ function setup(): Harness {
   const openPaths = new Set<string>([docPath()])
   const editorStates: EditorState[] = [CLEAN]
   let editorCalls = 0
-  const capability = { syncFeed: true }
+  const capability = {
+    syncFeed: true,
+    hold: null as Promise<void> | null,
+    entered: null as (() => void) | null,
+  }
   const client = {
     detail: detailOf('10', 4, HEAD_BYTES),
     error: null as UniworkDocError | null,
@@ -226,11 +239,21 @@ function setup(): Harness {
       return state
     },
     capability: {
-      get: async () => ({
-        kind: 'ok' as const,
-        capabilities: { sync_write: true, sync_feed: capability.syncFeed },
-        source: 'fresh' as const,
-      }),
+      get: async () => {
+        // A3 regression seam: the FIRST read after `hold` is set parks on it,
+        // which lands the decision between its editor-AI sample and its bar
+        const held = capability.hold
+        if (held) {
+          capability.hold = null
+          capability.entered?.()
+          await held
+        }
+        return {
+          kind: 'ok' as const,
+          capabilities: { sync_write: true, sync_feed: capability.syncFeed },
+          source: 'fresh' as const,
+        }
+      },
     },
     client: api as unknown as UniworkDocsClient,
     ui,
@@ -912,6 +935,45 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     expect(h.reloaded).toEqual([])
     expect(bindingOf()).toMatchObject({ baseRevision: '9', state: 'saved' })
     expect(h.client.calls.download).toBe(1)
+  })
+
+  it('A3 (UNI-1362): keeps the editor-AI sample a closed path needs while its remote decision is still in flight', async () => {
+    seedCopy()
+    const h = setup()
+    h.editorStates.splice(0, 1, AI_TURN)
+    const internals = h.service as unknown as { editorAi: Map<string, unknown> }
+    // the running turn the session already reported: this is the sample the
+    // settle edge of a `newer-ai` bar is decided on
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+    expect(internals.editorAi.get(docPath())).toEqual({ aiRunning: true, aiEpoch: 2 })
+
+    // hold the decision between its editor-AI sample and the bar it publishes:
+    // remoteLocalFor reads the AI turn, then parks on the capability read
+    let entered!: () => void
+    const enteredP = new Promise<void>((resolve) => (entered = resolve))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    h.capability.hold = gate
+    h.capability.entered = entered
+    notice(h)
+    await enteredP
+
+    // the path closes while the decision is in flight: the poll must not drop
+    // the `aiRunning` sample the decision was made on
+    h.openPaths.delete(docPath())
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // the delayed bar lands after the close, then the path is reopened and the
+    // AI turn ends: the sample is what lets the settle edge re-decide the notice
+    release()
+    await waitForBar(h, { kind: 'newer-ai', version: 4 })
+    h.editorStates.splice(0, 1, CLEAN)
+    h.openPaths.add(docPath())
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
   })
 
   it('A3 (UNI-1362): prunes closed-path editor-AI memory on poll once no live bar needs it, and drops settled reload chains', async () => {

@@ -801,12 +801,12 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     })
   })
 
-  it('9. RAM cache audit + signed_out lock reason: lockSession clears all 15 caches and refuses residual working copy while signed out', async () => {
+  it('9. RAM cache audit + signed_out lock reason: lockSession clears all 16 caches and refuses residual working copy while signed out', async () => {
     const path = seedWorkingCopy({ bytes: 'v3 base', baseBytes: 'v3 base', state: 'saved' })
     const ctx = setup({ openPaths: [path] })
     await ctx.service.openSyncStore()
 
-    // Populate all 15 in-memory caches on service
+    // Populate all 16 in-memory caches on service
     const svc = ctx.service as unknown as Record<string, unknown>
     ;(svc.locks as Map<string, UniworkDocLock>).set(pathKey(path), {
       path,
@@ -824,12 +824,13 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     ;(svc.ownEcho as Map<string, Set<string>>).set(DOC, new Set(['41']))
     ;(svc.remoteLocked as Map<string, string>).set(DOC, 'revoked')
     ;(svc.editorAi as Map<string, unknown>).set(path, { aiRunning: true, aiEpoch: 1 })
+    ;(svc.remoteDecisions as Map<string, number>).set(path, 1)
     ;(svc.remoteReloads as Map<string, Promise<void>>).set(path, Promise.resolve())
     ;(svc.orgMemberNames as Map<string, string>).set('usr_1', 'Alice')
     svc.orgMemberNamesOrg = 'org_a'
     ;(svc.migratedScopes as Set<string>).add('default/acc_1')
 
-    // the editor is marked dirty (one of the 15 caches) and the harness module
+    // the editor is marked dirty (one of the 16 caches) and the harness module
     // never writes a capture: be-1 keeps the folder and lists the doc
     expect(await ctx.service.lockSession(ownerA)).toEqual({ ok: true, captureFailed: [DOC] })
 
@@ -845,6 +846,7 @@ describe('G5-11 sign-out lock-and-keep, N+1 park, and restoreParked', () => {
     expect((svc.ownEcho as Map<string, unknown>).size).toBe(0)
     expect((svc.remoteLocked as Map<string, unknown>).size).toBe(0)
     expect((svc.editorAi as Map<string, unknown>).size).toBe(0)
+    expect((svc.remoteDecisions as Map<string, unknown>).size).toBe(0)
     expect((svc.remoteReloads as Map<string, unknown>).size).toBe(0)
     expect((svc.orgMemberNames as Map<string, unknown>).size).toBe(0)
     expect(svc.orgMemberNamesOrg).toBeNull()
