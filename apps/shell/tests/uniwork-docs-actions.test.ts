@@ -24,6 +24,7 @@ import {
   LAST_OWNER_FILE,
 } from '../src/main/uniwork-docs/binding-store'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
+import type { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { UPLOAD_EXTENSIONS } from '../src/main/uniwork-docs/formats'
 import {
   TREE_CHANGED_WINDOW_MS,
@@ -1469,6 +1470,32 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     return { asked, answers, request, dismissed, dismiss: (id: string) => dismissed.push(id) }
   }
 
+  /**
+   * Every save the service hands the coordinator. A test awaits the saves
+   * themselves: a `saved` status is published before the coordinator lets go of
+   * the path, so a Save timed off the status can land on the finishing one
+   * (and be the coordinator's own coalescing) under load.
+   */
+  function coordinatorSaves(ctx: ReturnType<typeof setup>) {
+    const coordinator = (ctx.service as unknown as { coordinator: SaveCoordinator }).coordinator
+    const realSave = coordinator.save.bind(coordinator)
+    const runs: Array<Promise<unknown>> = []
+    coordinator.save = (path, options) => {
+      const run = realSave(path, options)
+      runs.push(run)
+      return run
+    }
+    return {
+      /** at least `count` saves have started, and every save started so far has settled */
+      async settled(count: number) {
+        await vi.waitFor(() => expect(runs.length).toBeGreaterThanOrEqual(count), {
+          timeout: 8000,
+        })
+        await Promise.all(runs)
+      },
+    }
+  }
+
   async function createdAndOpened(ctx: ReturnType<typeof setup>, name = 'Untitled document.docx') {
     const created = await ctx.service.createDocument({
       workspaceId: WS,
@@ -1491,11 +1518,11 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
       requestFirstSaveName: win.request,
     })
     const doc = await createdAndOpened(ctx)
+    const saves = coordinatorSaves(ctx)
 
     writeFileSync(doc.path, 'bytes v2')
     ctx.service.onUserSave(doc.path)
-    await idle()
-    expect(win.asked).toHaveLength(1)
+    await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
     expect(win.asked[0]).toMatchObject({
       path: doc.path,
       documentId: doc.id,
@@ -1506,17 +1533,16 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     expect(commitsOf(server)).toHaveLength(0)
 
     win.answers[0]!('continue')
-    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
     // the first save settles before the next one starts (a Save that lands while one is
     // finishing is the coordinator's own coalescing, not what this test is about)
-    await vi.waitFor(() => expect(ctx.statuses.at(-1)).toMatchObject({ state: 'saved' }), {
-      timeout: 8000,
-    })
+    await saves.settled(1)
+    expect(commitsOf(server)).toHaveLength(1)
 
     // a second save never asks
     writeFileSync(doc.path, 'bytes v3')
     ctx.service.onUserSave(doc.path)
-    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(2), { timeout: 8000 })
+    await saves.settled(2)
+    expect(commitsOf(server)).toHaveLength(2)
     expect(win.asked).toHaveLength(1)
   })
 
@@ -1791,17 +1817,17 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
       requestFirstSaveName: win.request,
     })
     const doc = await createdAndOpened(ctx)
+    const saves = coordinatorSaves(ctx)
     writeFileSync(doc.path, 'bytes v2')
     ctx.service.onUserSave(doc.path)
-    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
-    await vi.waitFor(() => expect(ctx.statuses.at(-1)).toMatchObject({ state: 'saved' }), {
-      timeout: 8000,
-    })
+    await saves.settled(1)
+    expect(commitsOf(server)).toHaveLength(1)
 
     ctx.setShellTab(true)
     writeFileSync(doc.path, 'bytes v3')
     ctx.service.onUserSave(doc.path)
-    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(2), { timeout: 8000 })
+    await saves.settled(2)
+    expect(commitsOf(server)).toHaveLength(2)
     expect(win.asked).toHaveLength(0)
   })
 
@@ -1814,16 +1840,16 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
       requestFirstSaveName: win.request,
     })
     const doc = await createdAndOpened(ctx)
+    const saves = coordinatorSaves(ctx)
     writeFileSync(doc.path, 'bytes v2')
     await ctx.service.save(doc.path)
-    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
-    await vi.waitFor(() => expect(ctx.statuses.at(-1)).toMatchObject({ state: 'saved' }), {
-      timeout: 8000,
-    })
+    await saves.settled(1)
+    expect(commitsOf(server)).toHaveLength(1)
 
     writeFileSync(doc.path, 'bytes v3')
     ctx.service.onUserSave(doc.path)
-    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(2), { timeout: 8000 })
+    await saves.settled(2)
+    expect(commitsOf(server)).toHaveLength(2)
     expect(win.asked).toHaveLength(0)
   })
 
@@ -2051,8 +2077,7 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     const unhandled: unknown[] = []
     const onUnhandled = (reason: unknown) => unhandled.push(reason)
     process.on('unhandledRejection', onUnhandled)
-    const store = (ctx.service as unknown as { store: { lookup: (path: string) => unknown } })
-      .store
+    const store = (ctx.service as unknown as { store: { lookup: (path: string) => unknown } }).store
     const realLookup = store.lookup
     let lookups = 0
     store.lookup = () => {
