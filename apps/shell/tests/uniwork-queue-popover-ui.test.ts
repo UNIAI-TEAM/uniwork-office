@@ -24,7 +24,7 @@ import {
 } from '../src/renderer/src/queue-popover-model'
 import { BLOCKED_REASONS, blockedCopy } from '../src/renderer/src/sync-center-model'
 import { blockedReasonKey, chipModelOf } from '../src/renderer/src/uniwork-docs-model'
-import type { UniworkDocStatus } from '../src/shared/home-api'
+import type { HomeApi, UniworkDocStatus } from '../src/shared/home-api'
 import { SYNC_CENTER_BLOCKED_REASONS } from '../src/shared/sync-center'
 import type {
   SyncCenterActionResult,
@@ -263,6 +263,8 @@ describe('queue popover model (S4)', () => {
     )
     expect(keystore.line1).toMatchObject({ key: 'uwRowBlocked', reasonKey: 'uwReasonKeystore' })
     expect(keystore.line3).toBeUndefined()
+    // a locked keychain has the account's own Retry before the sync center (A20)
+    expect(keystore.actions.map((a) => a.id)).toEqual(['retry', 'open-center'])
     const full = queuePopoverModelOf(
       makeStatus({ state: 'error', error: 'store_full' }),
       undefined,
@@ -685,6 +687,19 @@ describe('UniworkQueuePopover (S4)', () => {
     await mount(makeStatus({ state: 'error', error: 'store_full' }), { opener: 'ctrl-s' })
     expect(dialog()!.textContent).toContain(en.uwQueueFull)
     expect(buttons().map((b) => b.textContent)).toEqual([en.uwQueueOpenCenter])
+  })
+
+  it('a keystore refusal offers the account Retry, which calls accountRetry', async () => {
+    snapshot = makeSnapshot([])
+    const accountRetry = vi.fn(async () => undefined)
+    window.aiOffice = { accountRetry } as unknown as HomeApi
+    await mount(makeStatus({ state: 'error', error: 'keystore_locked' }), { opener: 'ctrl-s' })
+    expect(dialog()!.textContent).toContain(en.uwReasonKeystore)
+    expect(buttons().map((b) => b.textContent)).toEqual([enDocs.uwActRetry, en.uwQueueOpenCenter])
+    await act(async () => {
+      buttonByText(enDocs.uwActRetry)!.click()
+    })
+    expect(accountRetry).toHaveBeenCalledTimes(1)
   })
 
   it('failed: Save again calls saveAgain with the row id and closes', async () => {

@@ -118,6 +118,10 @@ function fakeLock(
       const lease = table.leases.get(docKey)
       return !!lease && lease.owner === owner && lease.generation === generation
     },
+    async isHeld(docKey) {
+      const lease = table.leases.get(docKey)
+      return !!lease && lease.owner !== owner && clock() - lease.heartbeatAt <= goneMs
+    },
     async release(docKey, generation) {
       const lease = table.leases.get(docKey)
       if (lease && lease.owner === owner && lease.generation === generation) {

@@ -259,6 +259,8 @@ export class LeaseManager {
   private lastStoreToken: string | null = null
   /** bumped by every lock and boundary change: an answer from before it is dropped */
   private generation = 0
+  /** per document: the lease commits that landed, and the ones in flight (G703-R7-1) */
+  private readonly commits = new Map<string, { landed: number; inFlight: number }>()
 
   constructor(options: LeaseManagerOptions) {
     this.options = options
@@ -583,7 +585,16 @@ export class LeaseManager {
         : undefined,
     )
 
-    const written = await this.options.store.put(record)
+    const commit = this.commits.get(documentId) ?? { landed: 0, inFlight: 0 }
+    this.commits.set(documentId, commit)
+    commit.inFlight += 1
+    let written: Awaited<ReturnType<typeof this.options.store.put>>
+    try {
+      written = await this.options.store.put(record)
+    } finally {
+      commit.inFlight -= 1
+      commit.landed += 1
+    }
     const unavailable = unavailableResult(written)
     if (unavailable) return unavailable
     if (written.kind === 'store_full') {
@@ -805,6 +816,18 @@ export class LeaseManager {
     this.wallSeen.delete(documentId)
     this.inProcessAnchored.add(documentId)
     return this.effectiveState(documentId)
+  }
+
+  /**
+   * G703-R7-1: a stamp of the lease commits of `documentId`. It changes when a
+   * granted/renewed lease starts to be written and again when the write lands,
+   * and is odd while one is in flight - so a caller that decided on an older
+   * read of the lease (the offline copy's expiry lock) can tell it went stale.
+   */
+  commitStamp(documentId: string): number {
+    const commit = this.commits.get(documentId)
+    if (!commit) return 0
+    return commit.landed * 2 + (commit.inFlight > 0 ? 1 : 0)
   }
 
   /**

@@ -24,7 +24,14 @@ import {
 export type QueuePopoverOpener = 'pill' | 'ctrl-s'
 
 export type PopoverActionId =
-  'sign-in' | 'sign-in-again' | 'recheck' | 'save-again' | 'cancel' | 'open-center' | 'edit-here'
+  | 'sign-in'
+  | 'sign-in-again'
+  | 'recheck'
+  | 'retry'
+  | 'save-again'
+  | 'cancel'
+  | 'open-center'
+  | 'edit-here'
 
 export interface PopoverAction {
   id: PopoverActionId
@@ -240,7 +247,13 @@ export function queuePopoverModelOf(
                 ? { maxBytes }
                 : {}),
             },
-      actions: [openCenter],
+      // a locked keychain re-checks the account itself: the existing Retry, which needs no row
+      actions: [
+        ...(reason === 'keystore_locked'
+          ? [{ id: 'retry' as const, labelKey: 'uwActRetry' as const }]
+          : []),
+        openCenter,
+      ],
     }
   }
 

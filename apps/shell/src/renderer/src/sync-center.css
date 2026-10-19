@@ -482,7 +482,10 @@
   .sc-link,
   .sc-doc-btn,
   .sc-tab,
-  .sc-usage .set-btn {
+  .sc-usage .set-btn,
+  .sc-controls .set-btn,
+  .sc-status-line .set-btn,
+  .sc-store-error .set-btn {
     min-height: 44px;
   }
 }

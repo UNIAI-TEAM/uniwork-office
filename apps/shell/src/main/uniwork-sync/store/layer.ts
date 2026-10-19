@@ -365,6 +365,10 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
             // a wipe mid-flush takes the folder with it: that is the wipe's
             // interruption, not a filesystem failure to report
             if (!live()) return { kind: 'interrupted' }
+            // B33 (UNI-1362): a real filesystem failure (ENOSPC) would leave this
+            // encrypted temp behind until the next scope scrub. Best effort: drop
+            // the file this write owns, then rethrow the original error.
+            await fs.rm(tmp).catch(() => undefined)
             throw error
           }
           if (!live()) {
@@ -377,6 +381,8 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
           } catch (error) {
             // the rename can fail because the wiped folder is gone
             if (!live()) return { kind: 'interrupted' }
+            // B33 (UNI-1362): the same best-effort cleanup on a publish failure
+            await fs.rm(tmp).catch(() => undefined)
             throw error
           }
           if (!published) return { kind: 'interrupted' }

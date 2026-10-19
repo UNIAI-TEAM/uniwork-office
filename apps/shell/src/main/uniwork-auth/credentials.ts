@@ -55,6 +55,38 @@ export interface SafeStorageLike {
   getSelectedStorageBackend?(): string
 }
 
+/** Linux backends behind a real OS keyring: one that can be locked, unlike `basic_text` */
+const REAL_KEYRING_BACKEND = /^(gnome_libsecret|kwallet\d*)$/
+
+/**
+ * No usable keyring: refused, never a plaintext fallback. A real keyring that
+ * reports encryption unavailable while a secret it wrapped is already on disk
+ * is a locked keyring (gnome-keyring with its prompt cancelled), not a missing
+ * one: that is the transient `keystore_locked`, so the saved sign-in is kept
+ * and offered again. `basic_text`, a host that names no backend, or no saved
+ * secret stay `keyring_unavailable` (FL-09).
+ */
+export function ensureKeyringAvailable(safeStorage: SafeStorageLike, savedSecret: boolean): void {
+  let backend: string | undefined
+  try {
+    backend = safeStorage.getSelectedStorageBackend?.()
+  } catch {
+    backend = undefined
+  }
+  if (backend === 'basic_text') throw new CredentialStoreError('keyring_unavailable')
+  let available: boolean
+  try {
+    available = safeStorage.isEncryptionAvailable()
+  } catch {
+    available = false
+  }
+  if (available) return
+  if (savedSecret && backend !== undefined && REAL_KEYRING_BACKEND.test(backend)) {
+    throw new CredentialStoreError('keystore_locked')
+  }
+  throw new CredentialStoreError('keyring_unavailable')
+}
+
 export interface CredentialStore {
   load(): StoredCredential | null
   save(credential: StoredCredential): void
@@ -123,22 +155,7 @@ export function createCredentialStore(options: {
   const legacyBackup = `${target}.bak`
   const { safeStorage } = options
 
-  const ensureAvailable = () => {
-    let backend: string | undefined
-    try {
-      backend = safeStorage.getSelectedStorageBackend?.()
-    } catch {
-      backend = undefined
-    }
-    if (backend === 'basic_text') throw new CredentialStoreError('keyring_unavailable')
-    let available: boolean
-    try {
-      available = safeStorage.isEncryptionAvailable()
-    } catch {
-      available = false
-    }
-    if (!available) throw new CredentialStoreError('keyring_unavailable')
-  }
+  const ensureAvailable = (savedSecret = false) => ensureKeyringAvailable(safeStorage, savedSecret)
 
   const readTarget = (): ReadResult => {
     let plain: string
@@ -173,7 +190,7 @@ export function createCredentialStore(options: {
 
   return {
     load() {
-      ensureAvailable()
+      ensureAvailable(existsSync(target))
       removeQuietly(legacyBackup)
       if (!existsSync(target)) return null
       const read = readTarget()

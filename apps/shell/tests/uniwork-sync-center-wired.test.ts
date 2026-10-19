@@ -113,6 +113,8 @@ function wired(
     /** the lease manager's effective state per document id (RES-3) */
     lease?: (documentId: string) => string
     offlineLibrary?: boolean
+    /** the deployment this build runs against (default: the last owner's) */
+    activeDeployment?: string | null
   } = {},
 ) {
   const storeRoot = join(base, 'store')
@@ -261,6 +263,8 @@ function wired(
         org: { id: 'org-1', name: 'VietAnts' },
         ...options.status,
       }) as never,
+    activeDeploymentId: () =>
+      options.activeDeployment === undefined ? SCOPE.deploymentId : options.activeDeployment,
     capabilityRead: async () => ({
       kind: 'ok',
       capabilities: {
@@ -756,10 +760,13 @@ describe('W10: "Đồng bộ ngay" restarts a feed stopped on refused resyncs, e
       await rt.runtime.tick()
     }
     await vi.waitFor(async () =>
-      expect((await h.controller.getSnapshot()).header.online).toBe(false),
+      expect((await h.controller.getSnapshot()).header.status).toBe('resync_failed'),
     )
     const stopped = (await h.controller.getSnapshot()).header
-    // the refused resyncs are reported as offline (deferred to G5-13), and the flag is still set
+    // B47 (UNI-1362): a refused resync is a round trip that REACHED the server,
+    // so the pass is not offline and the header names the condition the click
+    // clears instead of masking it behind `offline`
+    expect(stopped.online).toBe(true)
     expect(stopped.resyncFailed).toBe(true)
     tick.mockClear()
     return { rt, h, tick }
@@ -865,5 +872,24 @@ describe('EL1A-R2-2: wired Sync Center names edit_locked from a stored failed re
       state: 'failed',
       failedReason: 'edit_locked',
     })
+  })
+})
+
+describe('G703B-P4 (FL-08): the signed-out working-copy count belongs to the active deployment', () => {
+  const signedOut = { loggedIn: false, state: 'signed-out' }
+
+  it("counts the last owner's copies on the deployment it ran against (FL-07 unchanged)", async () => {
+    const h = wired({ docs: [{ key: 'doc-1' }], status: signedOut })
+    expect((await h.controller.getSnapshot()).signedOut).toEqual({ lockedCount: 1 })
+  })
+
+  it("does not count another deployment's last owner", async () => {
+    const h = wired({ docs: [{ key: 'doc-1' }], status: signedOut, activeDeployment: 'dep-B' })
+    expect((await h.controller.getSnapshot()).signedOut).toEqual({ lockedCount: 0 })
+  })
+
+  it('counts nothing while no deployment profile is known', async () => {
+    const h = wired({ docs: [{ key: 'doc-1' }], status: signedOut, activeDeployment: null })
+    expect((await h.controller.getSnapshot()).signedOut).toEqual({ lockedCount: 0 })
   })
 })
