@@ -88,4 +88,9 @@ export const id = {
   uhShelvedNoPermission: 'Anda tidak mengelola item ini.',
   uhShelvedUnshelveFailed: 'Tidak dapat membatalkan arsip. Tidak ada yang berubah.',
   uhShelvedTrashFailed: 'Tidak dapat memindahkan ke sampah. Tidak ada yang berubah.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'Arsipkan',
+  uhShelvedToastShelved: '{title} diarsipkan',
+  uhShelvedUndo: 'Urungkan',
+  uhShelvedShelveFailed: 'Tidak dapat mengarsipkan. Tidak ada yang berubah.',
 } satisfies Record<keyof typeof zh, string>

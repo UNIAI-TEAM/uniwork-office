@@ -88,4 +88,9 @@ export const nl = {
   uhShelvedNoPermission: 'U beheert dit item niet.',
   uhShelvedUnshelveFailed: 'Dearchiveren mislukt. Er is niets gewijzigd.',
   uhShelvedTrashFailed: 'Verplaatsen naar prullenbak mislukt. Er is niets gewijzigd.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'Archiveren',
+  uhShelvedToastShelved: '{title} gearchiveerd',
+  uhShelvedUndo: 'Ongedaan maken',
+  uhShelvedShelveFailed: 'Archiveren mislukt. Er is niets gewijzigd.',
 } satisfies Record<keyof typeof zh, string>

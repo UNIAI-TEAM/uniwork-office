@@ -89,4 +89,9 @@ export const ja = {
   uhShelvedNoPermission: 'この項目を管理する権限がありません。',
   uhShelvedUnshelveFailed: 'アーカイブを解除できませんでした。何も変更されていません。',
   uhShelvedTrashFailed: 'ごみ箱に移動できませんでした。何も変更されていません。',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'アーカイブ',
+  uhShelvedToastShelved: '{title} をアーカイブしました',
+  uhShelvedUndo: '元に戻す',
+  uhShelvedShelveFailed: 'アーカイブできませんでした。何も変更されていません。',
 } satisfies Record<keyof typeof zh, string>

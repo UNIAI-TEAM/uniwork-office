@@ -88,4 +88,9 @@ export const pt = {
   uhShelvedNoPermission: 'Você não gerencia este item.',
   uhShelvedUnshelveFailed: 'Não foi possível desarquivar. Nada mudou.',
   uhShelvedTrashFailed: 'Não foi possível mover para a lixeira. Nada mudou.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'Arquivar',
+  uhShelvedToastShelved: '{title} arquivado',
+  uhShelvedUndo: 'Desfazer',
+  uhShelvedShelveFailed: 'Não foi possível arquivar. Nada mudou.',
 } satisfies Record<keyof typeof zh, string>

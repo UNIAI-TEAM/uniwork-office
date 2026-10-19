@@ -88,4 +88,9 @@ export const ko = {
   uhShelvedNoPermission: '이 항목을 관리할 권한이 없습니다.',
   uhShelvedUnshelveFailed: '보관을 해제하지 못했습니다. 변경된 내용이 없습니다.',
   uhShelvedTrashFailed: '휴지통으로 이동하지 못했습니다. 변경된 내용이 없습니다.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: '보관',
+  uhShelvedToastShelved: '{title}을(를) 보관했습니다',
+  uhShelvedUndo: '실행 취소',
+  uhShelvedShelveFailed: '보관하지 못했습니다. 변경된 내용이 없습니다.',
 } satisfies Record<keyof typeof zh, string>

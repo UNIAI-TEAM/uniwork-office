@@ -88,4 +88,9 @@ export const ar = {
   uhShelvedNoPermission: 'أنت لا تدير هذا العنصر.',
   uhShelvedUnshelveFailed: 'تعذر إلغاء الأرشفة. لم يتغير شيء.',
   uhShelvedTrashFailed: 'تعذر النقل إلى المهملات. لم يتغير شيء.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'أرشفة',
+  uhShelvedToastShelved: 'تمت أرشفة {title}',
+  uhShelvedUndo: 'تراجع',
+  uhShelvedShelveFailed: 'تعذرت الأرشفة. لم يتغير شيء.',
 } satisfies Record<keyof typeof zh, string>

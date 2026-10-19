@@ -88,4 +88,9 @@ export const zhTW = {
   uhShelvedNoPermission: '你無法管理此項目。',
   uhShelvedUnshelveFailed: '無法取消封存。未做任何變更。',
   uhShelvedTrashFailed: '無法移至垃圾桶。未做任何變更。',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: '封存',
+  uhShelvedToastShelved: '已封存 {title}',
+  uhShelvedUndo: '復原',
+  uhShelvedShelveFailed: '無法封存。未做任何變更。',
 } satisfies Record<keyof typeof zh, string>

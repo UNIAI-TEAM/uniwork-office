@@ -91,4 +91,9 @@ export const hi = {
   uhShelvedNoPermission: 'आप इस आइटम का प्रबंधन नहीं करते।',
   uhShelvedUnshelveFailed: 'संग्रह से नहीं हटा सके। कुछ नहीं बदला।',
   uhShelvedTrashFailed: 'ट्रैश में नहीं ले जा सके। कुछ नहीं बदला।',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'संग्रहीत करें',
+  uhShelvedToastShelved: '{title} संग्रहीत किया गया',
+  uhShelvedUndo: 'पूर्ववत करें',
+  uhShelvedShelveFailed: 'संग्रहीत नहीं कर सके। कुछ नहीं बदला।',
 } satisfies Record<keyof typeof zh, string>

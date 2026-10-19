@@ -90,4 +90,9 @@ export const de = {
   uhShelvedNoPermission: 'Sie verwalten dieses Element nicht.',
   uhShelvedUnshelveFailed: 'Dearchivieren nicht möglich. Nichts wurde geändert.',
   uhShelvedTrashFailed: 'Verschieben in den Papierkorb nicht möglich. Nichts wurde geändert.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'Archivieren',
+  uhShelvedToastShelved: '{title} archiviert',
+  uhShelvedUndo: 'Rückgängig',
+  uhShelvedShelveFailed: 'Archivieren nicht möglich. Nichts wurde geändert.',
 } satisfies Record<keyof typeof zh, string>

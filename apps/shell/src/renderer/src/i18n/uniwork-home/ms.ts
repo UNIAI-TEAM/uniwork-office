@@ -88,4 +88,9 @@ export const ms = {
   uhShelvedNoPermission: 'Anda tidak mengurus item ini.',
   uhShelvedUnshelveFailed: 'Tidak dapat menyaharkib. Tiada apa yang berubah.',
   uhShelvedTrashFailed: 'Tidak dapat mengalih ke sampah. Tiada apa yang berubah.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'Arkib',
+  uhShelvedToastShelved: '{title} diarkib',
+  uhShelvedUndo: 'Buat asal',
+  uhShelvedShelveFailed: 'Tidak dapat mengarkib. Tiada apa yang berubah.',
 } satisfies Record<keyof typeof zh, string>

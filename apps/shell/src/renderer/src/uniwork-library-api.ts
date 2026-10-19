@@ -238,6 +238,7 @@ export function saveLocalCopy(path: string): Promise<boolean> {
 interface ShelvedBridge {
   uniworkUnshelveDocument?(documentId: string): Promise<DocActionResult<UniworkDocShelveResult>>
   uniworkTrashShelvedDocument?(documentId: string): Promise<DocActionResult<UniworkDocSummary>>
+  uniworkShelveDocument?(documentId: string): Promise<DocActionResult<UniworkDocShelveResult>>
 }
 
 function shelvedActions(): ShelvedBridge {
@@ -256,4 +257,11 @@ export function trashShelvedDocument(
   documentId: string,
 ): Promise<DocActionResult<UniworkDocSummary>> {
   return settleAct(shelvedActions().uniworkTrashShelvedDocument?.(documentId))
+}
+
+/** Lưu trữ a live item from its row (the web's row ⋯ "Lưu trữ") */
+export function shelveDocument(
+  documentId: string,
+): Promise<DocActionResult<UniworkDocShelveResult>> {
+  return settleAct(shelvedActions().uniworkShelveDocument?.(documentId))
 }

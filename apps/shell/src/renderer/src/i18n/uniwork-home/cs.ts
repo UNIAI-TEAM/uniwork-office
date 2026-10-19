@@ -89,4 +89,9 @@ export const cs = {
   uhShelvedNoPermission: 'Tuto položku nespravujete.',
   uhShelvedUnshelveFailed: 'Archivaci se nepodařilo zrušit. Nic se nezměnilo.',
   uhShelvedTrashFailed: 'Přesun do koše se nezdařil. Nic se nezměnilo.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'Archivovat',
+  uhShelvedToastShelved: '{title} archivováno',
+  uhShelvedUndo: 'Zpět',
+  uhShelvedShelveFailed: 'Archivace se nezdařila. Nic se nezměnilo.',
 } satisfies Record<keyof typeof zh, string>

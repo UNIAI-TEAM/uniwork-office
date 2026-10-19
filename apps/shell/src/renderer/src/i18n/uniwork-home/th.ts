@@ -88,4 +88,9 @@ export const th = {
   uhShelvedNoPermission: 'คุณไม่ได้จัดการรายการนี้',
   uhShelvedUnshelveFailed: 'ยกเลิกการเก็บถาวรไม่ได้ ยังไม่มีอะไรเปลี่ยนแปลง',
   uhShelvedTrashFailed: 'ย้ายไปถังขยะไม่ได้ ยังไม่มีอะไรเปลี่ยนแปลง',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'เก็บถาวร',
+  uhShelvedToastShelved: 'เก็บถาวร {title} แล้ว',
+  uhShelvedUndo: 'เลิกทำ',
+  uhShelvedShelveFailed: 'เก็บถาวรไม่ได้ ยังไม่มีอะไรเปลี่ยนแปลง',
 } satisfies Record<keyof typeof zh, string>

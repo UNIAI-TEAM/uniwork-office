@@ -6285,6 +6285,16 @@ export class UniworkDocsService {
     })
   }
 
+  /** UNI-1961: Lưu trữ a live item the caller manages (the web's row ⋯ "Lưu trữ") */
+  shelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId)
+      return this.api().shelve(documentId, this.newIdempotencyKey())
+    })
+  }
+
   /** UNI-1961: manage (or admin_scope, the web's canManageTrashed) on a row of any kind */
   private async requireManageAnyKind(documentId: string): Promise<void> {
     const ref = await this.api().documentManageRef(documentId)

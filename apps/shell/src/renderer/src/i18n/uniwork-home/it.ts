@@ -88,4 +88,9 @@ export const it = {
   uhShelvedNoPermission: 'Non gestisci questo elemento.',
   uhShelvedUnshelveFailed: 'Impossibile ripristinare dall’archivio. Nulla è cambiato.',
   uhShelvedTrashFailed: 'Impossibile spostare nel cestino. Nulla è cambiato.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'Archivia',
+  uhShelvedToastShelved: '{title} archiviato',
+  uhShelvedUndo: 'Annulla',
+  uhShelvedShelveFailed: 'Impossibile archiviare. Nulla è cambiato.',
 } satisfies Record<keyof typeof zh, string>

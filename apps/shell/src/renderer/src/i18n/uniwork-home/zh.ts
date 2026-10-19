@@ -87,4 +87,9 @@ export const zh = {
   uhShelvedNoPermission: '你不能管理此项目。',
   uhShelvedUnshelveFailed: '无法取消归档。未做任何更改。',
   uhShelvedTrashFailed: '无法移到回收站。未做任何更改。',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: '归档',
+  uhShelvedToastShelved: '已归档 {title}',
+  uhShelvedUndo: '撤销',
+  uhShelvedShelveFailed: '无法归档。未做任何更改。',
 }

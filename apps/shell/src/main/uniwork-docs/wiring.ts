@@ -919,6 +919,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.trashShelvedDocument, (_event, documentId: unknown) =>
     service.trashShelvedDocument(documentId as string),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.shelveDocument, (_event, documentId: unknown) =>
+    service.shelveDocument(documentId as string),
+  )
   // FD-11: the folder-tree surface
   ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, (_event, workspaceId: unknown) =>
     service.folderTree(workspaceId as string),

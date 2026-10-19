@@ -88,4 +88,9 @@ export const ru = {
   uhShelvedNoPermission: 'Вы не управляете этим элементом.',
   uhShelvedUnshelveFailed: 'Не удалось разархивировать. Ничего не изменилось.',
   uhShelvedTrashFailed: 'Не удалось переместить в корзину. Ничего не изменилось.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'Архивировать',
+  uhShelvedToastShelved: '{title} в архиве',
+  uhShelvedUndo: 'Отменить',
+  uhShelvedShelveFailed: 'Не удалось архивировать. Ничего не изменилось.',
 } satisfies Record<keyof typeof zh, string>

@@ -88,4 +88,9 @@ export const he = {
   uhShelvedNoPermission: 'אינך מנהל את הפריט הזה.',
   uhShelvedUnshelveFailed: 'לא ניתן לבטל את הארכוב. דבר לא השתנה.',
   uhShelvedTrashFailed: 'לא ניתן להעביר לאשפה. דבר לא השתנה.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'העברה לארכיון',
+  uhShelvedToastShelved: '{title} הועבר לארכיון',
+  uhShelvedUndo: 'ביטול',
+  uhShelvedShelveFailed: 'לא ניתן להעביר לארכיון. דבר לא השתנה.',
 } satisfies Record<keyof typeof zh, string>

@@ -274,6 +274,8 @@ export interface UniworkDocsClient {
   documentManageRef(documentId: string): Promise<DocumentManageRef>
   /** UNI-1961: bring a shelved item (and its same-batch descendants the caller manages) back */
   unshelve(documentId: string, idempotencyKey: string): Promise<UniworkDocShelveResult>
+  /** UNI-1961: shelve a live item and its live subtree into Lưu trữ (one batch) */
+  shelve(documentId: string, idempotencyKey: string): Promise<UniworkDocShelveResult>
   /**
    * one page of org members (id + display name) for resolving the properties
    * panel's names; `cursor` is D's opaque `next_cursor` and `limit` is capped
@@ -1018,6 +1020,17 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const raw = await send({
         method: 'POST',
         route: `/documents/${id(documentId)}/unshelve`,
+        idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentShelveResult(raw)
+    },
+
+    async shelve(documentId, idempotencyKey) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/shelve`,
         idempotencyKey,
         timeoutMs: metadataTimeout,
         read: json,

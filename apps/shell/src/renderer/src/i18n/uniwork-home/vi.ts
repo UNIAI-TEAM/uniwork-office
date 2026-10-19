@@ -88,4 +88,9 @@ export const vi = {
   uhShelvedNoPermission: 'Bạn không quản lý mục này.',
   uhShelvedUnshelveFailed: 'Không bỏ lưu trữ được. Chưa có gì thay đổi.',
   uhShelvedTrashFailed: 'Không chuyển vào thùng rác được. Chưa có gì thay đổi.',
+  // UNI-1961: the live-row Lưu trữ (shelve) and its Hoàn tác toast
+  uhShelvedShelve: 'Lưu trữ',
+  uhShelvedToastShelved: 'Đã lưu trữ {title}',
+  uhShelvedUndo: 'Hoàn tác',
+  uhShelvedShelveFailed: 'Không lưu trữ được. Chưa có gì thay đổi.',
 } satisfies Record<keyof typeof zh, string>

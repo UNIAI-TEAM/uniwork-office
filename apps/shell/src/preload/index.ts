@@ -1230,6 +1230,11 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.trashShelvedDocument, documentId),
     )
   },
+  async uniworkShelveDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocShelveResult>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.shelveDocument, documentId),
+    )
+  },
   async uniworkFolderTree(workspaceId: string) {
     return asUniworkResult<UniworkFolderNode[]>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.folderTree, workspaceId),

@@ -1313,6 +1313,8 @@ export interface HomeApi {
   uniworkTrashShelvedDocument(
     documentId: string,
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** UNI-1961: Lưu trữ - shelve a live item the caller manages (the row ⋯; files and pages) */
+  uniworkShelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>>
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
@@ -1993,6 +1995,8 @@ export const UNIWORK_DOC_CHANNELS = {
   unshelveDocument: 'uniwork-doc:unshelve-document',
   /** invoke(documentId) -> move a shelved item of any kind to the trash (UNI-1961) */
   trashShelvedDocument: 'uniwork-doc:trash-shelved-document',
+  /** invoke(documentId) -> Lưu trữ a live item (UNI-1961) */
+  shelveDocument: 'uniwork-doc:shelve-document',
 } as const
 
 export const PROJECT_CHANNELS = {

@@ -103,7 +103,7 @@ import {
   type DocumentsHomeViewMode,
   type UpdatedByOption,
 } from './documents-home-model'
-import { trashShelvedDocument, unshelveDocument } from '../uniwork-library-api'
+import { shelveDocument, trashShelvedDocument, unshelveDocument } from '../uniwork-library-api'
 import {
   ShelvedTable,
   ShelvedToolbar,
@@ -332,7 +332,11 @@ export function DocumentsHome({
     busy: boolean
   } | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<DocumentsHomeDoc | null>(null)
-  const [toast, setToast] = useState<{ message: string; tone: 'ok' | 'error' } | null>(null)
+  const [toast, setToast] = useState<{
+    message: string
+    tone: 'ok' | 'error'
+    action?: { label: string; onClick: () => void }
+  } | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
 
   // G5-05u / NET-OFF-01: pin/unpin entry in each document row's "…" menu (hidden while the capability is off)
@@ -1011,6 +1015,56 @@ export function DocumentsHome({
     })
   }
 
+  // UNI-1961: shelve at once, then a toast whose Hoàn tác unshelves it (no optimistic update)
+  const shelvingRef = useRef<Set<string>>(new Set())
+  const handleShelve = async (doc: DocumentsHomeDoc) => {
+    if (shelvingRef.current.has(doc.id)) return
+    shelvingRef.current.add(doc.id)
+    const res = await shelveDocument(doc.id)
+    shelvingRef.current.delete(doc.id)
+    if (!res.ok) {
+      setToast({
+        message:
+          res.error === 'forbidden' ? t('uhShelvedNoPermission') : t('uhShelvedShelveFailed'),
+        tone: 'error',
+      })
+      return
+    }
+    const title = res.value.document.title || doc.title
+    const message = t('uhShelvedToastShelved', { title })
+    announce(message)
+    setToast({
+      message,
+      tone: 'ok',
+      action: {
+        label: t('uhShelvedUndo'),
+        onClick: () => {
+          void (async () => {
+            if (unshelvingRef.current.has(doc.id)) return
+            trackUnshelving(doc.id, true)
+            const undone = await unshelveDocument(doc.id)
+            trackUnshelving(doc.id, false)
+            if (undone.ok) {
+              const back = t('uhShelvedToastUnshelved', { title })
+              announce(back)
+              setToast({ message: back, tone: 'ok' })
+              refreshAll()
+              return
+            }
+            setToast({
+              message:
+                undone.error === 'forbidden'
+                  ? t('uhShelvedNoPermission')
+                  : t('uhShelvedUnshelveFailed'),
+              tone: 'error',
+            })
+          })()
+        },
+      },
+    })
+    refreshAll()
+  }
+
   const handleConfirmShelvedTrash = async () => {
     const doc = shelvedTrashTarget
     if (!doc) return
@@ -1136,6 +1190,14 @@ export function DocumentsHome({
             parentId: doc.parentId ?? folderId,
             title: doc.title,
           }),
+      })
+    }
+    // UNI-1961: the web's row Lưu trữ (files and pages here; folder shelve is a residual)
+    if (doc.canManage === true && (doc.kind === 'file' || doc.kind === 'page') && !doc.shelvedAt) {
+      items.push({
+        id: 'shelve',
+        label: t('uhShelvedShelve'),
+        onSelect: () => void handleShelve(doc),
       })
     }
     if (doc.canManage === true) {
@@ -2035,7 +2097,14 @@ export function DocumentsHome({
 
       {offlineToggle.node}
 
-      {toast && <ActionToast message={toast.message} tone={toast.tone} onDone={clearToast} />}
+      {toast && (
+        <ActionToast
+          message={toast.message}
+          tone={toast.tone}
+          action={toast.action}
+          onDone={clearToast}
+        />
+      )}
     </div>
   )
 }
