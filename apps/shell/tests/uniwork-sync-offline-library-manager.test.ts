@@ -1101,6 +1101,23 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
       expect(changes).toEqual([])
     })
 
+    it('FUSR-R1-7: a refresh whose metadata read fails with a revoke across the sign-out recreates no row', async () => {
+      const { h, changes } = await pinnedHarness()
+      const held = gate()
+      h.docs.getDocument = async () => {
+        held.reached()
+        await held.open
+        throw new UniworkDocError('forbidden')
+      }
+      const refreshing = h.manager.refresh('doc_1')
+      await held.entered
+      await lockAndWipeOutgoing(h)
+      held.release()
+      expect(await refreshing).toEqual({ kind: 'refused', code: 'interrupted' })
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
     it('FUSR-R1-6: an eviction whose copy deletion spans the sign-out writes no row', async () => {
       const { h, changes } = await pinnedHarness()
       // getPin, then the copy's delete is held
