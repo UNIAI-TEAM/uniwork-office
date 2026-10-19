@@ -118,6 +118,7 @@ export const zhTW = {
   uwSignOutWaiting: '正在完成傳送中的儲存，然後登出…',
   uwSignOutCaptureFailed:
     '部分未儲存的變更未能及時擷取；已為你的帳號保留最近的已儲存或自動儲存版本。',
+  uwSignOutTimedOut: '登出確認逾時；帳戶可能仍處於登入狀態。',
   uwSwitchLostTitle: '上一個帳號的部分未儲存變更已遺失',
   uwSwitchLostBody:
     '另一個帳號已在這台電腦上登入，因此上一個帳號已被鎖定。未儲存的變更無法保留的文件：{count}。其他內容仍為該帳號鎖定保存在這台電腦上。',
