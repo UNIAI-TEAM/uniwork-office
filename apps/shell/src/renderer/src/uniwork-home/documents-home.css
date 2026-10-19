@@ -119,6 +119,26 @@
   overflow-y: auto;
 }
 
+/* UNI-1957: the My Folder stand-in is a tree row (same box, glyph and selected look), indented as one */
+.dh-my-folder-standin {
+  width: 100%;
+  padding-block: 0;
+  padding-inline-start: 18px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+}
+
+.dh-my-folder-standin:hover {
+  background: var(--hover);
+}
+
+.dh-my-folder-standin.selected {
+  background: var(--accent-soft);
+}
+
 /* Main workspace pane */
 .dh-main {
   display: flex;
@@ -303,37 +323,6 @@
 .dh-quick-pill:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-}
-
-.dh-quick-hint {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin-inline-start: auto;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.dh-quick-hint-icon {
-  flex: none;
-  color: var(--text-tertiary);
-}
-
-.dh-quick-hint-link {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.dh-quick-hint-link:hover {
-  color: var(--accent);
 }
 
 .dh-subview-banner {
@@ -820,6 +809,11 @@
   .dh-view-btn {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  /* the card's "…" is 44px here (.uw-pick-info-btn) + the actions box's 12px: keep the name clear of both */
+  .dh-folder-open {
+    padding-right: 60px;
   }
 }
 

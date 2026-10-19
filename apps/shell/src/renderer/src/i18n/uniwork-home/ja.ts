@@ -22,8 +22,6 @@ export const ja = {
   uhQuickMd: 'Markdownファイル',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
-  uhQuickHintPrefix: 'このページでの新規作成とアップロードは',
-  uhQuickHintSuffix: 'に保存され、あなただけが見られます。必要に応じて共有または移動してください。',
   uhFilterType: '種類:',
   uhFilterTypeAll: 'すべて',
   uhFilterModifiedBy: '更新者:',
@@ -64,8 +62,6 @@ export const ja = {
   uhEmptyTrash: 'ごみ箱は空です。',
   uhEmptyFiltered: '条件に一致するドキュメントがありません。',
   uhTrashNote: '管理権限がある場合、ごみ箱のアイテムを復元できます。',
-  uhMyFolderNote:
-    '非公開 — 共有または共有フォルダーへ移動しない限り、あなただけがアクセスできます。',
   uhLoadMore: 'さらに読み込む',
   uhRowActions: 'その他の操作',
 } satisfies Record<keyof typeof zh, string>
