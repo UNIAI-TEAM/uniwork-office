@@ -12,7 +12,7 @@
 import { Buffer } from 'node:buffer'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 import { App } from '../src/renderer/App'
@@ -289,5 +289,64 @@ describe('canvas watermark layer when the pending watermark changes', () => {
 
     expect(document.querySelector('.page-watermark'), 'no ghost after remove').toBeNull()
     expect(floatImages(), 'parsed watermark float dropped').toHaveLength(0)
+  })
+
+  it('a font-ready promise settling after unmount arms no pass against the destroyed editor', async () => {
+    // the beforeEach mount resolved fonts at once; remount with a deferred ready so
+    // the effect's `fonts.ready.then` callbacks outlive their editor, as a slow
+    // font load does when a document closes and another one opens
+    const defineFonts = (ready: Promise<void>) =>
+      Object.defineProperty(document, 'fonts', {
+        configurable: true,
+        value: {
+          status: 'loaded',
+          ready,
+          addEventListener() {},
+          removeEventListener() {},
+        },
+      })
+    const mountApp = async () => {
+      root = createRoot(host!)
+      await act(async () => {
+        root!.render(createElement(LocaleProvider, { initial: 'en', children: createElement(App) }))
+      })
+      await untilMounted()
+      await settle()
+    }
+    act(() => root?.unmount())
+    let settleFonts: () => void = () => {}
+    defineFonts(
+      new Promise<void>((resolve) => {
+        settleFonts = resolve
+      }),
+    )
+    await mountApp()
+    act(() => root?.unmount())
+    // a second document is open (its .ProseMirror exists) when the first one's
+    // font promise finally settles
+    defineFonts(Promise.resolve())
+    await mountApp()
+    expect(document.querySelector('.ProseMirror'), 'second document mounted').not.toBeNull()
+
+    // the late callback must not schedule a remeasure pass: its editor is gone, and
+    // the pass would run against it while the second document's DOM is in place
+    const armed: string[] = []
+    const realSetTimeout = window.setTimeout.bind(window)
+    const spy = vi.spyOn(window, 'setTimeout').mockImplementation(((
+      fn: TimerHandler,
+      ...rest: unknown[]
+    ) => {
+      if (typeof fn === 'function') armed.push(fn.name)
+      return realSetTimeout(fn, ...(rest as [number?]))
+    }) as typeof window.setTimeout)
+    try {
+      settleFonts()
+      await tick()
+    } finally {
+      spy.mockRestore()
+    }
+    expect(armed, 'no remeasure armed by the stale font-ready callback').not.toContain('remeasure')
+    // let a pass armed anyway fire inside this test, not in the next one
+    await new Promise((resolve) => setTimeout(resolve, 1200))
   })
 })
