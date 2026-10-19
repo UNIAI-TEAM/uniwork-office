@@ -134,6 +134,17 @@ export function formulaCells(worksheetXml: string): { row: number; column: numbe
 /** a formula's result as the gateway types it: number, text, boolean, `{ error }`, or null = none */
 export type CachedValue = string | number | boolean | null | { readonly error: string }
 
+/** red-commit stub (UNI-1989): the keep marker and the originals reader arrive with the fix */
+export const KEEP = Symbol('keep-cached')
+export type CachedEntry = CachedValue | typeof KEEP
+
+/** 0-based row and column of every formula cell with the cached value the file holds for it */
+export function formulaCellsWithValues(
+  _worksheetXml: string,
+): { row: number; column: number; original?: CachedValue }[] {
+  return []
+}
+
 const escapeText = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -162,16 +173,16 @@ const FORMULA_ELEMENT = /<f\b[^>]*\/>|<f\b[^>]*>[\s\S]*?<\/f>/
  */
 export function rewriteFormulaCachedValues(
   worksheetXml: string,
-  valueAt?: (row: number, column: number) => CachedValue | undefined,
+  valueAt?: (row: number, column: number) => CachedEntry | undefined,
 ): string {
   return worksheetXml.replace(CELL, (whole, attrs: string, body: string | undefined) => {
     if (body === undefined || !HAS_FORMULA.test(body)) return whole
-    let value: CachedValue | undefined
+    let value: CachedEntry | undefined
     if (valueAt) {
       const ref = /\br="([A-Z]{1,3})(\d+)"/.exec(attrs)
       if (ref) value = valueAt(Number(ref[2]) - 1, columnIndex(ref[1] ?? 'A'))
     }
-    const { type, valueXml } = serializeCached(value)
+    const { type, valueXml } = serializeCached(value as CachedValue | undefined)
     if (valueXml === '' && !HAS_VALUE.test(body)) return whole
     const kept = body.replace(VALUE_ELEMENT, '')
     const withValue =

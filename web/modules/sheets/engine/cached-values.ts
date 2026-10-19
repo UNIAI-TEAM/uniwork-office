@@ -17,7 +17,7 @@
  * gone; the transport then sweeps.
  */
 import type { WorkbookSaveRequest } from '../../../../apps/sheets/src/shared/desktop-api'
-import { engineCanReplaySave } from './stale-values'
+import { engineCanReplaySave, type CachedValue } from './stale-values'
 
 type SaveEdit = WorkbookSaveRequest['edits'][number]
 type FormulaValue = WorkbookSaveRequest['formulaValues'][number]
@@ -81,7 +81,10 @@ export function planRefresh(
   request: WorkbookSaveRequest,
   sheetNames: ReadonlyMap<string, string>,
   fileBytes: number,
-  fileFormulas: ReadonlyMap<string, readonly { row: number; column: number }[]>,
+  fileFormulas: ReadonlyMap<
+    string,
+    readonly { row: number; column: number; original?: CachedValue }[]
+  >,
 ): RefreshPlan | null {
   if (fileBytes > RECALC_MAX_FILE_BYTES) return null
   if (!engineCanReplaySave(request)) return null

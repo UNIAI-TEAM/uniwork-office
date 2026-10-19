@@ -106,8 +106,8 @@ async function syntheticWorkbook(rows: number): Promise<Uint8Array> {
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
 }
 
-/** a two-sheet workbook whose formulas carry a cached value computed from A1 = 1 */
-async function chainWorkbook(): Promise<Uint8Array> {
+/** a workbook of two sheets, Data (sheet1.xml) and Report (sheet2.xml), with the given worksheet XML */
+async function twoSheetWorkbook(sheet1Xml: string, sheet2Xml: string): Promise<Uint8Array> {
   const zip = new JSZip()
   const ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
   zip.file(
@@ -130,17 +130,39 @@ async function chainWorkbook(): Promise<Uint8Array> {
     'xl/styles.xml',
     '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
   )
-  // A1 = 1; B1 = A1*2 (2); D1 = A1+100 (101); E1 = TEXT-free constant-independent formula (7)
-  zip.file(
-    'xl/worksheets/sheet1.xml',
-    `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="${ns}"><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><f>A1*2</f><v>2</v></c><c r="D1"><f>A1+100</f><v>101</v></c><c r="E1"><f>3+4</f><v>7</v></c></row></sheetData></worksheet>`,
-  )
-  // Report!C1 = Data!B1 + 1 (3): depends on A1 through another formula on another sheet
-  zip.file(
-    'xl/worksheets/sheet2.xml',
-    `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="${ns}"><sheetData><row r="1"><c r="C1"><f>Data!B1+1</f><v>3</v></c><c r="D1" t="str"><f>"x"&amp;Data!B1</f><v>x2</v></c></row></sheetData></worksheet>`,
-  )
+  zip.file('xl/worksheets/sheet1.xml', sheet1Xml)
+  zip.file('xl/worksheets/sheet2.xml', sheet2Xml)
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+}
+
+const MAIN_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+const sheetXml = (cells: string) =>
+  `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="${MAIN_NS}"><sheetData>${cells}</sheetData></worksheet>`
+
+/** a two-sheet workbook whose formulas carry a cached value computed from A1 = 1 */
+function chainWorkbook(): Promise<Uint8Array> {
+  // A1 = 1; B1 = A1*2 (2); D1 = A1+100 (101); E1 = TEXT-free constant-independent formula (7)
+  // Report!C1 = Data!B1 + 1 (3): depends on A1 through another formula on another sheet
+  return twoSheetWorkbook(
+    sheetXml(
+      '<row r="1"><c r="A1"><v>1</v></c><c r="B1"><f>A1*2</f><v>2</v></c><c r="D1"><f>A1+100</f><v>101</v></c><c r="E1"><f>3+4</f><v>7</v></c></row>',
+    ),
+    sheetXml(
+      '<row r="1"><c r="C1"><f>Data!B1+1</f><v>3</v></c><c r="D1" t="str"><f>"x"&amp;Data!B1</f><v>x2</v></c></row>',
+    ),
+  )
+}
+
+/** formulas that are errors or float sums in the file: A1 = 1, B1 = 1/0, C1 = 0.1+0.2, D1 = 10/A1, Report!A1 = NA(), Report!B1 = Data!A1 */
+function errorsWorkbook(): Promise<Uint8Array> {
+  return twoSheetWorkbook(
+    sheetXml(
+      '<row r="1"><c r="A1"><v>1</v></c><c r="B1" t="e"><f>1/0</f><v>#DIV/0!</v></c><c r="C1"><f>0.1+0.2</f><v>0.3</v></c><c r="D1"><f>10/A1</f><v>10</v></c></row>',
+    ),
+    sheetXml(
+      '<row r="1"><c r="A1" t="e"><f>NA()</f><v>#N/A</v></c><c r="B1"><f>Data!A1</f><v>1</v></c></row>',
+    ),
+  )
 }
 
 describe('refresh plan (SH3, A2)', () => {
@@ -717,6 +739,43 @@ describe.skipIf(!hasWasm)(
         const parts = await sheetParts(saved.data)
         expect(parts.data).toMatch(/<c r="B1"[^>]*><f>A1\*2<\/f><v>2<\/v>/)
         expect(parts.report).toMatch(/<c r="C1"[^>]*><f>Data!B1\+1<\/f><v>3<\/v>/)
+      })
+
+      describe('untouched errors and float sums survive a save (UNI-1989)', () => {
+        async function openErrors() {
+          const { transport } = await engine()
+          const wb = await transport.open({
+            name: 'Errors.xlsx',
+            data: toArrayBuffer(await errorsWorkbook()),
+            locale: 'en',
+          })
+          return { transport, wb, data: wb.sheets.find((sheet) => sheet.name === 'Data')!.id }
+        }
+
+        it('keeps the file errors and 0.3, writes the new dependent error, updates a real dependent', async () => {
+          const { transport, wb, data } = await openErrors()
+          const saved = await transport.serialize(
+            saveRequest(wb.sessionId, [{ sheetId: data, row: 0, column: 0, value: 0 }]),
+          )
+          const parts = await sheetParts(saved.data)
+          // untouched: a dependent of nothing edited keeps its error / its 0.3 (the engine says 0.30000000000000004)
+          expect(parts.data).toMatch(/<c r="B1" t="e"><f>1\/0<\/f><v>#DIV\/0!<\/v>/)
+          expect(parts.report).toMatch(/<c r="A1" t="e"><f>NA\(\)<\/f><v>#N\/A<\/v>/)
+          expect(parts.data).toMatch(/<c r="C1"><f>0\.1\+0\.2<\/f><v>0\.3<\/v>/)
+          // dependents of the edited A1: a new error, a new number
+          expect(parts.data).toMatch(/<c r="D1" t="e"><f>10\/A1<\/f><v>#DIV\/0!<\/v>/)
+          expect(parts.report).toMatch(/<c r="B1"[^>]*><f>Data!A1<\/f><v>0<\/v>/)
+        })
+
+        it('a dependent of the edit gets the new number', async () => {
+          const { transport, wb, data } = await openErrors()
+          const saved = await transport.serialize(
+            saveRequest(wb.sessionId, [{ sheetId: data, row: 0, column: 0, value: 2 }]),
+          )
+          const parts = await sheetParts(saved.data)
+          expect(parts.data).toMatch(/<c r="D1"[^>]*><f>10\/A1<\/f><v>5<\/v>/)
+          expect(parts.data).toMatch(/<c r="B1" t="e"><f>1\/0<\/f><v>#DIV\/0!<\/v>/)
+        })
       })
 
       it('a structural change pending: no formula keeps a cached value (the engine cannot replay it)', async () => {
