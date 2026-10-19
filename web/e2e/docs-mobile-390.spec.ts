@@ -52,6 +52,14 @@ async function hitTestMenu(ed: Frame) {
   })
 }
 
+/** `.status-page` rect in the frame's own coordinates (the same space as the toast and status bar rects) */
+async function statusPageRect(ed: Frame) {
+  return ed.evaluate(() => {
+    const r = document.querySelector('.status-page')!.getBoundingClientRect()
+    return { x: r.x, y: r.y, width: r.width, height: r.height }
+  })
+}
+
 const narrow = { width: 390, height: 844 }
 
 for (const [name, query] of [
@@ -185,7 +193,7 @@ test('docs-mobile-390: a status message shows as a toast above the status bar', 
   const ed = await openDoc(page)
   const editor = ed.locator('.ProseMirror').first()
   await editor.getByText(TEXT, { exact: false }).first().click()
-  const pageBefore = await ed.locator('.status-page').boundingBox()
+  const pageBefore = await statusPageRect(ed)
   await page.evaluate(() => (window as any).__host.failNextSave())
   await page.keyboard.press('Control+s')
   await expect
@@ -196,21 +204,27 @@ test('docs-mobile-390: a status message shows as a toast above the status bar', 
   const toast = ed.locator('.app-toast.show')
   await expect(toast).toBeVisible()
   await expect(toast).toContainText(/save failed/i)
-  const box = await toast.boundingBox()
-  const geo = await ed.evaluate(() => ({
-    w: window.innerWidth,
-    h: window.innerHeight,
-    barTop: document.querySelector('.status-bar')!.getBoundingClientRect().top,
-  }))
-  expect(box!.width).toBeGreaterThan(0)
-  expect(box!.height).toBeGreaterThan(0)
-  expect(box!.x).toBeGreaterThanOrEqual(0)
-  expect(box!.x + box!.width).toBeLessThanOrEqual(geo.w + 1)
-  expect(box!.y).toBeGreaterThanOrEqual(0)
+  // the toast and the bar are measured in the frame's own coordinates, in one evaluate: Playwright's
+  // boundingBox() is in page coordinates and the host's strip above the iframe would offset it
+  const geo = await ed.evaluate(() => {
+    const t = document.querySelector('.app-toast.show')!.getBoundingClientRect()
+    return {
+      w: window.innerWidth,
+      h: window.innerHeight,
+      barTop: document.querySelector('.status-bar')!.getBoundingClientRect().top,
+      box: { x: t.x, y: t.y, width: t.width, height: t.height },
+    }
+  })
+  const box = geo.box
+  expect(box.width).toBeGreaterThan(0)
+  expect(box.height).toBeGreaterThan(0)
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(geo.w + 1)
+  expect(box.y).toBeGreaterThanOrEqual(0)
   // just above the status bar (not the default top-centre pill), not over the page counter
-  expect(box!.y + box!.height).toBeLessThanOrEqual(geo.barTop + 1)
-  expect(geo.barTop - (box!.y + box!.height)).toBeLessThanOrEqual(60)
-  const pageAfter = await ed.locator('.status-page').boundingBox()
+  expect(box.y + box.height).toBeLessThanOrEqual(geo.barTop + 1)
+  expect(geo.barTop - (box.y + box.height)).toBeLessThanOrEqual(60)
+  const pageAfter = await statusPageRect(ed)
   expect(pageAfter).toEqual(pageBefore)
   // it goes away by itself
   await expect(ed.locator('.app-toast')).toHaveCount(0, { timeout: 10_000 })
