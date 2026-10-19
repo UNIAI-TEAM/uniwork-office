@@ -34,6 +34,7 @@ export function drainedOrigin(queued: readonly SaveOrigin[]): SaveOrigin {
       : 'internal'
 }
 
+// Plain JSON-like data only (rects, text, ids): Map / Set / Date compare by own keys, so two instances look equal.
 const sameContent = (a: unknown, b: unknown): boolean => {
   if (a === b) return true
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false

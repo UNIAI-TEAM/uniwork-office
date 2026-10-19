@@ -3879,7 +3879,9 @@ export default function App() {
   /** Origin of the save that most recently started writing (a queued save checks it) */
   const lastWriteOriginRef = useRef<SaveOrigin | null>(null)
   /** What the last save that succeeded sent. A drained (queued) save drops pending items that are
-      still equal to these: the render it runs from can still list edits that save wrote */
+      still equal to these: the render it runs from can still list edits that save wrote. A belt
+      only: it covers the id-carrying lists (not rotations, deleted pages, order, metadata, stamp or
+      form edits); the primary guard is draining from the render after `saveSettled` */
   const lastWrittenRef = useRef<PendingLists | null>(null)
   /** Bumped each time a save settles, after `saveInFlightRef` is cleared and the post-save
       subtractions are queued: the drain effect runs from the render that carries both */
