@@ -270,6 +270,12 @@ describe('UNI-1922: AI write past the current sheet grid grows the grid on apply
     expect(worksheet.getRange('AA1').getFormula()).toBeFalsy()
     expect(worksheet.getRange('AA2').getValue()).toBeNull()
     expect(worksheet.getRange('AA7').getValue()).toBeNull()
+
+    // RSG-4: redo restores the formula and the values on the grown grid.
+    await univerAPI.redo()
+    expect(worksheet.getRange('AA1').getFormula()).toBe('=SUM(AA2:AA7)')
+    expect(worksheet.getRange('AA2').getValue()).toBe(30)
+    expect(worksheet.getRange('AA7').getValue()).toBe(80)
   })
 
   it('case 2: fill_range and copy_range targeting column AA propose cleanly and apply (not refused as beyond grid)', async () => {
@@ -534,11 +540,10 @@ describe('UNI-1922: AI write past the current sheet grid grows the grid on apply
     // only needs the viewport repainted. Painting the full range
     // synchronously builds an O(fill) matrix, and undo writing `null` over
     // the whole range destroys file values resident beyond the viewport.
-    const { univerAPI, worksheet, state, proposeOnly, apply, undoDepth } = bootWorkbook(
-      400,
-      26,
-      { rowCount: 400, columnCount: 26 },
-    )
+    const { univerAPI, worksheet, state, proposeOnly, apply, undoDepth } = bootWorkbook(400, 26, {
+      rowCount: 400,
+      columnCount: 26,
+    })
     installJournalSuppressionUndoFilter()
     // File cells resident in the preloaded grid: near the top (inside the
     // buffered viewport a reload installs) and past it.
@@ -598,10 +603,15 @@ describe('UNI-1922: AI write past the current sheet grid grows the grid on apply
       expect(undoDepth()).toBe(undoBefore + 1)
       // The viewport window shows the fill after its reload.
       await vi.waitFor(() => expect(worksheet.getRange('C10').getValue()).toBe('CONST'))
+      // Let apply's reload fully finish (loadingKeys cleared) before undo:
+      // a second loadVisibleRange fired while the same key is in flight is
+      // deduped, which would leave the post-undo window reload un-run.
+      await vi.waitFor(() => expect(state.loadingKeys.size).toBe(0))
 
       await univerAPI.undo()
       // Undo reloads the window, restoring the file values there…
       await vi.waitFor(() => expect(worksheet.getRange('C10').getValue()).toBe('file-C10'))
+      await vi.waitFor(() => expect(state.loadingKeys.size).toBe(0))
       // …and the off-viewport resident file values survive apply + undo
       // untouched (a null-matrix write over the whole fill range destroys
       // them — RSG-1).

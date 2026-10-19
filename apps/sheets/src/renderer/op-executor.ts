@@ -57,7 +57,7 @@ import {
   structuralDeleteFormulaError,
   type StreamedRefSheet,
 } from './plan-operations'
-import { aiBulkUndoGate, journalSuppression } from './univer-state'
+import { aiBulkUndoGate, journalSuppression, lazySheetScreenExtent } from './univer-state'
 import { isVeryHiddenSheet } from './very-hidden-sheets'
 import { effectiveSheetProtection, mergeSheetProtectionAllow } from './sheet-protection'
 import {
@@ -942,20 +942,12 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
         setPendingEdits(journalSize(current.editJournal))
         const active = runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
         if (active?.getSheetId() !== op.sheetId) return
-        const loaded = current.loadedRanges.get(op.sheetId)
-        const startRow = current.flags.preloadComplete
-          ? fill.startRow
-          : loaded
-            ? Math.max(loaded.startRow, fill.startRow)
-            : 0
-        const endRow = current.flags.preloadComplete
-          ? fill.endRow
-          : loaded
-            ? Math.min(loaded.endRow, fill.endRow)
-            : -1
-        const startColumn = fill.startColumn
-        const endColumn = Math.min(fill.endColumn, active.getMaxColumns() - 1)
-        if (startRow <= endRow && startColumn <= endColumn) {
+        const paintCells = (
+          startRow: number,
+          endRow: number,
+          startColumn: number,
+          endColumn: number,
+        ) => {
           const value = direction === 'undo' ? null : fill.value
           const matrix = Array.from({ length: endRow - startRow + 1 }, () =>
             Array.from({ length: endColumn - startColumn + 1 }, () => ({
@@ -984,10 +976,35 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
             journalSuppression.active = false
           }
         }
-        if (direction === 'undo' && !targetIsInsertedThisSession) {
-          current.loadedRanges.delete(op.sheetId)
-          void loadVisibleRange(runtime, lazyWorkbookRef, active, setMessage)
+        if (targetIsInsertedThisSession) {
+          // The inserted column has no underlying file cells to restore.
+          // Update only the resident intersection; evicting the whole
+          // viewport made unrelated A:J data flash blank while a CT fill
+          // reloaded asynchronously.
+          const loaded = current.loadedRanges.get(op.sheetId)
+          if (!loaded) return
+          const startRow = Math.max(loaded.startRow, fill.startRow)
+          const endRow = Math.min(loaded.endRow, fill.endRow)
+          const startColumn = Math.max(loaded.startColumn, fill.startColumn)
+          const endColumn = Math.min(loaded.endColumn, fill.endColumn, active.getMaxColumns() - 1)
+          if (startRow > endRow || startColumn > endColumn) return
+          paintCells(startRow, endRow, startColumn, endColumn)
+          return
         }
+        // Columns the grid grew to past the file extent (this batch or an
+        // earlier scroll) are journal-owned like inserted columns: the
+        // reload's window is clamped to the file's screen extent and the
+        // journal overlay never reaches them, so a fill landing there would
+        // show blank until save/reopen. Paint them directly, then let the
+        // evict + reload repaint the file-backed part of the range.
+        const extentColumns = lazySheetScreenExtent(current, op.sheetId)?.columns
+        const grownStartColumn = Math.max(fill.startColumn, extentColumns ?? fill.endColumn + 1)
+        const grownEndColumn = Math.min(fill.endColumn, active.getMaxColumns() - 1)
+        if (grownStartColumn <= grownEndColumn && fill.startRow <= fill.endRow) {
+          paintCells(fill.startRow, fill.endRow, grownStartColumn, grownEndColumn)
+        }
+        current.loadedRanges.delete(op.sheetId)
+        void loadVisibleRange(runtime, lazyWorkbookRef, active, setMessage)
       }
       if (targetIsInsertedThisSession) {
         pushBulkFillUndo(
