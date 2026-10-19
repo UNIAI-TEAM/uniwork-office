@@ -161,8 +161,6 @@ export interface AccountController {
   signOutWaiting?: boolean
   /** d1-2: true after a sign-out whose done event reported captureFailed > 0 */
   signOutCaptureFailed?: boolean
-  /** A72: the sign-out safety wait expired before `done`; outcome is unconfirmed */
-  signOutTimedOut?: boolean
   /** keystore-locked after a failed Retry: main accepts a sign-in that replaces the saved one */
   canReplaceLockedSignIn?: boolean
   /** the "replace the saved sign-in?" confirmation is open */
@@ -209,7 +207,6 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
   const [signOutPrompt, setSignOutPrompt] = useState<SignOutPlan | null>(null)
   const [signOutNotice, setSignOutNotice] = useState<SignOutPlan | null>(null)
   const [signOutWaiting, setSignOutWaiting] = useState(false)
-  const [signOutTimedOut, setSignOutTimedOut] = useState(false)
   const [signOutCaptureFailed, setSignOutCaptureFailed] = useState(false)
   const [replacePromptOpen, setReplacePromptOpen] = useState(false)
   const noticeTimer = useRef<number | null>(null)
@@ -245,9 +242,6 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     if (state === 'signed-in' || state === 'refreshing') {
       setLocalError(null)
       setSignOutCaptureFailed(false)
-    } else {
-      // the timed-out sign-out is settled once the account is no longer shown as signed in
-      setSignOutTimedOut(false)
     }
     // the replace confirmation only stands while main still allows it
     if (state !== 'keystore-locked' || next.canReplaceLockedSignIn !== true) {
@@ -277,9 +271,6 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
         signingOut.current = false
         setBusy(null)
         setSignOutPrompt(null)
-        // G5-13 A72: the silent expiry gets an outcome: the prompt is gone and the
-        // pane says the sign-out could not be confirmed
-        setSignOutTimedOut(true)
         refresh()
       }
     }, SIGN_OUT_WAIT_SAFETY_MS)
@@ -319,7 +310,6 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
             clearWaitTimer()
             waitingForDone.current = false
             setSignOutWaiting(false)
-            setSignOutTimedOut(false)
             setSignOutPrompt(null)
             setSignOutCaptureFailed((p.captureFailed ?? 0) > 0)
             // FE d1-n2: keep busy/signingOut while a renderer-initiated accountLogout() is still in flight
@@ -468,7 +458,6 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
 
   const signOut = () => {
     if (signingOut.current) return
-    setSignOutTimedOut(false)
     const planFn = window.aiOffice.signOutPlan
     if (!planFn) {
       runLogout()
@@ -530,8 +519,6 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     }
     clearWaitTimer()
     waitingForDone.current = false
-    // Back is a known outcome (still signed in by choice): a stale timeout notice must go
-    setSignOutTimedOut(false)
     setSignOutPrompt(null)
     setSignOutWaiting(false)
   }
@@ -604,7 +591,6 @@ export function useAccount(options?: { ownsSignOutPrompt?: boolean }): AccountCo
     signOutNotice,
     signOutWaiting,
     signOutCaptureFailed,
-    signOutTimedOut,
     canReplaceLockedSignIn,
     replaceLockedPrompt,
     signIn,

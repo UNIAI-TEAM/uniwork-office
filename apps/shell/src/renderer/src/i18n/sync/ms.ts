@@ -130,8 +130,6 @@ export const ms = {
   uwSignOutWaiting: 'Menyelesaikan simpanan yang sedang berjalan sebelum log keluar…',
   uwSignOutCaptureFailed:
     'Sesetengah perubahan yang belum disimpan tidak dapat ditangkap tepat pada masanya; versi simpanan atau autosimpan terkini disimpan untuk akaun anda.',
-  uwSignOutTimedOut:
-    'Log keluar mengambil masa terlalu lama untuk disahkan; akaun mungkin masih log masuk.',
   uwSwitchLostTitle: 'Sebahagian perubahan yang belum disimpan bagi akaun sebelumnya telah hilang',
   uwSwitchLostBody:
     'Akaun lain telah log masuk pada komputer ini, jadi akaun sebelumnya telah dikunci. Dokumen yang perubahan belum disimpannya tidak dapat dikekalkan: {count}. Semua yang lain kekal dikunci pada komputer ini untuk akaun tersebut.',

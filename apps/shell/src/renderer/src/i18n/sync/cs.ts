@@ -123,7 +123,6 @@ export const cs = {
   uwSignOutWaiting: 'Dokončování probíhajícího uložení před odhlášením…',
   uwSignOutCaptureFailed:
     'Některé neuložené změny se nepodařilo včas zachytit; pro váš účet je ponechána poslední uložená nebo automaticky uložená verze.',
-  uwSignOutTimedOut: 'Potvrzení odhlášení trvalo příliš dlouho; účet může být stále přihlášen.',
   uwSwitchLostTitle: 'Některé neuložené změny předchozího účtu byly ztraceny',
   uwSwitchLostBody:
     'Na tomto počítači se přihlásil jiný účet, takže předchozí účet byl uzamčen. Dokumenty, jejichž neuložené změny nešlo zachovat: {count}. Vše ostatní zůstává pro tento účet na tomto počítači uzamčeno.',

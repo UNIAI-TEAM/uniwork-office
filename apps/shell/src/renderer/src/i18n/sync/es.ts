@@ -126,8 +126,6 @@ export const es = {
   uwSignOutWaiting: 'Terminando el guardado en curso antes de cerrar sesión…',
   uwSignOutCaptureFailed:
     'Algunos cambios sin guardar no pudieron capturarse a tiempo; se conserva la versión guardada o guardada automáticamente más reciente para tu cuenta.',
-  uwSignOutTimedOut:
-    'El cierre de sesión tardó demasiado en confirmarse; la cuenta podría seguir iniciada.',
   uwSwitchLostTitle: 'Se perdieron algunos cambios sin guardar de la cuenta anterior',
   uwSwitchLostBody:
     'Otra cuenta inició sesión en este equipo, así que la cuenta anterior se bloqueó. Documentos cuyos cambios sin guardar no se pudieron conservar: {count}. Todo lo demás sigue bloqueado en este equipo para esa cuenta.',
