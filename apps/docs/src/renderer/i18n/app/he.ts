@@ -532,6 +532,7 @@ export const he = {
   appOnlyEncrypted: 'המסמך "{name}" מוגן בסיסמה ולא ניתן לפתוח אותו כאן.',
   appFileExportPdf: 'ייצוא כ-PDF…',
   appFilePrint: 'הדפסה…',
+  appPrintNoDocument: 'פתחו מסמך כדי להדפיס אותו.',
   appPrintNoPrinter: 'אין מדפסת זמינה במחשב זה. אפשר לשמור את המסמך כקובץ PDF במקום.',
   appPrintFailedPdfHint: 'ההדפסה נכשלה: {error}. אפשר לשמור את המסמך כקובץ PDF במקום.',
   appPrintSaveAsPdf: 'שמירה כ-PDF…',

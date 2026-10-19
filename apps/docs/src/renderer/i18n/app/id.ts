@@ -550,6 +550,7 @@ export const id = {
   appOnlyEncrypted: '"{name}" dilindungi kata sandi dan tidak dapat dibuka di sini.',
   appFileExportPdf: 'Ekspor sebagai PDF…',
   appFilePrint: 'Cetak…',
+  appPrintNoDocument: 'Buka dokumen untuk mencetaknya.',
   appPrintNoPrinter:
     'Tidak ada printer di komputer ini. Anda dapat menyimpan dokumen sebagai PDF sebagai gantinya.',
   appPrintFailedPdfHint:

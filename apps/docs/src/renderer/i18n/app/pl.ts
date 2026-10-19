@@ -554,6 +554,7 @@ export const pl = {
   appOnlyEncrypted: 'Dokument „{name}” jest chroniony hasłem i nie można go tu otworzyć.',
   appFileExportPdf: 'Eksportuj jako PDF…',
   appFilePrint: 'Drukuj…',
+  appPrintNoDocument: 'Otwórz dokument, aby go wydrukować.',
   appPrintNoPrinter:
     'Na tym komputerze nie ma dostępnej drukarki. Możesz zamiast tego zapisać dokument jako PDF.',
   appPrintFailedPdfHint:
