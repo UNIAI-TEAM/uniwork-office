@@ -50,7 +50,7 @@ export const vi = {
   collabDeleteConfirm: 'Xóa hẳn',
   collabDeleted: 'Nội dung đã bị xóa',
   collabEdited: 'Đã sửa · {time}',
-  collabEditedMark: '(đã chỉnh sửa)',
+  collabEditedMark: '(đã sửa)',
   collabFormerMember: 'Cựu thành viên',
   collabHistory: 'Xem lịch sử sửa',
   collabHistoryTitle: 'Lịch sử sửa',
