@@ -326,6 +326,9 @@ export function DocumentsHome({
     () => labelMyFolderPath(rawPath, resolvedMyFolderId, myFolderLabel),
     [rawPath, resolvedMyFolderId, myFolderLabel],
   )
+  // the Move picker's start for a row with no parent: the open folder, but only in a folder view
+  // (the other lists keep the folder they were left from, which is not where their rows are)
+  const moveFallbackFolderId = subView === 'workspace' || subView === 'my-folder' ? folderId : null
 
   const refreshAll = useCallback(() => {
     setTreeTick((n) => n + 1)
@@ -992,7 +995,7 @@ export function DocumentsHome({
           folderActions.startMove({
             id: folder.id,
             kind: 'folder',
-            parentId: folder.parentId ?? folderId,
+            parentId: folder.parentId ?? moveFallbackFolderId,
             title: folder.title,
           }),
       },
@@ -1048,7 +1051,7 @@ export function DocumentsHome({
           folderActions.startMove({
             id: doc.id,
             kind: 'file',
-            parentId: doc.parentId ?? folderId,
+            parentId: doc.parentId ?? moveFallbackFolderId,
             title: doc.title,
           }),
       })
