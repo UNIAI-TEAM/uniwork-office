@@ -577,3 +577,58 @@ test('html: Ctrl+P without the print grant runs nothing and keeps the browser de
   expect(await ctrlPDefaults(frame), 'the press was not claimed').toEqual([false])
   await expectClean(page, frame, problems)
 })
+
+// UNI-1919 (RR2D-4): the default view is Preview, a nested sandboxed frame (preview.html, opaque
+// origin). A keydown inside it never reaches the module window, so the accelerator above cannot
+// hear it; the inspector injected into the page relays the press over its port and the module
+// runs the same print path once, with the browser's dialog suppressed inside the preview.
+test('html: Ctrl+P with focus inside the Preview runs the module print path once per press', async ({
+  page,
+}) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en' })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  await watchCtrlP(frame)
+  const preview = previewFrame(page)!
+  await watchCtrlP(preview)
+
+  // focus inside the preview document (a click on rendered text also starts an inline edit)
+  await frame.locator('iframe.preview-frame').contentFrame().locator('h1').click()
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(1)
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(2)
+  await page.waitForTimeout(500)
+  expect(await prints(frame), 'one module print per press, never two').toHaveLength(2)
+  expect(await ctrlPDefaults(preview), 'both presses claimed inside the preview').toEqual([
+    true,
+    true,
+  ])
+  expect(await ctrlPDefaults(frame), 'the key never reached the module window').toEqual([])
+  expect((await prints(frame))[0]).toContain('UniWork HTML web fixture')
+  await expectClean(page, frame, problems)
+})
+
+test('html: Ctrl+P inside the Preview without the print grant keeps the browser default', async ({
+  page,
+}) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', {
+    open: PAGE_PATH,
+    lang: 'en',
+    noprint: '1',
+  })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  const preview = previewFrame(page)!
+  await watchCtrlP(preview)
+  await frame.locator('iframe.preview-frame').contentFrame().locator('h1').click()
+  await page.keyboard.press('Control+p')
+  await page.waitForTimeout(500)
+  expect(await prints(frame), 'no print grant -> the module print path never ran').toEqual([])
+  expect(await ctrlPDefaults(preview), 'the press was not claimed').toEqual([false])
+  await expectClean(page, frame, problems)
+})
