@@ -1015,6 +1015,42 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
       expect(after.kind === 'ok' && decodePinRecord(after.value)?.state).toBe('ready')
     })
 
+    it("FUSR-R1-3: a multi-key deletion that crosses a boundary between two keys never deletes in the next account's scope", async () => {
+      const h = createHarness()
+      const readyKey = blobKey('doc_1', '0000000a', 'main')
+      const stagingKey = blobKey('doc_1', '0000000b', 'main')
+      const seed = seedRow('doc_1', 4096)
+      // account A holds a committed copy and a staging generation: two keys to delete
+      expect(
+        (
+          await h.store.putPin({
+            ...seed,
+            state: 'ready',
+            readyManifest: seed.manifest,
+            readyGeneration: '0000000a',
+            readyVersion: 1,
+            bytes: 4096,
+            staging: { generation: '0000000b', keys: [stagingKey] },
+          })
+        ).kind,
+      ).toBe('ok')
+      expect((await h.store.writeIndex({ pins: ['doc_1'], cleanup: {} })).kind).toBe('ok')
+      expect((await h.store.putBlob(readyKey, plaintext('a-ready'))).kind).toBe('ok')
+      expect((await h.store.putBlob(stagingKey, plaintext('a-staging'))).kind).toBe('ok')
+      // account B owns a record at the key the revoke would reach second
+      const bRecords = await libraryRecords(h, SCOPE_B)
+      expect((await bRecords.write(stagingKey, plaintext('b-staging'))).kind).toBe('ok')
+      // getPin, then the first delete is held
+      const hold = holdVerify(h, 2)
+      const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+      await hold.entered
+      await signOut(h)
+      switchTo(h, SCOPE_B, 'sess_B')
+      hold.release()
+      expect(await revoking).toBeNull()
+      expect((await bRecords.read(stagingKey)).kind).toBe('ok')
+    })
+
     it('FUSR-R1-4: an archive whose lease projection spans the sign-out returns nothing', async () => {
       const { h } = await pinnedHarness()
       const hold = holdLeaseView(h)
