@@ -486,10 +486,17 @@ export class OfflineLibraryManager {
     }
   }
 
-  private async put(record: PinRecord): Promise<boolean> {
+  /**
+   * `epoch`: the boundary the row was read under. R4F-2 (UNI-1362): a row read
+   * before a sign-out is never written back after it, so a moved epoch refuses
+   * with no store call and no change notice.
+   */
+  private async put(record: PinRecord, epoch?: number): Promise<boolean> {
+    if (epoch !== undefined && epoch !== this.epoch) return false
     const written = await this.options.store.putPin(record)
     if (written.kind === 'ok') this.unsaved.delete(record.documentId)
-    this.changed(record.documentId)
+    // interrupted: the scope was wiped under the write, there is no row to announce
+    if (written.kind !== 'interrupted') this.changed(record.documentId)
     return written.kind === 'ok'
   }
 
@@ -837,20 +844,24 @@ export class OfflineLibraryManager {
   private async purgeRecord(
     record: PinRecord,
     state: 'revoked' | 'deleted',
+    epoch?: number,
   ): Promise<PinRecord | null> {
     await wipeKeys(this.options.store, heldKeys(record))
     const purged: PinRecord = { ...withoutCopy(record), state }
     delete purged.failure
-    return (await this.put(purged)) ? purged : null
+    return (await this.put(purged, epoch)) ? purged : null
   }
 
   private async purge(documentId: string, state: 'revoked' | 'deleted'): Promise<PinRow | null> {
     this.checkBoundary()
+    // R4F-2 (UNI-1362): read -> delete -> write spans several awaits; a sign-out
+    // in between must not let the revoked / deleted row be written after it
+    const epoch = this.epoch
     await this.stopJob(documentId)
     return this.withDoc(documentId, async () => {
       const read = await this.options.store.getPin(documentId)
       if (read.kind !== 'ok') return null
-      const purged = await this.purgeRecord(read.record, state)
+      const purged = await this.purgeRecord(read.record, state, epoch)
       return purged ? this.view(purged) : null
     })
   }
@@ -893,11 +904,14 @@ export class OfflineLibraryManager {
   /** archived on the server: the row stays and opens until the lease ends */
   async handleArchived(documentId: string): Promise<PinRow | null> {
     this.checkBoundary()
+    // R4F-2 (UNI-1362): the flag is written back only under the boundary it was read in
+    const epoch = this.epoch
     return this.withDoc(documentId, async () => {
       const read = await this.options.store.getPin(documentId)
       if (read.kind !== 'ok') return null
       const archived = { ...read.record, archived: true }
-      await this.put(archived)
+      await this.put(archived, epoch)
+      if (this.epoch !== epoch) return null
       return this.view(archived)
     })
   }

@@ -173,6 +173,12 @@ export function createOfflineLibraryStore(source: OfflineLibraryStoreSource): Of
    * wipe killed (interrupted) is dropped.
    */
   let opened: { token: string; store: OpenedStore } | null = null
+  /**
+   * R4F-2 (UNI-1362): bumped by `forget()` (the account boundary). A call that
+   * entered `resolve()` before it must not use or cache a handle it opens after
+   * the wipe: the layer's epoch check cannot refuse a handle opened post-wipe.
+   */
+  let generation = 0
 
   const unavailable = (status: Exclude<StoreKeyStatus, 'ok'>): LibraryStoreUnavailable => ({
     kind: status,
@@ -183,11 +189,14 @@ export function createOfflineLibraryStore(source: OfflineLibraryStoreSource): Of
     const scope = readScope(source.scope)
     if (!scope) return { kind: 'no_session' }
     const token = `${scope.deploymentId}/${scope.accountId}`
+    const entered = generation
     try {
       const status = await source.layer.verifyKey(scope)
+      if (generation !== entered) return { kind: 'interrupted' }
       if (status !== 'ok') return unavailable(status)
       if (!opened || opened.token !== token) {
         const result = await source.layer.open(scope)
+        if (generation !== entered) return { kind: 'interrupted' }
         if (result.kind !== 'ok') return unavailable(result.kind)
         opened = { token, store: result.store }
       }
@@ -294,6 +303,9 @@ export function createOfflineLibraryStore(source: OfflineLibraryStoreSource): Of
       return remove(key)
     },
 
-    forget: dropHandle,
+    forget() {
+      generation += 1
+      dropHandle()
+    },
   }
 }
