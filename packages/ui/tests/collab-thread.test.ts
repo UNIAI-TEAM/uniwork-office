@@ -566,6 +566,7 @@ describe('avatars (UNI-1970 A)', () => {
     const img = av.querySelector('img')!
     expect(img.getAttribute('src')).toBe('https://x/ann.png')
     expect(img.getAttribute('alt')).toBe('')
+    expect(img.getAttribute('referrerpolicy')).toBe('no-referrer')
     const replyAv = $('[data-comment-id="r"] .collab-av')!
     expect(replyAv.querySelector('img')).toBeNull()
     expect(replyAv.textContent).toBe('BH')
@@ -579,6 +580,21 @@ describe('avatars (UNI-1970 A)', () => {
     expect(cssRule('.collab-cm--reply[data-comment-id] .collab-av')).toMatch(/width:\s*24px/)
     expect(cssRule('.collab-cm--reply[data-comment-id] .collab-av')).toMatch(/height:\s*24px/)
     expect(cssRule('.collab-av img')).toMatch(/object-fit:\s*cover/)
+  })
+
+  it('a photo that fails to load falls back to initials (CSP blocks remote img-src)', async () => {
+    const src = fakeSource(
+      list([cm({ id: 'a', display_name: 'Ann Lee', avatar_url: 'https://x/ann.png' })]),
+    )
+    await mount(src)
+    const av = $('[data-comment-id="a"] .collab-av')!
+    const img = av.querySelector('img')!
+    await act(async () => {
+      img.dispatchEvent(new Event('error'))
+      await flush()
+    })
+    expect(av.querySelector('img')).toBeNull()
+    expect(av.textContent).toBe('AL')
   })
 })
 

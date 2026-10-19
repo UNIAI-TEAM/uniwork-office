@@ -126,6 +126,16 @@ function initials(name: string): string {
   return (first + last).toUpperCase()
 }
 
+/** photo with initials fallback: a load error (404, offline, CSP img-src block) swaps back to
+    initials; the flag tracks which url failed, so a url change renders the new photo */
+function CommentAvatar(p: { url: string | undefined; name: string }) {
+  const [badFor, setBadFor] = useState<string | null>(null)
+  if (!p.url || badFor === p.url) return <>{initials(p.name)}</>
+  return (
+    <img src={p.url} alt="" referrerPolicy="no-referrer" onError={() => setBadFor(p.url ?? null)} />
+  )
+}
+
 function copyText(text: string): void {
   try {
     void navigator.clipboard?.writeText(text)?.catch(() => {})
@@ -668,7 +678,7 @@ function CollabThreadImpl(p: CollabThreadProps) {
     const headRow = deleted ? null : (
       <>
         <span className="collab-av" aria-hidden="true">
-          {c.avatar_url ? <img src={c.avatar_url} alt="" /> : initials(nameOf(c))}
+          <CommentAvatar url={c.avatar_url} name={nameOf(c)} />
         </span>
         <span className="collab-au" id={authorId}>
           {nameOf(c)}
