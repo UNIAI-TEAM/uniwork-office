@@ -611,6 +611,23 @@ test('html: Ctrl+P with focus inside the Preview runs the module print path once
   await expectClean(page, frame, problems)
 })
 
+// UNI-1919 (RC-1): text typed into an inline edit is only in the preview DOM until the edit
+// commits; the press must commit it first so the printed document carries it
+test('html: Ctrl+P during an inline text edit prints the typed text', async ({ page }) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en' })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  await frame.locator('iframe.preview-frame').contentFrame().locator('h1').click()
+  const marker = 'PrintMarkerZq1919'
+  await page.keyboard.type(marker)
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(1)
+  expect((await prints(frame))[0]).toContain(marker)
+  await expectClean(page, frame, problems)
+})
+
 test('html: Ctrl+P inside the Preview without the print grant keeps the browser default', async ({
   page,
 }) => {

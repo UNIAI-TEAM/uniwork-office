@@ -132,8 +132,10 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
       { type: 'gx:keyCommand', command: 'print', version: 1 },
       { type: 'gx:keyCommand', command: 'print', version: 1 },
     ])
-    // autorepeat, Shift or Alt variants stay the browser's
-    expect(pressP({ repeat: true })).toBe(false)
+    // a held press is suppressed (no second browser dialog beside the module's) but runs nothing
+    expect(pressP({ repeat: true })).toBe(true)
+    expect(messages).toHaveLength(2)
+    // Shift or Alt variants stay the browser's
     expect(pressP({ shiftKey: true })).toBe(false)
     expect(pressP({ altKey: true })).toBe(false)
     expect(messages).toHaveLength(2)
@@ -141,5 +143,29 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
     send({ type: 'gx:printKey', claim: false })
     expect(pressP()).toBe(false)
     expect(messages).toHaveLength(2)
+  })
+
+  // UNI-1919 (RC-1): the typed run lives only in the preview DOM; it must reach the host before
+  // the print message, or the module serializes the stale text
+  it('commits an active inline text edit before the print command', () => {
+    const { dom, messages, send } = makePreview()
+    send({ type: 'gx:printKey', claim: true })
+    send({ type: 'gx:beginTextEdit', sid: 1 })
+    const el = dom.window.document.querySelector('[data-gx-sid="1"]')!
+    el.firstChild!.textContent = 'Hello typed'
+    messages.length = 0
+    const ev = new dom.window.KeyboardEvent('keydown', {
+      key: 'p',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    dom.window.document.body.dispatchEvent(ev)
+    expect(ev.defaultPrevented).toBe(true)
+    expect(messages).toEqual([
+      { type: 'gx:textEditCommit', sid: 1, textNodeIndex: 0, newText: 'Hello typed', version: 1 },
+      { type: 'gx:keyCommand', command: 'print', version: 1 },
+    ])
+    expect(el.hasAttribute('contenteditable')).toBe(false)
   })
 })
