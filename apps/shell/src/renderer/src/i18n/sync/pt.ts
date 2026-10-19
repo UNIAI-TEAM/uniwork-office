@@ -10,7 +10,7 @@ export const pt = {
   uwErrReconcileStuck: 'É preciso suporte para confirmar o salvamento.',
   uwChipRemoteNewer: 'Versão mais recente no UniWork',
   uwTipQueued:
-    'Seu salvamento das {time} fica guardado com segurança neste computador e será enviado quando possível.',
+    'Seu salvamento das {time} fica guardado com segurança neste computador e será enviado quando você estiver online.',
   uwTipQueuedNewer:
     'O salvamento das {time} está aguardando envio. Edições posteriores não fazem parte dele.',
   uwTipPausedAdmin:

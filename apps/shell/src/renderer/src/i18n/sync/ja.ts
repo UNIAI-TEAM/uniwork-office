@@ -9,7 +9,8 @@ export const ja = {
   uwChipReconcileStuck: '保存の確認にサポートが必要です',
   uwErrReconcileStuck: '保存の確認にサポートが必要です。',
   uwChipRemoteNewer: 'UniWork に新しいバージョンがあります',
-  uwTipQueued: '{time} の保存はこのコンピューターに安全に保持され、可能になり次第送信されます。',
+  uwTipQueued:
+    '{time} の保存はこのコンピューターに安全に保持され、オンラインになると送信されます。',
   uwTipQueuedNewer: '{time} の保存は送信待ちです。それ以降の編集は含まれていません。',
   uwTipPausedAdmin:
     '管理者が送信を一時停止しています。保存内容はこのコンピューターに保持されます。',

@@ -10,7 +10,7 @@ export const de = {
   uwErrReconcileStuck: 'Support nötig, um das Speichern zu bestätigen.',
   uwChipRemoteNewer: 'Neuere Version in UniWork',
   uwTipQueued:
-    'Ihr Speicherstand von {time} bleibt sicher auf diesem Computer und wird gesendet, sobald es möglich ist.',
+    'Ihr Speicherstand von {time} bleibt sicher auf diesem Computer und wird gesendet, sobald Sie online sind.',
   uwTipQueuedNewer:
     'Der Speicherstand von {time} wartet auf das Senden. Spätere Änderungen gehören nicht dazu.',
   uwTipPausedAdmin:
