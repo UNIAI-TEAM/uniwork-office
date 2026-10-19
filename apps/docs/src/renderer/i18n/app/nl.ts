@@ -564,4 +564,8 @@ export const nl = {
   appPrintFailedPdfHint:
     'Afdrukken is mislukt: {error}. U kunt het document in plaats daarvan als PDF opslaan.',
   appPrintSaveAsPdf: 'Opslaan als PDF…',
+  appFileSaveCopy: 'Opslaan als kopie…',
+  appCopySaved: 'Je versie is opgeslagen als nieuw document: {title}.',
+  appCopySaveFailed:
+    'Kan de kopie niet maken. Je wijzigingen zijn nog veilig; probeer het opnieuw.',
 } satisfies Record<keyof typeof zh, string>

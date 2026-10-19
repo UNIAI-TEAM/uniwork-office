@@ -555,4 +555,7 @@ export const id = {
   appPrintFailedPdfHint:
     'Pencetakan gagal: {error}. Anda dapat menyimpan dokumen sebagai PDF sebagai gantinya.',
   appPrintSaveAsPdf: 'Simpan sebagai PDF…',
+  appFileSaveCopy: 'Simpan sebagai salinan…',
+  appCopySaved: 'Versi Anda disimpan sebagai dokumen baru: {title}.',
+  appCopySaveFailed: 'Tidak dapat membuat salinan. Perubahan Anda tetap aman; coba lagi.',
 } satisfies Record<keyof typeof zh, string>

@@ -554,4 +554,8 @@ export const pt = {
     'Não há nenhuma impressora disponível neste computador. Você pode salvar o documento como PDF.',
   appPrintFailedPdfHint: 'A impressão falhou: {error}. Você pode salvar o documento como PDF.',
   appPrintSaveAsPdf: 'Salvar como PDF…',
+  appFileSaveCopy: 'Salvar como cópia…',
+  appCopySaved: 'Sua versão foi salva como um novo documento: {title}.',
+  appCopySaveFailed:
+    'Não foi possível criar a cópia. Suas alterações continuam seguras; tente novamente.',
 } satisfies Record<keyof typeof zh, string>

@@ -162,12 +162,13 @@ describe('C10: no autosave on the web', () => {
 })
 
 describe('FRAME-RO-01: readOnly profile & Escape forwarder in installModuleBridge', () => {
-  it('createCapabilityObject forces save/saveAs/edit/htmlVisualEdit off in readOnly profile while keeping print and exportPdf', async () => {
+  it('createCapabilityObject forces save/saveAs/saveCopy/edit/htmlVisualEdit off in readOnly profile while keeping print and exportPdf', async () => {
     const mock = createMockPort()
     const caps = createCapabilityObject(
       {
         save: false,
         saveAs: false,
+        saveCopy: false,
         edit: false,
         htmlVisualEdit: false,
         print: false,
@@ -177,6 +178,7 @@ describe('FRAME-RO-01: readOnly profile & Escape forwarder in installModuleBridg
       (g) => ({
         save: g?.save === true,
         saveAs: g?.saveAs === true,
+        saveCopy: g?.saveCopy === true,
         edit: g?.save === true,
         htmlVisualEdit: g?.save === true,
         print: g?.print === true,
@@ -185,17 +187,27 @@ describe('FRAME-RO-01: readOnly profile & Escape forwarder in installModuleBridg
     )
     mock.init({
       profile: 'readOnly',
-      capabilities: { save: true, saveAs: true, print: true, exportPdf: true },
+      capabilities: { save: true, saveAs: true, saveCopy: true, print: true, exportPdf: true },
     })
     await flush()
     expect(caps).toEqual({
       save: false,
       saveAs: false,
+      saveCopy: false,
       edit: false,
       htmlVisualEdit: false,
       print: true,
       exportPdf: true,
     })
+
+    // a locked-out tab (save:false + saveCopy:true) is NOT the readOnly profile: saveCopy survives
+    const locked = createMockPort()
+    const lockedCaps = createCapabilityObject({ saveCopy: false }, locked.port, (g) => ({
+      saveCopy: g?.saveCopy === true,
+    }))
+    locked.init({ capabilities: { save: false, saveCopy: true } })
+    await flush()
+    expect(lockedCaps.saveCopy).toBe(true)
   })
 
   it('createCapabilityObject marks readOnlyProfile for the profile only, not for save:false alone (RFW2-3)', async () => {
