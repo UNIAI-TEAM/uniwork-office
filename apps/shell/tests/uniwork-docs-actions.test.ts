@@ -177,6 +177,8 @@ function fakeServer(
     blankStatus?: number
     /** UNI-1959: the bound save's version upload waits on this latch (the first save stays in flight) */
     versionUploadGate?: () => Promise<void>
+    /** UNI-1959: a detail GET waits on this latch while it answers a promise (the naming metadata read) */
+    getDocumentGate?: () => Promise<void> | undefined
     /**
      * SAVE-01 r2 (S01-R1-4): the create POST waits on this latch, so a second
      * submit can be issued while the first is still in flight
@@ -606,6 +608,7 @@ function fakeServer(
       const id = detail[1]!
       // SAVE-01 r2 (S01-R1-2): the bind read can fail after the create landed
       if (options.getDocumentFailsFor?.includes(id)) return envelope(500, 'unavailable')
+      await options.getDocumentGate?.()
       if (id !== DOC && !state.documents.has(id)) return envelope(404, 'not_found')
       if (state.archived && id === DOC && state.myLevel !== 'manage') {
         return envelope(404, 'not_found')
@@ -948,6 +951,12 @@ function setup(
     }) => Promise<'continue' | 'cancel'>
     /** UNI-1959: false = the path is a detached editor window, which has no dialog host */
     shellTab?: boolean
+    /** UNI-1959: main takes a pending ask off the renderer's queue (a tab closed, a sign-out) */
+    dismissFirstSaveName?: (requestId: string) => void
+    /** UNI-1959: what the close prompt answers (default cancel) */
+    closeChoice?: 'save' | 'close' | 'cancel'
+    /** UNI-1959: shrinks the close-save settlement wait (ms) */
+    closeSaveWaitMs?: number
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -972,8 +981,9 @@ function setup(
     pickCopyPath: vi.fn(async () => null),
     showOpenLatestFailed: vi.fn(),
     showCopyFailed: vi.fn(),
-    chooseUnsavedClose: vi.fn(async () => 'cancel'),
+    chooseUnsavedClose: vi.fn(async () => options.closeChoice ?? 'cancel'),
   }
+  let shellTab = options.shellTab
   let currentIdentity: {
     accountId: string
     deviceSessionId: string
@@ -1021,7 +1031,9 @@ function setup(
     firstSaveFlushTimeoutMs: options.firstSaveFlushTimeoutMs,
     syncStore,
     requestFirstSaveName: options.requestFirstSaveName,
-    isShellTab: options.shellTab === undefined ? undefined : () => options.shellTab!,
+    isShellTab: options.shellTab === undefined ? undefined : () => shellTab!,
+    dismissFirstSaveName: options.dismissFirstSaveName,
+    closeSaveWaitMs: options.closeSaveWaitMs,
     requestModuleSave: (path) => {
       moduleSaveCalls.push(path)
       if (options.moduleSaveResult === false) return false
@@ -1071,6 +1083,9 @@ function setup(
     uploadFile,
     treeChanged,
     moduleSaveCalls,
+    setShellTab: (next: boolean) => {
+      shellTab = next
+    },
     setIdentity: (next: typeof currentIdentity) => {
       currentIdentity = next
     },
@@ -1389,16 +1404,18 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/versions/commit'))
   const idle = () => new Promise<void>((resolve) => setTimeout(resolve, 60))
 
+  type Verdict = 'continue' | 'cancel' | 'unavailable'
   /** a window whose dialog the test answers by hand */
   function dialogWindow() {
     const asked: Request[] = []
-    const answers: Array<(a: 'continue' | 'cancel') => void> = []
+    const dismissed: string[] = []
+    const answers: Array<(a: Verdict) => void> = []
     const request = (req: Request) =>
-      new Promise<'continue' | 'cancel'>((resolve) => {
+      new Promise<Verdict>((resolve) => {
         asked.push(req)
         answers.push(resolve)
       })
-    return { asked, answers, request }
+    return { asked, answers, request, dismissed, dismiss: (id: string) => dismissed.push(id) }
   }
 
   async function createdAndOpened(ctx: ReturnType<typeof setup>, name = 'Untitled document.docx') {
@@ -1573,6 +1590,317 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     win.answers[0]!('continue')
     await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
     expect(win.asked).toHaveLength(1)
+  })
+
+  it('BE-4: metadata still in flight when the session ends never reaches the next shell', async () => {
+    let hold: Promise<void> | undefined
+    let release: () => void = () => undefined
+    const server = fakeServer({ getDocumentGate: () => hold })
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+      dismissFirstSaveName: win.dismiss,
+    })
+    const doc = await createdAndOpened(ctx)
+    hold = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(0)
+
+    await ctx.service.lockSession(undefined, undefined, { switch: true })
+    release()
+    await idle()
+    expect(win.asked).toHaveLength(0)
+    expect(commitsOf(server)).toHaveLength(0)
+  })
+
+  it('BE-4/19: metadata that resolves for another account never reaches the shell (A -> B)', async () => {
+    let hold: Promise<void> | undefined
+    let release: () => void = () => undefined
+    const server = fakeServer({ getDocumentGate: () => hold })
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+      dismissFirstSaveName: win.dismiss,
+    })
+    const doc = await createdAndOpened(ctx)
+    hold = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    ctx.setIdentity({ accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' })
+    release()
+    await idle()
+    expect(win.asked).toHaveLength(0)
+    expect(commitsOf(server)).toHaveLength(0)
+  })
+
+  it('BE-4/19: an open ask is dismissed at the boundary and its late verdict resumes nothing', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+      dismissFirstSaveName: win.dismiss,
+    })
+    const doc = await createdAndOpened(ctx)
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+
+    ctx.setSelectedOrg({ id: 'org_b', slug: 'beta' })
+    ctx.service.noteSelectedOrg('org_b')
+    expect(win.dismissed).toEqual([win.asked[0]!.requestId])
+    win.answers[0]!('continue')
+    await idle()
+    expect(commitsOf(server)).toHaveLength(0)
+  })
+
+  it('BE-4/9: a late prior-epoch verdict does not repopulate the named set - the next Save asks again', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+      dismissFirstSaveName: win.dismiss,
+    })
+    const doc = await createdAndOpened(ctx)
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    ctx.setSelectedOrg({ id: 'org_b', slug: 'beta' })
+    ctx.service.noteSelectedOrg('org_b')
+    win.answers[0]!('continue')
+    await idle()
+
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(2)
+  })
+
+  it('BE-9: a continue that left the document at version 1 does not outlive the session (org change)', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+      dismissFirstSaveName: win.dismiss,
+    })
+    const doc = await createdAndOpened(ctx)
+    // unchanged bytes: the continued save has nothing to send, so the document stays at version 1
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+    win.answers[0]!('continue')
+    await idle()
+    expect(commitsOf(server)).toHaveLength(0)
+
+    ctx.setSelectedOrg({ id: 'org_b', slug: 'beta' })
+    ctx.service.noteSelectedOrg('org_b')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(2)
+  })
+
+  it('BE-6: a document the retained named-create dialog made is never asked about again', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx, 'Quarterly report.docx')
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
+    expect(win.asked).toHaveLength(0)
+  })
+
+  it('BE-7: a detached first Save (no host to ask) retires the blank provenance - a later shell Save does not ask', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      shellTab: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
+    await vi.waitFor(() => expect(ctx.statuses.at(-1)).toMatchObject({ state: 'saved' }), {
+      timeout: 8000,
+    })
+
+    ctx.setShellTab(true)
+    writeFileSync(doc.path, 'bytes v3')
+    ctx.service.onUserSave(doc.path)
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(2), { timeout: 8000 })
+    expect(win.asked).toHaveLength(0)
+  })
+
+  it('BE-7: a save that landed through the chip (not the dialog) leaves nothing to ask about', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+    writeFileSync(doc.path, 'bytes v2')
+    await ctx.service.save(doc.path)
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
+    await vi.waitFor(() => expect(ctx.statuses.at(-1)).toMatchObject({ state: 'saved' }), {
+      timeout: 8000,
+    })
+
+    writeFileSync(doc.path, 'bytes v3')
+    ctx.service.onUserSave(doc.path)
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(2), { timeout: 8000 })
+    expect(win.asked).toHaveLength(0)
+  })
+
+  it('BE-11: a dropped tab dismisses its ask, a late verdict does nothing, and a reopened tab asks afresh', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+      dismissFirstSaveName: win.dismiss,
+    })
+    const doc = await createdAndOpened(ctx)
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+
+    await ctx.service.notePathsDropped([doc.path])
+    expect(win.dismissed).toEqual([win.asked[0]!.requestId])
+    win.answers[0]!('continue')
+    await idle()
+    expect(commitsOf(server)).toHaveLength(0)
+
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(2)
+  })
+
+  it('BE-12: an unavailable host still lets the Save through, but marks nothing - a recovered host asks next', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    win.answers[0]!('unavailable')
+    await idle()
+    // unchanged bytes: the save has nothing to send and the document is still at version 1
+    expect(commitsOf(server)).toHaveLength(0)
+
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(2)
+  })
+
+  it('BE-12: an unavailable host does not hold back edited bytes', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    win.answers[0]!('unavailable')
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
+  })
+
+  it('BE-12: a host that throws never marks the document named', async () => {
+    const server = fakeServer()
+    let throwing = true
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: (req) => {
+        if (throwing) return Promise.reject(new Error('host gone'))
+        return win.request(req)
+      },
+    })
+    const doc = await createdAndOpened(ctx)
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    throwing = false
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+  })
+
+  it('BE-13: naming time is not part of the close-save deadline - one coherent close, no orphaned save', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      closeChoice: 'save',
+      closeSaveWaitMs: 150,
+      moduleSaveWrites: 'bytes v2',
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+    // unsent edits: the file differs from its base
+    writeFileSync(doc.path, 'edited before close')
+    const closing = ctx.service.confirmClose(doc.path)
+    await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
+    // the person takes longer to name it than the settlement deadline
+    await new Promise((resolve) => setTimeout(resolve, 450))
+    win.answers[0]!('continue')
+    await expect(closing).resolves.toBe(true)
+    expect(commitsOf(server)).toHaveLength(1)
+  })
+
+  it('BE-13: cancelling the name ends the close attempt without waiting out the deadline', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      closeChoice: 'save',
+      closeSaveWaitMs: 5000,
+      moduleSaveWrites: 'bytes v2',
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+    writeFileSync(doc.path, 'edited before close')
+    const closing = ctx.service.confirmClose(doc.path)
+    await vi.waitFor(() => expect(win.asked).toHaveLength(1), { timeout: 8000 })
+    win.answers[0]!('cancel')
+    const started = Date.now()
+    await expect(closing).resolves.toBe(false)
+    expect(Date.now() - started).toBeLessThan(2000)
+    expect(commitsOf(server)).toHaveLength(0)
   })
 
   it('the Vietnamese default name asks too, an ordinary name never does', async () => {
