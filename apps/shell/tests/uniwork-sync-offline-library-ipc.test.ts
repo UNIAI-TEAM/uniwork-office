@@ -210,8 +210,8 @@ describe('FUSR-R4-3 (UNI-1362): stopping the unlisted row’s transfer for a dis
     expect(await h.manager.row('doc_1')).toBeNull()
     const index = await h.store.readIndex()
     expect(index.kind === 'ok' && index.index.pins).toEqual([])
-    // no row, no staging, no copy: only the index record is left
-    expect(h.storeFiles()).toHaveLength(1)
+    // no row, no staging, no copy
+    expect(h.storeFiles()).toEqual([])
   }
 
   it('a replacement refused as too_large is reported as refused, not accepted by the stopped transfer', async () => {

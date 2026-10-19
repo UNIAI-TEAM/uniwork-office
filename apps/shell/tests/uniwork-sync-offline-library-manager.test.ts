@@ -1568,7 +1568,7 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
           expect(notices).toEqual([])
           expect(h.manager.cancel('doc_1')).toBe(false)
           expect(await h.manager.row('doc_1')).toBeNull()
-          expect(h.storeFiles()).toHaveLength(1)
+          expect(h.storeFiles()).toEqual([])
         })
 
         it('an ordinary cancel of the same transfer still settles interrupted and announces it', async () => {
