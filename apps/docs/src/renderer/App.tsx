@@ -3751,6 +3751,10 @@ export function App() {
     const contentH = twipsToPx(section.pageHeight) - effTopSingle - effBottomSingle
     let slices: PageSlice[] = []
     let timer: number | null = null
+    // set by the cleanup: callbacks that outlive this run (a font-ready promise
+    // settling late, a follow-up from a stale listener) must not re-arm a timer
+    // nobody will clear, or a pass would run against a destroyed editor
+    let disposed = false
     let suppressSig = ''
     let rowFillSig = ''
     // passes a pass schedules for itself (widths / suppression applied late);
@@ -3952,6 +3956,7 @@ export function App() {
     }
     const remeasure = () => {
       timer = null
+      if (disposed || editor?.isDestroyed) return
       lastPassAt = performance.now()
       const edited = fastEdits
       fastEdits = new Set()
@@ -5132,6 +5137,7 @@ export function App() {
       dirtyIndex: number | null = fastIndex,
       isFollowUp = false,
     ) => {
+      if (disposed) return
       if (fastIndex === null) fastEdits = null
       else fastEdits?.add(fastIndex)
       dirtyFrom = dirtyIndex === null || dirtyFrom === null ? null : Math.min(dirtyFrom, dirtyIndex)
@@ -5174,6 +5180,7 @@ export function App() {
     // (debounced: loadingdone fires per face, thousands of times on CJK documents)
     let hfTimer: number | undefined
     const onFontsChanged = (reprobeHf: boolean) => {
+      if (disposed) return
       bumpLineSampleFontEpoch()
       if (reprobeHf) {
         bumpHfProbeFontEpoch()
@@ -5223,6 +5230,7 @@ export function App() {
     }
     editor?.on('transaction', onShrinkTr)
     return () => {
+      disposed = true
       if (timer) window.clearTimeout(timer)
       if (hfTimer) window.clearTimeout(hfTimer)
       document.fonts.removeEventListener('loadingdone', onLoadingDone)
