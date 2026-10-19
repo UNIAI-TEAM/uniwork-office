@@ -1575,10 +1575,16 @@ test.describe.serial('UniWork documents', () => {
           covered.push(`${top.tagName.toLowerCase()}.${String(top.className)} at ${Math.round(x)}`)
         }
       }
-      // padding: the first and last things in the pill sit the same distance from its border
-      const first = pill.firstElementChild?.getBoundingClientRect()
-      const lastEl = pill.lastElementChild as HTMLElement | null
-      const last = lastEl?.getBoundingClientRect()
+      // padding: the first and last things in the pill sit the same distance from its border;
+      // only children laid out in the row count (not the sr-only text or the hidden focus tip)
+      const inRow = Array.from(pill.children).filter((el) => {
+        const style = getComputedStyle(el)
+        return (
+          style.display !== 'none' && style.position !== 'absolute' && style.position !== 'fixed'
+        )
+      })
+      const first = inRow[0]?.getBoundingClientRect()
+      const last = inRow[inRow.length - 1]?.getBoundingClientRect()
       const hasButton = !!pill.querySelector('.uw-pill-action, .uw-pill-close')
       return {
         hasButton,
