@@ -3907,8 +3907,19 @@ export function Home() {
   const activeUwSubView: DocumentsHomeSubViewId = activeUwWorkspaceId
     ? (uniworkSubViewByWs[activeUwWorkspaceId] ?? 'workspace')
     : 'workspace'
-  const showUniworkPane =
-    area === 'uniwork' && !selectedProjectId && !eduMode && !chatMode && isSignedIn
+  // the sidebar slot stays up under My AI / Workbench; only the main pane yields to them
+  const showUniworkPane = area === 'uniwork' && !selectedProjectId && isSignedIn
+  const uniworkPaneReady =
+    showUniworkPane &&
+    acctView !== 'loading' &&
+    !uwWsState.workspaceError &&
+    uwWsState.workspaces !== null &&
+    uwWsState.workspaces.length > 0 &&
+    !!activeUwWorkspaceId
+  const leaveAiMode = () => {
+    setChatMode(false)
+    setEduMode(false)
+  }
 
   return (
     <div className="home">
@@ -4089,7 +4100,7 @@ export function Home() {
           }}
         />
       ) : area === 'uniwork' ? (
-        acctView === 'loading' ? (
+        uniworkPaneReady ? null : acctView === 'loading' ? (
           <main className="content">
             <WorkSkeleton />
           </main>
@@ -4118,31 +4129,36 @@ export function Home() {
               onRetry={() => setUwWsTick((n) => n + 1)}
             />
           </main>
-        ) : (
-          <main className="content home-uw-pane">
-            <DocumentsHome
-              key={`${recentsAccount}:${activeUwWorkspaceId}`}
-              workspaceId={activeUwWorkspaceId}
-              workspaces={uwWsState.workspaces}
-              onWorkspaceChange={selectUniworkWorkspace}
-              initialFolderId={activeUwFolderId}
-              initialSubView={activeUwSubView}
-              onSubViewChange={(sv) => {
-                setUniworkSubViewByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: sv }))
-              }}
-              onFolderChange={(folderId) => {
-                setUniworkFolderByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: folderId }))
-              }}
-              onOpenDocument={openUniworkDocFromPane}
-              openingId={openingDocId}
-              sidebarHost={uniworkSidebarSlot}
-            />
-          </main>
-        )
+        ) : null
       ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
         renderFolderContent()
       ) : (
         renderGlobalContent()
+      )}
+
+      {/* stays mounted (main pane hidden) under My AI / Workbench so the portalled sidebar nav and its loaded lists survive */}
+      {uniworkPaneReady && uwWsState.workspaces && activeUwWorkspaceId && (
+        <main className="content home-uw-pane" hidden={chatMode || eduMode}>
+          <DocumentsHome
+            key={`${recentsAccount}:${activeUwWorkspaceId}`}
+            workspaceId={activeUwWorkspaceId}
+            workspaces={uwWsState.workspaces}
+            onWorkspaceChange={selectUniworkWorkspace}
+            initialFolderId={activeUwFolderId}
+            initialSubView={activeUwSubView}
+            onSubViewChange={(sv) => {
+              setUniworkSubViewByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: sv }))
+            }}
+            onFolderChange={(folderId) => {
+              setUniworkFolderByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: folderId }))
+            }}
+            onOpenDocument={openUniworkDocFromPane}
+            openingId={openingDocId}
+            sidebarHost={uniworkSidebarSlot}
+            sidebarIdle={chatMode || eduMode}
+            onSidebarNavigate={leaveAiMode}
+          />
+        </main>
       )}
 
       <div className="agent-intent-host">

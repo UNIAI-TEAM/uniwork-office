@@ -466,7 +466,8 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
         expect.anything(),
         'ws-2',
       )
-      expect(main!.querySelector('.wb-work-skeleton')).toBeNull()
+      // the documents pane is its own element now (not the skeleton's <main> reused), so re-query
+      expect(host.querySelector('main.content .wb-work-skeleton')).toBeNull()
       expect(host.textContent).toContain('Marketing Plan.docx')
     } finally {
       afterSpy.mockRestore()

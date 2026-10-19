@@ -214,6 +214,10 @@ export interface DocumentsHomeProps {
   onOpenDocument: (doc: UniworkDocSummary) => void
   openingId?: string | null
   sidebarHost?: HTMLElement | null
+  /** the host shows another surface (My AI / Workbench) in the main pane: no nav item reads as current */
+  sidebarIdle?: boolean
+  /** a sidebar nav item or folder was picked (lets the host leave My AI / Workbench) */
+  onSidebarNavigate?: () => void
   initialFolderId?: string | null
   /** sub-view to mount with (kept by the host so an area switch can restore it — VDH-7) */
   initialSubView?: DocumentsHomeSubViewId
@@ -242,6 +246,8 @@ export function DocumentsHome({
   onOpenDocument,
   openingId,
   sidebarHost,
+  sidebarIdle = false,
+  onSidebarNavigate,
   initialFolderId = null,
   initialSubView = 'workspace',
   onSubViewChange,
@@ -920,7 +926,11 @@ export function DocumentsHome({
       {
         id: 'new',
         label: row.id ? t('ufNewSubfolder') : t('ufNewFolder'),
-        onSelect: () => folderActions.openCreate(row.id, row.id !== null),
+        onSelect: () => {
+          // the dialog renders inside this pane, which is hidden while My AI / Workbench owns the view
+          onSidebarNavigate?.()
+          folderActions.openCreate(row.id, row.id !== null)
+        },
       },
     ]
     if (!row.id || !folderEditActionsOffered(row)) return items
@@ -931,7 +941,10 @@ export function DocumentsHome({
       {
         id: 'move',
         label: t('ufMoveTo'),
-        onSelect: () => folderActions.startMove({ id, kind: 'folder', parentId, title: row.title }),
+        onSelect: () => {
+          onSidebarNavigate?.()
+          folderActions.startMove({ id, kind: 'folder', parentId, title: row.title })
+        },
       },
     )
     return items
@@ -1074,16 +1087,18 @@ export function DocumentsHome({
   const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : t('ufNoResults', { query })
 
   const treeSelectedKey = useMemo(() => {
+    if (sidebarIdle) return '\u0000none'
     if (subView === 'my-folder' && resolvedMyFolderId) return resolvedMyFolderId
     if (subView === 'workspace') return folderId ?? ROOT_KEY
     return '\u0000none'
-  }, [subView, resolvedMyFolderId, folderId])
+  }, [sidebarIdle, subView, resolvedMyFolderId, folderId])
 
   const sidebarContent = (
     <div className="dh-sidebar-wrap">
       <nav className="dh-subnav home-area-nav" aria-label={t('ufAreaUniwork')}>
         {navEntries.map((entry) => {
-          const isActive = subView === entry.id && (entry.id !== 'workspace' || folderId === null)
+          const isActive =
+            !sidebarIdle && subView === entry.id && (entry.id !== 'workspace' || folderId === null)
           return (
             <button
               key={entry.id}
@@ -1091,7 +1106,10 @@ export function DocumentsHome({
               className={`dh-nav-item nav-item${isActive ? ' active' : ''}`}
               data-nav={entry.id}
               aria-current={isActive ? 'page' : undefined}
-              onClick={() => selectSubView(entry.id)}
+              onClick={() => {
+                onSidebarNavigate?.()
+                selectSubView(entry.id)
+              }}
             >
               <SubNavIcon id={entry.id} />
               <span className="dh-nav-label">{t(entry.labelKey)}</span>
@@ -1107,12 +1125,13 @@ export function DocumentsHome({
             className="dh-sidebar-add"
             aria-label={t('uhNewFolder')}
             title={t('uhNewFolder')}
-            onClick={() =>
+            onClick={() => {
+              onSidebarNavigate?.()
               folderActions.openCreate(
                 subView === 'workspace' ? folderId : null,
                 subView === 'workspace' && folderId !== null,
               )
-            }
+            }}
           >
             <svg
               width="14"
@@ -1150,7 +1169,10 @@ export function DocumentsHome({
               expanded={expanded}
               onExpandedChange={setExpanded}
               selectedKey={treeSelectedKey}
-              onOpen={openFolderInWorkspace}
+              onOpen={(id) => {
+                onSidebarNavigate?.()
+                openFolderInWorkspace(id)
+              }}
               menuFor={treeMenuFor}
               rename={folderActions.treeRename}
               onRenameSave={(id, value) =>
