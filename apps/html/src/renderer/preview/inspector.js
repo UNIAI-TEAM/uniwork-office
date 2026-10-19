@@ -965,16 +965,17 @@
     'keydown',
     (e) => {
       // mod+P never reaches the host window from inside this frame: relay it before any edit or
-      // field handling (same key rule as web/docs/bridge/print-accelerator.ts, repeats ignored)
+      // field handling (same key rule as web/docs/bridge/print-accelerator.ts); a held press is
+      // still suppressed so this frame's own browser dialog never opens beside the module's
       if (
         claimPrint &&
-        !e.repeat &&
         (e.metaKey || e.ctrlKey) &&
         !e.shiftKey &&
         !e.altKey &&
         e.key.toLowerCase() === 'p'
       ) {
         e.preventDefault()
+        if (e.repeat) return
         // a run being typed lives only in this DOM: commit it first so the host serializes it
         finishEdit(true)
         post({ type: 'gx:keyCommand', command: 'print' })
