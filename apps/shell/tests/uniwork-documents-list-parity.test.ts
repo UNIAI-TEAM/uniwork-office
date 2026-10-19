@@ -14,7 +14,10 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import {
   fetchDocumentsHomeSources,
+  formatBytes,
+  formatShortDate,
   mergeNewestFirst,
+  rowSizeBytes,
   sourceMatchesFilters,
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
@@ -393,4 +396,157 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
     ])
     expect(host.querySelector('.dh-load-more-row')).toBeNull()
   })
+})
+
+describe('Size and dates as the web shows them (UNI-1961 item 2)', () => {
+  it('formatBytes is the web byte formatter (1024 steps, 0 or 1 decimal, locale mark)', () => {
+    expect(formatBytes(null, 'en-US')).toBe('')
+    expect(formatBytes(-1, 'en-US')).toBe('')
+    expect(formatBytes(0, 'en-US')).toBe('0 B')
+    expect(formatBytes(512, 'en-US')).toBe('512 B')
+    expect(formatBytes(325632, 'en-US')).toBe('318 KB')
+    expect(formatBytes(1258291, 'en-US')).toBe('1.2 MB')
+    expect(formatBytes(1258291, 'vi-VN')).toBe('1,2 MB')
+    expect(formatBytes(15 * 1024 * 1024, 'en-US')).toBe('15 MB')
+    expect(formatBytes(3 * 1024 * 1024 * 1024, 'en-US')).toBe('3 GB')
+  })
+
+  it('formatShortDate is Intl dateStyle short; no date says nothing', () => {
+    const iso = '2026-10-19T08:00:00.000Z'
+    for (const locale of ['vi-VN', 'en-US']) {
+      expect(formatShortDate(iso, locale)).toBe(
+        new Intl.DateTimeFormat(locale, { dateStyle: 'short' }).format(new Date(iso)),
+      )
+    }
+    expect(formatShortDate('', 'en-US')).toBe('')
+    expect(formatShortDate('not a date', 'en-US')).toBe('')
+  })
+
+  it('a size shows for a file document with bytes and for every source; pages and folders say nothing', () => {
+    const at = { type: 'doc' as const }
+    expect(rowSizeBytes({ ...at, id: 'a', doc: doc({ id: 'a', sizeBytes: 100 }) })).toBe(100)
+    expect(rowSizeBytes({ ...at, id: 'b', doc: doc({ id: 'b' }) })).toBeNull()
+    expect(rowSizeBytes({ ...at, id: 'c', doc: doc({ id: 'c', sizeBytes: 0 }) })).toBeNull()
+    expect(
+      rowSizeBytes({ ...at, id: 'd', doc: doc({ id: 'd', kind: 'page', sizeBytes: 9 }) }),
+    ).toBeNull()
+    expect(
+      rowSizeBytes({ type: 'source', id: 'source:s', source: source({ id: 's', sizeBytes: 0 }) }),
+    ).toBe(0)
+  })
+})
+
+describe('DocumentsHome Size column and short dates (UNI-1961 item 2)', () => {
+  let host: HTMLDivElement
+  let sidebarSlot: HTMLDivElement
+  let root: Root
+  const workspaces: UniworkWorkspaceRef[] = [
+    { id: 'ws-1', name: 'Công ty UniWork', slug: 'uniwork' },
+  ]
+  const items: DocumentsHomeDoc[] = [
+    doc({
+      id: 'doc-1',
+      title: 'Kế hoạch.docx',
+      updatedAt: '2026-10-17T08:00:00.000Z',
+      sizeBytes: 325632,
+    }),
+    doc({
+      id: 'page-1',
+      title: 'Ghi chú',
+      kind: 'page',
+      format: null,
+      updatedAt: '2026-10-16T08:00:00.000Z',
+    }),
+  ]
+  const sourceFile = source({
+    id: 'src-1',
+    updatedAt: '2026-10-19T08:00:00.000Z',
+    sizeBytes: 1258291,
+  })
+
+  beforeEach(() => {
+    localStorage.clear()
+    const api = {
+      accountStatus: vi.fn(async () => ({ state: 'signed-in' as const, loggedIn: true })),
+      uniworkListWorkspaces: vi.fn(async () => ok(workspaces)),
+      uniworkFolderTree: vi.fn(async () => ok([])),
+      uniworkListChildren: vi.fn(async () => ok({ items, nextCursor: null })),
+      uniworkListSources: vi.fn(async () => ok({ items: [sourceFile], nextCursor: null })),
+      uniworkSearchDocuments: vi.fn(async () => ok({ items: [], nextCursor: null })),
+      onUniworkTreeChanged: vi.fn(() => () => {}),
+      onUniworkDocRenamed: vi.fn(() => () => {}),
+      onUniworkUploadProgress: vi.fn(() => () => {}),
+    }
+    ;(window as unknown as { aiOffice: unknown; home: unknown }).aiOffice = api
+    ;(window as unknown as { aiOffice: unknown; home: unknown }).home = api
+    host = document.createElement('div')
+    sidebarSlot = document.createElement('div')
+    document.body.appendChild(sidebarSlot)
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(async () => {
+    await act(async () => {
+      root.unmount()
+    })
+    host.remove()
+    sidebarSlot.remove()
+  })
+
+  async function renderHome(lang: 'vi' | 'en') {
+    localStorage.setItem('genoffice.lang', lang)
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: lang },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+  }
+
+  const cell = (selector: string, name: string) =>
+    host.querySelector<HTMLElement>(`${selector} .${name}`)?.textContent?.trim()
+
+  it.each([
+    ['vi', 'vi-VN', 'Dung lượng', '318 KB', '1,2 MB'],
+    ['en', 'en-US', 'Size', '318 KB', '1.2 MB'],
+  ] as const)(
+    '%s: Name, Access, editor, Updated, Size, then the actions',
+    async (lang, locale, size, docSize, srcSize) => {
+      await renderHome(lang)
+      const heads = Array.from(
+        host.querySelectorAll<HTMLElement>('.dh-doc-head > [role="columnheader"]'),
+      )
+      expect(heads.map((el) => el.className)).toEqual([
+        'dh-col-name',
+        'dh-col-access',
+        'dh-col-person',
+        'dh-col-time',
+        'dh-col-size',
+        'dh-col-actions',
+      ])
+      expect(heads[4]?.textContent).toBe(size)
+
+      const short = (iso: string) =>
+        new Intl.DateTimeFormat(locale, { dateStyle: 'short' }).format(new Date(iso))
+      expect(cell('[data-doc-id="doc-1"]', 'dh-cell-size')).toBe(docSize)
+      expect(cell('[data-doc-id="doc-1"]', 'dh-cell-time')).toBe(short('2026-10-17T08:00:00.000Z'))
+      expect(cell('[data-doc-id="page-1"]', 'dh-cell-size')).toBe('')
+      expect(cell('[data-doc-id="page-1"]', 'dh-cell-time')).toBe(short('2026-10-16T08:00:00.000Z'))
+      expect(cell('[data-source-id="src-1"]', 'dh-cell-size')).toBe(srcSize)
+      expect(cell('[data-source-id="src-1"]', 'dh-cell-time')).toBe(
+        short('2026-10-19T08:00:00.000Z'),
+      )
+    },
+  )
 })

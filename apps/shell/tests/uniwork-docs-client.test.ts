@@ -1078,3 +1078,36 @@ describe('document sources (UNI-1961)', () => {
     expect(await codeOf(api.downloadSource('ws_1', '../x'))).toBe('not_found')
   })
 })
+
+// UNI-1961 item 2: list rows carry the file's size for the web's Size column
+describe('list rows carry size_bytes (UNI-1961)', () => {
+  it('reads size_bytes on a file row; a page, a folder, a zero or a bad size carries none', async () => {
+    const row = (over: Record<string, unknown>) => ({
+      workspace_id: 'ws_1',
+      title: 'x.docx',
+      updated_at: '2026-10-19T08:00:00Z',
+      parent_id: null,
+      ...over,
+    })
+    const api = client(async () =>
+      json(200, {
+        documents: [
+          row({ id: 'f1', kind: 'file', size_bytes: 325632 }),
+          row({ id: 'f2', kind: 'file', size_bytes: 0 }),
+          row({ id: 'f3', kind: 'file', size_bytes: 'big' }),
+          row({ id: 'p1', kind: 'page', title: 'Ghi chú', size_bytes: 10 }),
+          row({ id: 'd1', kind: 'folder', title: 'Thư mục', size_bytes: 10 }),
+        ],
+        next_cursor: null,
+      }),
+    )
+    const page = await api.listChildren({ workspaceId: 'ws_1', parentId: null })
+    expect(page.documents.map((d) => [d.id, d.sizeBytes])).toEqual([
+      ['f1', 325632],
+      ['f2', undefined],
+      ['f3', undefined],
+      ['p1', undefined],
+      ['d1', undefined],
+    ])
+  })
+})
