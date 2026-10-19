@@ -340,6 +340,7 @@ import {
 } from './components/TableDialogs'
 import { TablePropertiesDialog } from './components/TablePropertiesDialog'
 import { showToast, toastStatusLine } from './components/toast-bus'
+import { isNoDocumentPrintKey } from './print-shortcut'
 import { setTableAutoFit, toggleRepeatHeaderRows } from './editor/table-properties'
 import { distributeSelectedColumns } from './editor/table-sizing'
 import {
@@ -5489,7 +5490,7 @@ export function App() {
       }
       // Print: with a document the native menu / browser owns the shortcut; with none it must
       // not vanish silently (printDoc answers with the "open a document" message)
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === 'p' && !doc) {
+      if (isNoDocumentPrintKey(e, !!doc, cap('print'))) {
         e.preventDefault()
         void printDoc()
       }

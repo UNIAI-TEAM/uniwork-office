@@ -91,3 +91,27 @@ describe('toastStatusLine at phone width', () => {
     expect(seen).toEqual([{ text: 'Open a document to print it.', kind: 'info' }])
   })
 })
+
+// UNI-1931 (FE1-5/6): the status -> toast bridge only acts where the bar hides the message
+describe('toastStatusLine matchMedia gate', () => {
+  it('skips a wide frame (the bar shows the message)', () => {
+    const matchMedia = vi.fn(() => ({ matches: false }))
+    vi.stubGlobal('matchMedia', matchMedia)
+    toastStatusLine({ key: 'appPrintNoDocument' }, t)
+    toastStatusLine('Save failed: 500', t)
+    expect(matchMedia).toHaveBeenCalledWith('(max-width: 640px)')
+    expect(seen).toEqual([])
+  })
+
+  it('toasts at 640px and below', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    toastStatusLine('Save failed: 500', t)
+    expect(seen).toEqual([{ text: 'Save failed: 500', kind: 'info' }])
+  })
+
+  it('without matchMedia (jsdom, a bare test mount) it does nothing and does not throw', () => {
+    vi.stubGlobal('matchMedia', undefined)
+    expect(() => toastStatusLine('Save failed: 500', t)).not.toThrow()
+    expect(seen).toEqual([])
+  })
+})
