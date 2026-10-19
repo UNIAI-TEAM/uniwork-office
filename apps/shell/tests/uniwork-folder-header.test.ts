@@ -287,7 +287,6 @@ describe('UNI-1979 open-folder header: one row, the folder name once', () => {
     // the app row also holds the workspace select, so the crumbs' basis is below the web's 18rem
     // (8rem): ~128 + select 96 + actions ~242 + 2 x 12 gap = ~490px stays on row one at 510px
     expect(crumbs).toMatch(/flex:\s*1\s+1\s+8rem/)
-    expect(crumbs).toMatch(/min-width:\s*0\b/)
     const actions = ruleBody(homeCss, '.dh-toolbar-actions')
     expect(actions).toMatch(/flex:\s*none/)
     // when the actions do wrap they stay at the inline end, never left under the crumbs

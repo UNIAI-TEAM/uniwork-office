@@ -230,7 +230,18 @@
 
 .dh-toolbar-folder > .uwf-crumbs {
   flex: 1 1 8rem;
-  min-width: 0;
+  min-width: calc(2.25rem + 2.5rem + 60px + 2px);
+}
+
+/* V1979-1: the crumbs box never gets narrower than the floors of its children
+   (home 2.25rem, ancestors 2.5rem, leaf 2.5rem + 60px for the pencil and the
+   menu, 2px between crumbs), so the pencil and the menu never slide under the
+   workspace select: the row wraps the select / actions instead. This is the
+   two-crumb floor (home + leaf = 138px); folders.css raises it for 3 and 4
+   crumbs (180 / 222px) and for coarse pointers. The select gives room back
+   first: a share of the row, floored at 96px. */
+.dh-toolbar-folder .dh-ws-select {
+  max-width: clamp(96px, 20cqw, 220px);
 }
 
 .dh-toolbar-actions {
@@ -250,8 +261,15 @@
 @container (min-width: 60rem) {
   .dh-toolbar-folder .dh-search-box {
     order: 0;
-    flex: 0 0 auto;
-    width: 14rem;
+    flex: 0 1 auto;
+    width: clamp(12rem, 18cqw, 14rem);
+    min-width: 12rem;
+  }
+
+  /* V1979-2: with the search inline the select takes a smaller share, so the
+     folder name keeps the room it has at a 1280 window */
+  .dh-toolbar-folder .dh-ws-select {
+    max-width: clamp(96px, 14cqw, 220px);
   }
 }
 

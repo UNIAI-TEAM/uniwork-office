@@ -423,6 +423,17 @@
   min-width: calc(2.5rem + 60px);
 }
 
+/* V1979-1: the crumbs box floor for 3 and 4 crumbs (home + ancestors + leaf + 2px
+   gaps); the two-crumb floor is on .dh-toolbar-folder > .uwf-crumbs. The :has()
+   rules out-rank that rule whichever stylesheet loads last. */
+.dh-toolbar.dh-toolbar-folder > .uwf-crumbs:has(li:nth-child(3)) {
+  min-width: calc(2.25rem + 5rem + 60px + 4px);
+}
+
+.dh-toolbar.dh-toolbar-folder > .uwf-crumbs:has(li:nth-child(4)) {
+  min-width: calc(2.25rem + 7.5rem + 60px + 6px);
+}
+
 .uwf-crumb-heading {
   flex: 0 1 auto;
   min-width: 2.5rem;
@@ -612,6 +623,19 @@
 
   .dh-toolbar .uwf-crumb-leaf {
     min-width: calc(2.5rem + 92px);
+  }
+
+  /* the same box floors with the leaf's 92px reserve */
+  .dh-toolbar.dh-toolbar-folder > .uwf-crumbs {
+    min-width: calc(2.25rem + 2.5rem + 92px + 2px);
+  }
+
+  .dh-toolbar.dh-toolbar-folder > .uwf-crumbs:has(li:nth-child(3)) {
+    min-width: calc(2.25rem + 5rem + 92px + 4px);
+  }
+
+  .dh-toolbar.dh-toolbar-folder > .uwf-crumbs:has(li:nth-child(4)) {
+    min-width: calc(2.25rem + 7.5rem + 92px + 6px);
   }
 
   .uwf-tree .uwf-tree-row .uw-row-menu.uwf-menu .uw-row-menu-btn,
