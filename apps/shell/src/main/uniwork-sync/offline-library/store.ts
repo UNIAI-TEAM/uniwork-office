@@ -216,8 +216,12 @@ export function createOfflineLibraryStore(source: OfflineLibraryStoreSource): Of
   }
 
   const write = async (key: string, value: Uint8Array): Promise<LibraryWriteResult> => {
+    const entered = generation
     const resolved = await resolve()
     if (resolved.kind !== 'ok') return resolved
+    // FUSR-R1-1: `resolve()` returns across one more await; a boundary landing
+    // there (forget() with no wipe) must not reach the record call
+    if (generation !== entered) return { kind: 'interrupted' }
     let written
     try {
       written = await resolved.records.write(key, value)
@@ -231,16 +235,20 @@ export function createOfflineLibraryStore(source: OfflineLibraryStoreSource): Of
   }
 
   const read = async (key: string) => {
+    const entered = generation
     const resolved = await resolve()
     if (resolved.kind !== 'ok') return resolved
+    if (generation !== entered) return { kind: 'interrupted' as const }
     const result = await resolved.records.read(key)
     if (result.kind === 'interrupted') dropHandle()
     return result
   }
 
   const remove = async (key: string): Promise<LibraryDeleteResult> => {
+    const entered = generation
     const resolved = await resolve()
     if (resolved.kind !== 'ok') return resolved
+    if (generation !== entered) return { kind: 'interrupted' }
     const result = await resolved.records.delete(key)
     if (result.kind === 'interrupted') dropHandle()
     return result
