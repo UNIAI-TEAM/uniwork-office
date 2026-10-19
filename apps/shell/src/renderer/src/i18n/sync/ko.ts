@@ -325,7 +325,7 @@ export const ko = {
     '모든 변경 사항을 실행 취소했습니다. UniWork의 버전 {n}이(가) 열린 사본보다 최신입니다.',
   uwRemoteStopAiConfirm:
     '다시 불러오기 위해 실행 중인 UniWork AI를 중지할까요? AI가 이미 적용한 변경 사항은 열린 사본에 속합니다.',
-  uwRemoteWaitCommit: '진행 중인 저장이 끝나기를 기다리는 중입니다. 그 후 다시 불러올 수 있습니다.',
+  uwRemoteWaitCommit: '진행 중인 저장이 끝나기를 기다리는 중입니다. 그 후 계속할 수 있습니다.',
   uwRemoteReload: '최신 버전 다시 불러오기…',
   uwRemoteLater: '나중에',
   uwRemoteClose: '닫기',

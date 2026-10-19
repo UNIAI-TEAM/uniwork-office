@@ -316,7 +316,7 @@ export const vi = {
   uwRemoteNowClean: 'Bạn đã hoàn tác hết thay đổi. Phiên bản {n} trên UniWork mới hơn bản đang mở.',
   uwRemoteStopAiConfirm:
     'Dừng lượt UniWork AI đang chạy để tải lại? Thay đổi AI đã áp dụng sẽ theo bản đang mở.',
-  uwRemoteWaitCommit: 'Đang chờ lần lưu đang gửi hoàn tất; tải lại được sau đó.',
+  uwRemoteWaitCommit: 'Đang chờ lần lưu đang gửi hoàn tất; có thể tiếp tục sau đó.',
   uwRemoteReload: 'Tải lại bản mới nhất…',
   uwRemoteLater: 'Để sau',
   uwRemoteClose: 'Đóng',

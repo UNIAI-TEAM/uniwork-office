@@ -334,7 +334,7 @@ export const es = {
     'Has deshecho todos los cambios. La versión {n} en UniWork es más reciente que la copia abierta.',
   uwRemoteStopAiConfirm:
     '¿Detener la ejecución de UniWork AI para recargar? Los cambios que ya hizo la IA pertenecen a la copia abierta.',
-  uwRemoteWaitCommit: 'Esperando a que termine el guardado en curso; después podrás recargar.',
+  uwRemoteWaitCommit: 'Esperando a que termine el guardado en curso; después podrás continuar.',
   uwRemoteReload: 'Recargar la última versión…',
   uwRemoteLater: 'Más tarde',
   uwRemoteClose: 'Cerrar',

@@ -325,7 +325,7 @@ export const cs = {
     'Vrátili jste všechny změny. Verze {n} v UniWork je novější než otevřená kopie.',
   uwRemoteStopAiConfirm:
     'Zastavit běžící UniWork AI a znovu načíst? Změny, které AI už provedla, patří k otevřené kopii.',
-  uwRemoteWaitCommit: 'Čeká se na dokončení probíhajícího uložení; potom můžete znovu načíst.',
+  uwRemoteWaitCommit: 'Čeká se na dokončení probíhajícího uložení; potom můžete pokračovat.',
   uwRemoteReload: 'Načíst nejnovější…',
   uwRemoteLater: 'Později',
   uwRemoteClose: 'Zavřít',

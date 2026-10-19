@@ -307,7 +307,7 @@ export const he = {
   uwRemoteNowClean: 'ביטלת את כל השינויים. גרסה {n} ב-UniWork חדשה יותר מהעותק הפתוח.',
   uwRemoteStopAiConfirm:
     'לעצור את הרצת UniWork AI כדי לטעון מחדש? שינויים שה-AI כבר ביצע שייכים לעותק הפתוח.',
-  uwRemoteWaitCommit: 'ממתין לסיום השמירה המתבצעת; אחר כך אפשר לטעון מחדש.',
+  uwRemoteWaitCommit: 'ממתין לסיום השמירה המתבצעת; אחר כך אפשר להמשיך.',
   uwRemoteReload: 'טעינה מחדש של הגרסה האחרונה…',
   uwRemoteLater: 'אחר כך',
   uwRemoteClose: 'סגירה',

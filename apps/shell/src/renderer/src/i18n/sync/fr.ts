@@ -343,7 +343,7 @@ export const fr = {
   uwRemoteStopAiConfirm:
     'Arrêter l’exécution en cours d’UniWork AI pour recharger ? Les modifications déjà faites par l’IA appartiennent à la copie ouverte.',
   uwRemoteWaitCommit:
-    'En attente de la fin de l’enregistrement en cours ; vous pourrez recharger ensuite.',
+    'En attente de la fin de l’enregistrement en cours ; vous pourrez continuer ensuite.',
   uwRemoteReload: 'Recharger la dernière version…',
   uwRemoteLater: 'Plus tard',
   uwRemoteClose: 'Fermer',

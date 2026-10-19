@@ -330,7 +330,7 @@ export const id = {
   uwRemoteStopAiConfirm:
     'Hentikan proses UniWork AI yang sedang berjalan untuk memuat ulang? Perubahan yang sudah dibuat AI menjadi bagian salinan yang terbuka.',
   uwRemoteWaitCommit:
-    'Menunggu penyimpanan yang sedang berjalan selesai; Anda bisa memuat ulang setelahnya.',
+    'Menunggu penyimpanan yang sedang berjalan selesai; Anda bisa melanjutkan setelahnya.',
   uwRemoteReload: 'Muat ulang versi terbaru…',
   uwRemoteLater: 'Nanti',
   uwRemoteClose: 'Tutup',

@@ -293,7 +293,7 @@ export const zhTW = {
   uwRemoteNowClean: '你已復原所有變更。UniWork 上的版本 {n} 比目前開啟的副本更新。',
   uwRemoteStopAiConfirm:
     '要停止正在執行的 UniWork AI 以重新載入嗎？AI 已做出的變更屬於目前開啟的副本。',
-  uwRemoteWaitCommit: '正在等待傳送中的儲存完成；完成後即可重新載入。',
+  uwRemoteWaitCommit: '正在等待傳送中的儲存完成；完成後即可繼續。',
   uwRemoteReload: '重新載入最新版本…',
   uwRemoteLater: '稍後',
   uwRemoteClose: '關閉',

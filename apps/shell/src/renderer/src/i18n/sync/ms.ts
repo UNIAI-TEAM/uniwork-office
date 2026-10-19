@@ -337,7 +337,7 @@ export const ms = {
   uwRemoteStopAiConfirm:
     'Hentikan larian UniWork AI yang sedang berjalan untuk memuat semula? Perubahan yang telah dibuat AI milik salinan yang terbuka.',
   uwRemoteWaitCommit:
-    'Menunggu simpanan yang sedang berjalan selesai; anda boleh memuat semula selepas itu.',
+    'Menunggu simpanan yang sedang berjalan selesai; anda boleh meneruskan selepas itu.',
   uwRemoteReload: 'Muat semula versi terkini…',
   uwRemoteLater: 'Kemudian',
   uwRemoteClose: 'Tutup',

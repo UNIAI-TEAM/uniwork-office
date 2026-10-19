@@ -301,7 +301,7 @@ export const zh = {
   uwRemoteNowClean: '你已撤销所有更改。UniWork 上的版本 {n} 比当前打开的副本更新。',
   uwRemoteStopAiConfirm:
     '要停止正在运行的 UniWork AI 以重新加载吗？AI 已做出的更改属于当前打开的副本。',
-  uwRemoteWaitCommit: '正在等待发送中的保存完成；完成后即可重新加载。',
+  uwRemoteWaitCommit: '正在等待发送中的保存完成；完成后即可继续。',
   uwRemoteReload: '重新加载最新版本…',
   uwRemoteLater: '稍后',
   uwRemoteClose: '关闭',

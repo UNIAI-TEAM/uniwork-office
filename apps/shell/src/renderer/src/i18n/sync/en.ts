@@ -321,7 +321,7 @@ export const en = {
     'You’ve undone all changes. Version {n} on UniWork is newer than the open copy.',
   uwRemoteStopAiConfirm:
     'Stop the running UniWork AI run to reload? Changes AI already made belong to the open copy.',
-  uwRemoteWaitCommit: 'Waiting for the save in progress to finish; you can reload after that.',
+  uwRemoteWaitCommit: 'Waiting for the save in progress to finish; you can continue when it does.',
   uwRemoteReload: 'Reload latest…',
   uwRemoteLater: 'Later',
   uwRemoteClose: 'Close',

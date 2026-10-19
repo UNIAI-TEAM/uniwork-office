@@ -337,7 +337,7 @@ export const pt = {
   uwRemoteStopAiConfirm:
     'Parar a execução do UniWork AI para recarregar? As alterações que a IA já fez pertencem à cópia aberta.',
   uwRemoteWaitCommit:
-    'Aguardando o salvamento em andamento terminar; depois você poderá recarregar.',
+    'Aguardando o salvamento em andamento terminar; depois você poderá continuar.',
   uwRemoteReload: 'Recarregar a mais recente…',
   uwRemoteLater: 'Depois',
   uwRemoteClose: 'Fechar',

@@ -324,7 +324,7 @@ export const hi = {
   uwRemoteNowClean: 'आपने सभी बदलाव पूर्ववत कर दिए। UniWork पर संस्करण {n} खुली प्रति से नया है।',
   uwRemoteStopAiConfirm:
     'फिर से लोड करने के लिए चल रहा UniWork AI रोकें? AI के किए गए बदलाव खुली प्रति के हैं।',
-  uwRemoteWaitCommit: 'चल रही सहेज पूरी होने की प्रतीक्षा; उसके बाद आप फिर से लोड कर सकते हैं।',
+  uwRemoteWaitCommit: 'चल रही सहेज पूरी होने की प्रतीक्षा; उसके बाद आप जारी रख सकते हैं।',
   uwRemoteReload: 'नवीनतम फिर से लोड करें…',
   uwRemoteLater: 'बाद में',
   uwRemoteClose: 'बंद करें',

@@ -332,7 +332,7 @@ export const pl = {
     'Cofnięto wszystkie zmiany. Wersja {n} w UniWork jest nowsza niż otwarta kopia.',
   uwRemoteStopAiConfirm:
     'Zatrzymać działające UniWork AI, aby wczytać ponownie? Zmiany wprowadzone już przez AI należą do otwartej kopii.',
-  uwRemoteWaitCommit: 'Czekanie na zakończenie trwającego zapisu; potem można wczytać ponownie.',
+  uwRemoteWaitCommit: 'Czekanie na zakończenie trwającego zapisu; potem można kontynuować.',
   uwRemoteReload: 'Wczytaj najnowszą…',
   uwRemoteLater: 'Później',
   uwRemoteClose: 'Zamknij',

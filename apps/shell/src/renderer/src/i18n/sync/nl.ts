@@ -334,7 +334,7 @@ export const nl = {
     'Je hebt alle wijzigingen ongedaan gemaakt. Versie {n} op UniWork is nieuwer dan de geopende kopie.',
   uwRemoteStopAiConfirm:
     'De lopende UniWork AI-run stoppen om opnieuw te laden? Wijzigingen die AI al heeft gemaakt horen bij de geopende kopie.',
-  uwRemoteWaitCommit: 'Wachten tot de lopende opslag klaar is; daarna kun je opnieuw laden.',
+  uwRemoteWaitCommit: 'Wachten tot de lopende opslag klaar is; daarna kun je verdergaan.',
   uwRemoteReload: 'Nieuwste opnieuw laden…',
   uwRemoteLater: 'Later',
   uwRemoteClose: 'Sluiten',

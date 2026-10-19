@@ -337,7 +337,7 @@ export const it = {
     'Hai annullato tutte le modifiche. La versione {n} su UniWork è più recente della copia aperta.',
   uwRemoteStopAiConfirm:
     'Interrompere l’esecuzione di UniWork AI per ricaricare? Le modifiche già fatte dall’IA appartengono alla copia aperta.',
-  uwRemoteWaitCommit: 'In attesa che termini il salvataggio in corso; poi potrai ricaricare.',
+  uwRemoteWaitCommit: 'In attesa che termini il salvataggio in corso; poi potrai continuare.',
   uwRemoteReload: 'Ricarica l’ultima versione…',
   uwRemoteLater: 'Più tardi',
   uwRemoteClose: 'Chiudi',

@@ -333,7 +333,7 @@ export const ja = {
     'すべての変更を元に戻しました。UniWork のバージョン {n} は開いているコピーより新しいです。',
   uwRemoteStopAiConfirm:
     '再読み込みのために実行中の UniWork AI を停止しますか？AI がすでに行った変更は開いているコピーのものです。',
-  uwRemoteWaitCommit: '進行中の保存が終わるのを待っています。その後で再読み込みできます。',
+  uwRemoteWaitCommit: '進行中の保存が終わるのを待っています。その後で続行できます。',
   uwRemoteReload: '最新版を再読み込み…',
   uwRemoteLater: '後で',
   uwRemoteClose: '閉じる',

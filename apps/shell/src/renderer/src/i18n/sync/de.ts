@@ -342,7 +342,7 @@ export const de = {
   uwRemoteStopAiConfirm:
     'Den laufenden UniWork-AI-Lauf stoppen, um neu zu laden? Bereits von der KI vorgenommene Änderungen gehören zur geöffneten Kopie.',
   uwRemoteWaitCommit:
-    'Warten, bis das laufende Speichern abgeschlossen ist; danach können Sie neu laden.',
+    'Warten, bis das laufende Speichern abgeschlossen ist; danach können Sie fortfahren.',
   uwRemoteReload: 'Neueste Version laden…',
   uwRemoteLater: 'Später',
   uwRemoteClose: 'Schließen',

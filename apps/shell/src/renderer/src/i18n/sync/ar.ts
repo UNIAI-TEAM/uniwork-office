@@ -310,7 +310,7 @@ export const ar = {
   uwRemoteNowClean: 'لقد تراجعت عن كل التغييرات. الإصدار {n} على UniWork أحدث من النسخة المفتوحة.',
   uwRemoteStopAiConfirm:
     'هل تريد إيقاف تشغيل UniWork AI الجاري لإعادة التحميل؟ التغييرات التي أجراها الذكاء الاصطناعي تخص النسخة المفتوحة.',
-  uwRemoteWaitCommit: 'في انتظار انتهاء الحفظ الجاري؛ يمكنك إعادة التحميل بعد ذلك.',
+  uwRemoteWaitCommit: 'في انتظار انتهاء الحفظ الجاري؛ يمكنك المتابعة عندما ينتهي.',
   uwRemoteReload: 'إعادة تحميل الأحدث…',
   uwRemoteLater: 'لاحقًا',
   uwRemoteClose: 'إغلاق',
