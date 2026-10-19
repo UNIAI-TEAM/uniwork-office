@@ -90,6 +90,8 @@ describe('uniwork documents string shards', () => {
         'document_too_deep',
         'document_cycle',
         'document_parent_kind',
+        // UNI-1975: a folder can't be shared
+        'folder_not_shareable',
       ].sort(),
     )
     // the G5-04 / G5-06 refusals reuse the sync shard's sentences, FD-11's the folders shard's

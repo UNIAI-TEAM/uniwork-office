@@ -16,8 +16,6 @@ export const fr = {
   usPickTitle: 'Choisir l’emplacement',
   usBack: 'Revenir au nom',
   usSearchFolders: 'Rechercher un dossier',
-  usSharedNote:
-    'Enregistré dans un dossier partagé, le document prend les autorisations de ce dossier.',
   usChooseFolder: 'Choisir « {folder} »',
   usSelected: 'Sélectionné',
   usRootBlocked: 'Choisissez un dossier',

@@ -2440,4 +2440,138 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         /width:\s*2[0-6]\dpx/.test(cssBlock(css, '.dh-search-box')),
     ).toBe(true)
   })
+
+  async function clickNavItem(id: string) {
+    const btn = sidebarSlot.querySelector<HTMLButtonElement>(`.nav-item[data-nav="${id}"]`)
+    expect(btn).not.toBeNull()
+    await act(async () => {
+      btn!.click()
+    })
+    await flush()
+  }
+
+  /** opens the row "..." menu of `docId` and presses the Move item, then reads the picker's path line */
+  async function openMovePickerFor(docId: string): Promise<string> {
+    const trigger = host.querySelector<HTMLButtonElement>(`[data-folder-menu-for="${docId}"]`)
+    expect(trigger).not.toBeNull()
+    await act(async () => {
+      trigger!.click()
+    })
+    await flush()
+    const move = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
+    ).find((el) => el.textContent?.trim() === 'Di chuyển tới…')
+    expect(move).toBeDefined()
+    await act(async () => {
+      move!.click()
+    })
+    await flush()
+    return document.querySelector('.uwf-picker-path')?.textContent ?? ''
+  }
+
+  it('never renders the Access cell or a scope badge for a folder, even when the server row still carries a scope (UNI-1975 FS1-2)', async () => {
+    // a folder row that still carries a scope from the server, next to a file row that carries one too
+    rootItems = rootItems.map((item) =>
+      item.kind === 'folder'
+        ? { ...item, visibility: 'workspace' as const, myLevel: 'manage' as const }
+        : item,
+    )
+    await mountHome()
+
+    const cards = Array.from(host.querySelectorAll<HTMLElement>('.dh-folder-card'))
+    expect(cards).toHaveLength(2)
+    for (const card of cards) {
+      expect(card.querySelector('.dh-cell-access, .dh-vis-badge, .dh-level-sub')).toBeNull()
+      expect(card.textContent).not.toContain('Workspace')
+      expect(card.textContent).not.toContain('Bạn: Quản lý')
+    }
+    // the folder rows are only cards: no table row is a folder row
+    const rowIds = Array.from(host.querySelectorAll('.dh-doc-row')).map((r) =>
+      r.getAttribute('data-doc-id'),
+    )
+    expect(rowIds).not.toContain('f-board')
+    expect(rowIds).not.toContain('f-legal')
+
+    // the file rows still show their access
+    const fileRow = host.querySelector<HTMLElement>('.dh-doc-row[data-doc-id="doc-2"]')
+    expect(fileRow!.querySelector('.dh-cell-access .dh-vis-badge')?.textContent?.trim()).toBe(
+      'Workspace',
+    )
+    expect(fileRow!.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Chỉnh sửa')
+  })
+
+  it('keeps a recipient row without parentId at the open folder: Move starts at the open folder in the workspace subView, at the root otherwise (UNI-1975 FS1-3)', async () => {
+    const orphan = {
+      id: 'doc-orphan',
+      workspaceId: 'ws-1',
+      title: 'Không rõ thư mục cha.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T08:00:00.000Z',
+      kind: 'file',
+      visibility: 'workspace',
+      myLevel: 'edit',
+    } satisfies DocumentsHomeDoc
+    const orphanFolder = {
+      id: 'f-orphan',
+      workspaceId: 'ws-1',
+      title: 'Thư mục không cha',
+      format: 'docx',
+      updatedAt: '2026-10-18T07:00:00.000Z',
+      kind: 'folder',
+      canEdit: true,
+    } satisfies DocumentsHomeDoc
+    folderTree = [
+      ...folderTree,
+      { id: 'f-orphan', parentId: null, title: 'Thư mục không cha', position: 3, children: [] },
+    ]
+    rootItems = [...rootItems, orphan, orphanFolder]
+    api.uniworkListChildren!.mockImplementation(async (q: { parentId: string | null }) => {
+      if (q.parentId === 'f-board') return ok({ items: [orphan], nextCursor: null })
+      return ok({ items: rootItems, nextCursor: null })
+    })
+    api.uniworkListSharedWithMe!.mockImplementation(async () =>
+      ok({ documents: [orphan], nextCursor: null }),
+    )
+    await mountHome()
+
+    // root: no parentId -> picker opens at the (null) open folder, i.e. the root
+    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: UniWork')
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+    })
+    await flush()
+
+    // folder card without parentId -> falls back to the open folder (root) too
+    expect(await openMovePickerFor('f-orphan')).toBe('Đường dẫn: UniWork')
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+    })
+    await flush()
+
+    // Shared with me (entered from the root): the row lists, and Move does not crash or invent a parent
+    await clickNavItem('shared-with-me')
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-orphan"]')).not.toBeNull()
+    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: UniWork')
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+    })
+    await flush()
+    await clickNavItem('workspace')
+
+    // inside a folder: the orphan lists there and Move starts at that folder, not an invented parent
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>(
+          '.dh-folder-card[data-folder-id="f-board"] .dh-folder-open',
+        )!
+        .click()
+    })
+    await flush()
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-orphan"]')).not.toBeNull()
+    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: UniWork › Báo cáo HĐQT Q4')
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+    })
+    await flush()
+  })
 })

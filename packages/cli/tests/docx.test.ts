@@ -279,12 +279,20 @@ describe('genoffice docx (docs editor under jsdom)', () => {
         }),
       ]),
     )
-    // a field result split by character formatting is still one field
+    // a field result split by character formatting is still one field. The needle
+    // is the first three digits of the year the DATE field just computed (the
+    // field renders `String(new Date().getFullYear())`), never a hardcoded
+    // decade: `'202'` stops matching the moment the real clock reaches 2030.
     const bold = join(dir, 'bold.json')
     writeFileSync(
       bold,
       JSON.stringify([
-        { op: 'setMatchedFont', text: '202', target: { blockIndexes: [c.index] }, bold: true },
+        {
+          op: 'setMatchedFont',
+          text: String(new Date().getFullYear()).slice(0, 3),
+          target: { blockIndexes: [c.index] },
+          bold: true,
+        },
       ]),
     )
     expect((await run(['docs', 'apply', copy, '--ops', bold, '--json'])).code).toBe(0)

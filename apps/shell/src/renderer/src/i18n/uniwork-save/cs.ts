@@ -15,7 +15,6 @@ export const cs = {
   usPickTitle: 'Vyberte, kam uložit',
   usBack: 'Zpět k pojmenování',
   usSearchFolders: 'Hledat složky',
-  usSharedNote: 'Při uložení do sdílené složky dostane dokument oprávnění této složky.',
   usChooseFolder: 'Vybrat „{folder}“',
   usSelected: 'Vybráno',
   usRootBlocked: 'Vyberte složku',

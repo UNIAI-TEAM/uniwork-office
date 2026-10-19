@@ -15,7 +15,6 @@ export const pl = {
   usPickTitle: 'Wybierz miejsce zapisu',
   usBack: 'Wróć do nazwy',
   usSearchFolders: 'Szukaj folderów',
-  usSharedNote: 'Zapisany w folderze udostępnionym dokument otrzymuje uprawnienia tego folderu.',
   usChooseFolder: 'Wybierz „{folder}”',
   usSelected: 'Wybrane',
   usRootBlocked: 'Wybierz folder',
