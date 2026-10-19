@@ -162,7 +162,8 @@ html.genoffice-popover-open .ribbon-tabs {
   padding: 6px 12px;
   height: 80px;
   /* the scroller is the containing block of the fit-level clipped labels (position: absolute): with
-   * .ribbon as their block they sat outside this clip and stretched the page sideways at phone width */
+   * no positioned ancestor inside it they sat outside this clip and stretched the page sideways at
+   * phone width */
   position: relative;
   overflow-x: auto;
   overflow-y: hidden;

@@ -2424,19 +2424,21 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 /* a phone, or a pane the open AI panel squeezed to ~120px: the right group (zoom -, slider, zoom +,
- * value) cannot shrink and pushed the whole frame sideways. The slider goes, the buttons and the
- * percentage stay (docs/html drop the same kind of status items at phone width), the bar tightens
- * its padding and clips instead of widening the page. */
+ * value) keeps its natural width (flex-shrink: 0) and pushed the whole frame sideways. The slider and
+ * the save text go so the zoom buttons get the room; the bar tightens its padding and clips
+ * (overflow: hidden) what still does not fit, instead of widening the page. */
 @media (max-width: 600px) {
   .status-bar {
-    min-width: 0;
     padding: 0 6px;
     overflow: hidden;
   }
 
   .status-right {
-    min-width: 0;
     gap: 2px;
+  }
+
+  .status-save {
+    display: none;
   }
 
   .zoom-slider {
