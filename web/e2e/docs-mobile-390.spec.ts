@@ -169,8 +169,9 @@ test('docs-mobile-390: a status message shows as a toast above the status bar', 
   expect(box!.x).toBeGreaterThanOrEqual(0)
   expect(box!.x + box!.width).toBeLessThanOrEqual(geo.w + 1)
   expect(box!.y).toBeGreaterThanOrEqual(0)
-  // above the status bar, not over the page counter
+  // just above the status bar (not the default top-centre pill), not over the page counter
   expect(box!.y + box!.height).toBeLessThanOrEqual(geo.barTop + 1)
+  expect(geo.barTop - (box!.y + box!.height)).toBeLessThanOrEqual(60)
   const pageAfter = await ed.locator('.status-page').boundingBox()
   expect(pageAfter).toEqual(pageBefore)
   // it goes away by itself
