@@ -1002,6 +1002,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     },
     show: (path) => service.showOfflineCopy(path),
     isPathOpen: (path) => wiring.isPathOpen(path),
+    lockOpened: (lock) => service.recordOfflineLock(lock),
+    leaseStamp: (documentId) => runtime.leases.commitStamp(documentId),
     appVersion: () => app.getVersion(),
   })
   // the service opens its cached copy through the same module (B5)
@@ -1018,12 +1020,14 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       (await runtime.capabilityRead(orgId)).capabilities.offline_library,
     signedOut: () => uniworkAccount().status().state !== 'signed-in',
     lastOwner: () => service.store.readLastOwner(),
+    activeDeploymentId: () => uniworkDeploymentProfile()?.deploymentId ?? null,
     libraryLayer: () => libraryLayerFor(),
     openDocument: (documentId) => service.openDocument(documentId),
     openCopy: (documentId) => offlineCopies.open(documentId),
     revealLibraryFolder: async () =>
       (await shell.openPath(join(app.getPath('userData'), 'uniwork-sync', 'library'))) === '',
     lockRefused: (lock) => service.recordOfflineLock(lock),
+    keystoreLock: (documentId) => service.offlineKeystoreLock(documentId),
     changed: () => offlinePush(),
   })
   /** stops the feed pass and remembers it, so the next status push restarts it */
@@ -1130,6 +1134,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     service,
     store: syncStoreFor(),
     accountStatus: () => uniworkAccount().status(),
+    activeDeploymentId: () => uniworkDeploymentProfile()?.deploymentId ?? null,
     capabilityRead: (orgId) => runtime.capabilityRead(orgId),
     feedVerdict: () => runtime.feedVerdict(),
     resetFeedResync: () => runtime.resetFeedResync(),
@@ -1163,8 +1168,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   offlinePush = () => syncCenter.controller.notifyChanged()
   offlineRowChanged = (documentId) => offlineApi.rowChanged(documentId)
   registerOfflineLibraryIpc(ipcMain, offlineApi)
-  // a copy no window shows any more goes at the next pass (the offline twin of the draft sweep)
-  runtime.onPollVerdict(() => void offlineCopies.sweep())
+  // a copy no window shows any more goes at the next pass (the offline twin of the draft
+  // sweep); it runs after the pass's lease renewal so it reads the renewed lease (G703-R7-3)
+  runtime.onAfterLeasePass(() => void offlineCopies.sweep())
   changeListeners.push(() => syncCenter.controller.notifyChanged())
   // every feed pass's connectivity verdict: the offline header, its refusals and lastSyncAt
   runtime.onPollVerdict((online) => void syncCenter.notePoll(online))
@@ -1208,6 +1214,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         // BE-R1-2: an account activation is the startup sweep - the last
         // session's read-only `@offline` plaintext goes before anything opens one
         void offlineCopies.recover().catch(() => undefined)
+        void offlineCopies.sweep().catch(() => undefined)
         // G8-16 S16: changing the organization reloads the library data. An
         // org-less push carrying orgsError is a transient /orgs failure; an
         // org-less push without it (deactivation, the picker) is a lasting

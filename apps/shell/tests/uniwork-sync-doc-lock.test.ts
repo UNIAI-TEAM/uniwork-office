@@ -211,6 +211,34 @@ describe('uniwork sync per-document lock', () => {
     expect(JSON.parse(fs.files.get(leasePath()) ?? '{}')).toMatchObject({ generation: 1 })
   })
 
+  // A32 (UNI-1362): the read-only status of a window is revalidated against the
+  // durable lease, so the lock needs a read-only query with exactly `acquire`'s
+  // refusal condition - and it must not take, write or bump anything.
+  it('isHeld answers another owner’s fresh lease only, without touching the lease', async () => {
+    const { fs, now, window } = world()
+    const a = window(WINDOW_A)
+    const b = window(WINDOW_B)
+    expect(await a.isHeld(DOC)).toBe(false)
+    expect(await b.isHeld(DOC)).toBe(false)
+    expect(await a.acquire(DOC)).toEqual({ kind: 'held', generation: 1 })
+    const raw = fs.files.get(leasePath())
+    // the holder's own lease is not "held by another window"
+    expect(await a.isHeld(DOC)).toBe(false)
+    expect(await b.isHeld(DOC)).toBe(true)
+    // the query wrote nothing
+    expect(fs.files.get(leasePath())).toBe(raw)
+    // a lease past its stale window is nobody's
+    now.value = START + QUEUE_LIMITS.goneMs + 1
+    expect(await b.isHeld(DOC)).toBe(false)
+    // and a released lock is not held either
+    now.value = START
+    await a.release(DOC, 1)
+    expect(await b.isHeld(DOC)).toBe(false)
+    // a corrupt lease is stale, exactly as `acquire` treats it
+    fs.files.set(leasePath(), '{not json')
+    expect(await b.isHeld(DOC)).toBe(false)
+  })
+
   it('leaves no lock behind on the real filesystem', async () => {
     const base = mkdtempSync(join(tmpdir(), 'uw-doc-lock-'))
     try {

@@ -812,8 +812,6 @@ function fakeServer(
     const session = state.session!
     const partSize = options.sessionPartSize ?? 8 * 1024 * 1024
     const totalParts = Math.ceil(session.sizeBytes / partSize)
-    // relative to now: a fixed date makes every presigned URL "expired" the day it passes
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
     const held = new Set(state.completedParts.map((part) => part.part_number))
     const parts = []
     for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
@@ -823,7 +821,7 @@ function fakeServer(
         method: 'PUT',
         url: `https://storage.example/part/${partNumber}`,
         headers: {},
-        expires_at: expiresAt,
+        expires_at: '2099-01-01T00:00:00Z',
       })
     }
     return {
@@ -837,7 +835,7 @@ function fakeServer(
         size: partSize,
       })),
       parts,
-      expires_at: expiresAt,
+      expires_at: '2099-01-01T00:00:00Z',
     }
   }
 

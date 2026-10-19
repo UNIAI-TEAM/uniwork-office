@@ -287,7 +287,7 @@ describe('uniwork sync intent store', () => {
           { partNumber: 2, etag: '"etag-2"' },
           { partNumber: 3, etag: '"etag-3"' },
         ],
-        expiresAt: '2026-10-19T00:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
       },
     })
     const payload = new Uint8Array([1, 2, 3, 4])

@@ -122,6 +122,7 @@ export type SaveQueueEngine = Pick<
   | 'supersede'
   | 'tombstone'
   | 'isOtherWindow'
+  | 'holdsOtherWindow'
 >
 
 export interface SaveCoordinatorDeps {
@@ -1294,6 +1295,15 @@ export class SaveCoordinator {
   /** whether another window holds the document lock (this one is read-only) */
   isOtherWindow(docKey: string): boolean {
     return this.deps.dispatcher?.isOtherWindow(docKey) === true
+  }
+
+  /**
+   * A32 (UNI-1362): whether the durable document lock is held by another window
+   * right now. `isOtherWindow` above is this process's own verdict and only a
+   * dispatch clears it, so the status front revalidates with this one instead.
+   */
+  async holdsOtherWindow(docKey: string): Promise<boolean> {
+    return (await this.deps.dispatcher?.holdsOtherWindow(docKey)) === true
   }
 
   /** push a queue record's state as the document's status (W4b maps the doc) */

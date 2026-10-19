@@ -174,6 +174,7 @@ async function buildFixture() {
     heartbeat: async () => true,
     check: async () => true,
     release: async () => undefined,
+    isHeld: async () => false,
   }
 
   const dispatcher = new QueueDispatcher({

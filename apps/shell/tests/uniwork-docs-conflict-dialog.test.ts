@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -2398,6 +2398,27 @@ describe('G5-12 W-F2 "Download my version" (main)', () => {
     })
     expect(server.calls).toHaveLength(callsBefore)
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+  })
+
+  // A105 (UNI-1362): the bytes are written only while the copy is still this
+  // account's. A switch inside the awaits above ends the dialog and writes
+  // nothing - the same guard the reload path already applies (d5-2).
+  it('an account switch before the picked path resolves ends the dialog and writes nothing', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    const target = join(outDir(), 'stale.docx')
+    // the OS dialog is answered after the session moved on
+    pick(ctx).mockImplementation(async () => {
+      ctx.setAccount('acc_2')
+      return target
+    })
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(reply).toEqual({ kind: 'closed' })
+    expect(existsSync(target)).toBe(false)
   })
 
   it('BE-12-304: after the folder refusal Download my version works like the no-seat step: the picked path gets the local bytes, a cancelled OS dialog keeps the folder notice', async () => {

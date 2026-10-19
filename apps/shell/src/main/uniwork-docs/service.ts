@@ -94,6 +94,7 @@ import {
   formatForMime,
   formatForName,
   hasReplacementChar,
+  sanitizeFilename,
   sha256Hex,
   workingCopyName,
 } from './formats'
@@ -174,6 +175,7 @@ import { compareRevision } from '../uniwork-sync/feed/revision'
 import type { FeedChange } from '../uniwork-sync/feed/client'
 import { decideRemote, type RemoteLocal, type RemoteNotice } from './remote-newer'
 import type { StoreRecords } from '../uniwork-sync/store'
+import { offlineCopyKey } from '../uniwork-sync/offline-library/copies'
 
 /**
  * UniWork documents in the shell main process: the picker reads, the open
@@ -1295,6 +1297,12 @@ export class UniworkDocsService {
         tombstone: async (doc) =>
           (await this.queueEngineOrNull())?.tombstone(doc) ?? doc.record.state,
         isOtherWindow: (key) => this.queueSession?.dispatcher.isOtherWindow(key) === true,
+        // A32: no engine means the durable lease cannot be read, so the overlay
+        // is kept rather than cleared on a guess (see revalidateOtherWindow)
+        holdsOtherWindow: async (key) => {
+          const dispatcher = await this.queueEngineOrNull()
+          return dispatcher ? await dispatcher.holdsOtherWindow(key) : true
+        },
       },
       // the queue engine exposes no public in-flight state, so the service
       // reports the keys its own poll pass is running right now (G506-be-1)
@@ -2688,6 +2696,21 @@ export class UniworkDocsService {
   }
 
   /**
+   * A32 (UNI-1362): a status read revalidates the window-local `other_window`
+   * overlay against the durable lease, because `applyRecord` - the only other
+   * path that clears it - runs only on a queue record push. The holder can
+   * release the lock and no record of this document ever move again: without
+   * this, `present` keeps re-applying a read-only status the window no longer
+   * has. Cosmetic only (`canSave` reads the live dispatcher), so a lock whose
+   * state cannot be read keeps the overlay rather than clearing it on a guess.
+   */
+  private async revalidateOtherWindow(doc: BoundDocument): Promise<void> {
+    if (!this.otherWindowStatus.has(doc.path)) return
+    if (await this.coordinator.holdsOtherWindow(doc.key)) return
+    this.otherWindowStatus.delete(doc.path)
+  }
+
+  /**
    * "Ghi đè" / "Tải lại" / "Lưu lại": the old intent is superseded BEFORE the
    * new one is minted or the base is replaced (EXPERIENCE - Superseded, :239).
    */
@@ -2833,10 +2856,18 @@ export class UniworkDocsService {
       }
     }
     const keystoreLocked = this.storeLocked()
-    const access = !keystoreLocked
-      ? await this.intentAccess()
+    // A62 (UNI-1362): the plan enumerates `target`'s folders, so its intents must
+    // come from `target`'s own store, never the live session's. After an account
+    // switch the next account is already live, and reading through the live scope
+    // planned the leaving account's copies against the wrong account's intents (a
+    // copy with a stored intent could read as clean, and one without as pending).
+    // This is the same owner-scoped open `lockSession` already uses.
+    const open = !keystoreLocked
+      ? await this.openStoreOf(target)
       : ({ kind: 'keystore_locked' } as const)
-    const storeLockedNow = keystoreLocked || access.kind === 'keystore_locked'
+    const intents =
+      open.kind === 'ok' ? createIntentStore(open.records(INTENT_STORE_REGISTRATION.name)) : null
+    const storeLockedNow = keystoreLocked || open.kind === 'keystore_locked'
     const unsavedDocs = new Set<string>()
     const waitingDocs = new Set<string>()
     const ramOnlyDocs = new Set<string>()
@@ -2851,8 +2882,8 @@ export class UniworkDocsService {
         waitingDocs.add(key)
         unsavedDocs.add(key)
       }
-      if (access.kind === 'ok') {
-        const stored = await access.intents.read(key, {
+      if (intents) {
+        const stored = await intents.read(key, {
           orgId: binding.orgId,
           workspaceId: binding.workspaceId,
           baseVersion: binding.baseVersion,
@@ -3611,21 +3642,55 @@ export class UniworkDocsService {
     if (!identity) return false
     const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
     const binding = await this.store.readDir(dir)
-    if (!binding || binding.documentId !== documentId) return false
-    if (KEEP_LOCAL_STATES.has(binding.state) || binding.state === 'saving') return true
-    // the editor holds edits the file does not show yet: keeping the index
-    // entry keeps the tab's document reachable until the save lands
-    if (this.editorDirty.has(join(dir, binding.filename))) return true
-    const access = await this.intentAccess()
-    // the store cannot answer: keep the copy rather than evict local work
-    if (access.kind !== 'ok') return true
-    // the editor signal was read before this await: an editor that turned
-    // dirty while the store was answering is local work too, so re-read it
-    // here instead of evicting the entry the tab still needs
-    return (
-      (await access.intents.get(documentId)) !== null ||
-      this.editorDirty.has(join(dir, binding.filename))
-    )
+    const bound = binding && binding.documentId === documentId ? binding : null
+    if (bound) {
+      if (KEEP_LOCAL_STATES.has(bound.state) || bound.state === 'saving') return true
+      // the editor holds edits the file does not show yet: keeping the index
+      // entry keeps the tab's document reachable until the save lands
+      if (this.editorDirty.has(join(dir, bound.filename))) return true
+      const access = await this.intentAccess()
+      // the store cannot answer: keep the copy rather than evict local work
+      if (access.kind !== 'ok') return true
+      // the editor signal was read before this await: an editor that turned
+      // dirty while the store was answering is local work too, so re-read it
+      // here instead of evicting the entry the tab still needs
+      if ((await access.intents.get(documentId)) !== null) return true
+    }
+    // B34 (UNI-1362): a kept draft - the user's snapshot of a cancelled intent -
+    // is local work as well, and it lives in its own store, never in the intent
+    // one. A closed document whose only local work is a kept draft must still
+    // answer true: the offline library asks this before an unpin deletes the
+    // committed copy, and the feed's resync asks it before evicting the index
+    // entry. Read only: the draft bytes are never touched.
+    //
+    // R1-1: this runs even without a readable binding. A copy whose plaintext
+    // folder the sign-out deleted (never parked: it was clean) or that was
+    // never opened here has no binding at all, and the kept draft of it is
+    // still the user's work - answering "nothing local" there loses it.
+    if ((await this.hasKeptDraft(documentId)) === true) return true
+    return bound ? this.editorDirty.has(join(dir, bound.filename)) : false
+  }
+
+  /**
+   * B34 (UNI-1362): whether the drafts store holds at least one kept draft of
+   * `documentId`. The store is only read, never written.
+   *
+   * R1-2: every outcome that cannot prove "no draft" answers true, because the
+   * callers use this to decide whether deleting or evicting the copy is safe: a
+   * store that will not open, a namespace this build cannot reach, a read the
+   * boundary refused or interrupted, and a read that throws all leave the draft
+   * unproven, so they count as local work. Only a readable record with no
+   * entries answers false.
+   */
+  private async hasKeptDraft(documentId: string): Promise<boolean> {
+    try {
+      const open = await this.openSyncStore()
+      if (open.kind !== 'ok') return true
+      const drafts = createDraftStore(open.records(DRAFTS_STORE_REGISTRATION.name))
+      return (await drafts.has(documentId)) !== false
+    } catch {
+      return true
+    }
   }
 
   /**
@@ -5866,16 +5931,41 @@ export class UniworkDocsService {
   openDocument(documentId: string): Promise<UniworkResult<{ path: string }>> {
     return result(async () => {
       if (typeof documentId !== 'string') throw new UniworkDocError('not_found')
+      // G703B-P3 (FL-09): a cold restore with a locked keychain has no session
+      // to open with, and "sign in again" is the wrong answer for it: S11 says
+      // unlock the machine and retry (the data is not deleted)
+      if (!this.deps.identity() && this.storeLocked()) throw new UniworkDocError('keystore_locked')
       const { path } = await this.openFromServer(documentId)
       return { path }
     })
+  }
+
+  /**
+   * G703B-P3: the S11 lock of an offline open the locked keychain refused. The
+   * tab never opened, so the lock names where the offline copy of the document
+   * would sit: under the saved owner's scope when one is known, else under the
+   * store root (a session-less machine still has a panel to show).
+   */
+  offlineKeystoreLock(documentId: string): UniworkDocLock {
+    const scope = this.localScope()
+    const key = offlineCopyKey(documentId)
+    const dir = scope
+      ? this.store.dirFor(scope.deploymentId, scope.accountId, key)
+      : join(this.store.root, key)
+    const name = sanitizeFilename(documentId, 'docx')
+    return { path: join(dir, name), name, reason: 'keystore_locked' }
   }
 
   /** the status, after re-checking the working copy's bytes (A1.3) */
   async docStatus(path: string): Promise<UniworkDocStatus | null> {
     if (typeof path !== 'string') return null
     const doc = this.store.lookup(path)
-    return doc && this.ownsLocally(doc) ? this.statusOf(await this.refreshDirty(doc)) : null
+    if (!doc || !this.ownsLocally(doc)) return null
+    // A32 (UNI-1362): the overlay is revalidated against the durable lease here,
+    // so a window whose holder released the lock stops showing read-only even
+    // when no queue record of this document ever moves again
+    await this.revalidateOtherWindow(doc)
+    return this.statusOf(await this.refreshDirty(doc))
   }
 
   activeDocStatus(): Promise<UniworkDocStatus | null> {
@@ -5887,6 +5977,9 @@ export class UniworkDocsService {
   async refreshPath(path: string | undefined): Promise<void> {
     const doc = path ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return
+    // A32 (UNI-1362): the same revalidation the status read runs, so a tab that
+    // gains focus after the holder released the lock stops reading read-only
+    await this.revalidateOtherWindow(doc)
     await this.refreshDirty(doc)
     // S18 renamed-elsewhere: a tab that gains focus re-reads the document's
     // metadata, so a title changed on the web shows here without the feed
@@ -7600,6 +7693,14 @@ export class UniworkDocsService {
     if (!target) {
       // the person cancelled the OS dialog: nothing changed
       return stay(open.downloadNotice ?? 'save_copy_no_seat')
+    }
+    // A105 (UNI-1362): an account switch (or a lock) inside the awaits above ends
+    // the dialog. The same guard the reload path applies, right before the bytes
+    // leave: this account's version is never written out under another one.
+    if (!this.ownsLocally(chosen)) {
+      open.controller.abort()
+      open.finish()
+      return { kind: 'closed' }
     }
     try {
       await writeFile(target, localBytes)

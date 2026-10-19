@@ -22,7 +22,11 @@ import { createDocLock } from '../src/main/uniwork-sync/doc-lock'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits } from '../src/main/uniwork-docs/limits'
 import type { CapabilitySource } from '../src/main/uniwork-sync/capability/cache'
 import { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
-import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
+import {
+  createStoreLayer,
+  type StoreLayer,
+  type StoreRecords,
+} from '../src/main/uniwork-sync/store'
 import {
   createLockableSafeStorage,
   type LockableSafeStorage,
@@ -217,7 +221,7 @@ function fakeServer(initial: {
           method: 'PUT',
           url: `${ORIGIN}/storage/part/${id}/${n}`,
           headers: {},
-          expires_at: '2026-10-19T00:00:00Z',
+          expires_at: '2099-01-01T00:00:00Z',
         })
       }
       return out
@@ -238,7 +242,7 @@ function fakeServer(initial: {
         session_id: id,
         part_size: sessionPartSize,
         total_parts: sessions.get(id)!.totalParts,
-        expires_at: '2026-10-19T00:00:00Z',
+        expires_at: '2099-01-01T00:00:00Z',
         parts: missingParts(id),
       })
     }
@@ -258,7 +262,7 @@ function fakeServer(initial: {
           size: s.parts.get(n)!.byteLength,
         })),
         parts: missingParts(sessionId),
-        expires_at: '2026-10-19T00:00:00Z',
+        expires_at: '2099-01-01T00:00:00Z',
       })
     }
     if (sessionId && init.method === 'DELETE') {
@@ -279,7 +283,7 @@ function fakeServer(initial: {
         upload_id: upload.id,
         checksum_sha256: upload.checksum,
         size_bytes: bytes.byteLength,
-        claim_expires_at: '2026-10-19T00:00:00Z',
+        claim_expires_at: '2099-01-01T00:00:00Z',
       })
     }
     const partId = u.pathname.match(/^\/storage\/part\/([^/]+)\/(\d+)$/)
@@ -335,12 +339,16 @@ function setup(
     account?: string | null
     /** the capability answer per org (default: sync_write on) */
     capability?: Record<string, boolean>
-    /** true = the store cannot be built (the queue's registrations are absent) */
-    bareLayer?: boolean
     /** SIZE-F1/BIGUP-A1: the `documents.limits` the service reads (defaults when absent) */
     limits?: () => DocumentLimits | Promise<DocumentLimits>
     /** the per-account store budget (default 1 MiB; a chunked test needs more) */
     budgetBytes?: number
+    /**
+     * R1-2 (UNI-1362): wraps the records the SERVICE opens, so a test can make
+     * one store unable to answer (a refused/interrupted read). The stores are
+     * all registered, as production registers them.
+     */
+    wrapRecords?: (name: string, records: StoreRecords) => StoreRecords
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -361,12 +369,25 @@ function setup(
     clock: () => 1_700_000_000_000,
   })
   layer.register(INTENT_STORE_REGISTRATION)
-  if (!opts.bareLayer) {
-    layer.register(DRAFTS_STORE_REGISTRATION)
-    layer.register(PAUSE_STORE_REGISTRATION)
-  }
+  layer.register(DRAFTS_STORE_REGISTRATION)
+  layer.register(PAUSE_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({
-    layer,
+    layer: opts.wrapRecords
+      ? {
+          ...layer,
+          async open(scope) {
+            const opened = await layer.open(scope)
+            if (opened.kind !== 'ok') return opened
+            return {
+              kind: 'ok',
+              store: {
+                scope: opened.store.scope,
+                records: (name: string) => opts.wrapRecords!(name, opened.store.records(name)),
+              },
+            }
+          },
+        }
+      : layer,
     scope: () => (account ? { deploymentId: 'default', accountId: account } : null),
   })
   const ui: ConflictUi = {
@@ -623,6 +644,88 @@ describe('G5-06 W4b save queue wiring', () => {
     )
     expect(kept).toHaveLength(1)
     expect(Buffer.from(kept[0]!.snapshot)).toEqual(Buffer.from(enc('v4')))
+  })
+
+  // B34 (UNI-1362): the drafts store is a store of its own, so a closed document
+  // whose only local work is a kept draft answered "no local work" - and the
+  // library asks exactly this before an unpin deletes the committed copy.
+  it('a kept draft of a clean, intent-less copy is local work', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const key = basename(dirname(path))
+    // clean on disk, no intent: nothing local to lose yet
+    expect(binding(path).state).not.toBe('dirty')
+    expect(await storedIntent(ctx, path)).toBeNull()
+    expect(await ctx.service.hasLocalDraft(DOC)).toBe(false)
+
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    const drafts = createDraftStore(opened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    expect(
+      await drafts.keep(key, enc('kept snapshot'), {
+        id: 'draft_1',
+        createdAt: '2026-04-17T00:00:00.000Z',
+      }),
+    ).toBe('ok')
+
+    // the kept draft alone makes the copy local work, and the draft is untouched
+    expect(await ctx.service.hasLocalDraft(DOC)).toBe(true)
+    const kept = await drafts.list(key)
+    expect(kept).toHaveLength(1)
+    expect(Buffer.from(kept[0]!.snapshot)).toEqual(Buffer.from(enc('kept snapshot')))
+  })
+
+  // R1-1 (UNI-1362): the presence check must not sit behind the binding read.
+  // A clean copy is never parked at sign-out, so its plaintext folder - binding
+  // included - is deleted while its kept draft survives in the sync store. On
+  // the next sign-in only parked copies come back: the copy has no binding, and
+  // "no binding" must not mean "nothing local".
+  it('R1-1: a kept draft is local work even when the copy has no binding left', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    const drafts = createDraftStore(opened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    expect(
+      await drafts.keep(basename(dirname(path)), enc('kept snapshot'), {
+        id: 'draft_1',
+        createdAt: '2026-04-17T00:00:00.000Z',
+      }),
+    ).toBe('ok')
+    // the sign-out deleted the clean copy's plaintext folder: binding and bytes gone
+    await rm(dirname(path), { recursive: true, force: true })
+    expect(await ctx.service.hasLocalDraft(DOC)).toBe(true)
+  })
+
+  // R1-2 (UNI-1362): `list` maps a refused/interrupted read to an empty list, so
+  // a store that cannot answer looked like "no draft". The presence check fails
+  // CLOSED instead: only a readable record with no entries proves there is none.
+  it('R1-2: a drafts store that cannot answer counts as local work', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const refuse = setup(server, {
+      wrapRecords: (name, records) =>
+        name === DRAFTS_STORE_REGISTRATION.name
+          ? { ...records, read: async () => ({ kind: 'refused' as const }) }
+          : records,
+    })
+    await openDoc(refuse)
+    expect(await refuse.service.hasLocalDraft(DOC)).toBe(true)
+
+    const fail = setup(server, {
+      wrapRecords: (name, records) =>
+        name === DRAFTS_STORE_REGISTRATION.name
+          ? {
+              ...records,
+              read: async () => {
+                throw new Error('EIO: the drafts record cannot be read')
+              },
+            }
+          : records,
+    })
+    await openDoc(fail)
+    expect(await fail.service.hasLocalDraft(DOC)).toBe(true)
   })
 
   describe("G5-11 d6-3: a switch during cancel/discard keeps nothing in the next account's drafts", () => {
@@ -1765,6 +1868,19 @@ describe('G5-06 W4b save queue wiring', () => {
     // still the holder's (never the loser's other_window)
     expect(readFileSync(join(path, '..', BINDING_FILE))).toEqual(before)
     expect(await first.service.docStatus(path)).not.toMatchObject({ error: 'other_window' })
+    // A32 (UNI-1362): the holder releases the lock and no queue record of this
+    // document ever moves again. A status read revalidates the window-local
+    // overlay against the durable lease, so the read-only chip clears instead of
+    // being re-applied forever
+    await opener.release(key, 1)
+    expect(await second.service.docStatus(path)).not.toMatchObject({ error: 'other_window' })
+    // and a lock still held keeps the overlay (the same read, the other verdict)
+    expect((await opener.acquire(key)).kind).toBe('held')
+    await second.service.pollSaveQueue()
+    expect(await second.service.docStatus(path)).toMatchObject({
+      state: 'blocked',
+      error: 'other_window',
+    })
     await opener.release(key, 1)
   })
 

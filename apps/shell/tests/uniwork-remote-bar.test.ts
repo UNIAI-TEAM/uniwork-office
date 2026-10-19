@@ -7,7 +7,10 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HomeApi, UniworkDocStatus, UniworkRemoteBar } from '../src/shared/home-api'
 import { LocaleProvider, type StringKey } from '../src/renderer/src/locale'
-import { UniworkRemoteBar as RemoteBar } from '../src/renderer/src/UniworkChrome'
+import {
+  UniworkRemoteBar as RemoteBar,
+  REMOTE_BAR_ALERT_MS,
+} from '../src/renderer/src/UniworkChrome'
 import { REMOTE_BAR_AUTO_HIDE_MS, remoteBarModelOf } from '../src/renderer/src/uniwork-docs-model'
 import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
@@ -88,7 +91,19 @@ describe('remoteBarModelOf', () => {
     expect(commit.actions[0]!.disabledReasonKey).toBe('uwRemoteWaitCommit')
     const stuck = remoteBarModelOf(status({ kind: 'newer-dirty', version: 4, wait: 'stuck' }))!
     expect(stuck.actions[0]!.disabledReasonKey).toBe('uwRemoteWaitStuck')
-    expect(stuck.actions[1]!.disabledReasonKey).toBeUndefined()
+    expect(stuck.actions[2]!.disabledReasonKey).toBeUndefined()
+  })
+
+  it('newer-dirty stuck: Open sync center joins Reload and Later; other waits do not offer it', () => {
+    const stuck = remoteBarModelOf(status({ kind: 'newer-dirty', version: 4, wait: 'stuck' }))!
+    expect(stuck.actions.map((a) => a.kind)).toEqual(['reload', 'open-center', 'later'])
+    expect(stuck.actions[1]).toMatchObject({ labelKey: 'uwQueueOpenCenter' })
+    for (const wait of [undefined, 'commit'] as const) {
+      const kinds = remoteBarModelOf(
+        status({ kind: 'newer-dirty', version: 4, ...(wait ? { wait } : {}) }),
+      )!.actions.map((a) => a.kind)
+      expect(kinds, String(wait)).toEqual(['reload', 'later'])
+    }
   })
 
   it('newer-ai: Reload is disabled until a stop channel exists (D3)', () => {
@@ -459,6 +474,23 @@ describe('UniworkRemoteBar: actions', () => {
     watch.stop()
   })
 
+  it('stuck: Open sync center asks the shell for the sync section and leaves the bar up', async () => {
+    const opened: CustomEvent[] = []
+    const onOpen = (e: Event) => opened.push(e as CustomEvent)
+    window.addEventListener('uniwork:open-settings', onOpen)
+    try {
+      await mount(status({ kind: 'newer-dirty', version: 4, wait: 'stuck' }))
+      await click(button('open-center'))
+      expect(opened).toHaveLength(1)
+      expect(opened[0]!.detail).toEqual({ section: 'sync' })
+      // a navigation action, not a bridge call: the bar and the notice stay
+      expect(remoteAction).not.toHaveBeenCalled()
+      expect(bar()).not.toBeNull()
+    } finally {
+      window.removeEventListener('uniwork:open-settings', onOpen)
+    }
+  })
+
   it('Close (updated, revoked) calls the bridge and hides the bar', async () => {
     await mount(status({ kind: 'updated', version: null }))
     await click(button('close'))
@@ -556,10 +588,31 @@ describe('UniworkRemoteBar: announcements', () => {
     expect(alert().textContent).toBe('')
   })
 
-  it('an error kind is announced as an alert', async () => {
+  it('an error kind is announced as an alert and clears after ~1 s', async () => {
+    vi.useFakeTimers()
     await mount(status({ kind: 'deleted' }))
     expect(alert().textContent).toBe(text('en', 'uwRemoteDeleted'))
     expect(polite().textContent).toBe('')
+    await act(async () => {
+      vi.advanceTimersByTime(REMOTE_BAR_ALERT_MS)
+    })
+    expect(alert().textContent).toBe('')
+  })
+
+  it('two error bars inside the alert window are both announced: the second queues behind the first', async () => {
+    vi.useFakeTimers()
+    await mount(status({ kind: 'deleted' }))
+    // a second assertive event while the first sentence is still on screen does not overwrite it
+    await mount(status({ kind: 'revoked' }))
+    expect(alert().textContent).toBe(text('en', 'uwRemoteDeleted'))
+    await act(async () => {
+      vi.advanceTimersByTime(REMOTE_BAR_ALERT_MS)
+    })
+    expect(alert().textContent).toBe(text('en', 'uwRemoteRevoked'))
+    await act(async () => {
+      vi.advanceTimersByTime(REMOTE_BAR_ALERT_MS)
+    })
+    expect(alert().textContent).toBe('')
   })
 
   it('the live nodes are in the DOM before any bar shows', async () => {

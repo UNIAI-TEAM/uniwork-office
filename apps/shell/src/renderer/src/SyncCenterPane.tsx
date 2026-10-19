@@ -522,6 +522,7 @@ export function SyncCenterPane({
       const running = busy.has(`${r.id}:${a.id}`)
       const disclosure = DISCLOSURES.has(a.id)
       const rowBusy = busyRows.has(r.id) && !disclosure
+      const disclosureOpen = disclosure && expanded === `${r.id}:${a.id}`
       return (
         <span key={a.id} className="sc-act-wrap">
           <button
@@ -531,7 +532,8 @@ export function SyncCenterPane({
             aria-disabled={a.unavailableKey || running || rowBusy ? true : undefined}
             aria-busy={running || undefined}
             aria-describedby={reasonId}
-            aria-expanded={disclosure ? expanded === `${r.id}:${a.id}` : undefined}
+            aria-expanded={disclosure ? disclosureOpen : undefined}
+            aria-controls={disclosureOpen ? `${base}-more-${r.id}` : undefined}
             onClick={() => activate(r, view, a, a.id)}
           >
             {t(a.labelKey)}
@@ -556,6 +558,12 @@ export function SyncCenterPane({
             danger: Boolean(a.confirm),
             disabled: Boolean(a.unavailableKey) || (busyRows.has(r.id) && !DISCLOSURES.has(a.id)),
             hint: a.unavailableKey ? t(a.unavailableKey) : undefined,
+            ...(DISCLOSURES.has(a.id)
+              ? {
+                  expanded: expanded === `${r.id}:${a.id}`,
+                  ...(expanded === `${r.id}:${a.id}` ? { controls: `${base}-more-${r.id}` } : {}),
+                }
+              : {}),
             onSelect: () => activate(r, view, a, 'more'),
           }))}
         />
@@ -606,13 +614,17 @@ export function SyncCenterPane({
               className="sc-progress"
               role="progressbar"
               aria-labelledby={docId}
-              aria-valuemin={0}
-              aria-valuemax={view.progress.total}
-              aria-valuenow={view.progress.done}
-              aria-valuetext={t('uwOfflineRowProgressAria', {
-                done: formatBytes(view.progress.done, dateLocale),
-                total: formatBytes(view.progress.total, dateLocale),
-              })}
+              {...(view.progress.total > 0
+                ? {
+                    'aria-valuemin': 0,
+                    'aria-valuemax': view.progress.total,
+                    'aria-valuenow': view.progress.done,
+                    'aria-valuetext': t('uwOfflineRowProgressAria', {
+                      done: formatBytes(view.progress.done, dateLocale),
+                      total: formatBytes(view.progress.total, dateLocale),
+                    }),
+                  }
+                : {})}
             >
               <span
                 className="sc-progress-fill"
@@ -622,9 +634,13 @@ export function SyncCenterPane({
               />
             </span>
           )}
-          {disclosure === 'guide' && <span className="sc-more-text">{t('uwTipReconciling')}</span>}
+          {disclosure === 'guide' && (
+            <span id={`${base}-more-${r.id}`} className="sc-more-text">
+              {t('uwTipReconciling')}
+            </span>
+          )}
           {disclosure === 'details' && (
-            <span className="sc-more-text">
+            <span id={`${base}-more-${r.id}`} className="sc-more-text">
               {fmt({
                 key: 'uwTipFailed',
                 keyParams: view.sub.keyParams,

@@ -118,6 +118,10 @@ function fakeLock(
       const lease = table.leases.get(docKey)
       return !!lease && lease.owner === owner && lease.generation === generation
     },
+    async isHeld(docKey) {
+      const lease = table.leases.get(docKey)
+      return !!lease && lease.owner !== owner && clock() - lease.heartbeatAt <= goneMs
+    },
     async release(docKey, generation) {
       const lease = table.leases.get(docKey)
       if (lease && lease.owner === owner && lease.generation === generation) {
@@ -1782,7 +1786,7 @@ function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
         method: 'PUT',
         url: `https://storage.example/version-part/${partNumber}`,
         headers: {},
-        expiresAt: '2026-10-19T00:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
       })
     }
     return {
@@ -1796,7 +1800,7 @@ function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
         size: Math.min(partSize, size - (partNumber - 1) * partSize),
       })),
       parts,
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
   }
 
@@ -1833,7 +1837,7 @@ function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
           uploadId: `upl_${input.sessionId}`,
           checksumSha256: options.checksumSha256,
           sizeBytes: size,
-          claimExpiresAt: '2026-10-19T00:00:00.000Z',
+          claimExpiresAt: '2099-01-01T00:00:00.000Z',
         },
       }
     },
@@ -2195,7 +2199,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
         { partNumber: 2, etag: '"e2"' },
         { partNumber: 3, etag: '"e3"' },
       ],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     await h.intents.put(doc.key, doc.record, doc.payload)
     await h.dispatcher.dispatchAll([doc])
@@ -2222,7 +2226,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
       partSize: CHUNK_PART_SIZE,
       totalParts: 6,
       completedParts: [{ partNumber: 1, etag: '"e1"' }],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     await h.intents.put(doc.key, doc.record, doc.payload)
 
@@ -2238,7 +2242,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
       partSize: CHUNK_PART_SIZE,
       totalParts: 6,
       completedParts: [{ partNumber: 1, etag: '"e1"' }],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     await h.intents.put(doc2.key, doc2.record, doc2.payload)
     await h.coordinator.supersede(doc2)

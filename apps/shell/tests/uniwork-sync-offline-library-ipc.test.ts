@@ -43,6 +43,7 @@ function bridge(h: Harness, over: Partial<OfflineLibraryApiDeps> = {}): Bridge {
     capabilityOn: async () => h.capability.on,
     signedOut: () => h.session.scope === null,
     lastOwner: () => null,
+    activeDeploymentId: () => SCOPE.deploymentId,
     libraryLayer: () => h.layer,
     openDocument: async () => ({ ok: false, error: 'network' }),
     openCopy: async () => ({ kind: 'none' }),

@@ -39,6 +39,14 @@ export interface DraftStore {
   /** keep one snapshot of `documentKey`; the 4th draft is refused `drafts_full` */
   keep(documentKey: string, snapshot: Uint8Array, meta: KeptDraftMeta): Promise<DraftKeepResult>
   list(documentKey: string): Promise<KeptDraft[]>
+  /**
+   * B34/R1-2 (UNI-1362): whether at least one draft is kept for `documentKey`,
+   * with the store's own status preserved: `unavailable` is a record this build
+   * cannot read right now (refused/interrupted), which `list` reports as `[]`.
+   * A caller deciding "is there local work to keep" must treat `unavailable` as
+   * "cannot prove there is none", never as an empty list.
+   */
+  has(documentKey: string): Promise<boolean | 'unavailable'>
   remove(documentKey: string, id: string): Promise<void>
 }
 
@@ -81,35 +89,55 @@ const isOffset = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 
 function decodeDrafts(bytes: Uint8Array): KeptDraft[] {
+  const parsed = parseDraftsRecord(bytes)
+  if (!parsed) return []
+  return parsed.entries.map((entry) => ({
+    id: entry.id,
+    createdAt: entry.createdAt,
+    ...(entry.title === undefined ? {} : { title: entry.title }),
+    snapshot: new Uint8Array(parsed.payload.subarray(entry.offset, entry.offset + entry.length)),
+  }))
+}
+
+/**
+ * The manifest of a record plus the byte range the snapshots live in, or null
+ * when the bytes are not one of ours. The snapshots themselves are not copied:
+ * a presence check only needs the entries.
+ */
+function parseDraftsRecord(
+  bytes: Uint8Array,
+): { entries: DraftsManifestEntry[]; payload: Buffer } | null {
   const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes)
-  if (buf.length < 4) return []
+  if (buf.length < 4) return null
   const metaLength = buf.readUInt32BE(0)
-  if (metaLength === 0 || buf.length < 4 + metaLength) return []
+  if (metaLength === 0 || buf.length < 4 + metaLength) return null
   let raw: unknown
   try {
     raw = JSON.parse(buf.subarray(4, 4 + metaLength).toString('utf8'))
   } catch {
-    return []
+    return null
   }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
-  const drafts = (raw as { drafts?: unknown }).drafts
-  if (!Array.isArray(drafts)) return []
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  if (!('drafts' in raw)) return null
+  const drafts = raw.drafts
+  if (!Array.isArray(drafts)) return null
   const payload = buf.subarray(4 + metaLength)
-  const decoded: KeptDraft[] = []
+  const entries: DraftsManifestEntry[] = []
   for (const item of drafts) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return null
     const entry = item as Record<string, unknown>
-    if (!isStr(entry.id) || !isStr(entry.createdAt)) return []
-    if (!isOffset(entry.offset) || !isOffset(entry.length)) return []
-    if (entry.offset + entry.length > payload.length) return []
-    decoded.push({
+    if (!isStr(entry.id) || !isStr(entry.createdAt)) return null
+    if (!isOffset(entry.offset) || !isOffset(entry.length)) return null
+    if (entry.offset + entry.length > payload.length) return null
+    entries.push({
       id: entry.id,
       createdAt: entry.createdAt,
       ...(isStr(entry.title) ? { title: entry.title } : {}),
-      snapshot: new Uint8Array(payload.subarray(entry.offset, entry.offset + entry.length)),
+      offset: entry.offset,
+      length: entry.length,
     })
   }
-  return decoded
+  return { entries, payload }
 }
 
 /** `unavailable`: the record exists but this build cannot serve it right now */
@@ -147,6 +175,16 @@ export function createDraftStore(records: StoreRecords): DraftStore {
     async list(documentKey) {
       const current = await read(documentKey)
       return current.kind === 'ok' ? current.drafts : []
+    },
+
+    async has(documentKey) {
+      const result = await records.read(documentKey)
+      // missing or corrupt: nothing this build can act on, so no draft to keep
+      if (result.kind === 'missing' || result.kind === 'corrupt') return false
+      // refused (a newer build's record), interrupted (the scope locked or was
+      // wiped under the read): the draft cannot be ruled out
+      if (result.kind !== 'ok') return 'unavailable'
+      return (parseDraftsRecord(result.value)?.entries.length ?? 0) > 0
     },
 
     async remove(documentKey, id) {

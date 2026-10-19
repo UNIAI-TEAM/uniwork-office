@@ -111,6 +111,8 @@ export function WbMenuItem({
   hint,
   disabled,
   danger,
+  expanded,
+  controls,
   children,
 }: {
   onSelect: () => void
@@ -119,6 +121,8 @@ export function WbMenuItem({
   hint?: string
   disabled?: boolean
   danger?: boolean
+  expanded?: boolean
+  controls?: string
   children: ReactNode
 }): ReactElement {
   return (
@@ -128,6 +132,8 @@ export function WbMenuItem({
       tabIndex={-1}
       className={`wb-menu-item${danger ? ' is-danger' : ''}`}
       title={title}
+      aria-expanded={expanded}
+      aria-controls={controls}
       disabled={disabled}
       onClick={onSelect}
     >
@@ -155,6 +161,9 @@ export interface WbMenuEntry {
   hint?: string
   danger?: boolean
   disabled?: boolean
+  /** the entry is a disclosure trigger: state and the region it reveals */
+  expanded?: boolean
+  controls?: string
   onSelect: () => void
 }
 
@@ -210,6 +219,8 @@ export function WbMenuButton({
             hint={it.hint}
             danger={it.danger}
             disabled={it.disabled}
+            expanded={it.expanded}
+            controls={it.controls}
             onSelect={() => {
               ref.current?.focus()
               setOpen(false)
