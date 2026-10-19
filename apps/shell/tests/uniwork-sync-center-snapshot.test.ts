@@ -561,6 +561,19 @@ describe('BE-10: the preload boundary validates the snapshot shape', () => {
       { header: {}, tabs: good.tabs },
       { header: good.header, tabs: { attention: [], pending: [] } },
       { header: good.header, tabs: { attention: [], pending: null, recent: [] } },
+      // B55: header.online is what the renderer reads for the connectivity line
+      { header: { ...good.header, online: undefined }, tabs: good.tabs },
+      { header: { ...good.header, online: 'yes' }, tabs: good.tabs },
+      // B55: a tab array holding a row the model would throw on
+      {
+        header: good.header,
+        tabs: { ...good.tabs, pending: [{ ...good.tabs.pending[0], id: 7 }] },
+      },
+      {
+        header: good.header,
+        tabs: { ...good.tabs, pending: [{ ...good.tabs.pending[0], canEdit: undefined }] },
+      },
+      { header: good.header, tabs: { ...good.tabs, recent: ['committed'] } },
     ]) {
       expect(() => asSyncCenterSnapshot(bad)).not.toThrow()
       expect(asSyncCenterSnapshot(bad), JSON.stringify(bad)).toBeNull()
