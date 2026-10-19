@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { UniworkFirstSaveNameRequest, UniworkFolderNode } from '../../../shared/home-api'
 import { FileBadge } from '../FileBadge'
 import { useI18n, type StringKey } from '../locale'
@@ -259,20 +259,53 @@ function FirstSaveNameDialog({
 
 /**
  * Listens for main's "Name the document" push and shows one dialog per ask, in
- * order. Every ask is answered exactly once with its own id.
+ * order. Every ask is answered exactly once with its own id: by the dialog's
+ * verdict, or `cancel` when this host goes away with it still open or queued (a
+ * shell reload or remount - main would otherwise hold the Save forever). Each
+ * push is acknowledged on receipt so main knows a host is listening, and a
+ * dismiss from main (its tab closed, its session ended) drops the ask without
+ * an answer - main has already settled it.
  */
 export function FirstSaveNameHost() {
   const [queue, setQueue] = useState<UniworkFirstSaveNameRequest[]>([])
+  // the asks not yet answered or dismissed
+  const open = useRef(new Set<string>())
+
+  const answer = useCallback((requestId: string, verdict: 'continue' | 'cancel') => {
+    if (!open.current.delete(requestId)) return
+    void Promise.resolve(
+      window.aiOffice.uniworkFirstSaveNameAnswer({ requestId, answer: verdict }),
+    ).catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     // a bridge without the push (a stale preload) simply never opens the dialog
     if (typeof window.aiOffice?.onUniworkFirstSaveName !== 'function') return
-    return window.aiOffice.onUniworkFirstSaveName((request) => {
-      setQueue((prev) =>
-        prev.some((r) => r.requestId === request.requestId) ? prev : [...prev, request],
-      )
+    const offAsk = window.aiOffice.onUniworkFirstSaveName((request) => {
+      if (open.current.has(request.requestId)) return
+      open.current.add(request.requestId)
+      setQueue((prev) => [...prev, request])
+      void Promise.resolve(
+        window.aiOffice.uniworkFirstSaveNameAnswer({
+          requestId: request.requestId,
+          answer: 'shown',
+        }),
+      ).catch(() => undefined)
     })
-  }, [])
+    const offDismiss =
+      typeof window.aiOffice.onUniworkFirstSaveNameDismiss === 'function'
+        ? window.aiOffice.onUniworkFirstSaveNameDismiss((requestId) => {
+            open.current.delete(requestId)
+            setQueue((prev) => prev.filter((r) => r.requestId !== requestId))
+          })
+        : undefined
+    const pending = open.current
+    return () => {
+      offAsk()
+      offDismiss?.()
+      for (const requestId of [...pending]) answer(requestId, 'cancel')
+    }
+  }, [answer])
 
   const current = queue[0]
   if (!current) return null
@@ -282,12 +315,7 @@ export function FirstSaveNameHost() {
       request={current}
       onAnswer={(verdict) => {
         setQueue((prev) => prev.filter((r) => r.requestId !== current.requestId))
-        void Promise.resolve(
-          window.aiOffice.uniworkFirstSaveNameAnswer({
-            requestId: current.requestId,
-            answer: verdict,
-          }),
-        ).catch(() => undefined)
+        answer(current.requestId, verdict)
       }}
     />
   )

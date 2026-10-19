@@ -1311,6 +1311,15 @@ const homeApi: HomeApi = {
   async uniworkFirstSaveNameAnswer(input) {
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.firstSaveNameAnswer, input)
   },
+  onUniworkFirstSaveNameDismiss(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const requestId =
+        raw && typeof raw === 'object' ? (raw as { requestId?: unknown }).requestId : null
+      if (typeof requestId === 'string' && requestId) cb(requestId)
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.firstSaveNameDismiss, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.firstSaveNameDismiss, listener)
+  },
   async uniworkSave(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.save, path))
   },

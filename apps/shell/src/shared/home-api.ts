@@ -704,7 +704,11 @@ export interface UniworkFirstSaveNameRequest {
 
 export interface UniworkFirstSaveNameAnswer {
   requestId: string
-  answer: 'continue' | 'cancel'
+  /**
+   * `shown` = the dialog is up (it stops main's delivery clock; the person has
+   * no deadline after it); `continue` / `cancel` = the verdict
+   */
+  answer: 'continue' | 'cancel' | 'shown'
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
@@ -1341,6 +1345,8 @@ export interface HomeApi {
   onUniworkFirstSaveName(cb: (request: UniworkFirstSaveNameRequest) => void): () => void
   /** UNI-1959: the dialog's verdict; main continues or drops the held save */
   uniworkFirstSaveNameAnswer(input: UniworkFirstSaveNameAnswer): Promise<void>
+  /** UNI-1959: main took an ask back (its tab closed, its session ended): drop its dialog / queue slot */
+  onUniworkFirstSaveNameDismiss(cb: (requestId: string) => void): () => void
   /** MYFOLDER-01 (Q3): ensure the caller's personal My Folder (dialog open) */
   uniworkEnsureMyFolder(workspaceId: string): Promise<UniworkResult<UniworkDocSummary>>
   /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
@@ -1968,6 +1974,8 @@ export const UNIWORK_DOC_CHANNELS = {
   firstSaveName: 'uniwork-doc:first-save-name',
   /** UNI-1959: invoke(UniworkFirstSaveNameAnswer) - the dialog's verdict on a held save */
   firstSaveNameAnswer: 'uniwork-doc:first-save-name-answer',
+  /** UNI-1959: main -> shell renderer: drop the dialog of this ask ({ requestId }) */
+  firstSaveNameDismiss: 'uniwork-doc:first-save-name-dismiss',
   /** MYFOLDER-01 (Q3): invoke(workspaceId) -> the ensured My Folder row (DocumentSDO) */
   ensureMyFolder: 'uniwork-doc:ensure-my-folder',
   /** invoke(sessionId, action) -> UniworkConflictReply (G5-09) */
