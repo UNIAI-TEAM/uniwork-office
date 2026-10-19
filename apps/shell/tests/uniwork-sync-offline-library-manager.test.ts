@@ -1541,6 +1541,16 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
           const doc = addDoc(h, 'doc_1', 1)
           await abortReservation(h, [])
           const hold = slowDownload(h, 'doc_1', 1)
+          // a chunk that was already on its way when the abort landed still reports progress
+          const real = h.docs.downloadStream.bind(h.docs)
+          h.docs.downloadStream = async (documentId, version, options) => {
+            try {
+              return await real(documentId, version, options)
+            } catch (error) {
+              options?.onProgress?.({ receivedBytes: 2048, totalBytes: 4096 })
+              throw error
+            }
+          }
           const downloading = h.manager.downloadNow('doc_1')
           await hold.waiting
           return { h, doc, hold, downloading }
