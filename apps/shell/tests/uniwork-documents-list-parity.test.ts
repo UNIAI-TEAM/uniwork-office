@@ -11,10 +11,13 @@ import type {
   UniworkWorkspaceRef,
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { buildFolderIndex } from '../src/renderer/src/uniwork-folders/uniwork-folders-model'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import {
+  DOCUMENTS_HOME_GROUP_BY,
   fetchDocumentsHomeSources,
   formatBytes,
+  groupDocumentsHomeRows,
   formatShortDate,
   mergeNewestFirst,
   rowSizeBytes,
@@ -549,4 +552,242 @@ describe('DocumentsHome Size column and short dates (UNI-1961 item 2)', () => {
       )
     },
   )
+})
+
+describe('groupDocumentsHomeRows - the web groupRows (UNI-1961 item 3)', () => {
+  const tree: UniworkFolderNode[] = [
+    {
+      id: 'f-mine',
+      parentId: null,
+      title: 'My Folder',
+      position: 0,
+      systemKind: 'my_folder',
+      children: [],
+    },
+    {
+      id: 'f-board',
+      parentId: null,
+      title: 'Báo cáo HĐQT',
+      position: 1,
+      children: [{ id: 'f-q4', parentId: 'f-board', title: 'Q4', position: 0, children: [] }],
+    },
+  ]
+  const index = buildFolderIndex(tree)
+  const rows = [
+    doc({ id: 'a', parentId: 'f-q4', origin: 'upload' }),
+    doc({ id: 'b', parentId: null, format: 'xlsx', origin: 'created' }),
+    doc({ id: 'c', parentId: 'f-mine', kind: 'page', format: null }),
+    doc({ id: 'd', parentId: 'f-gone', format: null, title: 'notes.txt' }),
+    doc({ id: 'e', parentId: 'f-q4', format: 'pptx' }),
+  ]
+  const shape = (groups: ReturnType<typeof groupDocumentsHomeRows>) =>
+    groups.map((group) => [group.key, group.title, group.rows.map((row) => row.id)])
+
+  it('offers Folder, Source, Type and None, in the web order', () => {
+    expect(DOCUMENTS_HOME_GROUP_BY).toEqual(['folder', 'source', 'type', 'none'])
+  })
+
+  it('folder: the deepest folder titled by its path (My Folder relabelled), else unfiled', () => {
+    expect(
+      shape(
+        groupDocumentsHomeRows(rows, 'folder', index, { id: 'f-mine', label: 'Thư mục của tôi' }),
+      ),
+    ).toEqual([
+      ['folder:f-q4', 'Báo cáo HĐQT / Q4', ['a', 'e']],
+      ['unfiled', '', ['b', 'd']],
+      ['folder:f-mine', 'Thư mục của tôi', ['c']],
+    ])
+  })
+
+  it('source: uploaded / created / documents (a server that does not say)', () => {
+    expect(shape(groupDocumentsHomeRows(rows, 'source', index))).toEqual([
+      ['origin:upload', '', ['a']],
+      ['origin:created', '', ['b']],
+      ['origin:documents', '', ['c', 'd', 'e']],
+    ])
+  })
+
+  it('type: the row format (page, the file format, else the title extension)', () => {
+    expect(shape(groupDocumentsHomeRows(rows, 'type', index))).toEqual([
+      ['type:docx', '', ['a']],
+      ['type:xlsx', '', ['b']],
+      ['type:page', '', ['c']],
+      ['type:txt', '', ['d']],
+      ['type:pptx', '', ['e']],
+    ])
+  })
+
+  it('none: one group, no header', () => {
+    expect(shape(groupDocumentsHomeRows(rows, 'none', index))).toEqual([
+      ['all', '', ['a', 'b', 'c', 'd', 'e']],
+    ])
+  })
+})
+
+describe('DocumentsHome Group by on the list views (UNI-1961 item 3)', () => {
+  let host: HTMLDivElement
+  let sidebarSlot: HTMLDivElement
+  let root: Root
+  const workspaces: UniworkWorkspaceRef[] = [
+    { id: 'ws-1', name: 'Công ty UniWork', slug: 'uniwork' },
+  ]
+  const tree: UniworkFolderNode[] = [
+    { id: 'f-board', parentId: null, title: 'Báo cáo HĐQT', position: 1, children: [] },
+  ]
+  const recent: DocumentsHomeDoc[] = [
+    doc({
+      id: 'r1',
+      title: 'Kế hoạch.docx',
+      parentId: 'f-board',
+      origin: 'upload',
+      updatedAt: '2026-10-19T08:00:00.000Z',
+    }),
+    doc({
+      id: 'r2',
+      title: 'Ngân sách.xlsx',
+      format: 'xlsx',
+      origin: 'created',
+      updatedAt: '2026-10-18T08:00:00.000Z',
+    }),
+    doc({
+      id: 'r3',
+      title: 'Hợp đồng.docx',
+      parentId: 'f-board',
+      updatedAt: '2026-10-17T08:00:00.000Z',
+    }),
+  ]
+
+  beforeEach(() => {
+    localStorage.clear()
+    const api = {
+      accountStatus: vi.fn(async () => ({ state: 'signed-in' as const, loggedIn: true })),
+      uniworkListWorkspaces: vi.fn(async () => ok(workspaces)),
+      uniworkFolderTree: vi.fn(async () => ok(tree)),
+      uniworkListChildren: vi.fn(async () => ok({ items: recent, nextCursor: null })),
+      uniworkListSources: vi.fn(async () => ok({ items: [], nextCursor: null })),
+      uniworkListDocuments: vi.fn(async () => ok({ documents: recent, nextCursor: null })),
+      uniworkListSharedWithMe: vi.fn(async () => ok({ documents: [recent[1]!], nextCursor: null })),
+      uniworkListSharedByMe: vi.fn(async () => ok({ documents: [recent[0]!], nextCursor: null })),
+      uniworkSearchDocuments: vi.fn(async () => ok({ items: [], nextCursor: null })),
+      onUniworkTreeChanged: vi.fn(() => () => {}),
+      onUniworkDocRenamed: vi.fn(() => () => {}),
+      onUniworkUploadProgress: vi.fn(() => () => {}),
+    }
+    ;(window as unknown as { aiOffice: unknown; home: unknown }).aiOffice = api
+    ;(window as unknown as { aiOffice: unknown; home: unknown }).home = api
+    host = document.createElement('div')
+    sidebarSlot = document.createElement('div')
+    document.body.appendChild(sidebarSlot)
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(async () => {
+    await act(async () => {
+      root.unmount()
+    })
+    host.remove()
+    sidebarSlot.remove()
+  })
+
+  async function renderHome(lang: 'vi' | 'en') {
+    localStorage.setItem('genoffice.lang', lang)
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: lang },
+          createElement(DocumentsHome, {
+            workspaceId: 'ws-1',
+            workspaces,
+            onWorkspaceChange: vi.fn(),
+            onOpenDocument: vi.fn(),
+            sidebarHost: sidebarSlot,
+          }),
+        ),
+      )
+    })
+    await flush()
+  }
+
+  const nav = async (id: string) => {
+    await act(async () => {
+      sidebarSlot.querySelector<HTMLButtonElement>(`.nav-item[data-nav="${id}"]`)!.click()
+    })
+    await flush()
+  }
+  const groupSelect = () => host.querySelector<HTMLSelectElement>('select[data-filter="groupBy"]')
+  const pick = async (value: string) => {
+    await act(async () => {
+      const select = groupSelect()!
+      select.value = value
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+  }
+  /** the table in DOM order: a group header as "# title count", a row as its id */
+  const table = () =>
+    Array.from(
+      host.querySelectorAll<HTMLElement>(
+        '.dh-doc-table > .dh-group-row, .dh-doc-table > .dh-doc-row',
+      ),
+    ).map((el) =>
+      el.classList.contains('dh-group-row')
+        ? `# ${el.querySelector('.dh-group-title')?.textContent} ${el.querySelector('.dh-group-count')?.textContent}`
+        : (el.dataset.docId ?? ''),
+    )
+
+  it('vi: the root has no Group by (the web home does not group); Recent groups by Folder by default', async () => {
+    await renderHome('vi')
+    expect(groupSelect()).toBeNull()
+    expect(host.querySelector('.dh-group-row')).toBeNull()
+
+    await nav('recent')
+    const select = groupSelect()!
+    expect(select).not.toBeNull()
+    expect(select.value).toBe('folder')
+    expect(Array.from(select.options).map((o) => [o.value, o.textContent])).toEqual([
+      ['folder', 'Thư mục'],
+      ['source', 'Nguồn'],
+      ['type', 'Loại file'],
+      ['none', 'Không nhóm'],
+    ])
+    expect(host.textContent).toContain('Nhóm theo')
+    expect(table()).toEqual(['# Báo cáo HĐQT 2', 'r1', 'r3', '# Chưa xếp thư mục 1', 'r2'])
+
+    await pick('source')
+    expect(table()).toEqual(['# Tải lên 1', 'r1', '# Tạo mới 1', 'r2', '# Tài liệu 1', 'r3'])
+
+    await pick('type')
+    expect(table()).toEqual(['# Docs 2', 'r1', 'r3', '# Sheets 1', 'r2'])
+
+    await pick('none')
+    expect(table()).toEqual(['r1', 'r2', 'r3'])
+    // the documents count says the rows, not the headers
+    expect(host.querySelector('.dh-docs-section .dh-section-count')?.textContent).toBe('3')
+  })
+
+  it('en: Shared with me and Shared by me offer it too, with the web words', async () => {
+    await renderHome('en')
+    await nav('shared-with-me')
+    expect(Array.from(groupSelect()!.options).map((o) => o.textContent)).toEqual([
+      'Folder',
+      'Source',
+      'File type',
+      'No grouping',
+    ])
+    expect(host.textContent).toContain('Group by')
+    expect(table()).toEqual(['# Not in a folder 1', 'r2'])
+    await pick('source')
+    expect(table()).toEqual(['# Created 1', 'r2'])
+
+    await nav('shared-by-me')
+    expect(groupSelect()?.value).toBe('source')
+    expect(table()).toEqual(['# Uploaded 1', 'r1'])
+    await pick('folder')
+    expect(table()).toEqual(['# Báo cáo HĐQT 1', 'r1'])
+
+    await nav('trash')
+    expect(groupSelect()).toBeNull()
+  })
 })

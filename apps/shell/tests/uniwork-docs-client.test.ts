@@ -1111,3 +1111,30 @@ describe('list rows carry size_bytes (UNI-1961)', () => {
     ])
   })
 })
+
+// UNI-1961 item 3: "Group by Source" reads a document's origin as the web does
+describe('list rows carry origin (UNI-1961)', () => {
+  it('keeps upload and created; anything else is no origin (the web calls it Documents)', async () => {
+    const row = (id: string, origin: unknown) => ({
+      id,
+      kind: 'file',
+      workspace_id: 'ws_1',
+      title: `${id}.docx`,
+      updated_at: '2026-10-19T08:00:00Z',
+      origin,
+    })
+    const api = client(async () =>
+      json(200, {
+        documents: [row('u', 'upload'), row('c', 'created'), row('x', 'import'), row('n', null)],
+        next_cursor: null,
+      }),
+    )
+    const page = await api.listChildren({ workspaceId: 'ws_1', parentId: null })
+    expect(page.documents.map((d) => [d.id, d.origin])).toEqual([
+      ['u', 'upload'],
+      ['c', 'created'],
+      ['x', undefined],
+      ['n', undefined],
+    ])
+  })
+})
