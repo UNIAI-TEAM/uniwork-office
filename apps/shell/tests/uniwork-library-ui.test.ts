@@ -333,6 +333,21 @@ describe('Open from UniWork: details panel', () => {
     expect(btn.getAttribute('aria-expanded')).toBe('true')
   })
 
+  it('UNI-1958 rows 2-3: My access names the web levels (vi: Nhận xét / Chỉ xem; en: Comment / View)', async () => {
+    const levelOf = async (myLevel: 'comment' | 'view', lang: Lang) => {
+      await render({ info: { ...FULL_INFO, myLevel } }, lang)
+      await click(infoButtons()[0]!)
+      const values = Array.from(infoPanel()!.querySelectorAll('dl dd')).map((d) => d.textContent)
+      act(() => root.unmount())
+      root = createRoot(host)
+      return values[3]
+    }
+    expect(await levelOf('comment', 'vi')).toBe('Nhận xét')
+    expect(await levelOf('view', 'vi')).toBe('Chỉ xem')
+    expect(await levelOf('comment', 'en')).toBe('Comment')
+    expect(await levelOf('view', 'en')).toBe('View')
+  })
+
   it('shows "—" for every field the server did not send', async () => {
     await render({ info: EMPTY_INFO })
     await click(infoButtons()[1]!)

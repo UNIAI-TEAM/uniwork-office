@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, createElement } from 'react'
+import { Fragment, act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -14,6 +14,7 @@ import type {
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
+import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { SaveDialog } from '../src/renderer/src/uniwork-folders/SaveDialog'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
 
@@ -489,7 +490,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.querySelector('.dh-cell-name .dh-doc-subpath')?.textContent?.trim()).toBe(
       'Phòng Tài chính',
     )
-    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Hạn chế')
+    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Riêng tư')
     expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Chỉnh sửa')
 
     // Paging on shared-with-me forwards only { cursor } and appends documents
@@ -529,7 +530,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       expect.objectContaining({ workspaceId: 'ws-1', format: 'xlsx', updatedBy: 'u-minh' }),
     )
     expect(host.textContent).toContain('Bản thảo hợp đồng.docx')
-    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Hạn chế')
+    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Riêng tư')
     expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Nhận xét')
 
     // If shared-with-me is empty while filters are active from another sub-view, it shows uhEmptySharedWithMe (not uhEmptyFiltered)
@@ -2164,6 +2165,95 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'My Folder',
       'Alpha Folder',
     ])
+  })
+
+  const restrictedDoc = (): DocumentsHomeDoc => ({
+    id: 'doc-restricted',
+    workspaceId: 'ws-1',
+    title: 'Hợp đồng riêng.docx',
+    format: 'docx',
+    updatedAt: '2026-10-17T08:00:00.000Z',
+    kind: 'file',
+    parentId: null,
+    visibility: 'restricted',
+    myLevel: 'edit',
+    canManage: true,
+  })
+  const visBadge = () =>
+    host
+      .querySelector('.dh-doc-row[data-doc-id="doc-restricted"] .dh-vis-badge')
+      ?.textContent?.trim()
+
+  it('UNI-1958 row 1: a restricted document wears the web label "Riêng tư" (vi), not "Hạn chế"', async () => {
+    rootItems = [restrictedDoc()]
+    await mountHome('vi')
+    expect(visBadge()).toBe('Riêng tư')
+  })
+
+  it('UNI-1958 row 1: a restricted document wears the web label "Private" (en), not "Restricted"', async () => {
+    rootItems = [restrictedDoc()]
+    await mountHome('en')
+    expect(visBadge()).toBe('Private')
+  })
+
+  it('UNI-1958 row 5: the doc-row archive action is the web "Chuyển vào thùng rác" (menu, confirm, announce)', async () => {
+    rootItems = [restrictedDoc()]
+    api.uniworkArchiveDocument = vi.fn(async () => ok({}))
+    resetLiveForTests()
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(
+            Fragment,
+            null,
+            createElement(UniworkLiveHost),
+            createElement(DocumentsHome, {
+              workspaceId: 'ws-1',
+              workspaces,
+              onWorkspaceChange: vi.fn(),
+              onOpenDocument: vi.fn(),
+              sidebarHost: sidebarSlot,
+            }),
+          ),
+        ),
+      )
+    })
+    await flush()
+    const kebab = host.querySelector<HTMLButtonElement>(
+      '.dh-doc-row[data-doc-id="doc-restricted"] .uw-row-menu-btn',
+    )!
+    await act(async () => {
+      kebab.click()
+    })
+    await flush()
+    const items = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
+    ).map((el) => el.textContent?.trim())
+    expect(items).toContain('Chuyển vào thùng rác')
+    expect(items).not.toContain('Lưu trữ')
+    const item = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
+    ).find((el) => el.textContent?.trim() === 'Chuyển vào thùng rác')!
+    await act(async () => {
+      item.click()
+    })
+    await flush()
+    const dialog = document.querySelector<HTMLElement>('.modal.uw-act')!
+    expect(dialog.textContent).toContain('Chuyển vào thùng rác · Hợp đồng riêng.docx')
+    expect(dialog.textContent).toContain(
+      'Tài liệu và toàn bộ cây con sẽ được chuyển vào thùng rác trong 30 ngày trước khi bị xóa vĩnh viễn.',
+    )
+    expect(dialog.textContent).not.toContain('Lưu trữ')
+    await act(async () => {
+      dialog.querySelector<HTMLButtonElement>('.btn-primary')!.click()
+    })
+    await flush()
+    expect(api.uniworkArchiveDocument).toHaveBeenCalledWith('doc-restricted')
+    expect(document.querySelector('[data-uw-live] [role="status"]')?.textContent).toBe(
+      'Đã chuyển vào thùng rác',
+    )
   })
 
   const docsHomeCss = () =>
