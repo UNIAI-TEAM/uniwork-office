@@ -22,8 +22,6 @@ export const ko = {
   uhQuickMd: 'Markdown 파일',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
-  uhQuickHintPrefix: '이 페이지에서 새로 만들고 업로드하면',
-  uhQuickHintSuffix: '에 저장되며 나만 볼 수 있습니다. 필요할 때 공유하거나 이동하세요.',
   uhFilterType: '유형:',
   uhFilterTypeAll: '전체',
   uhFilterModifiedBy: '수정자:',
@@ -63,7 +61,6 @@ export const ko = {
   uhEmptyTrash: '휴지통이 비어 있습니다.',
   uhEmptyFiltered: '필터와 일치하는 문서가 없습니다.',
   uhTrashNote: '관리 권한이 있는 경우 휴지통의 항목을 복원할 수 있습니다.',
-  uhMyFolderNote: '비공개 — 공유하거나 공유 폴더로 이동하지 않는 한 나만 액세스할 수 있습니다.',
   uhLoadMore: '더 보기',
   uhRowActions: '추가 작업',
 } satisfies Record<keyof typeof zh, string>
