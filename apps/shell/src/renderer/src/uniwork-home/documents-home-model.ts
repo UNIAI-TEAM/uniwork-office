@@ -489,8 +489,19 @@ export async function fetchDocumentsHomePage(
       cursor,
       ...filters,
     })
+    // UNI-1974: folders are never shared; the documents route this reads carries every kind,
+    // so a folder it still returns is not a Shared by me row
+    const mapped = mapDocListPageResult(res)
     return {
-      result: mapDocListPageResult(res),
+      result: mapped.ok
+        ? {
+            ok: true,
+            value: {
+              ...mapped.value,
+              items: mapped.value.items.filter((doc) => doc.kind !== 'folder'),
+            },
+          }
+        : mapped,
     }
   }
 
