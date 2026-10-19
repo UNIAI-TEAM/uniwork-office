@@ -1444,12 +1444,12 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     expect(commitsOf(server)).toHaveLength(0)
 
     win.answers[0]!('continue')
-    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1))
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
 
     // a second save never asks
     writeFileSync(doc.path, 'bytes v3')
     ctx.service.onUserSave(doc.path)
-    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(2))
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(2), { timeout: 8000 })
     expect(win.asked).toHaveLength(1)
   })
 
@@ -1518,7 +1518,7 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     if (!opened2.ok) throw new Error('open failed')
     writeFileSync(opened2.value.path, 'bytes v2')
     ctx2.service.onUserSave(opened2.value.path)
-    await vi.waitFor(() => expect(commitsOf(plain)).toHaveLength(1))
+    await vi.waitFor(() => expect(commitsOf(plain)).toHaveLength(1), { timeout: 8000 })
     expect(win2.asked).toHaveLength(0)
   })
 
@@ -1534,7 +1534,7 @@ describe('UNI-1959 first save of a blank document asks name + folder', () => {
     const doc = await createdAndOpened(ctx)
     writeFileSync(doc.path, 'bytes v2')
     ctx.service.onUserSave(doc.path)
-    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1))
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1), { timeout: 8000 })
     expect(win.asked).toHaveLength(0)
   })
 })

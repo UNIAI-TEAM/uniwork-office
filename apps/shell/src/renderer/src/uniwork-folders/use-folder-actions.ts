@@ -103,7 +103,8 @@ export function useFolderActions({
   /** submit of the name dialog */
   const submitName = (name: string): Promise<FolderNameOutcome> => {
     if (!nameDialog) return Promise.resolve({ ok: true })
-    if (nameDialog.mode === 'create') return create(nameDialog.parentId, name, nameDialog.visibility)
+    if (nameDialog.mode === 'create')
+      return create(nameDialog.parentId, name, nameDialog.visibility)
     if (name === nameDialog.title) {
       setNameDialog(null)
       return Promise.resolve({ ok: true })
