@@ -486,7 +486,6 @@ export function SaveDialog({
             </button>
           )}
           searchLabel={t('usSearchFolders')}
-          note={t('usSharedNote')}
           tagOf={(row) => {
             const key = folderVisibilityTagOf(row)
             return key ? t(key) : null
