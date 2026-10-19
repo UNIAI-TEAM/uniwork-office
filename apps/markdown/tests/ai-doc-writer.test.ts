@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { undoDepth } from '@tiptap/pm/history'
 import { buildExtensions } from '../src/renderer/editor/extensions'
@@ -218,5 +218,37 @@ describe('write_document tool', () => {
     )
     expect(exec.isError).toBe(true)
     expect(texts(editor)).toEqual([''])
+  })
+
+  // UNI-1923 (B): scope is the AI tool path only (executeTool with a stub writer): it issues
+  // no window.markdownApi.save. The product-level proof is web/e2e/ai-save-confirm.spec.ts.
+  it('the tool path of a discarded streamed draft issues no save', async () => {
+    const editor = createEditor('original')
+    const save = vi.fn()
+    const win = window as unknown as { markdownApi?: { save?: unknown } }
+    const prev = win.markdownApi
+    win.markdownApi = { save }
+    try {
+      const writer: AiDocWriter = {
+        write: async (_spec, onProgress) => {
+          onProgress('# Draft\n\npartial')
+          await tick()
+          return { ok: false, error: 'the user discarded the partial content' }
+        },
+      }
+      const exec = await executeTool(
+        editor,
+        { id: 't', name: 'write_document', input: { plan: 'p', replaceDocument: true } },
+        undefined,
+        undefined,
+        writer,
+      )
+      expect(exec.isError).toBe(true)
+      expect(texts(editor)).toEqual(['original'])
+    } finally {
+      if (prev === undefined) delete win.markdownApi
+      else win.markdownApi = prev
+    }
+    expect(save).not.toHaveBeenCalled()
   })
 })
