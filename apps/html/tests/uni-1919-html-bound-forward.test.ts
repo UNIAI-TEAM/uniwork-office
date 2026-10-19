@@ -252,6 +252,8 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
     await pumpUntil(() => harness.requests.length >= 1, 'first turn request')
     const request = harness.requests[0]
     expect(request.tools.map((tool) => tool.name)).not.toContain('apply_ops')
+    // the view-only note must be present, or the absence check below proves nothing
+    expect(request.system).toContain('this document is view-only')
     expect(request.system).not.toContain('plan_page and write_document are unavailable')
   })
 
@@ -290,6 +292,24 @@ describe('AiPanel forwards uniworkBound to the document skill (UNI-1919)', () =>
       const text = first && first.role === 'user' ? first.text : ''
       expect(text).not.toContain('write_document')
       expect(text).not.toContain('WRITE CONTENT')
+    })
+
+    it('a stale write intent keeps the design empty-state copy once the page is bound', async () => {
+      const { flip } = await mount(false, { blank: true })
+      const write = container!.querySelectorAll<HTMLElement>('.ai-intent-card')[1]
+      act(() => write.click())
+      flip(true)
+      // re-render without sending
+      const textarea = container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      act(() => {
+        setter.call(textarea, 'x')
+        textarea.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      expect(container!.querySelector('.ai-chat-empty-title')?.textContent).toBe(
+        'Design a page with AI',
+      )
+      expect(container!.querySelector('.ai-intent-bar')).toBeNull()
     })
   })
 })
