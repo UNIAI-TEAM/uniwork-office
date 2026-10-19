@@ -997,15 +997,21 @@ export class OfflineLibraryManager {
       if (!live()) return refused('interrupted')
       const existing = await this.options.store.getPin(documentId)
       if (isUnavailable(existing)) return refused(existing.kind)
-      if (existing.kind === 'ok') {
+      const index = await this.options.store.readIndex()
+      if (index.kind !== 'ok') return refused(isUnavailable(index) ? index.kind : 'invalid')
+      if (!live()) return refused('interrupted')
+      // FUSR-R2-1 (UNI-1362): a row the index does not list is a reservation an
+      // earlier pin left unfinished (its index write was refused at a boundary),
+      // not a completed pin: this pin adopts it through reserve() below
+      const adopted =
+        existing.kind === 'ok' && !index.index.pins.includes(documentId) ? existing.record : null
+      if (existing.kind === 'ok' && !adopted) {
         const row = await this.view(existing.record)
         return live() ? { kind: 'pinned', row } : refused('interrupted')
       }
-      const index = await this.options.store.readIndex()
-      if (index.kind !== 'ok') return refused(isUnavailable(index) ? index.kind : 'invalid')
       if (index.index.pins.length >= this.limits.maxPins) return refused('offline_cap_reached')
 
-      const base: PinRecord = {
+      const base: PinRecord = adopted ?? {
         schema: PIN_RECORD_SCHEMA,
         documentId,
         scope: { orgId, workspaceId },
@@ -1048,8 +1054,8 @@ export class OfflineLibraryManager {
 
       const record: PinRecord = {
         ...base,
-        manifest,
-        archived: detail?.archivedAt != null,
+        manifest: manifest ?? base.manifest,
+        archived: detail ? detail.archivedAt != null : base.archived,
       }
       // the quota is checked and the pin reserved in one step (T5-1)
       const reservation = await this.reserve(record, live)
@@ -1064,17 +1070,20 @@ export class OfflineLibraryManager {
       }
       if (!live()) return refused('interrupted')
       this.changed(documentId)
-      if (!manifest) return { kind: 'pinned', row: await this.view(record) }
+      // FUSR-R2-2 (UNI-1362): a row is returned only under the boundary the pin started in
+      if (!manifest) {
+        const row = await this.view(record)
+        return live() ? { kind: 'pinned', row } : refused('interrupted')
+      }
       const begun = await this.beginDownload(record, manifest, live)
       if (begun.kind === 'started') return begun
-      return {
-        kind: 'pinned',
-        row: await this.view(begun.kind === 'settled' ? begun.record : record),
-      }
+      const row = await this.view(begun.kind === 'settled' ? begun.record : record)
+      return live() ? { kind: 'pinned', row } : refused('interrupted')
     })
     // the transfer runs outside the document lock (T5-2)
     if (outcome.kind !== 'started') return outcome
-    return { kind: 'pinned', row: await this.view(await outcome.done) }
+    const row = await this.view(await outcome.done)
+    return live() ? { kind: 'pinned', row } : refused('interrupted')
   }
 
   /** "Hủy tải": the download stops, staging is wiped, the old copy (if any) stays */
@@ -1186,7 +1195,9 @@ export class OfflineLibraryManager {
     })
     // the transfer runs outside the document lock (T5-2)
     if (outcome.kind !== 'started') return outcome
-    return { kind: 'ok', row: await this.view(await outcome.done) }
+    // FUSR-R2-2 (UNI-1362): the settled row is returned only under the boundary refresh started in
+    const row = await this.view(await outcome.done)
+    return live() ? { kind: 'ok', row } : refused('interrupted')
   }
 
   /** "Tải ngay" / "Thử lại" */
