@@ -1160,9 +1160,7 @@ describe('review r1 save fixes', () => {
     // the server holds no intent row for this key: the poll parks it stuck
     server.faults.push({ route: 'lookup', kind: 410, code: 'commit_intent_unknown' })
     await ctx.service.pollSaveQueue()
-    await vi.waitFor(() =>
-      expect(binding(path)).toMatchObject({ state: 'reconciling-stuck' }),
-    )
+    await vi.waitFor(() => expect(binding(path)).toMatchObject({ state: 'reconciling-stuck' }))
     const before = {
       uploads: uploads(server).length,
       commits: commits(server).length,
@@ -1336,7 +1334,7 @@ describe('review r1 save fixes', () => {
     expect(lookups(server)).toHaveLength(1)
   })
 
-  it('another document_upload_invalid reason keeps today\'s recheck (B69-lite)', async () => {
+  it("another document_upload_invalid reason keeps today's recheck (B69-lite)", async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
     const path = await openDoc(ctx)

@@ -1020,9 +1020,7 @@ describe('SIZE-F1 desktop document size limits', () => {
       // the three phase writes of B70's commit leg, and NOT a fourth intent
       // (the record is the SAME one: no new intent was minted)
       expect(h.put).toHaveBeenCalledTimes(3)
-      expect(
-        new Set(h.put.mock.calls.map((call) => call[1].intentId)),
-      ).toEqual(new Set(['old']))
+      expect(new Set(h.put.mock.calls.map((call) => call[1].intentId))).toEqual(new Set(['old']))
       expect(h.statuses.some((push) => push.error === 'too_large')).toBe(false)
     })
 

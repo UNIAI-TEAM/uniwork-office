@@ -867,7 +867,7 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(h.server.state.counts.commit).toBe(commits)
   })
 
-  it('another document_upload_invalid reason keeps today\'s mapping', async () => {
+  it("another document_upload_invalid reason keeps today's mapping", async () => {
     const h = await harness()
     const doc = h.makeDoc()
     await h.dispatcher.enqueue(doc)
