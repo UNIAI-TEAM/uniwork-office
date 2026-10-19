@@ -853,6 +853,11 @@ export class QueueDispatcher {
       error.serverCode === 'document_upload_invalid' &&
       error.reason === 'file_claim_expired'
     ) {
+      // R7: the claim expired, so the record must DURABLY reconcile before the
+      // lookup (the machine's own `commitFailed` / `ticket_expired` enters
+      // `reconciling` with `reconcileSince`). A transient lookup failure then
+      // leaves an aging `reconciling` row the tick can age, never `committing`.
+      await this.apply(doc, { type: 'commitFailed', error: 'ticket_expired' }, now)
       await this.settleInFlight(doc, now)
       return
     }

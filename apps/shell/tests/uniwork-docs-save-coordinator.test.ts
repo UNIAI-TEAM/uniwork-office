@@ -132,6 +132,7 @@ function fakeLock(
 
 interface ServerState {
   lookupOutcome: CommitLookup['outcome']
+  lookupError: UniworkDocError | null
   commitError: UniworkDocError | null
   uploadError: UniworkDocError | null
   /**
@@ -150,6 +151,7 @@ interface ServerState {
 function fakeServer(): { client: QueueClient; state: ServerState } {
   const state: ServerState = {
     lookupOutcome: 'in_flight',
+    lookupError: null,
     commitError: null,
     uploadError: null,
     commitRefusal: null,
@@ -182,6 +184,7 @@ function fakeServer(): { client: QueueClient; state: ServerState } {
     async lookupCommit(input) {
       state.counts.lookup += 1
       state.keys.lookup.push(input.idempotencyKey)
+      if (state.lookupError) throw state.lookupError
       if (state.lookupOutcome === 'committed') {
         return { outcome: 'committed', receipt: { versionId: 'ver_4', version: 4, revision: '42' } }
       }
@@ -798,6 +801,23 @@ describe('G5-06 W4a save queue (fakes)', () => {
       doc.record.idempotencyKey,
     ])
     expect(doc.record.state).toBe('committed')
+  })
+
+  it('R7: a failed expiry lookup leaves the dispatcher record reconciling with an age, never committing', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    h.server.state.commitRefusal = new UniworkDocError('server_error', {
+      status: 409,
+      serverCode: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    // the ONE lookup that decides cannot be answered: nothing proves either way
+    h.server.state.lookupError = new UniworkDocError('server_error', { status: 500 })
+    await h.dispatcher.dispatchAll([doc])
+    const after = await stored(h.intents, doc)
+    expect(after?.intent.state).toBe('reconciling')
+    expect(after?.intent.reconcileSince).toBeTruthy()
   })
 
   it('an expired claim whose lookup is unknown parks stuck, never a blind resend', async () => {

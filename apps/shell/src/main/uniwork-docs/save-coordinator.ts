@@ -1167,9 +1167,17 @@ export class SaveCoordinator {
     intent: IntentRecordV2,
     intents: IntentStore,
   ): Promise<BoundDocument> {
+    // R7: the claim expired, so the record must DURABLY reconcile before the
+    // lookup - the machine's own `commitFailed` / `ticket_expired` event enters
+    // `reconciling` with `reconcileSince`. A lookup that then fails transiently
+    // therefore leaves an aging `reconciling` row (the stuck clock runs from
+    // that age), never a `committing` row the tick cannot age.
+    await this.settleRecord(intents, doc, intent, {
+      type: 'commitFailed',
+      error: 'ticket_expired',
+    })
     const lookup = this.deps.client.lookupCommit
     if (!lookup) {
-      await this.settleRecord(intents, doc, intent, { type: 'commitFailed', error: 'network' })
       return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
     }
     let answer: CommitLookup

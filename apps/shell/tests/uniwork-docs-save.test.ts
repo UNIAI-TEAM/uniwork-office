@@ -1208,6 +1208,29 @@ describe('review r1 save fixes', () => {
     ])
   })
 
+  it('R7: a failed expiry lookup leaves the record reconciling with an age, never committing', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    // the staged claim expired on the commit leg, and the one lookup that
+    // decides cannot be answered (a 5xx): nothing proves either way
+    server.faults.push({
+      route: 'commit',
+      kind: 409,
+      code: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    server.faults.push({ route: 'lookup', kind: 500, code: 'server_error' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'reconciling' })
+    // the durable record must have entered reconciliation BEFORE the lookup:
+    // a transient lookup failure leaves `reconciling` with an age to run the
+    // stuck clock from, never a `committing` row the tick cannot age
+    const intent = (await intentOf(ctx, path))?.intent
+    expect(intent?.state).toBe('reconciling')
+    expect(intent?.reconcileSince).toBeTruthy()
+  })
+
   it('an expired claim whose lookup proves the commit settles with the receipt, no second POST (B69-lite)', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
