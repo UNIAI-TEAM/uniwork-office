@@ -993,25 +993,57 @@ export class OfflineLibraryManager {
     if (!this.validIds(documentId, orgId, workspaceId)) return refused('invalid')
     // OQ-UX11 (a): with the capability off no new pin is taken
     if (!(await this.options.capability(orgId))) return refused('capability_off')
-    const outcome = await this.withDoc(documentId, async (): Promise<PinResult | Started> => {
+    let outcome: PinResult | Started
+    for (;;) {
+      const attempt = await this.pinUnderLock(documentId, orgId, workspaceId, live)
+      if (attempt.kind !== 'stop') {
+        outcome = attempt
+        break
+      }
+      // a transfer still runs for the row this pin discards: it stops outside the
+      // document lock (its settle takes that lock), then the pin looks again
+      await this.stopJob(documentId)
+      if (!live()) return refused('interrupted')
+    }
+    // the transfer runs outside the document lock (T5-2)
+    if (outcome.kind !== 'started') return outcome
+    const row = await this.view(await outcome.done)
+    return live() ? { kind: 'pinned', row } : refused('interrupted')
+  }
+
+  private pinUnderLock(
+    documentId: string,
+    orgId: string,
+    workspaceId: string,
+    live: () => boolean,
+  ): Promise<PinResult | Started | { kind: 'stop' }> {
+    return this.withDoc(documentId, async (): Promise<PinResult | Started | { kind: 'stop' }> => {
       if (!live()) return refused('interrupted')
       const existing = await this.options.store.getPin(documentId)
       if (isUnavailable(existing)) return refused(existing.kind)
       const index = await this.options.store.readIndex()
       if (index.kind !== 'ok') return refused(isUnavailable(index) ? index.kind : 'invalid')
       if (!live()) return refused('interrupted')
-      // FUSR-R2-1 (UNI-1362): a row the index does not list is a reservation an
-      // earlier pin left unfinished (its index write was refused at a boundary),
-      // not a completed pin: this pin adopts it through reserve() below
-      const adopted =
-        existing.kind === 'ok' && !index.index.pins.includes(documentId) ? existing.record : null
-      if (existing.kind === 'ok' && !adopted) {
-        const row = await this.view(existing.record)
-        return live() ? { kind: 'pinned', row } : refused('interrupted')
+      if (existing.kind === 'ok') {
+        if (index.index.pins.includes(documentId)) {
+          const row = await this.view(existing.record)
+          return live() ? { kind: 'pinned', row } : refused('interrupted')
+        }
+        // FUSR-R4 (UNI-1362): a row the index does not list is never a pin (an
+        // earlier pin or unpin was cut at a boundary): it is discarded, and this
+        // pin starts from nothing, with its own quota, lease and rollback
+        if (this.jobs.has(documentId)) return { kind: 'stop' }
+        const owned = new Set(index.index.cleanup[documentId] ?? [])
+        const keys = heldKeys(existing.record).filter((key) => !owned.has(key))
+        await wipeKeys(this.options.store, keys, live)
+        if (!live()) return refused('interrupted')
+        const deleted = await this.deletePinRow(documentId, live)
+        if (deleted.kind !== 'ok') return refused(deleted.kind)
+        if (!live()) return refused('interrupted')
       }
       if (index.index.pins.length >= this.limits.maxPins) return refused('offline_cap_reached')
 
-      const base: PinRecord = adopted ?? {
+      const base: PinRecord = {
         schema: PIN_RECORD_SCHEMA,
         documentId,
         scope: { orgId, workspaceId },
@@ -1054,8 +1086,8 @@ export class OfflineLibraryManager {
 
       const record: PinRecord = {
         ...base,
-        manifest: manifest ?? base.manifest,
-        archived: detail ? detail.archivedAt != null : base.archived,
+        manifest,
+        archived: detail?.archivedAt != null,
       }
       // the quota is checked and the pin reserved in one step (T5-1)
       const reservation = await this.reserve(record, live)
@@ -1080,10 +1112,6 @@ export class OfflineLibraryManager {
       const row = await this.view(begun.kind === 'settled' ? begun.record : record)
       return live() ? { kind: 'pinned', row } : refused('interrupted')
     })
-    // the transfer runs outside the document lock (T5-2)
-    if (outcome.kind !== 'started') return outcome
-    const row = await this.view(await outcome.done)
-    return live() ? { kind: 'pinned', row } : refused('interrupted')
   }
 
   /** "Hủy tải": the download stops, staging is wiped, the old copy (if any) stays */

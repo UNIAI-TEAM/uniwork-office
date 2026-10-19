@@ -14,7 +14,7 @@ import {
 } from '../src/main/uniwork-sync/offline-library'
 import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
 import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
-import { createStoreLayer } from '../src/main/uniwork-sync/store'
+import { createStoreLayer, recordFileName } from '../src/main/uniwork-sync/store'
 import {
   ORG,
   ROOT,
@@ -1246,7 +1246,9 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
       }
     })
 
-    describe('FUSR-R2-1: a reservation an aborted sign-out left unfinished is adopted by the next pin', () => {
+    describe('FUSR-R4: a row the index does not list is never a pin - a fresh pin discards it and pins anew', () => {
+      const interrupted = { kind: 'refused', code: 'interrupted' }
+
       /**
        * The first pin's reservation row is written, then a boundary that wipes
        * nothing (the sign-out hook was aborted) passes before the index entry:
@@ -1269,14 +1271,56 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
         await held.entered
         h.manager.lockBoundary()
         held.release()
-        expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(await pinning).toEqual(interrupted)
+        h.store.putPin = real
         const orphan = await h.store.getPin('doc_1')
         expect(orphan.kind).toBe('ok')
         const index = await h.store.readIndex()
         expect(index.kind === 'ok' && index.index.pins).toEqual(others)
       }
 
-      it('online: the fresh pin lists the document, holds a ready openable copy and keeps the others', async () => {
+      /**
+       * An unpin whose index write completed is cut by a boundary that wipes
+       * nothing: the document is no longer listed, its row (with its copy and
+       * staging) is still there, and with `open` the copy's keys are on the
+       * deferred cleanup list.
+       */
+      async function abortUnpin(h: Harness, options: { open?: boolean } = {}) {
+        if (options.open) h.manager.markOpen('doc_1')
+        const held = gate()
+        const real = h.store.writeIndex.bind(h.store)
+        let armed = true
+        h.store.writeIndex = async (index) => {
+          const result = await real(index)
+          if (armed) {
+            armed = false
+            held.reached()
+            await held.open
+          }
+          return result
+        }
+        const unpinning = h.manager.unpin('doc_1')
+        await held.entered
+        h.manager.lockBoundary()
+        held.release()
+        expect(await unpinning).toEqual(interrupted)
+        h.store.writeIndex = real
+        const orphan = await h.store.getPin('doc_1')
+        expect(orphan.kind).toBe('ok')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).not.toContain('doc_1')
+      }
+
+      const cleanupOf = async (h: Harness, documentId = 'doc_1') => {
+        const index = await h.store.readIndex()
+        return index.kind === 'ok' ? (index.index.cleanup[documentId] ?? []) : []
+      }
+      const hasFile = (h: Harness, key: string) => h.storeFiles().includes(recordFile(key))
+      const blobOf = (generation: string) => blobKey('doc_1', generation, 'main')
+      /** the index record, plus a row and one blob for each ready pin */
+      const filesOfReadyPins = (pins: number) => 1 + 2 * pins
+
+      it('online: the fresh pin lists the document, holds a ready openable copy, keeps the others and leaves no orphan key', async () => {
         const h = createHarness()
         addDoc(h, 'doc_2', 1)
         const doc = addDoc(h, 'doc_1', 1)
@@ -1296,9 +1340,10 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
           maxPins: 200,
         })
         expect(await h.manager.row('doc_2')).toMatchObject({ state: 'ready' })
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(2))
       })
 
-      it('offline: the fresh pin lists the document and the reconnect downloads it', async () => {
+      it('offline: the fresh pin is waiting-network and listed, the reconnect downloads it, no orphan key is left', async () => {
         const h = createHarness()
         addDoc(h, 'doc_1', 1)
         h.online.on = false
@@ -1307,10 +1352,186 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
         const index = await h.store.readIndex()
         expect(index.kind === 'ok' && index.index.pins).toEqual(['doc_1'])
         expect((await h.manager.list()).map((row) => row.documentId)).toEqual(['doc_1'])
+        // the index and the one row
+        expect(h.storeFiles()).toHaveLength(2)
         h.online.on = true
         const results = await h.manager.onReconnect()
         expect(results.get('doc_1')).toMatchObject({ kind: 'ok', row: { state: 'ready' } })
         expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(1))
+      })
+
+      it('FUSR-R3-1: a copy the deferred cleanup of an interrupted unpin owns is never reported ready and then deleted by recovery', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        addDoc(h, 'doc_2', 1)
+        rowOf(await pinDoc(h, 'doc_2'))
+        rowOf(await pinDoc(h))
+        await abortUnpin(h, { open: true })
+        const owned = await cleanupOf(h)
+        expect(owned).toHaveLength(1)
+        h.online.on = false
+        const pinned = rowOf(await pinDoc(h))
+        await h.manager.recover()
+        // whatever the fresh pin reported ready must still open after recovery
+        if (pinned.state === 'ready') expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        h.online.on = true
+        const results = await h.manager.onReconnect()
+        expect(results.get('doc_1')).toMatchObject({ kind: 'ok', row: { state: 'ready' } })
+        await h.manager.recover()
+        expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        expect((await h.manager.openCached('doc_2')).kind).toBe('ok')
+        // the cleanup ran for the keys it owns; nothing it names is a key of the live copy
+        expect(await cleanupOf(h)).toEqual([])
+        expect(hasFile(h, owned[0]!)).toBe(false)
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(2))
+      })
+
+      it('FUSR-R3-4: the keys a deferred unpin still owns stay for its tab, the fresh copy does not use them', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        await abortUnpin(h, { open: true })
+        const owned = await cleanupOf(h)
+        expect(owned).toHaveLength(1)
+        // the tab is open again in the new session
+        h.manager.markOpen('doc_1')
+        expect(rowOf(await pinDoc(h)).state).toBe('ready')
+        expect(hasFile(h, owned[0]!)).toBe(true)
+        expect(await cleanupOf(h)).toEqual(owned)
+        await h.manager.markClosed('doc_1')
+        expect(hasFile(h, owned[0]!)).toBe(false)
+        expect(await cleanupOf(h)).toEqual([])
+        expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(1))
+      })
+
+      it('FUSR-R3-2: the replacement of an interrupted unpin keeps the byte cap', async () => {
+        const h = createHarness({ limits: { maxBytes: 8192 } })
+        addDoc(h, 'doc_1', 1)
+        addDoc(h, 'doc_2', 1)
+        rowOf(await pinDoc(h))
+        rowOf(await pinDoc(h, 'doc_2'))
+        await abortUnpin(h)
+        // the head grew to the whole cap
+        addDoc(h, 'doc_1', 2, 8192)
+        h.docs.downloads.length = 0
+        expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'offline_cap_reached' })
+        expect(h.docs.downloads).toEqual([])
+        const quota = await h.manager.quota()
+        expect(quota.usedBytes).toBeLessThanOrEqual(quota.maxBytes)
+        expect(await h.manager.row('doc_1')).toBeNull()
+        expect(await h.manager.row('doc_2')).toMatchObject({ state: 'ready' })
+        expect((await h.manager.openCached('doc_2')).kind).toBe('ok')
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(1))
+      })
+
+      it('FUSR-R3-3: a refused index write leaves no key without an owner, and the retry pins', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        await abortUnpin(h)
+        h.online.on = false
+        // the next index write hits a full disk, once
+        let failed = false
+        h.fs.failWrite = (path) => {
+          if (failed || !path.includes(recordFileName('index'))) return false
+          failed = true
+          return true
+        }
+        expect((await pinDoc(h)).kind).toBe('refused')
+        h.fs.failWrite = null
+        expect(failed).toBe(true)
+        const row = await h.store.getPin('doc_1')
+        const blobKept = hasFile(h, blobOf('00000001'))
+        // never: row missing + blob there + no cleanup entry
+        expect(row.kind !== 'ok' && blobKept && (await cleanupOf(h)).length === 0).toBe(false)
+        expect(rowOf(await pinDoc(h)).state).toBe('waiting-network')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual(['doc_1'])
+      })
+
+      it('FUSR-R3-4: the staging an aborted refresh left on the row is deleted by the fresh pin, not abandoned', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        addDoc(h, 'doc_1', 2)
+        // v2 downloads: its first staging blob write completes, then a no-wipe boundary passes
+        const held = gate()
+        const real = h.store.putBlob.bind(h.store)
+        h.store.putBlob = async (key, bytes) => {
+          const result = await real(key, bytes)
+          held.reached()
+          await held.open
+          return result
+        }
+        const refreshing = h.manager.downloadNow('doc_1')
+        await held.entered
+        h.manager.lockBoundary()
+        held.release()
+        expect(await refreshing).toEqual(interrupted)
+        h.store.putBlob = real
+        expect(hasFile(h, blobOf('00000002'))).toBe(true)
+        await abortUnpin(h)
+        expect(rowOf(await pinDoc(h)).state).toBe('ready')
+        // the old copy and the abandoned staging are both gone; only the new generation is there
+        expect(hasFile(h, blobOf('00000001'))).toBe(false)
+        expect(hasFile(h, blobOf('00000002'))).toBe(false)
+        expect(hasFile(h, blobOf('00000003'))).toBe(true)
+        await h.manager.recover()
+        expect(await h.manager.unpin('doc_1')).toEqual({ kind: 'unpinned', deferred: false })
+        // only the index record is left
+        expect(h.storeFiles()).toHaveLength(1)
+      })
+
+      it('FUSR-R3-5: an unlisted revoked row is no pin: with the lease still revoked the pin refuses like any revoked document and leaks nothing', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        expect(await h.manager.handleLeaseRevoked(revokeNotice)).toMatchObject({ state: 'revoked' })
+        h.leases.states.set('doc_1', leaseState('revoked'))
+        await abortUnpin(h)
+        h.docs.downloads.length = 0
+        expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'revoked' })
+        expect(await h.manager.row('doc_1')).toBeNull()
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual([])
+        expect(h.docs.downloads).toEqual([])
+        // no half-listed row, no key: only the index record is left
+        expect(h.storeFiles()).toHaveLength(1)
+      })
+
+      it('FUSR-R3-6: a transfer running for the unlisted row is stopped first - one transfer at a time, the stopped one aborted, no staging left', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        await abortReservation(h, [])
+        const signals: Array<AbortSignal | undefined> = []
+        let active = 0
+        let peak = 0
+        const real = h.docs.downloadStream.bind(h.docs)
+        h.docs.downloadStream = async (documentId, version, options) => {
+          signals.push(options?.signal)
+          active += 1
+          peak = Math.max(peak, active)
+          try {
+            return await real(documentId, version, options)
+          } finally {
+            active -= 1
+          }
+        }
+        const hold = slowDownload(h, 'doc_1', 1)
+        const downloading = h.manager.downloadNow('doc_1')
+        await hold.waiting
+        const pinning = pinDoc(h)
+        await flush()
+        hold.release()
+        await downloading
+        expect(rowOf(await pinning).state).toBe('ready')
+        expect(peak).toBe(1)
+        expect(signals[0]?.aborted).toBe(true)
+        expect(h.manager.cancel('doc_1')).toBe(false)
+        expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(1))
       })
     })
 
@@ -1355,6 +1576,32 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
         changes.length = 0
         hold.release()
         expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(h.storeFiles()).toEqual([])
+        expect(changes).toEqual([])
+      })
+
+      it('FUSR-R3-7: a pin whose downloading row write completes across the sign-out is refused, not pinned', async () => {
+        const changes: string[] = []
+        const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+        addDoc(h, 'doc_1', 1)
+        // only the successful write of the downloading row is held: beginDownload's settled return
+        const held = gate()
+        const real = h.store.putPin.bind(h.store)
+        h.store.putPin = async (record) => {
+          const result = await real(record)
+          if (record.state === 'downloading') {
+            held.reached()
+            await held.open
+          }
+          return result
+        }
+        const pinning = pinDoc(h)
+        await held.entered
+        await lockAndWipeOutgoing(h)
+        changes.length = 0
+        held.release()
+        expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(h.docs.downloads).toEqual([])
         expect(h.storeFiles()).toEqual([])
         expect(changes).toEqual([])
       })
