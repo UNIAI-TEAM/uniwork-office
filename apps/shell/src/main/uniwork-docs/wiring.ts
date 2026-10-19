@@ -413,7 +413,8 @@ function syncStoreFor(): { layer: StoreLayer; access: SyncStoreAccess } {
  * `userData/uniwork-sync/library/` - its own root, safeStorage-wrapped key per
  * scope and budget, so pinned bytes never count against the sync store budget
  * (lead decision on W5 "A"). Wiped at the account boundary beside the sync
- * scope. Residual: moves into G5-11's SYNC_STORE_REGISTRATIONS when it lands.
+ * scope. It stays its own layer, never a `SYNC_STORE_REGISTRATIONS` entry: the
+ * library's bytes and budget must not be folded into the sync layer's.
  */
 const libraryLayers = new Map<string, StoreLayer>()
 
