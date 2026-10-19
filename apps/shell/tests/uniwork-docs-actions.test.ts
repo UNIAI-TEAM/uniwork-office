@@ -239,6 +239,16 @@ function fakeServer(
     sessionCreateMismatch?: boolean
     /** R1-BE-02: the session DELETE answers 500, so the abort is not reported clean */
     sessionDeleteRefused?: boolean
+    /**
+     * S01-R2-4: answers a first-save create BEFORE D's dedupe, by Idempotency-Key
+     * (null falls through). Models a key D never committed (503, expired claim)
+     * or one whose document is gone (404) without seeding a row.
+     */
+    createKeyAnswer?: (idempotencyKey: string) => Response | null
+    /** S01-R2-4: the same hook for the upload-session open of a chunked first save */
+    sessionOpenAnswer?: (idempotencyKey: string) => Response | null
+    /** S01-R2-4: the FIRST session `complete` answers 410 `upload_session_expired` */
+    sessionCompleteExpiredOnce?: boolean
   } = {},
 ) {
   const state = {
@@ -390,6 +400,8 @@ function fakeServer(
       if (options.invalidDestination) {
         return json(400, { error: { code: 'invalid_destination', message: 'x' } })
       }
+      const keyAnswer = options.createKeyAnswer?.(call.idempotencyKey)
+      if (keyAnswer) return keyAnswer
       // SAVE-01 r4 (S01-R4-3): D refuses the bytes itself - after the caller's
       // preflight passed - and no row is created. The envelope names only the
       // code, so the filename and the payload length can come from the caller.
@@ -669,6 +681,8 @@ function fakeServer(
         title?: string
       }
       call.body = body
+      const openAnswer = options.sessionOpenAnswer?.(call.idempotencyKey)
+      if (openAnswer) return openAnswer
       if (options.sessionTooSmall) {
         return json(422, { error: { code: 'upload_session_too_small', message: 'x' } })
       }
@@ -749,6 +763,11 @@ function fakeServer(
         // R1-BE-04: holds the validation open so a test can change the source
         // while the server is checking the uploaded bytes
         if (options.sessionCompleteGate) await options.sessionCompleteGate()
+        if (options.sessionCompleteExpiredOnce) {
+          options.sessionCompleteExpiredOnce = false
+          state.session = null
+          return json(410, { error: { code: 'upload_session_expired', message: 'x' } })
+        }
         state.completedParts = body.parts
         const id = `new_${++seq}`
         // R1-BE-04: the created document's bytes are what the storage actually
@@ -777,6 +796,8 @@ function fakeServer(
     const session = state.session!
     const partSize = options.sessionPartSize ?? 8 * 1024 * 1024
     const totalParts = Math.ceil(session.sizeBytes / partSize)
+    // relative to now: a fixed date makes every presigned URL "expired" the day it passes
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
     const held = new Set(state.completedParts.map((part) => part.part_number))
     const parts = []
     for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
@@ -786,7 +807,7 @@ function fakeServer(
         method: 'PUT',
         url: `https://storage.example/part/${partNumber}`,
         headers: {},
-        expires_at: '2026-10-19T00:00:00Z',
+        expires_at: expiresAt,
       })
     }
     return {
@@ -800,7 +821,7 @@ function fakeServer(
         size: partSize,
       })),
       parts,
-      expires_at: '2026-10-19T00:00:00Z',
+      expires_at: expiresAt,
     }
   }
 
@@ -904,6 +925,7 @@ afterEach(async () => {
 
 /** the fake UniWork documents server a setup() wires the service's client to */
 type FakeServer = ReturnType<typeof fakeServer>
+type FakeServerOptions = NonNullable<Parameters<typeof fakeServer>[0]>
 
 function setup(
   server: FakeServer,
@@ -4180,6 +4202,365 @@ describe('SAVE-01 first save r3 (S01-R2 fixes)', () => {
       cleanupError,
     )
     warn.mockRestore()
+  })
+})
+
+// S01-R2-4 (UNI-1847): a restart never turns one first Save into two UniWork
+// documents. "Restart" = a NEW service instance over the same store root, the
+// same encrypted sync store and the same server; the first instance is dropped.
+// The first save leaves the ORIGINAL file plain (by design), so after a restart
+// only a durable per-account record can tell that file was already saved.
+describe('SAVE-01 first save r4 (S01-R2-4 restart dedupe)', () => {
+  const input = (file: string) => ({
+    tabPath: file,
+    title: 'Draft.docx',
+    workspaceId: WS,
+    target: { kind: 'my_folder' } as never,
+  })
+  const fileCreates = (server: FakeServer) =>
+    server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/documents/files'))
+  const sessionOpens = (server: FakeServer) =>
+    server.calls.filter(
+      (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents/upload-sessions`,
+    )
+  const createdRows = (server: FakeServer, prefix: string) =>
+    [...server.state.documents.keys()].filter((id) => id.startsWith(prefix)).sort()
+  const boundId = (documentId: string): string | undefined =>
+    (
+      JSON.parse(readFileSync(join(docDir(documentId), BINDING_FILE), 'utf8')) as {
+        documentId?: string
+      }
+    ).documentId
+  const unavailable = () => envelope(503, 'unavailable')
+  // the caller's options object is the one the fake reads: a test flips a hook on it later
+  const chunkedServer = (options: FakeServerOptions = {}) =>
+    fakeServer(
+      Object.assign(options, {
+        limits: { upload_max_bytes: 200 * 1024 * 1024 },
+        chunkedThreshold: 1024 * 1024,
+        sessionPartSize: 1024 * 1024,
+        sessionAssemblesParts: true,
+      }),
+    )
+  const chunkedFile = (name: string): string => {
+    const file = join(dir, name)
+    writeFileSync(file, buildDocxBytes(2 * 1024 * 1024))
+    return file
+  }
+
+  it('(a) a first-saved original refuses a second first Save after a restart: conflict, no create', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    const saved = await first.service.firstSave(input(file))
+    expect(saved.ok).toBe(true)
+    expect(fileCreates(server)).toHaveLength(1)
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave(input(file))
+
+    // the existing verdict, unchanged shape (no new string, no renderer change)
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(fileCreates(server)).toHaveLength(1)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+  })
+
+  it('(a) the same holds for a chunked first save: no session is opened after a restart', async () => {
+    const server = chunkedServer()
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    const saved = await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+    expect(saved.ok).toBe(true)
+    expect(sessionOpens(server)).toHaveLength(1)
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(sessionOpens(server)).toHaveLength(1)
+    expect(createdRows(server, 'new_')).toHaveLength(1)
+  })
+
+  it('(a) the original is refused whatever title the second Save names', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(true)
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave({ ...input(file), title: 'Another name.docx' })
+
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(fileCreates(server)).toHaveLength(1)
+  })
+
+  it('(b) a record whose binding is gone is stale: the next first Save creates exactly once', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(true)
+    // the working copy and its binding are removed (a wiped store folder)
+    rmSync(docDir('up_1'), { recursive: true, force: true })
+
+    const restarted = setup(server, { syncStore: true })
+    const again = await restarted.service.firstSave(input(file))
+
+    expect(again.ok).toBe(true)
+    expect(fileCreates(server)).toHaveLength(2)
+    // the stale record's key was spent: the second create is a new attempt
+    expect(fileCreates(server)[1]!.idempotencyKey).not.toBe(fileCreates(server)[0]!.idempotencyKey)
+    expect(again.ok ? again.value.id : '').toBe('up_2')
+    expect(boundId('up_2')).toBe('up_2')
+  })
+
+  it('(c) a crash after the create answered but before the bind: the retry replays the SAME key and binds the same document', async () => {
+    const server = fakeServer({ createAnswerLost: true })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    // the row exists on D, the answer never reached the app: nothing is bound
+    const lost = await first.service.firstSave(input(file))
+    expect(lost.ok).toBe(false)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(2)
+    expect(creates[0]!.idempotencyKey).toBeTruthy()
+    expect(creates[1]!.idempotencyKey).toBe(creates[0]!.idempotencyKey)
+    // one server document, bound under the id the first create produced
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+    expect(retried.ok ? retried.value.id : '').toBe('up_1')
+    expect(boundId('up_1')).toBe('up_1')
+  })
+
+  it('(c) the same for a chunked first save whose session answer was lost', async () => {
+    const opts: FakeServerOptions = { sessionOpenAnswer: () => unavailable() }
+    const server = chunkedServer(opts)
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    const lost = await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+    expect(lost.ok).toBe(false)
+    expect(sessionOpens(server)).toHaveLength(1)
+
+    opts.sessionOpenAnswer = undefined
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(retried.ok).toBe(true)
+    const opens = sessionOpens(server)
+    expect(opens).toHaveLength(2)
+    expect(opens[0]!.idempotencyKey).toBeTruthy()
+    expect(opens[1]!.idempotencyKey).toBe(opens[0]!.idempotencyKey)
+    expect(createdRows(server, 'new_')).toHaveLength(1)
+  })
+
+  it('(c) a pending record with another fingerprint (edited bytes) mints a NEW key after a restart', async () => {
+    const server = fakeServer({ createAnswerLost: true })
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes v1')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(false)
+
+    writeFileSync(file, 'bytes v2 edited')
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(2)
+    expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    expect(server.state.documents.get('up_2')?.bytes).toEqual(enc('bytes v2 edited'))
+  })
+
+  it('(d) another account on the same machine is unaffected by this account record', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(true)
+
+    const other = setup(server, { syncStore: true })
+    other.setIdentity({ accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'default' })
+    const saved = await other.service.firstSave(input(file))
+
+    expect(saved.ok).toBe(true)
+    expect(fileCreates(server)).toHaveLength(2)
+    expect(saved.ok ? saved.value.id : '').toBe('up_2')
+  })
+
+  it('(e) a post-create failure that archives removes the record: the retry after a restart creates once', async () => {
+    const server = fakeServer()
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    // fail the first bind at the binding.json write (migration-hold fixture)
+    mkdirSync(docDir('up_1'), { recursive: true })
+    writeFileSync(
+      join(docDir('up_1'), BINDING_FILE),
+      JSON.stringify({ schema: 1, pendingIntent: {} }),
+    )
+    writeFileSync(join(docDir('up_1'), INTENT_PAYLOAD_FILE), 'x')
+    const first = setup(server, { syncStore: true })
+    const failed = await first.service.firstSave(input(file))
+    expect(failed.ok).toBe(false)
+    expect(server.state.documents.get('up_1')?.archived).toBe(true)
+    rmSync(docDir('up_1'), { recursive: true, force: true })
+
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    // the archived row's key was spent: a replay would answer the trashed row
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(2)
+    expect(creates[1]!.idempotencyKey).not.toBe(creates[0]!.idempotencyKey)
+    expect(createdRows(server, 'up_')).toEqual(['up_1', 'up_2'])
+    expect(retried.ok ? retried.value.id : '').toBe('up_2')
+    expect(boundId('up_2')).toBe('up_2')
+  })
+
+  it('(f) a reused key answered 409 document_upload_invalid (file_claim_expired): new key, one create', async () => {
+    const opts: FakeServerOptions = { createKeyAnswer: () => unavailable() }
+    const server = fakeServer(opts)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    // nothing was committed: D never seeded a row for this key
+    expect((await first.service.firstSave(input(file))).ok).toBe(false)
+    const spent = fileCreates(server)[0]!.idempotencyKey
+    expect(createdRows(server, 'up_')).toEqual([])
+
+    // the staged claim passed its 24 h ClaimTTL
+    opts.createKeyAnswer = (key) =>
+      key === spent
+        ? json(409, {
+            error: {
+              code: 'document_upload_invalid',
+              message: 'x',
+              fields: { reason: 'file_claim_expired' },
+            },
+          })
+        : null
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(3)
+    // the replay of the spent key, then ONE create under a new key
+    expect(creates[1]!.idempotencyKey).toBe(spent)
+    expect(creates[2]!.idempotencyKey).toBeTruthy()
+    expect(creates[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+    expect(boundId('up_1')).toBe('up_1')
+  })
+
+  it('(f) a chunked reused key whose session complete answers 410 upload_session_expired: new key, one create', async () => {
+    const opts: FakeServerOptions = { sessionOpenAnswer: () => unavailable() }
+    const server = chunkedServer(opts)
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })).ok).toBe(
+      false,
+    )
+    const spent = sessionOpens(server)[0]!.idempotencyKey
+
+    opts.sessionOpenAnswer = undefined
+    opts.sessionCompleteExpiredOnce = true
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(retried.ok).toBe(true)
+    const opens = sessionOpens(server)
+    expect(opens).toHaveLength(3)
+    expect(opens[1]!.idempotencyKey).toBe(spent)
+    expect(opens[2]!.idempotencyKey).toBeTruthy()
+    expect(opens[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'new_')).toHaveLength(1)
+
+    // the record follows the key the run adopted: a further restart is refused
+    const again = await setup(server, { syncStore: true }).service.firstSave({
+      ...input(file),
+      title: 'Chunked.docx',
+    })
+    expect(again).toEqual({ ok: false, error: 'conflict' })
+    expect(sessionOpens(server)).toHaveLength(3)
+  })
+
+  it('(g) a reused key answered 404 (the document is gone): new key, one create', async () => {
+    const opts: FakeServerOptions = { createKeyAnswer: () => unavailable() }
+    const server = fakeServer(opts)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(false)
+    const spent = fileCreates(server)[0]!.idempotencyKey
+
+    // trashed / purged / access lost since: the ledger row answers 404
+    opts.createKeyAnswer = (key) => (key === spent ? envelope(404, 'not_found') : null)
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave(input(file))
+
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(3)
+    expect(creates[1]!.idempotencyKey).toBe(spent)
+    expect(creates[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
+    expect(boundId('up_1')).toBe('up_1')
+  })
+
+  it('(g) a chunked reused key whose session open answers 404: new key, one create', async () => {
+    const opts: FakeServerOptions = { sessionOpenAnswer: () => unavailable() }
+    const server = chunkedServer(opts)
+    const file = chunkedFile('Chunked.docx')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave({ ...input(file), title: 'Chunked.docx' })).ok).toBe(
+      false,
+    )
+    const spent = sessionOpens(server)[0]!.idempotencyKey
+
+    opts.sessionOpenAnswer = (key) => (key === spent ? envelope(404, 'not_found') : null)
+    const restarted = setup(server, { syncStore: true })
+    const retried = await restarted.service.firstSave({ ...input(file), title: 'Chunked.docx' })
+
+    expect(retried.ok).toBe(true)
+    const opens = sessionOpens(server)
+    expect(opens).toHaveLength(3)
+    expect(opens[1]!.idempotencyKey).toBe(spent)
+    expect(opens[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'new_')).toHaveLength(1)
+  })
+
+  it('(h) a reused key answered 409 idempotency_payload_mismatch: typed refusal, the record is dropped, the next try mints a new key', async () => {
+    const opts: FakeServerOptions = { createKeyAnswer: () => unavailable() }
+    const server = fakeServer(opts)
+    const file = join(dir, 'Draft.docx')
+    writeFileSync(file, 'bytes')
+    const first = setup(server, { syncStore: true })
+    expect((await first.service.firstSave(input(file))).ok).toBe(false)
+    const spent = fileCreates(server)[0]!.idempotencyKey
+
+    // D holds the key for another body: the replay is refused
+    opts.createKeyAnswer = (key) =>
+      key === spent ? envelope(409, 'idempotency_payload_mismatch') : null
+    const refused = await setup(server, { syncStore: true }).service.firstSave(input(file))
+    expect(refused).toEqual({ ok: false, error: 'idempotency_mismatch' })
+    expect(fileCreates(server)[1]!.idempotencyKey).toBe(spent)
+
+    // a stuck record would replay the refused key for ever
+    const retried = await setup(server, { syncStore: true }).service.firstSave(input(file))
+    expect(retried.ok).toBe(true)
+    const creates = fileCreates(server)
+    expect(creates).toHaveLength(3)
+    expect(creates[2]!.idempotencyKey).not.toBe(spent)
+    expect(createdRows(server, 'up_')).toEqual(['up_1'])
   })
 })
 
