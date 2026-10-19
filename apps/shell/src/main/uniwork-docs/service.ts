@@ -116,7 +116,6 @@ import {
   createFirstSaveStore,
   firstSaveKey,
   FIRST_SAVES_STORE_REGISTRATION,
-  type FirstSaveRecord,
   type FirstSaveStore,
 } from '../uniwork-sync/first-saves'
 import {
@@ -5204,6 +5203,24 @@ export class UniworkDocsService {
   }): Promise<UniworkDocSummary> {
     const { session, owner, tabPath, key, title, filename, api, created, bytesChecksum } = input
     const createdTitle = created.title || title
+    // S01-R2-4 fix1: a REPLAYED key (a restored one) answers the document an earlier
+    // run already bound - the crash fell between binding.json and the `bound`
+    // record. Its working copy may hold edits since: nothing is written, nothing
+    // is archived (this is outside the compensating try on purpose), the record
+    // catches up to `bound` and the existing `conflict` verdict answers.
+    if (input.attempt.restored) {
+      const copy = await this.readyFirstSaveCopy(session.identity, created.id)
+      if (copy) {
+        this.firstSaveDone.add(`${owner}${key}`)
+        input.onBindFailure()
+        await this.saveFirstSaveRecord(input.attempt, {
+          state: 'bound',
+          documentId: created.id,
+          workingCopyPath: copy,
+        })
+        throw new UniworkDocError('conflict')
+      }
+    }
     // S01-R2-6: the written working copy is tracked so the compensation catch
     // can remove it on EVERY bind failure - a store.write that throws strands
     // it just like the sweep-refusal branch below did
@@ -5379,29 +5396,33 @@ export class UniworkDocsService {
     const recordKey = firstSaveKey(owner, pathKey(tabPath))
     const saved = await store.get(recordKey).catch(() => null)
     if (saved?.state !== 'bound') return
-    if (await this.firstSaveBindingReady(session.identity, saved)) {
+    if (
+      saved.documentId &&
+      (await this.readyFirstSaveCopy(session.identity, saved.documentId, saved.workingCopyPath))
+    ) {
       throw new UniworkDocError('conflict')
     }
     await store.remove(recordKey).catch(() => undefined)
   }
 
-  /** the document the record names still has a ready binding and its working copy */
-  private async firstSaveBindingReady(
+  /**
+   * The working copy of `documentId` when this machine still holds it bound and
+   * ready (its binding.json and the file), else null. `workingCopyPath` is the
+   * recorded one; without it the binding's own file name names the copy.
+   */
+  private async readyFirstSaveCopy(
     identity: SessionIdentity,
-    saved: FirstSaveRecord,
-  ): Promise<boolean> {
-    if (!saved.documentId) return false
-    const binding = await this.store.readDir(
-      this.store.dirFor(identity.deploymentId, identity.accountId, saved.documentId),
-    )
-    if (!binding || binding.state !== 'ready' || binding.documentId !== saved.documentId) {
-      return false
-    }
-    if (!saved.workingCopyPath) return true
+    documentId: string,
+    workingCopyPath?: string,
+  ): Promise<string | null> {
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const binding = await this.store.readDir(dir)
+    if (!binding || binding.state !== 'ready' || binding.documentId !== documentId) return null
+    const copy = workingCopyPath ?? join(dir, binding.filename)
     try {
-      return (await stat(saved.workingCopyPath)).isFile()
+      return (await stat(copy)).isFile() ? copy : null
     } catch {
-      return false
+      return null
     }
   }
 
