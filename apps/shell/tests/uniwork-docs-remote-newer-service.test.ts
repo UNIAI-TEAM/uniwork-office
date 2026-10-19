@@ -620,8 +620,23 @@ describe('G5-03a S6 service: the lock', () => {
     seedCopy()
     const h = setup()
     h.client.error = new UniworkDocError('not_found', { status: 404 })
+    // FORK-RED-LOCKBAR: one unreproduced Windows red (0/300 local runs); every
+    // assertion carries the session's lock/bar state and the binding on disk so
+    // the next red names its cause
+    const internals = h.service as unknown as {
+      remoteLocked: Map<string, unknown>
+      remoteLockPath: Map<string, unknown>
+      remoteBars: Map<string, unknown>
+    }
+    const state = (step: string) =>
+      `${step}: ${JSON.stringify({
+        remoteLocked: [...internals.remoteLocked],
+        remoteLockPath: [...internals.remoteLockPath],
+        remoteBars: [...internals.remoteBars],
+        binding: existsSync(join(docDir(), BINDING_FILE)) ? bindingOf() : null,
+      })}`
     await h.service.noteFeedGone(DOC)
-    expect(h.service.isLocked(docPath())).toBe(true)
+    expect(h.service.isLocked(docPath()), state('locked by the 404')).toBe(true)
 
     h.service.forgetLocksWhere(() => true)
 
@@ -631,9 +646,9 @@ describe('G5-03a S6 service: the lock', () => {
     // the next account's copy of the same document is not locked by it, and no
     // bar survives with it either.
     seedCopy({ state: 'dirty' })
-    expect(h.service.isLocked(docPath())).toBe(false)
-    expect(h.service.isReadOnly(docPath())).toBe(false)
-    expect(await barOf(h)).toBeUndefined()
+    expect(h.service.isLocked(docPath()), state('lock after the boundary')).toBe(false)
+    expect(h.service.isReadOnly(docPath()), state('read-only after the boundary')).toBe(false)
+    expect(await barOf(h), state('bar after the boundary')).toBeUndefined()
   })
 })
 
