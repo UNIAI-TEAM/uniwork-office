@@ -225,6 +225,109 @@ describe('R4F-2 (UNI-1362): a call in flight at sign-out never writes into the w
   })
 })
 
+describe('FUSR-R1-1 (UNI-1362): forget() between the last resolve check and the record call', () => {
+  /**
+   * A layer whose opened handle calls `onRecords` each time the store asks it for
+   * the record namespace: the last synchronous step of `resolve()`, after every
+   * generation check inside it and before the caller's own continuation. Calling
+   * `forget()` there is a boundary landing in the final async return.
+   */
+  function layerWithRecordsHook(layer: StoreLayer, calls: string[]) {
+    let onRecords: (() => void) | null = null
+    const hooked: StoreLayer = {
+      ...layer,
+      open: async (scope) => {
+        const result = await layer.open(scope)
+        if (result.kind !== 'ok') return result
+        const wrap = (name: string) => {
+          const records = result.store.records(name)
+          return {
+            ...records,
+            write: (key: string, value: Uint8Array) => {
+              calls.push(`write:${key}`)
+              return records.write(key, value)
+            },
+            read: (key: string) => {
+              calls.push(`read:${key}`)
+              return records.read(key)
+            },
+            delete: (key: string) => {
+              calls.push(`delete:${key}`)
+              return records.delete(key)
+            },
+          }
+        }
+        return {
+          kind: 'ok' as const,
+          store: {
+            scope: result.store.scope,
+            records: (name: string) => {
+              const hook = onRecords
+              onRecords = null
+              hook?.()
+              return wrap(name)
+            },
+          },
+        }
+      },
+    }
+    return { hooked, arm: (hook: () => void) => (onRecords = hook) }
+  }
+
+  const readPin = async (layer: StoreLayer, documentId: string) => {
+    const opened = await layer.open(SCOPE)
+    if (opened.kind !== 'ok') throw new Error(`did not open: ${opened.kind}`)
+    return opened.store.records(OFFLINE_LIBRARY_STORE_REGISTRATION.name).read(pinKey(documentId))
+  }
+
+  it('a cached handle: putPin after forget() is interrupted and writes no record', async () => {
+    const fs = createMemoryFs()
+    const layer = createLibraryLayer(fs, createFakeKeys())
+    const calls: string[] = []
+    const { hooked, arm } = layerWithRecordsHook(layer, calls)
+    const store = createOfflineLibraryStore({ layer: hooked, scope: SCOPE })
+    // cache the handle first: only the final continuation is left to race
+    expect(await store.readIndex()).toMatchObject({ kind: 'ok' })
+    calls.length = 0
+    arm(() => store.forget())
+    expect(await store.putPin(pinRow('doc_1'))).toEqual({ kind: 'interrupted' })
+    expect(calls).toEqual([])
+    expect(await readPin(layer, 'doc_1')).toEqual({ kind: 'missing' })
+    // no wipe happened: the next call works
+    expect(await store.putPin(pinRow('doc_1'))).toEqual({ kind: 'ok' })
+    expect(await store.getPin('doc_1')).toMatchObject({ kind: 'ok' })
+  })
+
+  it('a cached handle: getPin after forget() is interrupted and never reads', async () => {
+    const fs = createMemoryFs()
+    const layer = createLibraryLayer(fs, createFakeKeys())
+    const calls: string[] = []
+    const { hooked, arm } = layerWithRecordsHook(layer, calls)
+    const store = createOfflineLibraryStore({ layer: hooked, scope: SCOPE })
+    expect(await store.putPin(pinRow('doc_1'))).toEqual({ kind: 'ok' })
+    calls.length = 0
+    arm(() => store.forget())
+    expect(await store.getPin('doc_1')).toEqual({ kind: 'interrupted' })
+    expect(calls).toEqual([])
+    expect(await store.getPin('doc_1')).toMatchObject({ kind: 'ok' })
+  })
+
+  it('a cached handle: deletePin after forget() is interrupted and deletes nothing', async () => {
+    const fs = createMemoryFs()
+    const layer = createLibraryLayer(fs, createFakeKeys())
+    const calls: string[] = []
+    const { hooked, arm } = layerWithRecordsHook(layer, calls)
+    const store = createOfflineLibraryStore({ layer: hooked, scope: SCOPE })
+    expect(await store.putPin(pinRow('doc_1'))).toEqual({ kind: 'ok' })
+    calls.length = 0
+    arm(() => store.forget())
+    expect(await store.deletePin('doc_1')).toEqual({ kind: 'interrupted' })
+    expect(calls).toEqual([])
+    expect(await readPin(layer, 'doc_1')).toMatchObject({ kind: 'ok' })
+    expect(await store.deletePin('doc_1')).toEqual({ kind: 'ok' })
+  })
+})
+
 runStoreCompliance('uniwork-sync offline-library', async (env: ComplianceEnv) => {
   const layer = createStoreLayer({
     root: env.root,

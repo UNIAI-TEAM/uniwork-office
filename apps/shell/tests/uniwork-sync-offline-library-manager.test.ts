@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
+import type { StoreScope } from '../src/main/uniwork-sync/keys'
 import {
+  OFFLINE_LIBRARY_STORE_REGISTRATION,
   PIN_RECORD_SCHEMA,
   blobKey,
+  decodePinRecord,
   manifestFromDetail,
   pinKey,
   type PinRecord,
@@ -14,6 +17,7 @@ import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
 import { createStoreLayer } from '../src/main/uniwork-sync/store'
 import {
   ORG,
+  ROOT,
   SCOPE,
   WS,
   addDoc,
@@ -876,5 +880,317 @@ describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recr
     h.session.scope = SCOPE
     h.session.id = 'sess_2'
     expect(await h.manager.row('doc_1')).toBeNull()
+  })
+
+  describe('FUSR-R1 (UNI-1362): every step of an operation is checked against the boundary it started in', () => {
+    const SCOPE_B: StoreScope = { deploymentId: 'dep_1', accountId: 'user_2' }
+    const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    function gate() {
+      let release!: () => void
+      let reached!: () => void
+      const open = new Promise<void>((resolve) => (release = resolve))
+      const entered = new Promise<void>((resolve) => (reached = resolve))
+      return { open, release, entered, reached }
+    }
+
+    /** the first lease projection (`view`) from now on waits for `release()` */
+    function holdLeaseView(h: Harness) {
+      const held = gate()
+      const real = h.leases.effectiveState.bind(h.leases)
+      let armed = true
+      h.leases.effectiveState = async (documentId) => {
+        if (armed) {
+          armed = false
+          held.reached()
+          await held.open
+        }
+        return real(documentId)
+      }
+      return { release: held.release, entered: held.entered }
+    }
+
+    /** the first metadata read of the documents client from now on waits for `release()` */
+    function holdGetDocument(h: Harness) {
+      const held = gate()
+      const real = h.docs.getDocument.bind(h.docs)
+      let armed = true
+      h.docs.getDocument = async (documentId) => {
+        const detail = await real(documentId)
+        if (armed) {
+          armed = false
+          held.reached()
+          await held.open
+        }
+        return detail
+      }
+      return { release: held.release, entered: held.entered }
+    }
+
+    /** like holdVerify, but counting only from `arm()` on */
+    function holdVerifyAfter(h: Harness, nth: number) {
+      const held = gate()
+      const real = h.layer.verifyKey.bind(h.layer)
+      let calls = -1
+      h.layer.verifyKey = async (scope) => {
+        if (calls >= 0) {
+          calls += 1
+          if (calls === nth) {
+            held.reached()
+            await held.open
+          }
+        }
+        return real(scope)
+      }
+      return { arm: () => (calls = 0), release: held.release, entered: held.entered }
+    }
+
+    async function libraryRecords(h: Harness, scope: StoreScope) {
+      const opened = await h.layer.open(scope)
+      if (opened.kind !== 'ok') throw new Error(`did not open: ${opened.kind}`)
+      return opened.store.records(OFFLINE_LIBRARY_STORE_REGISTRATION.name)
+    }
+
+    const filesOf = (h: Harness, scope: StoreScope) =>
+      h.fs.listFiles(`${ROOT}/${scope.deploymentId}/${scope.accountId}`)
+
+    /** sign-out while the outgoing scope is still the active one (the sign-out hook awaits the wipe) */
+    async function lockAndWipeOutgoing(h: Harness) {
+      h.manager.lockBoundary()
+      await h.layer.lockAndWipe(SCOPE)
+    }
+
+    function switchTo(h: Harness, scope: StoreScope, session: string) {
+      h.session.scope = scope
+      h.session.id = session
+    }
+
+    it('FUSR-R1-2: a write that finished before the boundary announces nothing after it', async () => {
+      const { h, changes } = await pinnedHarness()
+      const held = gate()
+      const real = h.store.putPin.bind(h.store)
+      h.store.putPin = async (record) => {
+        const result = await real(record)
+        held.reached()
+        await held.open
+        return result
+      }
+      const archiving = h.manager.handleArchived('doc_1')
+      await held.entered
+      h.manager.lockBoundary()
+      held.release()
+      expect(await archiving).toBeNull()
+      expect(changes).toEqual([])
+    })
+
+    it("FUSR-R1-3: a revoke queued behind the document lock leaves the next account's copy alone", async () => {
+      const h = createHarness()
+      addDoc(h, 'doc_1', 1)
+      // account B holds its own usable copy of the same document id
+      switchTo(h, SCOPE_B, 'sess_B1')
+      rowOf(await pinDoc(h))
+      const bRecords = await libraryRecords(h, SCOPE_B)
+      const stored = await bRecords.read(pinKey('doc_1'))
+      if (stored.kind !== 'ok') throw new Error('B did not pin')
+      const bRow = decodePinRecord(stored.value)!
+      const bBlob = blobKey('doc_1', bRow.readyGeneration!, 'main')
+      expect(bRow.state).toBe('ready')
+      expect((await bRecords.read(bBlob)).kind).toBe('ok')
+      // account A pins it too; an archive of A holds A's document lock (lease projection)
+      switchTo(h, SCOPE, 'sess_A1')
+      rowOf(await pinDoc(h))
+      const hold = holdLeaseView(h)
+      const archiving = h.manager.handleArchived('doc_1')
+      await hold.entered
+      // A's revoke queues behind that lock
+      const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+      await flush()
+      await signOut(h)
+      switchTo(h, SCOPE_B, 'sess_B2')
+      hold.release()
+      await archiving
+      expect(await revoking).toBeNull()
+      expect((await bRecords.read(bBlob)).kind).toBe('ok')
+      const after = await bRecords.read(pinKey('doc_1'))
+      expect(after.kind === 'ok' && decodePinRecord(after.value)?.state).toBe('ready')
+    })
+
+    it('FUSR-R1-4: an archive whose lease projection spans the sign-out returns nothing', async () => {
+      const { h } = await pinnedHarness()
+      const hold = holdLeaseView(h)
+      const archiving = h.manager.handleArchived('doc_1')
+      await hold.entered
+      await signOut(h)
+      hold.release()
+      expect(await archiving).toBeNull()
+      expect(h.storeFiles()).toEqual([])
+    })
+
+    it('FUSR-R1-5: a revoke whose lease projection spans the sign-out returns nothing', async () => {
+      const { h } = await pinnedHarness()
+      const hold = holdLeaseView(h)
+      const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+      await hold.entered
+      await signOut(h)
+      hold.release()
+      expect(await revoking).toBeNull()
+      expect(h.storeFiles()).toEqual([])
+    })
+
+    it('FUSR-R1-6: a refresh whose metadata read spans the sign-out writes no row', async () => {
+      const { h, changes } = await pinnedHarness()
+      const hold = holdGetDocument(h)
+      const refreshing = h.manager.refresh('doc_1')
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      expect(h.storeFiles()).toEqual([])
+      hold.release()
+      expect(await refreshing).toEqual({ kind: 'refused', code: 'interrupted' })
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6: a refresh whose metadata read spans an account switch persists nothing under the new account', async () => {
+      const { h, changes } = await pinnedHarness()
+      const hold = holdGetDocument(h)
+      const refreshing = h.manager.refresh('doc_1')
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      switchTo(h, SCOPE_B, 'sess_B')
+      h.manager.markOpen('doc_other')
+      hold.release()
+      expect(await refreshing).toEqual({ kind: 'refused', code: 'interrupted' })
+      expect(filesOf(h, SCOPE_B)).toEqual([])
+      expect(filesOf(h, SCOPE)).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6: an eviction whose copy deletion spans the sign-out writes no row', async () => {
+      const { h, changes } = await pinnedHarness()
+      // getPin, then the copy's delete is held
+      const hold = holdVerify(h, 2)
+      const evicting = h.manager.evict('doc_1')
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      hold.release()
+      expect(await evicting).toEqual({ kind: 'refused', code: 'interrupted' })
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6: recovery whose staging deletion spans the sign-out writes no row', async () => {
+      const changes: string[] = []
+      const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+      const stagingKey = blobKey('doc_1', '0000000a', 'main')
+      expect(
+        (
+          await h.store.putPin({
+            ...seedRow('doc_1', 4096),
+            state: 'downloading',
+            staging: { generation: '0000000a', keys: [stagingKey] },
+          })
+        ).kind,
+      ).toBe('ok')
+      expect((await h.store.writeIndex({ pins: ['doc_1'], cleanup: {} })).kind).toBe('ok')
+      expect((await h.store.putBlob(stagingKey, plaintext('staged'))).kind).toBe('ok')
+      // the index read, getPin, then the staging delete is held
+      const hold = holdVerify(h, 3)
+      const recovering = h.manager.recover()
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      hold.release()
+      await recovering
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6/7: a failed download that settles into a revoke across the sign-out recreates no row', async () => {
+      const changes: string[] = []
+      const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+      addDoc(h, 'doc_1', 1)
+      // from the stream failure on: the settle's getPin, its staging delete, the purge's delete (held)
+      const hold = holdVerifyAfter(h, 3)
+      h.docs.downloadStream = async () => {
+        hold.arm()
+        throw new UniworkDocError('permission_revoked')
+      }
+      const pinning = pinDoc(h)
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      changes.length = 0
+      hold.release()
+      await pinning
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6: a deferred cleanup whose blob deletion spans an account switch copies no index into the new account', async () => {
+      const h = createHarness()
+      addDoc(h, 'doc_1', 1)
+      addDoc(h, 'doc_2', 1)
+      rowOf(await pinDoc(h, 'doc_1'))
+      rowOf(await pinDoc(h, 'doc_2'))
+      h.manager.markOpen('doc_1')
+      expect(await h.manager.unpin('doc_1')).toEqual({ kind: 'unpinned', deferred: true })
+      // the index read, then the first deferred blob delete is held
+      const hold = holdVerify(h, 2)
+      const closing = h.manager.markClosed('doc_1')
+      await hold.entered
+      h.manager.lockBoundary()
+      switchTo(h, SCOPE_B, 'sess_B')
+      await h.layer.lockAndWipe(SCOPE)
+      hold.release()
+      await closing
+      expect(filesOf(h, SCOPE_B)).toEqual([])
+      expect(await h.manager.pinnedIds()).toEqual(new Set())
+    })
+
+    describe('FUSR-R1-8: the held revoke is refused with a usable session already active', () => {
+      for (const [label, scope, session] of [
+        ['a new session of the same account', SCOPE, 'sess_2'],
+        ['another account', SCOPE_B, 'sess_B'],
+      ] as const) {
+        it(`${label}: no row recreated in either scope, no notice`, async () => {
+          const { h, changes } = await pinnedHarness()
+          // getPin, then the copy's delete is held
+          const hold = holdVerify(h, 2)
+          const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+          await hold.entered
+          await signOut(h)
+          switchTo(h, scope, session)
+          h.manager.markOpen('doc_other')
+          hold.release()
+          expect(await revoking).toBeNull()
+          expect(changes).toEqual([])
+          expect(filesOf(h, SCOPE)).toEqual([])
+          expect(filesOf(h, SCOPE_B)).toEqual([])
+          expect(await h.manager.row('doc_1')).toBeNull()
+          // the new session is usable
+          expect(rowOf(await pinDoc(h)).state).toBe('ready')
+        })
+      }
+    })
+
+    describe('FUSR-R1-9: after a boundary a fresh archive and revoke on the same manager persist', () => {
+      for (const [label, scope] of [
+        ['the same account', SCOPE],
+        ['another account', SCOPE_B],
+      ] as const) {
+        it(label, async () => {
+          const { h } = await pinnedHarness()
+          await signOut(h)
+          switchTo(h, scope, 'sess_2')
+          rowOf(await pinDoc(h))
+          expect(await h.manager.handleArchived('doc_1')).toMatchObject({ archived: true })
+          const archived = await h.store.getPin('doc_1')
+          expect(archived.kind === 'ok' && archived.record.archived).toBe(true)
+          expect(await h.manager.handleLeaseRevoked(revokeNotice)).toMatchObject({
+            state: 'revoked',
+          })
+          const revoked = await h.store.getPin('doc_1')
+          expect(revoked.kind === 'ok' && revoked.record.state).toBe('revoked')
+        })
+      }
+    })
   })
 })
