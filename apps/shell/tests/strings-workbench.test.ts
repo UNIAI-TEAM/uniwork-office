@@ -85,12 +85,11 @@ describe('workbench string shards', () => {
   })
 
   it('formal vi copy does not mix in English UI words', () => {
-    // placeholders such as {workspace} or {task} are parameter names, not copy
+    // placeholders such as {workspace} or {task} are parameter names, not copy;
+    // `workspace` is not listed: the glossary keeps it English in vi copy (UNI-1958 row 7)
     expect(
       Object.values(table('vi')).filter((v) =>
-        /\b(workspace|task|meeting|tab|inbox|online|offline|profile)\b/i.test(
-          v.replace(PLACEHOLDER, ''),
-        ),
+        /\b(task|meeting|tab|inbox|online|offline|profile)\b/i.test(v.replace(PLACEHOLDER, '')),
       ),
     ).toEqual([])
   })

@@ -15,7 +15,6 @@ export const th = {
   usPickTitle: 'เลือกที่บันทึก',
   usBack: 'กลับไปตั้งชื่อ',
   usSearchFolders: 'ค้นหาโฟลเดอร์',
-  usSharedNote: 'เมื่อบันทึกลงในโฟลเดอร์ที่แชร์ เอกสารจะได้รับสิทธิ์ของโฟลเดอร์นั้น',
   usChooseFolder: 'เลือก "{folder}"',
   usSelected: 'เลือกอยู่',
   usRootBlocked: 'โปรดเลือกโฟลเดอร์',

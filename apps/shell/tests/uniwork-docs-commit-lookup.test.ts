@@ -120,6 +120,47 @@ describe('error mapping rows (shared contract)', () => {
   })
 })
 
+describe('UNI-1918 B69-lite: the 409 document_upload_invalid reason', () => {
+  const uploadInvalid = (fields?: Record<string, unknown>) =>
+    errorFromResponse(409, {
+      error: { code: 'document_upload_invalid', message: 'x', ...(fields ? { fields } : {}) },
+    })
+
+  it('keeps reason=file_claim_expired with the coded 409 (never a bare server_error)', () => {
+    const error = uploadInvalid({ reason: 'file_claim_expired' })
+    expect(error.code).toBe('server_error')
+    expect(error.status).toBe(409)
+    expect(error.serverCode).toBe('document_upload_invalid')
+    expect(error.reason).toBe('file_claim_expired')
+    // the refusal is still a terminal refusal: dropping the intent is what the
+    // pipeline did before, and the expiry branch decides on the reason
+    expect(isTerminalRefusal(error)).toBe(true)
+  })
+
+  it('keeps the other reasons apart', () => {
+    expect(uploadInvalid({ reason: 'upload_canceled' }).reason).toBe('upload_canceled')
+    expect(uploadInvalid({ reason: 'file_not_ready' }).reason).toBe('file_not_ready')
+    expect(uploadInvalid({ reason: 'file_deleting' }).reason).toBe('file_deleting')
+  })
+
+  it('a missing, empty, non-string or oversized reason is undefined (lenient, never throws)', () => {
+    expect(uploadInvalid().reason).toBeUndefined()
+    expect(uploadInvalid({ reason: '' }).reason).toBeUndefined()
+    expect(uploadInvalid({ reason: '   ' }).reason).toBeUndefined()
+    expect(uploadInvalid({ reason: 42 }).reason).toBeUndefined()
+    expect(uploadInvalid({ reason: null }).reason).toBeUndefined()
+    expect(uploadInvalid({ reason: 'x'.repeat(65) }).reason).toBeUndefined()
+    expect(uploadInvalid({ reason: 'x'.repeat(64) }).reason).toBe('x'.repeat(64))
+  })
+
+  it('other codes never carry a reason', () => {
+    const conflict = errorFromResponse(409, {
+      error: { code: 'document_version_conflict', message: 'x', fields: { reason: 'nope' } },
+    })
+    expect(conflict.reason).toBeUndefined()
+  })
+})
+
 describe('EL-1(a): HTTP 423 document_locked envelope parsing', () => {
   it('parses 423 document_locked with holder_id, holder_name, since, expires_at, held_by_me, offline_hold_until', () => {
     const error = errorFromResponse(423, {

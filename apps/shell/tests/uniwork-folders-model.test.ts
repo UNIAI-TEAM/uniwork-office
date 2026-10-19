@@ -362,6 +362,8 @@ describe('folder action failures', () => {
     })
     expect(folderActionFailure('document_cycle')).toEqual({ key: 'ufCycle' })
     expect(folderActionFailure('document_parent_kind')).toEqual({ key: 'ufParentKind' })
+    // UNI-1975: folders can't be shared; the refusal has its own sentence
+    expect(folderActionFailure('folder_not_shareable')).toEqual({ key: 'ufNotShareable' })
     expect(folderActionFailure('forbidden')).toEqual({ key: 'ufNoPermission' })
     expect(folderActionFailure('network')).toEqual({ key: 'uwDocActionFailed' })
   })

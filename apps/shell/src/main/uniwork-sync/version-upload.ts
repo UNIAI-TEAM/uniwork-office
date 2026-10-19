@@ -45,11 +45,30 @@ export interface VersionUploadInput {
   bytes: Uint8Array
   idempotencyKey: string
   limits: DocumentLimits
+  /**
+   * UNI-1918 (B69-lite): the attempt of the durable intent this upload serves.
+   * The COMMIT key never changes, but the UPLOAD key must: FileService never
+   * resurrects an expired staged session, so re-uploading under the key of a
+   * dead claim answers `file_claim_expired` again. Attempt 0 keeps the bare
+   * commit key (records written before this change stay replayable); every
+   * later attempt stages under `${commitKey}:u${attempt}`.
+   */
+  attempt?: number
   resume?: SavedUploadSession
   signal?: AbortSignal
   onProgress?: (loaded: number, total: number) => void
   onPhase?: (phase: ChunkedUploadPhase) => void
   onSessionState?: (state: SavedUploadSession | undefined) => void | Promise<void>
+}
+
+/**
+ * UNI-1918 (B69-lite): the upload key of one attempt of one commit intent.
+ * Attempt 0 is the bare commit key (the shape every record written before this
+ * change already carries); a later attempt gets its own key, so a new staged
+ * upload is never sent under a claim the server has already retired.
+ */
+export function uploadKeyFor(commitKey: string, attempt: number): string {
+  return attempt === 0 ? commitKey : `${commitKey}:u${attempt}`
 }
 
 /** how many derived session-create keys one version upload tries on a 409 payload mismatch */
@@ -91,6 +110,10 @@ export async function uploadVersionBytes(
 ): Promise<{ uploadId: string; checksumSha256: string }> {
   const size = input.bytes.byteLength
   const session = client.uploadSession
+  // UNI-1918 (B69-lite): the key this attempt stages its bytes under. The
+  // commit key stays `input.idempotencyKey`; only the upload key moves with
+  // the attempt (see `uploadKeyFor`).
+  const uploadKey = uploadKeyFor(input.idempotencyKey, input.attempt ?? 0)
   if (!session || !shouldUseChunkedUpload(size, input.limits)) {
     if (input.resume && session) {
       await abortVersionUploadSession(session, input.resume.sessionId).catch(() => undefined)
@@ -103,7 +126,7 @@ export async function uploadVersionBytes(
       bytes: input.bytes,
       filename: input.filename,
       format: input.format as UniworkDocFormat,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey: uploadKey,
     })
   }
 
@@ -114,7 +137,7 @@ export async function uploadVersionBytes(
   // restart/next keys by the resumed session id (`${K}:r:${sessionId}:s${n}`),
   // so a second call resuming a later dead session never replays the create key
   // an earlier call already committed to the server's idempotency ledger.
-  const keyBase = resume ? `${input.idempotencyKey}:r:${resume.sessionId}` : input.idempotencyKey
+  const keyBase = resume ? `${uploadKey}:r:${resume.sessionId}` : uploadKey
   let keyIndex = 0
   const nextKey = (): string => `${keyBase}:s${(keyIndex += 1)}`
   for (let attempt = 0; attempt < VERSION_SESSION_KEY_ATTEMPTS; attempt += 1) {
@@ -144,7 +167,7 @@ export async function uploadVersionBytes(
           bytes: input.bytes,
           filename: input.filename,
           format: input.format as UniworkDocFormat,
-          idempotencyKey: input.idempotencyKey,
+          idempotencyKey: uploadKey,
         })
       }
       const mismatch =

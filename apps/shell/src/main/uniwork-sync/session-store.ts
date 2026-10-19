@@ -1,3 +1,4 @@
+import { FIRST_SAVES_STORE_REGISTRATION } from './first-saves'
 import { INTENT_STORE_REGISTRATION } from './intent-store'
 import type { StoreScope } from './keys'
 import { DRAFTS_STORE_REGISTRATION } from './queue/drafts'
@@ -38,6 +39,7 @@ export const SYNC_STORE_REGISTRATIONS: readonly StoreRegistration[] = [
   DOC_INDEX_REGISTRATION,
   LEASE_STORE_REGISTRATION,
   UPLOAD_SESSIONS_STORE_REGISTRATION,
+  FIRST_SAVES_STORE_REGISTRATION,
 ]
 
 export type SyncStoreOpen =

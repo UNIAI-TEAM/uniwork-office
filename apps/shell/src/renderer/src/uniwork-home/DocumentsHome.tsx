@@ -258,7 +258,7 @@ export function DocumentsHome({
   onSubViewChange,
   onFolderChange,
 }: DocumentsHomeProps) {
-  const { t, dateLocale } = useI18n()
+  const { t, lang, dateLocale } = useI18n()
   const uid = useId()
 
   const [subView, setSubView] = useState<DocumentsHomeSubViewId>(initialSubView)
@@ -1685,7 +1685,7 @@ export function DocumentsHome({
                   </div>
 
                   {files.map((doc) => {
-                    const access = formatAccessCell(doc, t)
+                    const access = formatAccessCell(doc, t, lang)
                     const person = formatUpdatedByCell(doc)
                     const menuItems = docMenuFor(doc)
                     const renaming = docRename?.doc.id === doc.id ? docRename : null
@@ -1761,19 +1761,15 @@ export function DocumentsHome({
                         </div>
 
                         <div className="dh-cell-access" role="cell">
-                          {access.isEmpty ? (
-                            <span className="dh-cell-empty">—</span>
+                          {access.visibilityLabel ? (
+                            <span className={`dh-vis-badge dh-vis-${access.tone}`}>
+                              {access.visibilityLabel}
+                            </span>
                           ) : (
-                            <>
-                              {access.visibilityLabel && (
-                                <span className={`dh-vis-badge dh-vis-${access.tone}`}>
-                                  {access.visibilityLabel}
-                                </span>
-                              )}
-                              {access.levelLabel && (
-                                <span className="dh-level-sub">{access.levelLabel}</span>
-                              )}
-                            </>
+                            <span className="dh-cell-empty">—</span>
+                          )}
+                          {access.levelLabel && (
+                            <span className="dh-level-sub">{access.levelLabel}</span>
                           )}
                         </div>
 

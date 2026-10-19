@@ -16,7 +16,6 @@ export const ms = {
   usPickTitle: 'Pilih tempat simpan',
   usBack: 'Kembali ke penamaan',
   usSearchFolders: 'Cari folder',
-  usSharedNote: 'Jika disimpan dalam folder kongsi, dokumen menerima kebenaran folder itu.',
   usChooseFolder: 'Pilih “{folder}”',
   usSelected: 'Dipilih',
   usRootBlocked: 'Pilih satu folder',

@@ -15,7 +15,6 @@ export const pt = {
   usPickTitle: 'Escolher onde salvar',
   usBack: 'Voltar ao nome',
   usSearchFolders: 'Pesquisar pastas',
-  usSharedNote: 'Ao salvar numa pasta compartilhada, o documento recebe as permissões dessa pasta.',
   usChooseFolder: 'Escolher “{folder}”',
   usSelected: 'Selecionado',
   usRootBlocked: 'Escolha uma pasta',

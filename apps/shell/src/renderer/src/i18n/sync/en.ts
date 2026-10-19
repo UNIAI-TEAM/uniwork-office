@@ -43,7 +43,7 @@ export const en = {
   uwReasonSession: 'sign in again',
   uwReasonSignedOut: 'signed out',
   uwReasonForeign: 'belongs to another account',
-  uwReasonArchived: 'document archived',
+  uwReasonArchived: 'document in trash',
   uwReasonSuspended: 'organization suspended',
   uwReasonDeactivated: 'your account is deactivated in this organization',
   uwReasonLease: 'offline access expired',
@@ -71,7 +71,7 @@ export const en = {
   uwBadgeSaved: 'Saved',
   uwBadgeKeptDraft: 'Kept draft',
   uwBadgeMoved: 'Moved',
-  uwBadgeArchived: 'Archived',
+  uwBadgeArchived: 'In trash',
 
   // S2 queue-row details
   uwRowQueued: 'Saved {time} · based on version {base} · {size}',
@@ -91,7 +91,7 @@ export const en = {
   uwRowCommitted: 'Version {n} · {time}',
   uwRowKeptDraft: 'Kept when you reloaded at {time}',
   uwRowMoved: 'The document moved to {workspace}',
-  uwRowArchived: 'The document was archived on UniWork',
+  uwRowArchived: 'The document was moved to the trash on UniWork',
 
   // S2 row actions
   uwActDiscard: 'Discard',
@@ -204,7 +204,8 @@ export const en = {
     'You no longer have access to this document. The downloaded copy was removed; drafts stay locked.',
   uwOfflineRowDeleted:
     'The document was deleted on UniWork. The downloaded copy was removed; drafts stay locked.',
-  uwOfflineRowArchived: 'The document was archived; the copy here opens until offline access ends.',
+  uwOfflineRowArchived:
+    'The document was moved to the trash; the copy here opens until offline access ends.',
   uwOfflineRowMoved: 'Moved to {workspace}; the copy here still works.',
   uwOfflineRowViewOnly: 'Version {n} · view only · offline access until {datetime}',
   uwOfflineReadyAnnounce: 'Available offline: {doc}',

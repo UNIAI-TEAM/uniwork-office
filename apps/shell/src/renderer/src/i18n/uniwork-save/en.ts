@@ -15,13 +15,12 @@ export const en = {
   usPickTitle: 'Choose where to save',
   usBack: 'Back to naming',
   usSearchFolders: 'Search folders',
-  usSharedNote: 'Saving into a shared folder gives the document that folder’s permissions.',
   usChooseFolder: 'Choose “{folder}”',
   usSelected: 'Selected',
   usRootBlocked: 'Choose a folder',
   usErrInvalidDestination: 'Can’t save there. Choose another folder.',
   usErrMyFolderLocked:
-    'My Folder is your personal system folder and can’t be renamed, shared, moved or archived.',
+    'My Folder is your personal system folder and can’t be renamed, shared, moved or put in the trash.',
   usErrFlushFailed:
     'The document couldn’t be written to this device yet. Save the document first, then try again.',
   usErrBindFailed:
