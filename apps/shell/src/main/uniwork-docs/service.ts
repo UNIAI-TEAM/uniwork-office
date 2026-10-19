@@ -4203,15 +4203,25 @@ export class UniworkDocsService {
       return
     }
     // UNI-1959: the first save of a document created blank asks name + folder;
-    // the upload below waits for the verdict (a second Save while the dialog is
-    // open is covered by it: the save reads the file when it runs)
+    // the upload below waits for the verdict. An ask already open for this path
+    // is checked BEFORE eligibility is read again: the dialog's own rename
+    // changes the title the fallback predicate reads, and must not release the
+    // hold (BE-2). While it is open the edits the module just wrote are unsent
+    // work, so the copy stays dirty (BE-1) and a second Save only waits.
+    const key = pathKey(doc.path)
+    if (this.firstSaveAsking.has(key)) {
+      this.editorDirty.add(doc.path)
+      return
+    }
     if (this.wantsFirstSaveName(doc)) {
-      const key = pathKey(doc.path)
-      if (this.firstSaveAsking.has(key)) return
       this.firstSaveAsking.add(key)
+      this.editorDirty.add(doc.path)
       void this.askFirstSaveName(doc)
         .then((answer) => {
-          if (answer === 'continue') this.saveAfterFirstSaveName(path)
+          if (answer === 'continue') {
+            this.editorDirty.delete(doc.path)
+            this.saveAfterFirstSaveName(path)
+          }
         })
         .finally(() => this.firstSaveAsking.delete(key))
       return
@@ -6305,7 +6315,11 @@ export class UniworkDocsService {
       baseRevision: doc.binding.baseRevision,
       feedOn: await this.feedOnFor(doc.binding.orgId),
       dirty:
-        doc.binding.state === 'dirty' || this.editorDirty.has(doc.path) || editor.dirty === true,
+        doc.binding.state === 'dirty' ||
+        this.editorDirty.has(doc.path) ||
+        // UNI-1959: the bytes the editor saved while the name dialog is open are not sent yet
+        this.firstSaveAsking.has(pathKey(doc.path)) ||
+        editor.dirty === true,
       aiRunning: editor.aiRunning,
       queue: record && !isTerminalQueueState(record.state) ? record.state : null,
       ...(record?.receipt ? { receiptRevision: record.receipt.revision } : {}),
