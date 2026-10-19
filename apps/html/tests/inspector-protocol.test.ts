@@ -104,4 +104,70 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
       { type: 'gx:keyCommand', command: 'escape', version: 1 },
     ])
   })
+
+  // UNI-1919 (RR2D-4): mod+P inside the preview never reaches the host window; the host claims it
+  // with gx:printKey only where its print path runs, else the browser keeps its default
+  it('relays mod+P as the print command once the host claims it, even during a text edit', () => {
+    const { dom, messages, send } = makePreview()
+    const pressP = (init: KeyboardEventInit = {}) => {
+      const ev = new dom.window.KeyboardEvent('keydown', {
+        key: 'p',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      })
+      dom.window.document.body.dispatchEvent(ev)
+      return ev.defaultPrevented
+    }
+    expect(pressP()).toBe(false)
+    expect(messages).toEqual([])
+
+    send({ type: 'gx:printKey', claim: true })
+    send({ type: 'gx:beginTextEdit', sid: 1 })
+    messages.length = 0
+    expect(pressP()).toBe(true)
+    expect(pressP({ key: 'P', ctrlKey: false, metaKey: true })).toBe(true)
+    // the first press ends the (unchanged) edit as a cancel, the second finds no edit
+    expect(messages).toEqual([
+      { type: 'gx:textEditCancel', version: 1 },
+      { type: 'gx:keyCommand', command: 'print', version: 1 },
+      { type: 'gx:keyCommand', command: 'print', version: 1 },
+    ])
+    // a held press is suppressed (no second browser dialog beside the module's) but runs nothing
+    expect(pressP({ repeat: true })).toBe(true)
+    expect(messages).toHaveLength(3)
+    // Shift or Alt variants stay the browser's
+    expect(pressP({ shiftKey: true })).toBe(false)
+    expect(pressP({ altKey: true })).toBe(false)
+    expect(messages).toHaveLength(3)
+
+    send({ type: 'gx:printKey', claim: false })
+    expect(pressP()).toBe(false)
+    expect(messages).toHaveLength(3)
+  })
+
+  // UNI-1919 (RC-1): the typed run lives only in the preview DOM; it must reach the host before
+  // the print message, or the module serializes the stale text
+  it('commits an active inline text edit before the print command', () => {
+    const { dom, messages, send } = makePreview()
+    send({ type: 'gx:printKey', claim: true })
+    send({ type: 'gx:beginTextEdit', sid: 1 })
+    const el = dom.window.document.querySelector('[data-gx-sid="1"]')!
+    el.firstChild!.textContent = 'Hello typed'
+    messages.length = 0
+    const ev = new dom.window.KeyboardEvent('keydown', {
+      key: 'p',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    dom.window.document.body.dispatchEvent(ev)
+    expect(ev.defaultPrevented).toBe(true)
+    expect(messages).toEqual([
+      { type: 'gx:textEditCommit', sid: 1, textNodeIndex: 0, newText: 'Hello typed', version: 1 },
+      { type: 'gx:keyCommand', command: 'print', version: 1 },
+    ])
+    expect(el.hasAttribute('contenteditable')).toBe(false)
+  })
 })
