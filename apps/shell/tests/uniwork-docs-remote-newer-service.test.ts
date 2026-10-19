@@ -1179,6 +1179,14 @@ describe('UNI-1959 a pending first-save ask is local unsent work', () => {
 
   it('UWNM-BE-R2-1: a reload already downloading when the first Save lands never writes over the held bytes', async () => {
     const { h, asked, answer } = blankCopy()
+    // "never writes": not even a write a later check undoes
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    const headWrites: string[] = []
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      if (hex(bytes) === hex(HEAD_BYTES)) headWrites.push(filename)
+      return realWrite(target, filename, bytes)
+    }
     let release!: () => void
     h.client.downloadGate = new Promise<void>((resolve) => (release = resolve))
     const entered = new Promise<void>((resolve) => (h.client.downloadEntered = resolve))
@@ -1195,6 +1203,7 @@ describe('UNI-1959 a pending first-save ask is local unsent work', () => {
     expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
     expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
     expect(h.reloaded).toEqual([])
+    expect(headWrites).toEqual([])
 
     // the answer releases the held edits into the normal save, which meets the
     // newer head as a version conflict - the bytes are still the person's
