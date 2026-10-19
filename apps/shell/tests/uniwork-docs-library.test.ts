@@ -316,6 +316,24 @@ describe('shared with me (S17)', () => {
     expect(second.ok && second.value.nextCursor).toBeNull()
   })
 
+  // UNI-1953 CT1-1: the Documents home asks for pages too; every other caller stays files-only
+  it('keeps a shared UniNote page only when the caller asks for pages', async () => {
+    const page = { ...docRow('p1', 'ws_1', 'Ghi chú', '2026-06-01T00:00:00Z'), kind: 'page' }
+    const server = fakeServer({
+      shared: {
+        ws_1: { documents: [docRow('d1', 'ws_1', 'A.docx', '2026-04-01T00:00:00Z'), page] },
+      },
+    })
+    const { service } = serviceWith(server)
+    const filesOnly = await service.listSharedWithMe()
+    expect(filesOnly.ok && filesOnly.value.documents.map((d) => d.id)).toEqual(['d1'])
+    const withPages = await service.listSharedWithMe({ includePages: true })
+    expect(withPages.ok && withPages.value.documents.map((d) => [d.id, d.kind])).toEqual([
+      ['p1', 'page'],
+      ['d1', 'file'],
+    ])
+  })
+
   it('an empty account gets an empty page, not an error', async () => {
     const server = fakeServer({ shared: {} })
     const { service } = serviceWith(server)

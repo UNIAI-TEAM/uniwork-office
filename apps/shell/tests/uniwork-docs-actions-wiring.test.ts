@@ -127,6 +127,7 @@ describe('the S18 action IPC', () => {
     const { handlers } = await setup()
     for (const channel of [
       UNIWORK_DOC_CHANNELS.createDocument,
+      UNIWORK_DOC_CHANNELS.createPage,
       UNIWORK_DOC_CHANNELS.pickUploadFile,
       UNIWORK_DOC_CHANNELS.uploadDocument,
       UNIWORK_DOC_CHANNELS.cancelUpload,
@@ -149,6 +150,18 @@ describe('the S18 action IPC', () => {
       folderId: null,
       name: '   ',
       format: 'docx',
+    })
+    expect(result).toEqual({ ok: false, error: 'name_empty' })
+  })
+
+  // UNI-1953 CT1-7: the create-page channel reaches service.createPage (an empty
+  // name is refused there, before any request, with the same result shape)
+  it('routes the create-page channel to the service createPage', async () => {
+    const { handlers } = await setup()
+    const result = await handlers.get(UNIWORK_DOC_CHANNELS.createPage)!(null, {
+      workspaceId: 'ws_1',
+      folderId: null,
+      name: '   ',
     })
     expect(result).toEqual({ ok: false, error: 'name_empty' })
   })

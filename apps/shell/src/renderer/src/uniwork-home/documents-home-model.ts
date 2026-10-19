@@ -363,6 +363,7 @@ export interface DocumentsHomeApiAdapter {
   uniworkListSharedWithMe?: (q?: {
     cursor?: string
     limit?: number
+    includePages?: boolean
   }) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSharedByMe?: (
     q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
@@ -452,10 +453,12 @@ export async function fetchDocumentsHomePage(
     if (typeof api.uniworkListDocuments !== 'function') {
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
+    // UNI-1953: the Documents home Recent also lists UniNote pages
     const res = await api.uniworkListDocuments({
       workspaceId,
       cursor,
       ...filters,
+      includePages: true,
     })
     return {
       result: mapDocListPageResult(res),
@@ -466,7 +469,10 @@ export async function fetchDocumentsHomePage(
     if (typeof api.uniworkListSharedWithMe !== 'function') {
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
-    const res = await api.uniworkListSharedWithMe(cursor ? { cursor } : {})
+    // UNI-1953: a shared UniNote is listed too
+    const res = await api.uniworkListSharedWithMe(
+      cursor ? { cursor, includePages: true } : { includePages: true },
+    )
     return {
       result: mapDocListPageResult(res),
     }

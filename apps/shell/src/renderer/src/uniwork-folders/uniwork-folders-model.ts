@@ -267,12 +267,13 @@ export function isFolderEntry(doc: UniworkDocSummary): boolean {
 }
 
 /**
- * A row the app shows: folders always; files it can open. Pages (UniNote) and
- * other formats are hidden and counted (the FD-14 rule, applied per folder).
+ * A row the app shows: folders and pages (UniNote, opened on the web: UNI-1953)
+ * always; files it can open. Other formats are hidden and counted (the FD-14
+ * rule, applied per folder).
  */
 export function isShownEntry(doc: UniworkDocSummary): boolean {
   if (isFolderEntry(doc)) return true
-  if (doc.kind === 'page') return false
+  if (doc.kind === 'page') return true
   return isOpenable(doc)
 }
 

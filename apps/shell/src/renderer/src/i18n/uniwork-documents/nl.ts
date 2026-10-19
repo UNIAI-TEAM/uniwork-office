@@ -148,6 +148,8 @@ export const nl = {
   uwDocNameTooLong: 'De naam is te lang (maximaal 500 tekens).',
   uwDocRenamedAnnounce: 'Het document is hernoemd naar {name}.',
   uwDocActionFailed: 'Dat is niet gelukt. Probeer het opnieuw.',
+  uwUniNoteOpenFailed:
+    'De UniNote is gemaakt, maar kon niet worden geopend. Open hem vanuit de lijst.',
   uwDocActionsFor: 'Meer acties voor “{name}”',
   uwDocCreate: 'Maken',
   uwDocUploadPick: 'Bestand kiezen',

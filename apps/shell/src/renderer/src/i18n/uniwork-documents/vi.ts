@@ -142,6 +142,7 @@ export const vi = {
   uwDocNameTooLong: 'Tên tài liệu quá dài (tối đa 500 ký tự).',
   uwDocRenamedAnnounce: 'Tài liệu đã được đổi tên thành {name}.',
   uwDocActionFailed: 'Không thực hiện được. Hãy thử lại.',
+  uwUniNoteOpenFailed: 'Đã tạo UniNote nhưng chưa mở được. Hãy mở từ danh sách.',
   uwDocActionsFor: 'Thao tác khác cho “{name}”',
   uwDocCreate: 'Tạo',
   uwDocUploadPick: 'Chọn tệp',
