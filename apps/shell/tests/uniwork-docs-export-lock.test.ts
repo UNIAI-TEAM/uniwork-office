@@ -201,20 +201,13 @@ vi.mock('../../sheets/src/main/xlsx-sidecar-client', () => ({
   },
 }))
 
-import {
-  docsFileRenamed,
-  registerDocsIpc,
-} from '../../docs/src/main/docs-main'
+import { docsFileRenamed, registerDocsIpc } from '../../docs/src/main/docs-main'
 import { createSheetsView } from '../../sheets/src/main/sheets-main'
 import { IPC_CHANNELS as SHEETS_CHANNELS } from '../../sheets/src/shared/ipc-channels'
 import { createBlankPptx } from '@genoffice/pptx-engine'
 import { registerSlidesIpc } from '../../slides/src/main/slides-main'
 import { sessions as slidesSessions } from '../../slides/src/main/session-state'
-import {
-  createPdfView,
-  requestPdfSaveAs,
-  sendPdfPrintRequest,
-} from '../../pdf/src/main/pdf-main'
+import { createPdfView, requestPdfSaveAs, sendPdfPrintRequest } from '../../pdf/src/main/pdf-main'
 import { PDF_CHANNELS } from '../../pdf/src/shared/ipc'
 import { PDF_UNIWORK_VIEW_ONLY } from '../../pdf/src/shared/uniwork-refusal'
 import {

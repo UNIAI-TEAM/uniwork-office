@@ -2,7 +2,15 @@
  * The real docs:save / docs:save-as handlers on a UniWork working copy
  * (electron mocked): which writes land and which report a user save.
  */
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -85,6 +93,7 @@ vi.mock('electron', () => ({
 
 import {
   authorizeMcpDocWrite,
+  clearRecoveryCopy,
   registerDocsIpc,
   setDocsUserSaveHook,
   setUniworkDocumentPolicy,
