@@ -144,6 +144,7 @@ import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
 import {
   drainedOrigin,
+  dropWrittenPending,
   forcesBoundSave,
   pdfExplainReadOnlySave,
   type PdfReadOnlySaveSeam,
@@ -250,6 +251,7 @@ import type {
   LocalAnnotDelete,
   LocalNoteEdit,
   EditSnapshot,
+  PendingLists,
   SavedSnapshot,
   AnnotSelection,
 } from './edit-state'
@@ -1955,14 +1957,14 @@ export default function App() {
     return [...records.values()]
   }, [imageEdits, savedStaticFormFills])
 
-  const ordinaryDirty =
-    markups.length > 0 ||
-    annotDeletes.length > 0 ||
-    noteEdits.length > 0 ||
-    drawings.length > 0 ||
-    textEdits.length > 0 ||
-    textInserts.length > 0 ||
-    imageEdits.length > 0 ||
+  const hasOrdinaryDirty = (pending: PendingLists) =>
+    pending.markups.length > 0 ||
+    pending.annotDeletes.length > 0 ||
+    pending.noteEdits.length > 0 ||
+    pending.drawings.length > 0 ||
+    pending.textEdits.length > 0 ||
+    pending.textInserts.length > 0 ||
+    pending.imageEdits.length > 0 ||
     stampCfg !== null ||
     formEdits.size > 0 ||
     rotations.size > 0 ||
@@ -1970,6 +1972,15 @@ export default function App() {
     order !== null ||
     metadata !== null ||
     recovered
+  const ordinaryDirty = hasOrdinaryDirty({
+    markups,
+    annotDeletes,
+    noteEdits,
+    drawings,
+    textEdits,
+    textInserts,
+    imageEdits,
+  })
   const dirty = redactions.length > 0 || ordinaryDirty
 
   // Existing images are listed while edit-image mode is on; `doc` in the deps refreshes
@@ -3802,14 +3813,17 @@ export default function App() {
     edits: LocalTextEdit[] = textEdits,
     noteFlush?: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] },
     extraDrawings: LocalDrawing[] = [],
-  ) => withoutFileNoteWrites(rawEditsPayload(edits, noteFlush, extraDrawings), serverComments)
+    pending?: Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'>,
+  ) =>
+    withoutFileNoteWrites(rawEditsPayload(edits, noteFlush, extraDrawings, pending), serverComments)
   const rawEditsPayload = (
     edits: LocalTextEdit[],
     noteFlush: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] } | undefined,
     extraDrawings: LocalDrawing[],
+    pending?: Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'>,
   ) => ({
-    markups: markups.map(({ id: _id, ...rest }) => rest),
-    annotDeletes: annotDeletes.map((d): AnnotDeleteInput => ({
+    markups: (pending?.markups ?? markups).map(({ id: _id, ...rest }) => rest),
+    annotDeletes: (pending?.annotDeletes ?? annotDeletes).map((d): AnnotDeleteInput => ({
       pageIndex: d.annot.pageIndex,
       objNum: d.annot.objNum,
       subtype: d.annot.type,
@@ -3826,8 +3840,8 @@ export default function App() {
     })),
     drawings: [...(noteFlush?.drawings ?? drawings), ...extraDrawings].map((d) => d.input),
     textEdits: edits.map((e) => e.input),
-    textInserts: textInserts.map((insert) => insert.input),
-    imageEdits: imageEdits.map((e) => e.input),
+    textInserts: (pending?.textInserts ?? textInserts).map((insert) => insert.input),
+    imageEdits: (pending?.imageEdits ?? imageEdits).map((e) => e.input),
     staticFormFills,
     stamps: stampCfg ? renderStamps(stampCfg, visList) : [],
     formValues: [...formEdits.values()],
@@ -3864,10 +3878,20 @@ export default function App() {
   const queuedSavesRef = useRef<{ origin: SaveOrigin; resolve: (ok: boolean) => void }[]>([])
   /** Origin of the save that most recently started writing (a queued save checks it) */
   const lastWriteOriginRef = useRef<SaveOrigin | null>(null)
+  /** What the last save that succeeded sent. A drained (queued) save drops pending items that are
+      still equal to these: the render it runs from can still list edits that save wrote */
+  const lastWrittenRef = useRef<PendingLists | null>(null)
+  /** Bumped each time a save settles, after `saveInFlightRef` is cleared and the post-save
+      subtractions are queued: the drain effect runs from the render that carries both */
+  const [saveSettled, setSaveSettled] = useState(0)
 
   /** `user` = explicit Save (button, ⌘S, menu, close prompt); `auto` = autosave tick/blur;
       `internal` = flush before a page tool. Main fires the UniWork user-save hook only for `user`. */
-  const save = (origin: SaveOrigin = 'user', afterUserSave = false): Promise<boolean> => {
+  const save = (
+    origin: SaveOrigin = 'user',
+    afterUserSave = false,
+    drained = false,
+  ): Promise<boolean> => {
     if (redactionRequestInFlightRef.current) return Promise.resolve(false)
     // EL-1(b) VEL-1: an explicit Save on a read-only bound PDF asks the shell to
     // explain the lock and never writes (local read-only PDFs keep today's path)
@@ -3895,8 +3919,23 @@ export default function App() {
     const edits = commitTextDraft()
     // Same for an open comment-edit box in the notes margin
     const noteFlush = commitNoteEdit()
+    // A drained save (queued behind one that wrote) leaves out what that save already wrote
+    const written = drained ? lastWrittenRef.current : null
+    const toWrite: PendingLists = {
+      markups: written ? dropWrittenPending(markups, written.markups) : markups,
+      annotDeletes: written ? dropWrittenPending(annotDeletes, written.annotDeletes) : annotDeletes,
+      noteEdits: written
+        ? dropWrittenPending(noteFlush.noteEdits, written.noteEdits)
+        : noteFlush.noteEdits,
+      drawings: written
+        ? dropWrittenPending(noteFlush.drawings, written.drawings)
+        : noteFlush.drawings,
+      textEdits: written ? dropWrittenPending(edits, written.textEdits) : edits,
+      textInserts: written ? dropWrittenPending(textInserts, written.textInserts) : textInserts,
+      imageEdits: written ? dropWrittenPending(imageEdits, written.imageEdits) : imageEdits,
+    }
     const anythingToSave =
-      ordinaryDirty ||
+      (written ? hasOrdinaryDirty(toWrite) : ordinaryDirty) ||
       edits !== textEdits ||
       noteFlush.drawings !== drawings ||
       noteFlush.noteEdits !== noteEdits
@@ -3936,14 +3975,29 @@ export default function App() {
       setSaveState('saving')
       const result = await window.pdfApi.save({
         path: filePath,
-        ...editsPayload(edits, noteFlush),
+        ...editsPayload(
+          toWrite.textEdits,
+          { drawings: toWrite.drawings, noteEdits: toWrite.noteEdits },
+          [],
+          toWrite,
+        ),
         origin,
       })
       if (!result.ok) {
+        lastWrittenRef.current = null
         // main declining an autosave tick that raced the document's UniWork state is
         // not a failure the user can act on
         if (!(origin === 'auto' && isUniworkRefusal(result.error))) opFailed(result.error)
         return false
+      }
+      lastWrittenRef.current = {
+        markups,
+        annotDeletes,
+        noteEdits: noteFlush.noteEdits,
+        drawings: noteFlush.drawings,
+        textEdits: edits,
+        textInserts,
+        imageEdits,
       }
       // the restored draft is the file's new version now
       setRecovered(false)
@@ -4004,25 +4058,27 @@ export default function App() {
         inFlightNoteWritesRef.current = new Map()
         inFlightPageMapRef.current = null
       }
+      setSaveSettled((n) => n + 1)
     })
     saveInFlightRef.current = tracked
     return tracked
   }
 
-  // Drain queued saves. This effect runs after every commit, so by the time it fires
-  // the in-flight save's reload has rendered and `save` reads post-reload state: the
-  // follow-up writes only what is still pending (usually nothing) instead of
-  // re-applying the previous payload.
+  // Drain queued saves. It runs only after a save settled (`saveSettled`), from the render that
+  // carries the post-save subtractions of the reload, so `save` reads post-reload state: the
+  // follow-up writes only what is still pending (usually nothing) instead of re-applying the
+  // previous payload. A render that merely has no save in flight is not enough (UNI-1984).
   useEffect(() => {
     if (queuedSavesRef.current.length === 0 || saveInFlightRef.current !== null) return
     const queued = queuedSavesRef.current
     queuedSavesRef.current = []
     // One explicit request makes the whole drained batch explicit (autosave opt-in)
     const origin = drainedOrigin(queued.map((q) => q.origin))
-    void save(origin, lastWriteOriginRef.current === 'user').then((ok) => {
+    void save(origin, lastWriteOriginRef.current === 'user', true).then((ok) => {
       for (const q of queued) q.resolve(ok)
     })
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- save is rebuilt every render; only a settled save drains
+  }, [saveSettled])
 
   /**
    * Save As: apply pending edits onto the source bytes and write only to targetPath.
