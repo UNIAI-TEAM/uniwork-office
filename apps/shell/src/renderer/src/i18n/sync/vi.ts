@@ -272,14 +272,14 @@ export const vi = {
     'UniWork sẽ tạo một tài liệu mới từ bản của bạn, cùng chủ sở hữu và quyền truy cập với tài liệu này. Tài liệu hiện tại và phiên bản {server} của {author} không đổi.',
   uwConflictSaveCopyGo: 'Tạo bản sao',
   uwConflictSaveCopyDone:
-    'Đã lưu bản của bạn thành tài liệu mới: {title}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại hoặc Ghi đè.',
+    'Đã lưu bản của bạn thành tài liệu mới: {title}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại bản mới nhất hoặc Ghi đè.',
   uwConflictSaveCopyFailed: 'Chưa tạo được bản sao. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
   uwConflictSaveCopyNoSeat:
     'Không tạo được bản sao vì bạn không phải thành viên của không gian làm việc chứa tài liệu này. Thay đổi của bạn vẫn an toàn; bạn có thể tải bản của mình về máy.',
   uwConflictSaveCopyFolderRefused:
     'Bạn không thể tạo tài liệu trong thư mục này. Hãy tải bản của bạn về máy.',
   uwConflictDownloadDone:
-    'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại hoặc Ghi đè.',
+    'Đã lưu bản của bạn vào máy: {file}. Tài liệu này chưa đổi; bạn vẫn chọn được Tải lại bản mới nhất hoặc Ghi đè.',
   uwConflictDownloadFailedDesktop: 'Chưa lưu được tệp. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
   uwConflictSaveCopyOffline:
     'Không có mạng. Tạo bản sao cần kết nối; thay đổi của bạn vẫn được giữ.',
