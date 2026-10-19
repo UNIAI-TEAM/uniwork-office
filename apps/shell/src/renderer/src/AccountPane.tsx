@@ -371,15 +371,9 @@ export function AccountPane({ account }: { account: AccountController }) {
         <Row label={t('acctServer')}>{status.serverOrigin}</Row>
       )}
 
-      {canChangeServer && (
-        <ServerConnect
-          key={view === 'not-configured' || unreachable ? 'open' : 'closed'}
-          account={account}
-          startOpen={view === 'not-configured' || unreachable}
-          unreachableServer={unreachable ? server : null}
-        />
-      )}
-
+      {/* the sign-out / replace prompts sit next to their initiating action and
+          the recovery actions lead, both above the Change server form
+          (G5-13 rows A22/A71) */}
       <SignOutPrompt account={account} returnFocusRef={signOutBtnRef} />
       <ReplaceSignInPrompt
         account={account}
@@ -396,6 +390,15 @@ export function AccountPane({ account }: { account: AccountController }) {
         !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
           <div className="set-pane-footer acct-actions">{actions}</div>
         )}
+
+      {canChangeServer && (
+        <ServerConnect
+          key={view === 'not-configured' || unreachable ? 'open' : 'closed'}
+          account={account}
+          startOpen={view === 'not-configured' || unreachable}
+          unreachableServer={unreachable ? server : null}
+        />
+      )}
     </section>
   )
 }
