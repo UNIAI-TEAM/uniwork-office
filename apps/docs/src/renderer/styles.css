@@ -9889,24 +9889,12 @@ body.docs-crop-active
 }
 
 /* A phone-width frame: keep the page counter, the save state and the zoom, drop the parts that
-   only repeat a ribbon entry (Track Changes, the layout switcher) or are long (the word count),
-   so nothing sits half-clipped under the view buttons. A status message (a failed save, a hint)
-   is the one thing the person must not lose: for its lifetime it takes the left side of the bar. */
+   only repeat a ribbon entry (Track Changes, the layout switcher) or are long (the word count,
+   the status message), so nothing sits half-clipped under the view buttons. The message itself
+   is not lost: App raises it as a toast above the bar (.app-toast, see below). */
 @media (max-width: 640px) {
-  .status-track {
-    display: none;
-  }
-
-  .status-left:has(.status-msg) > :not(.status-msg) {
-    display: none;
-  }
-
+  .status-track,
   .status-msg {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .status-msg-sep {
     display: none;
   }
 }
@@ -13454,6 +13442,24 @@ tr > .page-gap-cut {
 
 .app-toast.error {
   background: var(--docs-toast-error-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-toast {
+    transition: none;
+  }
+}
+
+/* a phone: the status bar drops its message, so toasts sit just above the bar (24px) where the
+   message would have been, and wrap instead of clipping at 60vw */
+@media (max-width: 640px) {
+  .app-toast {
+    top: auto;
+    bottom: 32px;
+    transform: translate(-50%, 8px);
+    max-width: calc(100vw - 24px);
+    white-space: normal;
+  }
 }
 
 .app-toast-icon {

@@ -339,7 +339,7 @@ import {
   type TableDialogKind,
 } from './components/TableDialogs'
 import { TablePropertiesDialog } from './components/TablePropertiesDialog'
-import { showToast } from './components/toast-bus'
+import { showStatusToast, showToast } from './components/toast-bus'
 import { setTableAutoFit, toggleRepeatHeaderRows } from './editor/table-properties'
 import { distributeSelectedColumns } from './editor/table-sizing'
 import {
@@ -849,6 +849,13 @@ export function App() {
   )
   const [status, setStatus] = useState<StatusLine>('')
   const [refusedMessage, setRefusedMessage] = useState<StatusLine>('')
+  // a phone-width frame hides the status message in the bar (styles.css, max-width 640px): raise it
+  // as a toast instead. `t` stays out of the deps; the message is translated when it is set.
+  useEffect(() => {
+    if (!status || !window.matchMedia('(max-width: 640px)').matches) return
+    showStatusToast(statusText(status, t))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
   // A key + params line re-translates at render time, so only a ready
   // (already translated) string goes stale on a UI language switch.
   const clearStaleStatus = useCallback(
@@ -7772,8 +7779,8 @@ export function App() {
                 })()}
               {status && !refusedMessage && (
                 <span className="status-msg" title={statusText(status, t)}>
-                  <span className="status-msg-sep"> — </span>
-                  {statusText(status, t)}
+                  {' '}
+                  — {statusText(status, t)}
                 </span>
               )}
             </div>
