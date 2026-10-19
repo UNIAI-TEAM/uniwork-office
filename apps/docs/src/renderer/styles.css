@@ -10723,6 +10723,42 @@ body.docs-crop-active
   color: var(--text-dim);
 }
 
+/* a phone: the options stack under the page preview (side by side the preview shrinks to a
+   strip), the preview keeps a usable height, and the dialog scrolls instead of overflowing */
+@media (max-width: 640px) {
+  .modal.print-dialog {
+    box-sizing: border-box;
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .print-dialog-body {
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 12px;
+    height: auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .print-preview-pane {
+    flex: none;
+    height: clamp(240px, 42vh, 360px);
+  }
+
+  .print-preview-nav {
+    white-space: nowrap;
+  }
+
+  .print-options {
+    width: auto;
+    overflow-y: visible;
+  }
+}
+
 /* provider tabs in AI settings */
 
 .provider-tabs {
