@@ -2640,6 +2640,40 @@ describe('file-level page operations', () => {
     expect(deps.insertBlankPage).not.toHaveBeenCalled()
   })
 
+  // UNI-1923 (B): a declined file-op card reaches nothing — not even the flush-save the op would
+  // run first. The flush lives inside the op dep (App.tsx runFileOp), so "no dep ran" IS "no save".
+  it('a declined file-op card fires no save path at all (nothing reaches UniWork)', async () => {
+    const deps = fourPages({ confirmFileOp: vi.fn(async () => false) })
+    const FILE_OP_DEPS: Array<keyof PdfAiDeps> = [
+      'insertBlankPage',
+      'setPageSize',
+      'cropPages',
+      'replacePages',
+      'extractPages',
+      'splitPdf',
+      'splitPages',
+      'mergePages',
+    ]
+    for (const c of [
+      call('insert_blank_page', { after_page: 2 }),
+      call('set_page_size', { preset: 'A4' }),
+      call('crop_pages', { pages: '1', left: 0.1, top: 0, right: 0.9, bottom: 1 }),
+      call('replace_pages', { pages: '1' }),
+      call('extract_pages', { pages: '1-2' }),
+      call('split_pdf', { pages_per_file: 2 }),
+      call('split_pages', { per_page: 2 }),
+      call('merge_pages', { per_sheet: 2, direction: 'horizontal' }),
+    ]) {
+      const result = await executePdfTool(deps, c)
+      expect(result.output, c.name).toContain('declined')
+      expect(result.mutated, c.name).toBeUndefined()
+    }
+    expect(deps.confirmFileOp).toHaveBeenCalled()
+    for (const key of FILE_OP_DEPS) {
+      expect(deps[key], key).not.toHaveBeenCalled()
+    }
+  })
+
   it('stopping the run while the card is open reports the stop', async () => {
     const ctl = new AbortController()
     const deps = fourPages({

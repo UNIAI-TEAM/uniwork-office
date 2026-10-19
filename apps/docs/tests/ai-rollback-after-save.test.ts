@@ -4,7 +4,7 @@
 // part. Without a save, Roll back restores everything and says nothing.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import { createAiSideState, sidePartOf } from '../src/renderer/ai/run-snapshot'
@@ -147,6 +147,31 @@ describe('Roll back after a mid-run Save (docs)', () => {
     await rollBack()
     expect(f.header.value).toEqual({})
     expect(notice()).toBeNull()
+  })
+
+  // UNI-1923 (B): Roll back after AI edits restores editor state only — nothing reaches UniWork.
+  // The seam is window.desktop.saveDocx*: a save the panel never asks for stays uncalled.
+  it('a rollback after AI edits fires no save', async () => {
+    const f = await mountWired()
+    const saveDocx = vi.fn()
+    const saveDocxAs = vi.fn()
+    const saveDocxNew = vi.fn()
+    const saveDocxTo = vi.fn()
+    Object.assign(window.desktop, { saveDocx, saveDocxAs, saveDocxNew, saveDocxTo })
+    await h!.send('add a header and bold the title')
+    await h!.toolTurn([HEADER, BOLD])
+    await h!.textTurn('Done.')
+    // the AI edits landed (local unsaved state) — still no save went out
+    expect(h!.editor.state.doc.child(0).firstChild?.marks?.length ?? 0).toBeGreaterThan(0)
+    expect(f.header.value).toEqual({ header: 'AI header' })
+    for (const s of [saveDocx, saveDocxAs, saveDocxNew, saveDocxTo]) {
+      expect(s).not.toHaveBeenCalled()
+    }
+    await rollBack()
+    expect(h!.editor.state.doc.child(0).firstChild?.marks ?? []).toEqual([])
+    for (const s of [saveDocx, saveDocxAs, saveDocxNew, saveDocxTo]) {
+      expect(s).not.toHaveBeenCalled()
+    }
   })
 })
 
