@@ -1141,6 +1141,7 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     type Internals = {
       draftFlushWaiters: Map<string, unknown>
       store: { lookup(path: string): unknown }
+      probeKeepDraft(...args: unknown[]): Promise<unknown>
       openConflictSession(doc: unknown, opts: unknown): Promise<unknown>
       queueEngine(): Promise<{
         kind: string
@@ -1365,6 +1366,146 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
       expect(readFileSync(path, 'utf8')).toBe('flushed bytes')
       expect(binding(path).state).not.toBe('saved')
       expect((await ctx.service.docStatus(path))?.state).not.toBe('saved')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
+    it('N1: a Save admitted while Reload waits on the download is drained, never superseded, and the action returns the conflict view', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      // the racing Save's commit answer never arrives: its record must survive as `reconciling`
+      server.faults.push({ route: 'commit', kind: 'network' })
+      const origFetch = server.fetch.getMockImplementation()!
+      let reloadReached!: () => void
+      const onReloadReached = new Promise<void>((resolve) => {
+        reloadReached = resolve
+      })
+      let releaseReload!: () => void
+      const reloadGate = new Promise<void>((resolve) => {
+        releaseReload = resolve
+      })
+      let commitReached!: () => void
+      const onCommitReached = new Promise<void>((resolve) => {
+        commitReached = resolve
+      })
+      let releaseCommit!: () => void
+      const commitGate = new Promise<void>((resolve) => {
+        releaseCommit = resolve
+      })
+      server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+        const u = new URL(url)
+        if (u.pathname === `/api/v1/documents/${DOC}/download`) {
+          reloadReached()
+          await reloadGate
+        }
+        if (u.pathname === `/api/v1/documents/${DOC}/versions/commit` && init.method === 'POST') {
+          commitReached()
+          await commitGate
+        }
+        return origFetch(url, init)
+      })
+      // the action may only move past its pre-destructive check once the in-flight Save settled
+      const coordinator = ctx.service.coordinator
+      const realSettled = coordinator.settled.bind(coordinator)
+      vi.spyOn(coordinator, 'settled').mockImplementation(async (target: string) => {
+        releaseCommit()
+        return realSettled(target)
+      })
+
+      const act = ctx.service.conflictAct(view.sessionId, {
+        kind: 'reload',
+        keep: 'discard',
+        stopAi: false,
+      })
+      await onReloadReached
+      writeFileSync(path, 'bytes from the racing save')
+      ctx.setEditorDirty(false)
+      ctx.service.onUserSave(path)
+      await onCommitReached
+      releaseReload()
+
+      const reply = await act
+      expect(reply).toMatchObject({ kind: 'view' })
+      const postKey = server.calls.find(
+        (c) => c.path.endsWith('/versions/commit') && c.method === 'POST',
+      )?.headers['idempotency-key']
+      expect(postKey).toBeTruthy()
+      expect(await storedIntent(ctx, path)).toMatchObject({
+        intent: { state: 'reconciling', idempotencyKey: postKey },
+      })
+      expect(readFileSync(path, 'utf8')).toBe('bytes from the racing save')
+      expect(binding(path).state).not.toBe('saved')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
+    it('N1: a Save admitted while Overwrite waits on the keep-draft probe is drained, never dropped, and the action returns the conflict view', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      server.faults.push({ route: 'commit', kind: 'network' })
+      const origFetch = server.fetch.getMockImplementation()!
+      let commitReached!: () => void
+      const onCommitReached = new Promise<void>((resolve) => {
+        commitReached = resolve
+      })
+      let releaseCommit!: () => void
+      const commitGate = new Promise<void>((resolve) => {
+        releaseCommit = resolve
+      })
+      server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+        const u = new URL(url)
+        if (u.pathname === `/api/v1/documents/${DOC}/versions/commit` && init.method === 'POST') {
+          commitReached()
+          await commitGate
+        }
+        return origFetch(url, init)
+      })
+      // the view the action decides on is held open until the Save is on the wire
+      const engine = internals(ctx)
+      const realProbe = engine.probeKeepDraft.bind(engine)
+      let probeReached!: () => void
+      const onProbeReached = new Promise<void>((resolve) => {
+        probeReached = resolve
+      })
+      let releaseProbe!: () => void
+      const probeGate = new Promise<void>((resolve) => {
+        releaseProbe = resolve
+      })
+      vi.spyOn(engine, 'probeKeepDraft').mockImplementation(async (...args: unknown[]) => {
+        probeReached()
+        await probeGate
+        return realProbe(...args)
+      })
+      const coordinator = ctx.service.coordinator
+      const realSettled = coordinator.settled.bind(coordinator)
+      vi.spyOn(coordinator, 'settled').mockImplementation(async (target: string) => {
+        releaseCommit()
+        return realSettled(target)
+      })
+
+      const act = ctx.service.conflictAct(view.sessionId, { kind: 'overwrite', stopAi: false })
+      await onProbeReached
+      writeFileSync(path, 'bytes from the racing save')
+      ctx.setEditorDirty(false)
+      ctx.service.onUserSave(path)
+      await onCommitReached
+      releaseProbe()
+
+      const reply = await act
+      expect(reply).toMatchObject({ kind: 'view' })
+      const postKey = server.calls.find(
+        (c) => c.path.endsWith('/versions/commit') && c.method === 'POST',
+      )?.headers['idempotency-key']
+      expect(postKey).toBeTruthy()
+      expect(await storedIntent(ctx, path)).toMatchObject({
+        intent: { state: 'reconciling', idempotencyKey: postKey },
+      })
+      expect(readFileSync(path, 'utf8')).toBe('bytes from the racing save')
+      expect(binding(path).state).not.toBe('saved')
       expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
       ctx.service.closeConflictPrompt()
       await flow

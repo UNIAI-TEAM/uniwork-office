@@ -6950,6 +6950,28 @@ export class UniworkDocsService {
     return intent
   }
 
+  /**
+   * N1: did a Save land between the action's view check and its first
+   * destructive step? The only await here is the drain of an in-flight
+   * attempt; the caller must keep this immediately before its
+   * `supersedePending` / `writeWorkingCopy` / `dropIntent`. True = a Save ran
+   * (its durable intent is not `none`, or the base the action started from
+   * moved): the replacement must supersede, drop and overwrite nothing.
+   */
+  private async saveRacedReplacement(
+    doc: BoundDocument,
+    start: { baseRevision: string; baseChecksum: string },
+  ): Promise<boolean> {
+    if (this.coordinator.isSaving(doc.path)) await this.coordinator.settled(doc.path)
+    if ((await this.conflictIntentBlock(doc)) !== 'none') return true
+    const now = this.store.lookup(doc.path)
+    if (!now) return true
+    return (
+      now.binding.baseRevision !== start.baseRevision ||
+      now.binding.baseChecksum !== start.baseChecksum
+    )
+  }
+
   private async probeKeepDraft(
     session: ConflictSession,
     doc: BoundDocument,
@@ -7583,6 +7605,20 @@ export class UniworkDocsService {
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
+    // N1: the view this action decided on was built earlier (its keep-draft
+    // probe and capability read await). A Save admitted since then - the user's
+    // Ctrl/Cmd+S - must not have its intent superseded or deleted under it, and
+    // the base it committed must not be overwritten by this one. Drain it and
+    // re-check right before the first destructive step, with no other await in
+    // between; a Save that ran leaves the decision to the conflict view.
+    if (
+      await this.saveRacedReplacement(chosen, {
+        baseRevision: chosen.binding.baseRevision,
+        baseChecksum: chosen.binding.baseChecksum,
+      })
+    ) {
+      return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+    }
     // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
     // user's snapshot is spent (superseded), never replayed against the new base
     await this.supersedePending(chosen)
@@ -7692,14 +7728,19 @@ export class UniworkDocsService {
     // durable intent must never be superseded or deleted under it - the record
     // is what authorizes the commit POST (R2), so deleting it refuses the POST
     // and orphans the staged upload, and the base read below would race the
-    // commit. Wait for the attempt to settle first, exactly as the close flow
-    // does, and only then replace the base.
-    if (this.coordinator.isSaving(doc.path)) await this.coordinator.settled(doc.path)
-    // N2: `settled` only proves the runner returned; if its commit lost its
-    // answer and left the durable record `committing` / `reconciling` /
-    // `reconciling-stuck`, do not supersede, drop, download or replace.
-    if ((await this.conflictIntentBlock(doc)) !== 'none') return null
+    // commit.
+    // N1: a Save can also be admitted DURING this action (the user's Ctrl/Cmd+S
+    // while the download runs). So the drain + re-check runs immediately before
+    // the first destructive step - `supersedePending` / `writeWorkingCopy` /
+    // `dropIntent` - with no other await in between: a Save that ran (its
+    // durable intent is not `none`, or the base this action started from moved)
+    // leaves the replacement to the dialog's conflict view instead.
+    const start = {
+      baseRevision: doc.binding.baseRevision,
+      baseChecksum: doc.binding.baseChecksum,
+    }
     const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
+    if (await this.saveRacedReplacement(doc, start)) return null
     // "Tải lại": the old intent is superseded BEFORE the base is replaced, so
     // it is spent (cancelled/superseded), never replayed against the new base
     await this.supersedePending(doc)
