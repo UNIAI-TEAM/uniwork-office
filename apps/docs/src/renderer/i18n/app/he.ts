@@ -536,4 +536,7 @@ export const he = {
   appPrintNoPrinter: 'אין מדפסת זמינה במחשב זה. אפשר לשמור את המסמך כקובץ PDF במקום.',
   appPrintFailedPdfHint: 'ההדפסה נכשלה: {error}. אפשר לשמור את המסמך כקובץ PDF במקום.',
   appPrintSaveAsPdf: 'שמירה כ-PDF…',
+  appFileSaveCopy: 'שמירה כעותק…',
+  appCopySaved: 'הגרסה שלך נשמרה כמסמך חדש: {title}.',
+  appCopySaveFailed: 'לא ניתן היה ליצור את העותק. השינויים שלך עדיין בטוחים; נסה שוב.',
 } satisfies Record<keyof typeof zh, string>

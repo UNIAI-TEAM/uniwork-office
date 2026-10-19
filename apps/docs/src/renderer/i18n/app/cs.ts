@@ -551,4 +551,8 @@ export const cs = {
     'Na tomto počítači není dostupná žádná tiskárna. Dokument můžete místo toho uložit jako PDF.',
   appPrintFailedPdfHint: 'Tisk se nepodařil: {error}. Dokument můžete místo toho uložit jako PDF.',
   appPrintSaveAsPdf: 'Uložit jako PDF…',
+  appFileSaveCopy: 'Uložit jako kopii…',
+  appCopySaved: 'Vaše verze byla uložena jako nový dokument: {title}.',
+  appCopySaveFailed:
+    'Kopii se nepodařilo vytvořit. Vaše změny jsou stále v bezpečí; zkuste to znovu.',
 } satisfies Record<keyof typeof zh, string>

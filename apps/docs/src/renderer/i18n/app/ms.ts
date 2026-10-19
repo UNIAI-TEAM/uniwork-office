@@ -558,4 +558,7 @@ export const ms = {
   appPrintFailedPdfHint:
     'Pencetakan gagal: {error}. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
   appPrintSaveAsPdf: 'Simpan sebagai PDF…',
+  appFileSaveCopy: 'Simpan sebagai salinan…',
+  appCopySaved: 'Versi anda disimpan sebagai dokumen baharu: {title}.',
+  appCopySaveFailed: 'Tidak dapat mencipta salinan. Perubahan anda masih selamat; cuba lagi.',
 } satisfies Record<keyof typeof zh, string>

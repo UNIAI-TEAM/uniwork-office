@@ -27,6 +27,7 @@ describe('webCapabilities (the single web capability source)', () => {
         'recents',
         'save',
         'saveAs',
+        'saveCopy',
         'tabs',
         'webSearch',
         'zotero',
@@ -47,13 +48,14 @@ describe('webCapabilities (the single web capability source)', () => {
     expect(hide.capabilities).toBe(webCapabilities)
   })
 
-  it('File > Open, recents, save, saveAs, print, exportPdf, and exportHtml turn on only with the negotiated host grants', () => {
+  it('File > Open, recents, save, saveAs, saveCopy, print, exportPdf, and exportHtml turn on only with the negotiated host grants', () => {
     expect(hostGrants(undefined)).toEqual({
       open: false,
       recents: false,
       desktopOpen: false,
       save: false,
       saveAs: false,
+      saveCopy: false,
       print: false,
       exportPdf: false,
       exportHtml: false,
@@ -65,6 +67,7 @@ describe('webCapabilities (the single web capability source)', () => {
       desktopOpen: false,
       save: true,
       saveAs: false,
+      saveCopy: false,
       print: false,
       exportPdf: false,
       exportHtml: false,
@@ -74,6 +77,7 @@ describe('webCapabilities (the single web capability source)', () => {
         filePick: true,
         recents: false,
         saveAs: true,
+        saveCopy: true,
         print: true,
         exportPdf: true,
         exportHtml: true,
@@ -84,6 +88,7 @@ describe('webCapabilities (the single web capability source)', () => {
       desktopOpen: false,
       save: false,
       saveAs: true,
+      saveCopy: true,
       print: true,
       exportPdf: true,
       exportHtml: true,
@@ -95,6 +100,7 @@ describe('webCapabilities (the single web capability source)', () => {
       desktopOpen: true,
       save: false,
       saveAs: false,
+      saveCopy: false,
       print: false,
       exportPdf: false,
       exportHtml: false,

@@ -569,4 +569,8 @@ export const de = {
   appPrintFailedPdfHint:
     'Drucken ist fehlgeschlagen: {error}. Sie können das Dokument stattdessen als PDF speichern.',
   appPrintSaveAsPdf: 'Als PDF speichern…',
+  appFileSaveCopy: 'Als Kopie speichern…',
+  appCopySaved: 'Ihre Version wurde als neues Dokument gespeichert: {title}.',
+  appCopySaveFailed:
+    'Die Kopie konnte nicht erstellt werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
 } satisfies Record<keyof typeof zh, string>

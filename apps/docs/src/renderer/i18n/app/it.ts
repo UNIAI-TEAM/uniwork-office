@@ -559,4 +559,7 @@ export const it = {
     'Nessuna stampante disponibile su questo computer. Puoi salvare il documento come PDF.',
   appPrintFailedPdfHint: 'Stampa non riuscita: {error}. Puoi salvare il documento come PDF.',
   appPrintSaveAsPdf: 'Salva come PDF…',
+  appFileSaveCopy: 'Salva come copia…',
+  appCopySaved: 'La tua versione è stata salvata come nuovo documento: {title}.',
+  appCopySaveFailed: 'Impossibile creare la copia. Le modifiche sono ancora al sicuro; riprova.',
 } satisfies Record<keyof typeof zh, string>

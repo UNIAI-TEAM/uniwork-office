@@ -546,4 +546,7 @@ export const th = {
   appPrintNoPrinter: 'ไม่มีเครื่องพิมพ์ในคอมพิวเตอร์เครื่องนี้ คุณบันทึกเอกสารเป็น PDF แทนได้',
   appPrintFailedPdfHint: 'พิมพ์ไม่สำเร็จ: {error} คุณบันทึกเอกสารเป็น PDF แทนได้',
   appPrintSaveAsPdf: 'บันทึกเป็น PDF…',
+  appFileSaveCopy: 'บันทึกเป็นสำเนา…',
+  appCopySaved: 'บันทึกเวอร์ชันของคุณเป็นเอกสารใหม่แล้ว: {title}',
+  appCopySaveFailed: 'สร้างสำเนาไม่ได้ การเปลี่ยนแปลงของคุณยังปลอดภัย โปรดลองอีกครั้ง',
 } satisfies Record<keyof typeof zh, string>

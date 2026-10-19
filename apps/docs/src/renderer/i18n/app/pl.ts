@@ -560,4 +560,7 @@ export const pl = {
   appPrintFailedPdfHint:
     'Drukowanie nie powiodło się: {error}. Możesz zamiast tego zapisać dokument jako PDF.',
   appPrintSaveAsPdf: 'Zapisz jako PDF…',
+  appFileSaveCopy: 'Zapisz jako kopię…',
+  appCopySaved: 'Twoja wersja została zapisana jako nowy dokument: {title}.',
+  appCopySaveFailed: 'Nie udało się utworzyć kopii. Zmiany są nadal bezpieczne; spróbuj ponownie.',
 } satisfies Record<keyof typeof zh, string>

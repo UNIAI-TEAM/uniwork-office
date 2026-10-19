@@ -553,4 +553,7 @@ export const hi = {
   appPrintFailedPdfHint:
     'प्रिंट नहीं हो सका: {error}। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
   appPrintSaveAsPdf: 'PDF के रूप में सहेजें…',
+  appFileSaveCopy: 'प्रति के रूप में सहेजें…',
+  appCopySaved: 'आपका संस्करण नए दस्तावेज़ के रूप में सहेजा गया: {title}।',
+  appCopySaveFailed: 'प्रति नहीं बन सकी। आपके बदलाव अब भी सुरक्षित हैं; फिर से कोशिश करें।',
 } satisfies Record<keyof typeof zh, string>
