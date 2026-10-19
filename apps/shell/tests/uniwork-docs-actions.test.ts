@@ -173,6 +173,8 @@ function fakeServer(
     myFolderLocked?: boolean
     /** SAVE-01: D's bare 400 `invalid_destination` on the create routes */
     invalidDestination?: boolean
+    /** UNI-1959: the blank route answers this bare status (a server without the route: 404 / 501) */
+    blankStatus?: number
     /**
      * SAVE-01 r2 (S01-R1-4): the create POST waits on this latch, so a second
      * submit can be issued while the first is still in flight
@@ -339,6 +341,7 @@ function fakeServer(
     // create blank
     if (u.pathname === `/api/v1/workspaces/${WS}/documents/files/blank`) {
       call.body = JSON.parse(String(init.body))
+      if (options.blankStatus) return new Response('', { status: options.blankStatus })
       if (options.nameTaken) return envelope(409, 'conflict')
       if (options.nameRefused) return envelope(400, 'invalid_request')
       // MYFOLDER-01: a create that mixes destination and parent_id, or names an
@@ -931,6 +934,17 @@ function setup(
     syncStoreBudgetBytes?: number
     /** SAVE-01: runs inside notifyPathRenamed, between the bind and its push */
     onPathMoved?: () => void
+    /** UNI-1959: the renderer's "Name the document" round trip on a blank document's first save */
+    requestFirstSaveName?: (request: {
+      requestId: string
+      path: string
+      documentId: string
+      workspaceId: string
+      title: string
+      parentId: string | null
+    }) => Promise<'continue' | 'cancel'>
+    /** UNI-1959: false = the path is a detached editor window, which has no dialog host */
+    shellTab?: boolean
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -1003,6 +1017,8 @@ function setup(
     isPathOpen: () => options.pathOpen === true,
     firstSaveFlushTimeoutMs: options.firstSaveFlushTimeoutMs,
     syncStore,
+    requestFirstSaveName: options.requestFirstSaveName,
+    isShellTab: options.shellTab === undefined ? undefined : () => options.shellTab!,
     requestModuleSave: (path) => {
       moduleSaveCalls.push(path)
       if (options.moduleSaveResult === false) return false
@@ -1254,6 +1270,272 @@ describe('UW-CREATE-TYPES create kinds', () => {
       error: 'name_empty',
     })
     expect(server.calls).toHaveLength(0)
+  })
+})
+
+describe('UNI-1959 share with workspace on create', () => {
+  const post = (server: FakeServer, suffix: string) =>
+    server.calls.find((c) => c.method === 'POST' && c.path.endsWith(suffix))!
+
+  it('sends visibility workspace on a blank file only when the input sets it', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name: 'Shared.docx',
+      format: 'docx',
+      visibility: 'workspace',
+    })
+    await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name: 'Own.docx',
+      format: 'docx',
+    })
+    const blanks = server.calls.filter((c) => c.path.endsWith('/documents/files/blank'))
+    expect(blanks).toHaveLength(2)
+    expect(blanks[0]!.body).toMatchObject({ title: 'Shared.docx', visibility: 'workspace' })
+    expect(blanks[1]!.body).not.toHaveProperty('visibility')
+  })
+
+  it('sends visibility workspace on a UniNote only when the input sets it', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.createPage({
+      workspaceId: WS,
+      folderId: 'fold_1',
+      name: 'Shared note',
+      visibility: 'workspace',
+    })
+    expect(post(server, `/${WS}/documents`).body).toEqual({
+      kind: 'page',
+      title: 'Shared note',
+      parent_id: 'fold_1',
+      visibility: 'workspace',
+    })
+    const plain = fakeServer()
+    await setup(plain).service.createPage({ workspaceId: WS, folderId: 'fold_1', name: 'Own note' })
+    expect(post(plain, `/${WS}/documents`).body).not.toHaveProperty('visibility')
+  })
+
+  it('sends visibility workspace on a folder only when the input sets it', async () => {
+    const server = fakeServer({ kind: 'folder' })
+    const ctx = setup(server)
+    await ctx.service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Shared folder',
+      visibility: 'workspace',
+    })
+    expect(post(server, `/${WS}/documents`).body).toMatchObject({
+      kind: 'folder',
+      title: 'Shared folder',
+      visibility: 'workspace',
+    })
+    const plain = fakeServer({ kind: 'folder' })
+    await setup(plain).service.createFolder({
+      workspaceId: WS,
+      parentId: null,
+      title: 'Own folder',
+    })
+    expect(post(plain, `/${WS}/documents`).body).not.toHaveProperty('visibility')
+  })
+
+  it('ignores any visibility other than workspace (a hand-typed invoke)', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name: 'X.docx',
+      format: 'docx',
+      visibility: 'restricted',
+    } as never)
+    const blank = server.calls.find((c) => c.path.endsWith('/documents/files/blank'))!
+    expect(blank.body).not.toHaveProperty('visibility')
+  })
+
+  it.each([404, 501])('a %s on the blank route says the endpoint is missing', async (status) => {
+    const server = fakeServer({ blankStatus: status })
+    const ctx = setup(server)
+    const result = await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name: 'X.pdf',
+      format: 'pdf',
+    })
+    expect(result).toMatchObject({ ok: false, endpointMissing: true })
+  })
+
+  it('a 500 on the blank route is a plain failure, not a missing endpoint', async () => {
+    const server = fakeServer({ blankStatus: 500 })
+    const ctx = setup(server)
+    const result = await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name: 'X.pdf',
+      format: 'pdf',
+    })
+    expect(result.ok).toBe(false)
+    expect(result).not.toHaveProperty('endpointMissing')
+  })
+})
+
+describe('UNI-1959 first save of a blank document asks name + folder', () => {
+  type Request = {
+    requestId: string
+    path: string
+    documentId: string
+    workspaceId: string
+    title: string
+    parentId: string | null
+  }
+  const commitsOf = (server: FakeServer) =>
+    server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/versions/commit'))
+  const idle = () => new Promise<void>((resolve) => setTimeout(resolve, 60))
+
+  /** a window whose dialog the test answers by hand */
+  function dialogWindow() {
+    const asked: Request[] = []
+    const answers: Array<(a: 'continue' | 'cancel') => void> = []
+    const request = (req: Request) =>
+      new Promise<'continue' | 'cancel'>((resolve) => {
+        asked.push(req)
+        answers.push(resolve)
+      })
+    return { asked, answers, request }
+  }
+
+  async function createdAndOpened(ctx: ReturnType<typeof setup>, name = 'Untitled document.docx') {
+    const created = await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name,
+      format: 'docx',
+    })
+    if (!created.ok) throw new Error('create failed')
+    const opened = await ctx.service.openDocument(created.value.id)
+    if (!opened.ok) throw new Error('open failed')
+    return { id: created.value.id, path: opened.value.path }
+  }
+
+  it('asks once for a document created blank in this session, holds the upload until answered, never asks twice', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+    expect(win.asked[0]).toMatchObject({
+      path: doc.path,
+      documentId: doc.id,
+      workspaceId: WS,
+      title: 'Untitled document.docx',
+    })
+    // the save does not run while the dialog is open
+    expect(commitsOf(server)).toHaveLength(0)
+
+    win.answers[0]!('continue')
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1))
+
+    // a second save never asks
+    writeFileSync(doc.path, 'bytes v3')
+    ctx.service.onUserSave(doc.path)
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(2))
+    expect(win.asked).toHaveLength(1)
+  })
+
+  it('Cancel runs no save, and the next save asks again', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    win.answers[0]!('cancel')
+    await idle()
+    expect(commitsOf(server)).toHaveLength(0)
+
+    ctx.service.onUserSave(doc.path)
+    await idle()
+    expect(win.asked).toHaveLength(2)
+  })
+
+  it('after a restart a version-1 document with a default blank name still asks', async () => {
+    const server = fakeServer({ title: 'Untitled document.docx' })
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win.request,
+    })
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error('open failed')
+    writeFileSync(opened.value.path, 'bytes v2')
+    ctx.service.onUserSave(opened.value.path)
+    await idle()
+    expect(win.asked).toHaveLength(1)
+    expect(win.asked[0]).toMatchObject({ documentId: DOC, title: 'Untitled document.docx' })
+  })
+
+  it('the Vietnamese default name asks too, an ordinary name never does', async () => {
+    const viServer = fakeServer({ title: 'Tài liệu chưa đặt tên.docx' })
+    const win1 = dialogWindow()
+    const ctx1 = setup(viServer, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win1.request,
+    })
+    const opened1 = await ctx1.service.openDocument(DOC)
+    if (!opened1.ok) throw new Error('open failed')
+    writeFileSync(opened1.value.path, 'bytes v2')
+    ctx1.service.onUserSave(opened1.value.path)
+    await idle()
+    expect(win1.asked).toHaveLength(1)
+
+    const plain = fakeServer({ title: 'Quarterly report.docx' })
+    const win2 = dialogWindow()
+    const ctx2 = setup(plain, {
+      syncStore: true,
+      moduleSaveResult: false,
+      requestFirstSaveName: win2.request,
+    })
+    const opened2 = await ctx2.service.openDocument(DOC)
+    if (!opened2.ok) throw new Error('open failed')
+    writeFileSync(opened2.value.path, 'bytes v2')
+    ctx2.service.onUserSave(opened2.value.path)
+    await vi.waitFor(() => expect(commitsOf(plain)).toHaveLength(1))
+    expect(win2.asked).toHaveLength(0)
+  })
+
+  it('a detached editor window has no dialog host: the save goes on without asking', async () => {
+    const server = fakeServer()
+    const win = dialogWindow()
+    const ctx = setup(server, {
+      syncStore: true,
+      moduleSaveResult: false,
+      shellTab: false,
+      requestFirstSaveName: win.request,
+    })
+    const doc = await createdAndOpened(ctx)
+    writeFileSync(doc.path, 'bytes v2')
+    ctx.service.onUserSave(doc.path)
+    await vi.waitFor(() => expect(commitsOf(server)).toHaveLength(1))
+    expect(win.asked).toHaveLength(0)
   })
 })
 
