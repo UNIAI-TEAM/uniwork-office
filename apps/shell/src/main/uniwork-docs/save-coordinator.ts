@@ -1080,6 +1080,35 @@ export class SaveCoordinator {
     intent: IntentRecordV2,
     intents: IntentStore,
   ): Promise<BoundDocument> {
+    if (intent.state === 'committing') {
+      // N3: a crash-left `committing` row must DURABLY enter `reconciling`
+      // before the lookup (the same `commitFailed` transition `resumeExpiredClaim`
+      // applies for R7), so a lookup that fails transiently leaves an aging
+      // `reconciling` row with `reconcileSince` instead of a `committing` row
+      // the tick cannot age. A refused transition keeps the intent and sends nothing.
+      const entered = await this.settleRecord(intents, doc, intent, {
+        type: 'commitFailed',
+        error: 'ticket_expired',
+      })
+      if (!entered.ok || entered.state !== 'reconciling') {
+        if (!entered.ok && entered.refusal === 'store_full') {
+          return this.commitState(doc, { ...doc.binding, state: 'error', error: 'store_full' })
+        }
+        if (!entered.ok && entered.refusal === 'interrupted') {
+          return this.commitState(doc, {
+            ...doc.binding,
+            state: 'signed-out',
+            error: 'not_signed_in',
+          })
+        }
+        const durable = entered.state ?? 'committing'
+        return this.commitState(doc, {
+          ...doc.binding,
+          state: queueChipState(durable) ?? doc.binding.state,
+          ...(errorForState(durable) ? { error: errorForState(durable) } : {}),
+        })
+      }
+    }
     const lookup = this.deps.client.lookupCommit
     if (!lookup) {
       await this.settleRecord(intents, doc, intent, { type: 'commitFailed', error: 'network' })

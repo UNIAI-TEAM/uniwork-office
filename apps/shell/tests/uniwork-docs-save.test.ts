@@ -176,6 +176,7 @@ function fakeServer(initial: {
     }
     if (u.pathname === `/api/v1/documents/${DOC}/versions/commit` && call.method === 'GET') {
       const fault = takeFault('lookup')
+      if (fault?.kind === 'network') throw new TypeError('fetch failed')
       if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
       if (fault?.outcome === 'in_flight') return json(200, { outcome: 'in_flight' })
       if (fault?.outcome === 'unknown') return error(410, 'commit_intent_unknown')
@@ -1229,6 +1230,35 @@ describe('review r1 save fixes', () => {
     const intent = (await intentOf(ctx, path))?.intent
     expect(intent?.state).toBe('reconciling')
     expect(intent?.reconcileSince).toBeTruthy()
+  })
+
+  it('N3: a crash-left committing record reconciles durably before a failing lookup', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    expect(await ctx.service.coordinator.save(path, { forceOffline: true })).toMatchObject({
+      binding: { state: 'paused_offline' },
+    })
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('open store failed')
+    const intents = createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+    const key = basename(dirname(path))
+    const current = await intents.get(key)
+    if (!current) throw new Error('the intent is missing from the store')
+    await intents.put(key, { ...current.intent, state: 'committing' }, current.payload)
+
+    server.faults.push({ route: 'lookup', kind: 'network' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'reconciling' })
+    const after = (await intentOf(ctx, path))?.intent
+    expect(after).toMatchObject({
+      state: 'reconciling',
+      idempotencyKey: current.intent.idempotencyKey,
+    })
+    expect(after?.reconcileSince).toBeTruthy()
+    expect(commits(server)).toHaveLength(0)
+    expect(uploads(server)).toHaveLength(0)
+    expect(lookups(server)).toHaveLength(1)
   })
 
   it('an expired claim whose lookup proves the commit settles with the receipt, no second POST (B69-lite)', async () => {
