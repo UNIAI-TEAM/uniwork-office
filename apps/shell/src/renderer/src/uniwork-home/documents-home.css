@@ -211,6 +211,17 @@
   flex: 1;
 }
 
+/* UNI-1979: an open folder's toolbar leads with the breadcrumb (its leaf is the
+   page title); it takes the free width, the search gives up width before it */
+.dh-toolbar-folder > .uwf-crumbs {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.dh-toolbar-folder .dh-search-box {
+  flex: 0 4 auto;
+}
+
 .dh-search-box {
   display: flex;
   flex: 0 1 auto;

@@ -389,6 +389,72 @@
   color: var(--text-muted);
 }
 
+/* UNI-1979: the open folder's header row. The crumbs share the toolbar with the
+   search and the create actions, never wrap, and give up width in order: the
+   ancestors first (they truncate down to a floor), the leaf last. */
+.dh-toolbar .uwf-crumbs ol {
+  flex-wrap: nowrap;
+}
+
+.uwf-crumb-root {
+  flex: none;
+}
+
+.uwf-crumb-ancestor {
+  flex: 0 1000 auto;
+  min-width: 44px;
+}
+
+.uwf-crumb-ancestor .uwf-crumb-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.uwf-crumb-leaf {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.uwf-crumb-heading {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.uwf-crumb-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.uwf-crumb-rename {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.uwf-crumb-rename:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.uwf-crumb-rename:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* ── search chips ── */
 
 .uwf-chips {
@@ -518,6 +584,7 @@
   .uwf-sort,
   .uwf-chip,
   .uwf-crumb-btn,
+  .uwf-crumb-rename,
   .uwf-new-folder,
   .uwf-location-btn {
     min-height: 44px;

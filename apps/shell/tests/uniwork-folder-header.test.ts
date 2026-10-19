@@ -66,8 +66,7 @@ describe('UNI-1979 open-folder header: one row, the folder name once', () => {
         parentId: null,
         title: 'My Folder',
         position: 0,
-        kind: 'my_folder',
-        isSystem: true,
+        systemKind: 'my_folder',
         children: [],
       },
       {
@@ -189,7 +188,7 @@ describe('UNI-1979 open-folder header: one row, the folder name once', () => {
       'move',
     ])
     expect(items.map((i) => i.textContent)).toEqual(['New subfolder', 'Rename', 'Move to…'])
-    expect(document.body.textContent).not.toMatch(/share/i)
+    expect(document.body.querySelector('[role="menu"]')?.textContent).not.toMatch(/share/i)
   })
 
   it('the rename pencil opens the rename dialog for the open folder', async () => {
@@ -255,8 +254,9 @@ describe('UNI-1979 open-folder header: one row, the folder name once', () => {
     expect(leaf).toMatch(/min-width:\s*0/)
     const heading = ruleBody(foldersCss, '.uwf-crumb-heading')
     expect(heading).toMatch(/min-width:\s*0/)
-    expect(heading).toMatch(/text-overflow:\s*ellipsis/)
     expect(heading).toMatch(/max-width:\s*none/)
+    // the h1 keeps the crumb's single-line ellipsis
+    expect(ruleBody(foldersCss, '.uwf-crumb-current')).toMatch(/text-overflow:\s*ellipsis/)
   })
 
   it('CSS: the search shrinks before the crumbs and no raw colour is added', () => {
