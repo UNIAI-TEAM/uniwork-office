@@ -644,7 +644,7 @@ function CollabThreadImpl(p: CollabThreadProps) {
     const headRow = deleted ? null : (
       <>
         <span className="collab-av" aria-hidden="true">
-          {initials(nameOf(c))}
+          {c.avatar_url ? <img src={c.avatar_url} alt="" /> : initials(nameOf(c))}
         </span>
         <span className="collab-au" id={authorId}>
           {nameOf(c)}

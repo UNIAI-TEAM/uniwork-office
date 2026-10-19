@@ -542,3 +542,40 @@ describe('visual r1 fixes (panel / thread)', () => {
     expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*white-space:\s*nowrap/)
   })
 })
+
+/* UNI-1970 (web dbc054a69) + UNI-1969 edit box (web d6aa9f82c): thread parity rows */
+
+/** the declarations of a single-selector collab.css rule; the selector must appear exactly once */
+const cssRule = (sel: string): string => {
+  const text = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+  const at = text.indexOf(`${sel} {`)
+  expect(at, `rule ${sel}`).toBeGreaterThanOrEqual(0)
+  return text.slice(at, text.indexOf('}', at))
+}
+
+describe('avatars (UNI-1970 A)', () => {
+  it('avatar_url renders a hidden img; initials otherwise; replies are smaller', async () => {
+    const src = fakeSource(
+      list([
+        cm({ id: 'a', display_name: 'Ann Lee', avatar_url: 'https://x/ann.png' }),
+        cm({ id: 'r', parent_id: 'a', display_name: 'Bo Han' }),
+      ]),
+    )
+    await mount(src)
+    const av = $('[data-comment-id="a"] .collab-av')!
+    expect(av.getAttribute('aria-hidden')).toBe('true')
+    const img = av.querySelector('img')!
+    expect(img.getAttribute('src')).toBe('https://x/ann.png')
+    expect(img.getAttribute('alt')).toBe('')
+    const replyAv = $('[data-comment-id="r"] .collab-av')!
+    expect(replyAv.querySelector('img')).toBeNull()
+    expect(replyAv.textContent).toBe('BH')
+    // web lg/md sizes: root 32px, reply 24px
+    expect(cssRule('.collab-av')).toMatch(/width:\s*32px/)
+    expect(cssRule('.collab-av')).toMatch(/height:\s*32px/)
+    expect(cssRule('.collab-cm--reply .collab-av')).toMatch(/width:\s*24px/)
+    expect(cssRule('.collab-cm--reply .collab-av')).toMatch(/height:\s*24px/)
+    expect(cssRule('.collab-av img')).toMatch(/object-fit:\s*cover/)
+  })
+})
+
