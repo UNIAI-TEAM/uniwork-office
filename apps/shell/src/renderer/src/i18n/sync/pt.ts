@@ -128,7 +128,8 @@ export const pt = {
   uwSignOutWaiting: 'Concluindo o salvamento em andamento antes de sair…',
   uwSignOutCaptureFailed:
     'Algumas alterações não salvas não puderam ser capturadas a tempo; a versão salva ou salva automaticamente mais recente é mantida para sua conta.',
-  uwSignOutTimedOut: 'A saída demorou demais para ser confirmada; a conta pode ainda estar conectada.',
+  uwSignOutTimedOut:
+    'A saída demorou demais para ser confirmada; a conta pode ainda estar conectada.',
   uwSwitchLostTitle: 'Algumas alterações não salvas da conta anterior foram perdidas',
   uwSwitchLostBody:
     'Outra conta entrou neste computador, então a conta anterior foi bloqueada. Documentos cujas alterações não salvas não puderam ser mantidas: {count}. Todo o resto continua bloqueado neste computador para essa conta.',

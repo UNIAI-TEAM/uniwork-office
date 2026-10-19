@@ -127,7 +127,8 @@ export const nl = {
   uwSignOutWaiting: 'Lopende opslag wordt afgerond voordat je wordt afgemeld…',
   uwSignOutCaptureFailed:
     'Sommige niet-opgeslagen wijzigingen konden niet op tijd worden vastgelegd; de laatst opgeslagen of automatisch opgeslagen versie blijft bewaard voor je account.',
-  uwSignOutTimedOut: 'Afmelden duurde te lang om te bevestigen; het account kan nog steeds aangemeld zijn.',
+  uwSignOutTimedOut:
+    'Afmelden duurde te lang om te bevestigen; het account kan nog steeds aangemeld zijn.',
   uwSwitchLostTitle:
     'Sommige niet-opgeslagen wijzigingen van het vorige account zijn verloren gegaan',
   uwSwitchLostBody:

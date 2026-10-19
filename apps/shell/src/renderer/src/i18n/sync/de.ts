@@ -130,7 +130,8 @@ export const de = {
   uwSignOutWaiting: 'Laufendes Speichern wird vor dem Abmelden abgeschlossen…',
   uwSignOutCaptureFailed:
     'Einige ungespeicherte Änderungen konnten nicht rechtzeitig erfasst werden; die zuletzt gespeicherte oder automatisch gespeicherte Version bleibt für dein Konto erhalten.',
-  uwSignOutTimedOut: 'Die Abmeldung konnte nicht rechtzeitig bestätigt werden; das Konto ist möglicherweise noch angemeldet.',
+  uwSignOutTimedOut:
+    'Die Abmeldung konnte nicht rechtzeitig bestätigt werden; das Konto ist möglicherweise noch angemeldet.',
   uwSwitchLostTitle:
     'Einige nicht gespeicherte Änderungen des vorherigen Kontos sind verloren gegangen',
   uwSwitchLostBody:

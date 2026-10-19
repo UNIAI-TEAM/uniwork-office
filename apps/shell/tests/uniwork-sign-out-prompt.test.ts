@@ -702,7 +702,9 @@ describe('Settings → Account sign-out prompt (S3)', () => {
       expect(promptDialog()).toBeNull()
       expect(api.accountStatus.mock.calls.length).toBeGreaterThan(statusCallsBefore)
       // A72: the silent expiry reports its outcome instead of vanishing
-      const statusNodes = Array.from(host.querySelectorAll<HTMLElement>('.acct-pane [role="status"]'))
+      const statusNodes = Array.from(
+        host.querySelectorAll<HTMLElement>('.acct-pane [role="status"]'),
+      )
       expect(statusNodes.some((n) => n.textContent?.includes(syncVi.uwSignOutTimedOut))).toBe(true)
       // a status push that shows the account signed out again settles the notice
       await act(async () => {

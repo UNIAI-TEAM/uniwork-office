@@ -9,8 +9,7 @@ export const ja = {
   uwChipReconcileStuck: '保存の確認にサポートが必要です',
   uwErrReconcileStuck: '保存の確認にサポートが必要です。',
   uwChipRemoteNewer: 'UniWork に新しいバージョンがあります',
-  uwTipQueued:
-    '{time} の保存はこのコンピューターに安全に保持され、可能になり次第送信されます。',
+  uwTipQueued: '{time} の保存はこのコンピューターに安全に保持され、可能になり次第送信されます。',
   uwTipQueuedNewer: '{time} の保存は送信待ちです。それ以降の編集は含まれていません。',
   uwTipPausedAdmin:
     '管理者が送信を一時停止しています。保存内容はこのコンピューターに保持されます。',
@@ -126,7 +125,8 @@ export const ja = {
   uwSignOutWaiting: 'ログアウトする前に進行中の保存を完了しています…',
   uwSignOutCaptureFailed:
     '一部の未保存の変更を時間内に取得できませんでした。最新の保存済みまたは自動保存版がアカウント用に保持されます。',
-  uwSignOutTimedOut: 'サインアウトの確認に時間がかかりすぎました。アカウントがまだサインインしている可能性があります。',
+  uwSignOutTimedOut:
+    'サインアウトの確認に時間がかかりすぎました。アカウントがまだサインインしている可能性があります。',
   uwSwitchLostTitle: '前のアカウントの未保存の変更の一部が失われました',
   uwSwitchLostBody:
     '別のアカウントがこのコンピューターにサインインしたため、前のアカウントはロックされました。未保存の変更を保持できなかったドキュメント: {count}。それ以外はすべて、そのアカウント用にこのコンピューターでロックされたまま保持されます。',

@@ -124,7 +124,8 @@ export const pl = {
   uwSignOutWaiting: 'Kończenie trwającego zapisu przed wylogowaniem…',
   uwSignOutCaptureFailed:
     'Niektórych niezapisanych zmian nie udało się przechwycić na czas; dla Twojego konta zachowano najnowszą zapisaną lub automatycznie zapisaną wersję.',
-  uwSignOutTimedOut: 'Potwierdzenie wylogowania trwało zbyt długo; konto może być nadal zalogowane.',
+  uwSignOutTimedOut:
+    'Potwierdzenie wylogowania trwało zbyt długo; konto może być nadal zalogowane.',
   uwSwitchLostTitle: 'Część niezapisanych zmian poprzedniego konta została utracona',
   uwSwitchLostBody:
     'Na tym komputerze zalogowało się inne konto, więc poprzednie konto zostało zablokowane. Dokumenty, których niezapisanych zmian nie udało się zachować: {count}. Wszystko inne pozostaje zablokowane na tym komputerze dla tamtego konta.',
