@@ -244,27 +244,71 @@ describe('UNI-1979 open-folder header: one row, the folder name once', () => {
     }
   })
 
-  it('CSS: the row never wraps its crumbs, ancestors shrink first and the leaf last', () => {
+  it('keeps the create actions together as the last child of the header row', async () => {
+    await openFolder('f-beta')
+    const row = headerRow()
+    const actions = row.lastElementChild as HTMLElement
+    expect(actions.classList.contains('dh-toolbar-actions')).toBe(true)
+    expect(actions.querySelector('.dh-btn-upload')).not.toBeNull()
+    expect(actions.querySelector('.dh-btn-create')).not.toBeNull()
+    // the search box is a child of the row itself (its own row or inline, by container width)
+    expect(row.querySelector(':scope > .dh-search-box')).not.toBeNull()
+  })
+
+  it('CSS: the row never wraps its crumbs, ancestors and home shrink first, the leaf last', () => {
     expect(ruleBody(foldersCss, '.dh-toolbar .uwf-crumbs ol')).toMatch(/flex-wrap:\s*nowrap/)
+    const root = ruleBody(foldersCss, '.uwf-crumb-root')
     const ancestor = ruleBody(foldersCss, '.uwf-crumb-ancestor')
     const leaf = ruleBody(foldersCss, '.uwf-crumb-leaf')
-    expect(ancestor).toMatch(/min-width:\s*\d+px/)
-    expect(Number.isNaN(shrinkOf(ancestor))).toBe(false)
-    expect(shrinkOf(ancestor)).toBeGreaterThan(shrinkOf(leaf))
-    expect(leaf).toMatch(/min-width:\s*0/)
+    // the web's weights: home crumb and ancestors 1000 against the leaf's 1
+    expect(shrinkOf(root)).toBe(1000)
+    expect(shrinkOf(ancestor)).toBe(1000)
+    expect(shrinkOf(leaf)).toBe(1)
+    // and floors, so nothing slides under a neighbour (web min-w-9 / min-w-10 / min-w-10)
+    expect(root).toMatch(/min-width:\s*2\.25rem/)
+    expect(ancestor).toMatch(/min-width:\s*2\.5rem/)
+    expect(leaf).toMatch(/min-width:\s*2\.5rem/)
     const heading = ruleBody(foldersCss, '.uwf-crumb-heading')
-    expect(heading).toMatch(/min-width:\s*0/)
+    expect(heading).toMatch(/min-width:\s*2\.5rem/)
     expect(heading).toMatch(/max-width:\s*none/)
     // the h1 keeps the crumb's single-line ellipsis
     expect(ruleBody(foldersCss, '.uwf-crumb-current')).toMatch(/text-overflow:\s*ellipsis/)
   })
 
-  it('CSS: the search shrinks before the crumbs and no raw colour is added', () => {
-    const search = ruleBody(homeCss, '.dh-toolbar-folder .dh-search-box')
-    expect(shrinkOf(search)).toBeGreaterThan(1)
+  it('CSS: the header row is a size container that always wraps, crumbs and actions on row one', () => {
+    const row = ruleBody(homeCss, '.dh-toolbar.dh-toolbar-folder')
+    expect(row).toMatch(/container-type:\s*inline-size/)
+    expect(row).toMatch(/flex-wrap:\s*wrap/)
+    // the wide-window rule that stops .dh-toolbar wrapping must not reach the folder row
+    const wide =
+      homeCss.match(/@media\s*\(\s*min-width:\s*1101px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(ruleBody(wide, '.dh-toolbar.dh-toolbar-folder')).toMatch(/flex-wrap:\s*wrap/)
     const crumbs = ruleBody(homeCss, '.dh-toolbar-folder > .uwf-crumbs')
-    expect(crumbs).toMatch(/flex:\s*1\s+1\s+\d+px/)
-    for (const body of [search, crumbs, ruleBody(foldersCss, '.uwf-crumb-rename')]) {
+    expect(crumbs).toMatch(/flex:\s*1\s+1\s+18rem/)
+    expect(ruleBody(homeCss, '.dh-toolbar-actions')).toMatch(/flex:\s*none/)
+  })
+
+  it('CSS: the search box is on its own row below 60rem and inline from 60rem up', () => {
+    const own = ruleBody(homeCss, '.dh-toolbar-folder .dh-search-box')
+    expect(own).toMatch(/order:\s*1\b/)
+    expect(own).toMatch(/flex:\s*0\s+0\s+100%/)
+    const container = homeCss.match(/@container\s*\(\s*min-width:\s*60rem\s*\)\s*\{([\s\S]*?)\n\}/)
+    expect(container, 'an @container (min-width: 60rem) rule').not.toBeNull()
+    const inline = ruleBody(container?.[1] ?? '', '.dh-toolbar-folder .dh-search-box')
+    expect(inline).toMatch(/order:\s*0\b/)
+    expect(inline).toMatch(/flex:\s*0\s+0\s+auto/)
+    expect(inline).toMatch(/width:\s*14rem/)
+    // never a viewport media query for the search position: the sidebars decide the width
+    expect(homeCss).not.toMatch(/@media[^{]*\{\s*\.dh-toolbar-folder \.dh-search-box/)
+  })
+
+  it('CSS: no raw colour is added', () => {
+    for (const body of [
+      ruleBody(homeCss, '.dh-toolbar.dh-toolbar-folder'),
+      ruleBody(homeCss, '.dh-toolbar-folder > .uwf-crumbs'),
+      ruleBody(homeCss, '.dh-toolbar-folder .dh-search-box'),
+      ruleBody(foldersCss, '.uwf-crumb-rename'),
+    ]) {
       expect(body).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i)
     }
   })
