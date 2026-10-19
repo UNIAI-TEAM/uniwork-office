@@ -452,6 +452,27 @@ function refusingCoordinator(
 }
 
 describe('G5-06 W4a save queue (fakes)', () => {
+  it('R2: a phase write the store refuses stops before the commit POST', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    // the mint (the first write) succeeds; every later phase write is refused
+    // with `store_full`, so the durable record can never say `committing`
+    const original = h.intents.put.bind(h.intents)
+    let writes = 0
+    h.intents.put = async (key, intent, payload) => {
+      writes += 1
+      return writes === 1 ? await original(key, intent, payload) : { kind: 'store_full' }
+    }
+    const ended = await h.coordinator.save(doc.path)
+    // nothing may have been POSTed: the durable record never reached the state
+    // that authorizes a commit
+    expect(h.server.state.counts.commit).toBe(0)
+    expect(ended?.binding.state).toBe('error')
+    expect(ended?.binding.error).toBe('store_full')
+    // the intent is kept: nothing was proven about it
+    expect(await stored(h.intents, doc)).not.toBeNull()
+  })
+
   it('crash at each step, timeout after commit, cancel race', async () => {
     // a commit whose answer is lost after the server committed: never "failed",
     // always reconciling, and a lookup settles it

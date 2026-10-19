@@ -100,6 +100,36 @@ function needsRecheck(error: unknown): error is UniworkDocError {
 }
 
 /**
+ * R2: the verdict of one inline phase write. `ok` is true only when the store
+ * really holds this attempt's own record in `state` afterwards (or the settled
+ * record was cleaned up). A store refusal, an interrupted write, or a key a
+ * newer generation now owns is `ok: false`, and `state` then reports the state
+ * the store really holds (null when nothing is stored at all).
+ */
+type PhaseWrite =
+  | { ok: true; state: IntentRecordV2['state'] | null }
+  | { ok: false; refusal: 'store_full' | 'interrupted' | 'owner_lost'; state: IntentRecordV2['state'] | null }
+
+/**
+ * R2: the durable record could not be driven to `committing` before the commit
+ * POST. Carries why (and the state the store really holds), so the caller keeps
+ * the intent and publishes that state instead of committing blind.
+ */
+class PhaseWriteRefusedError extends UniworkDocError {
+  readonly refusal: 'store_full' | 'interrupted' | 'owner_lost'
+  readonly durableState: IntentRecordV2['state'] | null
+
+  constructor(
+    refusal: 'store_full' | 'interrupted' | 'owner_lost',
+    durableState: IntentRecordV2['state'] | null,
+  ) {
+    super(refusal === 'store_full' ? 'store_full' : refusal === 'interrupted' ? 'not_signed_in' : 'server_error')
+    this.refusal = refusal
+    this.durableState = durableState
+  }
+}
+
+/**
  * B70: a COMMIT-leg failure whose answer the server never gave. It keeps the
  * original code and status - `applyFailure` and the trace read the same
  * verdicts - and exists only so the pipeline can tell a lost commit answer
@@ -787,6 +817,33 @@ export class SaveCoordinator {
       try {
         receipt = await this.uploadAndCommit(saving, intent, payload as Uint8Array, intents)
       } catch (error) {
+        // R2: the durable record could not be driven to `committing`, so the
+        // commit POST never left. Nothing was proven about the intent: it is
+        // kept and the chip shows the state the store really holds (a store
+        // refusal keeps today's store-error mapping).
+        if (error instanceof PhaseWriteRefusedError) {
+          if (error.refusal === 'store_full') {
+            return await this.commitState(saving, {
+              ...doc.binding,
+              state: 'error',
+              error: 'store_full',
+            })
+          }
+          if (error.refusal === 'interrupted') {
+            return await this.commitState(saving, {
+              ...doc.binding,
+              state: 'signed-out',
+              error: 'not_signed_in',
+            })
+          }
+          return await this.commitState(saving, {
+            ...doc.binding,
+            state: queueChipState(error.durableState ?? 'queued') ?? doc.binding.state,
+            ...(errorForState(error.durableState ?? 'queued')
+              ? { error: errorForState(error.durableState ?? 'queued') }
+              : {}),
+          })
+        }
         // B69-lite: the server refused the staged upload because its claim
         // expired. That is NOT "the upload is gone": the intent is kept and
         // exactly ONE lookup decides what happens to it (never a dropped intent,
@@ -947,21 +1004,33 @@ export class SaveCoordinator {
     doc: BoundDocument,
     owner: IntentRecordV2,
     event: QueueEvent,
-  ): Promise<void> {
+  ): Promise<PhaseWrite> {
     const stored = await intents.read(doc.key, factsOf(doc, 0))
     if (
       !stored ||
       stored.intent.intentId !== owner.intentId ||
       stored.intent.generation !== owner.generation
     ) {
-      return
+      // a newer generation (N+1) owns the key: this attempt's phase is not
+      // written, and the record really sits where the store says it does
+      return { ok: false, refusal: 'owner_lost', state: stored?.intent.state ?? null }
     }
     const result = transition(stored.intent, event, { now: this.now().getTime() })
     if (!result.record || result.effects.some((effect) => effect.kind === 'cleanup')) {
       await this.cleanupIntent(intents, doc, stored.intent)
-      return
+      return { ok: true, state: null }
     }
-    await intents.put(doc.key, result.record, stored.payload)
+    const written = await intents.put(doc.key, result.record, stored.payload)
+    if (written.kind !== 'ok') {
+      // the store refused (or the account boundary wiped the scope): the
+      // durable record still carries the state it had before this phase
+      return {
+        ok: false,
+        refusal: written.kind === 'store_full' ? 'store_full' : 'interrupted',
+        state: stored.intent.state,
+      }
+    }
+    return { ok: true, state: result.record.state }
   }
 
   /**
@@ -1225,13 +1294,22 @@ export class SaveCoordinator {
         if (!this.deps.isSignedIn() || !this.deps.ownsBinding(doc)) {
           throw new UniworkDocError('not_signed_in')
         }
-        // B70: the commit is about to be POSTed, so the durable record must say
-        // so BEFORE the request leaves - a crash or a lost answer then reads
-        // `committing`, never `queued` (which the next poll would re-POST
-        // blindly). Compare-then-put: a newer intent (N+1) is never clobbered.
-        await this.settleRecord(intents, doc, intent, { type: 'dispatch' })
-        await this.settleRecord(intents, doc, intent, { type: 'uploaded' })
-        await this.settleRecord(intents, doc, intent, { type: 'uploaded' })
+        // B70 + R2: the commit is about to be POSTed, so the durable record
+        // must say `committing` BEFORE the request leaves - a crash or a lost
+        // answer then reads `committing`, never `queued` (which the next poll
+        // would re-POST blindly). Compare-then-put: a newer intent (N+1) is
+        // never clobbered. Every write is checked and the LAST one must have
+        // landed as `committing`: a store refusal, an interrupted write, or a
+        // key another generation now owns stops the save BEFORE the POST,
+        // because nothing durable authorizes it.
+        let phase: PhaseWrite = { ok: false, refusal: 'owner_lost', state: null }
+        for (const event of [{ type: 'dispatch' }, { type: 'uploaded' }, { type: 'uploaded' }] as const) {
+          phase = await this.settleRecord(intents, doc, intent, event)
+          if (!phase.ok) break
+        }
+        if (!phase.ok || phase.state !== 'committing') {
+          throw new PhaseWriteRefusedError(phase.ok ? 'owner_lost' : phase.refusal, phase.state)
+        }
         try {
           return await this.deps.client.commit({
             documentId: intent.documentId,
