@@ -513,7 +513,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       )
       await expect(contents.locator('.dh-folder-open', { hasText: 'Storage' })).toBeVisible()
 
-      // Click `UniWork` in the breadcrumb to return to the workspace root
+      // Click the root crumb (`Documents (root)`) in the breadcrumb to return to the workspace root
       await crumbs.getByRole('button', { name: uniworkFoldersEn.ufRoot, exact: true }).click()
       await expect(crumbs).toBeHidden()
       await expect(contents.locator('.dh-title')).toHaveText(uniworkHomeEn.uhNavWorkspace)
@@ -734,7 +734,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       await expect(
         newDialog.getByRole('button', {
-          name: `${uniworkFoldersEn.ufLocation}: UniWork › Chosen Target`,
+          name: `${uniworkFoldersEn.ufLocation}: ${uniworkFoldersEn.ufRoot} › Chosen Target`,
         }),
       ).toBeVisible()
 
@@ -788,7 +788,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
       await expect(uploadDialog.locator('.uw-act-file-name')).toHaveText('uploaded-handbook.docx')
 
       const uploadLocBtn = uploadDialog.getByRole('button', {
-        name: `${uniworkFoldersEn.ufLocation}: UniWork › Start Folder`,
+        name: `${uniworkFoldersEn.ufLocation}: ${uniworkFoldersEn.ufRoot} › Start Folder`,
       })
       await expect(uploadLocBtn).toBeVisible()
       await uploadLocBtn.click()
@@ -803,7 +803,7 @@ test.describe.serial('UniWork folders (FD-11)', () => {
 
       await expect(
         uploadDialog.getByRole('button', {
-          name: `${uniworkFoldersEn.ufLocation}: UniWork › Chosen Target`,
+          name: `${uniworkFoldersEn.ufLocation}: ${uniworkFoldersEn.ufRoot} › Chosen Target`,
         }),
       ).toBeVisible()
 
