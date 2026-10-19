@@ -13331,6 +13331,17 @@ tr > .page-gap-cut {
   .ribbon-tabs > * {
     flex-shrink: 0;
   }
+
+  /* the scrolling tab row clips an absolute menu below it (overflow-x: auto makes overflow-y
+     auto too), so the File menu leaves the row's paint: fixed, with no offsets it keeps the
+     static position just under the File tab and no overflow ancestor clips it */
+  .ribbon-tabs .file-menu {
+    position: fixed;
+    top: auto;
+    left: auto;
+    margin-top: 2px;
+    max-width: calc(100vw - 16px);
+  }
 }
 
 .ai-msg-actions {
