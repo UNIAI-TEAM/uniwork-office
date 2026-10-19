@@ -804,6 +804,11 @@ describe('UniworkStatusChip: edit-lock session', () => {
     expect(onStatus).toHaveBeenCalledWith(next)
   })
 
+  it(`UNI-1958 row 8: the offline chip reads "Đang offline · chưa lưu" in vi`, async () => {
+    await mountChip(status(null, { state: 'offline' }), 'vi')
+    expect(host.querySelector('.uw-pill-label')!.textContent).toContain('Đang offline · chưa lưu')
+  })
+
   it(`'other': the pill reads View only`, async () => {
     await mountChip(status(lock('other')))
     expect(host.querySelector('.uw-pill-label')!.textContent).toContain('View only')
