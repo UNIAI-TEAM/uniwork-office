@@ -238,6 +238,35 @@ describe('DH1-W2 documents-home-model', () => {
     ).toEqual({ visibilityLabel: null, levelLabel: null, isEmpty: true, tone: 'none' })
   })
 
+  // UNI-1975 guard tests (pass on the base too)
+  it('shows no scope in the Access cell of a folder row (the server sends no visibility for a folder)', () => {
+    expect(
+      formatAccessCell(makeDoc({ kind: 'folder', visibility: undefined, myLevel: undefined }), tVi),
+    ).toEqual({ visibilityLabel: null, levelLabel: null, isEmpty: true, tone: 'none' })
+  })
+
+  it('lists Shared with me / Shared by me rows as given: a row without parentId stays a root row and no folder is added', async () => {
+    const rootRow = makeDoc({ id: 'recipient-doc', parentId: null })
+    const page = { ok: true as const, value: { documents: [rootRow], nextCursor: null } }
+    const api: DocumentsHomeApiAdapter = {
+      uniworkListChildren: vi.fn(),
+      uniworkEnsureMyFolder: vi.fn(),
+      uniworkListDocuments: vi.fn(),
+      uniworkListSharedWithMe: vi.fn(async () => page),
+      uniworkListSharedByMe: vi.fn(async () => page),
+    } as unknown as DocumentsHomeApiAdapter
+    for (const subView of ['shared-with-me', 'shared-by-me'] as const) {
+      const res = await fetchDocumentsHomePage(api, {
+        subView,
+        workspaceId: 'ws-1',
+        folderId: null,
+        myFolderId: null,
+        filters: DEFAULT_DOCUMENTS_HOME_FILTERS,
+      })
+      expect(res.result).toEqual({ ok: true, value: { items: [rootRow], nextCursor: null } })
+    }
+  })
+
   it('formats the Người sửa gần nhất (Last modified by) column with initial and returns null when updatedByName is absent', () => {
     expect(formatUpdatedByCell(makeDoc({ updatedByName: 'Minh Trần' }))).toEqual({
       name: 'Minh Trần',

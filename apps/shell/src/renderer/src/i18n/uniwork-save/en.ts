@@ -15,7 +15,6 @@ export const en = {
   usPickTitle: 'Choose where to save',
   usBack: 'Back to naming',
   usSearchFolders: 'Search folders',
-  usSharedNote: 'Saving into a shared folder gives the document that folder’s permissions.',
   usChooseFolder: 'Choose “{folder}”',
   usSelected: 'Selected',
   usRootBlocked: 'Choose a folder',

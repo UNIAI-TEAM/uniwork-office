@@ -15,7 +15,6 @@ export const zhTW = {
   usPickTitle: '選擇儲存位置',
   usBack: '返回命名',
   usSearchFolders: '搜尋資料夾',
-  usSharedNote: '儲存到共用資料夾後，文件會沿用該資料夾的權限。',
   usChooseFolder: '選擇「{folder}」',
   usSelected: '已選取',
   usRootBlocked: '請選擇一個資料夾',

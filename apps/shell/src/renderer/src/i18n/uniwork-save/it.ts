@@ -16,8 +16,6 @@ export const it = {
   usPickTitle: 'Scegli dove salvare',
   usBack: 'Torna al nome',
   usSearchFolders: 'Cerca cartelle',
-  usSharedNote:
-    'Se salvato in una cartella condivisa, il documento riceve le autorizzazioni di quella cartella.',
   usChooseFolder: 'Scegli “{folder}”',
   usSelected: 'Selezionato',
   usRootBlocked: 'Scegli una cartella',

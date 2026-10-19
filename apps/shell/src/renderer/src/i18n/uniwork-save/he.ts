@@ -15,7 +15,6 @@ export const he = {
   usPickTitle: 'בחירת מקום השמירה',
   usBack: 'חזרה למתן שם',
   usSearchFolders: 'חיפוש תיקיות',
-  usSharedNote: 'שמירה בתיקייה משותפת מעניקה למסמך את ההרשאות של אותה תיקייה.',
   usChooseFolder: 'בחירת "{folder}"',
   usSelected: 'נבחר',
   usRootBlocked: 'יש לבחור תיקייה',

@@ -791,6 +791,7 @@ export function AiPanel({
             resolveAttachmentSrc: (ref) => resolveAttachmentSrc(ref),
             listAttachmentNames: () => availableAttachments().map((a) => a.name),
             getEditFence: () => fenceRef.current,
+            uniworkBound: () => depsRef.current.access.uniworkBound?.() ?? false,
           },
           () => readOnlyRef.current,
         ),

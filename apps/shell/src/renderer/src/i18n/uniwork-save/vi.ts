@@ -15,7 +15,6 @@ export const vi = {
   usPickTitle: 'Chọn nơi lưu',
   usBack: 'Quay lại đặt tên',
   usSearchFolders: 'Tìm thư mục',
-  usSharedNote: 'Lưu vào thư mục chung thì tài liệu nhận quyền của thư mục đó.',
   usChooseFolder: 'Chọn “{folder}”',
   usSelected: 'Đang chọn',
   usRootBlocked: 'Hãy chọn một thư mục',

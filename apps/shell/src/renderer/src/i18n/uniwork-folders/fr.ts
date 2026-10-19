@@ -26,6 +26,7 @@ export const fr = {
   ufTooDeep: "L'arborescence compte au plus {max} niveaux.",
   ufCycle: 'Un dossier ne peut pas être déplacé dans lui-même ni dans un de ses sous-dossiers.',
   ufParentKind: 'Un dossier se trouve à la racine ou dans un autre dossier.',
+  ufNotShareable: 'Les dossiers ne peuvent pas être partagés. Partagez plutôt chaque document.',
   ufFolderGone: "Ce dossier n'est plus ici.",
   ufFolderNoAccess: "Vous n'avez plus accès à ce dossier.",
   ufNoPermission: "Vous n'avez pas l'autorisation de modifier ce dossier.",

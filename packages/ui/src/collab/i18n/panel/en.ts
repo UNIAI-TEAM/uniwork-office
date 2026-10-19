@@ -49,6 +49,7 @@ export const en = {
   collabDeleteConfirm: 'Delete permanently',
   collabDeleted: 'This content was deleted',
   collabEdited: 'Edited · {time}',
+  collabEditedMark: '(edited)',
   collabFormerMember: 'Former member',
   collabHistory: 'View edit history',
   collabHistoryTitle: 'Edit history',

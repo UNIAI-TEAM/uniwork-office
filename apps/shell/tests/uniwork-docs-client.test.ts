@@ -888,6 +888,34 @@ describe('401: one shared refresh, one retry (real account session)', () => {
     expectParsed((await api.listSharedByMe({ workspaceId: 'ws_1' })).documents)
   })
 
+  // UNI-1975 guard tests (pass on the base too): the app adds nothing to the
+  // server's folder-sharing answers (UNI-1973 / UNI-1974 reach it with no app change)
+  it('lists Shared by me exactly as the server answers: no folder rows added, a recipient row without parent_id lands at the root', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(200, {
+        documents: [
+          {
+            id: 'top_doc',
+            workspace_id: 'ws_1',
+            title: 'Top.docx',
+            kind: 'file',
+            updated_at: '2026-10-17T03:00:00Z',
+            visibility: 'restricted',
+            my_level: 'manage',
+          },
+        ],
+        next_cursor: null,
+      }),
+    )
+    const api = client(fetch)
+    const page = await api.listSharedByMe({ workspaceId: 'ws_1' })
+    expect(page.documents.map((d) => d.id)).toEqual(['top_doc'])
+    expect(page.documents.some((d) => d.kind === 'folder')).toBe(false)
+    // the server masked parent_id: the row stays at the workspace root, never a guessed folder
+    expect(page.documents[0]!.parentId).toBeNull()
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('sends listSharedByMe, listTrash, listWorkspaceMembers and filter params only when set', async () => {
     const seen: string[] = []
     const fetch = vi.fn<FetchLike>(async (url) => {

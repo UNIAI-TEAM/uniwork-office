@@ -793,6 +793,69 @@ describe('mention chip in the composer (the box never shows the id)', () => {
     await settle(act, 300)
     expect(listbox()).toBeNull()
   })
+
+  describe('same-named people get a distinct label (web withUniqueLabel, 302a45d4f)', () => {
+    const ANN1 = '01J8X4USR0D1D1D1D1D1D1D1D1'
+    const ANN2 = '01J8X4USR0D2D2D2D2D2D2D2D2'
+    const SAME_NAMED = [
+      candidate(ANN1, 'Ann Lee', 'ann.lee@x.vn'),
+      candidate(ANN2, 'Ann Lee', 'lee.ann@x.vn'),
+    ]
+
+    it('a second pick with the same display name is suffixed with the email local part', async () => {
+      const m = render({ source: fakeSource(SAME_NAMED) })
+      await openPicker('@a')
+      key('Enter')
+      expect(ta().value).toBe('@Ann Lee ')
+      await openPicker(`${ta().value}@a`)
+      key('ArrowDown')
+      key('Enter')
+      expect(ta().value).toBe('@Ann Lee @Ann Lee (lee.ann) ')
+      await act(async () => {
+        sendKeys()
+      })
+      expect(m.onSubmit).toHaveBeenCalledWith(
+        `${tokenOf(ANN1, 'Ann Lee')} ${tokenOf(ANN2, 'Ann Lee \\(lee.ann\\)')}`,
+      )
+    })
+
+    it('the same person picked twice is not suffixed', async () => {
+      const m = render({ source: fakeSource(SAME_NAMED) })
+      await openPicker('@a')
+      key('Enter')
+      await openPicker(`${ta().value}@a`)
+      key('Enter')
+      expect(ta().value).toBe('@Ann Lee @Ann Lee ')
+      await act(async () => {
+        sendKeys()
+      })
+      expect(m.onSubmit).toHaveBeenCalledWith(
+        `${tokenOf(ANN1, 'Ann Lee')} ${tokenOf(ANN1, 'Ann Lee')}`,
+      )
+    })
+
+    it('when the email-local suffix still collides, the user id is appended', async () => {
+      // an in-body token carries no email, so its pass-1 suffix is the user id; when the
+      // pick's email local part spells that same suffix, pass 2 appends the pick's id
+      const m = render({
+        initialBody: `cc ${tokenOf(ANN1, 'Ann Lee')} `,
+        source: fakeSource([
+          candidate(ANN1, 'Ann Lee', 'ann.lee@x.vn'),
+          candidate(ANN2, 'Ann Lee', `${ANN1.toLowerCase()}@y.vn`),
+        ]),
+      })
+      await openPicker(`${ta().value}@a`)
+      key('ArrowDown')
+      key('Enter')
+      expect(ta().value).toBe(`cc @Ann Lee @Ann Lee (${ANN1.toLowerCase()}) (${ANN2}) `)
+      await act(async () => {
+        sendKeys()
+      })
+      expect(m.onSubmit).toHaveBeenCalledWith(
+        `cc ${tokenOf(ANN1, 'Ann Lee')} ${tokenOf(ANN2, `Ann Lee \\(${ANN1.toLowerCase()}\\) \\(${ANN2}\\)`)}`,
+      )
+    })
+  })
 })
 
 describe('G8-18 mention people without access (chip badge + pre-send warning states)', () => {
