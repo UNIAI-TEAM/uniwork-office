@@ -25,7 +25,7 @@ import { UniverRenderEnginePlugin } from '@univerjs/engine-render'
 import { UniverSheetsPlugin } from '@univerjs/sheets'
 import '@univerjs/sheets/facade'
 import JSZip from 'jszip'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { columnIndex, parseAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { InMemoryWorkbookAdapter } from '@genoffice/xlsx-gateway/domain/in-memory-workbook'
@@ -38,12 +38,21 @@ import {
   type CellEdit,
 } from '@genoffice/xlsx-gateway/gateway/xlsx-gateway'
 import { anchorTileExpansion } from '../src/renderer/clipboard-anchor-tile'
-import { createEditJournal, recordSetRangeValues, toSaveEdits } from '../src/renderer/edit-journal'
+import {
+  bulkConstantFillValueAt,
+  createEditJournal,
+  recordSetRangeValues,
+  toSaveEdits,
+} from '../src/renderer/edit-journal'
 import { applyChangePlan, planFromOps, type OpExecutorContext } from '../src/renderer/op-executor'
 import type { PivotActionContext } from '../src/renderer/pivot-actions'
-import { proposeOperations, type PlanContext } from '../src/renderer/plan-operations'
 import { UNPROTECTED_SHEET } from '../src/renderer/sheet-protection'
-import type { LazyWorkbookState, UniverRuntime } from '../src/renderer/univer-state'
+import { proposeOperations, type PlanContext } from '../src/renderer/plan-operations'
+import {
+  installJournalSuppressionUndoFilter,
+  type LazyWorkbookState,
+  type UniverRuntime,
+} from '../src/renderer/univer-state'
 import { loadWorkbookSkeleton, MINIMUM_SHEET_COLUMN_COUNT } from '../src/renderer/univer-sync'
 import type { VisualActionContext } from '../src/renderer/visual-actions'
 import { buildStructureFixture } from './fixture-builder'
@@ -52,7 +61,11 @@ const UNIT_ID = 'sgrid-w2-unit'
 const SHEET_ID = 'sgrid-w2-sheet'
 const SHEET_NAME = 'Data'
 
-function bootWorkbook(rowCount = 1000, columnCount = 26) {
+function bootWorkbook(
+  rowCount = 1000,
+  columnCount = 26,
+  fileExtent: { rowCount: number; columnCount: number } = { rowCount: 10, columnCount: 7 },
+) {
   const univer = new Univer({
     logLevel: LogLevel.SILENT,
     locale: LocaleType.EN_US,
@@ -94,8 +107,8 @@ function bootWorkbook(rowCount = 1000, columnCount = 26) {
         {
           id: SHEET_ID,
           name: SHEET_NAME,
-          rowCount: 10,
-          columnCount: 7,
+          rowCount: fileExtent.rowCount,
+          columnCount: fileExtent.columnCount,
           hidden: false,
           showGridLines: true,
           tabColor: null,
@@ -514,5 +527,140 @@ describe('UNI-1922: AI write past the current sheet grid grows the grid on apply
       endColumn: 26,
       rangeType: RANGE_TYPE.NORMAL,
     })
+  })
+
+  it('case 9 (RSG-1): a 1x1 constant fill over a resident column reloads instead of painting the whole range, and undo keeps off-viewport file values', async () => {
+    // The journal-level bulk fill is the source of truth; the resident grid
+    // only needs the viewport repainted. Painting the full range
+    // synchronously builds an O(fill) matrix, and undo writing `null` over
+    // the whole range destroys file values resident beyond the viewport.
+    const { univerAPI, worksheet, state, proposeOnly, apply, undoDepth } = bootWorkbook(
+      400,
+      26,
+      { rowCount: 400, columnCount: 26 },
+    )
+    installJournalSuppressionUndoFilter()
+    // File cells resident in the preloaded grid: near the top (inside the
+    // buffered viewport a reload installs) and past it.
+    worksheet.getRange('C1').setValue('CONST')
+    for (const address of ['C10', 'C200', 'C300', 'C400']) {
+      worksheet.getRange(address).setValue(`file-${address}`)
+    }
+    const readCalls: { startRow: number; endRow: number }[] = []
+    const desktopWindow = window as unknown as { desktopApi?: unknown }
+    desktopWindow.desktopApi = {
+      readWorkbookRange: vi.fn(async (call: { range: { startRow: number; endRow: number } }) => {
+        readCalls.push(call.range)
+        const cells = []
+        for (let row = call.range.startRow; row <= call.range.endRow; row += 1) {
+          cells.push({ row, column: 2, value: `file-C${row + 1}` })
+        }
+        return {
+          cells,
+          rows: [],
+          merges: [],
+          hyperlinks: [],
+          conditionalRules: [],
+          dataValidations: [],
+          rowBreaks: [],
+          colBreaks: [],
+          protectedRanges: [],
+          indexedThroughRow: call.range.endRow,
+          indexingComplete: true,
+        }
+      }),
+    }
+    const rangeCalls: unknown[][] = []
+    const worksheetProto = Object.getPrototypeOf(worksheet) as {
+      getRange: (...args: unknown[]) => unknown
+    }
+    const originalGetRange = worksheetProto.getRange
+    vi.spyOn(worksheetProto, 'getRange').mockImplementation(function (
+      this: unknown,
+      ...args: unknown[]
+    ) {
+      rangeCalls.push(args)
+      return originalGetRange.apply(this, args as never)
+    })
+    try {
+      const proposed = proposeOnly([
+        { op: 'fill_range', sheetId: SHEET_ID, source: 'C1', target: 'C2:C400' },
+      ])
+      expect(proposed.ok).toBe(true)
+      if (!proposed.ok) return
+      const undoBefore = undoDepth()
+      expect(await apply(proposed.plan)).toEqual({ ok: true })
+      // The fill is journal-truth immediately; the resident repaint is async.
+      expect(bulkConstantFillValueAt(state.editJournal, SHEET_ID, 9, 2)).toEqual({
+        found: true,
+        value: 'CONST',
+      })
+      expect(undoDepth()).toBe(undoBefore + 1)
+      // The viewport window shows the fill after its reload.
+      await vi.waitFor(() => expect(worksheet.getRange('C10').getValue()).toBe('CONST'))
+
+      await univerAPI.undo()
+      // Undo reloads the window, restoring the file values there…
+      await vi.waitFor(() => expect(worksheet.getRange('C10').getValue()).toBe('file-C10'))
+      // …and the off-viewport resident file values survive apply + undo
+      // untouched (a null-matrix write over the whole fill range destroys
+      // them — RSG-1).
+      expect(worksheet.getRange('C300').getValue()).toBe('file-C300')
+      expect(worksheet.getRange('C400').getValue()).toBe('file-C400')
+      // A reload must have actually run on both apply and undo.
+      expect(readCalls.length).toBeGreaterThan(1)
+      // No synchronous whole-range matrix: numeric getRange paints stay inside
+      // the reloaded window, never the 399-row fill span.
+      const paintedRowSpans = rangeCalls
+        .filter((call) => typeof call[0] === 'number' && typeof call[2] === 'number')
+        .map((call) => call[2] as number)
+      expect(Math.max(0, ...paintedRowSpans)).toBeLessThan(399)
+    } finally {
+      vi.restoreAllMocks()
+      delete desktopWindow.desktopApi
+    }
+  })
+
+  it('case 10 (RSG-1): a constant fill into columns grown past the file extent still shows after the window reload', async () => {
+    // The reload's window is clamped to the file's screen extent, so columns
+    // grown past it (Y1:AA1 < file extent A..G, grid grows to AA on apply)
+    // never come back from the sidecar — they must be painted like inserted
+    // columns or the fill lands blank until save/reopen.
+    const { worksheet, proposeOnly, apply } = bootWorkbook(1000, 26)
+    const readCalls: unknown[] = []
+    const desktopWindow = window as unknown as { desktopApi?: unknown }
+    desktopWindow.desktopApi = {
+      readWorkbookRange: vi.fn(async (call: { range: { endRow: number } }) => {
+        readCalls.push(call.range)
+        return {
+          cells: [],
+          rows: [],
+          merges: [],
+          hyperlinks: [],
+          conditionalRules: [],
+          dataValidations: [],
+          rowBreaks: [],
+          colBreaks: [],
+          protectedRanges: [],
+          indexedThroughRow: call.range.endRow,
+          indexingComplete: true,
+        }
+      }),
+    }
+    try {
+      worksheet.getRange('Y1').setValue('CONST')
+      const proposed = proposeOnly([
+        { op: 'fill_range', sheetId: SHEET_ID, source: 'Y1', target: 'Y2:AA2' },
+      ])
+      expect(proposed.ok).toBe(true)
+      if (!proposed.ok) return
+      expect(await apply(proposed.plan)).toEqual({ ok: true })
+      expect(worksheet.getMaxColumns()).toBeGreaterThanOrEqual(27)
+      await vi.waitFor(() => expect(readCalls.length).toBeGreaterThan(0))
+      expect(worksheet.getRange('AA2').getValue()).toBe('CONST')
+    } finally {
+      vi.restoreAllMocks()
+      delete desktopWindow.desktopApi
+    }
   })
 })
