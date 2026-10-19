@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+<<<<<<< ours
 import type {
   DragEvent as ReactDragEvent,
   KeyboardEvent as ReactKeyboardEvent,
   ReactElement,
 } from 'react'
 import appIcon from './assets/app-icon.png'
+=======
+import type { DragEvent as ReactDragEvent, ReactElement } from 'react'
+import logoLockup from './assets/genoffice-logo.svg'
+import { KbAskPanel } from './KbAskPanel'
+import iconDocx from './assets/file-docx.svg'
+import iconXlsx from './assets/file-xlsx.svg'
+import iconPptx from './assets/file-pptx.svg'
+import iconPdf from './assets/file-pdf.svg'
+import iconMd from './assets/file-md.svg'
+import iconHtml from './assets/file-html.svg'
+>>>>>>> theirs
 import type {
   AccountStatus,
   FolderEntry,
@@ -72,13 +84,20 @@ function isHomeArea(raw: string | null | undefined): raw is HomeArea {
   return raw === 'uniwork' || raw === 'device'
 }
 
+import type { ProjectApi } from '@genoffice/project-store'
+
 declare global {
   interface Window {
     aiOffice: HomeApi
     aiOfficeIntegrations?: IntegrationsApi
+<<<<<<< ours
     aiOfficeProject?: ProjectHomeApi
     /** UniWork work data (preload, same lifetime as aiOffice); declared here only */
     uniworkWork: UniworkWorkApi
+=======
+    /** Optional: a build without the project bridge keeps the panel in memory. */
+    projectApi?: ProjectApi
+>>>>>>> theirs
   }
 }
 
@@ -95,10 +114,36 @@ const GREET_ASK_KEYS = [
   'greetAsk6',
 ] as const satisfies readonly StringKey[]
 
+<<<<<<< ours
 /* Formats the open-local card advertises. Too long for the card at any window
    width, so it ellipsizes and a hover ScreenTip carries the full list. Derived
    from the main-process open-dialog filter so the two cannot drift apart. */
 const OPEN_LOCAL_EXTENSIONS = openLocalHint()
+=======
+const FILE_ICONS: Record<string, string> = {
+  docx: iconDocx,
+  odt: iconDocx,
+  ott: iconDocx,
+  xlsx: iconXlsx,
+  xlsm: iconXlsx,
+  ods: iconXlsx,
+  ots: iconXlsx,
+  pptx: iconPptx,
+  odp: iconPptx,
+  otp: iconPptx,
+  pdf: iconPdf,
+  md: iconMd,
+  markdown: iconMd,
+  html: iconHtml,
+  htm: iconHtml,
+}
+
+/* Formats the open-local card advertises. Too long for the card at any window
+   width, so it ellipsizes and a hover ScreenTip carries the full list. Keep in
+   sync with the main-process open-dialog filter (OPEN_DIALOG_EXTENSIONS). */
+const OPEN_LOCAL_EXTENSIONS =
+  '.docx / .odt / .ott / .xlsx / .xlsm / .xls / .csv / .tsv / .ods / .ots / .pptx / .odp / .otp / .pdf / .md / .html'
+>>>>>>> theirs
 
 /** drag payload of home file/folder rows (JSON array of absolute paths) */
 const DRAG_PATHS_MIME = 'application/x-genoffice-paths'
@@ -111,10 +156,42 @@ const TREE_STATE_KEY = 'home.folderTree'
  * Width of the viewport that `position: fixed` elements anchor to. The layout
  * engine owns this coordinate system, so documentElement's client rect is the
  * value to compute menu offsets from; window.innerWidth can disagree on scaled
+<<<<<<< ours
  * Linux desktops, which pushed row menus past the window's left edge (#1946).
  */
 function fixedViewportWidth(): number {
   return document.documentElement.clientWidth
+=======
+ * Linux desktops, which pushed row menus past the window's left edge (genoffice#1946).
+ */
+function fixedViewportWidth(): number {
+  return document.documentElement.clientWidth
+}
+
+function FileBadge({ ext, size }: { ext: string; size: number }) {
+  const icon = FILE_ICONS[ext]
+  if (icon) {
+    return <img src={icon} width={size} height={size} alt="" aria-hidden="true" />
+  }
+  const label = ext ? ext[0].toUpperCase() : '?'
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="7.5" fill="#98a2b3" />
+      <text
+        x="16"
+        y="16.5"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="#fff"
+        fontSize={17}
+        fontWeight="700"
+        fontFamily="system-ui, -apple-system, 'Segoe UI', sans-serif"
+      >
+        {label}
+      </text>
+    </svg>
+  )
+>>>>>>> theirs
 }
 
 function FolderIcon({ size = 16, open = false }: { size?: number; open?: boolean }) {
@@ -256,9 +333,9 @@ const FILTERS: { key: string; label: StringKey }[] = [
 
 /** sidebar filter keys that stand for a family of extensions (mirrors recent-files.ts) */
 const FILTER_FAMILY: Record<string, readonly string[]> = {
-  docx: ['docx', 'doc'],
-  xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'],
-  pptx: ['pptx', 'ppt'],
+  docx: ['docx', 'doc', 'odt', 'ott'],
+  xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv', 'ods', 'ots'],
+  pptx: ['pptx', 'ppt', 'odp', 'otp'],
   md: ['md', 'markdown', 'txt', 'json'],
   html: ['html', 'htm'],
 }
@@ -711,10 +788,113 @@ function ConflictPrompt({ names, onChoose }: ConflictPromptProps) {
   )
 }
 
+<<<<<<< ours
 /** whether we are inside the shell (aiOfficeProject API available) */
 function hasProjectApi(): boolean {
   return typeof window.aiOfficeProject !== 'undefined'
 }
+=======
+// ── Starred-group picker ─────────────────────────────────
+
+interface GroupPickerProps {
+  /** existing group names (a group exists while it has at least one file) */
+  groups: readonly string[]
+  count: number
+  onCancel: () => void
+  /** put the files into an existing group */
+  onPick: (group: string) => void
+  /** create a group named `name` and put the files into it */
+  onCreate: (name: string) => void
+  /** take the files out of their group (back to the unfiltered list) */
+  onRemove: () => void
+}
+
+/** Modal moving starred files into a named group. Deliberately minimal: no
+ *  group rename/delete — a group is just a label its entries carry, and it
+ *  vanishes when its last member leaves (via this dialog's remove action,
+ *  an unstar, or a deleted file). */
+function GroupPicker({ groups, count, onCancel, onPick, onCreate, onRemove }: GroupPickerProps) {
+  const { t } = useI18n()
+  const [name, setName] = useState('')
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
+
+  const create = () => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setName('')
+    onCreate(trimmed)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('moveToGroupTitle')}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3>{t('moveToGroupTitle')}</h3>
+        <p>{t('selectedCount', { n: count })}</p>
+        {groups.length > 0 && (
+          <ul className="group-picker-list">
+            {groups.map((group) => (
+              <li key={group}>
+                <button
+                  className="group-picker-row"
+                  onClick={() => {
+                    setName('')
+                    onPick(group)
+                  }}
+                >
+                  <FolderIcon size={16} />
+                  <span className="group-picker-name">{group}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="group-picker-new">
+          <input
+            className="folder-rename-input"
+            placeholder={t('groupNamePlaceholder')}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.nativeEvent.isComposing) return
+              if (e.key === 'Enter') create()
+            }}
+          />
+          <button className="btn btn-secondary" disabled={!name.trim()} onClick={create}>
+            {t('newGroup')}
+          </button>
+        </div>
+        <div className="modal-buttons">
+          <button className="btn btn-secondary" onClick={onRemove}>
+            {t('removeFromGroup')}
+          </button>
+          <button className="btn btn-secondary" autoFocus onClick={onCancel}>
+            {t('cancel')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Account entry (bottom-left) ──────────────────────────
+// Currently the Genspark (gsk) login entry; to be upgraded to a signup/account system later.
+// Clicking it opens the settings modal directly (SettingsModal.tsx), which hosts
+// login/logout plus preferences (language, theme, save location, update channel).
+>>>>>>> theirs
 
 // ── Starred-group picker ─────────────────────────────────
 
@@ -1311,6 +1491,7 @@ export function Home() {
   const [lastPageLen, setLastPageLen] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [view, setView] = useState<'recent' | 'starred'>('recent')
+<<<<<<< ours
   // FD-13 persisted area preference ('uniwork' | 'device')
   const [savedArea, setSavedArea] = useState<HomeArea | null>(() => {
     const raw = wbStoreGetRaw(HOME_AREA_KEY)
@@ -1360,6 +1541,12 @@ export function Home() {
   const [projectFileEntries, setProjectFileEntries] = useState<RecentEntry[]>([])
   // refresh signal for project-view data (re-pull file stats after file changes)
   const [projectTick, setProjectTick] = useState(0)
+=======
+  // Genspark web projects take over the content area (like a selected folder)
+  const [cloudMode, setCloudMode] = useState(false)
+  // the knowledge-base ask panel takes over the content area the same way
+  const [askMode, setAskMode] = useState(false)
+>>>>>>> theirs
   const [filter, setFilter] = useState('all')
   // ── Starred groups (named buckets the Starred view can filter on) ──
   // groups that currently have at least one starred file (drives the pills)
@@ -1715,6 +1902,7 @@ export function Home() {
     const limit = keepCount ? Math.max(entriesLen.current, PAGE_SIZE) : PAGE_SIZE
     const primary = view === 'recent' ? window.aiOffice.recents : window.aiOffice.starred
     const secondary = view === 'recent' ? window.aiOffice.starred : window.aiOffice.recents
+<<<<<<< ours
     void primary({ offset: 0, limit, ext, group })
       .then((page) => {
         if (seq !== requestSeq.current) return
@@ -1751,6 +1939,28 @@ export function Home() {
     if (projectMode) {
       void window.aiOfficeProject!.listProjects().then(setProjects)
     }
+    // the group pills live on the renderer, so their list rides along with
+    // every reload; a vanished group (last file unstarred/ungrouped) clears
+    // the filter instead of showing a silently empty list
+    void window.aiOffice.starredGroups().then((groups) => {
+=======
+    void primary({ offset: 0, limit, ext, group }).then((page) => {
+      if (seq !== requestSeq.current) return
+      setEntries(page.entries)
+      setListTotal(page.total)
+      setNavCounts((prev) =>
+        view === 'recent'
+          ? { ...prev, recent: visiblePageCount(page) }
+          : { ...prev, starred: visiblePageCount(page) },
+      )
+    })
+    // The other view fetches only its count under the same active filter.
+    void secondary({ offset: 0, limit: 0, ext }).then((page) => {
+>>>>>>> theirs
+      if (seq !== requestSeq.current) return
+      setStarredGroups(groups)
+      setGroupFilter((cur) => (cur && !groups.includes(cur) ? null : cur))
+    })
     // the group pills live on the renderer, so their list rides along with
     // every reload; a vanished group (last file unstarred/ungrouped) clears
     // the filter instead of showing a silently empty list
@@ -2058,6 +2268,7 @@ export function Home() {
   const folderAllSelected =
     folderFiles.length > 0 && folderSelectedPaths.length === folderFiles.length
 
+<<<<<<< ours
   // project files of the selected project
   useEffect(() => {
     if (!projectMode || !selectedProjectId) {
@@ -2137,6 +2348,16 @@ export function Home() {
     projectFileEntries.length > 0 && projSelectedPaths.length === projectFileEntries.length
   const toggleSelectAllProject = () => {
     setSelected(projAllSelected ? new Set() : new Set(projectFileEntries.map((e) => e.path)))
+=======
+  const changeView = (next: 'recent' | 'starred') => {
+    setView(next)
+    setSelectedFolder(null)
+    setCloudMode(false)
+    setAskMode(false)
+    setSelected(new Set())
+    setRowMenu(null)
+    setGroupFilter(null)
+>>>>>>> theirs
   }
 
   const changeFilter = (key: string) => {
@@ -2153,9 +2374,14 @@ export function Home() {
 
   const selectFolder = (dir: string) => {
     setSelectedFolder(dir)
+<<<<<<< ours
     setSelectedProjectId(null)
     setEduMode(false)
     setChatMode(false)
+=======
+    setCloudMode(false)
+    setAskMode(false)
+>>>>>>> theirs
     setSelected(new Set())
     setRowMenu(null)
     setFolderMenu(null)
@@ -3963,14 +4189,49 @@ export function Home() {
                   : 'My AI'}
             </span>
           </button>
+<<<<<<< ours
           {projectMode && (
+=======
+          <button
+            className={`nav-item${askMode && !selectedFolder && !cloudMode ? ' active' : ''}`}
+            onClick={() => {
+              setAskMode(true)
+              setSelectedFolder(null)
+              setCloudMode(false)
+              setSelected(new Set())
+              setRowMenu(null)
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M14 10.5c0 .9-.7 1.6-1.6 1.6H5.4L2 14.5V3.6C2 2.7 2.7 2 3.6 2h8.8c.9 0 1.6.7 1.6 1.6z"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M5 6.2h6M5 8.6h4"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="nav-label">{t('navAsk')}</span>
+          </button>
+          {loggedIn && (
+>>>>>>> theirs
             <button
               className={`nav-item${eduMode && !selectedProjectId ? ' active' : ''}`}
               aria-current={eduMode && !selectedProjectId ? 'page' : undefined}
               onClick={() => {
+<<<<<<< ours
                 setEduMode(true)
                 setChatMode(false)
                 setSelectedProjectId(null)
+=======
+                setCloudMode(true)
+                setAskMode(false)
+>>>>>>> theirs
                 setSelectedFolder(null)
                 setSelected(new Set())
                 setRowMenu(null)
@@ -4132,6 +4393,16 @@ export function Home() {
         ) : null
       ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
         renderFolderContent()
+<<<<<<< ours
+=======
+      ) : askMode ? (
+        <KbAskPanel
+          onOpenPath={(path) => void window.aiOffice.openPath(path)}
+          onGoToRecents={() => changeView('recent')}
+        />
+      ) : cloudMode ? (
+        <CloudProjectsView />
+>>>>>>> theirs
       ) : (
         renderGlobalContent()
       )}

@@ -653,8 +653,11 @@ export function createHtmlSkillCore(
           source.length > SELECTION_MAX_CHARS
             ? `${source.slice(0, SELECTION_MAX_CHARS)}\n… (truncated; read_source sid=${selected.sid} for the rest)`
             : source
-        const l1 = lineOf(text, selected.range[0])
-        const l2 = lineOf(text, Math.max(selected.range[0], selected.range[1] - 1))
+        const l1 = lineOf(proj.view, proj.toViewOffset(selected.range[0]))
+        const l2 = lineOf(
+          proj.view,
+          proj.toViewOffset(Math.max(selected.range[0], selected.range[1] - 1)),
+        )
         selection = `\n\n## User selection\nsid=${selected.sid} <${selected.tag}> L${l1}-L${l2}\nEdit/rewrite-style requests apply to this element by default.\n\`\`\`html\n${clipped}\n\`\`\``
       }
       const brief = parseBrief(text)
@@ -998,6 +1001,7 @@ export function createHtmlSkillCore(
   }
 }
 
+<<<<<<< ours
 /** the only tools a view-only UniWork document keeps: they read the page, none writes it */
 export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['get_outline', 'read_source'])
 
@@ -1025,10 +1029,13 @@ const VIEW_ONLY_NOTE =
 const BOUND_NOTE =
   '\n\nNote: this is a UniWork document. plan_page and write_document are unavailable on it; do not call or promise them. Do restyles, theme changes and structural edits with apply_ops on the existing page (incl. the --brief-* CSS variables); never replace the whole document.'
 
+=======
+>>>>>>> theirs
 /** A live prompt is read on every request, so it can follow the document. */
 export function createHtmlSkill(
   access: HtmlDocAccess,
   systemPrompt: string | { readonly systemPrompt: string },
+<<<<<<< ours
   /** live predicate: a view-only UniWork document, where the assistant may read but never edit */
   isReadOnly?: () => boolean,
 ): AgentSkill {
@@ -1052,6 +1059,16 @@ export function createHtmlSkill(
         return AGENT_TOOLS.filter((t) => !BOUND_HIDDEN_TOOLS.has(t.name))
       return AGENT_TOOLS
     },
+=======
+): AgentSkill {
+  const core = createHtmlSkillCore(access)
+  return {
+    id: 'html',
+    get systemPrompt() {
+      return typeof systemPrompt === 'string' ? systemPrompt : systemPrompt.systemPrompt
+    },
+    tools: AGENT_TOOLS,
+>>>>>>> theirs
     buildContext: () => core.buildContext(),
     executeTool: (call, signal) => {
       if (access.uniworkBound?.() === true && BOUND_HIDDEN_TOOLS.has(call.name))

@@ -247,6 +247,25 @@ export const vi = {
     'Tổng thời gian cho buổi trình chiếu là {duration}. Bạn có muốn lưu thời gian trang chiếu để tự động chuyển trang không?',
   appRehearseDiscard: 'Không lưu',
   appRehearseSave: 'Lưu',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Ghi tường thuật',
+  appRecordSummary: 'Thời lượng ghi {duration}. Lưu tường thuật và thời gian của từng trang chiếu?',
+  appRecordDiscard: 'Không lưu',
+  appRecordSave: 'Lưu',
+  appStatusRecordSaved: 'Đã lưu tường thuật trên {count} trang chiếu (PowerPoint cũng phát được)',
+  appStatusRecordFailed: 'Không thể lưu bản ghi',
+  appStatusNarrationCleared: 'Đã xóa tường thuật',
+  appSettingsTitle: 'Cài đặt AI',
+  appSettingsAccount: 'Tài khoản Genspark',
+  appSettingsChecking: 'Đang kiểm tra…',
+  appSettingsLoggedIn: 'Đã đăng nhập',
+  appSettingsLoggedInEmail: 'Đã đăng nhập: {email}',
+  appSettingsLoggedOut: 'Chưa đăng nhập (các tính năng AI yêu cầu tài khoản Genspark)',
+  appSettingsLoginPending: 'Đang chờ đăng nhập trên trình duyệt…',
+  appSettingsLogin: 'Đăng nhập vào Genspark',
+  appSettingsModel: 'Mô hình',
+>>>>>>> theirs
   appSettingsCancel: 'Hủy',
   appCropHint: 'Enter để xác nhận · Esc để hủy · Nhấp ra ngoài để xác nhận',
   appStatusZoomsInserted:

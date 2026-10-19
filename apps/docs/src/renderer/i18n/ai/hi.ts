@@ -197,6 +197,7 @@ export const hi = {
   aiCmdImages: '{count} चित्र अपडेट किए गए',
   aiCmdToc: 'विषय-सूची सम्मिलित की गई ({count} प्रविष्टियाँ)',
   aiCmdSkipped: ' ({count} सुरक्षित ब्लॉक छोड़े गए)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
   aiClarifyTitle: 'आगे बढ़ने से पहले कुछ सवाल',
@@ -211,6 +212,8 @@ export const hi = {
   aiClarifySubmit: 'जारी रखें',
   aiSumClarify: 'स्पष्टीकरण का जवाब दिया गया',
   aiSumClarifySkipped: 'स्पष्टीकरण छोड़ा गया',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'इस दस्तावेज़ का माइंड मैप बनाएँ',
   aiMindMapBtn: 'AI माइंड मैप',
   aiMindMapPrompt:

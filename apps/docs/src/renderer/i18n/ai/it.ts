@@ -203,6 +203,7 @@ export const it = {
   aiCmdImages: '{count} immagine/i aggiornata/e',
   aiCmdToc: 'Sommario inserito ({count} voci)',
   aiCmdSkipped: ' ({count} blocco/i protetto/i ignorato/i)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
   aiClarifyTitle: 'Qualche domanda prima di continuare',
@@ -217,6 +218,8 @@ export const it = {
   aiClarifySubmit: 'Continua',
   aiSumClarify: 'Chiarimenti forniti',
   aiSumClarifySkipped: 'Chiarimenti saltati',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Genera una mappa mentale di questo documento',
   aiMindMapBtn: 'Mappa mentale IA',
   aiMindMapPrompt:

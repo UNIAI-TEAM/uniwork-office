@@ -20,6 +20,10 @@ const PROBLEM_KEYS: Record<PdfSignatureProblem, Key> = {
 
 const STATUS_KEYS: Record<PdfSignatureInfo['status'], Key> = {
   valid: 'sigStatusValid',
+<<<<<<< ours
+=======
+  untrusted: 'sigStatusUntrusted',
+>>>>>>> theirs
   warning: 'sigStatusWarning',
   invalid: 'sigStatusInvalid',
 }
@@ -32,6 +36,10 @@ export function overallSignatureStatus(
 ): PdfSignatureInfo['status'] {
   if (signatures.some((s) => s.status === 'invalid')) return 'invalid'
   if (signatures.some((s) => s.status === 'warning')) return 'warning'
+<<<<<<< ours
+=======
+  if (signatures.some((s) => s.status === 'untrusted')) return 'untrusted'
+>>>>>>> theirs
   return 'valid'
 }
 
@@ -157,7 +165,13 @@ export function SignaturesDialog({
             }}
           />
         ))}
+<<<<<<< ours
         <div className="pdf-modal-hint">{t('sigNoRevocation')}</div>
+=======
+        <div className="pdf-modal-hint">
+          {t('sigTrustRoots')} {t('sigNoRevocation')}
+        </div>
+>>>>>>> theirs
         <div className="pdf-modal-actions">
           <button className="pdf-modal-btn primary" onClick={onClose}>
             {t('ok')}

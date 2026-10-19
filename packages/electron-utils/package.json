@@ -17,12 +17,16 @@
     "./atomic-write": "./src/atomic-write.ts",
     "./draft-preview": "./src/draft-preview.ts",
     "./drop-open": "./src/drop-open.ts",
-    "./generated-images": "./src/generated-images.ts",
     "./font-catalog": "./src/font-catalog.ts",
     "./font-store": "./src/font-store.ts",
+    "./generated-images": "./src/generated-images.ts",
     "./headless-export": "./src/headless-export.ts",
+<<<<<<< ours
     "./recovery-copy": "./src/recovery-copy.ts",
     "./recovery-epochs": "./src/recovery-epochs.ts",
+=======
+    "./print-job": "./src/print-job.ts",
+>>>>>>> theirs
     "./print-window": "./src/print-window.ts",
     "./remote-image": "./src/remote-image.ts",
     "./renderer-protocol": "./src/renderer-protocol.ts",

@@ -53,11 +53,16 @@ const SYSTEM_PROMPT = [
   '- Keep replies short; the edits are the deliverable. Summarize what you changed in one or two sentences.',
 ].join('\n')
 
+<<<<<<< ours
 export function createDocumentSkill(access: HtmlDocAccess, isReadOnly?: () => boolean): AgentSkill {
+=======
+export function createDocumentSkill(access: HtmlDocAccess): AgentSkill {
+>>>>>>> theirs
   // live like the tool list: rebuilt per request from the page as it is now, so
   // a mark applied a moment ago is in the next prompt and a removed one is gone
   // from it. A page with nothing withheld pays nothing and is not told to look
   // for markers that are not there.
+<<<<<<< ours
   return createHtmlSkill(
     access,
     {
@@ -69,4 +74,13 @@ export function createDocumentSkill(access: HtmlDocAccess, isReadOnly?: () => bo
     },
     isReadOnly,
   )
+=======
+  return createHtmlSkill(access, {
+    get systemPrompt(): string {
+      const proj = buildProjection(access.getText(), access.getMap())
+      if (proj.empty) return SYSTEM_PROMPT
+      return `${SYSTEM_PROMPT}\n\n${placeholderInstruction(proj.labels())}`
+    },
+  })
+>>>>>>> theirs
 }

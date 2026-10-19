@@ -332,7 +332,9 @@ export const it = {
   appFullLoadRunning:
     'Caricamento della cartella completa in corso: ordinamento e filtri saranno disponibili al termine…',
   appFullLoadTooLarge:
-    'Questa cartella di lavoro è troppo grande per essere caricata completamente in memoria; ordinamento e filtri non sono disponibili per questo file.',
+    'Questa cartella di lavoro è troppo grande per essere caricata completamente in memoria; ordinamento e spostamento di intervalli non sono disponibili per questo file. Il filtro viene eseguito direttamente sul file.',
+  appLargeFilterLoading: 'Lettura della colonna del filtro dal file…',
+  appLargeFilterApplying: 'Applicazione del filtro sul file…',
   appSortValueModeFormulas:
     'Questo intervallo contiene formule che in questa cartella di grandi dimensioni non vengono calcolate in tempo reale: ordinarlo o spostarlo le salverebbe come semplici valori. Scegliere un intervallo senza formule.',
   appSortRangeTooLarge:
@@ -716,6 +718,7 @@ export const it = {
   appTabReview: 'Revisione',
   appRibbonCollapse: 'Riduci a icona la barra multifunzione',
   appRibbonExpand: 'Espandi la barra multifunzione',
+  appRibbonCompact: 'Barra multifunzione compatta (solo icone)',
   appTabView: 'Visualizza',
   appTabAi: 'IA',
   appTabChartDesign: 'Struttura grafico',
@@ -1263,6 +1266,10 @@ export const it = {
   appFontSizeTip: 'Dimensione carattere',
   appZoomIn: 'Ingrandisci',
   appZoomOut: 'Riduci',
+  appImgActualSize: 'Dimensioni originali',
+  appImgFitWindow: 'Adatta alla finestra',
+  appImgSaveAs: 'Salva immagine con nome…',
+  appImgClose: 'Chiudi (Esc)',
   appZoomSheetTitle: 'Zoom sul foglio',
   appResetZoom: 'Reimposta zoom',
   appZoomToSelection: 'Zoom sulla selezione',
@@ -1534,6 +1541,8 @@ export const it = {
   appVisualSendBackward: 'Porta indietro',
   appVisualSizeProperties: 'Dimensioni e proprietà…',
   appVisualHyperlink: 'Collegamento ipertestuale…',
+  appVisualEmbedInCell: "Incorpora l'immagine nella cella",
+  appVisualEmbedFailed: 'Impossibile incorporare questa immagine nella cella.',
   appVisualDelete: 'Elimina',
   appVisualArranged: 'Oggetto aggiornato — salva con ⌘S.',
   appVisualCopied: 'Oggetto copiato.',

@@ -340,7 +340,9 @@ export const fr = {
   appFullLoadRunning:
     'Chargement complet du classeur en cours — le tri et le filtrage seront disponibles une fois terminé…',
   appFullLoadTooLarge:
-    'Ce classeur est trop volumineux pour être chargé entièrement en mémoire ; le tri et le filtrage sont indisponibles pour ce fichier.',
+    "Ce classeur est trop volumineux pour être chargé entièrement en mémoire ; le tri et le déplacement de plages sont indisponibles pour ce fichier. Le filtrage s'exécute directement sur le fichier.",
+  appLargeFilterLoading: 'Lecture de la colonne de filtre depuis le fichier…',
+  appLargeFilterApplying: 'Application du filtre sur le fichier…',
   appSortValueModeFormulas:
     'Cette plage contient des formules qui ne sont pas calculées en direct dans ce grand classeur — la trier ou la déplacer les enregistrerait comme simples valeurs. Choisissez une plage sans formules.',
   appSortRangeTooLarge:
@@ -741,6 +743,7 @@ export const fr = {
   appTabReview: 'Révision',
   appRibbonCollapse: 'Réduire le ruban',
   appRibbonExpand: 'Développer le ruban',
+  appRibbonCompact: 'Ruban compact (icônes uniquement)',
   appTabView: 'Affichage',
   appTabAi: 'IA',
   appTabChartDesign: 'Création de graphique',
@@ -1288,6 +1291,10 @@ export const fr = {
   appFontSizeTip: 'Taille de police',
   appZoomIn: 'Zoom avant',
   appZoomOut: 'Zoom arrière',
+  appImgActualSize: 'Taille réelle',
+  appImgFitWindow: 'Ajuster à la fenêtre',
+  appImgSaveAs: "Enregistrer l'image sous…",
+  appImgClose: 'Fermer (Échap)',
   appZoomSheetTitle: 'Zoomer la feuille',
   appResetZoom: 'Réinitialiser le zoom',
   appZoomToSelection: 'Zoom sur la sélection',
@@ -1561,6 +1568,8 @@ export const fr = {
   appVisualSendBackward: 'Reculer',
   appVisualSizeProperties: 'Taille et propriétés…',
   appVisualHyperlink: 'Lien hypertexte…',
+  appVisualEmbedInCell: "Incorporer l'image dans la cellule",
+  appVisualEmbedFailed: "Impossible d'incorporer cette image dans la cellule.",
   appVisualDelete: 'Supprimer',
   appVisualArranged: 'Objet mis à jour — enregistrez avec ⌘S.',
   appVisualCopied: 'Objet copié.',

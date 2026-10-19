@@ -1,4 +1,8 @@
+<<<<<<< ours
 import type { AgentStreamNotice, AgentToolCall } from '@genoffice/agent-core'
+=======
+import type { AgentToolCall } from '@genoffice/agent-core'
+>>>>>>> theirs
 import type { AiTokenUsage } from '../types'
 
 // ---- endpoint URL composition ----

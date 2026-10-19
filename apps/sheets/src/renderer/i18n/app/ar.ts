@@ -300,7 +300,9 @@ export const ar = {
   appFullLoadStart: 'تحميل الكل',
   appFullLoadRunning: 'جارٍ تحميل المصنف بالكامل — سيتوفر الفرز والتصفية عند الانتهاء…',
   appFullLoadTooLarge:
-    'هذا المصنف كبير جدًا بحيث لا يمكن تحميله بالكامل في الذاكرة؛ الفرز والتصفية غير متاحين لهذا الملف.',
+    'هذا المصنف كبير جدًا بحيث لا يمكن تحميله بالكامل في الذاكرة؛ الفرز ونقل النطاقات غير متاحين لهذا الملف. تعمل التصفية مباشرة على الملف.',
+  appLargeFilterLoading: 'جارٍ قراءة عمود التصفية من الملف…',
+  appLargeFilterApplying: 'جارٍ تطبيق التصفية على الملف…',
   appSortValueModeFormulas:
     'يحتوي هذا النطاق على صيغ لا تُحسب مباشرةً في هذا المصنف الكبير — سيؤدي فرزه أو نقله إلى حفظها كقيم عادية. اختر نطاقًا بدون صيغ.',
   appSortRangeTooLarge:
@@ -647,6 +649,7 @@ export const ar = {
   appTabReview: 'مراجعة',
   appRibbonCollapse: 'طي الشريط',
   appRibbonExpand: 'توسيع الشريط',
+  appRibbonCompact: 'شريط مضغوط (أيقونات فقط)',
   appTabView: 'عرض',
   appTabAi: 'الذكاء الاصطناعي',
   appTabChartDesign: 'تصميم المخطط',
@@ -1190,6 +1193,10 @@ export const ar = {
   appFontSizeTip: 'حجم الخط',
   appZoomIn: 'تكبير',
   appZoomOut: 'تصغير',
+  appImgActualSize: 'الحجم الفعلي',
+  appImgFitWindow: 'ملاءمة للنافذة',
+  appImgSaveAs: 'حفظ الصورة باسم…',
+  appImgClose: 'إغلاق (Esc)',
   appZoomSheetTitle: 'تكبير/تصغير الورقة',
   appResetZoom: 'إعادة تعيين التكبير/التصغير',
   appZoomToSelection: 'تكبير/تصغير حسب التحديد',
@@ -1454,6 +1461,8 @@ export const ar = {
   appVisualSendBackward: 'إرسال للخلف',
   appVisualSizeProperties: 'الحجم والخصائص…',
   appVisualHyperlink: 'ارتباط تشعبي…',
+  appVisualEmbedInCell: 'تضمين الصورة في الخلية',
+  appVisualEmbedFailed: 'تعذّر تضمين هذه الصورة في الخلية.',
   appVisualDelete: 'حذف',
   appVisualArranged: 'تم تحديث الكائن — احفظ بـ ⌘S.',
   appVisualCopied: 'تم نسخ الكائن.',

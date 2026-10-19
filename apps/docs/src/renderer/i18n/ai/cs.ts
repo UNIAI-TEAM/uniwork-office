@@ -199,6 +199,7 @@ export const cs = {
   aiCmdImages: 'Aktualizováno obrázků: {count}',
   aiCmdToc: 'Vložen obsah ({count} položek)',
   aiCmdSkipped: ' (přeskočeno {count} chráněných bloků)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
   aiClarifyTitle: 'Pár otázek, než budu pokračovat',
@@ -213,6 +214,8 @@ export const cs = {
   aiClarifySubmit: 'Pokračovat',
   aiSumClarify: 'Upřesnění zodpovězeno',
   aiSumClarifySkipped: 'Upřesnění přeskočeno',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Vytvořit myšlenkovou mapu tohoto dokumentu',
   aiMindMapBtn: 'Myšlenková mapa AI',
   aiMindMapPrompt:

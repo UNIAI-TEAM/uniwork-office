@@ -324,7 +324,9 @@ export const pl = {
   appFullLoadRunning:
     'Trwa pełne wczytywanie skoroszytu — sortowanie i filtrowanie będą dostępne po zakończeniu…',
   appFullLoadTooLarge:
-    'Ten skoroszyt jest zbyt duży, aby w pełni zmieścić się w pamięci; sortowanie i filtrowanie są niedostępne dla tego pliku.',
+    'Ten skoroszyt jest zbyt duży, aby w całości załadować go do pamięci; sortowanie i przenoszenie zakresów są niedostępne dla tego pliku. Filtrowanie działa bezpośrednio na pliku.',
+  appLargeFilterLoading: 'Odczyt kolumny filtru z pliku…',
+  appLargeFilterApplying: 'Stosowanie filtru do pliku…',
   appSortValueModeFormulas:
     'Ten zakres zawiera formuły, które w tym dużym skoroszycie nie są obliczane na żywo — sortowanie lub przeniesienie zapisałoby je jako zwykłe wartości. Wybierz zakres bez formuł.',
   appSortRangeTooLarge:
@@ -704,6 +706,7 @@ export const pl = {
   appTabReview: 'Recenzja',
   appRibbonCollapse: 'Zwiń Wstążkę',
   appRibbonExpand: 'Rozwiń Wstążkę',
+  appRibbonCompact: 'Zwinięta Wstążka (tylko ikony)',
   appTabView: 'Widok',
   appTabAi: 'AI',
   appTabChartDesign: 'Projekt wykresu',
@@ -1250,6 +1253,10 @@ export const pl = {
   appFontSizeTip: 'Rozmiar czcionki',
   appZoomIn: 'Powiększ',
   appZoomOut: 'Pomniejsz',
+  appImgActualSize: 'Rzeczywisty rozmiar',
+  appImgFitWindow: 'Dopasuj do okna',
+  appImgSaveAs: 'Zapisz obraz jako…',
+  appImgClose: 'Zamknij (Esc)',
   appZoomSheetTitle: 'Powiększ arkusz',
   appResetZoom: 'Resetuj powiększenie',
   appZoomToSelection: 'Powiększ do zaznaczenia',
@@ -1519,6 +1526,8 @@ export const pl = {
   appVisualSendBackward: 'Przesuń do tyłu',
   appVisualSizeProperties: 'Rozmiar i właściwości…',
   appVisualHyperlink: 'Hiperłącze…',
+  appVisualEmbedInCell: 'Osadź obraz w komórce',
+  appVisualEmbedFailed: 'Nie udało się osadzić tego obrazu w komórce.',
   appVisualDelete: 'Usuń',
   appVisualArranged: 'Obiekt zaktualizowany — zapisz za pomocą ⌘S.',
   appVisualCopied: 'Obiekt skopiowany.',

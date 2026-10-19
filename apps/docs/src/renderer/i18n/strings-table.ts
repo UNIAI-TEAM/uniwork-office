@@ -26,6 +26,7 @@ const en = {
   ribbonCellMargins: 'Default cell margins',
 }
 
+<<<<<<< ours
 /** Vietnamese is reviewed for the UniWork web (the Table Design tab was English in vi). */
 const vi: Record<keyof typeof en, string> = {
   ribbonTableStyleOptions: 'Tùy chọn kiểu bảng',
@@ -53,6 +54,8 @@ const vi: Record<keyof typeof en, string> = {
   ribbonCellMargins: 'Lề ô mặc định',
 }
 
+=======
+>>>>>>> theirs
 const ru: Record<keyof typeof en, string> = {
   ribbonTableStyleOptions: 'Параметры стилей таблиц',
   ribbonTableFirstRow: 'Строка заголовка',

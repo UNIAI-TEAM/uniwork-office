@@ -19,8 +19,12 @@ export interface IpcStreamChunk {
   requestId: string
   /** 'ping' = wire-level keepalive; re-arms the silence watchdog and carries no payload;
    * 'reasoning' = model thinking delta (text carries it) */
+<<<<<<< ours
   type:
     'delta' | 'reasoning' | 'tool-call' | 'usage' | 'done' | 'error' | 'ping' | 'notice' | 'reset'
+=======
+  type: 'delta' | 'reasoning' | 'tool-call' | 'usage' | 'done' | 'error' | 'ping'
+>>>>>>> theirs
   text?: string
   toolCall?: AgentToolCall
   /** 'notice' only: the non-fatal turn notice (UniWork AI) */
@@ -34,8 +38,11 @@ export interface IpcStreamChunk {
   retryAfterSec?: number
   /** normalized stop reason on 'done' ('max_tokens' = cut off by the token limit) */
   stopReason?: string
+<<<<<<< ours
   /** the server's run id of this turn (UniWork AI `X-UniWork-AI-Run`), on the chunk after it is known */
   runId?: string
+=======
+>>>>>>> theirs
   /** tokens the provider billed for this turn, carried on 'usage' (always sent before 'done') */
   usage?: AgentTokenUsage
 }
@@ -162,6 +169,7 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
         } else if (chunk.type === 'tool-call') {
           armSilence()
           if (chunk.toolCall) cb.onToolCall(chunk.toolCall)
+<<<<<<< ours
         } else if (chunk.type === 'notice') {
           // a wait or a restart is traffic too: the watchdog stays armed through a Retry-After wait
           armSilence()
@@ -169,6 +177,8 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
         } else if (chunk.type === 'reset') {
           armSilence()
           cb.onTurnReset?.()
+=======
+>>>>>>> theirs
         } else if (chunk.type === 'usage') {
           armSilence()
           if (chunk.usage) cb.onUsage?.(chunk.usage)

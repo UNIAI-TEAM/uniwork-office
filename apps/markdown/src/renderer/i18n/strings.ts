@@ -1,5 +1,6 @@
 export const strings = {
   zh: {
+<<<<<<< ours
     aiRedoPictureLost: '无法恢复这次运行插入的图片，所以未能重做。',
     aiClarifyTitle: '继续之前先确认几个问题',
     aiClarifyDecide: '帮我决定',
@@ -14,6 +15,8 @@ export const strings = {
     aiToolClarify: '已回答澄清问题',
     aiToolClarifySkipped: '跳过了澄清问题',
     aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
+=======
+>>>>>>> theirs
     mdThemeTitle: '文档主题',
     mdThemeDefault: '默认（跟随文档主题）',
     renameNeedsSave: '先保存或放弃改动，再改文件后缀',
@@ -190,6 +193,13 @@ export const strings = {
     sourceView: '源码',
     sourceViewHint: '直接编辑 Markdown 源码，与保存到文件的文本完全一致',
     outlineEmpty: '暂无标题',
+    backlinks: '反向链接',
+    backlinksEmpty: '还没有笔记链接到这里。',
+    backlinksRefresh: '刷新反向链接',
+    graph: '关系图谱',
+    graphClose: '关闭图谱',
+    graphEmpty: '库中还没有笔记。',
+    graphTruncated: '笔记太多，图谱只画出了前 {shown} / {total} 篇。',
     codeCopy: '复制',
     codeCopied: '已复制',
     tableRowAbove: '上方插入行',
@@ -276,6 +286,7 @@ export const strings = {
     zoomOut: '缩小',
   },
   en: {
+<<<<<<< ours
     aiRedoPictureLost: "Couldn't put the picture back, so the redo was not applied.",
     aiClarifyTitle: 'A few questions before I continue',
     aiClarifyDecide: 'Decide for me',
@@ -291,6 +302,8 @@ export const strings = {
     aiToolClarifySkipped: 'Clarification skipped',
     aiViewOnlyNotice:
       'View-only document: AI can read it and answer questions, but editing is turned off.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Document theme',
     mdThemeDefault: 'Default (follow the document theme)',
     renameNeedsSave: 'Save or discard your changes before changing the extension',
@@ -472,6 +485,13 @@ export const strings = {
     sourceView: 'Source',
     sourceViewHint: 'Edit the raw Markdown — exactly the text a save writes',
     outlineEmpty: 'No headings yet',
+    backlinks: 'Backlinks',
+    backlinksEmpty: 'No notes link here yet.',
+    backlinksRefresh: 'Refresh backlinks',
+    graph: 'Graph view',
+    graphClose: 'Close the graph',
+    graphEmpty: 'The vault has no notes yet.',
+    graphTruncated: 'Too many notes: the graph shows the first {shown} of {total}.',
     codeCopy: 'Copy',
     codeCopied: 'Copied',
     tableRowAbove: 'Insert row above',
@@ -562,6 +582,7 @@ export const strings = {
     zoomOut: 'Zoom out',
   },
   vi: {
+<<<<<<< ours
     aiRedoPictureLost: 'Không khôi phục được ảnh nên chưa làm lại được.',
     aiClarifyTitle: 'Vài câu hỏi trước khi tiếp tục',
     aiClarifyDecide: 'Quyết định giúp tôi',
@@ -577,6 +598,8 @@ export const strings = {
     aiToolClarifySkipped: 'Đã bỏ qua câu hỏi làm rõ',
     aiViewOnlyNotice:
       'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Chủ đề tài liệu',
     mdThemeDefault: 'Mặc định (theo chủ đề tài liệu)',
     renameNeedsSave: 'Hãy lưu hoặc hủy thay đổi trước khi đổi phần mở rộng',
@@ -757,6 +780,14 @@ export const strings = {
     sourceView: 'Mã nguồn',
     sourceViewHint: 'Chỉnh sửa Markdown thô — đúng văn bản mà lưu sẽ ghi ra',
     outlineEmpty: 'Chưa có tiêu đề nào',
+    backlinks: 'Liên kết ngược',
+    backlinksEmpty: 'Chưa có ghi chú nào liên kết đến đây.',
+    backlinksRefresh: 'Làm mới liên kết ngược',
+    graph: 'Xem đồ thị',
+    graphClose: 'Đóng đồ thị',
+    graphEmpty: 'Kho chưa có ghi chú nào.',
+    graphTruncated:
+      'Quá nhiều ghi chú: biểu đồ chỉ hiển thị {shown} ghi chú đầu tiên trong tổng số {total}.',
     codeCopy: 'Sao chép',
     codeCopied: 'Đã sao chép',
     tableRowAbove: 'Chèn hàng phía trên',
@@ -846,6 +877,7 @@ export const strings = {
     zoomOut: 'Thu nhỏ',
   },
   ja: {
+<<<<<<< ours
     aiRedoPictureLost: '画像を元に戻せなかったため、やり直しできませんでした。',
     aiClarifyTitle: '続ける前にいくつか確認させてください',
     aiClarifyDecide: 'おまかせ',
@@ -861,6 +893,8 @@ export const strings = {
     aiToolClarifySkipped: '確認の質問をスキップ',
     aiViewOnlyNotice:
       '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'ドキュメントテーマ',
     mdThemeDefault: 'デフォルト（ドキュメントテーマに従う）',
     renameNeedsSave: '拡張子を変更する前に変更を保存または破棄してください',
@@ -1040,6 +1074,13 @@ export const strings = {
     sourceView: 'ソース',
     sourceViewHint: 'Markdown のソースを直接編集。保存される内容と同じテキストです',
     outlineEmpty: '見出しがありません',
+    backlinks: 'バックリンク',
+    backlinksEmpty: 'まだどのノートもリンクしていません。',
+    backlinksRefresh: 'バックリンクを更新',
+    graph: 'グラフビュー',
+    graphClose: 'グラフを閉じる',
+    graphEmpty: 'ボールトにノートがまだありません。',
+    graphTruncated: 'ノートが多すぎます。グラフには先頭 {shown} / {total} 件のみ表示しています。',
     codeCopy: 'コピー',
     codeCopied: 'コピーしました',
     tableRowAbove: '上に行を挿入',
@@ -1130,6 +1171,7 @@ export const strings = {
     zoomOut: '縮小',
   },
   ko: {
+<<<<<<< ours
     aiRedoPictureLost: '이미지를 되돌리지 못해 다시 실행하지 못했습니다.',
     aiClarifyTitle: '계속하기 전에 몇 가지 확인할게요',
     aiClarifyDecide: '알아서 결정',
@@ -1145,6 +1187,8 @@ export const strings = {
     aiToolClarifySkipped: '확인 질문을 건너뜀',
     aiViewOnlyNotice:
       '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
+=======
+>>>>>>> theirs
     mdThemeTitle: '문서 테마',
     mdThemeDefault: '기본값(문서 테마 따르기)',
     renameNeedsSave: '확장자를 바꾸기 전에 변경 사항을 저장하거나 버리세요',
@@ -1325,6 +1369,13 @@ export const strings = {
     sourceView: '소스',
     sourceViewHint: '원본 Markdown을 직접 편집하세요. 저장되는 텍스트와 동일합니다',
     outlineEmpty: '제목이 없습니다',
+    backlinks: '백링크',
+    backlinksEmpty: '아직 링크한 노트가 없습니다.',
+    backlinksRefresh: '백링크 새로고침',
+    graph: '그래프 보기',
+    graphClose: '그래프 닫기',
+    graphEmpty: '볼트에 아직 노트가 없습니다.',
+    graphTruncated: '노트가 너무 많아 그래프에 앞의 {shown} / {total}개만 표시됩니다.',
     codeCopy: '복사',
     codeCopied: '복사됨',
     tableRowAbove: '위에 행 삽입',
@@ -1415,6 +1466,7 @@ export const strings = {
     zoomOut: '축소',
   },
   fr: {
+<<<<<<< ours
     aiRedoPictureLost:
       "L'image n'a pas pu être remise en place, le rétablissement n'a donc pas été appliqué.",
     aiClarifyTitle: 'Quelques questions avant de continuer',
@@ -1431,6 +1483,8 @@ export const strings = {
     aiToolClarifySkipped: 'Précisions ignorées',
     aiViewOnlyNotice:
       'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Thème du document',
     mdThemeDefault: 'Par défaut (suivre le thème du document)',
     renameNeedsSave: "Enregistrez ou annulez vos modifications avant de changer l'extension",
@@ -1614,6 +1668,13 @@ export const strings = {
     sourceView: 'Source',
     sourceViewHint: 'Modifier le Markdown brut — exactement le texte qu’un enregistrement écrit',
     outlineEmpty: 'Aucun titre pour le moment',
+    backlinks: 'Rétroliens',
+    backlinksEmpty: 'Aucune note ne pointe encore ici.',
+    backlinksRefresh: 'Actualiser les rétroliens',
+    graph: 'Vue graphe',
+    graphClose: 'Fermer le graphe',
+    graphEmpty: 'Le coffre n’a pas encore de notes.',
+    graphTruncated: 'Trop de notes : le graphique affiche les {shown} premières sur {total}.',
     codeCopy: 'Copier',
     codeCopied: 'Copié',
     tableRowAbove: 'Insérer une ligne au-dessus',
@@ -1706,6 +1767,7 @@ export const strings = {
     zoomOut: 'Zoom arrière',
   },
   de: {
+<<<<<<< ours
     aiRedoPictureLost:
       'Das Bild konnte nicht wiederhergestellt werden, daher wurde das Wiederholen nicht ausgeführt.',
     aiClarifyTitle: 'Ein paar Fragen, bevor ich weitermache',
@@ -1722,6 +1784,8 @@ export const strings = {
     aiToolClarifySkipped: 'Rückfragen übersprungen',
     aiViewOnlyNotice:
       'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Dokumentthema',
     mdThemeDefault: 'Standard (dem Dokumentthema folgen)',
     renameNeedsSave:
@@ -1906,6 +1970,13 @@ export const strings = {
     sourceView: 'Quelltext',
     sourceViewHint: 'Das rohe Markdown bearbeiten — genau der Text, den ein Speichern schreibt',
     outlineEmpty: 'Noch keine Überschriften',
+    backlinks: 'Rückverweise',
+    backlinksEmpty: 'Noch keine Notiz verweist hierher.',
+    backlinksRefresh: 'Rückverweise aktualisieren',
+    graph: 'Graphenansicht',
+    graphClose: 'Graph schließen',
+    graphEmpty: 'Der Tresor hat noch keine Notizen.',
+    graphTruncated: 'Zu viele Notizen: Das Diagramm zeigt die ersten {shown} von {total}.',
     codeCopy: 'Kopieren',
     codeCopied: 'Kopiert',
     tableRowAbove: 'Zeile oberhalb einfügen',
@@ -1997,6 +2068,7 @@ export const strings = {
     zoomOut: 'Verkleinern',
   },
   es: {
+<<<<<<< ours
     aiRedoPictureLost: 'No se pudo devolver la imagen, así que no se rehízo el cambio.',
     aiClarifyTitle: 'Unas preguntas antes de continuar',
     aiClarifyDecide: 'Decide por mí',
@@ -2012,6 +2084,8 @@ export const strings = {
     aiToolClarifySkipped: 'Aclaración omitida',
     aiViewOnlyNotice:
       'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Tema del documento',
     mdThemeDefault: 'Predeterminado (seguir el tema del documento)',
     renameNeedsSave: 'Guarda o descarta los cambios antes de cambiar la extensión',
@@ -2194,6 +2268,13 @@ export const strings = {
     sourceView: 'Código fuente',
     sourceViewHint: 'Edita el Markdown sin formato: exactamente el texto que se guarda',
     outlineEmpty: 'Sin encabezados todavía',
+    backlinks: 'Retroenlaces',
+    backlinksEmpty: 'Aún no hay notas que enlacen aquí.',
+    backlinksRefresh: 'Actualizar retroenlaces',
+    graph: 'Vista de grafo',
+    graphClose: 'Cerrar el grafo',
+    graphEmpty: 'El almacén aún no tiene notas.',
+    graphTruncated: 'Demasiadas notas: el gráfico muestra las primeras {shown} de {total}.',
     codeCopy: 'Copiar',
     codeCopied: 'Copiado',
     tableRowAbove: 'Insertar fila arriba',
@@ -2287,6 +2368,7 @@ export const strings = {
     zoomOut: 'Alejar',
   },
   th: {
+<<<<<<< ours
     aiRedoPictureLost: 'ไม่สามารถนำรูปภาพกลับมาได้ จึงทำซ้ำไม่ได้',
     aiClarifyTitle: 'ขอถามสักครู่ก่อนดำเนินการต่อ',
     aiClarifyDecide: 'ตัดสินใจให้ฉัน',
@@ -2301,6 +2383,8 @@ export const strings = {
     aiToolClarify: 'ตอบคำถามเพื่อความชัดเจนแล้ว',
     aiToolClarifySkipped: 'ข้ามคำถามเพื่อความชัดเจน',
     aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'ธีมเอกสาร',
     mdThemeDefault: 'ค่าเริ่มต้น (ตามธีมเอกสาร)',
     renameNeedsSave: 'บันทึกหรือยกเลิกการเปลี่ยนแปลงก่อนเปลี่ยนนามสกุลไฟล์',
@@ -2478,6 +2562,13 @@ export const strings = {
     sourceView: 'ซอร์สโค้ด',
     sourceViewHint: 'แก้ไข Markdown ดิบ — เป็นข้อความเดียวกับที่การบันทึกเขียนลงไฟล์',
     outlineEmpty: 'ยังไม่มีหัวข้อ',
+    backlinks: 'ลิงก์ย้อนกลับ',
+    backlinksEmpty: 'ยังไม่มีโน้ตที่ลิงก์มาที่นี่',
+    backlinksRefresh: 'รีเฟรชลิงก์ย้อนกลับ',
+    graph: 'มุมมองกราฟ',
+    graphClose: 'ปิดกราฟ',
+    graphEmpty: 'ยังไม่มีโน้ตในไลบรารี',
+    graphTruncated: 'มีโน้ตมากเกินไป: กราฟแสดง {shown} จาก {total} รายการแรก',
     codeCopy: 'คัดลอก',
     codeCopied: 'คัดลอกแล้ว',
     tableRowAbove: 'แทรกแถวด้านบน',
@@ -2568,6 +2659,7 @@ export const strings = {
     zoomOut: 'ย่อ',
   },
   id: {
+<<<<<<< ours
     aiRedoPictureLost: 'Gambar tidak dapat dikembalikan, jadi pengulangan tidak diterapkan.',
     aiClarifyTitle: 'Beberapa pertanyaan sebelum melanjutkan',
     aiClarifyDecide: 'Putuskan untuk saya',
@@ -2583,6 +2675,8 @@ export const strings = {
     aiToolClarifySkipped: 'Klarifikasi dilewati',
     aiViewOnlyNotice:
       'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Tema dokumen',
     mdThemeDefault: 'Bawaan (ikuti tema dokumen)',
     renameNeedsSave: 'Simpan atau batalkan perubahan Anda sebelum mengubah ekstensi',
@@ -2763,6 +2857,13 @@ export const strings = {
     sourceView: 'Sumber',
     sourceViewHint: 'Edit Markdown mentah — persis sama dengan teks yang ditulis saat menyimpan',
     outlineEmpty: 'Belum ada judul',
+    backlinks: 'Tautan balik',
+    backlinksEmpty: 'Belum ada catatan yang menaut ke sini.',
+    backlinksRefresh: 'Segarkan tautan balik',
+    graph: 'Tampilan graf',
+    graphClose: 'Tutup graf',
+    graphEmpty: 'Vault belum memiliki catatan.',
+    graphTruncated: 'Terlalu banyak catatan: graf menampilkan {shown} pertama dari {total}.',
     codeCopy: 'Salin',
     codeCopied: 'Disalin',
     tableRowAbove: 'Sisipkan baris di atas',
@@ -2853,6 +2954,7 @@ export const strings = {
     zoomOut: 'Perkecil',
   },
   ru: {
+<<<<<<< ours
     aiRedoPictureLost: 'Не удалось вернуть изображение, поэтому повтор не выполнен.',
     aiClarifyTitle: 'Несколько вопросов, прежде чем продолжить',
     aiClarifyDecide: 'Решите за меня',
@@ -2868,6 +2970,8 @@ export const strings = {
     aiToolClarifySkipped: 'Уточнения пропущены',
     aiViewOnlyNotice:
       'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Тема документа',
     mdThemeDefault: 'По умолчанию (как тема документа)',
     renameNeedsSave: 'Сохраните или отмените изменения перед сменой расширения',
@@ -3049,6 +3153,13 @@ export const strings = {
     sourceView: 'Исходник',
     sourceViewHint: 'Правьте чистый Markdown — ровно тот текст, который записывает сохранение',
     outlineEmpty: 'Заголовков пока нет',
+    backlinks: 'Обратные ссылки',
+    backlinksEmpty: 'Ещё ни одна заметка не ссылается сюда.',
+    backlinksRefresh: 'Обновить обратные ссылки',
+    graph: 'Просмотр графа',
+    graphClose: 'Закрыть граф',
+    graphEmpty: 'В хранилище ещё нет заметок.',
+    graphTruncated: 'Слишком много заметок: на графике показаны первые {shown} из {total}.',
     codeCopy: 'Копировать',
     codeCopied: 'Скопировано',
     tableRowAbove: 'Вставить строку выше',
@@ -3139,6 +3250,7 @@ export const strings = {
     zoomOut: 'Уменьшить',
   },
   ar: {
+<<<<<<< ours
     aiRedoPictureLost: 'تعذّرت إعادة الصورة، لذلك لم تُطبَّق الإعادة.',
     aiClarifyTitle: 'بعض الأسئلة قبل المتابعة',
     aiClarifyDecide: 'قرِّر بالنيابة عني',
@@ -3154,6 +3266,8 @@ export const strings = {
     aiToolClarifySkipped: 'تم تخطي أسئلة التوضيح',
     aiViewOnlyNotice:
       'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'سمة المستند',
     mdThemeDefault: 'الافتراضي (اتباع سمة المستند)',
     renameNeedsSave: 'احفظ تغييراتك أو تجاهلها قبل تغيير الامتداد',
@@ -3331,6 +3445,13 @@ export const strings = {
     sourceView: 'المصدر',
     sourceViewHint: 'حرّر Markdown الخام — وهو النص نفسه الذي تكتبه عملية الحفظ',
     outlineEmpty: 'لا توجد عناوين بعد',
+    backlinks: 'روابط خلفية',
+    backlinksEmpty: 'لا توجد ملاحظات تربط هنا بعد.',
+    backlinksRefresh: 'تحديث الروابط الخلفية',
+    graph: 'عرض المخطط',
+    graphClose: 'إغلاق المخطط',
+    graphEmpty: 'لا توجد ملاحظات في المكتبة بعد.',
+    graphTruncated: 'ملاحظات كثيرة جدًا: يعرض الرسم أول {shown} من {total}.',
     codeCopy: 'نسخ',
     codeCopied: 'تم النسخ',
     tableRowAbove: 'إدراج صف أعلى',
@@ -3421,6 +3542,7 @@ export const strings = {
     zoomOut: 'تصغير',
   },
   pt: {
+<<<<<<< ours
     aiRedoPictureLost: 'Não foi possível restaurar a imagem, então o refazer não foi aplicado.',
     aiClarifyTitle: 'Algumas perguntas antes de continuar',
     aiClarifyDecide: 'Decida por mim',
@@ -3436,6 +3558,8 @@ export const strings = {
     aiToolClarifySkipped: 'Esclarecimento ignorado',
     aiViewOnlyNotice:
       'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Tema do documento',
     mdThemeDefault: 'Padrão (seguir o tema do documento)',
     renameNeedsSave: 'Salve ou descarte as alterações antes de mudar a extensão',
@@ -3618,6 +3742,13 @@ export const strings = {
     sourceView: 'Fonte',
     sourceViewHint: 'Edite o Markdown bruto — exatamente o texto que uma gravação escreve',
     outlineEmpty: 'Sem títulos ainda',
+    backlinks: 'Retro-ligações',
+    backlinksEmpty: 'Ainda nenhuma nota liga aqui.',
+    backlinksRefresh: 'Atualizar retro-ligações',
+    graph: 'Vista de grafo',
+    graphClose: 'Fechar o grafo',
+    graphEmpty: 'O cofre ainda não tem notas.',
+    graphTruncated: 'Notas demais: o gráfico mostra as primeiras {shown} de {total}.',
     codeCopy: 'Copiar',
     codeCopied: 'Copiado',
     tableRowAbove: 'Inserir linha acima',
@@ -3709,6 +3840,7 @@ export const strings = {
     zoomOut: 'Reduzir',
   },
   it: {
+<<<<<<< ours
     aiRedoPictureLost:
       "Non è stato possibile ripristinare l'immagine, quindi il ripristino non è stato applicato.",
     aiClarifyTitle: 'Qualche domanda prima di continuare',
@@ -3725,6 +3857,8 @@ export const strings = {
     aiToolClarifySkipped: 'Chiarimenti saltati',
     aiViewOnlyNotice:
       'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Tema del documento',
     mdThemeDefault: 'Predefinito (segui il tema del documento)',
     renameNeedsSave: "Salva o annulla le modifiche prima di cambiare l'estensione",
@@ -3907,6 +4041,13 @@ export const strings = {
     sourceView: 'Sorgente',
     sourceViewHint: 'Modifica il Markdown grezzo — è il testo che il salvataggio scrive',
     outlineEmpty: 'Nessuna intestazione',
+    backlinks: 'Collegamenti inversi',
+    backlinksEmpty: 'Ancora nessuna nota rimanda qui.',
+    backlinksRefresh: 'Aggiorna i collegamenti inversi',
+    graph: 'Vista grafo',
+    graphClose: 'Chiudi il grafo',
+    graphEmpty: 'La libreria non ha ancora note.',
+    graphTruncated: 'Troppe note: il grafico mostra le prime {shown} su {total}.',
     codeCopy: 'Copia',
     codeCopied: 'Copiato',
     tableRowAbove: 'Inserisci riga sopra',
@@ -3998,6 +4139,7 @@ export const strings = {
     zoomOut: 'Riduci',
   },
   pl: {
+<<<<<<< ours
     aiRedoPictureLost: 'Nie udało się przywrócić obrazu, więc ponowienie nie zostało zastosowane.',
     aiClarifyTitle: 'Kilka pytań, zanim przejdę dalej',
     aiClarifyDecide: 'Zdecyduj za mnie',
@@ -4013,6 +4155,8 @@ export const strings = {
     aiToolClarifySkipped: 'Pominięto wyjaśnienia',
     aiViewOnlyNotice:
       'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Motyw dokumentu',
     mdThemeDefault: 'Domyślnie (zgodnie z motywem dokumentu)',
     renameNeedsSave: 'Zapisz lub odrzuć zmiany przed zmianą rozszerzenia',
@@ -4194,6 +4338,13 @@ export const strings = {
     sourceView: 'Źródło',
     sourceViewHint: 'Edytuj surowy Markdown — dokładnie tekst zapisywany do pliku',
     outlineEmpty: 'Brak nagłówków',
+    backlinks: 'Odwołania',
+    backlinksEmpty: 'Żadna notatka nie linkuje tu jeszcze.',
+    backlinksRefresh: 'Odśwież odwołania',
+    graph: 'Widok grafu',
+    graphClose: 'Zamknij graf',
+    graphEmpty: 'W sejfie nie ma jeszcze notatek.',
+    graphTruncated: 'Za dużo notatek: wykres pokazuje pierwsze {shown} z {total}.',
     codeCopy: 'Kopiuj',
     codeCopied: 'Skopiowano',
     tableRowAbove: 'Wstaw wiersz powyżej',
@@ -4284,6 +4435,7 @@ export const strings = {
     zoomOut: 'Pomniejsz',
   },
   cs: {
+<<<<<<< ours
     aiRedoPictureLost: 'Obrázek se nepodařilo vrátit, takže opakování nebylo provedeno.',
     aiClarifyTitle: 'Pár otázek, než budu pokračovat',
     aiClarifyDecide: 'Rozhodni za mě',
@@ -4299,6 +4451,8 @@ export const strings = {
     aiToolClarifySkipped: 'Upřesnění přeskočeno',
     aiViewOnlyNotice:
       'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Motiv dokumentu',
     mdThemeDefault: 'Výchozí (podle motivu dokumentu)',
     renameNeedsSave: 'Před změnou přípony uložte nebo zrušte změny',
@@ -4459,6 +4613,13 @@ export const strings = {
     sourceView: 'Zdrojový kód',
     sourceViewHint: 'Upravujte surový Markdown — přesně text, který se zapisuje do souboru',
     outlineEmpty: 'Zatím žádné nadpisy',
+    backlinks: 'Zpětné odkazy',
+    backlinksEmpty: 'Zatím žádná poznámka nelinkuje sem.',
+    backlinksRefresh: 'Aktualizovat zpětné odkazy',
+    graph: 'Zobrazení grafu',
+    graphClose: 'Zavřít graf',
+    graphEmpty: 'V trezoru ještě nejsou poznámky.',
+    graphTruncated: 'Příliš poznámek: graf zobrazuje prvních {shown} z {total}.',
     codeCopy: 'Kopírovat',
     codeCopied: 'Zkopírováno',
     tableRowAbove: 'Vložit řádek nad',
@@ -4569,6 +4730,7 @@ export const strings = {
     mermaidErrorDetails: 'Technické podrobnosti',
   },
   nl: {
+<<<<<<< ours
     aiRedoPictureLost:
       'De afbeelding kon niet worden teruggezet, dus het opnieuw uitvoeren is niet toegepast.',
     aiClarifyTitle: 'Een paar vragen voordat ik verder ga',
@@ -4585,6 +4747,8 @@ export const strings = {
     aiToolClarifySkipped: 'Verduidelijking overgeslagen',
     aiViewOnlyNotice:
       'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Documentthema',
     mdThemeDefault: 'Standaard (documentthema volgen)',
     renameNeedsSave: 'Sla uw wijzigingen op of verwerp ze voordat u de extensie wijzigt',
@@ -4767,6 +4931,13 @@ export const strings = {
     sourceView: 'Broncode',
     sourceViewHint: 'Bewerk de ruwe Markdown — precies de tekst die bij opslaan wordt geschreven',
     outlineEmpty: 'Nog geen koppen',
+    backlinks: 'Terugverwijzingen',
+    backlinksEmpty: 'Nog geen notities linken hierheen.',
+    backlinksRefresh: 'Terugverwijzingen bijwerken',
+    graph: 'Grafiekweergave',
+    graphClose: 'Grafiek sluiten',
+    graphEmpty: 'De kluis heeft nog geen notities.',
+    graphTruncated: 'Te veel notities: de grafiek toont de eerste {shown} van {total}.',
     codeCopy: 'Kopiëren',
     codeCopied: 'Gekopieerd',
     tableRowAbove: 'Rij boven invoegen',
@@ -4857,6 +5028,7 @@ export const strings = {
     zoomOut: 'Uitzoomen',
   },
   ms: {
+<<<<<<< ours
     aiRedoPictureLost: 'Gambar tidak dapat dikembalikan, jadi ulang semula tidak dilaksanakan.',
     aiClarifyTitle: 'Beberapa soalan sebelum meneruskan',
     aiClarifyDecide: 'Putuskan untuk saya',
@@ -4872,6 +5044,8 @@ export const strings = {
     aiToolClarifySkipped: 'Penjelasan dilangkau',
     aiViewOnlyNotice:
       'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'Tema dokumen',
     mdThemeDefault: 'Lalai (ikut tema dokumen)',
     renameNeedsSave: 'Simpan atau buang perubahan anda sebelum menukar sambungan',
@@ -5052,6 +5226,13 @@ export const strings = {
     sourceView: 'Sumber',
     sourceViewHint: 'Edit Markdown mentah — teks yang sama seperti yang ditulis semasa menyimpan',
     outlineEmpty: 'Tiada tajuk lagi',
+    backlinks: 'Pautan balik',
+    backlinksEmpty: 'Belum ada nota yang memautkan ke sini.',
+    backlinksRefresh: 'Segar semula pautan balik',
+    graph: 'Paparan graf',
+    graphClose: 'Tutup graf',
+    graphEmpty: 'Vault belum mempunyai nota.',
+    graphTruncated: 'Terlalu banyak nota: graf menunjukkan {shown} yang pertama daripada {total}.',
     codeCopy: 'Salin',
     codeCopied: 'Disalin',
     tableRowAbove: 'Sisip baris di atas',
@@ -5142,6 +5323,7 @@ export const strings = {
     zoomOut: 'Zum keluar',
   },
   he: {
+<<<<<<< ours
     aiRedoPictureLost: 'לא ניתן היה להחזיר את התמונה, ולכן הפעולה לא בוצעה מחדש.',
     aiClarifyTitle: 'כמה שאלות לפני שאמשיך',
     aiClarifyDecide: 'החלט בשבילי',
@@ -5156,6 +5338,8 @@ export const strings = {
     aiToolClarify: 'שאלות ההבהרה נענו',
     aiToolClarifySkipped: 'שאלות ההבהרה דולגו',
     aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'ערכת נושא של המסמך',
     mdThemeDefault: 'ברירת מחדל (בהתאם לערכת המסמך)',
     renameNeedsSave: 'שמור או בטל את השינויים לפני שינוי הסיומת',
@@ -5332,6 +5516,13 @@ export const strings = {
     sourceView: 'מקור',
     sourceViewHint: 'ערוך Markdown גולמי — בדיוק הטקסט שנכתב בעת השמירה',
     outlineEmpty: 'אין כותרות עדיין',
+    backlinks: 'קישורים נכנסים',
+    backlinksEmpty: 'אף פתק לא מקשר לכאן עדיין.',
+    backlinksRefresh: 'רענון קישורים נכנסים',
+    graph: 'תצוגת גרף',
+    graphClose: 'סגירת הגרף',
+    graphEmpty: 'עדיין אין פתקים בכספת.',
+    graphTruncated: 'יותר מדי הערות: הגרף מציג את {shown} הראשונות מתוך {total}.',
     codeCopy: 'העתק',
     codeCopied: 'הועתק',
     tableRowAbove: 'הוסף שורה מעל',
@@ -5421,6 +5612,7 @@ export const strings = {
     zoomOut: 'הקטנה',
   },
   hi: {
+<<<<<<< ours
     aiRedoPictureLost: 'तस्वीर वापस नहीं रखी जा सकी, इसलिए दोबारा लागू नहीं हो सका।',
     aiClarifyTitle: 'आगे बढ़ने से पहले कुछ सवाल',
     aiClarifyDecide: 'मेरे लिए तय करें',
@@ -5436,6 +5628,8 @@ export const strings = {
     aiToolClarifySkipped: 'स्पष्टीकरण छोड़ा गया',
     aiViewOnlyNotice:
       'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
+=======
+>>>>>>> theirs
     mdThemeTitle: 'दस्तावेज़ थीम',
     mdThemeDefault: 'डिफ़ॉल्ट (दस्तावेज़ थीम का पालन करें)',
     renameNeedsSave: 'एक्सटेंशन बदलने से पहले अपने बदलाव सहेजें या छोड़ें',
@@ -5616,6 +5810,13 @@ export const strings = {
     sourceView: 'स्रोत',
     sourceViewHint: 'कच्चा Markdown संपादित करें — वही टेक्स्ट जो सहेजने पर लिखा जाता है',
     outlineEmpty: 'अभी कोई शीर्षक नहीं',
+    backlinks: 'बैकलिंक',
+    backlinksEmpty: 'अभी कोई नोट यहाँ लिंक नहीं करता।',
+    backlinksRefresh: 'बैकलिंक रीफ़्रेश करें',
+    graph: 'ग्राफ़ दृश्य',
+    graphClose: 'ग्राफ़ बंद करें',
+    graphEmpty: 'वॉल्ट में अभी कोई नोट नहीं है।',
+    graphTruncated: 'बहुत अधिक नोट्स: ग्राफ़ पहली {shown} / {total} दिखाता है।',
     codeCopy: 'कॉपी',
     codeCopied: 'कॉपी हो गया',
     tableRowAbove: 'ऊपर पंक्ति जोड़ें',
@@ -5706,6 +5907,7 @@ export const strings = {
     zoomOut: 'ज़ूम आउट',
   },
   'zh-TW': {
+<<<<<<< ours
     aiRedoPictureLost: '無法復原這次執行插入的圖片，所以未能重做。',
     aiClarifyTitle: '繼續之前先確認幾個問題',
     aiClarifyDecide: '幫我決定',
@@ -5720,6 +5922,8 @@ export const strings = {
     aiToolClarify: '已回答釐清問題',
     aiToolClarifySkipped: '已略過釐清問題',
     aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
+=======
+>>>>>>> theirs
     mdThemeTitle: '文件主題',
     mdThemeDefault: '預設（跟隨文件主題）',
     renameNeedsSave: '先儲存或捨棄變更，再更改副檔名',
@@ -5896,6 +6100,13 @@ export const strings = {
     sourceView: '原始碼',
     sourceViewHint: '直接編輯 Markdown 原始碼，與儲存到檔案的文字完全一致',
     outlineEmpty: '尚無標題',
+    backlinks: 'बैकलिंक',
+    backlinksEmpty: 'अभी कोई नोट यहाँ लिंक नहीं करता।',
+    backlinksRefresh: 'बैकलिंक रीफ़्रेश करें',
+    graph: 'ग्राफ़ दृश्य',
+    graphClose: 'ग्राफ़ बंद करें',
+    graphEmpty: '庫中還沒有筆記。',
+    graphTruncated: '筆記太多，圖譜只畫出了前 {shown} / {total} 篇。',
     codeCopy: '複製',
     codeCopied: '已複製',
     tableRowAbove: '上方插入列',

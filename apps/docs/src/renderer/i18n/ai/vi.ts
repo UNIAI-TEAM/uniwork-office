@@ -197,6 +197,7 @@ export const vi = {
   aiCmdImages: 'Đã cập nhật {count} hình ảnh',
   aiCmdToc: 'Đã chèn mục lục ({count} mục)',
   aiCmdSkipped: ' (đã bỏ qua {count} khối được bảo vệ)',
+<<<<<<< ours
   aiOpenSettingsBtn: 'Mở cài đặt AI',
   aiViewOnlyNotice:
     'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
@@ -212,6 +213,8 @@ export const vi = {
   aiClarifySubmit: 'Tiếp tục',
   aiSumClarify: 'Đã trả lời câu hỏi làm rõ',
   aiSumClarifySkipped: 'Đã bỏ qua câu hỏi làm rõ',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Tạo bản đồ tư duy cho tài liệu này',
   aiMindMapBtn: 'Bản đồ tư duy AI',
   aiMindMapPrompt:

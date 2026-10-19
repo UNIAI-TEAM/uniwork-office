@@ -1,6 +1,10 @@
+<<<<<<< ours
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+=======
+import { afterEach, describe, expect, it } from 'vitest'
+>>>>>>> theirs
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { MindMapTreeNode } from '@genoffice/agent-core'
@@ -78,6 +82,7 @@ describe('MindMapCard wheel gestures', () => {
     expect(zoomOf(canvas)).toBeCloseTo(1, 5)
   })
 })
+<<<<<<< ours
 
 describe('MindMapCard first frame', () => {
   it('fits the map into a measured card on first render (V10)', () => {
@@ -164,3 +169,5 @@ describe('MindMapCard refit when first measured hidden (R3-4)', () => {
     expect(source).not.toMatch(/lastTreeRef[\s\S]{0,120}\n {2}useEffect\(/)
   })
 })
+=======
+>>>>>>> theirs

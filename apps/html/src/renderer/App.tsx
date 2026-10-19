@@ -9,7 +9,10 @@ import {
   type FindTarget,
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
+<<<<<<< ours
   UniAiMark,
+=======
+>>>>>>> theirs
   useAiSidebarEnabled,
 } from '@genoffice/ui'
 import {
@@ -21,7 +24,10 @@ import { cap, platform } from './capabilities'
 import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { useNarrowFrame } from './narrow-frame'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
+<<<<<<< ours
 import { textWithPendingStyles } from './document/pending-draft'
+=======
+>>>>>>> theirs
 import {
   SourceEditor,
   type CursorInfo,
@@ -710,8 +716,13 @@ export default function App() {
     const src = textRef.current
     // one pin per element; several queued edits on the same element share it and list their ordinals
     const bySid = new Map<number, string[]>()
+    const proj = map && buildProjection(src, map)
     items.forEach((item, i) => {
+<<<<<<< ours
       const target = map && resolveQueueItem(buildProjection(src, map), map, item).target
+=======
+      const target = proj && resolveQueueItem(proj, map, item).target
+>>>>>>> theirs
       if (target) bySid.set(target.sid, [...(bySid.get(target.sid) ?? []), String(i + 1)])
     })
     const marks = [...bySid].map(([sid, ordinals]) => ({ sid, label: ordinals.join('·') }))
@@ -740,13 +751,18 @@ export default function App() {
         }
         case 'gx:markClick': {
           const map = getMap()
+          const proj = buildProjection(textRef.current, map)
           // a shared pin opens the most recent edit on that element; the others stay reachable from the queue card
           const item = editQueueRef.current
+<<<<<<< ours
             .filter(
               (q) =>
                 resolveQueueItem(buildProjection(textRef.current, map), map, q).target?.sid ===
                 msg.sid,
             )
+=======
+            .filter((q) => resolveQueueItem(proj, map, q).target?.sid === msg.sid)
+>>>>>>> theirs
             .at(-1)
           if (!item) return
           selectSid(item.sid, { reveal: true })
@@ -1746,6 +1762,7 @@ export default function App() {
       />
 
       <div className="app-main">
+<<<<<<< ours
         {aiEnabled && (
           <div
             className={`ai-dock${aiOpen ? '' : ' collapsed'}${
@@ -1780,6 +1797,37 @@ export default function App() {
             />
           </div>
         )}
+=======
+        <div
+          className={`ai-dock${aiOpen ? '' : ' collapsed'}${
+            !aiSidebarEnabled && !aiOpen ? ' ai-dock-off' : ''
+          }`}
+        >
+          {!aiOpen && aiSidebarEnabled && (
+            <button
+              className="ai-rail"
+              data-tip={t('aiOpenAssistant')}
+              aria-label={t('aiOpenAssistant')}
+              onClick={() => setAiOpen(true)}
+            >
+              <GensparkMark size={18} />
+            </button>
+          )}
+          {/* stays mounted while collapsed: an in-flight run, its snapshots and the loop context survive */}
+          <AiPanel
+            deps={aiDeps}
+            filePath={path}
+            preset={aiPreset}
+            editQueue={editQueue}
+            onQueueEditInstruction={queueUpdate}
+            onQueueRemove={queueRemove}
+            onQueueClear={() => setEditQueue([])}
+            onQueueFocus={queueFocus}
+            onQueueConsume={queueConsume}
+            onCollapse={() => setAiOpen(false)}
+          />
+        </div>
+>>>>>>> theirs
         <div className="app-content">
           {findTarget && (
             <FindPanel
@@ -1906,9 +1954,13 @@ export default function App() {
                 onChange={onEditorChange}
                 onCursor={onCursor}
                 onBeforeReplace={flushPending}
+<<<<<<< ours
                 // withholding means "the model does not read this", and the model lives behind
                 // `ai`: with the key off (web frame) the source pane keeps Chromium's own menu
                 onRedact={aiEnabled && canEdit && !uniwork.readOnly ? onRedactSelection : undefined}
+=======
+                onRedact={onRedactSelection}
+>>>>>>> theirs
               />
             </div>
           </div>

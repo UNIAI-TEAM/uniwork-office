@@ -250,6 +250,25 @@ export const id = {
     'Total waktu peragaan slide adalah {duration}. Simpan waktu setiap slide untuk perpindahan slide otomatis?',
   appRehearseDiscard: 'Jangan Simpan',
   appRehearseSave: 'Simpan',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Rekam Narasi',
+  appRecordSummary: 'Durasi rekaman {duration}. Simpan narasi dan waktu setiap slide?',
+  appRecordDiscard: 'Jangan Simpan',
+  appRecordSave: 'Simpan',
+  appStatusRecordSaved: 'Narasi disimpan di {count} slide (PowerPoint juga memutarnya)',
+  appStatusRecordFailed: 'Rekaman tidak dapat disimpan',
+  appStatusNarrationCleared: 'Narasi dihapus',
+  appSettingsTitle: 'Pengaturan AI',
+  appSettingsAccount: 'Akun Genspark',
+  appSettingsChecking: 'Memeriksa…',
+  appSettingsLoggedIn: 'Sudah masuk',
+  appSettingsLoggedInEmail: 'Sudah masuk: {email}',
+  appSettingsLoggedOut: 'Belum masuk (fitur AI memerlukan akun Genspark)',
+  appSettingsLoginPending: 'Menunggu proses masuk di browser…',
+  appSettingsLogin: 'Masuk ke Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Batal',
   appCropHint:
     'Enter untuk mengonfirmasi · Esc untuk membatalkan · Klik di luar untuk mengonfirmasi',

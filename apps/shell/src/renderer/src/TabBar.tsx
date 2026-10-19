@@ -22,6 +22,15 @@ declare global {
   }
 }
 
+/**
+ * Formats hover tooltip for document tab:
+ * - Tabs with a saved filePath show the full title on line 1, and the full absolute path on line 2.
+ * - Untitled or Home/Help tabs without a filePath show the title alone.
+ */
+export function formatTabTooltip(tab: TabSummary): string {
+  return tab.filePath ? `${tab.title}\n${tab.filePath}` : tab.title
+}
+
 function DocIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 240 240" fill="none" aria-hidden="true">
@@ -52,6 +61,18 @@ function PdfIcon() {
       <rect width="240" height="240" rx="48" fill="#EF4444" />
       <path
         d="M102.719 63.0153C105.738 52.1477 126.265 50.9398 128.68 66.6374C131.699 75.6938 127.472 90.7878 125.661 100.448C130.491 113.127 137.133 122.183 147.397 128.22C158.264 127.013 179.395 125.202 186.641 132.447C192.678 138.485 191.471 155.389 175.774 155.389C166.717 155.389 153.434 151.767 141.963 145.126C129.284 147.541 114.19 152.974 100.907 157.804C70.7196 209.727 53.2104 186.181 55.0216 176.521C57.4366 164.446 73.7385 154.786 85.8136 148.749C91.8511 137.277 100.907 117.957 106.944 103.466C102.718 86.5617 100.304 72.6754 102.719 63.0153ZM85.2149 158.437C81.5921 161.456 70.1214 171.117 67.1026 179.569C67.1026 179.569 73.7436 176.55 85.2149 158.437ZM116.605 113.718C112.378 124.586 107.548 136.662 101.511 146.925C111.171 142.699 122.039 137.869 134.718 134.85C127.473 130.02 121.435 122.775 116.605 113.718ZM180.613 143.932C183.028 142.121 179.406 137.291 158.275 139.102C177.595 147.555 180.613 143.932 180.613 143.932ZM116.013 64.2419C114.805 64.2436 114.806 80.5436 117.221 88.9958C120.239 83.5616 120.843 64.2421 116.013 64.2419Z"
+        fill="#fff"
+      />
+    </svg>
+  )
+}
+
+function HelpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 240 240" fill="none" aria-hidden="true">
+      <rect width="240" height="240" rx="48" fill="#7C5CE0" />
+      <path
+        d="M120 176c-6.6 0-12-5.2-12-11.6 0-6.5 5.4-11.7 12-11.7s12 5.2 12 11.7c0 6.4-5.4 11.6-12 11.6zm-9.6-34.9c0-16.2 19.2-19.1 19.2-30.4 0-5.6-4.4-9.3-10.6-9.3-6.5 0-11 3.4-13.3 8.7-1.5 3.5-5.1 5.4-8.9 4.6l-8.7-1.8c-4.7-1-7.6-5.7-6.2-10.2C86.5 88.7 99.6 79 119.6 79c20.7 0 34.3 12.3 34.3 29.6 0 23.7-24.4 26.6-24.4 39.4 0 2.5-2.1 4.4-4.7 4.4h-10.1c-2.6 0-4.7-1.9-4.7-4.4z"
         fill="#fff"
       />
     </svg>
@@ -137,6 +158,7 @@ const KIND_ICON: Record<TabSummary['kind'], ReactElement> = {
   pdf: <PdfIcon />,
   markdown: <MarkdownIcon />,
   html: <HtmlIcon />,
+  help: <HelpIcon />,
 }
 
 /**
@@ -187,6 +209,22 @@ export function TabBar() {
   renamingRef.current = renaming
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
+  /** open the inline rename box on a file tab (double-click, or "Rename" in the tab menu) */
+  const beginRename = (tab: TabSummary) => {
+    if (tab.id === 'home' || !tab.filePath) return
+    // whole name, extension included: only the shell may change an extension
+    setRenaming({ id: tab.id, value: tab.title })
+  }
+  const beginRenameRef = useRef(beginRename)
+  beginRenameRef.current = beginRename
+  useEffect(
+    () =>
+      window.aiOfficeTabs.onStartRename?.((id) => {
+        const tab = tabsRef.current.find((candidate) => candidate.id === id)
+        if (tab) beginRenameRef.current(tab)
+      }),
+    [],
+  )
   const commitRename = () => {
     const r = renamingRef.current
     renamingRef.current = null
@@ -520,8 +558,8 @@ export function TabBar() {
               key={tab.id}
               className={`tab-item ${tab.kind === 'home' ? 'tab-home' : ''} ${tab.active ? 'active' : ''} ${dragVisual?.id === tab.id ? 'drag-source' : ''}`}
               // long file names ellipsize in the strip — hover reveals the
-              // full title (the close button's own tooltip still wins there)
-              title={tab.title}
+              // full title and where the file is (the close button's own tooltip still wins there)
+              title={formatTabTooltip(tab)}
               style={dragStyle}
               onContextMenu={(event) => {
                 event.preventDefault()
@@ -532,7 +570,18 @@ export function TabBar() {
                   Math.round(event.clientY),
                 )
               }}
+              onAuxClick={(event) => {
+                if (event.button !== 1 || !tab.closable) return
+                event.preventDefault()
+                void window.aiOfficeTabs.close(tab.id)
+              }}
               onMouseDown={(event) => {
+                // middle button: stop Chromium's autoscroll on the scrollable
+                // strip so the tab is still under the pointer at auxclick
+                if (event.button === 1) {
+                  event.preventDefault()
+                  return
+                }
                 // the strip captures the pointer for dragging, which retargets
                 // the derived dblclick to the strip; pointer events carry no
                 // click count either, so read it off the compat mousedown
@@ -545,8 +594,7 @@ export function TabBar() {
                 // the input mounts and autofocuses inside this dispatch; the
                 // default mousedown focus step would blur it straight away
                 event.preventDefault()
-                // whole name, extension included: only the shell may change an extension
-                setRenaming({ id: tab.id, value: tab.title })
+                beginRename(tab)
               }}
               onPointerDown={(event) => {
                 if (event.button !== 0) return

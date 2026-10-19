@@ -202,6 +202,7 @@ export const pt = {
   aiCmdImages: '{count} imagem(ns) atualizada(s)',
   aiCmdToc: 'Sumário inserido ({count} entradas)',
   aiCmdSkipped: ' ({count} bloco(s) protegido(s) ignorado(s))',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
   aiClarifyTitle: 'Algumas perguntas antes de continuar',
@@ -216,6 +217,8 @@ export const pt = {
   aiClarifySubmit: 'Continuar',
   aiSumClarify: 'Esclarecimento respondido',
   aiSumClarifySkipped: 'Esclarecimento ignorado',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Gerar um mapa mental deste documento',
   aiMindMapBtn: 'Mapa mental IA',
   aiMindMapPrompt:

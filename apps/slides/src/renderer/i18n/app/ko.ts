@@ -242,6 +242,25 @@ export const ko = {
     '슬라이드 쇼에 걸린 시간은 {duration}입니다. 각 슬라이드의 표시 시간을 자동 전환 시간으로 저장하시겠습니까?',
   appRehearseDiscard: '저장 안 함',
   appRehearseSave: '저장',
+<<<<<<< ours
+=======
+  appRecordTitle: '내레이션 녹음',
+  appRecordSummary: '녹음 길이 {duration}. 각 슬라이드의 내레이션과 표시 시간을 저장하시겠습니까?',
+  appRecordDiscard: '저장 안 함',
+  appRecordSave: '저장',
+  appStatusRecordSaved: '슬라이드 {count}개에 내레이션을 저장했습니다(PowerPoint에서도 재생됨)',
+  appStatusRecordFailed: '녹음을 저장할 수 없습니다',
+  appStatusNarrationCleared: '내레이션을 지웠습니다',
+  appSettingsTitle: 'AI 설정',
+  appSettingsAccount: 'Genspark 계정',
+  appSettingsChecking: '확인 중…',
+  appSettingsLoggedIn: '로그인됨',
+  appSettingsLoggedInEmail: '로그인됨: {email}',
+  appSettingsLoggedOut: '로그인되지 않음(AI 기능을 사용하려면 Genspark 계정으로 로그인해야 합니다)',
+  appSettingsLoginPending: '브라우저 로그인을 기다리는 중…',
+  appSettingsLogin: 'Genspark 로그인',
+  appSettingsModel: '모델',
+>>>>>>> theirs
   appSettingsCancel: '취소',
   appCropHint: 'Enter 확인 · Esc 취소 · 바깥쪽 클릭으로 확인',
   appStatusZoomsInserted:

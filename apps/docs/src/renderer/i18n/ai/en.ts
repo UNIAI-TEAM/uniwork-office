@@ -198,6 +198,7 @@ export const en = {
   aiCmdImages: 'Updated {count} image(s)',
   aiCmdToc: 'Inserted a table of contents ({count} entries)',
   aiCmdSkipped: ' ({count} protected block(s) skipped)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'View-only document: AI can read it and answer questions, but editing is turned off.',
   aiClarifyTitle: 'A few questions before I continue',
@@ -212,6 +213,8 @@ export const en = {
   aiClarifySubmit: 'Continue',
   aiSumClarify: 'Clarification answered',
   aiSumClarifySkipped: 'Clarification skipped',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Generate a mind map of this document',
   aiMindMapBtn: 'AI Mind Map',
   aiMindMapPrompt:

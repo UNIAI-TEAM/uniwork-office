@@ -44,6 +44,7 @@ import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-c
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { PDF_CHANNELS } from '../shared/ipc'
+import { printJobOptions } from '@genoffice/electron-utils/print-job'
 import { buildExportImagePaths, hasValidExportPageNumbers } from './export-images'
 import type {
   ExportImagesRequest,
@@ -80,6 +81,11 @@ import type {
   ValidateTextEditsRequest,
 } from '../shared/ipc'
 import type {
+<<<<<<< ours
+=======
+  CertificateErrorCode,
+  CertificateInfo,
+>>>>>>> theirs
   InspectCertificateResult,
   ListSystemCertificatesResult,
   PdfSignatureInfo,
@@ -111,6 +117,7 @@ import {
 } from './signature-store'
 import { uniqueGeneratedPdfPath } from './generated-output'
 import { validateRedactionRegions } from './redaction'
+<<<<<<< ours
 import { savePdfToPath } from './save-pdf-file'
 import { installNodePdfEnv } from './node-env'
 import { electronImageCodec } from './electron-image'
@@ -122,6 +129,13 @@ import {
   listSystemCertificates,
 } from './system-certificates'
 import type { ExportedIdentity, SystemCertificateRef } from './system-certificates'
+=======
+import { SignError, openCertificate, openExternalCertificate, signPdf } from './pdf-sign'
+import type { ExternalSigner, SignPdfOptions } from './pdf-sign'
+import { readPdfSignatures } from './pdf-signatures'
+import { SystemStoreError, openSystemSigner, listSystemCertificates } from './system-certificates'
+import type { SystemCertificateRef, SystemIdentity } from './system-certificates'
+>>>>>>> theirs
 
 const tDlg = createI18n({
   zh: {
@@ -177,9 +191,15 @@ const tDlg = createI18n({
     dlgReplace: 'Chọn một tệp PDF thay thế',
     dlgSplitPages: 'Lưu các trang đã tách dưới dạng',
     dlgRedactCopy: 'Lưu bản sao đã che thông tin dưới dạng',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Chọn tệp chứng chỉ',
+    dlgSignedCopy: 'Lưu bản sao đã ký dưới dạng',
+    filterCertificate: 'Tệp chứng chỉ (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Tài liệu PDF',
     closeUnsavedMsg: 'Tệp PDF này có những thay đổi chưa được lưu.',
     closeUnsavedDetail: 'Bạn có muốn lưu các thay đổi trước khi đóng không?',
@@ -240,9 +260,15 @@ const tDlg = createI18n({
     dlgReplace: 'Choisir un PDF de remplacement',
     dlgSplitPages: 'Enregistrer les pages divisées sous',
     dlgRedactCopy: 'Enregistrer la copie caviardée sous',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Choisir un fichier de certificat',
+    dlgSignedCopy: 'Enregistrer la copie signée sous',
+    filterCertificate: 'Fichiers de certificat (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Documents PDF',
     closeUnsavedMsg: 'Ce PDF contient des modifications non enregistrées.',
     closeUnsavedDetail: 'Voulez-vous les enregistrer avant de fermer ?',
@@ -261,9 +287,15 @@ const tDlg = createI18n({
     dlgReplace: 'Ersatz-PDF wählen',
     dlgSplitPages: 'Geteilte Seiten speichern unter',
     dlgRedactCopy: 'Geschwärzte Kopie speichern unter',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Zertifikatdatei wählen',
+    dlgSignedCopy: 'Signierte Kopie speichern unter',
+    filterCertificate: 'Zertifikatdateien (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'PDF-Dokumente',
     closeUnsavedMsg: 'Dieses PDF enthält ungespeicherte Änderungen.',
     closeUnsavedDetail: 'Vor dem Schließen speichern?',
@@ -282,9 +314,15 @@ const tDlg = createI18n({
     dlgReplace: 'Elegir un PDF de reemplazo',
     dlgSplitPages: 'Guardar páginas divididas como',
     dlgRedactCopy: 'Guardar copia censurada como',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Elegir un archivo de certificado',
+    dlgSignedCopy: 'Guardar copia firmada como',
+    filterCertificate: 'Archivos de certificado (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Documentos PDF',
     closeUnsavedMsg: 'Este PDF tiene cambios sin guardar.',
     closeUnsavedDetail: '¿Quieres guardarlos antes de cerrar?',
@@ -303,9 +341,15 @@ const tDlg = createI18n({
     dlgReplace: 'เลือก PDF สำหรับแทนที่',
     dlgSplitPages: 'บันทึกหน้าที่แยกแล้วเป็น',
     dlgRedactCopy: 'บันทึกสำเนาที่ปิดทับเป็น',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'เลือกไฟล์ใบรับรอง',
+    dlgSignedCopy: 'บันทึกสำเนาที่ลงนามแล้วเป็น',
+    filterCertificate: 'ไฟล์ใบรับรอง (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'เอกสาร PDF',
     closeUnsavedMsg: 'PDF นี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก',
     closeUnsavedDetail: 'ต้องการบันทึกก่อนปิดหรือไม่?',
@@ -324,9 +368,15 @@ const tDlg = createI18n({
     dlgReplace: 'Pilih PDF pengganti',
     dlgSplitPages: 'Simpan halaman terpisah sebagai',
     dlgRedactCopy: 'Simpan Salinan Teredaksi Sebagai',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Pilih Berkas Sertifikat',
+    dlgSignedCopy: 'Simpan Salinan Bertanda Tangan Sebagai',
+    filterCertificate: 'Berkas Sertifikat (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Dokumen PDF',
     closeUnsavedMsg: 'PDF ini memiliki perubahan yang belum disimpan.',
     closeUnsavedDetail: 'Simpan sebelum menutup?',
@@ -345,9 +395,15 @@ const tDlg = createI18n({
     dlgReplace: 'Выберите PDF для замены',
     dlgSplitPages: 'Сохранить разделённые страницы как',
     dlgRedactCopy: 'Сохранить затемнённую копию как',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Выберите файл сертификата',
+    dlgSignedCopy: 'Сохранить подписанную копию как',
+    filterCertificate: 'Файлы сертификатов (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Документы PDF',
     closeUnsavedMsg: 'В этом PDF есть несохранённые изменения.',
     closeUnsavedDetail: 'Сохранить их перед закрытием?',
@@ -366,9 +422,15 @@ const tDlg = createI18n({
     dlgReplace: 'اختر PDF بديلاً',
     dlgSplitPages: 'حفظ الصفحات المقسّمة باسم',
     dlgRedactCopy: 'حفظ النسخة المنقّحة باسم',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'اختيار ملف شهادة',
+    dlgSignedCopy: 'حفظ النسخة الموقّعة باسم',
+    filterCertificate: 'ملفات الشهادات (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'مستندات PDF',
     closeUnsavedMsg: 'يحتوي هذا الـ PDF على تغييرات غير محفوظة.',
     closeUnsavedDetail: 'هل تريد حفظها قبل الإغلاق؟',
@@ -387,9 +449,15 @@ const tDlg = createI18n({
     dlgReplace: 'Escolher um PDF de substituição',
     dlgSplitPages: 'Salvar páginas divididas como',
     dlgRedactCopy: 'Salvar cópia censurada como',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Escolher um arquivo de certificado',
+    dlgSignedCopy: 'Salvar cópia assinada como',
+    filterCertificate: 'Arquivos de certificado (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Documentos PDF',
     closeUnsavedMsg: 'Este PDF tem alterações não salvas.',
     closeUnsavedDetail: 'Deseja salvá-las antes de fechar?',
@@ -408,9 +476,15 @@ const tDlg = createI18n({
     dlgReplace: 'Scegli un PDF sostitutivo',
     dlgSplitPages: 'Salva le pagine divise come',
     dlgRedactCopy: 'Salva copia oscurata con nome',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Scegli un file di certificato',
+    dlgSignedCopy: 'Salva copia firmata con nome',
+    filterCertificate: 'File di certificato (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Documenti PDF',
     closeUnsavedMsg: 'Questo PDF contiene modifiche non salvate.',
     closeUnsavedDetail: 'Vuoi salvarle prima di chiudere?',
@@ -429,9 +503,15 @@ const tDlg = createI18n({
     dlgReplace: 'Wybierz PDF zastępczy',
     dlgSplitPages: 'Zapisz podzielone strony jako',
     dlgRedactCopy: 'Zapisz zaczernioną kopię jako',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Wybierz plik certyfikatu',
+    dlgSignedCopy: 'Zapisz podpisaną kopię jako',
+    filterCertificate: 'Pliki certyfikatów (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Dokumenty PDF',
     closeUnsavedMsg: 'Ten PDF ma niezapisane zmiany.',
     closeUnsavedDetail: 'Czy zapisać je przed zamknięciem?',
@@ -450,9 +530,15 @@ const tDlg = createI18n({
     dlgReplace: 'Vyberte náhradní PDF',
     dlgSplitPages: 'Uložit rozdělené stránky jako',
     dlgRedactCopy: 'Uložit začerněnou kopii jako',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Vyberte soubor certifikátu',
+    dlgSignedCopy: 'Uložit podepsanou kopii jako',
+    filterCertificate: 'Soubory certifikátů (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Dokumenty PDF',
     closeUnsavedMsg: 'Tento PDF obsahuje neuložené změny.',
     closeUnsavedDetail: 'Chcete je před zavřením uložit?',
@@ -471,9 +557,15 @@ const tDlg = createI18n({
     dlgReplace: 'Kies een vervangende PDF',
     dlgSplitPages: "Gesplitste pagina's opslaan als",
     dlgRedactCopy: 'Zwartgemaakte kopie opslaan als',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Certificaatbestand kiezen',
+    dlgSignedCopy: 'Ondertekende kopie opslaan als',
+    filterCertificate: 'Certificaatbestanden (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'PDF-documenten',
     closeUnsavedMsg: 'Deze PDF bevat niet-opgeslagen wijzigingen.',
     closeUnsavedDetail: 'Wilt u ze opslaan voordat u sluit?',
@@ -492,9 +584,15 @@ const tDlg = createI18n({
     dlgReplace: 'Pilih PDF pengganti',
     dlgSplitPages: 'Simpan halaman dipisah sebagai',
     dlgRedactCopy: 'Simpan Salinan Teredaksi Sebagai',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'Pilih Fail Sijil',
+    dlgSignedCopy: 'Simpan Salinan Bertandatangan Sebagai',
+    filterCertificate: 'Fail Sijil (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'Dokumen PDF',
     closeUnsavedMsg: 'PDF ini mempunyai perubahan yang belum disimpan.',
     closeUnsavedDetail: 'Simpan sebelum menutup?',
@@ -513,9 +611,15 @@ const tDlg = createI18n({
     dlgReplace: 'בחרו PDF חלופי',
     dlgSplitPages: 'שמירת העמודים המפוצלים בשם',
     dlgRedactCopy: 'שמירת עותק מושחר בשם',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'בחירת קובץ אישור',
+    dlgSignedCopy: 'שמירת עותק חתום בשם',
+    filterCertificate: 'קובצי אישורים (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'מסמכי PDF',
     closeUnsavedMsg: 'ב-PDF הזה יש שינויים שלא נשמרו.',
     closeUnsavedDetail: 'האם לשמור אותם לפני הסגירה?',
@@ -534,9 +638,15 @@ const tDlg = createI18n({
     dlgReplace: 'प्रतिस्थापन के लिए PDF चुनें',
     dlgSplitPages: 'विभाजित पृष्ठ इस रूप में सहेजें',
     dlgRedactCopy: 'काला किया गया प्रति इस रूप में सहेजें',
+<<<<<<< ours
     dlgPickCertificate: 'Choose a Certificate File',
     dlgSignedCopy: 'Save Signed Copy As',
     filterCertificate: 'Certificate Files (.p12, .pfx)',
+=======
+    dlgPickCertificate: 'प्रमाणपत्र फ़ाइल चुनें',
+    dlgSignedCopy: 'हस्ताक्षरित प्रति इस रूप में सहेजें',
+    filterCertificate: 'प्रमाणपत्र फ़ाइलें (.p12, .pfx)',
+>>>>>>> theirs
     filterPdf: 'PDF दस्तावेज़',
     closeUnsavedMsg: 'इस PDF में सहेजे नहीं गए परिवर्तन हैं।',
     closeUnsavedDetail: 'क्या बंद करने से पहले उन्हें सहेजना चाहते हैं?',
@@ -770,7 +880,11 @@ export function setPdfRedactionSavedHook(hook: (wc: WebContents, path: string) =
 /** Certificate files the user picked in this view, by opaque id; the renderer never learns the path */
 type CertEntry =
   | { kind: 'file'; path: string }
+<<<<<<< ours
   | { kind: 'system'; ref: SystemCertificateRef; identity?: ExportedIdentity }
+=======
+  | { kind: 'system'; ref: SystemCertificateRef; identity?: SystemIdentity }
+>>>>>>> theirs
 const certEntriesByWc = new Map<number, Map<string, CertEntry>>()
 
 const certEntryOf = (wcId: number, id: unknown): CertEntry | undefined =>
@@ -789,17 +903,62 @@ function releaseCertEntry(entry: CertEntry | undefined): void {
   if (entry?.kind === 'system') delete entry.identity
 }
 
+<<<<<<< ours
 /** PKCS#12 bytes and the password to open them; for a system identity both come from the store export */
+=======
+/** What signs: PKCS#12 bytes with their password, or an OS store that signs in place */
+type CertMaterial =
+  { kind: 'p12'; p12: Uint8Array; password: string } | { kind: 'in-place'; signer: ExternalSigner }
+
+>>>>>>> theirs
 async function certMaterial(
   entry: CertEntry,
   password: string,
   storePassword?: string,
+<<<<<<< ours
 ): Promise<{ p12: Uint8Array; password: string; sha1?: string }> {
   if (entry.kind === 'file') return { p12: await readCertificateFile(entry.path), password }
   entry.identity ??= await exportSystemCertificate(entry.ref, storePassword)
   return entry.identity
 }
 
+=======
+): Promise<CertMaterial> {
+  if (entry.kind === 'file')
+    return { kind: 'p12', p12: await readCertificateFile(entry.path), password }
+  entry.identity ??= await openSystemSigner(entry.ref, storePassword)
+  return entry.identity
+}
+
+/** Decrypt a PKCS#12 once, or read the chain an OS store reports; the key itself is never read for the latter */
+function openMaterial(material: CertMaterial):
+  | { ok: false; error: CertificateErrorCode }
+  | {
+      ok: true
+      info: CertificateInfo[]
+      sign: Pick<SignPdfOptions, 'loaded' | 'p12' | 'password' | 'external'>
+    } {
+  if (material.kind === 'in-place') {
+    const opened = openExternalCertificate(material.signer)
+    return opened.ok
+      ? {
+          ok: true,
+          info: opened.info,
+          sign: { external: { signer: material.signer, loaded: opened.loaded } },
+        }
+      : opened
+  }
+  const opened = openCertificate(material.p12, material.password)
+  return opened.ok
+    ? {
+        ok: true,
+        info: opened.info,
+        sign: { loaded: opened.loaded, p12: material.p12, password: material.password },
+      }
+    : opened
+}
+
+>>>>>>> theirs
 const MAX_CERTIFICATE_FILE_BYTES = 4 * 1024 * 1024
 const SIGNATURE_POSITIONS = new Set([
   'bottom-right',
@@ -1059,6 +1218,7 @@ export async function requestPdfClose(
       : await dialog.showMessageBox(options)
   if (response === 2) return false
   if (response === 1) return true
+<<<<<<< ours
   return await requestRendererSave(contents, 'user')
 }
 
@@ -1066,6 +1226,12 @@ function requestRendererSave(
   contents: WebContents,
   origin: PdfCloseSaveRequest['origin'] = 'user',
 ): Promise<boolean> {
+=======
+  return await requestRendererSave(contents, true)
+}
+
+function requestRendererSave(contents: WebContents, flushAll: boolean): Promise<boolean> {
+>>>>>>> theirs
   return new Promise<boolean>((resolve) => {
     const timer = setTimeout(() => {
       closeSaveWaiters.delete(contents.id)
@@ -1075,6 +1241,7 @@ function requestRendererSave(
       clearTimeout(timer)
       resolve(ok)
     })
+<<<<<<< ours
     contents.send(PDF_CHANNELS.closeSaveRequest, { origin } satisfies PdfCloseSaveRequest)
   })
 }
@@ -1097,6 +1264,18 @@ export function flushPdfSave(
   // The renderer saves with the origin it is told, so a Ctrl+S that lands while an
   // export flush is pending still counts as the user's Save.
   return requestRendererSave(contents, explicit ? 'user' : 'internal')
+=======
+    contents.send(PDF_CHANNELS.closeSaveRequest, { flushAll })
+  })
+}
+
+/** Ask the renderer to write pending edits to disk; clean views resolve true immediately.
+ *  flushAll (export flows): the file must then hold everything on screen, so the form field
+ *  whose card is open is written too; menu Save leaves it to Done */
+export function flushPdfSave(contents: WebContents, flushAll = false): Promise<boolean> {
+  if (contents.isDestroyed() || !dirtyByWc.has(contents.id)) return Promise.resolve(true)
+  return requestRendererSave(contents, flushAll)
+>>>>>>> theirs
 }
 
 /** Menu Print: ask the renderer to run its print flow (save, rasterize, system dialog) */
@@ -1221,12 +1400,32 @@ function registerPdfIpc(): void {
     return preset
   })
 
+<<<<<<< ours
   // G8-02: the author written into new note comments. The shell's single source
   // answers with the signed-in account's display name for a bound document and
   // the neutral constant otherwise — never the OS account name.
   ipcMain.handle(PDF_CHANNELS.getUsername, (e) =>
     uniworkCommentAuthor(openPathByWc.get(e.sender.id)),
   )
+=======
+  ipcMain.handle(PDF_CHANNELS.printers, async (e) => {
+    const printers = await e.sender.getPrintersAsync()
+    return printers.map((p) => ({ name: p.name, displayName: p.displayName || p.name }))
+  })
+
+  ipcMain.handle(PDF_CHANNELS.print, (e, job: unknown) => {
+    const opts = printJobOptions(job)
+    // the renderer's print stylesheet already lays one rasterized page per sheet
+    return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      e.sender.print({ margins: { marginType: 'none' }, ...opts }, (success, failureReason) => {
+        resolve({
+          ok: success,
+          ...(failureReason && !/cancel/i.test(failureReason) ? { error: failureReason } : {}),
+        })
+      })
+    })
+  })
+>>>>>>> theirs
 
   ipcMain.handle(PDF_CHANNELS.readFile, async (e, path: unknown) => {
     if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
@@ -1982,7 +2181,14 @@ function registerPdfIpc(): void {
           password,
           typeof storePassword === 'string' && storePassword ? storePassword : undefined,
         )
+<<<<<<< ours
         return inspectCertificate(material.p12, material.password, material.sha1)
+=======
+        const opened = openMaterial(material)
+        return opened.ok
+          ? { ok: true, signer: opened.info[0]!, chain: opened.info }
+          : { ok: false, error: opened.error }
+>>>>>>> theirs
       } catch (err) {
         return { ok: false, error: err instanceof SystemStoreError ? err.code : 'cert-invalid' }
       }
@@ -2016,9 +2222,21 @@ function registerPdfIpc(): void {
       redactionFlows.add(e.sender.id)
       setPdfSaveAsInFlight(e.sender, true)
       try {
+<<<<<<< ours
         const material = await certMaterial(certEntry, request.password)
         // Fail on a wrong password before asking where to save
         const opened = openCertificate(material.p12, material.password, material.sha1)
+=======
+        const material = await certMaterial(
+          certEntry,
+          request.password,
+          typeof request.storePassword === 'string' && request.storePassword
+            ? request.storePassword
+            : undefined,
+        )
+        // Fail on a wrong password before asking where to save
+        const opened = openMaterial(material)
+>>>>>>> theirs
         if (!opened.ok) return { ok: false, error: opened.error }
 
         const parent = BrowserWindow.fromWebContents(e.sender)
@@ -2037,9 +2255,13 @@ function registerPdfIpc(): void {
         if (isSameRedactionCopyPath(path, target)) return { ok: false, cancelled: true }
 
         const signed = await signPdf(new Uint8Array(await readFile(path)), {
+<<<<<<< ours
           loaded: opened.loaded,
           p12: material.p12,
           password: material.password,
+=======
+          ...opened.sign,
+>>>>>>> theirs
           ...options,
         })
         await writePdfAtomically(target, signed)

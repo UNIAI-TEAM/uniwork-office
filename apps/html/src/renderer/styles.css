@@ -577,6 +577,7 @@ html.genoffice-popover-open .ribbon-tabs {
   color: var(--text-dim);
 }
 
+<<<<<<< ours
 /* the disclaimer that the file still holds the words: same rhythm as the description */
 .redact-dialog-scope {
   margin: 0 0 12px;
@@ -585,6 +586,8 @@ html.genoffice-popover-open .ribbon-tabs {
   color: var(--text-dim);
 }
 
+=======
+>>>>>>> theirs
 /* the marker as the model will see it, live as the label is typed */
 .redact-dialog-preview {
   margin-bottom: 8px;
@@ -593,7 +596,11 @@ html.genoffice-popover-open .ribbon-tabs {
   border-radius: var(--radius-8);
   background: var(--surface-subtle);
   color: var(--text);
+<<<<<<< ours
   font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
+=======
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+>>>>>>> theirs
   font-size: 12.5px;
   word-break: break-all;
 }

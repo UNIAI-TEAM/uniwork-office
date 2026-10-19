@@ -191,6 +191,7 @@ export const he = {
   aiCmdImages: 'עודכנו {count} תמונות',
   aiCmdToc: 'הוסף תוכן עניינים ({count} ערכים)',
   aiCmdSkipped: ' (דולגו {count} בלוקים מוגנים)',
+<<<<<<< ours
   aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
   aiClarifyTitle: 'כמה שאלות לפני שאמשיך',
   aiClarifyDecide: 'החלט בשבילי',
@@ -204,6 +205,8 @@ export const he = {
   aiClarifySubmit: 'המשך',
   aiSumClarify: 'שאלות ההבהרה נענו',
   aiSumClarifySkipped: 'שאלות ההבהרה דולגו',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'צור מפת חשיבה של המסמך הזה',
   aiMindMapBtn: 'מפת חשיבה AI',
   aiMindMapPrompt:

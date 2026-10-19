@@ -10,8 +10,11 @@ import {
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   useAutoSavePref,
+<<<<<<< ours
   useImageGenerationOffered,
   UniAiMark,
+=======
+>>>>>>> theirs
   useAiSidebarEnabled,
 } from '@genoffice/ui'
 import {
@@ -48,7 +51,12 @@ import { rewriteRawHtmlImages } from './editor/rawHtml'
 import { buildSlashItems } from './editor/slashCommand'
 import type { SlashController, SlashMenuState } from './editor/slashCommand'
 import { wikiFragmentPosition } from './editor/wikilink'
+<<<<<<< ours
 import { dirOf, refreshWebPictures, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
+=======
+import type { WikiSuggestController, WikiSuggestState } from './editor/wikiSuggest'
+import { dirOf, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
+>>>>>>> theirs
 import { Ribbon } from './components/Ribbon'
 import type { MarkdownTheme } from '../shared/markdown-theme'
 import { ImageHostDialog } from './components/ImageHostDialog'
@@ -56,6 +64,9 @@ import { RedactMenu } from './components/RedactMenu'
 import { OutlinePane } from './components/OutlinePane'
 import { SourcePane } from './components/SourcePane'
 import { SlashMenu, type SlashMenuHandle } from './components/SlashMenu'
+import { WikiSuggestMenu, type WikiSuggestMenuHandle } from './components/WikiSuggestMenu'
+import { BacklinksPane } from './components/BacklinksPane'
+import { GraphView } from './components/GraphView'
 import { ToastHost } from './components/toast'
 import { showToast } from './components/toast-bus'
 import { TableMenu } from './components/TableMenu'
@@ -175,6 +186,7 @@ export default function App() {
     params?: Record<string, string | number>
   } | null>(null)
   const [slashState, setSlashState] = useState<SlashMenuState | null>(null)
+  const [wikiSuggestState, setWikiSuggestState] = useState<WikiSuggestState | null>(null)
   const [fmOpen, setFmOpen] = useState(false)
   const [fmText, setFmText] = useState('')
   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
@@ -197,6 +209,8 @@ export default function App() {
   const [outlineWidth, setOutlineWidth] = useState(
     () => Number(localStorage.getItem('mdapp.outlineWidth')) || undefined,
   )
+  const [backlinksOpen, setBacklinksOpen] = useState(false)
+  const [graphOpen, setGraphOpen] = useState(false)
   const [sourceViewOpen, setSourceViewOpen] = useState(false)
   const [sourceText, setSourceText] = useState('')
   const sourceViewOpenRef = useRef(false)
@@ -256,6 +270,7 @@ export default function App() {
   }
   const filePathRef = useRef<string | null>(null)
   const slashMenuRef = useRef<SlashMenuHandle>(null)
+  const wikiSuggestMenuRef = useRef<WikiSuggestMenuHandle>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const zoomOut = useCallback(
@@ -335,10 +350,20 @@ export default function App() {
       onKeyDown: (event) => slashMenuRef.current?.handleKey(event) ?? false,
       onClose: () => setSlashState(null),
     }
+    const wikiSuggestController: WikiSuggestController = {
+      onOpen: setWikiSuggestState,
+      onUpdate: setWikiSuggestState,
+      onKeyDown: (event) => wikiSuggestMenuRef.current?.handleKey(event) ?? false,
+      onClose: () => setWikiSuggestState(null),
+    }
     return buildExtensions({
       slashController: controller,
       slashItems: () =>
         buildSlashItems({ insertImage: filePathRef.current ? insertImage : undefined }),
+<<<<<<< ours
+=======
+      wikiSuggestController,
+>>>>>>> theirs
       wikiLink: {
         getDocumentPath: () => filePathRef.current ?? '',
         onOpen: (path, fragment) => {
@@ -489,8 +514,11 @@ export default function App() {
           if (cancelled) return
           loadFromPath(path, raw)
           jumpToWikiFragment(path)
+<<<<<<< ours
           // LAG-F1 (web frame): the document is mounted; the lag detector's settle stamp starts now
           window.markdownApi.noteDocumentMounted?.()
+=======
+>>>>>>> theirs
         } else {
           envelopeRef.current = { ...EMPTY_ENVELOPE }
         }
@@ -509,7 +537,11 @@ export default function App() {
     return () => {
       cancelled = true
     }
+<<<<<<< ours
   }, [editor, roundTripEnabled, loadFromPath, markDirty, jumpToWikiFragment])
+=======
+  }, [editor, roundTripEnabled, loadFromPath, jumpToWikiFragment])
+>>>>>>> theirs
 
   const onFrontmatterChange = useCallback(
     (inner: string) => {
@@ -1323,6 +1355,9 @@ export default function App() {
         outlineOpen={outlineOpen}
         onToggleOutline={() => setOutlineOpen((v) => !v)}
         hasOutline={outlineItems.length > 0}
+        backlinksOpen={backlinksOpen}
+        onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
+        onOpenGraph={() => setGraphOpen(true)}
         spellcheck={spellcheck}
         onToggleSpellcheck={() => setSpellcheck((v) => !v)}
         sourceMode={sourceMode}
@@ -1343,6 +1378,7 @@ export default function App() {
       />
       {status === 'loading' && <div className="center-note">{t('loading')}</div>}
       <div className="app-main" style={status === 'ready' ? undefined : { display: 'none' }}>
+<<<<<<< ours
         {aiEnabled && (
           <div
             className={`ai-dock${aiOpen ? '' : ' collapsed'}${
@@ -1379,12 +1415,51 @@ export default function App() {
             )}
           </div>
         )}
+=======
+        <div
+          className={`ai-dock${aiOpen ? '' : ' collapsed'}${
+            !aiSidebarEnabled && !aiOpen ? ' ai-dock-off' : ''
+          }`}
+        >
+          {!aiOpen && aiSidebarEnabled && (
+            <button
+              className="ai-rail"
+              data-tip={t('aiOpenAssistant')}
+              aria-label={t('aiOpenAssistant')}
+              onClick={() => setAiOpen(true)}
+            >
+              <GensparkMark size={22} />
+            </button>
+          )}
+          {/* mounted only after the file is loaded so chat history resolves against the real path */}
+          {status === 'ready' && (
+            <AiPanel
+              deps={aiDeps}
+              filePath={filePath}
+              preset={aiPreset}
+              onCollapse={() => setAiOpen(false)}
+              editQueue={editQueue}
+              onQueueEditInstruction={queueUpdate}
+              onQueueRemove={queueRemove}
+              onQueueClear={queueClear}
+              onQueueFocus={queueFocus}
+              onQueueConsume={queueConsume}
+            />
+          )}
+        </div>
+>>>>>>> theirs
         {outlineOpen && !sourceMode && (
           <OutlinePane
             items={outlineItems}
             onJump={jumpToOutline}
             width={outlineWidth}
             onResize={setOutlineWidth}
+          />
+        )}
+        {backlinksOpen && !sourceMode && (
+          <BacklinksPane
+            path={filePath}
+            onOpen={(path) => void window.markdownApi.openSourcePath(path)}
           />
         )}
         <div className="app-content">
@@ -1498,12 +1573,33 @@ export default function App() {
       {!sourceMode && (
         <SlashMenu ref={slashMenuRef} state={slashState} onDismiss={() => setSlashState(null)} />
       )}
+<<<<<<< ours
       {/* the model lives behind `ai`: with the key off (web frame) a stored toggle has nothing to hide from */}
       <RedactMenu
         editor={editor}
         enabled={aiEnabled && redactEnabled && canEdit && !uniwork.readOnly}
       />
+=======
+      {!sourceMode && (
+        <WikiSuggestMenu
+          ref={wikiSuggestMenuRef}
+          state={wikiSuggestState}
+          onDismiss={() => setWikiSuggestState(null)}
+        />
+      )}
+      <RedactMenu editor={editor} enabled={redactEnabled} />
+>>>>>>> theirs
       <ToastHost />
+      {graphOpen && (
+        <GraphView
+          current={filePath}
+          onClose={() => setGraphOpen(false)}
+          onOpen={(path) => {
+            setGraphOpen(false)
+            void window.markdownApi.openSourcePath(path)
+          }}
+        />
+      )}
       {imageHostOpen && (
         <ImageHostDialog onClose={() => setImageHostOpen(false)} onSaved={() => {}} />
       )}

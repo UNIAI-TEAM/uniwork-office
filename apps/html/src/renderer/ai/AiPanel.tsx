@@ -43,18 +43,27 @@ function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
 }
 import {
   AiComposer,
+<<<<<<< ours
   AiErrorAction,
+=======
+>>>>>>> theirs
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
   AiTypingIndicator,
   AiUsageChip,
   addTokenUsage,
+<<<<<<< ours
   Markdown,
   uniworkErrorForEntry,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
+=======
+  createFileNav,
+  Markdown,
+  useChatRunQueue,
+>>>>>>> theirs
   type AiScopeQuoteData,
   type AiTokenUsageView,
 } from '@genoffice/ui'
@@ -267,12 +276,15 @@ interface ChatEntry {
   tools?: ToolActivity[]
   /** the element this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+<<<<<<< ours
   /** the sids this element-scoped turn may edit; a retry resends them */
   fenceSids?: number[]
   stopped?: boolean | undefined
   /** the turn streamed real text before it ended (a stop filler is not text) */
   streamedText?: boolean | undefined
   mutated?: boolean | undefined
+=======
+>>>>>>> theirs
   /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
   usage?: AiTokenUsageView
 }
@@ -395,10 +407,16 @@ export function AiPanel({
     busy,
     submit: (text, atts) => {
       const loop = loopRef.current
+<<<<<<< ours
       if (needModelHint !== null || !loop || loop.busy) return false
       // held until the user acknowledges the UniWork disclosure, as Send is
       if (uniworkGate.isBlocked()) return false
       return send(text, text, false, atts, undefined)
+=======
+      if (!loop || loop.busy) return false
+      send(text, text, false, atts, undefined)
+      return true
+>>>>>>> theirs
     },
   })
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
@@ -1193,6 +1211,7 @@ export function AiPanel({
   }
 
   const stop = (): void => {
+    msgQueue.hold()
     dismissCards()
     const loop = loopRef.current
     if (loop?.busy) loop.cancel()
@@ -1219,6 +1238,10 @@ export function AiPanel({
       if (sid !== null) depsRef.current.navigateTo(sid)
     },
   }
+  // [name](filenav:///abs/path) citations open the cited file in its own app
+  const fileNav = createFileNav((path) => {
+    void window.htmlApi.openSourcePath(path)
+  })
 
   const draftNonceRef = useRef(0)
   useEffect(() => {
@@ -1641,6 +1664,7 @@ export function AiPanel({
                   <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />
                 </span>
               ) : (
+<<<<<<< ours
                 (bodyText || chip) && (
                   <div className="ai-msg-answer" dir="auto">
                     {(bodyText || chipLead) && (
@@ -1650,6 +1674,11 @@ export function AiPanel({
                         lead={chipLead}
                       />
                     )}
+=======
+                entry.text && (
+                  <div dir="auto">
+                    <Markdown text={entry.text} navs={[docNav, fileNav]} />
+>>>>>>> theirs
                   </div>
                 )
               )}
@@ -1980,11 +2009,15 @@ export function AiPanel({
           }
           footerStart={
             <>
+<<<<<<< ours
               <AiModelPicker
                 bridge={MODEL_BRIDGE}
                 lang={lang}
                 onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
               />
+=======
+              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+>>>>>>> theirs
               {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
               <button
                 type="button"

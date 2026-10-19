@@ -11,7 +11,10 @@ import {
   UniAiMark,
 } from '@genoffice/ui'
 import { useI18n } from '../i18n/locale'
+<<<<<<< ours
 import { cap } from '../capabilities'
+=======
+>>>>>>> theirs
 import { MARKDOWN_THEME_IDS, type MarkdownTheme } from '../../shared/markdown-theme'
 import type { StringKey } from '../i18n/locale'
 import { uiOp, type BlockType, type ListKind, type StylableMark } from '../editor/ops'
@@ -30,6 +33,8 @@ import {
   IconSearch,
   IconEyeOff,
   IconSourceCode,
+  IconBacklinks,
+  IconGraph,
   IconSpellcheck,
   IconTable,
   IconTaskList,
@@ -67,12 +72,18 @@ interface Props {
   outlineOpen: boolean
   onToggleOutline: () => void
   hasOutline: boolean
+  backlinksOpen: boolean
+  onToggleBacklinks: () => void
+  onOpenGraph: () => void
   spellcheck: boolean
   onToggleSpellcheck: () => void
+<<<<<<< ours
   /** false on the web (cap 'autoSave'): no AutoSave toggle */
   showAutoSave?: boolean
   /** false on the web (cap 'ai'): no AI group */
   showAi?: boolean
+=======
+>>>>>>> theirs
   mdTheme: MarkdownTheme
   onMarkdownTheme: (theme: MarkdownTheme) => void
   aiOpen: boolean
@@ -199,6 +210,7 @@ function ThemePicker({
   useDismissablePopover(open, () => setOpen(false), {
     inside: () => [wrapRef.current],
   })
+<<<<<<< ours
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -210,6 +222,8 @@ function ThemePicker({
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [open])
+=======
+>>>>>>> theirs
   return (
     <div className="md-theme-wrap" ref={wrapRef}>
       <IconBtn
@@ -297,10 +311,16 @@ export function Ribbon({
   outlineOpen,
   onToggleOutline,
   hasOutline,
+  backlinksOpen,
+  onToggleBacklinks,
+  onOpenGraph,
   spellcheck,
   onToggleSpellcheck,
+<<<<<<< ours
   showAutoSave = true,
   showAi = true,
+=======
+>>>>>>> theirs
   mdTheme,
   onMarkdownTheme,
   aiOpen,
@@ -742,9 +762,31 @@ export function Ribbon({
                 <IconOutlineView size={ICON} />
               </IconBtn>
             )}
+<<<<<<< ours
             {/* the paper theme persists through the desktop's config file (cap 'mdTheme': no web store) */}
             {cap('mdTheme') && (
               <ThemePicker mdTheme={mdTheme} disabled={disabled} onPick={onMarkdownTheme} />
+=======
+            <ThemePicker
+              mdTheme={mdTheme}
+              disabled={disabled || sourceMode || sourceViewOpen}
+              onPick={onMarkdownTheme}
+            />
+            {!sourceMode && (
+              <IconBtn
+                title={t('backlinks')}
+                active={backlinksOpen}
+                disabled={disabled}
+                onClick={onToggleBacklinks}
+              >
+                <IconBacklinks size={ICON} />
+              </IconBtn>
+            )}
+            {!sourceMode && (
+              <IconBtn title={t('graph')} disabled={disabled} onClick={onOpenGraph}>
+                <IconGraph size={ICON} />
+              </IconBtn>
+>>>>>>> theirs
             )}
             <IconBtn
               title={t('spellcheck')}
@@ -754,7 +796,11 @@ export function Ribbon({
             >
               <IconSpellcheck size={ICON} />
             </IconBtn>
+<<<<<<< ours
             {showAi && !sourceMode && (
+=======
+            {!sourceMode && (
+>>>>>>> theirs
               <IconBtn
                 title={t('redactEnable')}
                 active={redactEnabled}

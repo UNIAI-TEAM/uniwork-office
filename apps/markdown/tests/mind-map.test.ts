@@ -5,7 +5,10 @@ import { executeTool } from '../src/renderer/ai/tools'
 import { createMarkdownSkill } from '../src/renderer/ai/markdown-skill'
 import {
   countMindMapNodes,
+<<<<<<< ours
   fitMindMapView,
+=======
+>>>>>>> theirs
   labelUnits,
   layoutMindMap,
   MIND_MAP_LIMITS,
@@ -240,12 +243,22 @@ describe('layoutMindMap', () => {
     const a2 = byId.get('0.0.1')!
     const { nodeWidth: w, nodeHeight: h, depthGap, siblingGap, padding } = MIND_MAP_METRICS
 
+<<<<<<< ours
     expect(a1.y).toBe(2 * (h + depthGap))
     expect(a2.y).toBe(a1.y)
     // B is a direct child of the root: one level up from A1/A2, level with A
     expect(b.y).toBe(h + depthGap)
     expect(a.y).toBe(h + depthGap)
     expect(root.y).toBe(0)
+=======
+    expect(a1.y).toBe(2 * (h + depthGap) + padding)
+    expect(a2.y).toBe(a1.y)
+    // B is a direct child of the root: one level up from A1/A2, level with A
+    expect(b.y).toBe(h + depthGap + padding)
+    expect(a.y).toBe(h + depthGap + padding)
+    expect(root.y).toBe(padding)
+    expect(a1.x).toBe(padding)
+>>>>>>> theirs
 
     // leaves are sequential; A centers over A1/A2; the root centers over A..B
     expect(a2.x).toBe(a1.x + w + siblingGap)
@@ -257,7 +270,11 @@ describe('layoutMindMap', () => {
     expect(edges).toHaveLength(4)
     expect(edges.every((e) => e.d.startsWith('M '))).toBe(true)
 
+<<<<<<< ours
     expect(width).toBe(b.x + w + padding * 2)
+=======
+    expect(width).toBe(b.x + w + padding)
+>>>>>>> theirs
     expect(height).toBe(3 * (h + depthGap) - depthGap + padding * 2)
   })
 
@@ -414,6 +431,7 @@ describe('generate_mindmap tool', () => {
   })
 })
 
+<<<<<<< ours
 // V10: the first frame showed the middle of the map (root outside the card, branches clipped);
 // the card now fits the whole map, and keeps the root in view when it cannot all fit.
 describe('fitMindMapView', () => {
@@ -479,5 +497,22 @@ describe('fitMindMapView', () => {
       x: 8,
       y: 8,
     })
+=======
+describe('MIND_MAP_TOOL schema', () => {
+  it('gives every array an items schema (Gemini refuses the whole request without one)', () => {
+    // genoffice#2059: the leaf `children` array carried only a description,
+    // and the API answered "...properties[children].items: missing field".
+    const walk = (node: unknown): void => {
+      if (typeof node !== 'object' || node === null) return
+      if (Array.isArray(node)) {
+        node.forEach(walk)
+        return
+      }
+      const record = node as Record<string, unknown>
+      if (record.type === 'array') expect(record.items).toBeDefined()
+      for (const value of Object.values(record)) walk(value)
+    }
+    walk(MIND_MAP_TOOL.inputSchema)
+>>>>>>> theirs
   })
 })

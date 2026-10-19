@@ -10,12 +10,16 @@ import {
   type AgentSkill,
   type AgentTransport,
 } from '@genoffice/agent-core'
+<<<<<<< ours
 import {
   aiEffectiveModel,
   getProviderAdapter,
   modelLacksVision,
   type AiSettings,
 } from '@genoffice/ai-provider/browser'
+=======
+import { endpointSupportsVision, type AiSettings } from '@genoffice/ai-provider/browser'
+>>>>>>> theirs
 import { auditSlideLayout } from '@genoffice/pipelines/slides/layout-audit'
 import { createSlidesSkill, formatSlideDump, type DeckAccess } from './slides-skill'
 import qcVisualPrompt from './prompts/qc-visual.md?raw'
@@ -51,10 +55,18 @@ export function isQcEnabled(): boolean {
 /** Cost ceiling per generation run — beyond this the tail pages are skipped (reported to the user) */
 export const QC_MAX_PAGES = 20
 
-/** Unknown providers are treated as text-only: omitting an image is safer than a user-visible 400. */
+/**
+ * Whether a rendered picture of this slide may go to the model.
+ *
+ * A custom endpoint answers from its own declaration (compat.vision, or a
+ * per-model override); everything else keeps the provider capability plus the
+ * shipped text-only model list. Unknown providers are treated as text-only:
+ * omitting an image is safer than a user-visible 400.
+ */
 export function settingsSupportVision(
   settings: Pick<AiSettings, 'provider' | 'providers' | 'modelSources'>,
 ): boolean {
+<<<<<<< ours
   try {
     if (!getProviderAdapter(settings.provider).capabilities.vision) return false
     // the model main will use: for a provider served by a key on UniWork that is the source's, not the slot's
@@ -62,6 +74,9 @@ export function settingsSupportVision(
   } catch {
     return false
   }
+=======
+  return endpointSupportsVision(settings)
+>>>>>>> theirs
 }
 
 /** Custom/OpenAI-compatible endpoints can still reject images despite optimistic metadata. */

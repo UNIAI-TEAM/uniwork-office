@@ -125,6 +125,7 @@ export function createMarkdownSkill(
     id: 'markdown',
     // live: the predicates are re-read before every model request
     get systemPrompt() {
+<<<<<<< ours
       const editor = getEditor()
       const labels = editor ? redactLabelsOf(editor.getJSON() as never) : []
       // only when the open document actually withholds something, so a
@@ -137,6 +138,18 @@ export function createMarkdownSkill(
           ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
           : AGENT_SYSTEM_PROMPT
       return (hostOffers('insert_image') ? prompt : prompt + IMAGE_FETCH_OFF_NOTE) + redact
+=======
+      const base =
+        imageGenAvailable?.() === false
+          ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
+          : AGENT_SYSTEM_PROMPT
+      // only when the open document actually withholds something, so a
+      // document without spans pays nothing and the model is not told to
+      // look for markers that are not there
+      const editor = getEditor()
+      const labels = editor ? redactLabelsOf(editor.getJSON() as never) : []
+      return labels.length > 0 ? `${base}\n\n${placeholderInstruction(labels)}` : base
+>>>>>>> theirs
     },
     get tools() {
       if (isReadOnly?.()) return withAsk(AGENT_TOOLS, true)

@@ -33,6 +33,7 @@
     "@genoffice/pptx-render": "*",
     "@genoffice/sheets": "*",
     "@genoffice/slides": "*",
+    "@genoffice/project-store": "*",
     "@genoffice/ui": "*",
     "@genoffice/xlsx-gateway": "*",
     "@types/qrcode": "^1.5.6",

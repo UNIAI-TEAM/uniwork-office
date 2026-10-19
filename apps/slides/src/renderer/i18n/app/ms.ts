@@ -254,6 +254,25 @@ export const ms = {
     'Jumlah masa persembahan ialah {duration}. Adakah anda mahu menyimpan pemasaan slaid untuk peralihan slaid automatik?',
   appRehearseDiscard: 'Jangan Simpan',
   appRehearseSave: 'Simpan',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Rakam Naratif',
+  appRecordSummary: 'Tempoh rakaman {duration}. Simpan naratif dan masa setiap slaid?',
+  appRecordDiscard: 'Jangan Simpan',
+  appRecordSave: 'Simpan',
+  appStatusRecordSaved: 'Naratif disimpan pada {count} slaid (PowerPoint turut memainkannya)',
+  appStatusRecordFailed: 'Rakaman tidak dapat disimpan',
+  appStatusNarrationCleared: 'Naratif dikosongkan',
+  appSettingsTitle: 'Tetapan AI',
+  appSettingsAccount: 'Akaun Genspark',
+  appSettingsChecking: 'Menyemak…',
+  appSettingsLoggedIn: 'Telah log masuk',
+  appSettingsLoggedInEmail: 'Telah log masuk: {email}',
+  appSettingsLoggedOut: 'Belum log masuk (ciri AI memerlukan akaun Genspark)',
+  appSettingsLoginPending: 'Menunggu log masuk pelayar…',
+  appSettingsLogin: 'Log masuk ke Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Batal',
   appCropHint: 'Enter untuk mengesahkan · Esc untuk membatalkan · Klik di luar untuk mengesahkan',
   appStatusZoomsInserted:

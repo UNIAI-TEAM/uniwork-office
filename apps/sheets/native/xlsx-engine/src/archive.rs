@@ -175,7 +175,11 @@ pub fn save_archive(
     removals: &[String],
     additions: &[EntryContent],
 ) -> Result<SaveArchiveResult, SidecarError> {
+<<<<<<< ours
     if same_file(source_path, target_path)? {
+=======
+    if crate::canonicalize(source_path)? == crate::canonicalize(target_path).unwrap_or_default() {
+>>>>>>> theirs
         return Err(SidecarError::InvalidRequest(
             "Save target must differ from the source archive.".into(),
         ));

@@ -23,6 +23,7 @@ export default defineConfig({
       '@genoffice/electron-utils/safe-external-url': local(
         '../../packages/electron-utils/src/safe-external-url.ts',
       ),
+<<<<<<< ours
       '@genoffice/electron-utils/ai-run-bridge': local(
         '../../packages/electron-utils/src/ai-run-bridge.ts',
       ),
@@ -54,6 +55,10 @@ export default defineConfig({
       '@genoffice/electron-utils/ai-run': local('../../packages/electron-utils/src/ai-run.ts'),
       '@genoffice/electron-utils/drop-open': local(
         '../../packages/electron-utils/src/drop-open.ts',
+=======
+      '@genoffice/electron-utils/print-job': local(
+        '../../packages/electron-utils/src/print-job.ts',
+>>>>>>> theirs
       ),
       '@genoffice/electron-utils': local('../../packages/electron-utils/src/index.ts'),
       '@genoffice/ai-provider/browser': local('../../packages/ai-provider/src/browser.ts'),

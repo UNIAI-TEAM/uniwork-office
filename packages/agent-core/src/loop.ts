@@ -3,7 +3,10 @@ import type {
   AgentImage,
   AgentMessage,
   AgentStreamHandle,
+<<<<<<< ours
   AgentStreamNotice,
+=======
+>>>>>>> theirs
   AgentTokenUsage,
   AgentToolCall,
   AgentToolDef,
@@ -42,6 +45,7 @@ export interface AgentLoopEvents<TSnapshot> {
   onToolExecuted?(event: ToolExecutedEvent<TSnapshot>): void
   /** a turn requested tools and they ran; the loop is going back to the model */
   onTurnEnd?(): void
+<<<<<<< ours
   /** a transport notice (UniWork AI: dropped calls, a Retry-After wait, a new conversation); never fatal */
   onNotice?(notice: AgentStreamNotice): void
   /** the transport restarts this turn (a Retry-After wait ended): drop what the UI drew for it; fires on every reset, onText('') only follows when text had streamed */
@@ -56,6 +60,10 @@ export interface AgentLoopEvents<TSnapshot> {
    *  empty undo group is the cheaper mistake). A run started from inside this hook gets its onRunStart before
    *  this run's terminal onDone/onError, so key UI on the hook order, not on onDone */
   onRunEnd?(runId: string, end: AgentRunEnd): void
+=======
+  /** tokens the provider billed for the turn that just streamed (per model call; compaction summary turns are not reported) */
+  onUsage?(usage: AgentTokenUsage): void
+>>>>>>> theirs
   onDone?(result: AgentRunResult): void
   /** error: the localized message; errorKey: the S9 key when the failure was a UniWork AI one */
   onError?(error: string, errorKey?: string): void
@@ -841,6 +849,7 @@ export class AgentLoop<TSnapshot = unknown> {
   cancel(): void {
     if (!this.running) return
     this.cancelled = true
+    this.turnUsage = null
     // abort lets long tools mid-execution (internal LLM loops etc.) stop promptly
     this.abortController?.abort()
     // Waiting out a retry backoff: finalize here. A run that already committed
@@ -941,6 +950,7 @@ export class AgentLoop<TSnapshot = unknown> {
     this.handle?.cancel()
     this.handle = null
     this.running = false
+    this.turnUsage = null
     this.rollbackFailedRun()
     this.closeRun('error')
     try {
@@ -1047,6 +1057,7 @@ export class AgentLoop<TSnapshot = unknown> {
             if (generation !== this.generation || settled) return
             this.turnStopReason = reason
           },
+<<<<<<< ours
           onNotice: (notice) => {
             if (generation !== this.generation || settled) return
             try {
@@ -1078,6 +1089,8 @@ export class AgentLoop<TSnapshot = unknown> {
               this.failRun(err instanceof Error ? err.message : String(err))
             }
           },
+=======
+>>>>>>> theirs
           onUsage: (usage) => {
             if (generation !== this.generation || settled) return
             this.turnUsage = usage
@@ -1186,7 +1199,10 @@ export class AgentLoop<TSnapshot = unknown> {
       this.running = false
       this.runUserMsg = null
       this.mergeRunUsage()
+<<<<<<< ours
       this.closeRun(this.cancelled ? 'aborted' : 'done')
+=======
+>>>>>>> theirs
       events?.onDone?.({
         text: this.turnText,
         cancelled: this.cancelled,

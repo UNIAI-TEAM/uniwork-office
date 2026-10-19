@@ -246,6 +246,26 @@ export const ja = {
     'スライドショーの所要時間は {duration} でした。各スライドの表示時間を自動切り替えのタイミングとして保存しますか？',
   appRehearseDiscard: '保存しない',
   appRehearseSave: '保存',
+<<<<<<< ours
+=======
+  appRecordTitle: 'ナレーションの録音',
+  appRecordSummary: '録音時間 {duration}。各スライドのナレーションと表示時間を保存しますか？',
+  appRecordDiscard: '保存しない',
+  appRecordSave: '保存',
+  appStatusRecordSaved:
+    '{count} 枚のスライドにナレーションを保存しました（PowerPoint でも再生できます）',
+  appStatusRecordFailed: '録音を保存できませんでした',
+  appStatusNarrationCleared: 'ナレーションをクリアしました',
+  appSettingsTitle: 'AI 設定',
+  appSettingsAccount: 'Genspark アカウント',
+  appSettingsChecking: '確認中…',
+  appSettingsLoggedIn: 'サインイン済み',
+  appSettingsLoggedInEmail: 'サインイン済み：{email}',
+  appSettingsLoggedOut: '未サインイン（AI 機能には Genspark アカウントへのサインインが必要）',
+  appSettingsLoginPending: 'ブラウザーでのサインインを待機中…',
+  appSettingsLogin: 'Genspark にサインイン',
+  appSettingsModel: 'モデル',
+>>>>>>> theirs
   appSettingsCancel: 'キャンセル',
   appCropHint: 'Enter で確定 · Esc でキャンセル · 外側をクリックで確定',
   appStatusZoomsInserted:

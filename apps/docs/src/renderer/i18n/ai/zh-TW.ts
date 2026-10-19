@@ -187,6 +187,7 @@ export const zhTW = {
   aiCmdImages: '已更新 {count} 張圖片',
   aiCmdToc: '已插入目錄({count} 個項目)',
   aiCmdSkipped: '(略過 {count} 個受保護區塊)',
+<<<<<<< ours
   aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
   aiClarifyTitle: '繼續之前先確認幾個問題',
   aiClarifyDecide: '幫我決定',
@@ -200,6 +201,8 @@ export const zhTW = {
   aiClarifySubmit: '繼續',
   aiSumClarify: '已回答釐清問題',
   aiSumClarifySkipped: '已略過釐清問題',
+=======
+>>>>>>> theirs
   aiStarterMindMap: '為這份文件產生心智圖',
   aiMindMapBtn: 'AI 心智圖',
   aiMindMapPrompt: '為這份文件產生心智圖,依文件的章節結構組織主要主題與關鍵概念',

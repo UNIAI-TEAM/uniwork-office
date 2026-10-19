@@ -201,6 +201,7 @@ export const nl = {
   aiCmdImages: '{count} afbeelding(en) bijgewerkt',
   aiCmdToc: 'Inhoudsopgave ingevoegd ({count} vermeldingen)',
   aiCmdSkipped: ' ({count} beveiligde blok(ken) overgeslagen)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
   aiClarifyTitle: 'Een paar vragen voordat ik verder ga',
@@ -215,6 +216,8 @@ export const nl = {
   aiClarifySubmit: 'Doorgaan',
   aiSumClarify: 'Verduidelijking beantwoord',
   aiSumClarifySkipped: 'Verduidelijking overgeslagen',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Maak een mindmap van dit document',
   aiMindMapBtn: 'AI-mindmap',
   aiMindMapPrompt:

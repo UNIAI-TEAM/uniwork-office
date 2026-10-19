@@ -203,6 +203,7 @@ export const de = {
   aiCmdImages: '{count} Bild(er) aktualisiert',
   aiCmdToc: 'Inhaltsverzeichnis eingefügt ({count} Einträge)',
   aiCmdSkipped: ' ({count} geschützte Blöcke übersprungen)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
   aiClarifyTitle: 'Ein paar Fragen, bevor ich weitermache',
@@ -217,6 +218,8 @@ export const de = {
   aiClarifySubmit: 'Weiter',
   aiSumClarify: 'Rückfragen beantwortet',
   aiSumClarifySkipped: 'Rückfragen übersprungen',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Mindmap zu diesem Dokument erstellen',
   aiMindMapBtn: 'KI-Mindmap',
   aiMindMapPrompt:

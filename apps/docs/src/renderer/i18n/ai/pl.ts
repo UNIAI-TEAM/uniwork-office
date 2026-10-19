@@ -200,6 +200,7 @@ export const pl = {
   aiCmdImages: 'Zaktualizowano obrazów: {count}',
   aiCmdToc: 'Wstawiono spis treści (pozycji: {count})',
   aiCmdSkipped: ' (pominięto chronione bloki: {count})',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
   aiClarifyTitle: 'Kilka pytań, zanim przejdę dalej',
@@ -214,6 +215,8 @@ export const pl = {
   aiClarifySubmit: 'Dalej',
   aiSumClarify: 'Udzielono wyjaśnień',
   aiSumClarifySkipped: 'Pominięto wyjaśnienia',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Wygeneruj mapę myśli tego dokumentu',
   aiMindMapBtn: 'Mapa myśli AI',
   aiMindMapPrompt:

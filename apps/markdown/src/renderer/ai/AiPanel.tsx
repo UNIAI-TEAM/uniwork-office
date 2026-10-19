@@ -14,6 +14,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
+<<<<<<< ours
 import {
   AgentLoop,
   createImageUrlRegistry,
@@ -44,17 +45,29 @@ import type {
 import {
   AiComposer,
   AiErrorAction,
+=======
+import { AgentLoop, composeSkills, streamText, type MindMapTreeNode } from '@genoffice/agent-core'
+import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
+import {
+  AiComposer,
+>>>>>>> theirs
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
   AiTypingIndicator,
   AiUsageChip,
   addTokenUsage,
+<<<<<<< ours
   Markdown,
   uniworkErrorForEntry,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
+=======
+  createFileNav,
+  Markdown,
+  useChatRunQueue,
+>>>>>>> theirs
   type AiScopeQuoteData,
   type AiTokenUsageView,
 } from '@genoffice/ui'
@@ -186,12 +199,15 @@ interface ChatEntry {
   mindmap?: MindMapTreeNode
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+<<<<<<< ours
   /** the edit fence of this user turn (selection scope or queue submission): a retry reuses it, never runs the turn unfenced */
   fence?: EntryFence
   /** restored from a stored transcript: no retry, its fence ranges are unknown */
   restored?: true
   /** answered ask_clarification cards of this message's run (view-only receipts) */
   clarifyReceipts?: ClarifyQa[][]
+=======
+>>>>>>> theirs
   /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
   usage?: AiTokenUsageView
 }
@@ -331,12 +347,18 @@ export function AiPanel({
     busy,
     submit: (text) => {
       const loop = loopRef.current
+<<<<<<< ours
       if (needModelHint !== null || !loop || loop.busy) return false
       // held until the user acknowledges the UniWork disclosure, as Send is
       if (uniworkGate.isBlocked()) return false
       // undefined retryOf = a new turn: the queue batch's own display text means
       // no selection quote is captured (the fork's edit-fence send signature)
       return send(text, text)
+=======
+      if (!loop || loop.busy) return false
+      send(text, text, null)
+      return true
+>>>>>>> theirs
     },
   })
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
@@ -1010,6 +1032,14 @@ export function AiPanel({
     inputRef.current?.focus()
   }
 
+<<<<<<< ours
+=======
+  const stop = (): void => {
+    msgQueue.hold()
+    loopRef.current?.cancel()
+  }
+
+>>>>>>> theirs
   /** Enter while a reply runs: the draft joins the queue above the composer */
   const enqueueDraft = () => {
     const text = prompt.trim()
@@ -1091,6 +1121,10 @@ export function AiPanel({
       if (index !== null && current) navigateToBlock(current, index)
     },
   }
+  // [name](filenav:///abs/path) citations open the cited file in its own app
+  const fileNav = createFileNav((path) => {
+    void window.markdownApi.openSourcePath(path)
+  })
 
   /** submit every still-anchored queued edit as one batch run */
   const sendQueue = (): void => {
@@ -1503,6 +1537,7 @@ export function AiPanel({
                   <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />
                 </span>
               ) : (
+<<<<<<< ours
                 (bodyText || chip) && (
                   <div className="ai-msg-answer" dir="auto">
                     {(bodyText || chipLead) && (
@@ -1529,6 +1564,11 @@ export function AiPanel({
                         </span>
                       </div>
                     )}
+=======
+                entry.text && (
+                  <div dir="auto">
+                    <Markdown text={entry.text} navs={[docNav, fileNav]} />
+>>>>>>> theirs
                   </div>
                 )
               )}
@@ -1547,11 +1587,14 @@ export function AiPanel({
                 </div>
               )}
               {hasTools && <ToolChipList tools={entry.tools!} />}
+<<<<<<< ours
               {entry.usage && (
                 <div className="ai-message-usage">
                   <AiUsageChip usage={entry.usage} lang={lang} />
                 </div>
               )}
+=======
+>>>>>>> theirs
               {entry.mindmap && (
                 <MindMapCard
                   tree={entry.mindmap}
@@ -1565,6 +1608,14 @@ export function AiPanel({
                   }}
                 />
               )}
+<<<<<<< ours
+=======
+              {entry.usage && (
+                <div className="ai-message-usage">
+                  <AiUsageChip usage={entry.usage} lang={lang} />
+                </div>
+              )}
+>>>>>>> theirs
               {showToolbar && (
                 <div className="ai-msg-toolbar">
                   <button
@@ -1803,11 +1854,15 @@ export function AiPanel({
           iconOnly
           footerStart={
             <>
+<<<<<<< ours
               <AiModelPicker
                 bridge={MODEL_BRIDGE}
                 lang={lang}
                 onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
               />
+=======
+              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+>>>>>>> theirs
               {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
             </>
           }

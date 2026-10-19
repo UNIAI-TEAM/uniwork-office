@@ -35,6 +35,7 @@ export function printScaleOption(scale: unknown): { scale: number } | Record<str
     : {}
 }
 
+<<<<<<< ours
 /**
  * True when the machine reports no printers at all (a fresh Linux VM without
  * CUPS, macOS "No printers available"). Chromium's print() then neither shows
@@ -75,3 +76,7 @@ export function htmlExportPath(picked: string): string {
   if (/\.docx$/i.test(picked)) return picked.replace(/\.docx$/i, '.html')
   return `${picked}.html`
 }
+=======
+export { printJobOptions } from '@genoffice/electron-utils/print-job'
+export type { PrintDuplex, PrintJobOptions } from '@genoffice/electron-utils/print-job'
+>>>>>>> theirs

@@ -257,6 +257,25 @@ export const pt = {
     'O tempo total da apresentação foi de {duration}. Deseja salvar os intervalos dos slides para o avanço automático?',
   appRehearseDiscard: 'Não Salvar',
   appRehearseSave: 'Salvar',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Gravar Narração',
+  appRecordSummary: 'Duração da gravação: {duration}. Salvar a narração e o tempo de cada slide?',
+  appRecordDiscard: 'Não Salvar',
+  appRecordSave: 'Salvar',
+  appStatusRecordSaved: 'Narração salva em {count} slides (o PowerPoint também a reproduz)',
+  appStatusRecordFailed: 'Não foi possível salvar a gravação',
+  appStatusNarrationCleared: 'Narração limpa',
+  appSettingsTitle: 'Configurações de IA',
+  appSettingsAccount: 'Conta Genspark',
+  appSettingsChecking: 'Verificando…',
+  appSettingsLoggedIn: 'Conectado',
+  appSettingsLoggedInEmail: 'Conectado: {email}',
+  appSettingsLoggedOut: 'Não conectado (os recursos de IA exigem uma conta Genspark)',
+  appSettingsLoginPending: 'Aguardando o login no navegador…',
+  appSettingsLogin: 'Entrar no Genspark',
+  appSettingsModel: 'Modelo',
+>>>>>>> theirs
   appSettingsCancel: 'Cancelar',
   appCropHint: 'Enter para confirmar · Esc para cancelar · Clique fora para confirmar',
   appStatusZoomsInserted:

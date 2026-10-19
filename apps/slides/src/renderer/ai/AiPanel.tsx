@@ -89,23 +89,36 @@ import {
   screenshotAllowed,
   settingsSupportVision,
 } from './slide-qc'
+<<<<<<< ours
 import { useI18n, t as tGlobal, aiLangDirective, getLang, type TFunc } from '../i18n/locale'
 import {
   AiErrorAction,
+=======
+import { useI18n, t as tGlobal, aiLangDirective, type TFunc } from '../i18n/locale'
+import {
+>>>>>>> theirs
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
   AiUsageChip,
   Markdown,
+<<<<<<< ours
   useAiModelNeedAction,
   useAiModelNeedHint,
   addTokenUsage,
   uniworkErrorForEntry,
+=======
+  addTokenUsage,
+>>>>>>> theirs
   useAiPanelPrefs,
   useChatRunQueue,
   type AiScopeQuoteData,
   type AiTokenUsageView,
 } from '@genoffice/ui'
+<<<<<<< ours
+=======
+import { GensparkMark } from '../components/icons'
+>>>>>>> theirs
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -295,6 +308,7 @@ interface ChatEntry {
   attachments?: AttachmentMeta[]
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+<<<<<<< ours
   /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
   waitLine?: string | undefined
   /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
@@ -302,6 +316,8 @@ interface ChatEntry {
   stopped?: boolean | undefined
   /** the turn streamed real text before it ended (a stop filler is not text) */
   streamedText?: boolean | undefined
+=======
+>>>>>>> theirs
   /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
   usage?: AiTokenUsageView
 }
@@ -338,6 +354,8 @@ interface AiPanelProps {
   } | null
   /** false shows only the collapsed rail; the component stays mounted so panel state survives */
   open?: boolean
+  /** the sidebar setting is off: render nothing while collapsed instead of the rail */
+  hideRail?: boolean
   /** expand from the collapsed rail */
   onExpand?: () => void
   onCollapse?: () => void
@@ -449,6 +467,7 @@ export function AiPanel({
   settings,
   preset,
   open = true,
+  hideRail = false,
   onExpand,
   onCollapse,
   onPathChange,
@@ -491,11 +510,19 @@ export function AiPanel({
     busy,
     submit: (text, meta) => {
       // the QC pass edits the deck with busy=false: refuse and let the pump retry
+<<<<<<< ours
       if (needModelHint !== null || qcRunningRef.current || runStartingRef.current) return false
       if (uniworkSendBlockedRef.current) return false
       const loop = loopRef.current
       if (!loop || loop.busy) return false
       return runWith(text, text, { attachments: meta.attachments, scope: meta.scope })
+=======
+      if (qcRunningRef.current || runStartingRef.current) return false
+      const loop = loopRef.current
+      if (!loop || loop.busy) return false
+      runWith(text, text, { attachments: meta.attachments, scope: meta.scope })
+      return true
+>>>>>>> theirs
     },
   })
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -878,7 +905,7 @@ export function AiPanel({
   if (!loopRef.current) {
     // The three slides generation steps (style/planning/per-page HTML) force the high-quality model (only with the anthropic provider;
     // other providers keep the user setting, avoiding passing nonexistent model names). Chat/fine-tuning still uses the user's configured model.
-    const SLIDES_GEN_MODEL = 'claude-opus-4-7'
+    const SLIDES_GEN_MODEL = 'claude-opus-5-5'
     // Return on demand a settings copy with the generation model overridden (deep copy, doesn't pollute settingsRef).
     const settingsForGen = (): AiSettings => {
       const cur = settingsRef.current
@@ -1636,6 +1663,28 @@ export function AiPanel({
             }
             return next
           })
+<<<<<<< ours
+=======
+          // Signed-out failures get an inline sign-in button; detected via
+          // gsk status rather than matching the localized error text — but only
+          // when Genspark is the provider: a BYOK user's error (e.g. their own
+          // provider's rate limit) must not advertise a Genspark sign-in (genoffice#1948)
+          void window.slidesApi
+            .aiGskStatus()
+            .then((status) => {
+              if (status.loggedIn) return
+              if ((settingsRef.current?.provider ?? 'genspark') !== 'genspark') return
+              setChat((prev) => {
+                const next = [...prev]
+                const last = next.at(-1)
+                if (last?.role === 'assistant' && last.error) {
+                  next[next.length - 1] = { ...last, loginRequired: true }
+                }
+                return next
+              })
+            })
+            .catch(() => {})
+>>>>>>> theirs
           void finishHistoryBatch().finally(() => {
             setBusy(false)
             const resolveQueueRun = queueRunResolverRef.current
@@ -1713,6 +1762,31 @@ export function AiPanel({
       }
     }
     runWith(topic)
+  }
+
+  /** Enter while a reply runs: the draft joins the queue above the composer */
+  const enqueueDraft = () => {
+    const text = input.trim()
+    if (!text) return
+    // snapshot + consume the composer attachments exactly like a send does
+    const attachments = attachmentsRef.current
+    if (attachments.length > 0) {
+      const seen = new Set(sentAttachmentsRef.current.map((a) => a.path))
+      sentAttachmentsRef.current = [
+        ...sentAttachmentsRef.current,
+        ...attachments.filter((a) => !seen.has(a.path)),
+      ]
+      setAttachments([])
+      attachmentsRef.current = []
+    }
+    const scope =
+      selectedRef.current.length > 0
+        ? {
+            label: `${t('aiScopeSlide', { n: current + 1 })} · ${t('aiScopeSelection', { count: selectedRef.current.length })}`,
+          }
+        : undefined
+    msgQueue.enqueue(text, { attachments, scope })
+    setInput('')
   }
 
   /** Enter while a reply runs: the draft joins the queue above the composer */
@@ -2113,6 +2187,7 @@ export function AiPanel({
   }
 
   const cancel = () => {
+    msgQueue.hold()
     dismissClarify()
     qcAbortRef.current?.abort()
     loopRef.current?.cancel()
@@ -2311,6 +2386,7 @@ export function AiPanel({
 
   // collapsed: rail only — after all hooks, so the instance and its state survive
   if (!open) {
+    if (hideRail) return null
     return (
       <button
         className="ai-rail"
@@ -2613,6 +2689,12 @@ export function AiPanel({
                 <div className="ai-message-usage">
                   <AiUsageChip usage={entry.usage} lang={lang} />
                 </div>
+<<<<<<< ours
+=======
+              )}
+              {entry.error && (
+                <div className="ai-msg-error">{t('aiMsgError', { error: entry.error })}</div>
+>>>>>>> theirs
               )}
               {entry.error &&
                 (aiNoticeKind(entry.error) ? (
@@ -2782,6 +2864,7 @@ export function AiPanel({
           )}
           {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
           <div className="ai-input-box">
+<<<<<<< ours
             {isUniwork && (
               <UniworkComposerNote
                 note={composerNoteState}
@@ -2802,6 +2885,8 @@ export function AiPanel({
                 onAnnounce={setComposerAnnouncement}
               />
             )}
+=======
+>>>>>>> theirs
             <AiQueueStrip
               items={msgQueue.queued}
               labels={AI_QUEUE_LABELS[lang]}
@@ -2881,6 +2966,7 @@ export function AiPanel({
               placeholder={
                 busy
                   ? AI_QUEUE_LABELS[lang].queuePlaceholder
+<<<<<<< ours
                   : t(
                       !readOnly && deckEmpty && galleryTemplateId
                         ? 'aiTplTopicPlaceholder'
@@ -2888,6 +2974,9 @@ export function AiPanel({
                           ? 'aiInputPlaceholderGen'
                           : 'aiInputPlaceholder',
                     )
+=======
+                  : t(deckEmpty ? 'aiInputPlaceholderGen' : 'aiInputPlaceholder')
+>>>>>>> theirs
               }
               onChange={(e) => {
                 inputEditedSinceRunRef.current = true
@@ -2896,6 +2985,7 @@ export function AiPanel({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault()
+<<<<<<< ours
                   if (disclosureUnacked) {
                     setComposerAnnouncement(aiUniworkText(lang, 'aiUniworkSendNeedsAck'))
                     disclosureRegionRef.current?.focus()
@@ -2904,6 +2994,11 @@ export function AiPanel({
                   if (busy) enqueueDraft()
                   else run()
                 } else if (e.key === 'Escape' && busy && !isComposerPopupOpen(e.currentTarget)) {
+=======
+                  if (busy) enqueueDraft()
+                  else run()
+                } else if (e.key === 'Escape' && busy) {
+>>>>>>> theirs
                   e.preventDefault()
                   cancel()
                 }
@@ -2931,6 +3026,7 @@ export function AiPanel({
               </div>
             )}
             <div className="ai-input-footer">
+<<<<<<< ours
               <AiModelPicker
                 bridge={MODEL_BRIDGE}
                 lang={lang}
@@ -2938,6 +3034,9 @@ export function AiPanel({
                   setPickerNote({ text, over: refusalAnnouncement || panelLiveAnnouncement })
                 }
               />
+=======
+              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+>>>>>>> theirs
               {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
               <button
                 className="ai-attach-btn"

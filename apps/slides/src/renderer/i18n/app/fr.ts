@@ -258,6 +258,26 @@ export const fr = {
     'La durée totale du diaporama était de {duration}. Voulez-vous enregistrer le minutage des diapositives pour le défilement automatique ?',
   appRehearseDiscard: 'Ne pas enregistrer',
   appRehearseSave: 'Enregistrer',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Enregistrer la narration',
+  appRecordSummary:
+    'Durée de l’enregistrement : {duration}. Enregistrer la narration et le minutage de chaque diapositive ?',
+  appRecordDiscard: 'Ne pas enregistrer',
+  appRecordSave: 'Enregistrer',
+  appStatusRecordSaved: 'Narration enregistrée sur {count} diapositives (PowerPoint la lit aussi)',
+  appStatusRecordFailed: 'L’enregistrement n’a pas pu être sauvegardé',
+  appStatusNarrationCleared: 'Narration effacée',
+  appSettingsTitle: 'Paramètres IA',
+  appSettingsAccount: 'Compte Genspark',
+  appSettingsChecking: 'Vérification…',
+  appSettingsLoggedIn: 'Connecté',
+  appSettingsLoggedInEmail: 'Connecté : {email}',
+  appSettingsLoggedOut: 'Non connecté (les fonctionnalités IA nécessitent un compte Genspark)',
+  appSettingsLoginPending: 'En attente de la connexion dans le navigateur…',
+  appSettingsLogin: 'Se connecter à Genspark',
+  appSettingsModel: 'Modèle',
+>>>>>>> theirs
   appSettingsCancel: 'Annuler',
   appCropHint: 'Entrée pour confirmer · Échap pour annuler · Cliquez à l’extérieur pour confirmer',
   appStatusZoomsInserted:

@@ -308,7 +308,9 @@ export const id = {
   appFullLoadStart: 'Muat semua',
   appFullLoadRunning: 'Memuat seluruh buku kerja — pengurutan dan filter tersedia setelah selesai…',
   appFullLoadTooLarge:
-    'Buku kerja ini terlalu besar untuk dimuat sepenuhnya ke memori; pengurutan dan filter tidak tersedia untuk file ini.',
+    'Buku kerja ini terlalu besar untuk dimuat sepenuhnya ke memori; pengurutan dan pemindahan rentang tidak tersedia untuk file ini. Filter dijalankan langsung pada file.',
+  appLargeFilterLoading: 'Membaca kolom filter dari file…',
+  appLargeFilterApplying: 'Menerapkan filter pada file…',
   appSortValueModeFormulas:
     'Rentang ini berisi rumus yang tidak dihitung langsung di buku kerja besar ini — mengurutkan atau memindahkannya akan menyimpannya sebagai nilai biasa. Pilih rentang tanpa rumus.',
   appSortRangeTooLarge:
@@ -679,6 +681,7 @@ export const id = {
   appTabReview: 'Tinjau',
   appRibbonCollapse: 'Ciutkan Pita',
   appRibbonExpand: 'Perluas Pita',
+  appRibbonCompact: 'Pita Ringkas (hanya ikon)',
   appTabView: 'Tampilan',
   appTabAi: 'AI',
   appTabChartDesign: 'Desain Bagan',
@@ -1224,6 +1227,10 @@ export const id = {
   appFontSizeTip: 'Ukuran font',
   appZoomIn: 'Perbesar',
   appZoomOut: 'Perkecil',
+  appImgActualSize: 'Ukuran asli',
+  appImgFitWindow: 'Sesuaikan dengan jendela',
+  appImgSaveAs: 'Simpan gambar sebagai…',
+  appImgClose: 'Tutup (Esc)',
   appZoomSheetTitle: 'Zoom lembar',
   appResetZoom: 'Atur ulang zoom',
   appZoomToSelection: 'Zoom ke Pilihan',
@@ -1495,6 +1502,8 @@ export const id = {
   appVisualSendBackward: 'Mundurkan',
   appVisualSizeProperties: 'Ukuran dan Properti…',
   appVisualHyperlink: 'Hyperlink…',
+  appVisualEmbedInCell: 'Sematkan gambar di sel',
+  appVisualEmbedFailed: 'Tidak dapat menyematkan gambar ini di sel.',
   appVisualDelete: 'Hapus',
   appVisualArranged: 'Objek diperbarui — simpan dengan ⌘S.',
   appVisualCopied: 'Objek disalin.',

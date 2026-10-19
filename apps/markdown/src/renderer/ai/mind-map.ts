@@ -41,8 +41,14 @@ export const MIND_MAP_EXPORT_COLORS = {
   toggleText: '#606366',
 } as const
 
+<<<<<<< ours
 /** Bounded recursion: the schema inlines down to the enforced depth limit; deeper
  *  levels (which the parser trims anyway) carry a generic children description. */
+=======
+/** Bounded recursion: the schema inlines down to the enforced depth limit; the
+ *  deepest level carries a leaf-node shape, because Gemini's function schema
+ *  refuses an array without `items` for the whole request (genoffice#2059). */
+>>>>>>> theirs
 const nodeSchema = (depth: number): Record<string, unknown> => ({
   type: 'object',
   properties: {
@@ -66,6 +72,19 @@ const nodeSchema = (depth: number): Record<string, unknown> => ({
         : {
             type: 'array',
             description: 'sub-topics; 2-5 per node reads best',
+<<<<<<< ours
+=======
+            items: {
+              type: 'object',
+              properties: {
+                label: {
+                  type: 'string',
+                  description: "short node label (2-8 words) in the document's language",
+                },
+              },
+              required: ['label'],
+            },
+>>>>>>> theirs
           },
   },
   required: ['label'],
@@ -344,7 +363,12 @@ export function layoutMindMap(
 ): MindMapLayout {
   const nodes: MindMapLayoutNode[] = []
   const edges: MindMapLayoutEdge[] = []
+<<<<<<< ours
   let nextX = 0
+=======
+  const { padding } = MIND_MAP_METRICS
+  let nextX = padding
+>>>>>>> theirs
   let maxDepth = 0
 
   const place = (node: MindMapTreeNode, id: string, depth: number): MindMapLayoutNode => {
@@ -368,7 +392,11 @@ export function layoutMindMap(
       block: node.block,
       depth,
       x,
+<<<<<<< ours
       y: depth * (MIND_MAP_METRICS.nodeHeight + MIND_MAP_METRICS.depthGap),
+=======
+      y: depth * (MIND_MAP_METRICS.nodeHeight + MIND_MAP_METRICS.depthGap) + padding,
+>>>>>>> theirs
       hasChildren: kids.length > 0,
       childCount: kids.length,
       descendants: countMindMapNodes(node) - 1,
@@ -382,11 +410,19 @@ export function layoutMindMap(
   }
 
   place(root, '0', 0)
+<<<<<<< ours
   const { nodeWidth: w, nodeHeight: h, depthGap, siblingGap, padding } = MIND_MAP_METRICS
   return {
     nodes,
     edges,
     width: Math.max(w, nextX - siblingGap) + padding * 2,
+=======
+  const { nodeWidth: w, nodeHeight: h, depthGap, siblingGap } = MIND_MAP_METRICS
+  return {
+    nodes,
+    edges,
+    width: Math.max(w, nextX - siblingGap - padding) + padding * 2,
+>>>>>>> theirs
     height: (maxDepth + 1) * (h + depthGap) - depthGap + padding * 2,
   }
 }
@@ -397,6 +433,7 @@ function labelBudget(hasBadge: boolean, hasToggle: boolean): number {
   const right = hasToggle ? 32 : 10
   return Math.max(6, Math.floor((MIND_MAP_METRICS.nodeWidth - left - right) / 6.5))
 }
+<<<<<<< ours
 
 /** Margin kept around the map inside the card (px, before zoom). */
 const FIT_MARGIN = 8
@@ -433,3 +470,5 @@ export function fitMindMapView(
     y: place(availH, layout.height * zoom, root.y * zoom, MIND_MAP_METRICS.nodeHeight * zoom),
   }
 }
+=======
+>>>>>>> theirs

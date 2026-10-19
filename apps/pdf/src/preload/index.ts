@@ -12,6 +12,7 @@ import type { PdfApi, UiTheme } from '../shared/ipc'
 
 const api: PdfApi = {
   consumePending: () => ipcRenderer.invoke(PDF_CHANNELS.consumePending),
+<<<<<<< ours
   consumeAiPreset: () => ipcRenderer.invoke(PDF_CHANNELS.consumeAiPreset),
   onAiPreset: (handler) => {
     const listener = (
@@ -21,6 +22,9 @@ const api: PdfApi = {
     ipcRenderer.on('my-ai:ai-preset', listener)
     return () => ipcRenderer.removeListener('my-ai:ai-preset', listener)
   },
+=======
+  openSourcePath: (path: string) => ipcRenderer.invoke('home:open-path', path),
+>>>>>>> theirs
   readFile: (path) => ipcRenderer.invoke(PDF_CHANNELS.readFile, path),
   save: (request) => ipcRenderer.invoke(PDF_CHANNELS.save, request),
   requestRedactionCopy: (path) => ipcRenderer.invoke(PDF_CHANNELS.requestRedactionCopy, path),
@@ -87,8 +91,13 @@ const api: PdfApi = {
   },
   setDirty: (dirty) => ipcRenderer.send(PDF_CHANNELS.dirtyChanged, dirty),
   onCloseSaveRequest: (handler) => {
+<<<<<<< ours
     const listener = (_e: Electron.IpcRendererEvent, request?: { origin?: unknown }) =>
       handler({ origin: request?.origin === 'internal' ? 'internal' : 'user' })
+=======
+    const listener = (_e: unknown, opts?: { flushAll?: boolean }) =>
+      handler({ flushAll: opts?.flushAll === true })
+>>>>>>> theirs
     ipcRenderer.on(PDF_CHANNELS.closeSaveRequest, listener)
     return () => ipcRenderer.removeListener(PDF_CHANNELS.closeSaveRequest, listener)
   },
@@ -104,6 +113,8 @@ const api: PdfApi = {
     ipcRenderer.on(PDF_CHANNELS.saveAsFlow, listener)
     return () => ipcRenderer.removeListener(PDF_CHANNELS.saveAsFlow, listener)
   },
+  print: (job) => ipcRenderer.invoke(PDF_CHANNELS.print, job),
+  listPrinters: () => ipcRenderer.invoke(PDF_CHANNELS.printers),
   onPrintRequest: (handler) => {
     const listener = () => handler()
     ipcRenderer.on(PDF_CHANNELS.printRequest, listener)

@@ -198,6 +198,7 @@ export const ms = {
   aiCmdImages: '{count} imej dikemas kini',
   aiCmdToc: 'Jadual kandungan disisipkan ({count} entri)',
   aiCmdSkipped: ' ({count} blok dilindungi dilangkau)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
   aiClarifyTitle: 'Beberapa soalan sebelum meneruskan',
@@ -212,6 +213,8 @@ export const ms = {
   aiClarifySubmit: 'Teruskan',
   aiSumClarify: 'Penjelasan dijawab',
   aiSumClarifySkipped: 'Penjelasan dilangkau',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Jana peta minda dokumen ini',
   aiMindMapBtn: 'Peta Minda AI',
   aiMindMapPrompt:

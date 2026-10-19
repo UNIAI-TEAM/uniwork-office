@@ -8,10 +8,15 @@ import {
   composerNoteFor,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState } from 'react'
+<<<<<<< ours
 import '@genoffice/ui/ai-uniwork-composer.css'
 import {
   AiComposer,
   AiErrorAction,
+=======
+import {
+  AiComposer,
+>>>>>>> theirs
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
@@ -19,6 +24,7 @@ import {
   AiUsageChip,
   type AiScopeQuoteData,
   type AiTokenUsageView,
+<<<<<<< ours
   uniworkErrorForEntry,
   useAiModelNeedHint,
   useChatRunQueue,
@@ -42,6 +48,15 @@ import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop
 import { useI18n, type TFunc } from '../i18n/locale'
 import { describeFootprint, type ApplyFootprint } from './apply-footprint'
 import { Markdown } from '@genoffice/ui'
+=======
+  useChatRunQueue,
+} from '@genoffice/ui'
+import { GensparkMark } from '../ribbon-icons'
+import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
+import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop-api'
+import { useI18n, type TFunc } from '../i18n/locale'
+import { createFileNav, Markdown } from '@genoffice/ui'
+>>>>>>> theirs
 import { SHEET_NAV_SCHEME } from './sheet-nav'
 import type { ClarifyQuestion } from './tools'
 import { ClarifyCard } from './ClarifyCard'
@@ -264,6 +279,7 @@ export interface AiChatMessage {
   readonly attachments?: readonly AttachmentMeta[] | undefined
   /** the range this user message targeted, frozen at send */
   readonly scope?: AiScopeQuoteData | undefined
+<<<<<<< ours
   /** answered ask_clarification cards of this message's run (view-only receipts) */
   readonly clarifyReceipts?: readonly (readonly ClarifyQa[])[] | undefined
   /** UniWork AI: the notice or wait line to announce to a screen reader now (the visible text is in `text`) */
@@ -278,6 +294,10 @@ export interface AiChatMessage {
         readonly module?: string | undefined
       }[]
     | undefined
+=======
+  /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
+  readonly usage?: AiTokenUsageView | undefined
+>>>>>>> theirs
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -305,7 +325,10 @@ export function AiChatPanel({
   onAddPastedImage,
   onRemoveAttachment,
   onSendQueued,
+<<<<<<< ours
   sendGate,
+=======
+>>>>>>> theirs
   prompt,
   preview,
   aiBusy,
@@ -358,11 +381,14 @@ export function AiChatPanel({
   ) => void
   /** a queued message is ready to run: return false to keep it queued (panel busy some other way) */
   readonly onSendQueued?: (instruction: string, attachments: readonly AttachmentMeta[]) => boolean
+<<<<<<< ours
   /**
    * The UniWork disclosure gate shared with the shell, so entries outside this panel (ribbon runs,
    * presets, the selection ask) are refused by the same state; the panel makes its own when absent
    */
   readonly sendGate?: UniworkSendGate | undefined
+=======
+>>>>>>> theirs
   readonly onStop: () => void
   readonly onNewChat: () => void
   readonly onUndo: (steps: number) => void
@@ -392,6 +418,7 @@ export function AiChatPanel({
   } | null
 }): React.JSX.Element {
   const { t, lang } = useI18n()
+<<<<<<< ours
   const needModelHint = useAiModelNeedHint()
   // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
   // silently, and retry (and, through ExcelShell, presets and ribbon runs) refuse through it
@@ -406,6 +433,12 @@ export function AiChatPanel({
       if (uniworkGate.isBlocked()) return false
       return onSendQueued?.(text, atts) ?? false
     },
+=======
+  /** messages queued while a reply runs; the pump re-sends them through onSend on settle */
+  const msgQueue = useChatRunQueue<readonly AttachmentMeta[]>({
+    busy: aiBusy,
+    submit: (text, atts) => onSendQueued?.(text, atts) ?? false,
+>>>>>>> theirs
   })
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
@@ -645,6 +678,10 @@ export function AiChatPanel({
 
   /** [B12](sheetnav://B12) links in answers jump the grid to the cited range */
   const citationNav = { scheme: SHEET_NAV_SCHEME, onNavigate: onCitation }
+  // [name](filenav:///abs/path) citations open the cited file in its own app
+  const fileNav = createFileNav((path) => {
+    void window.desktopApi.openSourcePath(path)
+  })
 
   const send = (): void => {
     if (!canSend) return
@@ -814,7 +851,11 @@ export function AiChatPanel({
                 {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                 {entry.text && (
                   <div dir="auto">
+<<<<<<< ours
                     <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />
+=======
+                    <Markdown text={entry.text} navs={[citationNav, fileNav]} />
+>>>>>>> theirs
                   </div>
                 )}
               </div>
@@ -859,10 +900,59 @@ export function AiChatPanel({
           const chipLead =
             chip && chipLabel ? (
               <>
+<<<<<<< ours
                 <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
                   {chipLabel}
                 </span>
                 {entry.text ? <span className="ai-result-chip-sep">: </span> : null}
+=======
+                {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
+                {entry.usage && (
+                  <div className="ai-message-usage">
+                    <AiUsageChip usage={entry.usage} lang={lang} />
+                  </div>
+                )}
+                {entry.text ? (
+                  <div dir="auto">
+                    <Markdown text={entry.text} navs={[citationNav, fileNav]} />
+                  </div>
+                ) : (
+                  entry.streaming && (
+                    <span className="ai-typing-row">
+                      <AiTypingIndicator
+                        label={entry.tools.length > 0 ? t('aiWorking') : t('aiThinking')}
+                      />
+                    </span>
+                  )
+                )}
+                {entry.autoApplied && (
+                  <div className="ai-auto-applied">
+                    <span className="ai-auto-applied-text">
+                      {t('aiAutoApplied', { count: entry.autoApplied.opCount })}
+                    </span>
+                    {/* undoSteps 0 = the batch exceeded the undo budget and
+                        kept no stack entry; a forced 1-step undo would revert
+                        the user's own previous action instead. */}
+                    {(entry.autoApplied.undoSteps ?? 1) > 0 && (
+                      <button
+                        className="ai-undo-btn"
+                        onClick={() => onUndo(Math.max(1, entry.autoApplied?.undoSteps ?? 1))}
+                        data-tip={t('aiUndoTitle')}
+                      >
+                        {t('aiUndo')}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {entry.loginRequired && (
+                  <button
+                    className="ai-login-btn"
+                    onClick={() => void window.desktopApi.aiGskLogin()}
+                  >
+                    {t('aiGskLoginBtn')}
+                  </button>
+                )}
+>>>>>>> theirs
               </>
             ) : undefined
           // Retry resends the question this reply answered, like the "not sent" retry on its message
@@ -1235,6 +1325,7 @@ export function AiChatPanel({
           }
           footerStart={
             <>
+<<<<<<< ours
               <AiModelPicker
                 bridge={MODEL_BRIDGE}
                 lang={lang}
@@ -1251,14 +1342,31 @@ export function AiChatPanel({
                   <img src={attachIcon} alt="" aria-hidden />
                 </button>
               )}
+=======
+              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
+              <button
+                className="ai-attach-btn"
+                onClick={onPickAttachments}
+                data-tip={t('aiAttachTitle')}
+                aria-label={t('aiAttachTitle')}
+              >
+                <img src={attachIcon} alt="" aria-hidden />
+              </button>
+>>>>>>> theirs
             </>
           }
           textareaRef={inputRef}
           onChange={onPromptChange}
           onSend={send}
           onStop={() => {
+<<<<<<< ours
             onStop()
             inputRef.current?.focus()
+=======
+            msgQueue.hold()
+            onStop()
+>>>>>>> theirs
           }}
           onPasteFiles={onPasteFiles}
         />

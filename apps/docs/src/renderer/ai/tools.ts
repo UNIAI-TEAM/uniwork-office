@@ -1,12 +1,18 @@
 import type { Editor } from '@tiptap/core'
 import type { Mark, Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { ChartDisplay, CommentInfo, NewChart, NoteInfo } from '@genoffice/docx-engine'
+<<<<<<< ours
 import type { ImageUrlRegistry, ToolDisplay } from '@genoffice/agent-core'
+=======
+import type { ToolDisplay } from '@genoffice/agent-core'
+>>>>>>> theirs
 import type { AgentToolCall, AgentToolDef, CreateDocumentType } from '../../shared/ipc'
 import { t } from '../i18n/locale'
 import { MIND_MAP_LIMITS, MIND_MAP_TOOL, parseMindMapTree } from './mind-map'
 import { executeOps, opNames } from './ops'
 import { clipExcerpt, repliesOf, resolveCommentAnchor } from './comment-ops'
+import { redactTextBetween } from './redact-view'
+import { insertPictureAtSelection } from '../editor/insert-picture'
 import {
   PAGE_SETUP_TOOL,
   SECTION_BREAK_TOOL,
@@ -1236,22 +1242,14 @@ async function insertImageFromUrl(
     // freshness baseline stale, so only our own insertion may mark the doc
     // seen. Checked right before the write — there is no async gap after.
     const userEditedDuringFetch = editedExternally(editor)
-    editor
-      .chain()
-      .focus()
-      .insertContent({
-        type: 'docProtected',
-        attrs: {
-          docxIndex: null,
-          blockType: 'image',
-          label: labels.blockLabel,
-          imageDataUrl: dataUrl,
-          imageWidthPx: w,
-          imageHeightPx: h,
-          genImage: { base64: fetched.base64, mime, widthPx: w, heightPx: h },
-        },
-      })
-      .run()
+    insertPictureAtSelection(editor, {
+      dataUrl,
+      base64: fetched.base64,
+      mime,
+      widthPx: w,
+      heightPx: h,
+      label: labels.blockLabel,
+    })
     if (!userEditedDuringFetch) markDocSeen(editor)
     return {
       output: `Inserted the image (${w}×${h}px).`,
@@ -1634,7 +1632,9 @@ function executeSyncTool(
         return schema.text(n.text ?? '', marks)
       })
       const blockIndex = $from.index(0)
-      const oldText = doc.textBetween(range.from, range.to, ' ', ' ')
+      // the echo quotes what was replaced back to the model, so a selection
+      // covering a withheld span would undo the withholding right here
+      const oldText = redactTextBetween(editor.getJSON(), range.from, range.to, ' ')
       replaceInlineRange(editor, range.from, range.to, nodes, track)
       const newText = nodes.map((n) => n.textContent).join('')
       return {

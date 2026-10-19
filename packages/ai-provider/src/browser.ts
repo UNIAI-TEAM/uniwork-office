@@ -1,5 +1,10 @@
 /** Browser-safe settings surface. Keep Node-backed transports out of renderer bundles. */
 export type {
+  AiCustomCompat,
+  AiCustomEndpoint,
+  AiCustomModelProfile,
+  AiCustomProfile,
+  AiCustomProtocol,
   AiProviderConfig,
   AiProviderId,
   AiProviderMeta,
@@ -25,6 +30,7 @@ export {
   uniAiOpenRouterKey,
   type ProviderNeed,
 } from './providers'
+<<<<<<< ours
 export { getProviderAdapter, modelLacksVision } from './registry'
 export {
   AI_MEDIA_PROVIDERS,
@@ -97,4 +103,24 @@ export type {
 } from './ai-notice'
 export { normalizeAiTestFailureKind } from './ai-test-failure'
 export type { AiTestFailureKind } from './ai-test-failure'
+=======
+export {
+  activeCustomEndpoint,
+  customEndpointLabel,
+  newCustomEndpointId,
+  removeCustomEndpoint,
+  resolveCustomEndpoints,
+  selectCustomEndpoint,
+  upsertCustomEndpoint,
+} from './custom-endpoints'
+export {
+  AI_CUSTOM_PROTOCOLS,
+  declaredModelProfile,
+  normalizeCustomProfile,
+  resolveCustomProfile,
+} from './custom-profile'
+export type { ResolvedCustomProfile } from './custom-profile'
+export { endpointSupportsVision, getProviderAdapter, modelLacksVision } from './registry'
+export { AI_MEDIA_PROVIDERS, imageGenerationAvailable, mediaAnalysisAvailable } from './media'
+>>>>>>> theirs
 export { AI_SEARCH_PROVIDERS } from './search-settings'

@@ -76,12 +76,18 @@ import { consumePendingUndoCarry, undoStackDepth } from './undo-carry'
 import { createSaveGate, recoveryCopyBacksSession, shouldRunSaveTick } from './save-scheduler'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
+<<<<<<< ours
   aiUniworkText,
   isUniworkRefusalErrorKey,
   useAutoSavePref,
   useCloudSignedIn,
   useAiModelNeedHint,
   addTokenUsage,
+=======
+  useAutoSavePref,
+  addTokenUsage,
+  ImageViewer,
+>>>>>>> theirs
   type AiTokenUsageView,
   type AiScopeQuoteData,
 } from '@genoffice/ui'
@@ -374,9 +380,18 @@ import { sharedFormulaResolverFor } from './shared-formula-journal'
 import { installCellClipAnchorFix } from './cell-clip-anchor-fix'
 import { installBorderOverflowExclusionFix } from './border-overflow-exclusion'
 import { installCfEmptySheetFastPath } from './cf-empty-fast-path'
+import { installOtherFormulaAnchor } from './other-formula-anchor'
 import { installMergeBorderFix } from './merge-border-fix'
 import { installThickBorderFix } from './thick-border-fix'
 import { installCenterContinuousRender } from './center-continuous'
+import { installExcelFilterButton } from './filter-button-excel-style'
+import {
+  extendLargeFilterRange,
+  installLargeFilterValues,
+  isLargeFilterSheet,
+  largeFilterAction,
+} from './large-filter'
+import { resetLargeFilter } from './large-filter-state'
 import { installForceStringMarkGate, installLongTextRender } from './long-text-render'
 import { installAutofitWrapBudget } from './autofit-wrap-budget'
 import { installAutofitLinePitch } from './autofit-line-pitch'
@@ -388,6 +403,7 @@ import { installRtlTextDirectionFix } from './rtl-text-fix'
 import { installRtlGridMirror } from './rtl-grid-mirror'
 import { installMultiRowAutofit } from './autofit-multi-row'
 import { registerExcelJumpNav } from './excel-jump-nav'
+import { registerEditorWordJump } from './editor-word-jump'
 import { registerExcelShortcuts } from './excel-shortcuts'
 import { InsertDeleteCellsDialog } from './InsertDeleteCellsDialog'
 import { runCellsChoice } from './insert-delete-cells'
@@ -467,6 +483,7 @@ import {
 import { VisualDialog, type SizeDialogResult } from './VisualDialogs'
 
 import {
+  cellImageAddAt,
   createEditJournal,
   isSheetRemoved,
   hyperlinkEditAt,
@@ -505,6 +522,7 @@ import { EquationDialog } from './EquationDialog'
 import { IconsDialog } from './IconsDialog'
 import { RecommendedChartsDialog } from './RecommendedChartsDialog'
 import { installPictureTransfer } from './picture-paste'
+import { installCellImagePreview } from './cell-image-preview'
 import { installWheelZoomSteps } from './wheel-zoom'
 import { ScreenshotDialog } from './ScreenshotDialog'
 import { SymbolDialog } from './SymbolDialog'
@@ -536,6 +554,7 @@ import {
   setVisualCommandListener,
   setVisualSelectionListener,
   subscribeChartElementSelection,
+  workbookMediaDataUrl,
   type ChartDialogKind,
   type ChartEditData,
   type ChartVectorRead,
@@ -843,6 +862,8 @@ export function App({
     kind: VisualDialogKind
     visualId: string
   } | null>(null)
+  /// Data URL of the cell picture opened in the full-size viewer, if any.
+  const [viewImage, setViewImage] = useState<string | null>(null)
   const visualCommandRef = useRef<(command: string, visualId: string) => void>(() => undefined)
   const [selectedTable, setSelectedTable] = useState<SelectedTableRibbon | null>(null)
   const [tableCreatedSeq, setTableCreatedSeq] = useState(0)
@@ -1093,6 +1114,17 @@ export function App({
       setPendingEdits,
       openDialog: (kind, visualId) => setVisualDialog({ kind, visualId }),
       resyncChart: (state, editKey) => queueChartRefResync(visualSyncContext(), state, editKey),
+      refreshCellImages: () => {
+        const runtime = univerRef.current
+        if (runtime) {
+          queueSparklineInstall(
+            runtime,
+            lazyWorkbookRef,
+            sparklineDisposablesRef,
+            sparklineTimerRef,
+          )
+        }
+      },
     }
   }
   visualCommandRef.current = (command, visualId) =>
@@ -1701,6 +1733,7 @@ export function App({
           setAiRunScope(undefined)
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
+<<<<<<< ours
         onError: (error, errorKey) => {
           // a refused question (too long, rejected) goes back into the composer to be shortened or
           // fixed, as the message says
@@ -1710,6 +1743,51 @@ export function App({
           // the "AI is working" state (the same text also sat in the ribbon row and the status bar)
           setMessage('')
           setChat((previous) => markRunFailed(previous, error, errorKey))
+=======
+        onError: (error) => {
+          setMessage(error)
+          setChat((previous) => {
+            const next = [...previous]
+            // the loop rolled this run's user message out of the model context — surface that
+            for (let i = next.length - 1; i >= 0; i--) {
+              const entry = next[i]!
+              if (entry.role === 'user') {
+                next[i] = { ...entry, undelivered: true }
+                break
+              }
+            }
+            const last = next.at(-1)
+            if (last?.role === 'assistant') {
+              next[next.length - 1] = {
+                ...last,
+                text: error,
+                isError: true,
+                streaming: false,
+                tools: last.tools.filter((tl) => !tl.running),
+              }
+            }
+            return next
+          })
+          // Signed-out failures get an inline sign-in button; detected via
+          // gsk status rather than matching the localized error text — but only
+          // when Genspark is the provider: a BYOK user's error (e.g. their own
+          // provider's rate limit) must not advertise a Genspark sign-in (genoffice#1948)
+          void window.desktopApi
+            .aiGskStatus()
+            .then((status) => {
+              if (status.loggedIn) return
+              if ((aiSettingsRef.current?.provider ?? 'genspark') !== 'genspark') return
+              setChat((previous) => {
+                const next = [...previous]
+                const last = next.at(-1)
+                if (last?.role === 'assistant' && last.isError) {
+                  next[next.length - 1] = { ...last, loginRequired: true }
+                }
+                return next
+              })
+            })
+            .catch(() => {})
+>>>>>>> theirs
           setAiRunScope(undefined)
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
@@ -2029,6 +2107,7 @@ export function App({
     installLoadAutoHeightGate()
     installBorderOverflowExclusionFix()
     installCfEmptySheetFastPath()
+    installOtherFormulaAnchor()
     installCellClipAnchorFix()
     // Borders stored on a merged range's main cell must render their edge
     // segments like Excel; stock Univer drops them entirely.
@@ -2049,6 +2128,7 @@ export function App({
     // Excel's "Center Across Selection": center anchor text over its run of
     // blank same-format neighbors instead of folding it inside one cell.
     installCenterContinuousRender()
+    installExcelFilterButton()
     // Paragraph-sized plain text cells: draw only the slice that can reach the
     // clip box instead of shaping the whole string every frame.
     installLongTextRender()
@@ -2199,6 +2279,8 @@ export function App({
     // Ctrl/Cmd+Arrow data-edge jumps must stop at formula cells even when
     // their values are empty strings or not yet materialized (cache mode).
     registerExcelJumpNav(runtime)
+    // Ctrl+arrow (mac: Option) word jumps inside the cell editor / formula bar
+    registerEditorWordJump(runtime)
     // Excel-standard keys Univer doesn't ship: worksheet-tab switching,
     // Ctrl+Home/End, Home, whole row/column selection. The used-end hint
     // covers streamed workbooks whose cell matrix is a loaded window.
@@ -2257,6 +2339,13 @@ export function App({
       recordNoteChange(state.editJournal, sheetId)
       setPendingEdits(journalSize(state.editJournal))
     }
+<<<<<<< ours
+=======
+    void window.desktopApi.getUserDisplayName?.().then((name) => threadStore.setAuthor(name))
+    const offAuthorChanged = window.desktopApi.onUserDisplayNameChanged?.((name) =>
+      threadStore.setAuthor(name),
+    )
+>>>>>>> theirs
     // Univer's own UI (rule-management panels, dialogs) follows the app
     // language instead of hard-coded English.
     void applyUniverLocale(runtime, getLang())
@@ -2720,6 +2809,18 @@ export function App({
         }
         if (FILTER_MUTATIONS.has(event.id)) {
           recordFilterChange(state.editJournal, params.subUnitId)
+          if (
+            event.id === 'sheet.mutation.set-filter-range' &&
+            isLargeFilterSheet(state, params.subUnitId)
+          ) {
+            const worksheet = runtime.univerAPI
+              .getActiveWorkbook()
+              ?.getSheetBySheetId(params.subUnitId)
+            if (worksheet) extendLargeFilterRange(runtime, state, worksheet)
+          }
+          if (event.id === 'sheet.mutation.remove-filter') {
+            resetLargeFilter(state, params.subUnitId)
+          }
           setPendingEdits(journalSize(state.editJournal))
           return
         }
@@ -3175,6 +3276,31 @@ export function App({
               preloadRunning: state.flags.preloadRunning,
               cellCounts: workbookCellCounts(state.file.sheets),
             })
+<<<<<<< ours
+=======
+            if (verdict === 'workbookTooLarge' && subUnitId !== undefined) {
+              // Past the budget the filter runs on column projections read
+              // from the file (large-filter.ts); the panel opens as usual.
+              installLargeFilterValues(runtime, lazyWorkbookRef, isLargeFilterSheet, (loading) =>
+                setMessage(t(loading ? 'appLargeFilterLoading' : 'appReadyInitial')),
+              )
+              const worksheet = runtime.univerAPI.getActiveWorkbook()?.getSheetBySheetId(subUnitId)
+              const action = worksheet ? largeFilterAction(event.id, event.params, worksheet) : null
+              if (!action) {
+                event.cancel = false
+                return
+              }
+              event.cancel = true
+              setMessage(t('appLargeFilterApplying'))
+              void action(runtime, state)
+                .then(() => {
+                  setPendingEdits(journalSize(state.editJournal))
+                  setMessage(t('appReadyInitial'))
+                })
+                .catch((error: unknown) => setMessage(String(error)))
+              return
+            }
+>>>>>>> theirs
             if (verdict === 'loading') setMessage(t('appFullLoadRunning'))
             else setFullLoadPrompt(verdict === 'offerFullLoad' ? 'ask' : 'tooLarge')
             return
@@ -3331,6 +3457,39 @@ export function App({
           insert: (file, anchor) => handleInsertPictureFile(visualContext(), file, anchor),
         })
       : () => undefined
+    // Double-click on a cell picture opens the viewer instead of the editor.
+    const openCellImagePreview = (row: number, column: number): boolean => {
+      const state = lazyWorkbookRef.current
+      const worksheet = runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
+      if (!state || !worksheet) return false
+      const sheetId = worksheet.getSheetId()
+      const session = cellImageAddAt(state.editJournal, sheetId, row, column)
+      if (session) {
+        setViewImage(session.dataUrl)
+        return true
+      }
+      const fileImage = state.file.sheets
+        .find((sheet) => sheet.id === sheetId)
+        ?.cellImages?.find((image) => image.row === row && image.column === column)
+      if (!fileImage) return false
+      void window.desktopApi
+        .readWorkbookMedia({ sessionId: state.file.sessionId, visualId: fileImage.id })
+        .then(async (media) => {
+          const next = await workbookMediaDataUrl(media)
+          if (next) setViewImage(next)
+        })
+        .catch((reason: unknown) => {
+          console.warn(`cell picture preview unavailable (${fileImage.id})`, reason)
+        })
+      return true
+    }
+    const disposeCellImagePreview = gridHost
+      ? installCellImagePreview(gridHost, {
+          isCellEditing: () => editingCellRef.current,
+          cellAtPoint: (x, y) => cellAtClientPoint(runtime, x, y),
+          openPreview: openCellImagePreview,
+        })
+      : () => undefined
     const disposeWheelZoom = gridHost
       ? installWheelZoomSteps(gridHost, {
           isCellEditing: () => editingCellRef.current,
@@ -3484,10 +3643,14 @@ export function App({
       offThemeChanged?.()
       offAiPreset?.()
       offDocThemeChanged?.()
+<<<<<<< ours
       if (selectionFormatRafRef.current) {
         cancelAnimationFrame(selectionFormatRafRef.current)
         selectionFormatRafRef.current = 0
       }
+=======
+      offAuthorChanged?.()
+>>>>>>> theirs
       undoRedoSub.unsubscribe()
       findRevealDispose()
       gridGrowthDispose()
@@ -3554,6 +3717,7 @@ export function App({
       if (contentTimer) clearTimeout(contentTimer)
       contentDisposable.dispose()
       disposePictureTransfer()
+      disposeCellImagePreview()
       disposeWheelZoom()
       gridHost?.removeEventListener('pointerdown', onSelectionPointerDown, true)
       window.removeEventListener('pointermove', onSelectionPointerMove, true)
@@ -4892,7 +5056,11 @@ export function App({
     if (action === 'open') {
       void handleInspectWorkbook()
     } else if (action === 'print') {
+<<<<<<< ours
       if (cap('print')) void openPrintPreviewHost(pageLayoutContext()).then(setPrintHost)
+=======
+      void openPrintPreviewHost(pageLayoutContext()).then(setPrintHost)
+>>>>>>> theirs
     } else if (action === 'export-pdf') {
       if (cap('exportPdf')) void handleExportPdfImpl(pageLayoutContext())
     } else if (action === 'export-csv') {
@@ -5273,6 +5441,21 @@ export function App({
             shapeEditRef.current(visualDialogTarget.id, changes as ShapeEditChanges)
           }}
           onClose={() => setVisualDialog(null)}
+        />
+      )}
+      {viewImage && (
+        <ImageViewer
+          src={viewImage}
+          lang={getLang()}
+          labels={{
+            zoomIn: t('appZoomIn'),
+            zoomOut: t('appZoomOut'),
+            actualSize: t('appImgActualSize'),
+            fitToWindow: t('appImgFitWindow'),
+            save: t('appImgSaveAs'),
+            close: t('appImgClose'),
+          }}
+          onClose={() => setViewImage(null)}
         />
       )}
       {chartDialog && chartDialogTarget && chartDialog.kind === 'format' && (

@@ -310,7 +310,9 @@ export const ms = {
   appFullLoadRunning:
     'Memuatkan seluruh buku kerja — pengisihan dan penapisan tersedia selepas selesai…',
   appFullLoadTooLarge:
-    'Buku kerja ini terlalu besar untuk dimuatkan sepenuhnya ke ingatan; pengisihan dan penapisan tidak tersedia untuk fail ini.',
+    'Buku kerja ini terlalu besar untuk dimuatkan sepenuhnya ke memori; pengisihan dan pemindahan julat tidak tersedia untuk fail ini. Penapisan dijalankan terus pada fail.',
+  appLargeFilterLoading: 'Membaca lajur penapis daripada fail…',
+  appLargeFilterApplying: 'Menggunakan penapis pada fail…',
   appSortValueModeFormulas:
     'Julat ini mengandungi formula yang tidak dikira secara langsung dalam buku kerja besar ini — mengisih atau mengalihkannya akan menyimpannya sebagai nilai biasa. Pilih julat tanpa formula.',
   appSortRangeTooLarge:
@@ -679,6 +681,7 @@ export const ms = {
   appTabReview: 'Semakan',
   appRibbonCollapse: 'Runtuhkan Reben',
   appRibbonExpand: 'Kembangkan Reben',
+  appRibbonCompact: 'Reben Padat (ikon sahaja)',
   appTabView: 'Pandangan',
   appTabAi: 'AI',
   appTabChartDesign: 'Reka Bentuk Carta',
@@ -1224,6 +1227,10 @@ export const ms = {
   appFontSizeTip: 'Saiz fon',
   appZoomIn: 'Zum masuk',
   appZoomOut: 'Zum keluar',
+  appImgActualSize: 'Saiz sebenar',
+  appImgFitWindow: 'Muat ke tetingkap',
+  appImgSaveAs: 'Simpan imej sebagai…',
+  appImgClose: 'Tutup (Esc)',
   appZoomSheetTitle: 'Zum helaian',
   appResetZoom: 'Tetapkan semula zum',
   appZoomToSelection: 'Zum ke Pilihan',
@@ -1494,6 +1501,8 @@ export const ms = {
   appVisualSendBackward: 'Undurkan',
   appVisualSizeProperties: 'Saiz dan Sifat…',
   appVisualHyperlink: 'Hiperpautan…',
+  appVisualEmbedInCell: 'Benamkan imej dalam sel',
+  appVisualEmbedFailed: 'Tidak dapat membenamkan imej ini dalam sel.',
   appVisualDelete: 'Padam',
   appVisualArranged: 'Objek dikemas kini — simpan dengan ⌘S.',
   appVisualCopied: 'Objek disalin.',

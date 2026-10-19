@@ -199,6 +199,7 @@ export const ru = {
   aiCmdImages: 'Обновлено изображений: {count}',
   aiCmdToc: 'Вставлено оглавление (элементов: {count})',
   aiCmdSkipped: ' (пропущено защищенных блоков: {count})',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
   aiClarifyTitle: 'Несколько вопросов, прежде чем продолжить',
@@ -213,6 +214,8 @@ export const ru = {
   aiClarifySubmit: 'Продолжить',
   aiSumClarify: 'Уточнения получены',
   aiSumClarifySkipped: 'Уточнения пропущены',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Создать ментальную карту документа',
   aiMindMapBtn: 'ИИ-ментальная карта',
   aiMindMapPrompt:

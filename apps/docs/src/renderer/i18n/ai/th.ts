@@ -195,6 +195,7 @@ export const th = {
   aiCmdImages: 'อัปเดตรูปภาพ {count} รูปแล้ว',
   aiCmdToc: 'แทรกสารบัญแล้ว ({count} รายการ)',
   aiCmdSkipped: ' (ข้ามบล็อกที่ได้รับการป้องกัน {count} บล็อก)',
+<<<<<<< ours
   aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
   aiClarifyTitle: 'ขอถามสักครู่ก่อนดำเนินการต่อ',
   aiClarifyDecide: 'ตัดสินใจให้ฉัน',
@@ -208,6 +209,8 @@ export const th = {
   aiClarifySubmit: 'ดำเนินการต่อ',
   aiSumClarify: 'ตอบคำถามเพื่อความชัดเจนแล้ว',
   aiSumClarifySkipped: 'ข้ามคำถามเพื่อความชัดเจน',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'สร้างแผนที่ความคิดของเอกสารนี้',
   aiMindMapBtn: 'แผนที่ความคิด AI',
   aiMindMapPrompt:

@@ -245,6 +245,25 @@ export const en = {
     'The total time for the slide show was {duration}. Do you want to save the slide timings for automatic slide advance?',
   appRehearseDiscard: "Don't Save",
   appRehearseSave: 'Save',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Record Narration',
+  appRecordSummary: "Recording length {duration}. Save each slide's narration and timing?",
+  appRecordDiscard: "Don't Save",
+  appRecordSave: 'Save',
+  appStatusRecordSaved: 'Narration saved on {count} slides (PowerPoint plays it too)',
+  appStatusRecordFailed: 'The recording could not be saved',
+  appStatusNarrationCleared: 'Narration cleared',
+  appSettingsTitle: 'AI Settings',
+  appSettingsAccount: 'Genspark Account',
+  appSettingsChecking: 'Checking…',
+  appSettingsLoggedIn: 'Signed in',
+  appSettingsLoggedInEmail: 'Signed in: {email}',
+  appSettingsLoggedOut: 'Not signed in (AI features require a Genspark account)',
+  appSettingsLoginPending: 'Waiting for browser sign-in…',
+  appSettingsLogin: 'Sign in to Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Cancel',
   appCropHint: 'Enter to confirm · Esc to cancel · Click outside to confirm',
   appStatusZoomsInserted:

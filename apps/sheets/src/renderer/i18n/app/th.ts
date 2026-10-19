@@ -296,7 +296,9 @@ export const th = {
   appFullLoadStart: 'โหลดทั้งหมด',
   appFullLoadRunning: 'กำลังโหลดเวิร์กบุ๊กทั้งหมด เมื่อเสร็จแล้วจะเรียงลำดับและกรองได้…',
   appFullLoadTooLarge:
-    'เวิร์กบุ๊กนี้ใหญ่เกินกว่าจะโหลดทั้งหมดลงหน่วยความจำ ไม่สามารถเรียงลำดับและกรองกับไฟล์นี้ได้',
+    'เวิร์กบุ๊กนี้ใหญ่เกินกว่าจะโหลดทั้งหมดลงหน่วยความจำ การเรียงลำดับและการย้ายช่วงใช้ไม่ได้กับไฟล์นี้ การกรองทำงานบนไฟล์โดยตรง',
+  appLargeFilterLoading: 'กำลังอ่านคอลัมน์ตัวกรองจากไฟล์…',
+  appLargeFilterApplying: 'กำลังใช้ตัวกรองกับไฟล์…',
   appSortValueModeFormulas:
     'ช่วงนี้มีสูตรซึ่งไม่ได้คำนวณแบบสดในเวิร์กบุ๊กขนาดใหญ่นี้ การเรียงลำดับหรือย้ายจะบันทึกสูตรเป็นค่าธรรมดา โปรดเลือกช่วงที่ไม่มีสูตร',
   appSortRangeTooLarge:
@@ -647,6 +649,7 @@ export const th = {
   appTabReview: 'รีวิว',
   appRibbonCollapse: 'ยุบ Ribbon',
   appRibbonExpand: 'ขยาย Ribbon',
+  appRibbonCompact: 'Ribbon แบบกระชับ (ไอคอนเท่านั้น)',
   appTabView: 'มุมมอง',
   appTabAi: 'AI',
   appTabChartDesign: 'การออกแบบแผนภูมิ',
@@ -1190,6 +1193,10 @@ export const th = {
   appFontSizeTip: 'ขนาดแบบอักษร',
   appZoomIn: 'ขยาย',
   appZoomOut: 'ย่อ',
+  appImgActualSize: 'ขนาดจริง',
+  appImgFitWindow: 'พอดีกับหน้าต่าง',
+  appImgSaveAs: 'บันทึกรูปภาพเป็น…',
+  appImgClose: 'ปิด (Esc)',
   appZoomSheetTitle: 'ย่อ/ขยายแผ่นงาน',
   appResetZoom: 'รีเซ็ตการย่อ/ขยาย',
   appZoomToSelection: 'ขยายไปยังส่วนที่เลือก',
@@ -1454,6 +1461,8 @@ export const th = {
   appVisualSendBackward: 'ส่งไปข้างหลัง',
   appVisualSizeProperties: 'ขนาดและคุณสมบัติ…',
   appVisualHyperlink: 'ไฮเปอร์ลิงก์…',
+  appVisualEmbedInCell: 'ฝังรูปภาพในเซลล์',
+  appVisualEmbedFailed: 'ไม่สามารถฝังรูปภาพนี้ในเซลล์ได้',
   appVisualDelete: 'ลบ',
   appVisualArranged: 'อัปเดตวัตถุแล้ว — บันทึกด้วย ⌘S',
   appVisualCopied: 'คัดลอกวัตถุแล้ว',

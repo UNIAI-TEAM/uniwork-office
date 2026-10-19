@@ -330,7 +330,9 @@ export const de = {
   appFullLoadRunning:
     'Die gesamte Arbeitsmappe wird geladen — Sortieren und Filtern sind danach verfügbar…',
   appFullLoadTooLarge:
-    'Diese Arbeitsmappe ist zu groß, um vollständig geladen zu werden; Sortieren und Filtern sind für diese Datei nicht verfügbar.',
+    'Diese Arbeitsmappe ist zu groß, um vollständig geladen zu werden; Sortieren und Verschieben von Bereichen sind für diese Datei nicht verfügbar. Das Filtern läuft direkt auf der Datei.',
+  appLargeFilterLoading: 'Filterspalte wird aus der Datei gelesen …',
+  appLargeFilterApplying: 'Filter wird auf die Datei angewendet …',
   appSortValueModeFormulas:
     'Dieser Bereich enthält Formeln, die in dieser großen Arbeitsmappe nicht live berechnet werden — Sortieren oder Verschieben würde sie als reine Werte speichern. Wählen Sie einen Bereich ohne Formeln.',
   appSortRangeTooLarge:
@@ -730,6 +732,7 @@ export const de = {
   appTabReview: 'Überprüfen',
   appRibbonCollapse: 'Menüband reduzieren',
   appRibbonExpand: 'Menüband erweitern',
+  appRibbonCompact: 'Kompaktes Menüband (nur Symbole)',
   appTabView: 'Ansicht',
   appTabAi: 'KI',
   appTabChartDesign: 'Diagrammentwurf',
@@ -1276,6 +1279,10 @@ export const de = {
   appFontSizeTip: 'Schriftgrad',
   appZoomIn: 'Vergrößern',
   appZoomOut: 'Verkleinern',
+  appImgActualSize: 'Originalgröße',
+  appImgFitWindow: 'An Fenster anpassen',
+  appImgSaveAs: 'Bild speichern unter…',
+  appImgClose: 'Schließen (Esc)',
   appZoomSheetTitle: 'Blatt zoomen',
   appResetZoom: 'Zoom zurücksetzen',
   appZoomToSelection: 'An Markierung anpassen',
@@ -1549,6 +1556,8 @@ export const de = {
   appVisualSendBackward: 'Eine Ebene nach hinten',
   appVisualSizeProperties: 'Größe und Eigenschaften…',
   appVisualHyperlink: 'Link…',
+  appVisualEmbedInCell: 'Bild in Zelle einbetten',
+  appVisualEmbedFailed: 'Das Bild konnte nicht in die Zelle eingebettet werden.',
   appVisualDelete: 'Löschen',
   appVisualArranged: 'Objekt aktualisiert — mit ⌘S speichern.',
   appVisualCopied: 'Objekt kopiert.',

@@ -9,9 +9,13 @@ import {
   useRibbonCollapse,
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
+<<<<<<< ours
   UniAiMark,
   useAiSidebarEnabled,
   useUniworkSendGate,
+=======
+  useAiSidebarEnabled,
+>>>>>>> theirs
   type AiTokenUsageView,
 } from '@genoffice/ui'
 
@@ -572,8 +576,12 @@ export function ExcelShell({
   const collapse = useRibbonCollapse('ai-sheets-ribbon-collapsed', {
     collapse: t('appRibbonCollapse'),
     expand: t('appRibbonExpand'),
+    // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (docs parity, see #362)
+    compact: t('appRibbonCompact'),
+    expandFull: t('appRibbonExpand'),
   })
   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
+<<<<<<< ours
   // A narrow viewport starts with the dock collapsed (it would squeeze the grid to a sliver); that
   // automatic collapse is not the user's choice, so it is not remembered.
   const autoCollapsedRef = useRef(false)
@@ -592,6 +600,11 @@ export function ExcelShell({
     if (cap('ai'))
       setIsCopilotOpenState((prev) => resolveCopilotOpen(prev, next, askingRef.current))
   }, [])
+=======
+  const [isCopilotOpen, setIsCopilotOpen] = useState(() =>
+    aiPanelInitiallyOpen('ai-sheets-show-ai'),
+  )
+>>>>>>> theirs
   // the sidebar switch is a soft hide; it closes the panel when it turns off
   const aiSidebarEnabled = useAiSidebarEnabled(setIsCopilotOpen)
   useEffect(() => {
@@ -604,6 +617,7 @@ export function ExcelShell({
     }
     rememberAiPanelOpen('ai-sheets-show-ai', isCopilotOpen)
   }, [isCopilotOpen])
+<<<<<<< ours
   // every time the dock opens, so a plan changed while it was collapsed shows
   const onAiPanelOpenRef = useRef(onAiPanelOpen)
   onAiPanelOpenRef.current = onAiPanelOpen
@@ -628,6 +642,8 @@ export function ExcelShell({
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiPreset?.nonce])
+=======
+>>>>>>> theirs
   // the "show the AI sidebar" setting off hides the copilot rail (soft hide):
   // an explicit AI action (ribbon run, toggle) still opens the panel, and
   // closing it returns to hidden — no dead affordances, no invisible runs
@@ -933,7 +949,13 @@ export function ExcelShell({
 
   return (
     <main
+<<<<<<< ours
       className={`app-shell ${copilotShellClass(cap('ai'), aiSidebarEnabled, isCopilotOpen)}`}
+=======
+      className={`app-shell ${isCopilotOpen ? '' : 'copilot-collapsed'}${
+        !isCopilotOpen && !aiSidebarEnabled ? ' copilot-off' : ''
+      }`}
+>>>>>>> theirs
       inert={openingWorkbook}
       aria-busy={openingWorkbook}
     >
@@ -1072,6 +1094,7 @@ export function ExcelShell({
 
       {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
       <div className="sheet-body">
+<<<<<<< ours
         {cap('ai') && (
           <AiChatPanel
             isOpen={isCopilotOpen}
@@ -1111,6 +1134,42 @@ export function ExcelShell({
             clarify={aiClarify}
           />
         )}
+=======
+        <AiChatPanel
+          isOpen={isCopilotOpen}
+          hideRail={!aiSidebarEnabled}
+          hasContent={sheetHasContent}
+          chat={chat}
+          {...(historicChat !== undefined ? { historicChat } : {})}
+          attachments={attachments}
+          attachNotice={attachNotice}
+          onPickAttachments={onPickAttachments}
+          onAddAttachmentPaths={onAddAttachmentPaths}
+          onAddPastedImage={onAddPastedImage}
+          onRemoveAttachment={onRemoveAttachment}
+          prompt={prompt}
+          preview={preview}
+          aiBusy={aiBusy}
+          sessionUsage={sessionUsage}
+          onPromptChange={onPromptChange}
+          onSend={onSend}
+          onSendQueued={(text, atts) => {
+            if (aiBusy) return false
+            onSend(text, atts)
+            return true
+          }}
+          onStop={onStop}
+          onNewChat={onNewChat}
+          onUndo={onUndo}
+          scopeRange={aiScopeRange}
+          scopeColumns={aiScopeColumns}
+          scopeLocked={aiScopeLocked}
+          onScopeDismiss={onAiScopeDismiss}
+          onCitation={onAiCitation}
+          onExpand={() => setIsCopilotOpen(true)}
+          onCollapse={() => setIsCopilotOpen(false)}
+        />
+>>>>>>> theirs
         <div className="sheet-main">
           <section className="workbook-area">
             <div id="univer-container" className="spreadsheet" />

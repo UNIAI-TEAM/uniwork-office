@@ -323,7 +323,9 @@ export const nl = {
   appFullLoadRunning:
     'De hele werkmap wordt geladen — sorteren en filteren zijn beschikbaar zodra dit klaar is…',
   appFullLoadTooLarge:
-    'Deze werkmap is te groot om volledig in het geheugen te laden; sorteren en filteren zijn niet beschikbaar voor dit bestand.',
+    'Deze werkmap is te groot om volledig in het geheugen te laden; sorteren en bereiken verplaatsen zijn voor dit bestand niet beschikbaar. Filteren gebeurt rechtstreeks op het bestand.',
+  appLargeFilterLoading: 'Filterkolom wordt uit het bestand gelezen…',
+  appLargeFilterApplying: 'Filter wordt op het bestand toegepast…',
   appSortValueModeFormulas:
     'Dit bereik bevat formules die in deze grote werkmap niet live worden berekend — sorteren of verplaatsen zou ze als gewone waarden opslaan. Kies een bereik zonder formules.',
   appSortRangeTooLarge:
@@ -715,6 +717,7 @@ export const nl = {
   appTabReview: 'Controleren',
   appRibbonCollapse: 'Het lint samenvouwen',
   appRibbonExpand: 'Het lint uitvouwen',
+  appRibbonCompact: 'Compact lint (alleen pictogrammen)',
   appTabView: 'Beeld',
   appTabAi: 'AI',
   appTabChartDesign: 'Grafiekontwerp',
@@ -1259,6 +1262,10 @@ export const nl = {
   appFontSizeTip: 'Tekengrootte',
   appZoomIn: 'Inzoomen',
   appZoomOut: 'Uitzoomen',
+  appImgActualSize: 'Ware grootte',
+  appImgFitWindow: 'Aanpassen aan venster',
+  appImgSaveAs: 'Afbeelding opslaan als…',
+  appImgClose: 'Sluiten (Esc)',
   appZoomSheetTitle: 'In-/uitzoomen op het werkblad',
   appResetZoom: 'Zoomniveau herstellen',
   appZoomToSelection: 'Inzoomen op selectie',
@@ -1531,6 +1538,8 @@ export const nl = {
   appVisualSendBackward: 'Naar achteren',
   appVisualSizeProperties: 'Grootte en eigenschappen…',
   appVisualHyperlink: 'Hyperlink…',
+  appVisualEmbedInCell: 'Afbeelding in cel insluiten',
+  appVisualEmbedFailed: 'Deze afbeelding kon niet in de cel worden ingesloten.',
   appVisualDelete: 'Verwijderen',
   appVisualArranged: 'Object bijgewerkt — opslaan met ⌘S.',
   appVisualCopied: 'Object gekopieerd.',

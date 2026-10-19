@@ -67,6 +67,7 @@ import { parseWorksheetComment } from './worksheet-comments'
 
 const desktopApi: DesktopApi = {
   getLanguage: () => ipcRenderer.invoke('app:get-language'),
+  openSourcePath: (path: string) => ipcRenderer.invoke('home:open-path', path),
   onLanguageChanged(handler) {
     const listener = (
       _event: Electron.IpcRendererEvent,
@@ -500,6 +501,7 @@ const desktopApi: DesktopApi = {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.userDisplayName, sessionId)
     return typeof result === 'string' ? result : ''
   },
+<<<<<<< ours
   onCommentAuthorChanged(handler) {
     const listener = () => handler()
     ipcRenderer.on('uniwork:comment-author-changed', listener)
@@ -535,6 +537,14 @@ const desktopApi: DesktopApi = {
   },
   async uniworkReadOnlySave(path?: string) {
     await ipcRenderer.invoke(IPC_CHANNELS.uniworkReadOnlySave, path)
+=======
+  onUserDisplayNameChanged(handler) {
+    const listener = (_event: Electron.IpcRendererEvent, name: unknown) => {
+      if (typeof name === 'string') handler(name)
+    }
+    ipcRenderer.on('app:author-name-changed', listener)
+    return () => ipcRenderer.removeListener('app:author-name-changed', listener)
+>>>>>>> theirs
   },
   async getAiSettings() {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.aiGetSettings)
@@ -1049,6 +1059,12 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
       ...(isPositiveInteger(sheet.sourceXmlBytes) ? { sourceXmlBytes: sheet.sourceXmlBytes } : {}),
       ...(isNonnegativeInteger(sheet.storedCellCount)
         ? { storedCellCount: sheet.storedCellCount }
+        : {}),
+      ...(isNonnegativeInteger(sheet.valueCellCount)
+        ? { valueCellCount: sheet.valueCellCount }
+        : {}),
+      ...(isNonnegativeInteger(sheet.valueRowCount) && isNonnegativeInteger(sheet.valueColumnCount)
+        ? { valueRowCount: sheet.valueRowCount, valueColumnCount: sheet.valueColumnCount }
         : {}),
       columnWidths,
       // Degrade instead of rejecting the workbook: 0 / malformed defaults

@@ -197,6 +197,7 @@ export const id = {
   aiCmdImages: '{count} gambar diperbarui',
   aiCmdToc: 'Daftar isi disisipkan ({count} entri)',
   aiCmdSkipped: ' ({count} blok terlindungi dilewati)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
   aiClarifyTitle: 'Beberapa pertanyaan sebelum melanjutkan',
@@ -211,6 +212,8 @@ export const id = {
   aiClarifySubmit: 'Lanjutkan',
   aiSumClarify: 'Klarifikasi dijawab',
   aiSumClarifySkipped: 'Klarifikasi dilewati',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Buat peta pikiran dari dokumen ini',
   aiMindMapBtn: 'Peta Pikiran AI',
   aiMindMapPrompt:

@@ -259,6 +259,27 @@ export const it = {
     "Il tempo totale della presentazione è stato {duration}. Vuoi salvare gli intervalli delle diapositive per l'avanzamento automatico?",
   appRehearseDiscard: 'Non salvare',
   appRehearseSave: 'Salva',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Registra commento',
+  appRecordSummary:
+    'Durata della registrazione: {duration}. Salvare il commento e la durata di ogni diapositiva?',
+  appRecordDiscard: 'Non salvare',
+  appRecordSave: 'Salva',
+  appStatusRecordSaved: 'Commento salvato in {count} diapositive (riprodotto anche da PowerPoint)',
+  appStatusRecordFailed: 'Impossibile salvare la registrazione',
+  appStatusNarrationCleared: 'Commento cancellato',
+  appSettingsTitle: 'Impostazioni IA',
+  appSettingsAccount: 'Account Genspark',
+  appSettingsChecking: 'Verifica in corso…',
+  appSettingsLoggedIn: 'Accesso effettuato',
+  appSettingsLoggedInEmail: 'Accesso effettuato: {email}',
+  appSettingsLoggedOut:
+    'Accesso non effettuato (le funzionalità IA richiedono un account Genspark)',
+  appSettingsLoginPending: "In attesa dell'accesso dal browser…",
+  appSettingsLogin: 'Accedi a Genspark',
+  appSettingsModel: 'Modello',
+>>>>>>> theirs
   appSettingsCancel: 'Annulla',
   appCropHint: "Invio per confermare · Esc per annullare · Fai clic all'esterno per confermare",
   appStatusZoomsInserted:

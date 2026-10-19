@@ -95,7 +95,11 @@ function redactSpans(tokens: InlineToken[]): InlineToken[] {
   const out: InlineToken[] = []
   let label: string | null = null
   for (const token of tokens) {
+<<<<<<< ours
     const raw = token.raw ?? token.text ?? ''
+=======
+    const raw = token.type === 'html' ? (token.raw ?? token.text ?? '') : ''
+>>>>>>> theirs
     const open = REDACTION_OPEN_RE.exec(raw)
     if (open) {
       const found = REDACTION_LABEL_RE.exec(open[0])

@@ -282,6 +282,14 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
           ]
         : []),
       {
+        // Withhold the selection from the model. Disabled on a bare caret, like Cut/Copy above:
+        // there is nothing there to hide, but the row stays so the menu does not reflow.
+        // A selection that is already withheld clears the mark instead of asking again.
+        label: t('redactMenuLabel'),
+        disabled: ctxMenu.collapsed,
+        onClick: onSel(() => redactActions.openTextRedaction(ctx)),
+      },
+      {
         label: t('appCtxSelectAll'),
         hint: '⌘A',
         onClick: onSel(() => void document.execCommand('selectAll')),
@@ -559,6 +567,7 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
           // the setRedaction op. Disabled on a multi-selection, like Bring to Front above: the
           // op addresses one element, and marking only the right-clicked one of several would
           // withhold less than the reader asked for. The row stays so the menu does not reflow.
+<<<<<<< ours
           // Same `ai` gate as the text entry: it is only meaningful with a model to hide from.
           ...(cap('ai')
             ? [
@@ -569,6 +578,13 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
                 } as CtxItem,
               ]
             : []),
+=======
+          {
+            label: t('redactMenuLabel'),
+            disabled: !single,
+            onClick: () => void redactActions.toggleElementRedaction(ctx, ctxMenu.targetId),
+          } as CtxItem,
+>>>>>>> theirs
         ]
       : []),
     ...(defaultStyle

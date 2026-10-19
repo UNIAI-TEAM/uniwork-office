@@ -14,6 +14,7 @@ import {
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
+<<<<<<< ours
 import {
   AgentLoop,
   createImageUrlRegistry,
@@ -40,12 +41,19 @@ import type {
 import {
   AiComposer,
   AiErrorAction,
+=======
+import { AgentLoop } from '@genoffice/agent-core'
+import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
+import {
+  AiComposer,
+>>>>>>> theirs
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
   AiTypingIndicator,
   AiUsageChip,
   addTokenUsage,
+<<<<<<< ours
   uniworkErrorForEntry,
   useChatRunQueue,
   useUniworkDisclosureAck,
@@ -54,8 +62,14 @@ import {
   type AiTokenUsageView,
 } from '@genoffice/ui'
 import { cap, platform } from '../capabilities'
+=======
+  useChatRunQueue,
+  type AiScopeQuoteData,
+  type AiTokenUsageView,
+} from '@genoffice/ui'
+>>>>>>> theirs
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
-import { Markdown } from '@genoffice/ui'
+import { createFileNav, Markdown } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -213,10 +227,16 @@ export function AiPanel({
     busy,
     submit: (text) => {
       const loop = loopRef.current
+<<<<<<< ours
       if (needModelHint !== null || !loop || loop.busy) return false
       // held until the user acknowledges the UniWork disclosure, as Send is
       if (uniworkGate.isBlocked()) return false
       return send(text, null)
+=======
+      if (!loop || loop.busy) return false
+      send(text, null)
+      return true
+>>>>>>> theirs
     },
   })
   const [phase, setPhase] = useState<Phase>('thinking')
@@ -508,6 +528,8 @@ export function AiPanel({
       moveTextBlock: (idx, block, d) => apiRef.current.moveTextBlock(idx, block, d),
       insertText: (input) => apiRef.current.insertText(input),
       addFormMark: (idx, kind, rect) => apiRef.current.addFormMark(idx, kind, rect),
+      formWidgets: (idx) => apiRef.current.formWidgets(idx),
+      pageBoxes: (idx) => apiRef.current.pageBoxes(idx),
       textInserts: () => apiRef.current.textInserts(),
       updateTextInsert: (id, edit) => apiRef.current.updateTextInsert(id, edit),
       moveTextInsert: (id, origin) => apiRef.current.moveTextInsert(id, origin),
@@ -737,8 +759,13 @@ export function AiPanel({
   }
 
   const stop = (): void => {
+<<<<<<< ours
     loopRef.current?.cancel()
     inputRef.current?.focus()
+=======
+    msgQueue.hold()
+    loopRef.current?.cancel()
+>>>>>>> theirs
   }
 
   /** Enter while a reply runs: the draft joins the queue above the composer */
@@ -935,6 +962,10 @@ export function AiPanel({
       if (page !== null) apiRef.current.gotoPage(page)
     },
   }
+  // [name](filenav:///abs/path) citations open the cited file in its own app
+  const fileNav = createFileNav((path) => {
+    void window.pdfApi.openSourcePath(path)
+  })
 
   // Collapsed: rail is owned by App; keep this instance mounted for chat state
   // but skip building the heavy panel tree on every App re-render.
@@ -974,8 +1005,11 @@ export function AiPanel({
               onClick={() => {
                 stop()
                 loopRef.current?.reset()
+<<<<<<< ours
                 clarify.dismiss()
                 clarify.clearReceipts()
+=======
+>>>>>>> theirs
                 msgQueue.clear()
                 setBusy(false)
                 offerEpochRef.current++
@@ -1144,6 +1178,7 @@ export function AiPanel({
                   <AiUsageChip usage={entry.usage} lang={lang} />
                 </div>
               )}
+<<<<<<< ours
               {(bodyText || chip) && (
                 <div className="ai-msg-answer" dir="auto">
                   {(bodyText || chipLead) && (
@@ -1191,6 +1226,11 @@ export function AiPanel({
               {stoppedText && (
                 <div className="ai-run-stopped" dir="auto">
                   {stoppedText}
+=======
+              {entry.text && (
+                <div dir="auto">
+                  <Markdown text={entry.text} navs={[pdfNav, fileNav]} />
+>>>>>>> theirs
                 </div>
               )}
             </div>
@@ -1256,7 +1296,10 @@ export function AiPanel({
           </div>
         )}
         <AiComposer
+<<<<<<< ours
           textareaRef={inputRef}
+=======
+>>>>>>> theirs
           queueStrip={
             <AiQueueStrip
               items={msgQueue.queued}
@@ -1354,11 +1397,15 @@ export function AiPanel({
           iconOnly
           footerStart={
             <>
+<<<<<<< ours
               <AiModelPicker
                 bridge={MODEL_BRIDGE}
                 lang={lang}
                 onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
               />
+=======
+              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+>>>>>>> theirs
               {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
             </>
           }

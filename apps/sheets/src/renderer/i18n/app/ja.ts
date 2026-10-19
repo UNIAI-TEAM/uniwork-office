@@ -323,7 +323,9 @@ export const ja = {
   appFullLoadStart: 'すべて読み込む',
   appFullLoadRunning: 'ブック全体を読み込んでいます。完了すると並べ替えとフィルターが使用できます…',
   appFullLoadTooLarge:
-    'このブックは大きすぎるため完全に読み込めません。このファイルでは並べ替えとフィルターを使用できません。',
+    'このブックは大きすぎるため完全に読み込めません。このファイルでは並べ替えと範囲の移動を使用できません。フィルターはファイル上で直接実行されます。',
+  appLargeFilterLoading: 'ファイルからフィルター列を読み込んでいます…',
+  appLargeFilterApplying: 'ファイルにフィルターを適用しています…',
   appSortValueModeFormulas:
     '選択範囲に数式が含まれていますが、この大きなブックでは数式はライブ計算されません。並べ替えや移動を行うと数式が値として保存されます。数式を含まない範囲を選択してください。',
   appSortRangeTooLarge:
@@ -715,6 +717,7 @@ export const ja = {
   appTabReview: '校閲',
   appRibbonCollapse: 'リボンを折りたたむ',
   appRibbonExpand: 'リボンを展開する',
+  appRibbonCompact: 'コンパクトリボン（アイコンのみ）',
   appTabView: '表示',
   appTabAi: 'AI',
   appTabChartDesign: 'グラフのデザイン',
@@ -1272,6 +1275,10 @@ export const ja = {
   appFontSizeTip: 'フォントサイズ',
   appZoomIn: '拡大',
   appZoomOut: '縮小',
+  appImgActualSize: '実際のサイズ',
+  appImgFitWindow: 'ウィンドウに合わせる',
+  appImgSaveAs: '画像を名前を付けて保存…',
+  appImgClose: '閉じる (Esc)',
   appZoomSheetTitle: 'シートをズーム',
   appResetZoom: 'ズームのリセット',
   appZoomToSelection: '選択範囲に合わせて拡大/縮小',
@@ -1541,6 +1548,8 @@ export const ja = {
   appVisualSendBackward: '背面へ移動',
   appVisualSizeProperties: 'サイズとプロパティ…',
   appVisualHyperlink: 'ハイパーリンク…',
+  appVisualEmbedInCell: 'セルに画像を埋め込む',
+  appVisualEmbedFailed: 'この画像をセルに埋め込めませんでした。',
   appVisualDelete: '削除',
   appVisualArranged: 'オブジェクトを更新しました — ⌘S で保存。',
   appVisualCopied: 'オブジェクトをコピーしました。',

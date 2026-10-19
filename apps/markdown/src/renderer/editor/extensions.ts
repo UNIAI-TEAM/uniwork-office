@@ -16,7 +16,10 @@ import { AiQueueAnchors } from './aiQueueAnchors'
 import { InactiveSelection } from './inactiveSelection'
 import { SearchHighlight } from './searchHighlight'
 import { buildMathExtensions } from './math'
+<<<<<<< ours
 import { RawHtmlBlock, RawHtmlInline } from './rawHtml'
+=======
+>>>>>>> theirs
 import { Redaction } from './Redaction'
 import {
   BlockStartEscapedParagraph,
@@ -40,12 +43,23 @@ import { boundOrderedList, boundTable, boundTaskList } from './boundedTokenizers
 import { WikiLink, WikiLinkResolve } from './wikilink'
 import type { WikiLinkOptions } from './wikilink'
 import type { SlashController, SlashItem } from './slashCommand'
+import { WikiSuggest } from './wikiSuggest'
+import type { WikiSuggestController } from './wikiSuggest'
+import { WikiEmbed } from './wikiEmbed'
 import { t } from '../i18n/locale'
 
 export interface BuildExtensionsOptions {
   slashController: SlashController
   slashItems: () => SlashItem[]
   /**
+<<<<<<< ours
+=======
+   * The `[[` suggester. Omitted in tests and headless paths: the plugin then
+   * runs with no menu sink, so nothing intercepts the keys around a `[[`.
+   */
+  wikiSuggestController?: WikiSuggestController
+  /**
+>>>>>>> theirs
    * Wiki-link navigation. Omitted in tests and headless paths: the resolver is
    * then left on its default, which reports every link unresolved rather than
    * reaching for the filesystem.
@@ -128,9 +142,12 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     StyledTaskItem.configure({ nested: true }),
     // KaTeX-rendered $...$ / $$...$$ formulas (issue #100)
     ...buildMathExtensions(),
+<<<<<<< ours
     // raw HTML / comments survive open → save byte-identically
     RawHtmlBlock,
     RawHtmlInline,
+=======
+>>>>>>> theirs
     // text the reader withholds from the model: the words stay in the document
     // and in the file, and only the model-facing view replaces them
     Redaction,
@@ -138,7 +155,13 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     // links open externally via main-process guard
     ImageAwareLink.configure({ openOnClick: false }),
     WikiLink,
+<<<<<<< ours
     WikiLinkResolve.configure(options.wikiLink ?? {}),
+=======
+    WikiEmbed,
+    WikiLinkResolve.configure(options.wikiLink ?? {}),
+    WikiSuggest.configure({ controller: options.wikiSuggestController }),
+>>>>>>> theirs
     BlockDragHandle,
     BlockKeymap,
     AiHighlight,

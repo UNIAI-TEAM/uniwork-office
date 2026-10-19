@@ -217,10 +217,15 @@ export interface ImageData {
 export interface HtmlApi {
   /** Take the md path pending for this view (queued at tab creation); null = new untitled document */
   consumePending(): Promise<string | null>
+<<<<<<< ours
   /** Web frame only (UNI-1865): the renderer reports that the opened document finished
    *  mounting, so the passive lag detector's settle stamp starts at first paint. Absent
    *  on desktop. */
   noteDocumentMounted?(): void
+=======
+  /** open any shell-routed document path (an AI answer's filenav citation) */
+  openSourcePath(path: string): Promise<void>
+>>>>>>> theirs
   /** Headless export mode: the path and format this hidden renderer must export, null in normal use */
   consumeHeadlessExport(): Promise<HeadlessExportTarget | null>
   /** Headless export mode: report the export outcome so the main process can quit */

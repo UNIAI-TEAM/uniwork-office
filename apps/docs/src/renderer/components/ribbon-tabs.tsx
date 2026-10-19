@@ -24,6 +24,7 @@ import { stepDocsZoom } from '../wheel-zoom'
 import { defaultParagraphStyleId, headingStyleId, type StyleMap } from '../style-gallery'
 import { tableModelToPmNode } from '../editor/convert'
 import { insertPageBreak } from '../editor/page-break'
+import { insertPictureAtSelection } from '../editor/insert-picture'
 import { isStraightLineKind } from '../editor/shape-svg'
 import type { InkTool } from '../editor/ink'
 import { t, useI18n, type StringKey } from '../i18n/locale'
@@ -34,7 +35,6 @@ import type { RevisionDisplayMode } from '../editor/revision-view'
 import { TRANSLATE_LANGS, ribbonLangKey } from './translate-langs'
 import {
   IconAccept,
-  IconAiPanel,
   IconCaret,
   IconComment,
   IconCommentNext,
@@ -65,6 +65,7 @@ import {
   IconUndo,
   IconWebLayout,
   IconWholePage,
+  IconMultiPage,
   IconZoom,
   IconZoom100,
   IconZoomIn,
@@ -388,27 +389,14 @@ export async function insertImageFromDataUrl(
   try {
     const natural = await imageSizeOf(dataUrl)
     const scale = Math.min(1, MAX_IMAGE_WIDTH_PX / natural.width)
-    editor
-      .chain()
-      .focus()
-      .insertContent({
-        type: 'docProtected',
-        attrs: {
-          docxIndex: null,
-          blockType: 'image',
-          label,
-          imageDataUrl: dataUrl,
-          imageWidthPx: Math.round(natural.width * scale),
-          imageHeightPx: Math.round(natural.height * scale),
-          genImage: {
-            base64: m[2],
-            mime,
-            widthPx: Math.round(natural.width * scale),
-            heightPx: Math.round(natural.height * scale),
-          },
-        },
-      })
-      .run()
+    insertPictureAtSelection(editor, {
+      dataUrl,
+      base64: m[2],
+      mime,
+      widthPx: Math.round(natural.width * scale),
+      heightPx: Math.round(natural.height * scale),
+      label,
+    })
     // Pasting into an empty document leaves the image as the ONLY node with a
     // node-selection on it: there is no text position to type at, and the
     // next keystroke REPLACES the picture. Ensure a
@@ -1300,10 +1288,8 @@ interface ViewTabProps {
   filePath: string | null
   zoom: number
   onZoom: (zoom: number) => void
-  onZoomFit: (mode: 'width' | 'page') => void
+  onZoomFit: (mode: 'width' | 'page' | 'multi') => void
   onZoomDialog: () => void
-  showAi: boolean
-  onToggleAi: () => void
   darkPage: boolean
   onDarkPage: (v: boolean) => void
   showRuler: boolean
@@ -1328,8 +1314,6 @@ export function ViewTab({
   onZoom,
   onZoomFit,
   onZoomDialog,
-  showAi,
-  onToggleAi,
   darkPage,
   onDarkPage,
   showRuler,
@@ -1510,6 +1494,17 @@ export function ViewTab({
             </span>
             <span>{t('ribbonWholePage')}</span>
           </button>
+          <button
+            className="rb-big"
+            disabled={!hasDoc}
+            data-tip={t('ribbonMultiPageTip')}
+            onClick={() => onZoomFit('multi')}
+          >
+            <span className="rb-big-icon">
+              <IconMultiPage size={BIG} />
+            </span>
+            <span>{t('ribbonMultiPage')}</span>
+          </button>
         </div>
         <div className="ribbon-group-label">{t('ribbonGroupZoom')}</div>
       </div>
@@ -1518,6 +1513,7 @@ export function ViewTab({
 
       <div className="ribbon-group">
         <div className="ribbon-group-items">
+<<<<<<< ours
           {cap('ai') && (
             <button
               className={`rb-big ${showAi ? 'active' : ''}`}
@@ -1530,6 +1526,8 @@ export function ViewTab({
               <span>{t('ribbonAiPanel')}</span>
             </button>
           )}
+=======
+>>>>>>> theirs
           <button
             className={`rb-big ${darkPage ? 'active' : ''}`}
             data-tip={t('ribbonDarkModeTip')}

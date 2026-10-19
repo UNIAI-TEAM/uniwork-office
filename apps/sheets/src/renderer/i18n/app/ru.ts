@@ -316,7 +316,9 @@ export const ru = {
   appFullLoadRunning:
     'Идёт полная загрузка книги — сортировка и фильтрация станут доступны после завершения…',
   appFullLoadTooLarge:
-    'Книга слишком велика для полной загрузки в память; сортировка и фильтрация для этого файла недоступны.',
+    'Книга слишком велика для полной загрузки в память; сортировка и перемещение диапазонов для этого файла недоступны. Фильтрация выполняется непосредственно по файлу.',
+  appLargeFilterLoading: 'Чтение столбца фильтра из файла…',
+  appLargeFilterApplying: 'Применение фильтра к файлу…',
   appSortValueModeFormulas:
     'Этот диапазон содержит формулы, которые в этой большой книге не вычисляются в реальном времени — сортировка или перемещение сохранит их как обычные значения. Выберите диапазон без формул.',
   appSortRangeTooLarge:
@@ -698,6 +700,7 @@ export const ru = {
   appTabReview: 'Рецензирование',
   appRibbonCollapse: 'Свернуть ленту',
   appRibbonExpand: 'Развернуть ленту',
+  appRibbonCompact: 'Компактная лента (только значки)',
   appTabView: 'Вид',
   appTabAi: 'ИИ',
   appTabChartDesign: 'Конструктор диаграмм',
@@ -1243,6 +1246,10 @@ export const ru = {
   appFontSizeTip: 'Размер шрифта',
   appZoomIn: 'Увеличить',
   appZoomOut: 'Уменьшить',
+  appImgActualSize: 'Реальный размер',
+  appImgFitWindow: 'По размеру окна',
+  appImgSaveAs: 'Сохранить изображение как…',
+  appImgClose: 'Закрыть (Esc)',
   appZoomSheetTitle: 'Масштабировать лист',
   appResetZoom: 'Сбросить масштаб',
   appZoomToSelection: 'Масштаб по выделенному',
@@ -1510,6 +1517,8 @@ export const ru = {
   appVisualSendBackward: 'Переместить назад',
   appVisualSizeProperties: 'Размер и свойства…',
   appVisualHyperlink: 'Гиперссылка…',
+  appVisualEmbedInCell: 'Встроить изображение в ячейку',
+  appVisualEmbedFailed: 'Не удалось встроить это изображение в ячейку.',
   appVisualDelete: 'Удалить',
   appVisualArranged: 'Объект обновлён — сохраните через ⌘S.',
   appVisualCopied: 'Объект скопирован.',

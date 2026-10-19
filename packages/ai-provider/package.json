@@ -10,8 +10,12 @@
     "./browser": "./src/browser.ts",
     "./codex-app-server": "./src/codex-app-server.ts",
     "./custom-models": "./src/custom-models.ts",
+<<<<<<< ours
     "./provider-models": "./src/provider-models.ts",
     "./proxy-url": "./src/proxy-url.ts"
+=======
+    "./trace": "./src/trace.ts"
+>>>>>>> theirs
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

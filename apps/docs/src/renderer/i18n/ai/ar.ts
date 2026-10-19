@@ -194,6 +194,7 @@ export const ar = {
   aiCmdImages: 'تم تحديث {count} صورة',
   aiCmdToc: 'تم إدراج جدول محتويات ({count} إدخالًا)',
   aiCmdSkipped: ' (تم تخطي {count} كتلة محمية)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
   aiClarifyTitle: 'بعض الأسئلة قبل المتابعة',
@@ -208,6 +209,8 @@ export const ar = {
   aiClarifySubmit: 'متابعة',
   aiSumClarify: 'تمت الإجابة عن أسئلة التوضيح',
   aiSumClarifySkipped: 'تم تخطي أسئلة التوضيح',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'إنشاء خريطة ذهنية لهذا المستند',
   aiMindMapBtn: 'خريطة ذهنية بالذكاء الاصطناعي',
   aiMindMapPrompt:

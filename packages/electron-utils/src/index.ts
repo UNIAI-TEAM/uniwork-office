@@ -29,6 +29,15 @@ export {
   type ViewMenuOptions,
 } from './app-menu'
 export {
+  AUTHOR_NAME_KEY,
+  AUTHOR_NAME_MAX,
+  configuredAuthorName,
+  readAuthorNameSetting,
+  resolveAuthorName,
+  sanitizeAuthorName,
+  systemAuthorName,
+} from './author-name'
+export {
   saveAsSuggestion,
   showOpenDialogWithMemory,
   showSaveDialogWithMemory,
@@ -37,7 +46,11 @@ export {
   DEFAULT_SAVE_DIR_KEY,
   configuredDefaultSaveDir,
   isUsableSaveDir,
+<<<<<<< ours
   peekDefaultSaveDir,
+=======
+  mkdirDirs,
+>>>>>>> theirs
   readDefaultSaveDirSetting,
   resolveDefaultSaveDir,
   type PathProvider,
@@ -111,6 +124,7 @@ export {
   type PrintDocumentOptions,
 } from './print-window'
 export { abortOnDestroyed, type DestroyableSender } from './abort-on-destroyed'
+<<<<<<< ours
 export { createUniworkCommentsApi, installUniworkCommentsBridge } from './comments-bridge'
 export { unwrapCommentsReply } from './comments-reply'
 export {
@@ -148,3 +162,6 @@ export {
 } from './comments-poll'
 export { newerCopyMtime } from './recovery-copy'
 export { RecoveryClearEpochs, recoveryEpochKey, type RecoveryWriteTicket } from './recovery-epochs'
+=======
+export { recoveryCopyDiskNewer } from './recovery-copy'
+>>>>>>> theirs

@@ -185,6 +185,7 @@ export const zh = {
   aiCmdImages: '已更新 {count} 张图片',
   aiCmdToc: '已插入目录({count} 个条目)',
   aiCmdSkipped: '(跳过 {count} 个受保护块)',
+<<<<<<< ours
   aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
   aiClarifyTitle: '继续之前先确认几个问题',
   aiClarifyDecide: '帮我决定',
@@ -198,6 +199,8 @@ export const zh = {
   aiClarifySubmit: '继续',
   aiSumClarify: '已回答澄清问题',
   aiSumClarifySkipped: '跳过了澄清问题',
+=======
+>>>>>>> theirs
   aiStarterMindMap: '为这篇文档生成思维导图',
   aiMindMapBtn: 'AI 思维导图',
   aiMindMapPrompt: '为这篇文档生成思维导图,按文档的章节结构组织主要主题和关键概念',
