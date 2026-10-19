@@ -1,5 +1,6 @@
 // UNI-1987 (AIPANEL-PHONE): the AI panel under 900 px, all six modules.
 //  1. no sideways scroll with the panel open, idle and after typing one line (TVA2-3), at 390 and 360
+//     (the Markdown typed-overflow assertion, TVA2-3, is a regression guard: it did not reproduce red at b5da4d4dc)
 //  2. no squeeze at 390: the dock covers the document, or the pane keeps >= 300 px (TVA-1)
 //  3. 600 / 768: the dock floats over the document (absolute) and the pane keeps width - 34
 //     (Sheets keeps its own 719 px block: absolute at 600, side by side at 768)
