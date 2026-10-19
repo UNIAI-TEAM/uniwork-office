@@ -6,6 +6,8 @@ import {
   uniworkIsReadOnly,
   uniworkRefusesOpen,
   uniworkRequestOrigin,
+  uniworkReadOnlySave,
+  uniworkSamePath,
   uniworkSaveAsDefault,
   uniworkSaveDecision,
 } from './uniwork-policy'
@@ -1636,6 +1638,10 @@ interface SheetsTabSession {
   readonly webContents: WebContents
   readonly client: XlsxSidecarClient
   readonly sessions: Map<string, SessionInfo>
+  /// The workbook session the tab shows. `sessions` also holds auxiliary
+  /// merge-source sessions, so no position in the map identifies it; the
+  /// lock-follow state queries answer for this one (EL-1(b) fix10).
+  displayedSessionId: string | null
   readonly aiStreams: Map<string, AbortController>
   /// Chunked uploads of large saves' cell edits, pending their save request.
   readonly saveTransfers: SaveEditsTransferStore
@@ -1655,6 +1661,13 @@ function startPastedTempCleanup(): void {
   if (pastedTempCleanupStarted) return
   pastedTempCleanupStarted = true
   void cleanupExpiredPastedFiles(app.getPath('temp'))
+}
+
+/** The tab's displayed workbook session, never an auxiliary merge source. */
+function displayedSession(entry: SheetsTabSession): SessionInfo | undefined {
+  return entry.displayedSessionId === null
+    ? undefined
+    : entry.sessions.get(entry.displayedSessionId)
 }
 
 function sessionFor(event: IpcMainInvokeEvent): SheetsTabSession {
@@ -1752,6 +1765,7 @@ function registerSheetsSession(webContents: WebContents, client: XlsxSidecarClie
     webContents,
     client,
     sessions: new Map(),
+    displayedSessionId: null,
     aiStreams: new Map(),
     saveTransfers: new SaveEditsTransferStore(),
   })
@@ -2606,6 +2620,34 @@ export function registerSheetsIpc(): void {
     workbookCommentAuthor(sessionFor(event).sessions, sessionId),
   )
 
+  // EL-1(b) fix6 (VEL-2 / Addendum 1): bound / read-only state of the sender's
+  // open workbook session so the renderer can re-query on the lock ping.
+  ipcMain.handle(IPC_CHANNELS.uniworkState, (event) => {
+    const entry = sheetsTabs.get(event.sender.id)
+    const session = entry ? displayedSession(entry) : undefined
+    const path = session ? sessionDocumentPath(session) : null
+    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
+  // EL-1(b) fix6 (VEL-1): explicit Save on a read-only bound workbook asks the
+  // shell to explain the lock / view-only state (never writes, never fires hook).
+  ipcMain.handle(IPC_CHANNELS.uniworkReadOnlySave, (event, filePath?: unknown) => {
+    const entry = sheetsTabs.get(event.sender.id)
+    if (!entry) return
+    const shown = displayedSession(entry)
+    const displayedPath = shown ? sessionDocumentPath(shown) : null
+    const paths = [...entry.sessions.values()]
+      .map((s) => sessionDocumentPath(s))
+      .filter((p): p is string => typeof p === 'string' && p.length > 0)
+    if (typeof filePath === 'string' && filePath.length > 0) {
+      const matched = paths.find((p) => p === filePath || uniworkSamePath(p, filePath))
+      if (!matched) return
+      uniworkReadOnlySave(matched)
+      return
+    }
+    if (displayedPath) uniworkReadOnlySave(displayedPath)
+  })
+
   // Registered here (not in registerSheetsAiIpc, skipped in shell mode):
   // slides' ai:generate-image only exists once a slides view opens, so sheets
   // owns its channel the way pdf does.
@@ -2773,6 +2815,7 @@ export function registerSheetsIpc(): void {
       }
       return null
     }
+    entry.displayedSessionId = result.sessionId
     // an unsaved new workbook's tab already shows the untitled name; its temp
     // backing path must not become a recent file
     if (!prepared.unsavedNew) workbookOpenedHook?.(event.sender, path)
@@ -3456,6 +3499,7 @@ export function registerSheetsIpc(): void {
     // unreachable in practice; a null here means the session could not be
     // swapped over the bytes we just wrote.
     if (file === null) throw new Error('the saved workbook could not be reopened')
+    if (entry.displayedSessionId === request.sessionId) entry.displayedSessionId = file.sessionId
     if (quietUnsavedNew && session.suggestSaveAs !== undefined) {
       // the temp path must not reach the title or recents; the recovery copy
       // is what a crash restores from, so it tracks the saved bytes
@@ -3566,6 +3610,7 @@ export function registerSheetsIpc(): void {
     entry.saveTransfers.discardSession(validatedSessionId)
     const session = entry.sessions.get(validatedSessionId)
     if (!entry.sessions.delete(validatedSessionId)) return
+    if (entry.displayedSessionId === validatedSessionId) entry.displayedSessionId = null
     if (session === undefined) return
     if (session.unsavedNew && session.suggestSaveAs !== undefined)
       forgetUnsavedNewRecovery(session.suggestSaveAs)

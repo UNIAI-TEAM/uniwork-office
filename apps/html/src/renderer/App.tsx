@@ -84,6 +84,10 @@ import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
+interface HtmlUniworkLockSeam {
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  uniworkReadOnlySave?(path?: string): Promise<void>
+}
 
 interface TextSel {
   sid: number
@@ -1256,6 +1260,13 @@ export default function App() {
     async (mode: SaveMode, suggestedName?: string, origin?: 'auto'): Promise<boolean> => {
       const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
       if (statusRef.current !== 'ready' || !allowed) return false
+      // EL-1(b) VEL-1: an explicit Save on a read-only bound copy asks main to
+      // explain the lock instead of writing (Save As and unbound files keep
+      // today's path)
+      if (mode === 'save' && !origin && uniworkRef.current.bound && uniworkRef.current.readOnly) {
+        void (window.htmlApi as HtmlUniworkLockSeam).uniworkReadOnlySave?.()?.catch(() => {})
+        return false
+      }
       // uncommitted live style pokes belong to the document being saved
       flushPending()
       // a menu save or ⌘S during an autosave queues behind it instead of being dropped;
@@ -1419,6 +1430,11 @@ export default function App() {
         window.htmlApi.sendSaveRequestAck(false)
         return
       }
+      if (mode === 'save' && uniworkRef.current.bound && uniworkRef.current.readOnly) {
+        void doSave(mode)
+        window.htmlApi.sendSaveRequestAck(false)
+        return
+      }
       void doSave(mode)
     })
     // MCP read of this open document: hand back the same serialization a save
@@ -1535,16 +1551,24 @@ export default function App() {
       return
     }
     // the browser harness may not expose the method: a missing or failed answer is a plain local file
-    void Promise.resolve(window.htmlApi.uniworkState?.())
-      .then((state) => {
-        if (live) setUniwork({ bound: state?.bound === true, readOnly: state?.readOnly === true })
-      })
-      .catch((err) => {
-        console.warn('[html] UniWork state query failed:', err)
-        if (live) setUniwork({ bound: false, readOnly: false })
-      })
+    const query = () => {
+      void Promise.resolve(window.htmlApi.uniworkState?.())
+        .then((state) => {
+          if (live) setUniwork({ bound: state?.bound === true, readOnly: state?.readOnly === true })
+        })
+        .catch((err) => {
+          console.warn('[html] UniWork state query failed:', err)
+          if (live) setUniwork({ bound: false, readOnly: false })
+        })
+    }
+    query()
+    // EL-1(b) VEL-2: the edit lock makes readOnly change while the document stays open
+    const unsubscribe = (window.htmlApi as HtmlUniworkLockSeam).onUniworkStateChanged?.((p) => {
+      if (p === path) query()
+    })
     return () => {
       live = false
+      unsubscribe?.()
     }
   }, [path])
 

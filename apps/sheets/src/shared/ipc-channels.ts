@@ -94,6 +94,8 @@ export const IPC_CHANNELS = {
   openExternal: 'shell:open-external',
   menuAction: 'menu:action',
   userDisplayName: 'user:display-name',
+  uniworkState: 'sheets:uniwork-state',
+  uniworkReadOnlySave: 'sheets:uniwork-read-only-save',
   aiGetSettings: 'ai:get-settings',
   aiSetSettings: 'ai:set-settings',
   aiSettingsChanged: 'ai:settings-changed',

@@ -21,6 +21,7 @@ export const MARKDOWN_CHANNELS = {
   takeWikiFragment: 'markdown:take-wiki-fragment',
   save: 'markdown:save',
   uniworkState: 'markdown:uniwork-state',
+  uniworkReadOnlySave: 'markdown:uniwork-read-only-save',
   saveRequest: 'markdown:save-request',
   saveRequestAck: 'markdown:save-request-ack',
   readTextRequest: 'markdown:read-text-request',
@@ -284,6 +285,10 @@ export interface MarkdownApi {
   save(request: SaveMarkdownRequest): Promise<SaveMarkdownResult>
   /** Whether this view's document is a UniWork copy (AutoSave off) and whether it is view only; absent where the renderer runs without the desktop shell (browser harness), then a plain local file */
   uniworkState?(): Promise<UniworkViewState>
+  /** EL-1(b) fix6: pushed (`{ path }`) when `isReadOnly(path)` or `isBound(path)` may have changed */
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  /** EL-1(b) fix6: explicit Save on a read-only bound Markdown document asks main to explain */
+  uniworkReadOnlySave?(path?: string): Promise<void>
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
   /** Shell menu Save / Save As → renderer serializes and calls save() with the given mode */

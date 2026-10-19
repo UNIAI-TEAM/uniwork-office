@@ -1,5 +1,5 @@
+import { useEffect, useState } from 'react'
 import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
-
 import { platform } from './capabilities'
 
 import type { PdfUniworkState } from '../shared/ipc'
@@ -37,4 +37,54 @@ export async function queryPdfUniworkState(
  */
 export function pdfUniworkBoundForAi(state: PdfUniworkState): boolean {
   return uniworkBoundForAi(state.bound, platform())
+}
+
+/**
+ * EL-1(b) fix10: whether an open editor box with typed text counts as unsaved
+ * for the close guard. `platformReadOnly` is view-only / encrypted, never the
+ * UniWork lock: a box typed before the lock was lost in place keeps its text,
+ * so closing must still ask.
+ */
+export function openBoxesCountAsDirty(
+  platformReadOnly: boolean,
+  hasDraft: boolean,
+  pendingOpen: () => boolean,
+): boolean {
+  return !platformReadOnly && hasDraft ? pendingOpen() : false
+}
+
+export interface PdfUniworkSeam {
+  uniworkState?(path: string): Promise<PdfUniworkState>
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+}
+
+/** Query main for `filePath` and re-query when the lock ping names that path. */
+export function usePdfUniworkState(
+  api: PdfUniworkSeam | null | undefined,
+  filePath: string | null | undefined,
+): PdfUniworkState {
+  const [uniwork, setUniwork] = useState<PdfUniworkState>(PLAIN_PDF_STATE)
+  useEffect(() => {
+    let live = true
+    if (!filePath) {
+      setUniwork(PLAIN_PDF_STATE)
+      return
+    }
+    const query = () => {
+      void queryPdfUniworkState(api ?? {}, filePath).then((state) => {
+        if (live) setUniwork(state)
+      })
+    }
+    query()
+    // EL-1(b): the edit lock makes readOnly change while the PDF stays open;
+    // the shell pings the affected path, and only a ping for this file re-queries.
+    const unsubscribe = api?.onUniworkStateChanged?.((p) => {
+      if (p === filePath) query()
+    })
+    return () => {
+      live = false
+      unsubscribe?.()
+    }
+  }, [api, filePath])
+  return uniwork
 }

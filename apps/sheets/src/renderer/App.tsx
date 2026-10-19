@@ -52,6 +52,11 @@ import {
   type UniverWorksheet,
 } from './univer-state'
 import { viewOnlyLock } from './view-only-lock'
+import {
+  sheetsBlocksReadOnlySave,
+  watchSheetsUniworkState,
+  type SheetsUniworkSeam,
+} from './uniwork-state'
 import { applyChangePlan, planFromOps, type OpExecutorContext } from './op-executor'
 import { installSheetsMcpBridge, type McpSheetHandlers } from './mcp-bridge'
 import { renameChartRefsForSheet } from './workbook-ops'
@@ -1214,6 +1219,23 @@ export function App({
       window.desktopApi?.onWorkbookRenamed?.((newName) => {
         setWorkbookFile((prev) => (prev ? { ...prev, name: newName } : prev))
       }) ?? (() => undefined),
+    [],
+  )
+  // EL-1(b) VEL-2: the edit lock makes readOnly change while the workbook stays
+  // open; re-query main and flip viewOnlyLock without touching pending edits.
+  useEffect(
+    () =>
+      watchSheetsUniworkState({
+        api: window.desktopApi as SheetsUniworkSeam | undefined,
+        getFile: () => lazyWorkbookRef.current?.file ?? null,
+        setFile: (next) => {
+          if (lazyWorkbookRef.current) lazyWorkbookRef.current.file = next
+          setWorkbookFile(next)
+        },
+        getWorkbook: () => univerRef.current?.univerAPI.getActiveWorkbook() ?? null,
+        lock: viewOnlyLock,
+        webViewOnly: isViewOnly(),
+      }),
     [],
   )
 
@@ -4819,8 +4841,18 @@ export function App({
     const gate = saveGateRef.current
     if (engineUnavailable !== null) return { ok: false }
     if (mode === 'recovery' && gate.busy) return { ok: false }
-    // View-only UniWork document: Save is unavailable (Save As stays open).
-    if (mode === 'save' && lazyWorkbookRef.current?.file.readOnly === true) return { ok: false }
+    // View-only UniWork document: Save is unavailable (Save As stays open);
+    // an explicit Save on a bound read-only workbook asks main to explain the lock.
+    if (
+      sheetsBlocksReadOnlySave(
+        window.desktopApi as SheetsUniworkSeam | undefined,
+        lazyWorkbookRef.current?.file,
+        mode,
+        quiet,
+      )
+    ) {
+      return { ok: false }
+    }
     return gate.run(async () => {
       if (!(await commitActiveEditor())) return { ok: false }
       return handleSaveImpl(saveContext(), mode, quiet, explicitTarget)

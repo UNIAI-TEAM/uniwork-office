@@ -135,6 +135,14 @@ interface ServerState {
   uploadReceipt: { uploadId: string; checksumSha256: string }
   counts: { upload: number; commit: number; lookup: number }
   keys: { upload: string[]; commit: string[]; lookup: string[] }
+  /** EL-1(b): outgoing commit inputs (assert editLockId, never a mock echo) */
+  commitInputs: Array<{
+    documentId: string
+    uploadId: string
+    baseRevision: string
+    idempotencyKey: string
+    editLockId?: string
+  }>
 }
 
 function fakeServer(): { client: QueueClient; state: ServerState } {
@@ -146,6 +154,7 @@ function fakeServer(): { client: QueueClient; state: ServerState } {
     uploadReceipt: { uploadId: 'up_1', checksumSha256: 'unset' },
     counts: { upload: 0, commit: 0, lookup: 0 },
     keys: { upload: [], commit: [], lookup: [] },
+    commitInputs: [],
   }
   const client: QueueClient = {
     async upload(input) {
@@ -160,6 +169,7 @@ function fakeServer(): { client: QueueClient; state: ServerState } {
     async commit(input) {
       state.counts.commit += 1
       state.keys.commit.push(input.idempotencyKey)
+      state.commitInputs.push(input)
       if (state.commitError) throw state.commitError
       return {
         documentId: input.documentId,
@@ -227,7 +237,13 @@ afterEach(() => {
   rmSync(base, { recursive: true, force: true })
 })
 
-async function harness(): Promise<Harness> {
+async function harness(
+  extra: {
+    editLockId?: (path: string) => string | null
+    prepareEditLock?: (path: string) => Promise<'held' | 'park' | 'proceed'>
+    onCommitEditLocked?: (path: string, error: UniworkDocError) => void
+  } = {},
+): Promise<Harness> {
   const clock = new FakeClock()
   const safeStorage = createLockableSafeStorage()
   const layer = createStoreLayer({
@@ -268,6 +284,9 @@ async function harness(): Promise<Harness> {
       limits: QUEUE_LIMITS,
       publish: (record) => published.push(record),
       uuid: () => 'u1',
+      ...(extra.editLockId ? { editLockId: extra.editLockId } : {}),
+      ...(extra.prepareEditLock ? { prepareEditLock: extra.prepareEditLock } : {}),
+      ...(extra.onCommitEditLocked ? { onCommitEditLocked: extra.onCommitEditLocked } : {}),
       ...deps,
     })
   const makeDispatcher = (owner: string): QueueDispatcher =>
@@ -294,6 +313,9 @@ async function harness(): Promise<Harness> {
     pause,
     drafts,
     dispatcher,
+    ...(extra.editLockId ? { editLockId: extra.editLockId } : {}),
+    ...(extra.prepareEditLock ? { prepareEditLock: extra.prepareEditLock } : {}),
+    ...(extra.onCommitEditLocked ? { onCommitEditLocked: extra.onCommitEditLocked } : {}),
   })
 
   const makeDoc = (opts: { key?: string; orgId?: string; payload?: string } = {}): QueueDoc => {
@@ -1760,7 +1782,7 @@ function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
         method: 'PUT',
         url: `https://storage.example/version-part/${partNumber}`,
         headers: {},
-        expiresAt: '2026-10-19T00:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
       })
     }
     return {
@@ -1774,7 +1796,7 @@ function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
         size: Math.min(partSize, size - (partNumber - 1) * partSize),
       })),
       parts,
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
   }
 
@@ -1811,7 +1833,7 @@ function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
           uploadId: `upl_${input.sessionId}`,
           checksumSha256: options.checksumSha256,
           sizeBytes: size,
-          claimExpiresAt: '2026-10-19T00:00:00.000Z',
+          claimExpiresAt: '2099-01-01T00:00:00.000Z',
         },
       }
     },
@@ -2173,7 +2195,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
         { partNumber: 2, etag: '"e2"' },
         { partNumber: 3, etag: '"e3"' },
       ],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     await h.intents.put(doc.key, doc.record, doc.payload)
     await h.dispatcher.dispatchAll([doc])
@@ -2200,7 +2222,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
       partSize: CHUNK_PART_SIZE,
       totalParts: 6,
       completedParts: [{ partNumber: 1, etag: '"e1"' }],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     await h.intents.put(doc.key, doc.record, doc.payload)
 
@@ -2216,7 +2238,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
       partSize: CHUNK_PART_SIZE,
       totalParts: 6,
       completedParts: [{ partNumber: 1, etag: '"e1"' }],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     await h.intents.put(doc2.key, doc2.record, doc2.payload)
     await h.coordinator.supersede(doc2)
@@ -2589,5 +2611,83 @@ describe('EL1A-BE-2 / EL1A-BE-5: queueBindingPatch (the record -> binding projec
     expect(patch).toHaveProperty('editLock', undefined)
     expect(queueBindingPatch(failedRecord({ state: 'committed' }))).toBeNull()
     expect(queueBindingPatch(failedRecord({ state: 'cancelled' }))).toBeNull()
+  })
+})
+
+describe('EL-1(b): outgoing commit carries edit_lock_id; 423 while held -> lost', () => {
+  const LOCK = '01J8X4LOCK0N1P2Q3R4S5T6U7V'
+
+  it('save-coordinator commit body includes edit_lock_id from the held path', async () => {
+    const h = await harness({ editLockId: () => LOCK })
+    const doc = h.makeDoc()
+    await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.commitInputs).toHaveLength(1)
+    expect(h.server.state.commitInputs[0]).toMatchObject({
+      uploadId: 'up_1',
+      baseRevision: '41',
+      editLockId: LOCK,
+    })
+  })
+
+  it('save-coordinator copy-like commit (no lock) omits editLockId', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.commitInputs[0]?.editLockId).toBeUndefined()
+  })
+
+  it('queue dispatcher commit body includes edit_lock_id', async () => {
+    const h = await harness({ editLockId: () => LOCK })
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    await h.dispatcher.dispatchAll([doc])
+    expect(h.server.state.commitInputs.at(-1)).toMatchObject({ editLockId: LOCK })
+  })
+
+  it('commit 423 while held notifies onCommitEditLocked and parks edit_locked', async () => {
+    const lost: string[] = []
+    const h = await harness({
+      editLockId: () => LOCK,
+      onCommitEditLocked: (path) => lost.push(path),
+    })
+    const doc = h.makeDoc()
+    h.server.state.commitError = new UniworkDocError('edit_locked', {
+      status: 423,
+      serverCode: 'document_locked',
+      editLock: {
+        holderName: 'Lan',
+        since: '2026-10-15T03:12:00Z',
+        expiresAt: '2026-10-15T03:14:00Z',
+        heldByMe: false,
+      },
+    })
+    const ended = await h.coordinator.save(doc.path, { userSave: true })
+    expect(ended?.binding.state).toBe('edit_locked')
+    expect(lost).toEqual([doc.path])
+    const parked = await stored(h.intents, doc)
+    expect(parked?.intent.state).toBe('failed')
+    expect(parked?.intent.lastError).toBe('edit_locked')
+    expect(parked?.intent.retryAt).toBeUndefined()
+  })
+
+  it('Q2: prepareEditLock park sends no commit and parks edit_locked', async () => {
+    const h = await harness({
+      prepareEditLock: async () => 'park',
+      editLockId: () => null,
+    })
+    const doc = h.makeDoc()
+    const ended = await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.counts.commit).toBe(0)
+    expect(ended?.binding.state).toBe('edit_locked')
+  })
+
+  it('Q2 dispatcher: prepareEditLock park sends no commit', async () => {
+    const h = await harness({ prepareEditLock: async () => 'park' })
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    await h.dispatcher.dispatchAll([doc])
+    expect(h.server.state.counts.commit).toBe(0)
+    expect(doc.record.state).toBe('failed')
+    expect(doc.record.lastError).toBe('edit_locked')
   })
 })

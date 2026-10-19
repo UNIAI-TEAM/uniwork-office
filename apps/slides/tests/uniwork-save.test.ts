@@ -590,3 +590,24 @@ describe('the sign-out sweep against the autosave tick (G5-11f d3-1, d3-3)', () 
     expect(existsSync(join(dir, bound))).toBe(false)
   })
 })
+
+describe('EL-1(b) fix6: slides:uniwork-read-only-save', () => {
+  it('forwards the sender session deck path to policy.readOnlySave and ignores unknown senders or mismatched paths', async () => {
+    const readOnlySaves: string[] = []
+    const policy = {
+      isBound: (p: string) => p === deckPath,
+      isReadOnly: (p: string) => p === deckPath,
+      readOnlySave: (p: string) => void readOnlySaves.push(p),
+    }
+    setUniworkDocumentPolicy(policy)
+    await call('slides:uniwork-read-only-save')
+    await call('slides:uniwork-read-only-save', deckPath)
+    await call('slides:uniwork-read-only-save', join(env.dir, 'other.pptx'))
+    const fn = env.handlers.get('slides:uniwork-read-only-save')
+    if (fn) {
+      const unknownSender = { sender: { id: 9999 } } as never
+      fn(unknownSender)
+    }
+    expect(readOnlySaves).toEqual([deckPath, deckPath])
+  })
+})

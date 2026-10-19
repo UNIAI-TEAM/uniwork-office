@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { drainedOrigin, forcesBoundSave } from '../src/renderer/uniwork-save'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  drainedOrigin,
+  forcesBoundSave,
+  pdfExplainReadOnlySave,
+} from '../src/renderer/uniwork-save'
 import {
   PDF_UNIWORK_AUTOSAVE_OFF,
   PDF_UNIWORK_VIEW_ONLY,
@@ -51,5 +55,34 @@ describe('isUniworkRefusal', () => {
     expect(isUniworkRefusal(PDF_UNIWORK_AUTOSAVE_OFF)).toBe(true)
     expect(isUniworkRefusal('EACCES: permission denied')).toBe(false)
     expect(isUniworkRefusal(undefined)).toBe(false)
+  })
+})
+
+describe('pdfExplainReadOnlySave', () => {
+  const PATH = 'C:/u/uniwork-documents/dep/user/doc1/spec.pdf'
+  const view = { origin: 'user' as const, bound: true, readOnly: true, filePath: PATH }
+
+  it('calls uniworkReadOnlySave once and returns true for an explicit Save on a read-only bound PDF', () => {
+    const uniworkReadOnlySave = vi.fn(async () => undefined)
+    expect(pdfExplainReadOnlySave({ uniworkReadOnlySave }, view)).toBe(true)
+    expect(uniworkReadOnlySave).toHaveBeenCalledTimes(1)
+    expect(uniworkReadOnlySave).toHaveBeenCalledWith(PATH)
+  })
+
+  it.each([
+    ['editable bound', { readOnly: false }],
+    ['unbound read-only', { bound: false }],
+    ['autosave', { origin: 'auto' as const }],
+    ['internal flush', { origin: 'internal' as const }],
+    ['no path', { filePath: null }],
+  ])('returns false and does not call the seam for %s', (_label, patch) => {
+    const uniworkReadOnlySave = vi.fn(async () => undefined)
+    expect(pdfExplainReadOnlySave({ uniworkReadOnlySave }, { ...view, ...patch })).toBe(false)
+    expect(uniworkReadOnlySave).not.toHaveBeenCalled()
+  })
+
+  it('still blocks the write when the seam is absent', () => {
+    expect(pdfExplainReadOnlySave({}, view)).toBe(true)
+    expect(pdfExplainReadOnlySave(undefined, view)).toBe(true)
   })
 })

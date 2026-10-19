@@ -16,6 +16,7 @@ export const PDF_CHANNELS = {
   autoRename: 'pdf:auto-rename',
   isUntitled: 'pdf:is-untitled',
   uniworkState: 'pdf:uniwork-state',
+  uniworkReadOnlySave: 'pdf:uniwork-read-only-save',
   validateTextEdits: 'pdf:validate-text-edits',
   listEditFonts: 'pdf:list-edit-fonts',
   canDrawText: 'pdf:can-draw-text',
@@ -890,6 +891,10 @@ export interface PdfApi {
   isUntitled(path: string): Promise<boolean>
   /** UniWork state of a path granted to this view (all false for plain local files); absent where the renderer runs without the desktop shell (browser harness), then a plain local file */
   uniworkState?(path: string): Promise<PdfUniworkState>
+  /** EL-1(b) fix6: pushed (`{ path }`) when `isReadOnly(path)` or `isBound(path)` may have changed */
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  /** EL-1(b) fix6: explicit Save on a read-only bound PDF asks main to explain */
+  uniworkReadOnlySave?(path?: string): Promise<void>
   /** Dry-run match of pending text edits against the file: reason null = would apply */
   validateTextEdits(request: ValidateTextEditsRequest): Promise<TextEditValidation[]>
   /** EDIT_FONTS ids whose font file exists on this machine */
