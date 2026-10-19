@@ -96,6 +96,9 @@
   let selected = null
   let editing = null
   let dark = false
+  // the host claims mod+P (gx:printKey) only where its print path runs for this press (web, print
+  // granted); otherwise the key keeps the browser default (desktop: the shell menu owns it)
+  let claimPrint = false
   let resizing = null
   let drag = null
   /** horizontal slide of a replaced element (image / video): live margin-left, committed as styles */
@@ -961,6 +964,23 @@
   document.addEventListener(
     'keydown',
     (e) => {
+      // mod+P never reaches the host window from inside this frame: relay it before any edit or
+      // field handling (same key rule as web/docs/bridge/print-accelerator.ts); a held press is
+      // still suppressed so this frame's own browser dialog never opens beside the module's
+      if (
+        claimPrint &&
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        e.key.toLowerCase() === 'p'
+      ) {
+        e.preventDefault()
+        if (e.repeat) return
+        // a run being typed lives only in this DOM: commit it first so the host serializes it
+        finishEdit(true)
+        post({ type: 'gx:keyCommand', command: 'print' })
+        return
+      }
       if (editing) {
         const mod = (e.metaKey || e.ctrlKey) && !e.altKey
         if (e.key === 'Escape') {
@@ -1142,6 +1162,9 @@
         break
       case 'gx:scrollTo':
         window.scrollTo(0, msg.y)
+        break
+      case 'gx:printKey':
+        claimPrint = msg.claim === true
         break
       case 'gx:theme':
         dark = !!msg.dark

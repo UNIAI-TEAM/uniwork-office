@@ -57,6 +57,7 @@ describe('parseFromInspector', () => {
       { type: 'gx:htmlEditCommit', sid: 7, html: 'a <b>b</b>' },
       { type: 'gx:textEditCancel' },
       { type: 'gx:keyCommand', command: 'delete' },
+      { type: 'gx:keyCommand', command: 'print' },
       { type: 'gx:zoom', delta: -3.5 },
       { type: 'gx:navigateBlocked', href: 'https://example.com/' },
       { type: 'gx:markClick', sid: 2 },
