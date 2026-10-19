@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 import { useI18n } from './locale'
 import { signOutIsKeystoreVariant, type AccountController } from './account-model'
-import { foreignModalOpen, whenNoForeignModal } from './modal-guard'
+import { foreignModalOpen, whenNoForeignModal, wrapTabKey } from './modal-guard'
 import type { SignOutPlan } from '../../shared/home-api'
 
 /** puts focus back on the opener, or on it once it is mounted again */
@@ -64,6 +64,7 @@ function SignOutNotice({
       aria-labelledby="acct-switch-lost-title"
       aria-describedby="acct-switch-lost-body"
       onKeyDown={(e) => {
+        wrapTabKey(e)
         if (e.key !== 'Escape') return
         e.preventDefault()
         e.stopPropagation()
@@ -154,6 +155,7 @@ export function SignOutPrompt({
       aria-labelledby="acct-signout-title"
       aria-describedby="acct-signout-body"
       onKeyDown={(e) => {
+        wrapTabKey(e)
         if (e.key !== 'Escape') return
         e.preventDefault()
         e.stopPropagation()
@@ -254,6 +256,7 @@ function ReplaceSignInDialog({
       aria-labelledby="acct-replace-title"
       aria-describedby="acct-replace-body"
       onKeyDown={(e) => {
+        wrapTabKey(e)
         if (e.key !== 'Escape') return
         e.preventDefault()
         e.stopPropagation()

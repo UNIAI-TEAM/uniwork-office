@@ -760,10 +760,13 @@ describe('W10: "Đồng bộ ngay" restarts a feed stopped on refused resyncs, e
       await rt.runtime.tick()
     }
     await vi.waitFor(async () =>
-      expect((await h.controller.getSnapshot()).header.online).toBe(false),
+      expect((await h.controller.getSnapshot()).header.status).toBe('resync_failed'),
     )
     const stopped = (await h.controller.getSnapshot()).header
-    // the refused resyncs are reported as offline (deferred to G5-13), and the flag is still set
+    // B47 (UNI-1362): a refused resync is a round trip that REACHED the server,
+    // so the pass is not offline and the header names the condition the click
+    // clears instead of masking it behind `offline`
+    expect(stopped.online).toBe(true)
     expect(stopped.resyncFailed).toBe(true)
     tick.mockClear()
     return { rt, h, tick }

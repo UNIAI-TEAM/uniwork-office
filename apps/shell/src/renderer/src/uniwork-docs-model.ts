@@ -146,9 +146,8 @@ export function blockedReasonKey(
 
 /**
  * what the person can do about an error: sign in again, try again, or nothing (just read it).
- * Deferred (G504-fe-3): a save refused with keystore_locked / store_full has its own S4 action
- * ("Mở trung tâm đồng bộ" / Retry, EXPERIENCE l.156, l.212) once the sync center and the S4
- * row exist in the shell; the Open dialog and launch notice never see these two codes.
+ * A save refused by a locked keychain gets its own action in the queue popover
+ * (`queue-popover-model.ts`); the Open dialog and launch notice never see that code.
  */
 export type ErrorAction = 'sign-in' | 'retry' | 'none'
 
@@ -644,7 +643,8 @@ export function focusTipRoomOf(pillLeft: number, scale: number): number {
 export type RemoteBarTone = 'info' | 'warn' | 'error'
 
 export interface RemoteBarAction {
-  kind: UniworkRemoteAction
+  /** the bridge actions, plus the renderer-local `open-center` that asks the shell to open sync settings */
+  kind: UniworkRemoteAction | 'open-center'
   labelKey: StringKey
   /** why the button cannot be used yet: it stays focusable (`aria-disabled`) and the reason describes it */
   disabledReasonKey?: StringKey
@@ -673,9 +673,6 @@ const RELOAD_LATER: RemoteBarAction[] = [
  * New-version bar). `who` is the author and time of the loaded version when the host knows
  * them: until a source for them exists the "updated" bar reads `uwRemoteUpdatedNoRev`, never
  * a sentence with a hole in it.
- *
- * Deferred: the stuck-save reason also offers `uwQueueOpenCenter`, which needs the sync
- * center opener; the shell has none yet, so only the reason is shown.
  */
 export function remoteBarModelOf(
   status: UniworkDocStatus,
@@ -726,12 +723,19 @@ export function remoteBarModelOf(
           : bar.wait === 'stuck'
             ? 'uwRemoteWaitStuck'
             : undefined
+      const actions: RemoteBarAction[] = [
+        { ...RELOAD_LATER[0], disabledReasonKey: reason },
+        ...(bar.wait === 'stuck'
+          ? [{ kind: 'open-center' as const, labelKey: 'uwQueueOpenCenter' as const }]
+          : []),
+        { ...RELOAD_LATER[1] },
+      ]
       return {
         tone: 'warn',
         regionKey: 'uwRemoteRegion',
         messageKey: 'uwRemoteNewerDirty',
         params: { n: bar.version },
-        actions: [{ ...RELOAD_LATER[0], disabledReasonKey: reason }, { ...RELOAD_LATER[1] }],
+        actions,
       }
     }
     case 'newer-ai':

@@ -277,11 +277,15 @@ export interface SyncRuntimeOptions {
   /**
    * Runs after every pass (sign-in and each interval tick), for the durable
    * save queue the same poll drives. `online` is the pass's connectivity
-   * verdict: `false` only when a capability or feed round trip actually failed
-   * (a network/timeout error or a consumer backoff), `true` when a request
-   * reached the server, and `undefined` when the pass simply had nothing to do
-   * (no chosen org, no scope) - a no-op is neither, so it must not park the
-   * queue (G506-be-3). It dispatches the pending intents and advances their
+   * verdict: `false` only when a feed round trip actually failed (a
+   * network/timeout error), `true` when a request reached the server, and
+   * `undefined` when the pass simply had nothing to do (no chosen org, no
+   * scope) - a no-op is neither, so it must not park the queue (G506-be-3).
+   * A consumer backoff is not a failure: it either follows a refused resync (a
+   * round trip that reached the server) or skips the request inside the
+   * consumer's own retry window, so it reports the device online and leaves the
+   * `resync_failed` condition visible in the header (B47 / UNI-1362). It
+   * dispatches the pending intents and advances their
    * reconciling clocks. Awaited, so a slow dispatch cannot overlap the next pass.
    */
   onPoll?(online: boolean | undefined): Promise<void>
@@ -594,8 +598,14 @@ export class SyncRuntime {
         const result = await consumer.sync()
         if (!current()) return
         if (result.kind === 'session_expired') sessionExpired = true
-        // a failed or backed-off feed round trip is a real transport failure
-        if (result.kind === 'failed' || result.kind === 'backoff') transportFailed = true
+        // B47 (UNI-1362): only a round trip that actually FAILED is a transport
+        // failure. A consumer backoff is a scheduling state, not evidence of an
+        // offline device: either the server refused the resync - a round trip
+        // that did reach the server - or the consumer skipped the request inside
+        // its own retry window. Counting it as a failure parked the queue
+        // offline and let the header's `offline` (prio 5) mask `resync_failed`
+        // (prio 7), hiding the state the person has to see and act on.
+        if (result.kind === 'failed') transportFailed = true
         if (result.kind === 'synced' && result.resynced) resynced = true
       }
     }

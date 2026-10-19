@@ -1177,9 +1177,12 @@ function remoteNoticeKey(status: UniworkDocStatus | null): string | null {
 interface RemoteSay {
   key: StringKey
   params: Record<string, string | number>
-  assertive: boolean
+  /** a fresh key per announcement, so the live node mounts a new child each time */
   n: number
 }
+
+/** how long an assertive sentence stays in the alert node before it clears (EXPERIENCE: ~1 s) */
+export const REMOTE_BAR_ALERT_MS = 1_000
 
 /**
  * The bar under the tab strip for the ACTIVE tab's document (one bar, never stacked; a second
@@ -1233,6 +1236,11 @@ export function UniworkRemoteBar({
   const [focused, setFocused] = useState(false)
   const [busy, setBusy] = useState(false)
   const [say, setSay] = useState<RemoteSay | null>(null)
+  const [alertSay, setAlertSay] = useState<RemoteSay | null>(null)
+  // assertive sentences wait here while another is on screen (two events inside the
+  // ~1 s window must both be said, not overwritten)
+  const pendingAlerts = useRef<RemoteSay[]>([])
+  const saySeq = useRef(0)
   const [lockSay, setLockSay] = useState<{ text: string; n: number } | null>(null)
   const [lockFailedSign, setLockFailedSign] = useState<string | null>(null)
   const stackRef = useRef<HTMLDivElement>(null)
@@ -1246,6 +1254,13 @@ export function UniworkRemoteBar({
   const act = useCallback(
     (kind: RemoteBarAction['kind']) => {
       if (!status) return
+      if (kind === 'open-center') {
+        // renderer-local action: the same uniwork:open-settings event the queue popover sends
+        window.dispatchEvent(
+          new CustomEvent('uniwork:open-settings', { detail: { section: 'sync' } }),
+        )
+        return
+      }
       if (kind === 'later' || kind === 'close') hide()
       setBusy(true)
       void window.aiOffice
@@ -1283,17 +1298,30 @@ export function UniworkRemoteBar({
     const current = modelRef.current
     if (!announceKey || !current || path === null || noticeKey === null) {
       setSay(null)
+      pendingAlerts.current = []
+      setAlertSay(null)
       return
     }
     if (announced.current.get(path) === noticeKey) return
     announced.current.set(path, noticeKey)
-    setSay((prev) => ({
-      key: current.messageKey,
-      params: current.params,
-      assertive: current.tone === 'error',
-      n: (prev?.n ?? 0) + 1,
-    }))
-  }, [announceKey, path, noticeKey])
+    const next: RemoteSay = { key: current.messageKey, params: current.params, n: ++saySeq.current }
+    if (current.tone === 'error') {
+      // the alert dwells ~1 s; a second assertive event in that window queues behind it
+      if (alertSay === null) setAlertSay(next)
+      else pendingAlerts.current.push(next)
+    } else {
+      setSay(next)
+    }
+  }, [announceKey, path, noticeKey, alertSay])
+  useEffect(() => {
+    if (alertSay === null) return
+    const timer = window.setTimeout(() => {
+      const [next, ...rest] = pendingAlerts.current
+      pendingAlerts.current = rest
+      setAlertSay(next ?? null)
+    }, REMOTE_BAR_ALERT_MS)
+    return () => window.clearTimeout(timer)
+  }, [alertSay])
 
   // an information bar hides itself unless the pointer or the focus is in it; leaving restarts the 8 s
   const autoHideMs = visible ? model?.autoHideMs : undefined
@@ -1513,10 +1541,10 @@ export function UniworkRemoteBar({
       )}
       {/* window-level live nodes: always in the DOM so a screen reader picks the change up */}
       <span className="uw-sr-only" role="status" aria-live="polite">
-        {say && !say.assertive ? <span key={say.n}>{t(say.key, say.params)}</span> : null}
+        {say ? <span key={say.n}>{t(say.key, say.params)}</span> : null}
       </span>
       <span className="uw-sr-only" role="alert">
-        {say?.assertive ? <span key={say.n}>{t(say.key, say.params)}</span> : null}
+        {alertSay ? <span key={alertSay.n}>{t(alertSay.key, alertSay.params)}</span> : null}
       </span>
       {/* the lock strip's polite reading channel: text only, so phase changes are said once */}
       <span className="uw-sr-only" role="status" aria-live="polite" data-lock-status="">
