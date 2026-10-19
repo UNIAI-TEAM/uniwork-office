@@ -13370,13 +13370,13 @@ tr > .page-gap-cut {
   }
 
   /* the scrolling tab row clips an absolute menu below it (overflow-x: auto makes overflow-y
-     auto too), so the File menu leaves the row's paint: fixed, with no offsets it keeps the
-     static position just under the File tab and no overflow ancestor clips it */
+     auto too), so the File menu leaves the row's paint: fixed. A fixed box ignores the row's
+     scroll offset, so Ribbon sets left/top from the File tab's measured rectangle
+     (file-menu-anchor.ts); auto is only the pre-measure fallback */
   .ribbon-tabs .file-menu {
     position: fixed;
     top: auto;
     left: auto;
-    margin-top: 2px;
     max-width: calc(100vw - 16px);
   }
 }

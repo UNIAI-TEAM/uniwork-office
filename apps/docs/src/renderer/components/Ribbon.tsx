@@ -131,6 +131,7 @@ import {
 import { RibbonColorPalette } from './ribbon-color-palette'
 import { HeaderFooterTab, type HfAction, type HfEditingInfo } from './ribbon-hf-tab'
 import { PasteSpecialDialog } from './PasteSpecialDialog'
+import { FILE_MENU_FIXED_QUERY, fileMenuAnchor } from './file-menu-anchor'
 import { cap } from '../capabilities'
 import { fontFamiliesFor, isEastAsianFontName, systemFamiliesBesidesCandidates } from '../font-list'
 import {
@@ -835,6 +836,23 @@ function RibbonInner({
   const docEmpty = !hasDoc || fs.docEmpty
   const [tab, setTab] = useState<RibbonTab>('home')
   const [dropdown, setDropdown] = useState<string | null>(null)
+  // phone width: the tab row scrolls and the File menu is fixed (styles.css); anchor it from the
+  // File tab's measured rectangle, since a fixed box ignores the row's scroll offset
+  const fileMenuRef = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const menu = fileMenuRef.current
+    if (dropdown !== 'file' || !menu || !window.matchMedia?.(FILE_MENU_FIXED_QUERY).matches) return
+    const tab = menu.parentElement?.querySelector('.ribbon-tab-file')
+    if (!tab) return
+    menu.style.left = '0px' // measure the natural width, not one squeezed by a far-right start
+    const { left, top } = fileMenuAnchor(
+      tab.getBoundingClientRect(),
+      menu.offsetWidth,
+      window.innerWidth,
+    )
+    menu.style.left = `${left}px`
+    menu.style.top = `${top}px`
+  }, [dropdown])
   // null = Automatic: the pen button clears the run colour instead of writing one
   const [penColor, setPenColor] = useState<string | null>('FF0000')
   const [penHighlight, setPenHighlight] = useState('yellow')
@@ -2012,8 +2030,8 @@ function RibbonInner({
       <div
         className={`ribbon-tabs ${IN_TAB ? '' : IS_MAC ? 'ribbon-tabs-mac' : 'ribbon-tabs-win'}`}
         onDoubleClick={collapse.onTabsDoubleClick}
-        // phone width: the tab row scrolls and the File menu is positioned from where the File
-        // tab was when it opened; scrolling the row moves the tab away, so the menu closes
+        // phone width: the File menu is anchored from where the File tab was when it opened;
+        // scrolling the row moves the tab away, so the menu closes
         onScroll={() => setDropdown((v) => (v === 'file' ? null : v))}
       >
         {!IS_MAC && (
@@ -2025,7 +2043,7 @@ function RibbonInner({
               {t('ribbonTabFile')}
             </button>
             {dropdown === 'file' && (
-              <div data-rb-panel="" className="file-menu">
+              <div data-rb-panel="" className="file-menu" ref={fileMenuRef}>
                 {cap('open') && (
                   <button
                     onClick={() => {
