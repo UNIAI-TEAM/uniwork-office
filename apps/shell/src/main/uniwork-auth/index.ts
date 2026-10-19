@@ -674,13 +674,14 @@ export function registerAccountIpc(
   })
   ipcMain.handle(HOME_CHANNELS.accountRetry, (event) => account(event.sender).retry())
   ipcMain.handle(HOME_CHANNELS.accountReplaceLockedSignIn, (event) => {
-    const current = account(event.sender)
     // replaces the saved sign-in, so only the shell's own page (Settings >
     // Account) may ask; the manager itself refuses unless keystore-locked
-    // after a failed Retry
+    // after a failed Retry. The frame is validated BEFORE `account(...)`, so a
+    // refused sender is not registered for account-status pushes either.
     const fromShell =
       event.sender === shellContents() && event.senderFrame === event.sender.mainFrame
-    return fromShell ? current.replaceLockedSignIn() : false
+    if (!fromShell) return false
+    return account(event.sender).replaceLockedSignIn()
   })
   ipcMain.handle(HOME_CHANNELS.uniworkCloudStatus, (event) => {
     account(event.sender)

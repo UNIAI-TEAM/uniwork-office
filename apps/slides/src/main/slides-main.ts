@@ -268,6 +268,21 @@ export function trackSlidesWebContents(wc: WebContents): void {
     if (s && !sessionDirty(s)) dropUntitledRecovery(wc.id)
     else untitledRecovery.delete(wc.id)
     sessions.delete(wc.id)
+    // A82 (UNI-1362): a closed deck whose path no live session holds any more
+    // has nothing left for its sweep mark to protect, so drop it here instead
+    // of keeping it until the next autosave tick's prune. An aliased session
+    // (another view of the same deck) keeps the mark.
+    if (s?.path) {
+      const key = recoveryEpochKey(s.path)
+      let live = false
+      for (const open of sessions.values()) {
+        if (open.path && recoveryEpochKey(open.path) === key) {
+          live = true
+          break
+        }
+      }
+      if (!live) sweptRecoveryPaths.delete(key)
+    }
     pendingByWc.delete(wc.id)
     reloadingByWc.delete(wc.id)
     forgetClient(wc.id)
