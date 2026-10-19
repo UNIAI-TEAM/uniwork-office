@@ -719,6 +719,8 @@ export default function App() {
   }, [getMap])
   useEffect(postMarks, [editQueue, canvasMode, postMarks])
 
+  // runPrint is declared further down; the inspector's relayed mod+P reaches it through this ref
+  const runPrintRef = useRef<() => Promise<boolean>>(async () => false)
   const onInspectorMessage = useCallback(
     (msg: FromInspector) => {
       // a click that lands while the frame is reloading carries sids from the previous copy
@@ -727,6 +729,12 @@ export default function App() {
         case 'gx:ready': {
           previewRef.current?.post({ type: 'gx:theme', dark: isDarkTheme() })
           previewRef.current?.post({ type: 'gx:setMode', mode: frameMode(canvasModeRef.current) })
+          // web (UNI-1919): a mod+P inside the preview never reaches the frame's print
+          // accelerator, so the inspector relays it; desktop keeps the shell menu's accelerator
+          previewRef.current?.post({
+            type: 'gx:printKey',
+            claim: !!window.htmlApi.connectPreview && cap('print'),
+          })
           // an edit reloaded the page under the reader: put it back where it was before selecting
           if (frameScrollRef.current !== null)
             previewRef.current?.post({ type: 'gx:scrollTo', y: frameScrollRef.current })
@@ -831,6 +839,10 @@ export default function App() {
           if (canvasModeRef.current !== 'present') setZoom((z) => clampZoom(z - msg.delta * 0.6))
           return
         case 'gx:keyCommand': {
+          if (msg.command === 'print') {
+            void runPrintRef.current()
+            return
+          }
           if (canvasModeRef.current === 'present') {
             if (msg.command === 'escape') setCanvasModeState('edit')
             return
@@ -1400,6 +1412,7 @@ export default function App() {
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t is not referentially stable
   }, [])
+  runPrintRef.current = runPrint
 
   // Headless export mode (--headless-export): this renderer lives in a hidden
   // window whose only job is to run the File menu's PDF or Word export against

@@ -180,6 +180,7 @@ const KEY_COMMANDS = new Set([
   'zoomReset',
   'moveUp',
   'moveDown',
+  'print',
 ])
 
 function body(type: string, m: Obj): FromInspectorBody | undefined {

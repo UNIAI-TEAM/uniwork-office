@@ -104,4 +104,42 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
       { type: 'gx:keyCommand', command: 'escape', version: 1 },
     ])
   })
+
+  // UNI-1919 (RR2D-4): mod+P inside the preview never reaches the host window; the host claims it
+  // with gx:printKey only where its print path runs, else the browser keeps its default
+  it('relays mod+P as the print command once the host claims it, even during a text edit', () => {
+    const { dom, messages, send } = makePreview()
+    const pressP = (init: KeyboardEventInit = {}) => {
+      const ev = new dom.window.KeyboardEvent('keydown', {
+        key: 'p',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+        ...init,
+      })
+      dom.window.document.body.dispatchEvent(ev)
+      return ev.defaultPrevented
+    }
+    expect(pressP()).toBe(false)
+    expect(messages).toEqual([])
+
+    send({ type: 'gx:printKey', claim: true })
+    send({ type: 'gx:beginTextEdit', sid: 1 })
+    messages.length = 0
+    expect(pressP()).toBe(true)
+    expect(pressP({ key: 'P', ctrlKey: false, metaKey: true })).toBe(true)
+    expect(messages).toEqual([
+      { type: 'gx:keyCommand', command: 'print', version: 1 },
+      { type: 'gx:keyCommand', command: 'print', version: 1 },
+    ])
+    // autorepeat, Shift or Alt variants stay the browser's
+    expect(pressP({ repeat: true })).toBe(false)
+    expect(pressP({ shiftKey: true })).toBe(false)
+    expect(pressP({ altKey: true })).toBe(false)
+    expect(messages).toHaveLength(2)
+
+    send({ type: 'gx:printKey', claim: false })
+    expect(pressP()).toBe(false)
+    expect(messages).toHaveLength(2)
+  })
 })
