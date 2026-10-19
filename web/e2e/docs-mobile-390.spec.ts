@@ -1,7 +1,8 @@
 // UNI-1931 (MOBILE-390-DOCS): the Docs frame at phone width in the protocol test host.
 //  - SVF-1: the File menu paints and takes presses at 390 (the tab row is a scroller there; the menu
-//    must not be clipped by it), editable and view-only; 1280 keeps the menu under the File tab
-//  - SVF-2: a status message (a failed save) stays visible in the status bar at 390
+//    must not be clipped by it, also with the row scrolled sideways), editable and view-only;
+//    1280 keeps the menu under the File tab
+//  - SVF-2: a status message (a failed save) shows as an auto-hiding toast above the status bar at 390
 //  - SVF-3: the print dialog keeps a usable preview and a one-line pager at 390
 // (the no-document Ctrl+P message is covered by a vitest unit test: the test host always opens a document)
 import { test, expect, type Frame, type Page } from '@playwright/test'
@@ -82,27 +83,98 @@ for (const [name, query] of [
   })
 }
 
-test('docs-mobile-390: a status message stays visible', async ({ page }) => {
+for (const [name, query] of [
+  ['editable', ''],
+  ['view-only', '&readonly=1'],
+] as const) {
+  test(`docs-mobile-390: File menu holds with the tab row scrolled sideways (${name})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(narrow)
+    const ed = await openDoc(page, query)
+    const scrolled = await ed.evaluate(() => {
+      const row = document.querySelector('.ribbon-tabs') as HTMLElement
+      row.scrollLeft = 30
+      return row.scrollLeft
+    })
+    expect(scrolled).toBeGreaterThan(0)
+    // press the File tab itself (a DOM click: Playwright would scroll the row back first)
+    await ed.evaluate(() => (document.querySelector('.ribbon-tab-file') as HTMLElement).click())
+    await expect(ed.locator('.file-menu')).toBeVisible()
+    const geo = await ed.evaluate(() => {
+      const m = document.querySelector('.file-menu')!.getBoundingClientRect()
+      const tab = document.querySelector('.ribbon-tab-file')!.getBoundingClientRect()
+      return { menuTop: m.top, menuLeft: m.left, tabBottom: tab.bottom, tabLeft: tab.left }
+    })
+    // painted under the File tab where it now is, and hit-testable
+    expect(geo.menuTop).toBeGreaterThanOrEqual(geo.tabBottom - 1)
+    expect(Math.abs(geo.menuLeft - geo.tabLeft)).toBeLessThanOrEqual(2)
+    const items = await hitTestMenu(ed)
+    expect(items.length).toBeGreaterThan(0)
+    expect(items[0], items[0]!.label).toEqual({
+      label: items[0]!.label,
+      inViewport: true,
+      hitInMenu: true,
+    })
+
+    // scrolling the row afterwards never leaves a menu floating away from its tab
+    await ed.evaluate(() => {
+      ;(document.querySelector('.ribbon-tabs') as HTMLElement).scrollLeft = 80
+    })
+    await page.waitForTimeout(200)
+    if ((await ed.locator('.file-menu').count()) > 0) {
+      const after = await ed.evaluate(() => {
+        const m = document.querySelector('.file-menu')!.getBoundingClientRect()
+        const tab = document.querySelector('.ribbon-tab-file')!.getBoundingClientRect()
+        return { menuLeft: m.left, tabLeft: tab.left }
+      })
+      expect(Math.abs(after.menuLeft - after.tabLeft)).toBeLessThanOrEqual(2)
+    }
+    // scrolled back, the File tab opens the menu again
+    await ed.evaluate(() => {
+      ;(document.querySelector('.ribbon-tabs') as HTMLElement).scrollLeft = 0
+    })
+    await ed.locator('.ribbon-tab-file').click()
+    await expect(ed.locator('.file-menu')).toBeVisible()
+    for (const item of await hitTestMenu(ed)) expect(item.hitInMenu, item.label).toBe(true)
+  })
+}
+
+test('docs-mobile-390: a status message shows as a toast above the status bar', async ({
+  page,
+}) => {
   await page.setViewportSize(narrow)
   const ed = await openDoc(page)
   const editor = ed.locator('.ProseMirror').first()
   await editor.getByText(TEXT, { exact: false }).first().click()
+  const pageBefore = await ed.locator('.status-page').boundingBox()
   await page.evaluate(() => (window as any).__host.failNextSave())
   await page.keyboard.press('Control+s')
   await expect
     .poll(() => page.evaluate(() => (window as any).__host.saveCalls()), { timeout: 15_000 })
     .toBeGreaterThanOrEqual(1)
-  const msg = ed.locator('.status-bar .status-msg')
-  await expect(msg).toBeVisible()
-  await expect(msg).toContainText(/save failed/i)
-  const box = await msg.boundingBox()
-  const vp = await ed.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))
+  // the bar keeps its row (no message squeezed in), the message is raised as a toast
+  await expect(ed.locator('.status-bar .status-msg')).toBeHidden()
+  const toast = ed.locator('.app-toast.show')
+  await expect(toast).toBeVisible()
+  await expect(toast).toContainText(/save failed/i)
+  const box = await toast.boundingBox()
+  const geo = await ed.evaluate(() => ({
+    w: window.innerWidth,
+    h: window.innerHeight,
+    barTop: document.querySelector('.status-bar')!.getBoundingClientRect().top,
+  }))
   expect(box!.width).toBeGreaterThan(0)
   expect(box!.height).toBeGreaterThan(0)
   expect(box!.x).toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(geo.w + 1)
   expect(box!.y).toBeGreaterThanOrEqual(0)
-  expect(box!.x + box!.width).toBeLessThanOrEqual(vp.w + 1)
-  expect(box!.y + box!.height).toBeLessThanOrEqual(vp.h + 1)
+  // above the status bar, not over the page counter
+  expect(box!.y + box!.height).toBeLessThanOrEqual(geo.barTop + 1)
+  const pageAfter = await ed.locator('.status-page').boundingBox()
+  expect(pageAfter).toEqual(pageBefore)
+  // it goes away by itself
+  await expect(ed.locator('.app-toast')).toHaveCount(0, { timeout: 10_000 })
 })
 
 test('docs-mobile-390: print dialog keeps a usable preview and a one-line pager', async ({
