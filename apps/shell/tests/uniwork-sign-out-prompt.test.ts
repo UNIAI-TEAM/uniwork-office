@@ -647,10 +647,10 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     })
     await flush()
     const expectedEn =
-      'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.'
+      'Couldn’t keep some unsaved changes in time; the latest saved or autosaved version is kept for your account.'
     expect(syncEn.uwSignOutCaptureFailed).toBe(expectedEn)
     expect(syncVi.uwSignOutCaptureFailed).toBe(
-      'Một số thay đổi chưa lưu kịp; bản lưu hoặc tự lưu gần nhất được giữ cho tài khoản của bạn.',
+      'Chưa giữ kịp một số thay đổi chưa lưu; bản lưu hoặc tự lưu gần nhất vẫn được giữ cho tài khoản của bạn.',
     )
     expect(pane()?.textContent ?? '').not.toContain(expectedEn)
 
@@ -853,7 +853,7 @@ describe('Settings → Account sign-out prompt (S3)', () => {
 
       // Notice is shown after captureFailed: 1
       const expectedEn =
-        'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.'
+        'Couldn’t keep some unsaved changes in time; the latest saved or autosaved version is kept for your account.'
       expect(pane()?.textContent ?? '').toContain(expectedEn)
 
       // Open a new prompt before the 40s mark and advance past 40s -> neither clobbered nor refreshed

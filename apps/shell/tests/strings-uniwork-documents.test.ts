@@ -138,10 +138,10 @@ describe('uniwork documents string shards', () => {
     expect(uniworkDocumentStrings.en.uwChipViewOnly).toBe('View only')
     expect(uniworkDocumentStrings.vi.uwChipViewOnly).toBe('Chỉ xem')
     expect(uniworkDocumentStrings.en.uwPickHiddenFormats).toBe(
-      'Hidden because UniWork Office cannot open their format: {count}',
+      'Hid {count} items in formats UniWork Office can’t open',
     )
     expect(uniworkDocumentStrings.vi.uwPickHiddenFormats).toBe(
-      'Đã ẩn vì UniWork Office chưa mở được định dạng: {count}',
+      'Đã ẩn {count} mục vì UniWork Office chưa hỗ trợ định dạng này',
     )
     expect(uniworkDocumentStrings.en.uwErrTicketExpired).toBe(
       'This link expired. Open the document again from UniWork.',
