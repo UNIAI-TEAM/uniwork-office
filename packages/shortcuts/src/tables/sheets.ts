@@ -1151,22 +1151,7 @@ export const sheetsNotes: readonly ShortcutNote[] = [
  * apps/sheets picks the sub-action from the chord that matched (see
  * `isSecondSubAction` in apps/sheets/src/renderer/sheets-keymap.ts).
  *
- * Rows apps/sheets leaves unbound (UNI-2011 S-sheets; no key handler, so a chord
- * listed here or in `sheetsUnmapped` is not a working shortcut yet):
- * - sheets-41 Ctrl+Shift+PgDn/PgUp (multi-select tabs), sheets-59 F8 / Shift+F8
- *   (extend selection mode), sheets-85 F6 cycle panes, sheets-84 ribbon key tips:
- *   the app has no command behind them
- * - sheets-57 Ctrl+' / Ctrl+Shift+" (copy from the cell above): no command, and the
- *   quote chords are layout-dependent
- * - sheets-60 Shift+F10 / Menu key: the context menu opens from the pointer only
- * - sheets-58 F7 spell check, sheets-86 F1 / Cmd+/ help: in the table but nothing
- *   listens
- * - sheets-46 chart: F11 clashes with Electron's fullscreen role, Alt+F1 is web only
- *   in the table and not wired
- * - sheets-83 ribbon collapse: owned by the shared useRibbonCollapse hook (packages/ui)
- * - sheets-87 zoom Ctrl+Alt+= / Ctrl+Alt+-: Ctrl+Alt is AltGr on many layouts, and
- *   Univer keeps Ctrl+= / the wheel
- * - sheets-43 Excel for Mac's Shift+F5 Find: not added; Cmd+F stays Univer's
+ * Rows apps/sheets leaves unbound are listed in `sheetsManualUnmapped` below.
  */
 const manual: readonly ShortcutAction[] = [
   // Cut / Copy / Paste: Univer and the browser clipboard own the keys; the row is the one
@@ -1639,5 +1624,69 @@ export const sheetsShortcuts: readonly ShortcutAction[] = mergeRows(generated, m
 
 /** Why a manual row has no chord on a surface or platform, and remarks on manual rows:
  * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */
-export const sheetsManualUnmapped: readonly UnmappedShortcut[] = []
+export const sheetsManualUnmapped: readonly UnmappedShortcut[] = [
+  {
+    id: 'sheets-41',
+    part: 'row',
+    reason: 'no command behind the key in apps/sheets (multi-select sheet tabs)',
+  },
+  {
+    id: 'sheets-57',
+    part: 'row',
+    reason:
+      'no command behind the key in apps/sheets (copy from the cell above), and the quote chords depend on the layout',
+  },
+  {
+    id: 'sheets-58',
+    part: 'row',
+    reason: 'F7 spell check: the key is in the table, but no spell-check command listens',
+  },
+  {
+    id: 'sheets-59',
+    part: 'row',
+    reason: 'no command behind the key in apps/sheets (extend selection mode, F8 / Shift+F8)',
+  },
+  {
+    id: 'sheets-60',
+    part: 'row',
+    reason: 'the context menu opens from the pointer only, so Shift+F10 / Menu key is not wired',
+  },
+  {
+    id: 'sheets-84',
+    part: 'row',
+    reason: 'no command behind the key in apps/sheets (ribbon key tips)',
+  },
+  {
+    id: 'sheets-85',
+    part: 'row',
+    reason: 'no command behind the key in apps/sheets (cycle panes, F6)',
+  },
+  {
+    id: 'sheets-86',
+    part: 'desktop.win',
+    reason: 'F1 help: the key is in the table, but nothing listens',
+  },
+  {
+    id: 'sheets-86',
+    part: 'desktop.mac',
+    reason: 'F1 / Cmd+/ help: the keys are in the table, but nothing listens',
+  },
+  {
+    id: 'sheets-87',
+    part: 'row',
+    reason:
+      'zoom stays on Univer (Ctrl+= and the wheel); Ctrl+Alt+= / Ctrl+Alt+- is AltGr on many layouts',
+  },
+  {
+    id: 'sheets-46',
+    part: 'web.win',
+    reason:
+      'Alt+F1 chart is in the table, but no chart command is bound to it; F11 clashes with the Electron fullscreen role on desktop',
+  },
+  {
+    id: 'sheets-43',
+    part: 'desktop.mac',
+    reason: "Excel for Mac's Shift+F5 Find is not added; Cmd+F stays Univer's",
+  },
+]
 export const sheetsManualNotes: readonly ShortcutNote[] = []
