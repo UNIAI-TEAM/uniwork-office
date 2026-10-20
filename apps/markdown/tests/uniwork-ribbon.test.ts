@@ -100,7 +100,7 @@ describe('Ribbon on a UniWork copy', () => {
     const find = container.querySelector<HTMLButtonElement>(
       '.ribbon-tabs button[aria-label^="查找和替换"]',
     )!
-    // a label may end with the table's key hint, e.g. "源码 (Ctrl+E)"
+    // a label may end with the table's key hint, e.g. "Source (Ctrl+E)"
     const body = (label: string) =>
       container.querySelector<HTMLButtonElement>(
         `button[aria-label="${label}"], button[aria-label^="${label} ("]`,
