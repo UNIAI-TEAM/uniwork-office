@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -744,6 +744,51 @@ describe('the document sources IPC (UNI-1961)', () => {
         'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/meeting%3Asrc_1/download',
         'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/email%3Asrc_1/download',
       ])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('cancels an oversized streamed source download at the cap and leaves an existing destination unchanged (R1-4, R1-12)', async () => {
+    const { handlers } = await setup()
+    const target = join(dir, 'existing.docx')
+    writeFileSync(target, new Uint8Array([1, 2, 3]))
+    dialogs.save = { canceled: false, filePath: target }
+    const chunk = new Uint8Array(16 * 1024 * 1024)
+    let pulls = 0
+    let cancelled = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        const body = new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              pulls += 1
+              if (pulls > 20) {
+                controller.close()
+                return
+              }
+              controller.enqueue(chunk)
+            },
+            cancel() {
+              cancelled = true
+            },
+          },
+          { highWaterMark: 0 },
+        )
+        return new Response(body, { status: 200 })
+      }),
+    )
+    try {
+      const res = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(res).toEqual({ ok: false, error: 'too_large' })
+      expect(cancelled).toBe(true)
+      expect(pulls).toBe(17)
+      expect([...readFileSync(target)]).toEqual([1, 2, 3])
     } finally {
       vi.unstubAllGlobals()
     }

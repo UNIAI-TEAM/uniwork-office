@@ -1189,6 +1189,54 @@ describe('document sources (UNI-1961)', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('enforces the 256 MiB source download cap incrementally and cancels oversized streams at the crossing (R1-4, R1-12, R1-15)', async () => {
+    const maxBytes = 256 * 1024 * 1024
+    let declaredPulls = 0
+    const declaredApi = client(async () => {
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            declaredPulls += 1
+            controller.enqueue(new Uint8Array(1024))
+          },
+        },
+        { highWaterMark: 0 },
+      )
+      return new Response(body, {
+        status: 200,
+        headers: { 'Content-Length': String(maxBytes + 1) },
+      })
+    })
+    expect(await codeOf(declaredApi.downloadSource('ws_1', 'task:att_1'))).toBe('too_large')
+    expect(declaredPulls).toBe(0)
+
+    const chunk = new Uint8Array(16 * 1024 * 1024)
+    let pulls = 0
+    let cancelled = false
+    const streamApi = client(async () => {
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            pulls += 1
+            if (pulls > 20) {
+              controller.close()
+              return
+            }
+            controller.enqueue(chunk)
+          },
+          cancel() {
+            cancelled = true
+          },
+        },
+        { highWaterMark: 0 },
+      )
+      return new Response(body, { status: 200 })
+    })
+    expect(await codeOf(streamApi.downloadSource('ws_1', 'task:att_1'))).toBe('too_large')
+    expect(cancelled).toBe(true)
+    expect(pulls).toBe(17)
+  })
+
   it('rejects shelve and unshelve responses whose document id does not match the requested id (R1-9)', async () => {
     const api = client(async () =>
       json(200, {
