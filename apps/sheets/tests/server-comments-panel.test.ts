@@ -777,3 +777,84 @@ describe('the anchor store follows a reopen that is not a Save (FE13-4)', () => 
     expect(serverAnchorStore.hasMarker('sheet-2', 6, 1)).toBe(true)
   })
 })
+
+describe('server mode: reveal focus guard against the editor refocus', () => {
+  let univer: HTMLDivElement
+  let editor: HTMLDivElement
+
+  beforeEach(() => {
+    // stands in for Univer's hidden cell editor, which takes focus back shortly after a selection
+    univer = document.createElement('div')
+    univer.id = 'univer-container'
+    editor = document.createElement('div')
+    editor.tabIndex = 0
+    univer.append(editor)
+    document.body.append(univer)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    univer.remove()
+  })
+
+  async function revealed() {
+    const server = fakeServer()
+    const c = server.add({
+      body: 'Look here',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+      anchor_state: 'exact',
+    })
+    await mount(server, fakeView().view)
+    expect(await server.reveal(c.id)).toEqual([true])
+    const heading = el.querySelector<HTMLElement>(
+      `[data-thread-id="${c.id}"] [data-thread-heading]`,
+    )!
+    expect(document.activeElement).toBe(heading)
+    return { heading, server, c }
+  }
+
+  it('gives focus back to the thread heading when the sheet editor takes it after the reveal', async () => {
+    const { heading } = await revealed()
+    act(() => editor.focus())
+    expect(document.activeElement).toBe(heading)
+  })
+
+  it('stops guarding at the first user pointer / key / wheel input', async () => {
+    for (const type of ['pointerdown', 'keydown', 'wheel']) {
+      act(() => root.unmount())
+      root = createRoot(el)
+      const { heading } = await revealed()
+      act(() => void document.dispatchEvent(new Event(type, { bubbles: true })))
+      act(() => editor.focus())
+      expect(document.activeElement, type).toBe(editor)
+      act(() => heading.focus())
+    }
+  })
+
+  it('stops guarding after about 1.5 s', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { heading } = await revealed()
+    act(() => void vi.advanceTimersByTime(1600))
+    act(() => editor.focus())
+    expect(document.activeElement).not.toBe(heading)
+    expect(document.activeElement).toBe(editor)
+  })
+
+  it('leaves focus alone when the thread heading is gone (panel closed)', async () => {
+    await revealed()
+    act(() => threadPane.close())
+    await flush()
+    act(() => editor.focus())
+    expect(document.activeElement).toBe(editor)
+  })
+
+  it('does not steal focus from anything outside the sheet editor', async () => {
+    const { heading } = await revealed()
+    const other = document.createElement('input')
+    document.body.append(other)
+    act(() => other.focus())
+    expect(document.activeElement).toBe(other)
+    other.remove()
+    act(() => heading.focus())
+  })
+})
