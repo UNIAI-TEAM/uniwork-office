@@ -40,6 +40,7 @@ interface Row {
   revision: number
   anchor: Record<string, unknown> | null
   anchor_state: string | null
+  anchor_version_id?: string | null
   resolved_at: string | null
   deleted_at: string | null
   created_at: string
@@ -425,6 +426,80 @@ describe('server mode: anchors after Save', () => {
     expect(sent.versionId).toBe('v2')
     expect(sent.anchors.map((a) => a.commentId).sort()).toEqual([first.id, later.id].sort())
     expect(sent.anchors.every((a) => a.state === 'exact')).toBe(true)
+  })
+
+  it('a comment made on the opened version after the first list, then a row insert above it, panel closed: B8 (G819-A02c)', async () => {
+    const server = fakeServer()
+    await mount(server)
+    // the other host comments on the opened version v1 after this editor listed
+    const later = server.add({
+      body: 'from the other host',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+      anchor_state: 'exact',
+      anchor_version_id: 'v1',
+    })
+    // the desktop then inserts a row above B7; nothing lists in between
+    act(() =>
+      serverAnchorStore.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 1 }),
+    )
+    await server.saved('v2')
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    expect(server.calls.anchors.mock.calls[0]![0]).toEqual({
+      path: PATH,
+      versionId: 'v2',
+      anchors: [
+        {
+          commentId: later.id,
+          anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B8' },
+          state: 'exact',
+        },
+      ],
+    })
+  })
+
+  it('a comment on a version the editor never held goes out as listed (G819-A02c)', async () => {
+    const server = fakeServer()
+    await mount(server)
+    const foreign = server.add({
+      body: 'made on a newer version',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+      anchor_state: 'exact',
+      anchor_version_id: 'v-newer',
+    })
+    act(() =>
+      serverAnchorStore.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 1 }),
+    )
+    await server.saved('v2')
+    expect(server.calls.anchors.mock.calls[0]![0].anchors).toEqual([
+      {
+        commentId: foreign.id,
+        anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+        state: 'exact',
+      },
+    ])
+  })
+
+  it('a comment this editor makes after a row insert is not shifted again at the Save (G819-A02c)', async () => {
+    const server = fakeServer()
+    const { view, state } = fakeView()
+    state.active = 'sheet-2'
+    await mount(server, view)
+    act(() =>
+      serverAnchorStore.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 1 }),
+    )
+    // the user selects B8 (live, after the insert) and comments there; the server stores it on v1
+    state.selection = { sheetId: 'sheet-2', range: cell(7, 1) }
+    await act(async () => serverComments.handle!.startThread())
+    await flush()
+    await typeAndSend(el.querySelector<HTMLTextAreaElement>('.collab-thread--new textarea')!, 'B8')
+    await server.saved('v2')
+    expect(server.calls.anchors.mock.calls[0]![0].anchors).toEqual([
+      {
+        commentId: server.rows[0]!.id,
+        anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B8' },
+        state: 'exact',
+      },
+    ])
   })
 
   it('server comments never touch the thread store (the file parts stay byte-identical)', async () => {
