@@ -74,6 +74,7 @@ export const STREAM_CEILING_MS = 60 * 60_000
 /** the server stages at most 50 MiB per upload; a download far past that is refused */
 const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 const ID = /^[A-Za-z0-9_-]{1,128}$/
+const SOURCE_ID = /^(?:chat|task|meeting|email):[A-Za-z0-9_-]{1,64}$/
 
 export interface UniworkDocsClientOptions {
   /** normalized deployment origin (no trailing slash), validated by the profile */
@@ -428,6 +429,12 @@ export function uniworkId(value: string): string {
   return encodeURIComponent(value)
 }
 const id = uniworkId
+
+/** a compound `<source>:<rowId>` segment the sources routes issue (document_sources.go:352-355) */
+export function uniworkSourceId(value: string): string {
+  if (typeof value !== 'string' || !SOURCE_ID.test(value)) throw new UniworkDocError('not_found')
+  return encodeURIComponent(value)
+}
 
 /** UNI-1961: the sources list's filter values (D sources-schema.ts); anything else is not sent */
 const SOURCE_KINDS: ReadonlySet<string> = new Set(['chat', 'task', 'meeting', 'email'])
@@ -784,7 +791,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     async downloadSource(workspaceId, sourceId) {
       return send({
         method: 'GET',
-        route: `/workspaces/${id(workspaceId)}/documents/sources/${id(sourceId)}/download`,
+        route: `/workspaces/${id(workspaceId)}/documents/sources/${uniworkSourceId(sourceId)}/download`,
         timeoutMs: transferTimeout,
         async read(response) {
           const length = Number(response.headers.get('Content-Length') ?? '0')
@@ -1084,7 +1091,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         timeoutMs: metadataTimeout,
         read: json,
       })
-      return parseDocumentShelveResult(raw)
+      const res = parseDocumentShelveResult(raw)
+      if (res.document.id !== documentId) throw new UniworkDocError('malformed_response')
+      return res
     },
 
     async shelve(documentId, idempotencyKey) {
@@ -1095,7 +1104,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         timeoutMs: metadataTimeout,
         read: json,
       })
-      return parseDocumentShelveResult(raw)
+      const res = parseDocumentShelveResult(raw)
+      if (res.document.id !== documentId) throw new UniworkDocError('malformed_response')
+      return res
     },
 
     async listOrgMembers(input) {

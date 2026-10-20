@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
 import { open, readdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
   SignOutPlan,
@@ -87,6 +87,7 @@ import {
   type UniworkDocsClient,
   createUniworkDocsClient,
   uniworkId,
+  uniworkSourceId,
 } from './client'
 import {
   createUniworkEditLockClient,
@@ -587,7 +588,11 @@ function sourceFileName(name: unknown): string {
   const last = typeof name === 'string' ? (name.split(/[\\/]/).pop() ?? '') : ''
   // eslint-disable-next-line no-control-regex -- a file name never carries control characters
   const clean = last.replace(/[<>:"|?*\u0000-\u001f]/g, '').trim()
-  return clean && clean !== '.' && clean !== '..' ? clean.slice(0, 200) : 'download'
+  if (!clean || clean === '.' || clean === '..') return 'download'
+  if (clean.length <= 200) return clean
+  const rawExt = extname(clean)
+  const ext = rawExt.length > 1 && rawExt.length <= 32 ? rawExt : ''
+  return `${clean.slice(0, 200 - ext.length)}${ext}`
 }
 
 async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
@@ -6628,7 +6633,7 @@ export class UniworkDocsService {
       }
       // refused ids never open the dialog
       uniworkId(input.workspaceId)
-      uniworkId(input.sourceId)
+      uniworkSourceId(input.sourceId)
       const target = (await this.deps.pickDownloadPath?.(sourceFileName(input.name))) ?? null
       if (!target) return { path: null }
       // A106 (UNI-1362): the working-copy root is the app's own folder
