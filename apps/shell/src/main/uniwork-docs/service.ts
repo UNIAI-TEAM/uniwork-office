@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { open, readdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
-import { createHash, randomUUID } from 'node:crypto'
+import { lstat, open, readdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
@@ -593,6 +593,22 @@ function sourceFileName(name: unknown): string {
   const rawExt = extname(clean)
   const ext = rawExt.length > 1 && rawExt.length <= 32 ? rawExt : ''
   return `${clean.slice(0, 200 - ext.length)}${ext}`
+}
+
+async function resolvePhysicalPath(targetPath: string): Promise<string> {
+  let current = resolve(targetPath)
+  const tail: string[] = []
+  for (;;) {
+    try {
+      const real = await realpath(current)
+      return tail.length > 0 ? join(real, ...tail.reverse()) : real
+    } catch {
+      const parent = dirname(current)
+      if (parent === current) return resolve(targetPath)
+      tail.push(basename(current))
+      current = parent
+    }
+  }
 }
 
 async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
@@ -6636,12 +6652,47 @@ export class UniworkDocsService {
       uniworkSourceId(input.sourceId)
       const target = (await this.deps.pickDownloadPath?.(sourceFileName(input.name))) ?? null
       if (!target) return { path: null }
-      // A106 (UNI-1362): the working-copy root is the app's own folder
-      if (this.store.isInside(target)) throw new UniworkDocError('forbidden')
+      // A106 (UNI-1362) + R1-6: the working-copy root is the app's own folder
+      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
       const { bytes } = await this.api().downloadSource(input.workspaceId, input.sourceId)
-      await writeFile(target, bytes)
+      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+      const resolvedTarget = resolve(target)
+      const tmp = join(
+        dirname(resolvedTarget),
+        `.${basename(resolvedTarget)}.${randomBytes(8).toString('hex')}.tmp`,
+      )
+      try {
+        await writeFile(tmp, bytes, { flag: 'wx' })
+        if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+        await rename(tmp, resolvedTarget)
+      } catch (error) {
+        await unlink(tmp).catch(() => undefined)
+        throw error
+      }
       return { path: target }
     })
+  }
+
+  private async isForbiddenDownloadTarget(target: string): Promise<boolean> {
+    if (this.store.isInside(target)) return true
+    const resolvedTarget = resolve(target)
+    const linkStat = await lstat(resolvedTarget).catch(() => null)
+    if (linkStat?.isSymbolicLink()) return true
+    if (typeof this.store.root !== 'string' || !this.store.root) return false
+    const resolvedRoot = resolve(this.store.root)
+    const realRoot = await resolvePhysicalPath(resolvedRoot)
+    const insideRoot = (candidate: string): boolean => {
+      for (const root of [resolvedRoot, realRoot]) {
+        const rel = relative(root, resolve(candidate))
+        if (!rel || (!rel.startsWith('..') && !isAbsolute(rel))) return true
+      }
+      return false
+    }
+    if (insideRoot(resolvedTarget)) return true
+    const realParent = await resolvePhysicalPath(dirname(resolvedTarget))
+    if (insideRoot(join(realParent, basename(resolvedTarget)))) return true
+    const realTarget = await realpath(resolvedTarget).catch(() => null)
+    return realTarget !== null && insideRoot(realTarget)
   }
 
   openDocument(documentId: string): Promise<UniworkResult<{ path: string }>> {
