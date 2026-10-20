@@ -907,7 +907,7 @@ describe('the document sources IPC (UNI-1961)', () => {
     }
   })
 
-  it('stages source downloads through a private exclusive sibling temp file, preserves destination mode under permissive umask, and cleans up on write or rename failure (R1-5, R2-2, R2-7, R2-10)', async () => {
+  it('stages source downloads through a private exclusive sibling temp file, preserves destination mode (0600 and 0660) under permissive umask, and cleans up on write or rename failure (R1-5, R2-2, R2-7, R2-10, R3-7)', async () => {
     const { handlers } = await setup()
     const subDir = join(dir, 'target-dir')
     mkdirSync(subDir, { recursive: true })
@@ -959,6 +959,20 @@ describe('the document sources IPC (UNI-1961)', () => {
       expect(saved).toEqual({ ok: true, value: { path: target } })
       expect([...readFileSync(target)]).toEqual([7, 8, 9, 10])
       expect(statSync(target).mode & 0o777).toBe(0o600)
+      expect(readdirSync(subDir)).toEqual(['existing.docx'])
+
+      // R3-7: existing destination mode 0o660 also survives replacement under permissive umask
+      writeFileSync(target, new Uint8Array([1, 2, 3, 4]))
+      chmodSync(target, 0o660)
+      dialogs.save = { canceled: false, filePath: target }
+      const saved660 = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(saved660).toEqual({ ok: true, value: { path: target } })
+      expect([...readFileSync(target)]).toEqual([7, 8, 9, 10])
+      expect(statSync(target).mode & 0o777).toBe(0o660)
       expect(readdirSync(subDir)).toEqual(['existing.docx'])
     } finally {
       downloadHooks.onRename = null
