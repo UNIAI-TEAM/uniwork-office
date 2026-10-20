@@ -12,6 +12,8 @@ import {
 } from '@genoffice/ui'
 import { useI18n } from '../i18n/locale'
 import { cap } from '../capabilities'
+import { withMarkdownHint } from '../shortcuts'
+import { OPEN_LINK_EVENT } from '../editor/tableKeymap'
 import { MARKDOWN_THEME_IDS, type MarkdownTheme } from '../../shared/markdown-theme'
 import type { StringKey } from '../i18n/locale'
 import { uiOp, type BlockType, type ListKind, type StylableMark } from '../editor/ops'
@@ -385,6 +387,20 @@ export function Ribbon({
     setLinkOpen((v) => !v)
   }
 
+  // Ctrl/Cmd+K in the document opens this popover (editor/tableKeymap.ts); the same press on an
+  // open popover closes it, like the button
+  const openLinkRef = useRef(openLink)
+  openLinkRef.current = openLink
+  const offRef = useRef(off)
+  offRef.current = off
+  useEffect(() => {
+    const onOpen = () => {
+      if (!offRef.current) openLinkRef.current()
+    }
+    window.addEventListener(OPEN_LINK_EVENT, onOpen)
+    return () => window.removeEventListener(OPEN_LINK_EVENT, onOpen)
+  }, [])
+
   const applyLink = () => {
     if (!editor) return
     uiOp(editor, { op: 'setLink', target: 'selection', href: linkUrl.trim() || null })
@@ -421,8 +437,8 @@ export function Ribbon({
           <button
             type="button"
             className="qa-btn"
-            data-tip={t('save')}
-            aria-label={t('save')}
+            data-tip={withMarkdownHint(t('save'), 'save')}
+            aria-label={withMarkdownHint(t('save'), 'save')}
             disabled={disabled || (!dirty && !uniworkBound)}
             onMouseDown={(e) => e.preventDefault()}
             onClick={onSave}
@@ -434,7 +450,7 @@ export function Ribbon({
           <button
             type="button"
             className="qa-btn qa-save-as"
-            data-tip={t('saveAs')}
+            data-tip={withMarkdownHint(t('saveAs'), 'saveAs')}
             aria-label={t('saveAs')}
             disabled={notReady}
             onMouseDown={(e) => e.preventDefault()}
@@ -459,8 +475,8 @@ export function Ribbon({
         <button
           type="button"
           className="qa-btn"
-          data-tip={t('undo')}
-          aria-label={t('undo')}
+          data-tip={withMarkdownHint(t('undo'), 'undo')}
+          aria-label={withMarkdownHint(t('undo'), 'undo')}
           disabled={sourceHistory ? !sourceHistory.canUndo : off || !state?.canUndo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() =>
@@ -472,8 +488,8 @@ export function Ribbon({
         <button
           type="button"
           className="qa-btn"
-          data-tip={t('redo')}
-          aria-label={t('redo')}
+          data-tip={withMarkdownHint(t('redo'), 'redo')}
+          aria-label={withMarkdownHint(t('redo'), 'redo')}
           disabled={sourceHistory ? !sourceHistory.canRedo : off || !state?.canRedo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() =>
@@ -485,8 +501,8 @@ export function Ribbon({
         <button
           type="button"
           className="qa-btn"
-          data-tip={t('findTip')}
-          aria-label={t('findTip')}
+          data-tip={withMarkdownHint(t('findTip'), 'find')}
+          aria-label={withMarkdownHint(t('findTip'), 'find')}
           disabled={findOff}
           onMouseDown={(e) => e.preventDefault()}
           onClick={onFind}
@@ -574,7 +590,7 @@ export function Ribbon({
           <div className="ribbon-group">
             <div className="ribbon-group-items">
               <IconBtn
-                title={t('bold')}
+                title={withMarkdownHint(t('bold'), 'bold')}
                 active={state?.bold}
                 disabled={off}
                 onClick={() => toggleStyle(editor, 'bold')}
@@ -582,7 +598,7 @@ export function Ribbon({
                 <b>B</b>
               </IconBtn>
               <IconBtn
-                title={t('italic')}
+                title={withMarkdownHint(t('italic'), 'italic')}
                 active={state?.italic}
                 disabled={off}
                 onClick={() => toggleStyle(editor, 'italic')}
@@ -590,7 +606,7 @@ export function Ribbon({
                 <i>I</i>
               </IconBtn>
               <IconBtn
-                title={t('strike')}
+                title={withMarkdownHint(t('strike'), 'strike')}
                 active={state?.strike}
                 disabled={off}
                 onClick={() => toggleStyle(editor, 'strike')}
@@ -606,7 +622,12 @@ export function Ribbon({
                 <IconInlineCode size={ICON} />
               </IconBtn>
               <span className="rb-link-anchor" ref={linkAnchorRef}>
-                <IconBtn title={t('link')} active={state?.link} disabled={off} onClick={openLink}>
+                <IconBtn
+                  title={withMarkdownHint(t('link'), 'link')}
+                  active={state?.link}
+                  disabled={off}
+                  onClick={openLink}
+                >
                   <IconLink size={ICON} />
                 </IconBtn>
                 {linkOpen && (
@@ -644,7 +665,7 @@ export function Ribbon({
           <div className="ribbon-group">
             <div className="ribbon-group-items">
               <IconBtn
-                title={t('bulletList')}
+                title={withMarkdownHint(t('bulletList'), 'bulletList')}
                 active={state?.bullet}
                 disabled={off}
                 onClick={() => toggleList(editor, 'bullet')}
@@ -652,7 +673,7 @@ export function Ribbon({
                 <IconBullets size={ICON} />
               </IconBtn>
               <IconBtn
-                title={t('orderedList')}
+                title={withMarkdownHint(t('orderedList'), 'orderedList')}
                 active={state?.ordered}
                 disabled={off}
                 onClick={() => toggleList(editor, 'ordered')}
@@ -714,7 +735,7 @@ export function Ribbon({
           <div className="ribbon-group-items">
             {!sourceMode && (
               <IconBtn
-                title={t('sourceView')}
+                title={withMarkdownHint(t('sourceView'), 'toggleSource')}
                 active={sourceViewOpen}
                 disabled={disabled}
                 onClick={onToggleSource}

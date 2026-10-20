@@ -34,6 +34,9 @@ export const StyledItalic = Italic.extend({
 export const CodeSpan = Code.extend({
   // other marks may wrap a code span (**`x`**); the default excludes '_' rejects them
   excludes: '',
+  // Code's own Mod-e shadowed the source toggle (Ctrl/Cmd+E): inline code stays on the
+  // toolbar and backticks, and the chord belongs to markdown-021 in the shortcut table
+  addKeyboardShortcuts: () => ({}),
   renderMarkdown: (node, h) => (node.content ? h.renderChildren(node.content) : ''),
 })
 

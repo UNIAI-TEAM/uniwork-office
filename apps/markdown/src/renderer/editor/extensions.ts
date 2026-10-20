@@ -10,6 +10,7 @@ import { CodeBlockView } from './CodeBlockView'
 import { ImageAwareLink, LocalImage } from './localImage'
 import { BlockDragHandle } from './blockDragHandle'
 import { BlockKeymap } from './blockKeymap'
+import { TableKeymap } from './tableKeymap'
 import { AiHighlight } from './aiHighlight'
 import { AiRunHistory } from './aiRunHistory'
 import { AiQueueAnchors } from './aiQueueAnchors'
@@ -141,6 +142,7 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     WikiLinkResolve.configure(options.wikiLink ?? {}),
     BlockDragHandle,
     BlockKeymap,
+    TableKeymap,
     AiHighlight,
     AiRunHistory,
     AiQueueAnchors,

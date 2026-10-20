@@ -73,6 +73,7 @@ import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 import type { AiSettings } from '@genoffice/ai-provider/browser'
 import { uiOp } from './editor/ops'
 import { cap, platform } from './capabilities'
+import { isAppCommand, markdownShortcutCommand } from './shortcuts'
 import { cleanDraftName } from '../shared/draft-name'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -83,6 +84,18 @@ interface MarkdownUniworkLockSeam {
 }
 
 const MIN_ZOOM = 50
+
+/** presses the Find panel's Next button; false when no panel is open */
+function clickFindStep(label: string): boolean {
+  if (!label) return false
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.find-btn')) {
+    if (button.getAttribute('aria-label') === label && !button.disabled) {
+      button.click()
+      return true
+    }
+  }
+  return false
+}
 const MAX_ZOOM = 200
 const ZOOM_STEP = 10
 const SOURCE_APPLY_DEBOUNCE_MS = 150
@@ -240,6 +253,7 @@ export default function App() {
   const [zoom, setZoom] = useState(100)
 
   const statusRef = useRef<LoadStatus>('loading')
+  const findNextLabelRef = useRef('')
   const dirtyRef = useRef(false)
   const savingRef = useRef(false)
   const [roundTripEnabled] = useState(roundTripMarkdownEnabled)
@@ -1071,35 +1085,39 @@ export default function App() {
       })()
     })
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return
-      const key = event.key.toLowerCase()
-      if (key === 's') {
-        event.preventDefault()
-        void doSave(event.shiftKey ? 'saveAs' : 'save')
-      } else if (key === 'p' && !event.shiftKey) {
-        event.preventDefault()
-        void printDoc()
-      } else if (key === 'f' && !event.shiftKey) {
-        event.preventDefault()
-        openFind(false)
-      } else if (key === 'h' && !event.shiftKey) {
-        // Word's replace shortcut: Ctrl+H on Windows/Linux, Control+H on macOS —
-        // its ⌘H belongs to the system Hide role, so the menu keeps that key
-        event.preventDefault()
-        openFind(true)
-      } else if (key === 'e' && !event.shiftKey) {
-        // Obsidian's edit/preview toggle: the source view
-        event.preventDefault()
-        toggleSource()
-      } else if (key === '=' || key === '+') {
-        event.preventDefault()
-        zoomIn()
-      } else if (key === '-' || key === '_') {
-        event.preventDefault()
-        zoomOut()
-      } else if (key === '0') {
-        event.preventDefault()
-        setZoom(100)
+      // Only window-level commands are claimed here (and only they are preventDefault'ed):
+      // text and block keys, Ctrl+Shift+S strikethrough among them, go on to the editor
+      const command = markdownShortcutCommand(event)
+      if (!command || !isAppCommand(command)) return
+      event.preventDefault()
+      switch (command) {
+        case 'save':
+        case 'saveAs':
+          void doSave(command)
+          return
+        case 'print':
+          void printDoc()
+          return
+        case 'find':
+        case 'replace':
+          openFind(command === 'replace')
+          return
+        case 'findNext':
+          // an open panel steps to the next hit; a closed one opens (Word's "repeat Find")
+          if (!clickFindStep(findNextLabelRef.current)) openFind(false)
+          return
+        case 'toggleSource':
+          toggleSource()
+          return
+        case 'zoomIn':
+          zoomIn()
+          return
+        case 'zoomOut':
+          zoomOut()
+          return
+        case 'zoomReset':
+          setZoom(100)
+          return
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
@@ -1273,6 +1291,7 @@ export default function App() {
             ? t('savedOk')
             : ''
 
+  findNextLabelRef.current = t('nextMatch')
   const findStrings: FindPanelStrings = {
     findPlaceholder: t('findPlaceholder'),
     replacePlaceholder: t('replacePlaceholder'),
