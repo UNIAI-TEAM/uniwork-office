@@ -39,6 +39,7 @@ import {
 } from './anchor-store'
 import type { ServerMode } from './mode'
 import { createUniworkCommentsSource } from './seam'
+import { guardRevealFocus } from './reveal-focus-guard'
 
 /** what the ribbon / context menu reach while the host is mounted */
 export interface SheetsServerCommentsHandle {
@@ -272,6 +273,7 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
       waitersRef.current.push(done)
     })
   }, [])
+  const unguardRef = useRef<() => void>(() => undefined)
   const openRef = useRef(p.onOpenPanel)
   openRef.current = p.onOpenPanel
   useEffect(() => {
@@ -294,9 +296,14 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
       openRef.current()
       // located: the kit selects the cell / range (adapter.goTo); lost: the thread only
       const r = await ctlRef.current.reveal(commentId)
+      if (r.revealed) {
+        unguardRef.current()
+        unguardRef.current = guardRevealFocus(threadOf(ctlRef.current, commentId)?.id ?? commentId)
+      }
       return r.revealed
     })
   }, [mode.api, mode.path, loaded])
+  useEffect(() => () => unguardRef.current(), [])
 
   // one side panel at a time: announce open / close, close when another owner opens (harmless on desktop)
   const panelOpenRef = useRef(panelOpen)
