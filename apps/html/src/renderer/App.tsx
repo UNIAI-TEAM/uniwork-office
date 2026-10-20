@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
   Dropdown,
   FindPanel,
+  stepFindMatch,
   type FindFocusRequest,
   type AiScopeQuoteData,
   useAutoSavePref,
@@ -18,7 +19,7 @@ import {
 } from '@genoffice/electron-utils/headless-export'
 import { useI18n } from './i18n/locale'
 import { cap, platform } from './capabilities'
-import { htmlShortcutCommand, type HtmlShortcutCommand } from './shortcuts'
+import { htmlWindowCommand, type HtmlShortcutCommand } from './shortcuts'
 import { LinkPopover } from './components/LinkPopover'
 import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { useNarrowFrame } from './narrow-frame'
@@ -111,18 +112,6 @@ const WRAP_TAG = { bold: 'strong', italic: 'em', underline: 'u' } as const satis
   Record<HtmlShortcutCommand, string>
 >
 
-/** presses the Find panel's Next button; false when no panel is open */
-function clickFindStep(label: string): boolean {
-  if (!label) return false
-  const buttons = document.querySelectorAll<HTMLButtonElement>('.find-btn')
-  for (const button of buttons) {
-    if (button.getAttribute('aria-label') === label && !button.disabled) {
-      button.click()
-      return true
-    }
-  }
-  return false
-}
 /** the shortcuts a frame in view mode may still relay on a read-only copy */
 const READ_ONLY_FRAME_KEYS = new Set(['print', 'zoomIn', 'zoomOut', 'zoomReset', 'escape'])
 const DEFAULT_ENVELOPE: Envelope = { bom: false, eol: '\n', trailingNewline: true }
@@ -198,7 +187,6 @@ export default function App() {
   const [textSel, setTextSel] = useState<TextSel | null>(null)
   const wrapSelectionRef = useRef<(tag: string) => void>(() => {})
   const openLinkRef = useRef<() => void>(() => {})
-  const findNextLabelRef = useRef('')
   const [linkSel, setLinkSel] = useState<TextSel | null>(null)
   const moveSelectedRef = useRef<(dir: -1 | 1) => void>(() => {})
   // selected element as the preview sees it: drives the floating toolbar and the style panel
@@ -925,7 +913,6 @@ export default function App() {
             moveSelectedRef.current(msg.command === 'moveUp' ? -1 : 1)
           else if (msg.command === 'delete') runManual([{ op: 'remove', sid }], 'clear')
           else if (msg.command === 'escape') selectSid(null)
-          else if (msg.command === 'askAi') setAskMode({ kind: 'new' })
           else if (msg.command === 'bold') wrapSelectionRef.current('strong')
           else if (msg.command === 'italic') wrapSelectionRef.current('em')
           else if (msg.command === 'underline') wrapSelectionRef.current('u')
@@ -1560,59 +1547,44 @@ export default function App() {
       )
     })
     const onKeyDown = (event: KeyboardEvent) => {
-      const command = htmlShortcutCommand(event)
+      const command = htmlWindowCommand(event, inTextField(event.target))
       if (!command) return
-      const field = inTextField(event.target)
+      event.preventDefault()
       switch (command) {
         case 'save':
         case 'saveAs':
-          event.preventDefault()
           void doSave(command)
           return
         case 'cycleView':
-          event.preventDefault()
           cycleView()
           return
         case 'find':
         case 'replace':
-          event.preventDefault()
           openFind(command === 'replace')
           return
         case 'findNext':
-          event.preventDefault()
           // an open panel steps to the next hit; a closed one opens (Word's "repeat Find")
-          if (!clickFindStep(findNextLabelRef.current)) openFind(false)
+          if (!stepFindMatch('next')) openFind(false)
           return
         case 'zoomIn':
-          event.preventDefault()
           zoomIn()
           return
         case 'zoomOut':
-          event.preventDefault()
           zoomOut()
           return
         case 'zoomReset':
-          event.preventDefault()
           setZoom(100)
           return
         case 'bold':
         case 'italic':
         case 'underline':
-          // CodeMirror and form fields keep their own keys (Ctrl+U is CodeMirror's undoSelection)
-          if (field) return
-          event.preventDefault()
           wrapSelectionRef.current(WRAP_TAG[command])
           return
         case 'link':
-          if (field) return
-          event.preventDefault()
           openLinkRef.current()
           return
         case 'undo':
         case 'redo':
-          // CodeMirror and form fields keep their own history
-          if (field) return
-          event.preventDefault()
           editorRef.current?.[command]()
           return
       }
@@ -1790,7 +1762,6 @@ export default function App() {
     }
   }
 
-  findNextLabelRef.current = t('nextMatch')
   const findStrings: FindPanelStrings = {
     findPlaceholder: t('findPlaceholder'),
     replacePlaceholder: t('replacePlaceholder'),

@@ -72,6 +72,7 @@ export const fr = {
   openExternal: 'Lien ouvert dans le navigateur',
   insertLink: 'Insérer un lien hypertexte',
   linkPlaceholder: 'Collez ou saisissez l’adresse du lien',
+  linkInvalid: 'Cette adresse ne peut pas servir de lien',
   linkNeedsSelection: 'Sélectionnez d’abord du texte dans l’aperçu',
   save: 'Enregistrer (⌘S)',
   saveAs: 'Enregistrer sous…',

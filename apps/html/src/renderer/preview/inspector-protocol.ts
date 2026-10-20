@@ -108,7 +108,6 @@ export type FromInspectorBody =
         | 'next'
         | 'prev'
         | 'child'
-        | 'askAi'
         | 'bold'
         | 'italic'
         | 'underline'

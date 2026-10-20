@@ -69,6 +69,7 @@ export const ms = {
   openExternal: 'Pautan dibuka dalam pelayar',
   insertLink: 'Sisipkan hiperpautan',
   linkPlaceholder: 'Tampal atau taip alamat pautan',
+  linkInvalid: 'Alamat ini tidak boleh digunakan sebagai pautan',
   linkNeedsSelection: 'Pilih teks dalam pratonton dahulu',
   save: 'Simpan (⌘S)',
   saveAs: 'Simpan Sebagai…',

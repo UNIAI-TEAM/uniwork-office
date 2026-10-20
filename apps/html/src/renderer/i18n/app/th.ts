@@ -67,6 +67,7 @@ export const th = {
   openExternal: 'เปิดลิงก์ในเบราว์เซอร์แล้ว',
   insertLink: 'แทรกไฮเปอร์ลิงก์',
   linkPlaceholder: 'วางหรือพิมพ์ที่อยู่ลิงก์',
+  linkInvalid: 'ไม่สามารถใช้ที่อยู่นี้เป็นลิงก์ได้',
   linkNeedsSelection: 'เลือกข้อความในพรีวิวก่อน',
   save: 'บันทึก (⌘S)',
   saveAs: 'บันทึกเป็น…',

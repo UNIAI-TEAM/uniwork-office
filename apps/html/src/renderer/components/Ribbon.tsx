@@ -6,9 +6,10 @@ import {
   useRibbonCollapse,
   UniAiMark,
 } from '@genoffice/ui'
+import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n } from '../i18n/locale'
 import { cap } from '../capabilities'
-import { withHtmlHint } from '../shortcuts'
+import { htmlSurface, withHtmlHint } from '../shortcuts'
 import { useRibbonFit } from './ribbon-fit'
 import type { StringKey } from '../i18n/locale'
 import type { InsertKind, InsertOptions } from '../document/insert-presets'
@@ -157,10 +158,17 @@ export function Ribbon(p: Props) {
     bodyRef,
     `${lang}|${p.showAi !== false}|${p.presentNewTab !== false}|${p.readOnly ?? false}`,
   )
-  const collapse = useRibbonCollapse('htmlapp.ribbonCollapsed', {
-    collapse: t('ribbonCollapse'),
-    expand: t('ribbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'htmlapp.ribbonCollapsed',
+    {
+      collapse: t('ribbonCollapse'),
+      expand: t('ribbonExpand'),
+    },
+    {
+      action: findShortcut('common', 'common-10'),
+      surface: htmlSurface(),
+    },
+  )
   const [themeOpen, setThemeOpen] = useState(false)
   const themeRef = useRef<HTMLDivElement>(null)
   useDismissablePopover(themeOpen, () => setThemeOpen(false), {

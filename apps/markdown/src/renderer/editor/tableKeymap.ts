@@ -33,9 +33,11 @@ const RUN: Readonly<Record<EditorKey, (editor: Editor) => boolean>> = {
  * Text and block keys from the markdown shortcut table, matched by the shared
  * matcher (key vs code, IME composition, AltGr). It replaces the keys TipTap's
  * marks bound by themselves: Mod-Shift-s (strikethrough, shadowed Save As on
- * macOS) and Mod-e (inline code, shadowed the source toggle) are gone with
- * them, and strikethrough answers Ctrl+Shift+S on Windows and Shift+Cmd+X on
- * macOS.
+ * macOS) and Mod-e (inline code, shadowed the source toggle) are stripped from
+ * `TableStrike` / `CodeSpan`, and strikethrough answers Ctrl+Shift+S on Windows
+ * and Shift+Cmd+X on macOS. The headings, lists, bold and italic still carry
+ * TipTap's own keys; those equal the table's chords (or a subset), so they
+ * cannot take a key the table gave to another action.
  */
 export const TableKeymap = Extension.create({
   name: 'tableKeymap',

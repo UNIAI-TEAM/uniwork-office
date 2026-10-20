@@ -188,6 +188,9 @@ describe('link address', () => {
     ['#top', '#top'],
     ['./next.html', './next.html'],
     ['  /docs  ', '/docs'],
+    ['localhost:3000/x', 'https://localhost:3000/x'],
+    ['example.com:8080', 'https://example.com:8080'],
+    ['tel:5551234', 'tel:5551234'],
   ])('%s -> %s', (raw, out) => {
     expect(normalizeLinkHref(raw)).toBe(out)
   })
@@ -199,6 +202,8 @@ describe('link address', () => {
     'vbscript:x',
     '',
     'a b',
+    'javascript:1',
+    'data:text/html;base64,AAAA',
   ])('refuses %j', (raw) => {
     expect(normalizeLinkHref(raw)).toBeNull()
   })
@@ -215,7 +220,7 @@ describe('preview frame relay', () => {
   it('inspector.js maps k to link (not Ask AI) and u to underline', () => {
     const here = dirname(fileURLToPath(import.meta.url))
     const source = readFileSync(join(here, '../src/renderer/preview/inspector.js'), 'utf8')
-    expect(source).toContain("{ k: 'link', u: 'underline', b: 'bold', i: 'italic' }")
+    expect(source).toContain("{ b: 'bold', i: 'italic', u: 'underline', k: 'link' }")
     expect(source).not.toContain("k: 'askAi'")
   })
 })

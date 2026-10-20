@@ -71,6 +71,7 @@ export const ja = {
   openExternal: 'ブラウザでリンクを開きました',
   insertLink: 'ハイパーリンクの挿入',
   linkPlaceholder: 'リンク先を貼り付けるか入力',
+  linkInvalid: 'このアドレスはリンクに使用できません',
   linkNeedsSelection: '先にプレビューでテキストを選択してください',
   save: '上書き保存 (⌘S)',
   saveAs: '名前を付けて保存…',

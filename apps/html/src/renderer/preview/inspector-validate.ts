@@ -169,7 +169,6 @@ const KEY_COMMANDS = new Set([
   'next',
   'prev',
   'child',
-  'askAi',
   'bold',
   'italic',
   'underline',

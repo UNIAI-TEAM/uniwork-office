@@ -35,6 +35,7 @@ import {
   StyledItalic,
   StyledListItem,
   StyledTaskItem,
+  TableStrike,
   renderTable,
 } from './markdownStyleRenderers'
 import { boundOrderedList, boundTable, boundTaskList } from './boundedTokenizers'
@@ -75,12 +76,15 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
       horizontalRule: false,
       hardBreak: false,
       listItem: false,
+      // re-added below without its own key: strikethrough is a table chord
+      strike: false,
       // re-added below: code after the other marks so it serializes innermost
       code: false,
     }),
     BlockStartEscapedParagraph,
     StyledBold,
     StyledItalic,
+    TableStrike,
     CodeSpan,
     StyledHeading,
     StyledHorizontalRule,

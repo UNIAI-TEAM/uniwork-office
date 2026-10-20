@@ -66,6 +66,7 @@ export const zhTW = {
   openExternal: '已在瀏覽器中開啟連結',
   insertLink: '插入超連結',
   linkPlaceholder: '貼上或輸入連結位址',
+  linkInvalid: '此位址無法用作連結',
   linkNeedsSelection: '請先在預覽中選取文字',
   save: '儲存 (⌘S)',
   saveAs: '另存新檔…',

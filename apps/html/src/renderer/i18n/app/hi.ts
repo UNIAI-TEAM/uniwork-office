@@ -71,6 +71,7 @@ export const hi = {
   openExternal: 'लिंक ब्राउज़र में खोला गया',
   insertLink: 'हाइपरलिंक डालें',
   linkPlaceholder: 'लिंक का पता चिपकाएँ या लिखें',
+  linkInvalid: 'इस पते को लिंक के रूप में उपयोग नहीं किया जा सकता',
   linkNeedsSelection: 'पहले पूर्वावलोकन में टेक्स्ट चुनें',
   save: 'सहेजें (⌘S)',
   saveAs: 'इस रूप में सहेजें…',

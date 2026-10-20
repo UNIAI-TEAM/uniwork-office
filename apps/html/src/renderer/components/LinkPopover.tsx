@@ -7,6 +7,7 @@ interface Props {
 }
 
 const SAFE_SCHEMES = new Set(['http', 'https', 'mailto', 'tel'])
+const HOST_WITH_PORT = /^(?:localhost|[a-z0-9-]+(?:\.[a-z0-9-]+)+):\d+(?:[/?#]|$)/i
 
 /**
  * The href to write for what the user typed, or null when it must not become a
@@ -17,7 +18,10 @@ export function normalizeLinkHref(raw: string): string | null {
   const value = raw.trim()
   if (!value || /\s/.test(value)) return null
   const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(value)?.[1]
-  if (scheme) return SAFE_SCHEMES.has(scheme.toLowerCase()) ? value : null
+  if (scheme && SAFE_SCHEMES.has(scheme.toLowerCase())) return value
+  // `localhost:3000/x` and `example.com:8080` are addresses with a port, not a scheme (a bare
+  // word before the colon, such as `javascript:1`, stays a scheme)
+  if (scheme && !HOST_WITH_PORT.test(value)) return null
   if (/^[#/.?]/.test(value)) return value
   return `https://${value}`
 }
@@ -29,6 +33,7 @@ export function normalizeLinkHref(raw: string): string | null {
 export function LinkPopover({ onApply, onCancel }: Props) {
   const { t } = useI18n()
   const [href, setHref] = useState('')
+  const [refused, setRefused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => inputRef.current?.focus(), [])
   return (
@@ -46,7 +51,12 @@ export function LinkPopover({ onApply, onCancel }: Props) {
         value={href}
         placeholder={t('linkPlaceholder')}
         aria-label={t('linkPlaceholder')}
-        onChange={(e) => setHref(e.target.value)}
+        aria-invalid={refused}
+        aria-describedby={refused ? 'link-pop-invalid' : undefined}
+        onChange={(e) => {
+          setHref(e.target.value)
+          setRefused(false)
+        }}
         onBlur={onCancel}
         onKeyDown={(e) => {
           // an IME composition owns Enter and Esc
@@ -58,9 +68,15 @@ export function LinkPopover({ onApply, onCancel }: Props) {
             e.preventDefault()
             const safe = normalizeLinkHref(href)
             if (safe) onApply(safe)
+            else setRefused(true)
           }
         }}
       />
+      {refused && (
+        <div id="link-pop-invalid" className="link-pop-invalid" role="alert">
+          {t('linkInvalid')}
+        </div>
+      )}
     </div>
   )
 }

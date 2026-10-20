@@ -71,6 +71,7 @@ export const vi = {
   openExternal: 'Đã mở liên kết trong trình duyệt của bạn',
   insertLink: 'Chèn siêu kết nối',
   linkPlaceholder: 'Dán hoặc nhập địa chỉ liên kết',
+  linkInvalid: 'Không thể dùng địa chỉ này làm liên kết',
   linkNeedsSelection: 'Hãy chọn văn bản trong bản xem trước trước',
   save: 'Lưu (⌘S)',
   saveAs: 'Lưu dưới dạng…',

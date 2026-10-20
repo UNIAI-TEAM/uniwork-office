@@ -80,6 +80,32 @@ export function htmlShortcutCommand(
   return action ? (COMMANDS[action.id] ?? null) : null
 }
 
+/** commands a focused text field (CodeMirror, an input) keeps for itself; Ctrl+U is CodeMirror's undoSelection */
+const FIELD_KEEPS: ReadonlySet<HtmlShortcutCommand> = new Set([
+  'bold',
+  'italic',
+  'underline',
+  'link',
+  'undo',
+  'redo',
+])
+
+/**
+ * What the window handler does with a keydown: the command it claims (and
+ * preventDefault's), or null when the key is not ours or the focused text field
+ * keeps it. Pure, so the handler's claims are testable without mounting the App.
+ */
+export function htmlWindowCommand(
+  event: ShortcutKeyEvent,
+  inTextField: boolean,
+  platform?: ShortcutPlatform,
+  surface?: ShortcutSurface,
+): HtmlShortcutCommand | null {
+  const command = htmlShortcutCommand(event, platform, surface)
+  if (!command || (inTextField && FIELD_KEEPS.has(command))) return null
+  return command
+}
+
 /** `Ctrl+S` / `⌘S` for a command on this platform and surface; '' when it has none */
 export function htmlHint(
   command: HtmlShortcutCommand,

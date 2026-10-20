@@ -73,6 +73,7 @@ export const nl = {
   openExternal: 'Link geopend in de browser',
   insertLink: 'Hyperlink invoegen',
   linkPlaceholder: 'Plak of typ het linkadres',
+  linkInvalid: 'Dit adres kan niet als link worden gebruikt',
   linkNeedsSelection: 'Selecteer eerst tekst in het voorbeeld',
   save: 'Opslaan (⌘S)',
   saveAs: 'Opslaan als…',

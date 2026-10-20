@@ -68,6 +68,7 @@ export const pl = {
   openExternal: 'Link otwarty w przeglądarce',
   insertLink: 'Wstaw hiperłącze',
   linkPlaceholder: 'Wklej lub wpisz adres łącza',
+  linkInvalid: 'Tego adresu nie można użyć jako łącza',
   linkNeedsSelection: 'Najpierw zaznacz tekst w podglądzie',
   save: 'Zapisz (⌘S)',
   saveAs: 'Zapisz jako…',

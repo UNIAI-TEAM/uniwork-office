@@ -58,6 +58,7 @@ export const cs = {
   openExternal: 'Odkaz byl otevřen v prohlížeči',
   insertLink: 'Vložit hypertextový odkaz',
   linkPlaceholder: 'Vložte nebo zadejte adresu odkazu',
+  linkInvalid: 'Tuto adresu nelze použít jako odkaz',
   linkNeedsSelection: 'Nejprve v náhledu vyberte text',
   save: 'Uložit (⌘S)',
   saveAs: 'Uložit jako…',

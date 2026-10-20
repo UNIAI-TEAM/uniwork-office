@@ -73,6 +73,7 @@ export const it = {
   openExternal: 'Link aperto nel browser',
   insertLink: 'Inserisci collegamento ipertestuale',
   linkPlaceholder: 'Incolla o digita l’indirizzo del collegamento',
+  linkInvalid: 'Questo indirizzo non può essere usato come collegamento',
   linkNeedsSelection: 'Seleziona prima del testo nell’anteprima',
   save: 'Salva (⌘S)',
   saveAs: 'Salva con nome…',

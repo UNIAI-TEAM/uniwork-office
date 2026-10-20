@@ -70,6 +70,7 @@ export const ko = {
   openExternal: '브라우저에서 링크를 열었습니다',
   insertLink: '하이퍼링크 삽입',
   linkPlaceholder: '링크 주소를 붙여넣거나 입력하세요',
+  linkInvalid: '이 주소는 링크로 사용할 수 없습니다',
   linkNeedsSelection: '먼저 미리보기에서 텍스트를 선택하세요',
   save: '저장 (⌘S)',
   saveAs: '다른 이름으로 저장…',

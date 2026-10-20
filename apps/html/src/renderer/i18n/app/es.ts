@@ -72,6 +72,7 @@ export const es = {
   openExternal: 'Enlace abierto en el navegador',
   insertLink: 'Insertar hipervínculo',
   linkPlaceholder: 'Pega o escribe la dirección del vínculo',
+  linkInvalid: 'Esta dirección no se puede usar como vínculo',
   linkNeedsSelection: 'Selecciona primero texto en la vista previa',
   save: 'Guardar (⌘S)',
   saveAs: 'Guardar como…',

@@ -118,6 +118,20 @@ export function markdownShortcutCommand(
   return action ? (COMMANDS[action.id] ?? null) : null
 }
 
+/**
+ * The command the window handler claims (and preventDefault's) for a keydown, or
+ * null: text and block keys, Ctrl+Shift+S strikethrough among them, are left to
+ * the editor. Pure, so the handler's claims are testable without mounting the App.
+ */
+export function markdownWindowCommand(
+  event: ShortcutKeyEvent,
+  platform?: ShortcutPlatform,
+  surface?: ShortcutSurface,
+): MarkdownAppCommand | null {
+  const command = markdownShortcutCommand(event, platform, surface)
+  return command && isAppCommand(command) ? command : null
+}
+
 export function isAppCommand(command: MarkdownCommand): command is MarkdownAppCommand {
   return APP_COMMANDS.has(command)
 }

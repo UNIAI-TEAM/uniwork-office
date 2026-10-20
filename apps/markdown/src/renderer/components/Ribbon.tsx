@@ -10,9 +10,10 @@ import {
   useRibbonCollapse,
   UniAiMark,
 } from '@genoffice/ui'
+import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n } from '../i18n/locale'
 import { cap } from '../capabilities'
-import { withMarkdownHint } from '../shortcuts'
+import { markdownSurface, withMarkdownHint } from '../shortcuts'
 import { OPEN_LINK_EVENT } from '../editor/tableKeymap'
 import { MARKDOWN_THEME_IDS, type MarkdownTheme } from '../../shared/markdown-theme'
 import type { StringKey } from '../i18n/locale'
@@ -315,10 +316,17 @@ export function Ribbon({
 }: Props) {
   const { t } = useI18n()
   const disabled = notReady || readOnly
-  const collapse = useRibbonCollapse('mdapp.ribbonCollapsed', {
-    collapse: t('ribbonCollapse'),
-    expand: t('ribbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'mdapp.ribbonCollapsed',
+    {
+      collapse: t('ribbonCollapse'),
+      expand: t('ribbonExpand'),
+    },
+    {
+      action: findShortcut('common', 'common-10'),
+      surface: markdownSurface(),
+    },
+  )
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const linkInputRef = useRef<HTMLInputElement>(null)
@@ -642,6 +650,8 @@ export function Ribbon({
                       placeholder={t('linkPlaceholder')}
                       onChange={(e) => setLinkUrl(e.target.value)}
                       onKeyDown={(e) => {
+                        // an IME composition owns Enter: it commits the candidate, not the link
+                        if (e.nativeEvent.isComposing || e.keyCode === 229) return
                         if (e.key === 'Enter' && linkUrl.trim()) applyLink()
                         if (e.key === 'Escape') {
                           e.preventDefault()

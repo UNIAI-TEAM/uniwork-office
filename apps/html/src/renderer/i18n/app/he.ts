@@ -67,6 +67,7 @@ export const he = {
   openExternal: 'הקישור נפתח בדפדפן',
   insertLink: 'הוספת היפר-קישור',
   linkPlaceholder: 'הדביקו או הקלידו את כתובת הקישור',
+  linkInvalid: 'לא ניתן להשתמש בכתובת זו כקישור',
   linkNeedsSelection: 'בחרו תחילה טקסט בתצוגה המקדימה',
   save: 'שמירה (⌘S)',
   saveAs: 'שמירה בשם…',

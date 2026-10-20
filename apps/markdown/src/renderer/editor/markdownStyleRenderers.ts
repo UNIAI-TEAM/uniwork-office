@@ -6,6 +6,7 @@ import { Heading } from '@tiptap/extension-heading'
 import { HorizontalRule } from '@tiptap/extension-horizontal-rule'
 import { Italic } from '@tiptap/extension-italic'
 import { getListMarker, ListItem, TaskItem } from '@tiptap/extension-list'
+import { Strike } from '@tiptap/extension-strike'
 import { Table } from '@tiptap/extension-table'
 import { activeMarkdownStyle } from '../markdown/markdownStyle'
 import { renderingTable } from './markdownEscape'
@@ -28,6 +29,14 @@ export const StyledItalic = Italic.extend({
     const em = activeMarkdownStyle().em
     return `${em}${h.renderChildren(node)}${em}`
   },
+})
+
+/**
+ * Strike's own Mod-Shift-s shadowed Save As on macOS and would eat any later Save As chord:
+ * strikethrough answers markdown-019 in the shortcut table only (editor/tableKeymap.ts)
+ */
+export const TableStrike = Strike.extend({
+  addKeyboardShortcuts: () => ({}),
 })
 
 /** fence comes with the text (fenceCodeSpan); registered last among marks so it renders innermost */

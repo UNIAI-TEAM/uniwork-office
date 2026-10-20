@@ -72,6 +72,7 @@ export const pt = {
   openExternal: 'Link aberto no navegador',
   insertLink: 'Inserir hiperlink',
   linkPlaceholder: 'Cole ou digite o endereço do link',
+  linkInvalid: 'Este endereço não pode ser usado como link',
   linkNeedsSelection: 'Selecione primeiro um texto na visualização',
   save: 'Salvar (⌘S)',
   saveAs: 'Salvar Como…',

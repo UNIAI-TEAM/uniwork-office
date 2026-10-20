@@ -72,6 +72,7 @@ export const de = {
   openExternal: 'Link im Browser geöffnet',
   insertLink: 'Link einfügen',
   linkPlaceholder: 'Linkadresse einfügen oder eingeben',
+  linkInvalid: 'Diese Adresse kann nicht als Link verwendet werden',
   linkNeedsSelection: 'Markieren Sie zuerst Text in der Vorschau',
   save: 'Speichern (⌘S)',
   saveAs: 'Speichern unter…',

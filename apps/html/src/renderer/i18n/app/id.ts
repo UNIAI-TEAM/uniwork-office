@@ -70,6 +70,7 @@ export const id = {
   openExternal: 'Tautan dibuka di browser',
   insertLink: 'Sisipkan hyperlink',
   linkPlaceholder: 'Tempel atau ketik alamat tautan',
+  linkInvalid: 'Alamat ini tidak dapat digunakan sebagai tautan',
   linkNeedsSelection: 'Pilih teks di pratinjau terlebih dahulu',
   save: 'Simpan (⌘S)',
   saveAs: 'Simpan Sebagai…',

@@ -65,6 +65,7 @@ export const zh = {
   openExternal: '已在浏览器中打开链接',
   insertLink: '插入超链接',
   linkPlaceholder: '粘贴或输入链接地址',
+  linkInvalid: '此地址不能用作链接',
   linkNeedsSelection: '请先在预览中选中文字',
   save: '保存 (⌘S)',
   saveAs: '另存为…',

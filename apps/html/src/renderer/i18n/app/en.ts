@@ -70,6 +70,7 @@ export const en = {
   openExternal: 'Link opened in your browser',
   insertLink: 'Insert hyperlink',
   linkPlaceholder: 'Paste or type a link address',
+  linkInvalid: 'This address can’t be used as a link',
   linkNeedsSelection: 'Select some text in the preview first',
   save: 'Save (⌘S)',
   saveAs: 'Save As…',
