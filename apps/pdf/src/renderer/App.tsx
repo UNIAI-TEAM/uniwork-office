@@ -83,8 +83,9 @@ import {
 import {
   isCancelKey,
   isConfirmKey,
-  isPlainKey,
+  isContextKey,
   matchPdfKey,
+  pdfRibbonCollapseOptions,
   pdfTip,
   resolvePdfWindowKey,
   searchEnterDirection,
@@ -363,10 +364,11 @@ type RibbonTab = (typeof RIBBON_TABS)[number]['id'] | 'fillForm'
 
 export default function App() {
   const { lang, t } = useI18n()
-  const collapse = useRibbonCollapse('genoffice-pdf-ribbon-collapsed', {
-    collapse: t('ribbonCollapse'),
-    expand: t('ribbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'genoffice-pdf-ribbon-collapsed',
+    { collapse: t('ribbonCollapse'), expand: t('ribbonExpand') },
+    pdfRibbonCollapseOptions(),
+  )
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [filePath, setFilePath] = useState('')
   const [status, setStatus] = useState<'loading' | 'error' | 'empty' | 'password' | 'ready'>(
@@ -6411,7 +6413,7 @@ export default function App() {
       }
       // Any other Ctrl / Cmd chord belongs to the browser or the text field
       if (e.metaKey || e.ctrlKey) return
-      if (isCancelKey(e)) {
+      if (isCancelKey(e, 'overlay')) {
         // Modal dialogs and local overlays own Escape; the states behind them must not react too
         if (
           e.defaultPrevented ||
@@ -6466,7 +6468,7 @@ export default function App() {
         return
       }
       if (inEditable) return
-      if (selected && (isPlainKey(e, 'Delete') || isPlainKey(e, 'Backspace'))) {
+      if (selected && matchPdfKey(e, 'selection')) {
         e.preventDefault()
         deleteSelected()
         return
@@ -6707,7 +6709,7 @@ export default function App() {
               className="tb-page-input"
               value={pageInput}
               onChange={(e) => setPageInput(e.target.value)}
-              onKeyDown={(e) => isConfirmKey(e) && commitPageInput()}
+              onKeyDown={(e) => isConfirmKey(e, 'page-box') && commitPageInput()}
               onBlur={commitPageInput}
             />
             <span className="tb-page-total">{t('pageOf', { total: pageCount })}</span>
@@ -8874,13 +8876,13 @@ export default function App() {
                                             if (matchPdfKey(e, 'text-edit')?.id === 'pdf-24') {
                                               e.preventDefault()
                                               commitTextDraft()
-                                            } else if (isCancelKey(e)) {
+                                            } else if (isCancelKey(e, 'text-edit')) {
                                               e.preventDefault()
                                               e.stopPropagation()
                                               setTextDraft(null)
                                             } else if (
-                                              (isPlainKey(e, 'Backspace') ||
-                                                isPlainKey(e, 'Delete')) &&
+                                              (isContextKey(e, 'text-edit', 'Backspace') ||
+                                                isContextKey(e, 'text-edit', 'Delete')) &&
                                               textDraft.value === ''
                                             ) {
                                               // The editor is already empty: one more delete

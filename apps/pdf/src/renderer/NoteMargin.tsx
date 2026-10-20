@@ -212,7 +212,7 @@ function NoteCard({
                   onKeyDown={(e) => {
                     if (matchPdfKey(e, 'note')?.id === 'pdf-21') {
                       if (editingText.trim()) onEditSubmit(item)
-                    } else if (isCancelKey(e)) {
+                    } else if (isCancelKey(e, 'note')) {
                       e.preventDefault()
                       e.stopPropagation()
                       onEditCancel()
@@ -248,7 +248,7 @@ function NoteCard({
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               if (matchPdfKey(e, 'note')?.id === 'pdf-21') submit()
-              else if (isCancelKey(e)) {
+              else if (isCancelKey(e, 'note')) {
                 e.preventDefault()
                 e.stopPropagation()
                 onClose()
@@ -325,7 +325,7 @@ function NoteDraftCard({
           }}
           onKeyDown={(e) => {
             if (matchPdfKey(e, 'note')?.id === 'pdf-21') submit()
-            else if (isCancelKey(e)) {
+            else if (isCancelKey(e, 'note')) {
               e.preventDefault()
               e.stopPropagation()
               onCancel()

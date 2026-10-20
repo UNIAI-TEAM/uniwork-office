@@ -5,9 +5,10 @@
  * matcher already refuses an IME composition (isComposing / keyCode 229), an
  * AltGr chord and any extra modifier.
  *
- * Bare keys (Enter, Esc, Space, arrows, Delete...) are not table rows: the
- * table's trace lock only accepts chords a CSV cell prints with a modifier. They
- * are matched here with the same guards (plain key, no composition).
+ * Bare keys (Enter, Esc, Space, arrows, Delete...) are table rows too, each in the
+ * `context` of the surface that owns it (`dialog`, `ask`, `page-box`, `overlay`,
+ * `selection`, `nav`, `note`, `text-edit`), so they never shadow the window-level
+ * keymap. They go through the same matcher: no modifier, no IME composition.
  */
 import {
   createMatcher,
@@ -89,27 +90,22 @@ export function resolvePdfWindowKey(
   return { action, preventDefault: action.id !== 'pdf-02' }
 }
 
-/** `key` with no modifier held and no IME composition in progress. */
-export function isPlainKey(event: PdfKeyEvent, key: string): boolean {
-  const e = nativeEvent(event)
-  return (
-    e.key === key &&
-    !e.ctrlKey &&
-    !e.altKey &&
-    !e.shiftKey &&
-    !e.metaKey &&
-    !isComposingEvent(e as ShortcutKeyEvent)
-  )
+/**
+ * True when the keydown is `key` and the table has a chord for it in `context`
+ * (a plain key: any modifier or an IME composition fails the match).
+ */
+export function isContextKey(event: PdfKeyEvent, context: string, key: string): boolean {
+  return nativeEvent(event).key === key && matchPdfKey(event, context) !== null
 }
 
-/** Enter confirms a dialog; not while an IME composition is being committed. */
-export function isConfirmKey(event: PdfKeyEvent): boolean {
-  return isPlainKey(event, 'Enter')
+/** Enter confirms (`dialog` by default; `ask`: the Ask-AI box, `page-box`: the page number); not mid-composition. */
+export function isConfirmKey(event: PdfKeyEvent, context = 'dialog'): boolean {
+  return isContextKey(event, context, 'Enter')
 }
 
-/** Esc cancels a dialog or overlay; not while an IME composition is being cancelled. */
-export function isCancelKey(event: PdfKeyEvent): boolean {
-  return isPlainKey(event, 'Escape')
+/** Esc cancels a dialog or overlay (`dialog` by default, `note`, `text-edit`, `ask`, `overlay`); not mid-composition. */
+export function isCancelKey(event: PdfKeyEvent, context = 'dialog'): boolean {
+  return isContextKey(event, context, 'Escape')
 }
 
 /** Enter (next) / Shift+Enter (previous) in the search box; null for any other key or an IME Enter. */
@@ -118,6 +114,20 @@ export function searchEnterDirection(event: PdfKeyEvent): 1 | -1 | null {
   if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey) return null
   if (isComposingEvent(e as ShortcutKeyEvent)) return null
   return e.shiftKey ? -1 : 1
+}
+
+/** The ribbon collapse key (common-10: Ctrl+F1 / Alt+Cmd+R; no key in a browser frame) for `useRibbonCollapse`. */
+export function pdfRibbonCollapseOptions(
+  platform?: ShortcutPlatform,
+  surface: ShortcutSurface = pdfSurface(),
+): {
+  readonly action: ShortcutAction
+  readonly surface: ShortcutSurface
+  readonly platform?: ShortcutPlatform
+} {
+  const action = findShortcut('common', 'common-10')
+  if (!action) throw new Error('no common shortcut row common-10')
+  return platform ? { action, surface, platform } : { action, surface }
 }
 
 /** The primary chord of a table row as this platform shows it (`Ctrl+Y`, `⌘F`), or '' without one. */

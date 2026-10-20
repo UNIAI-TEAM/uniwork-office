@@ -97,7 +97,7 @@ export function AiAskPopover({
       style={{ left, top, width: WIDTH }}
       role="dialog"
       onKeyDown={(e) => {
-        if (isCancelKey(e)) {
+        if (isCancelKey(e, 'ask')) {
           e.preventDefault()
           e.stopPropagation()
           onClose()
@@ -134,7 +134,7 @@ export function AiAskPopover({
         placeholder={t('aiAskPlaceholder')}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          if (isConfirmKey(e)) {
+          if (isConfirmKey(e, 'ask')) {
             e.preventDefault()
             submit()
           }

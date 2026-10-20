@@ -283,20 +283,20 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: {},
   },
-  // Zoom in / out (Edge PDF: Ctrl+Plus / Ctrl+Minus)
+  // Zoom in / out (Edge PDF: Ctrl+Plus / Ctrl+Minus), with the Shift and keypad aliases
   {
     id: 'pdf-08',
     scope: 'pdf',
-    win: ['Ctrl+Equal'],
-    mac: ['Cmd+Equal'],
+    win: ['Ctrl+Equal', 'Ctrl+Shift+Equal', 'Ctrl+NumpadAdd'],
+    mac: ['Cmd+Equal', 'Shift+Cmd+Equal', 'Cmd+NumpadAdd'],
     match: 'key',
     guard: {},
   },
   {
     id: 'pdf-09',
     scope: 'pdf',
-    win: ['Ctrl+Minus'],
-    mac: ['Cmd+Minus'],
+    win: ['Ctrl+Minus', 'Ctrl+NumpadSubtract'],
+    mac: ['Cmd+Minus', 'Cmd+NumpadSubtract'],
     match: 'key',
     guard: {},
   },
@@ -304,8 +304,8 @@ const manual: readonly ShortcutAction[] = [
   {
     id: 'pdf-10',
     scope: 'pdf',
-    win: ['Ctrl+0'],
-    mac: ['Cmd+0'],
+    win: ['Ctrl+0', 'Ctrl+Numpad0'],
+    mac: ['Cmd+0', 'Cmd+Numpad0'],
     match: 'key',
     guard: { noRepeat: true },
   },
@@ -327,25 +327,108 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: {},
   },
-  // Margin note box: Ctrl+Enter submits (Esc cancels)
+  // The bare keys below are module-local: they never leave their `context`, so the window-level
+  // keymap (no context) is not shadowed. Win and Mac print the same keys.
+  // Go to page: Enter in the page box
+  {
+    id: 'pdf-13',
+    scope: 'pdf',
+    context: 'page-box',
+    win: ['Enter'],
+    mac: ['Enter'],
+    match: 'key',
+    guard: {},
+  },
+  // Scroll one screen down / up (Edge PDF: Space, Shift+Space, PageDown, PageUp)
+  {
+    id: 'pdf-14',
+    scope: 'pdf',
+    context: 'nav',
+    win: ['Space', 'Shift+Space', 'PageDown', 'PageUp'],
+    mac: ['Space', 'Shift+Space', 'PageDown', 'PageUp'],
+    match: 'key',
+    guard: {},
+  },
+  // Top / bottom (Edge PDF: Home / End) and the 60 px scroll (ours: Up / Down)
+  {
+    id: 'pdf-15',
+    scope: 'pdf',
+    context: 'nav',
+    win: ['Home', 'End', 'Up', 'Down'],
+    mac: ['Home', 'End', 'Up', 'Down'],
+    match: 'key',
+    guard: {},
+  },
+  // Next / previous page (ours: Right / Left, spread aware)
+  {
+    id: 'pdf-16',
+    scope: 'pdf',
+    context: 'nav',
+    win: ['Right', 'Left'],
+    mac: ['Right', 'Left'],
+    match: 'key',
+    guard: {},
+  },
+  // Margin note box: Ctrl+Enter submits, Esc cancels
   {
     id: 'pdf-21',
     scope: 'pdf',
     context: 'note',
-    win: ['Ctrl+Enter'],
-    mac: ['Cmd+Enter'],
+    win: ['Ctrl+Enter', 'Escape'],
+    mac: ['Cmd+Enter', 'Escape'],
     match: 'key',
     guard: { noRepeat: true },
   },
-  // In-place text edit: Ctrl+Enter commits (ours-only)
+  // Delete the selected annotation / object (ours-only; not while focus is in a field)
+  {
+    id: 'pdf-22',
+    scope: 'pdf',
+    context: 'selection',
+    win: ['Delete', 'Backspace'],
+    mac: ['Delete', 'Backspace'],
+    match: 'key',
+    guard: {},
+  },
+  // Esc closes the innermost tool or overlay (ours-only)
+  {
+    id: 'pdf-23',
+    scope: 'pdf',
+    context: 'overlay',
+    win: ['Escape'],
+    mac: ['Escape'],
+    match: 'key',
+    guard: {},
+  },
+  // In-place text edit: Ctrl+Enter commits, Esc cancels, Backspace / Delete on an empty draft
+  // removes the run (ours-only)
   {
     id: 'pdf-24',
     scope: 'pdf',
     context: 'text-edit',
-    win: ['Ctrl+Enter'],
-    mac: ['Cmd+Enter'],
+    win: ['Ctrl+Enter', 'Escape', 'Backspace', 'Delete'],
+    mac: ['Cmd+Enter', 'Escape', 'Backspace', 'Delete'],
     match: 'key',
     guard: { noRepeat: true },
+  },
+  // Ask-AI popover: Enter submits, Esc closes (ours-only)
+  {
+    id: 'pdf-25',
+    scope: 'pdf',
+    context: 'ask',
+    win: ['Enter', 'Escape'],
+    mac: ['Enter', 'Escape'],
+    match: 'key',
+    guard: {},
+  },
+  // Dialogs: Enter confirms, Esc cancels
+  {
+    id: 'pdf-dialog-keys',
+    scope: 'pdf',
+    context: 'dialog',
+    win: ['Enter', 'Escape'],
+    mac: ['Enter', 'Escape'],
+    match: 'key',
+    guard: {},
   },
 ]
 

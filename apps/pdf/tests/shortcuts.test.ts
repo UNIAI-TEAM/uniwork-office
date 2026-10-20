@@ -4,16 +4,19 @@
  * keys no longer do, an IME composition / AltGr never fires, hints per platform,
  * and the dialogs ignore an Enter / Esc that belongs to the IME.
  */
-import { act, createElement, createRef } from 'react'
+import { act, createElement, createRef, useEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { ShortcutPlatform, ShortcutSurface } from '@genoffice/shortcuts'
+import { formatHint, type ShortcutPlatform, type ShortcutSurface } from '@genoffice/shortcuts'
+import { useRibbonCollapse, type RibbonCollapse } from '@genoffice/ui'
 import { navKeyAction } from '../src/renderer/keyNav'
 import {
   isCancelKey,
   isConfirmKey,
+  isContextKey,
   matchPdfKey,
   pdfHint,
+  pdfRibbonCollapseOptions,
   pdfTip,
   resolvePdfWindowKey,
   searchEnterDirection,
@@ -95,10 +98,9 @@ describe('pdf table chords fire their action', () => {
       mac({ key: '0', code: 'Digit0' }),
     ],
     [
-      // a German layout types "#" on the physical backslash key: the chord is by position
       'pdf-11 Fit toggle',
       'pdf-11',
-      win({ key: '#', code: 'Backslash' }),
+      win({ key: '\\', code: 'Backslash' }),
       mac({ key: '\\', code: 'Backslash' }),
     ],
     [
@@ -166,6 +168,273 @@ describe('the old colliding keys no longer fire', () => {
   it('Ctrl+0 resets the zoom (pdf-10) instead of fitting the width; Ctrl+\\ toggles the fit', () => {
     expect(fires('win', win({ key: '0', code: 'Digit0' }))).toBe('pdf-10')
     expect(fires('win', win({ key: '\\', code: 'Backslash' }))).toBe('pdf-11')
+  })
+})
+
+/** Windows layouts: `code → [unshifted, shifted]` for the keys the zoom and rotate chords use. */
+const LAYOUTS: Record<string, Record<string, readonly [string, string]>> = {
+  US: {
+    Equal: ['=', '+'],
+    Minus: ['-', '_'],
+    BracketLeft: ['[', '{'],
+    BracketRight: [']', '}'],
+    Backslash: ['\\', '|'],
+  },
+  German: {
+    Equal: ['´', '`'],
+    Minus: ['ß', '?'],
+    Slash: ['-', '_'],
+    BracketLeft: ['ü', 'Ü'],
+    BracketRight: ['+', '*'],
+    Backslash: ['#', "'"],
+  },
+  Spanish: {
+    Equal: ['¡', '¿'],
+    Minus: ["'", '?'],
+    Slash: ['-', '_'],
+    BracketLeft: ['`', '^'],
+    BracketRight: ['+', '*'],
+    Backslash: ['ç', 'Ç'],
+  },
+  Italian: {
+    Equal: ['ì', '^'],
+    Minus: ["'", '?'],
+    Slash: ['-', '_'],
+    BracketLeft: ['è', 'é'],
+    BracketRight: ['+', '*'],
+    Backslash: ['ù', '§'],
+  },
+}
+
+/** A Ctrl chord pressed on `layout`: the key a layout types at `code`, with or without Shift. */
+function press(layout: string, code: string, shift = false): Init {
+  const [plain, shifted] = LAYOUTS[layout]![code] ?? ['', '']
+  return win({ key: shift ? shifted : plain, code, shiftKey: shift })
+}
+
+const NON_US = ['German', 'Spanish', 'Italian']
+
+describe('zoom on US, German, Spanish and Italian layouts (the matcher compares the character)', () => {
+  it('US: Ctrl+= and Ctrl+Shift+= zoom in, Ctrl+- zooms out, Ctrl+[ / Ctrl+] rotate, Ctrl+\\ fits', () => {
+    expect(fires('win', press('US', 'Equal'))).toBe('pdf-08')
+    expect(fires('win', press('US', 'Equal', true))).toBe('pdf-08')
+    expect(fires('win', press('US', 'Minus'))).toBe('pdf-09')
+    expect(fires('win', press('US', 'BracketLeft'))).toBe('pdf-12')
+    expect(fires('win', press('US', 'BracketRight'))).toBe('pdf-12')
+    expect(fires('win', press('US', 'Backslash'))).toBe('pdf-11')
+  })
+
+  it.each(NON_US)('%s: Ctrl + "+" zooms in and Ctrl + "-" zooms out; neither rotates', (layout) => {
+    // "+" sits on the physical BracketRight key, "-" on the physical Slash key
+    expect(fires('win', press(layout, 'BracketRight')), 'plus').toBe('pdf-08')
+    expect(fires('win', press(layout, 'Slash')), 'minus').toBe('pdf-09')
+    const plus = resolvePdfWindowKey(keydown(press(layout, 'BracketRight')), {
+      inEditable: false,
+      documentUndo: true,
+      platform: 'win',
+      surface: 'desktop',
+    })
+    expect(plus?.action.id).toBe('pdf-08')
+    expect(plus?.rotate).toBeUndefined()
+  })
+
+  it('German: the "#" key (the US backslash position) is not the fit toggle, Ctrl + backslash is', () => {
+    // by position only where a key types no ASCII character; "#" is ASCII
+    expect(fires('win', press('German', 'Backslash'))).toBeNull()
+    expect(fires('win', win({ key: '\\', code: 'Backslash' }))).toBe('pdf-11')
+  })
+
+  it.each(NON_US)('%s: the keys at the US [ / ] positions never rotate', (layout) => {
+    for (const code of ['BracketLeft', 'BracketRight']) {
+      const effect = resolvePdfWindowKey(keydown(press(layout, code)), {
+        inEditable: false,
+        documentUndo: true,
+        platform: 'win',
+        surface: 'desktop',
+      })
+      expect(effect?.rotate, `${layout} ${code}`).toBeUndefined()
+    }
+  })
+
+  it('the keypad zooms: Ctrl+NumpadAdd / NumpadSubtract / Numpad0 on both platforms and surfaces', () => {
+    for (const surface of ['desktop', 'web'] as const) {
+      for (const [platform, modifier] of [
+        ['win', { ctrlKey: true }],
+        ['mac', { metaKey: true }],
+      ] as const) {
+        const f = (init: Init) => fires(platform, { ...modifier, ...init }, surface)
+        expect(f({ key: '+', code: 'NumpadAdd' }), `${platform} ${surface} +`).toBe('pdf-08')
+        expect(f({ key: '-', code: 'NumpadSubtract' }), `${platform} ${surface} -`).toBe('pdf-09')
+        expect(f({ key: '0', code: 'Numpad0' }), `${platform} ${surface} 0`).toBe('pdf-10')
+      }
+    }
+  })
+
+  it('Ctrl+Shift+= and Shift+Cmd+= (the + key of a US layout) zoom in', () => {
+    expect(fires('win', win({ key: '+', code: 'Equal', shiftKey: true }))).toBe('pdf-08')
+    expect(fires('mac', mac({ key: '+', code: 'Equal', shiftKey: true }))).toBe('pdf-08')
+  })
+
+  it('a keypad key without Ctrl / Cmd, and Ctrl+Alt+keypad, are not zoom', () => {
+    expect(fires('win', { key: '+', code: 'NumpadAdd' })).toBeNull()
+    expect(fires('win', win({ key: '+', code: 'NumpadAdd', altKey: true }))).toBeNull()
+  })
+})
+
+describe('bare keys are table rows in their own context', () => {
+  const plain = (key: string, extra: Init = {}): Init => ({
+    key,
+    code: key === ' ' ? 'Space' : key,
+    ...extra,
+  })
+
+  it('the window-level keymap (no context) does not see a bare key', () => {
+    for (const key of ['Enter', 'Escape', ' ', 'PageDown', 'Home', 'ArrowLeft', 'Delete']) {
+      expect(fires('win', plain(key))).toBeNull()
+    }
+  })
+
+  it.each([
+    ['page-box', 'Enter', 'pdf-13'],
+    ['nav', ' ', 'pdf-14'],
+    ['nav', 'PageDown', 'pdf-14'],
+    ['nav', 'PageUp', 'pdf-14'],
+    ['nav', 'Home', 'pdf-15'],
+    ['nav', 'End', 'pdf-15'],
+    ['nav', 'ArrowUp', 'pdf-15'],
+    ['nav', 'ArrowDown', 'pdf-15'],
+    ['nav', 'ArrowLeft', 'pdf-16'],
+    ['nav', 'ArrowRight', 'pdf-16'],
+    ['selection', 'Delete', 'pdf-22'],
+    ['selection', 'Backspace', 'pdf-22'],
+    ['overlay', 'Escape', 'pdf-23'],
+    ['text-edit', 'Escape', 'pdf-24'],
+    ['text-edit', 'Backspace', 'pdf-24'],
+    ['note', 'Escape', 'pdf-21'],
+    ['ask', 'Enter', 'pdf-25'],
+    ['ask', 'Escape', 'pdf-25'],
+    ['dialog', 'Enter', 'pdf-dialog-keys'],
+    ['dialog', 'Escape', 'pdf-dialog-keys'],
+  ])('%s: %s is %s on both platforms and surfaces', (context, key, id) => {
+    for (const platform of ['win', 'mac'] as const) {
+      for (const surface of ['desktop', 'web'] as const) {
+        expect(fires(platform, plain(key), surface, context), `${platform} ${surface}`).toBe(id)
+        expect(fires(platform, plain(key, { isComposing: true }), surface, context)).toBeNull()
+        expect(fires(platform, plain(key, { keyCode: 229 }), surface, context)).toBeNull()
+      }
+    }
+  })
+
+  it('Shift+Space is the Space row; any other Shift, Ctrl, Alt or Cmd chord is not a bare key', () => {
+    expect(fires('win', plain(' ', { shiftKey: true }), 'desktop', 'nav')).toBe('pdf-14')
+    for (const extra of [
+      { shiftKey: true },
+      { ctrlKey: true },
+      { altKey: true },
+      { metaKey: true },
+    ]) {
+      expect(fires('win', plain('Enter', extra), 'desktop', 'dialog')).toBeNull()
+      expect(fires('win', plain('ArrowLeft', extra), 'desktop', 'nav')).toBeNull()
+    }
+  })
+
+  it('isContextKey also needs the key to be the asked one', () => {
+    expect(isContextKey(keydown(plain('Enter')), 'dialog', 'Enter')).toBe(true)
+    expect(isContextKey(keydown(plain('Enter')), 'dialog', 'Escape')).toBe(false)
+    expect(isContextKey(keydown(plain('Enter')), 'nav', 'Enter')).toBe(false)
+  })
+
+  it('confirm and cancel read the context they are given', () => {
+    expect(isConfirmKey(keydown(plain('Enter')), 'page-box')).toBe(true)
+    expect(isConfirmKey(keydown(plain('Enter')), 'ask')).toBe(true)
+    expect(isCancelKey(keydown(plain('Escape')), 'overlay')).toBe(true)
+    expect(isCancelKey(keydown(plain('Escape')), 'page-box')).toBe(false)
+    expect(isCancelKey(keydown(plain('Escape')), 'nav')).toBe(false)
+  })
+})
+
+describe('the ribbon collapse key comes from common-10', () => {
+  it('hands the shared collapse row to the hook, per platform and surface', () => {
+    const options = pdfRibbonCollapseOptions('win', 'desktop')
+    expect(options.action.id).toBe('common-10')
+    expect(formatHint(options.action, 'win', 'desktop')).toBe('Ctrl+F1')
+    expect(formatHint(options.action, 'mac', 'desktop')).toBe('⌥⌘R')
+    // the common row keeps the desktop chord in a browser frame
+    expect(formatHint(options.action, 'win', 'web')).toBe('Ctrl+F1')
+    expect(pdfRibbonCollapseOptions('mac', 'web')).toMatchObject({
+      surface: 'web',
+      platform: 'mac',
+    })
+  })
+
+  describe('in a mounted ribbon', () => {
+    let root: Root | null = null
+    let host: HTMLDivElement | null = null
+
+    beforeAll(() => {
+      ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+    })
+
+    afterEach(async () => {
+      if (root) await act(async () => root?.unmount())
+      host?.remove()
+      root = null
+      host = null
+      try {
+        localStorage.clear()
+      } catch {
+        /* no storage in this environment */
+      }
+    })
+
+    function Probe(props: { surface: ShortcutSurface; sink: (state: RibbonCollapse) => void }) {
+      const state = useRibbonCollapse(
+        'pdf-test-ribbon',
+        { collapse: 'Collapse the ribbon', expand: 'Expand the ribbon' },
+        pdfRibbonCollapseOptions('win', props.surface),
+      )
+      useEffect(() => {
+        props.sink(state)
+      })
+      return null
+    }
+
+    async function mountProbe(surface: ShortcutSurface): Promise<() => RibbonCollapse> {
+      let latest: RibbonCollapse | null = null
+      host = document.createElement('div')
+      document.body.appendChild(host)
+      root = createRoot(host)
+      await act(async () => {
+        root!.render(createElement(Probe, { surface, sink: (s) => (latest = s) }))
+        await Promise.resolve()
+      })
+      return () => latest!
+    }
+
+    it('desktop: shows Ctrl+F1 in the tip, and Ctrl+F1 collapses the band', async () => {
+      const state = await mountProbe('desktop')
+      expect(state().shortcutLabel).toBe('Ctrl+F1')
+      expect(state().tabTip(true)).toBe('Collapse the ribbon (Ctrl+F1)')
+      await act(async () => {
+        window.dispatchEvent(keydown({ key: 'F1', code: 'F1', ctrlKey: true }))
+      })
+      expect(state().collapsed).toBe(true)
+      // an IME composition does not toggle it back
+      await act(async () => {
+        window.dispatchEvent(keydown({ key: 'F1', code: 'F1', ctrlKey: true, isComposing: true }))
+      })
+      expect(state().collapsed).toBe(true)
+    })
+
+    it('web frame: the same key and tip as the desktop (common-10 keeps the chord there)', async () => {
+      const state = await mountProbe('web')
+      expect(state().shortcutLabel).toBe('Ctrl+F1')
+      expect(state().tabTip(true)).toBe('Collapse the ribbon (Ctrl+F1)')
+      await act(async () => {
+        window.dispatchEvent(keydown({ key: 'F1', code: 'F1', ctrlKey: true }))
+      })
+      expect(state().collapsed).toBe(true)
+    })
   })
 })
 
@@ -237,11 +506,17 @@ describe('the window handler decision (resolvePdfWindowKey)', () => {
     expect(resolve('mac', mac({ key: ']', code: 'BracketRight' }))?.rotate).toBe(90)
   })
 
-  it('German layout: Ctrl + "+" (zoom in on the physical bracket key) and Ctrl + "ü" do not rotate', () => {
-    // the matcher answers by position, the handler checks the printed character
-    expect(fires('win', win({ key: '+', code: 'BracketRight' }))).toBe('pdf-12')
-    expect(resolve('win', win({ key: '+', code: 'BracketRight' }))).toBeNull()
+  it('German layout: Ctrl + "+" zooms in (the matcher compares the character), it does not rotate', () => {
+    // "+" sits on the physical BracketRight key of a German layout
+    expect(fires('win', win({ key: '+', code: 'BracketRight' }))).toBe('pdf-08')
+    expect(resolve('win', win({ key: '+', code: 'BracketRight' }))?.action.id).toBe('pdf-08')
+    expect(resolve('win', win({ key: '+', code: 'BracketRight' }))?.rotate).toBeUndefined()
+  })
+
+  it('German layout: Ctrl + "ü" (no ASCII character, so by position) never rotates', () => {
+    expect(fires('win', win({ key: 'ü', code: 'BracketLeft' }))).toBe('pdf-12')
     expect(resolve('win', win({ key: 'ü', code: 'BracketLeft' }))).toBeNull()
+    expect(resolve('win', win({ key: 'ö', code: 'Semicolon' }))).toBeNull()
   })
 
   it('fit toggle and rotate never run inside a text field', () => {
