@@ -288,6 +288,69 @@ describe('UniWork transport', () => {
     expect(await codeOf(transport.billing('../admin', 'at'))).toBe('invalid_request')
   })
 
+  // Mirrors the D server's OrgMembershipSDO (server/internal/handler/dto/sdo/people.go,
+  // struct OrgMembershipSDO): GET /orgs/{org}/members/me answers a FLAT body
+  // `{role, deactivated_at?, platform_role?}`, never `{membership: {...}}`.
+  describe('orgMembership mirrors the D OrgMembershipSDO (flat body)', () => {
+    const membershipOf = (body: unknown) => {
+      const fetch = vi.fn<FetchLike>(async () => json(200, body))
+      const transport = createUniworkTransport(profile, { fetch })
+      return { transport, fetch }
+    }
+
+    it('reads the SDO example and omits the empty optional fields', async () => {
+      const { transport, fetch } = membershipOf({
+        role: 'owner',
+        deactivated_at: '',
+        platform_role: '',
+      })
+      const result = await transport.orgMembership('acme', 'at')
+      expect(result).toEqual({ role: 'owner' })
+      expect(Object.keys(result)).toEqual(['role'])
+      expect(fetch.mock.calls[0][0]).toBe('https://uniwork.example/api/v1/orgs/acme/members/me')
+    })
+
+    it('reads a bare active member', async () => {
+      expect(await membershipOf({ role: 'member' }).transport.orgMembership('acme', 'at')).toEqual({
+        role: 'member',
+      })
+    })
+
+    it('keeps a non-empty deactivated_at', async () => {
+      expect(
+        await membershipOf({
+          role: 'member',
+          deactivated_at: '2026-09-07T09:00:00Z',
+        }).transport.orgMembership('acme', 'at'),
+      ).toEqual({ role: 'member', deactivatedAt: '2026-09-07T09:00:00Z' })
+    })
+
+    it('keeps a platform_role', async () => {
+      expect(
+        await membershipOf({ role: 'admin', platform_role: 'support' }).transport.orgMembership(
+          'acme',
+          'at',
+        ),
+      ).toEqual({ role: 'admin', platformRole: 'support' })
+    })
+
+    it.each([
+      ['a string', 'owner'],
+      ['an array', [{ role: 'owner' }]],
+      ['null', null],
+      ['a missing role', { deactivated_at: '' }],
+      ['a non-string role', { role: 3 }],
+      ['an empty role', { role: '' }],
+      ['the old wrapped shape', { membership: { role: 'owner' } }],
+      ['a non-string deactivated_at', { role: 'member', deactivated_at: 5 }],
+      ['a non-string platform_role', { role: 'member', platform_role: {} }],
+    ])('refuses %s as malformed_response', async (_name, body) => {
+      expect(await codeOf(membershipOf(body).transport.orgMembership('acme', 'at'))).toBe(
+        'malformed_response',
+      )
+    })
+  })
+
   it('refuses an http origin outside dev loopback', () => {
     expect(() =>
       createUniworkTransport({ ...profile, apiOrigin: 'http://uniwork.example' }),

@@ -133,6 +133,7 @@ import { createModuleSaveRequester } from './uniwork-docs/module-save'
 import { createSourceSaveHint } from './uniwork-docs/source-view'
 import { saveTabToUniWork } from './uniwork-docs/first-save-open'
 import { mergeEditorStates, startEditorStatePoll } from './uniwork-docs/editor-state-poll'
+import { createActiveDocRefresh } from './uniwork-docs/active-doc-refresh'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
@@ -3695,6 +3696,9 @@ function createShellWindow(): void {
   win.on('focus', () => {
     tabManager?.refreshActiveTargets()
     tabManager?.focusActiveView()
+    // S18: coming back to the app re-reads the open document, so a rename made
+    // on the web shows without waiting for the feed
+    activeDocRefresh.gainedFocus(tabManager?.activeFilePath())
   })
 
   const manager = new TabManager(
@@ -3703,13 +3707,7 @@ function createShellWindow(): void {
       win.webContents.send(TABS_CHANNELS.changed, manager.list())
       publishOpenDocumentsIfOwner([...manager.openFilePaths(), ...detachedFilePaths()])
       // a UniWork copy written outside the save hook shows as dirty once its tab is active
-      const active = manager.activeFilePath()
-      if (active !== lastActiveDocPath) {
-        lastActiveDocPath = active
-        // a conflict dialog names one document: it closes when that tab is left
-        uniworkDocs?.service.noteActivePath(active)
-        void uniworkDocs?.service.refreshPath(active).catch(() => undefined)
-      }
+      activeDocRefresh.tabsChanged(manager.activeFilePath())
     },
     applyMenuFor,
     // no extension: these tabs have no file on disk yet; the title becomes the
@@ -4109,8 +4107,11 @@ const droppedFilesDeps = () => ({
 })
 
 let uniworkDocs: UniworkDocsHandle | null = null
-/** the active tab's file at the last tab change (UniWork re-checks it on activation) */
-let lastActiveDocPath: string | undefined
+/** re-checks the active UniWork document on a tab switch and when the user comes back to it */
+const activeDocRefresh = createActiveDocRefresh({
+  noteActivePath: (path) => uniworkDocs?.service.noteActivePath(path),
+  refreshPath: (path) => uniworkDocs?.service.refreshPath(path) ?? Promise.resolve(),
+})
 
 /** the tab or detached window showing a path (UniWork documents: Save, reload) */
 function webContentsForPath(
@@ -5757,7 +5758,10 @@ function registerTabsIpc(): void {
   ipcMain.handle(TABS_CHANNELS.list, () => tabManager?.list() ?? [])
   ipcMain.handle(TABS_CHANNELS.activate, (_event, id: unknown) => {
     if (typeof id !== 'string' || !id) return
+    const before = tabManager?.activeFilePath()
     if (!activateDetached(id)) tabManager?.activateTab(id)
+    // a click on the tab that is already active is no tab switch: re-read it here
+    if (tabManager?.activeFilePath() === before) activeDocRefresh.gainedFocus(before)
   })
   ipcMain.handle(TABS_CHANNELS.close, (_event, id: unknown) => {
     if (typeof id !== 'string' || !id) return
