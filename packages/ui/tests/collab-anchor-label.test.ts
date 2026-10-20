@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { anchorLabel } from '../src/collab/anchor-label'
 import { AnchorLabel } from '../src/collab/AnchorLabel'
+import { collabPanelStrings } from '../src/strings-collab-panel'
 
 const STRINGS = {
   collabAnchorDocx: 'Đoạn “{quote}”',
@@ -11,7 +12,7 @@ const STRINGS = {
   collabAnchorSlide: 'Slide {slide}',
   collabAnchorPage: 'Trang {page}',
   collabAnchorStale: 'Vị trí có thể đã thay đổi',
-  collabAnchorLost: 'Không còn tìm thấy vị trí được bình luận',
+  collabAnchorLost: 'Đoạn được bình luận không còn trong bản hiện tại',
 }
 
 let host: HTMLDivElement
@@ -226,14 +227,27 @@ describe('AnchorLabel', () => {
     const state = render({ anchor: docx, state: 'lost' }).querySelector(
       '.collab-anchor-state',
     ) as HTMLElement
-    expect(state.textContent).toBe('Không còn tìm thấy vị trí được bình luận')
+    expect(state.textContent).toBe('Đoạn được bình luận không còn trong bản hiện tại')
     expect(state.classList.contains('collab-anchor-state-lost')).toBe(true)
+  })
+
+  it('lost renders the shipped copy of vi and en with the same class and words', () => {
+    for (const [lang, text] of [
+      ['vi', 'Đoạn được bình luận không còn trong bản hiện tại'],
+      ['en', 'The commented passage is not in the current version'],
+    ] as const) {
+      const strings = { ...STRINGS, ...collabPanelStrings[lang] }
+      const state = render({ anchor: docx, state: 'lost', strings }).querySelector(
+        '.collab-anchor-state-lost',
+      ) as HTMLElement
+      expect(state.textContent).toBe(text)
+    }
   })
 
   it('lost with a position that cannot be labelled still shows the state text', () => {
     const el = render({ anchor: { format: 'docx', v: 1, quote: '' }, state: 'lost' })
     expect(el.querySelector('.collab-anchor-label')).toBeNull()
-    expect(el.textContent).toBe('Không còn tìm thấy vị trí được bình luận')
+    expect(el.textContent).toBe('Đoạn được bình luận không còn trong bản hiện tại')
   })
 
   it('exposes ids so the thread can name itself from them', () => {
