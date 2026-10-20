@@ -1034,7 +1034,7 @@ describe('text formatting shortcuts', () => {
   ] as const)('toggles %s on selected shapes with Command+%s', (key, kind) => {
     const ctx = makeCtx({ selectedIds: ['a'] })
     const e = keydown(key)
-    handleGlobalKeydown(ctx, e)
+    handleGlobalKeydown(ctx, e, 'MacIntel')
     expect(e.defaultPrevented).toBe(true)
     expect(styleActions.onTextToggle).toHaveBeenCalledWith(ctx, kind)
   })

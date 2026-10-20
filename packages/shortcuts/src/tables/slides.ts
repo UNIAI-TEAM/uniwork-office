@@ -739,7 +739,93 @@ export const slidesNotes: readonly ShortcutNote[] = [
 // @generated-end
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
-const manual: readonly ShortcutAction[] = []
+const manual: readonly ShortcutAction[] = [
+  // Redo: PowerPoint's Ctrl+Y / Cmd+Y first (menus show it); the old Shift+Z chord stays
+  {
+    id: 'slides-08',
+    scope: 'slides',
+    win: ['Ctrl+Y', 'Ctrl+Shift+Z'],
+    mac: ['Cmd+Y', 'Shift+Cmd+Z'],
+    match: 'key',
+    guard: {},
+  },
+  // Duplicate object: PowerPoint for Mac's Control+D first, the old Cmd+D stays
+  {
+    id: 'slides-16',
+    scope: 'slides',
+    win: ['Ctrl+D'],
+    mac: ['Ctrl+D', 'Cmd+D'],
+    web: { win: ['Ctrl+D'], mac: ['Cmd+D'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Move the selected slides one up / down (the handler reads the direction from the key)
+  {
+    id: 'slides-19',
+    scope: 'slides',
+    win: ['Ctrl+Up', 'Ctrl+Down'],
+    mac: ['Cmd+Up', 'Cmd+Down'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Move the selected slides to the start / end
+  {
+    id: 'slides-20',
+    scope: 'slides',
+    win: ['Ctrl+Shift+Up', 'Ctrl+Shift+Down'],
+    mac: ['Shift+Cmd+Up', 'Shift+Cmd+Down'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Start the show from the beginning: F5; PowerPoint for Mac adds Shift+Cmd+Return
+  {
+    id: 'slides-22',
+    scope: 'slides',
+    win: ['F5'],
+    mac: ['Shift+Cmd+Enter', 'F5'],
+    web: { win: ['Ctrl+F5'], mac: ['Shift+Cmd+Enter'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Group: PowerPoint for Mac's Cmd+Option+G first, the old Cmd+G stays on the desktop
+  {
+    id: 'slides-37',
+    scope: 'slides',
+    win: ['Ctrl+G'],
+    mac: ['Alt+Cmd+G', 'Cmd+G'],
+    web: { win: ['Ctrl+G'], mac: ['Alt+Cmd+G'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Ungroup: PowerPoint for Mac's Cmd+Option+Shift+G first, the old Shift+Cmd+G stays
+  {
+    id: 'slides-38',
+    scope: 'slides',
+    win: ['Ctrl+Shift+G'],
+    mac: ['Alt+Shift+Cmd+G', 'Shift+Cmd+G'],
+    web: { win: ['Ctrl+Shift+G'], mac: ['Alt+Shift+Cmd+G'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Rotate the selection 15 degrees right / left (direction from the key)
+  {
+    id: 'slides-43',
+    scope: 'slides',
+    win: ['Alt+Right', 'Alt+Left'],
+    mac: ['Alt+Right', 'Alt+Left'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Insert hyperlink; Ask AI is button-only now (contract D2/D4, OFFICE-WINS)
+  {
+    id: 'slides-59',
+    scope: 'slides',
+    win: ['Ctrl+K'],
+    mac: ['Cmd+K'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+]
 
 export const slidesShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
 
