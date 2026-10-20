@@ -14,8 +14,10 @@ import type {
   UniworkSearchPage,
   UniworkSearchQuery,
   UniworkSharedQuery,
+  UniworkSourceDownloadInput,
   UniworkTreeChangedEvent,
 } from '../../shared/home-api'
+import type { UniworkDocShelveResult } from '../../shared/home-api'
 import type { DocNameError, NewDocFormat } from './uniwork-docs-model'
 
 /**
@@ -128,6 +130,9 @@ interface ActionsBridge {
   uniworkMoveDocument?(i: UniworkMoveDocumentInput): Promise<DocActionResult<UniworkMoveResult>>
   onUniworkTreeChanged?(cb: (event: UniworkTreeChangedEvent) => void): () => void
   onUniworkDocRenamed?(cb: (event: DocRenamedEvent) => void): () => void
+  uniworkDownloadSource?(
+    input: UniworkSourceDownloadInput,
+  ): Promise<UniworkResult<{ path: string | null }>>
 }
 
 const unavailable = { ok: false, error: 'server_error' } as const
@@ -221,6 +226,13 @@ export function moveDocument(
   return settleAct(actions().uniworkMoveDocument?.(input))
 }
 
+/** UNI-1961: save a Documents-home source file through the save dialog (path null = cancelled) */
+export function downloadSource(
+  input: UniworkSourceDownloadInput,
+): Promise<UniworkResult<{ path: string | null }>> {
+  return settleRead(actions().uniworkDownloadSource?.(input))
+}
+
 /** a workspace's tree changed (feed page or an own action, coalesced in main) */
 export function onTreeChanged(cb: (event: UniworkTreeChangedEvent) => void): () => void {
   return actions().onUniworkTreeChanged?.(cb) ?? (() => undefined)
@@ -234,4 +246,39 @@ export function onDocRenamed(cb: (event: DocRenamedEvent) => void): () => void {
 /** SIZE-F1: save the bound document's working copy to a user-chosen local path */
 export function saveLocalCopy(path: string): Promise<boolean> {
   return actions().uniworkSaveLocalCopy?.(path) ?? Promise.resolve(false)
+}
+
+// ── UNI-1961: the Lưu trữ (Archive) shelf ───────────────
+// The shelf list itself is read through the Documents home adapter
+// (fetchDocumentsHomePage); these are its two row commands.
+
+interface ShelvedBridge {
+  uniworkUnshelveDocument?(documentId: string): Promise<DocActionResult<UniworkDocShelveResult>>
+  uniworkTrashShelvedDocument?(documentId: string): Promise<DocActionResult<UniworkDocSummary>>
+  uniworkShelveDocument?(documentId: string): Promise<DocActionResult<UniworkDocShelveResult>>
+}
+
+function shelvedActions(): ShelvedBridge {
+  return window.aiOffice as unknown as ShelvedBridge
+}
+
+/** Bỏ lưu trữ: the item and its same-batch descendants the caller manages */
+export function unshelveDocument(
+  documentId: string,
+): Promise<DocActionResult<UniworkDocShelveResult>> {
+  return settleAct(shelvedActions().uniworkUnshelveDocument?.(documentId))
+}
+
+/** Chuyển vào thùng rác from Lưu trữ, for a shelved item of any kind */
+export function trashShelvedDocument(
+  documentId: string,
+): Promise<DocActionResult<UniworkDocSummary>> {
+  return settleAct(shelvedActions().uniworkTrashShelvedDocument?.(documentId))
+}
+
+/** Lưu trữ a live item from its row (the web's row ⋯ "Lưu trữ") */
+export function shelveDocument(
+  documentId: string,
+): Promise<DocActionResult<UniworkDocShelveResult>> {
+  return settleAct(shelvedActions().uniworkShelveDocument?.(documentId))
 }

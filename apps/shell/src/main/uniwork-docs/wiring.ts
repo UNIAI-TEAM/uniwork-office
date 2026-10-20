@@ -29,6 +29,8 @@ import {
   type UniworkMoveDocumentInput,
   type UniworkRemoteAction,
   type UniworkSearchQuery,
+  type UniworkSourceDownloadInput,
+  type UniworkSourceListQuery,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
 } from '../../shared/home-api'
@@ -888,6 +890,12 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listTrash, (_event, query: unknown) =>
     service.listTrash((query ?? {}) as UniworkDocListQuery),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
+    service.listSources((query ?? {}) as UniworkSourceListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.downloadSource, (_event, input: unknown) =>
+    service.downloadSource((input ?? {}) as UniworkSourceDownloadInput),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.documentProperties, (_event, documentId: unknown) =>
     service.documentProperties(documentId as string),
   )
@@ -916,6 +924,19 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
     service.restoreDocument(documentId as string),
+  )
+  // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf, Bỏ lưu trữ and trash from Lưu trữ
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listShelved, (_event, query: unknown) =>
+    service.listShelved((query ?? {}) as UniworkDocListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.unshelveDocument, (_event, documentId: unknown) =>
+    service.unshelveDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.trashShelvedDocument, (_event, documentId: unknown) =>
+    service.trashShelvedDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.shelveDocument, (_event, documentId: unknown) =>
+    service.shelveDocument(documentId as string),
   )
   // FD-11: the folder-tree surface
   ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, (_event, workspaceId: unknown) =>

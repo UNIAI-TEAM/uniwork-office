@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ja = {
-  ufRoot: 'UniWork',
+  ufRoot: 'ドキュメント（ルート）',
   ufTreeLabel: 'フォルダー',
   ufContentsLabel: 'フォルダーの内容',
   ufRecent: '最近',

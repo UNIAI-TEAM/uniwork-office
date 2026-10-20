@@ -74,6 +74,7 @@ import type {
   UniworkResult,
   UniworkSearchPage,
   UniworkSearchQuery,
+  UniworkSourceListPage,
   UniworkSharedPage,
   UniworkSharedQuery,
   UniworkTreeChangedEvent,
@@ -90,6 +91,7 @@ import {
   UNIWORK_DOC_CHANNELS,
   UNIWORK_LOCK_REASONS,
 } from '../shared/home-api'
+import type { UniworkDocShelveResult } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
 import type {
   IntegrationsApi,
@@ -1186,6 +1188,16 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listTrash, q),
     )
   },
+  async uniworkListSources(q) {
+    return asUniworkResult<UniworkSourceListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listSources, q),
+    )
+  },
+  async uniworkDownloadSource(input) {
+    return asUniworkResult<{ path: string | null }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.downloadSource, input),
+    )
+  },
   async uniworkDocumentProperties(documentId: string) {
     return asUniworkResult<UniworkDocProperties>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.documentProperties, documentId),
@@ -1237,6 +1249,27 @@ const homeApi: HomeApi = {
   async uniworkRestoreDocument(documentId: string) {
     return asUniworkActionResult<UniworkDocSummary>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.restoreDocument, documentId),
+    )
+  },
+  // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf
+  async uniworkListShelved(q) {
+    return asUniworkResult<UniworkDocListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listShelved, q),
+    )
+  },
+  async uniworkUnshelveDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocShelveResult>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.unshelveDocument, documentId),
+    )
+  },
+  async uniworkTrashShelvedDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.trashShelvedDocument, documentId),
+    )
+  },
+  async uniworkShelveDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocShelveResult>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.shelveDocument, documentId),
     )
   },
   async uniworkFolderTree(workspaceId: string) {

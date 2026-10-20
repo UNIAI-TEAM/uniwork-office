@@ -1,7 +1,17 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { open, readdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
-import { createHash, randomUUID } from 'node:crypto'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import {
+  lstat,
+  open,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
   SignOutPlan,
@@ -39,6 +49,9 @@ import type {
   UniworkRemoteAction,
   UniworkRemoteBar,
   UniworkResult,
+  UniworkSourceDownloadInput,
+  UniworkSourceListPage,
+  UniworkSourceListQuery,
   UniworkSearchPage,
   UniworkSearchQuery,
   UniworkSharedPage,
@@ -48,6 +61,7 @@ import type {
   UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
+import type { UniworkDocShelveResult } from '../../shared/home-api'
 import type {
   UniworkConflictAction,
   UniworkConflictIntentBlock,
@@ -82,6 +96,8 @@ import {
   type UniworkCreateTarget,
   type UniworkDocsClient,
   createUniworkDocsClient,
+  uniworkId,
+  uniworkSourceId,
 } from './client'
 import {
   createUniworkEditLockClient,
@@ -577,6 +593,34 @@ function parseOffsetCursor(cursor: string | undefined): number {
   return match ? Number(match[1]) : 0
 }
 
+/** UNI-1961: a source file's suggested save name: its last segment, never a path */
+function sourceFileName(name: unknown): string {
+  const last = typeof name === 'string' ? (name.split(/[\\/]/).pop() ?? '') : ''
+  // eslint-disable-next-line no-control-regex -- a file name never carries control characters
+  const clean = last.replace(/[<>:"|?*\u0000-\u001f]/g, '').trim()
+  if (!clean || clean === '.' || clean === '..') return 'download'
+  if (clean.length <= 200) return clean
+  const rawExt = extname(clean)
+  const ext = rawExt.length > 1 && rawExt.length <= 32 ? rawExt : ''
+  return `${clean.slice(0, 200 - ext.length)}${ext}`
+}
+
+async function resolvePhysicalPath(targetPath: string): Promise<string> {
+  let current = resolve(targetPath)
+  const tail: string[] = []
+  for (;;) {
+    try {
+      const real = await realpath(current)
+      return tail.length > 0 ? join(real, ...tail.reverse()) : real
+    } catch {
+      const parent = dirname(current)
+      if (parent === current) return resolve(targetPath)
+      tail.push(basename(current))
+      current = parent
+    }
+  }
+}
+
 async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
   try {
     return { ok: true, value: await run() }
@@ -944,10 +988,19 @@ function accessFor(level: string | null): UniworkDocAccess {
  */
 function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = false): Binding {
   const next = { ...binding }
+  const shelved = Boolean(detail.shelvedAt)
   const level = docLevelOf(detail.myLevel)
-  // a read-only copy (a view ticket, or a launch that asked to view) never shows a level above view
+  // a read-only copy (a view ticket, or a launch that asked to view) never shows a level above view;
+  // a shelved document keeps its real ACL in `level` while `shelved: true` and `access: 'view'`
+  // enforce read-only in main-process policy (R1-7)
   if (level) next.level = readOnly ? 'view' : level
   else delete next.level
+  if (shelved) {
+    next.shelved = true
+    next.access = 'view'
+  } else {
+    delete next.shelved
+  }
   if (detail.file.versionId && next.baseVersion === detail.file.version) {
     next.baseVersionId = detail.file.versionId
   }
@@ -1212,6 +1265,12 @@ export class UniworkDocsService {
    * set would swallow it) and is followed as usual.
    */
   private readonly selfRenamed = new Map<string, string>()
+  /**
+   * UNI-1961 (R4-1): per-document generation advanced on each successful own
+   * shelve/unshelve transition so a metadata GET begun beforehand cannot
+   * overwrite the local transition with a stale shelved answer.
+   */
+  private readonly localPolicyGen = new Map<string, number>()
   /**
    * UNI-1959: documents this app created blank from the menu / strip / default
    * name (`createDocument`) and has not had a first save for yet; their first
@@ -4266,6 +4325,7 @@ export class UniworkDocsService {
     // the document key the in-memory lock map is keyed by.
     return (
       found.doc.binding.access === 'view' ||
+      found.doc.binding.shelved === true ||
       !this.ownsLocally(found.doc) ||
       this.coordinator.isOtherWindow(found.doc.key) ||
       this.editLockReadOnly(found.doc.path)
@@ -4714,32 +4774,55 @@ export class UniworkDocsService {
    * response arriving after sign-out, account switch, organization change, or
    * `lockSession` must not reopen a coalescer window for the outgoing scope.
    */
-  private captureActionSessionOrNull(): { identity: SessionIdentity; epoch: number } | null {
+  private captureActionSessionOrNull(): {
+    identity: SessionIdentity
+    epoch: number
+    apiOrigin: string | null
+  } | null {
     const identity = this.liveIdentity()
     if (!identity) return null
     if (this.sessionOrgId === undefined) {
-      this.sessionOrgId = this.deps.selectedOrg()?.id ?? null
+      this.sessionOrgId = this.deps.selectedOrg?.()?.id ?? null
     }
-    return { identity, epoch: this.sessionEpoch }
+    return {
+      identity,
+      epoch: this.sessionEpoch ?? 0,
+      apiOrigin: this.deps.profile?.()?.apiOrigin ?? null,
+    }
   }
 
-  private captureActionSession(): { identity: SessionIdentity; epoch: number } {
+  private captureActionSession(): {
+    identity: SessionIdentity
+    epoch: number
+    apiOrigin: string | null
+  } {
     const session = this.captureActionSessionOrNull()
     if (!session) throw new UniworkDocError('not_signed_in')
     return session
   }
 
-  /** the session that started an async action is still the live one (same epoch, same device session) */
-  private sessionLive(started: { identity: SessionIdentity; epoch: number }): boolean {
-    if (this.sessionEpoch !== started.epoch) return false
+  /** the session that started an async action is still the live one (same epoch, same device session, same origin) */
+  private sessionLive(started: {
+    identity: SessionIdentity
+    epoch: number
+    apiOrigin?: string | null
+  }): boolean {
+    if ((this.sessionEpoch ?? 0) !== started.epoch) return false
     const current = this.deps.identity()
     const owner = started.identity
-    return (
-      !!current &&
-      current.accountId === owner.accountId &&
-      current.deploymentId === owner.deploymentId &&
-      current.deviceSessionId === owner.deviceSessionId
-    )
+    if (
+      !current ||
+      current.accountId !== owner.accountId ||
+      current.deploymentId !== owner.deploymentId ||
+      current.deviceSessionId !== owner.deviceSessionId
+    ) {
+      return false
+    }
+    if (started.apiOrigin !== undefined) {
+      const currentOrigin = this.deps.profile?.()?.apiOrigin ?? null
+      if (currentOrigin !== started.apiOrigin) return false
+    }
+    return true
   }
 
   private pushTreeChangedFor(
@@ -6201,9 +6284,9 @@ export class UniworkDocsService {
   /** S18: restore an archived document (only its own archive batch comes back) */
   restoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const session = this.captureActionSession()
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
-      await this.requireManage(documentId)
+      await this.requireManageAnyKind(documentId, session)
       return this.api().restore(documentId, this.newIdempotencyKey())
     })
   }
@@ -6492,6 +6575,248 @@ export class UniworkDocsService {
     })
   }
 
+  /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (paged, shelved_at DESC) */
+  listShelved(q: {
+    workspaceId: string
+    cursor?: string
+    limit?: number
+    format?: UniworkDocFormat
+  }): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const { format } = this.listFiltersOf(q)
+      const page = await this.api().listShelved({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...(format ? { format } : {}),
+      })
+      const documents = await this.enrichShelvedRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** UNI-1961: the Documents home's "other sources" files (owner names come from the server) */
+  listSources(q: UniworkSourceListQuery): Promise<UniworkResult<UniworkSourceListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      return this.api().listSources({
+        workspaceId: q.workspaceId,
+        ...(typeof q.source === 'string' ? { source: q.source } : {}),
+        ...(typeof q.type === 'string' ? { type: q.type } : {}),
+        ...(typeof q.q === 'string' ? { q: q.q } : {}),
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+      })
+    })
+  }
+
+  /**
+   * UNI-1961: the updater and the shelver by name. An id the member list does
+   * not hold is a former member; with no member list at all nothing is
+   * guessed (the renderer shows "—").
+   */
+  private async enrichShelvedRows(
+    workspaceId: string,
+    rows: UniworkDocSummary[],
+  ): Promise<UniworkDocSummary[]> {
+    const names = await this.memberNamesForWorkspace(workspaceId)
+    if (names.size === 0) return rows
+    return rows.map((row) => {
+      const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
+      const shelvedByName = row.shelvedById ? names.get(row.shelvedById)?.trim() : undefined
+      return {
+        ...row,
+        ...(updatedByName ? { updatedByName } : {}),
+        ...(shelvedByName
+          ? { shelvedByName }
+          : row.shelvedById && !names.has(row.shelvedById)
+            ? { shelvedByFormer: true }
+            : {}),
+      }
+    })
+  }
+
+  /** UNI-1961: Bỏ lưu trữ, for a shelved item of any kind the caller manages */
+  unshelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>> {
+    return actionResult(async () => {
+      const session = this.captureActionSession()
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId, session)
+      const res = await this.api().unshelve(documentId, this.newIdempotencyKey())
+      await this.afterLocalShelveChange(session, documentId, false, res.affected)
+      return res
+    })
+  }
+
+  /**
+   * UNI-1961: Chuyển vào thùng rác from Lưu trữ - the same trash route as
+   * `archiveDocument`, gated by the kind-agnostic manage read so a shelved
+   * folder or page can go too (`archiveDocument` itself stays file-only).
+   */
+  trashShelvedDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      const session = this.captureActionSession()
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId, session)
+      const archived = await this.api().archive(documentId, this.newIdempotencyKey())
+      await this.endFirstSaveRecords(session, documentId)
+      return archived
+    })
+  }
+
+  /** UNI-1961: Lưu trữ a live item the caller manages (the web's row ⋯ "Lưu trữ") */
+  shelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>> {
+    return actionResult(async () => {
+      const session = this.captureActionSession()
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId, session)
+      const res = await this.api().shelve(documentId, this.newIdempotencyKey())
+      await this.afterLocalShelveChange(session, documentId, true, res.affected)
+      return res
+    })
+  }
+
+  /**
+   * UNI-1961 (R1-7): refresh any locally bound copy touched by a shelve or
+   * unshelve action so main-process read-only, save, comment, and edit-lock
+   * policy stay consistent with the server without altering the stored ACL (`level`).
+   */
+  private async afterLocalShelveChange(
+    session: { identity: SessionIdentity; epoch: number; apiOrigin?: string | null },
+    documentId: string,
+    shelved: boolean,
+    affected: readonly string[] = [],
+  ): Promise<void> {
+    if (!this.sessionLive(session) || typeof this.store?.dirFor !== 'function') return
+    const ids = new Set<string>([documentId, ...affected])
+    for (const id of ids) {
+      if (typeof id !== 'string' || !id) continue
+      const dir = this.store.dirFor(session.identity.deploymentId, session.identity.accountId, id)
+      const existing = await this.store.readDir(dir)
+      if (!existing || existing.documentId !== id) continue
+      const local = join(dir, existing.filename)
+      const doc = this.store.lookup(local)
+      if (!doc || doc.binding.documentId !== id || !this.store.exists(doc.path)) continue
+      if (shelved) await this.stopEditLock(doc.path, true)
+      if (!this.sessionLive(session)) return
+      const prevGen = this.localPolicyGen.get(id) ?? 0
+      let advancedGen = false
+      let fresh: BoundDocument | null
+      try {
+        fresh = await this.coordinator.updateBinding(doc, (latest) => {
+          const preservedLevel = latest.level ?? (latest.access === 'edit' ? 'edit' : undefined)
+          const next: Binding = {
+            ...latest,
+            ...(preservedLevel ? { level: preservedLevel } : {}),
+          }
+          if (shelved) {
+            next.shelved = true
+            next.access = 'view'
+          } else {
+            delete next.shelved
+            next.access = accessFor(next.level ?? null)
+          }
+          this.localPolicyGen.set(id, prevGen + 1)
+          advancedGen = true
+          return next
+        })
+      } catch (error) {
+        if (advancedGen) this.localPolicyGen.set(id, prevGen)
+        throw error
+      }
+      if (fresh) {
+        this.notifyDocStateChanged(fresh.path)
+        if (!shelved && fresh.binding.access === 'edit' && this.deps.isPathOpen(fresh.path)) {
+          this.startEditLock(fresh)
+        }
+      } else if (advancedGen) {
+        this.localPolicyGen.set(id, prevGen)
+      }
+    }
+  }
+
+  /** UNI-1961: manage (or admin_scope, the web's canManageTrashed) on a row of any kind */
+  private async requireManageAnyKind(
+    documentId: string,
+    session = this.captureActionSession(),
+  ): Promise<void> {
+    const ref = await this.api().documentManageRef(documentId)
+    if (!this.sessionLive(session)) throw new UniworkDocError('not_signed_in')
+    if (ref.myLevel !== 'manage' && !ref.adminScope) throw new UniworkDocError('forbidden')
+  }
+
+  /**
+   * UNI-1961: a source row's Download (the web's primary action when it cannot
+   * view the file): the save dialog suggests the file's own name, then the
+   * bytes are read and written there. A cancelled dialog reads nothing.
+   */
+  downloadSource(
+    input: UniworkSourceDownloadInput,
+  ): Promise<UniworkResult<{ path: string | null }>> {
+    return result(async () => {
+      if (!input || typeof input.workspaceId !== 'string' || typeof input.sourceId !== 'string') {
+        throw new UniworkDocError('not_found')
+      }
+      // refused ids never open the dialog
+      uniworkId(input.workspaceId)
+      uniworkSourceId(input.sourceId)
+      const target = (await this.deps.pickDownloadPath?.(sourceFileName(input.name))) ?? null
+      if (!target) return { path: null }
+      // A106 (UNI-1362) + R1-6: the working-copy root is the app's own folder
+      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+      const { bytes } = await this.api().downloadSource(input.workspaceId, input.sourceId)
+      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+      const resolvedTarget = resolve(target)
+      const tmp = join(dirname(resolvedTarget), `.uw-dl-${randomBytes(8).toString('hex')}.tmp`)
+      let createdTmp = false
+      try {
+        const existingStat = await lstat(resolvedTarget).catch(() => null)
+        const targetMode = existingStat?.isFile() ? existingStat.mode & 0o777 : 0o600
+        const handle = await open(tmp, 'wx', 0o600)
+        createdTmp = true
+        try {
+          await handle.writeFile(bytes)
+          await handle.chmod(targetMode)
+        } finally {
+          await handle.close()
+        }
+        if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+        await rename(tmp, resolvedTarget)
+      } catch (error) {
+        if (createdTmp) await unlink(tmp).catch(() => undefined)
+        throw error
+      }
+      return { path: target }
+    })
+  }
+
+  private async isForbiddenDownloadTarget(target: string): Promise<boolean> {
+    if (this.store.isInside(target)) return true
+    const resolvedTarget = resolve(target)
+    const linkStat = await lstat(resolvedTarget).catch(() => null)
+    if (linkStat?.isSymbolicLink()) return true
+    if (typeof this.store.root !== 'string' || !this.store.root) return false
+    const resolvedRoot = resolve(this.store.root)
+    const realRoot = await resolvePhysicalPath(resolvedRoot)
+    const insideRoot = (candidate: string): boolean => {
+      for (const root of [resolvedRoot, realRoot]) {
+        const rel = relative(root, resolve(candidate))
+        if (!rel || (!rel.startsWith('..') && !isAbsolute(rel))) return true
+      }
+      return false
+    }
+    if (insideRoot(resolvedTarget)) return true
+    const realParent = await resolvePhysicalPath(dirname(resolvedTarget))
+    if (insideRoot(join(realParent, basename(resolvedTarget)))) return true
+    const realTarget = await realpath(resolvedTarget).catch(() => null)
+    return realTarget !== null && insideRoot(realTarget)
+  }
+
   openDocument(documentId: string): Promise<UniworkResult<{ path: string }>> {
     return result(async () => {
       if (typeof documentId !== 'string') throw new UniworkDocError('not_found')
@@ -6615,7 +6940,8 @@ export class UniworkDocsService {
     if (!existing || existing.documentId !== documentId) return
     const local = join(dir, existing.filename)
     if (!this.store.exists(local)) return
-    if (KEEP_LOCAL_STATES.has(existing.state) || this.coordinator.isSaving(local)) return
+    if (this.coordinator.isSaving(local)) return
+    const policyGen = this.localPolicyGen.get(documentId) ?? 0
     let detail: DocumentDetail
     try {
       detail = await this.api().getDocument(documentId)
@@ -6627,17 +6953,57 @@ export class UniworkDocsService {
       if (verdict) await this.lockFromServer(documentId, verdict)
       return
     }
+    const currentIdentity = this.liveIdentity()
+    if (
+      !currentIdentity ||
+      currentIdentity.deploymentId !== identity.deploymentId ||
+      currentIdentity.accountId !== identity.accountId
+    ) {
+      return
+    }
     // the metadata read is async: a save may have started or settled, and an
-    // editor may have made the copy dirty, while it was in flight. The title is
-    // applied to the binding as it is NOW - never re-written from the one read
-    // before the await, which would clear that newer state (R1-4).
+    // editor may have made the copy dirty, while it was in flight. A shelved
+    // server verdict downgrades the latest binding to read-only through the
+    // coordinator's per-key chain independently of dirty/title handling
+    // (R1-7 residual), never upgrading in the reverse direction; the title is
+    // applied only when the copy is still clean and idle (R1-4).
     const latest = await this.store.readDir(dir)
     if (!latest || latest.documentId !== documentId) return
     const latestLocal = join(dir, latest.filename)
-    if (!this.store.exists(latestLocal)) return
-    if (KEEP_LOCAL_STATES.has(latest.state) || this.coordinator.isSaving(latestLocal)) return
-    if (detail.title === latest.title) return
-    await this.applyTitle(latest, detail.title, latestLocal, true)
+    const doc = this.store.lookup(latestLocal)
+    if (!doc || !this.store.exists(doc.path)) return
+    let after: BoundDocument | null = doc
+    if (detail.shelvedAt && (this.localPolicyGen.get(documentId) ?? 0) === policyGen) {
+      await this.stopEditLock(doc.path, true)
+      let policyChanged = false
+      try {
+        const refreshed = await this.coordinator.updateBinding(doc, (cur) => {
+          if ((this.localPolicyGen.get(documentId) ?? 0) !== policyGen) return null
+          if (cur.state === 'blocked') return null
+          if (cur.shelved && cur.access === 'view') return null
+          policyChanged = true
+          const preservedLevel = cur.level ?? (cur.access === 'edit' ? 'edit' : undefined)
+          return {
+            ...cur,
+            ...(preservedLevel ? { level: preservedLevel } : {}),
+            shelved: true,
+            access: 'view',
+          }
+        })
+        after = refreshed ?? this.store.lookup(doc.path)
+        if (policyChanged && after) this.notifyDocStateChanged(after.path)
+      } catch (error) {
+        console.warn(
+          `uniwork docs: shelving policy refresh for ${documentId} could not be persisted:`,
+          error instanceof UniworkDocError ? error.code : 'unknown',
+        )
+        return
+      }
+    }
+    if (!after || !this.store.exists(after.path)) return
+    if (KEEP_LOCAL_STATES.has(after.binding.state) || this.coordinator.isSaving(after.path)) return
+    if (detail.title === after.binding.title) return
+    await this.applyTitle(after.binding, detail.title, after.path, true)
   }
 
   /** the binding rewrite that follows a title change, plus the pushes it owes */
@@ -6776,7 +7142,12 @@ export class UniworkDocsService {
   /** a Save that can reach the UniWork step (not view, conflict, saving or blocked) */
   private canSave(doc: BoundDocument): boolean {
     const b = doc.binding
-    if (b.access === 'view' || b.state === 'conflict' || this.coordinator.isSaving(doc.path)) {
+    if (
+      b.access === 'view' ||
+      b.shelved === true ||
+      b.state === 'conflict' ||
+      this.coordinator.isSaving(doc.path)
+    ) {
       return false
     }
     // another window holds the document lock: this window is read-only and
@@ -8583,7 +8954,7 @@ export class UniworkDocsService {
       documentId: b.documentId,
       workspaceId: b.workspaceId,
       title: b.title,
-      access: b.access,
+      access: b.shelved ? 'view' : b.access,
     }
   }
 
@@ -8599,7 +8970,7 @@ export class UniworkDocsService {
     return {
       documentId: b.documentId,
       versionId: b.baseVersionId ?? null,
-      ...(b.level ? { level: b.level } : {}),
+      ...(b.shelved ? { level: 'view' } : b.level ? { level: b.level } : {}),
       myUserId: doc.userId,
     }
   }
@@ -8742,8 +9113,8 @@ export class UniworkDocsService {
       if (open) return this.focusOpen(open.path, open.title)
     }
     const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
-    const access: UniworkDocAccess =
-      viewTicket || viewRequested ? 'view' : accessFor(detail.myLevel)
+    const effectiveViewOnly = viewTicket || viewRequested || Boolean(detail.shelvedAt)
+    const access: UniworkDocAccess = effectiveViewOnly ? 'view' : accessFor(detail.myLevel)
     const dir = dirs[0]!
     const existing = await this.store.readDir(dir)
     const workspaceId = launch?.workspaceId ?? detail.workspaceId
@@ -8925,7 +9296,7 @@ export class UniworkDocsService {
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     const doc = this.store.lookup(path)
     if (doc) this.publish(toStatus(doc))
-    if (doc && doc.binding.access === 'edit') this.startEditLock(doc)
+    if (doc && doc.binding.access === 'edit' && !doc.binding.shelved) this.startEditLock(doc)
     return { path, title: binding?.title ?? doc?.binding.title ?? basename(path) }
   }
 }

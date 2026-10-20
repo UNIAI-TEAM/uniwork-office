@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const cs = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Dokumenty (kořen)',
   ufTreeLabel: 'Složky',
   ufContentsLabel: 'Obsah složky',
   ufRecent: 'Nedávné',

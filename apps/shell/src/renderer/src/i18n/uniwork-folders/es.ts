@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const es = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Documentos (raíz)',
   ufTreeLabel: 'Carpetas',
   ufContentsLabel: 'Contenido de la carpeta',
   ufRecent: 'Recientes',

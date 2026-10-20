@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const he = {
-  ufRoot: 'UniWork',
+  ufRoot: 'מסמכים (שורש)',
   ufTreeLabel: 'תיקיות',
   ufContentsLabel: 'תוכן התיקייה',
   ufRecent: 'אחרונים',

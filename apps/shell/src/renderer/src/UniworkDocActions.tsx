@@ -832,9 +832,12 @@ export function ActionToast({
   message,
   onDone,
   tone = 'error',
+  action,
 }: {
   message: string
   onDone: () => void
+  /** UNI-1961: one command beside the text (the web's toast action, e.g. Hoàn tác) */
+  action?: { label: string; onClick: () => void }
   /**
    * FD-11 'ok': a done note (moved, created). It has no live role: the caller
    * says it once through the shell's uniwork-live region instead.
@@ -863,6 +866,18 @@ export function ActionToast({
         <circle cx="8" cy="11.1" r="0.9" fill="currentColor" />
       </svg>
       <span className="uw-act-toast-text">{message}</span>
+      {action && (
+        <button
+          type="button"
+          className="uw-act-toast-action"
+          onClick={() => {
+            onDone()
+            action.onClick()
+          }}
+        >
+          {action.label}
+        </button>
+      )}
       <button
         type="button"
         className="uw-act-toast-close"

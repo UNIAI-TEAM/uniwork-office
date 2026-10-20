@@ -1,8 +1,11 @@
 import type {
   UniworkDocFormat,
+  UniworkDocShelveResult,
   UniworkDocSummary,
   UniworkEntryKind,
   UniworkFolderNode,
+  UniworkSourceFile,
+  UniworkSourceListPage,
   UniworkSystemKind,
 } from '../../shared/home-api'
 import { UniworkDocError } from './errors'
@@ -25,6 +28,8 @@ export interface DocumentDetail {
   myLevel: string | null
   /** `archived_at`: present while the document sits in the trash */
   archivedAt: string | null
+  /** UNI-1961: `shelved_at`: present while the document sits in Archive (Lưu trữ) */
+  shelvedAt?: string
   /** G5-12: the folder or page holding the document; null = at the root, absent = not sent */
   parentId?: string | null
   file: {
@@ -274,7 +279,24 @@ function summaryRow(
     ...(path ? { path } : {}),
     ...(systemKindOf(row.system_kind) ? { systemKind: 'my_folder' as const } : {}),
     ...editLockOf(row.edit_lock),
+    ...shelvedFieldsOf(row),
+    ...fileSizeOf(row, kind),
+    ...(row.origin === 'upload' || row.origin === 'created' ? { origin: row.origin } : {}),
   }
+}
+
+/**
+ * UNI-1961: the web's Size column reads a file row's `size_bytes`; a page or
+ * folder, a zero, and a mistyped value show no size (never a guess).
+ */
+function fileSizeOf(
+  row: Record<string, unknown>,
+  kind: UniworkEntryKind,
+): { sizeBytes: number } | Record<string, never> {
+  const size = row.size_bytes
+  return kind === 'file' && typeof size === 'number' && Number.isSafeInteger(size) && size > 0
+    ? { sizeBytes: size }
+    : {}
 }
 
 /** EL-1(b): optional list-row `edit_lock` summary. Malformed objects are dropped, not the row. */
@@ -371,6 +393,11 @@ export function parseDetail(raw: unknown): DocumentDetail {
     currentVersion: nonNegInt(doc.current_version),
     myLevel,
     archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
+    ...(typeof doc.shelved_at === 'string' &&
+    doc.shelved_at.length > 0 &&
+    doc.shelved_at.length <= 64
+      ? { shelvedAt: doc.shelved_at }
+      : {}),
     ...(typeof doc.parent_id === 'string' && doc.parent_id.length > 0 && doc.parent_id.length <= 128
       ? { parentId: doc.parent_id }
       : doc.parent_id === null
@@ -441,6 +468,50 @@ export function parseDocumentList(raw: unknown, workspaceId: string): DocumentLi
     documents.push(summaryRow(row, workspaceId, kind))
   }
   return { documents, nextCursor: typeof next === 'string' && next ? next : null }
+}
+
+/**
+ * UNI-1961: `GET /workspaces/{ws}/documents/sources`, read the way the web reads
+ * it (D sources-schema.ts): the id, source, parent and name are required; every
+ * other field takes its default when absent or mistyped. A body that is not a
+ * list fails closed - an empty list would read as "no files".
+ */
+export function parseSourceList(raw: unknown): UniworkSourceListPage {
+  const body = record(raw)
+  if (!Array.isArray(body.items)) bad()
+  const next = body.next_cursor
+  if (next !== null && next !== undefined && typeof next !== 'string') bad()
+  const items = body.items.map(sourceFile)
+  return { items, nextCursor: typeof next === 'string' && next ? next : null }
+}
+
+function sourceFile(value: unknown): UniworkSourceFile {
+  const row = record(value)
+  const parent = record(row.parent)
+  const text = (field: unknown, max = 1024) =>
+    typeof field === 'string' && field.length <= max ? field : ''
+  const owner = isRecord(row.owner) ? row.owner : null
+  return {
+    id: str(row.id, 128),
+    source: str(row.source, 64),
+    parent: { kind: str(parent.kind, 64), id: str(parent.id, 128), title: text(parent.title) },
+    name: str(row.name),
+    mimeType: text(row.mime_type, 255),
+    extension: text(row.extension, 32),
+    sizeBytes:
+      typeof row.size_bytes === 'number' &&
+      Number.isSafeInteger(row.size_bytes) &&
+      row.size_bytes >= 0
+        ? row.size_bytes
+        : 0,
+    updatedAt: text(row.updated_at, 64),
+    owner:
+      owner && typeof owner.id === 'string' && owner.id && typeof owner.name === 'string'
+        ? { id: owner.id, name: owner.name }
+        : null,
+    canOpenInApp: row.can_open_in_app === true,
+    canSave: row.can_save === true,
+  }
 }
 
 export function parseUpload(raw: unknown): UploadReceipt {
@@ -849,4 +920,66 @@ export function parseRenamedTitle(raw: unknown): string | null {
   const doc = record(record(raw).document)
   const title = doc.title
   return typeof title === 'string' && title.length > 0 && title.length <= 512 ? title : null
+}
+
+/**
+ * UNI-1961 (ARCHIVE-01): the shelved pair and `admin_scope` a list row may
+ * carry. Lenient: an odd value drops the field, never the row (a null
+ * `shelved_by` is the system, so it stays absent too).
+ */
+function shelvedFieldsOf(
+  row: Record<string, unknown>,
+): Pick<UniworkDocSummary, 'shelvedAt' | 'shelvedById' | 'adminScope'> {
+  const at = row.shelved_at
+  const by = optId(row.shelved_by)
+  return {
+    ...(typeof at === 'string' && at.length > 0 && at.length <= 64 ? { shelvedAt: at } : {}),
+    ...(by ? { shelvedById: by } : {}),
+    ...(row.admin_scope === true ? { adminScope: true } : {}),
+  }
+}
+
+/**
+ * UNI-1961: what the kind-agnostic manage gate needs from `GET /documents/{id}`
+ * - a folder or page has no `file` block, so `parseDetail` cannot serve it.
+ */
+export interface DocumentManageRef {
+  id: string
+  kind: UniworkEntryKind
+  myLevel: string | null
+  adminScope: boolean
+}
+
+export function parseDocumentManageRef(raw: unknown): DocumentManageRef {
+  const env = record(raw)
+  const doc = record(env.document)
+  const kind = kindOf(doc.kind)
+  if (!kind) bad()
+  const myLevel = doc.my_level ?? env.my_level
+  if (myLevel !== undefined && myLevel !== null && typeof myLevel !== 'string') bad()
+  return {
+    id: str(doc.id, 128),
+    kind,
+    myLevel: typeof myLevel === 'string' && myLevel.length > 0 ? myLevel : null,
+    adminScope: doc.admin_scope === true || env.admin_scope === true,
+  }
+}
+
+/**
+ * UNI-1961: the `{document, batch_id, affected}` answer of shelve/unshelve.
+ * The document fails closed like any summary; `affected` is lenient (an odd
+ * list reads as empty, an odd entry is dropped).
+ */
+export function parseDocumentShelveResult(raw: unknown): UniworkDocShelveResult {
+  const document = parseDocumentSummary(raw)
+  const affected = record(raw).affected
+  return {
+    document,
+    affected: Array.isArray(affected)
+      ? affected.filter(
+          (value): value is string =>
+            typeof value === 'string' && value.length > 0 && value.length <= 128,
+        )
+      : [],
+  }
 }

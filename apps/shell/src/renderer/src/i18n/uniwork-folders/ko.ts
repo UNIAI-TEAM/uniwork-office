@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ko = {
-  ufRoot: 'UniWork',
+  ufRoot: '문서(루트)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: '폴더',
   ufContentsLabel: '폴더 내용',

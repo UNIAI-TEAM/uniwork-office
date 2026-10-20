@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const zhTW = {
-  ufRoot: 'UniWork',
+  ufRoot: '文件（根目錄）',
   ufTreeLabel: '資料夾',
   ufContentsLabel: '資料夾內容',
   ufRecent: '最近',
