@@ -4,7 +4,7 @@
  * path. Electron is mocked the way the other wiring tests do; the network is a
  * stubbed `fetch`.
  */
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -262,5 +262,29 @@ describe('the explicit-Save hint', () => {
     expect(owner.sent).toHaveLength(1)
     seam.onReadOnlySave?.('/x/local.docx')
     expect(owner.sent).toHaveLength(1)
+  })
+})
+
+describe('main-side entries that act on a path must not touch a source view', () => {
+  const index = readFileSync(join(__dirname, '..', 'src/main/index.ts'), 'utf8')
+
+  it('renameFile refuses a registered source path before anything is validated or renamed', () => {
+    const from = index.indexOf('HOME_CHANNELS.renameFile,')
+    expect(from).toBeGreaterThan(-1)
+    const handler = index.slice(from, index.indexOf('HOME_CHANNELS.duplicateFile', from))
+    const guard = handler.indexOf('uniworkDocs?.service.sourceViews.has(path)')
+    expect(guard).toBeGreaterThan(-1)
+    // a renamed temp file would leave the registry and read as a plain editable local file
+    expect(guard).toBeLessThan(handler.indexOf('renameSync('))
+    expect(handler.slice(guard, guard + 160)).toContain("ok: false, error: tm('errBadArgs')")
+  })
+
+  it('the native tab menu has only Open in new window, the bound-document offline pin and Close', () => {
+    const from = index.indexOf('TABS_CHANNELS.showTabMenu,')
+    const menu = index.slice(from, index.indexOf('TABS_CHANNELS.showNewMenu', from))
+    const labels = [...menu.matchAll(/label: (tm\('\w+'\))/g)].map((m) => m[1])
+    expect(labels).toEqual(["tm('menuOpenInNewWindow')", "tm('menuClose')"])
+    // the one document-only entry is keyed by a stored binding, which a source never has
+    expect(menu).toContain('offlineBindingOf(tab.filePath)')
   })
 })

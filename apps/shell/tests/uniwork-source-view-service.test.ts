@@ -145,6 +145,14 @@ describe('UniworkDocsService.openSource / sourceViewState (thin delegates)', () 
     expect(ctx.service.store.isInside(res.value.path)).toBe(false)
   })
 
+  it('a source path has no stored binding, so the document-only tab menu entries (offline pin) never apply', async () => {
+    const ctx = setup()
+    const res = await ctx.service.openSource(input())
+    if (!res.ok) throw new Error(res.error)
+    // index.ts offlineBindingOf: aiBinding / store.lookup of the path; both need a stored binding
+    expect(ctx.service.store.lookup(res.value.path)).toBeNull()
+  })
+
   it('refuses a row over the max from the limits cache before any request', async () => {
     const ctx = setup()
     const max = ctx.service.limitsCache.peek().max_bytes
