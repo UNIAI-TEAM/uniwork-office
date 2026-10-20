@@ -132,7 +132,7 @@ export const de = {
   appMoreSeries: '+{count} weitere Reihen…',
   appMoreItems: '+{count} weitere…',
   appTruncationNote: 'Erste {shown} von {total}',
-  appGoToButtonTitle: 'Gehe zu (⌘G)',
+  appGoToButtonTitle: 'Gehe zu ({keys})',
   appPivotChartHintIn: 'PivotChart aus der aktuellen PivotTable erstellen',
   appPivotChartHintOut:
     'Wählen Sie zuerst eine Zelle im PivotTable-Ausgabebereich aus, dann einen Diagrammtyp',
@@ -1216,7 +1216,7 @@ export const de = {
   appSortZToA: 'Von Z bis A sortieren',
   appCustomSort: 'Benutzerdefiniertes Sortieren…',
   appFilter: 'Filtern',
-  appFilterToggleDetail: 'Umschalten ⇧⌘L',
+  appFilterToggleDetail: 'Umschalten {keys}',
   appClear: 'Löschen',
   appClearFilterTitle: 'Filterkriterien löschen',
   appReapply: 'Erneut anwenden',

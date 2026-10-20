@@ -127,7 +127,7 @@ export const ru = {
   appMoreSeries: 'ещё +{count} ряд(ов)…',
   appMoreItems: 'ещё +{count}…',
   appTruncationNote: 'Первые {shown} из {total}',
-  appGoToButtonTitle: 'Переход (⌘G)',
+  appGoToButtonTitle: 'Переход ({keys})',
   appPivotChartHintIn: 'Создать сводную диаграмму из текущей сводной таблицы',
   appPivotChartHintOut:
     'Сначала выделите ячейку в области вывода сводной таблицы, затем выберите тип диаграммы',
@@ -1183,7 +1183,7 @@ export const ru = {
   appSortZToA: 'По убыванию',
   appCustomSort: 'Настраиваемая сортировка…',
   appFilter: 'Фильтр',
-  appFilterToggleDetail: 'Переключение ⇧⌘L',
+  appFilterToggleDetail: 'Переключение {keys}',
   appClear: 'Очистить',
   appClearFilterTitle: 'Очистить условия фильтра',
   appReapply: 'Повторить',

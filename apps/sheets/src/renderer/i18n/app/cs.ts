@@ -125,7 +125,7 @@ export const cs = {
   appMoreSeries: '+{count} dalších řad…',
   appMoreItems: '+{count} dalších…',
   appTruncationNote: 'Prvních {shown} z {total}',
-  appGoToButtonTitle: 'Přejít na (⌘G)',
+  appGoToButtonTitle: 'Přejít na ({keys})',
   appPivotChartHintIn: 'Vytvořit kontingenční graf z aktuální kontingenční tabulky',
   appPivotChartHintOut:
     'Nejprve vyberte buňku ve výstupu kontingenční tabulky a pak zvolte typ grafu',
@@ -1165,7 +1165,7 @@ export const cs = {
   appSortZToA: 'Seřadit Z → A',
   appCustomSort: 'Vlastní řazení…',
   appFilter: 'Filtr',
-  appFilterToggleDetail: 'Přepnout ⇧⌘L',
+  appFilterToggleDetail: 'Přepnout {keys}',
   appClear: 'Vymazat',
   appClearFilterTitle: 'Vymazat kritéria filtru',
   appReapply: 'Použít znovu',

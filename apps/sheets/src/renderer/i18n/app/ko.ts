@@ -128,7 +128,7 @@ export const ko = {
   appMoreItems: '+{count}개 항목…',
   appTruncationNote: '처음 {shown}/{total}개 항목',
   // ExcelShell (name box / ribbon)
-  appGoToButtonTitle: '이동(Go To, ⌘G)',
+  appGoToButtonTitle: '이동(Go To, {keys})',
   appPivotChartHintIn: '현재 피벗 테이블을 기준으로 피벗 차트 만들기',
   appPivotChartHintOut: '먼저 피벗 테이블 출력 영역의 셀을 선택한 후 차트 종류를 선택하십시오',
   appChartColumn: '세로 막대형 차트',
@@ -1185,7 +1185,7 @@ export const ko = {
   appSortZToA: '내림차순 정렬',
   appCustomSort: '사용자 지정 정렬…',
   appFilter: '필터',
-  appFilterToggleDetail: '전환 ⇧⌘L',
+  appFilterToggleDetail: '전환 {keys}',
   appClear: '지우기',
   appClearFilterTitle: '필터 조건 지우기',
   appReapply: '다시 적용',

@@ -131,7 +131,7 @@ export const es = {
   appMoreSeries: '+{count} series más…',
   appMoreItems: '+{count} más…',
   appTruncationNote: 'Primeros {shown} de {total}',
-  appGoToButtonTitle: 'Ir a (⌘G)',
+  appGoToButtonTitle: 'Ir a ({keys})',
   appPivotChartHintIn: 'Crear un gráfico dinámico a partir de la tabla dinámica actual',
   appPivotChartHintOut:
     'Seleccione primero una celda dentro de la salida de la tabla dinámica y luego elija un tipo de gráfico',
@@ -1206,7 +1206,7 @@ export const es = {
   appSortZToA: 'Ordenar de Z a A',
   appCustomSort: 'Orden personalizado…',
   appFilter: 'Filtro',
-  appFilterToggleDetail: 'Alternar ⇧⌘L',
+  appFilterToggleDetail: 'Alternar {keys}',
   appClear: 'Borrar',
   appClearFilterTitle: 'Borrar los criterios de filtro',
   appReapply: 'Volver a aplicar',

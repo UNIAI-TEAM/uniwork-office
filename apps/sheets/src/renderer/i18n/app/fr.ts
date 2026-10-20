@@ -133,7 +133,7 @@ export const fr = {
   appMoreSeries: '+{count} séries…',
   appMoreItems: '+{count} éléments…',
   appTruncationNote: '{shown} premiers sur {total}',
-  appGoToButtonTitle: 'Atteindre (⌘G)',
+  appGoToButtonTitle: 'Atteindre ({keys})',
   appPivotChartHintIn:
     'Créer un graphique croisé dynamique à partir du tableau croisé dynamique actuel',
   appPivotChartHintOut:
@@ -1228,7 +1228,7 @@ export const fr = {
   appSortZToA: 'Trier de Z à A',
   appCustomSort: 'Tri personnalisé…',
   appFilter: 'Filtrer',
-  appFilterToggleDetail: 'Basculer ⇧⌘L',
+  appFilterToggleDetail: 'Basculer {keys}',
   appClear: 'Effacer',
   appClearFilterTitle: 'Effacer les critères de filtre',
   appReapply: 'Réappliquer',

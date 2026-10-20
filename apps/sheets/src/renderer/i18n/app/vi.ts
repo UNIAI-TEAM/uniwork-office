@@ -127,7 +127,7 @@ export const vi = {
   appMoreSeries: '+{count} chuỗi khác…',
   appMoreItems: '+{count} mục khác…',
   appTruncationNote: '{shown} mục đầu trên tổng số {total}',
-  appGoToButtonTitle: 'Đi tới (⌘G)',
+  appGoToButtonTitle: 'Đi tới ({keys})',
   appPivotChartHintIn: 'Tạo PivotChart từ PivotTable hiện tại',
   appPivotChartHintOut:
     'Trước tiên hãy chọn một ô bên trong đầu ra của PivotTable, sau đó chọn loại biểu đồ',
@@ -1155,7 +1155,7 @@ export const vi = {
   appSortZToA: 'Sắp xếp Z → A',
   appCustomSort: 'Sắp xếp tùy chỉnh…',
   appFilter: 'Bộ lọc',
-  appFilterToggleDetail: 'Bật/tắt ⇧⌘L',
+  appFilterToggleDetail: 'Bật/tắt {keys}',
   appClear: 'Xóa',
   appClearFilterTitle: 'Xóa các tiêu chí lọc',
   appReapply: 'Áp dụng lại',

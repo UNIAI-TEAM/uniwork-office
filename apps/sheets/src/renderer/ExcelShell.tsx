@@ -1,6 +1,5 @@
 import type { IFunctionInfo } from '@univerjs/engine-formula'
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
-import { platformShortcuts } from '@genoffice/i18n'
 import {
   Dropdown,
   SHAPE_GALLERY_GROUPS,
@@ -34,7 +33,7 @@ import {
 import { sheetContextMenuAction } from './sheet-context-menu'
 
 import { ColorDropdown } from './ColorDropdown'
-import { FormatCellsDialog } from './FormatCellsDialog'
+import { FormatCellsDialog, type FormatCellsTab } from './FormatCellsDialog'
 import { AllowEditRangesDialog } from './AllowEditRangesDialog'
 import { ProtectSheetDialog } from './ProtectSheetDialog'
 import type { SheetProtectionAllow } from '@genoffice/xlsx-gateway/gateway/xlsx-protection'
@@ -70,6 +69,7 @@ import {
   RIBBON_CURRENCY_SYMBOL,
 } from './excel-format-shortcuts'
 import { isModalOpen, resolveGlobalShortcut } from './global-shortcuts'
+import { sheetsHint, sheetsKeyTarget } from './sheets-keymap'
 import { stepFontSize } from './font-size-ladder'
 
 import type { ChartSeriesVisualState } from '@genoffice/xlsx-gateway/domain/chart-visual'
@@ -199,6 +199,8 @@ const CHART_TEXT_LABELS: Record<ChartTextTarget, { heading: StringKey; command: 
 /// lights / caption buttons — the ribbon must not reserve space for them.
 const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab'
 const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+/// which column of the shortcut table this renderer answers to (platform, desktop or web frame)
+const SHORTCUT_TARGET = sheetsKeyTarget()
 
 /// Univer's formula bar keeps its expanded state in React component state
 /// with no command behind it; the fold arrow is the only way in.
@@ -631,7 +633,8 @@ export function ExcelShell({
   // the "show the AI sidebar" setting off hides the copilot rail (soft hide):
   // an explicit AI action (ribbon run, toggle) still opens the panel, and
   // closing it returns to hidden — no dead affordances, no invisible runs
-  const [showFormatCells, setShowFormatCells] = useState(false)
+  /// the tab Format Cells opens on, or null while it is closed
+  const [showFormatCells, setShowFormatCells] = useState<FormatCellsTab | null>(null)
   const [axisSizeTarget, setAxisSizeTarget] = useState<'row' | 'col' | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showSortDialog, setShowSortDialog] = useState(false)
@@ -732,7 +735,7 @@ export function ExcelShell({
   onIsCellEditingRef.current = onIsCellEditing
   openingWorkbookRef.current = openingWorkbook
   const dispatchCommand = (command: string): void => {
-    if (command === 'format-cells') setShowFormatCells(true)
+    if (command === 'format-cells') setShowFormatCells('Number')
     else if (command === 'row-height-open') setAxisSizeTarget('row')
     else if (command === 'col-width-open') setAxisSizeTarget('col')
     else if (command === 'link-open') setShowLinkDialog(true)
@@ -771,6 +774,15 @@ export function ExcelShell({
   }
   const dispatchCommandRef = useRef(dispatchCommand)
   dispatchCommandRef.current = dispatchCommand
+  // application-menu actions a window chord can run (the menu owns their primary key)
+  const menuShortcuts = {
+    'save-as': () => {
+      if (canSaveAs) onSaveAs()
+    },
+    redo: onRedo,
+  }
+  const menuShortcutRef = useRef(menuShortcuts)
+  menuShortcutRef.current = menuShortcuts
   useEffect(() => {
     setContextMenuCommandSink((command) => dispatchCommandRef.current(command))
     const unregisterFx = registerFxButtonOpener(() =>
@@ -803,7 +815,7 @@ export function ExcelShell({
         return
       }
       const action = resolveGlobalShortcut(event, {
-        isMac: IS_MAC,
+        ...SHORTCUT_TARGET,
         modalOpen: isModalOpen(),
         cellEditing: onIsCellEditingRef.current(),
         gridTarget: isGridKeyTarget(event.target),
@@ -812,8 +824,12 @@ export function ExcelShell({
       if (!action) return
       event.preventDefault()
       if (action.kind === 'dialog') {
-        if (action.dialog === 'formatCells') setShowFormatCells(true)
+        if (action.dialog === 'formatCells') setShowFormatCells(action.tab ?? 'Number')
         else setShowGoTo(true)
+        return
+      }
+      if (action.kind === 'menu') {
+        menuShortcutRef.current[action.action]()
         return
       }
       dispatchCommandRef.current(action.command)
@@ -866,7 +882,7 @@ export function ExcelShell({
   // cell-reference box; the Go To ▾ arrow rides inside the bar next to it.
   // The bar is Univer-owned DOM that can remount with the workbench, so the
   // button is (re)inserted on mutation rather than rendered by React.
-  const gotoTip = t('appGoToButtonTitle')
+  const gotoTip = t('appGoToButtonTitle', { keys: sheetsHint('sheets-42', SHORTCUT_TARGET) })
   const gotoTipRef = useRef(gotoTip)
   gotoTipRef.current = gotoTip
   const onGoToReferenceRef = useRef(onGoToReference)
@@ -929,7 +945,8 @@ export function ExcelShell({
         ...(selectedVisualKind === 'shape' ? (['Shape Format'] as const) : []),
         ...(selectedVisualKind === 'image' ? (['Picture Format'] as const) : []),
       ]
-  const saveAsTitle = `${t('appSaveAs')} (${platformShortcuts('⇧⌘S')})`
+  const saveAsKeys = sheetsHint('sheets-04', SHORTCUT_TARGET)
+  const saveAsTitle = saveAsKeys ? `${t('appSaveAs')} (${saveAsKeys})` : t('appSaveAs')
 
   return (
     <main
@@ -1236,7 +1253,8 @@ export function ExcelShell({
           selectionFormat={selectionFormat}
           anchorValue={onGetAnchorValue()}
           onCommand={onCommand}
-          onClose={() => setShowFormatCells(false)}
+          onClose={() => setShowFormatCells(null)}
+          initialTab={showFormatCells}
         />
       )}
       {axisSizeTarget && (
@@ -3152,7 +3170,7 @@ function Ribbon({
           <RibbonButton
             large
             label={t('appFilter')}
-            detail={platformShortcuts(t('appFilterToggleDetail'))}
+            detail={t('appFilterToggleDetail', { keys: sheetsHint('sheets-81', SHORTCUT_TARGET) })}
             symbol="▽"
             onClick={() => onCommand('filter-toggle')}
           />
@@ -4025,11 +4043,11 @@ function Ribbon({
           <button
             className="styles-row as-button"
             data-tip={t('appFormatCells')}
-            data-tip-kbd={platformShortcuts('⌘1')}
+            data-tip-kbd={sheetsHint('sheets-61', SHORTCUT_TARGET)}
             onClick={() => onCommand('format-cells')}
           >
             <ToolSymbol symbol="🎨" />
-            {t('appFormatCells')} {platformShortcuts('⌘1')}
+            {t('appFormatCells')} {sheetsHint('sheets-61', SHORTCUT_TARGET)}
             <CaretIcon />
           </button>
           <div className="inline-tools cell-tools">
@@ -4063,7 +4081,7 @@ function Ribbon({
             </button>
             <button
               data-tip={t('appInsertCells')}
-              data-tip-kbd={platformShortcuts('⇧⌘=')}
+              data-tip-kbd={sheetsHint('sheets-19', SHORTCUT_TARGET)}
               aria-label={t('appInsertCells')}
               onClick={() => onCommand('insert-cells')}
             >
@@ -4071,7 +4089,7 @@ function Ribbon({
             </button>
             <button
               data-tip={t('appDeleteCells')}
-              data-tip-kbd={platformShortcuts('⌘-')}
+              data-tip-kbd={sheetsHint('sheets-20', SHORTCUT_TARGET)}
               aria-label={t('appDeleteCells')}
               onClick={() => onCommand('delete-cells')}
             >
@@ -4186,7 +4204,7 @@ function Ribbon({
             </button>
             <button
               className="labeled"
-              data-tip={`${t('appGoTo')} ${platformShortcuts('⌘G')}`}
+              data-tip={`${t('appGoTo')} ${sheetsHint('sheets-42', SHORTCUT_TARGET)}`}
               onClick={() => onCommand('goto-open')}
             >
               <ToolSymbol symbol="⌖" /> {t('appGoTo')}

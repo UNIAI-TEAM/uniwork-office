@@ -128,7 +128,7 @@ export const id = {
   appMoreSeries: '+{count} seri lagi…',
   appMoreItems: '+{count} lagi…',
   appTruncationNote: '{shown} pertama dari {total}',
-  appGoToButtonTitle: 'Buka (Go To, ⌘G)',
+  appGoToButtonTitle: 'Buka (Go To, {keys})',
   appPivotChartHintIn: 'Buat PivotChart dari PivotTable saat ini',
   appPivotChartHintOut:
     'Pilih dahulu sel di dalam area keluaran PivotTable, lalu pilih jenis bagan',
@@ -1164,7 +1164,7 @@ export const id = {
   appSortZToA: 'Urutkan Z → A',
   appCustomSort: 'Pengurutan Kustom…',
   appFilter: 'Filter',
-  appFilterToggleDetail: 'Alihkan ⇧⌘L',
+  appFilterToggleDetail: 'Alihkan {keys}',
   appClear: 'Hapus',
   appClearFilterTitle: 'Hapus kriteria filter',
   appReapply: 'Terapkan Ulang',

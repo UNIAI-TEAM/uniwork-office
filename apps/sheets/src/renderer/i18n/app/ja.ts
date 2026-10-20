@@ -130,7 +130,7 @@ export const ja = {
   appMoreItems: '+{count} 項目…',
   appTruncationNote: '先頭 {shown}/{total} 項目',
   // ExcelShell (name box / ribbon)
-  appGoToButtonTitle: 'ジャンプ（Go To、⌘G）',
+  appGoToButtonTitle: 'ジャンプ（Go To、{keys}）',
   appPivotChartHintIn: '現在のピボットテーブルからピボットグラフを作成',
   appPivotChartHintOut:
     '先にピボットテーブルの出力範囲内のセルを選択してから、グラフの種類を選択してください',
@@ -1211,7 +1211,7 @@ export const ja = {
   appSortZToA: '降順',
   appCustomSort: 'ユーザー設定の並べ替え…',
   appFilter: 'フィルター',
-  appFilterToggleDetail: '切り替え ⇧⌘L',
+  appFilterToggleDetail: '切り替え {keys}',
   appClear: 'クリア',
   appClearFilterTitle: 'フィルター条件をクリア',
   appReapply: '再適用',

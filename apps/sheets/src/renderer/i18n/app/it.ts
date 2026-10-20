@@ -131,7 +131,7 @@ export const it = {
   appMoreSeries: '+{count} serie…',
   appMoreItems: '+{count} altri…',
   appTruncationNote: 'Primi {shown} di {total}',
-  appGoToButtonTitle: 'Vai a (⌘G)',
+  appGoToButtonTitle: 'Vai a ({keys})',
   appPivotChartHintIn: 'Crea un grafico pivot dalla tabella pivot corrente',
   appPivotChartHintOut:
     "Seleziona prima una cella nell'output della tabella pivot, poi scegli un tipo di grafico",
@@ -1202,7 +1202,7 @@ export const it = {
   appSortZToA: 'Ordina dalla Z alla A',
   appCustomSort: 'Ordinamento personalizzato…',
   appFilter: 'Filtro',
-  appFilterToggleDetail: 'Attiva/disattiva ⇧⌘L',
+  appFilterToggleDetail: 'Attiva/disattiva {keys}',
   appClear: 'Cancella',
   appClearFilterTitle: 'Cancella i criteri di filtro',
   appReapply: 'Riapplica',

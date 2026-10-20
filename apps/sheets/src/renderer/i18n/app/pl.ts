@@ -127,7 +127,7 @@ export const pl = {
   appMoreSeries: '+{count} serii…',
   appMoreItems: '+{count} więcej…',
   appTruncationNote: 'Pierwsze {shown} z {total}',
-  appGoToButtonTitle: 'Przejdź do (⌘G)',
+  appGoToButtonTitle: 'Przejdź do ({keys})',
   appPivotChartHintIn: 'Utwórz wykres przestawny na podstawie bieżącej tabeli przestawnej',
   appPivotChartHintOut:
     'Najpierw zaznacz komórkę w obszarze wyników tabeli przestawnej, a następnie wybierz typ wykresu',
@@ -1190,7 +1190,7 @@ export const pl = {
   appSortZToA: 'Sortuj od Z do A',
   appCustomSort: 'Sortowanie niestandardowe…',
   appFilter: 'Filtr',
-  appFilterToggleDetail: 'Przełącz ⇧⌘L',
+  appFilterToggleDetail: 'Przełącz {keys}',
   appClear: 'Wyczyść',
   appClearFilterTitle: 'Wyczyść kryteria filtru',
   appReapply: 'Zastosuj ponownie',

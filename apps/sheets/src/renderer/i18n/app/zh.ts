@@ -125,7 +125,7 @@ export const zh = {
   appMoreItems: '+{count} 项…',
   appTruncationNote: '前 {shown}/{total} 项',
   // ExcelShell (name box / ribbon)
-  appGoToButtonTitle: '定位（Go To，⌘G）',
+  appGoToButtonTitle: '定位（Go To，{keys}）',
   appPivotChartHintIn: '基于当前透视表创建数据透视图',
   appPivotChartHintOut: '先选中透视表输出区内的单元格,再选择图表类型',
   appChartColumn: '柱形图',
@@ -1101,7 +1101,7 @@ export const zh = {
   appSortZToA: '降序',
   appCustomSort: '自定义排序…',
   appFilter: '筛选',
-  appFilterToggleDetail: '切换 ⇧⌘L',
+  appFilterToggleDetail: '切换 {keys}',
   appClear: '清除',
   appClearFilterTitle: '清除筛选条件',
   appReapply: '重新应用',

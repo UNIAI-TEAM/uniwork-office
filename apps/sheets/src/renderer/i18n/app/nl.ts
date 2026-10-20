@@ -130,7 +130,7 @@ export const nl = {
   appMoreSeries: '+{count} reeksen…',
   appMoreItems: '+{count} meer…',
   appTruncationNote: 'Eerste {shown} van {total}',
-  appGoToButtonTitle: 'Ga naar (⌘G)',
+  appGoToButtonTitle: 'Ga naar ({keys})',
   appPivotChartHintIn: 'Een draaigrafiek maken op basis van de huidige draaitabel',
   appPivotChartHintOut:
     'Selecteer eerst een cel in de uitvoer van de draaitabel en kies dan een grafiektype',
@@ -1199,7 +1199,7 @@ export const nl = {
   appSortZToA: 'Sorteren van Z naar A',
   appCustomSort: 'Aangepast sorteren…',
   appFilter: 'Filteren',
-  appFilterToggleDetail: 'In-/uitschakelen ⇧⌘L',
+  appFilterToggleDetail: 'In-/uitschakelen {keys}',
   appClear: 'Wissen',
   appClearFilterTitle: 'De filtercriteria wissen',
   appReapply: 'Opnieuw toepassen',
