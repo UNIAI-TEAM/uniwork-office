@@ -10,7 +10,14 @@
  */
 import type { Editor } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import { Plugin, PluginKey, TextSelection, type EditorState } from '@tiptap/pm/state'
+import {
+  Plugin,
+  PluginKey,
+  TextSelection,
+  type EditorState,
+  type Transaction,
+} from '@tiptap/pm/state'
+import { ReplaceStep } from '@tiptap/pm/transform'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import {
   asDocxAnchor,
@@ -101,6 +108,12 @@ export function createServerCommentsPlugin(): Plugin<TrackerState> {
   })
 }
 
+/** true when the first step replaces the whole old document (what TipTap `setContent` dispatches) */
+function replacesWholeDoc(tr: Transaction): boolean {
+  const step = tr.steps[0]
+  return step instanceof ReplaceStep && step.from === 0 && step.to === tr.before.content.size
+}
+
 export function trackedRanges(state: EditorState): ReadonlyMap<string, PmRange | null> {
   return serverCommentsPluginKey.getState(state)?.ranges ?? new Map()
 }
@@ -183,16 +196,28 @@ export function createServerAnchors(
    * and suffix still surround it (never at another place with the same words), and only from the next
    * document change after it was lost, so deleting a commented paragraph never re-attaches at once.
    */
-  const recoverLost = () => {
+  const recoverLost = (transaction: Transaction) => {
     const now = trackedRanges(state())
     const justLost = new Set<string>()
-    for (const [id, r] of now) {
-      if (r === null && lastRanges.get(id)) {
-        lostHere.add(id)
-        justLost.add(id)
-      }
-    }
     let recovered: Map<string, PmRange | null> | null = null
+    const replaced = replacesWholeDoc(transaction)
+    for (const [id, r] of now) {
+      const before = lastRanges.get(id)
+      if (r !== null || !before) continue
+      // a whole-document replace (the reload after Save) collapses every range at once: look the
+      // text up again, from the old document and the live range, so edits made before the Save count
+      const anchor = replaced ? encodeDocxAnchor(transaction.before, before, opts) : null
+      const range = anchor
+        ? locateDocxAnchor(transaction.doc, anchor, { ...opts, requireContext: true })
+        : null
+      if (range) {
+        recovered ??= new Map(now)
+        recovered.set(id, range)
+        continue
+      }
+      lostHere.add(id)
+      justLost.add(id)
+    }
     for (const id of [...lostHere]) {
       if (now.get(id) !== null) {
         lostHere.delete(id)
@@ -211,9 +236,9 @@ export function createServerAnchors(
   }
 
   // a lost / found flip while typing re-sorts the list on the next panel render
-  const onTransaction = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+  const onTransaction = ({ transaction }: { transaction: Transaction }) => {
     if (!transaction.docChanged) return
-    recoverLost()
+    recoverLost(transaction)
     refreshAdapter()
   }
   editor.on('transaction', onTransaction)
