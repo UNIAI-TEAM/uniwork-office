@@ -172,6 +172,8 @@ const KEY_COMMANDS = new Set([
   'askAi',
   'bold',
   'italic',
+  'underline',
+  'link',
   'escape',
   'undo',
   'redo',

@@ -111,6 +111,8 @@ export type FromInspectorBody =
         | 'askAi'
         | 'bold'
         | 'italic'
+        | 'underline'
+        | 'link'
         | 'escape'
         | 'undo'
         | 'redo'

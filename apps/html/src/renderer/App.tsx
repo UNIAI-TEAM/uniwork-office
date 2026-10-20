@@ -18,6 +18,8 @@ import {
 } from '@genoffice/electron-utils/headless-export'
 import { useI18n } from './i18n/locale'
 import { cap, platform } from './capabilities'
+import { htmlShortcutCommand, type HtmlShortcutCommand } from './shortcuts'
+import { LinkPopover } from './components/LinkPopover'
 import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { useNarrowFrame } from './narrow-frame'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
@@ -104,6 +106,23 @@ const inTextField = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   !!target.closest('.cm-editor, input, textarea, [contenteditable=""], [contenteditable="true"]')
 const PREVIEW_DEBOUNCE_MS = 150
+/** the inline element each formatting command wraps a preview text selection in */
+const WRAP_TAG = { bold: 'strong', italic: 'em', underline: 'u' } as const satisfies Partial<
+  Record<HtmlShortcutCommand, string>
+>
+
+/** presses the Find panel's Next button; false when no panel is open */
+function clickFindStep(label: string): boolean {
+  if (!label) return false
+  const buttons = document.querySelectorAll<HTMLButtonElement>('.find-btn')
+  for (const button of buttons) {
+    if (button.getAttribute('aria-label') === label && !button.disabled) {
+      button.click()
+      return true
+    }
+  }
+  return false
+}
 /** the shortcuts a frame in view mode may still relay on a read-only copy */
 const READ_ONLY_FRAME_KEYS = new Set(['print', 'zoomIn', 'zoomOut', 'zoomReset', 'escape'])
 const DEFAULT_ENVELOPE: Envelope = { bom: false, eol: '\n', trailingNewline: true }
@@ -178,6 +197,9 @@ export default function App() {
   const [selectedState, setSelectedState] = useState<NodeState>('static')
   const [textSel, setTextSel] = useState<TextSel | null>(null)
   const wrapSelectionRef = useRef<(tag: string) => void>(() => {})
+  const openLinkRef = useRef<() => void>(() => {})
+  const findNextLabelRef = useRef('')
+  const [linkSel, setLinkSel] = useState<TextSel | null>(null)
   const moveSelectedRef = useRef<(dir: -1 | 1) => void>(() => {})
   // selected element as the preview sees it: drives the floating toolbar and the style panel
   const [selRect, setSelRect] = useState<ElementRect | null>(null)
@@ -906,6 +928,8 @@ export default function App() {
           else if (msg.command === 'askAi') setAskMode({ kind: 'new' })
           else if (msg.command === 'bold') wrapSelectionRef.current('strong')
           else if (msg.command === 'italic') wrapSelectionRef.current('em')
+          else if (msg.command === 'underline') wrapSelectionRef.current('u')
+          else if (msg.command === 'link') openLinkRef.current()
           else if (msg.command === 'parent' && e.parentSid !== null) {
             const parent = map.bySid.get(e.parentSid)
             if (parent && parent.tag !== 'body' && parent.tag !== 'html')
@@ -973,6 +997,22 @@ export default function App() {
       setTextSel(null)
   }
   wrapSelectionRef.current = wrapSelection
+  /** Ctrl/Cmd+K: ask for an address, then wrap the preview's text selection in a link */
+  openLinkRef.current = () => {
+    if (statusRef.current !== 'ready' || canvasModeRef.current === 'present') return
+    if (uniwork.readOnly) return
+    if (textSel) setLinkSel(textSel)
+    else setNotice(t('linkNeedsSelection'))
+  }
+  const applyLink = (href: string) => {
+    const sel = linkSel
+    setLinkSel(null)
+    if (!sel) return
+    if (
+      runManual([{ op: 'wrap_text', ...sel, index: sel.textNodeIndex, tag: 'a', attrs: { href } }])
+    )
+      setTextSel(null)
+  }
   const askAi = () => {
     if (selectedEntry) setAskMode({ kind: 'new' })
   }
@@ -1520,41 +1560,61 @@ export default function App() {
       )
     })
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return
-      const key = event.key.toLowerCase()
-      if (key === 's') {
-        event.preventDefault()
-        void doSave(event.shiftKey ? 'saveAs' : 'save')
-      } else if (key === '\\') {
-        event.preventDefault()
-        cycleView()
-      } else if (key === 'f' && !event.shiftKey) {
-        event.preventDefault()
-        openFind(false)
-      } else if (key === 'h' && !event.shiftKey) {
-        // Word's replace shortcut: Ctrl+H on Windows/Linux, Control+H on macOS —
-        // its ⌘H belongs to the system Hide role, so the menu keeps that key
-        event.preventDefault()
-        openFind(true)
-      } else if (key === '=' || key === '+') {
-        event.preventDefault()
-        zoomIn()
-      } else if (key === '-' || key === '_') {
-        event.preventDefault()
-        zoomOut()
-      } else if (key === '0') {
-        event.preventDefault()
-        setZoom(100)
-      } else if (key === 'b' || key === 'i') {
-        if (inTextField(event.target)) return
-        event.preventDefault()
-        wrapSelectionRef.current(key === 'b' ? 'strong' : 'em')
-      } else if (key === 'z' || (key === 'y' && !event.shiftKey)) {
-        // CodeMirror and form fields keep their own history
-        if (inTextField(event.target)) return
-        event.preventDefault()
-        if (key === 'z' && !event.shiftKey) editorRef.current?.undo()
-        else editorRef.current?.redo()
+      const command = htmlShortcutCommand(event)
+      if (!command) return
+      const field = inTextField(event.target)
+      switch (command) {
+        case 'save':
+        case 'saveAs':
+          event.preventDefault()
+          void doSave(command)
+          return
+        case 'cycleView':
+          event.preventDefault()
+          cycleView()
+          return
+        case 'find':
+        case 'replace':
+          event.preventDefault()
+          openFind(command === 'replace')
+          return
+        case 'findNext':
+          event.preventDefault()
+          // an open panel steps to the next hit; a closed one opens (Word's "repeat Find")
+          if (!clickFindStep(findNextLabelRef.current)) openFind(false)
+          return
+        case 'zoomIn':
+          event.preventDefault()
+          zoomIn()
+          return
+        case 'zoomOut':
+          event.preventDefault()
+          zoomOut()
+          return
+        case 'zoomReset':
+          event.preventDefault()
+          setZoom(100)
+          return
+        case 'bold':
+        case 'italic':
+        case 'underline':
+          // CodeMirror and form fields keep their own keys (Ctrl+U is CodeMirror's undoSelection)
+          if (field) return
+          event.preventDefault()
+          wrapSelectionRef.current(WRAP_TAG[command])
+          return
+        case 'link':
+          if (field) return
+          event.preventDefault()
+          openLinkRef.current()
+          return
+        case 'undo':
+        case 'redo':
+          // CodeMirror and form fields keep their own history
+          if (field) return
+          event.preventDefault()
+          editorRef.current?.[command]()
+          return
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
@@ -1730,6 +1790,7 @@ export default function App() {
     }
   }
 
+  findNextLabelRef.current = t('nextMatch')
   const findStrings: FindPanelStrings = {
     findPlaceholder: t('findPlaceholder'),
     replacePlaceholder: t('replacePlaceholder'),
@@ -2031,6 +2092,9 @@ export default function App() {
           </footer>
         </div>
       </div>
+      {linkSel && canvasMode !== 'present' && (
+        <LinkPopover onApply={applyLink} onCancel={() => setLinkSel(null)} />
+      )}
       {aiEnabled && askTarget && askMode && canvasMode !== 'present' && !uniwork.readOnly && (
         <AiAskPopover
           key={askMode.kind === 'edit' ? askMode.qid : 'new'}

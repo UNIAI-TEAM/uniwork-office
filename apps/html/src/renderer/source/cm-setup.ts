@@ -11,7 +11,14 @@ import {
   lineNumbers,
   rectangularSelection,
 } from '@codemirror/view'
-import { defaultKeymap, history, historyKeymap, indentWithTab, redo } from '@codemirror/commands'
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  redo,
+  undo,
+} from '@codemirror/commands'
 import {
   HighlightStyle,
   bracketMatching,
@@ -27,6 +34,7 @@ import { tags } from '@lezer/highlight'
 import { aiHighlight } from './cm-highlight'
 import { findHighlight } from './cm-find'
 import { joinRunEdits, runHistoryExtension } from './cm-run-history'
+import { htmlShortcutCommand } from '../shortcuts'
 
 /** Marks transactions that replace the document from outside the editor (load, patches) */
 export const External = Annotation.define<boolean>()
@@ -77,20 +85,23 @@ const theme = EditorView.theme({
 })
 
 /**
- * Ctrl/Cmd+Shift+Z is redo on every platform and whatever the key event looks like. CodeMirror's
- * keymap drops Shift for a letter key, so with Caps Lock on (or a synthetic event) the lowercase
- * "z" matched Ctrl+Z and UNDID, emptying the source under an undone AI run; and the stock history
- * keymap binds Ctrl-Shift-z on Linux only (Mac: Shift-Cmd-z), leaving Windows to the browser.
+ * Undo and redo come from the html shortcut table (Ctrl+Z; Ctrl+Y or Ctrl+Shift+Z; the Cmd forms on
+ * macOS), whatever the key event looks like. CodeMirror's own keymap drops Shift for a letter key,
+ * so with Caps Lock on (or a synthetic event) the lowercase "z" matched Ctrl+Z and UNDID, emptying
+ * the source under an undone AI run; its stock history keymap binds Ctrl-Shift-z on Linux only
+ * (Mac: Shift-Cmd-z, and Cmd+Y is not bound at all), leaving Windows to the browser. The shared
+ * matcher compares the letter case-insensitively and skips composition and AltGr.
  */
-const shiftRedoKey = Prec.highest(
+const historyKeys = Prec.highest(
   EditorView.domEventHandlers({
     keydown(event, view) {
       // an IME composition owns its keys (CodeMirror's own keymap skips them too)
-      if (event.isComposing || event.keyCode === 229 || view.composing) return false
-      if (!(event.ctrlKey || event.metaKey) || event.altKey || !event.shiftKey) return false
-      if (event.key.toLowerCase() !== 'z') return false
+      if (view.composing) return false
+      const command = htmlShortcutCommand(event)
+      if (command !== 'undo' && command !== 'redo') return false
       event.preventDefault()
-      redo(view)
+      if (command === 'undo') undo(view)
+      else redo(view)
       return true
     },
   }),
@@ -103,7 +114,7 @@ export function buildExtensions(onDocChanged: (view: EditorView) => void): Exten
     highlightSpecialChars(),
     history({ joinToEvent: joinRunEdits }),
     runHistoryExtension,
-    shiftRedoKey,
+    historyKeys,
     foldGutter(),
     drawSelection(),
     dropCursor(),
