@@ -125,6 +125,16 @@ export const pt = {
   uhSourceDownloaded: '{name} baixado',
   uhSourceShowInFolder: 'Mostrar na pasta',
   uhSourceDownloadFailed: 'Não foi possível baixar o arquivo. Tente novamente.',
+  uhSourceOpen: 'Abrir (somente leitura)',
+  uhSourceOpening: 'Abrindo {name}…',
+  uhSourceOpenFailed: 'Não foi possível abrir o arquivo. Tente novamente.',
+  uhSourceOpenGone:
+    'Não foi possível abrir o arquivo: ele foi excluído ou você não tem mais acesso.',
+  uhSourceOpenOffline:
+    'Não foi possível abrir o arquivo porque o UniWork não pode ser alcançado. Verifique sua conexão e tente novamente.',
+  uhSourceOpenTooLarge:
+    'Este arquivo é grande demais para ser aberto no app. Baixe-o em vez disso.',
+  uhSourceOpenRetry: 'Tentar novamente',
   uhColSize: 'Tamanho',
   uhGroupBy: 'Agrupar por',
   uhGroupByFolder: 'Pasta',

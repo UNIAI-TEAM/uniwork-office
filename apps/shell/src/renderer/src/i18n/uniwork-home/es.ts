@@ -126,6 +126,15 @@ export const es = {
   uhSourceDownloaded: '{name} descargado',
   uhSourceShowInFolder: 'Mostrar en la carpeta',
   uhSourceDownloadFailed: 'No se pudo descargar el archivo. Inténtalo de nuevo.',
+  uhSourceOpen: 'Abrir (solo lectura)',
+  uhSourceOpening: 'Abriendo {name}…',
+  uhSourceOpenFailed: 'No se pudo abrir el archivo. Inténtalo de nuevo.',
+  uhSourceOpenGone: 'No se pudo abrir el archivo: se eliminó o ya no tienes acceso.',
+  uhSourceOpenOffline:
+    'No se pudo abrir el archivo porque no se puede conectar con UniWork. Comprueba tu conexión e inténtalo de nuevo.',
+  uhSourceOpenTooLarge:
+    'Este archivo es demasiado grande para abrirlo en la aplicación. Descárgalo en su lugar.',
+  uhSourceOpenRetry: 'Reintentar',
   uhColSize: 'Tamaño',
   uhGroupBy: 'Agrupar por',
   uhGroupByFolder: 'Carpeta',
