@@ -345,13 +345,17 @@ describe('the document sources bridge (UNI-1961)', () => {
     invoked.length = 0
     expect(await bridge.uniworkListSources({ workspaceId: 'ws_1', type: 'pdf' })).toEqual(reply)
     expect(
-      await bridge.uniworkDownloadSource({ workspaceId: 'ws_1', sourceId: 'src_1', name: 'a.pdf' }),
+      await bridge.uniworkDownloadSource({
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'a.pdf',
+      }),
     ).toEqual(reply)
     expect(invoked).toEqual([
       { channel: UNIWORK_DOC_CHANNELS.listSources, args: [{ workspaceId: 'ws_1', type: 'pdf' }] },
       {
         channel: UNIWORK_DOC_CHANNELS.downloadSource,
-        args: [{ workspaceId: 'ws_1', sourceId: 'src_1', name: 'a.pdf' }],
+        args: [{ workspaceId: 'ws_1', sourceId: 'task:src_1', name: 'a.pdf' }],
       },
     ])
   })

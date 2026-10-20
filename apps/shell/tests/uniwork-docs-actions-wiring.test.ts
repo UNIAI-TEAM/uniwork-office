@@ -637,7 +637,7 @@ describe('the document sources IPC (UNI-1961)', () => {
   const sourcesBody = {
     items: [
       {
-        id: 'src_1',
+        id: 'task:src_1',
         source: 'task',
         parent: { kind: 'task', id: 'task_1', title: 'Chuẩn bị họp' },
         name: 'Biên bản.docx',
@@ -669,7 +669,7 @@ describe('the document sources IPC (UNI-1961)', () => {
         cursor: 'c_1',
       })) as { ok: boolean; value?: { items: Array<{ id: string }>; nextCursor: string | null } }
       expect(page.ok).toBe(true)
-      expect(page.value?.items.map((item) => item.id)).toEqual(['src_1'])
+      expect(page.value?.items.map((item) => item.id)).toEqual(['task:src_1'])
       expect(page.value?.nextCursor).toBeNull()
       expect(seen).toEqual([
         'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources?type=docx&cursor=c_1&limit=50',
@@ -685,7 +685,7 @@ describe('the document sources IPC (UNI-1961)', () => {
     }
   })
 
-  it('downloads a source into the path the save dialog picked; a cancel writes nothing', async () => {
+  it('downloads canonical compound source ids into the picked path, preserves extensions on long names, and refuses malformed ids before the dialog (R1-1, R1-10)', async () => {
     const { handlers } = await setup()
     const seen: string[] = []
     vi.stubGlobal(
@@ -696,30 +696,54 @@ describe('the document sources IPC (UNI-1961)', () => {
       }),
     )
     try {
+      dialogs.saveOptions.length = 0
+      for (const bad of ['src_1', '../x', 'other:att_1', 'task:att/1']) {
+        expect(
+          await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+            workspaceId: 'ws_1',
+            sourceId: bad,
+            name: 'Biên bản.docx',
+          }),
+        ).toEqual({ ok: false, error: 'not_found' })
+      }
+      expect(dialogs.saveOptions).toHaveLength(0)
+      expect(seen).toEqual([])
+
       const cancelled = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
         workspaceId: 'ws_1',
-        sourceId: 'src_1',
-        name: 'Biên bản.docx',
+        sourceId: 'task:src_1',
+        name: `${'a'.repeat(200)}.pdf`,
       })
       expect(cancelled).toEqual({ ok: true, value: { path: null } })
       expect(seen).toEqual([])
+      const longOpt = dialogs.saveOptions.at(-1) as {
+        defaultPath?: string
+        filters?: Array<{ extensions?: string[] }>
+      }
+      expect(longOpt.defaultPath).toBe(join(dir, `${'a'.repeat(196)}.pdf`))
+      expect(longOpt.filters?.[0]?.extensions).toEqual(['pdf'])
 
-      const target = join(dir, 'Biên bản.docx')
-      dialogs.save = { canceled: false, filePath: target }
-      const saved = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
-        workspaceId: 'ws_1',
-        sourceId: 'src_1',
-        name: '../../Biên bản.docx',
-      })
-      // the suggested name is the file's own name, never a path out of the folder
-      const suggested = (dialogs.saveOptions.at(-1) as { defaultPath?: string }).defaultPath ?? ''
-      expect(suggested.endsWith('Biên bản.docx')).toBe(true)
-      expect(suggested).not.toContain('..')
-      expect(saved).toEqual({ ok: true, value: { path: target } })
+      for (const prefix of ['chat', 'task', 'meeting', 'email'] as const) {
+        const target = join(dir, `${prefix}-Biên bản.docx`)
+        dialogs.save = { canceled: false, filePath: target }
+        const saved = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+          workspaceId: 'ws_1',
+          sourceId: `${prefix}:src_1`,
+          name: '../../Biên bản.docx',
+        })
+        const lastOpt = dialogs.saveOptions.at(-1) as { defaultPath?: string }
+        const suggested = lastOpt.defaultPath ?? ''
+        expect(suggested.endsWith('Biên bản.docx')).toBe(true)
+        expect(suggested).not.toContain('..')
+        expect(saved).toEqual({ ok: true, value: { path: target } })
+        expect([...readFileSync(target)]).toEqual([7, 8, 9])
+      }
       expect(seen).toEqual([
-        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/src_1/download',
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/chat%3Asrc_1/download',
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/task%3Asrc_1/download',
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/meeting%3Asrc_1/download',
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/email%3Asrc_1/download',
       ])
-      expect([...readFileSync(target)]).toEqual([7, 8, 9])
     } finally {
       vi.unstubAllGlobals()
     }

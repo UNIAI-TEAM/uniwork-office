@@ -1066,7 +1066,7 @@ describe('UniNote pages on the library lists (UNI-1953 CT1-1)', () => {
 // them (D packages/core/api/endpoints/documents-sources.ts, sources-schema.ts).
 describe('document sources (UNI-1961)', () => {
   const sourceItem = (over: Record<string, unknown> = {}) => ({
-    id: 'src_1',
+    id: 'task:src_1',
     source: 'task',
     parent: { kind: 'task', id: 'task_1', title: 'Chuẩn bị họp', message_id: '' },
     name: 'Biên bản.docx',
@@ -1105,7 +1105,7 @@ describe('document sources (UNI-1961)', () => {
         items: [
           sourceItem(),
           {
-            id: 'src_2',
+            id: 'chat:src_2',
             source: 'chat',
             parent: { kind: 'chat_channel', id: 'room_1', title: 'Chung' },
             name: 'notes.md',
@@ -1118,7 +1118,7 @@ describe('document sources (UNI-1961)', () => {
     expect(page).toEqual({
       items: [
         {
-          id: 'src_1',
+          id: 'task:src_1',
           source: 'task',
           parent: { kind: 'task', id: 'task_1', title: 'Chuẩn bị họp' },
           name: 'Biên bản.docx',
@@ -1131,7 +1131,7 @@ describe('document sources (UNI-1961)', () => {
           canSave: true,
         },
         {
-          id: 'src_2',
+          id: 'chat:src_2',
           source: 'chat',
           parent: { kind: 'chat_channel', id: 'room_1', title: 'Chung' },
           name: 'notes.md',
@@ -1152,7 +1152,7 @@ describe('document sources (UNI-1961)', () => {
     for (const body of [
       {},
       { items: null },
-      { items: [{ id: 'src_1' }] },
+      { items: [{ id: 'task:src_1' }] },
       { items: [sourceItem({ parent: 'task_1' })] },
       { items: [], next_cursor: 7 },
     ]) {
@@ -1166,18 +1166,44 @@ describe('document sources (UNI-1961)', () => {
     expect(await codeOf(api.listSources({ workspaceId: 'ws_1' }))).toBe('not_found')
   })
 
-  it('downloads a source file through its proxy route', async () => {
+  it('downloads canonical compound source ids across all four prefixes and refuses opaque or malformed ids (R1-1)', async () => {
     const fetch = vi.fn<FetchLike>(
       async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }),
     )
     const api = client(fetch)
-    expect(await api.downloadSource('ws_1', 'src_1')).toEqual({
-      bytes: new Uint8Array([1, 2, 3]),
-    })
-    expect(fetch.mock.calls[0]![0]).toBe(
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/src_1/download`,
+    for (const sourceId of ['chat:att_1', 'task:att_1', 'meeting:att_1', 'email:att_1']) {
+      expect(await api.downloadSource('ws_1', sourceId)).toEqual({
+        bytes: new Uint8Array([1, 2, 3]),
+      })
+    }
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/chat%3Aatt_1/download`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/task%3Aatt_1/download`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/meeting%3Aatt_1/download`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/email%3Aatt_1/download`,
+    ])
+    fetch.mockClear()
+    for (const bad of ['src_1', '../x', 'other:att_1', 'task:', `task:${'a'.repeat(65)}`]) {
+      expect(await codeOf(api.downloadSource('ws_1', bad))).toBe('not_found')
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects shelve and unshelve responses whose document id does not match the requested id (R1-9)', async () => {
+    const api = client(async () =>
+      json(200, {
+        document: {
+          id: 'wrong_doc',
+          workspace_id: 'ws_1',
+          kind: 'page',
+          title: 'Wrong report',
+          updated_at: '2026-10-20T08:00:00Z',
+        },
+        affected: ['wrong_doc'],
+      }),
     )
-    expect(await codeOf(api.downloadSource('ws_1', '../x'))).toBe('not_found')
+    expect(await codeOf(api.shelve('doc_1', 'key-1'))).toBe('malformed_response')
+    expect(await codeOf(api.unshelve('doc_1', 'key-2'))).toBe('malformed_response')
   })
 })
 
