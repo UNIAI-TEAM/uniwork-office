@@ -178,6 +178,61 @@ describe('reload', () => {
   })
 })
 
+describe('freshComments', () => {
+  it('lists again and returns the changed list', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 'tok-1'))
+    await mount(src)
+    src.list.mockResolvedValueOnce(list([cm({ id: 'a' }), cm({ id: 'b' })], 'tok-2'))
+    let out: readonly { id: string }[] = []
+    await act(async () => {
+      out = await ctl.freshComments()
+    })
+    expect(src.list).toHaveBeenLastCalledWith({ kind: 'comment', since_token: 'tok-1' })
+    expect(out.map((c) => c.id)).toEqual(['a', 'b'])
+  })
+
+  it('an unchanged list keeps the data', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 'tok-1'))
+    await mount(src)
+    src.list.mockResolvedValueOnce(UNCHANGED)
+    let out: readonly { id: string }[] = []
+    await act(async () => {
+      out = await ctl.freshComments()
+    })
+    expect(out.map((c) => c.id)).toEqual(['a'])
+  })
+
+  it('a failed list returns the last data and does not reject', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 'tok-1'))
+    await mount(src)
+    src.list.mockRejectedValueOnce(err('network'))
+    let out: readonly { id: string }[] = []
+    await act(async () => {
+      out = await ctl.freshComments()
+    })
+    expect(out.map((c) => c.id)).toEqual(['a'])
+  })
+
+  it('joins the first list while it is still in flight', async () => {
+    let resolve!: (v: unknown) => void
+    const src = fakeSource()
+    src.list.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+    src.list.mockResolvedValue(UNCHANGED)
+    await mount(src)
+    let out: readonly { id: string }[] | undefined
+    await act(async () => {
+      void ctl.freshComments().then((v) => (out = v))
+      await flush()
+    })
+    expect(out).toBeUndefined()
+    await act(async () => {
+      resolve(list([cm({ id: 'a' })], 'tok-1'))
+      await flush()
+    })
+    expect(out?.map((c) => c.id)).toEqual(['a'])
+  })
+})
+
 describe('writes', () => {
   it('403 on a write -> view only from then on', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me' })]))

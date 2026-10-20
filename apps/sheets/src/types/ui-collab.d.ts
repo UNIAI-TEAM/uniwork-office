@@ -256,6 +256,7 @@ export interface CollabController {
   startThread(p: CollabNewThread): void
   cancelThread(): void
   reload(): Promise<void>
+  freshComments(): Promise<readonly CollabComment[]>
   reveal(commentId: string): Promise<{ revealed: boolean }>
 }
 

@@ -119,6 +119,12 @@ export interface CollabController {
   cancelThread(): void
   dismissNotice(): void
   reload(): Promise<void>
+  /**
+   * lists once more (`since_token`, joins a list already in flight) and resolves with the list as it is
+   * afterwards: the changed list, or the last one when nothing changed or the list failed. Never rejects.
+   * For a host that must act on the server's current rows even while the panel is closed (Save receipts).
+   */
+  freshComments(): Promise<readonly CollabComment[]>
   retry(): Promise<void>
   /** answers `comments.reveal`; rejects `{code: 'not_ready', retryable: true}` when the first list is late */
   reveal(commentId: string): Promise<{ revealed: boolean }>
@@ -452,6 +458,12 @@ export function useCollabThreads(
     return p
   }, [runList])
 
+  const freshComments = useCallback(async (): Promise<readonly CollabComment[]> => {
+    await reload().catch(() => undefined)
+    // the ref, not React state: threads lag one render behind the list that just landed
+    return dataRef.current.comments
+  }, [reload])
+
   const retry = useCallback((): Promise<void> => {
     if (!loadedRef.current) setState('loading')
     return reload()
@@ -657,6 +669,7 @@ export function useCollabThreads(
     cancelThread: useCallback(() => setNewThread(null), []),
     dismissNotice: useCallback(() => setNotice(null), []),
     reload,
+    freshComments,
     retry,
     reveal,
     actions,
