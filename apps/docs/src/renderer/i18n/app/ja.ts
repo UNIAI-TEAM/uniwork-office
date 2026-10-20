@@ -26,6 +26,7 @@ export const ja = {
   appScLineBreak: '改行',
   appScNbsp: '改行しないスペース',
   appScNbHyphen: '改行しないハイフン',
+  appScOptHyphen: '任意指定のハイフン',
   appScGrowFont1: 'フォントサイズを 1 pt 拡大',
   appScShrinkFont1: 'フォントサイズを 1 pt 縮小',
   appScListDemote: 'リストのレベルを下げる',
@@ -224,7 +225,7 @@ export const ja = {
   // Quick actions bar
   appAutoSave: '自動保存',
   appAutoSaveTip: '自動保存(30 秒ごと、およびウィンドウのフォーカスが外れたとき)',
-  appSaveShortcutTip: '上書き保存 (⌘S)',
+  appSaveShortcutTip: '上書き保存 ({keys})',
   appUndo: '元に戻す',
   appRedo: 'やり直し',
   // Start screen

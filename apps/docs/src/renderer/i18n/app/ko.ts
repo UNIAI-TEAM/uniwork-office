@@ -26,6 +26,7 @@ export const ko = {
   appScLineBreak: '줄 바꿈',
   appScNbsp: '줄바꿈 없는 공백',
   appScNbHyphen: '줄바꿈 없는 하이픈',
+  appScOptHyphen: '선택적 하이픈',
   appScGrowFont1: '글꼴 크기 1pt 크게',
   appScShrinkFont1: '글꼴 크기 1pt 작게',
   appScListDemote: '목록 수준 내리기',
@@ -222,7 +223,7 @@ export const ko = {
   // Quick actions bar
   appAutoSave: '자동 저장',
   appAutoSaveTip: '자동 저장(30초마다, 창 포커스가 해제될 때)',
-  appSaveShortcutTip: '저장 (⌘S)',
+  appSaveShortcutTip: '저장 ({keys})',
   appUndo: '실행 취소',
   appRedo: '다시 실행',
   // Start screen

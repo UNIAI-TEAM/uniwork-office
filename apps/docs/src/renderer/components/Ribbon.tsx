@@ -133,6 +133,7 @@ import { HeaderFooterTab, type HfAction, type HfEditingInfo } from './ribbon-hf-
 import { PasteSpecialDialog } from './PasteSpecialDialog'
 import { FILE_MENU_FIXED_QUERY, closeOnResize, fileMenuAnchor } from './file-menu-anchor'
 import { cap, saveCopyAvailable } from '../capabilities'
+import { createShortcutMatcher, shortcutHint, shortcutSurface } from '../shortcuts'
 import { fontFamiliesFor, isEastAsianFontName, systemFamiliesBesidesCandidates } from '../font-list'
 import {
   fontSizeLabel,
@@ -236,6 +237,7 @@ interface RibbonProps {
   actionsRef?: React.MutableRefObject<{
     stepFontSize?: (dir: 1 | -1) => void
     nudgeFontSize?: (dir: 1 | -1) => void
+    toggleList?: (kind: 'bullet' | 'ordered') => void
   }>
   /** Quick-access area on the tab row's left (save/undo-redo/autosave), matching the WPS/Office QAT */
   quickActions?: React.ReactNode
@@ -506,6 +508,9 @@ const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 const WIDTH_CASE_LANGS = new Set<Lang>(['zh', 'zh-TW', 'ja'])
 /** shell tab mode: the tab strip above owns traffic lights / caption buttons */
 const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab'
+/** the ribbon's own keys, from the docs shortcut table */
+const matchFormatClipKey = createShortcutMatcher(['copy-format', 'paste-format'])
+const matchRibbonToggleKey = createShortcutMatcher(['ribbon-toggle'])
 
 const TABS = (
   IS_MAC
@@ -1724,6 +1729,7 @@ function RibbonInner({
     if (!actionsRef) return
     actionsRef.current.stepFontSize = stepFontSize
     actionsRef.current.nudgeFontSize = nudgeFontSize
+    actionsRef.current.toggleList = toggleList
   })
 
   const toggleVertAlign = (kind: 'superscript' | 'subscript') => {
@@ -1847,15 +1853,14 @@ function RibbonInner({
     else armPainter(true)
   }
 
-  // Word's copy / paste formatting chords (⇧⌘C / ⇧⌘V; off the Mac the paste
-  // chord carries Alt because Ctrl+Shift+V is the paste-and-match-style menu
-  // accelerator). Paste targets the selection, or the word at the caret.
+  // Word's copy / paste formatting chords (Ctrl+Alt+C / Ctrl+Alt+V, ⌥⌘C / ⌥⌘V; the desktop
+  // keeps the old Shift chords that do not collide). Paste targets the selection, or the word
+  // at the caret.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return
-      const copy = e.code === 'KeyC' && !e.altKey
-      const paste = e.code === 'KeyV' && e.altKey === !IS_MAC
-      if (!copy && !paste) return
+      const command = matchFormatClipKey(e)
+      if (!command) return
+      const copy = command === 'copy-format'
       const el = document.activeElement
       if (el && el !== document.body && !el.closest('.ProseMirror')) return
       if (!editor.isEditable || getActiveSubEditor()) return
@@ -1877,6 +1882,20 @@ function RibbonInner({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [editor])
+
+  // Word web's Ctrl+F3 stands in for Ctrl+F1, which the browser keeps; the shared collapse hook
+  // owns the desktop chords
+  const toggleRibbon = collapse.toggle
+  useEffect(() => {
+    if (shortcutSurface() !== 'web') return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || !matchRibbonToggleKey(e)) return
+      e.preventDefault()
+      toggleRibbon()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [toggleRibbon])
 
   useEffect(() => {
     if (!painter) return
@@ -2282,17 +2301,22 @@ function RibbonInner({
                 <div className="ribbon-group-items">
                   <div className="rb-col">
                     <div className="rb-row">
-                      {shapeMarkBtn('bold', shapeTextActive.bold, t('ribbonBoldTip'), <b>B</b>)}
+                      {shapeMarkBtn(
+                        'bold',
+                        shapeTextActive.bold,
+                        t('ribbonBoldTip', { keys: shortcutHint('bold') }),
+                        <b>B</b>,
+                      )}
                       {shapeMarkBtn(
                         'italic',
                         shapeTextActive.italic,
-                        t('ribbonItalicTip'),
+                        t('ribbonItalicTip', { keys: shortcutHint('italic') }),
                         <i>I</i>,
                       )}
                       {shapeMarkBtn(
                         'underline',
                         shapeTextActive.underline,
-                        t('ribbonUnderlineTip'),
+                        t('ribbonUnderlineTip', { keys: shortcutHint('underline') }),
                         <u>U</u>,
                       )}
                       <div className="rb-split-wrap">
@@ -2330,10 +2354,26 @@ function RibbonInner({
                       </div>
                     </div>
                     <div className="rb-row">
-                      {shapeAlignBtn('left', t('ribbonAlignLeftTip'), <IconAlignLeft />)}
-                      {shapeAlignBtn('center', t('ribbonAlignCenterTip'), <IconAlignCenter />)}
-                      {shapeAlignBtn('right', t('ribbonAlignRightTip'), <IconAlignRight />)}
-                      {shapeAlignBtn('justify', t('ribbonJustifyTip'), <IconAlignJustify />)}
+                      {shapeAlignBtn(
+                        'left',
+                        t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') }),
+                        <IconAlignLeft />,
+                      )}
+                      {shapeAlignBtn(
+                        'center',
+                        t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') }),
+                        <IconAlignCenter />,
+                      )}
+                      {shapeAlignBtn(
+                        'right',
+                        t('ribbonAlignRightTip', { keys: shortcutHint('align-right') }),
+                        <IconAlignRight />,
+                      )}
+                      {shapeAlignBtn(
+                        'justify',
+                        t('ribbonJustifyTip', { keys: shortcutHint('align-justify') }),
+                        <IconAlignJustify />,
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2482,9 +2522,21 @@ function RibbonInner({
               <div className="table-tool-row">
                 {(
                   [
-                    ['left', <IconAlignLeft key="l" />, t('ribbonAlignLeftTip')],
-                    ['center', <IconAlignCenter key="c" />, t('ribbonAlignCenterTip')],
-                    ['right', <IconAlignRight key="r" />, t('ribbonAlignRightTip')],
+                    [
+                      'left',
+                      <IconAlignLeft key="l" />,
+                      t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') }),
+                    ],
+                    [
+                      'center',
+                      <IconAlignCenter key="c" />,
+                      t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') }),
+                    ],
+                    [
+                      'right',
+                      <IconAlignRight key="r" />,
+                      t('ribbonAlignRightTip', { keys: shortcutHint('align-right') }),
+                    ],
                   ] as const
                 ).map(([value, icon, label]) => (
                   <button
@@ -3330,8 +3382,8 @@ function RibbonInner({
                   <button
                     className="rb-small"
                     disabled={!canEdit}
-                    data-tip={t('ribbonCutTip')}
-                    aria-label={t('ribbonCutTip')}
+                    data-tip={t('ribbonCutTip', { keys: shortcutHint('cut') })}
+                    aria-label={t('ribbonCutTip', { keys: shortcutHint('cut') })}
                     onClick={() => clipboard('cut')}
                   >
                     <IconCut />
@@ -3339,8 +3391,8 @@ function RibbonInner({
                   <button
                     className="rb-small"
                     disabled={!hasDoc}
-                    data-tip={t('ribbonCopyTip')}
-                    aria-label={t('ribbonCopyTip')}
+                    data-tip={t('ribbonCopyTip', { keys: shortcutHint('copy') })}
+                    aria-label={t('ribbonCopyTip', { keys: shortcutHint('copy') })}
                     onClick={() => clipboard('copy')}
                   >
                     <IconCopy />
@@ -3561,9 +3613,24 @@ function RibbonInner({
                   </button>
                 </div>
                 <div className="rb-row">
-                  {markBtn('bold', fs.bold, t('ribbonBoldTip'), <b>B</b>)}
-                  {markBtn('italic', fs.italic, t('ribbonItalicTip'), <i>I</i>)}
-                  {markBtn('underline', fs.underline, t('ribbonUnderlineTip'), <u>U</u>)}
+                  {markBtn(
+                    'bold',
+                    fs.bold,
+                    t('ribbonBoldTip', { keys: shortcutHint('bold') }),
+                    <b>B</b>,
+                  )}
+                  {markBtn(
+                    'italic',
+                    fs.italic,
+                    t('ribbonItalicTip', { keys: shortcutHint('italic') }),
+                    <i>I</i>,
+                  )}
+                  {markBtn(
+                    'underline',
+                    fs.underline,
+                    t('ribbonUnderlineTip', { keys: shortcutHint('underline') }),
+                    <u>U</u>,
+                  )}
                   {markBtn('strike', fs.strike, t('ribbonStrikethrough'), <s>ab</s>)}
                   <button
                     className={`rb-icon ${fs.vertAlign === 'subscript' ? 'active' : ''}`}
@@ -3924,8 +3991,8 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'left' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonAlignLeftTip')}
-                    aria-label={t('ribbonAlignLeftTip')}
+                    data-tip={t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') })}
+                    aria-label={t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') })}
                     onClick={() => setSelectionAlign(ed, 'left')}
                   >
                     <IconAlignLeft />
@@ -3933,8 +4000,8 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'center' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonAlignCenterTip')}
-                    aria-label={t('ribbonAlignCenterTip')}
+                    data-tip={t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') })}
+                    aria-label={t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') })}
                     onClick={() => setSelectionAlign(ed, 'center')}
                   >
                     <IconAlignCenter />
@@ -3942,8 +4009,8 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'right' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonAlignRightTip')}
-                    aria-label={t('ribbonAlignRightTip')}
+                    data-tip={t('ribbonAlignRightTip', { keys: shortcutHint('align-right') })}
+                    aria-label={t('ribbonAlignRightTip', { keys: shortcutHint('align-right') })}
                     onClick={() => setSelectionAlign(ed, 'right')}
                   >
                     <IconAlignRight />
@@ -3951,8 +4018,8 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'justify' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonJustifyTip')}
-                    aria-label={t('ribbonJustifyTip')}
+                    data-tip={t('ribbonJustifyTip', { keys: shortcutHint('align-justify') })}
+                    aria-label={t('ribbonJustifyTip', { keys: shortcutHint('align-justify') })}
                     onClick={() => setSelectionAlign(ed, 'justify')}
                   >
                     <IconAlignJustify />

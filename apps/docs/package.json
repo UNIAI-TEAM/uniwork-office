@@ -25,6 +25,7 @@
     "@genoffice/docx-engine": "*",
     "@genoffice/file-parse": "*",
     "@genoffice/project-store": "*",
+    "@genoffice/shortcuts": "*",
     "@genoffice/ui": "*",
     "@tiptap/core": "3.31.0",
     "@tiptap/extensions": "3.31.0",
