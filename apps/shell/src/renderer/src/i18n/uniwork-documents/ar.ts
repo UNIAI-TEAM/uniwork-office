@@ -183,4 +183,12 @@ export const ar = {
   uwLockLostGeneric: 'لم تعد تعدّل. تغييراتك غير المحفوظة ما زالت هنا.',
   uwLockLostHeldBy: '{name} يعدّل الآن. تغييراتك غير المحفوظة ما زالت هنا.',
   uwLockAcquireFailed: 'تعذّر الحصول على صلاحية التعديل. حاول مرة أخرى بعد بضع دقائق.',
+  uwChipSourceView: 'للعرض فقط · من {origin}',
+  uwTipSourceView:
+    'هذا الملف مرفق في {origin}{parent}. لن يتم حفظ التغييرات. للحصول على نسخة، استخدم «تنزيل» في قائمة المستندات.',
+  uwSourceViewSaveHint: 'هذا الملف للعرض فقط — لا يتم حفظ التغييرات.',
+  uwSourceOriginChat: 'الدردشة',
+  uwSourceOriginTask: 'المهام',
+  uwSourceOriginMeeting: 'الاجتماعات',
+  uwSourceOriginEmail: 'البريد الإلكتروني',
 } satisfies Record<keyof typeof zh, string>

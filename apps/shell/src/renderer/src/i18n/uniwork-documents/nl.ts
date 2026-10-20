@@ -196,4 +196,13 @@ export const nl = {
   uwLockLostHeldBy: '{name} bewerkt nu. Je niet-opgeslagen wijzigingen zijn er nog.',
   uwLockAcquireFailed:
     'Kon geen bewerkingstoegang krijgen. Probeer het over een paar minuten opnieuw.',
+  uwChipSourceView: 'Alleen bekijken · Uit {origin}',
+  uwTipSourceView:
+    'Dit bestand is bijgevoegd in {origin}{parent}. Wijzigingen worden niet opgeslagen. Gebruik Downloaden in de documentenlijst om een kopie te krijgen.',
+  uwSourceViewSaveHint:
+    'Dit bestand is alleen om te bekijken — wijzigingen worden niet opgeslagen.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Taken',
+  uwSourceOriginMeeting: 'Vergaderingen',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>

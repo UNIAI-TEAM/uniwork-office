@@ -40,7 +40,8 @@ async function mount(s: UniworkSourceViewState | null, lang: 'en' | 'vi' = 'en')
     root.render(
       createElement(
         LocaleProvider,
-        { initial: lang },
+        // the provider keeps its first language, so a new language is a new provider
+        { initial: lang, key: lang },
         createElement(UniworkSourceViewChip, { state: s }),
       ),
     )
@@ -111,7 +112,7 @@ describe('UniworkSourceViewChip', () => {
     }
   })
 
-  it('swaps language live', async () => {
+  it('follows the language it is mounted in', async () => {
     await mount(state({ origin: 'chat' }), 'en')
     expect(label()).toBe('View only · From Chat')
     await mount(state({ origin: 'chat' }), 'vi')

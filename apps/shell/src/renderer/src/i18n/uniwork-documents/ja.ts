@@ -189,4 +189,12 @@ export const ja = {
   uwLockLostGeneric: 'あなたはもう編集していません。未保存の変更はまだ残っています。',
   uwLockLostHeldBy: '{name} が現在編集しています。未保存の変更はまだ残っています。',
   uwLockAcquireFailed: '編集アクセスを取得できませんでした。数分後にもう一度お試しください。',
+  uwChipSourceView: '閲覧のみ · {origin}から',
+  uwTipSourceView:
+    'このファイルは{origin}{parent}に添付されています。変更は保存されません。コピーが必要な場合は、ドキュメント一覧の「ダウンロード」を使ってください。',
+  uwSourceViewSaveHint: 'このファイルは閲覧専用です — 変更は保存されません。',
+  uwSourceOriginChat: 'チャット',
+  uwSourceOriginTask: 'タスク',
+  uwSourceOriginMeeting: '会議',
+  uwSourceOriginEmail: 'メール',
 } satisfies Record<keyof typeof zh, string>

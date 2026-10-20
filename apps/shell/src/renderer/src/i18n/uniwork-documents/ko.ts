@@ -188,4 +188,12 @@ export const ko = {
   uwLockLostGeneric: '더 이상 편집하고 있지 않습니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
   uwLockLostHeldBy: '{name} 님이 지금 편집 중입니다. 저장되지 않은 변경 사항은 그대로 있습니다.',
   uwLockAcquireFailed: '편집 액세스 권한을 가져올 수 없습니다. 몇 분 후에 다시 시도하세요.',
+  uwChipSourceView: '보기 전용 · {origin}에서',
+  uwTipSourceView:
+    '이 파일은 {origin}{parent}에 첨부되어 있습니다. 변경 내용은 저장되지 않습니다. 사본이 필요하면 문서 목록에서 다운로드를 사용하세요.',
+  uwSourceViewSaveHint: '이 파일은 보기 전용입니다 — 변경 내용은 저장되지 않습니다.',
+  uwSourceOriginChat: '채팅',
+  uwSourceOriginTask: '작업',
+  uwSourceOriginMeeting: '회의',
+  uwSourceOriginEmail: '이메일',
 } satisfies Record<keyof typeof zh, string>

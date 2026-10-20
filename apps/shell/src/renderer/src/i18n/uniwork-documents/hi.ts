@@ -186,4 +186,12 @@ export const hi = {
   uwLockLostGeneric: 'आप अब संपादित नहीं कर रहे। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
   uwLockLostHeldBy: '{name} अभी संपादित कर रहे हैं। आपके असहेजे बदलाव अभी भी यहाँ हैं।',
   uwLockAcquireFailed: 'संपादन एक्सेस नहीं मिल सका। कुछ मिनट बाद फिर से प्रयास करें।',
+  uwChipSourceView: 'केवल देखें · {origin} से',
+  uwTipSourceView:
+    'यह फ़ाइल {origin}{parent} में संलग्न है। बदलाव सहेजे नहीं जाएँगे। प्रति पाने के लिए दस्तावेज़ सूची में डाउनलोड का उपयोग करें।',
+  uwSourceViewSaveHint: 'यह फ़ाइल केवल देखने के लिए है — बदलाव सहेजे नहीं जाते।',
+  uwSourceOriginChat: 'चैट',
+  uwSourceOriginTask: 'कार्य',
+  uwSourceOriginMeeting: 'मीटिंग',
+  uwSourceOriginEmail: 'ईमेल',
 } satisfies Record<keyof typeof zh, string>
