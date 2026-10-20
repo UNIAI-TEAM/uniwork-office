@@ -131,7 +131,7 @@ export const es = {
   appMoreSeries: '+{count} series más…',
   appMoreItems: '+{count} más…',
   appTruncationNote: 'Primeros {shown} de {total}',
-  appGoToButtonTitle: 'Ir a (⌘G)',
+  appGoToButtonTitle: 'Ir a ({keys})',
   appPivotChartHintIn: 'Crear un gráfico dinámico a partir de la tabla dinámica actual',
   appPivotChartHintOut:
     'Seleccione primero una celda dentro de la salida de la tabla dinámica y luego elija un tipo de gráfico',
@@ -150,7 +150,7 @@ export const es = {
   appAttachmentReadFailed: '{name}: error de lectura',
   appTooManyImages: 'Como máximo {max} imágenes por mensaje; las sobrantes se ignoraron',
   appAppliedRevision:
-    'Aplicado (revisión {revision}) — deshaga con ⌘Z, guarde en el archivo con ⌘S.',
+    'Aplicado (revisión {revision}) — deshaga con {undoKeys}, guarde en el archivo con {saveKeys}.',
   appCannotReadImage: 'No se puede leer el archivo de imagen.',
   appTableNotDeletable:
     'La tabla "{name}" no existe o no se creó en esta sesión — las tablas ya presentes en el archivo aún no se pueden eliminar.',
@@ -164,9 +164,9 @@ export const es = {
     'La definición de la tabla dinámica aún no terminó de cargarse (o no se pudo analizar) — inténtelo de nuevo en un momento.',
   appPivotNoChartData: 'Esta tabla dinámica no tiene filas/columnas de datos para graficar.',
   appPivotChartInsertedTruncated:
-    'Gráfico dinámico insertado (demasiados puntos de datos, truncado) — guarde (⌘S) para escribirlo en el archivo.',
+    'Gráfico dinámico insertado (demasiados puntos de datos, truncado) — guarde ({saveKeys}) para escribirlo en el archivo.',
   appPivotChartInserted:
-    'Gráfico dinámico insertado — sigue las actualizaciones de la tabla dinámica; guarde (⌘S) para escribirlo en el archivo.',
+    'Gráfico dinámico insertado — sigue las actualizaciones de la tabla dinámica; guarde ({saveKeys}) para escribirlo en el archivo.',
   appSheetNoPivot: 'Esta hoja no tiene tablas dinámicas.',
   appPivotNeedsFullLoad:
     'Actualizar tablas dinámicas requiere el modo de carga completa — este libro es demasiado grande y se cargó por streaming.',
@@ -205,7 +205,7 @@ export const es = {
     'Coloque el cursor dentro de la salida de la tabla dinámica que desea editar.',
   appPivotNoCacheDef: 'Esta tabla dinámica no tiene definición de caché y no se puede editar.',
   appPivotDefNotLoadedSave:
-    'La definición de la tabla dinámica aún no está cargada — si la editó en esta sesión, guarde primero (⌘S).',
+    'La definición de la tabla dinámica aún no está cargada — si la editó en esta sesión, guarde primero ({saveKeys}).',
   appPivotEditUnsupported: 'Esta tabla dinámica aún no se puede editar: {reasons}',
   appPivotEditHasFeatures:
     'Las tablas dinámicas con agrupaciones, filtros, filtros de informe o campos calculados aún no admiten la edición de diseño — ajústelas en Excel.',
@@ -215,12 +215,12 @@ export const es = {
     'La agregación de esta tabla dinámica (p. ej. producto o contar números) aún no admite la edición de diseño.',
   appPivotSourceSheetNotFound: 'No se encuentra la hoja de origen "{name}" de la tabla dinámica.',
   appPivotLayoutUpdated:
-    'Diseño de la tabla dinámica actualizado — guarde (⌘S) para escribirlo en el archivo; Excel reconstruye la caché al abrir.',
+    'Diseño de la tabla dinámica actualizado — guarde ({saveKeys}) para escribirlo en el archivo; Excel reconstruye la caché al abrir.',
   appPivotEditFailed: 'No se pudo editar la tabla dinámica.',
   appNoActiveSheet: 'No hay ninguna hoja activa.',
   appCurrentSheetNoPivot: 'La hoja actual no tiene tablas dinámicas.',
   appPivotsRefreshed:
-    'Se actualizaron {count} tabla(s) dinámica(s) — guarde para escribir en el archivo (⌘S).',
+    'Se actualizaron {count} tabla(s) dinámica(s) — guarde para escribir en el archivo ({saveKeys}).',
   appRefreshFailed: 'Error al actualizar.',
   appSlicerNeedsFile:
     'Abra primero un archivo XLSX — las segmentaciones de datos funcionan con las tablas dinámicas del archivo.',
@@ -239,7 +239,7 @@ export const es = {
   appSlicerFilterFailed: 'Error al filtrar con la segmentación.',
   appSlicerKeepOne: 'Mantenga al menos un miembro seleccionado en la segmentación.',
   appSlicerApplied:
-    'Segmentación de datos "{name}" aplicada — guarde (⌘S) para escribir la tabla dinámica filtrada.',
+    'Segmentación de datos "{name}" aplicada — guarde ({saveKeys}) para escribir la tabla dinámica filtrada.',
   appSlicerCleared: 'Filtro de la segmentación "{name}" borrado.',
   appSlicerRemoved: 'Segmentación de datos "{name}" eliminada; se restauraron todos los miembros.',
   appTimelineHintIn:
@@ -251,7 +251,7 @@ export const es = {
   appTimelineCreated:
     'Escala de tiempo "{name}" creada — haga clic en los meses para filtrar la tabla dinámica.',
   appTimelineApplied:
-    'Escala de tiempo "{name}" aplicada — guarde (⌘S) para escribir la tabla dinámica filtrada.',
+    'Escala de tiempo "{name}" aplicada — guarde ({saveKeys}) para escribir la tabla dinámica filtrada.',
   appTimelineCleared: 'Filtro de la escala de tiempo "{name}" borrado.',
   appTimelineRemoved: 'Escala de tiempo "{name}" eliminada; se restauraron todos los miembros.',
   appTimelineEmptyRange: 'No hay miembros en el intervalo de meses seleccionado.',
@@ -272,7 +272,7 @@ export const es = {
     'El filtro avanzado necesita un rango de autofiltro — seleccione primero los datos y haga clic en Filtro.',
   appAdvFilterGone: 'La hoja actual no tiene autofiltro — actívelo de nuevo y reintente.',
   appAdvFilterFailed: 'No se pudo aplicar el filtro avanzado.',
-  appAdvFilterApplied: 'Criterios de filtro avanzado aplicados — ⌘S guarda en el archivo.',
+  appAdvFilterApplied: 'Criterios de filtro avanzado aplicados — {saveKeys} guarda en el archivo.',
   appFlashFillNeedsLeft:
     'El relleno rápido necesita columnas de datos a la izquierda de la columna de destino.',
   appFlashFillNeedsRows: 'El relleno rápido necesita al menos dos filas de datos.',
@@ -289,7 +289,7 @@ export const es = {
   appSparklineOutsideGrid:
     'Las celdas de destino de los minigráficos quedan fuera de la cuadrícula de la hoja.',
   appSparklinesInserted:
-    'Se insertaron {count} minigráfico(s) en la columna a la derecha de la selección — ⌘S guarda en el archivo.',
+    'Se insertaron {count} minigráfico(s) en la columna a la derecha de la selección — {saveKeys} guarda en el archivo.',
   appSaveHeldStranded:
     'Las tablas dinámicas/tablas no se pueden guardar junto con hojas nuevas más cambios de filas/columnas — guarde primero la estructura y luego agréguelas.',
   appSaveSecondCanceled:
@@ -365,7 +365,7 @@ export const es = {
   appPreviewSheetGone: 'La hoja de la vista previa ya no existe — cree una vista previa nueva.',
   appWorkbookChangedSincePreview:
     'El libro cambió desde la vista previa — cree una vista previa nueva.',
-  appAppliedJournaled: 'Aplicado — los cambios quedaron registrados; guarde con ⌘S.',
+  appAppliedJournaled: 'Aplicado — los cambios quedaron registrados; guarde con {saveKeys}.',
   appUndoCommitted: 'Deshacer confirmado (revisión {revision}).',
   appUndoFailed: 'No se puede deshacer.',
   appAutoFilterCreateFailed: 'No se puede crear el autofiltro.',
@@ -377,17 +377,19 @@ export const es = {
   appChartInsertFailed: 'No se puede insertar el gráfico.',
   appChartNeedsNumericColumn:
     'Seleccione un rango con al menos una columna numérica (encabezados opcionales).',
-  appChartInserted: 'Gráfico insertado — selecciónelo para editarlo, ⌘S lo escribe en el archivo.',
+  appChartInserted:
+    'Gráfico insertado — selecciónelo para editarlo, {saveKeys} lo escribe en el archivo.',
   appShapeNeedsFile:
     'Abra primero un archivo XLSX — las formas insertadas se escriben en el archivo.',
   appSelectCellFirst: 'Seleccione primero una celda.',
-  appTextBoxInserted: 'Cuadro de texto insertado — se escribe en el archivo al guardar (⌘S).',
-  appShapeInserted: 'Forma insertada — se escribe en el archivo al guardar (⌘S).',
+  appTextBoxInserted:
+    'Cuadro de texto insertado — se escribe en el archivo al guardar ({saveKeys}).',
+  appShapeInserted: 'Forma insertada — se escribe en el archivo al guardar ({saveKeys}).',
   appPictureNeedsFile:
     'Abra primero un archivo XLSX — las imágenes insertadas se escriben en el archivo.',
   appPictureTooLarge: 'No se admiten imágenes de más de 20 MB.',
   appPictureBadType: 'Solo se admiten imágenes PNG, JPEG o GIF.',
-  appPictureInserted: 'Imagen insertada — se escribe en el archivo al guardar (⌘S).',
+  appPictureInserted: 'Imagen insertada — se escribe en el archivo al guardar ({saveKeys}).',
   appTableNeedsRows: 'Una tabla necesita una fila de encabezado más al menos una fila de datos.',
   appTableTooWide: 'Una tabla puede abarcar como máximo 1.000 columnas.',
   appTableNameUsed: 'El nombre de tabla "{name}" ya se usó en esta sesión.',
@@ -396,7 +398,7 @@ export const es = {
   appTablesNeedFile: 'Abra primero un archivo XLSX — las tablas se escriben en el archivo.',
   appTableSelectRange:
     'Seleccione primero el rango de datos — con los encabezados en su primera fila.',
-  appTableCreated: 'Tabla creada — guarde con ⌘S.',
+  appTableCreated: 'Tabla creada — guarde con {saveKeys}.',
   appTableCreateFailed: 'No se puede crear la tabla.',
   appPivotOnAddedSheet:
     'Las tablas dinámicas en hojas agregadas en esta sesión aún no se admiten — guarde primero.',
@@ -450,14 +452,14 @@ export const es = {
   appOutlineNeedsFile:
     'Abra primero un archivo XLSX — los grupos de esquema se escriben en el archivo.',
   appOutlineSelectFirst: 'Seleccione primero las filas o columnas que desea agrupar.',
-  appDetailHidden: 'Detalle oculto — guarde con ⌘S.',
-  appDetailShown: 'Detalle mostrado — guarde con ⌘S.',
+  appDetailHidden: 'Detalle oculto — guarde con {saveKeys}.',
+  appDetailShown: 'Detalle mostrado — guarde con {saveKeys}.',
   appOutlineMaxLevel: 'Ya está en el nivel de esquema más profundo (7).',
   appNothingToUngroup: 'No hay nada que desagrupar en la selección.',
-  appRowsGrouped: 'Filas agrupadas — guarde con ⌘S. Contráigalas con "Ocultar detalle".',
-  appColsGrouped: 'Columnas agrupadas — guarde con ⌘S. Contráigalas con "Ocultar detalle".',
-  appRowsUngrouped: 'Filas desagrupadas — guarde con ⌘S.',
-  appColsUngrouped: 'Columnas desagrupadas — guarde con ⌘S.',
+  appRowsGrouped: 'Filas agrupadas — guarde con {saveKeys}. Contráigalas con "Ocultar detalle".',
+  appColsGrouped: 'Columnas agrupadas — guarde con {saveKeys}. Contráigalas con "Ocultar detalle".',
+  appRowsUngrouped: 'Filas desagrupadas — guarde con {saveKeys}.',
+  appColsUngrouped: 'Columnas desagrupadas — guarde con {saveKeys}.',
   appSheetAdded: 'Hoja agregada — haga doble clic en su pestaña para cambiarle el nombre.',
   appSheetAddFailed: 'No se puede agregar una hoja.',
   appFormatCopied: 'Formato copiado — seleccione las celdas de destino para aplicarlo.',
@@ -469,16 +471,16 @@ export const es = {
   appProtectionWillWrite: 'La protección de la hoja está activada y se escribirá al guardar.',
   appProtectionWillRemove: 'La protección de la hoja se quitará al guardar.',
   appZoom: 'Zoom {percent} %.',
-  appTopRowFrozen: 'Fila superior inmovilizada — guarde con ⌘S.',
-  appFirstColFrozen: 'Primera columna inmovilizada — guarde con ⌘S.',
+  appTopRowFrozen: 'Fila superior inmovilizada — guarde con {saveKeys}.',
+  appFirstColFrozen: 'Primera columna inmovilizada — guarde con {saveKeys}.',
   appFindMatchesCapped:
     'Demasiadas coincidencias: se muestran las primeras {count}; acote la búsqueda para ver el resto.',
   appFindScanTruncated:
     'Hoja grande: la búsqueda se detuvo tras {cells} celdas; los resultados pueden estar incompletos.',
   appReplaceNeedsFullLoad:
     'Reemplazar requiere el modo de carga completa — use Buscar en su lugar.',
-  appGridlinesHiddenSave: 'Líneas de cuadrícula ocultas — guarde con ⌘S.',
-  appGridlinesShownSave: 'Líneas de cuadrícula mostradas — guarde con ⌘S.',
+  appGridlinesHiddenSave: 'Líneas de cuadrícula ocultas — guarde con {saveKeys}.',
+  appGridlinesShownSave: 'Líneas de cuadrícula mostradas — guarde con {saveKeys}.',
   appGridlinesHidden: 'Líneas de cuadrícula ocultas.',
   appGridlinesShown: 'Líneas de cuadrícula mostradas.',
   appShowingFormulas: 'Mostrando fórmulas — vuelva a alternar para ver los valores.',
@@ -495,10 +497,10 @@ export const es = {
   appNoTraceArrows: 'No hay flechas de rastreo que quitar.',
   appWorkbookStats:
     'Estadísticas del libro: {sheets} hojas · {cells} celdas con datos · {formulas} fórmulas{note}.',
-  appFrozenAtSelection: 'Paneles inmovilizados en la selección — guarde con ⌘S.',
+  appFrozenAtSelection: 'Paneles inmovilizados en la selección — guarde con {saveKeys}.',
   appSelectCellsFirst: 'Seleccione primero las celdas.',
   appCellStyleApplied:
-    'Estilo de celda aplicado — se registra como cualquier edición de formato (⌘S para guardar).',
+    'Estilo de celda aplicado — se registra como cualquier edición de formato ({saveKeys} para guardar).',
   appSelectRangeFirst: 'Seleccione primero un rango de celdas.',
   appSettingNeedsFile:
     'Abra primero un archivo XLSX — esta configuración solo se guarda en el archivo.',
@@ -534,11 +536,11 @@ export const es = {
   appOpeningWorkbook: 'Abriendo libro…',
   appOpenStalled: 'No se pudo abrir el libro.',
   appOpenRetry: 'Reintentar',
-  appOpened: 'Se abrió {name} — las ediciones de celdas se vuelven a guardar con ⌘S.',
+  appOpened: 'Se abrió {name} — las ediciones de celdas se vuelven a guardar con {saveKeys}.',
   appOpenFailed: 'No se puede abrir el libro.',
   appPageSetupNeedsFile:
     'Abra primero un archivo XLSX — la configuración de página se guarda en el archivo.',
-  appPageSetupRecorded: '{note} — guarde con ⌘S.',
+  appPageSetupRecorded: '{note} — guarde con {saveKeys}.',
   appOrientationPortrait: 'Orientación: vertical',
   appOrientationLandscape: 'Orientación: horizontal',
   appMarginsNormal: 'Márgenes: normales',
@@ -564,7 +566,7 @@ export const es = {
   appHfNeedsFile:
     'Abra primero un archivo XLSX — los encabezados y pies de página se guardan en el archivo.',
   appActiveSheetUnavailable: 'La hoja activa no está disponible.',
-  appHfUpdated: 'Encabezado y pie de página actualizados — guarde con ⌘S.',
+  appHfUpdated: 'Encabezado y pie de página actualizados — guarde con {saveKeys}.',
   appPdfNeedsFullLoad:
     'La exportación a PDF requiere el libro completamente cargado — espere a que termine la carga.',
   appPdfRendering: 'Generando el PDF…',
@@ -637,11 +639,12 @@ export const es = {
   appNoteNextTitle: 'Ir al comentario siguiente',
   appShowCommentsTitle: 'Fijar o soltar el globo de comentario de la celda seleccionada',
   appStructuralShiftBlocked:
-    'Un gráfico o tabla de esta hoja está anclado a las filas/columnas afectadas; no se pueden desplazar y el cambio estructural no se guardó. Deshágalo (⌘Z) y vuelva a guardar.',
-  appAiChangesNotSaved: 'Cambios de IA aplicados (sin guardar). Deshaga con ⌘Z; guarde con ⌘S.',
+    'Un gráfico o tabla de esta hoja está anclado a las filas/columnas afectadas; no se pueden desplazar y el cambio estructural no se guardó. Deshágalo ({undoKeys}) y vuelva a guardar.',
+  appAiChangesNotSaved:
+    'Cambios de IA aplicados (sin guardar). Deshaga con {undoKeys}; guarde con {saveKeys}.',
   appChartUpdated: 'Gráfico actualizado.',
   appChartNotEditable: 'Este gráfico no es editable.',
-  appChartEditRecorded: 'Edición del gráfico registrada — guarde con ⌘S.',
+  appChartEditRecorded: 'Edición del gráfico registrada — guarde con {saveKeys}.',
   appChartDeleted: 'Gráfico eliminado.',
   appChartMoved: 'Gráfico movido.',
   appVisualNotEditable: 'Este objeto no es editable.',
@@ -649,14 +652,14 @@ export const es = {
   appFileVisualMoveDeleteOnly:
     'Para los objetos ya presentes en el archivo solo se admite mover o eliminar.',
   appVisualNoMove: 'Este objeto no se puede mover — su forma de dibujo no es editable.',
-  appVisualDeleted: 'Objeto eliminado — guarde con ⌘S.',
-  appShapeTextUpdated: 'Texto de la forma actualizado — guarde con ⌘S.',
-  appShapeMoved: 'Forma movida — guarde con ⌘S.',
+  appVisualDeleted: 'Objeto eliminado — guarde con {saveKeys}.',
+  appShapeTextUpdated: 'Texto de la forma actualizado — guarde con {saveKeys}.',
+  appShapeMoved: 'Forma movida — guarde con {saveKeys}.',
   appTabShapeFormat: 'Formato de forma',
   appShapeFill: 'Relleno de forma',
   appShapeOutline: 'Contorno de forma',
   appShapeNoOutline: 'Sin contorno',
-  appShapeStyleUpdated: 'Estilo de forma actualizado — guarde con ⌘S.',
+  appShapeStyleUpdated: 'Estilo de forma actualizado — guarde con {saveKeys}.',
   appDeleteShape: 'Eliminar forma',
   appGroupShapeStyles: 'Estilos de forma',
   appScopeWorkbook: 'Libro',
@@ -664,7 +667,7 @@ export const es = {
     'Abra primero un archivo XLSX — los nombres definidos se guardan en el archivo.',
   appNameGone: 'Ese nombre ya no existe.',
   appNameApplyFailed: 'No se pudo aplicar el nombre.',
-  appNamesUpdated: 'Nombres definidos actualizados — guarde con ⌘S.',
+  appNamesUpdated: 'Nombres definidos actualizados — guarde con {saveKeys}.',
   appLinkInternal: 'El vínculo apunta dentro del libro: {location}',
   appLinkSheetNotFound: 'No se encontró la hoja "{name}".',
   appLinkJumpFailed: 'No se puede saltar a {location}.',
@@ -727,7 +730,7 @@ export const es = {
   appAutoSaveTitle: 'El autoguardado solo está disponible para archivos en la nube',
   appAutoSaveTip: 'Autoguardado (cada 30 segundos y cuando la ventana pierde el foco)',
   appExportPdfTitle: 'Exportar como PDF',
-  appSaveTitle: 'Guardar (⌘S)',
+  appSaveTitle: 'Guardar',
   appSaveAs: 'Guardar como',
   appUndo: 'Deshacer',
   appRedo: 'Rehacer',
@@ -736,7 +739,7 @@ export const es = {
   appSavedState: 'Guardado',
   appSavedLocally: 'Guardado localmente',
   appRevisionChip: 'Revisión {revision}',
-  appOpenWorkbookTitle: 'Abrir libro (⌘O)',
+  appOpenWorkbookTitle: 'Abrir libro',
   appOpenXlsx: 'Abrir XLSX',
   appHideAi: 'Ocultar IA',
   appShowAi: 'Mostrar IA',
@@ -1206,7 +1209,7 @@ export const es = {
   appSortZToA: 'Ordenar de Z a A',
   appCustomSort: 'Orden personalizado…',
   appFilter: 'Filtro',
-  appFilterToggleDetail: 'Alternar ⇧⌘L',
+  appFilterToggleDetail: 'Alternar {keys}',
   appClear: 'Borrar',
   appClearFilterTitle: 'Borrar los criterios de filtro',
   appReapply: 'Volver a aplicar',
@@ -1311,7 +1314,7 @@ export const es = {
   appAllowEditRanges: 'Permitir editar rangos',
   appGroupClipboard: 'Portapapeles',
   appPaste: 'Pegar',
-  appPasteTitle: 'Pegar ⌘V',
+  appPasteTitle: 'Pegar',
   appPasteSpecial: 'Pegado especial',
   appPasteSpecialTitle: 'Pegar solo valores, fórmulas o formato',
   appPasteValuesOnly: 'Solo valores',
@@ -1320,8 +1323,8 @@ export const es = {
   appPasteColWidths: 'Solo anchos de columna',
   appPasteExceptBorders: 'Todo excepto bordes',
   appPasteSpecialDialog: 'Pegado especial…',
-  appCutTitle: 'Cortar ⌘X',
-  appCopyTitle: 'Copiar ⌘C',
+  appCutTitle: 'Cortar',
+  appCopyTitle: 'Copiar',
   appFormatPainter: 'Copiar formato',
   appFormatPainterTip: 'Copiar formato — doble clic para mantenerlo activo hasta Esc',
   appFormatPainterLocked:
@@ -1416,7 +1419,7 @@ export const es = {
   appClearFormats: 'Borrar formatos',
   appClearContents: 'Borrar contenido',
   appFind: 'Buscar',
-  appFindTitle: 'Buscar y seleccionar ⌘F',
+  appFindTitle: 'Buscar y seleccionar',
   appReplace: 'Reemplazar',
   appGoTo: 'Ir a',
   appInsertCells: 'Insertar celdas…',
@@ -1539,9 +1542,9 @@ export const es = {
   appVisualSizeProperties: 'Tamaño y propiedades…',
   appVisualHyperlink: 'Hipervínculo…',
   appVisualDelete: 'Eliminar',
-  appVisualArranged: 'Objeto actualizado — guarda con ⌘S.',
+  appVisualArranged: 'Objeto actualizado — guarda con {saveKeys}.',
   appVisualCopied: 'Objeto copiado.',
-  appVisualPasted: 'Objeto pegado — guarda con ⌘S.',
+  appVisualPasted: 'Objeto pegado — guarda con {saveKeys}.',
   appVisualNoCopy: 'Este objeto no se puede copiar.',
   appVisualSelectTwo: 'Mayús+clic para seleccionar al menos dos objetos que alinear.',
   appVisualSelectThree: 'Mayús+clic para seleccionar al menos tres objetos que distribuir.',

@@ -1,9 +1,23 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createI18n, htmlDir, htmlLang, type Lang, type Params } from '@genoffice/i18n'
+import { sheetsHint } from '../sheets-keymap'
 import { strings } from './strings'
 
-const translate = createI18n(strings)
+const translateRaw = createI18n(strings)
+
+/**
+ * Strings name the Save / Undo keys as `{saveKeys}` / `{undoKeys}` instead of a
+ * hand-written chord; they come from the sheets shortcut table (sheets-03,
+ * sheets-07) for this platform and surface, so a notice never says ⌘S to a
+ * Windows or web user. Explicit params win.
+ */
+const translate = (lang: Lang, key: StringKey, params?: Params): string =>
+  translateRaw(lang, key, {
+    saveKeys: sheetsHint('sheets-03'),
+    undoKeys: sheetsHint('sheets-07'),
+    ...params,
+  })
 
 export type StringKey = keyof typeof strings.zh
 export type TFunc = (key: StringKey, params?: Params) => string

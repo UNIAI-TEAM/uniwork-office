@@ -31,7 +31,7 @@ export const ko = {
   aiFootprintOverwritten: '데이터를 덮어쓴 셀: {count}',
   aiFootprintOverwrittenMin: '데이터를 덮어쓴 셀: {count} 이상',
   aiFootprintNoOverwrite: '기존 데이터를 덮어쓰지 않았습니다',
-  aiUndoTitle: '이 AI 변경 실행 취소(⌘Z와 동일)',
+  aiUndoTitle: '이 AI 변경 실행 취소({undoKeys}와 동일)',
   aiUndo: '실행 취소',
   aiPreviewAria: '변경 미리 보기',
   aiProposedChanges: '변경 제안',

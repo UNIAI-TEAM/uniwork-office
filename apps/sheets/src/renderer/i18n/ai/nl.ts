@@ -33,7 +33,7 @@ export const nl = {
   aiFootprintOverwritten: 'Overschreven cellen met gegevens: {count}',
   aiFootprintOverwrittenMin: 'Overschreven cellen met gegevens: minstens {count}',
   aiFootprintNoOverwrite: 'Geen bestaande gegevens overschreven',
-  aiUndoTitle: 'Deze AI-wijziging ongedaan maken (zelfde als ⌘Z)',
+  aiUndoTitle: 'Deze AI-wijziging ongedaan maken (zelfde als {undoKeys})',
   aiUndo: 'Ongedaan maken',
   aiPreviewAria: 'Voorbeeld van wijzigingen',
   aiProposedChanges: 'Voorgestelde wijzigingen',

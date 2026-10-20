@@ -31,7 +31,7 @@ export const ja = {
   aiFootprintOverwritten: 'データを上書きしたセル: {count}',
   aiFootprintOverwrittenMin: 'データを上書きしたセル: {count} 以上',
   aiFootprintNoOverwrite: '既存データの上書きはありません',
-  aiUndoTitle: 'この AI 変更を元に戻す（⌘Z と同じ）',
+  aiUndoTitle: 'この AI 変更を元に戻す（{undoKeys} と同じ）',
   aiUndo: '元に戻す',
   aiPreviewAria: '変更プレビュー',
   aiProposedChanges: '変更案',

@@ -872,6 +872,8 @@ export function App({
   /// Non-null while the "Insert Timeline" field picker is open.
   const [timelinePicker, setTimelinePicker] = useState<TimelinePickerState | null>(null)
   const menuActionRef = useRef<(action: MenuAction) => void>(() => {})
+  /// latest ribbon command handler, for keys Univer's dispatcher hands back (Cmd+= recalculates)
+  const ribbonCommandRef = useRef<(command: string) => void>(() => {})
   /// Where the user was when a save started: the post-save session swap
   /// reinstalls the workbook, and the install consumes this instead of
   /// resetting the view to the first sheet's A1.
@@ -2217,6 +2219,7 @@ export function App({
         return row !== null && column !== null ? { row, column } : null
       },
       setCellsDialog,
+      (command) => ribbonCommandRef.current(command),
     )
     // Wide expression CF rules register folded/windowed formula ranges so
     // the engine stops rebuilding millions of per-cell dependency trees on
@@ -4913,6 +4916,7 @@ export function App({
     }
   }
   handleSaveRef.current = handleSave
+  ribbonCommandRef.current = handleRibbonCommand
 
   // MCP visible-grid session (planning/mcp-server.md phase 2): the shell pushes
   // read/apply/save commands; they run through the same executors the built-in

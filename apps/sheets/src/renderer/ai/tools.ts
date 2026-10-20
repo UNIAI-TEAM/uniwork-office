@@ -24,6 +24,7 @@ import type { AttachmentMeta } from '../../shared/desktop-api'
 import { cap } from '../capabilities'
 import { planWrite, type PlanWrite } from './apply-footprint'
 import { t } from '../i18n/locale'
+import { sheetsHint } from '../sheets-keymap'
 import { formatRangeAggregate, type RangeAggregate } from './aggregate'
 import type { CellRead } from './cell-read'
 import type { RangeRowsOutcome } from './range-rows'
@@ -696,7 +697,7 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
   {
     name: 'propose_operations',
     description:
-      'Submit a batch of change operations, applied to the workbook immediately (the user can roll back with the [Undo] button or ⌘Z). Basic operations: ' +
+      'Submit a batch of change operations, applied to the workbook immediately (the user can roll back with the [Undo] button or the Undo shortcut). Basic operations: ' +
       '{op:"set_cell",sheetId,address,value} | {op:"set_formula",sheetId,address,formula(starts with =)} | ' +
       '{op:"clear_cell",sheetId,address} | {op:"rename_sheet",sheetId,name}. ' +
       'Field definitions for the remaining operations live in the guides — load_guide before using them: ' +
@@ -2301,7 +2302,7 @@ export function executeWorkbookTool(
           outcome.plan.sheetRenames.length +
           outcome.plan.structuralChanges.length
         const write = planWrite(outcome.plan, operations, deps.getActiveSheetInfo())
-        const base = `Auto-applied ${opCount} change(s) (undo via the side panel [Undo] button or ⌘Z): ${formatPlanSummary(outcome.plan)}${warnings}`
+        const base = `Auto-applied ${opCount} change(s) (undo via the side panel [Undo] button or ${sheetsHint('sheets-07')}): ${formatPlanSummary(outcome.plan)}${warnings}`
         // Read-back after write (write → verify): formula cells fetch their
         // computed values after the async recalc, so the AI sees real results and
         // errors like #REF!/#DIV/0! instead of just what it wrote.
@@ -2377,8 +2378,8 @@ export function executeWorkbookTool(
             ? `Apply failed MID-BATCH — operations before the failing one were already committed: ${reason}. ` +
                 'Read the affected ranges to see the current state before continuing; ' +
                 (applied.undoDropped
-                  ? 'the committed part is too large for the undo history — ⌘Z will NOT revert it.'
-                  : 'the whole partial batch is one undo step (⌘Z / [Undo]).')
+                  ? `the committed part is too large for the undo history — ${sheetsHint('sheets-07')} will NOT revert it.`
+                  : `the whole partial batch is one undo step (${sheetsHint('sheets-07')} / [Undo]).`)
             : `Apply failed — the workbook is UNCHANGED: ${reason}. ` +
                 'Do not tell the user the changes were made; adjust the operations and retry, or explain the failure.',
         )

@@ -33,7 +33,7 @@ export const es = {
   aiFootprintOverwritten: 'Celdas con datos sobrescritas: {count}',
   aiFootprintOverwrittenMin: 'Celdas con datos sobrescritas: al menos {count}',
   aiFootprintNoOverwrite: 'No se sobrescribieron datos existentes',
-  aiUndoTitle: 'Deshacer este cambio de la IA (igual que ⌘Z)',
+  aiUndoTitle: 'Deshacer este cambio de la IA (igual que {undoKeys})',
   aiUndo: 'Deshacer',
   aiPreviewAria: 'Vista previa de cambios',
   aiProposedChanges: 'Cambios propuestos',

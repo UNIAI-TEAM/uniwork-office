@@ -133,7 +133,7 @@ export const fr = {
   appMoreSeries: '+{count} séries…',
   appMoreItems: '+{count} éléments…',
   appTruncationNote: '{shown} premiers sur {total}',
-  appGoToButtonTitle: 'Atteindre (⌘G)',
+  appGoToButtonTitle: 'Atteindre ({keys})',
   appPivotChartHintIn:
     'Créer un graphique croisé dynamique à partir du tableau croisé dynamique actuel',
   appPivotChartHintOut:
@@ -153,7 +153,7 @@ export const fr = {
   appAttachmentReadFailed: '{name} : échec de la lecture',
   appTooManyImages: '{max} images maximum par message ; les images en trop ont été ignorées',
   appAppliedRevision:
-    'Appliqué (révision {revision}) — annulez avec ⌘Z, enregistrez dans le fichier avec ⌘S.',
+    'Appliqué (révision {revision}) — annulez avec {undoKeys}, enregistrez dans le fichier avec {saveKeys}.',
   appCannotReadImage: 'Impossible de lire le fichier image.',
   appTableNotDeletable:
     "Le tableau « {name} » n'existe pas ou n'a pas été créé pendant cette session — les tableaux déjà présents dans le fichier ne peuvent pas encore être supprimés.",
@@ -168,9 +168,9 @@ export const fr = {
   appPivotNoChartData:
     "Ce tableau croisé dynamique n'a aucune ligne/colonne de données à représenter.",
   appPivotChartInsertedTruncated:
-    "Graphique croisé dynamique inséré (trop de points de données, tronqué) — enregistrez (⌘S) pour l'écrire dans le fichier.",
+    "Graphique croisé dynamique inséré (trop de points de données, tronqué) — enregistrez ({saveKeys}) pour l'écrire dans le fichier.",
   appPivotChartInserted:
-    "Graphique croisé dynamique inséré — il suit les actualisations du tableau croisé dynamique ; enregistrez (⌘S) pour l'écrire dans le fichier.",
+    "Graphique croisé dynamique inséré — il suit les actualisations du tableau croisé dynamique ; enregistrez ({saveKeys}) pour l'écrire dans le fichier.",
   appSheetNoPivot: 'Cette feuille ne contient aucun tableau croisé dynamique.',
   appPivotNeedsFullLoad:
     "L'actualisation des tableaux croisés dynamiques nécessite le mode de chargement complet — ce classeur est trop volumineux et a été chargé en flux.",
@@ -212,7 +212,7 @@ export const fr = {
   appPivotNoCacheDef:
     "Ce tableau croisé dynamique n'a pas de définition de cache et ne peut pas être modifié.",
   appPivotDefNotLoadedSave:
-    "La définition du tableau croisé dynamique n'est pas encore chargée — si vous l'avez modifié pendant cette session, enregistrez d'abord (⌘S).",
+    "La définition du tableau croisé dynamique n'est pas encore chargée — si vous l'avez modifié pendant cette session, enregistrez d'abord ({saveKeys}).",
   appPivotEditUnsupported:
     'Ce tableau croisé dynamique ne peut pas encore être modifié : {reasons}',
   appPivotEditHasFeatures:
@@ -224,12 +224,12 @@ export const fr = {
   appPivotSourceSheetNotFound:
     'Impossible de trouver la feuille source « {name} » du tableau croisé dynamique.',
   appPivotLayoutUpdated:
-    "Disposition du tableau croisé dynamique mise à jour — enregistrez (⌘S) pour l'écrire dans le fichier ; Excel reconstruit le cache à l'ouverture.",
+    "Disposition du tableau croisé dynamique mise à jour — enregistrez ({saveKeys}) pour l'écrire dans le fichier ; Excel reconstruit le cache à l'ouverture.",
   appPivotEditFailed: 'Échec de la modification du tableau croisé dynamique.',
   appNoActiveSheet: 'Aucune feuille active.',
   appCurrentSheetNoPivot: 'La feuille active ne contient aucun tableau croisé dynamique.',
   appPivotsRefreshed:
-    '{count} tableau(x) croisé(s) dynamique(s) actualisé(s) — enregistrez pour écrire dans le fichier (⌘S).',
+    '{count} tableau(x) croisé(s) dynamique(s) actualisé(s) — enregistrez pour écrire dans le fichier ({saveKeys}).',
   appRefreshFailed: "Échec de l'actualisation.",
   appSlicerNeedsFile:
     "Ouvrez d'abord un fichier XLSX — les segments s'appuient sur les tableaux croisés dynamiques du fichier.",
@@ -248,7 +248,7 @@ export const fr = {
   appSlicerFilterFailed: 'Échec du filtrage par segment.',
   appSlicerKeepOne: 'Conservez au moins un membre sélectionné dans le segment.',
   appSlicerApplied:
-    'Segment « {name} » appliqué — enregistrez (⌘S) pour écrire le tableau croisé dynamique filtré.',
+    'Segment « {name} » appliqué — enregistrez ({saveKeys}) pour écrire le tableau croisé dynamique filtré.',
   appSlicerCleared: 'Filtre du segment « {name} » effacé.',
   appSlicerRemoved: 'Segment « {name} » supprimé ; tous les membres ont été rétablis.',
   appTimelineHintIn:
@@ -260,7 +260,7 @@ export const fr = {
   appTimelineCreated:
     'Chronologie « {name} » créée — cliquez sur les mois pour filtrer le tableau croisé dynamique.',
   appTimelineApplied:
-    'Chronologie « {name} » appliquée — enregistrez (⌘S) pour écrire le tableau croisé dynamique filtré.',
+    'Chronologie « {name} » appliquée — enregistrez ({saveKeys}) pour écrire le tableau croisé dynamique filtré.',
   appTimelineCleared: 'Filtre de la chronologie « {name} » effacé.',
   appTimelineRemoved: 'Chronologie « {name} » supprimée ; tous les membres ont été rétablis.',
   appTimelineEmptyRange: 'Aucun membre dans la plage de mois sélectionnée.',
@@ -283,7 +283,8 @@ export const fr = {
   appAdvFilterGone:
     "La feuille active n'a pas de filtre automatique — réactivez-le puis réessayez.",
   appAdvFilterFailed: "Échec de l'application du filtre avancé.",
-  appAdvFilterApplied: 'Critères de filtre avancé appliqués — ⌘S enregistre dans le fichier.',
+  appAdvFilterApplied:
+    'Critères de filtre avancé appliqués — {saveKeys} enregistre dans le fichier.',
   appFlashFillNeedsLeft:
     'Le remplissage instantané nécessite des colonnes de données à gauche de la colonne cible.',
   appFlashFillNeedsRows: 'Le remplissage instantané nécessite au moins deux lignes de données.',
@@ -300,7 +301,7 @@ export const fr = {
   appSparklineNoSpace: "Pas d'espace pour les graphiques sparkline à droite de la sélection.",
   appSparklineOutsideGrid: 'Les cellules hôtes des sparklines sortent de la grille de la feuille.',
   appSparklinesInserted:
-    '{count} graphique(s) sparkline inséré(s) dans la colonne à droite de la sélection — ⌘S enregistre dans le fichier.',
+    '{count} graphique(s) sparkline inséré(s) dans la colonne à droite de la sélection — {saveKeys} enregistre dans le fichier.',
   appSaveHeldStranded:
     "Les tableaux croisés dynamiques/tableaux ne peuvent pas être enregistrés en même temps que de nouvelles feuilles plus des modifications de lignes/colonnes — enregistrez d'abord la structure, puis ajoutez-les.",
   appSaveSecondCanceled:
@@ -376,7 +377,8 @@ export const fr = {
   appPreviewOtherWorkbook: "L'aperçu appartenait à un autre classeur — créez-en un nouveau.",
   appPreviewSheetGone: "La feuille de l'aperçu n'existe plus — créez un nouvel aperçu.",
   appWorkbookChangedSincePreview: "Le classeur a changé depuis l'aperçu — créez un nouvel aperçu.",
-  appAppliedJournaled: 'Appliqué — les modifications sont journalisées ; enregistrez avec ⌘S.',
+  appAppliedJournaled:
+    'Appliqué — les modifications sont journalisées ; enregistrez avec {saveKeys}.',
   appUndoCommitted: 'Annulation validée (révision {revision}).',
   appUndoFailed: "Impossible d'annuler.",
   appAutoFilterCreateFailed: 'Impossible de créer le filtre automatique.',
@@ -389,17 +391,18 @@ export const fr = {
   appChartNeedsNumericColumn:
     'Sélectionnez une plage contenant au moins une colonne numérique (en-têtes facultatifs).',
   appChartInserted:
-    "Graphique inséré — sélectionnez-le pour le modifier, ⌘S l'écrit dans le fichier.",
+    "Graphique inséré — sélectionnez-le pour le modifier, {saveKeys} l'écrit dans le fichier.",
   appShapeNeedsFile:
     "Ouvrez d'abord un fichier XLSX — les formes insérées sont écrites dans le fichier.",
   appSelectCellFirst: "Sélectionnez d'abord une cellule.",
-  appTextBoxInserted: "Zone de texte insérée — écrite dans le fichier à l'enregistrement (⌘S).",
-  appShapeInserted: "Forme insérée — écrite dans le fichier à l'enregistrement (⌘S).",
+  appTextBoxInserted:
+    "Zone de texte insérée — écrite dans le fichier à l'enregistrement ({saveKeys}).",
+  appShapeInserted: "Forme insérée — écrite dans le fichier à l'enregistrement ({saveKeys}).",
   appPictureNeedsFile:
     "Ouvrez d'abord un fichier XLSX — les images insérées sont écrites dans le fichier.",
   appPictureTooLarge: 'Les images de plus de 20 Mo ne sont pas prises en charge.',
   appPictureBadType: 'Seules les images PNG, JPEG ou GIF sont prises en charge.',
-  appPictureInserted: "Image insérée — écrite dans le fichier à l'enregistrement (⌘S).",
+  appPictureInserted: "Image insérée — écrite dans le fichier à l'enregistrement ({saveKeys}).",
   appTableNeedsRows: "Un tableau nécessite une ligne d'en-tête plus au moins une ligne de données.",
   appTableTooWide: 'Un tableau peut comporter au maximum 1 000 colonnes.',
   appTableNameUsed: 'Le nom de tableau « {name} » a déjà été utilisé pendant cette session.',
@@ -408,7 +411,7 @@ export const fr = {
   appTablesNeedFile: "Ouvrez d'abord un fichier XLSX — les tableaux sont écrits dans le fichier.",
   appTableSelectRange:
     "Sélectionnez d'abord la plage de données — les en-têtes dans sa première ligne.",
-  appTableCreated: 'Tableau créé — enregistrez avec ⌘S.',
+  appTableCreated: 'Tableau créé — enregistrez avec {saveKeys}.',
   appTableCreateFailed: 'Impossible de créer le tableau.',
   appPivotOnAddedSheet:
     "Les tableaux croisés dynamiques sur des feuilles ajoutées pendant cette session ne sont pas encore pris en charge — enregistrez d'abord.",
@@ -464,15 +467,16 @@ export const fr = {
   appOutlineNeedsFile:
     "Ouvrez d'abord un fichier XLSX — les groupes de plan sont écrits dans le fichier.",
   appOutlineSelectFirst: "Sélectionnez d'abord les lignes ou colonnes à grouper.",
-  appDetailHidden: 'Détail masqué — enregistrez avec ⌘S.',
-  appDetailShown: 'Détail affiché — enregistrez avec ⌘S.',
+  appDetailHidden: 'Détail masqué — enregistrez avec {saveKeys}.',
+  appDetailShown: 'Détail affiché — enregistrez avec {saveKeys}.',
   appOutlineMaxLevel: 'Niveau de plan le plus profond déjà atteint (7).',
   appNothingToUngroup: 'Rien à dissocier dans la sélection.',
-  appRowsGrouped: 'Lignes groupées — enregistrez avec ⌘S. Réduisez-les avec « Masquer le détail ».',
+  appRowsGrouped:
+    'Lignes groupées — enregistrez avec {saveKeys}. Réduisez-les avec « Masquer le détail ».',
   appColsGrouped:
-    'Colonnes groupées — enregistrez avec ⌘S. Réduisez-les avec « Masquer le détail ».',
-  appRowsUngrouped: 'Lignes dissociées — enregistrez avec ⌘S.',
-  appColsUngrouped: 'Colonnes dissociées — enregistrez avec ⌘S.',
+    'Colonnes groupées — enregistrez avec {saveKeys}. Réduisez-les avec « Masquer le détail ».',
+  appRowsUngrouped: 'Lignes dissociées — enregistrez avec {saveKeys}.',
+  appColsUngrouped: 'Colonnes dissociées — enregistrez avec {saveKeys}.',
   appSheetAdded: 'Feuille ajoutée — double-cliquez sur son onglet pour la renommer.',
   appSheetAddFailed: "Impossible d'ajouter une feuille.",
   appFormatCopied: "Format copié — sélectionnez les cellules cibles pour l'appliquer.",
@@ -486,16 +490,16 @@ export const fr = {
     "La protection de la feuille est activée et sera écrite à l'enregistrement.",
   appProtectionWillRemove: "La protection de la feuille sera supprimée à l'enregistrement.",
   appZoom: 'Zoom {percent} %.',
-  appTopRowFrozen: 'Ligne supérieure figée — enregistrez avec ⌘S.',
-  appFirstColFrozen: 'Première colonne figée — enregistrez avec ⌘S.',
+  appTopRowFrozen: 'Ligne supérieure figée — enregistrez avec {saveKeys}.',
+  appFirstColFrozen: 'Première colonne figée — enregistrez avec {saveKeys}.',
   appFindMatchesCapped:
     'Trop de résultats : seuls les {count} premiers sont affichés — affinez la recherche pour voir le reste.',
   appFindScanTruncated:
     'Grande feuille : recherche interrompue après {cells} cellules — les résultats peuvent être incomplets.',
   appReplaceNeedsFullLoad:
     'Le remplacement nécessite le mode de chargement complet — utilisez plutôt Rechercher.',
-  appGridlinesHiddenSave: 'Quadrillage masqué — enregistrez avec ⌘S.',
-  appGridlinesShownSave: 'Quadrillage affiché — enregistrez avec ⌘S.',
+  appGridlinesHiddenSave: 'Quadrillage masqué — enregistrez avec {saveKeys}.',
+  appGridlinesShownSave: 'Quadrillage affiché — enregistrez avec {saveKeys}.',
   appGridlinesHidden: 'Quadrillage masqué.',
   appGridlinesShown: 'Quadrillage affiché.',
   appShowingFormulas: 'Affichage des formules — basculez à nouveau pour les valeurs.',
@@ -512,10 +516,10 @@ export const fr = {
   appNoTraceArrows: 'Aucune flèche de repérage à supprimer.',
   appWorkbookStats:
     'Statistiques du classeur : {sheets} feuilles · {cells} cellules avec données · {formulas} formules{note}.',
-  appFrozenAtSelection: 'Volets figés à la sélection — enregistrez avec ⌘S.',
+  appFrozenAtSelection: 'Volets figés à la sélection — enregistrez avec {saveKeys}.',
   appSelectCellsFirst: "Sélectionnez d'abord les cellules.",
   appCellStyleApplied:
-    'Style de cellule appliqué — journalisé comme toute modification de format (⌘S pour enregistrer).',
+    'Style de cellule appliqué — journalisé comme toute modification de format ({saveKeys} pour enregistrer).',
   appSelectRangeFirst: "Sélectionnez d'abord une plage de cellules.",
   appSettingNeedsFile:
     "Ouvrez d'abord un fichier XLSX — ce paramètre est enregistré uniquement dans le fichier.",
@@ -552,11 +556,11 @@ export const fr = {
   appOpeningWorkbook: 'Ouverture du classeur…',
   appOpenStalled: "Impossible d'ouvrir le classeur.",
   appOpenRetry: 'Réessayer',
-  appOpened: '{name} ouvert — les modifications de cellules se réenregistrent avec ⌘S.',
+  appOpened: '{name} ouvert — les modifications de cellules se réenregistrent avec {saveKeys}.',
   appOpenFailed: "Impossible d'ouvrir le classeur.",
   appPageSetupNeedsFile:
     "Ouvrez d'abord un fichier XLSX — la mise en page est enregistrée dans le fichier.",
-  appPageSetupRecorded: '{note} — enregistrez avec ⌘S.',
+  appPageSetupRecorded: '{note} — enregistrez avec {saveKeys}.',
   appOrientationPortrait: 'Orientation : portrait',
   appOrientationLandscape: 'Orientation : paysage',
   appMarginsNormal: 'Marges : normales',
@@ -582,7 +586,7 @@ export const fr = {
   appHfNeedsFile:
     "Ouvrez d'abord un fichier XLSX — les en-têtes et pieds de page sont enregistrés dans le fichier.",
   appActiveSheetUnavailable: "La feuille active n'est pas disponible.",
-  appHfUpdated: 'En-tête et pied de page mis à jour — enregistrez avec ⌘S.',
+  appHfUpdated: 'En-tête et pied de page mis à jour — enregistrez avec {saveKeys}.',
   appPdfNeedsFullLoad:
     "L'export PDF nécessite un classeur entièrement chargé — attendez la fin du chargement.",
   appPdfRendering: 'Rendu du PDF en cours…',
@@ -655,12 +659,12 @@ export const fr = {
   appNoteNextTitle: 'Aller au commentaire suivant',
   appShowCommentsTitle: 'Épingler/détacher la bulle de commentaire de la cellule sélectionnée',
   appStructuralShiftBlocked:
-    "Un graphique ou un tableau de cette feuille est ancré aux lignes/colonnes concernées : impossible de les décaler, la modification structurelle n'a pas été enregistrée. Annulez-la (⌘Z) puis réenregistrez.",
+    "Un graphique ou un tableau de cette feuille est ancré aux lignes/colonnes concernées : impossible de les décaler, la modification structurelle n'a pas été enregistrée. Annulez-la ({undoKeys}) puis réenregistrez.",
   appAiChangesNotSaved:
-    'Modifications IA appliquées (non enregistrées). Annulez avec ⌘Z ; enregistrez avec ⌘S.',
+    'Modifications IA appliquées (non enregistrées). Annulez avec {undoKeys} ; enregistrez avec {saveKeys}.',
   appChartUpdated: 'Graphique mis à jour.',
   appChartNotEditable: "Ce graphique n'est pas modifiable.",
-  appChartEditRecorded: 'Modification du graphique enregistrée — sauvegardez avec ⌘S.',
+  appChartEditRecorded: 'Modification du graphique enregistrée — sauvegardez avec {saveKeys}.',
   appChartDeleted: 'Graphique supprimé.',
   appChartMoved: 'Graphique déplacé.',
   appVisualNotEditable: "Cet objet n'est pas modifiable.",
@@ -669,14 +673,14 @@ export const fr = {
   appFileVisualMoveDeleteOnly:
     'Seuls le déplacement et la suppression sont pris en charge pour les objets déjà présents dans le fichier.',
   appVisualNoMove: "Cet objet ne peut pas être déplacé — sa forme de dessin n'est pas modifiable.",
-  appVisualDeleted: 'Objet supprimé — enregistrez avec ⌘S.',
-  appShapeTextUpdated: 'Texte de la forme mis à jour — enregistrez avec ⌘S.',
-  appShapeMoved: 'Forme déplacée — enregistrez avec ⌘S.',
+  appVisualDeleted: 'Objet supprimé — enregistrez avec {saveKeys}.',
+  appShapeTextUpdated: 'Texte de la forme mis à jour — enregistrez avec {saveKeys}.',
+  appShapeMoved: 'Forme déplacée — enregistrez avec {saveKeys}.',
   appTabShapeFormat: 'Format de la forme',
   appShapeFill: 'Remplissage',
   appShapeOutline: 'Contour',
   appShapeNoOutline: 'Sans contour',
-  appShapeStyleUpdated: 'Style de la forme mis à jour — enregistrez avec ⌘S.',
+  appShapeStyleUpdated: 'Style de la forme mis à jour — enregistrez avec {saveKeys}.',
   appDeleteShape: 'Supprimer la forme',
   appGroupShapeStyles: 'Styles de formes',
   appScopeWorkbook: 'Classeur',
@@ -684,7 +688,7 @@ export const fr = {
     "Ouvrez d'abord un fichier XLSX — les noms définis sont enregistrés dans le fichier.",
   appNameGone: "Ce nom n'existe plus.",
   appNameApplyFailed: "Le nom n'a pas pu être appliqué.",
-  appNamesUpdated: 'Noms définis mis à jour — enregistrez avec ⌘S.',
+  appNamesUpdated: 'Noms définis mis à jour — enregistrez avec {saveKeys}.',
   appLinkInternal: "Le lien pointe à l'intérieur du classeur : {location}",
   appLinkSheetNotFound: 'La feuille « {name} » est introuvable.',
   appLinkJumpFailed: "Impossible d'accéder à {location}.",
@@ -750,7 +754,7 @@ export const fr = {
   appAutoSaveTip:
     'Enregistrement automatique (toutes les 30 secondes et lorsque la fenêtre perd le focus)',
   appExportPdfTitle: 'Exporter en PDF',
-  appSaveTitle: 'Enregistrer (⌘S)',
+  appSaveTitle: 'Enregistrer',
   appSaveAs: 'Enregistrer sous',
   appUndo: 'Annuler',
   appRedo: 'Rétablir',
@@ -759,7 +763,7 @@ export const fr = {
   appSavedState: 'Enregistré',
   appSavedLocally: 'Enregistré localement',
   appRevisionChip: 'Révision {revision}',
-  appOpenWorkbookTitle: 'Ouvrir un classeur (⌘O)',
+  appOpenWorkbookTitle: 'Ouvrir un classeur',
   appOpenXlsx: 'Ouvrir un XLSX',
   appHideAi: "Masquer l'IA",
   appShowAi: "Afficher l'IA",
@@ -1228,7 +1232,7 @@ export const fr = {
   appSortZToA: 'Trier de Z à A',
   appCustomSort: 'Tri personnalisé…',
   appFilter: 'Filtrer',
-  appFilterToggleDetail: 'Basculer ⇧⌘L',
+  appFilterToggleDetail: 'Basculer {keys}',
   appClear: 'Effacer',
   appClearFilterTitle: 'Effacer les critères de filtre',
   appReapply: 'Réappliquer',
@@ -1333,7 +1337,7 @@ export const fr = {
   appAllowEditRanges: 'Permettre la modification des plages',
   appGroupClipboard: 'Presse-papiers',
   appPaste: 'Coller',
-  appPasteTitle: 'Coller ⌘V',
+  appPasteTitle: 'Coller',
   appPasteSpecial: 'Collage spécial',
   appPasteSpecialTitle: 'Coller uniquement les valeurs, les formules ou la mise en forme',
   appPasteValuesOnly: 'Valeurs uniquement',
@@ -1342,8 +1346,8 @@ export const fr = {
   appPasteColWidths: 'Largeurs de colonnes uniquement',
   appPasteExceptBorders: 'Tout sauf les bordures',
   appPasteSpecialDialog: 'Collage spécial…',
-  appCutTitle: 'Couper ⌘X',
-  appCopyTitle: 'Copier ⌘C',
+  appCutTitle: 'Couper',
+  appCopyTitle: 'Copier',
   appFormatPainter: 'Reproduire la mise en forme',
   appFormatPainterTip:
     "Reproduire la mise en forme — double-cliquez pour la conserver jusqu'à Échap",
@@ -1439,7 +1443,7 @@ export const fr = {
   appClearFormats: 'Effacer les formats',
   appClearContents: 'Effacer le contenu',
   appFind: 'Rechercher',
-  appFindTitle: 'Rechercher et sélectionner ⌘F',
+  appFindTitle: 'Rechercher et sélectionner',
   appReplace: 'Remplacer',
   appGoTo: 'Atteindre',
   appInsertCells: 'Insérer des cellules…',
@@ -1562,9 +1566,9 @@ export const fr = {
   appVisualSizeProperties: 'Taille et propriétés…',
   appVisualHyperlink: 'Lien hypertexte…',
   appVisualDelete: 'Supprimer',
-  appVisualArranged: 'Objet mis à jour — enregistrez avec ⌘S.',
+  appVisualArranged: 'Objet mis à jour — enregistrez avec {saveKeys}.',
   appVisualCopied: 'Objet copié.',
-  appVisualPasted: 'Objet collé — enregistrez avec ⌘S.',
+  appVisualPasted: 'Objet collé — enregistrez avec {saveKeys}.',
   appVisualNoCopy: 'Cet objet ne peut pas être copié.',
   appVisualSelectTwo: 'Maj+clic pour sélectionner au moins deux objets à aligner.',
   appVisualSelectThree: 'Maj+clic pour sélectionner au moins trois objets à distribuer.',

@@ -1143,12 +1143,550 @@ export const sheetsNotes: readonly ShortcutNote[] = [
 ]
 // @generated-end
 
-/** Hand-maintained rows: an entry with a generated id replaces that row. */
-const manual: readonly ShortcutAction[] = []
+/**
+ * Hand-maintained rows: an entry with a generated id replaces that row.
+ *
+ * A row that names two sub-actions (hide / unhide, Home / End, Page down / Page
+ * up...) keeps every chord in one row, since a row id is a `shortcuts.csv` id;
+ * apps/sheets picks the sub-action from the chord that matched (see
+ * `isSecondSubAction` in apps/sheets/src/renderer/sheets-keymap.ts).
+ *
+ * Rows apps/sheets leaves unbound are listed in `sheetsManualUnmapped` below.
+ */
+const manual: readonly ShortcutAction[] = [
+  // Cut / Copy / Paste: Univer and the browser clipboard own the keys; the row is the one
+  // source of the tooltip text (clipboardHint in apps/sheets picks X / C / V from it)
+  {
+    id: 'sheets-10',
+    scope: 'sheets',
+    win: ['Ctrl+X', 'Ctrl+C', 'Ctrl+V'],
+    mac: ['Cmd+X', 'Cmd+C', 'Cmd+V'],
+    web: { win: ['Ctrl+X', 'Ctrl+C', 'Ctrl+V'], mac: ['Cmd+X', 'Cmd+C', 'Cmd+V'] },
+    match: 'key',
+    guard: {},
+  },
+  // Find: Univer binds Ctrl+F / Cmd+F on desktop (the Excel Windows page prints no Find key);
+  // Excel for the web's Ctrl+F in the frame. Excel for Mac's Shift+F5 is not wired
+  {
+    id: 'sheets-43',
+    scope: 'sheets',
+    win: ['Ctrl+F'],
+    mac: ['Cmd+F'],
+    web: { win: ['Ctrl+F'], mac: ['Ctrl+F'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Format Cells: Excel for Mac prints "Cmd+1 or Ctrl+1"
+  {
+    id: 'sheets-61',
+    scope: 'sheets',
+    win: ['Ctrl+1'],
+    mac: ['Cmd+1', 'Ctrl+1'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Insert hyperlink: Excel for Mac prints "Cmd+K or Ctrl+K"
+  {
+    id: 'sheets-78',
+    scope: 'sheets',
+    win: ['Ctrl+K'],
+    mac: ['Cmd+K', 'Ctrl+K'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Print: Ctrl+P on Windows too (the Excel Windows page prints no Print row)
+  {
+    id: 'sheets-05',
+    scope: 'sheets',
+    win: ['Ctrl+P'],
+    mac: ['Cmd+P'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Redo: Excel's Ctrl+Y / Cmd+Y first (menus show it); Shift+Ctrl+Z stays an alias
+  {
+    id: 'sheets-08',
+    scope: 'sheets',
+    win: ['Ctrl+Y', 'Ctrl+Shift+Z'],
+    mac: ['Cmd+Y', 'Shift+Cmd+Z'],
+    match: 'key',
+    guard: {},
+  },
+  // Paste Special: Excel for Mac also prints Ctrl+Option+V
+  {
+    id: 'sheets-11',
+    scope: 'sheets',
+    win: ['Ctrl+Alt+V'],
+    mac: ['Ctrl+Cmd+V', 'Alt+Cmd+V', 'Ctrl+Alt+V'],
+    match: 'key',
+    guard: { altGraph: true, noRepeat: true },
+  },
+  // Paste values: ours only (Excel goes through Paste Special, V)
+  {
+    id: 'sheets-12',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+V'],
+    mac: ['Shift+Cmd+V'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // New line in a cell: the old Cmd+Option+Return stays next to Excel for Mac's two keys
+  {
+    id: 'sheets-15',
+    scope: 'sheets',
+    win: ['Alt+Enter'],
+    mac: ['Alt+Enter', 'Ctrl+Alt+Enter', 'Alt+Cmd+Enter'],
+    web: { win: ['Alt+Enter'], mac: ['Alt+Enter'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Fill down / right: Excel for Mac prints Cmd and Control
+  {
+    id: 'sheets-17',
+    scope: 'sheets',
+    win: ['Ctrl+D'],
+    mac: ['Cmd+D', 'Ctrl+D'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  {
+    id: 'sheets-18',
+    scope: 'sheets',
+    win: ['Ctrl+R'],
+    mac: ['Cmd+R', 'Ctrl+R'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Insert cells: Excel for Mac's Control+Shift+=, the old Cmd+Shift+= kept
+  {
+    id: 'sheets-19',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+Equal'],
+    mac: ['Ctrl+Shift+Equal', 'Shift+Cmd+Equal'],
+    web: { win: ['Ctrl+Shift+Equal'], mac: ['Ctrl+Shift+Equal'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  {
+    id: 'sheets-20',
+    scope: 'sheets',
+    win: ['Ctrl+Minus'],
+    mac: ['Cmd+Minus', 'Ctrl+Minus'],
+    web: { win: ['Ctrl+Minus'], mac: ['Cmd+Minus'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Hide / unhide rows. Sub-action: Ctrl (Control) with Shift unhides, anything else
+  // hides. Mac follows Excel for Mac: Control+9 and Cmd+( (= Shift+Cmd+9) hide; the old
+  // Cmd+Shift+9 = unhide was the inverse (P0). The old Cmd+9 hide stays an alias.
+  {
+    id: 'sheets-22',
+    scope: 'sheets',
+    win: ['Ctrl+9', 'Ctrl+Shift+9'],
+    mac: ['Ctrl+9', 'Shift+Cmd+9', 'Cmd+9', 'Ctrl+Shift+9'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Hide / unhide columns: same rule with 0 and Cmd+) (= Shift+Cmd+0)
+  {
+    id: 'sheets-23',
+    scope: 'sheets',
+    win: ['Ctrl+0', 'Ctrl+Shift+0'],
+    mac: ['Ctrl+0', 'Shift+Cmd+0', 'Cmd+0', 'Ctrl+Shift+0'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Select all: Excel's Ctrl+Shift+Space next to Ctrl+A
+  {
+    id: 'sheets-26',
+    scope: 'sheets',
+    win: ['Ctrl+A', 'Ctrl+Shift+Space'],
+    mac: ['Cmd+A', 'Shift+Cmd+Space'],
+    match: 'key',
+    guard: {},
+  },
+  // Current region (Ctrl+Shift+*); on a Mac Cmd+A (sheets-26) already grows to the region
+  {
+    id: 'sheets-27',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+8'],
+    mac: [],
+    web: { win: ['Ctrl+Shift+8'], mac: [] },
+    match: 'key',
+    guard: {},
+  },
+  // Extend the selection to the sheet start / last used cell. Sub-action by key.
+  {
+    id: 'sheets-33',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+Home', 'Ctrl+Shift+End'],
+    mac: ['Ctrl+Shift+Home', 'Ctrl+Shift+End', 'Shift+Cmd+Home', 'Shift+Cmd+End'],
+    match: 'key',
+    guard: {},
+  },
+  // Ctrl+Home / Ctrl+End: Excel for Mac's Control keys, the old Cmd keys kept
+  {
+    id: 'sheets-34',
+    scope: 'sheets',
+    win: ['Ctrl+Home'],
+    mac: ['Ctrl+Home', 'Cmd+Home'],
+    match: 'key',
+    guard: {},
+  },
+  {
+    id: 'sheets-35',
+    scope: 'sheets',
+    win: ['Ctrl+End'],
+    mac: ['Ctrl+End', 'Cmd+End'],
+    match: 'key',
+    guard: {},
+  },
+  // One screen right / left. Sub-action by key.
+  {
+    id: 'sheets-38',
+    scope: 'sheets',
+    win: ['Alt+PageDown', 'Alt+PageUp'],
+    mac: ['Alt+PageDown', 'Alt+PageUp'],
+    match: 'key',
+    guard: {},
+  },
+  // Next / previous sheet. Mac desktop: Excel for Mac's Control+PgDn and Option+arrow,
+  // the old Cmd+PgDn kept (the browser keeps Control+PgDn on the web)
+  {
+    id: 'sheets-39',
+    scope: 'sheets',
+    win: ['Ctrl+PageDown'],
+    mac: ['Ctrl+PageDown', 'Alt+Right', 'Cmd+PageDown'],
+    web: { win: [], mac: ['Alt+Right'] },
+    webAlt: { win: 'Ctrl+Alt+PageDown' },
+    match: 'key',
+    guard: { altGraph: true },
+  },
+  // Previous sheet: the Excel for Mac page prints Ctrl+Page down here (typo); Ctrl+Page up
+  {
+    id: 'sheets-40',
+    scope: 'sheets',
+    win: ['Ctrl+PageUp'],
+    mac: ['Ctrl+PageUp', 'Alt+Left', 'Cmd+PageUp'],
+    web: { win: [], mac: ['Alt+Left'] },
+    webAlt: { win: 'Ctrl+Alt+PageUp' },
+    match: 'key',
+    guard: { altGraph: true },
+  },
+  // Go To: F5 first on Windows, Ctrl+G first on a Mac (the order Excel prints them); the old Cmd+G kept
+  {
+    id: 'sheets-42',
+    scope: 'sheets',
+    win: ['F5', 'Ctrl+G'],
+    mac: ['Ctrl+G', 'F5', 'Cmd+G'],
+    web: { win: ['Ctrl+G'], mac: ['Ctrl+G'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Absolute / relative reference while a formula is edited (cell-edit keymap: F4 and
+  // Cmd+T mean Repeat and Create Table outside it)
+  {
+    id: 'sheets-47',
+    scope: 'sheets',
+    context: 'edit',
+    win: ['F4'],
+    mac: ['Cmd+T', 'F4'],
+    web: { win: ['F4'], mac: ['F4'] },
+    match: 'key',
+    guard: {},
+  },
+  // AutoSum: Alt+= / Shift+Cmd+T. The old Ctrl+Shift+T (Windows) and Univer's
+  // Cmd+Option+= (Mac) stay aliases; the browser keeps both T chords on the web.
+  {
+    id: 'sheets-48',
+    scope: 'sheets',
+    win: ['Alt+Equal', 'Ctrl+Shift+T'],
+    mac: ['Shift+Cmd+T', 'Alt+Cmd+Equal', 'Alt+Equal'],
+    web: { win: ['Alt+Equal'], mac: ['Alt+Cmd+Equal', 'Alt+Equal'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Name Manager: Ctrl+F3 / Cmd+F3 (Excel's Windows key is the Alt+M, M, D access sequence)
+  {
+    id: 'sheets-50',
+    scope: 'sheets',
+    win: ['Ctrl+F3'],
+    mac: ['Cmd+F3'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Expand / collapse the formula bar: Control+Shift+U on both, the old Cmd form kept
+  {
+    id: 'sheets-51',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+U'],
+    mac: ['Ctrl+Shift+U', 'Shift+Cmd+U'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Flash Fill: Excel for Mac's Control+E, the old Cmd+E kept
+  {
+    id: 'sheets-52',
+    scope: 'sheets',
+    win: ['Ctrl+E'],
+    mac: ['Ctrl+E', 'Cmd+E'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Calculate now: Excel for Mac's Cmd+= (it outranks Univer's zoom-in there), F9 kept
+  {
+    id: 'sheets-53',
+    scope: 'sheets',
+    win: ['F9'],
+    mac: ['Cmd+Equal', 'F9'],
+    web: { win: ['F9'], mac: ['F9'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Show formulas: Control+` on a Mac too (Cmd+` cycles the app's windows in macOS)
+  {
+    id: 'sheets-55',
+    scope: 'sheets',
+    win: ['Ctrl+Backquote'],
+    mac: ['Ctrl+Backquote'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Precedents / dependents. Sub-action by key. Mac: Excel for Mac's Control keys
+  // instead of Cmd+[ / Cmd+] (back / forward)
+  {
+    id: 'sheets-56',
+    scope: 'sheets',
+    win: ['Ctrl+BracketLeft', 'Ctrl+BracketRight'],
+    mac: ['Ctrl+Shift+BracketLeft', 'Ctrl+BracketRight'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Format Cells on its Font tab (Windows only; Excel for Mac prints none)
+  {
+    id: 'sheets-62',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+F'],
+    mac: [],
+    web: { win: ['Ctrl+Shift+F'], mac: [] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Strikethrough: the old Cmd+5 stays next to Excel for Mac's Shift+Cmd+X
+  {
+    id: 'sheets-66',
+    scope: 'sheets',
+    win: ['Ctrl+5'],
+    mac: ['Shift+Cmd+X', 'Cmd+5'],
+    web: { win: ['Ctrl+5'], mac: ['Shift+Cmd+X'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Font size up / down one step. Sub-action by key (> grows, < shrinks).
+  {
+    id: 'sheets-67',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+Period', 'Ctrl+Shift+Comma'],
+    mac: ['Shift+Cmd+Period', 'Shift+Cmd+Comma'],
+    match: 'key',
+    guard: {},
+  },
+  // Number formats: Excel for Mac prints Control+Shift; Cmd+Shift+3/4/5 are the macOS
+  // screenshot keys, so the old Cmd forms go
+  {
+    id: 'sheets-68',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+Backquote'],
+    mac: ['Ctrl+Shift+Backquote'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  {
+    id: 'sheets-69',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+1'],
+    mac: ['Ctrl+Shift+1'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  {
+    id: 'sheets-70',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+2'],
+    mac: ['Ctrl+Shift+2'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  {
+    id: 'sheets-71',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+3'],
+    mac: ['Ctrl+Shift+3'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  {
+    id: 'sheets-72',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+4'],
+    mac: ['Ctrl+Shift+4'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  {
+    id: 'sheets-73',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+5'],
+    mac: ['Ctrl+Shift+5'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  {
+    id: 'sheets-74',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+6'],
+    mac: ['Ctrl+Shift+6'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Outline border / no border. Sub-action by key (Minus removes). Mac: Excel for Mac's
+  // Cmd+Option+0 / Cmd+Option+Hyphen, the Control+Shift forms kept
+  {
+    id: 'sheets-75',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+7', 'Ctrl+Shift+Minus'],
+    mac: ['Alt+Cmd+0', 'Alt+Cmd+Minus', 'Ctrl+Shift+7', 'Ctrl+Shift+Minus'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Current date: Control+; on a Mac; Cmd+; is the time there (sheets-77, P0)
+  {
+    id: 'sheets-76',
+    scope: 'sheets',
+    win: ['Ctrl+Semicolon'],
+    mac: ['Ctrl+Semicolon'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Current time: Excel for Mac's Cmd+;, the old Cmd+Shift+; kept
+  {
+    id: 'sheets-77',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+Semicolon'],
+    mac: ['Cmd+Semicolon', 'Shift+Cmd+Semicolon'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Threaded comment: the old Ctrl+Shift+M stays on Windows; Cmd+Shift+M is
+  // PowerPoint for Mac's key, not Excel's, so it goes on a Mac
+  {
+    id: 'sheets-80',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+F2', 'Ctrl+Shift+M'],
+    mac: ['Shift+Cmd+F2'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Filter: Ctrl+Shift+L; Mac Shift+Cmd+F and Control+Shift+L. Shift+Cmd+L (Excel for
+  // Mac: Modify Cell Style) no longer toggles the filter.
+  {
+    id: 'sheets-81',
+    scope: 'sheets',
+    win: ['Ctrl+Shift+L'],
+    mac: ['Shift+Cmd+F', 'Ctrl+Shift+L'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Create table: Ctrl+T / Ctrl+L, Cmd+T on a Mac; the browser keeps both T chords
+  {
+    id: 'sheets-82',
+    scope: 'sheets',
+    win: ['Ctrl+T', 'Ctrl+L'],
+    mac: ['Cmd+T'],
+    web: { win: ['Ctrl+L'], mac: [] },
+    webAlt: { mac: 'Ctrl+L' },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Group / ungroup. Sub-action by key (Right / K groups). Mac: Excel for Mac's
+  // Cmd+Shift+K / J, the old Option+Shift+arrows kept
+  {
+    id: 'sheets-91',
+    scope: 'sheets',
+    win: ['Alt+Shift+Right', 'Alt+Shift+Left'],
+    mac: ['Shift+Cmd+K', 'Shift+Cmd+J', 'Alt+Shift+Right', 'Alt+Shift+Left'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+]
 
 export const sheetsShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
 
 /** Why a manual row has no chord on a surface or platform, and remarks on manual rows:
  * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */
-export const sheetsManualUnmapped: readonly UnmappedShortcut[] = []
+export const sheetsManualUnmapped: readonly UnmappedShortcut[] = [
+  {
+    id: 'sheets-41',
+    part: 'row',
+    reason: 'no command behind the key in apps/sheets (multi-select sheet tabs)',
+  },
+  {
+    id: 'sheets-57',
+    part: 'row',
+    reason:
+      'no command behind the key in apps/sheets (copy from the cell above), and the quote chords depend on the layout',
+  },
+  {
+    id: 'sheets-58',
+    part: 'row',
+    reason: 'F7 spell check: the key is in the table, but no spell-check command listens',
+  },
+  {
+    id: 'sheets-59',
+    part: 'row',
+    reason: 'no command behind the key in apps/sheets (extend selection mode, F8 / Shift+F8)',
+  },
+  {
+    id: 'sheets-60',
+    part: 'row',
+    reason: 'the context menu opens from the pointer only, so Shift+F10 / Menu key is not wired',
+  },
+  {
+    id: 'sheets-84',
+    part: 'row',
+    reason: 'no command behind the key in apps/sheets (ribbon key tips)',
+  },
+  {
+    id: 'sheets-85',
+    part: 'row',
+    reason: 'no command behind the key in apps/sheets (cycle panes, F6)',
+  },
+  {
+    id: 'sheets-86',
+    part: 'desktop.win',
+    reason: 'F1 help: the key is in the table, but nothing listens',
+  },
+  {
+    id: 'sheets-86',
+    part: 'desktop.mac',
+    reason: 'F1 / Cmd+/ help: the keys are in the table, but nothing listens',
+  },
+  {
+    id: 'sheets-87',
+    part: 'row',
+    reason:
+      'zoom stays on Univer (Ctrl+= and the wheel); Ctrl+Alt+= / Ctrl+Alt+- is AltGr on many layouts',
+  },
+  {
+    id: 'sheets-46',
+    part: 'web.win',
+    reason:
+      'Alt+F1 chart is in the table, but no chart command is bound to it; F11 clashes with the Electron fullscreen role on desktop',
+  },
+  {
+    id: 'sheets-43',
+    part: 'desktop.mac',
+    reason: "Excel for Mac's Shift+F5 Find is not added; Cmd+F stays Univer's",
+  },
+]
 export const sheetsManualNotes: readonly ShortcutNote[] = []
