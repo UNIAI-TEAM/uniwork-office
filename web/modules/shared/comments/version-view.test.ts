@@ -157,3 +157,56 @@ describe('window.uniworkComments extras', () => {
     expect(bare.openVersionId?.()).toBe('ver-5')
   })
 })
+
+describe('window.uniworkComments.openVersion (the editors read it as `api.openVersion?.(...)`)', () => {
+  async function apiWith(capabilities: Capabilities, version = createFrameDocVersion()) {
+    const mock = framePort(capabilities)
+    const api = createFrameCommentsApi(mock.port, {
+      version,
+      session: await mock.port.whenInitialized(),
+    })
+    return { mock, api }
+  }
+  const viewVersionCalls = (mock: ReturnType<typeof framePort>) =>
+    mock.calls.filter((c) => c.type === 'comments.viewVersion')
+
+  it('with the grant: forwards the snake_case payload once and returns {opened}', async () => {
+    const { mock, api } = await apiWith({ comments: true, commentsViewVersion: true })
+    mock.override('comments.viewVersion', () => ({ opened: true }))
+    expect(api.openVersion).toBeTypeOf('function')
+    await expect(
+      api.openVersion!({ path: 'ignored', commentId: COMMENT_ID, versionNo: 4 }),
+    ).resolves.toEqual({ opened: true })
+    expect(viewVersionCalls(mock).map((c) => c.payload)).toEqual([
+      { comment_id: COMMENT_ID, version_no: 4 },
+    ])
+  })
+
+  it('without the effective grant the member is absent, so the editors show no action', async () => {
+    for (const caps of [{ comments: true }, { commentsViewVersion: true }, {}]) {
+      const { mock, api } = await apiWith(caps)
+      expect(api.openVersion).toBeUndefined()
+      expect('openVersion' in api).toBe(false)
+      expect(viewVersionCalls(mock)).toEqual([])
+    }
+  })
+
+  it('a host rejection answers {opened: false} and never throws to the editor', async () => {
+    const { mock, api } = await apiWith({ comments: true, commentsViewVersion: true })
+    mock.override('comments.viewVersion', () => {
+      throw { code: 'forbidden', message: 'no', retryable: false }
+    })
+    await expect(
+      api.openVersion!({ path: '', commentId: COMMENT_ID, versionNo: 2 }),
+    ).resolves.toEqual({ opened: false })
+  })
+
+  it('context().versionId is the FileMeta.versionId the host gave in api.open, then a landed save', async () => {
+    const version = createFrameDocVersion()
+    const { api } = await apiWith({ comments: true, commentsViewVersion: true }, version)
+    version.noteOpened({ path: 'uniwork://f/Plan.docx', versionId: 'ver-open' })
+    expect(await api.context({ path: '' })).toMatchObject({ value: { versionId: 'ver-open' } })
+    version.noteSaved({ path: 'uniwork://f/Plan.docx', versionId: 'ver-saved' })
+    expect(await api.context({ path: '' })).toMatchObject({ value: { versionId: 'ver-saved' } })
+  })
+})
