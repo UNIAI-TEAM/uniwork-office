@@ -199,6 +199,7 @@ export const ru = {
   uwTipSourceView:
     'Этот файл прикреплён в разделе «{origin}»{parent}. Изменения не будут сохранены. Чтобы получить копию, нажмите «Скачать» в списке документов.',
   uwSourceViewSaveHint: 'Этот файл только для просмотра — изменения не сохраняются.',
+  uwSourceViewCopyHint: 'Чтобы получить копию, нажмите «Скачать» в списке документов.',
   uwSourceOriginChat: 'Чат',
   uwSourceOriginTask: 'Задачи',
   uwSourceOriginMeeting: 'Встречи',

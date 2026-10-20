@@ -338,7 +338,7 @@ describe('the explicit-Save hint in a detached editor window', () => {
     expect(shell.sent).toEqual([])
   })
 
-  it('tells the native box whether the copy sentence belongs to it', () => {
+  it('tells the native box whether the copy sentence belongs to it', async () => {
     const w = win('detached-1')
     const asked: Array<boolean | undefined> = []
     const { hint } = make(w, (_target, copy) => {
@@ -346,6 +346,9 @@ describe('the explicit-Save hint in a detached editor window', () => {
       return Promise.resolve()
     })
     hint('/x/a.docx')
+    // the first box was dismissed (its promise settled), so the next refusal shows again
+    await Promise.resolve()
+    await Promise.resolve()
     hint('/x/b.docx', true)
     expect(asked.map(Boolean)).toEqual([false, true])
   })

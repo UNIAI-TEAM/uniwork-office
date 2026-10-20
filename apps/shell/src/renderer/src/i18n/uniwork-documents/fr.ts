@@ -206,6 +206,8 @@ export const fr = {
     'Ce fichier est joint dans {origin}{parent}. Les modifications ne seront pas enregistrées. Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
   uwSourceViewSaveHint:
     'Ce fichier est en lecture seule — les modifications ne sont pas enregistrées.',
+  uwSourceViewCopyHint:
+    'Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Tâches',
   uwSourceOriginMeeting: 'Réunions',

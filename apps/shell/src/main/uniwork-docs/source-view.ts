@@ -60,6 +60,12 @@ export class SourceViewRegistry {
 export interface SourceViewSeamOptions {
   /** an explicit Save on a source view: the shell shows the "view only" hint (writes nothing) */
   onSourceSave?(path: string): void
+  /**
+   * An editor refused Save As, export or print on a source view. Every editor asks
+   * `isLocked` only at those refusal points, so a registered path answered there
+   * is a refusal the person should hear about (the editors' own text is internal).
+   */
+  onSourceLocked?(path: string): void
 }
 
 /** what `installUniworkModuleSeams` takes to merge the registry into the module seam */
@@ -82,7 +88,11 @@ export function withSourceViews(
   const wrapped: UniworkModuleSeam = {
     isBound: (path) => registry.has(path) || seam.isBound(path),
     isReadOnly: (path) => registry.has(path) || seam.isReadOnly(path),
-    isLocked: (path) => registry.has(path) || seam.isLocked?.(path) === true,
+    isLocked: (path) => {
+      if (!registry.has(path)) return seam.isLocked?.(path) === true
+      options.onSourceLocked?.(path)
+      return true
+    },
     consumeCapture: (path) => (registry.has(path) ? false : seam.consumeCapture?.(path) === true),
     // a source is never saved, so it never reaches the UniWork user-save pipeline
     onUserSave: (path) => {
@@ -446,9 +456,10 @@ export interface SourceHintTarget {
 /**
  * The `onSourceSave` of the module seam: an explicit Save on a source view
  * writes nothing; the window that owns the path is told so it can show the
- * "view only" hint. A detached editor window is a bare window around the editor
- * view with no renderer to show the band, so there the sentence is a native
- * box (`detached`), at most one at a time per window.
+ * "view only" hint. A refused Save As, export or print is the same hint with
+ * `copy` set, which adds where to get a copy. A detached editor window is a bare
+ * window around the editor view with no renderer to show the band, so there the
+ * sentence is a native box (`detached`), at most one at a time per window.
  */
 export function createSourceSaveHint<W extends object = object>(deps: {
   /** the shell window that shows `path` as a tab, undefined when none does */
@@ -457,21 +468,21 @@ export function createSourceSaveHint<W extends object = object>(deps: {
     /** the detached editor window that shows `path`, undefined when it is not in one */
     windowForPath(path: string): W | undefined
     /** shows the sentence on that window; settles when the person dismissed it */
-    notify(window: W): Promise<unknown>
+    notify(window: W, copy?: boolean): Promise<unknown>
   }
-}): (path: string) => void {
+}): (path: string, copy?: boolean) => void {
   const showing = new Set<W>()
-  return (path) => {
+  return (path, copy) => {
     const window = deps.detached?.windowForPath(path)
     if (window !== undefined && deps.detached) {
       if (showing.has(window)) return
       showing.add(window)
       const done = () => void showing.delete(window)
-      deps.detached.notify(window).then(done, done)
+      deps.detached.notify(window, copy).then(done, done)
       return
     }
     const host = deps.hostForPath(path)
     if (!host || host.isDestroyed()) return
-    host.send(SOURCE_VIEW_CHANNELS.hint, { path })
+    host.send(SOURCE_VIEW_CHANNELS.hint, copy ? { path, copy: true } : { path })
   }
 }

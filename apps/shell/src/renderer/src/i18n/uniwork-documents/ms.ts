@@ -197,6 +197,7 @@ export const ms = {
   uwTipSourceView:
     'Fail ini dilampirkan dalam {origin}{parent}. Perubahan tidak akan disimpan. Untuk mendapatkan salinan, gunakan Muat turun dalam senarai Dokumen.',
   uwSourceViewSaveHint: 'Fail ini untuk paparan sahaja — perubahan tidak disimpan.',
+  uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Muat turun dalam senarai Dokumen.',
   uwSourceOriginChat: 'Sembang',
   uwSourceOriginTask: 'Tugasan',
   uwSourceOriginMeeting: 'Mesyuarat',

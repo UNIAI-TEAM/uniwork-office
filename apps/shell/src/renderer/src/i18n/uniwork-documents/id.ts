@@ -196,6 +196,7 @@ export const id = {
   uwTipSourceView:
     'File ini dilampirkan di {origin}{parent}. Perubahan tidak akan disimpan. Untuk mendapatkan salinan, gunakan Unduh di daftar Dokumen.',
   uwSourceViewSaveHint: 'File ini hanya untuk dilihat — perubahan tidak disimpan.',
+  uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Unduh di daftar Dokumen.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Tugas',
   uwSourceOriginMeeting: 'Rapat',

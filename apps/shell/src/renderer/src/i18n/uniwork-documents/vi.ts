@@ -190,6 +190,7 @@ export const vi = {
   uwTipSourceView:
     'Đây là tệp đính kèm trong {origin}{parent}. Thay đổi sẽ không được lưu. Muốn có bản sao, dùng Tải xuống ở danh sách Tài liệu.',
   uwSourceViewSaveHint: 'Tệp này chỉ để xem — thay đổi không được lưu.',
+  uwSourceViewCopyHint: 'Muốn có bản sao, dùng Tải xuống ở danh sách Tài liệu.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Công việc',
   uwSourceOriginMeeting: 'Cuộc họp',

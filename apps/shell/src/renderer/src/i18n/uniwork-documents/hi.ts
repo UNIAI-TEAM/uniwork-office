@@ -191,6 +191,7 @@ export const hi = {
   uwTipSourceView:
     'यह फ़ाइल {origin}{parent} में संलग्न है। बदलाव सहेजे नहीं जाएँगे। प्रति पाने के लिए दस्तावेज़ सूची में डाउनलोड का उपयोग करें।',
   uwSourceViewSaveHint: 'यह फ़ाइल केवल देखने के लिए है — बदलाव सहेजे नहीं जाते।',
+  uwSourceViewCopyHint: 'प्रति पाने के लिए दस्तावेज़ सूची में डाउनलोड का उपयोग करें।',
   uwSourceOriginChat: 'चैट',
   uwSourceOriginTask: 'कार्य',
   uwSourceOriginMeeting: 'मीटिंग',

@@ -188,6 +188,7 @@ export const ar = {
   uwTipSourceView:
     'هذا الملف مرفق في {origin}{parent}. لن يتم حفظ التغييرات. للحصول على نسخة، استخدم «تنزيل» في قائمة المستندات.',
   uwSourceViewSaveHint: 'هذا الملف للعرض فقط — لا يتم حفظ التغييرات.',
+  uwSourceViewCopyHint: 'للحصول على نسخة، استخدم «تنزيل» في قائمة المستندات.',
   uwSourceOriginChat: 'الدردشة',
   uwSourceOriginTask: 'المهام',
   uwSourceOriginMeeting: 'الاجتماعات',

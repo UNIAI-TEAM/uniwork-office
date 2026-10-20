@@ -1241,8 +1241,11 @@ const homeApi: HomeApi = {
   },
   onUniworkSourceViewHint(cb) {
     const listener = (_event: IpcRendererEvent, raw: unknown) => {
-      const path = raw && typeof raw === 'object' ? (raw as { path?: unknown }).path : undefined
-      if (typeof path === 'string' && path) cb({ path })
+      const fields =
+        raw && typeof raw === 'object' ? (raw as { path?: unknown; copy?: unknown }) : {}
+      if (typeof fields.path === 'string' && fields.path) {
+        cb(fields.copy === true ? { path: fields.path, copy: true } : { path: fields.path })
+      }
     }
     ipcRenderer.on(SOURCE_VIEW_CHANNELS.hint, listener)
     return () => ipcRenderer.removeListener(SOURCE_VIEW_CHANNELS.hint, listener)

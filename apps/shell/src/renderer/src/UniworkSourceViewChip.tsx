@@ -114,14 +114,15 @@ export function UniworkSourceViewHint({ activePath }: { activePath: string | und
   const activeKey = activePath ? pathKey(activePath) : ''
   const activeRef = useRef(activeKey)
   activeRef.current = activeKey
-  // a new object per request: a second Save restarts the time and keeps one hint
-  const [hint, setHint] = useState<{ at: number } | null>(null)
+  // a new object per request: a second Save restarts the time and keeps one hint;
+  // `copy` is a refused Save As / export / print, which also says where to get a copy
+  const [hint, setHint] = useState<{ at: number; copy: boolean } | null>(null)
 
   useEffect(
     () =>
-      onSourceViewHint(({ path }) => {
+      onSourceViewHint(({ path, copy }) => {
         if (activeRef.current && pathKey(path) === activeRef.current) {
-          setHint((prev) => ({ at: (prev?.at ?? 0) + 1 }))
+          setHint((prev) => ({ at: (prev?.at ?? 0) + 1, copy: copy === true }))
         }
       }),
     [],
@@ -148,10 +149,10 @@ export function UniworkSourceViewHint({ activePath }: { activePath: string | und
     }
   }, [shown])
 
-  return hint ? <HintBand /> : null
+  return hint ? <HintBand copy={hint.copy} /> : null
 }
 
-function HintBand() {
+function HintBand({ copy }: { copy: boolean }) {
   const { t } = useI18n()
   const bandRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -222,7 +223,9 @@ function HintBand() {
         style={left === null ? undefined : { marginLeft: `${left}px` }}
       >
         <p role="status" className="uw-queue-pop-line">
-          {t('uwSourceViewSaveHint')}
+          {copy
+            ? `${t('uwSourceViewSaveHint')} ${t('uwSourceViewCopyHint')}`
+            : t('uwSourceViewSaveHint')}
         </p>
       </div>
     </div>

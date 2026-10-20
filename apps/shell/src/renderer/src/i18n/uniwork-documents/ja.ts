@@ -194,6 +194,8 @@ export const ja = {
   uwTipSourceView:
     'このファイルは{origin}{parent}に添付されています。変更は保存されません。コピーが必要な場合は、ドキュメント一覧の「ダウンロード」を使ってください。',
   uwSourceViewSaveHint: 'このファイルは閲覧専用です — 変更は保存されません。',
+  uwSourceViewCopyHint:
+    'コピーが必要な場合は、ドキュメント一覧の「ダウンロード」を使ってください。',
   uwSourceOriginChat: 'チャット',
   uwSourceOriginTask: 'タスク',
   uwSourceOriginMeeting: '会議',

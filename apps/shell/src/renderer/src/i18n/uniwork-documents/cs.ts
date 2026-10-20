@@ -192,6 +192,7 @@ export const cs = {
   uwTipSourceView:
     'Tento soubor je přiložen v {origin}{parent}. Změny se neuloží. Kopii získáte pomocí Stáhnout v seznamu dokumentů.',
   uwSourceViewSaveHint: 'Tento soubor je pouze pro čtení — změny se neukládají.',
+  uwSourceViewCopyHint: 'Kopii získáte pomocí Stáhnout v seznamu dokumentů.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Úkoly',
   uwSourceOriginMeeting: 'Schůzky',

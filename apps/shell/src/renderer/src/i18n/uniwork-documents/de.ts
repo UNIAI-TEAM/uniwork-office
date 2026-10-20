@@ -204,6 +204,7 @@ export const de = {
   uwTipSourceView:
     'Diese Datei ist in {origin}{parent} angehängt. Änderungen werden nicht gespeichert. Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
   uwSourceViewSaveHint: 'Diese Datei ist nur zur Ansicht — Änderungen werden nicht gespeichert.',
+  uwSourceViewCopyHint: 'Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Aufgaben',
   uwSourceOriginMeeting: 'Meetings',

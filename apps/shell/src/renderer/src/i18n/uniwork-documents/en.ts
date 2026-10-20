@@ -192,6 +192,7 @@ export const en = {
   uwTipSourceView:
     "This file is attached in {origin}{parent}. Changes won't be saved. To get a copy, use Download in the Documents list.",
   uwSourceViewSaveHint: "This file is view only — changes aren't saved.",
+  uwSourceViewCopyHint: 'To get a copy, use Download in the Documents list.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Tasks',
   uwSourceOriginMeeting: 'Meetings',

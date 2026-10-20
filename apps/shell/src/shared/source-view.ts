@@ -15,9 +15,14 @@ export const SOURCE_VIEW_CHANNELS = {
   hint: 'uniwork-doc:source-view-hint',
 } as const
 
-/** the payload of the `hint` event: which source view the Save was pressed in */
+/**
+ * the payload of the `hint` event: which source view the Save was pressed in.
+ * `copy` is set when Save As, export or print was refused instead: the hint then
+ * also says where to get a copy.
+ */
 export interface SourceViewHint {
   path: string
+  copy?: true
 }
 
 /** what the renderer sends for one source row (the row's own fields, never an id of a document) */

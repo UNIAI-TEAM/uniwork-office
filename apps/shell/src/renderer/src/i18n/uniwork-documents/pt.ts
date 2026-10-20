@@ -199,6 +199,7 @@ export const pt = {
   uwTipSourceView:
     'Este arquivo está anexado em {origin}{parent}. As alterações não serão salvas. Para obter uma cópia, use Baixar na lista de documentos.',
   uwSourceViewSaveHint: 'Este arquivo é somente leitura — as alterações não são salvas.',
+  uwSourceViewCopyHint: 'Para obter uma cópia, use Baixar na lista de documentos.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Tarefas',
   uwSourceOriginMeeting: 'Reuniões',

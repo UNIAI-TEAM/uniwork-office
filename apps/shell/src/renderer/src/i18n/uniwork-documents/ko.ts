@@ -193,6 +193,7 @@ export const ko = {
   uwTipSourceView:
     '이 파일은 {origin}{parent}에 첨부되어 있습니다. 변경 내용은 저장되지 않습니다. 사본이 필요하면 문서 목록에서 다운로드를 사용하세요.',
   uwSourceViewSaveHint: '이 파일은 보기 전용입니다 — 변경 내용은 저장되지 않습니다.',
+  uwSourceViewCopyHint: '사본이 필요하면 문서 목록에서 다운로드를 사용하세요.',
   uwSourceOriginChat: '채팅',
   uwSourceOriginTask: '작업',
   uwSourceOriginMeeting: '회의',

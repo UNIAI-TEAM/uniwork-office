@@ -21,6 +21,7 @@ import type { UniworkDocShelveResult } from '../../shared/home-api'
 import type {
   OpenSourceInput,
   OpenSourceValue,
+  SourceViewHint,
   SourceViewResult,
   SourceViewState,
 } from '../../shared/source-view'
@@ -141,7 +142,7 @@ interface ActionsBridge {
   ): Promise<UniworkResult<{ path: string | null }>>
   uniworkOpenSource?(input: OpenSourceInput): Promise<SourceViewResult<OpenSourceValue>>
   uniworkSourceViewState?(path: string): Promise<SourceViewState | null>
-  onUniworkSourceViewHint?(cb: (payload: { path: string }) => void): () => void
+  onUniworkSourceViewHint?(cb: (payload: SourceViewHint) => void): () => void
 }
 
 const unavailable = { ok: false, error: 'server_error' } as const
@@ -269,7 +270,7 @@ export async function sourceViewStateOf(path: string): Promise<SourceViewState |
 }
 
 /** UNI-1993: main says an explicit Save hit a source view path (the tab shows the hint) */
-export function onSourceViewHint(cb: (payload: { path: string }) => void): () => void {
+export function onSourceViewHint(cb: (payload: SourceViewHint) => void): () => void {
   return actions().onUniworkSourceViewHint?.(cb) ?? (() => undefined)
 }
 

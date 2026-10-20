@@ -194,6 +194,7 @@ export const pl = {
   uwTipSourceView:
     'Ten plik jest załączony w {origin}{parent}. Zmiany nie zostaną zapisane. Aby mieć kopię, użyj opcji Pobierz na liście dokumentów.',
   uwSourceViewSaveHint: 'Ten plik jest tylko do podglądu — zmiany nie są zapisywane.',
+  uwSourceViewCopyHint: 'Aby mieć kopię, użyj opcji Pobierz na liście dokumentów.',
   uwSourceOriginChat: 'Czat',
   uwSourceOriginTask: 'Zadania',
   uwSourceOriginMeeting: 'Spotkania',

@@ -795,6 +795,7 @@ const tMain = createI18n({
     dlgPickSaveDir: '选择默认保存位置',
     errSaveDirUnusable: '所选文件夹不可写，无法用作默认保存位置',
     uwSourceViewSaveHint: '此文件仅供查看 — 更改不会被保存。',
+    uwSourceViewCopyHint: '如需副本，请在文档列表中使用“下载”。',
   },
   en: {
     dlgAddFolderRoot: 'Add Folder to Home',
@@ -915,6 +916,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'The selected folder is not writable and cannot be used as the default save location',
     uwSourceViewSaveHint: "This file is view only — changes aren't saved.",
+    uwSourceViewCopyHint: 'To get a copy, use Download in the Documents list.',
   },
   vi: {
     dlgAddFolderRoot: 'Thêm thư mục vào Trang chủ',
@@ -1035,6 +1037,7 @@ const tMain = createI18n({
     uwSessionExpired: 'Phiên UniWork đã hết hạn.',
     uwUnsupported: 'Không thể mở loại tệp này từ UniWork.',
     uwSourceViewSaveHint: 'Tệp này chỉ để xem — thay đổi không được lưu.',
+    uwSourceViewCopyHint: 'Muốn có bản sao, dùng Tải xuống ở danh sách Tài liệu.',
   },
   ja: {
     dlgAddFolderRoot: 'フォルダーをホームに追加',
@@ -1155,6 +1158,8 @@ const tMain = createI18n({
     errSaveDirUnusable:
       '選択したフォルダーは書き込みできないため、既定の保存先として使用できません',
     uwSourceViewSaveHint: 'このファイルは閲覧専用です — 変更は保存されません。',
+    uwSourceViewCopyHint:
+      'コピーが必要な場合は、ドキュメント一覧の「ダウンロード」を使ってください。',
   },
   ko: {
     dlgAddFolderRoot: '홈에 폴더 추가',
@@ -1274,6 +1279,7 @@ const tMain = createI18n({
     dlgPickSaveDir: '기본 저장 위치 선택',
     errSaveDirUnusable: '선택한 폴더에 쓸 수 없어 기본 저장 위치로 사용할 수 없습니다',
     uwSourceViewSaveHint: '이 파일은 보기 전용입니다 — 변경 내용은 저장되지 않습니다.',
+    uwSourceViewCopyHint: '사본이 필요하면 문서 목록에서 다운로드를 사용하세요.',
   },
   fr: {
     dlgAddFolderRoot: "Ajouter un dossier à l'accueil",
@@ -1396,6 +1402,8 @@ const tMain = createI18n({
       "Le dossier sélectionné n'est pas accessible en écriture et ne peut pas servir d'emplacement d'enregistrement par défaut",
     uwSourceViewSaveHint:
       'Ce fichier est en lecture seule — les modifications ne sont pas enregistrées.',
+    uwSourceViewCopyHint:
+      'Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
   },
   de: {
     dlgAddFolderRoot: 'Ordner zur Startseite hinzufügen',
@@ -1518,6 +1526,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'Der ausgewählte Ordner ist nicht beschreibbar und kann nicht als Standard-Speicherort verwendet werden',
     uwSourceViewSaveHint: 'Diese Datei ist nur zur Ansicht — Änderungen werden nicht gespeichert.',
+    uwSourceViewCopyHint: 'Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
   },
   es: {
     dlgAddFolderRoot: 'Añadir carpeta al inicio',
@@ -1639,6 +1648,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'La carpeta seleccionada no admite escritura y no puede usarse como ubicación de guardado predeterminada',
     uwSourceViewSaveHint: 'Este archivo es de solo lectura — los cambios no se guardan.',
+    uwSourceViewCopyHint: 'Para obtener una copia, usa Descargar en la lista de documentos.',
   },
   th: {
     dlgAddFolderRoot: 'เพิ่มโฟลเดอร์ไปยังหน้าแรก',
@@ -1756,6 +1766,7 @@ const tMain = createI18n({
     dlgPickSaveDir: 'เลือกตำแหน่งบันทึกเริ่มต้น',
     errSaveDirUnusable: 'โฟลเดอร์ที่เลือกไม่สามารถเขียนได้ จึงใช้เป็นตำแหน่งบันทึกเริ่มต้นไม่ได้',
     uwSourceViewSaveHint: 'ไฟล์นี้ดูได้อย่างเดียว — การเปลี่ยนแปลงจะไม่ถูกบันทึก',
+    uwSourceViewCopyHint: 'หากต้องการสำเนา ให้ใช้ดาวน์โหลดในรายการเอกสาร',
   },
   id: {
     dlgAddFolderRoot: 'Tambahkan Folder ke Beranda',
@@ -1877,6 +1888,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'Folder yang dipilih tidak dapat ditulis dan tidak bisa digunakan sebagai lokasi penyimpanan default',
     uwSourceViewSaveHint: 'File ini hanya untuk dilihat — perubahan tidak disimpan.',
+    uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Unduh di daftar Dokumen.',
   },
   ru: {
     dlgAddFolderRoot: 'Добавить папку на главную',
@@ -1998,6 +2010,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'Выбранная папка недоступна для записи и не может использоваться как папка сохранения по умолчанию',
     uwSourceViewSaveHint: 'Этот файл только для просмотра — изменения не сохраняются.',
+    uwSourceViewCopyHint: 'Чтобы получить копию, нажмите «Скачать» в списке документов.',
   },
   ar: {
     dlgAddFolderRoot: 'إضافة مجلد إلى الصفحة الرئيسية',
@@ -2115,6 +2128,7 @@ const tMain = createI18n({
     dlgPickSaveDir: 'اختيار موقع الحفظ الافتراضي',
     errSaveDirUnusable: 'المجلد المحدد غير قابل للكتابة ولا يمكن استخدامه كموقع حفظ افتراضي',
     uwSourceViewSaveHint: 'هذا الملف للعرض فقط — لا يتم حفظ التغييرات.',
+    uwSourceViewCopyHint: 'للحصول على نسخة، استخدم «تنزيل» في قائمة المستندات.',
   },
   pt: {
     dlgAddFolderRoot: 'Adicionar pasta à página inicial',
@@ -2236,6 +2250,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'A pasta selecionada não permite gravação e não pode ser usada como local de salvamento padrão',
     uwSourceViewSaveHint: 'Este arquivo é somente leitura — as alterações não são salvas.',
+    uwSourceViewCopyHint: 'Para obter uma cópia, use Baixar na lista de documentos.',
   },
   it: {
     dlgAddFolderRoot: 'Aggiungi cartella alla Home',
@@ -2357,6 +2372,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'La cartella selezionata non è scrivibile e non può essere usata come posizione di salvataggio predefinita',
     uwSourceViewSaveHint: 'Questo file è in sola lettura — le modifiche non vengono salvate.',
+    uwSourceViewCopyHint: 'Per averne una copia, usa Scarica nell’elenco dei documenti.',
   },
   pl: {
     dlgAddFolderRoot: 'Dodaj folder do strony głównej',
@@ -2478,6 +2494,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'Wybrany folder nie pozwala na zapis i nie może być domyślną lokalizacją zapisu',
     uwSourceViewSaveHint: 'Ten plik jest tylko do podglądu — zmiany nie są zapisywane.',
+    uwSourceViewCopyHint: 'Aby mieć kopię, użyj opcji Pobierz na liście dokumentów.',
   },
   cs: {
     dlgAddFolderRoot: 'Přidat složku na domovskou stránku',
@@ -2597,6 +2614,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'Do vybrané složky nelze zapisovat a nelze ji použít jako výchozí umístění pro ukládání',
     uwSourceViewSaveHint: 'Tento soubor je pouze pro čtení — změny se neukládají.',
+    uwSourceViewCopyHint: 'Kopii získáte pomocí Stáhnout v seznamu dokumentů.',
   },
   nl: {
     dlgAddFolderRoot: 'Map toevoegen aan startpagina',
@@ -2719,6 +2737,7 @@ const tMain = createI18n({
       'De geselecteerde map is niet beschrijfbaar en kan niet als standaard opslaglocatie worden gebruikt',
     uwSourceViewSaveHint:
       'Dit bestand is alleen om te bekijken — wijzigingen worden niet opgeslagen.',
+    uwSourceViewCopyHint: 'Gebruik Downloaden in de documentenlijst om een kopie te krijgen.',
   },
   ms: {
     dlgAddFolderRoot: 'Tambah Folder ke Laman Utama',
@@ -2839,6 +2858,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'Folder yang dipilih tidak boleh ditulis dan tidak dapat digunakan sebagai lokasi simpanan lalai',
     uwSourceViewSaveHint: 'Fail ini untuk paparan sahaja — perubahan tidak disimpan.',
+    uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Muat turun dalam senarai Dokumen.',
   },
   he: {
     dlgAddFolderRoot: 'הוספת תיקייה לדף הבית',
@@ -2956,6 +2976,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'התיקייה שנבחרה אינה ניתנת לכתיבה ולא ניתן להשתמש בה כמיקום שמירה כברירת מחדל',
     uwSourceViewSaveHint: 'קובץ זה לצפייה בלבד — שינויים לא נשמרים.',
+    uwSourceViewCopyHint: 'כדי לקבל עותק, השתמשו בהורדה ברשימת המסמכים.',
   },
   hi: {
     dlgAddFolderRoot: 'होम में फ़ोल्डर जोड़ें',
@@ -3077,6 +3098,7 @@ const tMain = createI18n({
     errSaveDirUnusable:
       'चयनित फ़ोल्डर में लिखा नहीं जा सकता, इसलिए इसे डिफ़ॉल्ट सहेजने के स्थान के रूप में उपयोग नहीं किया जा सकता',
     uwSourceViewSaveHint: 'यह फ़ाइल केवल देखने के लिए है — बदलाव सहेजे नहीं जाते।',
+    uwSourceViewCopyHint: 'प्रति पाने के लिए दस्तावेज़ सूची में डाउनलोड का उपयोग करें।',
   },
   'zh-TW': {
     dlgAddFolderRoot: '將資料夾加入首頁',
@@ -3188,6 +3210,7 @@ const tMain = createI18n({
     dlgPickSaveDir: '選擇預設儲存位置',
     errSaveDirUnusable: '所選資料夾無法寫入，無法作為預設儲存位置',
     uwSourceViewSaveHint: '此檔案僅供檢視 — 變更不會被儲存。',
+    uwSourceViewCopyHint: '如需副本，請在文件清單中使用「下載」。',
   },
 })
 
@@ -4646,6 +4669,19 @@ function registerHomeIpc(): void {
   // G8-02: the single comment-author source. A bound document takes the
   // signed-in account's display name; local files and signed-out sessions take
   // the neutral constant — the OS account name is never an author.
+  const sourceViewHint = createSourceSaveHint({
+    hostForPath: sourceViewHostForPath,
+    // a detached window has no renderer to show the band: say it in a native box on that window
+    detached: {
+      windowForPath: sourceViewDetachedWindowForPath,
+      notify: (win, copy) =>
+        dialog.showMessageBox(win, {
+          type: 'info',
+          message: tm('uwSourceViewSaveHint'),
+          ...(copy ? { detail: tm('uwSourceViewCopyHint') } : {}),
+        }),
+    },
+  })
   installUniworkModuleSeams(
     uniworkService,
     createCommentAuthorResolver({
@@ -4653,18 +4689,12 @@ function registerHomeIpc(): void {
       displayName: uniworkAccountDisplayName,
     }),
     // UNI-1993: a view-only source file reads as bound/read-only/locked to every editor;
-    // an explicit Save on one only tells the window that owns it
+    // an explicit Save on one only tells the window that owns it, and a refused Save As,
+    // export or print says the same plus where to get a copy
     {
       registry: uniworkService.sourceViews,
-      onSourceSave: createSourceSaveHint({
-        hostForPath: sourceViewHostForPath,
-        // a detached window has no renderer to show the band: say it in a native box on that window
-        detached: {
-          windowForPath: sourceViewDetachedWindowForPath,
-          notify: (win) =>
-            dialog.showMessageBox(win, { type: 'info', message: tm('uwSourceViewSaveHint') }),
-        },
-      }),
+      onSourceSave: (path) => sourceViewHint(path),
+      onSourceLocked: (path) => sourceViewHint(path, true),
     },
   )
   // the chip reads "Unsaved changes" while an editor holds edits not saved yet

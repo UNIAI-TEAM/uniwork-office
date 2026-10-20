@@ -202,6 +202,7 @@ export const nl = {
     'Dit bestand is bijgevoegd in {origin}{parent}. Wijzigingen worden niet opgeslagen. Gebruik Downloaden in de documentenlijst om een kopie te krijgen.',
   uwSourceViewSaveHint:
     'Dit bestand is alleen om te bekijken — wijzigingen worden niet opgeslagen.',
+  uwSourceViewCopyHint: 'Gebruik Downloaden in de documentenlijst om een kopie te krijgen.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Taken',
   uwSourceOriginMeeting: 'Vergaderingen',

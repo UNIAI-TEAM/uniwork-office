@@ -195,6 +195,7 @@ export const it = {
   uwTipSourceView:
     'Questo file è allegato in {origin}{parent}. Le modifiche non verranno salvate. Per averne una copia, usa Scarica nell’elenco dei documenti.',
   uwSourceViewSaveHint: 'Questo file è in sola lettura — le modifiche non vengono salvate.',
+  uwSourceViewCopyHint: 'Per averne una copia, usa Scarica nell’elenco dei documenti.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Attività',
   uwSourceOriginMeeting: 'Riunioni',

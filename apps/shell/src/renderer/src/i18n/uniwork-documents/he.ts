@@ -188,6 +188,7 @@ export const he = {
   uwTipSourceView:
     'קובץ זה מצורף ב{origin}{parent}. שינויים לא יישמרו. כדי לקבל עותק, השתמשו בהורדה ברשימת המסמכים.',
   uwSourceViewSaveHint: 'קובץ זה לצפייה בלבד — שינויים לא נשמרים.',
+  uwSourceViewCopyHint: 'כדי לקבל עותק, השתמשו בהורדה ברשימת המסמכים.',
   uwSourceOriginChat: 'צ׳אט',
   uwSourceOriginTask: 'משימות',
   uwSourceOriginMeeting: 'פגישות',

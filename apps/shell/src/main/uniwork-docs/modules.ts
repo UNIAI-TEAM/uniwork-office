@@ -156,6 +156,7 @@ export function installUniworkModuleSeams(
     serviceSeam && sourceViews
       ? withSourceViews(serviceSeam, sourceViews.registry, {
           onSourceSave: sourceViews.onSourceSave,
+          onSourceLocked: sourceViews.onSourceLocked,
         })
       : serviceSeam
   seam?.setClearRecovery?.((path: string) => {
