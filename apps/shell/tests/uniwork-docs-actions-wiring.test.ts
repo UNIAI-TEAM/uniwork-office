@@ -1,4 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -790,6 +799,108 @@ describe('the document sources IPC (UNI-1961)', () => {
       expect(pulls).toBe(17)
       expect([...readFileSync(target)]).toEqual([1, 2, 3])
     } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('refuses direct store targets, final symlinks, parent-directory symlinks, and held-download symlink replacements without modifying protected bytes (R1-6, R1-13, R1-16)', async () => {
+    const { handlers } = await setup()
+    const storeDir = join(dir, 'uniwork-documents', 'default', 'acc_1', 'doc_1')
+    mkdirSync(storeDir, { recursive: true })
+    const storeFile = join(storeDir, 'Protected.docx')
+    writeFileSync(storeFile, new Uint8Array([10, 20, 30]))
+
+    const finalLink = join(dir, 'alias.docx')
+    symlinkSync(storeFile, finalLink)
+    const parentLink = join(dir, 'linked-store')
+    symlinkSync(storeDir, parentLink)
+    const viaParentLink = join(parentLink, 'Protected.docx')
+
+    let fetches = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        fetches += 1
+        return new Response(new Uint8Array([7, 8, 9]), { status: 200 })
+      }),
+    )
+    try {
+      for (const candidate of [storeFile, finalLink, viaParentLink]) {
+        dialogs.save = { canceled: false, filePath: candidate }
+        const res = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+          workspaceId: 'ws_1',
+          sourceId: 'task:src_1',
+          name: 'Protected.docx',
+        })
+        expect(res).toEqual({ ok: false, error: 'forbidden' })
+        expect([...readFileSync(storeFile)]).toEqual([10, 20, 30])
+      }
+      expect(fetches).toBe(0)
+
+      const raceTarget = join(dir, 'race-target.docx')
+      let releaseFetch: (res: Response) => void = () => undefined
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          () =>
+            new Promise<Response>((resolve) => {
+              releaseFetch = resolve
+            }),
+        ),
+      )
+      dialogs.save = { canceled: false, filePath: raceTarget }
+      const pending = handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'Protected.docx',
+      })
+      await vi.waitFor(() => {
+        expect(releaseFetch).not.toBeUndefined()
+      })
+      symlinkSync(storeFile, raceTarget)
+      releaseFetch(new Response(new Uint8Array([7, 8, 9]), { status: 200 }))
+      expect(await pending).toEqual({ ok: false, error: 'forbidden' })
+      expect([...readFileSync(storeFile)]).toEqual([10, 20, 30])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('stages source downloads through an exclusive sibling temp file and preserves an existing destination on write failure (R1-5)', async () => {
+    const { handlers } = await setup()
+    const subDir = join(dir, 'target-dir')
+    mkdirSync(subDir, { recursive: true })
+    const target = join(subDir, 'existing.docx')
+    writeFileSync(target, new Uint8Array([1, 2, 3, 4]))
+    chmodSync(target, 0o600)
+    chmodSync(subDir, 0o500)
+    dialogs.save = { canceled: false, filePath: target }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array([7, 8, 9, 10]), { status: 200 })),
+    )
+    try {
+      const failed = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(failed).toEqual({ ok: false, error: 'server_error' })
+      expect([...readFileSync(target)]).toEqual([1, 2, 3, 4])
+      expect(readdirSync(subDir)).toEqual(['existing.docx'])
+
+      chmodSync(subDir, 0o700)
+      dialogs.save = { canceled: false, filePath: target }
+      const saved = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(saved).toEqual({ ok: true, value: { path: target } })
+      expect([...readFileSync(target)]).toEqual([7, 8, 9, 10])
+      expect(readdirSync(subDir)).toEqual(['existing.docx'])
+    } finally {
+      chmodSync(subDir, 0o700)
       vi.unstubAllGlobals()
     }
   })
