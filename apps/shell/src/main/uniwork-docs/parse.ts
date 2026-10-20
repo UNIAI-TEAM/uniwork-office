@@ -28,6 +28,8 @@ export interface DocumentDetail {
   myLevel: string | null
   /** `archived_at`: present while the document sits in the trash */
   archivedAt: string | null
+  /** UNI-1961: `shelved_at`: present while the document sits in Archive (Lưu trữ) */
+  shelvedAt?: string
   /** G5-12: the folder or page holding the document; null = at the root, absent = not sent */
   parentId?: string | null
   file: {
@@ -391,6 +393,11 @@ export function parseDetail(raw: unknown): DocumentDetail {
     currentVersion: nonNegInt(doc.current_version),
     myLevel,
     archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
+    ...(typeof doc.shelved_at === 'string' &&
+    doc.shelved_at.length > 0 &&
+    doc.shelved_at.length <= 64
+      ? { shelvedAt: doc.shelved_at }
+      : {}),
     ...(typeof doc.parent_id === 'string' && doc.parent_id.length > 0 && doc.parent_id.length <= 128
       ? { parentId: doc.parent_id }
       : doc.parent_id === null

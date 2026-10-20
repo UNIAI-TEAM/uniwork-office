@@ -1,5 +1,15 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { lstat, open, readdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import {
+  lstat,
+  open,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
@@ -978,12 +988,23 @@ function accessFor(level: string | null): UniworkDocAccess {
  */
 function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = false): Binding {
   const next = { ...binding }
+  const shelved = Boolean(detail.shelvedAt)
   const level = docLevelOf(detail.myLevel)
-  // a read-only copy (a view ticket, or a launch that asked to view) never shows a level above view
+  // a read-only copy (a view ticket, or a launch that asked to view) never shows a level above view;
+  // a shelved document keeps its real ACL in `level` while `shelved: true` and `access: 'view'`
+  // enforce read-only in main-process policy (R1-7)
   if (level) next.level = readOnly ? 'view' : level
   else delete next.level
+  if (shelved) {
+    next.shelved = true
+    next.access = 'view'
+  } else {
+    delete next.shelved
+  }
   if (detail.file.versionId && next.baseVersion === detail.file.version) {
     next.baseVersionId = detail.file.versionId
+  } else if (next.baseVersion !== detail.file.version) {
+    delete next.baseVersionId
   }
   return next
 }
@@ -4300,6 +4321,7 @@ export class UniworkDocsService {
     // the document key the in-memory lock map is keyed by.
     return (
       found.doc.binding.access === 'view' ||
+      found.doc.binding.shelved === true ||
       !this.ownsLocally(found.doc) ||
       this.coordinator.isOtherWindow(found.doc.key) ||
       this.editLockReadOnly(found.doc.path)
@@ -6621,7 +6643,9 @@ export class UniworkDocsService {
       const session = this.captureActionSession()
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
       await this.requireManageAnyKind(documentId, session)
-      return this.api().unshelve(documentId, this.newIdempotencyKey())
+      const res = await this.api().unshelve(documentId, this.newIdempotencyKey())
+      await this.afterLocalShelveChange(session, documentId, false, res.affected)
+      return res
     })
   }
 
@@ -6647,8 +6671,54 @@ export class UniworkDocsService {
       const session = this.captureActionSession()
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
       await this.requireManageAnyKind(documentId, session)
-      return this.api().shelve(documentId, this.newIdempotencyKey())
+      const res = await this.api().shelve(documentId, this.newIdempotencyKey())
+      await this.afterLocalShelveChange(session, documentId, true, res.affected)
+      return res
     })
+  }
+
+  /**
+   * UNI-1961 (R1-7): refresh any locally bound copy touched by a shelve or
+   * unshelve action so main-process read-only, save, comment, and edit-lock
+   * policy stay consistent with the server without altering the stored ACL (`level`).
+   */
+  private async afterLocalShelveChange(
+    session: { identity: SessionIdentity; epoch: number; apiOrigin?: string | null },
+    documentId: string,
+    shelved: boolean,
+    affected: readonly string[] = [],
+  ): Promise<void> {
+    if (!this.sessionLive(session) || typeof this.store?.dirFor !== 'function') return
+    const ids = new Set<string>([documentId, ...affected])
+    for (const id of ids) {
+      if (typeof id !== 'string' || !id) continue
+      const dir = this.store.dirFor(session.identity.deploymentId, session.identity.accountId, id)
+      const existing = await this.store.readDir(dir)
+      if (!existing || existing.documentId !== id) continue
+      const local = join(dir, existing.filename)
+      if (!this.store.exists(local)) continue
+      const preservedLevel = existing.level ?? (existing.access === 'edit' ? 'edit' : undefined)
+      const next: Binding = {
+        ...existing,
+        ...(preservedLevel ? { level: preservedLevel } : {}),
+      }
+      if (shelved) {
+        next.shelved = true
+        next.access = 'view'
+      } else {
+        delete next.shelved
+        next.access = accessFor(next.level ?? null)
+      }
+      if (shelved) await this.stopEditLock(local, true)
+      const written = await this.store.write(dir, next)
+      const fresh = written ? this.store.lookup(local) : null
+      if (fresh) {
+        this.publish(this.statusOf(fresh))
+        if (!shelved && fresh.binding.access === 'edit' && this.deps.isPathOpen(local)) {
+          this.startEditLock(fresh)
+        }
+      }
+    }
   }
 
   /** UNI-1961: manage (or admin_scope, the web's canManageTrashed) on a row of any kind */
@@ -7005,7 +7075,12 @@ export class UniworkDocsService {
   /** a Save that can reach the UniWork step (not view, conflict, saving or blocked) */
   private canSave(doc: BoundDocument): boolean {
     const b = doc.binding
-    if (b.access === 'view' || b.state === 'conflict' || this.coordinator.isSaving(doc.path)) {
+    if (
+      b.access === 'view' ||
+      b.shelved === true ||
+      b.state === 'conflict' ||
+      this.coordinator.isSaving(doc.path)
+    ) {
       return false
     }
     // another window holds the document lock: this window is read-only and
@@ -8812,7 +8887,7 @@ export class UniworkDocsService {
       documentId: b.documentId,
       workspaceId: b.workspaceId,
       title: b.title,
-      access: b.access,
+      access: b.shelved ? 'view' : b.access,
     }
   }
 
@@ -8828,7 +8903,7 @@ export class UniworkDocsService {
     return {
       documentId: b.documentId,
       versionId: b.baseVersionId ?? null,
-      ...(b.level ? { level: b.level } : {}),
+      ...(b.shelved ? { level: 'view' } : b.level ? { level: b.level } : {}),
       myUserId: doc.userId,
     }
   }
@@ -8971,8 +9046,8 @@ export class UniworkDocsService {
       if (open) return this.focusOpen(open.path, open.title)
     }
     const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
-    const access: UniworkDocAccess =
-      viewTicket || viewRequested ? 'view' : accessFor(detail.myLevel)
+    const effectiveViewOnly = viewTicket || viewRequested || Boolean(detail.shelvedAt)
+    const access: UniworkDocAccess = effectiveViewOnly ? 'view' : accessFor(detail.myLevel)
     const dir = dirs[0]!
     const existing = await this.store.readDir(dir)
     const workspaceId = launch?.workspaceId ?? detail.workspaceId
@@ -9154,7 +9229,7 @@ export class UniworkDocsService {
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     const doc = this.store.lookup(path)
     if (doc) this.publish(toStatus(doc))
-    if (doc && doc.binding.access === 'edit') this.startEditLock(doc)
+    if (doc && doc.binding.access === 'edit' && !doc.binding.shelved) this.startEditLock(doc)
     return { path, title: binding?.title ?? doc?.binding.title ?? basename(path) }
   }
 }
