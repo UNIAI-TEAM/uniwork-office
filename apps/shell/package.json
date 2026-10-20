@@ -32,6 +32,7 @@
     "@genoffice/pptx-engine": "*",
     "@genoffice/pptx-render": "*",
     "@genoffice/sheets": "*",
+    "@genoffice/shortcuts": "*",
     "@genoffice/slides": "*",
     "@genoffice/ui": "*",
     "@genoffice/xlsx-gateway": "*",

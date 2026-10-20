@@ -179,7 +179,18 @@ export const shellNotes: readonly ShortcutNote[] = []
 // @generated-end
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
-const manual: readonly ShortcutAction[] = []
+const manual: readonly ShortcutAction[] = [
+  // Redo: Ctrl+Y on Windows (Word, Excel, PowerPoint), the Shift variant stays
+  {
+    id: 'shell-05',
+    scope: 'shell',
+    win: ['Ctrl+Y', 'Ctrl+Shift+Z'],
+    mac: ['Cmd+Y', 'Shift+Cmd+Z'],
+    web: { win: ['Ctrl+Y', 'Ctrl+Shift+Z'], mac: ['Cmd+Y', 'Shift+Cmd+Z'] },
+    match: 'key',
+    guard: {},
+  },
+]
 
 export const shellShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
 

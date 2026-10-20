@@ -62,7 +62,7 @@ import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../s
 import { tabStripHeight } from '../shared/tab-drag-geometry'
 import { clampDiscussionPanelWidth } from '@genoffice/electron-utils/comments-ipc'
 import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
-import { isCloseTabChord } from './close-tab-chord'
+import { matchShellKey, shortcutPlatform } from './shell-shortcuts'
 import { blankRetiredPage } from './retire-page'
 import { reloadViewFromDisk } from './reload-view'
 
@@ -143,6 +143,8 @@ export class TabManager {
      * made from the View menu reaches the next layout without rebuilding this.
      */
     private readonly uiScale: () => number = () => 1,
+    /** developer tools are offered (a development build): F12 opens them where the module does not bind it */
+    private readonly devToolsEnabled: () => boolean = () => false,
   ) {
     // Layout once synchronously for macOS/Windows (bounds are already correct),
     // then once more on the next tick. On Linux/X11, `resize` fires before the
@@ -302,24 +304,43 @@ export class TabManager {
   }
 
   /**
-   * Ctrl/Cmd+W closes the active tab straight from the key event, whichever
-   * webContents of this window has keyboard focus: the active tab's view, the
-   * shell chrome, a hidden view (the spare sheets view mounted after an open
-   * can take focus), so the chord never depends on the menu accelerator
-   * receiving the page's unhandled key. A view that moved to a detached window
-   * keeps this listener but is no longer ours, so its own window handles it.
-   * Home and chrome-free Present tabs keep the default path.
+   * The keys the shell takes before any page sees them (`matchShellKey`, from the
+   * shortcut tables), whichever webContents of this window has keyboard focus: the
+   * active tab's view, the shell chrome, a hidden view (the spare sheets view
+   * mounted after an open can take focus), so they never depend on the menu
+   * accelerator receiving the page's unhandled key. Close tab (Ctrl/Cmd+W) closes
+   * the active tab; F6 / Shift+F6 move focus between the chrome and the tab; F12
+   * opens the developer tools of a development build on a tab whose module does
+   * not bind F12. A view that moved to a detached window keeps this listener but
+   * is no longer ours, so its own window handles it. Home and chrome-free Present
+   * tabs keep the default path for the close key.
    */
   private trackCloseChord(wc: WebContents): void {
     if (this.closeChordTracked.has(wc)) return
     this.closeChordTracked.add(wc)
     wc.on('before-input-event', (event, input) => {
-      if (!isCloseTabChord(input)) return
       if (!this.ownsWebContents(wc)) return
       const active = this.tabs.find((t) => t.id === this.activeId)
-      if (!active?.view || active.present) return
-      event.preventDefault()
-      this.closeActiveTab()
+      if (!active) return
+      const key = matchShellKey(input, {
+        platform: shortcutPlatform(),
+        devTools: this.devToolsEnabled(),
+        activeKind: active.kind,
+      })
+      if (!key) return
+      switch (key.command) {
+        case 'close-tab':
+          if (!active.view || active.present) return
+          event.preventDefault()
+          this.closeActiveTab()
+          return
+        case 'cycle-region':
+          if (this.cycleRegion(wc, active)) event.preventDefault()
+          return
+        case 'toggle-devtools':
+          if (this.toggleDevTools(wc, active)) event.preventDefault()
+          return
+      }
     })
     // the chrome takes focus legitimately (tab strip, Home, dialogs); a hidden view
     // must not keep it. Deferred: a focus() call made inside Chromium's own focus
@@ -327,6 +348,30 @@ export class TabManager {
     if (wc !== this.shellWindow.webContents) {
       wc.on('focus', () => setImmediate(() => this.refocusIfHidden(wc)))
     }
+  }
+
+  /**
+   * F6 / Shift+F6: keyboard focus moves between the window's two regions, the shell
+   * chrome (tab strip) and the active tab. A tab's own regions (ribbon, document, side
+   * pane) are not walked here. Home is one region (nothing to move to), and a hidden
+   * view's key is left alone.
+   */
+  private cycleRegion(from: WebContents, active: TabRecord): boolean {
+    if (!active.view || active.present) return false
+    const chrome = this.shellWindow.webContents
+    const content = active.view.webContents
+    if (from === chrome) content.focus()
+    else if (from === content) chrome.focus()
+    else return false
+    return true
+  }
+
+  /** Developer tools of the focused region, detached (docked ones sit under the tab views). */
+  private toggleDevTools(from: WebContents, active: TabRecord): boolean {
+    if (from !== this.shellWindow.webContents && from !== active.view?.webContents) return false
+    if (from.isDevToolsOpened()) from.closeDevTools()
+    else from.openDevTools({ mode: 'detach' })
+    return true
   }
 
   /** A hidden view of this window holding keyboard focus swallows every OS key

@@ -331,7 +331,63 @@ export const htmlNotes: readonly ShortcutNote[] = [
 // @generated-end
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
-const manual: readonly ShortcutAction[] = []
+const manual: readonly ShortcutAction[] = [
+  // Save As: F12 is Word's key; Ctrl+Shift+S stays as an alias (HTML has no Strikethrough to collide with)
+  {
+    id: 'html-003',
+    scope: 'html',
+    win: ['F12', 'Ctrl+Shift+S'],
+    mac: ['Shift+Cmd+S'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Redo: Ctrl+Y (Word); the existing Ctrl+Shift+Z / Cmd+Shift+Z stays
+  {
+    id: 'html-007',
+    scope: 'html',
+    win: ['Ctrl+Y', 'Ctrl+Shift+Z'],
+    mac: ['Cmd+Y', 'Shift+Cmd+Z'],
+    match: 'key',
+    guard: {},
+  },
+  // Replace: macOS keeps Control+H (the menu's Cmd+H is the system Hide role)
+  {
+    id: 'html-014',
+    scope: 'html',
+    win: ['Ctrl+H'],
+    mac: ['Ctrl+H'],
+    web: { win: ['Ctrl+H'], mac: ['Ctrl+H'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Underline (preview selection): Word's key on desktop and web
+  {
+    id: 'html-017',
+    scope: 'html',
+    win: ['Ctrl+U'],
+    mac: ['Cmd+U'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Insert hyperlink: Ctrl+K is the link key; Ask AI left it (ribbon / popover entry only)
+  {
+    id: 'html-018',
+    scope: 'html',
+    win: ['Ctrl+K'],
+    mac: ['Cmd+K'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Cycle view mode: ours-only, the same chord on desktop and web
+  {
+    id: 'html-025',
+    scope: 'html',
+    win: ['Ctrl+Backslash'],
+    mac: ['Cmd+Backslash'],
+    match: 'key',
+    guard: {},
+  },
+]
 
 export const htmlShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
 
