@@ -317,7 +317,72 @@ export interface UniworkDocSummary {
   sizeBytes?: number
   /** UNI-1961: the server's `origin` when it is one the web names (Group by Source) */
   origin?: 'upload' | 'created'
+  /**
+   * UNI-2047 doclist fields. Every one is optional and read leniently by main:
+   * a missing or malformed server value leaves the key absent, so a screen
+   * hides its column instead of guessing.
+   */
+  /** trash rows: the server's `archived_at` timestamp (`archived` stays the flag) */
+  archivedAt?: string
+  /** trash rows: the server's `archived_by` id (the name is resolved later, like `shelvedById`) */
+  archivedById?: string
+  /** trash rows: when the server purges the row (`purge_after`); "N days left" counts to it */
+  purgeAfter?: string
+  /** the caller owns the row (`is_owner`) */
+  isOwner?: boolean
+  /** the last editor as the server names them; absent outside the caller's org or for a non-person */
+  updatedByUser?: UniworkDocUpdatedByUser
+  /** recent rows: the caller's last opened/edited/commented touch */
+  lastActivity?: UniworkDocLastActivity
+  /** shared-with-me rows: who shared the row and when */
+  shared?: UniworkDocShared
+  /** shared-by-me rows: how widely the caller shared the row */
+  shareSummary?: UniworkDocShareSummary
+  /** favorites rows: when the caller starred the row (`favorited_at`) */
+  favoritedAt?: string
 }
+
+/** UNI-2047: the server's `updated_by_user`; `avatarUrl` is absolute http(s) and loads with no auth header */
+export interface UniworkDocUpdatedByUser {
+  name: string
+  avatarUrl?: string
+}
+
+/** UNI-2047: the server's `last_activity` on a recent row */
+export interface UniworkDocLastActivity {
+  kind: 'opened' | 'edited' | 'commented'
+  at: string
+}
+
+/** UNI-2047: the server's `shared` block on a shared-with-me row */
+export interface UniworkDocShared {
+  /** `shared.by`: the sharer's id */
+  byId?: string
+  /** `shared.by_kind`, kept as sent (the server may add kinds) */
+  byKind?: string
+  /** `shared.by_name`; absent when the sharer is outside the caller's org */
+  byName?: string
+  at: string
+}
+
+/**
+ * UNI-2047: the server's `share_summary` on a shared-by-me row. `people` are
+ * direct users, `links` are the live ones; `latestAt` is absent when nothing
+ * is shared.
+ */
+export interface UniworkDocShareSummary {
+  people: number
+  workspaces: number
+  links: number
+  latestAt?: string
+}
+
+/** UNI-2047: the sort keys a doclist route accepts (S3 plus the SV-0..SV-3 per-list keys) */
+export type UniworkListSort =
+  'updated' | 'name' | 'size' | 'editor' | 'activity' | 'shared' | 'starred' | 'deleted' | 'shelved'
+
+/** UNI-2047: the Recent segment (`activity` filter on `/documents/recent`) */
+export type UniworkListActivity = 'opened' | 'edited'
 
 /**
  * UNI-1961 (ARCHIVE-01): the answer of an unshelve or shelve - the item, and
@@ -342,12 +407,19 @@ export type UniworkSystemKind = 'my_folder'
 
 /**
  * DESKTOP-HOME: optional list filters for `listChildren`, `listDocuments`,
- * `listSharedByMe`, and `listTrash`. Unset = parameter omitted.
+ * `listSharedByMe`, `listTrash`, `listSharedWithMe` and `listShelved`.
+ * Unset = parameter omitted.
  */
 export interface UniworkListFilters {
   format?: UniworkDocFormat
   updatedBy?: string
   updatedFrom?: string
+  /** UNI-2047: server-side sort key; unset = the route's own order, nothing sent */
+  sort?: UniworkListSort
+  /** UNI-2047: sort direction; unset = the key's own default, nothing sent */
+  order?: 'asc' | 'desc'
+  /** UNI-2047: Recent only (`/documents/recent`): keep rows by their last touch */
+  activity?: UniworkListActivity
 }
 
 /**
