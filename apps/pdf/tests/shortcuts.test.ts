@@ -4,7 +4,7 @@
  * keys no longer do, an IME composition / AltGr never fires, hints per platform,
  * and the dialogs ignore an Enter / Esc that belongs to the IME.
  */
-import { act, createElement } from 'react'
+import { act, createElement, createRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { ShortcutPlatform, ShortcutSurface } from '@genoffice/shortcuts'
@@ -15,10 +15,14 @@ import {
   matchPdfKey,
   pdfHint,
   pdfTip,
+  resolvePdfWindowKey,
   searchEnterDirection,
 } from '../src/renderer/shortcuts'
 import { PasswordDialog } from '../src/renderer/PasswordDialog'
+import { SignatureDialog } from '../src/renderer/SignatureDialog'
+import { SignaturesDialog } from '../src/renderer/SignaturesDialog'
 import { StampDialog } from '../src/renderer/StampDialog'
+import { StaticTextDialog } from '../src/renderer/StaticTextDialog'
 import type { TFunc } from '../src/renderer/i18n/locale'
 
 type Init = KeyboardEventInit & { keyCode?: number }
@@ -98,16 +102,15 @@ describe('pdf table chords fire their action', () => {
       mac({ key: '\\', code: 'Backslash' }),
     ],
     [
-      // a German layout types "ü" on the physical bracket key
       'pdf-12 Rotate counterclockwise',
       'pdf-12',
-      win({ key: 'ü', code: 'BracketLeft' }),
+      win({ key: '[', code: 'BracketLeft' }),
       mac({ key: '[', code: 'BracketLeft' }),
     ],
     [
       'pdf-12 Rotate clockwise',
       'pdf-12',
-      win({ key: '+', code: 'BracketRight' }),
+      win({ key: ']', code: 'BracketRight' }),
       mac({ key: ']', code: 'BracketRight' }),
     ],
   ]
@@ -204,6 +207,65 @@ describe('IME composition and AltGr never fire', () => {
   })
 })
 
+describe('the window handler decision (resolvePdfWindowKey)', () => {
+  const resolve = (
+    platform: ShortcutPlatform,
+    init: Init,
+    opts: { inEditable?: boolean; nativeUndo?: boolean } = {},
+  ) =>
+    resolvePdfWindowKey(keydown(init), {
+      inEditable: opts.inEditable ?? false,
+      documentUndo: !opts.nativeUndo,
+      platform,
+      surface: 'desktop',
+    })
+
+  it('Ctrl+Shift+S is Save As: not Save, and the key is left to the shell menu', () => {
+    const effect = resolve('win', win({ key: 'S', code: 'KeyS', shiftKey: true }))
+    expect(effect?.action.id).toBe('pdf-02')
+    expect(effect?.preventDefault).toBe(false)
+    expect(resolve('win', win({ key: 's', code: 'KeyS' }))?.preventDefault).toBe(true)
+  })
+
+  it('Ctrl+0 resets the zoom and does not fit the width', () => {
+    expect(resolve('win', win({ key: '0', code: 'Digit0' }))?.action.id).toBe('pdf-10')
+  })
+
+  it('a US layout rotates on Ctrl+[ / Ctrl+], counterclockwise / clockwise', () => {
+    expect(resolve('win', win({ key: '[', code: 'BracketLeft' }))?.rotate).toBe(-90)
+    expect(resolve('win', win({ key: ']', code: 'BracketRight' }))?.rotate).toBe(90)
+    expect(resolve('mac', mac({ key: ']', code: 'BracketRight' }))?.rotate).toBe(90)
+  })
+
+  it('German layout: Ctrl + "+" (zoom in on the physical bracket key) and Ctrl + "ü" do not rotate', () => {
+    // the matcher answers by position, the handler checks the printed character
+    expect(fires('win', win({ key: '+', code: 'BracketRight' }))).toBe('pdf-12')
+    expect(resolve('win', win({ key: '+', code: 'BracketRight' }))).toBeNull()
+    expect(resolve('win', win({ key: 'ü', code: 'BracketLeft' }))).toBeNull()
+  })
+
+  it('fit toggle and rotate never run inside a text field', () => {
+    const inField = { inEditable: true }
+    expect(resolve('win', win({ key: '\\', code: 'Backslash' }), inField)).toBeNull()
+    expect(resolve('win', win({ key: ']', code: 'BracketRight' }), inField)).toBeNull()
+    expect(resolve('win', win({ key: '[', code: 'BracketLeft' }), inField)).toBeNull()
+    // save, find and Find next / F3 in the search box still work in a field
+    expect(resolve('win', win({ key: 's', code: 'KeyS' }), inField)?.action.id).toBe('pdf-01')
+    expect(resolve('win', { key: 'F3', code: 'F3' }, inField)?.action.id).toBe('pdf-06')
+  })
+
+  it('a text field keeps its own undo and redo', () => {
+    const native = { inEditable: true, nativeUndo: true }
+    expect(resolve('win', win({ key: 'z', code: 'KeyZ' }), native)).toBeNull()
+    expect(resolve('win', win({ key: 'y', code: 'KeyY' }), native)).toBeNull()
+    expect(resolve('win', win({ key: 'z', code: 'KeyZ' }))?.action.id).toBe('pdf-03')
+  })
+
+  it('an IME composition resolves to nothing', () => {
+    expect(resolve('win', win({ key: 's', code: 'KeyS', isComposing: true }))).toBeNull()
+  })
+})
+
 describe('hints come from the table', () => {
   it('prints the primary chord per platform and surface', () => {
     expect(pdfHint('pdf-01', 'win', 'desktop')).toBe('Ctrl+S')
@@ -214,6 +276,13 @@ describe('hints come from the table', () => {
     expect(pdfHint('pdf-05', 'win', 'web')).toBe('Ctrl+F')
     expect(pdfHint('pdf-07', 'mac', 'web')).toBe('⌘P')
     expect(pdfHint('pdf-11', 'win', 'desktop')).toBe('Ctrl+\\')
+  })
+
+  it('the zoom and fit tooltips show the key where the table prints one', () => {
+    expect(pdfTip('Zoom out', 'pdf-09', 'win', 'web')).toBe('Zoom out (Ctrl+-)')
+    expect(pdfTip('Fit page', 'pdf-11', 'win', 'desktop')).toBe('Fit page (Ctrl+\\)')
+    expect(pdfTip('Fit page', 'pdf-11', 'mac', 'desktop')).toBe('Fit page (⌘\\)')
+    expect(pdfTip('Next match', 'pdf-06', 'win', 'desktop')).toMatch(/^Next match \(Ctrl\+/)
   })
 
   it('appends the key to a tooltip label', () => {
@@ -281,6 +350,9 @@ describe('dialogs ignore the IME Enter / Esc', () => {
 
   beforeAll(() => {
     ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+    ;(window as unknown as { pdfApi: unknown }).pdfApi = {
+      listSavedSignatures: () => Promise.resolve([]),
+    }
   })
 
   afterEach(async () => {
@@ -338,4 +410,56 @@ describe('dialogs ignore the IME Enter / Esc', () => {
     })
     expect(onCancel).toHaveBeenCalledTimes(1)
   })
+
+  // every dialog on the shared useModalDialog helper drops an IME Escape
+  const modalDialogs: Array<[string, (onClose: () => void) => ReturnType<typeof createElement>]> = [
+    [
+      'SignatureDialog',
+      (onCancel) =>
+        createElement(SignatureDialog, { color: [0, 0, 0], t, onCancel, onConfirm: () => {} }),
+    ],
+    [
+      'SignaturesDialog',
+      (onClose) =>
+        createElement(SignaturesDialog, { t, signatures: [], onClose, onGoToPage: () => {} }),
+    ],
+    [
+      'StaticTextDialog',
+      (onCancel) =>
+        createElement(StaticTextDialog, {
+          t,
+          titleKey: 'sigPanelTitle',
+          text: '',
+          size: 12,
+          color: '#000000',
+          colorOpen: false,
+          align: 'left',
+          colorFieldRef: createRef<HTMLDivElement>(),
+          onText: () => {},
+          onSize: () => {},
+          onColor: () => {},
+          onColorOpen: () => {},
+          onAlign: () => {},
+          onCancel,
+          onConfirm: () => {},
+        }),
+    ],
+  ]
+
+  it.each(modalDialogs)(
+    '%s ignores the Escape of a composition and closes on a plain one',
+    async (_name, build) => {
+      const onClose = vi.fn()
+      await mount(build(onClose))
+      await act(async () => {
+        window.dispatchEvent(keydown({ key: 'Escape', isComposing: true }))
+        window.dispatchEvent(keydown({ key: 'Escape', keyCode: 229 }))
+      })
+      expect(onClose).not.toHaveBeenCalled()
+      await act(async () => {
+        window.dispatchEvent(keydown({ key: 'Escape' }))
+      })
+      expect(onClose).toHaveBeenCalledTimes(1)
+    },
+  )
 })

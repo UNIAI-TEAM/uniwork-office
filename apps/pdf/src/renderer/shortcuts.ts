@@ -51,6 +51,44 @@ export function matchPdfKey(
   return matcher(nativeEvent(event) as ShortcutKeyEvent, platform, surface, context)
 }
 
+/** What the window keydown handler does with a matched table chord. */
+export interface PdfWindowKeyEffect {
+  readonly action: ShortcutAction
+  /** Save As is the shell menu's: the key must reach its accelerator, so no preventDefault. */
+  readonly preventDefault: boolean
+  /** Rotate (pdf-12): the angle to add to every page. */
+  readonly rotate?: -90 | 90
+}
+
+/**
+ * The window handler's decision for a keydown: the effect to run, or null when
+ * the key is not ours. Ctrl+[ / Ctrl+] rotate only when the key prints `[` / `]`
+ * (the table matches punctuation by position, and a German, Spanish or Italian
+ * layout prints "+" on the physical BracketRight key: that is zoom, not rotate).
+ * Fit toggle and rotate never run inside a text field; undo / redo stay with a
+ * text field that has its own (`documentUndo` false).
+ */
+export function resolvePdfWindowKey(
+  event: PdfKeyEvent,
+  state: {
+    readonly inEditable: boolean
+    readonly documentUndo: boolean
+    readonly platform?: ShortcutPlatform
+    readonly surface?: ShortcutSurface
+  },
+): PdfWindowKeyEffect | null {
+  const action = matchPdfKey(event, undefined, state.platform, state.surface)
+  if (!action) return null
+  if ((action.id === 'pdf-03' || action.id === 'pdf-04') && !state.documentUndo) return null
+  if (state.inEditable && (action.id === 'pdf-11' || action.id === 'pdf-12')) return null
+  if (action.id === 'pdf-12') {
+    const key = nativeEvent(event).key
+    if (key !== '[' && key !== ']') return null
+    return { action, preventDefault: true, rotate: key === '[' ? -90 : 90 }
+  }
+  return { action, preventDefault: action.id !== 'pdf-02' }
+}
+
 /** `key` with no modifier held and no IME composition in progress. */
 export function isPlainKey(event: PdfKeyEvent, key: string): boolean {
   const e = nativeEvent(event)

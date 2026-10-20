@@ -86,6 +86,7 @@ import {
   isPlainKey,
   matchPdfKey,
   pdfTip,
+  resolvePdfWindowKey,
   searchEnterDirection,
 } from './shortcuts'
 import { rowOfVisIdx, spreadRows, stepPage } from './spread'
@@ -6356,17 +6357,15 @@ export default function App() {
           target.tagName === 'TEXTAREA' ||
           target.tagName === 'SELECT' ||
           target.isContentEditable)
-      const action = matchPdfKey(e)
-      // A text field keeps its own undo / redo
-      if (
-        (action?.id === 'pdf-03' || action?.id === 'pdf-04') &&
-        !shouldHandleDocumentUndo(e.target, 'z', true)
-      )
-        return
-      if (action) {
+      const effect = resolvePdfWindowKey(e, {
+        inEditable,
+        documentUndo: shouldHandleDocumentUndo(e.target, 'z', true),
+      })
+      const action = effect?.action
+      if (effect && action) {
+        if (effect.preventDefault) e.preventDefault()
         switch (action.id) {
           case 'pdf-01':
-            e.preventDefault()
             if (cap('save')) void save()
             break
           case 'pdf-02':
@@ -6374,46 +6373,36 @@ export default function App() {
             // must not fall into Save and must reach the menu accelerator, so no preventDefault
             break
           case 'pdf-03':
-            e.preventDefault()
             undo()
             break
           case 'pdf-04':
-            e.preventDefault()
             redo()
             break
           case 'pdf-05':
-            e.preventDefault()
             openSearch()
             break
           case 'pdf-06':
-            e.preventDefault()
             if (searchOpen) searchStep(e.shiftKey ? -1 : 1)
             else openSearch()
             break
           case 'pdf-07':
-            e.preventDefault()
             if (cap('print')) openPrintDlg()
             break
           case 'pdf-08':
-            e.preventDefault()
             zoomIn()
             break
           case 'pdf-09':
-            e.preventDefault()
             zoomOut()
             break
           case 'pdf-10':
-            e.preventDefault()
             applyScale(1, null)
             break
           case 'pdf-11':
-            e.preventDefault()
             fitModeRef.current = fitModeRef.current === 'width' ? 'page' : 'width'
             recomputeFit()
             break
           case 'pdf-12': {
-            e.preventDefault()
-            const error = rotateAllPages(e.code === 'BracketLeft' ? -90 : 90)
+            const error = rotateAllPages(effect.rotate ?? 90)
             if (error) showNotice(error)
             break
           }
@@ -6726,7 +6715,7 @@ export default function App() {
           <div className="rb-row">
             <button
               className="rb-icon"
-              data-tip={t('zoomOut')}
+              data-tip={pdfTip(t('zoomOut'), 'pdf-09')}
               aria-label={t('zoomOut')}
               onClick={zoomOut}
             >
@@ -6735,7 +6724,7 @@ export default function App() {
             <span className="tb-zoom">{Math.round(scale * 100)}%</span>
             <button
               className="rb-icon"
-              data-tip={t('zoomIn')}
+              data-tip={pdfTip(t('zoomIn'), 'pdf-08')}
               aria-label={t('zoomIn')}
               onClick={zoomIn}
             >
@@ -6745,6 +6734,7 @@ export default function App() {
         </div>
         <button
           className="rb-big"
+          data-tip={pdfTip(t('fitWidth'), 'pdf-11')}
           onClick={() => {
             fitModeRef.current = 'width'
             recomputeFit()
@@ -6757,6 +6747,7 @@ export default function App() {
         </button>
         <button
           className="rb-big"
+          data-tip={pdfTip(t('fitPage'), 'pdf-11')}
           onClick={() => {
             fitModeRef.current = 'page'
             recomputeFit()
@@ -9291,7 +9282,7 @@ export default function App() {
                 </span>
                 <button
                   className="rb-icon"
-                  data-tip={t('searchPrev')}
+                  data-tip={pdfTip(t('searchPrev'), 'pdf-06')}
                   aria-label={t('searchPrev')}
                   disabled={activeMatches.length === 0}
                   onClick={() => searchStep(-1)}
@@ -9300,7 +9291,7 @@ export default function App() {
                 </button>
                 <button
                   className="rb-icon"
-                  data-tip={t('searchNext')}
+                  data-tip={pdfTip(t('searchNext'), 'pdf-06')}
                   aria-label={t('searchNext')}
                   disabled={activeMatches.length === 0}
                   onClick={() => searchStep(1)}
@@ -10119,7 +10110,7 @@ export default function App() {
             <div className="status-right">
               <button
                 className="zoom-btn"
-                data-tip={t('zoomOut')}
+                data-tip={pdfTip(t('zoomOut'), 'pdf-09')}
                 aria-label={t('zoomOut')}
                 onClick={zoomOut}
               >
@@ -10136,7 +10127,7 @@ export default function App() {
               />
               <button
                 className="zoom-btn"
-                data-tip={t('zoomIn')}
+                data-tip={pdfTip(t('zoomIn'), 'pdf-08')}
                 aria-label={t('zoomIn')}
                 onClick={zoomIn}
               >
