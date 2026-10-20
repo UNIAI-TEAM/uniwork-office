@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import JSZip from 'jszip'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ElectronApplication, Page } from '@playwright/test'
@@ -23,12 +23,8 @@ const DOC_ID = 'doc-uni2020'
 const ROOT_ID = '01M4ZFJ4K2BJC1X6313JVAP243'
 const ANCHOR_SHEET = 'Doanh thu Q2'
 const ANCHOR_RANGE = 'B7'
-/** the server list answers at once (a LAN round trip): the reveal then runs while the workbook is still opening */
-const LIST_DELAY_MS = Number(process.env.U2020_LIST_DELAY ?? 0)
-/** rows per sheet: a big sheet keeps the workbook opening longer than a fast list answer */
-const ROWS = Number(process.env.U2020_ROWS ?? 10)
-
-type RevealMode = 'pull' | 'push-after-list'
+/** rows per sheet */
+const ROWS = 10
 
 interface Probe {
   /** every fake-seam call the renderer made, in order, with ms since install */
@@ -112,11 +108,7 @@ async function twoSheetWorkbook(): Promise<Buffer> {
  * (`window.uniworkComments`) talks to a scripted server. The held reveal behaves like
  * comments-wiring's: the first `reveal:pending` pull gets it once, later pulls get null.
  */
-async function installFakeComments(
-  app: ElectronApplication,
-  mode: RevealMode,
-  commentId: string,
-): Promise<void> {
+async function installFakeComments(app: ElectronApplication, commentId: string): Promise<void> {
   await app.evaluate(
     ({ ipcMain, webContents, app: electronApp }, cfg) => {
       const g = globalThis as unknown as { __u2020?: Probe }
@@ -172,7 +164,7 @@ async function installFakeComments(
       ipcMain.handle(channels.context, (_e, input: { path: string }) => {
         path = input.path
         note(`context path=${path}`)
-        if (cfg.mode === 'pull') held = { path, commentId: cfg.commentId }
+        held = { path, commentId: cfg.commentId }
         return {
           ok: true,
           value: {
@@ -183,17 +175,8 @@ async function installFakeComments(
           },
         }
       })
-      ipcMain.handle(channels.list, async (event) => {
-        note('list start')
-        await new Promise((r) => setTimeout(r, cfg.listDelay))
+      ipcMain.handle(channels.list, () => {
         note('list answered')
-        if (cfg.mode === 'push-after-list' && !held) {
-          held = { path, commentId: cfg.commentId }
-          setTimeout(() => {
-            note('push reveal')
-            event.sender.send(channels.reveal, held)
-          }, 400)
-        }
         return {
           ok: true,
           value: { comments: [root], mentions: [], list_token: 'tok-1', unchanged: false },
@@ -201,7 +184,7 @@ async function installFakeComments(
       })
       ipcMain.handle(channels.revealPending, () => {
         pulls += 1
-        const answer = cfg.mode === 'pull' ? held : null
+        const answer = held
         if (answer) held = null
         note(`reveal pull #${pulls} -> ${answer ? 'held reveal' : 'null'}`)
         return answer
@@ -214,12 +197,10 @@ async function installFakeComments(
       }))
     },
     {
-      mode,
       commentId,
       docId: DOC_ID,
       anchorSheet: ANCHOR_SHEET,
       anchorRange: ANCHOR_RANGE,
-      listDelay: LIST_DELAY_MS,
     },
   )
 }
@@ -254,7 +235,7 @@ for (const mode of ['pull'] as const) {
         videoDir: 'sheets-server-reveal',
       })
       try {
-        await installFakeComments(launched.app, mode, ROOT_ID)
+        await installFakeComments(launched.app, ROOT_ID)
         // the OS hands the file to the running app: the sheets editor opens after the fake is live
         await handoffUrlToRunningApp(launched.userDataDir, workbook)
         const sheets = await waitForPageWithUrl(launched.app, '://sheets/')
@@ -268,8 +249,20 @@ for (const mode of ['pull'] as const) {
             },
           )
           .toBe(true)
-        // the panel's thread heading is DOM: focused = document.activeElement
+        // the reveal runs once the workbook has opened: wait until it demonstrably happened ...
+        await expect
+          .poll(
+            async () => {
+              const calls = (await readProbe(launched.app)).calls
+              const pulled = calls.some((c) => c.includes('-> held reveal'))
+              return pulled && (await editorState(sheets)).range === ANCHOR_RANGE
+            },
+            { timeout: 25_000 },
+          )
+          .toBe(true)
+        // ... then settle past the 1.5 s focus guard, so the final read proves focus survives its end
         await sheets.waitForTimeout(3_000)
+        // the panel's thread heading is DOM: focused = document.activeElement
 
         const probe = await readProbe(launched.app)
         const focus = await sheets.evaluate((id) => {
@@ -292,6 +285,7 @@ for (const mode of ['pull'] as const) {
         expect(state.sheet, 'the anchor sheet is active').toBe(ANCHOR_SHEET)
       } finally {
         await closeAndSaveVideo(launched, `sheets-server-reveal-${mode}`)
+        await rm(scratch, { recursive: true, force: true })
       }
     })
   })
