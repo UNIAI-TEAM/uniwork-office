@@ -306,7 +306,20 @@ export const commonNotes: readonly ShortcutNote[] = [
 // @generated-end
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
-const manual: readonly ShortcutAction[] = []
+const manual: readonly ShortcutAction[] = [
+  // Expand / collapse the ribbon. The CSV's web column is per module (Docs Ctrl+F3, MS web;
+  // Sheets / Slides: the desktop key as DESKTOP-FALLBACK), so the common row keeps the desktop
+  // chords on the web; the Docs table overrides its own web key (docs-086, webAlt Ctrl+F3).
+  {
+    id: 'common-10',
+    scope: 'common',
+    win: ['Ctrl+F1'],
+    mac: ['Alt+Cmd+R'],
+    web: { win: ['Ctrl+F1'], mac: ['Alt+Cmd+R'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+]
 
 export const commonShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
 

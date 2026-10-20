@@ -67,6 +67,7 @@ export {
   RIBBON_TOGGLE_SHORTCUT,
   type RibbonCollapse,
   type RibbonCollapseLabels,
+  type RibbonCollapseOptions,
   type RibbonDensity,
   type RibbonOverflow,
   type RibbonScrollMetrics,
