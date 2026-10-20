@@ -2808,4 +2808,39 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
   })
+
+  it('Shared by me lists no folder row, even when the server still sends one from an older share (UNI-1974)', async () => {
+    const file = {
+      id: 'doc-out',
+      workspaceId: 'ws-1',
+      title: 'Đã chia sẻ đi.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T08:00:00.000Z',
+      kind: 'file',
+      visibility: 'restricted',
+      myLevel: 'manage',
+    } satisfies DocumentsHomeDoc
+    const folder = {
+      id: 'f-shared-old',
+      workspaceId: 'ws-1',
+      title: 'Thư mục chia sẻ cũ',
+      format: null,
+      updatedAt: '2026-10-18T09:00:00.000Z',
+      kind: 'folder',
+      visibility: 'restricted',
+    } satisfies DocumentsHomeDoc
+    api.uniworkListSharedByMe!.mockImplementation(async () =>
+      ok({ documents: [folder, file], nextCursor: null }),
+    )
+    await mountHome()
+    await clickNavItem('shared-by-me')
+
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-out"]')).not.toBeNull()
+    expect(
+      host.querySelector('[data-doc-id="f-shared-old"], [data-folder-id="f-shared-old"]'),
+    ).toBeNull()
+    expect(host.querySelector('.dh-folders-section')).toBeNull()
+    // the count says what the table shows
+    expect(host.querySelector('.dh-docs-section .dh-section-count')?.textContent).toBe('1')
+  })
 })
