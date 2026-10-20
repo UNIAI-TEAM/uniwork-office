@@ -318,15 +318,16 @@ describe('openSource: reuse of an open tab', () => {
 describe('openSource: a second open while the tab is being created', () => {
   it('does not drop the first open when a second call lands inside openPath (tab not registered as open yet)', async () => {
     let finish!: () => void
-    let slow!: ReturnType<typeof harness>
+    const built: { h?: ReturnType<typeof harness> } = {}
     const slowOpen = vi.fn(async (path: string) => {
       await new Promise<void>((resolve) => {
         finish = resolve
       })
-      slow.openTabs.add(path)
+      built.h?.openTabs.add(path)
       return true
     })
-    slow = harness({ openPath: slowOpen })
+    const slow = harness({ openPath: slowOpen })
+    built.h = slow
     const first = slow.opener.openSource(input())
     // wait until the first call is inside openPath: downloaded, written, registered
     for (let i = 0; i < 100 && slowOpen.mock.calls.length === 0; i += 1) {

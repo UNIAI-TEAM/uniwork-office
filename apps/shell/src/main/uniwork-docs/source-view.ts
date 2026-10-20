@@ -121,7 +121,7 @@ const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i
 
 /** the injected file operations; defaults are node's, tests inject faults */
 export interface SourceViewFs {
-  mkdir(path: string, options: { recursive: true }): Promise<unknown>
+  mkdir(path: string, options: { recursive: true; mode: number }): Promise<unknown>
   writeFile(path: string, bytes: Uint8Array): Promise<void>
   chmod(path: string, mode: number): Promise<void>
   rm(path: string, options: { recursive: true; force: true }): Promise<void>
@@ -131,8 +131,8 @@ export interface SourceViewFs {
 export interface SourceViewOpenerDeps {
   /** `<userData>/uniwork-drafts-preview`: shared with the read-only draft previews */
   previewRoot: string
-  /** the sync center's startup sweep of `previewRoot`; nothing is written before it settles */
-  startupSweep: Promise<unknown>
+  /** the sync center's startup sweep of `previewRoot` (absent without a sync center); nothing is written before it settles */
+  startupSweep?: Promise<unknown>
   registry: SourceViewRegistry
   /** the live session, null when signed out */
   identity(): { deploymentId: string } | null
@@ -298,18 +298,21 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
     } catch (error) {
       return fail(mapDownloadError(error))
     }
+    // the row's size is the renderer's word: the editors refuse anything over the max
+    if (bytes.byteLength > deps.documentMaxBytes()) return fail('too_large')
     // the sweep removes the whole preview root: write only after it is done
-    await deps.startupSweep.catch(() => undefined)
+    await Promise.resolve(deps.startupSweep).catch(() => undefined)
     if (epoch !== startedAt) return fail('not_signed_in')
 
     const hash = createHash('sha256').update(key).digest('hex').slice(0, 16)
     const dir = join(sessionDir(), hash)
     const path = join(dir, safeFileName(input.name, extension))
     try {
-      await fs.mkdir(dir, { recursive: true })
+      // owner-only: the plaintext of an attachment must not be readable by other users
+      await fs.mkdir(dir, { recursive: true, mode: 0o700 })
       await fs.writeFile(path, bytes)
       // a courtesy only: the registry, not the file mode, is what makes the view read-only
-      await fs.chmod(path, 0o444).catch(() => undefined)
+      await fs.chmod(path, 0o400).catch(() => undefined)
     } catch {
       await removeDir(dir)
       return fail('open_failed')
@@ -348,6 +351,10 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
       if (input.sizeBytes > deps.documentMaxBytes()) return fail('too_large')
 
       const key = `${input.sourceId}|${input.updatedAt}|${input.sizeBytes}`
+      // first: while a tab is still being created its path is not "open" yet, and the
+      // live branch below would take that for a closed tab and delete the file
+      const running = inflight.get(key)
+      if (running) return running
       const live = entries.get(key)
       if (live) {
         if (deps.isPathOpen(live.path)) {
@@ -359,8 +366,6 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
         // its tab is gone: a new open shows the server's current bytes, not a stale temp copy
         await dropEntry(key)
       }
-      const running = inflight.get(key)
-      if (running) return running
       const run = fetchAndOpen(input, extension, key).finally(() => {
         if (inflight.get(key) === run) inflight.delete(key)
       })
