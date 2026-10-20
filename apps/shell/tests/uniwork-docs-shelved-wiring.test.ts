@@ -1,6 +1,6 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UNIWORK_DOC_CHANNELS } from '../src/shared/home-api'
 
@@ -306,23 +306,20 @@ function stubServer(): Seen[] {
       if (editLock) {
         const docId = editLock[1]!
         const base = DOCS[docId]
+        if (method === 'DELETE') return new Response(null, { status: 204 })
         if (base?.shelved_at) {
           return reply(409, { error: { code: 'document_shelved', message: 'Shelved' } })
         }
-        if (method === 'DELETE') return new Response(null, { status: 204 })
         return reply(200, {
+          lock_id: 'l_1',
+          document_id: docId,
+          holder_id: 'u_1',
+          client: 'desktop',
+          acquired_at: '2026-10-20T00:00:00Z',
+          expires_at: '2026-10-20T00:05:00Z',
+          heartbeat_interval_ms: 60_000,
+          ttl_ms: 300_000,
           server_time: '2026-10-20T00:00:00Z',
-          lock: {
-            lock_id: 'l_1',
-            document_id: docId,
-            holder: { id: 'u_1', display_name: 'Alice' },
-            client: 'desktop',
-            acquired_at: '2026-10-20T00:00:00Z',
-            expires_at: '2026-10-20T00:05:00Z',
-            heartbeat_interval_ms: 60_000,
-            ttl_ms: 300_000,
-            held_by_me: true,
-          },
         })
       }
       const detail = /^\/api\/v1\/documents\/([^/]+)$/.exec(url.pathname)
@@ -776,6 +773,130 @@ describe('UNI-1961 live-row Lưu trữ (shelve)', () => {
       })
       expect(restoredBinding?.shelved).toBeUndefined()
     } finally {
+      await service.releaseAllEditLocks()
+    }
+  })
+
+  it('follows server shelving state changes in both directions on refreshMetadataFor, preserving dirty state, old bindings without shelved, and view-only launches (R1-7 residual)', async () => {
+    const { call, service } = await setup()
+    const seen = stubServer()
+    const origDocLive = { ...DOCS.doc_live }
+    const origDocS1 = { ...DOCS.doc_s1 }
+    try {
+      const liveOpen = (await call(UNIWORK_DOC_CHANNELS.openDocument, 'doc_live')) as {
+        ok: boolean
+        value: { path: string }
+      }
+      expect(liveOpen.ok).toBe(true)
+      const livePath = liveOpen.value.path
+      await vi.waitFor(() => {
+        expect(
+          seen.some(
+            (s) => s.method === 'POST' && s.url.pathname === '/api/v1/documents/doc_live/edit-lock',
+          ),
+        ).toBe(true)
+      })
+
+      // Seed an old stored binding without `shelved` and make the working copy dirty
+      writeFileSync(livePath, new Uint8Array([9, 8, 7]))
+      await service.refreshPath(livePath)
+      const bindingPath = join(dirname(livePath), 'binding.json')
+      const diskRaw = JSON.parse(readFileSync(bindingPath, 'utf8')) as Record<string, unknown>
+      delete diskRaw.shelved
+      writeFileSync(bindingPath, `${JSON.stringify(diskRaw, null, 2)}\n`)
+      expect(service.store.lookup(livePath)?.binding.state).toBe('dirty')
+      expect(service.isReadOnly(livePath)).toBe(false)
+
+      // Another client shelves doc_live without changing its title
+      DOCS.doc_live = { ...origDocLive, shelved_at: '2026-10-20T01:00:00Z' }
+      await service.refreshMetadataFor('doc_live')
+      expect(service.isReadOnly(livePath)).toBe(true)
+      expect(await service.docStatus(livePath)).toMatchObject({
+        access: 'view',
+        commentsLevel: 'view',
+        state: 'dirty',
+      })
+      expect(service.commentContext(livePath)).toMatchObject({
+        level: 'view',
+        versionId: 'v_live',
+      })
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        access: 'view',
+        level: 'manage',
+        shelved: true,
+        state: 'dirty',
+        baseRevision: '7',
+        baseVersion: 1,
+      })
+      expect([...readFileSync(livePath)]).toEqual([9, 8, 7])
+      expect(
+        seen.some(
+          (s) =>
+            s.method === 'DELETE' && s.url.pathname === '/api/v1/documents/doc_live/edit-lock/l_1',
+        ),
+      ).toBe(true)
+
+      // Also verify an old stored binding without `shelved` (view + manage) unshelves back to edit
+      const shelvedDisk = JSON.parse(readFileSync(bindingPath, 'utf8')) as Record<string, unknown>
+      delete shelvedDisk.shelved
+      writeFileSync(bindingPath, `${JSON.stringify(shelvedDisk, null, 2)}\n`)
+      const lockPostsBeforeUnshelve = seen.filter(
+        (s) => s.method === 'POST' && s.url.pathname === '/api/v1/documents/doc_live/edit-lock',
+      ).length
+      DOCS.doc_live = { ...origDocLive }
+      await service.refreshMetadataFor('doc_live')
+      expect(service.isReadOnly(livePath)).toBe(false)
+      expect(await service.docStatus(livePath)).toMatchObject({
+        access: 'edit',
+        commentsLevel: 'manage',
+        state: 'dirty',
+      })
+      expect(service.commentContext(livePath)).toMatchObject({
+        level: 'manage',
+        versionId: 'v_live',
+      })
+      const unshelvedBinding = service.store.lookup(livePath)?.binding
+      expect(unshelvedBinding).toMatchObject({
+        access: 'edit',
+        level: 'manage',
+        state: 'dirty',
+        baseRevision: '7',
+        baseVersion: 1,
+      })
+      expect(unshelvedBinding?.shelved).toBeUndefined()
+      expect([...readFileSync(livePath)]).toEqual([9, 8, 7])
+      await vi.waitFor(() => {
+        expect(
+          seen.filter(
+            (s) => s.method === 'POST' && s.url.pathname === '/api/v1/documents/doc_live/edit-lock',
+          ).length,
+        ).toBeGreaterThan(lockPostsBeforeUnshelve)
+      })
+
+      // Explicit view-only launch restriction stays view-only when server unshelves
+      const viewLaunched = await service.openFromServer('doc_s1', {
+        receiptId: 'r_view',
+        redeemedAt: '2026-10-20T00:00:00Z',
+        id: 'doc_s1',
+        organizationId: 'org_a',
+        workspaceId: 'ws_1',
+        title: 'Plan.docx',
+        operation: 'view',
+        version: 0,
+        revision: '7',
+        downloadPath: '/api/v1/documents/doc_s1/download',
+      })
+      expect(service.isReadOnly(viewLaunched.path)).toBe(true)
+      DOCS.doc_s1 = { ...origDocS1, shelved_at: undefined }
+      await service.refreshMetadataFor('doc_s1')
+      expect(service.isReadOnly(viewLaunched.path)).toBe(true)
+      const viewBinding = service.store.lookup(viewLaunched.path)?.binding
+      expect(viewBinding).toMatchObject({ access: 'view', level: 'view' })
+      expect(viewBinding?.shelved).toBeUndefined()
+      expect(seen.some((s) => s.url.pathname === '/api/v1/documents/doc_s1/edit-lock')).toBe(false)
+    } finally {
+      DOCS.doc_live = origDocLive
+      DOCS.doc_s1 = origDocS1
       await service.releaseAllEditLocks()
     }
   })
