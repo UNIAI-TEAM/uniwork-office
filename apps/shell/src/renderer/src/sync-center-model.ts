@@ -13,6 +13,7 @@ import {
   type SyncCenterRowTabId,
   type SyncCenterTabId,
 } from '../../shared/sync-center'
+import { formatBytes as formatListBytes } from './doclist/format'
 import type { StringKey } from './locale'
 
 export type SyncTone = 'info' | 'warn' | 'error' | 'ok' | 'neutral'
@@ -523,19 +524,9 @@ export function actionErrorKey(code: SyncCenterActionErrorCode): StringKey {
   return 'uwSyncActionFailed'
 }
 
-const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
-
+/** a size as every Documents list reads it; a zero count stays "0 B" for progress and budget lines */
 export function formatBytes(bytes: number, locale: string): string {
-  let value = Math.max(0, bytes)
-  let unit = 0
-  while (value >= 1024 && unit < UNITS.length - 1) {
-    value /= 1024
-    unit++
-  }
-  const n = new Intl.NumberFormat(locale, { maximumFractionDigits: unit === 0 ? 0 : 1 }).format(
-    value,
-  )
-  return `${n} ${UNITS[unit]}`
+  return bytes > 0 ? formatListBytes(bytes, locale) : '0 B'
 }
 
 /** a timestamp as the user reads it: time today, else date + time; a non-date label stays as given */
