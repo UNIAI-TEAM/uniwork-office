@@ -4,6 +4,7 @@ import type {
   UniworkDocErrorCode,
   UniworkDocSummary,
   UniworkFolderNode,
+  UniworkSourceFile,
   UniworkWorkspaceRef,
 } from '../../../shared/home-api'
 import { FileBadge } from '../FileBadge'
@@ -26,7 +27,6 @@ import {
   checkDocName,
   docExtension,
   errorActionOf,
-  formatWhen,
   isDocNameError,
   isDocTitleTooLong,
   renameFormatOf,
@@ -67,6 +67,7 @@ import {
   cancelUploadDocument,
   createDocument,
   createPage,
+  downloadSource,
   loadFolderTree,
   onDocRenamed,
   onTreeChanged,
@@ -81,14 +82,26 @@ import { openPageOnWeb } from '../uniwork-page-web'
 import { announce } from '../uniwork-live'
 import {
   DEFAULT_DOCUMENTS_HOME_FILTERS,
+  DEFAULT_DOCUMENTS_HOME_GROUP_BY,
   DOCUMENTS_HOME_FORMAT_OPTIONS,
+  DOCUMENTS_HOME_GROUP_BY,
+  DOCUMENTS_HOME_GROUP_BY_KEYS,
   DOCUMENTS_HOME_UPDATED_OPTIONS,
   collectUpdatedByOptions,
+  documentsHomeGroupLabel,
+  documentsHomeGroupable,
   fetchDocumentsHomePage,
+  fetchDocumentsHomeSources,
   formatAccessCell,
+  formatBytes,
+  formatShortDate,
   formatUpdatedByCell,
   getDocumentsHomeNavEntry,
+  groupDocumentsHomeRows,
   hasActiveFilters,
+  mergeNewestFirst,
+  rowSizeBytes,
+  sourceMatchesFilters,
   splitAndSortItems,
   toUniworkListFilters,
   updatedByOptionsForSelect,
@@ -96,8 +109,11 @@ import {
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
   type DocumentsHomeFilterState,
+  type DocumentsHomeGroupBy,
+  type DocumentsHomeRowGroup,
   type DocumentsHomeSort,
   type DocumentsHomeSubViewId,
+  type DocumentsHomeTableRow,
   type DocumentsHomeTypeFilter,
   type DocumentsHomeUpdatedPreset,
   type DocumentsHomeViewMode,
@@ -110,6 +126,7 @@ import {
   filterByShelver,
   shelvedDescendantIds,
 } from './ShelvedDocumentsView'
+import { DocumentsSourceRow } from './DocumentsSourceRow'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
 
@@ -255,6 +272,10 @@ export interface DocumentsHomeProps {
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
 }
 
+/** UNI-1961: a table row, or the header of a Group by group */
+type DocumentsHomeTableItem =
+  DocumentsHomeTableRow | { type: 'group'; id: string; group: DocumentsHomeRowGroup }
+
 type TreeState =
   | { status: 'loading'; nodes: UniworkFolderNode[] }
   | { status: 'ready'; nodes: UniworkFolderNode[] }
@@ -303,6 +324,7 @@ export function DocumentsHome({
   const [filters, setFilters] = useState<DocumentsHomeFilterState>(DEFAULT_DOCUMENTS_HOME_FILTERS)
   const [sort, setSort] = useState<DocumentsHomeSort>('recent')
   const [viewMode, setViewMode] = useState<DocumentsHomeViewMode>('list')
+  const [groupBy, setGroupBy] = useState<DocumentsHomeGroupBy>(DEFAULT_DOCUMENTS_HOME_GROUP_BY)
   const [searchDraft, setSearchDraft] = useState('')
   const [page, setPage] = useState<PageState>({
     status: 'loading',
@@ -311,6 +333,13 @@ export function DocumentsHome({
     loadingMore: false,
   })
   const [listTick, setListTick] = useState(0)
+  // UNI-1961: the workspace root also lists the files of the other modules
+  // (the web's "other sources"), paged on their own
+  const [sources, setSources] = useState<{
+    items: UniworkSourceFile[]
+    nextCursor: string | null
+    loadingMore: boolean
+  }>({ items: [], nextCursor: null, loadingMore: false })
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
 
   // Dialogs & inline actions
@@ -629,7 +658,52 @@ export function DocumentsHome({
       })
   }, [workspaceId, subView, folderId, resolvedMyFolderId, wireFilters, query, listTick])
 
+  // UNI-1961: as on the web, the sources merge only at the workspace root (no
+  // folder, no search); a failed sources read (an older server's 404/501 or any
+  // other) leaves the documents as they are
+  const sourcesWanted = subView === 'workspace' && folderId === null && query.length === 0
+  const sourcesSeqRef = useRef(0)
+  useEffect(() => {
+    const seq = ++sourcesSeqRef.current
+    setSources({ items: [], nextCursor: null, loadingMore: false })
+    if (!sourcesWanted) return
+    const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
+    void fetchDocumentsHomeSources(api, { workspaceId, filters: wireFilters })
+      .then((res) => {
+        if (sourcesSeqRef.current !== seq || !res?.ok) return
+        setSources({ items: res.value.items, nextCursor: res.value.nextCursor, loadingMore: false })
+      })
+      .catch(() => undefined)
+  }, [workspaceId, sourcesWanted, wireFilters, listTick])
+  const sourcesMerged = sourcesWanted && sources.items.length > 0
+
+  const loadMoreSources = () => {
+    const cursor = sources.nextCursor
+    if (!cursor || sources.loadingMore) return
+    const seq = sourcesSeqRef.current
+    setSources((prev) => ({ ...prev, loadingMore: true }))
+    const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
+    void fetchDocumentsHomeSources(api, { workspaceId, filters: wireFilters, cursor })
+      .then((res) => {
+        if (sourcesSeqRef.current !== seq) return
+        setSources((prev) =>
+          res?.ok
+            ? {
+                items: [...prev.items, ...res.value.items],
+                nextCursor: res.value.nextCursor,
+                loadingMore: false,
+              }
+            : { ...prev, loadingMore: false },
+        )
+      })
+      .catch(() => {
+        if (sourcesSeqRef.current === seq) setSources((prev) => ({ ...prev, loadingMore: false }))
+      })
+  }
+
   const loadMore = () => {
+    // UNI-1961: "Load more" asks both lists for their next page (the web's rule)
+    if (sourcesMerged) loadMoreSources()
     if (!page.nextCursor || page.loadingMore || page.status !== 'ready') return
     const cursor = page.nextCursor
     const seq = listSeqRef.current
@@ -798,6 +872,28 @@ export function DocumentsHome({
     if (!(await openPageOnWeb(workspaces, doc.workspaceId || workspaceId, doc.id))) {
       setToast({ message: t('uwDocActionFailed'), tone: 'error' })
     }
+  }
+
+  // UNI-1961: a source row's Download - the web's primary action for a file it
+  // cannot view in place; the done note offers the file in its folder
+  const downloadSourceFile = async (source: UniworkSourceFile): Promise<void> => {
+    const res = await downloadSource({ workspaceId, sourceId: source.id, name: source.name })
+    if (!res.ok) {
+      setToast({ message: t('uhSourceDownloadFailed'), tone: 'error' })
+      return
+    }
+    const path = res.value.path
+    if (!path) return
+    const message = t('uhSourceDownloaded', { name: source.name })
+    announce(message)
+    setToast({
+      message,
+      tone: 'ok',
+      action: {
+        label: t('uhSourceShowInFolder'),
+        onClick: () => void window.aiOffice.revealPath(path),
+      },
+    })
   }
 
   // CT1-4: the page exists already, so an opening that fails says that, not "failed"
@@ -1215,6 +1311,40 @@ export function DocumentsHome({
     return { folders: myFolderFirst(split.folders), files: split.files }
   }, [page.items, sort, dateLocale])
 
+  // UNI-1961: the table's rows; at the root the source files join the documents
+  // newest first under the web's paging cutoff, and the home filters the server
+  // could not apply to them run here (the web's merge, use-documents-library.ts)
+  const tableRows = useMemo<DocumentsHomeTableRow[]>(() => {
+    if (!sourcesMerged) return files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc }))
+    const merged = mergeNewestFirst(page.items, sources.items, {
+      docs: page.nextCursor !== null,
+      sources: sources.nextCursor !== null,
+    }).filter((row) =>
+      row.type === 'source'
+        ? sourceMatchesFilters(row.source, wireFilters)
+        : row.doc.kind !== 'folder',
+    )
+    if (sort !== 'name') return merged
+    const titleOf = (row: DocumentsHomeTableRow) =>
+      row.type === 'doc' ? row.doc.title : row.source.name
+    return [...merged].sort((a, b) =>
+      titleOf(a).localeCompare(titleOf(b), dateLocale, { numeric: true, sensitivity: 'base' }),
+    )
+  }, [sourcesMerged, files, page.items, page.nextCursor, sources, wireFilters, sort, dateLocale])
+
+  // UNI-1961: the web's Group by, on its list views only (never the root, a
+  // folder or a search); a group header row precedes its rows
+  const grouping = documentsHomeGroupable(subView) && query.length === 0
+  const tableItems = useMemo<DocumentsHomeTableItem[]>(() => {
+    if (!grouping || groupBy === 'none') return tableRows
+    const docs = tableRows.flatMap((row) => (row.type === 'doc' ? [row.doc] : []))
+    const myFolder = { id: resolvedMyFolderId, label: myFolderLabel }
+    return groupDocumentsHomeRows(docs, groupBy, index, myFolder).flatMap((group) => [
+      { type: 'group' as const, id: `group:${group.key}`, group },
+      ...group.rows.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
+    ])
+  }, [grouping, groupBy, tableRows, index, resolvedMyFolderId, myFolderLabel])
+
   const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
 
   const currentHeadingSpec = useMemo<
@@ -1625,6 +1755,24 @@ export function DocumentsHome({
           )}
 
           <div className="dh-view-tools">
+            {grouping && (
+              <label className="dh-filter-chip">
+                <span className="dh-filter-k">{t('uhGroupBy')}</span>
+                <select
+                  className="dh-group-select"
+                  data-filter="groupBy"
+                  aria-label={t('uhGroupBy')}
+                  value={groupBy}
+                  onChange={(e) => setGroupBy(e.target.value as DocumentsHomeGroupBy)}
+                >
+                  {DOCUMENTS_HOME_GROUP_BY.map((id) => (
+                    <option key={id} value={id}>
+                      {t(DOCUMENTS_HOME_GROUP_BY_KEYS[id])}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <button
               type="button"
               className="dh-sort-btn"
@@ -1828,10 +1976,10 @@ export function DocumentsHome({
             >
               <div className="dh-section-head">
                 <span className="dh-section-title">{t('uhSectionDocuments')}</span>
-                <span className="dh-section-count">{files.length}</span>
+                <span className="dh-section-count">{tableRows.length}</span>
               </div>
 
-              {files.length === 0 ? (
+              {tableRows.length === 0 ? (
                 <div className="dh-empty" role="status">
                   {emptyMessage}
                 </div>
@@ -1854,6 +2002,9 @@ export function DocumentsHome({
                     <div className="dh-col-time" role="columnheader">
                       {t('uhColUpdatedAt')}
                     </div>
+                    <div className="dh-col-size" role="columnheader">
+                      {t('uhColSize')}
+                    </div>
                     <div
                       className="dh-col-actions"
                       role="columnheader"
@@ -1861,7 +2012,31 @@ export function DocumentsHome({
                     />
                   </div>
 
-                  {files.map((doc) => {
+                  {tableItems.map((row) => {
+                    if (row.type === 'group') {
+                      return (
+                        <div key={row.id} role="row" className="dh-group-row">
+                          <div role="rowheader" aria-colspan={6} className="dh-group-cell">
+                            <span className="dh-group-title">
+                              {documentsHomeGroupLabel(row.group, t)}
+                            </span>
+                            <span className="dh-group-count">{row.group.rows.length}</span>
+                          </div>
+                        </div>
+                      )
+                    }
+                    if (row.type === 'source') {
+                      return (
+                        <DocumentsSourceRow
+                          key={row.id}
+                          source={row.source}
+                          menuOpen={openMenuId === row.id}
+                          onMenuOpenChange={(o) => setOpenMenuId(o ? row.id : null)}
+                          onDownload={(source) => void downloadSourceFile(source)}
+                        />
+                      )
+                    }
+                    const doc = row.doc
                     const access = formatAccessCell(doc, t)
                     const person = formatUpdatedByCell(doc)
                     const menuItems = docMenuFor(doc)
@@ -1970,7 +2145,11 @@ export function DocumentsHome({
                         </div>
 
                         <div className="dh-cell-time" role="cell">
-                          {formatWhen(doc.updatedAt, dateLocale)}
+                          {formatShortDate(doc.updatedAt, dateLocale)}
+                        </div>
+
+                        <div className="dh-cell-size" role="cell">
+                          {formatBytes(rowSizeBytes(row), dateLocale)}
                         </div>
 
                         <div
@@ -2000,15 +2179,17 @@ export function DocumentsHome({
                 </p>
               )}
 
-              {page.nextCursor && (
+              {(page.nextCursor || (sourcesMerged && sources.nextCursor)) && (
                 <div className="dh-load-more-row">
                   <button
                     type="button"
                     className="btn btn-secondary uw-pick-more"
-                    disabled={page.loadingMore}
+                    disabled={page.loadingMore || sources.loadingMore}
                     onClick={loadMore}
                   >
-                    {page.loadingMore ? t('uwPickLoadingMore') : t('uhLoadMore')}
+                    {page.loadingMore || sources.loadingMore
+                      ? t('uwPickLoadingMore')
+                      : t('uhLoadMore')}
                   </button>
                 </div>
               )}

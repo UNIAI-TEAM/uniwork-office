@@ -5,6 +5,8 @@ import type {
   UniworkDocSummary,
   UniworkFolderNode,
   UniworkListFilters,
+  UniworkSourceListPage,
+  UniworkSourceListQuery,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'
@@ -25,6 +27,7 @@ import {
   parseOrgMembers,
   parseProperties,
   parseSharedWithMe,
+  parseSourceList,
   parseUpload,
 } from './parse'
 import type {
@@ -153,6 +156,13 @@ export interface UniworkDocsClient {
       limit?: number
     } & UniworkListFilters,
   ): Promise<DocumentListResult>
+  /**
+   * UNI-1961: the Documents home's "other sources" files
+   * (`GET /workspaces/{ws}/documents/sources`, paged like the web's list)
+   */
+  listSources(input: UniworkSourceListQuery): Promise<UniworkSourceListPage>
+  /** UNI-1961: one source file's bytes through its download proxy */
+  downloadSource(workspaceId: string, sourceId: string): Promise<DownloadResult>
   /** DESKTOP-HOME: workspace members (`GET /workspaces/{ws}/members`) for row updater names */
   listWorkspaceMembers(workspaceId: string): Promise<OrgMemberName[]>
   /** the properties panel of one document (ids/times/level/version, no names) */
@@ -413,6 +423,10 @@ export function uniworkId(value: string): string {
   return encodeURIComponent(value)
 }
 const id = uniworkId
+
+/** UNI-1961: the sources list's filter values (D sources-schema.ts); anything else is not sent */
+const SOURCE_KINDS: ReadonlySet<string> = new Set(['chat', 'task', 'meeting', 'email'])
+const SOURCE_TYPES: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])
 /**
  * SAVE-01 r2 (S01-R1-5): a `parent_id` that reaches the wire. Absent/null is
  * the caller's "no folder" (the field is then omitted - the absence IS the
@@ -736,6 +750,45 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         read: json,
       })
       return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async listSources(input) {
+      const params = new URLSearchParams()
+      if (typeof input.source === 'string' && SOURCE_KINDS.has(input.source)) {
+        params.set('source', input.source)
+      }
+      if (typeof input.type === 'string' && SOURCE_TYPES.has(input.type)) {
+        params.set('type', input.type)
+      }
+      const q = typeof input.q === 'string' ? input.q.trim().slice(0, 200) : ''
+      if (q) params.set('q', q)
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      // the server's page is 50 by default and 100 at most (document_sources.go)
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${id(input.workspaceId)}/documents/sources`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseSourceList(raw)
+    },
+
+    async downloadSource(workspaceId, sourceId) {
+      return send({
+        method: 'GET',
+        route: `/workspaces/${id(workspaceId)}/documents/sources/${id(sourceId)}/download`,
+        timeoutMs: transferTimeout,
+        async read(response) {
+          const length = Number(response.headers.get('Content-Length') ?? '0')
+          if (length > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
+          const bytes = new Uint8Array(await response.arrayBuffer())
+          if (bytes.byteLength > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
+          return { bytes }
+        },
+      })
     },
 
     async listWorkspaceMembers(workspaceId) {

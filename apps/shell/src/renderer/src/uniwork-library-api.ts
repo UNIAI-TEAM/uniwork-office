@@ -13,6 +13,7 @@ import type {
   UniworkSearchPage,
   UniworkSearchQuery,
   UniworkSharedQuery,
+  UniworkSourceDownloadInput,
   UniworkTreeChangedEvent,
 } from '../../shared/home-api'
 import type { UniworkDocShelveResult } from '../../shared/home-api'
@@ -123,6 +124,9 @@ interface ActionsBridge {
   uniworkMoveDocument?(i: UniworkMoveDocumentInput): Promise<DocActionResult<UniworkMoveResult>>
   onUniworkTreeChanged?(cb: (event: UniworkTreeChangedEvent) => void): () => void
   onUniworkDocRenamed?(cb: (event: DocRenamedEvent) => void): () => void
+  uniworkDownloadSource?(
+    input: UniworkSourceDownloadInput,
+  ): Promise<UniworkResult<{ path: string | null }>>
 }
 
 const unavailable = { ok: false, error: 'server_error' } as const
@@ -214,6 +218,13 @@ export function moveDocument(
   input: UniworkMoveDocumentInput,
 ): Promise<DocActionResult<UniworkMoveResult>> {
   return settleAct(actions().uniworkMoveDocument?.(input))
+}
+
+/** UNI-1961: save a Documents-home source file through the save dialog (path null = cancelled) */
+export function downloadSource(
+  input: UniworkSourceDownloadInput,
+): Promise<UniworkResult<{ path: string | null }>> {
+  return settleRead(actions().uniworkDownloadSource?.(input))
 }
 
 /** a workspace's tree changed (feed page or an own action, coalesced in main) */
