@@ -38,6 +38,16 @@ const PUNCTUATION: Record<string, string> = {
   Period: '.',
   Slash: '/',
 }
+/** what a US keyboard types with Shift held (a Shift chord names this character) */
+const SHIFTED: Record<string, string> = {
+  Minus: '_',
+  Equal: '+',
+  BracketLeft: '{',
+  BracketRight: '}',
+  Comma: '<',
+  Period: '>',
+  Slash: '?',
+}
 
 /** the keydown a US keyboard sends for a canonical chord */
 function keydown(chord: Chord, extra: Partial<ShortcutKeyEvent> = {}): ShortcutKeyEvent {
@@ -52,7 +62,7 @@ function keydown(chord: Chord, extra: Partial<ShortcutKeyEvent> = {}): ShortcutK
   } else if (/^[0-9]$/.test(key)) {
     code = `Digit${key}`
   } else if (PUNCTUATION[key]) {
-    eventKey = PUNCTUATION[key]
+    eventKey = (parsed.shift ? SHIFTED[key] : undefined) ?? PUNCTUATION[key]
   } else if (NAMED_KEYS[key]) {
     code = key === 'Space' ? 'Space' : `Arrow${key}`
   }
@@ -99,9 +109,11 @@ describe('Word keys per platform and surface', () => {
     expect(on('Shift+Cmd+S', 'mac')).toBe('save-as')
     // the old web handler compared key === 's', which Shift turns into 'S'
     expect(on('Shift+Cmd+S', 'mac', 'web')).toBe('save-as')
-    // Ctrl+Shift+S is Word's Apply Styles (not bound yet), no longer Save As
-    expect(on('Ctrl+Shift+S', 'win')).toBeNull()
-    expect(on('Ctrl+Shift+S', 'win', 'web')).toBeNull()
+    // Ctrl+Shift+S is Word's Apply Styles: the Styles pane, no longer Save As
+    expect(on('Ctrl+Shift+S', 'win')).toBe('styles-pane')
+    expect(on('Ctrl+Shift+S', 'win', 'web')).toBe('styles-pane')
+    // Apply Styles has no Mac key in Word for Mac's documentation
+    expect(on('Shift+Cmd+S', 'mac')).toBe('save-as')
   })
 
   it('redo answers to Ctrl+Y first and keeps Ctrl+Shift+Z', () => {
@@ -198,6 +210,61 @@ describe('Word keys per platform and surface', () => {
     expect(match({ ...keydown('Ctrl+B'), key: 'B' }, 'win', 'desktop')).toBe('bold')
     // Cyrillic layout: no Latin letter, the physical key decides
     expect(match({ ...keydown('Ctrl+K'), key: 'л' }, 'win', 'desktop')).toBe('link')
+  })
+})
+
+describe('symbol chords follow the typed character (German / French layouts)', () => {
+  /** a keydown with the character this layout types on the physical key */
+  const typed = (
+    key: string,
+    code: string,
+    mods: Partial<ShortcutKeyEvent> = {},
+  ): ShortcutKeyEvent => ({
+    key,
+    code,
+    ctrlKey: true,
+    altKey: false,
+    shiftKey: false,
+    metaKey: false,
+    getModifierState: () => false,
+    ...mods,
+  })
+  const on = (
+    event: ShortcutKeyEvent,
+    platform: ShortcutPlatform = 'win',
+    surface: ShortcutSurface = 'desktop',
+  ) => match(event, platform, surface)
+
+  it('German: Ctrl+Shift+> / < change the font size, Ctrl+. and Ctrl+/ follow the character', () => {
+    // '>' is Shift+< on the key left of Y; '<' needs no Shift there
+    expect(on(typed('>', 'IntlBackslash', { shiftKey: true }))).toBe('grow-font')
+    expect(on(typed('<', 'IntlBackslash'))).toBe('shrink-font')
+    // the US position of Ctrl+Shift+. types ':' here and is no font size key
+    expect(on(typed(':', 'Period', { shiftKey: true }))).toBeNull()
+    // '.' is unshifted on the Period key
+    expect(on(typed('.', 'Period'))).toBe('superscript')
+    expect(on(typed('.', 'Period'), 'win', 'web')).toBe('bullets')
+    // '/' is Shift+7: the by-character chord wins over the digit key
+    expect(on(typed('/', 'Digit7', { shiftKey: true }))).toBe('shortcuts')
+    expect(on(typed('/', 'Digit7', { shiftKey: true }), 'win', 'web')).toBe('numbering')
+  })
+
+  it('French: the same chords on AZERTY, where . and / need Shift', () => {
+    expect(on(typed('>', 'IntlBackslash', { shiftKey: true }))).toBe('grow-font')
+    expect(on(typed('<', 'IntlBackslash'))).toBe('shrink-font')
+    // '.' is Shift+; on the physical Comma key, '/' is Shift+: on the physical Period key
+    expect(on(typed('.', 'Comma', { shiftKey: true }), 'win', 'web')).toBe('bullets')
+    expect(on(typed('/', 'Period', { shiftKey: true }), 'win', 'web')).toBe('numbering')
+    // the US positions type ';' and ':' there: no bullets, no list, no font size
+    expect(on(typed(';', 'Comma'), 'win', 'web')).toBeNull()
+    expect(on(typed(':', 'Period'), 'win', 'web')).toBeNull()
+    expect(on(typed('/', 'Period', { shiftKey: true }))).toBe('shortcuts')
+  })
+
+  it('macOS Option dead keys fall back to the physical key', () => {
+    expect(
+      on({ ...typed('≥', 'Period', { ctrlKey: false, metaKey: true, shiftKey: true }) }, 'mac'),
+    ).toBe('grow-font')
   })
 })
 

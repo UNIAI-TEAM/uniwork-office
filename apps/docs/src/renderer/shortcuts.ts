@@ -219,6 +219,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     desktopOnly: true,
   },
   { id: 'formatting-marks', group: 'view', labelKey: 'ribbonShowMarks', action: 'docs-042' },
+  { id: 'styles-pane', group: 'view', labelKey: 'ribbonStylesPane', action: 'docs-059' },
   { id: 'ribbon-toggle', group: 'view', labelKey: 'ribbonCollapse', action: 'docs-086' },
   { id: 'ribbon-compact', group: 'view', labelKey: 'ribbonCompact', action: 'docs-087' },
 ]

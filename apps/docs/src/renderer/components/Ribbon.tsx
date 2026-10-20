@@ -134,6 +134,7 @@ import { PasteSpecialDialog } from './PasteSpecialDialog'
 import { FILE_MENU_FIXED_QUERY, closeOnResize, fileMenuAnchor } from './file-menu-anchor'
 import { cap, saveCopyAvailable } from '../capabilities'
 import { createShortcutMatcher, shortcutHint, shortcutSurface } from '../shortcuts'
+import { docsShortcut } from '../../shared/docs-shortcuts'
 import { fontFamiliesFor, isEastAsianFontName, systemFamiliesBesidesCandidates } from '../font-list'
 import {
   fontSizeLabel,
@@ -510,7 +511,6 @@ const WIDTH_CASE_LANGS = new Set<Lang>(['zh', 'zh-TW', 'ja'])
 const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab'
 /** the ribbon's own keys, from the docs shortcut table */
 const matchFormatClipKey = createShortcutMatcher(['copy-format', 'paste-format'])
-const matchRibbonToggleKey = createShortcutMatcher(['ribbon-toggle'])
 
 const TABS = (
   IS_MAC
@@ -838,13 +838,21 @@ function RibbonInner({
   onPagePreview,
 }: RibbonProps) {
   const { t, lang } = useI18n()
-  const collapse = useRibbonCollapse('aidocs.ribbonCollapsed', {
-    collapse: t('ribbonCollapse'),
-    expand: t('ribbonExpand'),
-    // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (see genoffice#362)
-    compact: t('ribbonCompact'),
-    expandFull: t('ribbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'aidocs.ribbonCollapsed',
+    {
+      collapse: t('ribbonCollapse'),
+      expand: t('ribbonExpand'),
+      // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (see genoffice#362)
+      compact: t('ribbonCompact'),
+      expandFull: t('ribbonExpand'),
+    },
+    {
+      action: docsShortcut('docs-086'),
+      compactAction: docsShortcut('docs-087'),
+      surface: shortcutSurface(),
+    },
+  )
   // The one-click AI actions need text to work on; grey them out on an empty document
   const docEmpty = !hasDoc || fs.docEmpty
   const [tab, setTab] = useState<RibbonTab>('home')
@@ -1888,20 +1896,6 @@ function RibbonInner({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [editor])
-
-  // Word web's Ctrl+F3 stands in for Ctrl+F1, which the browser keeps; the shared collapse hook
-  // owns the desktop chords
-  const toggleRibbon = collapse.toggle
-  useEffect(() => {
-    if (shortcutSurface() !== 'web') return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.repeat || !matchRibbonToggleKey(e)) return
-      e.preventDefault()
-      toggleRibbon()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [toggleRibbon])
 
   useEffect(() => {
     if (!painter) return

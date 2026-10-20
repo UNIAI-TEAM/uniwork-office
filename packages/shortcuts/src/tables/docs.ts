@@ -1308,8 +1308,7 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
-  // Save As: Word's F12 / Shift+Cmd+S. Ctrl+Shift+S leaves it: Word binds it to Apply Styles
-  // (docs-059, not bound yet).
+  // Save As: Word's F12 / Shift+Cmd+S. Ctrl+Shift+S leaves it for Apply Styles (docs-059).
   // Web: the same keys (DESKTOP-FALLBACK), F12 only while the frame has focus
   {
     id: 'docs-005',
@@ -1468,6 +1467,15 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { altGraph: true, noRepeat: true },
   },
+  // Apply Styles: the Styles pane, on the Ctrl+Shift+S Save As gave up (Mac: not documented)
+  {
+    id: 'docs-059',
+    scope: 'docs',
+    win: ['Ctrl+Shift+S'],
+    mac: [],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
   // Insert comment: Word's Ctrl+Alt+M (the Paragraph dialog is menu-only now) / Cmd+Option+A
   {
     id: 'docs-072',
@@ -1501,6 +1509,16 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
+  // Compact ribbon: today's Ctrl+Alt+K / Alt+Cmd+K on the desktop too (the CSV proposal says
+  // "same", which the generator leaves open); the web frame shares it (no `web` key)
+  {
+    id: 'docs-087',
+    scope: 'docs',
+    win: ['Ctrl+Alt+K'],
+    mac: ['Alt+Cmd+K'],
+    match: 'key',
+    guard: { altGraph: true, noRepeat: true },
+  },
   // Shortcut sheet: F1 (Word's Help) and the old Ctrl+/ on Windows. On the Mac F1 is Word's
   // Undo alias, so Cmd+/ stays. Web: menu item only (Word web leaves F1 to the browser)
   {
@@ -1518,5 +1536,29 @@ export const docsShortcuts: readonly ShortcutAction[] = mergeRows(generated, man
 
 /** Why a manual row has no chord on a surface or platform, and remarks on manual rows:
  * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */
-export const docsManualUnmapped: readonly UnmappedShortcut[] = []
-export const docsManualNotes: readonly ShortcutNote[] = []
+export const docsManualUnmapped: readonly UnmappedShortcut[] = [
+  {
+    id: 'docs-059',
+    part: 'desktop.mac',
+    reason: 'Word for Mac documents no Apply Styles key',
+  },
+  {
+    id: 'docs-059',
+    part: 'web.mac',
+    reason: 'Word for Mac documents no Apply Styles key',
+  },
+]
+export const docsManualNotes: readonly ShortcutNote[] = [
+  {
+    id: 'docs-050',
+    part: 'web',
+    detail:
+      'Word web also prints Tab; the editor keymap owns Tab (list level, tab character, table cells), so the web frame binds Alt+Shift+Right only (Mac web: the desktop Mac key)',
+  },
+  {
+    id: 'docs-051',
+    part: 'web',
+    detail:
+      'Word web also prints Shift+Tab; the editor keymap owns it, so the web frame binds Alt+Shift+Left only (Mac web: the desktop Mac key)',
+  },
+]
