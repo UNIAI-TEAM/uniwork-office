@@ -47,14 +47,11 @@ export const th = {
   ribbonPasteTipDisabled: 'วาง (คัดลอกหรือตัดองค์ประกอบบนผืนผ้าใบก่อน)',
   ribbonCutTip: 'ตัด (⌘X)',
   ribbonCopyTip: 'คัดลอก (⌘C)',
-  ribbonBrushTipNoSelection:
-    'ตัวคัดวางรูปแบบ (เลือกองค์ประกอบก่อน; ⌘⇧C คัดลอกรูปแบบ / ⌘⇧V วางรูปแบบ)',
+  ribbonBrushTipNoSelection: 'ตัวคัดวางรูปแบบ (เลือกองค์ประกอบก่อน)',
   ribbonBrushTipContinuous: 'ตัวคัดวางรูปแบบโหมดต่อเนื่อง (กด Esc เพื่อออก)',
   ribbonBrushTipOnce: 'ตัวคัดวางรูปแบบโหมดครั้งเดียว (คลิกองค์ประกอบเป้าหมายเพื่อนำไปใช้)',
-  ribbonBrushTipHasFormat:
-    'ตัวคัดวางรูปแบบ (คลิกใช้ครั้งเดียว / ดับเบิลคลิกใช้ต่อเนื่อง; ⌘⇧C คัดลอกรูปแบบ / ⌘⇧V วางรูปแบบ)',
-  ribbonBrushTipDefault:
-    'ตัวคัดวางรูปแบบ (คลิกเพื่อคัดลอกและนำรูปแบบไปใช้; ⌘⇧C คัดลอกรูปแบบ / ⌘⇧V วางรูปแบบ)',
+  ribbonBrushTipHasFormat: 'ตัวคัดวางรูปแบบ (คลิกใช้ครั้งเดียว / ดับเบิลคลิกใช้ต่อเนื่อง)',
+  ribbonBrushTipDefault: 'ตัวคัดวางรูปแบบ (คลิกเพื่อคัดลอกและนำรูปแบบไปใช้)',
   ribbonGroupSlides: 'สไลด์',
   ribbonNewSlide: 'สไลด์ใหม่',
   ribbonNewSlideTip: 'สไลด์เปล่าใหม่ (ใช้พื้นหลังเค้าโครงของสไลด์ปัจจุบันต่อ)',

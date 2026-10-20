@@ -46,15 +46,13 @@ export const it = {
   ribbonPasteTipDisabled: 'Incolla (copia o taglia prima un elemento del canvas)',
   ribbonCutTip: 'Taglia (⌘X)',
   ribbonCopyTip: 'Copia (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Copia formato (seleziona prima un elemento; ⌘⇧C copia il formato / ⌘⇧V applica il formato)',
+  ribbonBrushTipNoSelection: 'Copia formato (seleziona prima un elemento)',
   ribbonBrushTipContinuous: 'Copia formato in modalità continua (premi Esc per uscire)',
   ribbonBrushTipOnce:
     "Copia formato in modalità singola (fai clic sull'elemento di destinazione per applicare)",
   ribbonBrushTipHasFormat:
-    'Copia formato (clic per una volta / doppio clic per la modalità continua; ⌘⇧C copia il formato / ⌘⇧V applica il formato)',
-  ribbonBrushTipDefault:
-    'Copia formato (fai clic per copiare e applicare la formattazione; ⌘⇧C copia il formato / ⌘⇧V applica il formato)',
+    'Copia formato (clic per una volta / doppio clic per la modalità continua)',
+  ribbonBrushTipDefault: 'Copia formato (fai clic per copiare e applicare la formattazione)',
   ribbonGroupSlides: 'Diapositive',
   ribbonNewSlide: 'Nuova Diapositiva',
   ribbonNewSlideTip:

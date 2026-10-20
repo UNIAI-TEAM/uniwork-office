@@ -39,6 +39,11 @@ export function slidesHint(id: string, platform: ShortcutPlatform = shortcutPlat
   return formatHint(slidesShortcut(id), platform, shortcutSurface())
 }
 
+/** Format Painter's key text: copy format / paste format, each only where the surface has a key. */
+export function brushTipKbd(): string | undefined {
+  return [slidesHint('slides-11'), slidesHint('slides-12')].filter(Boolean).join(' / ') || undefined
+}
+
 /** `data-tip-kbd` value: the hint, or undefined so an action without a key shows none. */
 export function slidesTipKbd(id: string): string | undefined {
   return slidesHint(id) || undefined

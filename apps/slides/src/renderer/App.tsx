@@ -183,7 +183,8 @@ import * as arrangeActions from './arrange-actions'
 import * as tableActions from './table-actions'
 import * as styleActions from './style-actions'
 import { handleGlobalKeydown, slideRailHasFocus } from './keyboard-actions'
-import { showNavKey } from './show-keys'
+import { readingNavKey } from './show-keys'
+import { shortcutPlatform, shortcutSurface } from './shortcuts'
 import { clickSelection, currentAfterHistory, normalizeSelection } from '../shared/slide-selection'
 import {
   notesBaselineAfterFlush,
@@ -2276,7 +2277,7 @@ export function App() {
       )
         return
       // the slide show's next / previous / end keys (show-keys.ts)
-      const nav = showNavKey(e)
+      const nav = readingNavKey(e, shortcutPlatform(), shortcutSurface())
       if (nav === 'exit') {
         if (!uniworkRef.current.readOnly) {
           e.preventDefault()

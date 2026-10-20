@@ -7,8 +7,11 @@ import {
   gotoPosition,
   INITIAL_SHOW_KEYS,
   pushVisited,
+  readingNavKey,
   reduceAudienceNav,
+  reducePresenterKey,
   reduceShowKey,
+  showGate,
   SHOW_KEY_ROWS,
   showNavKey,
   toggleScreen,
@@ -318,5 +321,95 @@ describe('pushVisited', () => {
     expect(pushVisited([0], 0)).toEqual([0])
     expect(pushVisited([0], 2)).toEqual([0, 2])
     expect(pushVisited([0, 2], 0)).toEqual([0, 2, 0])
+  })
+})
+
+describe('audience window and reading view keys follow the platform (L2)', () => {
+  it('mac: Hyphen and Cmd+Period end the show, as in the show window', () => {
+    expect(showNavKey(ev('-'), 'mac')).toBe('exit')
+    expect(showNavKey(ev('.', { metaKey: true }), 'mac')).toBe('exit')
+    expect(showNavKey(ev('-'), 'win')).toBeNull()
+    expect(showNavKey(ev('.', { metaKey: true }), 'win')).toBeNull()
+  })
+
+  it('web: Esc ends it, Hyphen does not', () => {
+    expect(showNavKey(ev('Escape'), 'mac', 'web')).toBe('exit')
+    expect(showNavKey(ev('-'), 'mac', 'web')).toBeNull()
+  })
+
+  it('still pages with N / P / arrows on both platforms', () => {
+    for (const platform of ['win', 'mac'] as const) {
+      expect(showNavKey(ev('n'), platform)).toBe('next')
+      expect(showNavKey(ev('ArrowLeft'), platform)).toBe('prev')
+    }
+  })
+})
+
+describe('presenter view ignores the pointer chord (L1)', () => {
+  it('Ctrl+H (Cmd+I on the Mac) is not claimed: nothing to hide in the console', () => {
+    expect(reducePresenterKey(INITIAL_SHOW_KEYS, ev('h', { ctrlKey: true }), 'win')).toBeNull()
+    expect(reducePresenterKey(INITIAL_SHOW_KEYS, ev('i', { metaKey: true }), 'mac')).toBeNull()
+    // the show window itself still has it
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('h', { ctrlKey: true }), 'win')?.action).toEqual({
+      type: 'pointer',
+    })
+  })
+
+  it('every other show key works as in the show window', () => {
+    expect(reducePresenterKey(INITIAL_SHOW_KEYS, ev('n'))?.action).toEqual({ type: 'next' })
+    expect(reducePresenterKey(INITIAL_SHOW_KEYS, ev('Escape'))?.action).toEqual({ type: 'exit' })
+  })
+})
+
+describe('reading view leaves typed keys to editable fields (M1)', () => {
+  /** Dispatch a keydown at `el` and return what readingNavKey says about it. */
+  function readingKey(el: Element, key: string, init: Partial<KeyboardEventInit> = {}) {
+    let seen: ReturnType<typeof readingNavKey> | undefined
+    const onKey = (e: KeyboardEvent) => {
+      seen = readingNavKey(e)
+    }
+    window.addEventListener('keydown', onKey, true)
+    el.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, ...init }))
+    window.removeEventListener('keydown', onKey, true)
+    return seen
+  }
+  const mount = (html: string) => {
+    document.body.innerHTML = html
+    return document.body.firstElementChild!
+  }
+
+  it.each(['n', 'p', 'Backspace', ' ', 'ArrowRight', 'ArrowLeft', 'Enter', 'Escape'])(
+    '%j in the comments box, an input or a contentEditable is not a page turn',
+    (key) => {
+      expect(readingKey(mount('<textarea></textarea>'), key)).toBeNull()
+      expect(readingKey(mount('<input type="text">'), key)).toBeNull()
+      expect(readingKey(mount('<div contenteditable="true"><b>x</b></div>'), key)).toBeNull()
+      const inner = mount('<div contenteditable="true"><b>x</b></div>').firstChild as Element
+      expect(readingKey(inner, key)).toBeNull()
+    },
+  )
+
+  it('pages and ends outside fields', () => {
+    const body = mount('<div></div>')
+    expect(readingKey(body, 'n')).toBe('next')
+    expect(readingKey(body, 'Backspace')).toBe('prev')
+    expect(readingKey(body, 'Escape')).toBe('exit')
+    expect(readingKey(document.body, 'ArrowRight')).toBe('next')
+  })
+})
+
+describe('slide show Esc gate (L5)', () => {
+  it('an open menu owns every key', () => {
+    expect(showGate(ev('Escape'), { menuOpen: true, gridOpen: false })).toBe('ignore')
+    expect(showGate(ev('n'), { menuOpen: true, gridOpen: true })).toBe('ignore')
+  })
+
+  it('the slide grid closes on Esc instead of ending the show and keeps other keys out', () => {
+    expect(showGate(ev('Escape'), { menuOpen: false, gridOpen: true })).toBe('closeGrid')
+    expect(showGate(ev('n'), { menuOpen: false, gridOpen: true })).toBe('ignore')
+  })
+
+  it('with nothing open the key goes to the show reducer', () => {
+    expect(showGate(ev('Escape'), { menuOpen: false, gridOpen: false })).toBe('show')
   })
 })

@@ -133,11 +133,63 @@ export function reduceShowKey(
 
 /**
  * Next / previous / end for views that only page through slides (the presenter's
- * audience window, the reading view): the show's own keys, nothing else.
+ * audience window, the reading view): the show's own keys, nothing else. `platform` /
+ * `surface` pick the chords like the show window does (Hyphen / Cmd+Period end it on the Mac).
  */
-export function showNavKey(e: ShortcutKeyEvent): 'next' | 'prev' | 'exit' | null {
-  const type = reduceShowKey(INITIAL_SHOW_KEYS, e)?.action.type
+export function showNavKey(
+  e: ShortcutKeyEvent,
+  platform: ShortcutPlatform = 'win',
+  surface: ShortcutSurface = 'desktop',
+): 'next' | 'prev' | 'exit' | null {
+  const type = reduceShowKey(INITIAL_SHOW_KEYS, e, platform, surface)?.action.type
   return type === 'next' || type === 'prev' || type === 'exit' ? type : null
+}
+
+/** An input, a textarea or a contentEditable: typed keys belong to it. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  return !!target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
+}
+
+/**
+ * The reading view's page-turn key. The comments pane and other fields stay open beside the
+ * page, so a key typed into one of them (the letters N / P, Backspace, Space, arrows) is not a
+ * page turn.
+ */
+export function readingNavKey(
+  e: KeyboardEvent,
+  platform: ShortcutPlatform = 'win',
+  surface: ShortcutSurface = 'desktop',
+): 'next' | 'prev' | 'exit' | null {
+  if (isEditableTarget(e.target)) return null
+  return showNavKey(e, platform, surface)
+}
+
+/**
+ * The presenter console's keys: the show's, except the pointer chord (Ctrl+H / Cmd+I): the
+ * console has no pointer to hide, and claiming the key would only swallow it.
+ */
+export function reducePresenterKey(
+  state: ShowKeyState,
+  e: ShortcutKeyEvent,
+  platform: ShortcutPlatform = 'win',
+  surface: ShortcutSurface = 'desktop',
+): { state: ShowKeyState; action: ShowKeyAction } | null {
+  const r = reduceShowKey(state, e, platform, surface)
+  return r?.action.type === 'pointer' ? null : r
+}
+
+/**
+ * Who gets a keydown in the show window: an open menu owns every key (and its Escape), the
+ * slide grid closes on Escape instead of ending the show, otherwise the show reducer reads it.
+ */
+export function showGate(
+  e: ShortcutKeyEvent,
+  open: { menuOpen: boolean; gridOpen: boolean },
+): 'ignore' | 'closeGrid' | 'show' {
+  if (open.menuOpen) return 'ignore'
+  if (open.gridOpen) return e.key === 'Escape' ? 'closeGrid' : 'ignore'
+  return 'show'
 }
 
 /** Toggle a blackout screen (menu / toolbar path): same screen again restores the slide */

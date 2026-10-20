@@ -45,13 +45,11 @@ export const he = {
   ribbonPasteTipDisabled: 'הדבקה (העתק או גזור תחילה רכיב בקנבס)',
   ribbonCutTip: 'גזירה (⌘X)',
   ribbonCopyTip: 'העתקה (⌘C)',
-  ribbonBrushTipNoSelection: 'מברשת עיצוב (בחר תחילה רכיב; ⌘⇧C מעתיק עיצוב / ⌘⇧V מדביק עיצוב)',
+  ribbonBrushTipNoSelection: 'מברשת עיצוב (בחר תחילה רכיב)',
   ribbonBrushTipContinuous: 'מברשת עיצוב במצב רציף (הקש Esc ליציאה)',
   ribbonBrushTipOnce: 'מברשת עיצוב במצב חד-פעמי (לחץ על רכיב היעד כדי להחיל)',
-  ribbonBrushTipHasFormat:
-    'מברשת עיצוב (לחיצה לפעם אחת / לחיצה כפולה למצב רציף; ⌘⇧C מעתיק עיצוב / ⌘⇧V מדביק עיצוב)',
-  ribbonBrushTipDefault:
-    'מברשת עיצוב (לחץ כדי להעתיק ולהחיל עיצוב; ⌘⇧C מעתיק עיצוב / ⌘⇧V מדביק עיצוב)',
+  ribbonBrushTipHasFormat: 'מברשת עיצוב (לחיצה לפעם אחת / לחיצה כפולה למצב רציף)',
+  ribbonBrushTipDefault: 'מברשת עיצוב (לחץ כדי להעתיק ולהחיל עיצוב)',
   ribbonGroupSlides: 'שקופיות',
   ribbonNewSlide: 'שקופית חדשה',
   ribbonNewSlideTip: 'שקופית ריקה חדשה (שומרת על רקע הפריסה של השקופית הנוכחית)',

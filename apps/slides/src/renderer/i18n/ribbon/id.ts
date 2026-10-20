@@ -48,14 +48,11 @@ export const id = {
   ribbonPasteTipDisabled: 'Tempel (salin atau potong elemen kanvas terlebih dahulu)',
   ribbonCutTip: 'Potong (⌘X)',
   ribbonCopyTip: 'Salin (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Penyalin Format (pilih elemen terlebih dahulu; ⌘⇧C salin format / ⌘⇧V tempel format)',
+  ribbonBrushTipNoSelection: 'Penyalin Format (pilih elemen terlebih dahulu)',
   ribbonBrushTipContinuous: 'Penyalin Format mode berkelanjutan (tekan Esc untuk keluar)',
   ribbonBrushTipOnce: 'Penyalin Format mode sekali pakai (klik elemen target untuk menerapkan)',
-  ribbonBrushTipHasFormat:
-    'Penyalin Format (klik untuk sekali / klik ganda untuk berkelanjutan; ⌘⇧C salin format / ⌘⇧V tempel format)',
-  ribbonBrushTipDefault:
-    'Penyalin Format (klik untuk menyalin dan menerapkan format; ⌘⇧C salin format / ⌘⇧V tempel format)',
+  ribbonBrushTipHasFormat: 'Penyalin Format (klik untuk sekali / klik ganda untuk berkelanjutan)',
+  ribbonBrushTipDefault: 'Penyalin Format (klik untuk menyalin dan menerapkan format)',
   ribbonGroupSlides: 'Slide',
   ribbonNewSlide: 'Slide Baru',
   ribbonNewSlideTip: 'Slide kosong baru (mempertahankan latar belakang tata letak slide saat ini)',

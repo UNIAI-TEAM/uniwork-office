@@ -48,15 +48,12 @@ export const es = {
   ribbonPasteTipDisabled: 'Pegar (primero copie o corte un elemento del lienzo)',
   ribbonCutTip: 'Cortar (⌘X)',
   ribbonCopyTip: 'Copiar (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Copiar formato (seleccione primero un elemento; ⌘⇧C copiar formato / ⌘⇧V pegar formato)',
+  ribbonBrushTipNoSelection: 'Copiar formato (seleccione primero un elemento)',
   ribbonBrushTipContinuous: 'Copiar formato en modo continuo (Esc para salir)',
   ribbonBrushTipOnce:
     'Copiar formato una sola vez (haga clic en el elemento de destino para aplicarlo)',
-  ribbonBrushTipHasFormat:
-    'Copiar formato (un clic para una vez / doble clic para modo continuo; ⌘⇧C copiar formato / ⌘⇧V pegar formato)',
-  ribbonBrushTipDefault:
-    'Copiar formato (haga clic para copiar y aplicar el formato; ⌘⇧C copiar formato / ⌘⇧V pegar formato)',
+  ribbonBrushTipHasFormat: 'Copiar formato (un clic para una vez / doble clic para modo continuo)',
+  ribbonBrushTipDefault: 'Copiar formato (haga clic para copiar y aplicar el formato)',
   ribbonGroupSlides: 'Diapositivas',
   ribbonNewSlide: 'Nueva diapositiva',
   ribbonNewSlideTip:

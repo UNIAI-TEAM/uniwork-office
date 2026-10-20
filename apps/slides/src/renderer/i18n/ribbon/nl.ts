@@ -46,16 +46,14 @@ export const nl = {
   ribbonPasteTipDisabled: 'Plakken (kopieer of knip eerst een canvaselement)',
   ribbonCutTip: 'Knippen (⌘X)',
   ribbonCopyTip: 'Kopiëren (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Opmaak kopiëren/plakken (selecteer eerst een element; ⌘⇧C kopieert opmaak / ⌘⇧V plakt opmaak)',
+  ribbonBrushTipNoSelection: 'Opmaak kopiëren/plakken (selecteer eerst een element)',
   ribbonBrushTipContinuous:
     'Opmaak kopiëren/plakken in doorlopende modus (druk op Esc om te stoppen)',
   ribbonBrushTipOnce:
     'Opmaak kopiëren/plakken in eenmalige modus (klik op een doelelement om toe te passen)',
   ribbonBrushTipHasFormat:
-    'Opmaak kopiëren/plakken (klik voor eenmalig / dubbelklik voor doorlopend; ⌘⇧C kopieert opmaak / ⌘⇧V plakt opmaak)',
-  ribbonBrushTipDefault:
-    'Opmaak kopiëren/plakken (klik om opmaak te kopiëren en toe te passen; ⌘⇧C kopieert opmaak / ⌘⇧V plakt opmaak)',
+    'Opmaak kopiëren/plakken (klik voor eenmalig / dubbelklik voor doorlopend)',
+  ribbonBrushTipDefault: 'Opmaak kopiëren/plakken (klik om opmaak te kopiëren en toe te passen)',
   ribbonGroupSlides: "Dia's",
   ribbonNewSlide: 'Nieuwe dia',
   ribbonNewSlideTip: 'Nieuwe lege dia (behoudt de indelingsachtergrond van de huidige dia)',

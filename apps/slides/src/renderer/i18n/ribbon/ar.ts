@@ -47,13 +47,11 @@ export const ar = {
   ribbonPasteTipDisabled: 'لصق (انسخ أو قص عنصرًا من اللوحة أولاً)',
   ribbonCutTip: 'قص (⌘X)',
   ribbonCopyTip: 'نسخ (⌘C)',
-  ribbonBrushTipNoSelection: 'نسخ التنسيق (حدد عنصرًا أولاً؛ ⌘⇧C نسخ التنسيق / ⌘⇧V لصق التنسيق)',
+  ribbonBrushTipNoSelection: 'نسخ التنسيق (حدد عنصرًا أولاً؛)',
   ribbonBrushTipContinuous: 'نسخ التنسيق في الوضع المستمر (اضغط Esc للخروج)',
   ribbonBrushTipOnce: 'نسخ التنسيق لمرة واحدة (انقر على العنصر الهدف للتطبيق)',
-  ribbonBrushTipHasFormat:
-    'نسخ التنسيق (نقرة واحدة لمرة واحدة / نقرة مزدوجة للوضع المستمر؛ ⌘⇧C نسخ التنسيق / ⌘⇧V لصق التنسيق)',
-  ribbonBrushTipDefault:
-    'نسخ التنسيق (انقر لنسخ التنسيق وتطبيقه؛ ⌘⇧C نسخ التنسيق / ⌘⇧V لصق التنسيق)',
+  ribbonBrushTipHasFormat: 'نسخ التنسيق (نقرة واحدة لمرة واحدة / نقرة مزدوجة للوضع المستمر؛)',
+  ribbonBrushTipDefault: 'نسخ التنسيق (انقر لنسخ التنسيق وتطبيقه؛)',
   ribbonGroupSlides: 'شرائح',
   ribbonNewSlide: 'شريحة جديدة',
   ribbonNewSlideTip: 'شريحة فارغة جديدة (تحتفظ بخلفية تخطيط الشريحة الحالية)',

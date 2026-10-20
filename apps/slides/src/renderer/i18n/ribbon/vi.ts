@@ -46,14 +46,12 @@ export const vi = {
   ribbonPasteTipDisabled: 'Dán (sao chép hoặc cắt một phần tử trên canvas trước)',
   ribbonCutTip: 'Cắt (⌘X)',
   ribbonCopyTip: 'Sao chép (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Chổi sao chép định dạng (chọn một phần tử trước; ⌘⇧C sao chép định dạng / ⌘⇧V dán định dạng)',
+  ribbonBrushTipNoSelection: 'Chổi sao chép định dạng (chọn một phần tử trước)',
   ribbonBrushTipContinuous: 'Chế độ sao chép định dạng liên tục (nhấn Esc để thoát)',
   ribbonBrushTipOnce: 'Chế độ sao chép định dạng một lần (nhấp vào phần tử đích để áp dụng)',
   ribbonBrushTipHasFormat:
-    'Chổi sao chép định dạng (nhấp một lần để dùng một lần / nhấp đúp để dùng liên tục; ⌘⇧C sao chép định dạng / ⌘⇧V dán định dạng)',
-  ribbonBrushTipDefault:
-    'Chổi sao chép định dạng (nhấp để sao chép và áp dụng định dạng; ⌘⇧C sao chép định dạng / ⌘⇧V dán định dạng)',
+    'Chổi sao chép định dạng (nhấp một lần để dùng một lần / nhấp đúp để dùng liên tục)',
+  ribbonBrushTipDefault: 'Chổi sao chép định dạng (nhấp để sao chép và áp dụng định dạng)',
   ribbonGroupSlides: 'Trang chiếu',
   ribbonNewSlide: 'Trang chiếu mới',
   ribbonNewSlideTip: 'Tạo trang chiếu trống mới (giữ lại nền bố cục của trang hiện tại)',

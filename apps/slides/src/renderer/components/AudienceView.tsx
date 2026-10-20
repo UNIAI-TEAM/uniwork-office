@@ -23,6 +23,7 @@ import { MorphStage } from './MorphStage'
 import { InkLayer, type InkStroke } from './ShowInk'
 import { isWeb } from '../capabilities'
 import { showNavKey } from '../show-keys'
+import { shortcutPlatform, shortcutSurface } from '../shortcuts'
 
 const ANIMATED = ['fade', 'push', 'wipe', 'split', 'circle'] as const
 
@@ -193,7 +194,7 @@ export function AudienceView() {
   // whole show. The show's own next / previous / end keys (show-keys.ts), nothing else.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const nav = showNavKey(e)
+      const nav = showNavKey(e, shortcutPlatform(), shortcutSurface())
       if (!nav) return
       e.preventDefault()
       window.slidesApi.audienceNav(nav)

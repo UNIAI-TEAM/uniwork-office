@@ -46,15 +46,13 @@ export const pl = {
   ribbonPasteTipDisabled: 'Wklej (najpierw skopiuj lub wytnij element kanwy)',
   ribbonCutTip: 'Wytnij (⌘X)',
   ribbonCopyTip: 'Kopiuj (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Malarz formatów (najpierw zaznacz element; ⌘⇧C kopiuje format / ⌘⇧V wkleja format)',
+  ribbonBrushTipNoSelection: 'Malarz formatów (najpierw zaznacz element)',
   ribbonBrushTipContinuous: 'Malarz formatów w trybie ciągłym (naciśnij Esc, aby wyjść)',
   ribbonBrushTipOnce:
     'Malarz formatów w trybie pojedynczym (kliknij element docelowy, aby zastosować)',
   ribbonBrushTipHasFormat:
-    'Malarz formatów (kliknij dla jednego użycia / kliknij dwukrotnie dla trybu ciągłego; ⌘⇧C kopiuje format / ⌘⇧V wkleja format)',
-  ribbonBrushTipDefault:
-    'Malarz formatów (kliknij, aby skopiować i zastosować formatowanie; ⌘⇧C kopiuje format / ⌘⇧V wkleja format)',
+    'Malarz formatów (kliknij dla jednego użycia / kliknij dwukrotnie dla trybu ciągłego)',
+  ribbonBrushTipDefault: 'Malarz formatów (kliknij, aby skopiować i zastosować formatowanie)',
   ribbonGroupSlides: 'Slajdy',
   ribbonNewSlide: 'Nowy slajd',
   ribbonNewSlideTip: 'Nowy pusty slajd (zachowuje tło układu bieżącego slajdu)',

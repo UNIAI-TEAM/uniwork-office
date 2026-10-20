@@ -4,7 +4,7 @@
  * PowerPoint for the web's in the web frame. Each chord fires its command, the
  * old colliding chords no longer do, and IME composition / AltGr never fire.
  */
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -388,7 +388,7 @@ describe('hints and menu accelerators come from the table', () => {
     const dir = join(dirname(fileURLToPath(import.meta.url)), '../src/renderer')
     for (const file of ['Ribbon.tsx', 'RibbonHomeTab.tsx', 'RibbonInsertTab.tsx']) {
       const src = readFileSync(join(dir, 'components', file), 'utf8')
-      expect(src, file).not.toMatch(/data-tip-kbd=(["']|\{(?!slidesTipKbd))/)
+      expect(src, file).not.toMatch(/data-tip-kbd=(["']|\{(?!slidesTipKbd|brushTipKbd))/)
       expect(src, file).not.toMatch(/file-menu-key">[^{]/)
     }
     // the show tooltips' key comes from data-tip-kbd, not from the translated text
@@ -402,5 +402,104 @@ describe('hints and menu accelerators come from the table', () => {
     expect(slidesMenuAccelerator('redo', 'win')).toBe('CmdOrCtrl+Y')
     expect(slidesMenuAccelerator('redo', 'mac')).toBe('CmdOrCtrl+Y')
     expect(slidesMenuAccelerator('close', 'mac')).toBe('CmdOrCtrl+W')
+  })
+})
+
+/** A text field with focus, as when the user types in the notes or a dialog box. */
+function focusField(tag: 'textarea' | 'input' = 'textarea'): void {
+  const el = document.createElement(tag)
+  document.body.appendChild(el)
+  el.focus()
+}
+
+describe('slide-level chords leave text editing alone (L5)', () => {
+  const chords: Array<[string, string, string, KeyboardEventInit]> = [
+    [WIN, 'ArrowUp', 'Ctrl+Up (move slide)', ctrl],
+    [WIN, 'ArrowDown', 'Ctrl+Shift+Down (move slide)', { ctrlKey: true, shiftKey: true }],
+    [WIN, 'D', 'Ctrl+Shift+D (duplicate slide)', { ctrlKey: true, shiftKey: true }],
+    [WIN, 'g', 'Ctrl+G (group)', ctrl],
+    [WIN, 'G', 'Ctrl+Shift+G (ungroup)', { ctrlKey: true, shiftKey: true }],
+    [WIN, 'ArrowRight', 'Alt+Right (rotate)', { altKey: true }],
+    [MAC, 'ArrowUp', 'Cmd+Up (move slide)', cmd],
+    [MAC, 'D', 'Shift+Cmd+D (duplicate slide)', { metaKey: true, shiftKey: true }],
+  ]
+  const acted = () =>
+    [
+      slideActions.moveSlidesTo,
+      slideActions.duplicateSlides,
+      arrangeActions.groupSelected,
+      arrangeActions.ungroupSelected,
+      arrangeActions.rotateSelected,
+      clipboardActions.duplicateSelected,
+    ].some((fn) => vi.mocked(fn).mock.calls.length > 0)
+
+  it.each(chords)('%s: %s (%s) is quiet while a shape text is edited', (p, k, _name, init) => {
+    const ctx = makeCtx({ editing: { sourceId: 's1' }, selectedIds: ['s1'] })
+    const e = press(ctx, k, init, p)
+    expect(acted()).toBe(false)
+    expect(e.defaultPrevented).toBe(false)
+  })
+
+  it.each(chords)('%s: %s (%s) is quiet in a focused text field', (p, k, _name, init) => {
+    focusField()
+    const e = press(makeCtx(), k, init, p)
+    expect(acted()).toBe(false)
+    expect(e.defaultPrevented).toBe(false)
+  })
+})
+
+describe('keys while the slide show or presenter view runs (L5)', () => {
+  it.each([{ slideShow: true }, { presenter: true }])(
+    'Ctrl+H hides the pointer there and does not open Replace in the editor (%o)',
+    (over) => {
+      const ctx = makeCtx(over)
+      const e = press(ctx, 'h', ctrl, WIN)
+      expect(ctx.setFindOpen).not.toHaveBeenCalled()
+      expect(e.defaultPrevented).toBe(false)
+      const mac = press(ctx, 'H', { metaKey: true, shiftKey: true }, MAC)
+      expect(ctx.setFindOpen).not.toHaveBeenCalled()
+      expect(mac.defaultPrevented).toBe(false)
+    },
+  )
+})
+
+describe('macOS Option chords match by the physical key (L5)', () => {
+  // Option + letter types a symbol on the Mac (Option+G = ©, Option+J = ∆): the key
+  // property is no longer the letter, so the matcher has to fall back to the code.
+  it.each([
+    ['©', 'KeyG', { metaKey: true, altKey: true }, 'groupSelected'],
+    ['©', 'KeyG', { metaKey: true, altKey: true, shiftKey: true }, 'ungroupSelected'],
+    ['∆', 'KeyJ', { metaKey: true, altKey: true }, 'regroupSelected'],
+  ] as const)('Option: key %s code %s → %s', (k, code, mod, fn) => {
+    const ctx = makeCtx({ selectedIds: ['a', 'b'] })
+    const e = new KeyboardEvent('keydown', { key: k, code, cancelable: true, ...mod })
+    handleGlobalKeydown(ctx, e, MAC)
+    expect(arrangeActions[fn]).toHaveBeenCalledWith(ctx)
+  })
+})
+
+describe('Format Painter tips (L3)', () => {
+  const dir = join(dirname(fileURLToPath(import.meta.url)), '../src/renderer')
+
+  it('no ribbon shard prints the copy / paste format chord in the translated text', () => {
+    const shards = readdirSync(join(dir, 'i18n/ribbon')).filter((f) => f.endsWith('.ts'))
+    expect(shards.length).toBeGreaterThanOrEqual(21)
+    for (const f of shards) {
+      const src = readFileSync(join(dir, 'i18n/ribbon', f), 'utf8')
+      const tips = /ribbonBrushTip(?:NoSelection|HasFormat|Default):\s*\n?\s*(['"`])[^]*?\1/g
+      const found = [...src.matchAll(tips)]
+      expect(found.length, f).toBe(3)
+      for (const m of found) expect(m[0], f).not.toMatch(/[⌘⇧⌃⌥]|Ctrl|Cmd/)
+    }
+  })
+
+  it('the button prints the table chords; the web has no paste-format key', () => {
+    const src = readFileSync(join(dir, 'components/RibbonHomeTab.tsx'), 'utf8')
+    expect(src).toMatch(/brushTipKbd\(\)/)
+    expect(slidesHint('slides-11', 'mac')).toBe('⇧⌘C')
+    expect(slidesHint('slides-12', 'mac')).toBe('⇧⌘V')
+    vi.mocked(capabilities.isWeb).mockReturnValue(true)
+    expect(slidesHint('slides-11', 'win')).toBe('Ctrl+Shift+C')
+    expect(slidesHint('slides-12', 'win')).toBe('')
   })
 })

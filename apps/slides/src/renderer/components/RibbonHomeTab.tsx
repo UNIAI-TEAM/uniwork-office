@@ -1,7 +1,7 @@
 /** Home tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import { useState } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
-import { slidesTipKbd } from '../shortcuts'
+import { brushTipKbd, slidesTipKbd } from '../shortcuts'
 import { ColorPicker, isSymbolFontFamily, partitionFontFamilies, UniAiMark } from '@genoffice/ui'
 import { saveEditSelection } from '../TextEditOverlay'
 import { armColorInput } from '../color-input'
@@ -321,6 +321,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
           <button
             className={`rb-icon${brushMode ? ' on' : ''}`}
             disabled={!hasSelection}
+            data-tip-kbd={brushTipKbd()}
             data-tip={
               !hasSelection
                 ? t('ribbonBrushTipNoSelection')

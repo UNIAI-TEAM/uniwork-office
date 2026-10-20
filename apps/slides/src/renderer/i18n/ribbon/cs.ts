@@ -46,14 +46,11 @@ export const cs = {
   ribbonPasteTipDisabled: 'Vložit (nejprve zkopírujte nebo vyjměte prvek na plátně)',
   ribbonCutTip: 'Vyjmout (⌘X)',
   ribbonCopyTip: 'Kopírovat (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Kopírovat formát (nejprve vyberte prvek; ⌘⇧C kopírovat formát / ⌘⇧V vložit formát)',
+  ribbonBrushTipNoSelection: 'Kopírovat formát (nejprve vyberte prvek)',
   ribbonBrushTipContinuous: 'Kopírovat formát – souvislý režim (ukončíte klávesou Esc)',
   ribbonBrushTipOnce: 'Kopírovat formát – jednorázový režim (klikněte na cílový prvek pro použití)',
-  ribbonBrushTipHasFormat:
-    'Kopírovat formát (kliknutí = jednou / dvojklik = souvisle; ⌘⇧C kopírovat formát / ⌘⇧V vložit formát)',
-  ribbonBrushTipDefault:
-    'Kopírovat formát (kliknutím zkopírujete a použijete formátování; ⌘⇧C kopírovat formát / ⌘⇧V vložit formát)',
+  ribbonBrushTipHasFormat: 'Kopírovat formát (kliknutí = jednou / dvojklik = souvisle)',
+  ribbonBrushTipDefault: 'Kopírovat formát (kliknutím zkopírujete a použijete formátování)',
   ribbonGroupSlides: 'Snímky',
   ribbonNewSlide: 'Nový snímek',
   ribbonNewSlideTip: 'Nový prázdný snímek (zachová pozadí rozložení aktuálního snímku)',

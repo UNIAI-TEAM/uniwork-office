@@ -48,15 +48,13 @@ export const fr = {
   ribbonPasteTipDisabled: "Coller (copiez ou coupez d'abord un élément du canevas)",
   ribbonCutTip: 'Couper (⌘X)',
   ribbonCopyTip: 'Copier (⌘C)',
-  ribbonBrushTipNoSelection:
-    "Reproduire la mise en forme (sélectionnez d'abord un élément ; ⌘⇧C copier le format / ⌘⇧V coller le format)",
+  ribbonBrushTipNoSelection: "Reproduire la mise en forme (sélectionnez d'abord un élément)",
   ribbonBrushTipContinuous: 'Reproduire la mise en forme en mode continu (Échap pour quitter)',
   ribbonBrushTipOnce:
     'Reproduire la mise en forme une seule fois (cliquez sur un élément cible pour appliquer)',
   ribbonBrushTipHasFormat:
-    'Reproduire la mise en forme (clic pour une fois / double-clic pour le mode continu ; ⌘⇧C copier le format / ⌘⇧V coller le format)',
-  ribbonBrushTipDefault:
-    'Reproduire la mise en forme (cliquez pour copier et appliquer le format ; ⌘⇧C copier le format / ⌘⇧V coller le format)',
+    'Reproduire la mise en forme (clic pour une fois / double-clic pour le mode continu)',
+  ribbonBrushTipDefault: 'Reproduire la mise en forme (cliquez pour copier et appliquer le format)',
   ribbonGroupSlides: 'Diapositives',
   ribbonNewSlide: 'Nouvelle diapositive',
   ribbonNewSlideTip:

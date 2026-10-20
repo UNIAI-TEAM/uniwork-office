@@ -25,6 +25,7 @@ import {
   INITIAL_SHOW_KEYS,
   pushVisited,
   reduceShowKey,
+  showGate,
   toggleScreen,
   type ShowKeyState,
   type ShowScreen,
@@ -403,14 +404,12 @@ export function SlideShowView({
   // Escape while open; the slide grid closes on Escape instead of ending the show.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (menuRef.current) return
-      if (gridRef.current) {
-        if (e.key === 'Escape') {
-          e.preventDefault()
-          setGrid(false)
-        }
-        return
+      const gate = showGate(e, { menuOpen: !!menuRef.current, gridOpen: !!gridRef.current })
+      if (gate === 'closeGrid') {
+        e.preventDefault()
+        setGrid(false)
       }
+      if (gate !== 'show') return
       const r = reduceShowKey(showKeysRef.current, e, shortcutPlatform(), shortcutSurface())
       if (!r) return
       e.preventDefault()
