@@ -1281,6 +1281,16 @@ export function DocumentsHome({
     return items
   }
 
+  // where Move says a row sits now: its own parent, else the folder this view lists. Only the
+  // workspace and My Folder views list a folder, so `folderId` (it outlives the view) is no
+  // answer elsewhere; a recipient's row is never inside the owner's folder (UNI-1974)
+  const currentParentOf = (doc: DocumentsHomeDoc): string | null => {
+    if (subView === 'shared-with-me') return null
+    if (doc.parentId) return doc.parentId
+    if (subView === 'workspace') return folderId
+    return subView === 'my-folder' ? resolvedMyFolderId : null
+  }
+
   const docMenuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] => {
     const items: FolderMenuItem[] = []
     const archived = doc.archived === true || subView === 'trash'
@@ -1331,7 +1341,7 @@ export function DocumentsHome({
           folderActions.startMove({
             id: doc.id,
             kind: 'file',
-            parentId: doc.parentId ?? folderId,
+            parentId: currentParentOf(doc),
             title: doc.title,
           }),
       })
