@@ -863,8 +863,11 @@
   min-width: 0;
 }
 
+/* the button sits in a block wrapper (not a flex container): as a block capped at the
+   wrapper's width the ellipsis applies, instead of the text printing over the next column */
 .dh-doc-open {
-  flex: 1;
+  display: block;
+  max-width: 100%;
   min-width: 0;
   padding: 0;
   border: 0;
