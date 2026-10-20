@@ -372,8 +372,11 @@ export interface UniworkSourceFile {
   canSave: boolean
 }
 
-/** UNI-1961: the type filter the sources list takes (the web's `type`) */
-/** a txt filter is accepted here (it follows UniworkDocFormat) but the client does not send it: the sources list has no txt type */
+/**
+ * UNI-1961: the type filter the sources list takes (the web's `type`). A txt filter is
+ * accepted here (it follows UniworkDocFormat) but the client does not send it: the
+ * sources list has no txt type.
+ */
 export type UniworkSourceType = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'html'
 
 export interface UniworkSourceListQuery {

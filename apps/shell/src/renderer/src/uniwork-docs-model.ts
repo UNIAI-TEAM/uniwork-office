@@ -1423,6 +1423,11 @@ export function retryActionOf(state: PickerState): PickerAction {
 export const NEW_DOC_FORMATS = ['docx', 'xlsx', 'pptx', 'md', 'txt', 'html', 'pdf'] as const
 export type NewDocFormat = (typeof NEW_DOC_FORMATS)[number]
 
+/** The formats the New document dialog offers: every one but Plain text, which lives only in the New menu (UNI-2046). */
+export const NEW_DIALOG_FORMATS = NEW_DOC_FORMATS.filter(
+  (format): format is Exclude<NewDocFormat, 'txt'> => format !== 'txt',
+)
+
 /**
  * What the Documents home offers to create, in the web's order (UNI-1953): UniNote
  * (`page`, a page rather than a file format, created through its own call) first.

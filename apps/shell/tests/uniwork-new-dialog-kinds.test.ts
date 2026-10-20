@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { NEW_KIND_LABEL_KEY } from '../src/renderer/src/UniworkDocActions'
 import * as model from '../src/renderer/src/uniwork-docs-model'
-import { strings } from '../src/renderer/src/strings'
+import { vi } from '../src/renderer/src/i18n/uniwork-home/vi'
 
 /**
  * UNI-2046 F1: Plain text lives only in the New menu. The UniWork Open dialog's
@@ -21,9 +21,7 @@ describe('New document dialog kinds', () => {
   it('shows a unique vi label per kind', () => {
     const labels = dialogKinds.map(
       (kind) =>
-        (strings.vi as Record<string, string>)[
-          NEW_KIND_LABEL_KEY[kind as keyof typeof NEW_KIND_LABEL_KEY]
-        ],
+        (vi as Record<string, string>)[NEW_KIND_LABEL_KEY[kind as keyof typeof NEW_KIND_LABEL_KEY]],
     )
     expect(labels.every(Boolean)).toBe(true)
     expect(new Set(labels).size).toBe(labels.length)
