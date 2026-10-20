@@ -873,4 +873,29 @@ describe('server mode: a comment that appears with the panel closed is re-anchor
     expect(sent.anchors.map((a) => a.commentId).sort()).toEqual([first.id, later.id].sort())
     expect(sent.anchors.every((a) => a.state === 'exact')).toBe(true)
   })
+
+  it('two receipts while the receipt list is loading send one PUT with the latest version (G819-A02 RF-4)', async () => {
+    const server = fakeServer()
+    server.add({
+      body: 'first',
+      anchor: encodeDocxAnchor(editor.state.doc, rangeOf('Intro'))!,
+      anchor_state: 'exact',
+    })
+    await mount(server, false)
+    const real = server.calls.list.getMockImplementation()!
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    server.calls.list.mockImplementationOnce((async (...args: unknown[]) => {
+      await gate
+      return (real as (...a: unknown[]) => unknown)(...args)
+    }) as never)
+    await act(async () => server.saved('v2'))
+    await act(async () => server.saved('v3'))
+    await act(async () => release())
+    await flush()
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    expect(server.calls.anchors.mock.calls[0]![0].versionId).toBe('v3')
+  })
 })

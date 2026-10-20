@@ -205,10 +205,11 @@ export function createServerAnchors(
       const before = lastRanges.get(id)
       if (r !== null || !before) continue
       // a whole-document replace (the reload after Save) collapses every range at once: look the
-      // text up again, from the old document and the live range, so edits made before the Save count
+      // text up again, from the old document and the live range, so edits made before the Save count;
+      // locate in the final state doc: appendTransaction plugins may change it after this transaction
       const anchor = replaced ? encodeDocxAnchor(transaction.before, before, opts) : null
       const range = anchor
-        ? locateDocxAnchor(transaction.doc, anchor, { ...opts, requireContext: true })
+        ? locateDocxAnchor(state().doc, anchor, { ...opts, requireContext: true })
         : null
       if (range) {
         recovered ??= new Map(now)

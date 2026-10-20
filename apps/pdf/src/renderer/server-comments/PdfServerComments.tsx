@@ -181,7 +181,8 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
     setShift(null)
     const resend = createAnchorResend({
       // a fresh list: with the pane closed nothing else lists after the first one
-      roots: () => ctlRef.current.freshComments(),
+      roots: async () =>
+        (await ctlRef.current.freshComments()).filter((c) => !c.parent_id && !c.deleted_at),
       send: (versionId, items) => sendAnchorMap(source, versionId, items),
       onUpdated: () => void ctlRef.current.reload(),
       onShift: setShift,
