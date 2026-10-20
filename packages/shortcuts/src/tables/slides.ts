@@ -740,6 +740,17 @@ export const slidesNotes: readonly ShortcutNote[] = [
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
 const manual: readonly ShortcutAction[] = [
+  // Open: on web Ctrl+O / Cmd+O is the browser's own, and the frame answers it only where the
+  // host grants Open (the CSV proposal_web); the ribbon shows File > Open only then
+  {
+    id: 'slides-02',
+    scope: 'slides',
+    win: ['Ctrl+O'],
+    mac: ['Cmd+O'],
+    web: { win: ['Ctrl+O'], mac: ['Cmd+O'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
   // Redo: PowerPoint's Ctrl+Y / Cmd+Y first (menus show it); the old Shift+Z chord stays
   {
     id: 'slides-08',
@@ -885,4 +896,11 @@ export const slidesShortcuts: readonly ShortcutAction[] = mergeRows(generated, m
 /** Why a manual row has no chord on a surface or platform, and remarks on manual rows:
  * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */
 export const slidesManualUnmapped: readonly UnmappedShortcut[] = []
-export const slidesManualNotes: readonly ShortcutNote[] = []
+export const slidesManualNotes: readonly ShortcutNote[] = [
+  {
+    id: 'slides-02',
+    part: 'web',
+    detail:
+      'the frame handles Ctrl+O / Cmd+O only when the host grants open; otherwise the browser keeps it',
+  },
+]
