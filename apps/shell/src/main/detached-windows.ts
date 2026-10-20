@@ -349,13 +349,27 @@ export async function detachedEditorStates(
   return out
 }
 
+/**
+ * UNI-2033: the title a detached window shows for its file (a read-only version copy says so).
+ * Idempotent by contract: a window docked back hands its decorated title to the tab strip,
+ * whose own decorator must not suffix it twice.
+ */
+let decorateTitle: (filePath: string | undefined, title: string) => string = (_filePath, title) =>
+  title
+
+export function setDetachedTitleDecorator(
+  decorate: (filePath: string | undefined, title: string) => string,
+): void {
+  decorateTitle = decorate
+}
+
 /** Save As / open-in-place landed on a new path — keep the window title and
  *  the dedup registry in sync (same contract as TabManager.setTabFileFor). */
 export function detachedSetFileFor(webContentsId: number, filePath: string): void {
   const rec = detached.get(webContentsId)
   if (!rec) return
   rec.filePath = filePath
-  if (!rec.window.isDestroyed()) rec.window.setTitle(basename(filePath))
+  if (!rec.window.isDestroyed()) rec.window.setTitle(decorateTitle(filePath, basename(filePath)))
   onChanged()
 }
 
@@ -375,7 +389,9 @@ export function detachedRenameFile(
   for (const rec of detached.values()) {
     if (rec.filePath && canonicalPath(rec.filePath) === wanted) {
       rec.filePath = newPath
-      if (!rec.window.isDestroyed()) rec.window.setTitle(basename(newPath))
+      if (!rec.window.isDestroyed()) {
+        rec.window.setTitle(decorateTitle(newPath, basename(newPath)))
+      }
       onChanged()
       return { kind: rec.kind, webContents: rec.view.webContents }
     }
@@ -396,7 +412,7 @@ export function detachedRetitleFile(
   const wanted = canonicalPath(path)
   for (const rec of detached.values()) {
     if (!rec.filePath || canonicalPath(rec.filePath) !== wanted) continue
-    if (!rec.window.isDestroyed()) rec.window.setTitle(title)
+    if (!rec.window.isDestroyed()) rec.window.setTitle(decorateTitle(rec.filePath, title))
     return { kind: rec.kind, webContents: rec.view.webContents }
   }
   return undefined
@@ -514,7 +530,7 @@ export function createDetachedEditorWindow(options: {
     ...origin,
     minWidth: 720,
     minHeight: 550,
-    title,
+    title: decorateTitle(filePath, title),
     show: !tearOffAt,
     // native frame: the editor view fills the window, so the OS title bar is
     // the only drag surface / window-controls host

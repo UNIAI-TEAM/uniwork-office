@@ -46,6 +46,11 @@ export const COMMENTS_CHANNELS = {
   context: 'uniwork:comments:context',
   /** G8-12: main -> editor renderer: a Save of `path` settled with a commit receipt */
   saved: 'uniwork:comments:saved',
+  /**
+   * UNI-2033: editor -> main (invoke `CommentsOpenVersionInput`): open version N of the
+   * bound document read-only and reveal the comment there (`CommentsOpenVersionResult`)
+   */
+  openVersion: 'uniwork:comments:open-version',
 } as const
 
 export type CommentKind = 'comment' | 'discussion'
@@ -102,6 +107,20 @@ export interface CommentsRevealPayload {
    * true when no other reveal owner is asked after this editor, so it shows its S15 line on a miss.
    */
   last?: boolean
+}
+
+/**
+ * UNI-2033: "View in version N" of a lost comment. `versionNo` is the ordinal the server kept
+ * for the comment's anchor (`anchor_version_no`); main resolves the document from `path`.
+ */
+export interface CommentsOpenVersionInput extends CommentsDocRef {
+  commentId: string
+  versionNo: number
+}
+
+/** `opened: false` for every refusal or failure; the handler never throws to the editor */
+export interface CommentsOpenVersionResult {
+  opened: boolean
 }
 
 /** the caller's effective level on the document (contract-collab §10) */
@@ -168,6 +187,8 @@ export interface UniworkCommentsApi {
   context(input: CommentsDocRef): Promise<CommentsReply<CommentsContextResult>>
   /** main pushes after a Save of `path` settled with a commit receipt; returns the unsubscribe */
   onSaved(handler: (payload: CommentsSavedPayload) => void): () => void
+  /** UNI-2033: open version N of the bound document read-only, revealing the comment there */
+  openVersion(input: CommentsOpenVersionInput): Promise<CommentsOpenVersionResult>
 }
 
 /** the global the six editor preloads expose the API under */
@@ -226,6 +247,22 @@ export function readCommentsPath(payload: unknown): string | null {
 export function parseCommentsContextInput(payload: unknown): CommentsDocRef | null {
   const path = readCommentsPath(payload)
   return path ? { path } : null
+}
+
+/**
+ * `openVersion`: the path, a bounded comment id and a positive safe integer version number; a
+ * document or version id the renderer adds is dropped (main resolves the document from the path)
+ */
+export function parseCommentsOpenVersionInput(payload: unknown): CommentsOpenVersionInput | null {
+  if (!isRecord(payload)) return null
+  const path = readCommentsPath(payload)
+  if (!path) return null
+  const { commentId, versionNo } = payload
+  if (!isId(commentId)) return null
+  if (typeof versionNo !== 'number' || !Number.isSafeInteger(versionNo) || versionNo < 1) {
+    return null
+  }
+  return { path, commentId, versionNo }
 }
 
 /** A validated saved push, or null when the payload is malformed. */

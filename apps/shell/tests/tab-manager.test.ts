@@ -1630,14 +1630,15 @@ describe('tab title decoration (UNI-2033)', () => {
   it('list() shows the decorated title; the stored title stays the file name', () => {
     manager = decorated()
     manager.openDocsTab('/store/DOC@v2/Plan.docx')
+    const docsView = lastCreatedView(createDocsView)
     manager.openSheetsTab('/store/DOC/Budget.xlsx')
     expect(manager.list().map((t) => t.title)).toEqual([
       'UniWork Office',
       'Plan.docx · v2',
       'Budget.xlsx',
     ])
-    expect(manager.describeWebContents(1)).toBeNull()
-    expect(manager.activeOfficeTab()?.title).toBe('Budget.xlsx')
+    // the stored title stays the raw file name, so renames and re-titles work on it
+    expect(manager.describeWebContents(docsView.webContents.id)?.title).toBe('Plan.docx')
   })
 
   it('a rename keeps following the decoration of the new path', () => {

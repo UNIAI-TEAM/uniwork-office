@@ -303,6 +303,12 @@ export interface UniworkDocsClient {
     limit?: number
   }): Promise<OrgMemberPage>
   getDocument(documentId: string): Promise<DocumentDetail>
+  /**
+   * UNI-2033: the server id of version `versionNo` (>= 1) of a document
+   * (`GET /documents/{id}/versions/{N}`), which names the version a read-only
+   * copy of it shows to the comments seam
+   */
+  getVersionId(documentId: string, versionNo: number): Promise<string>
   download(documentId: string, version?: number): Promise<DownloadResult>
   /**
    * G5-05: the same download read chunk by chunk, with progress and cancel.
@@ -429,6 +435,23 @@ export function uniworkId(value: string): string {
   return encodeURIComponent(value)
 }
 const id = uniworkId
+
+/** `{ version: { id, version } }` of one numbered version; the number must be the one asked for */
+function parseVersionId(raw: unknown, versionNo: number): string {
+  const version = (raw as { version?: unknown } | null)?.version as
+    { id?: unknown; version?: unknown } | null | undefined
+  if (
+    !version ||
+    typeof version !== 'object' ||
+    typeof version.id !== 'string' ||
+    version.id.length === 0 ||
+    version.id.length > 128 ||
+    version.version !== versionNo
+  ) {
+    throw new UniworkDocError('malformed_response')
+  }
+  return version.id
+}
 
 /** a compound `<source>:<rowId>` segment the sources routes issue (document_sources.go:352-355) */
 export function uniworkSourceId(value: string): string {
@@ -1251,6 +1274,17 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const detail = parseDetail(raw)
       if (detail.id !== documentId) throw new UniworkDocError('malformed_response')
       return detail
+    },
+
+    async getVersionId(documentId, versionNo) {
+      if (!Number.isSafeInteger(versionNo) || versionNo < 1) throw new UniworkDocError('not_found')
+      const raw = await send({
+        method: 'GET',
+        route: `/documents/${id(documentId)}/versions/${versionNo}`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseVersionId(raw, versionNo)
     },
 
     async download(documentId, version) {

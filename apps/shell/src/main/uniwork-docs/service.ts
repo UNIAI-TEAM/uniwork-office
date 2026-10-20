@@ -9164,6 +9164,11 @@ export class UniworkDocsService {
       const open = await this.openTabCopy(identity, documentId)
       if (open) return this.focusOpen(open.path, open.title)
     }
+    // UNI-2033: the @vN copy names the version it shows to the comments seam; a failed lookup
+    // leaves it unset (the comments kit then keeps a lost thread lost)
+    const viewVersionId = viewTicket
+      ? await this.versionIdOf(documentId, launch.version, detail)
+      : undefined
     const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
     const effectiveViewOnly = viewTicket || viewRequested || Boolean(detail.shelvedAt)
     const access: UniworkDocAccess = effectiveViewOnly ? 'view' : accessFor(detail.myLevel)
@@ -9192,6 +9197,7 @@ export class UniworkDocsService {
             detail,
             viewTicket || viewRequested,
           )
+          if (viewVersionId) binding.baseVersionId = viewVersionId
           // G5-06 W4b: the queue's refusal code is `permission_revoked` (the old
           // `forbidden`); a re-granted edit level clears the copy for saving
           if (
@@ -9300,10 +9306,57 @@ export class UniworkDocsService {
       base,
       viewTicket || viewRequested,
     )
+    if (viewVersionId) binding.baseVersionId = viewVersionId
     // a refused write is never ignored, exactly as in the branch above: the
     // copy then reads as the binding that persisted, not the refused one
     const written = await this.store.write(dir, binding)
     return this.show(path, written ? binding : (existing ?? binding))
+  }
+
+  /**
+   * UNI-2033: the server id of version `versionNo`, or undefined when it cannot be read. The head
+   * version is already named by the document read, so only an older one costs a request.
+   */
+  private async versionIdOf(
+    documentId: string,
+    versionNo: number,
+    detail: DocumentDetail,
+  ): Promise<string | undefined> {
+    if (versionNo === detail.file.version) return detail.file.versionId
+    try {
+      return await this.api().getVersionId(documentId, versionNo)
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
+   * UNI-2033 "View in version N": the read-only `@vN` copy of a document, opened like a view
+   * ticket but without one (the shell already holds the account session), then the thread of
+   * `commentId` is revealed in it through the same held reveal a launch ticket uses.
+   */
+  async openVersionView(
+    documentId: string,
+    versionNo: number,
+    commentId: string,
+  ): Promise<{ path: string; title: string }> {
+    if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+    const detail = await this.api().getDocument(documentId)
+    const opened = await this.openFromServer(documentId, {
+      // a ticket's bookkeeping fields; the view open reads none of them
+      receiptId: '',
+      redeemedAt: '',
+      downloadPath: '',
+      id: documentId,
+      organizationId: detail.organizationId,
+      workspaceId: detail.workspaceId,
+      title: detail.title,
+      operation: 'view',
+      version: versionNo,
+      revision: detail.revision,
+    })
+    this.deps.revealComment?.(opened.path, commentId)
+    return opened
   }
 
   /** the document's own working copy when a tab shows it */

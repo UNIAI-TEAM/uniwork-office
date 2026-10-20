@@ -134,6 +134,7 @@ import { createSourceSaveHint } from './uniwork-docs/source-view'
 import { saveTabToUniWork } from './uniwork-docs/first-save-open'
 import { mergeEditorStates, startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { createActiveDocRefresh } from './uniwork-docs/active-doc-refresh'
+import { withViewVersionTitle } from './uniwork-docs/view-title'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
@@ -400,6 +401,7 @@ import {
   detachedSetFileFor,
   detachedWebContentsFor,
   detachedRetitleFile,
+  setDetachedTitleDecorator,
   detachedSetTitleFor,
   detachedWindowForWebContents,
   dockBandFor,
@@ -3724,8 +3726,13 @@ function createShellWindow(): void {
               : tm('untitledSheet'),
     // the tab strip is interface chrome, so its height follows the scale
     () => currentUiScale,
+    // UNI-2033: a read-only copy of an older version says so in its title
+    (filePath, title) => withViewVersionTitle(title, filePath, currentLang()),
   )
   tabManager = manager
+  setDetachedTitleDecorator((filePath, title) =>
+    withViewVersionTitle(title, filePath, currentLang()),
+  )
 
   // Docking: a detached window dragged over this window's tab strip hands its
   // document back. The strip reports the insertion slot for each preview
