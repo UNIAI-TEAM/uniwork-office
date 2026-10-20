@@ -5104,6 +5104,9 @@ function registerHomeIpc(): void {
     (_event, path: unknown, newName: unknown): RenameResult => {
       if (typeof path !== 'string' || typeof newName !== 'string')
         return { ok: false, error: tm('errBadArgs') }
+      // UNI-1993: a view-only source is a temp copy; renamed, it would leave the
+      // registry and read as a plain editable local file
+      if (uniworkDocs?.service.sourceViews.has(path)) return { ok: false, error: tm('errBadArgs') }
       // Validate the raw name before trimming: trimming first would
       // silently turn "report " into "report" and make the
       // trailing-space gate in isValidRenameName unreachable. Reject
