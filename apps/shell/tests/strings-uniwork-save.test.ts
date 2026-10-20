@@ -49,6 +49,11 @@ describe('uniwork save string shards', () => {
     },
   )
 
+  it('UNI-1975: drops the shared-folder note in every locale (folders are not shared, a document keeps its own access)', () => {
+    expect(referenceKeys).not.toContain('usSharedNote')
+    for (const lang of LANGS) expect(Object.keys(table(lang))).not.toContain('usSharedNote')
+  })
+
   it('never says "cục bộ" (no local-only wording)', () => {
     const all = LANGS.flatMap((l) => Object.values(table(l)))
     expect(all.filter((v) => /cục bộ/i.test(v.normalize('NFC')))).toEqual([])
@@ -73,7 +78,6 @@ describe('uniwork save string shards', () => {
     expect(vi.usPickTitle).toBe('Chọn nơi lưu')
     expect(vi.usBack).toBe('Quay lại đặt tên')
     expect(vi.usSearchFolders).toBe('Tìm thư mục')
-    expect(vi.usSharedNote).toBe('Lưu vào thư mục chung thì tài liệu nhận quyền của thư mục đó.')
     expect(vi.usChooseFolder).toBe('Chọn “{folder}”')
     expect(vi.usSelected).toBe('Đang chọn')
     expect(vi.usPrivateTag).toBe('Riêng tư')

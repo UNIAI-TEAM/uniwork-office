@@ -3501,6 +3501,13 @@ async function rememberDiskState(wcId: number, filePath: string, hash: string): 
   }
 }
 
+/** shell notification: the shell itself rewrote `filePath` (a UniWork reload's
+ *  undo), so the next Save onto it is not a change by another program. Nothing
+ *  recorded is never a conflict; the next write records its state again. */
+export function forgetDocsDiskState(filePath: string): void {
+  for (const states of docDiskStates.values()) states.delete(filePath)
+}
+
 async function diskChangedExternally(wcId: number, filePath: string): Promise<boolean> {
   let current: { mtimeMs: number; size: number } | null
   try {

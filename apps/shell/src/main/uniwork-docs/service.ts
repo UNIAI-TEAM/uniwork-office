@@ -10,6 +10,7 @@ import type {
   UniworkCreateDocInput,
   UniworkCreatePageInput,
   UniworkCreateFolderInput,
+  UniworkCreateVisibility,
   UniworkDocAccess,
   UniworkDocActionError,
   UniworkDocActionResult,
@@ -25,6 +26,7 @@ import type {
   UniworkDocEditLock,
   UniworkEditLockSessionView,
   UniworkFirstSaveInput,
+  UniworkFirstSaveNameRequest,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
@@ -108,6 +110,7 @@ import {
   workingCopyName,
 } from './formats'
 import { pathKey } from '../../shared/path-key'
+import { isBlankDefaultTitle } from '../../shared/blank-default-names'
 import { LaunchController } from './launch'
 import { createDocumentLimitsCache, type DocumentLimits, type DocumentLimitsCache } from './limits'
 import { tUniworkDocs } from './strings'
@@ -332,6 +335,12 @@ export interface UniworkDocsServiceDeps {
    * `onUserSave`.
    */
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
+  /**
+   * The shell itself rewrote the file at `path` behind its module: a module
+   * that refuses to write over another program's change (docs) forgets what
+   * it recorded, so the next Save writes. Absent / a no-op for the others.
+   */
+  noteShellRewrote?(path: string): void
   /** remounts the tab showing the path so it re-reads the file */
   reloadPath(path: string): void
   activePath(): string | undefined
@@ -379,6 +388,19 @@ export interface UniworkDocsServiceDeps {
   pushStatus(status: UniworkDocStatus): void
   /** G5-06u: ask the shell renderer to open the queue popover of a path */
   pushQueuePopover?(request: UniworkQueuePopoverRequest): void
+  /**
+   * UNI-1959: ask the shell renderer for the "Name the document" dialog on the
+   * first save of a blank-created document and wait for its verdict:
+   * `continue` (named / moved / unchanged: the save goes on), `cancel` (no
+   * save) or `unavailable` (no dialog host was ever up: the save goes on, but
+   * nothing was confirmed). Absent = the save never asks (a build without the
+   * dialog host).
+   */
+  requestFirstSaveName?(
+    request: UniworkFirstSaveNameRequest,
+  ): Promise<'continue' | 'cancel' | 'unavailable'>
+  /** UNI-1959: takes a pending ask back (its tab closed, its session ended): cancel + drop its dialog */
+  dismissFirstSaveName?(requestId: string): void
   /**
    * EL-1(b) fix6 (VEL-2): broadcast `{ path }` on `uniwork:doc-state-changed`
    * when `isReadOnly(path)` or `isBound(path)` may have changed.
@@ -465,6 +487,11 @@ export interface UniworkDocsServiceDeps {
    */
   firstSaveFlushTimeoutMs?: number
   /**
+   * How long "Save to UniWork" from the close prompt waits for the upload to
+   * settle (UNI-1959 test seam; production leaves CLOSE_SAVE_WAIT_MS).
+   */
+  closeSaveWaitMs?: number
+  /**
    * ADVISOR D4 (a): this build's packaging flag (the wiring passes
    * app.isPackaged), read only by the dev-only S6 display fixture. Absent reads
    * as packaged, so a test that does not install the wiring stays inert.
@@ -518,6 +545,16 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
  * never reaches the user-save hook.
  */
 export const CLOSE_SAVE_WAIT_MS = 30_000
+
+/** UNI-1959: one first-save naming operation (see `firstSaveOps`) */
+interface FirstSaveOp {
+  /** the session that started it: its identity and epoch are revalidated before every step */
+  session: { identity: SessionIdentity; epoch: number }
+  documentId: string
+  /** the id of the ask pushed to the renderer, once there is one (dismissed with it) */
+  requestId: string | null
+  cancelled: boolean
+}
 
 /** back-off before a failed last-account.json write is retried */
 const LAST_OWNER_RETRY_MS = 2000
@@ -691,6 +728,16 @@ async function readFileRange(
 }
 
 /**
+ * UNI-1959: the one `visibility` a create may send. Only `workspace` ("Share
+ * with workspace") goes out; anything else a hand-typed invoke carries is
+ * dropped, so a private create and a create inside a shared folder (which the
+ * server inherits) send no field at all.
+ */
+function visibilityOf(input: { visibility?: unknown }): { visibility?: UniworkCreateVisibility } {
+  return input.visibility === 'workspace' ? { visibility: 'workspace' } : {}
+}
+
+/**
  * a trimmed, NFC-normalized name of 1..`max` runes (the server trims and
  * normalizes the same way, so the string the field shows is the one the server
  * stored). `max` defaults to the widest document cap; FD-11 passes the folder
@@ -718,7 +765,7 @@ function requireName(raw: string, max = MAX_DOC_NAME_RUNES): string {
  */
 async function actionResult<T>(
   run: () => Promise<T>,
-  options: { nameField?: boolean } = {},
+  options: { nameField?: boolean; flagMissingEndpoint?: boolean } = {},
 ): Promise<UniworkDocActionResult<T>> {
   try {
     return { ok: true, value: await run() }
@@ -740,12 +787,18 @@ async function actionResult<T>(
     // names the server document it left (compensated or not)
     const documentId = error instanceof UniworkDocError ? error.documentId : undefined
     const documentTitle = error instanceof UniworkDocError ? error.documentTitle : undefined
+    // UNI-1959: the server has no route for this create (the web's isEndpointMissing)
+    const endpointMissing =
+      options.flagMissingEndpoint === true &&
+      error instanceof UniworkDocError &&
+      (error.status === 404 || error.status === 501)
     return {
       ok: false,
       error: code,
       ...(max === undefined ? {} : { max }),
       ...(documentId === undefined ? {} : { documentId }),
       ...(documentTitle === undefined ? {} : { documentTitle }),
+      ...(endpointMissing ? { endpointMissing: true } : {}),
     }
   }
 }
@@ -1173,6 +1226,25 @@ export class UniworkDocsService {
    */
   private readonly selfRenamed = new Map<string, string>()
   /**
+   * UNI-1959: documents this app created blank from the menu / strip / default
+   * name (`createDocument`) and has not had a first save for yet; their first
+   * user save asks name + folder. Keyed by account + document
+   * (`firstSaveKeyOf`), and emptied at every session boundary. A document the
+   * dialog already answered is in `firstSaveNamed` instead.
+   */
+  private readonly createdBlank = new Set<string>()
+  /** UNI-1959: documents whose "Name the document" step the person answered this session (never asked twice) */
+  private readonly firstSaveNamed = new Set<string>()
+  /**
+   * UNI-1959: the naming operation in flight per path key - the metadata read,
+   * the pushed ask and the held save are one unit owned by the session that
+   * started it. A second Save while it is open only waits; a closed tab or a
+   * session boundary cancels it.
+   */
+  private readonly firstSaveOps = new Map<string, FirstSaveOp>()
+  /** UNI-1959: told the path key of every naming op that ends (a close-save wait re-arms on it) */
+  private readonly firstSaveOpEnded = new Set<(key: string) => void>()
+  /**
    * G5-03a (S6): the bar of each path as this session knows it, keyed by path.
    * An entry (even `null`, an explicitly hidden bar) is authoritative over the
    * rebuild from the binding - so `later`/`close` stay hidden and a fresh
@@ -1287,6 +1359,9 @@ export class UniworkDocsService {
         upload: (input) => this.api().upload(input),
         commit: (input) => this.api().commit(input),
         getDocument: (documentId) => this.api().getDocument(documentId),
+        // UNI-1918 (B69-lite): the one lookup the inline pipeline runs when the
+        // server refuses a staged upload whose claim expired
+        lookupCommit: (input) => this.api().lookupCommit(input),
         // BIGUP-A1: a version payload above `chunked_upload_threshold_bytes`
         // goes through an upload session instead of one multipart POST
         uploadSession: {
@@ -1352,6 +1427,14 @@ export class UniworkDocsService {
           const engine = await this.queueEngineOrNull()
           const st = (await engine?.supersede(doc)) ?? doc.record.state
           return st
+        },
+        supersedeDeferRelease: async (doc) => {
+          const engine = await this.queueEngineOrNull()
+          if (engine?.supersedeDeferRelease) return engine.supersedeDeferRelease(doc)
+          return {
+            state: (await engine?.supersede(doc)) ?? doc.record.state,
+            release: async () => {},
+          }
         },
         tombstone: async (doc) =>
           (await this.queueEngineOrNull())?.tombstone(doc) ?? doc.record.state,
@@ -1568,6 +1651,8 @@ export class UniworkDocsService {
     const droppedPaths: string[] = []
     for (const path of paths) {
       if (typeof path !== 'string' || !path) continue
+      // UNI-1959: a name dialog still open for a closed tab is dismissed with it
+      this.cancelFirstSaveFor(path)
       const key = pathKey(path)
       const session = this.editLocks.get(key)
       if (!session) continue
@@ -1812,6 +1897,9 @@ export class UniworkDocsService {
     // a poll pass that began before the last Save still sees the pre-Save
     // edits: the next pass reads the editor again
     if (dirty && mark !== undefined && (this.lastUserSave.get(doc.path) ?? 0) > mark) return
+    // UWNM-BE-R4-2: while the naming ask holds a first Save its bytes are unsent
+    // work, however clean the editor that wrote them reads
+    if (!dirty && this.firstSaveOps.has(pathKey(doc.path))) return
     if (dirty === this.editorDirty.has(doc.path)) return
     const before = this.statusOf(doc).state
     if (dirty) this.editorDirty.add(doc.path)
@@ -2816,6 +2904,17 @@ export class UniworkDocsService {
     if (queueDoc) await this.coordinator.supersede(queueDoc)
   }
 
+  /**
+   * `supersedePending` for the conflict actions: the old intent is persisted
+   * `cancelled` now, but the retained upload session's network DELETE is
+   * returned for the caller to run AFTER its local destructive steps, so no
+   * network sits between `saveRacedReplacement` and the last store write.
+   */
+  private async supersedePendingDeferRelease(doc: BoundDocument): Promise<() => Promise<void>> {
+    const queueDoc = await this.queueDocFromStore(doc)
+    return queueDoc ? await this.coordinator.supersedeDeferRelease(queueDoc) : async () => {}
+  }
+
   /** the document's stored intent as a queue doc, or null when there is none */
   private async queueDocFromStore(doc: BoundDocument): Promise<QueueDoc | null> {
     const access = await this.intentAccess()
@@ -3121,6 +3220,7 @@ export class UniworkDocsService {
 
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.sessionEpoch += 1
+    this.endFirstSaveNaming()
     this.deps.stopRuntime?.()
     if (this.queueSession) {
       this.stoppingQueueSessions.add(this.queueSession.id)
@@ -3861,11 +3961,13 @@ export class UniworkDocsService {
       this.sessionOrgId = orgId
       if (prevOrgId !== null && prevOrgId !== orgId) {
         this.sessionEpoch += 1
+        this.endFirstSaveNaming()
       }
     } else if (orgGone) {
       this.sessionOrgId = null
       if (prevOrgId !== null) {
         this.sessionEpoch += 1
+        this.endFirstSaveNaming()
       }
     } else if (this.sessionOrgId === undefined) {
       this.sessionOrgId = prevOrgId
@@ -4232,11 +4334,180 @@ export class UniworkDocsService {
       this.refuseMigration(doc)
       return
     }
-    // G5-06u: the user's own Save: a pending intent is not replayed and no
-    // second one is minted; the coordinator asks for the queue popover instead.
-    // Only a shell tab has the pill and popover: a detached editor window keeps
-    // the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
+    // UNI-1959: the first save of a document created blank asks name + folder;
+    // the upload below waits for the verdict. An ask already open for this path
+    // is checked BEFORE eligibility is read again: the dialog's own rename
+    // changes the title the fallback predicate reads, and must not release the
+    // hold (BE-2). While it is open the edits the module just wrote are unsent
+    // work, so the copy stays dirty (BE-1) and a second Save only waits.
+    const key = pathKey(doc.path)
+    if (this.firstSaveOps.has(key)) {
+      this.editorDirty.add(doc.path)
+      return
+    }
+    const session = this.wantsFirstSaveName(doc) ? this.captureActionSessionOrNull() : null
+    if (session) {
+      const op: FirstSaveOp = {
+        session,
+        documentId: doc.binding.documentId,
+        requestId: null,
+        cancelled: false,
+      }
+      this.firstSaveOps.set(key, op)
+      this.editorDirty.add(doc.path)
+      void this.askFirstSaveName(op, doc)
+        .then((answer) => {
+          const live = this.firstSaveOpLive(op)
+          if (this.firstSaveOps.get(key) === op) this.endFirstSaveOp(key)
+          // a verdict that lands after the tab closed or the session ended resumes nothing
+          if (!live) return
+          if (answer === 'cancel') {
+            this.afterFirstSaveCancelled(path)
+            return
+          }
+          // only the person's own verdict marks the document named: an unavailable
+          // dialog host (nobody was asked) leaves the next Save to ask
+          if (answer === 'continue') this.markFirstSaveNamed(op)
+          const now = this.store.lookup(path)
+          if (!now || now.binding.documentId !== op.documentId || !this.ownsLocally(now)) return
+          this.editorDirty.delete(now.path)
+          this.saveAfterFirstSaveName(path)
+        })
+        // a store that throws here leaves the op ended and the edits unsent
+        .catch(() => undefined)
+      return
+    }
+    this.saveAfterFirstSaveName(path)
+  }
+
+  /**
+   * G5-06u: the user's own Save: a pending intent is not replayed and no
+   * second one is minted; the coordinator asks for the queue popover instead.
+   * Only a shell tab has the pill and popover: a detached editor window keeps
+   * the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
+   */
+  private saveAfterFirstSaveName(path: string): void {
     void this.coordinator.save(path, { userSave: this.deps.isShellTab?.(path) ?? true })
+  }
+
+  /**
+   * UNI-1959 (the web's first-save-naming predicate): a document never saved -
+   * file version 1 - that this app created blank from the menu in this session
+   * or, after a restart, that still carries one of the default blank titles,
+   * and has not been asked yet. Version 1 is the one invariant: a document that
+   * reached version 2 by any save (a detached window, the chip) is never asked.
+   * A detached editor window has no dialog host, so it never asks.
+   */
+  private wantsFirstSaveName(doc: BoundDocument): boolean {
+    if (!this.deps.requestFirstSaveName) return false
+    if (this.deps.isShellTab?.(doc.path) === false) return false
+    const key = this.firstSaveKeyOf(doc.binding.documentId)
+    if (!key) return false
+    if (doc.binding.baseVersion !== 1) {
+      this.createdBlank.delete(key)
+      return false
+    }
+    if (this.firstSaveNamed.has(key)) return false
+    return this.createdBlank.has(key) || isBlankDefaultTitle(doc.binding.title)
+  }
+
+  /** `firstSaveNamed` / `createdBlank` are keyed by account too: a shared document is another account's own question */
+  private firstSaveKeyOf(documentId: string): string | null {
+    const identity = this.deps.identity()
+    return identity ? `${identity.deploymentId}/${identity.accountId}/${documentId}` : null
+  }
+
+  private markFirstSaveNamed(op: FirstSaveOp): void {
+    const key = this.firstSaveKeyOf(op.documentId)
+    if (!key) return
+    this.firstSaveNamed.add(key)
+    this.createdBlank.delete(key)
+  }
+
+  /** the operation may still act: not cancelled, and its session is the live one */
+  private firstSaveOpLive(op: FirstSaveOp): boolean {
+    return !op.cancelled && this.sessionLive(op.session)
+  }
+
+  /** cancel one operation and take its dialog off the renderer's queue */
+  private cancelFirstSaveOp(op: FirstSaveOp): void {
+    if (op.cancelled) return
+    op.cancelled = true
+    for (const [key, held] of this.firstSaveOps) if (held === op) this.endFirstSaveOp(key)
+    if (op.requestId) {
+      try {
+        this.deps.dismissFirstSaveName?.(op.requestId)
+      } catch {
+        // the dialog host is gone with the window; there is nothing to drop
+      }
+    }
+  }
+
+  /** the op of `key` is over: the path is free, and a waiting close starts its upload window */
+  private endFirstSaveOp(key: string): void {
+    this.firstSaveOps.delete(key)
+    for (const listener of [...this.firstSaveOpEnded]) listener(key)
+  }
+
+  /** a tab or window of `path` is gone: its naming operation goes with it */
+  private cancelFirstSaveFor(path: string): void {
+    const op = this.firstSaveOps.get(pathKey(path))
+    if (op) this.cancelFirstSaveOp(op)
+  }
+
+  /** a session boundary: every operation is cancelled and dismissed, and nothing remembered about naming survives */
+  private endFirstSaveNaming(): void {
+    for (const op of [...this.firstSaveOps.values()]) this.cancelFirstSaveOp(op)
+    this.firstSaveOps.clear()
+    this.createdBlank.clear()
+    this.firstSaveNamed.clear()
+  }
+
+  /**
+   * The person gave up naming: nothing is sent and the edits the editor wrote
+   * stay unsent work. The chip is published so a waiting close attempt hears it.
+   */
+  private afterFirstSaveCancelled(path: string): void {
+    const doc = this.store.lookup(path)
+    if (!doc || !this.ownsLocally(doc)) return
+    this.editorDirty.add(doc.path)
+    this.publish(this.statusOf(doc))
+    void this.refreshDirty(doc).catch(() => undefined)
+  }
+
+  /**
+   * Reads where the document sits now, asks the renderer for the dialog and
+   * answers its outcome. Every step is revalidated against the session that
+   * started the operation: metadata that lands after a sign-out, an account or
+   * organization change, or after the tab closed is never shown. An unreadable
+   * document (offline, gone) or a missing / failing dialog host is
+   * `unavailable`: the save is not blocked, but nothing was confirmed.
+   */
+  private async askFirstSaveName(
+    op: FirstSaveOp,
+    doc: BoundDocument,
+  ): Promise<'continue' | 'cancel' | 'unavailable'> {
+    let ref: DocumentRef
+    try {
+      ref = await this.api().documentRef(op.documentId)
+    } catch {
+      return 'unavailable'
+    }
+    if (!this.firstSaveOpLive(op)) return 'cancel'
+    const requestId = `fsn-${randomUUID()}`
+    op.requestId = requestId
+    try {
+      return await this.deps.requestFirstSaveName!({
+        requestId,
+        path: doc.path,
+        documentId: op.documentId,
+        workspaceId: ref.workspaceId || doc.binding.workspaceId,
+        title: ref.title,
+        parentId: ref.parentId,
+      })
+    } catch {
+      return 'unavailable'
+    }
   }
 
   /**
@@ -4471,21 +4742,24 @@ export class UniworkDocsService {
     return session
   }
 
+  /** the session that started an async action is still the live one (same epoch, same device session) */
+  private sessionLive(started: { identity: SessionIdentity; epoch: number }): boolean {
+    if (this.sessionEpoch !== started.epoch) return false
+    const current = this.deps.identity()
+    const owner = started.identity
+    return (
+      !!current &&
+      current.accountId === owner.accountId &&
+      current.deploymentId === owner.deploymentId &&
+      current.deviceSessionId === owner.deviceSessionId
+    )
+  }
+
   private pushTreeChangedFor(
     started: { identity: SessionIdentity; epoch: number },
     workspaceId: string,
   ): void {
-    if (this.sessionEpoch !== started.epoch) return
-    const current = this.deps.identity()
-    const owner = started.identity
-    if (
-      !current ||
-      current.accountId !== owner.accountId ||
-      current.deploymentId !== owner.deploymentId ||
-      current.deviceSessionId !== owner.deviceSessionId
-    ) {
-      return
-    }
+    if (!this.sessionLive(started)) return
     this.deps.pushTreeChanged?.({ workspaceId })
   }
 
@@ -4555,13 +4829,20 @@ export class UniworkDocsService {
           format: input.format,
           title: name,
           ...target.create,
+          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
+        // UNI-1959: a default-named blank (the menu / strip) is never saved yet - its
+        // first user save asks name + folder. A document the person named in the
+        // retained dialog is placed already and never asks (BE-6); a response that
+        // lands after the session ended marks nothing (BE-9).
+        const marked = isBlankDefaultTitle(name) ? this.firstSaveKeyOf(created.id) : null
+        if (marked && this.sessionLive(session)) this.createdBlank.add(marked)
         // FD-11: a new document changes the folder's contents for every view
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
       },
-      { nameField: true },
+      { nameField: true, flagMissingEndpoint: true },
     )
   }
 
@@ -4580,12 +4861,15 @@ export class UniworkDocsService {
           workspaceId: target.workspaceId,
           title: name,
           ...target.create,
+          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
       },
-      { nameField: true },
+      // a server without the pages route (404 / 501) disables the UniNote kind like
+      // any other create; a folder create keeps ordinary errors (its row never disables)
+      { nameField: true, flagMissingEndpoint: true },
     )
   }
 
@@ -6723,7 +7007,11 @@ export class UniworkDocsService {
       baseRevision: doc.binding.baseRevision,
       feedOn: await this.feedOnFor(doc.binding.orgId),
       dirty:
-        doc.binding.state === 'dirty' || this.editorDirty.has(doc.path) || editor.dirty === true,
+        doc.binding.state === 'dirty' ||
+        this.editorDirty.has(doc.path) ||
+        // UNI-1959: the bytes the editor saved while the name dialog is open are not sent yet
+        this.firstSaveOps.has(pathKey(doc.path)) ||
+        editor.dirty === true,
       aiRunning: editor.aiRunning,
       queue: record && !isTerminalQueueState(record.state) ? record.state : null,
       ...(record?.receipt ? { receiptRevision: record.receipt.revision } : {}),
@@ -7024,9 +7312,14 @@ export class UniworkDocsService {
     }
     const fresh = this.store.lookup(doc.path)
     if (!fresh) return
-    // a save or the schema 1 -> 2 sweep took the copy while it was fetching:
-    // the fetched bytes may not be written over it
-    if (this.coordinator.isSaving(fresh.path) || this.heldByMigration(fresh.dir)) {
+    // a save, a first-save naming hold (UNI-1959: the module already wrote the
+    // bytes the upload waits on) or the schema 1 -> 2 sweep took the copy while
+    // it was fetching: the fetched bytes may not be written over it
+    if (
+      this.coordinator.isSaving(fresh.path) ||
+      this.firstSaveOps.has(pathKey(fresh.path)) ||
+      this.heldByMigration(fresh.dir)
+    ) {
       await this.showRemoteBar(fresh, notice, { kind: 'newer-dirty', version: notice.version })
       return
     }
@@ -7051,6 +7344,17 @@ export class UniworkDocsService {
       })
       return
     }
+    // UWNM-BE-R3-1: a Save (or its naming hold) that took the copy while the
+    // previous bytes were read: they may already be the person's bytes the
+    // upload waits on. No await between this check and the write below
+    if (
+      this.coordinator.isSaving(fresh.path) ||
+      this.firstSaveOps.has(pathKey(fresh.path)) ||
+      this.heldByMigration(fresh.dir)
+    ) {
+      await this.showRemoteBar(fresh, notice, { kind: 'newer-dirty', version: notice.version })
+      return
+    }
     const previousBinding = fresh.binding
     await this.store.writeWorkingCopy(fresh.dir, fresh.binding.filename, fetched.bytes)
     const reloaded: Binding = {
@@ -7072,10 +7376,25 @@ export class UniworkDocsService {
     const done = await this.coordinator.commitState(fresh, next)
     const final = await this.editorState(done.path)
     const lateMove = final.aiEpoch !== before.aiEpoch
-    if (final.dirty === true || final.aiRunning || lateMove) {
+    // UNI-1959: a first Save that landed after the pre-write check is held by its naming op
+    const lateSave = this.firstSaveOps.has(pathKey(done.path))
+    if (final.dirty === true || final.aiRunning || lateMove || lateSave) {
       // a turn (or an edit) started after the write: the previous copy goes back
-      // byte for byte, binding included, and the bar says why
-      await this.restoreWorkingCopy(done, previousBinding, previousBytes)
+      // byte for byte, binding included, and the bar says why. A late Save may
+      // already have written the person's bytes over the fetched head: those
+      // stay, and only the binding goes back
+      const ownBytes = lateSave && !(await this.holdsBytes(done.path, fetched.bytes))
+      await this.restoreWorkingCopy(done, previousBinding, ownBytes ? null : previousBytes)
+      if (lateSave && !ownBytes) {
+        // UWNM-BE-R3-1: the Save wrote before the head landed over it (or wrote
+        // the head's own bytes), so the person's bytes are only in the editor.
+        // The copy stays unsent work and the module writes them again: that
+        // Save lands under the still-open naming op, and the verdict uploads it
+        this.editorDirty.add(done.path)
+        // UWNM-BE-R4-1: the restore was the shell's own write, not another program's
+        this.deps.noteShellRewrote?.(done.path)
+        this.deps.requestModuleSave(done.path)
+      }
       const restored = this.store.lookup(path)
       if (restored) {
         await this.showRemoteBar(restored, notice, {
@@ -7092,16 +7411,24 @@ export class UniworkDocsService {
     if (shown) this.publish(toStatus(shown))
   }
 
-  /** undo the write of a reload the last read refused */
+  /** undo the write of a reload the last read refused (`bytes` null: the file is not touched) */
   private async restoreWorkingCopy(
     doc: BoundDocument,
     binding: Binding,
-    bytes: Uint8Array,
+    bytes: Uint8Array | null,
   ): Promise<void> {
-    await this.store.writeWorkingCopy(doc.dir, binding.filename, bytes).catch(() => undefined)
+    if (bytes) {
+      await this.store.writeWorkingCopy(doc.dir, binding.filename, bytes).catch(() => undefined)
+    }
     // the coordinator's chain, so the restore cannot interleave with a save's
     // own binding write for the same document
     await this.coordinator.commitState(doc, binding)
+  }
+
+  /** whether the file at `path` still holds exactly `bytes` (an unreadable file does not) */
+  private async holdsBytes(path: string, bytes: Uint8Array): Promise<boolean> {
+    const current = await readFile(path).catch(() => null)
+    return current !== null && sha256Hex(new Uint8Array(current)) === sha256Hex(bytes)
   }
 
   /** the rule order again for a notice whose bar needs a fresh verdict (an AI turn ended) */
@@ -7243,7 +7570,7 @@ export class UniworkDocsService {
       this.refuseMigration(latest)
       return false
     }
-    const wait = this.waitForSettle(latest.path, CLOSE_SAVE_WAIT_MS)
+    const wait = this.waitForSettle(latest.path, this.deps.closeSaveWaitMs ?? CLOSE_SAVE_WAIT_MS)
     const notWritten = () => {
       if (!this.coordinator.isSaving(latest.path)) wait.cancel()
     }
@@ -7311,17 +7638,34 @@ export class UniworkDocsService {
   ): { promise: Promise<UniworkDocStatus | null>; cancel: () => void } {
     let finish: (status: UniworkDocStatus | null) => void = () => undefined
     const promise = new Promise<UniworkDocStatus | null>((resolveWait) => {
+      const key = pathKey(path)
       const listener = (status: UniworkDocStatus) => {
         if (status.path === path && !ignore.has(status.state)) finish(status)
       }
-      const timer = setTimeout(() => finish(null), timeoutMs)
-      ;(timer as { unref?: () => void }).unref?.()
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const arm = () => {
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          // UNI-1959: a person still naming the document is not a stalled upload:
+          // the wait goes on, and the dialog's answer arms a fresh window
+          if (!this.firstSaveOps.has(key)) finish(null)
+        }, timeoutMs)
+        ;(timer as { unref?: () => void }).unref?.()
+      }
+      // the upload a naming op held starts when the op ends: it gets the whole
+      // deadline from that moment, however long the person took to answer
+      const opEnded = (ended: string) => {
+        if (ended === key) arm()
+      }
+      arm()
       finish = (status) => {
         clearTimeout(timer)
         this.statusListeners.delete(listener)
+        this.firstSaveOpEnded.delete(opEnded)
         resolveWait(status)
       }
       this.statusListeners.add(listener)
+      this.firstSaveOpEnded.add(opEnded)
     })
     return { promise, cancel: () => finish(null) }
   }
@@ -7552,23 +7896,7 @@ export class UniworkDocsService {
       }
     }
 
-    let intent: UniworkConflictIntentBlock = 'none'
-    const access = await this.intentAccess()
-    if (access.kind === 'ok') {
-      const stored = await access.intents.read(session.doc.key, {
-        orgId: b.orgId,
-        workspaceId: b.workspaceId,
-        baseVersion: b.baseVersion,
-        length: 0,
-      })
-      const st = stored?.intent.state
-      if (st === 'committing' || st === 'reconciling' || st === 'reconciling-stuck') {
-        intent = st
-      }
-    }
-    if (intent === 'none' && this.coordinator.isSaving(session.path)) {
-      intent = 'committing'
-    }
+    const intent = await this.conflictIntentBlock(session.doc, session.path)
 
     const keepDraft = await this.probeKeepDraft(session, session.doc)
     const moduleKind: UniworkConflictView['module'] =
@@ -7612,6 +7940,58 @@ export class UniworkDocsService {
       notice: opts.notice ?? null,
       noticeArg: opts.noticeArg ?? null,
     }
+  }
+
+  /**
+   * The conflict dialog's uncertain-intent block for `doc`: `committing` /
+   * `reconciling` / `reconciling-stuck` from the durable store, or `committing`
+   * while a Save of the path is in flight in memory.
+   */
+  private async conflictIntentBlock(
+    doc: BoundDocument,
+    savingPath = doc.path,
+  ): Promise<UniworkConflictIntentBlock> {
+    const b = doc.binding
+    let intent: UniworkConflictIntentBlock = 'none'
+    const access = await this.intentAccess()
+    if (access.kind === 'ok') {
+      const stored = await access.intents.read(doc.key, {
+        orgId: b.orgId,
+        workspaceId: b.workspaceId,
+        baseVersion: b.baseVersion,
+        length: 0,
+      })
+      const st = stored?.intent.state
+      if (st === 'committing' || st === 'reconciling' || st === 'reconciling-stuck') {
+        intent = st
+      }
+    }
+    if (intent === 'none' && this.coordinator.isSaving(savingPath)) {
+      intent = 'committing'
+    }
+    return intent
+  }
+
+  /**
+   * N1: did a Save land between the action's view check and its first
+   * destructive step? The only await here is the drain of an in-flight
+   * attempt; the caller must keep this immediately before its
+   * `supersedePending` / `writeWorkingCopy` / `dropIntent`. True = a Save ran
+   * (its durable intent is not `none`, or the base the action started from
+   * moved): the replacement must supersede, drop and overwrite nothing.
+   */
+  private async saveRacedReplacement(
+    doc: BoundDocument,
+    start: { baseRevision: string; baseChecksum: string },
+  ): Promise<boolean> {
+    if (this.coordinator.isSaving(doc.path)) await this.coordinator.settled(doc.path)
+    if ((await this.conflictIntentBlock(doc)) !== 'none') return true
+    const now = this.store.lookup(doc.path)
+    if (!now) return true
+    return (
+      now.binding.baseRevision !== start.baseRevision ||
+      now.binding.baseChecksum !== start.baseChecksum
+    )
   }
 
   private async probeKeepDraft(
@@ -7781,6 +8161,9 @@ export class UniworkDocsService {
     }
     try {
       const done = await this.replaceWithLatest(chosen)
+      if (!done) {
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
       if (open.remoteNotice) {
         this.remoteBars.set(pathKey(done.path), {
           kind: 'updated',
@@ -8247,12 +8630,33 @@ export class UniworkDocsService {
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
+    // N1: the view this action decided on was built earlier (its keep-draft
+    // probe and capability read await). A Save admitted since then - the user's
+    // Ctrl/Cmd+S - must not have its intent superseded or deleted under it, and
+    // the base it committed must not be overwritten by this one. Drain it and
+    // re-check right before the first destructive step, with no other await in
+    // between; a Save that ran leaves the decision to the conflict view.
+    if (
+      await this.saveRacedReplacement(chosen, {
+        baseRevision: chosen.binding.baseRevision,
+        baseChecksum: chosen.binding.baseChecksum,
+      })
+    ) {
+      return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+    }
     // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
     // user's snapshot is spent (superseded), never replayed against the new base
-    await this.supersedePending(chosen)
-    // the old base's intent is invalid on the server's revision
-    await this.dropIntent(chosen)
-    const ready = await this.coordinator.commitState(chosen, next)
+    const releaseSession = await this.supersedePendingDeferRelease(chosen)
+    let ready: BoundDocument
+    try {
+      // the old base's intent is invalid on the server's revision
+      await this.dropIntent(chosen)
+      ready = await this.coordinator.commitState(chosen, next)
+    } finally {
+      // the superseded intent's upload session is released after the local steps, and also
+      // when one of them fails, so the server session is never leaked
+      await releaseSession()
+    }
     if (!currentView.online) {
       await this.coordinator.save(ready.path, { forceOffline: true })
       open.controller.abort()
@@ -8350,38 +8754,62 @@ export class UniworkDocsService {
   // ---- flows -----------------------------------------------------------------
 
   /** "Discard my changes and open the latest": download, replace, reload the tab */
-  private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument> {
+  private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument | null> {
+    // A Save of this path may still be in flight: the module's own Save landing
+    // in the keep-draft flush window, or a Ctrl/Cmd+S racing the dialog. Its
+    // durable intent must never be superseded or deleted under it - the record
+    // is what authorizes the commit POST (R2), so deleting it refuses the POST
+    // and orphans the staged upload, and the base read below would race the
+    // commit.
+    // N1: a Save can also be admitted DURING this action (the user's Ctrl/Cmd+S
+    // while the download runs). So the drain + re-check runs immediately before
+    // the first destructive step - `supersedePending` / `writeWorkingCopy` /
+    // `dropIntent` - with no other await in between: a Save that ran (its
+    // durable intent is not `none`, or the base this action started from moved)
+    // leaves the replacement to the dialog's conflict view instead.
+    const start = {
+      baseRevision: doc.binding.baseRevision,
+      baseChecksum: doc.binding.baseChecksum,
+    }
     const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
+    if (await this.saveRacedReplacement(doc, start)) return null
     // "Tải lại": the old intent is superseded BEFORE the base is replaced, so
     // it is spent (cancelled/superseded), never replayed against the new base
-    await this.supersedePending(doc)
-    await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
-    // the local work (and its intent) is discarded: nothing is left to replay
-    await this.dropIntent(doc)
-    const fresh: Binding = {
-      ...doc.binding,
-      title: detail.title,
-      access: accessFor(detail.myLevel),
-      baseRevision: detail.revision,
-      baseVersion: detail.file.version,
-      baseChecksum: sha256Hex(bytes),
-      // the old intent is superseded below; the copy reads saved
-      state: 'saved',
+    const releaseSession = await this.supersedePendingDeferRelease(doc)
+    let done: BoundDocument
+    try {
+      await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
+      // the local work (and its intent) is discarded: nothing is left to replay
+      await this.dropIntent(doc)
+      const fresh: Binding = {
+        ...doc.binding,
+        title: detail.title,
+        access: accessFor(detail.myLevel),
+        baseRevision: detail.revision,
+        baseVersion: detail.file.version,
+        baseChecksum: sha256Hex(bytes),
+        // the old intent is superseded below; the copy reads saved
+        state: 'saved',
+      }
+      // the base moved: the old version id must not survive an unknown new one
+      delete fresh.baseVersionId
+      const next = withServerContext(fresh, detail)
+      delete next.error
+      delete next.serverRevision
+      delete next.serverVersion
+      // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
+      this.lastUserSave.set(doc.path, ++this.saveCounter)
+      this.editorDirty.delete(doc.path)
+      done = await this.coordinator.commitState(doc, next)
+      // the bar belonged to the replaced base: the copy is at the head now
+      this.remoteBars.delete(pathKey(doc.path))
+      this.remoteNotices.delete(pathKey(doc.path))
+      this.deps.reloadPath(doc.path)
+    } finally {
+      // the superseded intent's upload session is released after the local steps, and also
+      // when one of them fails, so the server session is never leaked
+      await releaseSession()
     }
-    // the base moved: the old version id must not survive an unknown new one
-    delete fresh.baseVersionId
-    const next = withServerContext(fresh, detail)
-    delete next.error
-    delete next.serverRevision
-    delete next.serverVersion
-    // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
-    this.lastUserSave.set(doc.path, ++this.saveCounter)
-    this.editorDirty.delete(doc.path)
-    const done = await this.coordinator.commitState(doc, next)
-    // the bar belonged to the replaced base: the copy is at the head now
-    this.remoteBars.delete(pathKey(doc.path))
-    this.remoteNotices.delete(pathKey(doc.path))
-    this.deps.reloadPath(doc.path)
     return done
   }
 

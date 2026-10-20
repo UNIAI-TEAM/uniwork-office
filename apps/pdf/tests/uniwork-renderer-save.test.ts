@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   drainedOrigin,
+  dropWrittenPending,
   forcesBoundSave,
   pdfExplainReadOnlySave,
 } from '../src/renderer/uniwork-save'
@@ -46,6 +47,30 @@ describe('drainedOrigin', () => {
   it('keeps an all-autosave batch silent and mixed internal work internal', () => {
     expect(drainedOrigin(['auto', 'auto'])).toBe('auto')
     expect(drainedOrigin(['auto', 'internal'])).toBe('internal')
+  })
+})
+
+describe('dropWrittenPending (UNI-1984: a queued save must not write the last save again)', () => {
+  const a = { id: 'a', input: { text: 'one', rect: [0, 0, 1, 1] } }
+  const b = { id: 'b', input: { text: 'two', rect: [0, 0, 1, 1] } }
+
+  it('drops the item the last save wrote and keeps the rest', () => {
+    expect(dropWrittenPending([a, b], [a])).toEqual([b])
+  })
+  it('returns nothing when every pending item was written', () => {
+    expect(dropWrittenPending([a, b], [a, b])).toEqual([])
+  })
+  it('drops an item that is value-equal to the written one (state objects may be copied)', () => {
+    expect(dropWrittenPending([{ ...a, input: { ...a.input, rect: [0, 0, 1, 1] } }], [a])).toEqual(
+      [],
+    )
+  })
+  it('keeps an item with the same id but changed content: the user edited it during the write', () => {
+    const edited = { id: 'a', input: { text: 'one, edited', rect: [0, 0, 1, 1] } }
+    expect(dropWrittenPending([edited, b], [a])).toEqual([edited, b])
+  })
+  it('keeps everything when nothing was written', () => {
+    expect(dropWrittenPending([a, b], [])).toEqual([a, b])
   })
 })
 

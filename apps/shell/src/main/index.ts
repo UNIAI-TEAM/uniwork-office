@@ -148,6 +148,7 @@ import {
   buildDocsMenu,
   configureDocsRuntime,
   docsFileRenamed,
+  forgetDocsDiskState,
   readRecentFiles,
   readStarredFiles,
   readStarredGroupMap,
@@ -923,8 +924,8 @@ const tMain = createI18n({
     menuFile: 'Tệp',
     menuSectionNew: 'Mới',
     menuOpenInNewWindow: 'Mở trong cửa sổ mới',
-    uwOfflinePin: 'Dùng khi không có mạng',
-    uwOfflineUnpin: 'Bỏ dùng khi không có mạng',
+    uwOfflinePin: 'Lưu để dùng offline',
+    uwOfflineUnpin: 'Bỏ dùng offline',
     uwOfflineUnpinConfirm:
       'Bản tải về sẽ được xóa khỏi máy này. Nháp và lần lưu đang chờ được giữ lại.',
     uwOfflineUnpinShort: 'Bỏ ghim',
@@ -4117,6 +4118,8 @@ function uniworkDocsWiring() {
     isPathOpen: (path: string) => webContentsForPath(path) !== undefined,
     // the module's own Save (same path as the menu), which ends in the user-save hook
     requestModuleSave: requestUniworkModuleSave,
+    // UWNM-BE-R4-1: docs' outside-change check; slides / sheets keep no such state
+    noteShellRewrote: (path: string) => forgetDocsDiskState(path),
     reloadPath: (path: string) => {
       reloadPathTarget(webContentsForPath(path), path, (tabId) => tabManager?.reloadTab(tabId))
     },

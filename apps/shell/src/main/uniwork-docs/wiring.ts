@@ -91,6 +91,7 @@ import { scopeWorkingCopyDirs } from './binding-store'
 import { tUniworkDocs } from './strings'
 import { createTreeChangedCoalescer } from './tree-changed'
 import { registerFirstSaveOpenAck } from './first-save-open'
+import { createFirstSaveNameBroker, registerFirstSaveNameAnswer } from './first-save-name'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
 import { createOfflineCopies } from '../uniwork-sync/offline-library/copies'
@@ -130,6 +131,8 @@ export interface UniworkDocsWiring {
   /** EL-1(b) fix6 (VEL-2): broadcast `{ path }` to every renderer webContents */
   pushDocStateChanged?(path: string): void
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
+  /** UWNM-BE-R4-1: the shell rewrote `path` itself (docs forgets its disk state) */
+  noteShellRewrote?(path: string): void
   reloadPath(path: string): void
   /**
    * G5-03a: the FRESH editor state of one path, summed over every view that
@@ -680,6 +683,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
+  // UNI-1959: the "Name the document" dialog's ask / verdict round trip
+  const firstSaveName = createFirstSaveNameBroker()
   const syncStore = syncStoreFor().access
   /**
    * FD-11: the one tree-changed push of this process. A feed page (through the
@@ -755,6 +760,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPathOpen: (path) => wiring.isPathOpen(path),
     requestModuleSave: (path, onNotWritten, mode) =>
       wiring.requestModuleSave(path, onNotWritten, mode),
+    noteShellRewrote: (path) => wiring.noteShellRewrote?.(path),
     reloadPath: (path) => wiring.reloadPath(path),
     // G5-03a: the fresh editor state of one path (W2's live read; the wiring
     // placeholder is what index.ts installs today)
@@ -784,6 +790,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    requestFirstSaveName: (request) => firstSaveName.request(wiring.shellContents(), request),
+    dismissFirstSaveName: (requestId) => firstSaveName.cancel(requestId),
     pushDocStateChanged: (path) => wiring.pushDocStateChanged?.(path),
     // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
     // discussionTarget already resolves); a detached editor window is not one
@@ -963,6 +971,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // SAVE-01 r2 (S01-R1-6): the renderer's "dialog is open" ack that releases a
   // File > Save's pending firstSaveOpen; a stale or foreign ack is a no-op
   registerFirstSaveOpenAck(ipcMain)
+  registerFirstSaveNameAnswer(ipcMain, firstSaveName)
   ipcMain.handle(UNIWORK_DOC_CHANNELS.saveLocalCopy, (_event, path: unknown) =>
     service.saveLocalCopy(path as string),
   )

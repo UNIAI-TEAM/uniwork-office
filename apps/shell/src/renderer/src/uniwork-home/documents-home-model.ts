@@ -1,5 +1,6 @@
 import type {
   UniworkDocFormat,
+  UniworkDocShareScope,
   UniworkDocListPage,
   UniworkDocListQuery,
   UniworkDocSummary,
@@ -11,6 +12,7 @@ import type {
   UniworkSourceListPage,
   UniworkSourceListQuery,
 } from '../../../shared/home-api'
+import type { Lang } from '@genoffice/i18n'
 import type { StringKey, TFunc } from '../locale'
 import { folderPath, type FolderIndex } from '../uniwork-folders/uniwork-folders-model'
 
@@ -26,6 +28,8 @@ export interface UniworkListFilters {
 export type DocumentsHomeDoc = UniworkDocSummary & {
   position?: number
   visibility?: UniworkDocVisibility
+  /** web Access cell source: the server's `share_scope` (absent = no scope label) */
+  shareScope?: UniworkDocShareScope
   myLevel?: UniworkDocAccessLevel
   updatedById?: string
   updatedByName?: string
@@ -260,13 +264,7 @@ export interface FormattedAccessCell {
   visibilityLabel: string | null
   levelLabel: string | null
   isEmpty: boolean
-  tone: UniworkDocVisibility | 'none'
-}
-
-const VISIBILITY_KEYS: Record<UniworkDocVisibility, StringKey> = {
-  private: 'uhVisPrivate',
-  workspace: 'uhVisWorkspace',
-  restricted: 'uhVisRestricted',
+  tone: ShareScopeKind | 'none'
 }
 
 const LEVEL_KEYS: Record<UniworkDocAccessLevel, StringKey> = {
@@ -276,21 +274,61 @@ const LEVEL_KEYS: Record<UniworkDocAccessLevel, StringKey> = {
   view: 'uhLevelView',
 }
 
+export type ShareScopeKind =
+  'private' | 'people' | 'workspace' | 'workspaces' | 'organization' | 'multiple' | 'link'
+
+/** `one` form for a count, the shared plural otherwise (same split as `fileCountLabel`) */
+function isSingular(count: number, lang: Lang): boolean {
+  return new Intl.PluralRules(lang).select(count) === 'one'
+}
+
 /**
- * Formats the `Truy cập` column strictly from `doc.visibility` and `doc.myLevel`.
- * Never guesses from `canEdit`/`canManage`: if `visibility` is absent, omits visibility;
- * if `myLevel` is absent, omits `"Bạn: ..."`; if both are absent, `isEmpty` is true (`"—"`).
+ * Port of the web's `shareScopeView` (packages/views/documents/document-share-scope-badge.tsx):
+ * a live public link alone is "link"; no axis at all is "private"; two or more
+ * of people / home workspace / other workspaces / organization is "multiple";
+ * otherwise the single axis in the order people > home workspace > other
+ * workspaces > organization. The public link never joins the axis count.
  */
-export function formatAccessCell(doc: DocumentsHomeDoc, t: TFunc): FormattedAccessCell {
-  const visKey = doc.visibility ? VISIBILITY_KEYS[doc.visibility] : undefined
-  const visibilityLabel = visKey ? t(visKey) : null
+export function shareScopeView(
+  scope: UniworkDocShareScope,
+  t: TFunc,
+  lang: Lang,
+): { kind: ShareScopeKind; label: string } {
+  const hasUsers = scope.users > 0
+  const hasOtherWorkspaces = scope.workspaces > 0
+  const active = [hasUsers, scope.homeWorkspace, hasOtherWorkspaces, scope.organization].filter(
+    Boolean,
+  ).length
+  if (active === 0 && scope.publicLink) return { kind: 'link', label: t('uhScopePublicLink') }
+  if (active === 0) return { kind: 'private', label: t('uhVisPrivate') }
+  if (active >= 2) return { kind: 'multiple', label: t('uhScopeMultiple') }
+  if (hasUsers) {
+    const key = isSingular(scope.users, lang) ? 'uhScopePeopleOne' : 'uhScopePeople'
+    return { kind: 'people', label: t(key, { n: scope.users }) }
+  }
+  if (scope.homeWorkspace) return { kind: 'workspace', label: t('uhVisWorkspace') }
+  if (hasOtherWorkspaces) {
+    const key = isSingular(scope.workspaces, lang) ? 'uhScopeWorkspacesOne' : 'uhScopeWorkspaces'
+    return { kind: 'workspaces', label: t(key, { n: scope.workspaces }) }
+  }
+  return { kind: 'organization', label: t('uhScopeOrganization') }
+}
+
+/**
+ * Formats the `Truy cập` column like the web row: the scope label comes only
+ * from `doc.shareScope` (a row without it has no scope label, never one guessed
+ * from `visibility`) and the level from `doc.myLevel` (omits `"Bạn: ..."` when
+ * absent). `isEmpty` (`"—"`) when both are absent.
+ */
+export function formatAccessCell(doc: DocumentsHomeDoc, t: TFunc, lang: Lang): FormattedAccessCell {
+  const scope = doc.shareScope ? shareScopeView(doc.shareScope, t, lang) : null
   const lvlKey = doc.myLevel ? LEVEL_KEYS[doc.myLevel] : undefined
   const levelLabel = lvlKey ? t('uhLevelPrefix', { level: t(lvlKey) }) : null
   return {
-    visibilityLabel,
+    visibilityLabel: scope?.label ?? null,
     levelLabel,
-    isEmpty: visibilityLabel === null && levelLabel === null,
-    tone: doc.visibility ?? 'none',
+    isEmpty: scope === null && levelLabel === null,
+    tone: scope?.kind ?? 'none',
   }
 }
 

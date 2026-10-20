@@ -281,9 +281,10 @@
   filter: var(--ai-send-off-filter, none);
 }
 
-/* icon-only composer: the no-key / no-model hint above the footer (send is off meanwhile) */
+/* icon-only composer: the no-key / no-model hint above the footer (send is off meanwhile). The
+ * inline padding is the textarea's own (14px), so the link starts where the placeholder text starts. */
 .ai-input-need {
-  padding: 0 4px 4px;
+  padding: 0 14px 4px;
   font-size: var(--text-caption);
   color: var(--text-secondary);
   user-select: none;

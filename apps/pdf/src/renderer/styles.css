@@ -4557,6 +4557,25 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   height: 3px;
 }
 
+/* a phone, or a pane the open AI panel squeezed to ~120px: the right group (zoom -, slider, zoom +,
+ * value) keeps its natural width (flex-shrink: 0) and pushed the whole frame sideways. The slider
+ * goes; the bar tightens its padding and clips (overflow: hidden) what still does not fit, instead
+ * of widening the page. */
+@media (max-width: 600px) {
+  .status-bar {
+    padding: 0 6px;
+    overflow: hidden;
+  }
+
+  .status-right {
+    gap: 2px;
+  }
+
+  .zoom-slider {
+    display: none;
+  }
+}
+
 .zoom-value {
   min-width: 38px;
   text-align: right;

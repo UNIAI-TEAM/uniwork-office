@@ -112,8 +112,13 @@ Notes:
      `recalc_cells` with the save's edits (reads in batches of 20 000) and written with its new result, so
      `A1` edited, `B1 = A1*2` and `Report!C1 = Data!B1+1` are all saved with the new numbers. The gateway only writes
      cached values into worksheets it edits, so `save-plan.ts` `rewriteCachedValues` applies them to every worksheet part
-     (a dependent on another sheet is reached). A formula the user did not type whose result is an error is written with
-     no value (IronCalc may lack a function Excel has), the error of a formula the user typed is written.
+     (a dependent on another sheet is reached). A formula the user typed is written with the engine's result (its error
+     included). A formula the user did not type is compared with the `<v>` the file already holds (UNI-1989): the same
+     result (numbers within 1e-12 relative, text, TRUE/FALSE) or an error that was an error before is `KEEP`, the cell stays
+     byte-identical (`t="e"` and `<v>#N/A</v>` survive, `1` does not become `0.9999999999999999`); a changed result is
+     written; a `#DIV/0! #N/A #REF! #VALUE! #NUM! #NULL!` the file did not hold is written as the new error (a dependent
+     of the edit); any other error, or no answer, where the file held no error is written as no value (IronCalc may lack a
+     function Excel has).
   2. _Sweep_ in every other case (structural change pending, a sheet added or removed this session, bulk fills, pivot
      output, defined names changed, > 64 MB, > 10 000 edits, > 200 000 formulas, strict importer failure, engine crash):
      the cached `<v>` of every formula cell of every worksheet part is dropped. The formulas stay verbatim; Excel and the

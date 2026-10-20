@@ -213,6 +213,39 @@ function rowMyLevelOf(value: unknown): UniworkDocSummary['myLevel'] {
     : undefined
 }
 
+/** a non-negative whole share count, or null */
+function shareCountOf(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
+}
+
+/**
+ * UNI-1958 row 1: list-row `share_scope`. Lenient like `visibilityOf`: a
+ * missing, null, partial or mistyped block (or a negative / fractional count)
+ * is absent, never an error, and the row is kept.
+ */
+function shareScopeOf(value: unknown): UniworkDocSummary['shareScope'] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const scope = value as Record<string, unknown>
+  const users = shareCountOf(scope.users)
+  const workspaces = shareCountOf(scope.workspaces)
+  if (
+    users === null ||
+    workspaces === null ||
+    typeof scope.home_workspace !== 'boolean' ||
+    typeof scope.organization !== 'boolean' ||
+    typeof scope.public_link !== 'boolean'
+  ) {
+    return undefined
+  }
+  return {
+    homeWorkspace: scope.home_workspace,
+    users,
+    workspaces,
+    organization: scope.organization,
+    publicLink: scope.public_link,
+  }
+}
+
 /** one list row as the renderer's summary (title is the only name the server sends) */
 function summaryRow(
   row: Record<string, unknown>,
@@ -223,6 +256,7 @@ function summaryRow(
   const path = pathOf(row)
   const visibility = visibilityOf(row.visibility)
   const myLevel = rowMyLevelOf(row.my_level)
+  const shareScope = shareScopeOf(row.share_scope)
   const updatedById = optId(row.updated_by) ?? undefined
   return {
     id: str(row.id, 128),
@@ -236,6 +270,7 @@ function summaryRow(
     ...(updatedById ? { updatedById } : {}),
     ...(visibility ? { visibility } : {}),
     ...(myLevel ? { myLevel } : {}),
+    ...(shareScope ? { shareScope } : {}),
     ...summaryFlags(row),
     kind,
     parentId: parentIdOf(row.parent_id),

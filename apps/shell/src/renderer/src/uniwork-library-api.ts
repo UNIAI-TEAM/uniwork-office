@@ -1,5 +1,6 @@
 import type {
   UniworkCreateFolderInput,
+  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocListPage,
   UniworkDocProperties,
@@ -63,6 +64,8 @@ export type DocActionResult<T> =
       sizeBytes?: number
       maxBytes?: number
       /** FD-11: the depth cap of a document_too_deep */ max?: number
+      /** UNI-1959: the server has no route for this create (404 / 501): disable that kind */
+      endpointMissing?: boolean
     }
 
 export interface CreateDocInput {
@@ -70,6 +73,8 @@ export interface CreateDocInput {
   folderId: string | null
   name: string
   format: NewDocFormat
+  /** UNI-1959: "Share with workspace"; absent = the server's default (a document only) */
+  visibility?: UniworkCreateVisibility
 }
 
 /** UNI-1953: a UniNote is a page, created through its own call and opened on the web */
@@ -77,6 +82,7 @@ export interface CreatePageInput {
   workspaceId: string
   folderId: string | null
   name: string
+  visibility?: UniworkCreateVisibility
 }
 
 export interface UploadDocInput {
