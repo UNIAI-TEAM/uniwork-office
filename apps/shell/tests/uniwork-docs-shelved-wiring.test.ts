@@ -235,7 +235,7 @@ function stubServer(): Seen[] {
           next_cursor: 'c_next',
         })
       }
-      const lifecycle = /^\/api\/v1\/documents\/([^/]+)\/(unshelve|archive|shelve)$/.exec(
+      const lifecycle = /^\/api\/v1\/documents\/([^/]+)\/(unshelve|archive|shelve|restore)$/.exec(
         url.pathname,
       )
       if (lifecycle && method === 'POST') {
@@ -247,18 +247,43 @@ function stubServer(): Seen[] {
             ? docBody(id!, { ...base, shelved_at: undefined })
             : action === 'archive'
               ? docBody(id!, { ...base, archived_at: '2026-10-19T09:00:00Z' })
-              : docBody(id!, { ...base, shelved_at: '2026-10-19T09:00:00Z' })
+              : action === 'restore'
+                ? docBody(id!, { ...base, archived_at: undefined })
+                : docBody(id!, { ...base, shelved_at: '2026-10-19T09:00:00Z' })
         return reply(200, {
           document,
           batch_id: 'b_1',
           affected: action === 'unshelve' && id === 'fold_s1' ? ['fold_s1', 'doc_child'] : [id],
         })
       }
+      const adminSummary = /^\/api\/v1\/documents\/([^/]+)\/admin-summary$/.exec(url.pathname)
+      if (adminSummary && method === 'GET') {
+        const docId = adminSummary[1]!
+        const base = DOCS[docId]
+        if (!base) return reply(404, { error: { code: 'not_found', message: 'x' } })
+        if (base.my_level !== 'manage' && base.admin_scope !== true) {
+          return reply(403, { error: { code: 'forbidden', message: 'x' } })
+        }
+        const { my_level, admin_scope, ...docFields } = base
+        return reply(200, {
+          document: docBody(docId, docFields),
+          my_level: typeof my_level === 'string' ? my_level : '',
+          admin_scope: admin_scope === true,
+        })
+      }
       const detail = /^\/api\/v1\/documents\/([^/]+)$/.exec(url.pathname)
       if (detail && method === 'GET') {
-        const base = DOCS[detail[1]!]
+        const docId = detail[1]!
+        const base = DOCS[docId]
         if (!base) return reply(404, { error: { code: 'not_found', message: 'x' } })
-        return reply(200, { document: docBody(detail[1]!, base) })
+        // Canonical server (decideDocumentContent): an admin_scope caller with
+        // no read level receives 403 document_restricted on GET /documents/{id}.
+        if (!base.my_level && base.admin_scope === true) {
+          return reply(403, {
+            error: { code: 'document_restricted', fields: { can_break_glass: true } },
+          })
+        }
+        return reply(200, { document: docBody(docId, base) })
       }
       return reply(404, { error: { code: 'not_found', message: 'x' } })
     }),
@@ -376,12 +401,64 @@ describe('UNI-1961 Archive (shelved) IPC: unshelve and trash from Archive', () =
     expect(seen[1]!.idempotencyKey).not.toBe('')
   })
 
-  it('unshelves a page the caller administers (admin_scope, no my_level)', async () => {
+  it('unshelves and shelves a restricted page the caller administers (admin_scope with 403 document_restricted on detail, R1-2)', async () => {
     const { call } = await setup()
     const seen = stubServer()
-    const res = (await call(UNIWORK_DOC_CHANNELS.unshelveDocument, 'page_s1')) as { ok: boolean }
-    expect(res.ok).toBe(true)
-    expect(posts(seen)).toEqual(['/api/v1/documents/page_s1/unshelve'])
+    const unshelved = (await call(UNIWORK_DOC_CHANNELS.unshelveDocument, 'page_s1')) as {
+      ok: boolean
+    }
+    expect(unshelved.ok).toBe(true)
+    const shelved = (await call(UNIWORK_DOC_CHANNELS.shelveDocument, 'page_s1')) as {
+      ok: boolean
+    }
+    expect(shelved.ok).toBe(true)
+    expect(seen.map((s) => `${s.method} ${s.url.pathname}`)).toEqual([
+      'GET /api/v1/documents/page_s1',
+      'GET /api/v1/documents/page_s1/admin-summary',
+      'POST /api/v1/documents/page_s1/unshelve',
+      'GET /api/v1/documents/page_s1',
+      'GET /api/v1/documents/page_s1/admin-summary',
+      'POST /api/v1/documents/page_s1/shelve',
+    ])
+  })
+
+  it('makes no POST when the administrative read is denied, malformed, or lacks admin_scope (R1-2)', async () => {
+    const { call } = await setup()
+    for (const [summaryReply, expectedError] of [
+      [reply(403, { error: { code: 'forbidden', message: 'x' } }), 'forbidden'],
+      [reply(200, { document: { id: 'page_s1' } }), 'malformed_response'],
+      [
+        reply(200, {
+          document: docBody('page_s1', { title: 'Meeting notes', kind: 'page' }),
+          my_level: '',
+          admin_scope: false,
+        }),
+        'forbidden',
+      ],
+    ] as const) {
+      const seen: Seen[] = []
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string, init: RequestInit = {}) => {
+          const url = new URL(String(input))
+          seen.push({ method: init.method ?? 'GET', url, idempotencyKey: '' })
+          if (url.pathname === '/api/v1/documents/page_s1') {
+            return reply(403, {
+              error: { code: 'document_restricted', fields: { can_break_glass: true } },
+            })
+          }
+          if (url.pathname === '/api/v1/documents/page_s1/admin-summary') {
+            return summaryReply.clone()
+          }
+          return reply(500, {})
+        }),
+      )
+      expect(await call(UNIWORK_DOC_CHANNELS.unshelveDocument, 'page_s1')).toEqual({
+        ok: false,
+        error: expectedError,
+      })
+      expect(posts(seen)).toEqual([])
+    }
   })
 
   it('refuses a below-manage unshelve and trash without any write', async () => {
@@ -418,24 +495,102 @@ describe('UNI-1961 Archive (shelved) IPC: unshelve and trash from Archive', () =
     expect(seen.filter((s) => s.method === 'POST').every((s) => s.idempotencyKey !== '')).toBe(true)
   })
 
-  it('leaves the existing file-only archive / restore refusing a folder and a page exactly as before', async () => {
+  it('keeps archiveDocument file-only while allowing restoreDocument to recover trashed folders and pages (R1-8)', async () => {
     const { call } = await setup()
     const seen = stubServer()
-    for (const id of ['fold_s1', 'page_s1']) {
+    for (const id of ['fold_s1', 'page_live']) {
       expect(await call(UNIWORK_DOC_CHANNELS.archiveDocument, id)).toEqual({
-        ok: false,
-        error: 'unsupported_format',
-      })
-      expect(await call(UNIWORK_DOC_CHANNELS.restoreDocument, id)).toEqual({
         ok: false,
         error: 'unsupported_format',
       })
     }
     expect(posts(seen)).toEqual([])
-    // a file still archives through it
-    expect(
-      ((await call(UNIWORK_DOC_CHANNELS.archiveDocument, 'doc_s1')) as { ok: boolean }).ok,
-    ).toBe(true)
+
+    for (const id of ['fold_s1', 'page_s1']) {
+      const restored = (await call(UNIWORK_DOC_CHANNELS.restoreDocument, id)) as {
+        ok: boolean
+        value: Record<string, unknown>
+      }
+      expect(restored.ok).toBe(true)
+      expect(restored.value).toMatchObject({ id, archived: false })
+    }
+    expect(posts(seen)).toEqual([
+      '/api/v1/documents/fold_s1/restore',
+      '/api/v1/documents/page_s1/restore',
+    ])
+    // a file still archives through archiveDocument
+    const archivedFile = (await call(UNIWORK_DOC_CHANNELS.archiveDocument, 'doc_s1')) as {
+      ok: boolean
+    }
+    expect(archivedFile.ok).toBe(true)
+  })
+
+  it('rejects a mismatched manage-reference id with malformed_response and makes no lifecycle POST (R1-14)', async () => {
+    const { call } = await setup()
+    const seen: Seen[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init: RequestInit = {}) => {
+        const url = new URL(String(input))
+        seen.push({ method: init.method ?? 'GET', url, idempotencyKey: '' })
+        return reply(200, {
+          document: docBody('wrong_doc', { title: 'Wrong', kind: 'page', my_level: 'manage' }),
+        })
+      }),
+    )
+    for (const channel of [
+      UNIWORK_DOC_CHANNELS.shelveDocument,
+      UNIWORK_DOC_CHANNELS.unshelveDocument,
+      UNIWORK_DOC_CHANNELS.trashShelvedDocument,
+      UNIWORK_DOC_CHANNELS.restoreDocument,
+    ]) {
+      expect(await call(channel, 'page_live')).toEqual({
+        ok: false,
+        error: 'malformed_response',
+      })
+    }
+    expect(posts(seen)).toEqual([])
+  })
+
+  it('refuses shelve, unshelve, and trashShelved when the session changes while the manage read is pending (R1-3)', async () => {
+    const { call } = await setup()
+    for (const channel of [
+      UNIWORK_DOC_CHANNELS.shelveDocument,
+      UNIWORK_DOC_CHANNELS.unshelveDocument,
+      UNIWORK_DOC_CHANNELS.trashShelvedDocument,
+    ]) {
+      identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+      const seen: Seen[] = []
+      let releaseGet: (res: Response) => void = () => undefined
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: string, init: RequestInit = {}) => {
+          const url = new URL(String(input))
+          const method = init.method ?? 'GET'
+          seen.push({ method, url, idempotencyKey: '' })
+          if (method === 'GET') {
+            return new Promise<Response>((resolve) => {
+              releaseGet = resolve
+            })
+          }
+          return Promise.resolve(
+            reply(200, {
+              document: docBody('fold_s1', DOCS.fold_s1!),
+              batch_id: 'b_1',
+              affected: ['fold_s1'],
+            }),
+          )
+        }),
+      )
+      const pending = call(channel, 'fold_s1')
+      await vi.waitFor(() => {
+        expect(seen).toHaveLength(1)
+      })
+      identity = { accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'other' }
+      releaseGet(reply(200, { document: docBody('fold_s1', DOCS.fold_s1!) }))
+      expect(await pending).toEqual({ ok: false, error: 'not_signed_in' })
+      expect(posts(seen)).toEqual([])
+    }
   })
 })
 
