@@ -88,6 +88,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `aiRun`                         | event   | {state: 'running' \| 'idle', run_id?} — an AI turn started / ended (additive, X-02)                  |
 | `open_refused`                  | event   | {reason, bytes?, measure?} — the frame cannot show the document (additive, SIZE-F1)                  |
 | `comments.*`, `mentions.search` | request | server comments (additive, G8-08, cap `comments`); see "Server comments" below                       |
+| `comments.viewVersion`          | request | {comment_id, version_no} → {opened} (additive, UNI-2033, cap `commentsViewVersion`)                  |
 | `size_warning`                  | event   | {bytes, max_bytes, warn_ratio} — serialized save size reached warn threshold (SIZE-F1)               |
 | `save_blocked`                  | event   | {bytes, max_bytes} — save blocked because serialized bytes exceeded max_bytes (SIZE-F1)              |
 | `close_requested`               | event   | {reason: 'escape'} — Esc pressed in the frame and no frame-local UI consumed it (additive, UNI-1876) |
@@ -96,7 +97,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
 Capabilities: `save`, `saveAs`, `saveCopy` (additive, UNI-1872), `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
-`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`, and (additive, SIZE-F1) `sizeUi`. The effective set is the frame's ∩
+`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`, and (additive, G8-18) `commentsShareView`, and (additive, UNI-2033) `commentsViewVersion`, and (additive, SIZE-F1) `sizeUi`. The effective set is the frame's ∩
 the host's grant. `desktopOpen` (additive, default false) is the "Open in desktop app" grant, see "Open in desktop app (`app.open`)" below. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
 `InitPayload.limits?: DocumentSizeLimits` and `OpenPayload.limits?: DocumentSizeLimits` (`{ max_bytes, warn_ratio }`,
@@ -216,6 +217,13 @@ Source of truth: dev-uniwork `docs/office/g5g6g7/contract-collab.md` §2 (routes
   below 15 s, and it retries once on `not_ready` / `timeout`, after 2 s or on the next `notifyCommentsChanged`; a
   second failure rejects and the caller shows nothing. `revealed: false` = the list is loaded and has no such comment
   (the frame shows that state itself).
+- `comments.viewVersion {comment_id, version_no}` → `{opened}` (frame → host, additive, UNI-2033; capability
+  `commentsViewVersion`): a comment whose anchor was lost carries `anchor_version_no` (`number | null`, integer >= 1, next
+  to `anchor_version_id`), and the frame asks the host to open that version read-only with the comment revealed.
+  `client.viewCommentVersion(payload)` rejects `unsupported` without sending when the effective capabilities lack
+  `commentsViewVersion` (or `comments`). `{opened: false}` = the host could not open it (the frame says so itself). The
+  host must not grant `commentsViewVersion` inside a version view (the open document is already a past version), so the
+  frame never offers the action there. `PROTOCOL_VERSION` stays 1.
 
 ### Open in desktop app (`app.open`, additive)
 

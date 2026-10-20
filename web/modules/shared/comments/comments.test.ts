@@ -297,7 +297,11 @@ describe('G8-18 mention access through the frame bridge (F1)', () => {
   })
 
   it('the frame claims commentsShareView with comments, so the host grant can become effective', () => {
-    expect(frameCommentsClaim(true)).toEqual({ comments: true, commentsShareView: true })
+    expect(frameCommentsClaim(true)).toEqual({
+      comments: true,
+      commentsShareView: true,
+      commentsViewVersion: true,
+    })
     expect(frameCommentsClaim(false)).toEqual({})
     expect(
       frameMentionAccess({ capabilities: { comments: true, commentsShareView: true } }),

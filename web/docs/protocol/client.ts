@@ -145,6 +145,15 @@ export interface DocsFrameClient {
     payload: FrameRequests[K]['payload'],
     options?: RequestOptions,
   ): Promise<FrameRequests[K]['result']>
+  /**
+   * ask the host to open version `version_no` read-only with `comment_id` revealed (additive,
+   * UNI-2033). Rejects `unsupported` without sending when the effective capabilities lack
+   * `commentsViewVersion` (or `comments`); `{opened: false}` = the host could not open it.
+   */
+  viewCommentVersion(
+    payload: FrameRequests['comments.viewVersion']['payload'],
+    options?: RequestOptions,
+  ): Promise<FrameRequests['comments.viewVersion']['result']>
   /** 'direct' api mode: fetch `apiBase + path` with the bearer token, credentials omitted, one retry after 401 */
   fetchApi(path: string, init?: RequestInit): Promise<Response>
   handleOpen(handler: HostRequestHandler<'open'>): () => void
@@ -441,6 +450,10 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     if (s.capabilities.comments !== true) {
       throw err('unsupported', `${type} needs the comments capability`)
     }
+    // additive (UNI-2033): the host never gets the request without its own grant
+    if (type === 'comments.viewVersion' && s.capabilities.commentsViewVersion !== true) {
+      throw err('unsupported', `${type} needs the commentsViewVersion capability`)
+    }
     if (type !== 'comments.list') {
       return (await ep.request(type, payload, opts)) as FrameRequests[K]['result']
     }
@@ -530,6 +543,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     getToken,
     refreshToken,
     request,
+    viewCommentVersion: (payload, options) => request('comments.viewVersion', payload, options),
     fetchApi,
     handleOpen: (h) =>
       ep.handle('open', (p, ctx) => {

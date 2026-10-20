@@ -9,6 +9,15 @@ export {
 } from './frame-api'
 export { frameMentionAccess, type FrameMentionAccess } from './mention-access'
 export {
+  createFrameViewVersion,
+  frameOpenVersionId,
+  frameVersionViewProps,
+  frameViewVersionAccess,
+  type FrameVersionViewProps,
+  type FrameViewVersionRequest,
+  type FrameViewVersionResult,
+} from './version-view'
+export {
   createFrameDocVersion,
   frameDocVersion,
   type FrameDocSaved,
