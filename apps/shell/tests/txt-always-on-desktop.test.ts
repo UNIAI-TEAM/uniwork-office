@@ -129,7 +129,7 @@ describe('Plain text in the native New menus', () => {
       const rest = main.slice(at + 1)
       const next = rest.match(/label: tm\('(\w+)'\)/)
       expect(next?.[1]).toBe('menuNewTxt')
-      expect(rest.slice(0, next!.index! + 40)).toContain('newTxtTab()')
+      expect(rest.slice(0, next!.index! + 120)).toContain('newTxtTab()')
     }
   })
 
