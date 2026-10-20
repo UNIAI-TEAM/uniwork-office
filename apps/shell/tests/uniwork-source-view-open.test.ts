@@ -139,7 +139,11 @@ describe('openSource: what is downloaded and how', () => {
     expect(hashDir).toMatch(/^[0-9a-f]{8,}$/)
     expect(file).toBe('Plan.docx')
     expect(new Uint8Array(readFileSync(path))).toEqual(BYTES)
-    if (process.platform !== 'win32') expect(statSync(path).mode & 0o777).toBe(0o444)
+    if (process.platform !== 'win32') {
+      // owner-only: the plaintext of a chat/email attachment must not be world-readable
+      expect(statSync(path).mode & 0o777).toBe(0o400)
+      expect(statSync(dirname(path)).mode & 0o777).toBe(0o700)
+    }
   })
 
   it('strips path separators and reserved names from the file name and never leaves the preview root', async () => {
@@ -311,6 +315,36 @@ describe('openSource: reuse of an open tab', () => {
   })
 })
 
+describe('openSource: a second open while the tab is being created', () => {
+  it('does not drop the first open when a second call lands inside openPath (tab not registered as open yet)', async () => {
+    let finish!: () => void
+    let slow!: ReturnType<typeof harness>
+    const slowOpen = vi.fn(async (path: string) => {
+      await new Promise<void>((resolve) => {
+        finish = resolve
+      })
+      slow.openTabs.add(path)
+      return true
+    })
+    slow = harness({ openPath: slowOpen })
+    const first = slow.opener.openSource(input())
+    // wait until the first call is inside openPath: downloaded, written, registered
+    for (let i = 0; i < 100 && slowOpen.mock.calls.length === 0; i += 1) {
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    expect(slowOpen).toHaveBeenCalledTimes(1)
+    const second = slow.opener.openSource(input())
+    await new Promise((r) => setTimeout(r, 20))
+    finish()
+    const [a, b] = await Promise.all([first, second])
+    if (!a.ok || !b.ok) throw new Error('open failed')
+    expect(slow.client.downloadSource).toHaveBeenCalledTimes(1)
+    expect(slow.registry.has(a.value.path)).toBe(true)
+    expect(existsSync(a.value.path)).toBe(true)
+    expect(b.value.path).toBe(a.value.path)
+  })
+})
+
 describe('openSource: refusals and error mapping', () => {
   it('refuses before downloading when sizeBytes is over the document max (too_large) and never fetches', async () => {
     const h = harness({ documentMaxBytes: () => 1000 })
@@ -322,6 +356,25 @@ describe('openSource: refusals and error mapping', () => {
     expect(sourceDirs(h.root)).toEqual([])
     // exactly the max is still fine
     expect((await h.opener.openSource(input({ sizeBytes: 1000 }))).ok).toBe(true)
+  })
+
+  it('refuses a download larger than the document max even when the row said it was small (too_large, nothing written)', async () => {
+    const h = harness({ documentMaxBytes: () => BYTES.length - 1 })
+    expect(await h.opener.openSource(input({ sizeBytes: 0 }))).toEqual({
+      ok: false,
+      error: 'too_large',
+    })
+    expect(h.client.downloadSource).toHaveBeenCalledTimes(1)
+    expect(h.openPath).not.toHaveBeenCalled()
+    expect(h.registry.paths()).toEqual([])
+    expect(sourceDirs(h.root)).toEqual([])
+  })
+
+  it('opens fine when no startup sweep was passed (no sync center built)', async () => {
+    const h = harness({ startupSweep: undefined })
+    const res = await h.opener.openSource(input())
+    expect(res.ok).toBe(true)
+    expect(h.openPath).toHaveBeenCalledTimes(1)
   })
 
   it('checks identity, deployment and keystore before any request', async () => {
