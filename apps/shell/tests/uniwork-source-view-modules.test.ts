@@ -123,6 +123,18 @@ describe.each(MODULES)('%s sees a source view through the module seam', (_name, 
     expect(service.onReadOnlySave).toHaveBeenCalledWith(BOUND)
   })
 
+  it('a refused export / Save As / print on the source path asks the shell for the hint; other paths stay silent', () => {
+    const service = serviceSeam()
+    const onSourceLocked = vi.fn()
+    installUniworkModuleSeams(service, null, { registry, onSourceLocked })
+    expect(mod.uniworkIsLocked(SOURCE)).toBe(true)
+    expect(onSourceLocked).toHaveBeenCalledWith(SOURCE)
+    onSourceLocked.mockClear()
+    expect(mod.uniworkIsLocked(BOUND)).toBe(false)
+    expect(mod.uniworkIsLocked(LOCAL)).toBe(false)
+    expect(onSourceLocked).not.toHaveBeenCalled()
+  })
+
   it('a user save is refused and fires no hook', () => {
     const service = serviceSeam()
     installUniworkModuleSeams(service, null, { registry })

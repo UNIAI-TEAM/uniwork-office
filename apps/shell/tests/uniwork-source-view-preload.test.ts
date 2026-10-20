@@ -13,7 +13,7 @@ import { SOURCE_VIEW_CHANNELS } from '../src/shared/source-view'
 interface SourceBridge {
   uniworkOpenSource(input: unknown): Promise<unknown>
   uniworkSourceViewState(path: string): Promise<unknown>
-  onUniworkSourceViewHint(cb: (payload: { path: string }) => void): () => void
+  onUniworkSourceViewHint(cb: (payload: { path: string; copy?: true }) => void): () => void
 }
 
 async function loadBridge(reply: unknown) {
@@ -122,6 +122,21 @@ describe('onUniworkSourceViewHint', () => {
     expect(seen).toEqual([{ path: '/x/a.docx' }])
     off()
     expect(handlers.has(SOURCE_VIEW_CHANNELS.hint)).toBe(false)
+  })
+
+  it('keeps copy: true (a refused Save As / export / print) and drops any other copy value', async () => {
+    const { bridge, handlers } = await loadBridge(null)
+    const seen: Array<{ path: string; copy?: true }> = []
+    bridge.onUniworkSourceViewHint((payload) => seen.push(payload))
+    const push = handlers.get(SOURCE_VIEW_CHANNELS.hint)
+    push?.({}, { path: '/x/a.docx', copy: true })
+    push?.({}, { path: '/x/b.docx', copy: 'yes' })
+    push?.({}, { path: '/x/c.docx', copy: false })
+    expect(seen).toEqual([
+      { path: '/x/a.docx', copy: true },
+      { path: '/x/b.docx' },
+      { path: '/x/c.docx' },
+    ])
   })
 
   it('drops a push without a usable path', async () => {

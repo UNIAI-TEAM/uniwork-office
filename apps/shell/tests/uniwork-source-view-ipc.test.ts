@@ -232,6 +232,44 @@ describe('the explicit-Save hint', () => {
     ])
   })
 
+  it('a refused Save As / export / print sends { path, copy: true } so the band also says where to get a copy', () => {
+    const owner = host()
+    const hint = createSourceSaveHint({ hostForPath: () => owner.contents })
+    hint('/x/sources-1/ab/Plan.docx', true)
+    expect(owner.sent).toEqual([
+      {
+        channel: 'uniwork-doc:source-view-hint',
+        payload: { path: '/x/sources-1/ab/Plan.docx', copy: true },
+      },
+    ])
+  })
+
+  it('the seam asks for the hint when a registered source is refused, and for nothing on another path', () => {
+    const registry = new SourceViewRegistry()
+    registry.add('/x/sources-1/ab/Plan.docx', {
+      name: 'Plan.docx',
+      origin: 'chat',
+      parentTitle: '',
+    })
+    const onSourceLocked = vi.fn()
+    const seam = withSourceViews(
+      {
+        isBound: () => false,
+        isReadOnly: () => false,
+        isLocked: (path: string) => path === '/x/revoked.docx',
+        onUserSave: () => undefined,
+        refuseLockedPath: () => false,
+      } as never,
+      registry,
+      { onSourceLocked },
+    )
+    expect(seam.isLocked?.('/x/sources-1/ab/Plan.docx')).toBe(true)
+    expect(onSourceLocked).toHaveBeenCalledWith('/x/sources-1/ab/Plan.docx')
+    expect(seam.isLocked?.('/x/revoked.docx')).toBe(true)
+    expect(seam.isLocked?.('/x/local.docx')).toBe(false)
+    expect(onSourceLocked).toHaveBeenCalledTimes(1)
+  })
+
   it('sends nothing when no window shows the path or its window is gone', () => {
     const gone = host(true)
     expect(() => createSourceSaveHint({ hostForPath: () => undefined })('/x/a.docx')).not.toThrow()
@@ -278,7 +316,7 @@ describe('the explicit-Save hint in a detached editor window', () => {
   }
   const make = (
     detached: { label: string } | undefined,
-    notify: (w: { label: string }) => Promise<void>,
+    notify: (w: { label: string }, copy?: boolean) => Promise<void>,
   ) => {
     const shell = hostSpy()
     const hint = createSourceSaveHint({
@@ -298,6 +336,18 @@ describe('the explicit-Save hint in a detached editor window', () => {
     hint('/x/sources-1/ab/Plan.docx')
     expect(shown).toEqual([w])
     expect(shell.sent).toEqual([])
+  })
+
+  it('tells the native box whether the copy sentence belongs to it', () => {
+    const w = win('detached-1')
+    const asked: Array<boolean | undefined> = []
+    const { hint } = make(w, (_target, copy) => {
+      asked.push(copy)
+      return Promise.resolve()
+    })
+    hint('/x/a.docx')
+    hint('/x/b.docx', true)
+    expect(asked.map(Boolean)).toEqual([false, true])
   })
 
   it('keeps the shell-window path when no detached window shows the path', () => {
@@ -370,15 +420,21 @@ describe('the explicit-Save hint in a detached editor window', () => {
   it('index.ts glue: the detached branch is a native box with the main-side sentence in every locale', () => {
     const index = readFileSync(join(__dirname, '..', 'src/main/index.ts'), 'utf8')
     const glue = index.slice(index.indexOf('createSourceSaveHint({'))
-    expect(glue.slice(0, 900)).toMatch(
-      /detached: \{[\s\S]*?dialog\.showMessageBox\([^)]*\{ type: 'info', message: tm\('uwSourceViewSaveHint'\) \}/,
+    expect(glue.slice(0, 1500)).toMatch(
+      /detached: \{[\s\S]*?dialog\.showMessageBox\([\s\S]*?message: tm\('uwSourceViewSaveHint'\)/,
     )
+    // the refusal of Save As / export / print goes through the same hint, with the copy sentence
+    expect(glue.slice(0, 1500)).toMatch(/onSourceLocked: \(path\) => \w+\(path, true\)/)
+    expect(glue.slice(0, 1500)).toContain("tm('uwSourceViewCopyHint')")
     const table = index.slice(
       index.indexOf('const tMain = createI18n('),
       index.indexOf('const tm = '),
     )
     // the shell's main table is per-locale (zh defines the key set, the type check covers the rest)
     expect([...table.matchAll(/^ {4}uwSourceViewSaveHint:/gm)]).toHaveLength(
+      [...table.matchAll(/^ {2}(?:'zh-TW'|[a-z]{2}): \{$/gm)].length,
+    )
+    expect([...table.matchAll(/^ {4}uwSourceViewCopyHint:/gm)]).toHaveLength(
       [...table.matchAll(/^ {2}(?:'zh-TW'|[a-z]{2}): \{$/gm)].length,
     )
     expect(table).toContain("uwSourceViewSaveHint: 'Tệp này chỉ để xem — thay đổi không được lưu.'")

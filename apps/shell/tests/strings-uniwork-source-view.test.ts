@@ -12,6 +12,7 @@ const KEYS = [
   'uwChipSourceView',
   'uwTipSourceView',
   'uwSourceViewSaveHint',
+  'uwSourceViewCopyHint',
   'uwSourceOriginChat',
   'uwSourceOriginTask',
   'uwSourceOriginMeeting',
@@ -27,6 +28,7 @@ const EN: Record<(typeof KEYS)[number], string> = {
   uwTipSourceView:
     "This file is attached in {origin}{parent}. Changes won't be saved. To get a copy, use Download in the Documents list.",
   uwSourceViewSaveHint: "This file is view only — changes aren't saved.",
+  uwSourceViewCopyHint: 'To get a copy, use Download in the Documents list.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Tasks',
   uwSourceOriginMeeting: 'Meetings',
@@ -38,6 +40,7 @@ const VI: Record<(typeof KEYS)[number], string> = {
   uwTipSourceView:
     'Đây là tệp đính kèm trong {origin}{parent}. Thay đổi sẽ không được lưu. Muốn có bản sao, dùng Tải xuống ở danh sách Tài liệu.',
   uwSourceViewSaveHint: 'Tệp này chỉ để xem — thay đổi không được lưu.',
+  uwSourceViewCopyHint: 'Muốn có bản sao, dùng Tải xuống ở danh sách Tài liệu.',
   uwSourceOriginChat: 'Chat',
   uwSourceOriginTask: 'Công việc',
   uwSourceOriginMeeting: 'Cuộc họp',
@@ -63,7 +66,12 @@ describe('source view copy', () => {
   it.each([...LANGS].filter((lang) => lang !== 'en'))(
     'locale %s translates the chip, the tooltip and the save hint',
     (lang) => {
-      for (const key of ['uwChipSourceView', 'uwTipSourceView', 'uwSourceViewSaveHint'] as const) {
+      for (const key of [
+        'uwChipSourceView',
+        'uwTipSourceView',
+        'uwSourceViewSaveHint',
+        'uwSourceViewCopyHint',
+      ] as const) {
         expect(table(lang)[key], `${lang} ${key}`).not.toBe(EN[key])
       }
     },

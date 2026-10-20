@@ -37,7 +37,7 @@ let host: HTMLDivElement
 let root: Root
 let tabs: TabSummary[]
 let tabListeners: Set<(next: TabSummary[]) => void>
-let hintListeners: Set<(payload: { path: string }) => void>
+let hintListeners: Set<(payload: { path: string; copy?: true }) => void>
 let unsubscribed: number
 let states: Record<string, SourceViewState | null>
 let api: Record<string, ReturnType<typeof vi.fn>>
@@ -74,7 +74,7 @@ function installWindow(): void {
     onUniworkQueuePopover: vi.fn(() => () => undefined),
     onUniworkLaunch: vi.fn(() => () => undefined),
     uniworkSourceViewState: vi.fn(async (path: string) => states[path] ?? null),
-    onUniworkSourceViewHint: vi.fn((cb: (payload: { path: string }) => void) => {
+    onUniworkSourceViewHint: vi.fn((cb: (payload: { path: string; copy?: true }) => void) => {
       hintListeners.add(cb)
       return () => {
         unsubscribed++
@@ -151,9 +151,9 @@ const chip = () => host.querySelector<HTMLElement>('.uw-chrome .uw-pill[data-sta
 const statusPill = () =>
   host.querySelector('.uw-chrome .uw-pill[role="group"]:not([data-state="view-only"])')
 const hint = () => document.querySelector<HTMLElement>('[data-uw-source-hint]')
-async function emitHint(path: string): Promise<void> {
+async function emitHint(path: string, copy?: true): Promise<void> {
   await act(async () => {
-    for (const listener of [...hintListeners]) listener({ path })
+    for (const listener of [...hintListeners]) listener(copy ? { path, copy } : { path })
   })
   await flush()
 }
@@ -269,6 +269,23 @@ describe('the Save hint of a source tab', () => {
     await mount('vi')
     await emitHint(SRC)
     expect(hint()?.textContent).toContain('Tệp này chỉ để xem — thay đổi không được lưu.')
+  })
+
+  it('a plain Save says one sentence; a refused Save As / export / print adds where to get a copy', async () => {
+    await mount()
+    await emitHint(SRC)
+    expect(hint()?.textContent).not.toContain('Download')
+    await emitHint(SRC, true)
+    const text = hint()?.textContent ?? ''
+    expect(text).toContain("This file is view only — changes aren't saved.")
+    expect(text).toContain('To get a copy, use Download in the Documents list.')
+    expect(document.querySelectorAll('[data-uw-source-hint]')).toHaveLength(1)
+  })
+
+  it('the copy sentence speaks vi', async () => {
+    await mount('vi')
+    await emitHint(SRC, true)
+    expect(hint()?.textContent).toContain('Muốn có bản sao, dùng Tải xuống ở danh sách Tài liệu.')
   })
 
   it('ignores a path that is not the active source tab', async () => {
