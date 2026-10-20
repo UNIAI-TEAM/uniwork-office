@@ -1147,6 +1147,8 @@ export function DocumentsHome({
       refreshAll()
       return
     }
+    // the row is gone (another client unshelved or trashed it): reread, as the web does
+    if (res.error === 'not_found') refreshAll()
     setToast({
       message:
         res.error === 'forbidden' ? t('uhShelvedNoPermission') : t('uhShelvedUnshelveFailed'),
@@ -1216,6 +1218,7 @@ export function DocumentsHome({
       refreshAll()
       return
     }
+    if (res.error === 'not_found') refreshAll()
     setToast({
       message: res.error === 'forbidden' ? t('uhShelvedNoPermission') : t('uhShelvedTrashFailed'),
       tone: 'error',
