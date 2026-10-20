@@ -359,6 +359,11 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
     await flush()
     // the confirm dialog comes first: nothing moved yet
     expect(api.uniworkTrashShelvedDocument).not.toHaveBeenCalled()
+    // F2: the confirm names the trash, not "Lưu trữ" (the item is already archived)
+    const dialogText = document.querySelector('.modal.uw-act')?.textContent ?? ''
+    expect(dialogText).toContain('Chuyển vào thùng rác · Báo cáo năm.docx')
+    expect(dialogText).toContain('thùng rác trong 30 ngày')
+    expect(dialogText).not.toContain('Lưu trữ')
     const confirm = document.querySelector<HTMLButtonElement>('.modal-buttons .btn-primary')
     expect(confirm).not.toBeNull()
     await act(async () => {
