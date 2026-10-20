@@ -1347,8 +1347,7 @@ async function markupText(deps: PdfAiDeps, input: Record<string, unknown>): Prom
   if ('bad' in r) return err(r.bad, summary)
   const text = String(input.text ?? '').trim()
   if (!text) return err('text must not be empty', summary)
-  const color = hexToRgb01(input.color)
-  if (color === null) return err(`Invalid color "${String(input.color)}"; use #RRGGBB`, summary)
+  const { color, note: colorNote } = optionalRgb01(input.color)
   const indexPromise = deps.searchIndex()
   if (!indexPromise) return err('Document not ready', summary)
   const index = await indexPromise
@@ -1363,19 +1362,21 @@ async function markupText(deps: PdfAiDeps, input: Record<string, unknown>): Prom
   for (const m of targets) deps.addMarkup(type, r.origIdx, m.rects, color)
   deps.gotoPage(r.origIdx + 1)
   return {
-    output: `Marked ${targets.length} occurrence(s) on page ${r.origIdx + 1} (unsaved; the user saves with ⌘S)`,
+    output: withColorNote(
+      `Marked ${targets.length} occurrence(s) on page ${r.origIdx + 1} (unsaved; the user saves with ⌘S)`,
+      colorNote,
+    ),
     mutated: true,
     summary,
   }
 }
 
-/** #RRGGBB → rgb 0-1; undefined when omitted, null when malformed */
-const hexToRgb01 = (raw: unknown): [number, number, number] | undefined | null => {
-  if (raw === undefined) return undefined
-  const hex = HEX_COLOR.exec(String(raw))
-  if (!hex) return null
-  const v = parseInt(hex[1]!, 16)
-  return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]
+/** Optional color → rgb 0-1 (undefined when omitted or unusable) plus the parser's note */
+const optionalRgb01 = (raw: unknown): { color?: [number, number, number]; note?: string } => {
+  const { color, note } = parseOptionalColor(raw)
+  if (!color) return { note }
+  const [r, g, b] = hexToRgb255(color)
+  return { color: [r / 255, g / 255, b / 255], note }
 }
 
 const fmtNoteDate = (ms: number | null): string =>
@@ -1464,8 +1465,7 @@ async function addNoteTool(
   if ('bad' in r) return err(r.bad, summary)
   const text = String(input.text ?? '').trim()
   if (!text) return err('text must not be empty', summary)
-  const color = hexToRgb01(input.color)
-  if (color === null) return err(`Invalid color "${String(input.color)}"; use #RRGGBB`, summary)
+  const { color, note: colorNote } = optionalRgb01(input.color)
   const geom = deps.pageGeom(r.origIdx)
   if (!geom) return err('Document not ready', summary)
   let at: [number, number]
@@ -1501,7 +1501,10 @@ async function addNoteTool(
       )
     deps.gotoPage(r.origIdx + 1)
     return {
-      output: `Drafted a comment on page ${r.origIdx + 1} in the Comments panel. It is not posted: the user reviews it and presses Send.`,
+      output: withColorNote(
+        `Drafted a comment on page ${r.origIdx + 1} in the Comments panel. It is not posted: the user reviews it and presses Send.`,
+        colorNote,
+      ),
       summary,
     }
   }
@@ -1509,7 +1512,10 @@ async function addNoteTool(
   if ('error' in added) return err(added.error, summary)
   deps.gotoPage(r.origIdx + 1)
   return {
-    output: `Added note ${added.key} on page ${r.origIdx + 1} (unsaved; the user saves with ⌘S).`,
+    output: withColorNote(
+      `Added note ${added.key} on page ${r.origIdx + 1} (unsaved; the user saves with ⌘S).`,
+      colorNote,
+    ),
     mutated: true,
     summary,
   }
@@ -1630,8 +1636,34 @@ const countOccurrences = (entry: PageEntry, query: string): number => {
 }
 
 const HEX_COLOR = /^#?([0-9a-f]{6})$/i
+const SHORT_HEX_COLOR = /^#?([0-9a-f]{3})$/i
 
-export const parseOptionalColor = (_raw: unknown): { color?: string; note?: string } => ({})
+const COLOR_IGNORED_NOTE = 'color ignored: use #RRGGBB'
+
+/**
+ * The optional `color` argument of an AI tool. Never a reason to reject the call: empty,
+ * null, undefined or blank → omitted silently; #RRGGBB / RRGGBB / #RGB → `#rrggbb`;
+ * anything else (CSS names, wrong length) → omitted plus a note for the tool output.
+ */
+export const parseOptionalColor = (raw: unknown): { color?: string; note?: string } => {
+  if (raw === undefined || raw === null) return {}
+  const text = String(raw).trim()
+  if (!text) return {}
+  const short = SHORT_HEX_COLOR.exec(text)
+  if (short) return { color: `#${short[1]!.replace(/./g, '$&$&').toLowerCase()}` }
+  const hex = HEX_COLOR.exec(text)
+  return hex ? { color: `#${hex[1]!.toLowerCase()}` } : { note: COLOR_IGNORED_NOTE }
+}
+
+/** `#rrggbb` → rgb 0-255 */
+const hexToRgb255 = (hex: string): [number, number, number] => {
+  const v = parseInt(hex.slice(1), 16)
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255]
+}
+
+/** Tool output with the parser's note (if any) appended, in the style of the other notes */
+const withColorNote = (output: string, note: string | undefined): string =>
+  note ? `${output} Note: ${note}.` : output
 
 const MARKUP_TYPES: MarkupType[] = ['highlight', 'underline', 'strikeout']
 
@@ -1704,12 +1736,6 @@ function numberParam(
   return v
 }
 
-const hexColorParam = (input: Record<string, unknown>): string | undefined | null => {
-  if (input.color === undefined) return undefined
-  const hex = HEX_COLOR.exec(String(input.color))
-  return hex ? `#${hex[1]!.toLowerCase()}` : null
-}
-
 const METADATA_FIELDS = ['title', 'author', 'subject', 'keywords'] as const
 
 function describeMetadata(meta: MetadataInput): string {
@@ -1730,8 +1756,7 @@ function setWatermarkTool(deps: PdfAiDeps, input: Record<string, unknown>): Tool
   const opacity = numberParam(input, 'opacity', 0, 1)
   const size = numberParam(input, 'size', 0.02, 0.5)
   for (const v of [angle, opacity, size]) if (typeof v === 'string') return err(v, summary)
-  const color = hexColorParam(input)
-  if (color === null) return err(`Invalid color "${String(input.color)}"; use #RRGGBB`, summary)
+  const { color, note: colorNote } = parseOptionalColor(input.color)
   const base = prev?.wm ?? DEFAULT_WATERMARK
   deps.setStamps({
     wm: {
@@ -1744,7 +1769,10 @@ function setWatermarkTool(deps: PdfAiDeps, input: Record<string, unknown>): Tool
     hf: prev?.hf ?? null,
   })
   return {
-    output: `Watermark "${text}" applied to every page (unsaved; the user saves with ⌘S).`,
+    output: withColorNote(
+      `Watermark "${text}" applied to every page (unsaved; the user saves with ⌘S).`,
+      colorNote,
+    ),
     mutated: true,
     summary,
   }
@@ -2108,8 +2136,7 @@ function setHeaderFooterTool(deps: PdfAiDeps, input: Record<string, unknown>): T
   const startAt = numberParam(input, 'start_at', 0, 100000)
   const fontSize = numberParam(input, 'font_size', 4, 72)
   for (const v of [startAt, fontSize]) if (typeof v === 'string') return err(v, summary)
-  const color = hexColorParam(input)
-  if (color === null) return err(`Invalid color "${String(input.color)}"; use #RRGGBB`, summary)
+  const { color, note: colorNote } = parseOptionalColor(input.color)
   deps.setStamps({
     wm: prev?.wm ?? null,
     hf: {
@@ -2125,7 +2152,10 @@ function setHeaderFooterTool(deps: PdfAiDeps, input: Record<string, unknown>): T
     .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
   if (pageNumber) filled.push('page numbers in the footer center')
   return {
-    output: `Header/footer applied to every page: ${filled.join(', ')} (unsaved; the user saves with ⌘S).`,
+    output: withColorNote(
+      `Header/footer applied to every page: ${filled.join(', ')} (unsaved; the user saves with ⌘S).`,
+      colorNote,
+    ),
     mutated: true,
     summary,
   }
@@ -2145,13 +2175,8 @@ async function editText(deps: PdfAiDeps, input: Record<string, unknown>): Promis
     return err('edit_text cannot re-align a run; use edit_block with align', summary)
   }
   const occurrence = Math.max(1, Math.trunc(Number(input.occurrence ?? 1)) || 1)
-  let newColor: [number, number, number] | undefined
-  if (input.color !== undefined) {
-    const hex = HEX_COLOR.exec(String(input.color))
-    if (!hex) return err(`Invalid color "${String(input.color)}"; use #RRGGBB`, summary)
-    const v = parseInt(hex[1]!, 16)
-    newColor = [(v >> 16) & 255, (v >> 8) & 255, v & 255]
-  }
+  const { color: newHex, note: colorNote } = parseOptionalColor(input.color)
+  const newColor = newHex ? hexToRgb255(newHex) : undefined
   const newFontSize = input.font_size === undefined ? undefined : Number(input.font_size)
   if (newFontSize !== undefined && !(newFontSize > 0)) {
     return err('font_size must be a positive number', summary)
@@ -2198,7 +2223,10 @@ async function editText(deps: PdfAiDeps, input: Record<string, unknown>): Promis
       : ''
   const verb = newText ? 'Replaced' : 'Deleted'
   return {
-    output: `${verb} occurrence ${occurrence} of "${oldText}" on page ${r.origIdx + 1} (unsaved; the user saves with ⌘S).${note}`,
+    output: withColorNote(
+      `${verb} occurrence ${occurrence} of "${oldText}" on page ${r.origIdx + 1} (unsaved; the user saves with ⌘S).${note}`,
+      colorNote,
+    ),
     mutated: true,
     summary,
   }
@@ -2243,13 +2271,8 @@ async function editBlock(deps: PdfAiDeps, input: Record<string, unknown>): Promi
     .replace(/\r\n/g, '\n')
     .trim()
   if (!anchor) return err('paragraph_text must not be empty', summary)
-  let newColor: [number, number, number] | undefined
-  if (input.color !== undefined) {
-    const hex = HEX_COLOR.exec(String(input.color))
-    if (!hex) return err(`Invalid color "${String(input.color)}"; use #RRGGBB`, summary)
-    const v = parseInt(hex[1]!, 16)
-    newColor = [(v >> 16) & 255, (v >> 8) & 255, v & 255]
-  }
+  const { color: newHex, note: colorNote } = parseOptionalColor(input.color)
+  const newColor = newHex ? hexToRgb255(newHex) : undefined
   const newFontSize = input.font_size === undefined ? undefined : Number(input.font_size)
   if (newFontSize !== undefined && !(newFontSize > 0)) {
     return err('font_size must be a positive number', summary)
@@ -2311,9 +2334,12 @@ async function editBlock(deps: PdfAiDeps, input: Record<string, unknown>): Promi
   if (reason) return err(`The edit could not be applied: ${reason}`, summary)
   deps.gotoPage(r.origIdx + 1)
   return {
-    output: newText
-      ? `Replaced the paragraph containing "${anchor}" on page ${r.origIdx + 1} with ${lines.length} reflowed line(s) (unsaved; the user saves with ⌘S).`
-      : `Deleted the paragraph containing "${anchor}" on page ${r.origIdx + 1}; its area stays blank (unsaved; the user saves with ⌘S).`,
+    output: withColorNote(
+      newText
+        ? `Replaced the paragraph containing "${anchor}" on page ${r.origIdx + 1} with ${lines.length} reflowed line(s) (unsaved; the user saves with ⌘S).`
+        : `Deleted the paragraph containing "${anchor}" on page ${r.origIdx + 1}; its area stays blank (unsaved; the user saves with ⌘S).`,
+      colorNote,
+    ),
     mutated: true,
     summary,
   }
@@ -2445,13 +2471,8 @@ async function insertTextTool(
 
   const fontSize = input.font_size === undefined ? 14 : Number(input.font_size)
   if (!(fontSize > 0)) return err('font_size must be a positive number', summary)
-  let color: [number, number, number] = [0, 0, 0]
-  if (input.color !== undefined) {
-    const hex = HEX_COLOR.exec(String(input.color))
-    if (!hex) return err(`Invalid color "${String(input.color)}"; use #RRGGBB`, summary)
-    const v = parseInt(hex[1]!, 16)
-    color = [(v >> 16) & 255, (v >> 8) & 255, v & 255]
-  }
+  const { color: hexColor, note: colorNote } = parseOptionalColor(input.color)
+  const color: [number, number, number] = hexColor ? hexToRgb255(hexColor) : [0, 0, 0]
   const font = input.font === undefined ? undefined : String(input.font)
   if (font !== undefined && !deps.editFonts().includes(font)) {
     const avail = deps.editFonts()
@@ -2547,7 +2568,10 @@ async function insertTextTool(
   // report the position list_inserted_text/move_inserted_text will use, not the wrap box
   const [px, py] = insertDispTopLeft(geom, { id, input: record })
   return {
-    output: `Inserted ${lines.length} line(s) of text on page ${r.origIdx + 1} at x=${fmt(px)}, y=${fmt(py)}, ${fontSize} pt as T${id} (unsaved; the user can drag/edit it, undo with ⌘Z, save with ⌘S; edit_inserted_text / move_inserted_text / delete_inserted_text take this id until saved).`,
+    output: withColorNote(
+      `Inserted ${lines.length} line(s) of text on page ${r.origIdx + 1} at x=${fmt(px)}, y=${fmt(py)}, ${fontSize} pt as T${id} (unsaved; the user can drag/edit it, undo with ⌘Z, save with ⌘S; edit_inserted_text / move_inserted_text / delete_inserted_text take this id until saved).`,
+      colorNote,
+    ),
     mutated: true,
     summary,
   }
@@ -2642,10 +2666,11 @@ function editInsertedTextTool(deps: PdfAiDeps, input: Record<string, unknown>): 
   const r = resolveInsert(deps, input.id)
   if ('bad' in r) return err(r.bad, summary)
   const cur = r.ins.input
+  const { color: newHex, note: colorNote } = parseOptionalColor(input.color)
   if (
     input.text === undefined &&
     input.font_size === undefined &&
-    input.color === undefined &&
+    newHex === undefined &&
     input.align === undefined
   ) {
     return err('Pass at least one of text, font_size, color, align', summary)
@@ -2656,13 +2681,6 @@ function editInsertedTextTool(deps: PdfAiDeps, input: Record<string, unknown>): 
     return err('text must not be empty; use delete_inserted_text to remove the block', summary)
   const fontSize = input.font_size === undefined ? cur.fontSize : Number(input.font_size)
   if (!(fontSize > 0)) return err('font_size must be a positive number', summary)
-  let color = cur.color
-  if (input.color !== undefined) {
-    const hex = HEX_COLOR.exec(String(input.color))
-    if (!hex) return err(`Invalid color "${String(input.color)}"; use #RRGGBB`, summary)
-    const v = parseInt(hex[1]!, 16)
-    color = [(v >> 16) & 255, (v >> 8) & 255, v & 255]
-  }
   const align = input.align === undefined ? (cur.align ?? 'left') : input.align
   if (!isAlign(align)) return err("align must be 'left', 'center' or 'right'", summary)
   const edit: TextInsertEdit = {}
@@ -2671,7 +2689,7 @@ function editInsertedTextTool(deps: PdfAiDeps, input: Record<string, unknown>): 
     edit.fontSize = fontSize
     edit.lineLeading = fontSize * 1.2
   }
-  if (input.color !== undefined) edit.color = color
+  if (newHex) edit.color = hexToRgb255(newHex)
   if (input.align !== undefined) edit.align = align
   if (input.text !== undefined || input.font_size !== undefined || input.align !== undefined) {
     edit.lineXOffsets = remeasureOffsets(cur, text, fontSize, align)
@@ -2679,7 +2697,10 @@ function editInsertedTextTool(deps: PdfAiDeps, input: Record<string, unknown>): 
   deps.updateTextInsert(r.ins.id, edit)
   deps.gotoPage(cur.pageIndex + 1)
   return {
-    output: `Updated inserted text T${r.ins.id} on page ${cur.pageIndex + 1}: ${text.split('\n').length} line(s), ${fontSize} pt, ${align} (unsaved; the user saves with ⌘S).`,
+    output: withColorNote(
+      `Updated inserted text T${r.ins.id} on page ${cur.pageIndex + 1}: ${text.split('\n').length} line(s), ${fontSize} pt, ${align} (unsaved; the user saves with ⌘S).`,
+      colorNote,
+    ),
     mutated: true,
     summary,
   }
