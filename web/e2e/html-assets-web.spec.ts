@@ -155,11 +155,19 @@ test('html: Export HTML downloads the page from the ribbon, pictures inlined', a
   expect(html).toContain('data:image/webp;base64,')
 })
 
+// a view-only copy previews through the script-free srcdoc frame (signed F3 = A, UNI-1993), never preview.html
+async function readyStatic(frame: Frame, text: RegExp) {
+  await expect(frame.locator('.workspace')).toBeVisible({ timeout: 30_000 })
+  const iframe = frame.locator('iframe.preview-frame')
+  await expect(iframe).toHaveAttribute('sandbox', '', { timeout: 30_000 })
+  await expect(iframe.contentFrame().locator('body')).toContainText(text, { timeout: 30_000 })
+}
+
 test('html: view only still exports', async ({ page }) => {
   await serveFixture(page, PAGE_PATH, encode(PAGE), 'text/html')
   await serveAssets(page)
   const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en', readonly: '1' })
-  await ready(page, frame, /Assets page/)
+  await readyStatic(frame, /Assets page/)
   const button = frame.getByRole('button', { name: 'Export HTML' })
   await expect(button).toBeEnabled()
   const [download] = await Promise.all([page.waitForEvent('download'), button.click()])

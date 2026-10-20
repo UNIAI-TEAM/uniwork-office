@@ -108,6 +108,18 @@ async function ready(page: Page, frame: Frame, text: string | RegExp) {
   await expect.poll(() => previewText(page), { timeout: 30_000 }).toMatch(text)
 }
 
+/**
+ * A view-only copy never runs the page (signed F3 = A, UNI-1993): the web bridge shows the
+ * script-free copy in the srcdoc frame with an empty sandbox, and preview.html is never loaded.
+ */
+async function readyStatic(page: Page, frame: Frame, text: string | RegExp) {
+  await expect(frame.locator('.workspace')).toBeVisible({ timeout: 30_000 })
+  const iframe = frame.locator('iframe.preview-frame')
+  await expect(iframe).toHaveAttribute('sandbox', '', { timeout: 30_000 })
+  await expect(iframe.contentFrame().locator('body')).toContainText(text, { timeout: 30_000 })
+  expect(page.frames().filter((f) => f.url().includes('/preview.html'))).toHaveLength(0)
+}
+
 async function view(frame: Frame, name: RegExp, mode: string) {
   await frame.getByRole('tab', { name }).click()
   await expect(frame.locator(`.workspace.view-${mode}`)).toBeVisible()
@@ -361,7 +373,7 @@ test('html: view only without the save grant', async ({ page }) => {
   const problems = await watch(page)
   await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
   const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en', readonly: '1' })
-  await ready(page, frame, /UniWork HTML web fixture/)
+  await readyStatic(page, frame, /UniWork HTML web fixture/)
   // the host announces view-only (banner + live region): cap viewOnlyChip is off on the web
   await expect(frame.locator('.status-view-only')).toHaveCount(0)
   await view(frame, /^Source$/, 'source')
