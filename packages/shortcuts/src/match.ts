@@ -16,9 +16,9 @@ export interface ShortcutKeyEvent {
   readonly altKey: boolean
   readonly shiftKey: boolean
   readonly metaKey: boolean
-  readonly repeat?: boolean
-  readonly isComposing?: boolean
-  readonly keyCode?: number
+  readonly repeat?: boolean | undefined
+  readonly isComposing?: boolean | undefined
+  readonly keyCode?: number | undefined
   getModifierState?(key: string): boolean
 }
 
