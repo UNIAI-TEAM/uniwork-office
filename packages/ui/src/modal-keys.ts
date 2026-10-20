@@ -44,15 +44,20 @@ export function useModalKeys(onClose: () => void, options?: { restoreFocus?: boo
   return { ref, onKeyDown }
 }
 
+/** The controls of a container that Tab can reach, in DOM order. */
+export function focusableIn(container: HTMLElement): HTMLElement[] {
+  return [...container.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (el) => !el.hasAttribute('disabled') && el.tabIndex >= 0,
+  )
+}
+
 /** Cycle Tab/Shift+Tab inside a container (pure DOM helper, exported for tests). */
 export function trapTab(
   container: HTMLElement | null,
   e: { key: string; shiftKey: boolean; preventDefault: () => void },
 ): void {
   if (!container || e.key !== 'Tab') return
-  const items = [...container.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (el) => !el.hasAttribute('disabled') && el.tabIndex >= 0,
-  )
+  const items = focusableIn(container)
   if (items.length === 0) {
     e.preventDefault()
     return

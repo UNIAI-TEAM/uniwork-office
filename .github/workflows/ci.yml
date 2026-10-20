@@ -264,7 +264,7 @@ jobs:
           html-preview-security draft-recovery slides-presenter ai-web modules-smoke docs-web
           docs-rename-save conflict-dialog-layout docs-conflict-diff ui-forced-colors-picker
           size-gate open-refused sheets-too-large markdown-web docs-mobile-390 docs-readonly-narrow
-          html-web ai-save-confirm
+          html-web ai-save-confirm ai-panel-phone ai-composer-390
 
       - name: Upload web e2e artifacts on failure
         if: failure()

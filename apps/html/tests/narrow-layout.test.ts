@@ -8,13 +8,15 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(join(__dirname, '..', 'src/renderer/styles.css'), 'utf8')
+// the dock overlay is shared by every module (UNI-1987): packages/ui, imported by main.tsx
+const dockCss = readFileSync(join(__dirname, '../../../packages/ui/src/ai-dock-narrow.css'), 'utf8')
 
 /** every block of that media query, joined (the stylesheet has more than one per breakpoint) */
-function media(query: string): string {
+function media(query: string, sheet = css): string {
   const head = `@media (${query}) {`
   const blocks: string[] = []
-  for (let at = css.indexOf(head); at > -1; at = css.indexOf(head, at + 1)) {
-    blocks.push(css.slice(at, css.indexOf('\n}\n', at)))
+  for (let at = sheet.indexOf(head); at > -1; at = sheet.indexOf(head, at + 1)) {
+    blocks.push(sheet.slice(at, sheet.indexOf('\n}\n', at)))
   }
   expect(blocks.length, head).toBeGreaterThan(0)
   return blocks.join('\n')
@@ -22,11 +24,22 @@ function media(query: string): string {
 
 describe('narrow layout of the HTML frame', () => {
   it('the open AI dock overlays the page below 900 px and fills the row on a phone', () => {
-    const tablet = media('max-width: 900px')
+    const tablet = media('max-width: 900px', dockCss)
     expect(tablet).toMatch(/\.ai-dock \{[^}]*position: absolute;/)
-    expect(tablet).toMatch(/\.app-main:has\(> \.ai-dock\) \{\s*padding-left: 34px;/)
+    expect(tablet).toMatch(
+      /\.app-main:has\(> \.ai-dock:not\(\.ai-dock-off\)\) \{\s*padding-left: 34px;/,
+    )
+    // "show the AI sidebar" off: the dock is 0 wide, so the document must not keep a 34 px gutter (RP-2)
+    expect(tablet).not.toMatch(/has\(> \.ai-dock\)/)
+    expect(tablet).toMatch(
+      /has\(> \.ai-dock:not\(\.ai-dock-off\)\) \{\s*padding-left: 0;\s*padding-right: 34px;/,
+    )
     expect(tablet).toMatch(/\.ai-dock\.collapsed \{\s*width: 34px;/)
-    expect(media('max-width: 520px')).toMatch(/\.ai-dock:not\(\.collapsed\) \{\s*width: 100%;/)
+    expect(media('max-width: 520px', dockCss)).toMatch(
+      /\.ai-dock:not\(\.collapsed\) \{\s*width: 100%;/,
+    )
+    // the HTML frame no longer carries its own copy of the block
+    expect(css).not.toMatch(/\.ai-dock \{[^}]*position: absolute;/)
   })
 
   it('split stacks on a phone and each pane keeps a usable height', () => {
