@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createUniworkDocsClient, type FetchLike } from '../src/main/uniwork-docs/client'
-import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import { UniworkDocError, isTerminalRefusal } from '../src/main/uniwork-docs/errors'
 import { formatForMime } from '../src/main/uniwork-docs/formats'
 
 /**
@@ -465,6 +465,8 @@ describe('the folder refusals', () => {
     const cases: Array<[number, string, string]> = [
       [422, 'document_cycle', 'document_cycle'],
       [422, 'document_parent_kind', 'document_parent_kind'],
+      // UNI-1975: the server refuses sharing a folder (UNI-1974)
+      [422, 'folder_not_shareable', 'folder_not_shareable'],
     ]
     for (const [status, serverCode, expected] of cases) {
       const api = client(async () => envelope(status, serverCode))
@@ -485,6 +487,22 @@ describe('the folder refusals', () => {
     }
     expect(caught).toBeInstanceOf(UniworkDocError)
     expect(caught).toMatchObject({ code: 'server_error', serverCode: 'folder_name_taken' })
+  })
+
+  it('UNI-1975: folder_not_shareable is a user-facing refusal, sent once and not retried', async () => {
+    const fetch = vi.fn<FetchLike>(async () => envelope(422, 'folder_not_shareable'))
+    const api = client(fetch)
+    let caught: unknown
+    try {
+      await api.createFolder({ workspaceId: WS, parentId: null, title: 'x', idempotencyKey: 'k' })
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(UniworkDocError)
+    expect(caught).toMatchObject({ code: 'folder_not_shareable', status: 422 })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    // like document_parent_kind it is neither a terminal save refusal nor a network-like retry
+    expect(isTerminalRefusal(caught as UniworkDocError)).toBe(false)
   })
 
   it('carries the depth cap 20 on a too-deep tree refusal', async () => {

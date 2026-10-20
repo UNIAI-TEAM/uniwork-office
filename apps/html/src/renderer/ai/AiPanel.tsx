@@ -800,6 +800,7 @@ export function AiPanel({
         createIntentSkill(
           () => intentRef.current,
           () => isDocEmpty(depsRef.current.access.getText()),
+          () => depsRef.current.access.uniworkBound?.() === true,
         ),
       ]),
       captureSnapshot: () => depsRef.current.getSnapshot(),
@@ -1366,6 +1367,8 @@ export function AiPanel({
   }, [open, uniworkGate])
 
   const docEmpty = chat.length === 0 && isDocEmpty(deps.access.getText())
+  // a bound page has no whole-page writer, so the blank-page intent choice is gone: design is the only path
+  const intentBound = deps.access.uniworkBound?.() === true
 
   const lastEntry = chat.at(-1)
   const panelLiveAnnouncement =
@@ -1479,7 +1482,7 @@ export function AiPanel({
             <div className="ai-chat-empty-title">
               {t(
                 docEmpty
-                  ? intent === 'write'
+                  ? intent === 'write' && !intentBound
                     ? 'aiEmptyWriteTitle'
                     : 'aiEmptyTitle'
                   : 'aiEmptyDocTitle',
@@ -1488,7 +1491,7 @@ export function AiPanel({
             <div className="ai-chat-empty-body">
               {t(
                 docEmpty
-                  ? intent === 'write'
+                  ? intent === 'write' && !intentBound
                     ? 'aiEmptyWriteBody'
                     : 'aiEmptyBody'
                   : 'aiEmptyDocBody',
@@ -1496,7 +1499,7 @@ export function AiPanel({
             </div>
             <div className="ai-starter-list">
               {(docEmpty
-                ? intent === 'write'
+                ? intent === 'write' && !intentBound
                   ? WRITE_STARTERS
                   : GENERATE_STARTERS
                 : EDIT_STARTERS
@@ -1851,7 +1854,7 @@ export function AiPanel({
             {t('aiViewOnlyNotice')}
           </div>
         )}
-        {chat.length === 0 && docEmpty && !readOnly && (
+        {chat.length === 0 && docEmpty && !readOnly && !intentBound && (
           <div className="ai-intent-bar">
             <div className="ai-intent-label">{t('aiIntentLabel')}</div>
             <div className="ai-intent-cards" role="radiogroup" aria-label={t('aiIntentLabel')}>

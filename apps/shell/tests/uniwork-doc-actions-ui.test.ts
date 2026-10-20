@@ -693,15 +693,22 @@ describe('S18 row menu', () => {
 
   it('archives after a one-step confirmation, then offers Restore', async () => {
     await render([row('m', 'Old.docx', { canEdit: true, canManage: true })])
-    await openMenuItem('Old.docx', en.uwDocArchive)
+    await openMenuItem('Old.docx', 'Move to trash')
     const dialog = modal()!
-    expect(dialog.textContent).toContain('Archive “Old.docx”? You can restore it later.')
+    // UNI-1958 row 5: the web's move-to-trash wording (documents.archive.archive_description)
+    expect(dialog.textContent).toContain('Move to trash · Old.docx')
+    expect(dialog.textContent).toContain(
+      '“Old.docx” and its whole subtree will stay in the trash for 30 days before permanent deletion. Managers can restore them during this window.',
+    )
+    expect(dialog.textContent).not.toMatch(/archive/i)
     expect(api.uniworkArchiveDocument).not.toHaveBeenCalled()
     await click(dialog.querySelector('.btn-primary')!)
     expect(api.uniworkArchiveDocument).toHaveBeenCalledWith('m')
     expect(modal()).toBeNull()
     const archived = rowOf('Old.docx')
-    expect(archived.textContent).toContain(en.uwDocArchived)
+    // UNI-1958 row 5: the web's documents.library.archived_badge
+    expect(archived.textContent).toContain('In trash')
+    expect(archived.textContent).not.toMatch(/archived/i)
     expect(archived.getAttribute('aria-disabled')).toBeNull()
     await click(menuButton(archived)!)
     const items = Array.from(document.body.querySelectorAll('[role="menuitem"]')).map(
@@ -844,7 +851,7 @@ describe('S18 archived row and archive confirm (FX4)', () => {
     await render([archivedRow(), row('u', 'Notes.txt', { format: null })])
     const archived = rowOf('Old.docx')
     const meta = archived.querySelector('.uw-pick-row-meta')!.textContent!
-    expect(meta).toContain(en.uwDocArchived)
+    expect(meta).toContain('In trash')
     // an archived row is parked, not unsupported
     expect(meta).not.toContain('Not supported')
     // FD-14: a really unsupported format is not listed at all

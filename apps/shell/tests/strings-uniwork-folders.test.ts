@@ -65,7 +65,7 @@ describe('uniwork folders string shards', () => {
       'Thư mục đích đã có quá nhiều thư mục trùng tên. Hãy đổi tên trước khi chuyển.',
     )
     expect(vi.ufFolderGone).toBe('Thư mục này không còn ở đây.')
-    expect(vi.ufLocationRoot).toBe('UniWork (gốc)')
+    expect(vi.ufLocationRoot).toBe('Thư mục gốc của workspace')
     expect(vi.ufSameFolder).toBe('Cùng thư mục với bản gốc')
     expect(en.ufNameTaken).toBe('A folder with this name already exists here. Choose another name.')
     expect(en.ufTooDeep).toBe('The document tree is at most {max} levels deep.')

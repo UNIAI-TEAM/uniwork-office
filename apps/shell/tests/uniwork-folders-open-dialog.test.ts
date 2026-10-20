@@ -240,3 +240,52 @@ describe('Open from UniWork as the browser', () => {
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d2')
   })
 })
+
+describe('Open from UniWork in Vietnamese (UNI-1958 rows 7, 10)', () => {
+  async function renderVi() {
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(UniworkOpenDialog, {
+            onClose,
+            accountView: 'signed-in',
+            onSignIn: () => undefined,
+          }),
+        ),
+      )
+    })
+    await flush()
+  }
+
+  it('row 10: the tree view button reads "Được chia sẻ với tôi"', async () => {
+    await renderVi()
+    expect(button('Được chia sẻ với tôi')).toBeTruthy()
+    expect(button('Được chia sẻ với tôi').getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('row 7: the workspace picker is "Workspace" and the folder search says "workspace"', async () => {
+    await renderVi()
+    expect($('.uw-pick-ws')!.getAttribute('aria-label')).toBe('Workspace')
+    expect($('.uw-pick-ws optgroup')!.getAttribute('label')).toBe('Workspace')
+    await click(treeItem('UniWork'))
+    expect($<HTMLInputElement>('.uw-pick-search')!.placeholder).toBe('Tìm theo tên trong workspace')
+  })
+
+  it('row 7: an empty workspace says "Workspace này chưa có tài liệu."', async () => {
+    api.uniworkListDocuments.mockImplementation(async () =>
+      ok<UniworkDocListPage>({ documents: [], nextCursor: null }),
+    )
+    await renderVi()
+    expect($('.uw-pick-state-title')!.textContent).toBe('Workspace này chưa có tài liệu.')
+  })
+
+  it('row 7: no workspaces says "Bạn chưa có workspace nào."', async () => {
+    api.uniworkListWorkspaces.mockImplementation(async () => ok([]))
+    await renderVi()
+    expect($('.uw-pick-state-title')!.textContent).toBe('Bạn chưa có workspace nào.')
+  })
+})

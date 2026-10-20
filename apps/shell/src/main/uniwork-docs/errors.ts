@@ -38,6 +38,14 @@ export class UniworkDocError extends Error {
   readonly holderId?: string | null
   /** EL-1(a) (UNI-1645c): lock holder metadata from 423 `document_locked` */
   readonly editLock?: UniworkDocEditLock
+  /**
+   * UNI-1918 (B69-lite): the server's own `fields.reason` of a
+   * `document_upload_invalid` refusal (`file_claim_expired`,
+   * `file_not_ready`, `upload_canceled`, `file_deleting`). Without it those
+   * four answers are indistinguishable, and only an expired claim may be
+   * resumed with a fresh upload key after ONE lookup.
+   */
+  readonly reason?: string
   /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.reason */
   readonly lostReason?:
     | 'released'
@@ -70,6 +78,7 @@ export class UniworkDocError extends Error {
       documentTitle?: string
       holderId?: string | null
       editLock?: UniworkDocEditLock
+      reason?: string
       lostReason?: UniworkDocError['lostReason']
       byName?: string | null
     } = {},
@@ -89,6 +98,7 @@ export class UniworkDocError extends Error {
     this.documentTitle = extra.documentTitle
     this.holderId = extra.holderId
     this.editLock = extra.editLock
+    this.reason = extra.reason
     this.lostReason = extra.lostReason
     this.byName = extra.byName
   }
@@ -213,6 +223,16 @@ export function errorFromResponse(
   if (serverCode === 'upload_session_busy') return new UniworkDocError('server_error', retried)
   if (serverCode === 'upload_session_too_small') return new UniworkDocError('server_error', at)
   if (serverCode === 'upload_parts_invalid') return new UniworkDocError('server_error', at)
+  // UNI-1918 (B69-lite): a staged upload the server can no longer resolve. The
+  // four reasons (`file_claim_expired`, `file_not_ready`, `upload_canceled`,
+  // `file_deleting`) are NOT interchangeable: only an expired claim may be
+  // resumed (a fresh upload key, after ONE lookup proves the old attempt did
+  // not commit), so the reason is kept on the error. The code stays the coded
+  // 409 (`server_error` + status) the save pipeline already switches on.
+  if (serverCode === 'document_upload_invalid') {
+    const reason = boundedLockString(envelope?.fields?.reason, 64)
+    return new UniworkDocError('server_error', { ...at, ...(reason ? { reason } : {}) })
+  }
   if (serverCode === 'upload_size_mismatch' || serverCode === 'upload_probe_mismatch') {
     // the file changed under us: the same shape the app already answers an
     // upload-checksum mismatch with, so nothing retries it silently
@@ -280,6 +300,9 @@ export function errorFromResponse(
   if (serverCode === 'document_parent_kind') {
     return new UniworkDocError('document_parent_kind', at)
   }
+  // UNI-1975: the server refuses sharing a folder (only documents are shared). The
+  // app never sends it today; a user-facing refusal, not retried, not terminal.
+  if (serverCode === 'folder_not_shareable') return new UniworkDocError('folder_not_shareable', at)
   // G5-06 (UNI-1352): the server's own verdicts, kept apart from the generic
   // forbidden/deleted a caller would otherwise act on. A capability kill
   // switch is a pause, not a permission denial; a swept intent is unknown,

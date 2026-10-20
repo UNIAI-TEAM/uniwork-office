@@ -11,7 +11,13 @@ import { checkFolderName, folderActionFailure, type MovingItem } from './uniwork
 
 /** the name dialog: a new folder in `parentId` (null = root), or a rename from the contents list */
 export type NameDialogState =
-  | { mode: 'create'; parentId: string | null; sub: boolean }
+  | {
+      mode: 'create'
+      parentId: string | null
+      sub: boolean
+      /** UNI-1959: the New menu's default name, filled in (the person may change it) */
+      initial?: string
+    }
   | { mode: 'rename'; id: string; title: string }
 
 export interface MoveRequest extends MovingItem {
@@ -138,8 +144,13 @@ export function useFolderActions({
 
   return {
     nameDialog,
-    openCreate: (parentId: string | null, sub = false) =>
-      setNameDialog({ mode: 'create', parentId, sub }),
+    openCreate: (parentId: string | null, sub = false, options?: { initial?: string }) =>
+      setNameDialog({
+        mode: 'create',
+        parentId,
+        sub,
+        ...(options?.initial ? { initial: options.initial } : {}),
+      }),
     openRename: (doc: Pick<UniworkDocSummary, 'id' | 'title'>) =>
       setNameDialog({ mode: 'rename', id: doc.id, title: doc.title }),
     closeNameDialog: () => setNameDialog(null),

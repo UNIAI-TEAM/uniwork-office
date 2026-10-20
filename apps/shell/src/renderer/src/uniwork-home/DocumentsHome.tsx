@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type {
+  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocSummary,
   UniworkFolderNode,
@@ -12,7 +13,6 @@ import {
   ActionToast,
   ArchiveConfirm,
   NEW_KIND_LABEL_KEY,
-  NewDocDialog,
   RenameField,
   UploadDocDialog,
   type ActionOutcome,
@@ -103,6 +103,8 @@ import {
   type DocumentsHomeViewMode,
   type UpdatedByOption,
 } from './documents-home-model'
+import { NewMenu } from './NewMenu'
+import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
 
@@ -258,7 +260,7 @@ export function DocumentsHome({
   onSubViewChange,
   onFolderChange,
 }: DocumentsHomeProps) {
-  const { t, dateLocale } = useI18n()
+  const { t, lang, dateLocale } = useI18n()
   const uid = useId()
 
   const [subView, setSubView] = useState<DocumentsHomeSubViewId>(initialSubView)
@@ -289,7 +291,14 @@ export function DocumentsHome({
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
 
   // Dialogs & inline actions
-  const [newDocModal, setNewDocModal] = useState<{ format: NewDocKind } | null>(null)
+  // UNI-1959: "Share with workspace" of the New menu and the strip: off by default, kept while
+  // this view is open, reset after a create from the strip (the web's page-view behaviour)
+  const [shareWithWorkspace, setShareWithWorkspace] = useState(false)
+  const quickShareHintId = useId()
+  // UNI-1959: kinds the server answered 404 / 501 for: disabled for the session
+  const [unavailableKinds, setUnavailableKinds] = useState<ReadonlySet<NewDocKind>>(new Set())
+  const [creating, setCreating] = useState(false)
+  const creatingRef = useRef(false)
   const [uploadModal, setUploadModal] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
@@ -778,47 +787,81 @@ export function DocumentsHome({
     }
   }
 
-  const handleCreateDoc = async (
-    input: DocTarget & { name: string; format: NewDocKind },
-  ): Promise<ActionOutcome> => {
-    let targetFolderId = input.folderId
-    if (!targetFolderId && typeof window.aiOffice?.uniworkEnsureMyFolder === 'function') {
-      const ensured = await window.aiOffice
-        .uniworkEnsureMyFolder(input.workspaceId)
-        .catch(() => ({ ok: false as const, error: 'network' as const }))
-      if (ensured.ok) {
-        targetFolderId = ensured.value.id
-        setMyFolderId(ensured.value.id)
-      }
-    }
-    // UNI-1953: a UniNote is a page: its own create call, opened on the web
-    const res =
-      input.format === 'page'
-        ? await createPage({
-            workspaceId: input.workspaceId,
-            folderId: targetFolderId,
-            name: input.name,
-          })
-        : await createDocument({
-            workspaceId: input.workspaceId,
-            folderId: targetFolderId,
-            name: input.name,
-            format: input.format,
-          })
-    if (res.ok) {
-      setNewDocModal(null)
-      refreshAll()
-      if (input.format === 'page') void openCreatedPage(res.value)
-      else onOpenDocument(res.value)
-      return { ok: true }
-    }
-    if (isDocNameError(res.error) || res.error === 'unsupported_format') {
-      return { ok: false, error: res.error }
-    }
-    const key = UNIWORK_ERROR_KEYS[res.error as UniworkDocErrorCode]
-    setToast({ message: key ? t(key) : t('uwDocActionFailed'), tone: 'error' })
-    return { ok: false, error: 'failed' }
+  // what a create sends: the "Share with workspace" choice, for documents only (a folder is never shared)
+  const createVisibility = (): UniworkCreateVisibility | undefined =>
+    shareWithWorkspace ? 'workspace' : undefined
+
+  /** My Folder when no folder is known yet: main also places a null-folder create there */
+  const ensureTargetFolder = async (target: DocTarget): Promise<string | null> => {
+    if (target.folderId) return target.folderId
+    if (typeof window.aiOffice?.uniworkEnsureMyFolder !== 'function') return null
+    const ensured = await window.aiOffice
+      .uniworkEnsureMyFolder(target.workspaceId)
+      .catch(() => ({ ok: false as const, error: 'network' as const }))
+    if (!ensured.ok) return null
+    setMyFolderId(ensured.value.id)
+    return ensured.value.id
   }
+
+  // UNI-1959: a menu / strip pick creates at once - the web's default name, the open place -
+  // then opens it. No name dialog: the name is asked on the first save.
+  const createNow = async (kind: NewDocKind, fromStrip: boolean): Promise<void> => {
+    if (creatingRef.current || unavailableKinds.has(kind)) return
+    creatingRef.current = true
+    setCreating(true)
+    const visibility = createVisibility()
+    if (fromStrip) setShareWithWorkspace(false)
+    try {
+      const target = activeTargetFolder
+      const folderIdToUse = await ensureTargetFolder(target)
+      const name = t(NEW_DEFAULT_NAME_KEY[kind])
+      // UNI-1953: a UniNote is a page: its own create call, opened on the web
+      const res =
+        kind === 'page'
+          ? await createPage({
+              workspaceId: target.workspaceId,
+              folderId: folderIdToUse,
+              name,
+              ...(visibility ? { visibility } : {}),
+            })
+          : await createDocument({
+              workspaceId: target.workspaceId,
+              folderId: folderIdToUse,
+              name,
+              format: kind,
+              ...(visibility ? { visibility } : {}),
+            })
+      if (res.ok) {
+        refreshAll()
+        if (kind === 'page') void openCreatedPage(res.value)
+        else onOpenDocument(res.value)
+        return
+      }
+      if (res.endpointMissing) {
+        setUnavailableKinds((prev) => new Set(prev).add(kind))
+        setToast({ message: t('uhCreateUnavailable'), tone: 'error' })
+        return
+      }
+      const specific = (CREATE_SPECIFIC_ERRORS as readonly string[]).includes(res.error)
+        ? UNIWORK_ERROR_KEYS[res.error as UniworkDocErrorCode]
+        : undefined
+      setToast({ message: specific ? t(specific) : t('uhCreateFailed'), tone: 'error' })
+    } finally {
+      creatingRef.current = false
+      setCreating(false)
+    }
+  }
+
+  // the New menu's Folder row: the app's own folder name prompt, the web's default name filled in
+  const createFolderHere = () => {
+    const parentId = activeTargetFolder.folderId
+    if (parentId === null) return
+    folderActions.openCreate(parentId, true, { initial: t(NEW_DEFAULT_NAME_KEY.folder) })
+  }
+
+  const hasFolderRow =
+    (subView === 'workspace' && folderId !== null) ||
+    (subView === 'my-folder' && resolvedMyFolderId !== null)
 
   const handleUploadDoc = async (
     input: DocTarget & { path: string; name: string },
@@ -1414,25 +1457,18 @@ export function DocumentsHome({
               </svg>
               {t('uhUpload')}
             </button>
-            <button
-              type="button"
-              className="btn btn-primary dh-toolbar-btn dh-btn-create"
-              onClick={() => setNewDocModal({ format: 'docx' })}
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              {t('uhCreateNew')}
-            </button>
+            <NewMenu
+              label={t('uhCreateNew')}
+              hasFolderRow={hasFolderRow}
+              unavailable={unavailableKinds}
+              unavailableHint={t('uhCreateUnavailableHint')}
+              busy={creating}
+              share={{ checked: shareWithWorkspace, onChange: setShareWithWorkspace }}
+              onPick={(kind) => {
+                if (kind === 'folder') createFolderHere()
+                else void createNow(kind, false)
+              }}
+            />
           </div>
         </div>
 
@@ -1445,12 +1481,46 @@ export function DocumentsHome({
                 type="button"
                 className="dh-quick-pill"
                 data-quick-format={kind}
-                onClick={() => setNewDocModal({ format: kind })}
+                aria-disabled={creating || unavailableKinds.has(kind) || undefined}
+                title={unavailableKinds.has(kind) ? t('uhCreateUnavailableHint') : undefined}
+                onClick={() => void createNow(kind, true)}
               >
                 <FileBadge ext={kind} size={18} />
                 <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
+                <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
               </button>
             ))}
+            <button
+              type="button"
+              role="switch"
+              className="dh-quick-share"
+              aria-checked={shareWithWorkspace}
+              aria-disabled={creating || undefined}
+              aria-describedby={quickShareHintId}
+              onClick={() => {
+                if (!creating) setShareWithWorkspace(!shareWithWorkspace)
+              }}
+            >
+              <span className="dh-quick-check" aria-hidden="true">
+                {shareWithWorkspace && (
+                  <svg width="12" height="12" viewBox="0 0 16 16">
+                    <path
+                      d="m3.5 8.5 3 3 6-7"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </span>
+              <span>{t('uhNewShare')}</span>
+            </button>
+            {/* always mounted and one line tall, so the toggle neither moves the pills nor goes unannounced */}
+            <p id={quickShareHintId} role="status" className="dh-quick-share-hint">
+              {shareWithWorkspace ? t('uhNewShareHint', { level: t('uhNewShareLevelView') }) : ''}
+            </p>
           </div>
         )}
 
@@ -1766,7 +1836,7 @@ export function DocumentsHome({
                   </div>
 
                   {files.map((doc) => {
-                    const access = formatAccessCell(doc, t)
+                    const access = formatAccessCell(doc, t, lang)
                     const person = formatUpdatedByCell(doc)
                     const menuItems = docMenuFor(doc)
                     const renaming = docRename?.doc.id === doc.id ? docRename : null
@@ -1842,19 +1912,15 @@ export function DocumentsHome({
                         </div>
 
                         <div className="dh-cell-access" role="cell">
-                          {access.isEmpty ? (
-                            <span className="dh-cell-empty">—</span>
+                          {access.visibilityLabel ? (
+                            <span className={`dh-vis-badge dh-vis-${access.tone}`}>
+                              {access.visibilityLabel}
+                            </span>
                           ) : (
-                            <>
-                              {access.visibilityLabel && (
-                                <span className={`dh-vis-badge dh-vis-${access.tone}`}>
-                                  {access.visibilityLabel}
-                                </span>
-                              )}
-                              {access.levelLabel && (
-                                <span className="dh-level-sub">{access.levelLabel}</span>
-                              )}
-                            </>
+                            <span className="dh-cell-empty">—</span>
+                          )}
+                          {access.levelLabel && (
+                            <span className="dh-level-sub">{access.levelLabel}</span>
                           )}
                         </div>
 
@@ -1921,18 +1987,6 @@ export function DocumentsHome({
         )}
       </div>
 
-      {newDocModal && (
-        <NewDocDialog
-          workspaces={workspaces}
-          kinds={NEW_DOC_KINDS}
-          initialKind={newDocModal.format}
-          initialTarget={activeTargetFolder}
-          loadTree={loadFolderTree}
-          onCreate={handleCreateDoc}
-          onCancel={() => setNewDocModal(null)}
-        />
-      )}
-
       {uploadModal && (
         <UploadDocDialog
           workspaces={workspaces}
@@ -1970,7 +2024,7 @@ export function DocumentsHome({
                 ? t('ufNewSubfolder')
                 : t('ufNewFolder')
           }
-          initial={nameDialog.mode === 'rename' ? nameDialog.title : ''}
+          initial={nameDialog.mode === 'rename' ? nameDialog.title : (nameDialog.initial ?? '')}
           submitLabel={nameDialog.mode === 'rename' ? t('ufSave') : t('ufCreate')}
           onSubmit={folderActions.submitName}
           onCancel={folderActions.closeNameDialog}
