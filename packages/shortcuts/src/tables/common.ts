@@ -319,6 +319,84 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
+  // New document / workbook / presentation (every shell-owned File menu; the browser keeps Ctrl+N)
+  {
+    id: 'common-01',
+    scope: 'common',
+    win: ['Ctrl+N'],
+    mac: ['Cmd+N'],
+    web: { win: [], mac: [] },
+    webAlt: { win: 'Alt+Shift+N', mac: 'Alt+Shift+N' },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Close document / tab: Cmd+W on macOS (D7); the web build has Alt+Shift+W (MS web)
+  {
+    id: 'common-07',
+    scope: 'common',
+    win: ['Ctrl+W'],
+    mac: ['Cmd+W'],
+    web: { win: [], mac: [] },
+    webAlt: { win: 'Alt+Shift+W', mac: 'Alt+Shift+W' },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Next / previous region (the shell cycles its window regions; Shift reverses)
+  {
+    id: 'common-09',
+    scope: 'common',
+    win: ['F6', 'Shift+F6'],
+    mac: ['F6', 'Shift+F6'],
+    match: 'key',
+    guard: {},
+  },
+  // Zoom in / out / reset: on the Home page this is the interface scale, a document tab
+  // keeps its own zoom keys. The Ctrl+Alt chords left (Excel's grid zoom, AltGr on Windows).
+  {
+    id: 'common-16',
+    scope: 'common',
+    win: ['Ctrl+Equal'],
+    mac: ['Cmd+Equal'],
+    match: 'key',
+    guard: {},
+  },
+  {
+    id: 'common-17',
+    scope: 'common',
+    win: ['Ctrl+Minus'],
+    mac: ['Cmd+Minus'],
+    match: 'key',
+    guard: {},
+  },
+  {
+    id: 'common-18',
+    scope: 'common',
+    win: ['Ctrl+0'],
+    mac: ['Cmd+0'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Full screen (F11; the macOS role's Ctrl+Cmd+F)
+  {
+    id: 'common-20',
+    scope: 'common',
+    win: ['F11'],
+    mac: ['Ctrl+Cmd+F'],
+    web: { win: [], mac: [] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Developer tools (development builds only): Ctrl+Shift+I works in every window; F12 is
+  // also Save As in the Word-style modules, so it opens DevTools only where it is free
+  {
+    id: 'common-21',
+    scope: 'common',
+    win: ['Ctrl+Shift+I', 'F12'],
+    mac: ['Alt+Cmd+I'],
+    web: { win: [], mac: [] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
 ]
 
 export const commonShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
