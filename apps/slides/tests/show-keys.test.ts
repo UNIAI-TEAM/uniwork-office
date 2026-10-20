@@ -1,18 +1,29 @@
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { chordsFor, type ShortcutPlatform, type ShortcutSurface } from '@genoffice/shortcuts'
 import {
   gotoPosition,
   INITIAL_SHOW_KEYS,
   pushVisited,
   reduceAudienceNav,
   reduceShowKey,
+  SHOW_KEY_ROWS,
   showNavKey,
   toggleScreen,
   type ShowKeyState,
 } from '../src/renderer/show-keys'
 
-/** A plain keydown (no modifier unless given) as the reducer reads it */
+const CODES: Record<string, string> = { ' ': 'Space', '.': 'Period', ',': 'Comma', '-': 'Minus' }
+
+/** A plain keydown (no modifier unless given) with the physical code a US layout sends */
 function ev(key: string, init: Partial<KeyboardEventInit> = {}): KeyboardEvent {
-  const code = /^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : ''
+  const code = /^[a-z]$/i.test(key)
+    ? `Key${key.toUpperCase()}`
+    : /^[0-9]$/.test(key)
+      ? `Digit${key}`
+      : (CODES[key] ?? key)
   return new KeyboardEvent('keydown', { key, code, ...init })
 }
 
@@ -69,10 +80,20 @@ describe('slide show keys', () => {
     expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('ArrowRight', { ctrlKey: true }))).toBeNull()
     expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('b', { metaKey: true }), 'mac')).toBeNull()
     expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('n', { altKey: true }))).toBeNull()
-    // PowerPoint for Mac lists Shift+B / Shift+W
-    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('B', { shiftKey: true }))?.state.screen).toBe(
-      'black',
+    // PowerPoint for Mac lists Shift+B / Shift+W, the Windows page B / W only
+    const shiftB = ev('B', { shiftKey: true })
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, shiftB, 'mac')?.state.screen).toBe('black')
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, shiftB, 'win')).toBeNull()
+  })
+
+  it('PowerPoint for Mac also ends the show with Hyphen and Cmd+Period; the web with Esc only', () => {
+    const exit = { type: 'exit' }
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('-'), 'mac')?.action).toEqual(exit)
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('.', { metaKey: true }), 'mac')?.action).toEqual(
+      exit,
     )
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('-'), 'win')).toBeNull()
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('-'), 'mac', 'web')).toBeNull()
   })
 
   it('fires nothing while an IME is composing', () => {
@@ -140,6 +161,100 @@ describe('slide show keys', () => {
     expect(black.screen).toBe('black')
     expect(toggleScreen(black, 'black').screen).toBe('none')
     expect(toggleScreen(black, 'white').screen).toBe('white')
+  })
+})
+
+/** The UNI-2011 inventory snapshot the slides table is generated from. */
+function csvRows(): Map<string, Record<string, string>> {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const path = resolve(here, '../../../packages/shortcuts/tests/fixtures/shortcuts.csv')
+  const text = readFileSync(path, 'utf8')
+    .split(/\r?\n/)
+    .filter((line) => !line.startsWith('#'))
+    .join('\n')
+  const records: string[][] = []
+  let field = ''
+  let record: string[] = []
+  let quoted = false
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!
+    if (quoted) {
+      if (c === '"' && text[i + 1] === '"') field += text[++i]
+      else if (c === '"') quoted = false
+      else field += c
+    } else if (c === '"') quoted = true
+    else if (c === ',') {
+      record.push(field)
+      field = ''
+    } else if (c === '\n') {
+      records.push([...record, field])
+      record = []
+      field = ''
+    } else field += c
+  }
+  if (field || record.length) records.push([...record, field])
+  const [header, ...body] = records
+  return new Map(
+    body.map((cells) => {
+      const row = Object.fromEntries(header!.map((name, k) => [name, cells[k] ?? '']))
+      return [row.id!, row]
+    }),
+  )
+}
+
+/** How Microsoft's pages and the proposal columns spell a chord. */
+function spelling(chord: string): RegExp {
+  const named: Record<string, RegExp> = {
+    Enter: /\b(Enter|Return)\b/i,
+    PageDown: /Page ?down/i,
+    PageUp: /Page ?up/i,
+    Space: /Space(bar)?/i,
+    Backspace: /Backspace|\bDelete\b/i,
+    Escape: /\bEsc\b/i,
+    Minus: /Hyphen/i,
+    Period: /Period/i,
+    Comma: /Comma/i,
+    'Cmd+Period': /(⌘|Cmd)\+Period/i,
+  }
+  if (named[chord]) return named[chord]!
+  const letter = /^(Shift\+)?([A-Z])$/.exec(chord)
+  if (letter) return new RegExp(`(^|[^A-Za-z+])${letter[1] ? 'Shift\\+' : ''}${letter[2]}\\b`)
+  return new RegExp(`\\b${chord}\\b`, 'i')
+}
+
+describe('single show keys (module-local, UNI-2011 lead decision)', () => {
+  const rows = csvRows()
+  const platforms: ShortcutPlatform[] = ['win', 'mac']
+  const surfaces: ShortcutSurface[] = ['desktop', 'web']
+
+  it('every chord is printed in its own CSV row', () => {
+    const untraced: string[] = []
+    for (const showRow of SHOW_KEY_ROWS) {
+      const csv = rows.get(showRow.id)
+      expect(csv, showRow.id).toBeDefined()
+      for (const platform of platforms) {
+        const text = [
+          `ms_${platform}`,
+          `ms_web_${platform}`,
+          'proposal_desktop',
+          'proposal_web',
+          'desktop_today',
+          'web_today',
+        ]
+          .map((column) => csv?.[column] ?? '')
+          .join(' | ')
+        for (const surface of surfaces) {
+          for (const chord of chordsFor(showRow, platform, surface)) {
+            if (!spelling(chord).test(text)) untraced.push(`${showRow.id} ${platform}: ${chord}`)
+          }
+        }
+      }
+    }
+    expect(untraced).toEqual([])
+  })
+
+  it('stays out of the editor: every row is in the slideshow context', () => {
+    expect(SHOW_KEY_ROWS.every((r) => r.scope === 'slides' && r.context === 'slideshow')).toBe(true)
   })
 })
 

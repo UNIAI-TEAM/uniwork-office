@@ -2,15 +2,18 @@
  * Pure key handling for slide shows (PowerPoint keyset): navigation keys, B / . and W / ,
  * blackout toggles, digits + Enter go-to. No React/DOM dependency so the mapping is unit-testable.
  *
- * Modifier chords come from the @genoffice/shortcuts slides table's `slideshow` rows
- * (UNI-2011), so they never shadow the editor's keys: Ctrl+H / Cmd+I hide the pointer.
- * The single keys below (N, P, arrows, B, W, Esc...) are printed by PowerPoint without a
- * modifier, which the table's CSV tracing cannot read yet; they stay listed here.
+ * Keys are matched with the @genoffice/shortcuts matcher (UNI-2011: exact modifiers, IME
+ * guard, letters by the physical key on non-Latin layouts). Modifier chords come from the
+ * slides table's `slideshow` rows, so they never shadow the editor's keys (Ctrl+H / Cmd+I
+ * hide the pointer); the single keys PowerPoint prints without a modifier are SHOW_KEY_ROWS.
  */
 import {
   isComposingEvent,
   matchShortcut,
   slidesShortcuts,
+  type Chord,
+  type PlatformChords,
+  type ShortcutAction,
   type ShortcutKeyEvent,
   type ShortcutPlatform,
   type ShortcutSurface,
@@ -44,44 +47,52 @@ export type ShowKeyAction =
 
 const NONE: ShowKeyAction = { type: 'none' }
 
-const NAV_KEYS: Record<string, 'next' | 'prev' | 'first' | 'last'> = {
-  n: 'next',
-  ArrowRight: 'next',
-  ArrowDown: 'next',
-  ' ': 'next',
-  Enter: 'next',
-  PageDown: 'next',
-  p: 'prev',
-  ArrowLeft: 'prev',
-  ArrowUp: 'prev',
-  PageUp: 'prev',
-  // the Mac Delete key arrives as Backspace
-  Backspace: 'prev',
-  Home: 'first',
-  End: 'last',
+type ShowKey = 'next' | 'prev' | 'first' | 'last' | 'exit' | 'black' | 'white'
+
+/** A single show key in the table's row shape, plus what it does in the show. */
+export interface ShowKeyRow extends ShortcutAction {
+  readonly show: ShowKey
 }
 
-const SCREEN_KEYS: Record<string, ShowScreen> = {
-  b: 'black',
-  '.': 'black',
-  w: 'white',
-  ',': 'white',
-}
-
-/** The key as the tables above spell it: letters lower-case, read from the physical key
- * when the layout types no Latin letter (Cyrillic, Greek...). */
-function showKeyName(e: ShortcutKeyEvent): string {
-  if (e.key.length !== 1) return e.key
-  const letter = e.key.toLowerCase()
-  if (/^[a-z]$/.test(letter)) return letter
-  const physical = /^Key([A-Z])$/.exec(e.code)
-  return physical ? physical[1]!.toLowerCase() : e.key
+function row(
+  id: string,
+  show: ShowKey,
+  win: Chord[],
+  mac: Chord[] = win,
+  web?: PlatformChords,
+): ShowKeyRow {
+  const base = { id, scope: 'slides', context: SLIDESHOW_CONTEXT, win, mac } as const
+  return { ...base, ...(web ? { web } : {}), match: 'key', guard: {}, show }
 }
 
 /**
+ * The single show keys, each naming its `shortcuts.csv` row. They stay here rather than in
+ * the slides table (UNI-2011 lead decision): the table's CSV trace reads chords with a
+ * modifier only, so bare keys move there with S-table fix2. A test checks every chord
+ * against its row's text.
+ */
+export const SHOW_KEY_ROWS: readonly ShowKeyRow[] = [
+  // slides-25: next slide / animation
+  row('slides-25', 'next', ['N', 'Enter', 'PageDown', 'Right', 'Down', 'Space']),
+  // slides-26: previous slide / animation; the Mac Delete key arrives as Backspace
+  row('slides-26', 'prev', ['P', 'PageUp', 'Left', 'Up', 'Backspace']),
+  // slides-27: first / last slide
+  row('slides-27', 'first', ['Home']),
+  row('slides-27', 'last', ['End']),
+  // slides-29: end the show; PowerPoint for Mac adds Hyphen and Cmd+Period, the web Esc only
+  row('slides-29', 'exit', ['Escape'], ['Escape', 'Minus', 'Cmd+Period'], {
+    win: ['Escape'],
+    mac: ['Escape'],
+  }),
+  // slides-30: black (B, Period) / white (W, Comma) screen; PowerPoint for Mac adds Shift
+  row('slides-30', 'black', ['B', 'Period'], ['B', 'Shift+B', 'Period']),
+  row('slides-30', 'white', ['W', 'Comma'], ['W', 'Shift+W', 'Comma']),
+]
+
+/**
  * Maps a keydown to the next state + action; null = not a show key (leave the event alone).
- * `platform` / `surface` pick the table's chords (PowerPoint for Mac's on macOS, the web
- * column in the web frame).
+ * `platform` / `surface` pick the chords (PowerPoint for Mac's on macOS, the web's in the
+ * web frame).
  */
 export function reduceShowKey(
   state: ShowKeyState,
@@ -90,31 +101,34 @@ export function reduceShowKey(
   surface: ShortcutSurface = 'desktop',
 ): { state: ShowKeyState; action: ShowKeyAction } | null {
   if (isComposingEvent(e)) return null
-  const row = matchShortcut(e, slidesShortcuts, platform, surface, SLIDESHOW_CONTEXT)
-  if (row?.id === 'slides-32') return { state, action: { type: 'pointer' } }
-  // the single show keys never carry Ctrl / Cmd / Alt (Shift+B / Shift+W still black out)
-  if (e.ctrlKey || e.metaKey || e.altKey) return null
-  const key = showKeyName(e)
-  if (key === 'Escape') {
+  const tableRow = matchShortcut(e, slidesShortcuts, platform, surface, SLIDESHOW_CONTEXT)
+  if (tableRow?.id === 'slides-32') return { state, action: { type: 'pointer' } }
+  const matched = matchShortcut(e, SHOW_KEY_ROWS, platform, surface, SLIDESHOW_CONTEXT)
+  const show = (matched as ShowKeyRow | null)?.show
+  if (show === 'exit') {
     if (state.digits) return { state: { ...state, digits: '' }, action: NONE }
     return { state, action: { type: 'exit' } }
   }
+  const plain = !e.ctrlKey && !e.metaKey && !e.altKey
   // Blacked out: any key restores the slide and is otherwise swallowed
-  if (state.screen !== 'none') return { state: { screen: 'none', digits: '' }, action: NONE }
-  if (/^[0-9]$/.test(key)) {
-    return { state: { ...state, digits: (state.digits + key).slice(-4) }, action: NONE }
+  if (state.screen !== 'none') {
+    return plain || show ? { state: { screen: 'none', digits: '' }, action: NONE } : null
   }
-  const screen = SCREEN_KEYS[key]
-  if (screen) return { state: { screen, digits: '' }, action: NONE }
-  if (key === 'Enter' && state.digits) {
+  // slides-28: the typed slide number, then Enter
+  if (plain && /^[0-9]$/.test(e.key)) {
+    return { state: { ...state, digits: (state.digits + e.key).slice(-4) }, action: NONE }
+  }
+  if (show === 'black' || show === 'white') {
+    return { state: { screen: show, digits: '' }, action: NONE }
+  }
+  if (show === 'next' && e.key === 'Enter' && state.digits) {
     return {
       state: { ...state, digits: '' },
       action: { type: 'goto', slideNumber: parseInt(state.digits, 10) },
     }
   }
-  const nav = NAV_KEYS[key]
-  if (!nav) return null
-  return { state: { ...state, digits: '' }, action: { type: nav } }
+  if (!show) return null
+  return { state: { ...state, digits: '' }, action: { type: show } }
 }
 
 /**
