@@ -654,6 +654,63 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     if (ref.id !== documentId) throw new UniworkDocError('malformed_response')
     return ref
   }
+  const readBoundedStream = async (
+    response: Response,
+    progress?: () => void,
+    streamOptions: {
+      signal?: AbortSignal
+      onProgress?: (progress: { receivedBytes: number; totalBytes: number | null }) => void
+    } = {},
+  ): Promise<{ bytes: Uint8Array }> => {
+    const { signal, onProgress } = streamOptions
+    const header = response.headers.get('Content-Length')
+    const declared = header === null ? NaN : Number(header)
+    if (declared > MAX_DOWNLOAD_BYTES) {
+      void response.body?.cancel().catch(() => undefined)
+      throw new UniworkDocError('too_large')
+    }
+    const totalBytes = Number.isSafeInteger(declared) && declared >= 0 ? declared : null
+    // R5BE-8: a 200 with no readable body is refused, never buffered
+    // whole (the cap could only be checked after the bytes were in memory)
+    if (!response.body) throw new UniworkDocError('malformed_response')
+    const reader = response.body.getReader()
+    // send() detaches the caller's abort once the server answered: the
+    // body read listens to it itself, so a cancel ends the stream too
+    const stop = () => void reader.cancel().catch(() => undefined)
+    signal?.addEventListener('abort', stop, { once: true })
+    const chunks: Uint8Array[] = []
+    let receivedBytes = 0
+    try {
+      for (;;) {
+        if (signal?.aborted) throw new UniworkDocError('network')
+        let step: ReadableStreamReadResult<Uint8Array>
+        try {
+          step = await reader.read()
+        } catch {
+          throw new UniworkDocError('network')
+        }
+        if (signal?.aborted) throw new UniworkDocError('network')
+        if (step.done) break
+        receivedBytes += step.value.byteLength
+        if (receivedBytes > MAX_DOWNLOAD_BYTES) {
+          stop()
+          throw new UniworkDocError('too_large')
+        }
+        chunks.push(step.value)
+        progress?.()
+        onProgress?.({ receivedBytes, totalBytes })
+      }
+    } finally {
+      signal?.removeEventListener('abort', stop)
+    }
+    const bytes = new Uint8Array(receivedBytes)
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return { bytes }
+  }
 
   return {
     async listWorkspaces(orgId) {
@@ -793,13 +850,8 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         method: 'GET',
         route: `/workspaces/${id(workspaceId)}/documents/sources/${uniworkSourceId(sourceId)}/download`,
         timeoutMs: transferTimeout,
-        async read(response) {
-          const length = Number(response.headers.get('Content-Length') ?? '0')
-          if (length > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
-          const bytes = new Uint8Array(await response.arrayBuffer())
-          if (bytes.byteLength > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
-          return { bytes }
-        },
+        idle: { ceilingMs: streamCeiling },
+        read: readBoundedStream,
       })
     },
 
@@ -1207,52 +1259,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         timeoutMs: transferTimeout,
         idle: { ceilingMs: streamCeiling },
         ...(signal ? { signal } : {}),
-        async read(response, progress) {
-          const header = response.headers.get('Content-Length')
-          const declared = header === null ? NaN : Number(header)
-          if (declared > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
-          const totalBytes = Number.isSafeInteger(declared) && declared >= 0 ? declared : null
-          // R5BE-8: a 200 with no readable body is refused, never buffered
-          // whole (the cap could only be checked after the bytes were in memory)
-          if (!response.body) throw new UniworkDocError('malformed_response')
-          const reader = response.body.getReader()
-          // send() detaches the caller's abort once the server answered: the
-          // body read listens to it itself, so a cancel ends the stream too
-          const stop = () => void reader.cancel().catch(() => undefined)
-          signal?.addEventListener('abort', stop, { once: true })
-          const chunks: Uint8Array[] = []
-          let receivedBytes = 0
-          try {
-            for (;;) {
-              if (signal?.aborted) throw new UniworkDocError('network')
-              let step: ReadableStreamReadResult<Uint8Array>
-              try {
-                step = await reader.read()
-              } catch {
-                throw new UniworkDocError('network')
-              }
-              if (signal?.aborted) throw new UniworkDocError('network')
-              if (step.done) break
-              receivedBytes += step.value.byteLength
-              if (receivedBytes > MAX_DOWNLOAD_BYTES) {
-                stop()
-                throw new UniworkDocError('too_large')
-              }
-              chunks.push(step.value)
-              progress?.()
-              onProgress?.({ receivedBytes, totalBytes })
-            }
-          } finally {
-            signal?.removeEventListener('abort', stop)
-          }
-          const bytes = new Uint8Array(receivedBytes)
-          let offset = 0
-          for (const chunk of chunks) {
-            bytes.set(chunk, offset)
-            offset += chunk.byteLength
-          }
-          return { bytes }
-        },
+        read: (response, progress) => readBoundedStream(response, progress, { signal, onProgress }),
       })
     },
 
