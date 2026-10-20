@@ -287,8 +287,8 @@ export default function App() {
   const previewLimited = useMemo(() => usesBlockedPreviewFeatures(text), [text])
   // a view-only UniWork copy has no element editing: no selection chrome, toolbar or style panel
   const visualEdit = cap('htmlVisualEdit') && !uniwork.readOnly
-  // a source view (read-only AND locked) never runs the page's own scripts
-  const previewScriptsOff = uniwork.readOnly && uniwork.locked === true
+  // a view-only copy (shared view-only or a source view) never runs the page's own scripts
+  const previewScriptsOff = uniwork.readOnly
   // an untitled document has no UniWork binding to wait for
   const uniworkKnown = path === null || uniworkAnsweredPath === path
 
