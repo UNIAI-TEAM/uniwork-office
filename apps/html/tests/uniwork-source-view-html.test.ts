@@ -3,7 +3,8 @@
  * document, or a source view: bound + readOnly + locked).
  *  F2: the preview frame is put into the inspector's non-editing `view` mode, the element-edit
  *      chrome never shows and a forged selection / delete from the frame changes nothing.
- *  F3: a readOnly AND locked file previews in a sandbox without allow-scripts; the frame is not
+ *  F3: every readOnly file (shared view-only or source view) previews in a sandbox without
+ *      allow-scripts (user decision F3 = A, 2026-10-20); the frame is not
  *      loaded before the UniWork state is known, so a source never runs a script first.
  */
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
@@ -243,6 +244,7 @@ describe('F3: scripts never run in a source view', () => {
   it.each([
     ['source view (readOnly + locked)', { bound: true, readOnly: true, locked: true }],
     ['locked and read-only without a binding', { bound: false, readOnly: true, locked: true }],
+    ['shared view-only document (not locked)', { bound: true, readOnly: true }],
   ])('previews in a sandbox without allow-scripts: %s', async (_n, state) => {
     const h = await mount(state)
     open.push(h)
@@ -253,7 +255,6 @@ describe('F3: scripts never run in a source view', () => {
   it.each([
     ['plain local file', { bound: false, readOnly: false }],
     ['editable bound document', { bound: true, readOnly: false }],
-    ['shared view-only document (not locked)', { bound: true, readOnly: true }],
     ['locked but still editable', { bound: true, readOnly: false, locked: true }],
   ])('keeps the scripts sandbox for a %s', async (_n, state) => {
     const h = await mount(state)
@@ -282,47 +283,71 @@ describe('F3: a scripts-off frame is a fresh element, never a re-flagged one', (
    * navigation under the old allow-scripts flags: the inline script ran in a frame whose attribute
    * read "" afterwards. A frame that is created with its flags has no old flags.
    */
-  it('replaces the frame element when the answer turns it scripts-off', async () => {
-    let answer!: (s: State) => void
-    const h = await mount(new Promise<State>((r) => (answer = r)))
+  const SCRIPTS_OFF_STATES: Array<[string, State]> = [
+    ['source view', { bound: true, readOnly: true, locked: true }],
+    ['shared view-only document (not locked)', { bound: true, readOnly: true }],
+  ]
+
+  it.each(SCRIPTS_OFF_STATES)(
+    'replaces the frame element when the answer turns it scripts-off: %s',
+    async (_n, state) => {
+      let answer!: (s: State) => void
+      const h = await mount(new Promise<State>((r) => (answer = r)))
+      open.push(h)
+      const before = h.frame()
+      expect(before).not.toBeNull()
+      await act(async () => {
+        answer(state)
+      })
+      await settle()
+      expect(h.frame()).not.toBe(before)
+      expect(h.frame()?.isConnected).toBe(true)
+      expect(h.frame()?.getAttribute('sandbox')).toBe('')
+    },
+  )
+
+  it.each(SCRIPTS_OFF_STATES)(
+    'never gives a connected frame a real src before its sandbox is the empty one: %s',
+    async (_n, state) => {
+      const seen: Array<{ connected: boolean; sandbox: string | null }> = []
+      const realSet = Element.prototype.setAttribute
+      vi.spyOn(Element.prototype, 'setAttribute').mockImplementation(function (
+        this: Element,
+        name: string,
+        value: string,
+      ) {
+        if (
+          this instanceof HTMLIFrameElement &&
+          name === 'src' &&
+          value.includes('html-preview://view-1')
+        )
+          seen.push({ connected: this.isConnected, sandbox: this.getAttribute('sandbox') })
+        return realSet.call(this, name, value)
+      })
+      let answer!: (s: State) => void
+      const h = await mount(new Promise<State>((r) => (answer = r)))
+      open.push(h)
+      await act(async () => {
+        answer(state)
+      })
+      await settle()
+      expect(seen.length).toBeGreaterThan(0)
+      // a navigation starts only for a connected frame: it must already carry the empty sandbox
+      for (const s of seen) if (s.connected) expect(s.sandbox).toBe('')
+      expect(h.frame()?.getAttribute('src')).toContain('html-preview://view-1')
+    },
+  )
+
+  it('gives a frame that turns read-only while open (edit lock arrives) a fresh scripts-off frame', async () => {
+    const h = await mount({ bound: true, readOnly: false })
     open.push(h)
     const before = h.frame()
-    expect(before).not.toBeNull()
-    await act(async () => {
-      answer({ bound: true, readOnly: true, locked: true })
-    })
-    await settle()
+    expect(before?.getAttribute('sandbox')).toContain('allow-scripts')
+    h.setAnswer({ bound: true, readOnly: true })
+    await h.ping()
     expect(h.frame()).not.toBe(before)
     expect(h.frame()?.isConnected).toBe(true)
     expect(h.frame()?.getAttribute('sandbox')).toBe('')
-  })
-
-  it('never gives a connected frame a real src before its sandbox is the empty one', async () => {
-    const seen: Array<{ connected: boolean; sandbox: string | null }> = []
-    const realSet = Element.prototype.setAttribute
-    vi.spyOn(Element.prototype, 'setAttribute').mockImplementation(function (
-      this: Element,
-      name: string,
-      value: string,
-    ) {
-      if (
-        this instanceof HTMLIFrameElement &&
-        name === 'src' &&
-        value.includes('html-preview://view-1')
-      )
-        seen.push({ connected: this.isConnected, sandbox: this.getAttribute('sandbox') })
-      return realSet.call(this, name, value)
-    })
-    let answer!: (s: State) => void
-    const h = await mount(new Promise<State>((r) => (answer = r)))
-    open.push(h)
-    await act(async () => {
-      answer({ bound: true, readOnly: true, locked: true })
-    })
-    await settle()
-    expect(seen.length).toBeGreaterThan(0)
-    // a navigation starts only for a connected frame: it must already carry the empty sandbox
-    for (const s of seen) if (s.connected) expect(s.sandbox).toBe('')
     expect(h.frame()?.getAttribute('src')).toContain('html-preview://view-1')
   })
 
