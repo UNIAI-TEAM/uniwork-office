@@ -427,6 +427,18 @@ describe('copy and formatting', () => {
     expect(formatBytes(1024 ** 3, 'vi-VN')).toBe('1 GB')
   })
 
+  it('reads sizes by the shared list rule (whole from 10 units, locale decimal mark)', () => {
+    expect(formatBytes(12.5 * 1024, 'en-US')).toBe('13 KB')
+    expect(formatBytes(2970, 'en-US')).toBe('2.9 KB')
+    expect(formatBytes(2970, 'vi-VN')).toBe('2,9 KB')
+    expect(formatBytes(15 * 1024 * 1024, 'en-US')).toBe('15 MB')
+    expect(formatBytes(512 * 1024 ** 3, 'en-US')).toBe('512 GB')
+  })
+
+  it('keeps a zero byte count readable for progress and budget lines', () => {
+    expect(formatBytes(0, 'en-US')).toBe('0 B')
+  })
+
   it('every key the model can return exists in vi and en', () => {
     const states: SyncCenterRowState[] = [
       'queued',
