@@ -5,15 +5,12 @@
  * Keys are matched with the @genoffice/shortcuts matcher (UNI-2011: exact modifiers, IME
  * guard, letters by the physical key on non-Latin layouts). Modifier chords come from the
  * slides table's `slideshow` rows, so they never shadow the editor's keys (Ctrl+H / Cmd+I
- * hide the pointer); the single keys PowerPoint prints without a modifier are SHOW_KEY_ROWS.
+ * hide the pointer); the single keys PowerPoint prints without a modifier are rows too (slides-25..30).
  */
 import {
   isComposingEvent,
   matchShortcut,
   slidesShortcuts,
-  type Chord,
-  type PlatformChords,
-  type ShortcutAction,
   type ShortcutKeyEvent,
   type ShortcutPlatform,
   type ShortcutSurface,
@@ -49,45 +46,45 @@ const NONE: ShowKeyAction = { type: 'none' }
 
 type ShowKey = 'next' | 'prev' | 'first' | 'last' | 'exit' | 'black' | 'white'
 
-/** A single show key in the table's row shape, plus what it does in the show. */
-export interface ShowKeyRow extends ShortcutAction {
-  readonly show: ShowKey
-}
-
-function row(
-  id: string,
-  show: ShowKey,
-  win: Chord[],
-  mac: Chord[] = win,
-  web?: PlatformChords,
-): ShowKeyRow {
-  const base = { id, scope: 'slides', context: SLIDESHOW_CONTEXT, win, mac } as const
-  return { ...base, ...(web ? { web } : {}), match: 'key', guard: {}, show }
+/** True when the key typed an ASCII character (a layout the matcher reads by character). */
+function typesAscii(e: ShortcutKeyEvent): boolean {
+  return /^[!-~]$/.test(e.key)
 }
 
 /**
- * The single show keys, each naming its `shortcuts.csv` row. They stay here rather than in
- * the slides table (UNI-2011 lead decision): the table's CSV trace reads chords with a
- * modifier only, so bare keys move there with S-table fix2. A test checks every chord
- * against its row's text.
+ * What a matched show row does. The single-key rows are the slides table's `slideshow` rows
+ * (slides-25..30); rows that hold two actions (Home / End, black / white) read it from the key:
+ * by character, with the physical key for a layout that types no ASCII (Cyrillic B / W).
  */
-export const SHOW_KEY_ROWS: readonly ShowKeyRow[] = [
-  // slides-25: next slide / animation
-  row('slides-25', 'next', ['N', 'Enter', 'PageDown', 'Right', 'Down', 'Space']),
-  // slides-26: previous slide / animation; the Mac Delete key arrives as Backspace
-  row('slides-26', 'prev', ['P', 'PageUp', 'Left', 'Up', 'Backspace']),
-  // slides-27: first / last slide
-  row('slides-27', 'first', ['Home']),
-  row('slides-27', 'last', ['End']),
-  // slides-29: end the show; PowerPoint for Mac adds Hyphen and Cmd+Period, the web Esc only
-  row('slides-29', 'exit', ['Escape'], ['Escape', 'Minus', 'Cmd+Period'], {
-    win: ['Escape'],
-    mac: ['Escape'],
-  }),
-  // slides-30: black (B, Period) / white (W, Comma) screen; PowerPoint for Mac adds Shift
-  row('slides-30', 'black', ['B', 'Period'], ['B', 'Shift+B', 'Period']),
-  row('slides-30', 'white', ['W', 'Comma'], ['W', 'Shift+W', 'Comma']),
-]
+function showOf(id: string, e: ShortcutKeyEvent): ShowKey | null {
+  switch (id) {
+    case 'slides-25':
+      return 'next'
+    case 'slides-26':
+      return 'prev'
+    case 'slides-27':
+      return e.key === 'End' ? 'last' : 'first'
+    case 'slides-29':
+      return 'exit'
+    case 'slides-30': {
+      const k = typesAscii(e) ? e.key.toLowerCase() : e.code
+      return k === 'b' || k === '.' || k === 'KeyB' ? 'black' : 'white'
+    }
+    default:
+      return null
+  }
+}
+
+/**
+ * PowerPoint for Mac also blanks the show on Shift+B / Shift+W (slides-30). The table's
+ * chord trace does not read a Shift+letter from the CSV text, so the two chords are read here.
+ */
+function macShiftedScreen(e: ShortcutKeyEvent, platform: ShortcutPlatform): ShowKey | null {
+  if (platform !== 'mac' || !e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return null
+  const k = typesAscii(e) ? e.key.toLowerCase() : e.code
+  if (k === 'b' || k === 'KeyB') return 'black'
+  return k === 'w' || k === 'KeyW' ? 'white' : null
+}
 
 /**
  * Maps a keydown to the next state + action; null = not a show key (leave the event alone).
@@ -101,10 +98,9 @@ export function reduceShowKey(
   surface: ShortcutSurface = 'desktop',
 ): { state: ShowKeyState; action: ShowKeyAction } | null {
   if (isComposingEvent(e)) return null
-  const tableRow = matchShortcut(e, slidesShortcuts, platform, surface, SLIDESHOW_CONTEXT)
-  if (tableRow?.id === 'slides-32') return { state, action: { type: 'pointer' } }
-  const matched = matchShortcut(e, SHOW_KEY_ROWS, platform, surface, SLIDESHOW_CONTEXT)
-  const show = (matched as ShowKeyRow | null)?.show
+  const matched = matchShortcut(e, slidesShortcuts, platform, surface, SLIDESHOW_CONTEXT)
+  if (matched?.id === 'slides-32') return { state, action: { type: 'pointer' } }
+  const show = matched ? showOf(matched.id, e) : macShiftedScreen(e, platform)
   if (show === 'exit') {
     if (state.digits) return { state: { ...state, digits: '' }, action: NONE }
     return { state, action: { type: 'exit' } }

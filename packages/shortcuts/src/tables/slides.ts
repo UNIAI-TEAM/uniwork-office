@@ -816,6 +816,59 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
+  // Show keys (context 'slideshow': they never shadow the editor's keys). Bare keys trace to
+  // the CSV row text; B / W / Period / Comma match by character (AZERTY types "." on Shift+;)
+  // slides-25: next slide / animation
+  {
+    id: 'slides-25',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['N', 'Enter', 'PageDown', 'Right', 'Down', 'Space'],
+    mac: ['N', 'Enter', 'PageDown', 'Right', 'Down', 'Space'],
+    match: 'key',
+    guard: {},
+  },
+  // slides-26: previous slide / animation; the Mac Delete key arrives as Backspace
+  {
+    id: 'slides-26',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['P', 'PageUp', 'Left', 'Up', 'Backspace'],
+    mac: ['P', 'PageUp', 'Left', 'Up', 'Backspace'],
+    match: 'key',
+    guard: {},
+  },
+  // slides-27: first / last slide (the handler reads the direction from the key)
+  {
+    id: 'slides-27',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['Home', 'End'],
+    mac: ['Home', 'End'],
+    match: 'key',
+    guard: {},
+  },
+  // slides-29: end the show; PowerPoint for Mac adds Hyphen and Cmd+Period, the web Esc only
+  {
+    id: 'slides-29',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['Escape'],
+    mac: ['Escape', 'Minus', 'Cmd+Period'],
+    web: { win: ['Escape'], mac: ['Escape'] },
+    match: 'key',
+    guard: {},
+  },
+  // slides-30: black (B, Period) / white (W, Comma) screen; the Mac Shift+B / Shift+W are read by show-keys.ts (the chord trace skips Shift+letter)
+  {
+    id: 'slides-30',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['B', 'Period', 'W', 'Comma'],
+    mac: ['B', 'Period', 'W', 'Comma'],
+    match: 'key',
+    guard: {},
+  },
   // Insert hyperlink; Ask AI is button-only now (contract D2/D4, OFFICE-WINS)
   {
     id: 'slides-59',

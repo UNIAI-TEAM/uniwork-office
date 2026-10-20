@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { chordsFor, type ShortcutPlatform, type ShortcutSurface } from '@genoffice/shortcuts'
+import { slidesShortcuts } from '@genoffice/shortcuts'
 import {
   gotoPosition,
   INITIAL_SHOW_KEYS,
@@ -12,7 +12,6 @@ import {
   reducePresenterKey,
   reduceShowKey,
   showGate,
-  SHOW_KEY_ROWS,
   showNavKey,
   toggleScreen,
   type ShowKeyState,
@@ -225,39 +224,36 @@ function spelling(chord: string): RegExp {
   return new RegExp(`\\b${chord}\\b`, 'i')
 }
 
-describe('single show keys (module-local, UNI-2011 lead decision)', () => {
-  const rows = csvRows()
-  const platforms: ShortcutPlatform[] = ['win', 'mac']
-  const surfaces: ShortcutSurface[] = ['desktop', 'web']
-
-  it('every chord is printed in its own CSV row', () => {
-    const untraced: string[] = []
-    for (const showRow of SHOW_KEY_ROWS) {
-      const csv = rows.get(showRow.id)
-      expect(csv, showRow.id).toBeDefined()
-      for (const platform of platforms) {
-        const text = [
-          `ms_${platform}`,
-          `ms_web_${platform}`,
-          'proposal_desktop',
-          'proposal_web',
-          'desktop_today',
-          'web_today',
-        ]
-          .map((column) => csv?.[column] ?? '')
-          .join(' | ')
-        for (const surface of surfaces) {
-          for (const chord of chordsFor(showRow, platform, surface)) {
-            if (!spelling(chord).test(text)) untraced.push(`${showRow.id} ${platform}: ${chord}`)
-          }
-        }
-      }
+describe('single show keys (slides table, slideshow context)', () => {
+  // The chords' spelling against the CSV rows is the package's table lock (tables.test.ts).
+  it('the single keys are slides-25..30 rows of the slideshow context', () => {
+    const ids = ['slides-25', 'slides-26', 'slides-27', 'slides-29', 'slides-30']
+    for (const id of ids) {
+      const row = slidesShortcuts.find((r) => r.id === id)
+      expect(row?.context, id).toBe('slideshow')
     }
-    expect(untraced).toEqual([])
   })
 
-  it('stays out of the editor: every row is in the slideshow context', () => {
-    expect(SHOW_KEY_ROWS.every((r) => r.scope === 'slides' && r.context === 'slideshow')).toBe(true)
+  it('black / white screen punctuation is read by character on other layouts (RS-slides L4)', () => {
+    // French AZERTY: "." is Shift+; (code Semicolon), "," sits on the M key (code KeyM)
+    const azertyPeriod = { key: '.', code: 'Semicolon', shiftKey: true }
+    const azertyComma = { key: ',', code: 'KeyM' }
+    expect(
+      reduceShowKey(INITIAL_SHOW_KEYS, new KeyboardEvent('keydown', azertyPeriod))?.state.screen,
+    ).toBe('black')
+    expect(
+      reduceShowKey(INITIAL_SHOW_KEYS, new KeyboardEvent('keydown', azertyComma))?.state.screen,
+    ).toBe('white')
+    // German QWERTZ: the same physical keys as US for "." and ","
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('.'))?.state.screen).toBe('black')
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev(','))?.state.screen).toBe('white')
+    // AZERTY ":" is on the physical Period key but is not the black-screen character
+    expect(
+      reduceShowKey(INITIAL_SHOW_KEYS, new KeyboardEvent('keydown', { key: ':', code: 'Period' })),
+    ).toBeNull()
+    // German Mac: Hyphen is on the Slash key; it ends the show by character
+    const hyphen = new KeyboardEvent('keydown', { key: '-', code: 'Slash' })
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, hyphen, 'mac')?.action).toEqual({ type: 'exit' })
   })
 })
 
@@ -411,5 +407,16 @@ describe('slide show Esc gate (L5)', () => {
 
   it('with nothing open the key goes to the show reducer', () => {
     expect(showGate(ev('Escape'), { menuOpen: false, gridOpen: false })).toBe('show')
+  })
+})
+
+describe('Mac Shift+B / Shift+W', () => {
+  it('blank the show on macOS only', () => {
+    const shiftB = () => ev('B', { shiftKey: true })
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, shiftB(), 'mac')?.state.screen).toBe('black')
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('W', { shiftKey: true }), 'mac')?.state.screen).toBe(
+      'white',
+    )
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, shiftB(), 'win')).toBeNull()
   })
 })
