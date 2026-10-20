@@ -571,3 +571,44 @@ describe('cleanup', () => {
     expect(existsSync(draft)).toBe(true)
   })
 })
+
+describe('an account boundary that lands while the tab is being created (USR-fe-4b)', () => {
+  it('returns not_signed_in, closes the tab it just opened and drops the file and the registry entry', async () => {
+    let releaseOpen: () => void = () => undefined
+    const opening = new Promise<void>((resolve) => {
+      releaseOpen = resolve
+    })
+    const closed: string[] = []
+    let opener!: ReturnType<typeof harness>['opener']
+    const h = harness({
+      openPath: async (path) => {
+        // the boundary runs while the router is still creating the tab
+        await opening
+        return path !== ''
+      },
+      closePath: (path) => {
+        closed.push(path)
+      },
+    })
+    opener = h.opener
+    const pending = opener.openSource(input())
+    await vi.waitFor(() => expect(h.registry.paths()).toHaveLength(1))
+    const [path] = h.registry.paths()
+    await opener.dropAll()
+    releaseOpen()
+    const res = await pending
+    expect(res).toEqual({ ok: false, error: 'not_signed_in' })
+    // the tab the router created after the boundary is closed, not left on a deleted file
+    expect(closed).toEqual([path])
+    expect(existsSync(path!)).toBe(false)
+    expect(h.registry.has(path!)).toBe(false)
+  })
+
+  it('an open that finished before the boundary is unaffected', async () => {
+    const closed: string[] = []
+    const h = harness({ closePath: (path) => void closed.push(path) })
+    const res = await h.opener.openSource(input())
+    expect(res.ok).toBe(true)
+    expect(closed).toEqual([])
+  })
+})
