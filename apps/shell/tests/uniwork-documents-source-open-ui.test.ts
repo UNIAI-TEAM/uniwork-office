@@ -112,7 +112,9 @@ describe('UNI-1993 Documents home: open a source file view only', () => {
       uniworkEnsureMyFolder: vi.fn(async () =>
         ok({ id: 'f-mine', parentId: null, title: 'My Folder', position: 0, children: [] }),
       ),
-      uniworkListChildren: vi.fn(async () => ok({ items: [] as DocumentsHomeDoc[], nextCursor: null })),
+      uniworkListChildren: vi.fn(async () =>
+        ok({ items: [] as DocumentsHomeDoc[], nextCursor: null }),
+      ),
       uniworkListSources: vi.fn(async () => ok({ items: sources, nextCursor: null })),
       uniworkOpenSource: vi.fn(async () => ok({ path: '/tmp/x/Biên bản họp.docx', reused: false })),
       uniworkDownloadSource: vi.fn(async () => ok({ path: '/home/me/Downloads/x' })),
@@ -194,10 +196,7 @@ describe('UNI-1993 Documents home: open a source file view only', () => {
     await flush()
   }
 
-  async function failOpenWith(
-    error: string,
-    id = 'src-docx',
-  ): Promise<void> {
+  async function failOpenWith(error: string, id = 'src-docx'): Promise<void> {
     api.uniworkOpenSource.mockResolvedValueOnce({ ok: false, error })
     await act(async () => {
       nameButton(id).click()
@@ -385,20 +384,17 @@ describe('UNI-1993 Documents home: open a source file view only', () => {
     })
   })
 
-  it.each([
-    'forbidden',
-    'session_expired',
-    'not_signed_in',
-    'wrong_deployment',
-    'keystore_locked',
-  ])('%s goes to the notice bus (uwErr*), not to a toast, and keeps the list', async (error) => {
-    await renderHome()
-    api.uniworkListSources.mockClear()
-    await failOpenWith(error)
-    expect(notices).toEqual([{ phase: 'failed', error }])
-    expect(toastText()).toBe('')
-    expect(api.uniworkListSources).not.toHaveBeenCalled()
-  })
+  it.each(['forbidden', 'session_expired', 'not_signed_in', 'wrong_deployment', 'keystore_locked'])(
+    '%s goes to the notice bus (uwErr*), not to a toast, and keeps the list',
+    async (error) => {
+      await renderHome()
+      api.uniworkListSources.mockClear()
+      await failOpenWith(error)
+      expect(notices).toEqual([{ phase: 'failed', error }])
+      expect(toastText()).toBe('')
+      expect(api.uniworkListSources).not.toHaveBeenCalled()
+    },
+  )
 
   it.each(['server_error', 'open_failed', 'unsupported_format', 'something_new'])(
     'any other failure (%s) is the generic "Không mở được tệp. Thử lại."',

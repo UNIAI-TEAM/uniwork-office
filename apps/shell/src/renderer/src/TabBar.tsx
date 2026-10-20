@@ -6,6 +6,8 @@ import { notifyFilesChanged } from './file-events'
 import { useI18n } from './locale'
 import { compactStripOf } from './tab-strip-compact'
 import { uiScaleOf } from './uniwork-top-inset'
+import { UniworkSourceViewChip, UniworkSourceViewHint } from './UniworkSourceViewChip'
+import { useSourceViewStates } from './use-source-view-states'
 import {
   DiscussionToggle,
   PillFitScope,
@@ -169,7 +171,11 @@ export function TabBar() {
   const stripRef = useRef<HTMLDivElement>(null)
   // save state of the UniWork documents among the tabs (plain local files have none)
   const uniwork = useUniworkStatuses(tabs)
-  const activeStatus = uniwork.statusOf(tabs.find((tab) => tab.active)?.filePath)
+  const activePath = tabs.find((tab) => tab.active)?.filePath
+  const activeStatus = uniwork.statusOf(activePath)
+  // view-only source files (an attachment of a chat, task, meeting or email) carry no UniWork status
+  const sourceViews = useSourceViewStates(tabs)
+  const activeSource = sourceViews.stateOf(activePath)
   // the rename announcement speaks only for documents that are open in a tab
   const openDocumentIds = new Set(
     tabs.flatMap((tab) => {
@@ -540,6 +546,8 @@ export function TabBar() {
                 if (tab.id === 'home' || !tab.filePath) return
                 // a UniWork document's working copy keeps its name: the binding follows the path
                 if (uniwork.statusOf(tab.filePath)) return
+                // a source view keeps its temp file's name: the shell keys the view-only mark by the path
+                if (sourceViews.stateOf(tab.filePath)) return
                 if ((event.target as HTMLElement).closest('.tab-close')) return
                 if ((event.target as HTMLElement).closest('.tab-rename-input')) return
                 // the input mounts and autofocuses inside this dispatch; the
@@ -660,8 +668,10 @@ export function TabBar() {
               onStatus={uniwork.apply}
             />
           )}
+          {!activeStatus && activeSource && <UniworkSourceViewChip state={activeSource} />}
         </PillFitScope>
       </div>
+      <UniworkSourceViewHint activePath={activeSource ? activePath : undefined} />
       <button
         className="tab-overflow-btn"
         title={t('tabList')}

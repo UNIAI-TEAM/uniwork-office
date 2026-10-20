@@ -79,16 +79,13 @@ describe('UniworkSourceViewChip', () => {
     )
   })
 
-  it.each(['', '   '])(
-    'leaves the parent out when the title is %j',
-    async (parentTitle) => {
-      await mount(state({ origin: 'email', parentTitle }), 'en')
-      expect(tip()).toBe(
-        "This file is attached in Email. Changes won't be saved. To get a copy, use Download in the Documents list.",
-      )
-      expect(tip()).not.toContain('·')
-    },
-  )
+  it.each(['', '   '])('leaves the parent out when the title is %j', async (parentTitle) => {
+    await mount(state({ origin: 'email', parentTitle }), 'en')
+    expect(tip()).toBe(
+      "This file is attached in Email. Changes won't be saved. To get a copy, use Download in the Documents list.",
+    )
+    expect(tip()).not.toContain('·')
+  })
 
   it('is one labelled, focusable-by-description group that never prints ids or internal codes', async () => {
     await mount(state({ name: 'UNI-1993-spec.docx', origin: 'chat', parentTitle: 'Standup' }), 'en')

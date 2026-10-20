@@ -113,14 +113,43 @@ async function setTabs(next: TabSummary[]): Promise<void> {
 
 const tabsOf = (activeId: string): TabSummary[] => [
   { id: 'home', kind: 'home', title: 'Home', closable: false, active: activeId === 'home' },
-  { id: 'src', kind: 'docs', title: 'Plan.docx', closable: true, active: activeId === 'src', filePath: SRC },
-  { id: 'src2', kind: 'sheets', title: 'Budget.xlsx', closable: true, active: activeId === 'src2', filePath: SRC2 },
-  { id: 'doc', kind: 'docs', title: 'Notes', closable: true, active: activeId === 'doc', filePath: DOC },
-  { id: 'local', kind: 'markdown', title: 'todo', closable: true, active: activeId === 'local', filePath: LOCAL },
+  {
+    id: 'src',
+    kind: 'docs',
+    title: 'Plan.docx',
+    closable: true,
+    active: activeId === 'src',
+    filePath: SRC,
+  },
+  {
+    id: 'src2',
+    kind: 'sheets',
+    title: 'Budget.xlsx',
+    closable: true,
+    active: activeId === 'src2',
+    filePath: SRC2,
+  },
+  {
+    id: 'doc',
+    kind: 'docs',
+    title: 'Notes',
+    closable: true,
+    active: activeId === 'doc',
+    filePath: DOC,
+  },
+  {
+    id: 'local',
+    kind: 'markdown',
+    title: 'todo',
+    closable: true,
+    active: activeId === 'local',
+    filePath: LOCAL,
+  },
 ]
 
 const chip = () => host.querySelector<HTMLElement>('.uw-chrome .uw-pill[data-state="view-only"]')
-const statusPill = () => host.querySelector('.uw-chrome .uw-pill[role="group"]:not([data-state="view-only"])')
+const statusPill = () =>
+  host.querySelector('.uw-chrome .uw-pill[role="group"]:not([data-state="view-only"])')
 const hint = () => document.querySelector<HTMLElement>('[data-uw-source-hint]')
 async function emitHint(path: string): Promise<void> {
   await act(async () => {

@@ -25,9 +25,12 @@ const row = (over: Partial<UniworkSourceFile> = {}): UniworkSourceFile => ({
 })
 
 describe('openable', () => {
-  it.each(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])('%s opens when the server allows it', (ext) => {
-    expect(openable(row({ extension: ext, name: `File.${ext}` }))).toBe(true)
-  })
+  it.each(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])(
+    '%s opens when the server allows it',
+    (ext) => {
+      expect(openable(row({ extension: ext, name: `File.${ext}` }))).toBe(true)
+    },
+  )
 
   it('a txt opens through the markdown module when the server allows it', () => {
     expect(openable(row({ extension: 'txt', name: 'Notes.txt' }))).toBe(true)
@@ -72,8 +75,8 @@ describe('openable', () => {
     ).toBe(true)
     expect(openable(row({ extension: '', name: 'Plan', mimeType: '' }))).toBe(false)
     expect(sourceOpenExtension(row({ extension: '', name: 'Plan.xlsx' }))).toBe('xlsx')
-    expect(sourceOpenExtension(row({ extension: '', name: 'Plan', mimeType: 'application/pdf' }))).toBe(
-      'pdf',
-    )
+    expect(
+      sourceOpenExtension(row({ extension: '', name: 'Plan', mimeType: 'application/pdf' })),
+    ).toBe('pdf')
   })
 })

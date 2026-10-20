@@ -125,6 +125,16 @@ export const nl = {
   uhSourceDownloaded: '{name} gedownload',
   uhSourceShowInFolder: 'Weergeven in map',
   uhSourceDownloadFailed: 'Kan het bestand niet downloaden. Probeer het opnieuw.',
+  uhSourceOpen: 'Openen (alleen bekijken)',
+  uhSourceOpening: '{name} openen…',
+  uhSourceOpenFailed: 'Kan het bestand niet openen. Probeer het opnieuw.',
+  uhSourceOpenGone:
+    'Kan het bestand niet openen: het is verwijderd of je hebt er geen toegang meer toe.',
+  uhSourceOpenOffline:
+    'Kan het bestand niet openen omdat UniWork niet bereikbaar is. Controleer je verbinding en probeer het opnieuw.',
+  uhSourceOpenTooLarge:
+    'Dit bestand is te groot om in de app te openen. Download het in plaats daarvan.',
+  uhSourceOpenRetry: 'Opnieuw proberen',
   uhColSize: 'Grootte',
   uhGroupBy: 'Groeperen op',
   uhGroupByFolder: 'Map',
