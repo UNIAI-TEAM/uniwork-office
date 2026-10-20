@@ -1738,166 +1738,120 @@ export function DocumentsHome({
           />
         )}
 
-        <div className="dh-filter-bar" hidden={shelfView || undefined}>
-          {subView !== 'shared-with-me' && (
-            <>
-              <label className="dh-filter-chip">
-                <span className="dh-filter-k">{t('uhFilterType')}</span>
-                <select
-                  className="dh-filter-select"
-                  data-filter="format"
-                  aria-label={t('uhFilterType')}
-                  value={filters.format}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      format: e.target.value as DocumentsHomeTypeFilter,
-                    }))
-                  }
-                >
-                  {DOCUMENTS_HOME_FORMAT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.labelKey ? t(opt.labelKey) : opt.literal}
-                    </option>
-                  ))}
-                </select>
-              </label>
+        {!shelfView && (
+          <div className="dh-filter-bar">
+            {subView !== 'shared-with-me' && (
+              <>
+                <label className="dh-filter-chip">
+                  <span className="dh-filter-k">{t('uhFilterType')}</span>
+                  <select
+                    className="dh-filter-select"
+                    data-filter="format"
+                    aria-label={t('uhFilterType')}
+                    value={filters.format}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        format: e.target.value as DocumentsHomeTypeFilter,
+                      }))
+                    }
+                  >
+                    {DOCUMENTS_HOME_FORMAT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.labelKey ? t(opt.labelKey) : opt.literal}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="dh-filter-chip">
-                <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
-                <select
-                  className="dh-filter-select"
-                  data-filter="updatedBy"
-                  aria-label={t('uhFilterModifiedBy')}
-                  value={filters.updatedBy}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      updatedBy: e.target.value,
-                    }))
-                  }
-                >
-                  <option value="">{t('uhFilterAnyPerson')}</option>
-                  {updatedByOptionsForSelect(
-                    knownAuthors,
-                    filters.updatedBy,
-                    t('uwEditLockSomeone'),
-                  ).map((author) => (
-                    <option key={author.id} value={author.id}>
-                      {author.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="dh-filter-chip">
+                  <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
+                  <select
+                    className="dh-filter-select"
+                    data-filter="updatedBy"
+                    aria-label={t('uhFilterModifiedBy')}
+                    value={filters.updatedBy}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        updatedBy: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">{t('uhFilterAnyPerson')}</option>
+                    {updatedByOptionsForSelect(
+                      knownAuthors,
+                      filters.updatedBy,
+                      t('uwEditLockSomeone'),
+                    ).map((author) => (
+                      <option key={author.id} value={author.id}>
+                        {author.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="dh-filter-chip">
-                <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
-                <select
-                  className="dh-filter-select"
-                  data-filter="updatedFrom"
-                  aria-label={t('uhFilterUpdated')}
-                  value={filters.updatedPreset}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      updatedPreset: e.target.value as DocumentsHomeUpdatedPreset,
-                    }))
-                  }
-                >
-                  {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {t(opt.labelKey)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="dh-filter-chip">
+                  <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
+                  <select
+                    className="dh-filter-select"
+                    data-filter="updatedFrom"
+                    aria-label={t('uhFilterUpdated')}
+                    value={filters.updatedPreset}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        updatedPreset: e.target.value as DocumentsHomeUpdatedPreset,
+                      }))
+                    }
+                  >
+                    {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {t(opt.labelKey)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              {hasActiveFilters(filters) && (
-                <button
-                  type="button"
-                  className="dh-filter-clear"
-                  onClick={() => setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)}
-                >
-                  {t('uhFilterClear')}
-                </button>
-              )}
-            </>
-          )}
-
-          <div className="dh-view-tools">
-            {grouping && (
-              <label className="dh-filter-chip">
-                <span className="dh-filter-k">{t('uhGroupBy')}</span>
-                <select
-                  className="dh-group-select"
-                  data-filter="groupBy"
-                  aria-label={t('uhGroupBy')}
-                  value={groupBy}
-                  onChange={(e) => setGroupBy(e.target.value as DocumentsHomeGroupBy)}
-                >
-                  {DOCUMENTS_HOME_GROUP_BY.map((id) => (
-                    <option key={id} value={id}>
-                      {t(DOCUMENTS_HOME_GROUP_BY_KEYS[id])}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                {hasActiveFilters(filters) && (
+                  <button
+                    type="button"
+                    className="dh-filter-clear"
+                    onClick={() => setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)}
+                  >
+                    {t('uhFilterClear')}
+                  </button>
+                )}
+              </>
             )}
-            <button
-              type="button"
-              className="dh-sort-btn"
-              onClick={() => setSort((prev) => (prev === 'recent' ? 'name' : 'recent'))}
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16" />
-              </svg>
-              <span>{sort === 'recent' ? t('uhSortRecent') : t('uhSortName')}</span>
-            </button>
-            <div className="dh-view-toggle" role="group" aria-label={t('uhViewModeLabel')}>
+
+            <div className="dh-view-tools">
+              {grouping && (
+                <label className="dh-filter-chip">
+                  <span className="dh-filter-k">{t('uhGroupBy')}</span>
+                  <select
+                    className="dh-group-select"
+                    data-filter="groupBy"
+                    aria-label={t('uhGroupBy')}
+                    value={groupBy}
+                    onChange={(e) => setGroupBy(e.target.value as DocumentsHomeGroupBy)}
+                  >
+                    {DOCUMENTS_HOME_GROUP_BY.map((id) => (
+                      <option key={id} value={id}>
+                        {t(DOCUMENTS_HOME_GROUP_BY_KEYS[id])}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <button
                 type="button"
-                className="dh-view-btn"
-                data-view="list"
-                aria-pressed={viewMode === 'list'}
-                title={t('uhViewList')}
-                aria-label={t('uhViewList')}
-                onClick={() => setViewMode('list')}
+                className="dh-sort-btn"
+                onClick={() => setSort((prev) => (prev === 'recent' ? 'name' : 'recent'))}
               >
                 <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="dh-view-btn"
-                data-view="grid"
-                aria-pressed={viewMode === 'grid'}
-                title={t('uhViewGrid')}
-                aria-label={t('uhViewGrid')}
-                onClick={() => setViewMode('grid')}
-              >
-                <svg
-                  width="14"
-                  height="14"
+                  width="13"
+                  height="13"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1906,15 +1860,63 @@ export function DocumentsHome({
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <rect x="3" y="3" width="7" height="7" rx="1" />
-                  <rect x="14" y="3" width="7" height="7" rx="1" />
-                  <rect x="3" y="14" width="7" height="7" rx="1" />
-                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                  <path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16" />
                 </svg>
+                <span>{sort === 'recent' ? t('uhSortRecent') : t('uhSortName')}</span>
               </button>
+              <div className="dh-view-toggle" role="group" aria-label={t('uhViewModeLabel')}>
+                <button
+                  type="button"
+                  className="dh-view-btn"
+                  data-view="list"
+                  aria-pressed={viewMode === 'list'}
+                  title={t('uhViewList')}
+                  aria-label={t('uhViewList')}
+                  onClick={() => setViewMode('list')}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="dh-view-btn"
+                  data-view="grid"
+                  aria-pressed={viewMode === 'grid'}
+                  title={t('uhViewGrid')}
+                  aria-label={t('uhViewGrid')}
+                  onClick={() => setViewMode('grid')}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {page.status === 'loading' && page.items.length === 0 && (
           <div className="uw-pick-skeleton" role="status" aria-busy="true">
