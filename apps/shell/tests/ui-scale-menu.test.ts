@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // A tiny application menu: the Menu API the module uses, over plain objects.
 interface FakeItem {
+  id?: string
   label?: string
   role?: string
   accelerator?: string
@@ -51,6 +52,12 @@ const labels = {
 } as const
 const label = (key: keyof typeof labels) => labels[key]
 
+function scaleItems(): FakeItem[] {
+  return state.items.flatMap(
+    (i) => i.submenu?.items.filter((s) => s.id === 'ui-scale-zoom-in') ?? [],
+  )
+}
+
 function accelerators(): string[] {
   return state.items.flatMap((i) => i.submenu?.items.map((s) => s.accelerator ?? '') ?? [])
 }
@@ -76,10 +83,17 @@ describe('the interface-scale View items (R1-4)', () => {
     }
   })
 
-  it('adds a View menu with the three accelerators for Home and Sheets, before Help', () => {
+  it('adds a View menu with the zoom keys for Home, before Help', () => {
+    withViewMenu('home', label, () => '/tmp/settings.json')
+    expect(state.items.map((i) => i.label)).toEqual(['File', 'View', 'Help'])
+    expect(accelerators()).toEqual(['CmdOrCtrl+=', 'CmdOrCtrl+-', '', 'CmdOrCtrl+0'])
+  })
+
+  it('gives Sheets the items without accelerators: its Ctrl+- and Ctrl+0 are Excel keys, Ctrl+Alt is AltGr', () => {
     withViewMenu('sheets', label, () => '/tmp/settings.json')
     expect(state.items.map((i) => i.label)).toEqual(['File', 'View', 'Help'])
-    expect(accelerators()).toEqual(['CmdOrCtrl+Alt+=', 'CmdOrCtrl+Alt+-', '', 'CmdOrCtrl+Alt+0'])
+    expect(accelerators()).toEqual(['', '', '', ''])
+    expect(accelerators().some((a) => a.includes('Alt'))).toBe(false)
   })
 
   it('leaves the menu of Docs, Slides, PDF, Markdown and HTML tabs untouched', () => {
@@ -94,7 +108,7 @@ describe('the interface-scale View items (R1-4)', () => {
     state.items.splice(1, 0, { label: 'View', submenu: appendableFile() })
     withViewMenu('home', label, () => '/tmp/settings.json')
     withViewMenu('home', label, () => '/tmp/settings.json')
-    expect(accelerators().filter((a) => a === 'CmdOrCtrl+Alt+=')).toHaveLength(1)
+    expect(scaleItems()).toHaveLength(1)
     expect(state.items.map((i) => i.label)).toEqual(['File', 'View', 'Help'])
   })
 
@@ -130,10 +144,9 @@ describe('the interface-scale View items (R1-4)', () => {
         appLabels.help,
       ])
       const viewSubmenu = state.items[1]?.submenu?.items ?? []
-      expect(viewSubmenu.map((i) => i.accelerator).filter(Boolean)).toContain('CmdOrCtrl+Alt+=')
-      expect(viewSubmenu.map((i) => i.accelerator).filter(Boolean)).toContain('CmdOrCtrl+Alt+-')
-      expect(viewSubmenu.map((i) => i.accelerator).filter(Boolean)).toContain('CmdOrCtrl+Alt+0')
-      expect(accelerators().filter((a) => a === 'CmdOrCtrl+Alt+=')).toHaveLength(1)
+      expect(viewSubmenu.filter((i) => i.label === 'Interface zoom in')).toHaveLength(1)
+      expect(viewSubmenu.map((i) => i.label)).toContain('Reset interface zoom')
+      expect(scaleItems()).toHaveLength(1)
     },
   )
 })

@@ -5,6 +5,7 @@ import { LANGS } from '@genoffice/i18n'
 
 import type { TabKind } from '../shared/tabs-api'
 import { changeUiScale } from './ui-scale'
+import { interfaceScaleAccelerators, type InterfaceScaleItem } from './shell-shortcuts'
 
 /**
  * Every View menu label produced by `appMenuLabels(lang)` across supported
@@ -19,37 +20,48 @@ const APP_MENU_VIEW_LABELS: ReadonlySet<string> = new Set(
 /**
  * Tab kinds whose chrome follows the interface scale: the Home frame and the Sheets chrome opt in
  * to `zoom: var(--ui-scale)`. The Docs, Slides, PDF, Markdown and HTML chrome follows in upstream's
- * part 2, so until it is ported their View menu offers no scale items (and no Ctrl+Alt+= / - / 0
- * accelerators): a control that only grows the tab strip while the ribbon stays put is a
- * half-shipped feature. The stored setting is kept either way.
+ * part 2, so until it is ported their View menu offers no scale items: a control that only grows
+ * the tab strip while the ribbon stays put is a half-shipped feature. The stored setting is kept
+ * either way.
  */
 export function chromeFollowsUiScale(kind: TabKind): boolean {
   return kind === 'home' || kind === 'sheets'
 }
 
+/** The id of the first scale item: how `withViewMenu` tells a menu already has them. */
+const UI_SCALE_ITEM_ID = 'ui-scale-zoom-in'
+
 /**
- * The View › interface-scale items. CmdOrCtrl+Alt (not Shift): Shift+= is Sheets insert-cells and
- * Docs superscript.
+ * The View › interface-scale items. `accelerators` come from the shortcut table (the zoom keys,
+ * Ctrl/Cmd + = / - / 0) and are only given where those keys are the page zoom, that is on Home:
+ * Sheets keeps Ctrl+- (Delete cells) and Ctrl+0 (Hide columns), and the Ctrl+Alt chords the
+ * scale used to take are Excel's grid zoom and AltGr on many Windows layouts.
  */
 export function uiScaleMenuItems(
   label: (key: 'menuUiZoomIn' | 'menuUiZoomOut' | 'menuUiZoomReset') => string,
   settingsPath: () => string,
+  accelerators: Partial<Record<InterfaceScaleItem, string>> = {},
 ): MenuItemConstructorOptions[] {
+  const key = (item: InterfaceScaleItem): { accelerator?: string } => {
+    const accelerator = accelerators[item]
+    return accelerator ? { accelerator } : {}
+  }
   return [
     {
+      id: UI_SCALE_ITEM_ID,
       label: label('menuUiZoomIn'),
-      accelerator: 'CmdOrCtrl+Alt+=',
+      ...key('zoomIn'),
       click: () => changeUiScale(settingsPath(), 1),
     },
     {
       label: label('menuUiZoomOut'),
-      accelerator: 'CmdOrCtrl+Alt+-',
+      ...key('zoomOut'),
       click: () => changeUiScale(settingsPath(), -1),
     },
     { type: 'separator' },
     {
       label: label('menuUiZoomReset'),
-      accelerator: 'CmdOrCtrl+Alt+0',
+      ...key('zoomReset'),
       click: () => changeUiScale(settingsPath(), 0),
     },
   ]
@@ -70,10 +82,14 @@ export function withViewMenu(
   const menu = Menu.getApplicationMenu()
   if (!menu) return
   const hasScale = menu.items.some((item) =>
-    item.submenu?.items.some((i) => i.accelerator === 'CmdOrCtrl+Alt+='),
+    item.submenu?.items.some((i) => i.id === UI_SCALE_ITEM_ID),
   )
   if (hasScale) return
-  const items = uiScaleMenuItems(label, settingsPath)
+  const items = uiScaleMenuItems(
+    label,
+    settingsPath,
+    kind === 'home' ? interfaceScaleAccelerators() : {},
+  )
   const view = menu.items.find(
     (item) =>
       item.label === label('menuView') ||
