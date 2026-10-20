@@ -1,3 +1,4 @@
+import { isComposingEvent, type ShortcutKeyEvent } from '@genoffice/shortcuts'
 import type { MarkupType } from '../shared/ipc'
 
 export type MarkupToolClickOutcome =
@@ -108,4 +109,23 @@ export function navAction(key: string, focusInThumbs: boolean): NavAction | null
     default:
       return null
   }
+}
+
+/**
+ * The viewer navigation a keydown asks for. Plain keys only (Edge PDF: Space,
+ * Shift+Space, PageUp/PageDown, Home/End; ours: the arrows): any Ctrl / Alt /
+ * Cmd chord is a shortcut or the browser's (Alt+Left is history back), Shift
+ * only reverses Space, and an IME composition never navigates.
+ */
+export function navKeyAction(
+  event: Pick<
+    KeyboardEvent,
+    'key' | 'code' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey' | 'isComposing' | 'keyCode'
+  >,
+  focusInThumbs: boolean,
+): NavAction | null {
+  if (event.ctrlKey || event.altKey || event.metaKey) return null
+  if (isComposingEvent(event as ShortcutKeyEvent)) return null
+  if (event.shiftKey) return event.key === ' ' ? { type: 'scrollViewport', dir: -1 } : null
+  return navAction(event.key, focusInThumbs)
 }

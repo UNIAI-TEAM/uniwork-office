@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useI18n, type StringKey } from './i18n/locale'
+import { isCancelKey, isConfirmKey } from './shortcuts'
 
 export interface AskAnchorRect {
   left: number
@@ -96,7 +97,7 @@ export function AiAskPopover({
       style={{ left, top, width: WIDTH }}
       role="dialog"
       onKeyDown={(e) => {
-        if (e.key === 'Escape') {
+        if (isCancelKey(e)) {
           e.preventDefault()
           e.stopPropagation()
           onClose()
@@ -133,7 +134,7 @@ export function AiAskPopover({
         placeholder={t('aiAskPlaceholder')}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+          if (isConfirmKey(e)) {
             e.preventDefault()
             submit()
           }
