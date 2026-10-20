@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { DRAFT_PREVIEW_DIR, isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
 import { SourceViewRegistry, createSourceViewOpener } from '../src/main/uniwork-docs/source-view'
 
+// paths are relative to apps/
 const SRC = (rel: string) => readFileSync(join(__dirname, '..', '..', rel), 'utf8')
 
 let userData = ''
@@ -63,17 +64,17 @@ describe('a source view path is never a recent file', () => {
   })
 
   it('the three recents writers test isDraftPreviewPath before they record', () => {
-    const shell = SRC('main/index.ts')
+    const shell = SRC('shell/src/main/index.ts')
     const guard = shell.slice(shell.indexOf('function recordRecentFile('))
     expect(guard.slice(0, guard.indexOf('function routeDocumentPath('))).toContain(
       "if (isDraftPreviewPath(app.getPath('userData'), filePath)) return",
     )
-    const docs = SRC('../docs/src/main/docs-main.ts')
+    const docs = SRC('docs/src/main/docs-main.ts')
     const pushDocs = docs.slice(docs.indexOf('function pushRecent('))
     expect(pushDocs.slice(0, 400)).toContain(
       "if (isDraftPreviewPath(app.getPath('userData'), filePath)) return",
     )
-    const slides = SRC('../slides/src/main/slides-main.ts')
+    const slides = SRC('slides/src/main/slides-main.ts')
     const pushSlides = slides.slice(slides.indexOf('async function pushRecent('))
     expect(pushSlides.slice(0, 400)).toContain(
       "if (isDraftPreviewPath(app.getPath('userData'), path)) return",
@@ -82,7 +83,11 @@ describe('a source view path is never a recent file', () => {
 
   it('the source folder sits under the draft-preview root, not beside it', async () => {
     const path = await openOne('Plan.docx', 'docx')
-    expect(path.startsWith(join(userData, DRAFT_PREVIEW_DIR) + (process.platform === 'win32' ? '\\' : '/'))).toBe(true)
+    expect(
+      path.startsWith(
+        join(userData, DRAFT_PREVIEW_DIR) + (process.platform === 'win32' ? '\\' : '/'),
+      ),
+    ).toBe(true)
     expect(path.includes(`${DRAFT_PREVIEW_DIR}-`)).toBe(false)
   })
 })

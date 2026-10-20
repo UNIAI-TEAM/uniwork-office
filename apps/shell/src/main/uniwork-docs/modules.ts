@@ -26,6 +26,7 @@ import {
   setSlidesUserSaveHook,
   setUniworkDocumentPolicy as setSlidesUniworkPolicy,
 } from '../../../../slides/src/main/slides-main'
+import { withSourceViews, type SourceViewBinding } from './source-view'
 
 export { clearDocsRecoveryCopy, clearWorkbookRecovery }
 
@@ -141,11 +142,22 @@ export function watchCommentAuthorChanges(deps: {
  * document, else the neutral constant. null restores genoffice behaviour
  * everywhere (the modules then fall back to the same neutral constant, never
  * to the OS account).
+ *
+ * UNI-1993: `sourceViews` merges the view-only source paths into the seam, so
+ * every module reads a source file as bound, read-only and locked. Absent = the
+ * seam is the service's, unchanged.
  */
 export function installUniworkModuleSeams(
-  seam: UniworkModuleSeam | null,
+  serviceSeam: UniworkModuleSeam | null,
   commentAuthor: CommentAuthorResolver | null = null,
+  sourceViews: SourceViewBinding | null = null,
 ): void {
+  const seam =
+    serviceSeam && sourceViews
+      ? withSourceViews(serviceSeam, sourceViews.registry, {
+          onSourceSave: sourceViews.onSourceSave,
+        })
+      : serviceSeam
   seam?.setClearRecovery?.((path: string) => {
     clearDocsRecoveryCopy(path)
     clearWorkbookRecovery(path)

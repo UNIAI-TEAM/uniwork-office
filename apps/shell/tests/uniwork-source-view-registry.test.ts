@@ -8,7 +8,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { UniworkModuleSeam } from '../src/main/uniwork-docs/modules'
 import { SourceViewRegistry, withSourceViews } from '../src/main/uniwork-docs/source-view'
 
-const SOURCE = 'C:\\Users\\me\\AppData\\Roaming\\app\\uniwork-drafts-preview\\sources-s1\\ab12\\Plan.docx'
+const SOURCE =
+  'C:\\Users\\me\\AppData\\Roaming\\app\\uniwork-drafts-preview\\sources-s1\\ab12\\Plan.docx'
 const OTHER = 'C:/Users/me/Documents/notes.docx'
 const META = { name: 'Plan.docx', origin: 'chat', parentTitle: 'Launch' }
 
@@ -132,7 +133,10 @@ describe('withSourceViews', () => {
   it('a source path never fires the user-save hook, never consumes a capture and is never refused as a locked store', () => {
     const registry = new SourceViewRegistry()
     registry.add(SOURCE, META)
-    const inner = fakeSeam({ refuseLockedPath: vi.fn(() => true), consumeCapture: vi.fn(() => true) })
+    const inner = fakeSeam({
+      refuseLockedPath: vi.fn(() => true),
+      consumeCapture: vi.fn(() => true),
+    })
     const seam = withSourceViews(inner, registry)
     seam.onUserSave(SOURCE)
     expect(inner.onUserSave).not.toHaveBeenCalled()

@@ -5,7 +5,15 @@
  * client's `downloadSource(workspaceId, sourceId)` is UNI-1961's, so the opener
  * takes it as an injected dependency.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
@@ -148,7 +156,8 @@ describe('openSource: what is downloaded and how', () => {
       const res = await h.opener.openSource(input({ sourceId: `chat:m${i}`, name }))
       if (!res.ok) throw new Error(`open failed for ${name}: ${res.error}`)
       const file = basename(res.value.path)
-      expect(file).not.toMatch(/[<>:"/\\|?*\u0000-\u001f]/)
+      expect(file).not.toMatch(/[<>:"/\\|?*]/)
+      expect([...file].some((char) => char.charCodeAt(0) < 32)).toBe(false)
       expect(file.length).toBeLessThanOrEqual(120)
       expect(file.toLowerCase().endsWith('.docx')).toBe(true)
       expect(file.replace(/\.docx$/i, '')).not.toMatch(/^(con|prn|aux|nul|com\d|lpt\d)$/i)
@@ -178,7 +187,17 @@ describe('openSource: what is downloaded and how', () => {
 
   it('opens every editor format incl. markdown, html and txt', async () => {
     const h = harness()
-    for (const extension of ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'markdown', 'html', 'htm', 'txt']) {
+    for (const extension of [
+      'docx',
+      'xlsx',
+      'pptx',
+      'pdf',
+      'md',
+      'markdown',
+      'html',
+      'htm',
+      'txt',
+    ]) {
       const res = await h.opener.openSource(
         input({ sourceId: `chat:${extension}`, name: `f.${extension}`, extension }),
       )
@@ -188,7 +207,13 @@ describe('openSource: what is downloaded and how', () => {
 
   it('rejects a malformed input as not_found without any I/O', async () => {
     const h = harness()
-    for (const bad of [null, 'x', {}, input({ sourceId: '' }), input({ workspaceId: 3 as unknown as string })]) {
+    for (const bad of [
+      null,
+      'x',
+      {},
+      input({ sourceId: '' }),
+      input({ workspaceId: 3 as unknown as string }),
+    ]) {
       expect(await h.opener.openSource(bad)).toEqual({ ok: false, error: 'not_found' })
     }
     expect(h.client.downloadSource).not.toHaveBeenCalled()
@@ -301,13 +326,19 @@ describe('openSource: refusals and error mapping', () => {
 
   it('checks identity, deployment and keystore before any request', async () => {
     const signedOut = harness({ identity: () => null })
-    expect(await signedOut.opener.openSource(input())).toEqual({ ok: false, error: 'not_signed_in' })
+    expect(await signedOut.opener.openSource(input())).toEqual({
+      ok: false,
+      error: 'not_signed_in',
+    })
     const locked = harness({ identity: () => null, storeLocked: () => true })
     expect(await locked.opener.openSource(input())).toEqual({ ok: false, error: 'keystore_locked' })
     const other = harness({ profile: () => ({ deploymentId: 'elsewhere' }) })
     expect(await other.opener.openSource(input())).toEqual({ ok: false, error: 'wrong_deployment' })
     const noProfile = harness({ profile: () => null })
-    expect(await noProfile.opener.openSource(input())).toEqual({ ok: false, error: 'wrong_deployment' })
+    expect(await noProfile.opener.openSource(input())).toEqual({
+      ok: false,
+      error: 'wrong_deployment',
+    })
     for (const h of [signedOut, locked, other, noProfile]) {
       expect(h.client.downloadSource).not.toHaveBeenCalled()
       expect(h.openPath).not.toHaveBeenCalled()
@@ -325,14 +356,17 @@ describe('openSource: refusals and error mapping', () => {
     ['server_error', 'server_error'],
     ['malformed_response', 'server_error'],
     ['quota_exceeded', 'open_failed'],
-  ])('maps a download failing with %s to %s, opens no tab and leaves no folder', async (code, expected) => {
-    const h = harness()
-    h.client.downloadSource.mockRejectedValueOnce(Object.assign(new Error('boom'), { code }))
-    expect(await h.opener.openSource(input())).toEqual({ ok: false, error: expected })
-    expect(h.openPath).not.toHaveBeenCalled()
-    expect(h.registry.paths()).toEqual([])
-    expect(sourceDirs(h.root).flatMap((d) => readdirSync(join(h.root, d)))).toEqual([])
-  })
+  ])(
+    'maps a download failing with %s to %s, opens no tab and leaves no folder',
+    async (code, expected) => {
+      const h = harness()
+      h.client.downloadSource.mockRejectedValueOnce(Object.assign(new Error('boom'), { code }))
+      expect(await h.opener.openSource(input())).toEqual({ ok: false, error: expected })
+      expect(h.openPath).not.toHaveBeenCalled()
+      expect(h.registry.paths()).toEqual([])
+      expect(sourceDirs(h.root).flatMap((d) => readdirSync(join(h.root, d)))).toEqual([])
+    },
+  )
 
   it('maps a thrown non-API error to open_failed', async () => {
     const h = harness()
@@ -429,7 +463,9 @@ describe('cleanup', () => {
   it('dropAll (account change / sign-out) closes every registered tab, deletes the files and empties the registry', async () => {
     const h = harness()
     const a = await h.opener.openSource(input({ sourceId: 'chat:a', name: 'a.docx' }))
-    const b = await h.opener.openSource(input({ sourceId: 'task:b', name: 'b.pdf', extension: 'pdf' }))
+    const b = await h.opener.openSource(
+      input({ sourceId: 'task:b', name: 'b.pdf', extension: 'pdf' }),
+    )
     if (!a.ok || !b.ok) throw new Error('open failed')
     const closed: string[] = []
     await h.opener.dropAll((path) => {

@@ -15,17 +15,8 @@ import * as slides from '../../slides/src/main/uniwork-policy'
 
 // modules.ts imports the six editor mains (Electron-bound): stand-ins that only
 // install the policy and hook into the module's real uniwork-policy
-const forward = vi.hoisted(() => ({
-  policy: (spec: string) => async () => {
-    const real = (await import(/* @vite-ignore */ spec)) as {
-      setUniworkDocumentPolicy: unknown
-      setUniworkUserSaveHook: unknown
-    }
-    return real
-  },
-}))
 vi.mock('../../docs/src/main/docs-main', async () => {
-  const real = await forward.policy('../../docs/src/main/uniwork-policy')()
+  const real = await import('../../docs/src/main/uniwork-policy')
   return {
     setUniworkDocumentPolicy: real.setUniworkDocumentPolicy,
     setDocsUserSaveHook: real.setUniworkUserSaveHook,
@@ -34,7 +25,7 @@ vi.mock('../../docs/src/main/docs-main', async () => {
   }
 })
 vi.mock('../../sheets/src/main/sheets-main', async () => {
-  const real = await forward.policy('../../sheets/src/main/uniwork-policy')()
+  const real = await import('../../sheets/src/main/uniwork-policy')
   return {
     setUniworkDocumentPolicy: real.setUniworkDocumentPolicy,
     setSheetsUserSaveHook: real.setUniworkUserSaveHook,
@@ -42,7 +33,7 @@ vi.mock('../../sheets/src/main/sheets-main', async () => {
   }
 })
 vi.mock('../../slides/src/main/slides-main', async () => {
-  const real = await forward.policy('../../slides/src/main/uniwork-policy')()
+  const real = await import('../../slides/src/main/uniwork-policy')
   return {
     setUniworkDocumentPolicy: real.setUniworkDocumentPolicy,
     setSlidesUserSaveHook: real.setUniworkUserSaveHook,
@@ -50,31 +41,28 @@ vi.mock('../../slides/src/main/slides-main', async () => {
   }
 })
 vi.mock('../../pdf/src/main/pdf-main', async () => {
-  const real = await forward.policy('../../pdf/src/main/uniwork-policy')()
+  const real = await import('../../pdf/src/main/uniwork-policy')
   return {
     setUniworkDocumentPolicy: real.setUniworkDocumentPolicy,
     setPdfUserSaveHook: real.setUniworkUserSaveHook,
   }
 })
 vi.mock('../../markdown/src/main/markdown-main', async () => {
-  const real = await forward.policy('../../markdown/src/main/uniwork-policy')()
+  const real = await import('../../markdown/src/main/uniwork-policy')
   return {
     setUniworkDocumentPolicy: real.setUniworkDocumentPolicy,
     setMarkdownUserSaveHook: real.setUniworkUserSaveHook,
   }
 })
 vi.mock('../../html/src/main/html-main', async () => {
-  const real = await forward.policy('../../html/src/main/uniwork-policy')()
+  const real = await import('../../html/src/main/uniwork-policy')
   return {
     setUniworkDocumentPolicy: real.setUniworkDocumentPolicy,
     setHtmlUserSaveHook: real.setUniworkUserSaveHook,
   }
 })
 
-import {
-  installUniworkModuleSeams,
-  type UniworkModuleSeam,
-} from '../src/main/uniwork-docs/modules'
+import { installUniworkModuleSeams, type UniworkModuleSeam } from '../src/main/uniwork-docs/modules'
 import { SourceViewRegistry, withSourceViews } from '../src/main/uniwork-docs/source-view'
 
 const SOURCE = '/u/uniwork-drafts-preview/sources-s1/ab12/Plan.docx'

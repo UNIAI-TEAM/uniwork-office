@@ -67,6 +67,4 @@ export type SourceViewErrorCode =
   | 'unsupported_format'
   | 'open_failed'
 
-export type SourceViewResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: SourceViewErrorCode }
+export type SourceViewResult<T> = { ok: true; value: T } | { ok: false; error: SourceViewErrorCode }
