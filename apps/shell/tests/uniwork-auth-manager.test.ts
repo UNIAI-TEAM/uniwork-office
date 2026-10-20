@@ -14,6 +14,7 @@ import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { AccountManager, STARTUP_GATE_DEADLINE_MS } from '../src/main/uniwork-auth/manager'
 import {
   TransportError,
+  createUniworkTransport,
   type DesktopSession,
   type TransportErrorCode,
   type UniworkTransport,
@@ -1217,6 +1218,48 @@ describe('G8-16 organization choice (S16)', () => {
     // another usable org still works
     await ctx.manager.selectOrg('org_b')
     expect(ctx.manager.status().org?.id).toBe('org_b')
+  })
+
+  // The membership read goes through the real transport parser with the flat
+  // body of the D OrgMembershipSDO (sdo/people.go), not a pre-parsed fake.
+  describe('members/me answered with the flat D body', () => {
+    const withFlatBody = (ctx: ReturnType<typeof setup>, bodies: Record<string, unknown>) => {
+      const fetch = async (url: string) => {
+        const slug = /\/orgs\/([^/]+)\/members\/me$/.exec(url)?.[1] ?? ''
+        return new Response(JSON.stringify(bodies[slug]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      const real = createUniworkTransport(profile, { fetch })
+      ctx.transport.orgMembership.mockImplementation((slug: string, token: string) =>
+        real.orgMembership(slug, token),
+      )
+    }
+
+    it('a non-empty deactivated_at reads as not a member (blocked org)', async () => {
+      const ctx = setup()
+      withFlatBody(ctx, {
+        acme: { role: 'owner', deactivated_at: '2026-09-07T09:00:00Z' },
+        beta: { role: 'member' },
+      })
+      await signIn(ctx)
+      await ctx.manager.selectOrg('org_a')
+      expect(ctx.manager.status().org).toBeUndefined()
+      expect(ctx.manager.status().orgs?.find((o) => o.id === 'org_a')?.membership).toBe(
+        'member_deactivated',
+      )
+      expect(ctx.persistSelectedOrgId).not.toHaveBeenCalled()
+    })
+
+    it('an active member selects the org', async () => {
+      const ctx = setup()
+      withFlatBody(ctx, { acme: { role: 'owner', deactivated_at: '' }, beta: { role: 'member' } })
+      await signIn(ctx)
+      await ctx.manager.selectOrg('org_a')
+      expect(ctx.manager.status().org?.id).toBe('org_a')
+      expect(ctx.manager.status().orgs?.find((o) => o.id === 'org_a')?.membership).toBe('active')
+    })
   })
 
   it('a re-login deactivated in the single org locks it (F-2)', async () => {
