@@ -446,13 +446,30 @@ export interface SourceHintTarget {
 /**
  * The `onSourceSave` of the module seam: an explicit Save on a source view
  * writes nothing; the window that owns the path is told so it can show the
- * "view only" hint.
+ * "view only" hint. A detached editor window is a bare window around the editor
+ * view with no renderer to show the band, so there the sentence is a native
+ * box (`detached`), at most one at a time per window.
  */
-export function createSourceSaveHint(deps: {
-  /** the window (shell or detached) that shows `path`, undefined when none does */
+export function createSourceSaveHint<W extends object = object>(deps: {
+  /** the shell window that shows `path` as a tab, undefined when none does */
   hostForPath(path: string): SourceHintTarget | undefined
+  detached?: {
+    /** the detached editor window that shows `path`, undefined when it is not in one */
+    windowForPath(path: string): W | undefined
+    /** shows the sentence on that window; settles when the person dismissed it */
+    notify(window: W): Promise<unknown>
+  }
 }): (path: string) => void {
+  const showing = new Set<W>()
   return (path) => {
+    const window = deps.detached?.windowForPath(path)
+    if (window !== undefined && deps.detached) {
+      if (showing.has(window)) return
+      showing.add(window)
+      const done = () => void showing.delete(window)
+      deps.detached.notify(window).then(done, done)
+      return
+    }
     const host = deps.hostForPath(path)
     if (!host || host.isDestroyed()) return
     host.send(SOURCE_VIEW_CHANNELS.hint, { path })
