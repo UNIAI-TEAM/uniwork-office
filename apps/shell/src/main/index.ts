@@ -130,6 +130,7 @@ import {
   watchCommentAuthorChanges,
 } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
+import { createSourceSaveHint } from './uniwork-docs/source-view'
 import { saveTabToUniWork } from './uniwork-docs/first-save-open'
 import { mergeEditorStates, startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
@@ -4076,6 +4077,20 @@ function webContentsForPath(
 }
 
 /**
+ * UNI-1993: the window that owns a path, for the "view only" hint: a tab belongs to
+ * the shell window (its renderer shows the strip and the notices), a detached editor to
+ * its own window.
+ */
+function sourceViewHostForPath(path: string): WebContents | undefined {
+  const owner = webContentsForPath(path)
+  if (!owner) return undefined
+  if (owner.tabId !== undefined) {
+    return shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : undefined
+  }
+  return detachedWindowForWebContents(owner.webContents.id)?.webContents
+}
+
+/**
  * G5-03a: the editor state of one path, read fresh from the live views — the
  * owner tab (with its present views folded in) and every detached window of the
  * path. The guarded clean reload compares it across its fetch, so this is never
@@ -4611,6 +4626,12 @@ function registerHomeIpc(): void {
       isBound: (path) => uniworkService.isBound(path),
       displayName: uniworkAccountDisplayName,
     }),
+    // UNI-1993: a view-only source file reads as bound/read-only/locked to every editor;
+    // an explicit Save on one only tells the window that owns it
+    {
+      registry: uniworkService.sourceViews,
+      onSourceSave: createSourceSaveHint({ hostForPath: sourceViewHostForPath }),
+    },
   )
   // the chip reads "Unsaved changes" while an editor holds edits not saved yet
   startEditorStatePoll({
@@ -7064,6 +7085,10 @@ app.on('will-quit', (event) => {
     ).then(() => quitAgainAfterWillQuit(() => app.quit()))
     return
   }
+  // UNI-1993: the decrypted copies of the opened source files must not outlive the app. Here and
+  // not in before-quit: a close prompt can still veto the quit, and the tabs would then
+  // lose their files and read as plain local documents
+  uniworkDocs?.service.disposeSourceViews()
   stopUniworkAccount()
   fileIndexer?.stop()
   fileIndexStore?.close()

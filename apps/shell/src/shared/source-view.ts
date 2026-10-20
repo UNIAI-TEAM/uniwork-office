@@ -11,7 +11,14 @@ export const SOURCE_VIEW_CHANNELS = {
   openSource: 'uniwork-doc:open-source',
   /** invoke `(path)` -> `SourceViewState | null` (the tab chip) */
   sourceViewState: 'uniwork-doc:source-view-state',
+  /** main -> renderer event `SourceViewHint`: an explicit Save hit a source view path */
+  hint: 'uniwork-doc:source-view-hint',
 } as const
+
+/** the payload of the `hint` event: which source view the Save was pressed in */
+export interface SourceViewHint {
+  path: string
+}
 
 /** what the renderer sends for one source row (the row's own fields, never an id of a document) */
 export interface OpenSourceInput {

@@ -157,9 +157,9 @@ describe('installUniworkModuleSeams forwards refuseLockedPath (R1-be-3)', () => 
     expect(read('src/main/uniwork-docs/modules.ts')).toMatch(
       /refuseOpen: \(path: string\) => seam\.refuseLockedPath\(path\)/,
     )
-    // G8-02: the same installation carries the comment-author source
+    // G8-02: the same installation carries the comment-author source (UNI-1993: and the source views)
     expect(read('src/main/index.ts')).toMatch(
-      /installUniworkModuleSeams\(\s*uniworkService,\s*createCommentAuthorResolver\(\{\s*isBound: \(path\) => uniworkService\.isBound\(path\),\s*displayName: uniworkAccountDisplayName,\s*\}\),\s*\)/,
+      /installUniworkModuleSeams\(\s*uniworkService,\s*createCommentAuthorResolver\(\{\s*isBound: \(path\) => uniworkService\.isBound\(path\),\s*displayName: uniworkAccountDisplayName,\s*\}\),(?:(?:\s*\/\/[^\n]*)*\s*\{\s*registry: uniworkService\.sourceViews,\s*onSourceSave: createSourceSaveHint\(\{ hostForPath: sourceViewHostForPath \}\),\s*\},)?\s*\)/,
     )
   })
 })

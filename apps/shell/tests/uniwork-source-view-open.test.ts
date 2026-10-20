@@ -579,7 +579,6 @@ describe('an account boundary that lands while the tab is being created (USR-fe-
       releaseOpen = resolve
     })
     const closed: string[] = []
-    let opener!: ReturnType<typeof harness>['opener']
     const h = harness({
       openPath: async (path) => {
         // the boundary runs while the router is still creating the tab
@@ -590,7 +589,7 @@ describe('an account boundary that lands while the tab is being created (USR-fe-
         closed.push(path)
       },
     })
-    opener = h.opener
+    const opener = h.opener
     const pending = opener.openSource(input())
     await vi.waitFor(() => expect(h.registry.paths()).toHaveLength(1))
     const [path] = h.registry.paths()

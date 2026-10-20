@@ -131,6 +131,8 @@ async function setup() {
       closePathNow: (path: string) => void closedNow.push(path),
       aiHistoryPaths: () => [],
       forgetAiHistory: () => undefined,
+      editorStateOf: async () => ({ dirty: false, aiRunning: false, aiEpoch: 0 }),
+      notifyPathRenamed: () => undefined,
     },
   )
   return { handle, handlers, opened, closedNow }

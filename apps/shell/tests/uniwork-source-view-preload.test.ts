@@ -55,7 +55,10 @@ describe('uniworkOpenSource', () => {
     const { bridge, invoked } = await loadBridge(reply)
     const input = { workspaceId: 'ws_1', sourceId: 'chat:m1' }
     expect(await bridge.uniworkOpenSource(input)).toEqual(reply)
-    expect(invoked).toEqual([{ channel: SOURCE_VIEW_CHANNELS.openSource, args: [input] }])
+    // the preload also makes its own boot calls: look at this channel only
+    expect(invoked.filter((c) => c.channel === SOURCE_VIEW_CHANNELS.openSource)).toEqual([
+      { channel: SOURCE_VIEW_CHANNELS.openSource, args: [input] },
+    ])
     const failed = await loadBridge({ ok: false, error: 'not_found' })
     expect(await failed.bridge.uniworkOpenSource({})).toEqual({ ok: false, error: 'not_found' })
   })
@@ -84,7 +87,7 @@ describe('uniworkSourceViewState', () => {
     const state = { name: 'Plan.docx', origin: 'chat', parentTitle: 'Launch' }
     const { bridge, invoked } = await loadBridge(state)
     expect(await bridge.uniworkSourceViewState('/x/a.docx')).toEqual(state)
-    expect(invoked).toEqual([
+    expect(invoked.filter((c) => c.channel === SOURCE_VIEW_CHANNELS.sourceViewState)).toEqual([
       { channel: SOURCE_VIEW_CHANNELS.sourceViewState, args: ['/x/a.docx'] },
     ])
   })

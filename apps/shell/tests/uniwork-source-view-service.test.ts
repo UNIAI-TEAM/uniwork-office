@@ -67,12 +67,12 @@ function setup(
   const opened: string[] = []
   const closedNow: string[] = []
   const ui: ConflictUi = {
-    chooseConflict: vi.fn(async () => 'later'),
+    chooseConflict: vi.fn(async () => 'later' as const),
     confirmDiscard: vi.fn(async () => false),
     pickCopyPath: vi.fn(async () => null),
     showOpenLatestFailed: vi.fn(),
     showCopyFailed: vi.fn(),
-    chooseUnsavedClose: vi.fn(async () => 'cancel'),
+    chooseUnsavedClose: vi.fn(async () => 'cancel' as const),
   }
   const service = new UniworkDocsService({
     userDataDir: dir,
@@ -106,7 +106,7 @@ function setup(
     pushLaunch: () => undefined,
     reveal: () => undefined,
     ...(over.startupSweep ? { sourceViewStartupSweep: over.startupSweep } : {}),
-  } as never)
+  })
   return { service, requests, opened, closedNow, openTabs, fetch }
 }
 

@@ -3,12 +3,14 @@ import { rmSync } from 'node:fs'
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathKey } from '../../shared/path-key'
-import type {
-  OpenSourceInput,
-  OpenSourceValue,
-  SourceViewErrorCode,
-  SourceViewResult,
-  SourceViewState,
+import {
+  SOURCE_VIEW_CHANNELS,
+  type OpenSourceInput,
+  type OpenSourceValue,
+  type SourceViewErrorCode,
+  type SourceViewHint,
+  type SourceViewResult,
+  type SourceViewState,
 } from '../../shared/source-view'
 import type { UniworkModuleSeam } from './modules'
 
@@ -146,6 +148,11 @@ export interface SourceViewOpenerDeps {
   downloadSource(workspaceId: string, sourceId: string): Promise<{ bytes: Uint8Array }>
   /** the shell's open router (`routeDocumentPath`) */
   openPath(path: string): boolean | Promise<boolean>
+  /**
+   * Closes the tab or window showing `path` at once (no prompt). Used when an
+   * account boundary landed while the router was still creating the tab.
+   */
+  closePath?(path: string): void | Promise<void>
   isPathOpen(path: string): boolean
   now?(): number
   newSession?(): string
@@ -332,6 +339,19 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
     const opened = await Promise.resolve()
       .then(() => deps.openPath(path))
       .catch(() => false)
+    if (epoch !== startedAt) {
+      // the boundary's dropAll ran while the tab was being created: it saw no tab to close
+      try {
+        await deps.closePath?.(path)
+      } catch {
+        /* the tab is on a deleted file at worst, never on a registered one */
+      }
+      // an open of the same key that started after the boundary owns the entry now
+      if (entries.get(key)?.path === path) entries.delete(key)
+      deps.registry.remove(path)
+      await removeDir(dir)
+      return fail('not_signed_in')
+    }
     if (!opened) {
       await dropEntry(key)
       return fail('open_failed')
@@ -414,5 +434,27 @@ export function createSourceViewOpener(deps: SourceViewOpenerDeps): SourceViewOp
         /* the next start sweeps the whole root */
       }
     },
+  }
+}
+
+/** a webContents-shaped target for the hint push (the owner window of a path) */
+export interface SourceHintTarget {
+  isDestroyed(): boolean
+  send(channel: string, payload: SourceViewHint): void
+}
+
+/**
+ * The `onSourceSave` of the module seam: an explicit Save on a source view
+ * writes nothing; the window that owns the path is told so it can show the
+ * "view only" hint.
+ */
+export function createSourceSaveHint(deps: {
+  /** the window (shell or detached) that shows `path`, undefined when none does */
+  hostForPath(path: string): SourceHintTarget | undefined
+}): (path: string) => void {
+  return (path) => {
+    const host = deps.hostForPath(path)
+    if (!host || host.isDestroyed()) return
+    host.send(SOURCE_VIEW_CHANNELS.hint, { path })
   }
 }

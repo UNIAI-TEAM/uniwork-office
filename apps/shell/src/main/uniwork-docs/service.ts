@@ -124,6 +124,9 @@ import { pathKey } from '../../shared/path-key'
 import { isBlankDefaultTitle } from '../../shared/blank-default-names'
 import { LaunchController } from './launch'
 import { createDocumentLimitsCache, type DocumentLimits, type DocumentLimitsCache } from './limits'
+import { DRAFT_PREVIEW_DIR } from '@genoffice/electron-utils/draft-preview'
+import type { OpenSourceValue, SourceViewResult, SourceViewState } from '../../shared/source-view'
+import { SourceViewRegistry, createSourceViewOpener, type SourceViewOpener } from './source-view'
 import { tUniworkDocs } from './strings'
 import {
   abortUploadSession,
@@ -430,6 +433,12 @@ export interface UniworkDocsServiceDeps {
   stopRuntime?(): void
   openPaths?(): string[]
   closePathNow?(path: string): void
+  /**
+   * UNI-1993: the sync center's startup sweep of the draft-preview root (one
+   * promise, shared). A source file is written only after it settled; absent =
+   * nothing to wait for.
+   */
+  sourceViewStartupSweep?: Promise<unknown>
   aiHistoryPaths?(): string[]
   forgetAiHistory?(paths: string[]): void
   /** G5-09 S5: pushes the current conflict dialog view to the shell renderer */
@@ -1156,6 +1165,9 @@ export class UniworkDocsService {
   readonly coordinator: SaveCoordinator
   readonly launch: LaunchController
   readonly limitsCache: DocumentLimitsCache
+  /** UNI-1993: the view-only source files (not documents); index.ts merges it into the module seams */
+  readonly sourceViews = new SourceViewRegistry()
+  private readonly sourceViewOpener: SourceViewOpener
   private readonly deps: UniworkDocsServiceDeps
   /** the build's own version, stamped into bindings (see binding-store's minAppVersion) */
   private readonly appVersion: () => string
@@ -1398,6 +1410,19 @@ export class UniworkDocsService {
         const client = this.api()
         return client.getDocumentLimits ? await client.getDocumentLimits() : null
       },
+    })
+    this.sourceViewOpener = createSourceViewOpener({
+      previewRoot: join(deps.userDataDir, DRAFT_PREVIEW_DIR),
+      ...(deps.sourceViewStartupSweep ? { startupSweep: deps.sourceViewStartupSweep } : {}),
+      registry: this.sourceViews,
+      identity: () => this.deps.identity(),
+      profile: () => this.deps.profile(),
+      storeLocked: () => this.storeLocked(),
+      documentMaxBytes: () => this.limitsCache.peek().max_bytes,
+      downloadSource: (workspaceId, sourceId) => this.api().downloadSource(workspaceId, sourceId),
+      openPath: (path) => this.deps.openPath(path),
+      closePath: (path) => this.deps.closePathNow?.(path),
+      isPathOpen: (path) => this.deps.isPathOpen(path),
     })
     this.coordinator = new SaveCoordinator({
       store: this.store,
@@ -3248,6 +3273,8 @@ export class UniworkDocsService {
     onWaiting?: () => void,
     options?: { switch?: boolean },
   ): Promise<SignOutLockResult> {
+    // UNI-1993: a source view belongs to the session, not to a stored document: it goes first
+    await this.dropSourceViews()
     const target = owner ?? this.liveIdentity() ?? this.lastOwner
     if (!target) return { ok: true, captureFailed: [] }
     // d5-1: an account switch is already effective, so a refused park cannot
@@ -6793,6 +6820,31 @@ export class UniworkDocsService {
       }
       return { path: target }
     })
+  }
+
+  /** UNI-1993: opens a Workspace source file as a view-only tab (see ./source-view) */
+  openSource(input: unknown): Promise<SourceViewResult<OpenSourceValue>> {
+    return this.sourceViewOpener.openSource(input)
+  }
+
+  /** UNI-1993: the tab chip's state of a path; null unless it is a source view */
+  sourceViewState(path: string): SourceViewState | null {
+    return this.sourceViews.meta(path)
+  }
+
+  /** UNI-1993: deletes the source files whose tab has been closed for the grace */
+  sweepSourceViews(): Promise<void> {
+    return this.sourceViewOpener.sweep()
+  }
+
+  /** UNI-1993: account boundary: closes every source tab and deletes the files */
+  dropSourceViews(): Promise<void> {
+    return this.sourceViewOpener.dropAll((path) => this.deps.closePathNow?.(path))
+  }
+
+  /** UNI-1993: quit: removes this session's source files synchronously */
+  disposeSourceViews(): void {
+    this.sourceViewOpener.disposeSync()
   }
 
   private async isForbiddenDownloadTarget(target: string): Promise<boolean> {
