@@ -177,6 +177,10 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
         />
       ) : (
         <iframe
+          // Sandbox flags are read when a navigation starts, and React applies an update in prop
+          // order (src, then sandbox): re-flagging a live frame would load the page under the old
+          // allow-scripts flags. A scripts-off frame is therefore a new element, born with its flags.
+          key={scriptsOff ? 'scripts-off' : 'scripts-on'}
           ref={frameRef}
           className="preview-frame"
           title={t('viewPreview')}

@@ -91,7 +91,13 @@ export function uniworkIsLocked(path: string | null | undefined): boolean {
 
 /** `uniworkIsLocked` for a plain state query: it must not look like a refusal to the shell. */
 export function uniworkPeekLocked(path: string | null | undefined): boolean {
-  return uniworkIsLocked(path)
+  if (!path || !policy) return false
+  if (!policy.peekLocked) return uniworkIsLocked(path)
+  try {
+    return policy.peekLocked(path)
+  } catch {
+    return false
+  }
 }
 
 /** Same file, ignoring separators and (on Windows) letter case, so a dialog pick of the open file matches. */

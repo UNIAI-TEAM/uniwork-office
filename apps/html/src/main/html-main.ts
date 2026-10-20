@@ -3,6 +3,7 @@ import {
   setUniworkUserSaveHook,
   uniworkIsBound,
   uniworkIsLocked,
+  uniworkPeekLocked,
   uniworkIsReadOnly,
   uniworkReadOnlySave,
   uniworkSaveDecision,
@@ -1399,7 +1400,8 @@ function registerHtmlIpc(): void {
     return {
       bound: uniworkIsBound(path),
       readOnly: uniworkIsReadOnly(path),
-      ...(uniworkIsLocked(path) ? { locked: true } : {}),
+      // a query, not a refused action: it must not raise the shell's view-only hint
+      ...(uniworkPeekLocked(path) ? { locked: true } : {}),
     }
   })
 

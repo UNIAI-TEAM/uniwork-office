@@ -178,6 +178,7 @@ export function installUniworkModuleSeams(
         // G5-03a: an S6 lock (revoked / deleted while open) refuses export,
         // Save As and print-to-PDF in every module
         isLocked: (path: string) => seam.isLocked?.(path) === true,
+        peekLocked: (path: string) => (seam.peekLocked ?? seam.isLocked)?.call(seam, path) === true,
         consumeCapture: (path: string) => seam.consumeCapture?.(path) === true,
         refuseOpen: (path: string) => seam.refuseLockedPath(path),
         commentAuthor: (path: string) => author(path),

@@ -93,6 +93,9 @@ export function withSourceViews(
       options.onSourceLocked?.(path)
       return true
     },
+    // the same verdict without the hint: a state query is not a refused action
+    peekLocked: (path) =>
+      registry.has(path) ? true : (seam.peekLocked ?? seam.isLocked)?.call(seam, path) === true,
     consumeCapture: (path) => (registry.has(path) ? false : seam.consumeCapture?.(path) === true),
     // a source is never saved, so it never reaches the UniWork user-save pipeline
     onUserSave: (path) => {
