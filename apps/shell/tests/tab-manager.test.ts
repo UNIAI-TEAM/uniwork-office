@@ -1615,3 +1615,40 @@ describe('the S6 bar inset moves the active editor view down (G5-03a)', () => {
     })
   })
 })
+
+describe('tab title decoration (UNI-2033)', () => {
+  const decorated = () =>
+    new TabManager(
+      shellWindow as never,
+      () => onChanged(),
+      (kind) => applyMenuFor(kind),
+      undefined,
+      () => 1,
+      (filePath, title) => (filePath?.includes('@v2') ? `${title} · v2` : title),
+    )
+
+  it('list() shows the decorated title; the stored title stays the file name', () => {
+    manager = decorated()
+    manager.openDocsTab('/store/DOC@v2/Plan.docx')
+    manager.openSheetsTab('/store/DOC/Budget.xlsx')
+    expect(manager.list().map((t) => t.title)).toEqual([
+      'UniWork Office',
+      'Plan.docx · v2',
+      'Budget.xlsx',
+    ])
+    expect(manager.describeWebContents(1)).toBeNull()
+    expect(manager.activeOfficeTab()?.title).toBe('Budget.xlsx')
+  })
+
+  it('a rename keeps following the decoration of the new path', () => {
+    manager = decorated()
+    manager.openDocsTab('/store/DOC/Plan.docx')
+    manager.renameTabFile('/store/DOC/Plan.docx', '/store/DOC@v2/Plan.docx')
+    expect(manager.list()[1]?.title).toBe('Plan.docx · v2')
+  })
+
+  it('without a decorator the titles are untouched', () => {
+    manager.openDocsTab('/store/DOC@v2/Plan.docx')
+    expect(manager.list()[1]?.title).toBe('Plan.docx')
+  })
+})

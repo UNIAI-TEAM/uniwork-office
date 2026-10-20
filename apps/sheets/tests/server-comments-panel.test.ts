@@ -41,6 +41,7 @@ interface Row {
   anchor: Record<string, unknown> | null
   anchor_state: string | null
   anchor_version_id?: string | null
+  anchor_version_no?: number | null
   resolved_at: string | null
   deleted_at: string | null
   created_at: string
@@ -128,6 +129,9 @@ function fakeServer(
       },
     ),
     searchMentions: vi.fn(() => ok({ candidates: [] })),
+    openVersion: vi.fn((_i: { path: string; commentId: string; versionNo: number }) =>
+      Promise.resolve({ opened: true }),
+    ),
     context: vi.fn(() =>
       opts.context === 'not_found'
         ? Promise.resolve({ ok: false as const, error: { code: 'not_found' } })
@@ -575,6 +579,78 @@ describe('server mode: comments.reveal', () => {
     expect(await server.reveal(c.id)).toEqual([true])
     expect(state.selected).toEqual([])
     expect(await server.reveal('nope')).toEqual([false])
+  })
+})
+
+describe('a lost comment and its older version (UNI-2033)', () => {
+  const LOST = { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' }
+  const VIEW = 'View in version 2'
+  const buttons = (text: string) =>
+    [...el.querySelectorAll<HTMLButtonElement>('button')].filter((b) => b.textContent === text)
+
+  it('offers "View in version N" and asks the shell once, with the path, id and N', async () => {
+    const server = fakeServer()
+    const c = server.add({
+      body: 'Lost one',
+      anchor: LOST,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    await mount(server)
+    act(() => threadPane.show())
+    await flush()
+    expect(buttons(VIEW)).toHaveLength(1)
+    await act(async () => buttons(VIEW)[0]!.click())
+    await flush()
+    expect(server.calls.openVersion.mock.calls).toEqual([
+      [{ path: PATH, commentId: c.id, versionNo: 2 }],
+    ])
+    expect(el.textContent).not.toContain(EN.collabVersionViewUnavailable!)
+  })
+
+  it('shows the unavailable line when the shell could not open it', async () => {
+    const server = fakeServer()
+    server.calls.openVersion.mockImplementation(() => Promise.resolve({ opened: false }))
+    server.add({
+      body: 'Lost one',
+      anchor: LOST,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    await mount(server)
+    act(() => threadPane.show())
+    await flush()
+    await act(async () => buttons(VIEW)[0]!.click())
+    await flush()
+    expect(el.textContent).toContain(EN.collabVersionViewUnavailable!)
+  })
+
+  it('no action without a version number', async () => {
+    const server = fakeServer()
+    server.add({ body: 'Lost one', anchor: LOST, anchor_state: 'lost', anchor_version_id: 'v0' })
+    await mount(server)
+    act(() => threadPane.show())
+    await flush()
+    expect(el.textContent).not.toContain('View in version')
+  })
+
+  it('in the version it was last anchored on, a lost thread reveals at its cell', async () => {
+    // the editor's open version id is the context's: v1
+    const server = fakeServer({ versionId: 'v1' })
+    const c = server.add({
+      body: 'Lost one',
+      anchor: LOST,
+      anchor_state: 'lost',
+      anchor_version_id: 'v1',
+      anchor_version_no: 1,
+    })
+    const { view, state } = fakeView()
+    await mount(server, view)
+    expect(await server.reveal(c.id)).toEqual([true])
+    expect(state.selected).toEqual([['sheet-2', cell(6, 1)]])
+    expect(el.textContent).not.toContain('View in version')
   })
 })
 

@@ -70,6 +70,8 @@ interface Row {
   revision: number
   anchor: Record<string, unknown> | null
   anchor_state: string | null
+  anchor_version_id?: string | null
+  anchor_version_no?: number | null
   resolved_at: string | null
   deleted_at: string | null
   created_at: string
@@ -84,6 +86,8 @@ interface FakeOpts {
   anchorsFail?: { code: string; status?: number; detailsCode?: string }
   /** `list` waits for this promise (the first list still in flight) */
   listGate?: Promise<void>
+  /** what `openVersion` answers (default: the shell opened it) */
+  openVersion?: boolean
 }
 
 function fakeBridge(seed: Row[] = [], opts: FakeOpts = {}) {
@@ -184,6 +188,10 @@ function fakeBridge(seed: Row[] = [], opts: FakeOpts = {}) {
     searchMentions: (input) => {
       calls.push({ op: 'searchMentions', input })
       return ok({ candidates: [] })
+    },
+    openVersion: (input) => {
+      calls.push({ op: 'openVersion', input })
+      return Promise.resolve({ opened: opts.openVersion !== false })
     },
     onReveal: (handler) => {
       revealHandlers.add(handler)
@@ -1038,6 +1046,70 @@ describe('ServerCommentsHost over the comments bridge', () => {
     const zh = collabStrings('zh')
     expect(slot.textContent).toContain(zh.collabAnchorLost)
     expect(slot.textContent).toContain('Xem lại biểu đồ')
+  })
+
+  it('UNI-2033: a lost slide comment offers "View in version N" and asks the shell once', async () => {
+    const slides = deck('slide1', 'slide2')
+    const h = await mountHost({
+      slides,
+      versionId: 'v5',
+      rows: [
+        {
+          ...rootRow('x1', anchorOn(slides, 1), 'Xem lại biểu đồ'),
+          anchor_state: 'lost',
+          anchor_version_id: 'v2',
+          anchor_version_no: 2,
+        },
+      ],
+    })
+    const label = format(collabStrings('zh').collabAnchorViewVersion, { n: '2' })
+    const view = [...slot.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (b) => b.textContent === label,
+    )
+    expect(view).toHaveLength(1)
+    await act(async () => {
+      view[0]!.click()
+      await flush()
+    })
+    expect(h.server.calls.filter((c) => c.op === 'openVersion')).toEqual([
+      { op: 'openVersion', input: { path: '/work/deck.pptx', commentId: 'x1', versionNo: 2 } },
+    ])
+    expect(slot.textContent).not.toContain(collabStrings('zh').collabVersionViewUnavailable)
+  })
+
+  it('UNI-2033: no action without a version number, and none when the bridge cannot open one', async () => {
+    const slides = deck('slide1', 'slide2')
+    const row = {
+      ...rootRow('x1', anchorOn(slides, 1)),
+      anchor_state: 'lost',
+      anchor_version_id: 'v2',
+    }
+    const h = await mountHost({ slides, versionId: 'v5', rows: [row] })
+    const label = format(collabStrings('zh').collabAnchorViewVersion, { n: '2' })
+    expect(slot.textContent).not.toContain(label)
+    expect(h.server.calls.some((c) => c.op === 'openVersion')).toBe(false)
+  })
+
+  it('UNI-2033: in the version it was last anchored on, a lost slide comment reveals at its slide', async () => {
+    const slides = deck('slide1', 'slide2', 'slide3')
+    const h = await mountHost({
+      slides,
+      versionId: 'v2',
+      rows: [
+        {
+          ...rootRow('x1', anchorOn(slides, 2, 'e_slide3')),
+          anchor_state: 'lost',
+          anchor_version_id: 'v2',
+          anchor_version_no: 2,
+        },
+      ],
+      open: false,
+    })
+    await act(async () => {
+      h.server.reveal({ path: '/work/deck.pptx', commentId: 'x1' })
+      await flush()
+    })
+    expect(h.goTo).toHaveBeenCalledWith(2, 'src-slide3')
   })
 
   it('the file’s own comments show read-only and server actions never write the file', async () => {

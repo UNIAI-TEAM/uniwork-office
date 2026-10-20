@@ -34,6 +34,8 @@ interface Row {
   revision: number
   anchor: Record<string, unknown> | null
   anchor_state: string | null
+  anchor_version_id?: string | null
+  anchor_version_no?: number | null
   resolved_at: string | null
   deleted_at: string | null
   created_at: string
@@ -137,6 +139,9 @@ function fakeServer() {
       },
     ),
     searchMentions: vi.fn(() => ok({ candidates: [] })),
+    openVersion: vi.fn((_i: { path: string; commentId: string; versionNo: number }) =>
+      Promise.resolve({ opened: true }),
+    ),
     context: vi.fn(() =>
       ok({ documentId: 'doc1', versionId: 'v1', level: 'edit', myUserId: 'me' }),
     ),
@@ -589,6 +594,119 @@ describe('server mode: reveal', () => {
     expect(editor.state.selection.from).toBe(1)
     expect(editor.state.selection.empty).toBe(true)
     expect(thread(row.id).textContent).toContain(EN.collabAnchorLost!)
+  })
+})
+
+describe('server mode: a lost comment and its older version (UNI-2033)', () => {
+  const GONE = {
+    format: 'docx',
+    v: 1,
+    path: [7],
+    start: 0,
+    end: 4,
+    quote: 'nope',
+    prefix: '',
+    suffix: '',
+  }
+  const VIEW = 'View in version 2'
+
+  it('offers "View in version N" on a lost thread and asks the shell once, with the path, id and N', async () => {
+    const server = fakeServer()
+    const row = server.add({
+      body: 'gone',
+      anchor: GONE,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    await mount(server)
+    expect(buttons(VIEW)).toHaveLength(1)
+    await click(buttons(VIEW)[0])
+    expect(server.calls.openVersion.mock.calls).toEqual([
+      [{ path: PATH, commentId: row.id, versionNo: 2 }],
+    ])
+    // the shell opened it: no unavailable line
+    expect(el.textContent).not.toContain(EN.collabVersionViewUnavailable!)
+  })
+
+  it('shows the unavailable line when the shell could not open the version', async () => {
+    const server = fakeServer()
+    server.calls.openVersion.mockImplementation(() => Promise.resolve({ opened: false }))
+    server.add({
+      body: 'gone',
+      anchor: GONE,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    await mount(server)
+    await click(buttons(VIEW)[0])
+    expect(el.textContent).toContain(EN.collabVersionViewUnavailable!)
+  })
+
+  it('no action without a version number, or on a host that cannot open a version', async () => {
+    const server = fakeServer()
+    server.add({ body: 'gone', anchor: GONE, anchor_state: 'lost', anchor_version_id: 'v0' })
+    await mount(server)
+    expect(el.textContent).not.toContain('View in version')
+
+    const bare = fakeServer()
+    bare.add({
+      body: 'gone',
+      anchor: GONE,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    delete (bare.api as { openVersion?: unknown }).openVersion
+    act(() => root.unmount())
+    root = createRoot(el)
+    await mount(bare)
+    expect(el.textContent).not.toContain('View in version')
+  })
+
+  it('in the version the comment was last anchored on, a lost thread reveals at its anchor', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({
+      body: 'note',
+      anchor,
+      anchor_state: 'lost',
+      anchor_version_id: 'ver_2',
+      anchor_version_no: 2,
+    })
+    // this editor shows version ver_2 (the read-only copy of it)
+    await mount(server, false, 'ver_2')
+    let answer: unknown
+    await act(async () => {
+      answer = await server.reveal(row.id)[0]
+    })
+    await flush()
+    expect(answer).toBe(true)
+    const { from, to } = editor.state.selection
+    expect(editor.state.doc.textBetween(from, to)).toBe('third quarter')
+    // and no "View in version" action: it is that version
+    expect(el.textContent).not.toContain('View in version')
+  })
+
+  it('in another version, the same lost thread does not move the selection', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({
+      body: 'note',
+      anchor,
+      anchor_state: 'lost',
+      anchor_version_id: 'ver_2',
+      anchor_version_no: 2,
+    })
+    await mount(server, false, 'ver_5')
+    editor.commands.setTextSelection(1)
+    await act(async () => {
+      await server.reveal(row.id)[0]
+    })
+    await flush()
+    expect(editor.state.selection.from).toBe(1)
+    expect(editor.state.selection.empty).toBe(true)
   })
 })
 

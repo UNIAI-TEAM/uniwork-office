@@ -14,6 +14,7 @@ import {
   parseCommentsSaved,
   parseCommentsIdInput,
   parseCommentsListInput,
+  parseCommentsOpenVersionInput,
   parseCommentsReveal,
   parseCommentsUpdateInput,
   parseMentionsSearchInput,
@@ -45,6 +46,7 @@ describe('the comments IPC channel contract', () => {
       revealPending: 'uniwork:comments:reveal:pending',
       context: 'uniwork:comments:context',
       saved: 'uniwork:comments:saved',
+      openVersion: 'uniwork:comments:open-version',
     })
     expect(COMMENTS_BRIDGE_KEY).toBe('uniworkComments')
   })
@@ -431,5 +433,43 @@ describe('the comments context + saved seam (G8-12 §3.1)', () => {
     expect(parseCommentsSaved({ path: '/w/Plan.docx', versionId: 'x'.repeat(129) })).toBeNull()
     expect(parseCommentsSaved({ path: '', versionId: 'v' })).toBeNull()
     expect(parseCommentsSaved([])).toBeNull()
+  })
+})
+
+describe('comments.openVersion (UNI-2033)', () => {
+  const ok = { path: '/w/Plan.docx', commentId: 'c1', versionNo: 3 }
+
+  it('names its channel next to the others', () => {
+    expect(COMMENTS_CHANNELS.openVersion).toBe('uniwork:comments:open-version')
+  })
+
+  it('reads path, comment id and a positive safe integer version number', () => {
+    expect(parseCommentsOpenVersionInput(ok)).toEqual(ok)
+    expect(parseCommentsOpenVersionInput({ ...ok, versionNo: 1 })).toEqual({ ...ok, versionNo: 1 })
+    expect(parseCommentsOpenVersionInput({ ...ok, versionNo: Number.MAX_SAFE_INTEGER })).toEqual({
+      ...ok,
+      versionNo: Number.MAX_SAFE_INTEGER,
+    })
+  })
+
+  it('drops anything the renderer adds (a document or version id is never trusted)', () => {
+    expect(parseCommentsOpenVersionInput({ ...ok, documentId: 'd', versionId: 'v' })).toEqual(ok)
+  })
+
+  it('refuses a bad path, comment id or version number', () => {
+    expect(parseCommentsOpenVersionInput({ ...ok, path: '' })).toBeNull()
+    expect(parseCommentsOpenVersionInput({ ...ok, path: 5 })).toBeNull()
+    expect(parseCommentsOpenVersionInput({ ...ok, path: 'x'.repeat(4097) })).toBeNull()
+    expect(parseCommentsOpenVersionInput({ ...ok, commentId: '' })).toBeNull()
+    expect(parseCommentsOpenVersionInput({ ...ok, commentId: 7 })).toBeNull()
+    expect(parseCommentsOpenVersionInput({ ...ok, commentId: 'x'.repeat(129) })).toBeNull()
+    for (const versionNo of [0, -1, 1.5, '2', NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, null]) {
+      expect(parseCommentsOpenVersionInput({ ...ok, versionNo }), String(versionNo)).toBeNull()
+    }
+    const { versionNo: _omitted, ...noVersion } = ok
+    expect(parseCommentsOpenVersionInput(noVersion)).toBeNull()
+    expect(parseCommentsOpenVersionInput(null)).toBeNull()
+    expect(parseCommentsOpenVersionInput([])).toBeNull()
+    expect(parseCommentsOpenVersionInput('/w/Plan.docx')).toBeNull()
   })
 })

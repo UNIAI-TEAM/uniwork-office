@@ -70,6 +70,7 @@ const METHODS = [
   'onReveal',
   'context',
   'onSaved',
+  'openVersion',
 ] as const
 
 const ORIGIN = 'https://uniwork.example'
@@ -83,6 +84,7 @@ interface Api {
   remove(input: unknown): Promise<unknown>
   searchMentions(input: unknown): Promise<unknown>
   onReveal(handler: (payload: unknown) => void): () => void
+  openVersion(input: unknown): Promise<unknown>
 }
 
 /** the editor preload under test (the docs one; all six share the bridge) */
@@ -168,7 +170,7 @@ beforeEach(() => {
 })
 
 describe('every editor preload exposes window.uniworkComments', () => {
-  it('the same twelve-method surface per app', async () => {
+  it('the same thirteen-method surface per app', async () => {
     for (const app of APPS) {
       bridge.exposed.clear()
       vi.resetModules()
@@ -189,6 +191,21 @@ describe('every editor preload exposes window.uniworkComments', () => {
       'uniwork:comments:delete',
       'uniwork:comments:search-mentions',
     ])
+  })
+
+  it('openVersion forwards to its channel and resolves to a plain { opened } (UNI-2033)', async () => {
+    const api = await preloadApi()
+    const input = { path: 'p', commentId: 'c1', versionNo: 2 }
+    bridge.reply = { opened: true }
+    expect(await api.openVersion(input)).toEqual({ opened: true })
+    expect(bridge.invoked).toEqual([{ channel: 'uniwork:comments:open-version', args: [input] }])
+    // anything but a literal true is a refusal, and a rejected invoke never throws to the editor
+    bridge.reply = { opened: 'yes' }
+    expect(await api.openVersion(input)).toEqual({ opened: false })
+    bridge.reply = undefined
+    expect(await api.openVersion(input)).toEqual({ opened: false })
+    bridge.invokeImpl = () => Promise.reject(new Error('ipc gone'))
+    expect(await api.openVersion(input)).toEqual({ opened: false })
   })
 
   it('onReveal delivers a well-formed push and drops a malformed one', async () => {

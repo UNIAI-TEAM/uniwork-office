@@ -1314,3 +1314,49 @@ describe('list rows carry origin (UNI-1961)', () => {
     ])
   })
 })
+
+// UNI-2033: the id of one numbered version, for the read-only "View in version N" copy
+describe('getVersionId (UNI-2033)', () => {
+  it('reads GET /documents/{id}/versions/{N} and answers version.id', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, { version: { id: 'ver_2', version: 2 } }))
+    const api = client(fetch)
+    expect(await api.getVersionId(DOC, 2)).toBe('ver_2')
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      `${ORIGIN}/api/v1/documents/${DOC}/versions/2`,
+    ])
+    const init = fetch.mock.calls[0]![1]
+    expect(init.method).toBe('GET')
+    expect(init.redirect).toBe('error')
+    expect(init.cache).toBe('no-store')
+  })
+
+  it('maps the usual refusals through the documents error table', async () => {
+    expect(await codeOf(client(async () => envelope(404, 'not_found')).getVersionId(DOC, 9))).toBe(
+      'not_found',
+    )
+    expect(
+      await codeOf(client(async () => envelope(403, 'forbidden')).getVersionId(DOC, 2)),
+    ).not.toBe('resolved')
+  })
+
+  it('is strict: a missing id, another version number or a non-object body is malformed', async () => {
+    const malformed = async (body: unknown, no = 2) =>
+      codeOf(client(async () => json(200, body)).getVersionId(DOC, no))
+    expect(await malformed({ version: { version: 2 } })).toBe('malformed_response')
+    expect(await malformed({ version: { id: '', version: 2 } })).toBe('malformed_response')
+    expect(await malformed({ version: { id: 'ver_3', version: 3 } })).toBe('malformed_response')
+    expect(await malformed({ version: { id: 'ver_2', version: '2' } })).toBe('malformed_response')
+    expect(await malformed({})).toBe('malformed_response')
+    expect(await malformed([])).toBe('malformed_response')
+  })
+
+  it('refuses a bad document id or version number before the network', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, {}))
+    const api = client(fetch)
+    expect(await codeOf(api.getVersionId('../../evil', 2))).toBe('not_found')
+    expect(await codeOf(api.getVersionId(DOC, 0))).toBe('not_found')
+    expect(await codeOf(api.getVersionId(DOC, 1.5))).toBe('not_found')
+    expect(await codeOf(api.getVersionId(DOC, -1))).toBe('not_found')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
