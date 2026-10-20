@@ -64,4 +64,6 @@ export const vi = {
   dlActRestore: 'Khôi phục',
   dlActDetails: 'Xem chi tiết',
   dlActPurge: 'Xóa vĩnh viễn',
+  dlLinkCopied: 'Đã sao chép link',
+  dlLinkCopyFailed: 'Không sao chép được link. Thử lại.',
 } satisfies Record<keyof typeof zh, string>

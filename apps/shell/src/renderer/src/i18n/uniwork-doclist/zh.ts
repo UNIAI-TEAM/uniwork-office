@@ -63,4 +63,6 @@ export const zh = {
   dlActRestore: '恢复',
   dlActDetails: '查看详情',
   dlActPurge: '永久删除',
+  dlLinkCopied: '链接已复制',
+  dlLinkCopyFailed: '无法复制链接，请重试。',
 }

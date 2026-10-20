@@ -65,4 +65,6 @@ export const cs = {
   dlActRestore: 'Restore',
   dlActDetails: 'View details',
   dlActPurge: 'Delete permanently',
+  dlLinkCopied: 'Link copied',
+  dlLinkCopyFailed: 'Could not copy the link. Try again.',
 } satisfies Record<keyof typeof zh, string>

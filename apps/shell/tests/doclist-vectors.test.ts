@@ -23,7 +23,7 @@ import { uniworkDocListStrings } from '../src/renderer/src/i18n/strings-uniwork-
 const DIR = join(__dirname, '../src/renderer/src/doclist')
 const WEB_FILE = join(DIR, 'doclist-vectors.json')
 const APP_FILE = join(DIR, 'doclist-app-vectors.json')
-const WEB_BLOB_SHA1 = 'c4aa5e497c0f803be22a37911484635e6c7285ee'
+const WEB_BLOB_SHA1 = '4bbfd26ad5b2198b5a59a17026d47fddc4156d67'
 
 const webBytes = readFileSync(WEB_FILE)
 
@@ -192,6 +192,9 @@ const WEB_TO_APP_KEYS: Record<string, string> = {
   'documents.list.group.deleting_soon': 'dlGroupDeletingSoon',
   'documents.list.group.earlier': 'dlGroupEarlier',
   'documents.list.group.more_than_7_days': 'dlGroupMoreThan7Days',
+  'documents.list.menu.copy_link': 'dlActCopyLink',
+  'documents.list.menu.link_copied': 'dlLinkCopied',
+  'documents.list.menu.link_copy_failed': 'dlLinkCopyFailed',
   'documents.list.group.this_week': 'dlGroupThisWeek',
   'documents.list.group.today': 'dlGroupToday',
   'documents.list.group.yesterday': 'dlGroupYesterday',
