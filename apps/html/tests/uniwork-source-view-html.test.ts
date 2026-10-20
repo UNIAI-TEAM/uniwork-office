@@ -274,3 +274,88 @@ describe('F3: scripts never run in a source view', () => {
     expect(h.frame()?.getAttribute('src')).toContain('html-preview://view-1')
   })
 })
+
+describe('F3: the frame is released once, straight to its final document', () => {
+  /**
+   * Every src the preview iframe ever carried, transient ones included. A mutation record reads the
+   * attribute only when the observer fires, so the history is rebuilt from `oldValue`s plus the end value.
+   */
+  function recordSrcs(root: HTMLElement): { srcs: string[]; stop: () => void } {
+    const srcs: string[] = []
+    let frame: Element | null = null
+    const isFrame = (n: unknown): n is Element =>
+      n instanceof Element && n.matches('iframe.preview-frame')
+    const drain = (records: MutationRecord[]) => {
+      for (const r of records) {
+        if (r.type === 'childList')
+          r.addedNodes.forEach((n) => {
+            if (isFrame(n) && n !== frame) frame = n
+          })
+        else if (isFrame(r.target)) srcs.push(r.oldValue ?? '')
+      }
+    }
+    const observer = new MutationObserver(drain)
+    observer.observe(root, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['src'],
+      attributeOldValue: true,
+    })
+    return {
+      srcs,
+      stop: () => {
+        drain(observer.takeRecords())
+        observer.disconnect()
+        const f = frame ?? document.querySelector('iframe.preview-frame')
+        if (f) srcs.push(f.getAttribute('src') ?? '')
+      },
+    }
+  }
+
+  async function mountRecording(state: Promise<State> | State) {
+    const container = document.body.appendChild(document.createElement('div'))
+    // mount() makes its own container; record on the body to see it from the first commit
+    const rec = recordSrcs(document.body)
+    const h = await mount(state)
+    container.remove()
+    return { h, rec }
+  }
+
+  // rejects only when awaited, so no rejection is left unhandled before the app asks
+  const rejecting = {
+    then: (_ok: unknown, fail: (e: Error) => void) => fail(new Error('no handler')),
+  }
+
+  it.each([
+    ['unbound answer', { bound: false, readOnly: false } as State | 'reject'],
+    ['rejected call', 'reject' as State | 'reject'],
+  ])('loads a plain file once, never through a blank frame (%s)', async (_n, answer) => {
+    const state = answer === 'reject' ? (rejecting as unknown as Promise<State>) : answer
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { h, rec } = await mountRecording(state)
+    open.push(h)
+    rec.stop()
+    const real = rec.srcs.filter((s) => s.includes('html-preview://view-1'))
+    expect(real).toHaveLength(1)
+    // nothing blank follows the real document: the frame would be reloaded (or stay empty)
+    const firstReal = rec.srcs.findIndex((s) => s.includes('html-preview://view-1'))
+    expect(rec.srcs.slice(firstReal + 1)).toEqual([])
+    expect(h.frame()?.getAttribute('src')).toContain('html-preview://view-1')
+    expect(h.frame()?.getAttribute('sandbox')).toContain('allow-scripts')
+  })
+
+  it('does not load the real document before a late answer, then loads it once', async () => {
+    let answer!: (s: State) => void
+    const { h, rec } = await mountRecording(new Promise<State>((r) => (answer = r)))
+    open.push(h)
+    expect(rec.srcs.filter((s) => s.includes('html-preview://'))).toEqual([])
+    await act(async () => {
+      answer({ bound: false, readOnly: false })
+    })
+    await settle()
+    rec.stop()
+    expect(rec.srcs.filter((s) => s.includes('html-preview://view-1'))).toHaveLength(1)
+    expect(h.frame()?.getAttribute('src')).toContain('html-preview://view-1')
+  })
+})
