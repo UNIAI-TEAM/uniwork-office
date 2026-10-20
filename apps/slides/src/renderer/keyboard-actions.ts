@@ -165,6 +165,13 @@ export function handleGlobalKeydown(
     if (cap('print')) ctx.setPrintDlgOpen(true)
     return
   }
+  // Insert comment: Ctrl+Alt+M (AltGr guarded) / Shift+Cmd+M opens the composer
+  if (id === 'slides-47') {
+    if (inField && !editing) return
+    e.preventDefault()
+    ctx.newComment()
+    return
+  }
   // PowerPoint text formatting: ⌘L/E/R/J align, ⌘]/⌘[ ±1 pt, ⇧⌘>/⇧⌘< grow/shrink
   // font, ⌘B/I/U. Inside the edit overlay they hit the selection (B/I/U stay
   // native there); with shapes selected they change the whole shapes; any other

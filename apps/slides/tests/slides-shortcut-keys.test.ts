@@ -85,6 +85,7 @@ function makeCtx(over: Record<string, unknown> = {}): ActionCtx {
     zoomToFit: vi.fn(),
     setPrintDlgOpen: vi.fn(),
     openAskPopover: vi.fn(),
+    newComment: vi.fn(),
     ...over,
   } as unknown as ActionCtx
 }
@@ -327,6 +328,15 @@ describe('other table keys', () => {
     expect(ctx.zoomToFit).toHaveBeenCalledOnce()
     press(ctx, 'o', { metaKey: true, altKey: true }, MAC)
     expect(ctx.zoomToFit).toHaveBeenCalledTimes(2)
+  })
+
+  it('Insert comment: Ctrl+Alt+M (not AltGr+M) on Windows, Shift+Cmd+M on the Mac', () => {
+    const ctx = makeCtx()
+    press(ctx, 'm', { ctrlKey: true, altKey: true, modifierAltGraph: true }, WIN)
+    expect(ctx.newComment).not.toHaveBeenCalled()
+    press(ctx, 'm', { ctrlKey: true, altKey: true }, WIN)
+    press(ctx, 'M', { metaKey: true, shiftKey: true }, MAC)
+    expect(ctx.newComment).toHaveBeenCalledTimes(2)
   })
 
   it('pastes formatting with Ctrl+Shift+V on the desktop only (web: plain-text paste)', () => {

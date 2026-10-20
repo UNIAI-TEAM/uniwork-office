@@ -50,6 +50,8 @@ function makeCtx(over: Record<string, unknown> = {}): ActionCtx {
     overlayOpen: false,
     findNodeCtx: () => null,
     flushNotes: vi.fn(async () => {}),
+    // Ctrl+Alt+M is PowerPoint's Insert comment
+    newComment: vi.fn(),
     ...over,
   } as unknown as ActionCtx
 }
