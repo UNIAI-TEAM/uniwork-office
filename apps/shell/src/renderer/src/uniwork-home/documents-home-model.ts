@@ -541,8 +541,18 @@ export async function fetchDocumentsHomePage(
       cursor,
       ...filters,
     })
+    const page = mapDocListPageResult(res)
+    // UNI-1974: folders are not shareable; an older share the server still returns is no row here
     return {
-      result: mapDocListPageResult(res),
+      result: page.ok
+        ? {
+            ok: true,
+            value: {
+              ...page.value,
+              items: page.value.items.filter((doc) => doc.kind !== 'folder'),
+            },
+          }
+        : page,
     }
   }
 
