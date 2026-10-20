@@ -31,12 +31,17 @@ import { zh as wbZh } from '../src/renderer/src/i18n/workbench/zh'
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
-function makeEntry(path: string, name: string, uniwork?: RecentEntry['uniwork']): RecentEntry {
+function makeEntry(
+  path: string,
+  name: string,
+  uniwork?: RecentEntry['uniwork'],
+  mtimeMs = 1_700_000_000_000,
+): RecentEntry {
   return {
     path,
     name,
     ext: 'docx',
-    mtimeMs: 1_700_000_000_000,
+    mtimeMs,
     sizeBytes: 2048,
     starred: true,
     ...(uniwork ? { uniwork } : {}),
@@ -286,7 +291,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
 
   async function mountHome() {
     await act(async () => {
-      root.render(createElement(LocaleProvider, null, createElement(Home)))
+      root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(Home)))
     })
     await flush()
   }
@@ -688,13 +693,28 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
           title: `UW Full ${i}.docx`,
         }),
       ),
-      makeEntry('/Users/linh/Documents/Device Full 1.docx', 'Device Full 1.docx'),
+      makeEntry(
+        '/Users/linh/Documents/Device Full 1.docx',
+        'Device Full 1.docx',
+        undefined,
+        1_700_000_300_000,
+      ),
     ]
     const shortPage2: RecentEntry[] = [
-      makeEntry('/Users/linh/Documents/Device Short 2.docx', 'Device Short 2.docx'),
+      makeEntry(
+        '/Users/linh/Documents/Device Short 2.docx',
+        'Device Short 2.docx',
+        undefined,
+        1_700_000_200_000,
+      ),
     ]
     const tailPage3: RecentEntry[] = [
-      makeEntry('/Users/linh/Documents/Device Oldest Tail 3.docx', 'Device Oldest Tail 3.docx'),
+      makeEntry(
+        '/Users/linh/Documents/Device Oldest Tail 3.docx',
+        'Device Oldest Tail 3.docx',
+        undefined,
+        1_700_000_100_000,
+      ),
     ]
     api.recents = vi.fn(async ({ offset = 0 }: { offset?: number }) => {
       if (offset === 0) return { entries: fullPage1, total: 202 }
@@ -716,19 +736,15 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.textContent).toContain('Device Short 2.docx')
     expect(host.textContent).not.toContain('Device Oldest Tail 3.docx')
 
-    // (c) FE13-R3-5: switching fileSort to 'oldest' over a partially loaded list (201 < 202) drains the remaining page(s)
-    const sortBtn = host.querySelector<HTMLButtonElement>('.cloud-col-sort-btn')
-    expect(sortBtn).not.toBeNull()
+    // (c) FE13-R3-5: sorting Cập nhật oldest-first (second click on the sorted header) over a partially loaded
+    //     list (201 < 202) drains the remaining page(s)
+    const updatedSort = () =>
+      Array.from(host.querySelectorAll<HTMLElement>('[role="columnheader"]'))
+        .find((h) => h.textContent === 'Updated')!
+        .querySelector<HTMLButtonElement>('button')!
+    expect(updatedSort().textContent).toContain('Updated')
     await act(async () => {
-      sortBtn!.click()
-    })
-    await flush()
-    const oldestItem = Array.from(
-      host.querySelectorAll<HTMLButtonElement>('.cloud-sort-menu [role="menuitemradio"]'),
-    ).find((btn) => btn.textContent?.includes('Oldest'))
-    expect(oldestItem).toBeDefined()
-    await act(async () => {
-      oldestItem!.click()
+      updatedSort().click()
     })
     await flush()
 
@@ -743,16 +759,9 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       'Device Full 1.docx',
     ])
 
-    // Switch sort back to 'recent' before testing empty-page stop
+    // Switch sort back to newest-first before testing empty-page stop
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('.cloud-col-sort-btn')!.click()
-    })
-    await flush()
-    const recentSortItem = Array.from(
-      host.querySelectorAll<HTMLButtonElement>('.cloud-sort-menu [role="menuitemradio"]'),
-    ).find((btn) => !btn.textContent?.includes('Oldest'))!
-    await act(async () => {
-      recentSortItem.click()
+      updatedSort().click()
     })
     await flush()
 

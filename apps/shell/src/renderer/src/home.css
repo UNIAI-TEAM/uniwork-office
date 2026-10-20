@@ -2259,7 +2259,7 @@ body.vib .home {
 .recent-columns,
 .recent-item {
   display: grid;
-  grid-template-columns: 18px 24px minmax(0, 1fr) 120px 110px 76px 24px 28px;
+  grid-template-columns: 18px 24px minmax(0, 1fr) 128px 76px 24px 28px;
   align-items: center;
   gap: 12px;
   padding: 0 16px;
@@ -2275,12 +2275,19 @@ body.vib .home {
   color: var(--text-secondary);
 }
 
+/* the table hides Dung lượng by its own width (Home measures it), not by the window's */
+.recent-table.no-size .recent-columns,
+.recent-table.no-size .recent-item {
+  grid-template-columns: 18px 24px minmax(0, 1fr) 128px 24px 28px;
+}
+
 /* header label starts at the icon column so it lines up with the file badges */
 .recent-columns .col-name {
   grid-column: 2 / 4;
 }
 
 .col-size {
+  justify-self: end;
   text-align: right;
 }
 
@@ -2296,8 +2303,8 @@ body.vib .home {
 
 .recent-item {
   width: 100%;
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding-top: 10px;
+  padding-bottom: 10px;
   cursor: pointer;
   text-align: left;
 }
@@ -2359,6 +2366,14 @@ body.vib .home {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Tên with the location (or the UniWork badge) as its second line */
+.recent-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 /* unavailable recents (disconnected drive / moved / deleted) stay listed, dimmed */
@@ -3566,9 +3581,23 @@ body.vib .home {
 
 /* WPS-style sortable column header: label + direction arrow, click opens
    the sort popover (.cloud-sort-menu) */
-.cloud-col-sort {
-  position: relative;
+/* sortable headers (Tên, Cập nhật, Dung lượng): the arrow shows on the sorted one only */
+.recent-columns [role='columnheader'] {
+  min-width: 0;
+}
+
+.recent-columns .col-updated {
   justify-self: start;
+}
+
+.sort-arrow {
+  opacity: 0;
+}
+
+.sort-arrow.active,
+.cloud-col-sort-btn:hover .sort-arrow,
+.cloud-col-sort-btn:focus-visible .sort-arrow {
+  opacity: 1;
 }
 
 .cloud-col-sort-btn {
@@ -3584,6 +3613,11 @@ body.vib .home {
   letter-spacing: inherit;
   color: inherit;
   cursor: pointer;
+}
+
+.cloud-col-sort-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .cloud-col-sort-btn:hover {
@@ -3650,18 +3684,6 @@ body.vib .home {
 
   .recents-toolbar {
     gap: 8px 12px;
-  }
-
-  .recent-columns,
-  .recent-item {
-    grid-template-columns: 18px 24px minmax(0, 1fr) 110px 24px 28px;
-  }
-
-  .recent-columns .col-path,
-  .recent-columns .col-size,
-  .recent-path,
-  .recent-size {
-    display: none;
   }
 }
 

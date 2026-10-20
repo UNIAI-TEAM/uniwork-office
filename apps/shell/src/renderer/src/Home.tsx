@@ -29,6 +29,16 @@ import { openLocalHint } from '../../shared/open-extensions'
 import { useDismissablePopover } from '@genoffice/ui'
 import { boxOf, clipBoxesOf, followMenuAnchor } from './folder-menu-anchor'
 import { fileCountLabel } from './counts'
+import {
+  columnsFor,
+  defaultSort,
+  nextSort,
+  sortRows,
+  type ColumnId,
+  type SortSpec,
+} from './doclist/columns'
+import { formatBytes, formatListDate } from './doclist/format'
+import { readSort, writeSort } from './doclist/persist'
 import { useI18n } from './locale'
 import type { I18n, StringKey } from './locale'
 import { CreditWallet } from './CreditWallet'
@@ -174,11 +184,6 @@ function formatModified(mtimeMs: number, i18n: I18n): string {
   return date.toLocaleDateString(i18n.dateLocale, { month: 'short', day: 'numeric' })
 }
 
-function formatSize(bytes: number): string {
-  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`
-}
-
 function splitPath(path: string): string[] {
   return path.split(/[\\/]/).filter(Boolean)
 }
@@ -280,29 +285,6 @@ function highlightText(text: string, needles: readonly string[]): ReactElement[]
     ) : (
       <span key={i}>{m.text}</span>
     ),
-  )
-}
-
-/** Check glyph marking the selected sort option; invisible on the others so labels stay aligned */
-function SortCheck({ visible }: { visible: boolean }): ReactElement {
-  return (
-    <svg
-      className="cloud-sort-check"
-      width="12"
-      height="12"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-      style={visible ? undefined : { visibility: 'hidden' }}
-    >
-      <path
-        d="M3 8.5L6.5 12L13 4.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   )
 }
 
@@ -1387,10 +1369,25 @@ export function Home() {
   const composingRef = useRef(false)
   const searchSeq = useRef(0)
   const searchActive = searchQuery.trim().length > 0
-  // modified-column sort (WPS-style header popover), shared by the global and folder tables
-  const [fileSort, setFileSort] = useState<'recent' | 'oldest'>('recent')
-  const [fileSortMenuOpen, setFileSortMenuOpen] = useState(false)
-  const fileSortRef = useRef<HTMLDivElement>(null)
+  // header sort of the local file tables (shared rules: click a header, aria-sort, remembered per account)
+  const [fileSort, setFileSort] = useState<SortSpec>(
+    () => readSort('device') ?? defaultSort('device'),
+  )
+  // width of the table the columns hide by (container, not window); 0 = not measured yet
+  const [tableWidth, setTableWidth] = useState(0)
+  const tableObserver = useRef<ResizeObserver | null>(null)
+  const measureTable = useCallback((el: HTMLDivElement | null) => {
+    tableObserver.current?.disconnect()
+    tableObserver.current = null
+    if (!el) return
+    setTableWidth(el.getBoundingClientRect().width)
+    if (typeof ResizeObserver === 'undefined') return
+    tableObserver.current = new ResizeObserver((entries) => {
+      const width = entries[entries.length - 1]?.contentRect.width
+      if (typeof width === 'number') setTableWidth(width)
+    })
+    tableObserver.current.observe(el)
+  }, [])
   const [rowMenu, setRowMenu] = useState<string | null>(null)
   // G5-05u: "Dùng khi không có mạng" in a UniWork recents row's menu
   const offlineToggle = useOfflineToggle()
@@ -1858,11 +1855,6 @@ export function Home() {
 
   const hasMore = listLoaded && entries.length < listTotal
 
-  // unified dismissal: outside press, window blur, chrome press (tab strip / window drag)
-  useDismissablePopover(fileSortMenuOpen, () => setFileSortMenuOpen(false), {
-    inside: () => [fileSortRef.current],
-  })
-
   const loadMore = () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
@@ -1968,53 +1960,73 @@ export function Home() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [rowMenu, folderMenu, confirmDelete, confirmMissing, confirmDeleteFolder])
 
-  // WPS-style sortable "modified" column header, shared by both file tables
-  const renderModifiedHeader = () => (
-    <div className="cloud-col-sort" ref={fileSortRef}>
-      <button
-        className="cloud-col-sort-btn"
-        aria-haspopup="menu"
-        aria-expanded={fileSortMenuOpen}
-        onClick={() => setFileSortMenuOpen((o) => !o)}
+  // the local file table's columns at the table's own width (Dung lượng hides first)
+  const deviceColumns = columnsFor('device', tableWidth > 0 ? tableWidth : undefined)
+  const showSize = deviceColumns.includes('size')
+  const tableClass = `recent-table${showSize ? '' : ' no-size'}`
+
+  const sortLocalFiles = (files: RecentEntry[]): RecentEntry[] => {
+    const standard = fileSort.column === 'updated' && fileSort.dir === 'desc'
+    // newest-first keeps the order the main process lists them in
+    if (standard) return files
+    const read = (row: { entry: RecentEntry }, column: ColumnId): string | number | null => {
+      if (column === 'name') return row.entry.name
+      if (column === 'size') return row.entry.missing ? null : row.entry.sizeBytes
+      return recentRowModifiedMs(row.entry)
+    }
+    return sortRows(
+      files.map((entry) => ({ id: entry.path, entry })),
+      fileSort,
+      read,
+    ).map((row) => row.entry)
+  }
+
+  const sortHeader = (column: ColumnId, label: string, className: string) => {
+    const active = fileSort.column === column
+    return (
+      <span
+        className={className}
+        role="columnheader"
+        aria-sort={active ? (fileSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
       >
-        {t('colModified')}
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 16 16"
-          fill="none"
-          aria-hidden="true"
-          style={fileSort === 'oldest' ? { transform: 'rotate(180deg)' } : undefined}
+        <button
+          className="cloud-col-sort-btn"
+          onClick={() => {
+            const next = nextSort('device', fileSort, column)
+            setFileSort(next)
+            writeSort('device', next)
+          }}
         >
-          <path
-            d="M8 3v10M4.5 9.5L8 13l3.5-3.5"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-      {fileSortMenuOpen && (
-        <div className="cloud-sort-menu" role="menu">
-          {(['recent', 'oldest'] as const).map((key) => (
-            <button
-              key={key}
-              className={fileSort === key ? 'active' : ''}
-              role="menuitemradio"
-              aria-checked={fileSort === key}
-              onClick={() => {
-                setFileSort(key)
-                setFileSortMenuOpen(false)
-              }}
-            >
-              <SortCheck visible={fileSort === key} />
-              {t(key === 'recent' ? 'cloudSortRecent' : 'cloudSortOldest')}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+          {label}
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
+            className={active ? 'sort-arrow active' : 'sort-arrow'}
+            style={active && fileSort.dir === 'asc' ? { transform: 'rotate(180deg)' } : undefined}
+          >
+            <path
+              d="M8 3v10M4.5 9.5L8 13l3.5-3.5"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </span>
+    )
+  }
+
+  // Tên · Cập nhật · Dung lượng headers shared by the file tables; the check box and the two trailing cells stay with each table
+  const renderSortHeaders = () => (
+    <>
+      {sortHeader('name', t('dlColName'), 'col-name')}
+      {sortHeader('updated', t('dlColUpdated'), 'col-updated')}
+      {showSize && sortHeader('size', t('dlColSize'), 'col-size')}
+    </>
   )
 
   // ── Plain view (no folder selected): FD-13 splits loaded entries by area (UniWork vs device) ──
@@ -2036,13 +2048,13 @@ export function Home() {
   useEffect(() => {
     if (!hasMore || loadingMore) return
     if (
-      fileSort === 'oldest' ||
+      !(fileSort.column === 'updated' && fileSort.dir === 'desc') ||
       areaEntries.length === 0 ||
       (lastPageLen >= PAGE_SIZE && areaEntries.length < PAGE_SIZE)
     ) {
       loadMoreRef.current()
     }
-  }, [fileSort, hasMore, loadingMore, areaEntries.length, lastPageLen])
+  }, [fileSort.column, fileSort.dir, hasMore, loadingMore, areaEntries.length, lastPageLen])
 
   const selectedPaths = areaEntries.filter((e) => selected.has(e.path)).map((e) => e.path)
   // UniWork documents have no local file to move or delete: they are never selectable
@@ -2894,23 +2906,30 @@ export function Home() {
               }}
             />
           ) : (
-            <span className="recent-name">{entry.name}</span>
-          )}
-          {policy.badge && area === 'uniwork' ? (
-            <span className="recent-path">
-              <span className="uw-recent-badge" title={t('uwRecentBadgeTip')}>
-                {t('uwRecentBadge')}
-              </span>
-            </span>
-          ) : (
-            <span className="recent-path" title={dirOf(entry.path)}>
-              {locationLabel(entry.path, roots)}
+            // the location is the second line of the name (no Location column)
+            <span className="recent-name-cell">
+              <span className="recent-name">{entry.name}</span>
+              {policy.badge && area === 'uniwork' ? (
+                <span className="recent-path">
+                  <span className="uw-recent-badge" title={t('uwRecentBadgeTip')}>
+                    {t('uwRecentBadge')}
+                  </span>
+                </span>
+              ) : (
+                <span className="recent-path" title={dirOf(entry.path)}>
+                  {locationLabel(entry.path, roots)}
+                </span>
+              )}
             </span>
           )}
           <span className="recent-time">
-            {modifiedMs === null ? '—' : formatModified(modifiedMs, i18n)}
+            {formatListDate(modifiedMs, new Date(), i18n.dateLocale)}
           </span>
-          <span className="recent-size">{missing ? '—' : formatSize(entry.sizeBytes)}</span>
+          {showSize && (
+            <span className="recent-size">
+              {missing ? '—' : formatBytes(entry.sizeBytes, i18n.dateLocale)}
+            </span>
+          )}
           <button
             className={`star-btn${entry.starred ? ' starred' : ''}`}
             aria-label={entry.starred ? t('unstar') : t('star')}
@@ -2955,7 +2974,7 @@ export function Home() {
                     void openRecentEntry(entry, window.aiOffice)
                   }}
                 >
-                  {t('open')}
+                  {t('dlActOpen')}
                 </button>
                 {entry.uniwork && offlineToggle.labelOf(entry.uniwork.documentId) && (
                   <button
@@ -3051,10 +3070,10 @@ export function Home() {
                   <>
                     <div className="row-menu-divider" />
                     <button role="menuitem" onClick={() => startRename(entry)}>
-                      {t('rename')}
+                      {t('dlActRename')}
                     </button>
                     <button role="menuitem" onClick={() => duplicateFile(entry.path)}>
-                      {t('duplicate')}
+                      {t('dlActDuplicate')}
                     </button>
                   </>
                 )}
@@ -3163,11 +3182,15 @@ export function Home() {
               }}
             />
           ) : (
-            <span className="recent-name">{entry.name}</span>
+            <span className="recent-name-cell">
+              <span className="recent-name">{entry.name}</span>
+              <span className="recent-path">{t('folderType')}</span>
+            </span>
           )}
-          <span className="recent-path">{t('folderType')}</span>
-          <span className="recent-time">{formatModified(entry.mtimeMs, i18n)}</span>
-          <span className="recent-size">—</span>
+          <span className="recent-time">
+            {formatListDate(entry.mtimeMs, new Date(), i18n.dateLocale)}
+          </span>
+          {showSize && <span className="recent-size">—</span>}
           <span />
           <span
             className="recent-actions"
@@ -3437,7 +3460,7 @@ export function Home() {
 
   function renderFolderContent() {
     const total = folderSubfolders.length + folderFiles.length
-    const sortedFiles = fileSort === 'oldest' ? [...folderFiles].reverse() : folderFiles
+    const sortedFiles = sortLocalFiles(folderFiles)
     return (
       <main className="content">
         <section className="quick-start" aria-label={t('secQuickStart')}>
@@ -3508,9 +3531,10 @@ export function Home() {
             renderEmpty(filter === 'all' ? t('emptyFolder') : t('emptyFiltered'))
           ) : (
             <div
-              className={`recent-table${folderSelectedPaths.length > 0 ? ' has-selection' : ''}`}
+              ref={measureTable}
+              className={`${tableClass}${folderSelectedPaths.length > 0 ? ' has-selection' : ''}`}
             >
-              <div className="recent-columns">
+              <div className="recent-columns" role="row">
                 <span className="col-check">
                   <input
                     type="checkbox"
@@ -3520,10 +3544,7 @@ export function Home() {
                     aria-label={t('selectAll')}
                   />
                 </span>
-                <span className="col-name">{t('colName')}</span>
-                <span className="col-path">{t('colLocation')}</span>
-                {renderModifiedHeader()}
-                <span className="col-size">{t('colSize')}</span>
+                {renderSortHeaders()}
                 <span />
                 <span />
               </div>
@@ -3699,8 +3720,11 @@ export function Home() {
               )
             )
           ) : (
-            <div className={`recent-table${selectedPaths.length > 0 ? ' has-selection' : ''}`}>
-              <div className="recent-columns">
+            <div
+              ref={measureTable}
+              className={`${tableClass}${selectedPaths.length > 0 ? ' has-selection' : ''}`}
+            >
+              <div className="recent-columns" role="row">
                 <span className="col-check">
                   <input
                     type="checkbox"
@@ -3709,17 +3733,12 @@ export function Home() {
                     aria-label={t('selectAll')}
                   />
                 </span>
-                <span className="col-name">{t('colName')}</span>
-                <span className="col-path">{t('colLocation')}</span>
-                {renderModifiedHeader()}
-                <span className="col-size">{t('colSize')}</span>
+                {renderSortHeaders()}
                 <span />
                 <span />
               </div>
               <ul className="recent-list">
-                {(fileSort === 'oldest' ? [...areaEntries].reverse() : areaEntries).map((entry) =>
-                  renderFileRow(entry, 'global'),
-                )}
+                {sortLocalFiles(areaEntries).map((entry) => renderFileRow(entry, 'global'))}
               </ul>
               {hasMore && (
                 <div ref={sentinelRef} className="load-more" aria-hidden="true">
@@ -3808,8 +3827,8 @@ export function Home() {
               <span className="empty-hint">{t('projEmptyHint')}</span>
             </p>
           ) : (
-            <div className="recent-table">
-              <div className="recent-columns">
+            <div ref={measureTable} className={tableClass}>
+              <div className="recent-columns" role="row">
                 <span className="col-check">
                   <input
                     type="checkbox"
@@ -3818,18 +3837,12 @@ export function Home() {
                     aria-label={t('selectAll')}
                   />
                 </span>
-                <span className="col-name">{t('colName')}</span>
-                <span className="col-path">{t('colLocation')}</span>
-                {renderModifiedHeader()}
-                <span className="col-size">{t('colSize')}</span>
+                {renderSortHeaders()}
                 <span />
                 <span />
               </div>
               <ul className="recent-list">
-                {(fileSort === 'oldest'
-                  ? [...projectFileEntries].reverse()
-                  : projectFileEntries
-                ).map((entry) => renderFileRow(entry, 'global'))}
+                {sortLocalFiles(projectFileEntries).map((entry) => renderFileRow(entry, 'global'))}
               </ul>
             </div>
           )}
