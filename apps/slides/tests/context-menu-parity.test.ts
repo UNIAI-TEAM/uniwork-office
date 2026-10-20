@@ -4,6 +4,7 @@ import * as slideActions from '../src/renderer/slide-actions'
 import * as arrangeActions from '../src/renderer/arrange-actions'
 import * as pictureEditActions from '../src/renderer/picture-edit-actions'
 import { defaultShapeStyle } from '../src/renderer/default-shape'
+import { slidesHint } from '../src/renderer/shortcuts'
 import { t } from '../src/renderer/i18n/locale'
 import type { ActionCtx } from '../src/renderer/action-context'
 import type { CtxItem } from '../src/renderer/components/ContextMenu'
@@ -299,7 +300,9 @@ describe('shape context menu (PowerPoint order)', () => {
       t('appCtxUngroup'),
       t('appCtxRegroup'),
     ])
-    expect(group.sub![2]?.hint).toBeUndefined()
+    // the hint is the table's Regroup key (the chord runs regroupSelected, see slides-shortcut-keys)
+    expect(group.sub![2]?.hint).toBe(slidesHint('slides-39'))
+    expect(group.sub![2]?.hint).toBe('Ctrl+Shift+J')
     expect(group.sub![2]?.disabled).toBe(false)
     group.sub![2]?.onClick?.()
     expect(arrangeActions.regroupSelected).toHaveBeenCalled()

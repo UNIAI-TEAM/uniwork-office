@@ -39,6 +39,18 @@ export function slidesHint(id: string, platform: ShortcutPlatform = shortcutPlat
   return formatHint(slidesShortcut(id), platform, shortcutSurface())
 }
 
+/**
+ * Hint for a key the web frame answers itself (File > Open: Ctrl+O is a browser key, so the table
+ * has no web chord, but the frame maps it onto the Open command whenever the host grants `open`).
+ * Only call it where that grant is a precondition of showing the item; the desktop chord is printed.
+ */
+export function slidesFrameHint(
+  id: string,
+  platform: ShortcutPlatform = shortcutPlatform(),
+): string {
+  return formatHint(slidesShortcut(id), platform, 'desktop')
+}
+
 /** Format Painter's key text: copy format / paste format, each only where the surface has a key. */
 export function brushTipKbd(): string | undefined {
   return [slidesHint('slides-11'), slidesHint('slides-12')].filter(Boolean).join(' / ') || undefined

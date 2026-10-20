@@ -127,7 +127,13 @@ import { RibbonTabScroller } from './RibbonTabScroller'
 import { ShapeGalleryContent } from './ShapeGalleryPopover'
 import { autoContextTabForElement, contextTabForElement, type ContextTab } from './context-tabs'
 import { cap, isViewOnly, isWeb } from '../capabilities'
-import { shortcutPlatform, shortcutSurface, slidesHint, slidesTipKbd } from '../shortcuts'
+import {
+  shortcutPlatform,
+  shortcutSurface,
+  slidesFrameHint,
+  slidesHint,
+  slidesTipKbd,
+} from '../shortcuts'
 
 /** Electron on macOS: file commands live in the native menu bar, traffic lights sit in the tab row */
 const IS_MAC = navigator.platform.toLowerCase().includes('mac') && !isWeb()
@@ -1107,8 +1113,8 @@ function ShapeFillMenu({
 }
 
 /** The File menu's key label from the slides shortcut table; none when the action has no key here. */
-function FileMenuKey({ id }: { id: string }) {
-  const hint = slidesHint(id)
+function FileMenuKey({ id, frame }: { id: string; frame?: boolean }) {
+  const hint = frame ? slidesFrameHint(id) : slidesHint(id)
   return hint ? <span className="file-menu-key">{hint}</span> : null
 }
 
@@ -1804,7 +1810,7 @@ export function Ribbon({
                       onOpen()
                     }}
                   >
-                    {t('ribbonFileOpen')} <FileMenuKey id="slides-02" />
+                    {t('ribbonFileOpen')} <FileMenuKey id="slides-02" frame />
                   </button>
                 )}
                 {cap('save') && (
