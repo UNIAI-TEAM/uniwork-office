@@ -50,6 +50,15 @@ export interface ServerCommentsApi extends UniworkCommentsLike {
   /** a Save of `path` settled with a commit receipt */
   onSaved(handler: (payload: { path: string; versionId: string }) => void): () => void
   /**
+   * desktop only (UNI-2033): ask the shell to open version `versionNo` of this document read-only
+   * and reveal the comment there; absent in the web frame, which has its own host request
+   */
+  openVersion?(input: {
+    path: string
+    commentId: string
+    versionNo: number
+  }): Promise<{ opened: boolean }>
+  /**
    * web frame only: this editor has no server mode, so no owner will register (the reveal router
    * stops waiting for one); idempotent
    */

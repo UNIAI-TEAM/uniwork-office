@@ -124,7 +124,21 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
     [context.documentId, context.level, context.myUserId, lang, platform],
   )
   const strings = useMemo(() => collabStrings(lang), [lang])
-  const controller = useCollabThreads(source, host, { strings, adapter })
+  // "View in version N" of a lost thread: the desktop shell opens that version read-only; a bridge
+  // without it (the web frame's port) gives the kit no handler, so the action does not show
+  const onViewVersion = useMemo(() => {
+    const openVersion = bridge.openVersion?.bind(bridge)
+    return openVersion
+      ? ({ commentId, versionNo }: { commentId: string; versionNo: number }) =>
+          openVersion({ path, commentId, versionNo })
+      : undefined
+  }, [bridge, path])
+  const controller = useCollabThreads(source, host, {
+    strings,
+    adapter,
+    openVersionId: context.versionId ?? undefined,
+    ...(onViewVersion ? { onViewVersion } : {}),
+  })
   const ctlRef = useRef(controller)
   ctlRef.current = controller
   const onRevealRef = useRef(o.onRevealRequest)

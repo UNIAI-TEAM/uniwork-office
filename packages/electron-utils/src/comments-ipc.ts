@@ -187,8 +187,12 @@ export interface UniworkCommentsApi {
   context(input: CommentsDocRef): Promise<CommentsReply<CommentsContextResult>>
   /** main pushes after a Save of `path` settled with a commit receipt; returns the unsubscribe */
   onSaved(handler: (payload: CommentsSavedPayload) => void): () => void
-  /** UNI-2033: open version N of the bound document read-only, revealing the comment there */
-  openVersion(input: CommentsOpenVersionInput): Promise<CommentsOpenVersionResult>
+  /**
+   * UNI-2033: open version N of the bound document read-only, revealing the comment there. The
+   * desktop preload always has it; the web frame's port of this API (web/modules) does not (the
+   * frame asks its host instead), so an editor reads it as optional.
+   */
+  openVersion?(input: CommentsOpenVersionInput): Promise<CommentsOpenVersionResult>
 }
 
 /** the global the six editor preloads expose the API under */

@@ -29,6 +29,9 @@ export interface CollabComment {
   revision?: number | undefined
   anchor?: CollabAnchor | null | undefined
   anchor_state?: string | null | undefined
+  anchor_version_id?: string | null | undefined
+  /** the ordinal of `anchor_version_id`; null when the version row is gone */
+  anchor_version_no?: number | null | undefined
   resolved_at?: string | null | undefined
   deleted_at?: string | null | undefined
   created_at?: string | undefined
@@ -260,8 +263,18 @@ export interface CollabController {
   reveal(commentId: string): Promise<{ revealed: boolean }>
 }
 
+/** the host opens version `versionNo` read-only; `opened: false` (or a throw) shows the unavailable line */
+export type CollabViewVersion = (req: {
+  commentId: string
+  versionNo: number
+}) => Promise<{ opened: boolean }> | { opened: boolean } | void
+
 export interface CollabControllerOptions {
   adapter?: CollabAnchorAdapter | undefined
+  /** the id of the version the editor shows: a lost comment anchored on it is located like any other */
+  openVersionId?: string | undefined
+  /** opens version N read-only for a lost comment; absent: no "View in version N" action */
+  onViewVersion?: CollabViewVersion | undefined
   strings?: CollabStrings | undefined
 }
 
