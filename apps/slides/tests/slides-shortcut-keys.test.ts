@@ -384,6 +384,12 @@ describe('hints and menu accelerators come from the table', () => {
     expect(slidesTipKbd('slides-14')).toBe('Ctrl+M')
   })
 
+  it('the ribbon collapse key comes from the table row common-10', () => {
+    const dir = join(dirname(fileURLToPath(import.meta.url)), '../src/renderer')
+    const src = readFileSync(join(dir, 'components/Ribbon.tsx'), 'utf8')
+    expect(src).toMatch(/useRibbonCollapse\([\s\S]*?findShortcut\('common', 'common-10'\)/)
+  })
+
   it('ribbon tooltips and File menu keys carry no hand-written chord', () => {
     const dir = join(dirname(fileURLToPath(import.meta.url)), '../src/renderer')
     for (const file of ['Ribbon.tsx', 'RibbonHomeTab.tsx', 'RibbonInsertTab.tsx']) {

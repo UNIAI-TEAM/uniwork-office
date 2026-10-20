@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { slidesShortcuts } from '@genoffice/shortcuts'
 import {
@@ -165,64 +162,6 @@ describe('slide show keys', () => {
     expect(toggleScreen(black, 'white').screen).toBe('white')
   })
 })
-
-/** The UNI-2011 inventory snapshot the slides table is generated from. */
-function csvRows(): Map<string, Record<string, string>> {
-  const here = dirname(fileURLToPath(import.meta.url))
-  const path = resolve(here, '../../../packages/shortcuts/tests/fixtures/shortcuts.csv')
-  const text = readFileSync(path, 'utf8')
-    .split(/\r?\n/)
-    .filter((line) => !line.startsWith('#'))
-    .join('\n')
-  const records: string[][] = []
-  let field = ''
-  let record: string[] = []
-  let quoted = false
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]!
-    if (quoted) {
-      if (c === '"' && text[i + 1] === '"') field += text[++i]
-      else if (c === '"') quoted = false
-      else field += c
-    } else if (c === '"') quoted = true
-    else if (c === ',') {
-      record.push(field)
-      field = ''
-    } else if (c === '\n') {
-      records.push([...record, field])
-      record = []
-      field = ''
-    } else field += c
-  }
-  if (field || record.length) records.push([...record, field])
-  const [header, ...body] = records
-  return new Map(
-    body.map((cells) => {
-      const row = Object.fromEntries(header!.map((name, k) => [name, cells[k] ?? '']))
-      return [row.id!, row]
-    }),
-  )
-}
-
-/** How Microsoft's pages and the proposal columns spell a chord. */
-function spelling(chord: string): RegExp {
-  const named: Record<string, RegExp> = {
-    Enter: /\b(Enter|Return)\b/i,
-    PageDown: /Page ?down/i,
-    PageUp: /Page ?up/i,
-    Space: /Space(bar)?/i,
-    Backspace: /Backspace|\bDelete\b/i,
-    Escape: /\bEsc\b/i,
-    Minus: /Hyphen/i,
-    Period: /Period/i,
-    Comma: /Comma/i,
-    'Cmd+Period': /(⌘|Cmd)\+Period/i,
-  }
-  if (named[chord]) return named[chord]!
-  const letter = /^(Shift\+)?([A-Z])$/.exec(chord)
-  if (letter) return new RegExp(`(^|[^A-Za-z+])${letter[1] ? 'Shift\\+' : ''}${letter[2]}\\b`)
-  return new RegExp(`\\b${chord}\\b`, 'i')
-}
 
 describe('single show keys (slides table, slideshow context)', () => {
   // The chords' spelling against the CSV rows is the package's table lock (tables.test.ts).

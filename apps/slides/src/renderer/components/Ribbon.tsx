@@ -28,6 +28,7 @@ import { restoreEditSelection } from '../TextEditOverlay'
 import { armColorInput, toPickerHex } from '../color-input'
 import { nextPreset, prevPreset } from '../zoom-steps'
 import { TABLE_SHADING_COLORS } from './table-shading-colors'
+import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n, type StringKey } from '../i18n/locale'
 import {
   IconSlideMaster,
@@ -126,7 +127,7 @@ import { RibbonTabScroller } from './RibbonTabScroller'
 import { ShapeGalleryContent } from './ShapeGalleryPopover'
 import { autoContextTabForElement, contextTabForElement, type ContextTab } from './context-tabs'
 import { cap, isViewOnly, isWeb } from '../capabilities'
-import { slidesHint, slidesTipKbd } from '../shortcuts'
+import { shortcutPlatform, shortcutSurface, slidesHint, slidesTipKbd } from '../shortcuts'
 
 /** Electron on macOS: file commands live in the native menu bar, traffic lights sit in the tab row */
 const IS_MAC = navigator.platform.toLowerCase().includes('mac') && !isWeb()
@@ -1435,10 +1436,18 @@ export function Ribbon({
   // Expanded/collapsed widths are cached per group so the required width is
   // computable in every state (before the first fold the collapsed width is
   // an estimate, corrected by measurement as soon as the group first folds).
-  const collapse = useRibbonCollapse('ai-slides-ribbon-collapsed', {
-    collapse: t('ribbonCollapse'),
-    expand: t('ribbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'ai-slides-ribbon-collapsed',
+    {
+      collapse: t('ribbonCollapse'),
+      expand: t('ribbonExpand'),
+    },
+    {
+      action: findShortcut('common', 'common-10'),
+      surface: shortcutSurface(),
+      platform: shortcutPlatform(),
+    },
+  )
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const inlineWidthsRef = useRef(new Map<string, number>())
   const collapsedWidthsRef = useRef(new Map<string, number>())
