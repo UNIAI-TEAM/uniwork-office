@@ -2809,6 +2809,50 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     await flush()
   })
 
+  it('Recent and Shared by me: Move never starts at the folder browsed before them (UNI-1961 FS2-1)', async () => {
+    const orphan = {
+      id: 'doc-flat',
+      workspaceId: 'ws-1',
+      title: 'Không thư mục cha.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T08:00:00.000Z',
+      kind: 'file',
+      visibility: 'restricted',
+      myLevel: 'manage',
+      canManage: true,
+    } satisfies DocumentsHomeDoc
+    api.uniworkListChildren!.mockImplementation(async (q: { parentId: string | null }) =>
+      ok({ items: q.parentId === 'f-board' ? [] : rootItems, nextCursor: null }),
+    )
+    api.uniworkListDocuments!.mockImplementation(async () =>
+      ok({ documents: [orphan], nextCursor: null }),
+    )
+    api.uniworkListSharedByMe!.mockImplementation(async () =>
+      ok({ documents: [orphan], nextCursor: null }),
+    )
+    await mountHome()
+
+    // browse a folder first: its id stays in state while the other views show
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>(
+          '.dh-folder-card[data-folder-id="f-board"] .dh-folder-open',
+        )!
+        .click()
+    })
+    await flush()
+
+    for (const view of ['recent', 'shared-by-me']) {
+      await clickNavItem(view)
+      expect(host.querySelector('.dh-doc-row[data-doc-id="doc-flat"]')).not.toBeNull()
+      expect(await openMovePickerFor('doc-flat')).toBe('Đường dẫn: Tài liệu (gốc)')
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+      })
+      await flush()
+    }
+  })
+
   it('Shared by me lists no folder row, even when the server still sends one from an older share (UNI-1974)', async () => {
     const file = {
       id: 'doc-out',
