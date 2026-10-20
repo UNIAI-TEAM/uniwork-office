@@ -987,7 +987,7 @@ export function App() {
       // Fetch the layout list asynchronously (doesn't block opening)
       void window.slidesApi.getLayouts().then((r) => setLayoutsResult(r))
     },
-    [fitZoom],
+    [],
   )
 
   const setSelectedId = useCallback((id: string | null, additive = false) => {
