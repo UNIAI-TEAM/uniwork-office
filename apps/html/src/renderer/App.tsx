@@ -154,9 +154,11 @@ export default function App() {
   const [autoSave, setAutoSave] = useAutoSavePref('htmlapp.autoSave', window.htmlApi)
   // a UniWork copy never autosaves; a view-only one refuses every edit
   const [uniwork, setUniwork] = useState<UniworkViewState>({ bound: false, readOnly: false })
-  // the answer for the open path has arrived: the preview frame waits for it, so a source view
-  // never loads (and runs) the page in a scripts-on sandbox first
-  const [uniworkKnown, setUniworkKnown] = useState(false)
+  // the path whose UniWork answer has arrived. The preview frame waits for it, so a source view
+  // never loads (and runs) the page in a scripts-on sandbox first. Derived from the path, not a
+  // flag reset in an effect: a flag would still read "known" in the very commit that sets the
+  // path, so the frame would load the real document, drop back to about:blank and load it again.
+  const [uniworkAnsweredPath, setUniworkAnsweredPath] = useState<string | null>(null)
   const uniworkRef = useRef(uniwork)
   uniworkRef.current = uniwork
   const [findTarget, setFindTarget] = useState<FindTarget | null>(null)
@@ -287,6 +289,8 @@ export default function App() {
   const visualEdit = cap('htmlVisualEdit') && !uniwork.readOnly
   // a source view (read-only AND locked) never runs the page's own scripts
   const previewScriptsOff = uniwork.readOnly && uniwork.locked === true
+  // an untitled document has no UniWork binding to wait for
+  const uniworkKnown = path === null || uniworkAnsweredPath === path
 
   const getMap = useCallback((): ParseMap => {
     const cached = mapRef.current
@@ -1584,10 +1588,8 @@ export default function App() {
     let live = true
     if (!path) {
       setUniwork({ bound: false, readOnly: false })
-      setUniworkKnown(true)
       return
     }
-    setUniworkKnown(false)
     // the browser harness may not expose the method: a missing or failed answer is a plain local file
     const query = () => {
       void Promise.resolve(window.htmlApi.uniworkState?.())
@@ -1598,13 +1600,13 @@ export default function App() {
             readOnly: state?.readOnly === true,
             locked: state?.locked === true,
           })
-          setUniworkKnown(true)
+          setUniworkAnsweredPath(path)
         })
         .catch((err) => {
           console.warn('[html] UniWork state query failed:', err)
           if (!live) return
           setUniwork({ bound: false, readOnly: false })
-          setUniworkKnown(true)
+          setUniworkAnsweredPath(path)
         })
     }
     query()
