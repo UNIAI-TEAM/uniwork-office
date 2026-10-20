@@ -1003,8 +1003,6 @@ function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = 
   }
   if (detail.file.versionId && next.baseVersion === detail.file.version) {
     next.baseVersionId = detail.file.versionId
-  } else if (next.baseVersion !== detail.file.version) {
-    delete next.baseVersionId
   }
   return next
 }
