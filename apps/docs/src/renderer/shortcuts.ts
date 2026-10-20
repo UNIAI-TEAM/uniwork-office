@@ -196,9 +196,28 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   },
 
   // ---- View ----
-  { id: 'zoom-in', group: 'view', labelKey: 'ribbonZoomIn', action: 'docs-082' },
-  { id: 'zoom-out', group: 'view', labelKey: 'ribbonZoomOut', action: 'docs-083' },
-  { id: 'zoom-100', group: 'view', labelKey: 'ribbonZoom100Tip', action: 'docs-084' },
+  // web: the browser zooms the page with these keys and the frame does not intercept them
+  {
+    id: 'zoom-in',
+    group: 'view',
+    labelKey: 'ribbonZoomIn',
+    action: 'docs-082',
+    desktopOnly: true,
+  },
+  {
+    id: 'zoom-out',
+    group: 'view',
+    labelKey: 'ribbonZoomOut',
+    action: 'docs-083',
+    desktopOnly: true,
+  },
+  {
+    id: 'zoom-100',
+    group: 'view',
+    labelKey: 'ribbonZoom100Tip',
+    action: 'docs-084',
+    desktopOnly: true,
+  },
   { id: 'formatting-marks', group: 'view', labelKey: 'ribbonShowMarks', action: 'docs-042' },
   { id: 'ribbon-toggle', group: 'view', labelKey: 'ribbonCollapse', action: 'docs-086' },
   { id: 'ribbon-compact', group: 'view', labelKey: 'ribbonCompact', action: 'docs-087' },
@@ -257,6 +276,28 @@ export function shortcutHint(
   if (def.native)
     return def.native[platform][0] ? formatChord(def.native[platform][0], platform) : ''
   return def.action ? formatHint(docsShortcut(def.action), platform, surface) : ''
+}
+
+/** A tooltip's label with the command's primary key appended: `Redo (Ctrl+Y)`; the bare label without one. */
+export function shortcutTip(
+  label: string,
+  id: string,
+  platform: ShortcutPlatform = SHORTCUT_PLATFORM,
+  surface: ShortcutSurface = shortcutSurface(),
+): string {
+  const hint = shortcutHint(id, platform, surface)
+  return hint ? `${label} (${hint})` : label
+}
+
+/**
+ * Runs a command that exists only where the host grants it, and says whether
+ * the key was consumed: a key the command did not act on must reach the
+ * browser (F12 opens DevTools when Save As is withheld).
+ */
+export function consumeWhen(available: boolean, act: () => void): boolean {
+  if (!available) return false
+  act()
+  return true
 }
 
 /**

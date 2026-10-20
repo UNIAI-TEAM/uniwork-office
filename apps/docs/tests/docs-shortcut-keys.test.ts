@@ -14,9 +14,11 @@ import {
 } from '@genoffice/shortcuts'
 import {
   SHORTCUTS,
+  consumeWhen,
   createShortcutMatcher,
   shortcutChords,
   shortcutHint,
+  shortcutTip,
 } from '../src/renderer/shortcuts'
 import { docsMenuAccelerator } from '../src/shared/docs-shortcuts'
 
@@ -199,6 +201,28 @@ describe('Word keys per platform and surface', () => {
   })
 })
 
+describe('Open in the web frame (docs-003)', () => {
+  it('Ctrl+O / Cmd+O open the file on every platform and surface', () => {
+    for (const [platform, surface] of CASES) {
+      const chord: Chord = platform === 'win' ? 'Ctrl+O' : 'Cmd+O'
+      expect(match(keydown(chord), platform, surface), `${platform} ${surface}`).toBe('open')
+    }
+  })
+})
+
+describe('F12 pass-through', () => {
+  it('a gated command swallows its key only when it ran', () => {
+    let ran = 0
+    const act = () => {
+      ran += 1
+    }
+    expect(consumeWhen(false, act)).toBe(false)
+    expect(ran).toBe(0)
+    expect(consumeWhen(true, act)).toBe(true)
+    expect(ran).toBe(1)
+  })
+})
+
 describe('guards', () => {
   it('IME composition fires nothing', () => {
     expect(match(keydown('Ctrl+S', { isComposing: true }), 'win', 'desktop')).toBeNull()
@@ -242,5 +266,11 @@ describe('menus and hints', () => {
     expect(shortcutHint('bullets', 'win', 'web')).toBe('Ctrl+.')
     expect(shortcutHint('new', 'win', 'web')).toBe('')
     expect(shortcutHint('link', 'mac', 'desktop')).toBe('⌘K')
+  })
+
+  it('quick-access tips append the primary key', () => {
+    expect(shortcutTip('Redo', 'redo', 'win', 'desktop')).toBe('Redo (Ctrl+Y)')
+    expect(shortcutTip('Redo', 'redo', 'mac', 'web')).toBe('Redo (⌘Y)')
+    expect(shortcutTip('New', 'new', 'win', 'web')).toBe('New')
   })
 })

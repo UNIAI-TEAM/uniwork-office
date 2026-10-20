@@ -27,7 +27,12 @@ export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin({
-        exclude: ['@genoffice/docx-engine', '@genoffice/electron-utils', '@genoffice/font-metrics'],
+        exclude: [
+          '@genoffice/docx-engine',
+          '@genoffice/electron-utils',
+          '@genoffice/font-metrics',
+          '@genoffice/shortcuts',
+        ],
       }),
     ],
     resolve: { alias: localAlias },

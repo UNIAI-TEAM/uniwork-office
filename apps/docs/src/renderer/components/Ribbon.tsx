@@ -711,6 +711,12 @@ function keepDocumentFocus(e: ReactMouseEvent<HTMLDivElement>) {
   if (target.closest('button')) e.preventDefault()
 }
 
+/** a File-menu row's key hint, read from the shortcut table (nothing when the command has no key here) */
+function FileMenuKey({ command }: { command: string }) {
+  const keys = shortcutHint(command)
+  return keys ? <span className="file-menu-key">{keys}</span> : null
+}
+
 function RibbonInner({
   actionsRef,
   quickActions,
@@ -2077,7 +2083,7 @@ function RibbonInner({
                       onOpen()
                     }}
                   >
-                    {t('ribbonOpen')} <span className="file-menu-key">Ctrl+O</span>
+                    {t('ribbonOpen')} <FileMenuKey command="open" />
                   </button>
                 )}
                 {cap('save') && (
@@ -2088,7 +2094,7 @@ function RibbonInner({
                       onSave()
                     }}
                   >
-                    {t('ribbonSave')} <span className="file-menu-key">Ctrl+S</span>
+                    {t('ribbonSave')} <FileMenuKey command="save" />
                   </button>
                 )}
                 {cap('saveAs') && (
@@ -2099,7 +2105,7 @@ function RibbonInner({
                       onSaveAs()
                     }}
                   >
-                    {t('ribbonSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                    {t('ribbonSaveAs')} <FileMenuKey command="save-as" />
                   </button>
                 )}
                 {saveCopyAvailable() && onSaveCopy && (
@@ -2132,7 +2138,7 @@ function RibbonInner({
                       onPrint()
                     }}
                   >
-                    {t('appFilePrint')} <span className="file-menu-key">Ctrl+P</span>
+                    {t('appFilePrint')} <FileMenuKey command="print" />
                   </button>
                 )}
               </div>

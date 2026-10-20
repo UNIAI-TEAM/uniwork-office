@@ -341,7 +341,7 @@ import {
 import { TablePropertiesDialog } from './components/TablePropertiesDialog'
 import { showToast, toastStatusLine } from './components/toast-bus'
 import { isNoDocumentPrintKey } from './print-shortcut'
-import { createShortcutMatcher, shortcutHint } from './shortcuts'
+import { consumeWhen, createShortcutMatcher, shortcutHint, shortcutTip } from './shortcuts'
 import { setTableAutoFit, toggleRepeatHeaderRows } from './editor/table-properties'
 import { distributeSelectedColumns } from './editor/table-sizing'
 import {
@@ -5628,10 +5628,8 @@ export function App() {
           if (cap('save')) void save(false)
           return true
         },
-        'save-as': () => {
-          if (cap('saveAs')) void save(true)
-          return true
-        },
+        // F12 is DevTools in the web frame: swallowed only where Save As exists
+        'save-as': () => consumeWhen(cap('saveAs'), () => void save(true)),
         open: () => {
           if (cap('open')) void openFile()
           return true
@@ -7065,8 +7063,8 @@ export function App() {
         )}
         <button
           className="qa-btn"
-          data-tip={t('appUndo')}
-          aria-label={t('appUndo')}
+          data-tip={shortcutTip(t('appUndo'), 'undo')}
+          aria-label={shortcutTip(t('appUndo'), 'undo')}
           disabled={!hasDoc || !histState.canUndo}
           onClick={() => editor?.chain().focus().undo().run()}
         >
@@ -7074,8 +7072,8 @@ export function App() {
         </button>
         <button
           className="qa-btn"
-          data-tip={t('appRedo')}
-          aria-label={t('appRedo')}
+          data-tip={shortcutTip(t('appRedo'), 'redo')}
+          aria-label={shortcutTip(t('appRedo'), 'redo')}
           disabled={!hasDoc || !histState.canRedo}
           onClick={() => editor?.chain().focus().redo().run()}
         >

@@ -98,6 +98,21 @@ describe('shortcut registry', () => {
     expect(visibleShortcuts('mac', 'desktop').some((def) => def.id === 'strike')).toBe(true)
   })
 
+  it('leaves the zoom keys out of the web sheet: the browser zooms the page', () => {
+    const web = new Set(visibleShortcuts('win', 'web').map((def) => def.id))
+    for (const id of ['zoom-in', 'zoom-out', 'zoom-100']) expect(web.has(id), id).toBe(false)
+    const desktop = new Set(visibleShortcuts('win', 'desktop').map((def) => def.id))
+    for (const id of ['zoom-in', 'zoom-out', 'zoom-100']) expect(desktop.has(id), id).toBe(true)
+  })
+
+  it('writes no file-menu key hint by hand', () => {
+    for (const file of ['components/Ribbon.tsx', 'App.tsx']) {
+      const source = readFileSync(join(__dirname, '../src/renderer', file), 'utf8')
+      const hand = source.match(/file-menu-key">[^{<]*[A-Za-z⌘⇧⌥][^<]*</g) ?? []
+      expect(hand, file).toEqual([])
+    }
+  })
+
   it('lists every menu accelerator', () => {
     const listed = new Set(SHORTCUTS.map((def) => def.action))
     for (const [item, id] of Object.entries(DOCS_MENU_SHORTCUTS))

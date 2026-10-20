@@ -1298,6 +1298,16 @@ export const docsNotes: readonly ShortcutNote[] = [
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
 const manual: readonly ShortcutAction[] = [
+  // Open: the web frame keeps Word's Ctrl+O / Cmd+O too (no `web` key: web = desktop). The App
+  // handler runs it only where the host grants an Open action, else the browser's dialog stays
+  {
+    id: 'docs-003',
+    scope: 'docs',
+    win: ['Ctrl+O'],
+    mac: ['Cmd+O'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
   // Save As: Word's F12 / Shift+Cmd+S. Ctrl+Shift+S leaves it: Word binds it to Apply Styles
   // (docs-059, not bound yet).
   // Web: the same keys (DESKTOP-FALLBACK), F12 only while the frame has focus
