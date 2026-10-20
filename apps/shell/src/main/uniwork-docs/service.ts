@@ -1266,6 +1266,12 @@ export class UniworkDocsService {
    */
   private readonly selfRenamed = new Map<string, string>()
   /**
+   * UNI-1961 (R4-1): per-document generation advanced on each successful own
+   * shelve/unshelve transition so a metadata GET begun beforehand cannot
+   * overwrite the local transition with a stale shelved answer.
+   */
+  private readonly localPolicyGen = new Map<string, number>()
+  /**
    * UNI-1959: documents this app created blank from the menu / strip / default
    * name (`createDocument`) and has not had a first save for yet; their first
    * user save asks name + folder. Keyed by account + document
@@ -6698,26 +6704,38 @@ export class UniworkDocsService {
       if (!doc || doc.binding.documentId !== id || !this.store.exists(doc.path)) continue
       if (shelved) await this.stopEditLock(doc.path, true)
       if (!this.sessionLive(session)) return
-      const fresh = await this.coordinator.updateBinding(doc, (latest) => {
-        const preservedLevel = latest.level ?? (latest.access === 'edit' ? 'edit' : undefined)
-        const next: Binding = {
-          ...latest,
-          ...(preservedLevel ? { level: preservedLevel } : {}),
-        }
-        if (shelved) {
-          next.shelved = true
-          next.access = 'view'
-        } else {
-          delete next.shelved
-          next.access = accessFor(next.level ?? null)
-        }
-        return next
-      })
+      const prevGen = this.localPolicyGen.get(id) ?? 0
+      let advancedGen = false
+      let fresh: BoundDocument | null
+      try {
+        fresh = await this.coordinator.updateBinding(doc, (latest) => {
+          const preservedLevel = latest.level ?? (latest.access === 'edit' ? 'edit' : undefined)
+          const next: Binding = {
+            ...latest,
+            ...(preservedLevel ? { level: preservedLevel } : {}),
+          }
+          if (shelved) {
+            next.shelved = true
+            next.access = 'view'
+          } else {
+            delete next.shelved
+            next.access = accessFor(next.level ?? null)
+          }
+          this.localPolicyGen.set(id, prevGen + 1)
+          advancedGen = true
+          return next
+        })
+      } catch (error) {
+        if (advancedGen) this.localPolicyGen.set(id, prevGen)
+        throw error
+      }
       if (fresh) {
         this.notifyDocStateChanged(fresh.path)
         if (!shelved && fresh.binding.access === 'edit' && this.deps.isPathOpen(fresh.path)) {
           this.startEditLock(fresh)
         }
+      } else if (advancedGen) {
+        this.localPolicyGen.set(id, prevGen)
       }
     }
   }
@@ -6923,6 +6941,7 @@ export class UniworkDocsService {
     const local = join(dir, existing.filename)
     if (!this.store.exists(local)) return
     if (this.coordinator.isSaving(local)) return
+    const policyGen = this.localPolicyGen.get(documentId) ?? 0
     let detail: DocumentDetail
     try {
       detail = await this.api().getDocument(documentId)
@@ -6954,11 +6973,12 @@ export class UniworkDocsService {
     const doc = this.store.lookup(latestLocal)
     if (!doc || !this.store.exists(doc.path)) return
     let after: BoundDocument | null = doc
-    if (detail.shelvedAt) {
+    if (detail.shelvedAt && (this.localPolicyGen.get(documentId) ?? 0) === policyGen) {
       await this.stopEditLock(doc.path, true)
       let policyChanged = false
       try {
         const refreshed = await this.coordinator.updateBinding(doc, (cur) => {
+          if ((this.localPolicyGen.get(documentId) ?? 0) !== policyGen) return null
           if (cur.state === 'blocked') return null
           if (cur.shelved && cur.access === 'view') return null
           policyChanged = true
