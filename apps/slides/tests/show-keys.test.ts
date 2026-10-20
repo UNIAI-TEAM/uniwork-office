@@ -5,16 +5,23 @@ import {
   pushVisited,
   reduceAudienceNav,
   reduceShowKey,
+  showNavKey,
   toggleScreen,
   type ShowKeyState,
 } from '../src/renderer/show-keys'
+
+/** A plain keydown (no modifier unless given) as the reducer reads it */
+function ev(key: string, init: Partial<KeyboardEventInit> = {}): KeyboardEvent {
+  const code = /^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : ''
+  return new KeyboardEvent('keydown', { key, code, ...init })
+}
 
 /** Feed keys in sequence, returning the final state + the action of the last key */
 function run(keys: string[], start: ShowKeyState = INITIAL_SHOW_KEYS) {
   let state = start
   let last: ReturnType<typeof reduceShowKey> = null
   for (const k of keys) {
-    last = reduceShowKey(state, k)
+    last = reduceShowKey(state, ev(k))
     if (last) state = last.state
   }
   return { state, action: last?.action ?? null }
@@ -31,8 +38,56 @@ describe('slide show keys', () => {
     expect(run(['Home']).action).toEqual({ type: 'first' })
     expect(run(['End']).action).toEqual({ type: 'last' })
     expect(run(['Escape']).action).toEqual({ type: 'exit' })
-    expect(reduceShowKey(INITIAL_SHOW_KEYS, 'x')).toBeNull()
-    expect(reduceShowKey(INITIAL_SHOW_KEYS, 'F5')).toBeNull()
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('x'))).toBeNull()
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('F5'))).toBeNull()
+  })
+
+  it('N / P and Backspace (the Mac Delete key) page like PowerPoint', () => {
+    expect(run(['n']).action).toEqual({ type: 'next' })
+    expect(run(['N']).action).toEqual({ type: 'next' })
+    expect(run(['p']).action).toEqual({ type: 'prev' })
+    expect(run(['Backspace']).action).toEqual({ type: 'prev' })
+  })
+
+  it('reads letters by the physical key on a non-Latin layout', () => {
+    // Russian layout: the N key types "т", the B key "и"
+    const next = reduceShowKey(INITIAL_SHOW_KEYS, ev('т', { code: 'KeyN' }))
+    expect(next?.action).toEqual({ type: 'next' })
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('и', { code: 'KeyB' }))?.state.screen).toBe('black')
+  })
+
+  it('Ctrl+H on Windows, Cmd+I on the Mac hide the pointer (table slideshow row)', () => {
+    const pointer = { type: 'pointer' }
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('h', { ctrlKey: true }))?.action).toEqual(pointer)
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('i', { metaKey: true }), 'mac')?.action).toEqual(
+      pointer,
+    )
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('h', { ctrlKey: true }), 'mac')).toBeNull()
+  })
+
+  it('leaves Ctrl / Cmd / Alt chords alone instead of reading them as show keys', () => {
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('ArrowRight', { ctrlKey: true }))).toBeNull()
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('b', { metaKey: true }), 'mac')).toBeNull()
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('n', { altKey: true }))).toBeNull()
+    // PowerPoint for Mac lists Shift+B / Shift+W
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('B', { shiftKey: true }))?.state.screen).toBe(
+      'black',
+    )
+  })
+
+  it('fires nothing while an IME is composing', () => {
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('Enter', { isComposing: true }))).toBeNull()
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('Enter', { keyCode: 229 }))).toBeNull()
+  })
+
+  it('showNavKey gives the audience window and reading view next / previous / end only', () => {
+    expect(showNavKey(ev('ArrowRight'))).toBe('next')
+    expect(showNavKey(ev('n'))).toBe('next')
+    expect(showNavKey(ev('PageUp'))).toBe('prev')
+    expect(showNavKey(ev('Escape'))).toBe('exit')
+    expect(showNavKey(ev('b'))).toBeNull()
+    expect(showNavKey(ev('Home'))).toBeNull()
+    expect(showNavKey(ev('3'))).toBeNull()
   })
 
   it('B and . toggle black, W and , toggle white', () => {

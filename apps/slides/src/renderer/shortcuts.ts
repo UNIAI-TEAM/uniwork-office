@@ -15,9 +15,6 @@ import {
 import { slidesShortcut } from '../shared/slides-shortcuts'
 import { isWeb } from './capabilities'
 
-/** Slide-show keys (`context: 'slideshow'` rows): they never shadow editing keys. */
-export const SLIDESHOW_CONTEXT = 'slideshow'
-
 /** `win` or `mac` from a `navigator.platform` string (tests pass their own). */
 export function shortcutPlatform(platform: string = navigator.platform): ShortcutPlatform {
   return /mac/i.test(platform) ? 'mac' : 'win'

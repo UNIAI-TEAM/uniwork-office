@@ -1,7 +1,20 @@
 /**
  * Pure key handling for slide shows (PowerPoint keyset): navigation keys, B / . and W / ,
  * blackout toggles, digits + Enter go-to. No React/DOM dependency so the mapping is unit-testable.
+ *
+ * Modifier chords come from the @genoffice/shortcuts slides table's `slideshow` rows
+ * (UNI-2011), so they never shadow the editor's keys: Ctrl+H / Cmd+I hide the pointer.
+ * The single keys below (N, P, arrows, B, W, Esc...) are printed by PowerPoint without a
+ * modifier, which the table's CSV tracing cannot read yet; they stay listed here.
  */
+import {
+  isComposingEvent,
+  matchShortcut,
+  slidesShortcuts,
+  type ShortcutKeyEvent,
+  type ShortcutPlatform,
+  type ShortcutSurface,
+} from '@genoffice/shortcuts'
 
 export type ShowScreen = 'none' | 'black' | 'white'
 
@@ -13,6 +26,9 @@ export interface ShowKeyState {
 
 export const INITIAL_SHOW_KEYS: ShowKeyState = { screen: 'none', digits: '' }
 
+/** The table's context for slide-show rows: they never shadow the editor's keys. */
+export const SLIDESHOW_CONTEXT = 'slideshow'
+
 export type ShowKeyAction =
   | { type: 'exit' }
   | { type: 'next' }
@@ -21,38 +37,64 @@ export type ShowKeyAction =
   | { type: 'last' }
   /** 1-based slide number as printed in the deck */
   | { type: 'goto'; slideNumber: number }
+  /** Hide / show the mouse pointer and the navigation buttons (Ctrl+H / Cmd+I) */
+  | { type: 'pointer' }
   /** Key consumed without navigating (digit buffered, buffer cleared, screen toggled or restored) */
   | { type: 'none' }
 
 const NONE: ShowKeyAction = { type: 'none' }
 
 const NAV_KEYS: Record<string, 'next' | 'prev' | 'first' | 'last'> = {
+  n: 'next',
   ArrowRight: 'next',
   ArrowDown: 'next',
   ' ': 'next',
   Enter: 'next',
   PageDown: 'next',
+  p: 'prev',
   ArrowLeft: 'prev',
   ArrowUp: 'prev',
   PageUp: 'prev',
+  // the Mac Delete key arrives as Backspace
+  Backspace: 'prev',
   Home: 'first',
   End: 'last',
 }
 
 const SCREEN_KEYS: Record<string, ShowScreen> = {
   b: 'black',
-  B: 'black',
   '.': 'black',
   w: 'white',
-  W: 'white',
   ',': 'white',
 }
 
-/** Maps a keydown to the next state + action; null = not a show key (leave the event alone) */
+/** The key as the tables above spell it: letters lower-case, read from the physical key
+ * when the layout types no Latin letter (Cyrillic, Greek...). */
+function showKeyName(e: ShortcutKeyEvent): string {
+  if (e.key.length !== 1) return e.key
+  const letter = e.key.toLowerCase()
+  if (/^[a-z]$/.test(letter)) return letter
+  const physical = /^Key([A-Z])$/.exec(e.code)
+  return physical ? physical[1]!.toLowerCase() : e.key
+}
+
+/**
+ * Maps a keydown to the next state + action; null = not a show key (leave the event alone).
+ * `platform` / `surface` pick the table's chords (PowerPoint for Mac's on macOS, the web
+ * column in the web frame).
+ */
 export function reduceShowKey(
   state: ShowKeyState,
-  key: string,
+  e: ShortcutKeyEvent,
+  platform: ShortcutPlatform = 'win',
+  surface: ShortcutSurface = 'desktop',
 ): { state: ShowKeyState; action: ShowKeyAction } | null {
+  if (isComposingEvent(e)) return null
+  const row = matchShortcut(e, slidesShortcuts, platform, surface, SLIDESHOW_CONTEXT)
+  if (row?.id === 'slides-32') return { state, action: { type: 'pointer' } }
+  // the single show keys never carry Ctrl / Cmd / Alt (Shift+B / Shift+W still black out)
+  if (e.ctrlKey || e.metaKey || e.altKey) return null
+  const key = showKeyName(e)
   if (key === 'Escape') {
     if (state.digits) return { state: { ...state, digits: '' }, action: NONE }
     return { state, action: { type: 'exit' } }
@@ -73,6 +115,15 @@ export function reduceShowKey(
   const nav = NAV_KEYS[key]
   if (!nav) return null
   return { state: { ...state, digits: '' }, action: { type: nav } }
+}
+
+/**
+ * Next / previous / end for views that only page through slides (the presenter's
+ * audience window, the reading view): the show's own keys, nothing else.
+ */
+export function showNavKey(e: ShortcutKeyEvent): 'next' | 'prev' | 'exit' | null {
+  const type = reduceShowKey(INITIAL_SHOW_KEYS, e)?.action.type
+  return type === 'next' || type === 'prev' || type === 'exit' ? type : null
 }
 
 /** Toggle a blackout screen (menu / toolbar path): same screen again restores the slide */

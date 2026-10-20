@@ -183,6 +183,7 @@ import * as arrangeActions from './arrange-actions'
 import * as tableActions from './table-actions'
 import * as styleActions from './style-actions'
 import { handleGlobalKeydown, slideRailHasFocus } from './keyboard-actions'
+import { showNavKey } from './show-keys'
 import { clickSelection, currentAfterHistory, normalizeSelection } from '../shared/slide-selection'
 import {
   notesBaselineAfterFlush,
@@ -2274,21 +2275,17 @@ export function App() {
         )
       )
         return
-      if (e.key === 'Escape') {
+      // the slide show's next / previous / end keys (show-keys.ts)
+      const nav = showNavKey(e)
+      if (nav === 'exit') {
         if (!uniworkRef.current.readOnly) {
           e.preventDefault()
           setViewMode('normal')
         }
-      } else if (
-        e.key === 'ArrowRight' ||
-        e.key === 'ArrowDown' ||
-        e.key === ' ' ||
-        e.key === 'PageDown' ||
-        e.key === 'Enter'
-      ) {
+      } else if (nav === 'next') {
         e.preventDefault()
         setCurrent((c) => Math.min(c + 1, slides.length - 1))
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+      } else if (nav === 'prev') {
         e.preventDefault()
         setCurrent((c) => Math.max(c - 1, 0))
       }
