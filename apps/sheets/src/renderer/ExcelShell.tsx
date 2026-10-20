@@ -69,6 +69,7 @@ import {
   RIBBON_CURRENCY_SYMBOL,
 } from './excel-format-shortcuts'
 import { isModalOpen, resolveGlobalShortcut } from './global-shortcuts'
+import { findShortcut } from '@genoffice/shortcuts'
 import { clipboardHint, sheetsHint, sheetsKeyTarget, withKeyHint } from './sheets-keymap'
 import { stepFontSize } from './font-size-ladder'
 
@@ -201,6 +202,8 @@ const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab'
 const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 /// which column of the shortcut table this renderer answers to (platform, desktop or web frame)
 const SHORTCUT_TARGET = sheetsKeyTarget()
+/** Ribbon collapse key: the shared common-10 row */
+const RIBBON_COLLAPSE_ACTION = findShortcut('common', 'common-10')
 
 /// Univer's formula bar keeps its expanded state in React component state
 /// with no command behind it; the fold arrow is the only way in.
@@ -571,10 +574,18 @@ export function ExcelShell({
   const viewOnly = isViewOnly() || aiViewOnly
   const [activeTab, setActiveTab] = useState<RibbonTab>(() => (viewOnly ? 'View' : 'Home'))
   const effectiveTab: RibbonTab = viewOnly ? 'View' : activeTab
-  const collapse = useRibbonCollapse('ai-sheets-ribbon-collapsed', {
-    collapse: t('appRibbonCollapse'),
-    expand: t('appRibbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'ai-sheets-ribbon-collapsed',
+    {
+      collapse: t('appRibbonCollapse'),
+      expand: t('appRibbonExpand'),
+    },
+    {
+      ...(RIBBON_COLLAPSE_ACTION ? { action: RIBBON_COLLAPSE_ACTION } : {}),
+      surface: SHORTCUT_TARGET.surface,
+      platform: SHORTCUT_TARGET.platform,
+    },
+  )
   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
   // A narrow viewport starts with the dock collapsed (it would squeeze the grid to a sliver); that
   // automatic collapse is not the user's choice, so it is not remembered.
