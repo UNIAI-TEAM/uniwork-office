@@ -193,4 +193,13 @@ export const ms = {
   uwLockLostHeldBy:
     '{name} sedang menyunting sekarang. Perubahan anda yang belum disimpan masih di sini.',
   uwLockAcquireFailed: 'Tidak dapat memperoleh akses penyuntingan. Cuba lagi dalam beberapa minit.',
+  uwChipSourceView: 'Paparan sahaja · Dari {origin}',
+  uwTipSourceView:
+    'Fail ini dilampirkan dalam {origin}{parent}. Perubahan tidak akan disimpan. Untuk mendapatkan salinan, gunakan Muat turun dalam senarai Dokumen.',
+  uwSourceViewSaveHint: 'Fail ini untuk paparan sahaja — perubahan tidak disimpan.',
+  uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Muat turun dalam senarai Dokumen.',
+  uwSourceOriginChat: 'Sembang',
+  uwSourceOriginTask: 'Tugasan',
+  uwSourceOriginMeeting: 'Mesyuarat',
+  uwSourceOriginEmail: 'E-mel',
 } satisfies Record<keyof typeof zh, string>

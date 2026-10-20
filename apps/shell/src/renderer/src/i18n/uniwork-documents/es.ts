@@ -193,4 +193,13 @@ export const es = {
   uwLockLostHeldBy: '{name} está editando ahora. Tus cambios sin guardar siguen aquí.',
   uwLockAcquireFailed:
     'No se pudo obtener el acceso de edición. Inténtalo de nuevo en unos minutos.',
+  uwChipSourceView: 'Solo lectura · De {origin}',
+  uwTipSourceView:
+    'Este archivo está adjunto en {origin}{parent}. Los cambios no se guardarán. Para obtener una copia, usa Descargar en la lista de documentos.',
+  uwSourceViewSaveHint: 'Este archivo es de solo lectura — los cambios no se guardan.',
+  uwSourceViewCopyHint: 'Para obtener una copia, usa Descargar en la lista de documentos.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tareas',
+  uwSourceOriginMeeting: 'Reuniones',
+  uwSourceOriginEmail: 'Correo',
 } satisfies Record<keyof typeof zh, string>

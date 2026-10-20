@@ -125,6 +125,16 @@ export const ms = {
   uhSourceDownloaded: '{name} dimuat turun',
   uhSourceShowInFolder: 'Tunjukkan dalam folder',
   uhSourceDownloadFailed: 'Tidak dapat memuat turun fail. Cuba lagi.',
+  uhSourceOpen: 'Buka (lihat sahaja)',
+  uhSourceOpening: 'Membuka {name}…',
+  uhSourceOpenFailed: 'Tidak dapat membuka fail. Cuba lagi.',
+  uhSourceOpenGone:
+    'Tidak dapat membuka fail: fail telah dipadam atau anda tidak lagi mempunyai akses.',
+  uhSourceOpenOffline:
+    'Tidak dapat membuka fail kerana UniWork tidak dapat dicapai. Semak sambungan anda dan cuba lagi.',
+  uhSourceOpenTooLarge:
+    'Fail ini terlalu besar untuk dibuka dalam aplikasi. Muat turun sebaliknya.',
+  uhSourceOpenRetry: 'Cuba lagi',
   uhColSize: 'Saiz',
   uhGroupBy: 'Kumpulkan mengikut',
   uhGroupByFolder: 'Folder',

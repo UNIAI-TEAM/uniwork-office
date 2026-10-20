@@ -128,6 +128,15 @@ export const hi = {
   uhSourceDownloaded: '{name} डाउनलोड हो गया',
   uhSourceShowInFolder: 'फ़ोल्डर में दिखाएँ',
   uhSourceDownloadFailed: 'फ़ाइल डाउनलोड नहीं हो सकी। फिर से कोशिश करें।',
+  uhSourceOpen: 'खोलें (केवल देखें)',
+  uhSourceOpening: '{name} खोला जा रहा है…',
+  uhSourceOpenFailed: 'फ़ाइल नहीं खुल सकी। फिर से कोशिश करें।',
+  uhSourceOpenGone:
+    'फ़ाइल नहीं खुल सकी: उसे हटा दिया गया है या अब आपके पास उसे देखने की अनुमति नहीं है।',
+  uhSourceOpenOffline:
+    'फ़ाइल नहीं खुल सकी क्योंकि UniWork से कनेक्ट नहीं हो पा रहा। अपना कनेक्शन जाँचें और फिर से कोशिश करें।',
+  uhSourceOpenTooLarge: 'यह फ़ाइल ऐप में खोलने के लिए बहुत बड़ी है। इसके बजाय डाउनलोड करें।',
+  uhSourceOpenRetry: 'फिर से कोशिश करें',
   uhColSize: 'आकार',
   uhGroupBy: 'समूह बनाएँ',
   uhGroupByFolder: 'फ़ोल्डर',

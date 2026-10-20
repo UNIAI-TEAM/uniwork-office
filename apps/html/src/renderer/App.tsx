@@ -104,6 +104,8 @@ const inTextField = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   !!target.closest('.cm-editor, input, textarea, [contenteditable=""], [contenteditable="true"]')
 const PREVIEW_DEBOUNCE_MS = 150
+/** the shortcuts a frame in view mode may still relay on a read-only copy */
+const READ_ONLY_FRAME_KEYS = new Set(['print', 'zoomIn', 'zoomOut', 'zoomReset', 'escape'])
 const DEFAULT_ENVELOPE: Envelope = { bom: false, eol: '\n', trailingNewline: true }
 /** live style pokes are written to the source as one set_style op this long after the last change */
 const STYLE_COMMIT_MS = 600
@@ -152,6 +154,11 @@ export default function App() {
   const [autoSave, setAutoSave] = useAutoSavePref('htmlapp.autoSave', window.htmlApi)
   // a UniWork copy never autosaves; a view-only one refuses every edit
   const [uniwork, setUniwork] = useState<UniworkViewState>({ bound: false, readOnly: false })
+  // the path whose UniWork answer has arrived. The preview frame waits for it, so a source view
+  // never loads (and runs) the page in a scripts-on sandbox first. Derived from the path, not a
+  // flag reset in an effect: a flag would still read "known" in the very commit that sets the
+  // path, so the frame would load the real document, drop back to about:blank and load it again.
+  const [uniworkAnsweredPath, setUniworkAnsweredPath] = useState<string | null>(null)
   const uniworkRef = useRef(uniwork)
   uniworkRef.current = uniwork
   const [findTarget, setFindTarget] = useState<FindTarget | null>(null)
@@ -278,7 +285,12 @@ export default function App() {
   // both previews (the web bundle's preview.html and the desktop html-preview:// document) block
   // fetch/XHR and nested frames, so a page using them gets one note
   const previewLimited = useMemo(() => usesBlockedPreviewFeatures(text), [text])
-  const visualEdit = cap('htmlVisualEdit')
+  // a view-only UniWork copy has no element editing: no selection chrome, toolbar or style panel
+  const visualEdit = cap('htmlVisualEdit') && !uniwork.readOnly
+  // a view-only copy (shared view-only or a source view) never runs the page's own scripts
+  const previewScriptsOff = uniwork.readOnly
+  // an untitled document has no UniWork binding to wait for
+  const uniworkKnown = path === null || uniworkAnsweredPath === path
 
   const getMap = useCallback((): ParseMap => {
     const cached = mapRef.current
@@ -400,15 +412,17 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('htmlapp.viewMode', view)
   }, [view])
-  const frameMode = (mode: CanvasMode) => (mode === 'edit' ? 'inspect' : 'browse')
+  const frameMode = (mode: CanvasMode) =>
+    mode !== 'edit' ? 'browse' : uniworkRef.current.readOnly ? 'view' : 'inspect'
   const prevCanvasModeRef = useRef(canvasMode)
   useEffect(() => {
     // a presentation lets links navigate the frame; coming back reloads the instrumented document
     if (prevCanvasModeRef.current === 'present' && canvasMode !== 'present')
       setPreviewNonce((n) => n + 1)
     prevCanvasModeRef.current = canvasMode
+    // the lock ping flips readOnly while the frame stays loaded, so it re-posts the mode too
     previewRef.current?.post({ type: 'gx:setMode', mode: frameMode(canvasMode) })
-  }, [canvasMode])
+  }, [canvasMode, uniwork.readOnly])
 
   useEffect(() => {
     rememberAiPanelOpen('htmlapp.showAi', aiOpen)
@@ -725,6 +739,19 @@ export default function App() {
     (msg: FromInspector) => {
       // a click that lands while the frame is reloading carries sids from the previous copy
       if (!frameVersionsRef.current.has(msg.version)) return
+      // a view-only copy: the frame is in view mode, and a page script can forge anything, so only
+      // readiness, scroll, zoom, blocked links and the few shortcuts the host owns get through
+      if (
+        uniworkRef.current.readOnly &&
+        !(
+          msg.type === 'gx:ready' ||
+          msg.type === 'gx:scroll' ||
+          msg.type === 'gx:zoom' ||
+          msg.type === 'gx:navigateBlocked' ||
+          (msg.type === 'gx:keyCommand' && READ_ONLY_FRAME_KEYS.has(msg.command))
+        )
+      )
+        return
       switch (msg.type) {
         case 'gx:ready': {
           previewRef.current?.post({ type: 'gx:theme', dark: isDarkTheme() })
@@ -1567,11 +1594,19 @@ export default function App() {
     const query = () => {
       void Promise.resolve(window.htmlApi.uniworkState?.())
         .then((state) => {
-          if (live) setUniwork({ bound: state?.bound === true, readOnly: state?.readOnly === true })
+          if (!live) return
+          setUniwork({
+            bound: state?.bound === true,
+            readOnly: state?.readOnly === true,
+            locked: state?.locked === true,
+          })
+          setUniworkAnsweredPath(path)
         })
         .catch((err) => {
           console.warn('[html] UniWork state query failed:', err)
-          if (live) setUniwork({ bound: false, readOnly: false })
+          if (!live) return
+          setUniwork({ bound: false, readOnly: false })
+          setUniworkAnsweredPath(path)
         })
     }
     query()
@@ -1826,7 +1861,8 @@ export default function App() {
                 {previewLimited && canvasMode === 'edit' && <PreviewLimitNote />}
                 <PreviewFrame
                   ref={previewRef}
-                  url={previewUrl}
+                  url={uniworkKnown ? previewUrl : null}
+                  scriptsOff={previewScriptsOff}
                   nonce={previewNonce}
                   zoom={zoom}
                   onMessage={onInspectorMessage}

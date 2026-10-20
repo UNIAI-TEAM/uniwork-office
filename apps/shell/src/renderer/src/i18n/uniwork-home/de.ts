@@ -127,6 +127,16 @@ export const de = {
   uhSourceDownloaded: '{name} heruntergeladen',
   uhSourceShowInFolder: 'Im Ordner anzeigen',
   uhSourceDownloadFailed: 'Die Datei konnte nicht heruntergeladen werden. Versuchen Sie es erneut.',
+  uhSourceOpen: 'Öffnen (nur Ansicht)',
+  uhSourceOpening: '{name} wird geöffnet…',
+  uhSourceOpenFailed: 'Die Datei konnte nicht geöffnet werden. Versuchen Sie es erneut.',
+  uhSourceOpenGone:
+    'Die Datei konnte nicht geöffnet werden: Sie wurde gelöscht oder Sie haben keinen Zugriff mehr.',
+  uhSourceOpenOffline:
+    'Die Datei konnte nicht geöffnet werden, weil UniWork nicht erreichbar ist. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  uhSourceOpenTooLarge:
+    'Diese Datei ist zu groß, um in der App geöffnet zu werden. Laden Sie sie stattdessen herunter.',
+  uhSourceOpenRetry: 'Erneut versuchen',
   uhColSize: 'Größe',
   uhGroupBy: 'Gruppieren nach',
   uhGroupByFolder: 'Ordner',

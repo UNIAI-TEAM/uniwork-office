@@ -181,4 +181,13 @@ export const zh = {
   uwLockLostGeneric: '你不再拥有编辑权限。你未保存的更改仍在这里。',
   uwLockLostHeldBy: '{name} 正在编辑。你未保存的更改仍在这里。',
   uwLockAcquireFailed: '暂时无法获取编辑权限。请几分钟后再试。',
+  uwChipSourceView: '仅查看 · 来自{origin}',
+  uwTipSourceView:
+    '这是{origin}{parent}中的附件。更改不会被保存。如需副本，请在文档列表中使用“下载”。',
+  uwSourceViewSaveHint: '此文件仅供查看 — 更改不会被保存。',
+  uwSourceViewCopyHint: '如需副本，请在文档列表中使用“下载”。',
+  uwSourceOriginChat: '聊天',
+  uwSourceOriginTask: '任务',
+  uwSourceOriginMeeting: '会议',
+  uwSourceOriginEmail: '邮件',
 }

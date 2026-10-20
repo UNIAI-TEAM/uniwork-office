@@ -189,7 +189,14 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
       }),
     ]
     sources = [
-      source({ id: 'src-1', name: 'Biên bản họp.docx', updatedAt: '2026-10-19T08:00:00.000Z' }),
+      // UNI-1993: a row the server does not let the app open view-only keeps the web's
+      // fallback (Download); the openable rows are pinned in uniwork-documents-source-open-ui.test.ts
+      source({
+        id: 'src-1',
+        name: 'Biên bản họp.docx',
+        updatedAt: '2026-10-19T08:00:00.000Z',
+        canOpenInApp: false,
+      }),
       source({
         id: 'src-2',
         name: 'Hợp đồng.pdf',

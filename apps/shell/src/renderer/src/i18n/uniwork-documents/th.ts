@@ -192,4 +192,13 @@ export const th = {
   uwLockLostHeldBy:
     '{name} กำลังแก้ไขอยู่ในขณะนี้ การเปลี่ยนแปลงที่ยังไม่บันทึกของคุณยังอยู่ที่นี่',
   uwLockAcquireFailed: 'ไม่สามารถรับสิทธิ์แก้ไขได้ ลองอีกครั้งในอีกไม่กี่นาที',
+  uwChipSourceView: 'ดูได้อย่างเดียว · จาก{origin}',
+  uwTipSourceView:
+    'ไฟล์นี้แนบอยู่ใน{origin}{parent} การเปลี่ยนแปลงจะไม่ถูกบันทึก หากต้องการสำเนา ให้ใช้ดาวน์โหลดในรายการเอกสาร',
+  uwSourceViewSaveHint: 'ไฟล์นี้ดูได้อย่างเดียว — การเปลี่ยนแปลงจะไม่ถูกบันทึก',
+  uwSourceViewCopyHint: 'หากต้องการสำเนา ให้ใช้ดาวน์โหลดในรายการเอกสาร',
+  uwSourceOriginChat: 'แชต',
+  uwSourceOriginTask: 'งาน',
+  uwSourceOriginMeeting: 'การประชุม',
+  uwSourceOriginEmail: 'อีเมล',
 } satisfies Record<keyof typeof zh, string>

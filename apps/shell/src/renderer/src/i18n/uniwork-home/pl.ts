@@ -126,6 +126,16 @@ export const pl = {
   uhSourceDownloaded: 'Pobrano {name}',
   uhSourceShowInFolder: 'Pokaż w folderze',
   uhSourceDownloadFailed: 'Nie udało się pobrać pliku. Spróbuj ponownie.',
+  uhSourceOpen: 'Otwórz (tylko do odczytu)',
+  uhSourceOpening: 'Otwieranie pliku {name}…',
+  uhSourceOpenFailed: 'Nie udało się otworzyć pliku. Spróbuj ponownie.',
+  uhSourceOpenGone:
+    'Nie udało się otworzyć pliku: został usunięty lub nie masz już do niego dostępu.',
+  uhSourceOpenOffline:
+    'Nie udało się otworzyć pliku, bo nie można połączyć się z UniWork. Sprawdź połączenie i spróbuj ponownie.',
+  uhSourceOpenTooLarge:
+    'Ten plik jest zbyt duży, aby otworzyć go w aplikacji. Pobierz go zamiast tego.',
+  uhSourceOpenRetry: 'Spróbuj ponownie',
   uhColSize: 'Rozmiar',
   uhGroupBy: 'Grupuj według',
   uhGroupByFolder: 'Folder',

@@ -182,4 +182,13 @@ export const zhTW = {
   uwLockLostGeneric: '您不再擁有編輯權限。您未儲存的變更仍在這裡。',
   uwLockLostHeldBy: '{name} 正在編輯。您未儲存的變更仍在這裡。',
   uwLockAcquireFailed: '暫時無法取得編輯權限。請幾分鐘後再試。',
+  uwChipSourceView: '僅供檢視 · 來自{origin}',
+  uwTipSourceView:
+    '這是{origin}{parent}中的附件。變更不會被儲存。如需副本，請在文件清單中使用「下載」。',
+  uwSourceViewSaveHint: '此檔案僅供檢視 — 變更不會被儲存。',
+  uwSourceViewCopyHint: '如需副本，請在文件清單中使用「下載」。',
+  uwSourceOriginChat: '聊天',
+  uwSourceOriginTask: '工作',
+  uwSourceOriginMeeting: '會議',
+  uwSourceOriginEmail: '電子郵件',
 } satisfies Record<keyof typeof zh, string>

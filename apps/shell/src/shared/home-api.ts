@@ -21,6 +21,23 @@ import type {
   UniworkConflictReply,
   UniworkConflictView,
 } from './uniwork-conflict'
+import type {
+  OpenSourceInput,
+  OpenSourceValue,
+  SourceViewHint,
+  SourceViewResult,
+  SourceViewState,
+} from './source-view'
+
+export { SOURCE_VIEW_CHANNELS } from './source-view'
+export type {
+  OpenSourceInput,
+  OpenSourceValue,
+  SourceViewErrorCode,
+  SourceViewHint,
+  SourceViewResult,
+  SourceViewState,
+} from './source-view'
 
 export type {
   UniworkConflictAction,
@@ -1358,6 +1375,12 @@ export interface HomeApi {
   uniworkDownloadSource(
     input: UniworkSourceDownloadInput,
   ): Promise<UniworkResult<{ path: string | null }>>
+  /** UNI-1993: open a source row's file as a view-only tab (no document, no sync) */
+  uniworkOpenSource(input: OpenSourceInput): Promise<SourceViewResult<OpenSourceValue>>
+  /** UNI-1993: the tab chip's state of a path; null unless the path is a view-only source */
+  uniworkSourceViewState(path: string): Promise<SourceViewState | null>
+  /** UNI-1993: an explicit Save hit a view-only source path (the "view only" hint) */
+  onUniworkSourceViewHint(cb: (payload: SourceViewHint) => void): () => void
   /** the document properties panel (S17); nulls where the server sends no value */
   uniworkDocumentProperties(documentId: string): Promise<UniworkResult<UniworkDocProperties>>
   /** S18: create a blank document (docx/xlsx/pptx) in a workspace/folder */

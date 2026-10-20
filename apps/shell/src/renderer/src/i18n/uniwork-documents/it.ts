@@ -191,4 +191,13 @@ export const it = {
   uwLockLostGeneric: 'Non stai più modificando. Le tue modifiche non salvate sono ancora qui.',
   uwLockLostHeldBy: '{name} sta modificando ora. Le tue modifiche non salvate sono ancora qui.',
   uwLockAcquireFailed: 'Impossibile ottenere l’accesso in modifica. Riprova tra qualche minuto.',
+  uwChipSourceView: 'Sola lettura · Da {origin}',
+  uwTipSourceView:
+    'Questo file è allegato in {origin}{parent}. Le modifiche non verranno salvate. Per averne una copia, usa Scarica nell’elenco dei documenti.',
+  uwSourceViewSaveHint: 'Questo file è in sola lettura — le modifiche non vengono salvate.',
+  uwSourceViewCopyHint: 'Per averne una copia, usa Scarica nell’elenco dei documenti.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Attività',
+  uwSourceOriginMeeting: 'Riunioni',
+  uwSourceOriginEmail: 'Email',
 } satisfies Record<keyof typeof zh, string>

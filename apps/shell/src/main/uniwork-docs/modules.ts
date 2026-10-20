@@ -26,6 +26,7 @@ import {
   setSlidesUserSaveHook,
   setUniworkDocumentPolicy as setSlidesUniworkPolicy,
 } from '../../../../slides/src/main/slides-main'
+import { withSourceViews, type SourceViewBinding } from './source-view'
 
 export { clearDocsRecoveryCopy, clearWorkbookRecovery }
 
@@ -39,6 +40,11 @@ export interface UniworkModuleSeam {
    * (older tests) reads as not locked.
    */
   isLocked?(path: string): boolean
+  /**
+   * `isLocked` without side effects (the html state query asks it on every open). Optional:
+   * a seam without it is asked through `isLocked`.
+   */
+  peekLocked?(path: string): boolean
   /**
    * G5-11: consumes a one-shot capture request for `path` so a main-triggered
    * save writes the working copy to disk without firing the user-save hook.
@@ -141,11 +147,23 @@ export function watchCommentAuthorChanges(deps: {
  * document, else the neutral constant. null restores genoffice behaviour
  * everywhere (the modules then fall back to the same neutral constant, never
  * to the OS account).
+ *
+ * UNI-1993: `sourceViews` merges the view-only source paths into the seam, so
+ * every module reads a source file as bound, read-only and locked. Absent = the
+ * seam is the service's, unchanged.
  */
 export function installUniworkModuleSeams(
-  seam: UniworkModuleSeam | null,
+  serviceSeam: UniworkModuleSeam | null,
   commentAuthor: CommentAuthorResolver | null = null,
+  sourceViews: SourceViewBinding | null = null,
 ): void {
+  const seam =
+    serviceSeam && sourceViews
+      ? withSourceViews(serviceSeam, sourceViews.registry, {
+          onSourceSave: sourceViews.onSourceSave,
+          onSourceLocked: sourceViews.onSourceLocked,
+        })
+      : serviceSeam
   seam?.setClearRecovery?.((path: string) => {
     clearDocsRecoveryCopy(path)
     clearWorkbookRecovery(path)
@@ -160,6 +178,7 @@ export function installUniworkModuleSeams(
         // G5-03a: an S6 lock (revoked / deleted while open) refuses export,
         // Save As and print-to-PDF in every module
         isLocked: (path: string) => seam.isLocked?.(path) === true,
+        peekLocked: (path: string) => (seam.peekLocked ?? seam.isLocked)?.call(seam, path) === true,
         consumeCapture: (path: string) => seam.consumeCapture?.(path) === true,
         refuseOpen: (path: string) => seam.refuseLockedPath(path),
         commentAuthor: (path: string) => author(path),
