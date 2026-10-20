@@ -50,6 +50,7 @@ export {
   FindPanel,
   type FindFocusRequest,
   type FindPanelStrings,
+  stepFindMatch,
   type FindTarget,
 } from './find-panel'
 export { findInText, foldCase, isWordChar, type FindOptions } from './find-text'
