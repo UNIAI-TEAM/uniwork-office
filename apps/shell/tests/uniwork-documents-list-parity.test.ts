@@ -213,6 +213,7 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
         ok({ path: 'C:\\Users\\me\\Downloads\\Biên bản họp.docx' }),
       ),
       revealPath: vi.fn(async () => undefined),
+      uniworkShelveDocument: vi.fn(async () => ok({})),
       uniworkListDocuments: vi.fn(async () => ok({ documents: [rootItems[1]!], nextCursor: null })),
       uniworkListSharedWithMe: vi.fn(async () => ok({ documents: [], nextCursor: null })),
       uniworkListSharedByMe: vi.fn(async () => ok({ documents: [], nextCursor: null })),
@@ -325,6 +326,26 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
     expect(document.querySelector('.uw-act-toast')?.textContent).toContain(
       'Không thể tải file xuống. Thử lại.',
     )
+  })
+
+  it('a source row never offers Lưu trữ (no manage level), while a managed document row does (UNI-1961)', async () => {
+    rootItems[1] = { ...rootItems[1]!, canManage: true, myLevel: 'manage' }
+    await renderHome()
+    const menuLabels = async (selector: string): Promise<(string | undefined)[]> => {
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>(`${selector} .dh-cell-actions button`)!.click()
+      })
+      const labels = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map(
+        (el) => el.textContent?.trim(),
+      )
+      await act(async () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      })
+      return labels
+    }
+    expect(await menuLabels('.dh-doc-row[data-source-id="src-1"]')).toEqual(['Tải xuống'])
+    expect(await menuLabels('.dh-doc-row[data-doc-id="doc-1"]')).toContain('Lưu trữ')
+    expect(api.uniworkShelveDocument).not.toHaveBeenCalled()
   })
 
   it('lists no sources inside a folder or in Recent, and a failing sources call leaves the documents', async () => {
