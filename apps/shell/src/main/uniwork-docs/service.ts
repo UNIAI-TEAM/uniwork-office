@@ -6759,16 +6759,23 @@ export class UniworkDocsService {
       const { bytes } = await this.api().downloadSource(input.workspaceId, input.sourceId)
       if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
       const resolvedTarget = resolve(target)
-      const tmp = join(
-        dirname(resolvedTarget),
-        `.${basename(resolvedTarget)}.${randomBytes(8).toString('hex')}.tmp`,
-      )
+      const tmp = join(dirname(resolvedTarget), `.uw-dl-${randomBytes(8).toString('hex')}.tmp`)
+      let createdTmp = false
       try {
-        await writeFile(tmp, bytes, { flag: 'wx' })
+        const existingStat = await lstat(resolvedTarget).catch(() => null)
+        const targetMode = existingStat?.isFile() ? existingStat.mode & 0o777 : 0o600
+        const handle = await open(tmp, 'wx', 0o600)
+        createdTmp = true
+        try {
+          await handle.writeFile(bytes)
+          await handle.chmod(targetMode)
+        } finally {
+          await handle.close()
+        }
         if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
         await rename(tmp, resolvedTarget)
       } catch (error) {
-        await unlink(tmp).catch(() => undefined)
+        if (createdTmp) await unlink(tmp).catch(() => undefined)
         throw error
       }
       return { path: target }
