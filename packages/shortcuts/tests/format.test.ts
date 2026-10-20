@@ -72,6 +72,14 @@ describe('toElectronAccelerator', () => {
     expect(chordToElectronAccelerator('Alt+Shift+Up', 'win')).toBe('Alt+Shift+Up')
   })
 
+  it('writes the keypad zoom keys and bare keys', () => {
+    expect(chordToElectronAccelerator('Ctrl+NumpadAdd', 'win')).toBe('Ctrl+numadd')
+    expect(chordToElectronAccelerator('Cmd+NumpadSubtract', 'mac')).toBe('Command+numsub')
+    expect(chordToElectronAccelerator('Ctrl+Numpad0', 'win')).toBe('Ctrl+num0')
+    expect(chordToElectronAccelerator('Space', 'win')).toBe('Space')
+    expect(chordToElectronAccelerator('B', 'mac')).toBe('B')
+  })
+
   it('refuses chords Electron or the platform cannot express', () => {
     expect(chordToElectronAccelerator('Cmd+S', 'win')).toBeNull()
     expect(chordToElectronAccelerator('Shift+ContextMenu', 'win')).toBeNull()
@@ -85,6 +93,9 @@ describe('formatChord / formatHint', () => {
     expect(formatChord('Ctrl+Alt+Minus', 'win')).toBe('Ctrl+Alt+-')
     expect(formatChord('Ctrl+PageDown', 'win')).toBe('Ctrl+PgDn')
     expect(formatChord('Escape', 'win')).toBe('Esc')
+    expect(formatChord('Ctrl+NumpadAdd', 'win')).toBe('Ctrl+Num +')
+    expect(formatChord('Ctrl+Numpad0', 'win')).toBe('Ctrl+Num 0')
+    expect(formatChord('Period', 'win')).toBe('.')
   })
 
   it('macOS: Apple glyph order ⌃⌥⇧⌘', () => {
@@ -94,6 +105,7 @@ describe('formatChord / formatHint', () => {
     expect(formatChord('Ctrl+Alt+Shift+Cmd+G', 'mac')).toBe('⌃⌥⇧⌘G')
     expect(formatChord('Shift+Cmd+Enter', 'mac')).toBe('⇧⌘↩')
     expect(formatChord('Alt+Right', 'mac')).toBe('⌥→')
+    expect(formatChord('Cmd+NumpadSubtract', 'mac')).toBe('⌘Num -')
   })
 
   it('empty when the action has no chord on the platform', () => {

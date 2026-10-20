@@ -8,6 +8,9 @@ const WIN_KEY_NAMES: Readonly<Record<string, string>> = {
   PageUp: 'PgUp',
   PageDown: 'PgDn',
   ContextMenu: 'Menu',
+  NumpadAdd: 'Num +',
+  NumpadSubtract: 'Num -',
+  Numpad0: 'Num 0',
 }
 
 const MAC_KEY_NAMES: Readonly<Record<string, string>> = {
@@ -25,6 +28,9 @@ const MAC_KEY_NAMES: Readonly<Record<string, string>> = {
   Down: '↓',
   Left: '←',
   Right: '→',
+  NumpadAdd: 'Num +',
+  NumpadSubtract: 'Num -',
+  Numpad0: 'Num 0',
 }
 
 function displayKey(key: string, platform: ShortcutPlatform): string {

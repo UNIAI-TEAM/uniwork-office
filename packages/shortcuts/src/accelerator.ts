@@ -1,11 +1,19 @@
 import { keyKind, parseChord, PUNCTUATION_KEYS, type ParsedChord } from './chord'
 import type { Chord, ShortcutAction, ShortcutPlatform } from './types'
 
+/** Keypad chord keys → Electron's names for them. */
+const NUMPAD_KEYS: Readonly<Record<string, string>> = {
+  NumpadAdd: 'numadd',
+  NumpadSubtract: 'numsub',
+  Numpad0: 'num0',
+}
+
 /** Chord key → Electron key code. Letters, digits, F-keys and the named keys
  * already use Electron's names; punctuation is written as its character. */
 function electronKey(key: string): string | null {
   const kind = keyKind(key)
   if (kind === 'punctuation') return PUNCTUATION_KEYS[key] ?? null
+  if (key in NUMPAD_KEYS) return NUMPAD_KEYS[key] ?? null
   if (key === 'ContextMenu') return null // Electron has no accelerator for the menu key
   return kind ? key : null
 }

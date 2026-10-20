@@ -30,6 +30,10 @@ export const NAMED_KEYS: ReadonlySet<string> = new Set([
   'Left',
   'Right',
   'ContextMenu',
+  // Keypad keys, matched by position only (zoom aliases: Ctrl+NumpadAdd...).
+  'NumpadAdd',
+  'NumpadSubtract',
+  'Numpad0',
 ])
 
 /** Punctuation key (US-layout `KeyboardEvent.code`) → the unshifted character. */
@@ -45,6 +49,22 @@ export const PUNCTUATION_KEYS: Readonly<Record<string, string>> = {
   Period: '.',
   Slash: '/',
   Backslash: '\\',
+}
+
+/** Punctuation key → the US character it types with Shift. A `Shift+` chord on
+ * a punctuation key names this character (`Ctrl+Shift+Period` is Ctrl+">"). */
+export const SHIFTED_PUNCTUATION_KEYS: Readonly<Record<string, string>> = {
+  Minus: '_',
+  Equal: '+',
+  BracketLeft: '{',
+  BracketRight: '}',
+  Semicolon: ':',
+  Quote: '"',
+  Backquote: '~',
+  Comma: '<',
+  Period: '>',
+  Slash: '?',
+  Backslash: '|',
 }
 
 export function keyKind(key: string): KeyKind | null {

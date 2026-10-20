@@ -309,3 +309,8 @@ export const commonNotes: readonly ShortcutNote[] = [
 const manual: readonly ShortcutAction[] = []
 
 export const commonShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
+
+/** Why a manual row has no chord on a surface or platform, and remarks on manual rows:
+ * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */
+export const commonManualUnmapped: readonly UnmappedShortcut[] = []
+export const commonManualNotes: readonly ShortcutNote[] = []

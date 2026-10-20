@@ -625,6 +625,83 @@ function repeatable(label, chords) {
   )
 }
 
+/** A document zoom row: not wheel or pinch zoom, fit, or the shell's
+ * interface scale. */
+export function isZoomLabel(label) {
+  return /\bzoom\b/i.test(label) && !/wheel|scroll|pinch|fit|pointer|gesture|interface/i.test(label)
+}
+
+/**
+ * The chords a zoom chord also answers to (lead decision 3; Mod is Ctrl on
+ * Windows, Cmd on macOS): zoom in Mod+= also Mod+Shift+= (the "+" character,
+ * which German, Spanish and Italian type unshifted) and the keypad +; zoom out
+ * Mod+- the keypad -; reset Mod+0 the keypad 0.
+ */
+export function zoomAliases(chord, platform) {
+  const mod = platform === 'mac' ? 'Cmd' : 'Ctrl'
+  if (chord === `${mod}+Equal`) {
+    return [platform === 'mac' ? 'Shift+Cmd+Equal' : 'Ctrl+Shift+Equal', `${mod}+NumpadAdd`]
+  }
+  if (chord === `${mod}+Minus`) return [`${mod}+NumpadSubtract`]
+  if (chord === `${mod}+0`) return [`${mod}+Numpad0`]
+  return []
+}
+
+const SHIFT_EQUAL_RE = /^(Ctrl\+Shift|Shift\+Cmd)\+Equal$/
+
+/** An action's chord lists with the surfaces each one serves (no `web`: the
+ * desktop list serves both). */
+function chordLists(action) {
+  const out = []
+  for (const platform of ['win', 'mac']) {
+    const desktop = action.web ? ['desktop'] : ['desktop', 'web']
+    out.push({ platform, surfaces: desktop, list: action[platform] })
+    if (action.web) out.push({ platform, surfaces: ['web'], list: action.web[platform] })
+  }
+  return out
+}
+
+/**
+ * Adds `zoomAliases` to the zoom actions of one table, right after the chord
+ * they alias. An alias another action of the scope and context owns is left
+ * out, and so is the Shift alias wherever another action binds Ctrl+Shift+=
+ * or Shift+Cmd+= on any platform (docs superscript): there the exact chord
+ * wins.
+ */
+function addZoomAliases(actions) {
+  const owners = new Map()
+  const shiftTaken = new Set()
+  for (const action of actions) {
+    const context = action.context ?? ''
+    for (const { platform, surfaces, list } of chordLists(action)) {
+      const alt = surfaces.includes('web') ? action.webAlt?.[platform] : undefined
+      for (const chord of alt ? [...list, alt] : list) {
+        for (const surface of surfaces) {
+          owners.set(`${context}|${surface}|${platform}|${chord}`, action.id)
+        }
+        if (SHIFT_EQUAL_RE.test(chord) && !isZoomLabel(action.label)) shiftTaken.add(context)
+      }
+    }
+  }
+  for (const action of actions) {
+    if (!isZoomLabel(action.label)) continue
+    const context = action.context ?? ''
+    for (const { platform, surfaces, list } of chordLists(action)) {
+      for (const chord of [...list]) {
+        let at = list.indexOf(chord)
+        for (const alias of zoomAliases(chord, platform)) {
+          if (list.includes(alias)) continue
+          if (SHIFT_EQUAL_RE.test(alias) && shiftTaken.has(context)) continue
+          const slots = surfaces.map((surface) => `${context}|${surface}|${platform}|${alias}`)
+          if (slots.some((slot) => owners.has(slot) && owners.get(slot) !== action.id)) continue
+          for (const slot of slots) owners.set(slot, action.id)
+          list.splice(++at, 0, alias)
+        }
+      }
+    }
+  }
+}
+
 /** PowerPoint slide-show keys form their own keymap (MS lists them apart). */
 function contextOf(row) {
   return row.group === 'slides' && /^Show:/.test(row.action) ? 'slideshow' : undefined
@@ -744,11 +821,80 @@ export function buildTables(rows) {
     }
     table.actions.push(action)
   }
+  for (const module of MODULES) addZoomAliases(tables[module].actions)
   return tables
 }
 
+/** Named keys a row may print without a modifier, as the CSV writes them
+ * (capitalized or all caps, so prose such as "end the show" is not a key). */
+const BARE_WORDS = [
+  'Page down',
+  'Page Down',
+  'Page up',
+  'Page Up',
+  'PageDown',
+  'PageUp',
+  'PgDn',
+  'PgUp',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Up',
+  'Down',
+  'Left',
+  'Right',
+  'Spacebar',
+  'Space',
+  'Return',
+  'Enter',
+  'Escape',
+  'Esc',
+  'Tab',
+  'Backspace',
+  'Delete',
+  'Del',
+  'Insert',
+  'Home',
+  'End',
+  'Period',
+  'Comma',
+  'Hyphen',
+  'Minus',
+  'Semicolon',
+  'Apostrophe',
+  'Backslash',
+  'Slash',
+]
+const BARE_WORD_SRC = BARE_WORDS.flatMap((w) => [w, w.toUpperCase()])
+  .map((w) => w.replace(/ /g, '\\s'))
+  .join('|')
+const BARE_RE = new RegExp(
+  [
+    `(?<![A-Za-z0-9+])(?:${BARE_WORD_SRC}|${FKEY_SRC})(?:\\s+arrow(?:\\s+keys?)?)?(?![A-Za-z0-9])`,
+    // A lone capital letter ("N or Enter", "(H)").
+    "(?<![A-Za-z0-9+'])[A-Z](?![A-Za-z0-9+'])",
+    // A lone . , ; [ ] \ ` between spaces ("B or . = black"); "/" and "=" are
+    // separators in that prose, not keys.
+    '(?<=^|\\s)[.,;\\[\\]\\\\`](?=\\s|$)',
+  ].join('|'),
+  'g',
+)
+
+/** Keys a row prints with no modifier: slide-show, PDF navigation and dialog
+ * keys (lead decision 2). */
+function bareKeysIn(text) {
+  const keys = []
+  for (const m of text.matchAll(BARE_RE)) {
+    const { chord } = toChord(m[0].replace(/^Arrow/i, ''), null)
+    if (chord) keys.push(chord)
+  }
+  return keys
+}
+
 /** Every chord a row's Microsoft, proposal and current-binding columns print
- * for one platform (a superset check for the table locks). */
+ * for one platform, bare keys included, plus the zoom aliases of a zoom row
+ * (a superset check for the table locks). */
 export function chordsInRow(row, platform) {
   const out = new Set()
   for (const column of [
@@ -762,6 +908,10 @@ export function chordsInRow(row, platform) {
     const text = normalizeVerboseKeys(row[column] ?? '')
     for (const f of findChords(text, platform)) if (f.chord) out.add(f.chord)
     for (const chord of todayChords(text)[platform]) out.add(chord)
+    for (const key of bareKeysIn(text)) out.add(key)
+  }
+  if (isZoomLabel(row.action ?? '')) {
+    for (const chord of [...out]) for (const alias of zoomAliases(chord, platform)) out.add(alias)
   }
   return out
 }
@@ -893,7 +1043,19 @@ function freshFile(module, block) {
     '',
     `export const ${module}Shortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)`,
     '',
+    ...manualListsTail(module),
   ].join('\n')
+}
+
+/** The hand-maintained notes and unmapped entries at the end of a table file. */
+export function manualListsTail(module) {
+  return [
+    '/** Why a manual row has no chord on a surface or platform, and remarks on manual rows:',
+    ' * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */',
+    `export const ${module}ManualUnmapped: readonly UnmappedShortcut[] = []`,
+    `export const ${module}ManualNotes: readonly ShortcutNote[] = []`,
+    '',
+  ]
 }
 
 /** The full text of src/tables/<module>.ts, keeping what lies outside the markers. */

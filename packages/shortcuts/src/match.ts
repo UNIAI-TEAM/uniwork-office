@@ -1,4 +1,10 @@
-import { keyKind, parseChord, type ParsedChord } from './chord'
+import {
+  keyKind,
+  parseChord,
+  PUNCTUATION_KEYS,
+  SHIFTED_PUNCTUATION_KEYS,
+  type ParsedChord,
+} from './chord'
 import type {
   Chord,
   ShortcutAction,
@@ -67,43 +73,66 @@ export function isComposingEvent(event: ShortcutKeyEvent): boolean {
   return event.isComposing === true || event.keyCode === 229
 }
 
-function keyMatches(parsed: ParsedChord, event: ShortcutKeyEvent, match: ShortcutMatch): boolean {
+/** A key that types one printable ASCII character (not a dead key, not a
+ * non-Latin letter, not a macOS Option glyph). */
+function typesAscii(event: ShortcutKeyEvent): boolean {
+  return /^[!-~]$/.test(event.key)
+}
+
+/** The character a punctuation chord names: its key's US character, shifted
+ * when the chord holds Shift. */
+function punctuationChar(parsed: ParsedChord): string | undefined {
+  return (parsed.shift ? SHIFTED_PUNCTUATION_KEYS : PUNCTUATION_KEYS)[parsed.key]
+}
+
+/** True when the key matches and Shift must match too; see `ShortcutMatch`. */
+function keyMatches(
+  parsed: ParsedChord,
+  event: ShortcutKeyEvent,
+  match: ShortcutMatch,
+): { key: boolean; shift: boolean } {
   const { key } = parsed
+  const exact = (ok: boolean) => ({ key: ok, shift: true })
   switch (keyKind(key)) {
     case 'letter': {
       const code = `Key${key}`
-      if (match === 'code') return event.code === code
-      const typed = event.key.length === 1 ? event.key.toLowerCase() : ''
-      // Non-Latin layouts and macOS Option dead keys produce no a-z letter:
+      // Non-Latin layouts and macOS Option dead keys type no ASCII character:
       // fall back to the physical key so the chord still works.
-      if (!/^[a-z]$/.test(typed)) return event.code === code
-      return typed === key.toLowerCase()
+      if (match === 'code' || !typesAscii(event)) return exact(event.code === code)
+      return exact(event.key.toLowerCase() === key.toLowerCase())
     }
     case 'digit':
-      return event.code === `Digit${key}`
-    case 'punctuation':
-      return event.code === key
+      return exact(event.code === `Digit${key}`)
+    case 'punctuation': {
+      if (match === 'code' || !typesAscii(event)) return exact(event.code === key)
+      // By character: the layout decides whether it needs Shift.
+      if (event.code.startsWith('Numpad')) return exact(false)
+      return { key: event.key === punctuationChar(parsed), shift: false }
+    }
     case 'named': {
-      if (key === 'Space') return event.code === 'Space' || event.key === ' '
+      if (key === 'Space') return exact(event.code === 'Space' || event.key === ' ')
+      if (key.startsWith('Numpad')) return exact(event.code === key)
       const names = NAMED_EVENT_KEYS[key] ?? [key]
-      return names.includes(event.key) || (match === 'code' && event.code === key)
+      return exact(names.includes(event.key) || (match === 'code' && event.code === key))
     }
     default:
-      return false
+      return exact(false)
   }
 }
 
-/** Exact modifier match: every modifier of the chord is held, no other one is. */
+/** Every modifier of the chord is held and no other one is (Shift only when
+ * `shift` says the key comparison leaves it to the chord). */
 function modifiersMatch(
   parsed: ParsedChord,
   event: ShortcutKeyEvent,
   platform: ShortcutPlatform,
+  shift: boolean,
 ): boolean {
   if (platform === 'win' && parsed.cmd) return false
   return (
     event.ctrlKey === parsed.ctrl &&
     event.altKey === parsed.alt &&
-    event.shiftKey === parsed.shift &&
+    (!shift || event.shiftKey === parsed.shift) &&
     event.metaKey === parsed.cmd
   )
 }
@@ -127,7 +156,15 @@ export function matchChord(
       : event.ctrlKey && event.altKey
     if (altGraph) return false
   }
-  return modifiersMatch(parsed, event, platform) && keyMatches(parsed, event, match)
+  const keyed = keyMatches(parsed, event, match)
+  return keyed.key && modifiersMatch(parsed, event, platform, keyed.shift)
+}
+
+/** A chord compared by character on a punctuation key (it yields to a digit
+ * chord on the same keydown). */
+function isSymbolChord(chord: Chord, match: ShortcutMatch): boolean {
+  const parsed = parseChord(chord)
+  return match === 'key' && parsed !== null && keyKind(parsed.key) === 'punctuation'
 }
 
 /** The chords an action answers to on one platform and surface. */
@@ -144,7 +181,9 @@ export function chordsFor(
 
 /**
  * First action whose chord matches the event, or null. Table order breaks
- * ties. Only rows of `context` take part (rows without a context when it is
+ * ties, except that a punctuation chord matched by character yields to any
+ * other match (a digit chord on the key that typed it: French Ctrl+6 types
+ * "-"). Only rows of `context` take part (rows without a context when it is
  * omitted), so slide-show keys never shadow editing keys and vice versa.
  */
 export function matchShortcut(
@@ -155,14 +194,17 @@ export function matchShortcut(
   context?: string,
 ): ShortcutAction | null {
   if (isComposingEvent(event)) return null
+  let bySymbol: ShortcutAction | null = null
   for (const action of table) {
     if (action.context !== context) continue
     if (action.guard.noRepeat && event.repeat) continue
     for (const chord of chordsFor(action, platform, surface)) {
-      if (matchChord(chord, event, platform, action.match)) return action
+      if (!matchChord(chord, event, platform, action.match)) continue
+      if (!isSymbolChord(chord, action.match)) return action
+      bySymbol ??= action
     }
   }
-  return null
+  return bySymbol
 }
 
 /** Binds a table once; the returned function maps an event to its action. */

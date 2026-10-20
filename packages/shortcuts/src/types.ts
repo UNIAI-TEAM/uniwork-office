@@ -17,11 +17,14 @@ export type ShortcutSurface = 'desktop' | 'web'
  *
  * Keys: `A`-`Z`, `0`-`9`, `F1`-`F24`, the named keys `Enter`, `Escape`, `Tab`,
  * `Space`, `Backspace`, `Delete`, `Insert`, `Home`, `End`, `PageUp`,
- * `PageDown`, `Up`, `Down`, `Left`, `Right`, `ContextMenu`, and the
- * punctuation keys by their US-layout `KeyboardEvent.code` name: `Minus`,
- * `Equal`, `BracketLeft`, `BracketRight`, `Semicolon`, `Quote`, `Backquote`,
- * `Comma`, `Period`, `Slash`, `Backslash`. Example: `Ctrl+Shift+S`,
- * `Alt+Shift+Equal`, `Ctrl+Alt+Shift+Cmd+G`, `Shift+F4`.
+ * `PageDown`, `Up`, `Down`, `Left`, `Right`, `ContextMenu`, the keypad keys
+ * `NumpadAdd`, `NumpadSubtract`, `Numpad0`, and the punctuation keys by their
+ * US-layout `KeyboardEvent.code` name: `Minus`, `Equal`, `BracketLeft`,
+ * `BracketRight`, `Semicolon`, `Quote`, `Backquote`, `Comma`, `Period`,
+ * `Slash`, `Backslash`. A chord may be a bare key (`Space`, `B`, `Period`):
+ * slide-show, PDF navigation and dialog keys, kept apart by `context`.
+ * Example: `Ctrl+Shift+S`, `Alt+Shift+Equal`, `Ctrl+Alt+Shift+Cmd+G`,
+ * `Shift+F4`, `Ctrl+NumpadAdd`.
  */
 export type Chord = string
 
@@ -32,13 +35,21 @@ export interface PlatformChords {
 }
 
 /**
- * How letter keys are compared (rule 9 of the UNI-2011 contract):
- * - `key`: letters by `event.key`, case-insensitive (Caps Lock and Shift safe,
- *   follows the layout); when the layout produces no Latin letter (Cyrillic,
- *   macOS Option dead keys) the physical `KeyX` code is used instead. Digits
- *   and punctuation are always compared by `event.code`, named keys by
- *   `event.key`.
- * - `code`: every key by its physical `event.code`.
+ * How keys are compared (rule 9 of the UNI-2011 contract, as changed by lead
+ * decision 3 of S-table fix2):
+ * - `key`: letters and punctuation by `event.key`, so they follow the layout.
+ *   Letters are case-insensitive (Caps Lock safe), Shift exact. Punctuation
+ *   is compared by character: a chord names the US character of its key with
+ *   its Shift (`Ctrl+Shift+Period` is Ctrl+">", `Ctrl+Shift+Equal` is
+ *   Ctrl+"+"), and the event's Shift is not compared, since the layout decides
+ *   whether that character needs Shift (German "/" is Shift+7). When
+ *   `event.key` is not a printable ASCII character (dead key, Cyrillic,
+ *   German "ü", a macOS Option glyph) the physical `event.code` is used
+ *   instead, Shift exact. The keypad never stands in for a punctuation chord.
+ *   Digits are compared by `event.code` (Shift changes their character) and
+ *   win over a punctuation chord the same key types (French Ctrl+6 types
+ *   "-"). Named keys by `event.key`, keypad keys by `event.code`.
+ * - `code`: every key by its physical `event.code`, Shift exact.
  */
 export type ShortcutMatch = 'key' | 'code'
 

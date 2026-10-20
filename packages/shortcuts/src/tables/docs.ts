@@ -685,8 +685,8 @@ const generated: readonly ShortcutAction[] = [
   {
     id: 'docs-082',
     scope: 'docs',
-    win: ['Ctrl+Equal'],
-    mac: ['Cmd+Equal'],
+    win: ['Ctrl+Equal', 'Ctrl+NumpadAdd'],
+    mac: ['Cmd+Equal', 'Cmd+NumpadAdd'],
     match: 'key',
     guard: {},
   },
@@ -694,8 +694,8 @@ const generated: readonly ShortcutAction[] = [
   {
     id: 'docs-083',
     scope: 'docs',
-    win: ['Ctrl+Minus'],
-    mac: ['Cmd+Minus'],
+    win: ['Ctrl+Minus', 'Ctrl+NumpadSubtract'],
+    mac: ['Cmd+Minus', 'Cmd+NumpadSubtract'],
     match: 'key',
     guard: {},
   },
@@ -703,8 +703,8 @@ const generated: readonly ShortcutAction[] = [
   {
     id: 'docs-084',
     scope: 'docs',
-    win: ['Ctrl+0'],
-    mac: ['Cmd+0'],
+    win: ['Ctrl+0', 'Ctrl+Numpad0'],
+    mac: ['Cmd+0', 'Cmd+Numpad0'],
     match: 'key',
     guard: { noRepeat: true },
   },
@@ -1300,3 +1300,8 @@ export const docsNotes: readonly ShortcutNote[] = [
 const manual: readonly ShortcutAction[] = []
 
 export const docsShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
+
+/** Why a manual row has no chord on a surface or platform, and remarks on manual rows:
+ * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */
+export const docsManualUnmapped: readonly UnmappedShortcut[] = []
+export const docsManualNotes: readonly ShortcutNote[] = []

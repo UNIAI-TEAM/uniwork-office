@@ -742,3 +742,8 @@ export const slidesNotes: readonly ShortcutNote[] = [
 const manual: readonly ShortcutAction[] = []
 
 export const slidesShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
+
+/** Why a manual row has no chord on a surface or platform, and remarks on manual rows:
+ * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */
+export const slidesManualUnmapped: readonly UnmappedShortcut[] = []
+export const slidesManualNotes: readonly ShortcutNote[] = []

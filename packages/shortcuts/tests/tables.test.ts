@@ -6,10 +6,20 @@ import {
   MODULES,
   buildTables,
   chordsInRow,
+  isZoomLabel,
   parseCsv,
   renderTableFile,
   tablePath,
+  zoomAliases,
 } from '../scripts/gen-tables.mjs'
+import * as commonTable from '../src/tables/common'
+import * as docsTable from '../src/tables/docs'
+import * as htmlTable from '../src/tables/html'
+import * as markdownTable from '../src/tables/markdown'
+import * as pdfTable from '../src/tables/pdf'
+import * as sheetsTable from '../src/tables/sheets'
+import * as shellTable from '../src/tables/shell'
+import * as slidesTable from '../src/tables/slides'
 import {
   BROWSER_RESERVED,
   SHORTCUT_NOTES,
@@ -167,6 +177,62 @@ describe('table locks', () => {
     }
   })
 
+  it('zoom actions carry the keypad and Shift aliases (lead decision 3, RS-html-md M1)', () => {
+    const missing: string[] = []
+    for (const action of allActions) {
+      if (!isZoomLabel(csvById.get(action.id)?.action ?? '')) continue
+      for (const surface of SURFACES) {
+        for (const platform of PLATFORMS) {
+          const chords = chordsFor(action, platform, surface)
+          for (const chord of chords) {
+            for (const alias of zoomAliases(chord, platform) as string[]) {
+              if (chords.includes(alias)) continue
+              const elsewhere = SHORTCUT_TABLES[action.scope].some(
+                (other) =>
+                  other.id !== action.id &&
+                  (other.context ?? '') === (action.context ?? '') &&
+                  PLATFORMS.some((p) =>
+                    SURFACES.some((s) =>
+                      chordsFor(other, p, s).some((c) =>
+                        /^(Ctrl\+Shift|Shift\+Cmd)\+Equal$/.test(c),
+                      ),
+                    ),
+                  ),
+              )
+              // Where Ctrl+Shift+= is another action's key (docs superscript) the exact chord wins.
+              if (elsewhere && alias.includes('Shift+')) continue
+              missing.push(`${action.id} ${surface}.${platform}: ${alias}`)
+            }
+          }
+        }
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
+  it('manual notes and unmapped entries are merged into the scope lists (lead decision 1)', () => {
+    for (const scope of Object.keys(SHORTCUT_TABLES) as (keyof typeof SHORTCUT_TABLES)[]) {
+      const t = {
+        ...commonTable,
+        ...docsTable,
+        ...htmlTable,
+        ...markdownTable,
+        ...pdfTable,
+        ...sheetsTable,
+        ...shellTable,
+        ...slidesTable,
+      } as unknown as Record<string, readonly unknown[]>
+      expect(SHORTCUT_UNMAPPED[scope]).toEqual([
+        ...(t[`${scope}Unmapped`] ?? []),
+        ...(t[`${scope}ManualUnmapped`] ?? ['missing export']),
+      ])
+      expect(SHORTCUT_NOTES[scope]).toEqual([
+        ...(t[`${scope}Notes`] ?? []),
+        ...(t[`${scope}ManualNotes`] ?? ['missing export']),
+      ])
+    }
+  })
+
   it('maps the rows the contract calls out', () => {
     const find = (scope: keyof typeof SHORTCUT_TABLES, id: string) =>
       SHORTCUT_TABLES[scope].find((action) => action.id === id)
@@ -186,6 +252,91 @@ describe('generator', () => {
       const onDisk = readFileSync(tablePath(module), 'utf8')
       expect(renderTableFile(module, tables[module], onDisk)).toBe(onDisk)
     }
+  })
+
+  it('chordsInRow reads bare keys and F-keys the row prints (lead decision 2)', () => {
+    const inRow = (id: string, platform: ShortcutPlatform = 'win') =>
+      [...(chordsInRow(csvById.get(id), platform) as Set<string>)].sort()
+    expect(inRow('slides-25')).toEqual(
+      expect.arrayContaining(['N', 'Enter', 'PageDown', 'Right', 'Down', 'Space']),
+    )
+    expect(inRow('slides-26', 'mac')).toEqual(
+      expect.arrayContaining(['P', 'PageUp', 'Left', 'Up', 'Delete']),
+    )
+    expect(inRow('slides-29', 'mac')).toEqual(expect.arrayContaining(['Escape', 'Minus']))
+    expect(inRow('slides-30')).toEqual(expect.arrayContaining(['B', 'Period', 'W', 'Comma']))
+    expect(inRow('slides-31')).toContain('H')
+    expect(inRow('pdf-14')).toEqual(
+      expect.arrayContaining(['Space', 'Shift+Space', 'PageDown', 'PageUp']),
+    )
+    expect(inRow('pdf-15')).toEqual(
+      expect.arrayContaining(['Home', 'End', 'Up', 'Down', 'Left', 'Right']),
+    )
+    expect(inRow('pdf-23')).toContain('Escape')
+    expect(inRow('pdf-dialog-keys')).toEqual(expect.arrayContaining(['Enter', 'Escape']))
+    // Nothing the row does not print: no stray letters from words, no "/" separators.
+    expect(inRow('slides-25')).not.toContain('Tab')
+    expect(inRow('slides-27')).not.toContain('Slash')
+    expect(inRow('pdf-14')).not.toContain('D')
+  })
+
+  it('chordsInRow adds the zoom aliases on zoom rows only', () => {
+    const win = (id: string) => chordsInRow(csvById.get(id), 'win') as Set<string>
+    const mac = (id: string) => chordsInRow(csvById.get(id), 'mac') as Set<string>
+    expect([...win('html-019')]).toEqual(
+      expect.arrayContaining(['Ctrl+Equal', 'Ctrl+Shift+Equal', 'Ctrl+NumpadAdd']),
+    )
+    expect([...mac('html-019')]).toEqual(
+      expect.arrayContaining(['Cmd+Equal', 'Shift+Cmd+Equal', 'Cmd+NumpadAdd']),
+    )
+    expect(win('html-020').has('Ctrl+NumpadSubtract')).toBe(true)
+    expect(win('html-021').has('Ctrl+Numpad0')).toBe(true)
+    expect(win('docs-085').has('Ctrl+NumpadAdd')).toBe(false) // mouse wheel zoom
+    expect(win('sheets-19').has('Ctrl+NumpadAdd')).toBe(false)
+  })
+
+  it('adds the zoom aliases, except a Shift alias another row of the scope owns', () => {
+    const row = (id: string, action: string, win: string, mac: string) => ({
+      id,
+      group: 'docs',
+      action,
+      ms_win: win,
+      ms_mac: mac,
+      status: 'same',
+      desktop_today: `${win} / ${mac}`,
+      web_today: 'none',
+      proposal_desktop: `${win} / ${mac}`,
+      proposal_web: `${win} / ${mac}`,
+    })
+    const zoomIn = row('docs-910', 'Zoom in', 'Ctrl+=', 'Cmd+=')
+    const zoomOut = row('docs-911', 'Zoom out', 'Ctrl+-', 'Cmd+-')
+    const reset = row('docs-912', 'Zoom 100%', 'Ctrl+0', 'Cmd+0')
+    const byId = (rows: Record<string, string>[]) =>
+      Object.fromEntries(
+        buildTables(rows).docs.actions.map((a: ShortcutAction) => [a.id, [a.win, a.mac]]),
+      )
+    expect(byId([zoomIn, zoomOut, reset])).toEqual({
+      'docs-910': [
+        ['Ctrl+Equal', 'Ctrl+Shift+Equal', 'Ctrl+NumpadAdd'],
+        ['Cmd+Equal', 'Shift+Cmd+Equal', 'Cmd+NumpadAdd'],
+      ],
+      'docs-911': [
+        ['Ctrl+Minus', 'Ctrl+NumpadSubtract'],
+        ['Cmd+Minus', 'Cmd+NumpadSubtract'],
+      ],
+      'docs-912': [
+        ['Ctrl+0', 'Ctrl+Numpad0'],
+        ['Cmd+0', 'Cmd+Numpad0'],
+      ],
+    })
+    // A later row binding Ctrl+Shift+= on one platform keeps the Shift alias off both.
+    const superscript = row('docs-913', 'Superscript', 'Ctrl+Shift+=', 'not documented')
+    superscript.proposal_desktop = 'Win: Ctrl+Shift+='
+    superscript.proposal_web = 'Win: Ctrl+Shift+='
+    expect(byId([zoomIn, superscript])['docs-910']).toEqual([
+      ['Ctrl+Equal', 'Ctrl+NumpadAdd'],
+      ['Cmd+Equal', 'Cmd+NumpadAdd'],
+    ])
   })
 
   it('uses the same browser-reserved list as the runtime', () => {

@@ -5,14 +5,62 @@ import type {
   ShortcutScope,
   UnmappedShortcut,
 } from './types'
-import { commonNotes, commonShortcuts, commonUnmapped } from './tables/common'
-import { shellNotes, shellShortcuts, shellUnmapped } from './tables/shell'
-import { docsNotes, docsShortcuts, docsUnmapped } from './tables/docs'
-import { sheetsNotes, sheetsShortcuts, sheetsUnmapped } from './tables/sheets'
-import { slidesNotes, slidesShortcuts, slidesUnmapped } from './tables/slides'
-import { pdfNotes, pdfShortcuts, pdfUnmapped } from './tables/pdf'
-import { htmlNotes, htmlShortcuts, htmlUnmapped } from './tables/html'
-import { markdownNotes, markdownShortcuts, markdownUnmapped } from './tables/markdown'
+import {
+  commonManualNotes,
+  commonManualUnmapped,
+  commonNotes,
+  commonShortcuts,
+  commonUnmapped,
+} from './tables/common'
+import {
+  shellManualNotes,
+  shellManualUnmapped,
+  shellNotes,
+  shellShortcuts,
+  shellUnmapped,
+} from './tables/shell'
+import {
+  docsManualNotes,
+  docsManualUnmapped,
+  docsNotes,
+  docsShortcuts,
+  docsUnmapped,
+} from './tables/docs'
+import {
+  sheetsManualNotes,
+  sheetsManualUnmapped,
+  sheetsNotes,
+  sheetsShortcuts,
+  sheetsUnmapped,
+} from './tables/sheets'
+import {
+  slidesManualNotes,
+  slidesManualUnmapped,
+  slidesNotes,
+  slidesShortcuts,
+  slidesUnmapped,
+} from './tables/slides'
+import {
+  pdfManualNotes,
+  pdfManualUnmapped,
+  pdfNotes,
+  pdfShortcuts,
+  pdfUnmapped,
+} from './tables/pdf'
+import {
+  htmlManualNotes,
+  htmlManualUnmapped,
+  htmlNotes,
+  htmlShortcuts,
+  htmlUnmapped,
+} from './tables/html'
+import {
+  markdownManualNotes,
+  markdownManualUnmapped,
+  markdownNotes,
+  markdownShortcuts,
+  markdownUnmapped,
+} from './tables/markdown'
 
 export type {
   Chord,
@@ -86,29 +134,31 @@ export const SHORTCUT_TABLES: Readonly<Record<ShortcutScope, readonly ShortcutAc
   markdown: markdownShortcuts,
 }
 
-/** Keys each scope still lacks (per surface and platform): a module slice's
- * `manual` backlog. */
+/** Keys each scope still lacks (per surface and platform): the generator's
+ * list (a module slice's `manual` backlog), then the module's own entries for
+ * its manual rows (`<module>ManualUnmapped`). */
 export const SHORTCUT_UNMAPPED: Readonly<Record<ShortcutScope, readonly UnmappedShortcut[]>> = {
-  common: commonUnmapped,
-  shell: shellUnmapped,
-  docs: docsUnmapped,
-  sheets: sheetsUnmapped,
-  slides: slidesUnmapped,
-  pdf: pdfUnmapped,
-  html: htmlUnmapped,
-  markdown: markdownUnmapped,
+  common: [...commonUnmapped, ...commonManualUnmapped],
+  shell: [...shellUnmapped, ...shellManualUnmapped],
+  docs: [...docsUnmapped, ...docsManualUnmapped],
+  sheets: [...sheetsUnmapped, ...sheetsManualUnmapped],
+  slides: [...slidesUnmapped, ...slidesManualUnmapped],
+  pdf: [...pdfUnmapped, ...pdfManualUnmapped],
+  html: [...htmlUnmapped, ...htmlManualUnmapped],
+  markdown: [...markdownUnmapped, ...markdownManualUnmapped],
 }
 
-/** Remarks on mapped rows that are not missing keys. */
+/** Remarks on mapped rows that are not missing keys: generated, then the
+ * module's own (`<module>ManualNotes`). */
 export const SHORTCUT_NOTES: Readonly<Record<ShortcutScope, readonly ShortcutNote[]>> = {
-  common: commonNotes,
-  shell: shellNotes,
-  docs: docsNotes,
-  sheets: sheetsNotes,
-  slides: slidesNotes,
-  pdf: pdfNotes,
-  html: htmlNotes,
-  markdown: markdownNotes,
+  common: [...commonNotes, ...commonManualNotes],
+  shell: [...shellNotes, ...shellManualNotes],
+  docs: [...docsNotes, ...docsManualNotes],
+  sheets: [...sheetsNotes, ...sheetsManualNotes],
+  slides: [...slidesNotes, ...slidesManualNotes],
+  pdf: [...pdfNotes, ...pdfManualNotes],
+  html: [...htmlNotes, ...htmlManualNotes],
+  markdown: [...markdownNotes, ...markdownManualNotes],
 }
 
 /** The action with this CSV row id in a scope's table, or undefined. */

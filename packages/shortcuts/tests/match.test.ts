@@ -103,6 +103,15 @@ describe('matchChord: letters by key, case-insensitive', () => {
     expect(matchChord('Ctrl+S', event, 'win', 'code')).toBe(false)
   })
 
+  it('does not fall back to the position when the key types another ASCII character', () => {
+    // AZERTY: the US M key types ",", Dvorak: the US Q key types "'".
+    const azertyComma = keyEvent({ key: ',', code: 'KeyM', ctrlKey: true })
+    expect(matchChord('Ctrl+M', azertyComma, 'win')).toBe(false)
+    expect(matchChord('Ctrl+Comma', azertyComma, 'win')).toBe(true)
+    const dvorakQuote = keyEvent({ key: "'", code: 'KeyQ', ctrlKey: true })
+    expect(matchChord('Ctrl+Q', dvorakQuote, 'win')).toBe(false)
+  })
+
   it('falls back to the physical key when the layout types no Latin letter', () => {
     const cyrillic = keyEvent({ key: 'ы', code: 'KeyS', ctrlKey: true })
     expect(matchChord('Ctrl+S', cyrillic, 'win')).toBe(true)
@@ -111,16 +120,54 @@ describe('matchChord: letters by key, case-insensitive', () => {
   })
 })
 
-describe('matchChord: digits and punctuation by code', () => {
+describe('matchChord: digits by code, punctuation by character', () => {
   it('matches Ctrl+1 on AZERTY, where the unshifted digit key types "&"', () => {
     const event = keyEvent({ key: '&', code: 'Digit1', ctrlKey: true })
     expect(matchChord('Ctrl+1', event, 'win')).toBe(true)
   })
 
-  it('reads shifted punctuation by the physical key (Ctrl+Shift+> is Shift+Period)', () => {
+  it('reads a Shift chord as its US character (Ctrl+Shift+Period is Ctrl+">")', () => {
     const event = keyEvent({ key: '>', code: 'Period', ctrlKey: true, shiftKey: true })
     expect(matchChord('Ctrl+Shift+Period', event, 'win')).toBe(true)
     expect(matchChord('Ctrl+Period', event, 'win')).toBe(false)
+  })
+
+  it('matches the character wherever the layout puts it, Shift included', () => {
+    // German: ">" is Shift+<, "+" is the unshifted ] key, "/" is Shift+7.
+    const germanGreater = keyEvent({
+      key: '>',
+      code: 'IntlBackslash',
+      ctrlKey: true,
+      shiftKey: true,
+    })
+    expect(matchChord('Ctrl+Shift+Period', germanGreater, 'win')).toBe(true)
+    const germanPlus = keyEvent({ key: '+', code: 'BracketRight', ctrlKey: true })
+    expect(matchChord('Ctrl+Shift+Equal', germanPlus, 'win')).toBe(true)
+    expect(matchChord('Ctrl+BracketRight', germanPlus, 'win')).toBe(false)
+    const germanSlash = keyEvent({ key: '/', code: 'Digit7', ctrlKey: true, shiftKey: true })
+    expect(matchChord('Ctrl+Slash', germanSlash, 'win')).toBe(true)
+  })
+
+  it('keeps the other modifiers exact', () => {
+    const event = keyEvent({ key: '/', code: 'Slash', ctrlKey: true, altKey: true })
+    expect(matchChord('Ctrl+Slash', event, 'win')).toBe(false)
+  })
+
+  it('`code` rows still compare punctuation by position, Shift exact', () => {
+    const germanPlus = keyEvent({ key: '+', code: 'BracketRight', ctrlKey: true })
+    expect(matchChord('Ctrl+BracketRight', germanPlus, 'win', 'code')).toBe(true)
+    expect(matchChord('Ctrl+Shift+Equal', germanPlus, 'win', 'code')).toBe(false)
+  })
+
+  it('matches the keypad keys by position only', () => {
+    const numpadAdd = keyEvent({ key: '+', code: 'NumpadAdd', ctrlKey: true })
+    expect(matchChord('Ctrl+NumpadAdd', numpadAdd, 'win')).toBe(true)
+    expect(matchChord('Ctrl+Shift+Equal', numpadAdd, 'win')).toBe(false)
+    const plus = keyEvent({ key: '+', code: 'Equal', ctrlKey: true, shiftKey: true })
+    expect(matchChord('Ctrl+NumpadAdd', plus, 'win')).toBe(false)
+    const numpad0 = keyEvent({ key: '0', code: 'Numpad0', metaKey: true })
+    expect(matchChord('Cmd+Numpad0', numpad0, 'mac')).toBe(true)
+    expect(matchChord('Cmd+0', numpad0, 'mac')).toBe(false)
   })
 
   it('does not take the numeric keypad for a digit chord', () => {
