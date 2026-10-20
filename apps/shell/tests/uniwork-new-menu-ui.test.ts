@@ -621,11 +621,16 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
       noDialog()
     })
 
-    it('shows the extension on each pill', async () => {
+    it('shows the extension on each pill, and has no Plain text pill (it lives only in the New menu)', async () => {
       await mount('vi')
       const pills = Array.from(host.querySelectorAll<HTMLElement>('.dh-quick-pill'))
-      expect(pills.map((p) => p.getAttribute('data-quick-format'))).toEqual(KINDS)
-      expect(pills.map((p) => p.querySelector('.dh-quick-ext')?.textContent?.trim())).toEqual(EXTS)
+      expect(pills.map((p) => p.getAttribute('data-quick-format'))).toEqual(
+        KINDS.filter((kind) => kind !== 'txt'),
+      )
+      expect(pills.map((p) => p.querySelector('.dh-quick-ext')?.textContent?.trim())).toEqual(
+        EXTS.filter((ext) => ext !== '.txt'),
+      )
+      expect(host.querySelector('.dh-quick-row [data-quick-format="txt"]')).toBeNull()
     })
 
     it('a UniNote pill creates the page at once and opens it on the web', async () => {
