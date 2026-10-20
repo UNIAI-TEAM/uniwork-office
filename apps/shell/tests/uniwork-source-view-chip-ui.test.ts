@@ -3,11 +3,8 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
-import {
-  UniworkSourceViewChip,
-  type SourceViewOrigin,
-  type UniworkSourceViewState,
-} from '../src/renderer/src/UniworkSourceViewChip'
+import { UniworkSourceViewChip } from '../src/renderer/src/UniworkSourceViewChip'
+import type { SourceViewState } from '../src/shared/source-view'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -31,11 +28,11 @@ afterEach(() => {
   host.remove()
 })
 
-function state(over: Partial<UniworkSourceViewState> = {}): UniworkSourceViewState {
-  return { name: 'Plan.docx', origin: 'chat', parentTitle: null, ...over }
+function state(over: Partial<SourceViewState> = {}): SourceViewState {
+  return { name: 'Plan.docx', origin: 'chat', parentTitle: '', ...over }
 }
 
-async function mount(s: UniworkSourceViewState | null, lang: 'en' | 'vi' = 'en'): Promise<void> {
+async function mount(s: SourceViewState | null, lang: 'en' | 'vi' = 'en'): Promise<void> {
   await act(async () => {
     root.render(
       createElement(
@@ -58,7 +55,7 @@ describe('UniworkSourceViewChip', () => {
     expect(host.innerHTML).toBe('')
   })
 
-  it.each<[SourceViewOrigin, string, string]>([
+  it.each<[string, string, string]>([
     ['chat', 'View only · From Chat', 'Chỉ xem · Từ Chat'],
     ['task', 'View only · From Tasks', 'Chỉ xem · Từ Công việc'],
     ['meeting', 'View only · From Meetings', 'Chỉ xem · Từ Cuộc họp'],
@@ -82,7 +79,7 @@ describe('UniworkSourceViewChip', () => {
     )
   })
 
-  it.each([null, undefined, '', '   '])(
+  it.each(['', '   '])(
     'leaves the parent out when the title is %j',
     async (parentTitle) => {
       await mount(state({ origin: 'email', parentTitle }), 'en')
@@ -104,6 +101,23 @@ describe('UniworkSourceViewChip', () => {
     expect(el.textContent).not.toContain('UNI-')
     expect(el.textContent).not.toContain('Plan')
   })
+
+  // USR-fe-3: the shared state keeps the origin as the server sent it; an origin this build has no
+  // name for reads as the generic view-only chip (no new copy), never as a broken key
+  it.each(['doc', 'crm', ''])(
+    'an origin the chip does not know (%j) falls back to the generic view-only chip and tip',
+    async (origin) => {
+      await mount(state({ origin, parentTitle: 'Q4 deck' }), 'en')
+      expect(label()).toBe('View only')
+      expect(tip()).toBe('You can view this document but not change it.')
+      expect(chip()?.getAttribute('title')).toBe(tip())
+      expect(chip()?.getAttribute('aria-label')).toBe('View only')
+      expect(chip()?.textContent).not.toMatch(/undefined|uwSource|From/)
+      await mount(state({ origin, parentTitle: 'Q4 deck' }), 'vi')
+      expect(label()).toBe('Chỉ xem')
+      expect(chip()?.textContent).not.toMatch(/undefined|uwSource/)
+    },
+  )
 
   it('uses theme tokens only: no inline colour', async () => {
     await mount(state(), 'en')
