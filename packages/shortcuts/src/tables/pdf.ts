@@ -254,7 +254,100 @@ export const pdfNotes: readonly ShortcutNote[] = [
 // @generated-end
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
-const manual: readonly ShortcutAction[] = []
+const manual: readonly ShortcutAction[] = [
+  // Save As: the shell menu (desktop) or the host (web frame) owns the dialog. The
+  // renderer matches the chord only so that it is not mistaken for Save.
+  {
+    id: 'pdf-02',
+    scope: 'pdf',
+    win: ['Ctrl+Shift+S'],
+    mac: ['Shift+Cmd+S'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Undo document edit (ours-only; a text field keeps its own undo)
+  {
+    id: 'pdf-03',
+    scope: 'pdf',
+    win: ['Ctrl+Z'],
+    mac: ['Cmd+Z'],
+    match: 'key',
+    guard: {},
+  },
+  // Find next (F3 / Ctrl+G / Cmd+G) and previous (the same with Shift)
+  {
+    id: 'pdf-06',
+    scope: 'pdf',
+    win: ['Ctrl+G', 'Ctrl+Shift+G', 'F3', 'Shift+F3'],
+    mac: ['Cmd+G', 'Shift+Cmd+G', 'F3', 'Shift+F3'],
+    match: 'key',
+    guard: {},
+  },
+  // Zoom in / out (Edge PDF: Ctrl+Plus / Ctrl+Minus)
+  {
+    id: 'pdf-08',
+    scope: 'pdf',
+    win: ['Ctrl+Equal'],
+    mac: ['Cmd+Equal'],
+    match: 'key',
+    guard: {},
+  },
+  {
+    id: 'pdf-09',
+    scope: 'pdf',
+    win: ['Ctrl+Minus'],
+    mac: ['Cmd+Minus'],
+    match: 'key',
+    guard: {},
+  },
+  // Reset zoom to 100%
+  {
+    id: 'pdf-10',
+    scope: 'pdf',
+    win: ['Ctrl+0'],
+    mac: ['Cmd+0'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Toggle fit to page / fit to width (Edge PDF key; the web frame has it too)
+  {
+    id: 'pdf-11',
+    scope: 'pdf',
+    win: ['Ctrl+Backslash'],
+    mac: ['Cmd+Backslash'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Rotate counterclockwise / clockwise (Edge PDF: Ctrl+[ / Ctrl+])
+  {
+    id: 'pdf-12',
+    scope: 'pdf',
+    win: ['Ctrl+BracketLeft', 'Ctrl+BracketRight'],
+    mac: ['Cmd+BracketLeft', 'Cmd+BracketRight'],
+    match: 'key',
+    guard: {},
+  },
+  // Margin note box: Ctrl+Enter submits (Esc cancels)
+  {
+    id: 'pdf-21',
+    scope: 'pdf',
+    context: 'note',
+    win: ['Ctrl+Enter'],
+    mac: ['Cmd+Enter'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // In-place text edit: Ctrl+Enter commits (ours-only)
+  {
+    id: 'pdf-24',
+    scope: 'pdf',
+    context: 'text-edit',
+    win: ['Ctrl+Enter'],
+    mac: ['Cmd+Enter'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+]
 
 export const pdfShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
 
