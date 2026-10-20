@@ -55,6 +55,22 @@ A renderer reads it with `createCapabilityReader()` from `@genoffice/ui/capabili
 false, so desktop keeps everything). No autosave on the web (CONTRACT C10): the shared `getAutoSaveDefault` answers
 "off" and the bridges never send `api.save` with `auto`.
 
+Avatars (UNI-1986): the host rewrites `avatar_url` of comments, mentions and `mentions.search` candidates to the
+same-origin path `/api/v1/office-frame/documents/<documentId>/avatars/<userId>` (ULIDs, upper case) or to `""`; no
+protocol field, message or CSP change (`img-src 'self' data: blob:` stays). `shared/avatar/loader.ts` fetches that path
+with `Authorization: Bearer <frame token>` (the AI client's token: `getToken`, one `refreshToken('unauthorized')` retry
+after a 401), `credentials: 'omit'`, `mode: 'same-origin'`, and never sends the token to any other url. It accepts only
+`image/png|jpeg|gif|webp` up to 2 MiB (never SVG), keeps at most 64 `blob:` urls (least recently used revoked, all
+revoked on dispose), runs one request per path at a time and four in all, and remembers a 404 (or a refused body) for
+5 minutes. The collab kit (`packages/ui/src/collab/avatar-source.tsx`) shows initials until the `blob:` url is ready and
+whenever the answer is `null` (no avatar, 404, 401 after the retry, refused type or size, offline); without an
+`AvatarSourceProvider` (desktop) or for a url that is not a same-origin path the `<img src>` is used as before.
+`installFrameComments()` publishes `window.uniworkAvatars` (a loader factory; only with comments and a frame token);
+each comments host (Docs, pdf, Sheets, Slides, the Discussion) makes its own source with `useFrameAvatarSource()` and
+disposes it on unmount. The test host serves a fake route (`web/server/fake-avatars.mjs`, driven through
+`/__fake-avatars/*`). Tests: `shared/avatar/*.test.ts`, `packages/ui/tests/collab-thread.test.ts`,
+`collab-picker.test.ts`.
+
 Build: `npm run build:web -- --module <module>` -> `dist-web/<module>/<version>/` (see `web/docs/build/README.md`); the
 registry `web/docs/build/modules.ts` holds the one entry per module (root, renderer config, globals, CSP additions).
 Run in the test host: `/test-host/?module=<module>` (see `web/server/server.mjs`). Smoke e2e: `web/e2e/modules-smoke.spec.ts`.
