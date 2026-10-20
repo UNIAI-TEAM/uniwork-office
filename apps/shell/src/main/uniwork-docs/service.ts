@@ -4748,32 +4748,55 @@ export class UniworkDocsService {
    * response arriving after sign-out, account switch, organization change, or
    * `lockSession` must not reopen a coalescer window for the outgoing scope.
    */
-  private captureActionSessionOrNull(): { identity: SessionIdentity; epoch: number } | null {
+  private captureActionSessionOrNull(): {
+    identity: SessionIdentity
+    epoch: number
+    apiOrigin: string | null
+  } | null {
     const identity = this.liveIdentity()
     if (!identity) return null
     if (this.sessionOrgId === undefined) {
-      this.sessionOrgId = this.deps.selectedOrg()?.id ?? null
+      this.sessionOrgId = this.deps.selectedOrg?.()?.id ?? null
     }
-    return { identity, epoch: this.sessionEpoch }
+    return {
+      identity,
+      epoch: this.sessionEpoch ?? 0,
+      apiOrigin: this.deps.profile?.()?.apiOrigin ?? null,
+    }
   }
 
-  private captureActionSession(): { identity: SessionIdentity; epoch: number } {
+  private captureActionSession(): {
+    identity: SessionIdentity
+    epoch: number
+    apiOrigin: string | null
+  } {
     const session = this.captureActionSessionOrNull()
     if (!session) throw new UniworkDocError('not_signed_in')
     return session
   }
 
-  /** the session that started an async action is still the live one (same epoch, same device session) */
-  private sessionLive(started: { identity: SessionIdentity; epoch: number }): boolean {
-    if (this.sessionEpoch !== started.epoch) return false
+  /** the session that started an async action is still the live one (same epoch, same device session, same origin) */
+  private sessionLive(started: {
+    identity: SessionIdentity
+    epoch: number
+    apiOrigin?: string | null
+  }): boolean {
+    if ((this.sessionEpoch ?? 0) !== started.epoch) return false
     const current = this.deps.identity()
     const owner = started.identity
-    return (
-      !!current &&
-      current.accountId === owner.accountId &&
-      current.deploymentId === owner.deploymentId &&
-      current.deviceSessionId === owner.deviceSessionId
-    )
+    if (
+      !current ||
+      current.accountId !== owner.accountId ||
+      current.deploymentId !== owner.deploymentId ||
+      current.deviceSessionId !== owner.deviceSessionId
+    ) {
+      return false
+    }
+    if (started.apiOrigin !== undefined) {
+      const currentOrigin = this.deps.profile?.()?.apiOrigin ?? null
+      if (currentOrigin !== started.apiOrigin) return false
+    }
+    return true
   }
 
   private pushTreeChangedFor(
@@ -6235,9 +6258,9 @@ export class UniworkDocsService {
   /** S18: restore an archived document (only its own archive batch comes back) */
   restoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const session = this.captureActionSession()
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
-      await this.requireManage(documentId)
+      await this.requireManageAnyKind(documentId, session)
       return this.api().restore(documentId, this.newIdempotencyKey())
     })
   }
@@ -6595,9 +6618,9 @@ export class UniworkDocsService {
   /** UNI-1961: Bỏ lưu trữ, for a shelved item of any kind the caller manages */
   unshelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>> {
     return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const session = this.captureActionSession()
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
-      await this.requireManageAnyKind(documentId)
+      await this.requireManageAnyKind(documentId, session)
       return this.api().unshelve(documentId, this.newIdempotencyKey())
     })
   }
@@ -6609,10 +6632,9 @@ export class UniworkDocsService {
    */
   trashShelvedDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
-      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
-      await this.requireManageAnyKind(documentId)
       const session = this.captureActionSession()
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId, session)
       const archived = await this.api().archive(documentId, this.newIdempotencyKey())
       await this.endFirstSaveRecords(session, documentId)
       return archived
@@ -6622,16 +6644,20 @@ export class UniworkDocsService {
   /** UNI-1961: Lưu trữ a live item the caller manages (the web's row ⋯ "Lưu trữ") */
   shelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>> {
     return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const session = this.captureActionSession()
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
-      await this.requireManageAnyKind(documentId)
+      await this.requireManageAnyKind(documentId, session)
       return this.api().shelve(documentId, this.newIdempotencyKey())
     })
   }
 
   /** UNI-1961: manage (or admin_scope, the web's canManageTrashed) on a row of any kind */
-  private async requireManageAnyKind(documentId: string): Promise<void> {
+  private async requireManageAnyKind(
+    documentId: string,
+    session = this.captureActionSession(),
+  ): Promise<void> {
     const ref = await this.api().documentManageRef(documentId)
+    if (!this.sessionLive(session)) throw new UniworkDocError('not_signed_in')
     if (ref.myLevel !== 'manage' && !ref.adminScope) throw new UniworkDocError('forbidden')
   }
 

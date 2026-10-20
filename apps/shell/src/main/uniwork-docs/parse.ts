@@ -944,16 +944,17 @@ export interface DocumentManageRef {
 }
 
 export function parseDocumentManageRef(raw: unknown): DocumentManageRef {
-  const doc = record(record(raw).document)
+  const env = record(raw)
+  const doc = record(env.document)
   const kind = kindOf(doc.kind)
   if (!kind) bad()
-  const myLevel = doc.my_level
+  const myLevel = doc.my_level ?? env.my_level
   if (myLevel !== undefined && myLevel !== null && typeof myLevel !== 'string') bad()
   return {
     id: str(doc.id, 128),
     kind,
-    myLevel: typeof myLevel === 'string' ? myLevel : null,
-    adminScope: doc.admin_scope === true,
+    myLevel: typeof myLevel === 'string' && myLevel.length > 0 ? myLevel : null,
+    adminScope: doc.admin_scope === true || env.admin_scope === true,
   }
 }
 

@@ -1124,12 +1124,36 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     },
 
     async documentManageRef(documentId) {
-      const raw = await send({
-        method: 'GET',
-        route: `/documents/${id(documentId)}`,
-        timeoutMs: metadataTimeout,
-        read: json,
-      })
+      const targetId = id(documentId)
+      let raw: unknown
+      try {
+        raw = await send({
+          method: 'GET',
+          route: `/documents/${targetId}`,
+          timeoutMs: metadataTimeout,
+          read: json,
+        })
+      } catch (error) {
+        if (!(error instanceof UniworkDocError) || error.serverCode !== 'document_restricted') {
+          throw error
+        }
+        try {
+          raw = await send({
+            method: 'GET',
+            route: `/documents/${targetId}/admin-summary`,
+            timeoutMs: metadataTimeout,
+            read: json,
+          })
+        } catch (summaryError) {
+          if (
+            summaryError instanceof UniworkDocError &&
+            summaryError.code === 'permission_revoked'
+          ) {
+            throw new UniworkDocError('forbidden', { status: summaryError.status })
+          }
+          throw summaryError
+        }
+      }
       const ref = parseDocumentManageRef(raw)
       if (ref.id !== documentId) throw new UniworkDocError('malformed_response')
       return ref
