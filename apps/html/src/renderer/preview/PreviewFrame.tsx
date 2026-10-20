@@ -24,6 +24,11 @@ interface Props {
   /** bump to reload the frame after the buffer was pushed to the main process */
   nonce: number
   zoom: number
+  /**
+   * A source view (read-only and locked): the page never runs its scripts. Desktop loads the same
+   * preview document in an empty sandbox; the web bridge falls back to its script-free copy.
+   */
+  scriptsOff?: boolean
   onMessage: (msg: FromInspector) => void
   /** fires for every document the frame loads, link navigations included */
   onLoad?: () => void
@@ -58,7 +63,7 @@ interface Props {
  * own scripts share the inspector's realm and can forge anything it sends.
  */
 export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function PreviewFrame(
-  { url, nonce, zoom, onMessage, onLoad, draft },
+  { url, nonce, zoom, scriptsOff, onMessage, onLoad, draft },
   ref,
 ) {
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -74,7 +79,7 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
   )
   // preview.html did not boot (host without its policy): static from then on
   const [fallback, setFallback] = useState(false)
-  const staticMode = !cap('htmlPreviewScripts') || fallback
+  const staticMode = !cap('htmlPreviewScripts') || fallback || (!!scriptsOff && !!connectPreview)
   const portMode = !staticMode && !!connectPreview
   const [staticDoc, setStaticDoc] = useState('')
   const channelRef = useRef<{ post(msg: unknown): void; close(): void } | null>(null)
@@ -177,7 +182,7 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
           title={t('viewPreview')}
           src={src}
           onLoad={handleLoad}
-          sandbox="allow-scripts allow-forms allow-popups allow-modals"
+          sandbox={scriptsOff ? '' : 'allow-scripts allow-forms allow-popups allow-modals'}
           // web: no cookies or storage of the app in the preview (desktop: no-op)
           {...(portMode ? { credentialless: '' } : {})}
           referrerPolicy="no-referrer"

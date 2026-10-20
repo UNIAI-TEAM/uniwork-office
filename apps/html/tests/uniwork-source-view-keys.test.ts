@@ -83,6 +83,7 @@ vi.mock('@genoffice/electron-utils', () => ({
 }))
 
 import { createHtmlView, setUniworkDocumentPolicy } from '../src/main/html-main'
+import { HTML_CHANNELS } from '../src/shared/ipc'
 
 const directories: string[] = []
 
@@ -193,9 +194,9 @@ describe('Ctrl+S on a read-only UniWork copy, whichever frame has the focus', ()
 
 describe('uniworkState answers the lock to the renderer', () => {
   it.each([
-    [true, true],
-    [false, false],
-  ])('locked=%s when the policy says %s', async (locked, expected) => {
+    [true, { bound: true, readOnly: true, locked: true }],
+    [false, { bound: true, readOnly: true }],
+  ])('isLocked=%s answers %j', async (locked, expected) => {
     const { path, contents } = await openDocument()
     setUniworkDocumentPolicy({
       isBound: (p) => p === path,
@@ -203,7 +204,7 @@ describe('uniworkState answers the lock to the renderer', () => {
       isLocked: () => locked,
     })
     const state = handlers.get(HTML_CHANNELS.uniworkState)!({ sender: contents })
-    expect(state).toEqual({ bound: true, readOnly: true, locked: expected })
+    expect(state).toEqual(expected)
   })
 
   it('is not locked without a policy or without isLocked', async () => {
@@ -211,7 +212,6 @@ describe('uniworkState answers the lock to the renderer', () => {
     expect(handlers.get(HTML_CHANNELS.uniworkState)!({ sender: contents })).toEqual({
       bound: false,
       readOnly: false,
-      locked: false,
     })
   })
 })

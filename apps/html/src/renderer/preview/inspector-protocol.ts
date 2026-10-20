@@ -1,7 +1,7 @@
 /** messages between the app (parent) and the inspector script inside the sandboxed preview frame */
 
-/** inspect = full editing; browse = the page behaves as published */
-export type InspectorMode = 'inspect' | 'browse'
+/** inspect = full editing; browse = the page behaves as published; view = read-only copy: no selection, no editing, links inert */
+export type InspectorMode = 'inspect' | 'browse' | 'view'
 
 export type ToInspector =
   | { type: 'gx:select'; sid: number | null }
