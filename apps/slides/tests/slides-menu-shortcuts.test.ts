@@ -64,11 +64,12 @@ let buildSlidesMenu: typeof import('../src/main/slides-main').buildSlidesMenu
 let setSlidesCloseTabHook: typeof import('../src/main/slides-main').setSlidesCloseTabHook
 const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
 
+// slides-main pulls in the whole engine: allow the cold import more than the 10 s hook default
 beforeAll(async () => {
   const main = await import('../src/main/slides-main')
   buildSlidesMenu = main.buildSlidesMenu
   setSlidesCloseTabHook = main.setSlidesCloseTabHook
-})
+}, 60_000)
 
 afterEach(() => {
   Object.defineProperty(process, 'platform', platform)
