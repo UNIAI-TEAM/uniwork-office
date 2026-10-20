@@ -294,6 +294,36 @@ describe('delete a page -> lost (G8-15)', () => {
   })
 })
 
+describe('a comment that appears with the panel closed (G819-A02b)', () => {
+  it('made on the server after the first list, it is in the PUT after the receipt', async () => {
+    const bridge = fakeBridge([comment({ id: 'c1', anchor: makePdfAnchor(1, RECT) })])
+    const { api, setOpen } = await mount(bridge)
+    await setOpen(false)
+    // the other host comments after this editor listed; nothing here lists again while closed
+    bridge.comments.push(comment({ id: 'c2', anchor: makePdfAnchor(2, RECT) }))
+    await act(async () => {
+      // the renderer saved with page 1 (index 0) deleted: 1 -> 0, 2 -> 1
+      api.current!.saved(
+        new Map([
+          [1, 0],
+          [2, 1],
+        ]),
+      )
+      bridge.receipt('ver-2')
+      await flush()
+    })
+    expect(bridge.anchors).toHaveBeenCalledTimes(1)
+    expect(bridge.anchors).toHaveBeenCalledWith({
+      path: PATH,
+      versionId: 'ver-2',
+      anchors: [
+        { commentId: 'c1', anchor: makePdfAnchor(1, RECT), state: 'lost' },
+        { commentId: 'c2', anchor: makePdfAnchor(1, RECT), state: 'exact' },
+      ],
+    })
+  })
+})
+
 describe('reveal (G8-15)', () => {
   it('comments.reveal opens the panel and moves the viewer to the right page and rect', async () => {
     const bridge = fakeBridge([comment({ id: 'c1', anchor: makePdfAnchor(3, RECT) })])
@@ -457,8 +487,8 @@ describe('anchor_version_invalid keeps the anchors stale and retries on the next
       await flush()
     })
     expect(bridge.anchors).toHaveBeenCalledTimes(1)
-    // nothing changed on the server: no reload
-    expect((bridge.list as ReturnType<typeof vi.fn>).mock.calls.length).toBe(listCalls)
+    // nothing changed on the server: no reload after the PUT; the one list is the receipt's own refresh (G819-A02b)
+    expect((bridge.list as ReturnType<typeof vi.fn>).mock.calls.length).toBe(listCalls + 1)
     await act(async () => {
       api.current!.saved(new Map([[0, 0]])) // the next Save keeps page 1 (old page 2)
       bridge.receipt('ver-3')

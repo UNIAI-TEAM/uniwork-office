@@ -401,7 +401,30 @@ describe('server mode: anchors after Save', () => {
     const lists = server.calls.list.mock.calls.length
     await server.saved('v2')
     expect(server.calls.anchors).toHaveBeenCalledTimes(1)
-    expect(server.calls.list.mock.calls.length).toBe(lists)
+    // the one list is the receipt's own refresh (G819-A02b); the refused PUT adds no reload after it
+    expect(server.calls.list.mock.calls.length).toBe(lists + 1)
+  })
+
+  it('a comment made on the server after the first list is in the PUT after the receipt, panel closed (G819-A02b)', async () => {
+    const server = fakeServer()
+    const first = server.add({
+      body: 'first',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-1', range: 'A1' },
+      anchor_state: 'exact',
+    })
+    await mount(server)
+    // the other host comments after this editor listed; nothing here lists again while closed
+    const later = server.add({
+      body: 'from the other host',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+      anchor_state: 'exact',
+    })
+    await server.saved('v2')
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    const sent = server.calls.anchors.mock.calls[0]![0]
+    expect(sent.versionId).toBe('v2')
+    expect(sent.anchors.map((a) => a.commentId).sort()).toEqual([first.id, later.id].sort())
+    expect(sent.anchors.every((a) => a.state === 'exact')).toBe(true)
   })
 
   it('server comments never touch the thread store (the file parts stay byte-identical)', async () => {

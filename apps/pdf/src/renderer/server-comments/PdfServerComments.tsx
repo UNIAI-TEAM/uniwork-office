@@ -180,10 +180,8 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
   useEffect(() => {
     setShift(null)
     const resend = createAnchorResend({
-      roots: () => {
-        const c = ctlRef.current
-        return [...c.threads, ...c.resolved].map((t) => t.root)
-      },
+      // a fresh list: with the pane closed nothing else lists after the first one
+      roots: () => ctlRef.current.freshComments(),
       send: (versionId, items) => sendAnchorMap(source, versionId, items),
       onUpdated: () => void ctlRef.current.reload(),
       onShift: setShift,

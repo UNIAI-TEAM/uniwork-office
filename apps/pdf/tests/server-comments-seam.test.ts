@@ -283,7 +283,8 @@ describe('G8-A02 (pdf): the anchor map after the Save receipt on the real seam',
       await flush()
     })
     expect(bridge.anchors).toHaveBeenCalledTimes(1)
-    expect(bridge.list.mock.calls.length).toBe(lists)
+    // the one list is the receipt's own refresh (G819-A02b); the refused PUT adds no reload after it
+    expect(bridge.list.mock.calls.length).toBe(lists + 1)
   })
 })
 

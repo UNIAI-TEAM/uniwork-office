@@ -465,7 +465,8 @@ describe('server mode: anchors after Save', () => {
     const lists = server.calls.list.mock.calls.length
     await act(async () => server.saved('v2'))
     await flush()
-    expect(server.calls.list.mock.calls.length).toBe(lists)
+    // the one list is the receipt's own refresh (G819-A02b); the refused PUT adds no reload after it
+    expect(server.calls.list.mock.calls.length).toBe(lists + 1)
     await act(async () => server.saved('v3'))
     await flush()
     expect(server.calls.anchors).toHaveBeenCalledTimes(2)

@@ -19,6 +19,7 @@ import {
   collabStrings,
   formatCollabTime,
   useCollabThreads,
+  type CollabComment,
   type CollabController,
   type CollabHostState,
   type CollabThreadView,
@@ -86,6 +87,13 @@ function rootsOf(ctl: CollabController): TrackedRoot[] {
     anchor_state: t.root.anchor_state,
     deleted: t.deleted,
   }))
+}
+
+/** the roots of a raw list: what a Save round needs, without waiting for a render to derive threads */
+function rootsFromComments(comments: readonly CollabComment[]): TrackedRoot[] {
+  return comments
+    .filter((c) => !c.parent_id && !c.deleted_at)
+    .map((c) => ({ id: c.id, anchor: c.anchor, anchor_state: c.anchor_state }))
 }
 
 function threadOf(ctl: CollabController, id: string): CollabThreadView | undefined {
@@ -203,19 +211,51 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
     setKnownVersion(mode.versionId)
   }, [mode.versionId])
 
-  // after each Save receipt: one anchor map for every located (or lost) root
+  // after each Save receipt: one anchor map for every located (or lost) root, built from a fresh list
+  // (with the panel closed nothing else lists, so a comment made since the first list would be missed).
+  // Rounds are serialized: one in flight, the newest receipt waits as the single pending version.
   useEffect(() => {
-    return mode.api.onSaved((payload) => {
+    let disposed = false
+    const round: { running: boolean; pending: string | null } = { running: false, pending: null }
+    const runRound = async (queued: string) => {
+      const roots = rootsFromComments(await ctlRef.current.freshComments())
+      if (disposed) return
+      // a receipt that landed while the list was loading supersedes this one
+      const versionId = round.pending ?? queued
+      round.pending = null
+      store.track(roots, viewRef.current.sheets())
+      const updates = buildAnchorUpdates(store, roots, viewRef.current.sheets())
+      await syncAnchorsAfterSave(source, versionId, updates, () => {
+        void ctlRef.current.reload()
+      })
+    }
+    const drain = async () => {
+      round.running = true
+      try {
+        while (round.pending !== null && !disposed) {
+          const versionId = round.pending
+          round.pending = null
+          try {
+            await runRound(versionId)
+          } catch {
+            // a failed map is rebuilt from the live locations at the next Save receipt
+          }
+        }
+      } finally {
+        round.running = false
+      }
+    }
+    const off = mode.api.onSaved((payload) => {
       if (payload.path && mode.path && payload.path !== mode.path) return
       versionRef.current = payload.versionId
       setKnownVersion(payload.versionId)
-      const updates = buildAnchorUpdates(store, rootsOf(ctlRef.current), viewRef.current.sheets())
-      void syncAnchorsAfterSave(source, payload.versionId, updates, () => {
-        void ctlRef.current.reload()
-      }).catch(() => {
-        // a failed map is rebuilt from the live locations at the next Save receipt
-      })
+      round.pending = payload.versionId
+      if (!round.running) void drain()
     })
+    return () => {
+      disposed = true
+      off()
+    }
   }, [mode.api, mode.path, source, store])
 
   // desktop reload rule (addendum §4.7): focus + every 30 s while the panel is open and the tab visible

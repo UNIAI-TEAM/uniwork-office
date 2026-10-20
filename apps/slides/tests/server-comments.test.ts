@@ -982,16 +982,16 @@ describe('ServerCommentsHost over the comments bridge', () => {
       path: '/work/deck.pptx',
       versionId: 'v2',
       anchors: [
-        // in the list's order: by where each slide is now
-        {
-          commentId: 'x22',
-          state: 'exact',
-          anchor: { format: 'pptx', v: 1, slide_id: '258', slide_index: 0 },
-        },
+        // in the server list's order (the round reads the fresh list, not the rendered thread order)
         {
           commentId: 'x1',
           state: 'exact',
           anchor: { format: 'pptx', v: 1, slide_id: '256', slide_index: 2 },
+        },
+        {
+          commentId: 'x22',
+          state: 'exact',
+          anchor: { format: 'pptx', v: 1, slide_id: '258', slide_index: 0 },
         },
       ],
     })
