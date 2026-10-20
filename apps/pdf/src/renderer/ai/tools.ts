@@ -1631,6 +1631,8 @@ const countOccurrences = (entry: PageEntry, query: string): number => {
 
 const HEX_COLOR = /^#?([0-9a-f]{6})$/i
 
+export const parseOptionalColor = (_raw: unknown): { color?: string; note?: string } => ({})
+
 const MARKUP_TYPES: MarkupType[] = ['highlight', 'underline', 'strikeout']
 
 async function deleteMarkupTool(
