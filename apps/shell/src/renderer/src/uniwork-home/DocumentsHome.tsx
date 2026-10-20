@@ -1300,8 +1300,10 @@ export function DocumentsHome({
       label: t('open'),
       onSelect: () => void openDoc(doc),
     })
+    // a shelved search hit is read-only: the server refuses its rename / move (409 document_shelved)
+    const shelved = Boolean(doc.shelvedAt)
     // a page has no file to keep offline
-    const offlineLabel = doc.kind === 'page' ? null : offlineToggle.labelOf(doc.id)
+    const offlineLabel = doc.kind === 'page' || shelved ? null : offlineToggle.labelOf(doc.id)
     if (offlineLabel) {
       items.push({
         id: 'offline',
@@ -1314,7 +1316,7 @@ export function DocumentsHome({
           }),
       })
     }
-    if (doc.canEdit !== false) {
+    if (doc.canEdit !== false && !shelved) {
       if (doc.canEdit === true) {
         items.push({
           id: 'rename',
@@ -1335,7 +1337,7 @@ export function DocumentsHome({
       })
     }
     // UNI-1961: the web's row Lưu trữ (files and pages here; folder shelve is a residual)
-    if (doc.canManage === true && (doc.kind === 'file' || doc.kind === 'page') && !doc.shelvedAt) {
+    if (doc.canManage === true && (doc.kind === 'file' || doc.kind === 'page') && !shelved) {
       items.push({
         id: 'shelve',
         label: t('uhShelvedShelve'),
