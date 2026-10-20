@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { format } from '@genoffice/i18n'
 import { CollabComposer } from '../src/collab/CollabComposer'
 import { CollabPanel } from '../src/collab/CollabPanel'
+import { AvatarSourceProvider, type AvatarSource } from '../src/collab/avatar-source'
 import { formatCollabTime } from '../src/collab/CollabThread'
 import { useCollabThreads, type CollabController } from '../src/collab/use-collab-threads'
 import type { CollabHostState, CollabSource } from '../src/collab/types'
@@ -700,5 +701,129 @@ describe('edit box mentions (UNI-1969, web d6aa9f82c)', () => {
     await type($<HTMLTextAreaElement>('.collab-edit textarea')!, 'ping @Ann done')
     await click(btn(EN.collabSave))
     expect(src.update).toHaveBeenLastCalledWith({ comment_id: 'a', body: 'ping @Ann done' })
+  })
+})
+
+describe('avatars through the frame source (UNI-1986)', () => {
+  const PATH = '/api/v1/office-frame/documents/01HDOC/avatars/01HUSER'
+
+  function fakeAvatars(load: AvatarSource['load']) {
+    const source = { load: vi.fn(load), dispose: vi.fn() }
+    return source
+  }
+
+  async function mountWith(source: FakeSource, avatars: AvatarSource | undefined) {
+    await act(async () => {
+      root.render(
+        createElement(
+          AvatarSourceProvider,
+          { value: avatars ?? null },
+          createElement(Harness, { source, host: host() }),
+        ),
+      )
+      await flush()
+    })
+  }
+
+  const one = (url: string) =>
+    fakeSource(list([cm({ id: 'a', display_name: 'Ann Lee', avatar_url: url })]))
+
+  it('shows initials while loading, then the blob url the source returned', async () => {
+    let resolve!: (v: string | null) => void
+    const avatars = fakeAvatars(() => new Promise((r) => (resolve = r)))
+    await mountWith(one(PATH), avatars)
+    const av = $('[data-comment-id="a"] .collab-av')!
+    expect(avatars.load).toHaveBeenCalledWith(PATH, expect.any(AbortSignal))
+    expect(av.querySelector('img')).toBeNull()
+    expect(av.textContent).toBe('AL')
+    await act(async () => {
+      resolve('blob:https://app/1')
+      await flush()
+    })
+    expect(av.querySelector('img')!.getAttribute('src')).toBe('blob:https://app/1')
+  })
+
+  it('a null answer keeps the initials (no img, no request for the raw path)', async () => {
+    const avatars = fakeAvatars(async () => null)
+    await mountWith(one(PATH), avatars)
+    const av = $('[data-comment-id="a"] .collab-av')!
+    expect(av.querySelector('img')).toBeNull()
+    expect(av.textContent).toBe('AL')
+  })
+
+  it('a rejected load keeps the initials', async () => {
+    const avatars = fakeAvatars(async () => {
+      throw new Error('boom')
+    })
+    await mountWith(one(PATH), avatars)
+    expect($('[data-comment-id="a"] .collab-av')!.textContent).toBe('AL')
+  })
+
+  it('a blob that fails to decode falls back to initials', async () => {
+    const avatars = fakeAvatars(async () => 'blob:https://app/bad')
+    await mountWith(one(PATH), avatars)
+    const av = $('[data-comment-id="a"] .collab-av')!
+    await act(async () => {
+      av.querySelector('img')!.dispatchEvent(new Event('error'))
+      await flush()
+    })
+    expect(av.querySelector('img')).toBeNull()
+    expect(av.textContent).toBe('AL')
+  })
+
+  it('without a provider the url is used as before, desktop keeps real urls', async () => {
+    await mountWith(one('https://x/ann.png'), undefined)
+    expect($('[data-comment-id="a"] .collab-av img')!.getAttribute('src')).toBe('https://x/ann.png')
+    // a same-origin path without a provider is also left alone (no frame to load it)
+    await mountWith(one(PATH), undefined)
+    expect($('[data-comment-id="a"] .collab-av img')!.getAttribute('src')).toBe(PATH)
+  })
+
+  it('a provider leaves an absolute url alone (only same-origin paths go through it)', async () => {
+    const avatars = fakeAvatars(async () => 'blob:https://app/never')
+    await mountWith(one('https://x/ann.png'), avatars)
+    expect(avatars.load).not.toHaveBeenCalled()
+    expect($('[data-comment-id="a"] .collab-av img')!.getAttribute('src')).toBe('https://x/ann.png')
+  })
+
+  it('a new url loads a new image and never shows the old blob for it', async () => {
+    const avatars = fakeAvatars(
+      async (u) => `blob:https://app/${u.endsWith('01HUSER') ? 'one' : 'two'}`,
+    )
+    await mountWith(one(PATH), avatars)
+    expect($('[data-comment-id="a"] .collab-av img')!.getAttribute('src')).toBe(
+      'blob:https://app/one',
+    )
+    await mountWith(one(`${PATH.slice(0, -1)}2`), avatars)
+    expect($('[data-comment-id="a"] .collab-av img')!.getAttribute('src')).toBe(
+      'blob:https://app/two',
+    )
+  })
+
+  it('an unmount aborts a load that is still running and ignores its late answer', async () => {
+    let signal!: AbortSignal
+    let resolve!: (v: string | null) => void
+    const avatars = fakeAvatars((_u, s) => {
+      signal = s
+      return new Promise((r) => (resolve = r))
+    })
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await mountWith(one(PATH), avatars)
+    act(() => root.unmount())
+    expect(signal.aborted).toBe(true)
+    await act(async () => {
+      resolve('blob:https://app/late')
+      await flush()
+    })
+    expect(errors).not.toHaveBeenCalled()
+    // afterEach unmounts again: give it a live root
+    root = createRoot(el)
+  })
+
+  it('an empty avatar_url never asks the source', async () => {
+    const avatars = fakeAvatars(async () => 'blob:https://app/x')
+    await mountWith(one(''), avatars)
+    expect(avatars.load).not.toHaveBeenCalled()
+    expect($('[data-comment-id="a"] .collab-av')!.textContent).toBe('AL')
   })
 })
