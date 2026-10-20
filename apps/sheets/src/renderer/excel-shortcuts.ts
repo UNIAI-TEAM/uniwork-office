@@ -22,7 +22,8 @@
  *   dialog opens (sheets-19, -20)
  * - Excel for Mac's extra keys next to Univer's own: fill down / right with
  *   Control, ⌘Enter fills the selection like ⌃Enter, ⌃⌥Enter / ⌘⌥Enter break
- *   the line like ⌥Enter, ⌘T cycles the reference like F4, ⌘= recalculates
+ *   the line like ⌥Enter, ⌘T cycles the reference like F4, ⌘= recalculates,
+ *   ⇧⌘H opens Replace like ⌃H
  */
 import {
   CommandType,
@@ -60,6 +61,7 @@ import {
   whenSheetEditorFocused,
 } from '@univerjs/sheets-ui'
 import { BreakLineCommand } from '@univerjs/docs-ui'
+import { OpenReplaceDialogOperation } from '@univerjs/find-replace'
 import { ReferenceAbsoluteOperation } from '@univerjs/sheets-formula-ui'
 import { DeviceInputEventType } from '@univerjs/engine-render'
 import type { IContextService } from '@univerjs/core'
@@ -588,6 +590,12 @@ export function registerExcelShortcuts(
       row: 'sheets-47',
       item: { id: ReferenceAbsoluteOperation.id, preconditions: whenSheetEditorActivated },
       univerOwns: { win: ['F4'], mac: ['F4'] },
+    },
+    // Excel for Mac's Replace key next to Univer's Control+H (Ctrl+H elsewhere)
+    {
+      row: 'sheets-44',
+      item: { id: OpenReplaceDialogOperation.id, ...sheetFocused },
+      univerOwns: { win: ['Ctrl+H'], mac: [] },
     },
     // Excel for Mac's Cmd+= is Calculate Now, which Univer binds to zoom in
     {

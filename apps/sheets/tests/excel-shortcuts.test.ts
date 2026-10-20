@@ -10,6 +10,7 @@ import type { ICommand, IWorksheetData } from '@univerjs/core'
 import { IShortcutService, MetaKeys } from '@univerjs/ui'
 import type { IShortcutItem } from '@univerjs/ui'
 import { SheetCopyDownCommand, SheetCopyRightCommand } from '@univerjs/sheets-ui'
+import { OpenReplaceDialogOperation } from '@univerjs/find-replace'
 import { _shortcutInternals, registerExcelShortcuts } from '../src/renderer/excel-shortcuts'
 import type { SheetsKeyTarget } from '../src/renderer/sheets-keymap'
 import type { UniverRuntime } from '../src/renderer/univer-state'
@@ -41,6 +42,7 @@ const RIGHT = 39
 const KEY_0 = 48
 const KEY_9 = 57
 const KEY_D = 68
+const KEY_H = 72
 const KEY_L = 76
 const KEY_R = 82
 const EQUAL = 187
@@ -265,6 +267,13 @@ describe('Univer defaults the table overrides', () => {
     const handler = MAC.commands.get(RUN_APP_COMMAND_ID)!.handler
     handler({} as never, { command: 'calculate-now' })
     expect(MAC.appCommands).toEqual(['calculate-now'])
+  })
+
+  it('opens Replace with Excel for Mac’s Shift+Cmd+H, Ctrl+H staying Univer’s', () => {
+    expect(bindings(MAC, OpenReplaceDialogOperation.id)).toEqual([KEY_H | SHIFT | CTRL_COMMAND])
+    expect(bindings(WEB_MAC, OpenReplaceDialogOperation.id)).toEqual([KEY_H | SHIFT | CTRL_COMMAND])
+    expect(bindings(WIN, OpenReplaceDialogOperation.id)).toEqual([])
+    expect(bindings(WEB, OpenReplaceDialogOperation.id)).toEqual([])
   })
 
   it('silences Univer’s Shift+Cmd+L filter on a Mac only', () => {
