@@ -32,7 +32,7 @@ export const en = {
   aiFootprintOverwritten: 'Cells with data overwritten: {count}',
   aiFootprintOverwrittenMin: 'Cells with data overwritten: at least {count}',
   aiFootprintNoOverwrite: 'No existing data overwritten',
-  aiUndoTitle: 'Undo this AI change (same as ⌘Z)',
+  aiUndoTitle: 'Undo this AI change (same as {undoKeys})',
   aiUndo: 'Undo',
   aiPreviewAria: 'Change preview',
   aiProposedChanges: 'Proposed changes',

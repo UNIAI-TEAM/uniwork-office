@@ -31,7 +31,7 @@ export const id = {
   aiFootprintOverwritten: 'Sel berisi data yang ditimpa: {count}',
   aiFootprintOverwrittenMin: 'Sel berisi data yang ditimpa: minimal {count}',
   aiFootprintNoOverwrite: 'Tidak ada data yang ditimpa',
-  aiUndoTitle: 'Urungkan perubahan AI ini (sama dengan ⌘Z)',
+  aiUndoTitle: 'Urungkan perubahan AI ini (sama dengan {undoKeys})',
   aiUndo: 'Urungkan',
   aiPreviewAria: 'Pratinjau perubahan',
   aiProposedChanges: 'Perubahan yang diusulkan',

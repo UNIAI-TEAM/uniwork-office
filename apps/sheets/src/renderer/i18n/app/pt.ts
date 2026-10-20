@@ -150,7 +150,8 @@ export const pt = {
   appRefreshHintOut: 'Selecione a área da Tabela Dinâmica e atualize',
   appAttachmentReadFailed: '{name}: falha na leitura',
   appTooManyImages: 'No máximo {max} imagens por mensagem; as extras foram ignoradas',
-  appAppliedRevision: 'Aplicado (revisão {revision}) — desfaça com ⌘Z, salve no arquivo com ⌘S.',
+  appAppliedRevision:
+    'Aplicado (revisão {revision}) — desfaça com {undoKeys}, salve no arquivo com {saveKeys}.',
   appCannotReadImage: 'Não foi possível ler o arquivo de imagem.',
   appTableNotDeletable:
     'A tabela "{name}" não existe ou não foi criada nesta sessão — tabelas já existentes no arquivo ainda não podem ser excluídas.',
@@ -164,9 +165,9 @@ export const pt = {
     'A definição da Tabela Dinâmica ainda não terminou de carregar (ou falhou na análise) — tente novamente em instantes.',
   appPivotNoChartData: 'Esta Tabela Dinâmica não tem linhas/colunas de dados para gerar o gráfico.',
   appPivotChartInsertedTruncated:
-    'Gráfico Dinâmico inserido (muitos pontos de dados, truncado) — salve (⌘S) para gravar no arquivo.',
+    'Gráfico Dinâmico inserido (muitos pontos de dados, truncado) — salve ({saveKeys}) para gravar no arquivo.',
   appPivotChartInserted:
-    'Gráfico Dinâmico inserido — acompanha as atualizações da Tabela Dinâmica; salve (⌘S) para gravar no arquivo.',
+    'Gráfico Dinâmico inserido — acompanha as atualizações da Tabela Dinâmica; salve ({saveKeys}) para gravar no arquivo.',
   appSheetNoPivot: 'Esta planilha não tem Tabelas Dinâmicas.',
   appPivotNeedsFullLoad:
     'Atualizar Tabelas Dinâmicas requer o modo de carregamento completo — esta pasta de trabalho é muito grande e foi carregada por streaming.',
@@ -204,7 +205,7 @@ export const pt = {
   appPutCursorInPivot: 'Posicione o cursor dentro da saída da Tabela Dinâmica que deseja editar.',
   appPivotNoCacheDef: 'Esta Tabela Dinâmica não tem definição de cache e não pode ser editada.',
   appPivotDefNotLoadedSave:
-    'A definição da Tabela Dinâmica ainda não foi carregada — se você a editou nesta sessão, salve (⌘S) primeiro.',
+    'A definição da Tabela Dinâmica ainda não foi carregada — se você a editou nesta sessão, salve ({saveKeys}) primeiro.',
   appPivotEditUnsupported: 'Esta Tabela Dinâmica ainda não pode ser editada: {reasons}',
   appPivotEditHasFeatures:
     'Tabelas Dinâmicas com agrupamento, filtros, filtros de relatório ou campos calculados ainda não suportam edição de layout — ajuste-as no Excel.',
@@ -215,12 +216,12 @@ export const pt = {
   appPivotSourceSheetNotFound:
     'Não foi possível encontrar a planilha de origem da Tabela Dinâmica "{name}".',
   appPivotLayoutUpdated:
-    'Layout da Tabela Dinâmica atualizado — salve (⌘S) para gravar no arquivo; o Excel reconstrói o cache ao abrir.',
+    'Layout da Tabela Dinâmica atualizado — salve ({saveKeys}) para gravar no arquivo; o Excel reconstrói o cache ao abrir.',
   appPivotEditFailed: 'Falha ao editar a Tabela Dinâmica.',
   appNoActiveSheet: 'Nenhuma planilha ativa.',
   appCurrentSheetNoPivot: 'A planilha atual não tem Tabelas Dinâmicas.',
   appPivotsRefreshed:
-    '{count} Tabela(s) Dinâmica(s) atualizada(s) — salve para gravar no arquivo (⌘S).',
+    '{count} Tabela(s) Dinâmica(s) atualizada(s) — salve para gravar no arquivo ({saveKeys}).',
   appRefreshFailed: 'Falha ao atualizar.',
   appSlicerNeedsFile:
     'Abra primeiro um arquivo XLSX — as segmentações funcionam com as Tabelas Dinâmicas do arquivo.',
@@ -238,7 +239,7 @@ export const pt = {
   appSlicerFilterFailed: 'Falha na filtragem por segmentação.',
   appSlicerKeepOne: 'Mantenha pelo menos um membro selecionado na segmentação.',
   appSlicerApplied:
-    'Segmentação "{name}" aplicada — salve (⌘S) para gravar a Tabela Dinâmica filtrada.',
+    'Segmentação "{name}" aplicada — salve ({saveKeys}) para gravar a Tabela Dinâmica filtrada.',
   appSlicerCleared: 'Filtro da segmentação "{name}" limpo.',
   appSlicerRemoved: 'Segmentação "{name}" removida; todos os membros restaurados.',
   appTimelineHintIn: 'Inserir uma linha do tempo para um campo de data da Tabela Dinâmica atual',
@@ -249,7 +250,7 @@ export const pt = {
   appTimelineCreated:
     'Linha do tempo "{name}" criada — clique nos meses para filtrar a Tabela Dinâmica.',
   appTimelineApplied:
-    'Linha do tempo "{name}" aplicada — salve (⌘S) para gravar a Tabela Dinâmica filtrada.',
+    'Linha do tempo "{name}" aplicada — salve ({saveKeys}) para gravar a Tabela Dinâmica filtrada.',
   appTimelineCleared: 'Filtro da linha do tempo "{name}" limpo.',
   appTimelineRemoved: 'Linha do tempo "{name}" removida; todos os membros restaurados.',
   appTimelineEmptyRange: 'Nenhum membro no intervalo de meses selecionado.',
@@ -272,7 +273,7 @@ export const pt = {
     'O Filtro Avançado precisa de um intervalo de AutoFiltro — selecione os dados e clique em Filtro primeiro.',
   appAdvFilterGone: 'A planilha atual não tem AutoFiltro — ative-o novamente e tente de novo.',
   appAdvFilterFailed: 'Falha ao aplicar o filtro avançado.',
-  appAdvFilterApplied: 'Critérios do filtro avançado aplicados — ⌘S salva no arquivo.',
+  appAdvFilterApplied: 'Critérios do filtro avançado aplicados — {saveKeys} salva no arquivo.',
   appFlashFillNeedsLeft:
     'O Preenchimento Relâmpago precisa de colunas de dados à esquerda da coluna de destino.',
   appFlashFillNeedsRows: 'O Preenchimento Relâmpago precisa de pelo menos duas linhas de dados.',
@@ -290,7 +291,7 @@ export const pt = {
   appSparklineOutsideGrid:
     'As células de destino dos minigráficos ficam fora da grade da planilha.',
   appSparklinesInserted:
-    '{count} minigráfico(s) inserido(s) na coluna à direita da seleção — ⌘S salva no arquivo.',
+    '{count} minigráfico(s) inserido(s) na coluna à direita da seleção — {saveKeys} salva no arquivo.',
   appSaveHeldStranded:
     'Tabelas Dinâmicas/tabelas não podem ser salvas junto com novas planilhas e alterações de linhas/colunas — salve a estrutura primeiro e depois adicione as Tabelas Dinâmicas/tabelas.',
   appSaveSecondCanceled:
@@ -367,7 +368,7 @@ export const pt = {
   appPreviewSheetGone: 'A planilha visualizada não existe mais — crie uma nova visualização.',
   appWorkbookChangedSincePreview:
     'A pasta de trabalho mudou desde a visualização — crie uma nova visualização.',
-  appAppliedJournaled: 'Aplicado — as alterações foram registradas; salve com ⌘S.',
+  appAppliedJournaled: 'Aplicado — as alterações foram registradas; salve com {saveKeys}.',
   appUndoCommitted: 'Desfazer confirmado como revisão {revision}.',
   appUndoFailed: 'Não foi possível desfazer.',
   appAutoFilterCreateFailed: 'Não foi possível criar o AutoFiltro.',
@@ -379,16 +380,16 @@ export const pt = {
   appChartInsertFailed: 'Não foi possível inserir o gráfico.',
   appChartNeedsNumericColumn:
     'Selecione um intervalo com pelo menos uma coluna numérica (cabeçalhos opcionais).',
-  appChartInserted: 'Gráfico inserido — selecione-o para editar; ⌘S grava no arquivo.',
+  appChartInserted: 'Gráfico inserido — selecione-o para editar; {saveKeys} grava no arquivo.',
   appShapeNeedsFile: 'Abra primeiro um arquivo XLSX — as formas inseridas são gravadas no arquivo.',
   appSelectCellFirst: 'Selecione uma célula primeiro.',
-  appTextBoxInserted: 'Caixa de texto inserida — gravada no arquivo ao salvar (⌘S).',
-  appShapeInserted: 'Forma inserida — gravada no arquivo ao salvar (⌘S).',
+  appTextBoxInserted: 'Caixa de texto inserida — gravada no arquivo ao salvar ({saveKeys}).',
+  appShapeInserted: 'Forma inserida — gravada no arquivo ao salvar ({saveKeys}).',
   appPictureNeedsFile:
     'Abra primeiro um arquivo XLSX — as imagens inseridas são gravadas no arquivo.',
   appPictureTooLarge: 'Imagens com mais de 20MB não são suportadas.',
   appPictureBadType: 'Somente imagens PNG, JPEG ou GIF são suportadas.',
-  appPictureInserted: 'Imagem inserida — gravada no arquivo ao salvar (⌘S).',
+  appPictureInserted: 'Imagem inserida — gravada no arquivo ao salvar ({saveKeys}).',
   appTableNeedsRows:
     'Uma tabela precisa de uma linha de cabeçalho e pelo menos uma linha de dados.',
   appTableTooWide: 'Uma tabela pode ter no máximo 1.000 colunas.',
@@ -397,7 +398,7 @@ export const pt = {
   appTableOverlapsSession: 'O intervalo sobrepõe a tabela "{name}" criada nesta sessão.',
   appTablesNeedFile: 'Abra primeiro um arquivo XLSX — as tabelas são gravadas no arquivo.',
   appTableSelectRange: 'Selecione primeiro o intervalo de dados — cabeçalhos na primeira linha.',
-  appTableCreated: 'Tabela criada — salve com ⌘S.',
+  appTableCreated: 'Tabela criada — salve com {saveKeys}.',
   appTableCreateFailed: 'Não foi possível criar a tabela.',
   appPivotOnAddedSheet:
     'Tabelas Dinâmicas em planilhas adicionadas nesta sessão ainda não são suportadas — salve primeiro.',
@@ -450,14 +451,14 @@ export const pt = {
   appOutlineNeedsFile:
     'Abra primeiro um arquivo XLSX — os grupos de estrutura de tópicos são gravados no arquivo.',
   appOutlineSelectFirst: 'Selecione primeiro as linhas ou colunas a agrupar.',
-  appDetailHidden: 'Detalhes ocultos — salve com ⌘S.',
-  appDetailShown: 'Detalhes exibidos — salve com ⌘S.',
+  appDetailHidden: 'Detalhes ocultos — salve com {saveKeys}.',
+  appDetailShown: 'Detalhes exibidos — salve com {saveKeys}.',
   appOutlineMaxLevel: 'Já está no nível mais profundo da estrutura de tópicos (7).',
   appNothingToUngroup: 'Nada para desagrupar na seleção.',
-  appRowsGrouped: 'Linhas agrupadas — salve com ⌘S. Recolha-as com Ocultar Detalhes.',
-  appColsGrouped: 'Colunas agrupadas — salve com ⌘S. Recolha-as com Ocultar Detalhes.',
-  appRowsUngrouped: 'Linhas desagrupadas — salve com ⌘S.',
-  appColsUngrouped: 'Colunas desagrupadas — salve com ⌘S.',
+  appRowsGrouped: 'Linhas agrupadas — salve com {saveKeys}. Recolha-as com Ocultar Detalhes.',
+  appColsGrouped: 'Colunas agrupadas — salve com {saveKeys}. Recolha-as com Ocultar Detalhes.',
+  appRowsUngrouped: 'Linhas desagrupadas — salve com {saveKeys}.',
+  appColsUngrouped: 'Colunas desagrupadas — salve com {saveKeys}.',
   appSheetAdded: 'Planilha adicionada — clique duas vezes na guia para renomear.',
   appSheetAddFailed: 'Não foi possível adicionar a planilha.',
   appFormatCopied: 'Formato copiado — selecione as células de destino para aplicá-lo.',
@@ -468,15 +469,15 @@ export const pt = {
   appProtectionWillWrite: 'A proteção da planilha está ativa e será gravada ao salvar.',
   appProtectionWillRemove: 'A proteção da planilha será removida ao salvar.',
   appZoom: 'Zoom {percent}%.',
-  appTopRowFrozen: 'Primeira linha congelada — salve com ⌘S.',
-  appFirstColFrozen: 'Primeira coluna congelada — salve com ⌘S.',
+  appTopRowFrozen: 'Primeira linha congelada — salve com {saveKeys}.',
+  appFirstColFrozen: 'Primeira coluna congelada — salve com {saveKeys}.',
   appFindMatchesCapped:
     'Muitas correspondências: mostrando as primeiras {count} — refine a pesquisa para ver o restante.',
   appFindScanTruncated:
     'Planilha grande: a pesquisa parou após {cells} células — os resultados podem estar incompletos.',
   appReplaceNeedsFullLoad: 'Substituir requer o modo de carregamento completo — use Localizar.',
-  appGridlinesHiddenSave: 'Linhas de grade ocultas — salve com ⌘S.',
-  appGridlinesShownSave: 'Linhas de grade exibidas — salve com ⌘S.',
+  appGridlinesHiddenSave: 'Linhas de grade ocultas — salve com {saveKeys}.',
+  appGridlinesShownSave: 'Linhas de grade exibidas — salve com {saveKeys}.',
   appGridlinesHidden: 'Linhas de grade ocultas.',
   appGridlinesShown: 'Linhas de grade exibidas.',
   appShowingFormulas: 'Exibindo fórmulas — alterne novamente para ver os valores.',
@@ -493,10 +494,10 @@ export const pt = {
   appNoTraceArrows: 'Não há setas de rastreamento para remover.',
   appWorkbookStats:
     'Estatísticas da pasta de trabalho: {sheets} planilhas · {cells} células com dados · {formulas} fórmulas{note}.',
-  appFrozenAtSelection: 'Congelado na seleção — salve com ⌘S.',
+  appFrozenAtSelection: 'Congelado na seleção — salve com {saveKeys}.',
   appSelectCellsFirst: 'Selecione as células primeiro.',
   appCellStyleApplied:
-    'Estilo de célula aplicado — registrado como qualquer edição de formato (⌘S para salvar).',
+    'Estilo de célula aplicado — registrado como qualquer edição de formato ({saveKeys} para salvar).',
   appSelectRangeFirst: 'Selecione um intervalo de células primeiro.',
   appSettingNeedsFile:
     'Abra primeiro um arquivo XLSX — esta configuração é salva apenas no arquivo.',
@@ -533,11 +534,11 @@ export const pt = {
   appOpeningWorkbook: 'Abrindo pasta de trabalho…',
   appOpenStalled: 'Não foi possível abrir a pasta de trabalho.',
   appOpenRetry: 'Tentar novamente',
-  appOpened: '{name} aberto — edições de células são salvas de volta com ⌘S.',
+  appOpened: '{name} aberto — edições de células são salvas de volta com {saveKeys}.',
   appOpenFailed: 'Não foi possível abrir a pasta de trabalho.',
   appPageSetupNeedsFile:
     'Abra primeiro um arquivo XLSX — a configuração de página é salva no arquivo.',
-  appPageSetupRecorded: '{note} — salve com ⌘S.',
+  appPageSetupRecorded: '{note} — salve com {saveKeys}.',
   appOrientationPortrait: 'Orientação: retrato',
   appOrientationLandscape: 'Orientação: paisagem',
   appMarginsNormal: 'Margens: normais',
@@ -562,7 +563,7 @@ export const pt = {
   appRowsRepeat: 'As linhas {rows} se repetem em todas as páginas impressas',
   appHfNeedsFile: 'Abra primeiro um arquivo XLSX — cabeçalhos e rodapés são salvos no arquivo.',
   appActiveSheetUnavailable: 'A planilha ativa está indisponível.',
-  appHfUpdated: 'Cabeçalho e rodapé atualizados — salve com ⌘S.',
+  appHfUpdated: 'Cabeçalho e rodapé atualizados — salve com {saveKeys}.',
   appPdfNeedsFullLoad:
     'A exportação de PDF requer a pasta de trabalho totalmente carregada — aguarde o carregamento terminar.',
   appPdfRendering: 'Renderizando o PDF…',
@@ -635,11 +636,12 @@ export const pt = {
   appNoteNextTitle: 'Ir para o próximo comentário',
   appShowCommentsTitle: 'Fixar/desafixar o balão de comentário da célula selecionada',
   appStructuralShiftBlocked:
-    'Um gráfico ou tabela nesta planilha está ancorado às linhas/colunas afetadas; não é possível deslocá-las e a alteração estrutural não foi salva. Desfaça (⌘Z) e salve novamente.',
-  appAiChangesNotSaved: 'Alterações de IA aplicadas (não salvas). Desfaça com ⌘Z; salve com ⌘S.',
+    'Um gráfico ou tabela nesta planilha está ancorado às linhas/colunas afetadas; não é possível deslocá-las e a alteração estrutural não foi salva. Desfaça ({undoKeys}) e salve novamente.',
+  appAiChangesNotSaved:
+    'Alterações de IA aplicadas (não salvas). Desfaça com {undoKeys}; salve com {saveKeys}.',
   appChartUpdated: 'Gráfico atualizado.',
   appChartNotEditable: 'Este gráfico não é editável.',
-  appChartEditRecorded: 'Edição do gráfico registrada — salve com ⌘S.',
+  appChartEditRecorded: 'Edição do gráfico registrada — salve com {saveKeys}.',
   appChartDeleted: 'Gráfico excluído.',
   appChartMoved: 'Gráfico movido.',
   appVisualNotEditable: 'Este objeto não é editável.',
@@ -647,21 +649,21 @@ export const pt = {
   appFileVisualMoveDeleteOnly:
     'Objetos já existentes no arquivo só podem ser movidos ou excluídos.',
   appVisualNoMove: 'Este objeto não pode ser movido — sua forma de desenho não é editável.',
-  appVisualDeleted: 'Objeto excluído — salve com ⌘S.',
-  appShapeTextUpdated: 'Texto da forma atualizado — salve com ⌘S.',
-  appShapeMoved: 'Forma movida — salve com ⌘S.',
+  appVisualDeleted: 'Objeto excluído — salve com {saveKeys}.',
+  appShapeTextUpdated: 'Texto da forma atualizado — salve com {saveKeys}.',
+  appShapeMoved: 'Forma movida — salve com {saveKeys}.',
   appTabShapeFormat: 'Formato da Forma',
   appShapeFill: 'Preenchimento da Forma',
   appShapeOutline: 'Contorno da Forma',
   appShapeNoOutline: 'Sem Contorno',
-  appShapeStyleUpdated: 'Estilo da forma atualizado — salve com ⌘S.',
+  appShapeStyleUpdated: 'Estilo da forma atualizado — salve com {saveKeys}.',
   appDeleteShape: 'Excluir Forma',
   appGroupShapeStyles: 'Estilos de forma',
   appScopeWorkbook: 'Pasta de Trabalho',
   appNamesNeedFile: 'Abra primeiro um arquivo XLSX — os nomes definidos são salvos no arquivo.',
   appNameGone: 'Esse nome não existe mais.',
   appNameApplyFailed: 'Não foi possível aplicar o nome.',
-  appNamesUpdated: 'Nomes definidos atualizados — salve com ⌘S.',
+  appNamesUpdated: 'Nomes definidos atualizados — salve com {saveKeys}.',
   appLinkInternal: 'O link aponta para dentro da pasta de trabalho: {location}',
   appLinkSheetNotFound: 'A planilha "{name}" não foi encontrada.',
   appLinkJumpFailed: 'Não foi possível ir para {location}.',
@@ -724,7 +726,7 @@ export const pt = {
   appAutoSaveTitle: 'O Salvamento Automático está disponível apenas para arquivos na nuvem',
   appAutoSaveTip: 'Salvamento automático (a cada 30 segundos e quando a janela perde o foco)',
   appExportPdfTitle: 'Exportar como PDF',
-  appSaveTitle: 'Salvar (⌘S)',
+  appSaveTitle: 'Salvar',
   appSaveAs: 'Salvar Como',
   appUndo: 'Desfazer',
   appRedo: 'Refazer',
@@ -733,7 +735,7 @@ export const pt = {
   appSavedState: 'Salvo',
   appSavedLocally: 'Salvo localmente',
   appRevisionChip: 'Revisão {revision}',
-  appOpenWorkbookTitle: 'Abrir Pasta de Trabalho (⌘O)',
+  appOpenWorkbookTitle: 'Abrir Pasta de Trabalho',
   appOpenXlsx: 'Abrir XLSX',
   appHideAi: 'Ocultar IA',
   appShowAi: 'Mostrar IA',
@@ -1308,7 +1310,7 @@ export const pt = {
   appAllowEditRanges: 'Permitir Edição de Intervalos',
   appGroupClipboard: 'Área de Transferência',
   appPaste: 'Colar',
-  appPasteTitle: 'Colar ⌘V',
+  appPasteTitle: 'Colar',
   appPasteSpecial: 'Colar Especial',
   appPasteSpecialTitle: 'Colar somente valores, fórmulas ou formatação',
   appPasteValuesOnly: 'Somente Valores',
@@ -1317,8 +1319,8 @@ export const pt = {
   appPasteColWidths: 'Somente Larguras de Coluna',
   appPasteExceptBorders: 'Tudo Exceto Bordas',
   appPasteSpecialDialog: 'Colar especial…',
-  appCutTitle: 'Recortar ⌘X',
-  appCopyTitle: 'Copiar ⌘C',
+  appCutTitle: 'Recortar',
+  appCopyTitle: 'Copiar',
   appFormatPainter: 'Pincel de Formatação',
   appFormatPainterTip: 'Pincel de Formatação — clique duas vezes para mantê-lo ativo até Esc',
   appFormatPainterLocked:
@@ -1413,7 +1415,7 @@ export const pt = {
   appClearFormats: 'Limpar Formatos',
   appClearContents: 'Limpar Conteúdo',
   appFind: 'Localizar',
-  appFindTitle: 'Localizar e Selecionar ⌘F',
+  appFindTitle: 'Localizar e Selecionar',
   appReplace: 'Substituir',
   appGoTo: 'Ir para',
   appInsertCells: 'Inserir células…',
@@ -1536,9 +1538,9 @@ export const pt = {
   appVisualSizeProperties: 'Tamanho e propriedades…',
   appVisualHyperlink: 'Hiperligação…',
   appVisualDelete: 'Eliminar',
-  appVisualArranged: 'Objeto atualizado — guarde com ⌘S.',
+  appVisualArranged: 'Objeto atualizado — guarde com {saveKeys}.',
   appVisualCopied: 'Objeto copiado.',
-  appVisualPasted: 'Objeto colado — guarde com ⌘S.',
+  appVisualPasted: 'Objeto colado — guarde com {saveKeys}.',
   appVisualNoCopy: 'Este objeto não pode ser copiado.',
   appVisualSelectTwo: 'Shift+clique para selecionar pelo menos dois objetos a alinhar.',
   appVisualSelectThree: 'Shift+clique para selecionar pelo menos três objetos a distribuir.',

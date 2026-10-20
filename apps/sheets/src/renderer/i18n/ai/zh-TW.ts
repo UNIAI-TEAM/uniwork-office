@@ -31,7 +31,7 @@ export const zhTW = {
   aiFootprintOverwritten: '被覆寫的既有資料儲存格：{count}',
   aiFootprintOverwrittenMin: '被覆寫的既有資料儲存格：至少 {count}',
   aiFootprintNoOverwrite: '未覆寫既有資料',
-  aiUndoTitle: '復原本次 AI 修改（等同於 ⌘Z）',
+  aiUndoTitle: '復原本次 AI 修改（等同於 {undoKeys}）',
   aiUndo: '復原',
   aiPreviewAria: '變更預覽',
   aiProposedChanges: '擬定變更',

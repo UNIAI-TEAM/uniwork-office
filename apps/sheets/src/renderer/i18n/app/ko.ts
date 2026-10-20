@@ -145,7 +145,8 @@ export const ko = {
   // App status bar / toast messages
   appAttachmentReadFailed: '{name}: 읽기 실패',
   appTooManyImages: '메시지당 이미지는 최대 {max}개까지 보낼 수 있으며, 초과분은 무시되었습니다',
-  appAppliedRevision: '적용했습니다(리비전 {revision}) — ⌘Z로 실행 취소, ⌘S로 파일에 저장합니다.',
+  appAppliedRevision:
+    '적용했습니다(리비전 {revision}) — {undoKeys}로 실행 취소, {saveKeys}로 파일에 저장합니다.',
   appCannotReadImage: '이미지 파일을 읽을 수 없습니다.',
   appTableNotDeletable:
     '표 "{name}"이(가) 없거나 이번 세션에서 만든 표가 아닙니다. 파일에 원래 있던 표는 아직 삭제할 수 없습니다.',
@@ -158,9 +159,9 @@ export const ko = {
     '피벗 테이블 정의가 아직 로드되지 않았거나 구문 분석에 실패했습니다. 잠시 후 다시 시도하십시오.',
   appPivotNoChartData: '이 피벗 테이블에는 차트로 만들 수 있는 데이터 행/열이 없습니다.',
   appPivotChartInsertedTruncated:
-    '피벗 차트를 삽입했습니다(데이터 요소가 너무 많아 잘렸습니다). 저장(⌘S)하면 파일에 기록됩니다.',
+    '피벗 차트를 삽입했습니다(데이터 요소가 너무 많아 잘렸습니다). 저장({saveKeys})하면 파일에 기록됩니다.',
   appPivotChartInserted:
-    '피벗 차트를 삽입했습니다. 피벗 테이블 새로 고침과 연동되며, 저장(⌘S)하면 파일에 기록됩니다.',
+    '피벗 차트를 삽입했습니다. 피벗 테이블 새로 고침과 연동되며, 저장({saveKeys})하면 파일에 기록됩니다.',
   appSheetNoPivot: '이 시트에는 피벗 테이블이 없습니다.',
   appPivotNeedsFullLoad:
     '피벗 테이블 새로 고침에는 전체 로드 모드가 필요합니다. 이 통합 문서는 너무 커서 스트리밍 방식으로만 로드되었습니다.',
@@ -196,7 +197,7 @@ export const ko = {
   appPutCursorInPivot: '먼저 편집할 피벗 테이블 출력 영역 안에 커서를 두십시오.',
   appPivotNoCacheDef: '이 피벗 테이블에는 캐시 정의가 없어 편집할 수 없습니다.',
   appPivotDefNotLoadedSave:
-    '이 피벗 테이블의 정의가 아직 로드되지 않았습니다. 이번 세션에서 편집했다면 먼저 저장(⌘S)한 후 계속하십시오.',
+    '이 피벗 테이블의 정의가 아직 로드되지 않았습니다. 이번 세션에서 편집했다면 먼저 저장({saveKeys})한 후 계속하십시오.',
   appPivotEditUnsupported: '이 피벗 테이블은 아직 편집할 수 없습니다: {reasons}',
   appPivotEditHasFeatures:
     '그룹화/필터/보고서 필터/계산 필드가 있는 피벗 테이블은 아직 레이아웃 편집을 지원하지 않습니다. Excel에서 조정하십시오.',
@@ -206,11 +207,12 @@ export const ko = {
     '이 피벗 테이블의 집계 방식(곱, 숫자 개수 등)은 아직 레이아웃 편집을 지원하지 않습니다.',
   appPivotSourceSheetNotFound: '피벗 테이블의 원본 데이터 시트 "{name}"을(를) 찾을 수 없습니다.',
   appPivotLayoutUpdated:
-    '피벗 테이블 레이아웃을 업데이트했습니다. 저장(⌘S)하면 파일에 기록되며, Excel에서 열 때 캐시가 다시 만들어집니다.',
+    '피벗 테이블 레이아웃을 업데이트했습니다. 저장({saveKeys})하면 파일에 기록되며, Excel에서 열 때 캐시가 다시 만들어집니다.',
   appPivotEditFailed: '피벗 테이블을 편집하지 못했습니다.',
   appNoActiveSheet: '활성 시트가 없습니다.',
   appCurrentSheetNoPivot: '현재 시트에는 피벗 테이블이 없습니다.',
-  appPivotsRefreshed: '피벗 테이블 {count}개를 새로 고쳤습니다 — 저장(⌘S)하면 파일에 기록됩니다.',
+  appPivotsRefreshed:
+    '피벗 테이블 {count}개를 새로 고쳤습니다 — 저장({saveKeys})하면 파일에 기록됩니다.',
   appRefreshFailed: '새로 고침에 실패했습니다.',
   appSlicerNeedsFile:
     '먼저 XLSX 파일을 여십시오. 슬라이서는 파일에 있는 피벗 테이블을 기반으로 합니다.',
@@ -228,7 +230,7 @@ export const ko = {
   appSlicerFilterFailed: '슬라이서 필터링에 실패했습니다.',
   appSlicerKeepOne: '슬라이서에서는 구성원을 하나 이상 선택된 상태로 유지하십시오.',
   appSlicerApplied:
-    '슬라이서 "{name}"을(를) 적용했습니다. 저장(⌘S)하면 필터링된 피벗 테이블이 기록됩니다.',
+    '슬라이서 "{name}"을(를) 적용했습니다. 저장({saveKeys})하면 필터링된 피벗 테이블이 기록됩니다.',
   appSlicerCleared: '슬라이서 "{name}"의 필터를 해제했습니다.',
   appSlicerRemoved: '슬라이서 "{name}"을(를) 삭제했습니다. 모든 구성원이 복원되었습니다.',
   appTimelineHintIn: '현재 피벗 테이블의 날짜 필드로 시간 표시 막대 삽입',
@@ -238,7 +240,7 @@ export const ko = {
   appTimelineCreated:
     '시간 표시 막대 "{name}"을(를) 만들었습니다. 월을 클릭하면 피벗 테이블이 필터링됩니다.',
   appTimelineApplied:
-    '시간 표시 막대 "{name}"을(를) 적용했습니다. 저장(⌘S)하면 필터링된 피벗 테이블이 기록됩니다.',
+    '시간 표시 막대 "{name}"을(를) 적용했습니다. 저장({saveKeys})하면 필터링된 피벗 테이블이 기록됩니다.',
   appTimelineCleared: '시간 표시 막대 "{name}"의 필터를 해제했습니다.',
   appTimelineRemoved: '시간 표시 막대 "{name}"을(를) 삭제했습니다. 모든 구성원이 복원되었습니다.',
   appTimelineEmptyRange: '선택한 월 범위에 구성원이 없습니다.',
@@ -259,7 +261,7 @@ export const ko = {
     '고급 필터에는 자동 필터 범위가 필요합니다 — 먼저 데이터를 선택하고 필터를 켜십시오.',
   appAdvFilterGone: '현재 시트에 자동 필터가 없습니다 — 다시 켠 후 시도하십시오.',
   appAdvFilterFailed: '고급 필터를 적용하지 못했습니다.',
-  appAdvFilterApplied: '고급 필터 조건을 적용했습니다 — ⌘S로 저장하면 파일에 기록됩니다.',
+  appAdvFilterApplied: '고급 필터 조건을 적용했습니다 — {saveKeys}로 저장하면 파일에 기록됩니다.',
   appFlashFillNeedsLeft: '빠른 채우기에는 대상 열 왼쪽에 데이터 열이 필요합니다.',
   appFlashFillNeedsRows: '빠른 채우기에는 데이터가 두 행 이상 필요합니다.',
   appFlashFillNeedsExamples: '먼저 대상 열에 예를 1~2개 입력한 후 빠른 채우기를 클릭하십시오.',
@@ -273,7 +275,7 @@ export const ko = {
   appSparklineNoSpace: '선택 영역 오른쪽에 스파크라인을 배치할 공간이 없습니다.',
   appSparklineOutsideGrid: '스파크라인 대상 셀이 워크시트 그리드 밖에 있습니다.',
   appSparklinesInserted:
-    '스파크라인 {count}개를 삽입했습니다(선택 영역 오른쪽 열). ⌘S로 파일에 저장합니다.',
+    '스파크라인 {count}개를 삽입했습니다(선택 영역 오른쪽 열). {saveKeys}로 파일에 저장합니다.',
   appSaveHeldStranded:
     '피벗 테이블/표는 새 시트 및 행/열 변경과 한 번에 저장할 수 없습니다. 먼저 구조를 저장한 후 피벗 테이블/표를 추가하십시오.',
   appSaveSecondCanceled:
@@ -345,7 +347,7 @@ export const ko = {
   appPreviewSheetGone: '미리 본 시트가 더 이상 없습니다 — 미리 보기를 다시 만드십시오.',
   appWorkbookChangedSincePreview:
     '미리 보기 이후 통합 문서가 변경되었습니다 — 미리 보기를 다시 만드십시오.',
-  appAppliedJournaled: '적용했습니다 — 변경 내용이 기록되었습니다. ⌘S로 파일에 저장합니다.',
+  appAppliedJournaled: '적용했습니다 — 변경 내용이 기록되었습니다. {saveKeys}로 파일에 저장합니다.',
   appUndoCommitted: '실행 취소를 커밋했습니다(리비전 {revision}).',
   appUndoFailed: '실행 취소할 수 없습니다.',
   appAutoFilterCreateFailed: '자동 필터를 만들 수 없습니다.',
@@ -358,16 +360,17 @@ export const ko = {
   appChartInsertFailed: '차트를 삽입할 수 없습니다.',
   appChartNeedsNumericColumn:
     '숫자 열을 하나 이상 포함하는 범위를 선택하십시오(머리글은 선택 사항).',
-  appChartInserted: '차트를 삽입했습니다 — 선택하면 편집할 수 있으며, ⌘S로 파일에 기록합니다.',
+  appChartInserted:
+    '차트를 삽입했습니다 — 선택하면 편집할 수 있으며, {saveKeys}로 파일에 기록합니다.',
   // Insert shape / image
   appShapeNeedsFile: '먼저 XLSX 파일을 여십시오. 삽입한 도형은 파일에 기록됩니다.',
   appSelectCellFirst: '먼저 셀을 선택하십시오.',
-  appTextBoxInserted: '텍스트 상자를 삽입했습니다 — 저장할 때 파일에 기록됩니다(⌘S).',
-  appShapeInserted: '도형을 삽입했습니다 — 저장할 때 파일에 기록됩니다(⌘S).',
+  appTextBoxInserted: '텍스트 상자를 삽입했습니다 — 저장할 때 파일에 기록됩니다({saveKeys}).',
+  appShapeInserted: '도형을 삽입했습니다 — 저장할 때 파일에 기록됩니다({saveKeys}).',
   appPictureNeedsFile: '먼저 XLSX 파일을 여십시오. 삽입한 그림은 파일에 기록됩니다.',
   appPictureTooLarge: '20MB를 초과하는 그림은 지원되지 않습니다.',
   appPictureBadType: 'PNG, JPEG, GIF 그림만 지원됩니다.',
-  appPictureInserted: '그림을 삽입했습니다 — 저장할 때 파일에 기록됩니다(⌘S).',
+  appPictureInserted: '그림을 삽입했습니다 — 저장할 때 파일에 기록됩니다({saveKeys}).',
   // Tables
   appTableNeedsRows: '표에는 머리글 행과 데이터 행이 하나 이상 필요합니다.',
   appTableTooWide: '표는 최대 1,000개 열까지 지원합니다.',
@@ -376,7 +379,7 @@ export const ko = {
   appTableOverlapsSession: '이 범위는 이번 세션에서 만든 표 "{name}"과(와) 겹칩니다.',
   appTablesNeedFile: '먼저 XLSX 파일을 여십시오. 표는 파일에 기록됩니다.',
   appTableSelectRange: '먼저 데이터 범위를 선택하십시오. 첫 행이 머리글이 됩니다.',
-  appTableCreated: '표를 만들었습니다 — ⌘S로 저장합니다.',
+  appTableCreated: '표를 만들었습니다 — {saveKeys}로 저장합니다.',
   appTableCreateFailed: '표를 만들 수 없습니다.',
   // Pivot-creation validation
   appPivotOnAddedSheet:
@@ -427,14 +430,16 @@ export const ko = {
   // Outline (grouping)
   appOutlineNeedsFile: '먼저 XLSX 파일을 여십시오. 개요는 파일에 기록됩니다.',
   appOutlineSelectFirst: '먼저 그룹화할 행이나 열을 선택하십시오.',
-  appDetailHidden: '하위 수준을 숨겼습니다 — ⌘S로 저장합니다.',
-  appDetailShown: '하위 수준을 표시했습니다 — ⌘S로 저장합니다.',
+  appDetailHidden: '하위 수준을 숨겼습니다 — {saveKeys}로 저장합니다.',
+  appDetailShown: '하위 수준을 표시했습니다 — {saveKeys}로 저장합니다.',
   appOutlineMaxLevel: '이미 가장 깊은 개요 수준(7)입니다.',
   appNothingToUngroup: '선택 영역에 그룹 해제할 항목이 없습니다.',
-  appRowsGrouped: '행을 그룹화했습니다 — ⌘S로 저장합니다. 하위 수준 숨기기로 접을 수 있습니다.',
-  appColsGrouped: '열을 그룹화했습니다 — ⌘S로 저장합니다. 하위 수준 숨기기로 접을 수 있습니다.',
-  appRowsUngrouped: '행 그룹을 해제했습니다 — ⌘S로 저장합니다.',
-  appColsUngrouped: '열 그룹을 해제했습니다 — ⌘S로 저장합니다.',
+  appRowsGrouped:
+    '행을 그룹화했습니다 — {saveKeys}로 저장합니다. 하위 수준 숨기기로 접을 수 있습니다.',
+  appColsGrouped:
+    '열을 그룹화했습니다 — {saveKeys}로 저장합니다. 하위 수준 숨기기로 접을 수 있습니다.',
+  appRowsUngrouped: '행 그룹을 해제했습니다 — {saveKeys}로 저장합니다.',
+  appColsUngrouped: '열 그룹을 해제했습니다 — {saveKeys}로 저장합니다.',
   // Ribbon commands
   appSheetAdded: '시트를 추가했습니다 — 탭을 두 번 클릭하면 이름을 바꿀 수 있습니다.',
   appSheetAddFailed: '시트를 추가할 수 없습니다.',
@@ -446,15 +451,15 @@ export const ko = {
   appProtectionWillWrite: '시트 보호가 켜졌으며 저장 시 파일에 기록됩니다.',
   appProtectionWillRemove: '저장할 때 시트 보호가 제거됩니다.',
   appZoom: '확대/축소 {percent}%.',
-  appTopRowFrozen: '첫 행을 고정했습니다 — ⌘S로 저장합니다.',
-  appFirstColFrozen: '첫 열을 고정했습니다 — ⌘S로 저장합니다.',
+  appTopRowFrozen: '첫 행을 고정했습니다 — {saveKeys}로 저장합니다.',
+  appFirstColFrozen: '첫 열을 고정했습니다 — {saveKeys}로 저장합니다.',
   appFindMatchesCapped:
     '일치 항목이 너무 많습니다: 처음 {count}개만 표시합니다. 검색 범위를 좁혀 주세요.',
   appFindScanTruncated:
     '큰 시트: {cells}개 셀에서 검색을 중단했습니다. 결과가 불완전할 수 있습니다.',
   appReplaceNeedsFullLoad: '바꾸기에는 전체 로드 모드가 필요합니다 — 대신 찾기를 사용하십시오.',
-  appGridlinesHiddenSave: '눈금선을 숨겼습니다 — ⌘S로 저장합니다.',
-  appGridlinesShownSave: '눈금선을 표시했습니다 — ⌘S로 저장합니다.',
+  appGridlinesHiddenSave: '눈금선을 숨겼습니다 — {saveKeys}로 저장합니다.',
+  appGridlinesShownSave: '눈금선을 표시했습니다 — {saveKeys}로 저장합니다.',
   appGridlinesHidden: '눈금선을 숨겼습니다.',
   appGridlinesShown: '눈금선을 표시했습니다.',
   appShowingFormulas: '수식을 표시하는 중입니다 — 다시 전환하면 값이 표시됩니다.',
@@ -471,9 +476,10 @@ export const ko = {
   appNoTraceArrows: '제거할 연결선이 없습니다.',
   appWorkbookStats:
     '통합 문서 통계: 시트 {sheets}개 · 데이터가 있는 셀 {cells}개 · 수식 {formulas}개{note}.',
-  appFrozenAtSelection: '선택 위치에서 틀을 고정했습니다 — ⌘S로 저장합니다.',
+  appFrozenAtSelection: '선택 위치에서 틀을 고정했습니다 — {saveKeys}로 저장합니다.',
   appSelectCellsFirst: '먼저 셀을 선택하십시오.',
-  appCellStyleApplied: '셀 스타일을 적용했습니다 — 서식 편집과 마찬가지로 기록됩니다(⌘S로 저장).',
+  appCellStyleApplied:
+    '셀 스타일을 적용했습니다 — 서식 편집과 마찬가지로 기록됩니다({saveKeys}로 저장).',
   appSelectRangeFirst: '먼저 셀 범위를 선택하십시오.',
   appSettingNeedsFile: '먼저 XLSX 파일을 여십시오. 이 설정은 파일에만 저장됩니다.',
   appTooManyCellsForSetting: '이 설정에는 10,000개 미만의 셀을 선택하십시오.',
@@ -506,10 +512,10 @@ export const ko = {
   appOpeningWorkbook: '통합 문서를 여는 중…',
   appOpenStalled: '통합 문서를 열 수 없습니다.',
   appOpenRetry: '다시 시도',
-  appOpened: '{name}을(를) 열었습니다 — 셀 편집은 ⌘S로 파일에 저장합니다.',
+  appOpened: '{name}을(를) 열었습니다 — 셀 편집은 {saveKeys}로 파일에 저장합니다.',
   appOpenFailed: '통합 문서를 열 수 없습니다.',
   appPageSetupNeedsFile: '먼저 XLSX 파일을 여십시오. 페이지 설정은 파일에 저장됩니다.',
-  appPageSetupRecorded: '{note} — ⌘S로 저장합니다.',
+  appPageSetupRecorded: '{note} — {saveKeys}로 저장합니다.',
   appOrientationPortrait: '인쇄 방향: 세로',
   appOrientationLandscape: '인쇄 방향: 가로',
   appMarginsNormal: '여백: 보통',
@@ -534,7 +540,7 @@ export const ko = {
   appRowsRepeat: '{rows}행이 모든 페이지 위쪽에 반복됩니다',
   appHfNeedsFile: '먼저 XLSX 파일을 여십시오. 머리글과 바닥글은 파일에 저장됩니다.',
   appActiveSheetUnavailable: '활성 시트를 사용할 수 없습니다.',
-  appHfUpdated: '머리글/바닥글을 업데이트했습니다 — ⌘S로 저장합니다.',
+  appHfUpdated: '머리글/바닥글을 업데이트했습니다 — {saveKeys}로 저장합니다.',
   appPdfNeedsFullLoad:
     'PDF 내보내기에는 통합 문서 전체 로드가 필요합니다 — 로드가 완료될 때까지 기다리십시오.',
   appPdfRendering: 'PDF를 렌더링하는 중…',
@@ -605,27 +611,27 @@ export const ko = {
   appNoteNextTitle: '다음 메모로 이동',
   appShowCommentsTitle: '선택한 셀의 메모 풍선 고정/고정 해제',
   appStructuralShiftBlocked:
-    '이 시트의 차트나 표가 해당 행/열에 고정되어 있어 이동할 수 없으며, 구조 변경은 저장되지 않았습니다. 실행 취소(⌘Z) 후 다시 저장하세요.',
+    '이 시트의 차트나 표가 해당 행/열에 고정되어 있어 이동할 수 없으며, 구조 변경은 저장되지 않았습니다. 실행 취소({undoKeys}) 후 다시 저장하세요.',
   appAiChangesNotSaved:
-    'AI 변경 사항이 적용되었습니다(저장 안 됨). ⌘Z로 실행 취소, ⌘S로 파일에 저장하세요.',
+    'AI 변경 사항이 적용되었습니다(저장 안 됨). {undoKeys}로 실행 취소, {saveKeys}로 파일에 저장하세요.',
   // Floating objects / chart editing
   appChartUpdated: '차트를 업데이트했습니다.',
   appChartNotEditable: '이 차트는 편집할 수 없습니다.',
-  appChartEditRecorded: '차트 편집을 기록했습니다 — ⌘S로 저장합니다.',
+  appChartEditRecorded: '차트 편집을 기록했습니다 — {saveKeys}로 저장합니다.',
   appChartDeleted: '차트를 삭제했습니다.',
   appChartMoved: '차트를 이동했습니다.',
   appVisualNotEditable: '이 개체는 편집할 수 없습니다.',
   appVisualNoDelete: '이 개체는 삭제할 수 없습니다 — 그리기 도형을 편집할 수 없습니다.',
   appFileVisualMoveDeleteOnly: '파일에 원래 있던 개체는 이동과 삭제만 지원됩니다.',
   appVisualNoMove: '이 개체는 이동할 수 없습니다 — 그리기 도형을 편집할 수 없습니다.',
-  appVisualDeleted: '개체를 삭제했습니다 — ⌘S로 저장합니다.',
-  appShapeTextUpdated: '도형 텍스트를 업데이트했습니다 — ⌘S로 저장합니다.',
-  appShapeMoved: '도형을 이동했습니다 — ⌘S로 저장합니다.',
+  appVisualDeleted: '개체를 삭제했습니다 — {saveKeys}로 저장합니다.',
+  appShapeTextUpdated: '도형 텍스트를 업데이트했습니다 — {saveKeys}로 저장합니다.',
+  appShapeMoved: '도형을 이동했습니다 — {saveKeys}로 저장합니다.',
   appTabShapeFormat: '도형 서식',
   appShapeFill: '도형 채우기',
   appShapeOutline: '도형 윤곽선',
   appShapeNoOutline: '윤곽선 없음',
-  appShapeStyleUpdated: '도형 스타일을 변경했습니다 — ⌘S로 저장합니다.',
+  appShapeStyleUpdated: '도형 스타일을 변경했습니다 — {saveKeys}로 저장합니다.',
   appDeleteShape: '도형 삭제',
   appGroupShapeStyles: '도형 스타일',
   // Names / internal links
@@ -633,7 +639,7 @@ export const ko = {
   appNamesNeedFile: '먼저 XLSX 파일을 여십시오. 정의된 이름은 파일에 저장됩니다.',
   appNameGone: '해당 이름이 더 이상 없습니다.',
   appNameApplyFailed: '이름을 적용할 수 없습니다.',
-  appNamesUpdated: '이름을 업데이트했습니다 — ⌘S로 저장합니다.',
+  appNamesUpdated: '이름을 업데이트했습니다 — {saveKeys}로 저장합니다.',
   appLinkInternal: '링크가 통합 문서 내부를 가리킵니다: {location}',
   appLinkSheetNotFound: '시트 "{name}"을(를) 찾을 수 없습니다.',
   appLinkJumpFailed: '{location}(으)로 이동할 수 없습니다.',
@@ -698,7 +704,7 @@ export const ko = {
   appAutoSaveTitle: '자동 저장은 클라우드 파일에서만 사용할 수 있습니다',
   appAutoSaveTip: '자동 저장(30초마다, 창 포커스가 해제될 때)',
   appExportPdfTitle: 'PDF로 내보내기',
-  appSaveTitle: '저장(⌘S)',
+  appSaveTitle: '저장',
   appSaveAs: '다른 이름으로 저장',
   appUndo: '실행 취소',
   appRedo: '다시 실행',
@@ -707,7 +713,7 @@ export const ko = {
   appSavedState: '저장됨',
   appSavedLocally: '로컬에 저장됨',
   appRevisionChip: '리비전 {revision}',
-  appOpenWorkbookTitle: '통합 문서 열기(⌘O)',
+  appOpenWorkbookTitle: '통합 문서 열기',
   appOpenXlsx: 'XLSX 열기',
   appHideAi: 'AI 숨기기',
   appShowAi: 'AI 표시',
@@ -1292,7 +1298,7 @@ export const ko = {
   // Home tab
   appGroupClipboard: '클립보드',
   appPaste: '붙여넣기',
-  appPasteTitle: '붙여넣기 ⌘V',
+  appPasteTitle: '붙여넣기',
   appPasteSpecial: '선택하여 붙여넣기',
   appPasteSpecialTitle: '값, 수식 또는 서식만 붙여넣기',
   appPasteValuesOnly: '값만',
@@ -1301,8 +1307,8 @@ export const ko = {
   appPasteColWidths: '열 너비만',
   appPasteExceptBorders: '테두리만 제외',
   appPasteSpecialDialog: '선택하여 붙여넣기…',
-  appCutTitle: '잘라내기 ⌘X',
-  appCopyTitle: '복사 ⌘C',
+  appCutTitle: '잘라내기',
+  appCopyTitle: '복사',
   appFormatPainter: '서식 복사',
   appFormatPainterTip: '서식 복사 — 두 번 클릭하면 Esc까지 유지',
   appFormatPainterLocked:
@@ -1396,7 +1402,7 @@ export const ko = {
   appClearFormats: '서식 지우기',
   appClearContents: '내용 지우기',
   appFind: '찾기',
-  appFindTitle: '찾기 및 선택 ⌘F',
+  appFindTitle: '찾기 및 선택',
   appReplace: '바꾸기',
   appGoTo: '이동',
   appInsertCells: '셀 삽입…',
@@ -1514,9 +1520,9 @@ export const ko = {
   appVisualSizeProperties: '크기 및 속성…',
   appVisualHyperlink: '하이퍼링크…',
   appVisualDelete: '삭제',
-  appVisualArranged: '개체가 업데이트됨 — ⌘S로 저장하세요.',
+  appVisualArranged: '개체가 업데이트됨 — {saveKeys}로 저장하세요.',
   appVisualCopied: '개체가 복사되었습니다.',
-  appVisualPasted: '개체가 붙여넣어짐 — ⌘S로 저장하세요.',
+  appVisualPasted: '개체가 붙여넣어짐 — {saveKeys}로 저장하세요.',
   appVisualNoCopy: '이 개체는 복사할 수 없습니다.',
   appVisualSelectTwo: 'Shift를 누른 채 클릭하여 개체를 두 개 이상 선택하세요.',
   appVisualSelectThree: 'Shift를 누른 채 클릭하여 개체를 세 개 이상 선택하세요.',

@@ -32,7 +32,7 @@ export const pt = {
   aiFootprintOverwritten: 'Células com dados sobrescritas: {count}',
   aiFootprintOverwrittenMin: 'Células com dados sobrescritas: pelo menos {count}',
   aiFootprintNoOverwrite: 'Nenhum dado existente foi sobrescrito',
-  aiUndoTitle: 'Desfazer esta alteração da IA (igual a ⌘Z)',
+  aiUndoTitle: 'Desfazer esta alteração da IA (igual a {undoKeys})',
   aiUndo: 'Desfazer',
   aiPreviewAria: 'Visualização das alterações',
   aiProposedChanges: 'Alterações propostas',

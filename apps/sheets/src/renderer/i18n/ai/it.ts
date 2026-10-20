@@ -32,7 +32,7 @@ export const it = {
   aiFootprintOverwritten: 'Celle con dati sovrascritte: {count}',
   aiFootprintOverwrittenMin: 'Celle con dati sovrascritte: almeno {count}',
   aiFootprintNoOverwrite: 'Nessun dato esistente sovrascritto',
-  aiUndoTitle: "Annulla questa modifica dell'IA (equivale a ⌘Z)",
+  aiUndoTitle: "Annulla questa modifica dell'IA (equivale a {undoKeys})",
   aiUndo: 'Annulla',
   aiPreviewAria: 'Anteprima delle modifiche',
   aiProposedChanges: 'Modifiche proposte',

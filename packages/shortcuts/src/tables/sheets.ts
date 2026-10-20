@@ -1150,8 +1150,65 @@ export const sheetsNotes: readonly ShortcutNote[] = [
  * up...) keeps every chord in one row, since a row id is a `shortcuts.csv` id;
  * apps/sheets picks the sub-action from the chord that matched (see
  * `isSecondSubAction` in apps/sheets/src/renderer/sheets-keymap.ts).
+ *
+ * Rows apps/sheets leaves unbound (UNI-2011 S-sheets; no key handler, so a chord
+ * listed here or in `sheetsUnmapped` is not a working shortcut yet):
+ * - sheets-41 Ctrl+Shift+PgDn/PgUp (multi-select tabs), sheets-59 F8 / Shift+F8
+ *   (extend selection mode), sheets-85 F6 cycle panes, sheets-84 ribbon key tips:
+ *   the app has no command behind them
+ * - sheets-57 Ctrl+' / Ctrl+Shift+" (copy from the cell above): no command, and the
+ *   quote chords are layout-dependent
+ * - sheets-60 Shift+F10 / Menu key: the context menu opens from the pointer only
+ * - sheets-58 F7 spell check, sheets-86 F1 / Cmd+/ help: in the table but nothing
+ *   listens
+ * - sheets-46 chart: F11 clashes with Electron's fullscreen role, Alt+F1 is web only
+ *   in the table and not wired
+ * - sheets-83 ribbon collapse: owned by the shared useRibbonCollapse hook (packages/ui)
+ * - sheets-87 zoom Ctrl+Alt+= / Ctrl+Alt+-: Ctrl+Alt is AltGr on many layouts, and
+ *   Univer keeps Ctrl+= / the wheel
+ * - sheets-43 Excel for Mac's Shift+F5 Find: not added; Cmd+F stays Univer's
  */
 const manual: readonly ShortcutAction[] = [
+  // Cut / Copy / Paste: Univer and the browser clipboard own the keys; the row is the one
+  // source of the tooltip text (clipboardHint in apps/sheets picks X / C / V from it)
+  {
+    id: 'sheets-10',
+    scope: 'sheets',
+    win: ['Ctrl+X', 'Ctrl+C', 'Ctrl+V'],
+    mac: ['Cmd+X', 'Cmd+C', 'Cmd+V'],
+    web: { win: ['Ctrl+X', 'Ctrl+C', 'Ctrl+V'], mac: ['Cmd+X', 'Cmd+C', 'Cmd+V'] },
+    match: 'key',
+    guard: {},
+  },
+  // Find: Univer binds Ctrl+F / Cmd+F on desktop (the Excel Windows page prints no Find key);
+  // Excel for the web's Ctrl+F in the frame. Excel for Mac's Shift+F5 is not wired
+  {
+    id: 'sheets-43',
+    scope: 'sheets',
+    win: ['Ctrl+F'],
+    mac: ['Cmd+F'],
+    web: { win: ['Ctrl+F'], mac: ['Ctrl+F'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Format Cells: Excel for Mac prints "Cmd+1 or Ctrl+1"
+  {
+    id: 'sheets-61',
+    scope: 'sheets',
+    win: ['Ctrl+1'],
+    mac: ['Cmd+1', 'Ctrl+1'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Insert hyperlink: Excel for Mac prints "Cmd+K or Ctrl+K"
+  {
+    id: 'sheets-78',
+    scope: 'sheets',
+    win: ['Ctrl+K'],
+    mac: ['Cmd+K', 'Ctrl+K'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
   // Print: Ctrl+P on Windows too (the Excel Windows page prints no Print row)
   {
     id: 'sheets-05',
@@ -1331,12 +1388,12 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { altGraph: true },
   },
-  // Go To: F5 first, Ctrl+G (Excel for Mac, Excel web) next; the old Cmd+G kept on a Mac
+  // Go To: F5 first on Windows, Ctrl+G first on a Mac (the order Excel prints them); the old Cmd+G kept
   {
     id: 'sheets-42',
     scope: 'sheets',
     win: ['F5', 'Ctrl+G'],
-    mac: ['F5', 'Ctrl+G', 'Cmd+G'],
+    mac: ['Ctrl+G', 'F5', 'Cmd+G'],
     web: { win: ['Ctrl+G'], mac: ['Ctrl+G'] },
     match: 'key',
     guard: { noRepeat: true },

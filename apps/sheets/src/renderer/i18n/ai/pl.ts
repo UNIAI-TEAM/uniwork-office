@@ -31,7 +31,7 @@ export const pl = {
   aiFootprintOverwritten: 'Nadpisane komórki z danymi: {count}',
   aiFootprintOverwrittenMin: 'Nadpisane komórki z danymi: co najmniej {count}',
   aiFootprintNoOverwrite: 'Nie nadpisano istniejących danych',
-  aiUndoTitle: 'Cofnij tę zmianę AI (to samo co ⌘Z)',
+  aiUndoTitle: 'Cofnij tę zmianę AI (to samo co {undoKeys})',
   aiUndo: 'Cofnij',
   aiPreviewAria: 'Podgląd zmian',
   aiProposedChanges: 'Proponowane zmiany',

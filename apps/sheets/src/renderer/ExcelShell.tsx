@@ -69,7 +69,7 @@ import {
   RIBBON_CURRENCY_SYMBOL,
 } from './excel-format-shortcuts'
 import { isModalOpen, resolveGlobalShortcut } from './global-shortcuts'
-import { sheetsHint, sheetsKeyTarget } from './sheets-keymap'
+import { clipboardHint, sheetsHint, sheetsKeyTarget, withKeyHint } from './sheets-keymap'
 import { stepFontSize } from './font-size-ladder'
 
 import type { ChartSeriesVisualState } from '@genoffice/xlsx-gateway/domain/chart-visual'
@@ -946,7 +946,8 @@ export function ExcelShell({
         ...(selectedVisualKind === 'image' ? (['Picture Format'] as const) : []),
       ]
   const saveAsKeys = sheetsHint('sheets-04', SHORTCUT_TARGET)
-  const saveAsTitle = saveAsKeys ? `${t('appSaveAs')} (${saveAsKeys})` : t('appSaveAs')
+  const saveAsTitle = withKeyHint(t('appSaveAs'), saveAsKeys)
+  const saveTitle = withKeyHint(t('appSaveTitle'), sheetsHint('sheets-03', SHORTCUT_TARGET))
 
   return (
     <main
@@ -965,8 +966,8 @@ export function ExcelShell({
             <button
               type="button"
               className="qa-btn"
-              data-tip={t('appSaveTitle')}
-              aria-label={t('appSaveTitle')}
+              data-tip={saveTitle}
+              aria-label={saveTitle}
               disabled={!canSave}
               onClick={onSave}
             >
@@ -1135,7 +1136,7 @@ export function ExcelShell({
               <div className="csv-empty-notice" role="status">
                 <span>{t('appCsvEmpty')}</span>
                 <button type="button" onClick={onOpenWorkbook}>
-                  {t('appOpenWorkbookTitle')}
+                  {withKeyHint(t('appOpenWorkbookTitle'), sheetsHint('sheets-02', SHORTCUT_TARGET))}
                 </button>
                 <button
                   type="button"
@@ -3386,7 +3387,10 @@ function Ribbon({
               <div className="inline-tools">
                 <button
                   className="labeled"
-                  data-tip={t('appFindTitle')}
+                  data-tip={withKeyHint(
+                    t('appFindTitle'),
+                    sheetsHint('sheets-43', SHORTCUT_TARGET),
+                  )}
                   onClick={() => onCommand('find')}
                 >
                   <ToolSymbol symbol="🔍" /> {t('appFind')}
@@ -3619,7 +3623,7 @@ function Ribbon({
       <RibbonGroup label={t('appGroupClipboard')}>
         <button
           className="ribbon-tool as-button large"
-          data-tip={t('appPasteTitle')}
+          data-tip={withKeyHint(t('appPasteTitle'), clipboardHint('V', SHORTCUT_TARGET))}
           onClick={() => onCommand('paste')}
         >
           <span className="tool-icon-row">
@@ -3639,15 +3643,15 @@ function Ribbon({
         ])}
         <div className="tool-stack">
           <button
-            data-tip={t('appCutTitle')}
-            aria-label={t('appCutTitle')}
+            data-tip={withKeyHint(t('appCutTitle'), clipboardHint('X', SHORTCUT_TARGET))}
+            aria-label={withKeyHint(t('appCutTitle'), clipboardHint('X', SHORTCUT_TARGET))}
             onClick={() => onCommand('cut')}
           >
             <ToolSymbol symbol="✂" />
           </button>
           <button
-            data-tip={t('appCopyTitle')}
-            aria-label={t('appCopyTitle')}
+            data-tip={withKeyHint(t('appCopyTitle'), clipboardHint('C', SHORTCUT_TARGET))}
+            aria-label={withKeyHint(t('appCopyTitle'), clipboardHint('C', SHORTCUT_TARGET))}
             onClick={() => onCommand('copy')}
           >
             <ToolSymbol symbol="⧉" />
@@ -4190,7 +4194,7 @@ function Ribbon({
           <div className="inline-tools">
             <button
               className="labeled"
-              data-tip={t('appFindTitle')}
+              data-tip={withKeyHint(t('appFindTitle'), sheetsHint('sheets-43', SHORTCUT_TARGET))}
               onClick={() => onCommand('find')}
             >
               <ToolSymbol symbol="🔍" /> {t('appFind')}

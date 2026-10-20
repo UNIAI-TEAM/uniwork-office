@@ -184,6 +184,9 @@ describe('Excel for Mac desktop', () => {
   it('routes the Excel for Mac column', () => {
     expectRoutes(MAC, [
       ['Cmd+1', keyEvent('Digit1', meta), FORMAT_CELLS],
+      // Excel for Mac prints "Cmd+1 or Ctrl+1" and "Cmd+K or Ctrl+K" (RS-sheets M2)
+      ['Control+1', keyEvent('Digit1', ctrl), FORMAT_CELLS],
+      ['Control+K', keyEvent('KeyK', ctrl), cmd('link-open')],
       ['Cmd+G', keyEvent('KeyG', meta), GO_TO],
       ['Control+G', keyEvent('KeyG', ctrl), GO_TO],
       ['Control+`', keyEvent('Backquote', ctrl), cmd('toggle-show-formulas')],

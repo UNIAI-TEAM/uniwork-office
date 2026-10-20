@@ -7,10 +7,20 @@
  * chords (Excel for the web, minus the keys the browser keeps); Electron to the
  * desktop ones. Platform: Excel for Mac's column on macOS, Excel's Windows column
  * elsewhere.
+ *
+ * Two matchers read the same table: the window handler (global-shortcuts.ts) matches
+ * the physical key (`event.code`, layout-independent), while the Univer bindings built
+ * here are keyCode-based by Univer's design (its dispatcher compares `keyCode` plus
+ * modifiers, with US-layout punctuation codes). Letters, digits, F-keys and the named
+ * keys agree in both; the punctuation rows (Ctrl+Shift+=, Ctrl+-, Cmd+=, numpad +/-)
+ * fire on whatever key a QWERTZ/AZERTY layout puts at the US code, and Firefox's
+ * codes for - and = (173, 61) do not match at all. tests/sheets-keymap.test.ts pins
+ * the codes the Univer rows rely on.
  */
 import {
   chordsFor,
   currentShortcutPlatform,
+  formatChord,
   formatHint,
   isComposingEvent,
   matchChord,
@@ -42,6 +52,22 @@ export function sheetsKeyTarget(): SheetsKeyTarget {
 /** Tooltip / menu text for a row on this platform and surface (`Ctrl+1`, `⌘1`). */
 export function sheetsHint(id: string, target: SheetsKeyTarget = sheetsKeyTarget()): string {
   return formatHint(sheetsShortcut(id), target.platform, target.surface)
+}
+
+/** Cut / Copy / Paste tooltip key (`Ctrl+C`, `⌘C`): the sheets-10 chord of that letter. */
+export function clipboardHint(
+  key: 'X' | 'C' | 'V',
+  target: SheetsKeyTarget = sheetsKeyTarget(),
+): string {
+  const chord = chordsFor(sheetsShortcut('sheets-10'), target.platform, target.surface).find(
+    (candidate) => parseChord(candidate)?.key === key,
+  )
+  return chord ? formatChord(chord, target.platform) : ''
+}
+
+/** A tooltip label with its key in parentheses, or the bare label when the row has no key here. */
+export function withKeyHint(label: string, keys: string): string {
+  return keys ? `${label} (${keys})` : label
 }
 
 /**
