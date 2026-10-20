@@ -2,7 +2,7 @@
 // by scripts/gen-tables.mjs from tests/fixtures/shortcuts.csv: change the CSV and
 // regenerate, or put hand-maintained rows in `manual` below.
 import { mergeRows } from '../table'
-import type { ShortcutAction, UnmappedShortcut } from '../types'
+import type { ShortcutAction, ShortcutNote, UnmappedShortcut } from '../types'
 
 // @generated-begin
 const generated: readonly ShortcutAction[] = [
@@ -14,7 +14,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+O'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save
   {
@@ -24,7 +24,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+S'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Print
   {
@@ -34,7 +34,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+P'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Expand / collapse the ribbon
   {
@@ -44,17 +44,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Alt+Cmd+R'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
-  },
-  // Keyboard shortcut sheet (Ctrl+/)
-  {
-    id: 'common-14',
-    scope: 'common',
-    win: [],
-    mac: [],
-    web: { win: ['Alt+Shift+A'], mac: [] },
-    match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Tell Me / Search the ribbon (Alt+Q)
   {
@@ -63,7 +53,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Alt+Q'],
     mac: [],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
 ]
 
@@ -76,14 +66,15 @@ export const commonUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'common-02',
-    part: 'desktop',
+    part: 'desktop.win',
     reason:
       'proposal has prose: "KEEP only if Word "Apply the Normal style" Ctrl+Shift+N (Word 95ef... L1357) is not given to the editor; else move New window to menu only. Decision with S-docs"',
   },
   {
     id: 'common-02',
-    part: 'web.win',
-    reason: 'the browser keeps the Microsoft key',
+    part: 'desktop.mac',
+    reason:
+      'proposal has prose: "KEEP only if Word "Apply the Normal style" Ctrl+Shift+N (Word 95ef... L1357) is not given to the editor; else move New window to menu only. Decision with S-docs"',
   },
   {
     id: 'common-02',
@@ -92,13 +83,25 @@ export const commonUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'common-03',
-    part: 'web',
+    part: 'web.win',
     reason:
-      'proposal has prose: "Ctrl+O / Cmd+O handled by the page only where UniWork has an Open action (preventDefault, as Excel web \'Override browser shortcuts\' ON); elsewhere no-op with preventDefault; mac from desktop, web page has no Mac column"',
+      "proposal has prose: \"Excel: Ctrl+O / Cmd+O handled by the page (preventDefault), the way Excel web's opt-in 'Override browser shortcuts' lets Excel keep it [MS-WEB-ALT] | Word, PowerPoint: Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action [ Ctrl+O is not Chromium-reserved]; where there is no Open action the browser keeps Ctrl+O; mac from desktop, web page has no Mac column\"",
+  },
+  {
+    id: 'common-03',
+    part: 'web.mac',
+    reason:
+      "proposal has prose: \"Excel: Ctrl+O / Cmd+O handled by the page (preventDefault), the way Excel web's opt-in 'Override browser shortcuts' lets Excel keep it [MS-WEB-ALT] | Word, PowerPoint: Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action [ Ctrl+O is not Chromium-reserved]; where there is no Open action the browser keeps Ctrl+O; mac from desktop, web page has no Mac column\"",
   },
   {
     id: 'common-04',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "Ctrl+S / Cmd+S (preventDefault in frame; keep frame focus after dialogs); PowerPoint web autosaves and prints no key"',
+  },
+  {
+    id: 'common-04',
+    part: 'web.mac',
     reason:
       'proposal has prose: "Ctrl+S / Cmd+S (preventDefault in frame; keep frame focus after dialogs); PowerPoint web autosaves and prints no key"',
   },
@@ -110,7 +113,13 @@ export const commonUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'common-06',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "Ctrl+P / Cmd+P (preventDefault so the browser does not print the host page); mac from desktop for Word/Excel, web page has no Mac column; PowerPoint web prints Cmd+P"',
+  },
+  {
+    id: 'common-06',
+    part: 'web.mac',
     reason:
       'proposal has prose: "Ctrl+P / Cmd+P (preventDefault so the browser does not print the host page); mac from desktop for Word/Excel, web page has no Mac column; PowerPoint web prints Cmd+P"',
   },
@@ -134,15 +143,15 @@ export const commonUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'common-10',
-    part: 'web',
+    part: 'web.win',
     reason:
       'proposal has prose: "Docs: Ctrl+F3 / not documented [MS-WEB win; Mac desktop Mac prints none]"',
   },
   {
     id: 'common-10',
-    part: 'web.win',
+    part: 'web.mac',
     reason:
-      'ALT-PROPOSED without a single chord: "suggestion Cmd+Option+R = desktop Word Mac] | Sheets: Ctrl+F"',
+      'proposal has prose: "Docs: Ctrl+F3 / not documented [MS-WEB win; Mac desktop Mac prints none]"',
   },
   {
     id: 'common-11',
@@ -154,34 +163,24 @@ export const commonUnmapped: readonly UnmappedShortcut[] = [
     id: 'common-12',
     part: 'row',
     reason:
-      'desktop: proposal is conditional: "KEEP Alt reveals the menu bar for now; ribbon key tips would need Alt to move to the ribbon (decision with S-table)"; web: proposal is conditional: "Backlog (access keys not in scope for stage 2). Target when built: Docs Alt+Period / Control+Period; Sheets Alt+Windows logo key (unreachable for a page) / Control+Option; Slides Alt+Period / Ctrl+Period; Alt alone must not be swallowed"',
+      'desktop: proposal is conditional: "KEEP Alt reveals the menu bar for now; ribbon key tips would need Alt to move to the ribbon (decision with S-table)"; web: proposal is conditional: "Backlog (access keys not in scope for stage 2). Target when built: Docs Alt+Period / Control+Period (MS web); Sheets Alt+Period (.) / Control+Option ( Slides Alt+Period / Ctrl+Period (MS web); Alt alone must not be swallowed"',
   },
   {
     id: 'common-13',
     part: 'row',
     reason:
-      'desktop: proposal has prose: "F1 opens the in-app help / shortcut sheet"; web: proposal has prose: "F1 intercepted in frames to open UniWork help (like Excel web \'Override browser shortcuts\' ON); also Alt+Shift+A (common-14); Word/PowerPoint web leave F1 to the browser / not documented"',
+      'desktop: proposal has prose: "F1 opens the in-app help / shortcut sheet"; web: proposal has prose: "no in-frame key: F1 stays the browser\'s, as MS says for Word, Excel and PowerPoint web (\'common shortcuts like F1 (Help) and Ctrl+O (Open) apply to the web browser\'); Help by button / menu entry, as docs-094, sheets-86 and slides-73. Excel web\'s Override browser shortcuts setting (opt-in, off by default) is not adopted"',
   },
   {
     id: 'common-14',
-    part: 'desktop',
+    part: 'row',
     reason:
-      'proposal has prose: "Cmd+/ on Mac matches Excel for Mac; Windows: MS does not document Ctrl+/, so KEEP as UniWork-wide convention"',
-  },
-  {
-    id: 'common-14',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
-  },
-  {
-    id: 'common-15',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+      'desktop: proposal has prose: "Cmd+/ on Mac matches Excel for Mac; Windows: MS does not document Ctrl+/, so KEEP as UniWork-wide convention"; web: proposal has prose: "Docs: no key (Ctrl+/ is Numbered list in MS Word web; the shortcut sheet is a Help menu entry / button) | Sheets: Ctrl+/ / Cmd+/ (MS Excel web prints no key for Help > Keyboard Shortcuts and its table uses Ctrl+/ for nothing; Cmd+/ is the Excel Mac desktop key for the Help window) | Slides: Ctrl+/ / Cmd+/ (MS PowerPoint web prints no key for it and uses Ctrl+/ and Cmd+/ for nothing)"',
   },
   {
     id: 'common-15',
     part: 'desktop.mac',
-    reason: 'no mac chord in proposal_desktop',
+    reason: "Microsoft prints no Mac key; keep today's Mac binding (contract 3.1)",
   },
   {
     id: 'common-16',
@@ -208,14 +207,15 @@ export const commonUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'common-20',
-    part: 'desktop',
+    part: 'desktop.win',
     reason:
       'proposal has prose: "F11 (Edge) / Cmd+Ctrl+F; PowerPoint Windows page prints Ctrl+F1 for full screen but also for the ribbon, so do not copy it (open question)"',
   },
   {
     id: 'common-20',
-    part: 'web.win',
-    reason: 'the browser keeps the Microsoft key',
+    part: 'desktop.mac',
+    reason:
+      'proposal has prose: "F11 (Edge) / Cmd+Ctrl+F; PowerPoint Windows page prints Ctrl+F1 for full screen but also for the ribbon, so do not copy it (open question)"',
   },
   {
     id: 'common-20',
@@ -224,14 +224,15 @@ export const commonUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'common-21',
-    part: 'desktop',
+    part: 'desktop.win',
     reason:
       'proposal is conditional: "F12 and Ctrl+Shift+I identical in dev and packaged builds for all modules, or remove everywhere in packaged builds (product decision: Slides always-on is the outlier)"',
   },
   {
     id: 'common-21',
-    part: 'web.win',
-    reason: 'the browser keeps the Microsoft key',
+    part: 'desktop.mac',
+    reason:
+      'proposal is conditional: "F12 and Ctrl+Shift+I identical in dev and packaged builds for all modules, or remove everywhere in packaged builds (product decision: Slides always-on is the outlier)"',
   },
   {
     id: 'common-21',
@@ -240,14 +241,15 @@ export const commonUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'common-22',
-    part: 'desktop',
+    part: 'desktop.win',
     reason:
       'proposal has prose: "KEEP no reload in packaged builds (Cmd+R is Fill Right in Excel Mac, so it must not reload a Sheets tab)"',
   },
   {
     id: 'common-22',
-    part: 'web.win',
-    reason: 'the browser keeps the Microsoft key',
+    part: 'desktop.mac',
+    reason:
+      'proposal has prose: "KEEP no reload in packaged builds (Cmd+R is Fill Right in Excel Mac, so it must not reload a Sheets tab)"',
   },
   {
     id: 'common-22',
@@ -259,6 +261,46 @@ export const commonUnmapped: readonly UnmappedShortcut[] = [
     part: 'row',
     reason:
       'desktop: proposal has prose: "same"; web: proposal has prose: "KEEP Esc / Enter; add isComposing / keyCode 229 guards to every Enter-confirm handler"',
+  },
+]
+
+export const commonNotes: readonly ShortcutNote[] = [
+  {
+    id: 'common-02',
+    part: 'web',
+    detail: 'the browser keeps the Microsoft key',
+  },
+  {
+    id: 'common-03',
+    part: 'web',
+    detail:
+      'ALT-PROPOSED without a single chord: "MS web prints no Open row and no override setting for them;"',
+  },
+  {
+    id: 'common-10',
+    part: 'web',
+    detail:
+      'ALT-PROPOSED without a single chord: "suggestion Cmd+Option+R = desktop Word Mac] | Sheets: Ctrl+F"',
+  },
+  {
+    id: 'common-15',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'common-20',
+    part: 'web',
+    detail: 'the browser keeps the Microsoft key',
+  },
+  {
+    id: 'common-21',
+    part: 'web',
+    detail: 'the browser keeps the Microsoft key',
+  },
+  {
+    id: 'common-22',
+    part: 'web',
+    detail: 'the browser keeps the Microsoft key',
   },
 ]
 // @generated-end

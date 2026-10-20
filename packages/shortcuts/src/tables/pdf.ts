@@ -2,7 +2,7 @@
 // by scripts/gen-tables.mjs from tests/fixtures/shortcuts.csv: change the CSV and
 // regenerate, or put hand-maintained rows in `manual` below.
 import { mergeRows } from '../table'
-import type { ShortcutAction, UnmappedShortcut } from '../types'
+import type { ShortcutAction, ShortcutNote, UnmappedShortcut } from '../types'
 
 // @generated-begin
 const generated: readonly ShortcutAction[] = [
@@ -13,7 +13,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+S'],
     mac: ['Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Redo document edit (ours-only)
   {
@@ -32,7 +32,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+F'],
     mac: ['Cmd+F'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Print
   {
@@ -41,7 +41,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+P'],
     mac: ['Cmd+P'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Zoom in
   {
@@ -71,7 +71,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+Backslash'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
 ]
 
@@ -85,7 +85,8 @@ export const pdfUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'pdf-03',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'pdf-06',
@@ -95,13 +96,27 @@ export const pdfUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'pdf-08',
-    part: 'desktop',
-    reason: 'KEEP: the Microsoft win cell lists several sub-actions',
+    part: 'desktop.win',
+    reason:
+      'KEEP: the Microsoft win cell lists several sub-actions; KEEP: the Microsoft mac cell lists several sub-actions',
+  },
+  {
+    id: 'pdf-08',
+    part: 'desktop.mac',
+    reason:
+      'KEEP: the Microsoft win cell lists several sub-actions; KEEP: the Microsoft mac cell lists several sub-actions',
   },
   {
     id: 'pdf-09',
-    part: 'desktop',
-    reason: 'KEEP: the Microsoft win cell lists several sub-actions',
+    part: 'desktop.win',
+    reason:
+      'KEEP: the Microsoft win cell lists several sub-actions; KEEP: the Microsoft mac cell lists several sub-actions',
+  },
+  {
+    id: 'pdf-09',
+    part: 'desktop.mac',
+    reason:
+      'KEEP: the Microsoft win cell lists several sub-actions; KEEP: the Microsoft mac cell lists several sub-actions',
   },
   {
     id: 'pdf-10',
@@ -111,7 +126,12 @@ export const pdfUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'pdf-11',
-    part: 'web',
+    part: 'web.win',
+    reason: 'proposal has prose: "Ctrl+\\ toggles fit page / fit width / Cmd+\\ (Edge PDF key)"',
+  },
+  {
+    id: 'pdf-11',
+    part: 'web.mac',
     reason: 'proposal has prose: "Ctrl+\\ toggles fit page / fit width / Cmd+\\ (Edge PDF key)"',
   },
   {
@@ -157,14 +177,15 @@ export const pdfUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'pdf-19',
-    part: 'desktop',
+    part: 'desktop.win',
     reason:
       'proposal has prose: "F11 / Command+Ctrl+F: add the togglefullscreen role to the PDF menu"',
   },
   {
     id: 'pdf-19',
-    part: 'web.win',
-    reason: 'the browser keeps the Microsoft key',
+    part: 'desktop.mac',
+    reason:
+      'proposal has prose: "F11 / Command+Ctrl+F: add the togglefullscreen role to the PDF menu"',
   },
   {
     id: 'pdf-19',
@@ -180,7 +201,8 @@ export const pdfUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'pdf-21',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'pdf-22',
@@ -191,17 +213,19 @@ export const pdfUnmapped: readonly UnmappedShortcut[] = [
     id: 'pdf-23',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "KEEP Esc"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "KEEP Esc"',
   },
   {
     id: 'pdf-24',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'pdf-25',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'pdf-dialog-keys',
@@ -213,7 +237,15 @@ export const pdfUnmapped: readonly UnmappedShortcut[] = [
     id: 'pdf-open',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "same as common-03 (Ctrl+O / Cmd+O only where an Open action exists)"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "same as common-03 (Ctrl+O / Cmd+O only where an Open action exists)"',
+  },
+]
+
+export const pdfNotes: readonly ShortcutNote[] = [
+  {
+    id: 'pdf-19',
+    part: 'web',
+    detail: 'the browser keeps the Microsoft key',
   },
 ]
 // @generated-end

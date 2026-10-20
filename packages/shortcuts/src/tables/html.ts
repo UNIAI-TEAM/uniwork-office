@@ -2,7 +2,7 @@
 // by scripts/gen-tables.mjs from tests/fixtures/shortcuts.csv: change the CSV and
 // regenerate, or put hand-maintained rows in `manual` below.
 import { mergeRows } from '../table'
-import type { ShortcutAction, UnmappedShortcut } from '../types'
+import type { ShortcutAction, ShortcutNote, UnmappedShortcut } from '../types'
 
 // @generated-begin
 const generated: readonly ShortcutAction[] = [
@@ -12,8 +12,9 @@ const generated: readonly ShortcutAction[] = [
     scope: 'html',
     win: ['Ctrl+O'],
     mac: ['Cmd+O'],
+    web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save
   {
@@ -22,7 +23,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+S'],
     mac: ['Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save As
   {
@@ -31,7 +32,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['F12'],
     mac: ['Shift+Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Print
   {
@@ -40,17 +41,18 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+P'],
     mac: ['Cmd+P'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Close document
   {
     id: 'html-005',
     scope: 'html',
-    win: [],
+    win: ['Ctrl+W'],
     mac: [],
+    web: { win: [], mac: [] },
     webAlt: { win: 'Alt+Shift+W' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Undo
   {
@@ -77,7 +79,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+X'],
     mac: ['Cmd+X'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Copy
   {
@@ -86,7 +88,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+C'],
     mac: ['Cmd+C'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Paste
   {
@@ -95,7 +97,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+V'],
     mac: ['Cmd+V'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Select all
   {
@@ -104,7 +106,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+A'],
     mac: ['Cmd+A'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Find
   {
@@ -114,7 +116,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+F'],
     web: { win: ['Ctrl+F', 'Ctrl+G'], mac: ['Cmd+F'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Find next / repeat Find
   {
@@ -129,11 +131,11 @@ const generated: readonly ShortcutAction[] = [
   {
     id: 'html-014',
     scope: 'html',
-    win: [],
+    win: ['Ctrl+H'],
     mac: [],
     web: { win: ['Ctrl+H'], mac: ['Ctrl+H'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Bold (preview selection)
   {
@@ -142,7 +144,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+B'],
     mac: ['Cmd+B'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Italic (preview selection)
   {
@@ -151,7 +153,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+I'],
     mac: ['Cmd+I'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Underline
   {
@@ -161,7 +163,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+U'], mac: ['Cmd+U'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert hyperlink
   {
@@ -171,7 +173,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+K'], mac: ['Cmd+K'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Zoom in
   {
@@ -198,7 +200,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+0'],
     mac: ['Cmd+0'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Expand or collapse the ribbon
   {
@@ -209,7 +211,7 @@ const generated: readonly ShortcutAction[] = [
     web: { win: [], mac: [] },
     webAlt: { win: 'Ctrl+F3' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Cycle view mode (source / split / preview)
   {
@@ -225,66 +227,105 @@ const generated: readonly ShortcutAction[] = [
 
 export const htmlUnmapped: readonly UnmappedShortcut[] = [
   {
+    id: 'html-001',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action (capability-gated); MS Word web says Ctrl+O applies to the browser and prints no alternative or override setting, so the MS desktop key is kept ( where there is no Open action the browser keeps it"',
+  },
+  {
+    id: 'html-001',
+    part: 'web.mac',
+    reason:
+      'proposal has prose: "Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action (capability-gated); MS Word web says Ctrl+O applies to the browser and prints no alternative or override setting, so the MS desktop key is kept ( where there is no Open action the browser keeps it"',
+  },
+  {
     id: 'html-005',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
-    id: 'html-005',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
-  },
-  {
     id: 'html-014',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'html-017',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'proposal has prose: "same"',
+  },
+  {
+    id: 'html-017',
+    part: 'desktop.mac',
     reason: 'proposal has prose: "same"',
   },
   {
     id: 'html-018',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'proposal has prose: "same"',
+  },
+  {
+    id: 'html-018',
+    part: 'desktop.mac',
     reason: 'proposal has prose: "same"',
   },
   {
     id: 'html-022',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Scroll / Cmd+Scroll"',
-  },
-  {
-    id: 'html-023',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Scroll / Cmd+Scroll"',
   },
   {
     id: 'html-024',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
   },
   {
     id: 'html-025',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'html-025',
+    part: 'desktop.mac',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
     id: 'html-026',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'html-027',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'html-028',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
+  },
+]
+
+export const htmlNotes: readonly ShortcutNote[] = [
+  {
+    id: 'html-001',
+    part: 'web',
+    detail:
+      'ALT-PROPOSED without a single chord: ", not Chromium-reserved); where there is no Open action the"',
+  },
+  {
+    id: 'html-005',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'html-023',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
   },
 ]
 // @generated-end

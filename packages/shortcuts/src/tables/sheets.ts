@@ -2,7 +2,7 @@
 // by scripts/gen-tables.mjs from tests/fixtures/shortcuts.csv: change the CSV and
 // regenerate, or put hand-maintained rows in `manual` below.
 import { mergeRows } from '../table'
-import type { ShortcutAction, UnmappedShortcut } from '../types'
+import type { ShortcutAction, ShortcutNote, UnmappedShortcut } from '../types'
 
 // @generated-begin
 const generated: readonly ShortcutAction[] = [
@@ -12,8 +12,9 @@ const generated: readonly ShortcutAction[] = [
     scope: 'sheets',
     win: ['Ctrl+O'],
     mac: ['Cmd+O'],
+    web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save workbook
   {
@@ -22,7 +23,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+S'],
     mac: ['Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save As
   {
@@ -33,17 +34,17 @@ const generated: readonly ShortcutAction[] = [
     web: { win: [], mac: [] },
     webAlt: { win: 'Alt+F2' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Print
   {
     id: 'sheets-05',
     scope: 'sheets',
     win: [],
-    mac: [],
+    mac: ['Cmd+P'],
     web: { win: ['Ctrl+P'], mac: ['Cmd+P'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Close workbook
   {
@@ -53,7 +54,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+W'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Undo
   {
@@ -78,7 +79,7 @@ const generated: readonly ShortcutAction[] = [
   {
     id: 'sheets-09',
     scope: 'sheets',
-    win: [],
+    win: ['F4'],
     mac: [],
     web: { win: ['F4'], mac: ['F4'] },
     match: 'key',
@@ -91,7 +92,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+V'],
     mac: ['Ctrl+Cmd+V', 'Alt+Cmd+V'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Paste values only (outside the dialog)
   {
@@ -101,7 +102,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+V'], mac: ['Shift+Cmd+V'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Edit active cell
   {
@@ -110,7 +111,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['F2'],
     mac: ['F2'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // New line inside cell
   {
@@ -120,7 +121,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Alt+Enter', 'Ctrl+Alt+Enter'],
     web: { win: ['Alt+Enter'], mac: ['Alt+Enter'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Fill selected range with the current entry
   {
@@ -130,7 +131,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+Enter', 'Ctrl+Enter'],
     web: { win: ['Ctrl+Enter'], mac: ['Cmd+Enter'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Fill down
   {
@@ -139,17 +140,17 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+D'],
     mac: ['Cmd+D'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Fill right
   {
     id: 'sheets-18',
     scope: 'sheets',
     win: [],
-    mac: [],
+    mac: ['Cmd+R'],
     web: { win: ['Ctrl+R'], mac: ['Cmd+R'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert cells / rows / columns
   {
@@ -159,7 +160,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+Equal'], mac: ['Ctrl+Shift+Equal'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Delete cells / rows / columns
   {
@@ -169,7 +170,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Minus'], mac: ['Cmd+Minus'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Select entire column
   {
@@ -178,7 +179,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Space'],
     mac: ['Ctrl+Space'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Select entire row
   {
@@ -187,7 +188,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Shift+Space'],
     mac: ['Shift+Space'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Select all / current region
   {
@@ -197,7 +198,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+A'], mac: ['Cmd+A'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Select the current region (Ctrl+Shift+*)
   {
@@ -207,7 +208,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+8'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Go to start of sheet
   {
@@ -217,7 +218,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Home'], mac: ['Ctrl+Home'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Go to last used cell
   {
@@ -227,7 +228,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+End'], mac: ['Ctrl+End'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Next sheet
   {
@@ -259,7 +260,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['F5'],
     web: { win: ['Ctrl+G'], mac: ['Ctrl+G'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Find
   {
@@ -269,17 +270,17 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+F'], mac: ['Ctrl+F'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Replace
   {
     id: 'sheets-44',
     scope: 'sheets',
     win: [],
-    mac: [],
+    mac: ['Shift+Cmd+H'],
     web: { win: ['Ctrl+H'], mac: ['Shift+Cmd+H'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert new worksheet
   {
@@ -288,7 +289,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Shift+F11'],
     mac: ['Shift+F11'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Create chart (F11 chart sheet / Alt+F1 embedded chart)
   {
@@ -298,17 +299,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     webAlt: { win: 'Alt+F1' },
     match: 'key',
-    guard: {},
-  },
-  // AutoSum
-  {
-    id: 'sheets-48',
-    scope: 'sheets',
-    win: [],
-    mac: [],
-    web: { win: ['Alt+Equal'], mac: [] },
-    match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert function
   {
@@ -317,7 +308,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Shift+F3'],
     mac: ['Shift+F3'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Define name / Name Manager
   {
@@ -327,7 +318,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+F3'], mac: ['Cmd+F3'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Expand / collapse formula bar
   {
@@ -337,27 +328,27 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+U'], mac: ['Ctrl+Shift+U'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Flash Fill
   {
     id: 'sheets-52',
     scope: 'sheets',
-    win: [],
+    win: ['Ctrl+E'],
     mac: [],
     web: { win: ['Ctrl+E'], mac: ['Ctrl+E'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Calculate all (F9)
   {
     id: 'sheets-53',
     scope: 'sheets',
-    win: [],
+    win: ['F9'],
     mac: [],
     web: { win: ['F9'], mac: ['F9'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Calculate active sheet (Shift+F9)
   {
@@ -366,17 +357,17 @@ const generated: readonly ShortcutAction[] = [
     win: ['Shift+F9'],
     mac: ['Shift+F9'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Show formulas (Ctrl+`)
   {
     id: 'sheets-55',
     scope: 'sheets',
-    win: [],
+    win: ['Ctrl+Backquote'],
     mac: [],
     web: { win: ['Ctrl+Backquote'], mac: ['Ctrl+Backquote'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Spell check
   {
@@ -385,7 +376,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['F7'],
     mac: ['F7'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Format Cells dialog
   {
@@ -394,7 +385,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+1'],
     mac: ['Cmd+1'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Format Cells: Font tab (Ctrl+Shift+F)
   {
@@ -404,7 +395,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+F'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Bold
   {
@@ -413,7 +404,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+B'],
     mac: ['Cmd+B'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Italic
   {
@@ -422,7 +413,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+I'],
     mac: ['Cmd+I'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Underline
   {
@@ -431,7 +422,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+U'],
     mac: ['Cmd+U'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Strikethrough
   {
@@ -440,77 +431,87 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+5'],
     mac: ['Shift+Cmd+X'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Number format: General
   {
     id: 'sheets-68',
     scope: 'sheets',
-    win: [],
+    win: ['Ctrl+Shift+Backquote'],
     mac: [],
     web: { win: ['Ctrl+Shift+Backquote'], mac: ['Ctrl+Shift+Backquote'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Number format: Number (2 decimals, thousands)
   {
     id: 'sheets-69',
     scope: 'sheets',
-    win: [],
+    win: ['Ctrl+Shift+1'],
     mac: [],
     web: { win: ['Ctrl+Shift+1'], mac: ['Ctrl+Shift+1'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Number format: Time
   {
     id: 'sheets-70',
     scope: 'sheets',
-    win: [],
+    win: ['Ctrl+Shift+2'],
     mac: [],
     web: { win: ['Ctrl+Shift+2'], mac: ['Ctrl+Shift+2'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Number format: Date
   {
     id: 'sheets-71',
     scope: 'sheets',
-    win: [],
+    win: ['Ctrl+Shift+3'],
     mac: [],
     web: { win: ['Ctrl+Shift+3'], mac: ['Ctrl+Shift+3'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Number format: Currency
   {
     id: 'sheets-72',
     scope: 'sheets',
-    win: [],
+    win: ['Ctrl+Shift+4'],
     mac: [],
     web: { win: ['Ctrl+Shift+4'], mac: ['Ctrl+Shift+4'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Number format: Percentage
   {
     id: 'sheets-73',
     scope: 'sheets',
-    win: [],
+    win: ['Ctrl+Shift+5'],
     mac: [],
     web: { win: ['Ctrl+Shift+5'], mac: ['Ctrl+Shift+5'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Number format: Scientific
   {
     id: 'sheets-74',
     scope: 'sheets',
-    win: [],
+    win: ['Ctrl+Shift+6'],
     mac: [],
     web: { win: ['Ctrl+Shift+6'], mac: ['Ctrl+Shift+6'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
+  },
+  // Enter current date
+  {
+    id: 'sheets-76',
+    scope: 'sheets',
+    win: ['Ctrl+Semicolon'],
+    mac: [],
+    web: { win: [], mac: [] },
+    match: 'key',
+    guard: { noRepeat: true },
   },
   // Insert hyperlink
   {
@@ -519,7 +520,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+K'],
     mac: ['Cmd+K'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert note
   {
@@ -528,7 +529,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Shift+F2'],
     mac: ['Shift+F2'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert threaded comment
   {
@@ -537,7 +538,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+F2'],
     mac: ['Shift+Cmd+F2'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Add or remove a filter
   {
@@ -547,7 +548,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+L'], mac: ['Ctrl+Shift+L', 'Shift+Cmd+F'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Create table
   {
@@ -558,7 +559,7 @@ const generated: readonly ShortcutAction[] = [
     web: { win: ['Ctrl+L'], mac: [] },
     webAlt: { mac: 'Ctrl+L' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Expand or collapse ribbon
   {
@@ -567,7 +568,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+F1'],
     mac: ['Alt+Cmd+R'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Help
   {
@@ -577,7 +578,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['F1', 'Cmd+Slash'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
 ]
 
@@ -589,33 +590,47 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
       'desktop: proposal has prose: "mac: Cmd+N (MS). Windows: MS Excel page prints no New key; Ctrl+N is the Office convention but not on this page, so decide before adding"; web: proposal has prose: "no in-app key; Ctrl+N stays the browser\'s; New by File menu / documents-list button (MS web equivalent = the Excel.new address-bar route) / same"',
   },
   {
-    id: 'sheets-04',
+    id: 'sheets-02',
+    part: 'web.win',
+    reason:
+      "proposal has prose: \"Ctrl+O / Cmd+O handled by the page (preventDefault) as Excel web's opt-in 'Override browser shortcuts' lets Excel keep it; mac from desktop, Excel web has no Mac column\"",
+  },
+  {
+    id: 'sheets-02',
     part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    reason:
+      "proposal has prose: \"Ctrl+O / Cmd+O handled by the page (preventDefault) as Excel web's opt-in 'Override browser shortcuts' lets Excel keep it; mac from desktop, Excel web has no Mac column\"",
   },
   {
     id: 'sheets-05',
-    part: 'desktop',
+    part: 'desktop.win',
     reason: "KEEP: no Microsoft win chord confirmed by today's binding",
   },
   {
     id: 'sheets-06',
     part: 'web.win',
-    reason: 'win: Ctrl+W is browser-reserved',
+    reason:
+      'proposal has prose: "Ctrl+W / Cmd+W stay the browser\'s (Chromium-reserved: the page cannot intercept them; the browser closes the tab)"',
   },
   {
     id: 'sheets-06',
     part: 'web.mac',
-    reason: 'mac: Cmd+W is browser-reserved',
+    reason:
+      'proposal has prose: "Ctrl+W / Cmd+W stay the browser\'s (Chromium-reserved: the page cannot intercept them; the browser closes the tab)"',
   },
   {
     id: 'sheets-08',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'sheets-08',
+    part: 'desktop.mac',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
     id: 'sheets-09',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
@@ -626,8 +641,15 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-12',
-    part: 'desktop',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    part: 'desktop.win',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
+  },
+  {
+    id: 'sheets-12',
+    part: 'desktop.mac',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-13',
@@ -637,25 +659,36 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-18',
-    part: 'desktop',
+    part: 'desktop.win',
     reason: "KEEP: no Microsoft win chord confirmed by today's binding",
   },
   {
     id: 'sheets-19',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason:
+      'proposal has prose: "mac: add Ctrl+Shift+= (MS) next to Cmd+Shift+= (register with MetaKeys.MAC_CTRL)"',
+  },
+  {
+    id: 'sheets-19',
+    part: 'desktop.mac',
     reason:
       'proposal has prose: "mac: add Ctrl+Shift+= (MS) next to Cmd+Shift+= (register with MetaKeys.MAC_CTRL)"',
   },
   {
     id: 'sheets-20',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'sheets-20',
+    part: 'desktop.mac',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
     id: 'sheets-21',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Delete / Delete"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Delete / Delete"',
   },
   {
     id: 'sheets-22',
@@ -671,12 +704,22 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-26',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'sheets-26',
+    part: 'desktop.mac',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
     id: 'sheets-27',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'proposal has prose: "Ctrl+Shift+* ; mac Cmd+A already expands the region"',
+  },
+  {
+    id: 'sheets-27',
+    part: 'desktop.mac',
     reason: 'proposal has prose: "Ctrl+Shift+* ; mac Cmd+A already expands the region"',
   },
   {
@@ -694,25 +737,25 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
     id: 'sheets-29',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
   },
   {
     id: 'sheets-30',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Arrow / Cmd+Arrow"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Arrow / Cmd+Arrow"',
   },
   {
     id: 'sheets-31',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Shift+Arrow / Shift+Cmd+Arrow"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Shift+Arrow / Shift+Cmd+Arrow"',
   },
   {
     id: 'sheets-32',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Shift+Arrow / Shift+Arrow"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Shift+Arrow / Shift+Arrow"',
   },
   {
     id: 'sheets-33',
@@ -722,20 +765,31 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-34',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason:
+      'proposal has prose: "mac: register Ctrl+Home with MetaKeys.MAC_CTRL (MS lists Ctrl+Home); keep Cmd+Home"',
+  },
+  {
+    id: 'sheets-34',
+    part: 'desktop.mac',
     reason:
       'proposal has prose: "mac: register Ctrl+Home with MetaKeys.MAC_CTRL (MS lists Ctrl+Home); keep Cmd+Home"',
   },
   {
     id: 'sheets-35',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'proposal has prose: "mac: register Ctrl+End with MetaKeys.MAC_CTRL; keep Cmd+End"',
+  },
+  {
+    id: 'sheets-35',
+    part: 'desktop.mac',
     reason: 'proposal has prose: "mac: register Ctrl+End with MetaKeys.MAC_CTRL; keep Cmd+End"',
   },
   {
     id: 'sheets-36',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Home / Home"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Home / Home"',
   },
   {
     id: 'sheets-37',
@@ -757,66 +811,104 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-43',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
+  },
+  {
+    id: 'sheets-43',
+    part: 'desktop.mac',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
+  },
+  {
+    id: 'sheets-44',
+    part: 'desktop.win',
     reason: "KEEP: no Microsoft win chord confirmed by today's binding",
   },
   {
     id: 'sheets-44',
-    part: 'desktop',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    part: 'desktop.mac',
+    reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-46',
-    part: 'desktop',
+    part: 'desktop.win',
     reason:
       'proposal has prose: "F11 on Windows would clash with the Electron fullscreen role: decide"',
   },
   {
     id: 'sheets-46',
+    part: 'desktop.mac',
+    reason:
+      'proposal has prose: "F11 on Windows would clash with the Electron fullscreen role: decide"',
+  },
+  {
+    id: 'sheets-47',
+    part: 'desktop.win',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'sheets-47',
+    part: 'desktop.mac',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'sheets-47',
+    part: 'web.win',
+    reason: "F4 is already sheets-09's chord",
+  },
+  {
+    id: 'sheets-47',
     part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    reason: "F4 is already sheets-09's chord",
   },
   {
     id: 'sheets-47',
     part: 'row',
-    reason:
-      'desktop: KEEP on a row that names several sub-actions; web: "WIN / MAC" pair on a row with several sub-actions: "F4 / F4 or Cmd+T"',
+    reason: 'no chord left on any platform',
   },
   {
     id: 'sheets-48',
-    part: 'desktop',
+    part: 'row',
     reason:
-      'proposal has prose: "KEEP; Ctrl+Shift+T is not an MS Windows key, keep or drop by decision"',
-  },
-  {
-    id: 'sheets-48',
-    part: 'web.mac',
-    reason: 'mac: Shift+Cmd+T is browser-reserved',
+      'desktop: proposal has prose: "KEEP; Ctrl+Shift+T is not an MS Windows key, keep or drop by decision"; web: proposal has prose: "Alt+= / no key on web Mac (ribbon/button; Shift+Cmd+T is the Chromium restore-tab chord)"',
   },
   {
     id: 'sheets-50',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason:
+      'proposal has prose: "Windows: add Alt+M, M, D access chord only with ribbon key tips (see key tips row); mac Cmd+F3 already matches"',
+  },
+  {
+    id: 'sheets-50',
+    part: 'desktop.mac',
     reason:
       'proposal has prose: "Windows: add Alt+M, M, D access chord only with ribbon key tips (see key tips row); mac Cmd+F3 already matches"',
   },
   {
     id: 'sheets-51',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'sheets-51',
+    part: 'desktop.mac',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
     id: 'sheets-52',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-53',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-55',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
@@ -845,53 +937,53 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-62',
-    part: 'desktop',
+    part: 'desktop.win',
     reason: 'proposal has prose: "Ctrl+Shift+F (MS Windows); mac: MS lists no Font-tab key"',
   },
   {
     id: 'sheets-62',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    part: 'desktop.mac',
+    reason: 'proposal has prose: "Ctrl+Shift+F (MS Windows); mac: MS lists no Font-tab key"',
   },
   {
     id: 'sheets-67',
     part: 'row',
     reason:
-      'desktop: KEEP on a row that names several sub-actions; web: several chords for one row (sub-actions): "Ctrl+Shift+> / Ctrl+Shift+< / Shift+Cmd+> / Shift+Cmd+<"',
+      'desktop: KEEP on a row that names several sub-actions; web: several chords for one row (sub-actions): "Ctrl+Shift+> / Ctrl+Shift+< / Shift+Cmd+> / Shift+Cmd+< (Mac half from the MS desktop Mac key; the MS desktop Windows key is not documented, so the WEBMAP equality test cannot be shown)"',
   },
   {
     id: 'sheets-68',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-69',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-70',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-71',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-72',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-73',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-74',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
@@ -902,9 +994,18 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-76',
-    part: 'row',
-    reason:
-      'desktop: KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+; / Ctrl+;"',
+    part: 'desktop.mac',
+    reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
+  },
+  {
+    id: 'sheets-76',
+    part: 'web.win',
+    reason: 'proposal has prose: "Ctrl+; / Ctrl+;"',
+  },
+  {
+    id: 'sheets-76',
+    part: 'web.mac',
+    reason: 'proposal has prose: "Ctrl+; / Ctrl+;"',
   },
   {
     id: 'sheets-77',
@@ -914,7 +1015,13 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-81',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason:
+      'proposal has prose: "mac: keep Cmd+Shift+F; drop Cmd+Shift+L (MS Cmd+Shift+L opens Modify Cell Style); add Ctrl+Shift+L on mac (MS)"',
+  },
+  {
+    id: 'sheets-81',
+    part: 'desktop.mac',
     reason:
       'proposal has prose: "mac: keep Cmd+Shift+F; drop Cmd+Shift+L (MS Cmd+Shift+L opens Modify Cell Style); add Ctrl+Shift+L on mac (MS)"',
   },
@@ -927,7 +1034,7 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
     id: 'sheets-84',
     part: 'row',
     reason:
-      'desktop: proposal has prose: "Alt / F10 (MS Windows; mac not documented)"; web: proposal has prose: "Alt+Period (.) / Control+Option"',
+      'desktop: proposal has prose: "Alt / F10 (MS Windows; mac not documented)"; web: proposal has prose: "Alt+Period (.) / Control+Option (Alt+Period is MS\'s Narrator key for the classic ribbon, borrowed because the default MS web key, Alt+Windows logo key, cannot reach a page; Mac Control+Option is printed in prose)"',
   },
   {
     id: 'sheets-85',
@@ -937,7 +1044,13 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-86',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "no key: F1 stays the browser\'s; Help by button (MS web override: Help > Keyboard Shortcuts > Override browser shortcuts) / none"',
+  },
+  {
+    id: 'sheets-86',
+    part: 'web.mac',
     reason:
       'proposal has prose: "no key: F1 stays the browser\'s; Help by button (MS web override: Help > Keyboard Shortcuts > Override browser shortcuts) / none"',
   },
@@ -956,12 +1069,14 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'sheets-89',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-90',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-91',
@@ -972,7 +1087,8 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'sheets-92',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-93',
@@ -993,17 +1109,36 @@ export const sheetsUnmapped: readonly UnmappedShortcut[] = [
     id: 'sheets-96',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
   },
   {
     id: 'sheets-97',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'sheets-dialog-keys',
     part: 'row',
     reason: 'KEEP on a row that names several sub-actions',
+  },
+]
+
+export const sheetsNotes: readonly ShortcutNote[] = [
+  {
+    id: 'sheets-04',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'sheets-46',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'sheets-62',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
   },
 ]
 // @generated-end

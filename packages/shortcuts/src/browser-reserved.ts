@@ -11,7 +11,8 @@ import type { Chord, ShortcutPlatform } from './types'
  * https://chromium.googlesource.com/chromium/src.git/+/20e8909e694cab857da21d8fe9d5f1da170eaae2/chrome/browser/ui/browser_command_controller.cc
  * https://chromium.googlesource.com/chromium/src/+/dc26192a317d9511ce983fd4b26b1130fe25761a/chrome/app/chrome_dll.rc
  *
- * macOS: the same commands' keys from https://support.google.com/chrome/answer/157179;
+ * macOS: the same commands' keys from https://support.google.com/chrome/answer/157179
+ * (tab switching: Ctrl+PgUp/PgDn, Cmd+Option+Left/Right, Cmd+Shift+[ / ]);
  * that macOS Chrome reserves them is inferred, not yet tested in a browser.
  *
  * Keys the page can intercept but the browser also uses (Ctrl+S, Ctrl+P,
@@ -30,6 +31,7 @@ export const BROWSER_RESERVED: Readonly<Record<ShortcutPlatform, readonly Chord[
     'Ctrl+Shift+Tab',
     'Ctrl+PageDown',
     'Ctrl+PageUp',
+    'Ctrl+Shift+Q',
     'Alt+F4',
   ],
   mac: [
@@ -42,6 +44,12 @@ export const BROWSER_RESERVED: Readonly<Record<ShortcutPlatform, readonly Chord[
     'Cmd+Q',
     'Ctrl+Tab',
     'Ctrl+Shift+Tab',
+    'Ctrl+PageDown',
+    'Ctrl+PageUp',
+    'Alt+Cmd+Right',
+    'Alt+Cmd+Left',
+    'Shift+Cmd+BracketRight',
+    'Shift+Cmd+BracketLeft',
   ],
 }
 

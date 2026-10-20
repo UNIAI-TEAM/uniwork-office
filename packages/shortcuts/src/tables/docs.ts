@@ -2,7 +2,7 @@
 // by scripts/gen-tables.mjs from tests/fixtures/shortcuts.csv: change the CSV and
 // regenerate, or put hand-maintained rows in `manual` below.
 import { mergeRows } from '../table'
-import type { ShortcutAction, UnmappedShortcut } from '../types'
+import type { ShortcutAction, ShortcutNote, UnmappedShortcut } from '../types'
 
 // @generated-begin
 const generated: readonly ShortcutAction[] = [
@@ -14,7 +14,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+N'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Open
   {
@@ -22,8 +22,9 @@ const generated: readonly ShortcutAction[] = [
     scope: 'docs',
     win: ['Ctrl+O'],
     mac: ['Cmd+O'],
+    web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save
   {
@@ -32,7 +33,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+S'],
     mac: ['Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Print
   {
@@ -41,7 +42,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+P'],
     mac: ['Cmd+P'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Print preview
   {
@@ -50,7 +51,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+I'],
     mac: [],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Close document
   {
@@ -61,7 +62,7 @@ const generated: readonly ShortcutAction[] = [
     web: { win: [], mac: [] },
     webAlt: { win: 'Alt+Shift+W' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Undo
   {
@@ -89,7 +90,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+X'],
     mac: ['Cmd+X'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Copy
   {
@@ -98,7 +99,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+C'],
     mac: ['Cmd+C'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Paste
   {
@@ -107,7 +108,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+V'],
     mac: ['Cmd+V'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Paste text only
   {
@@ -117,7 +118,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+V'], mac: ['Shift+Cmd+V'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Select all
   {
@@ -126,7 +127,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+A'],
     mac: ['Cmd+A'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Find (Navigation pane)
   {
@@ -136,7 +137,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+F'],
     web: { win: ['Ctrl+F', 'Ctrl+G'], mac: ['Cmd+F'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Find next / repeat Find
   {
@@ -154,7 +155,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+H'],
     mac: ['Ctrl+H'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Go To
   {
@@ -164,7 +165,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Alt+Cmd+G'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Bold
   {
@@ -173,7 +174,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+B'],
     mac: ['Cmd+B'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Italic
   {
@@ -182,7 +183,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+I'],
     mac: ['Cmd+I'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Underline
   {
@@ -191,7 +192,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+U'],
     mac: ['Cmd+U'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Double underline
   {
@@ -201,7 +202,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+D'], mac: ['Shift+Cmd+D'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Strikethrough
   {
@@ -211,7 +212,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: [], mac: ['Shift+Cmd+X'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Subscript
   {
@@ -221,17 +222,16 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Shift+Cmd+Minus'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Superscript
   {
     id: 'docs-028',
     scope: 'docs',
-    win: [],
+    win: ['Ctrl+Shift+Equal'],
     mac: [],
-    web: { win: ['Ctrl+Shift+Equal'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Increase font size (preset steps)
   {
@@ -277,7 +277,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+D'], mac: ['Cmd+D'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Change case
   {
@@ -286,7 +286,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Shift+F3'],
     mac: ['Shift+F3'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // All caps
   {
@@ -295,7 +295,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+A'],
     mac: ['Shift+Cmd+A'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Small caps
   {
@@ -304,7 +304,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+K'],
     mac: ['Shift+Cmd+K'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Hidden text
   {
@@ -314,7 +314,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+H'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Underline words only
   {
@@ -324,7 +324,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Clear character formatting
   {
@@ -334,7 +334,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Space'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Copy formatting
   {
@@ -343,7 +343,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+C'],
     mac: ['Alt+Cmd+C'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Paste formatting
   {
@@ -352,7 +352,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+V'],
     mac: ['Alt+Cmd+V'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Show / hide formatting marks
   {
@@ -362,7 +362,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+8'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Align left
   {
@@ -371,7 +371,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+L'],
     mac: ['Cmd+L'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Center
   {
@@ -380,7 +380,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+E'],
     mac: ['Cmd+E'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Align right
   {
@@ -389,7 +389,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+R'],
     mac: ['Cmd+R'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Justify
   {
@@ -398,7 +398,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+J'],
     mac: ['Cmd+J'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Line spacing 1.0
   {
@@ -407,7 +407,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+1'],
     mac: ['Cmd+1'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Line spacing 2.0
   {
@@ -416,7 +416,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+2'],
     mac: ['Cmd+2'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Line spacing 1.5
   {
@@ -425,7 +425,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+5'],
     mac: ['Cmd+5'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Decrease indent
   {
@@ -445,7 +445,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+T'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Remove hanging indent
   {
@@ -455,17 +455,16 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Shift+Cmd+T'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Remove paragraph formatting
   {
     id: 'docs-054',
     scope: 'docs',
-    win: [],
+    win: ['Ctrl+Q'],
     mac: [],
-    web: { win: ['Ctrl+Q'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Normal style
   {
@@ -475,7 +474,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     webAlt: { win: 'Ctrl+Alt+0', mac: 'Alt+Cmd+0' },
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Heading 1
   {
@@ -484,7 +483,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+1'],
     mac: ['Alt+Cmd+1'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Heading 2
   {
@@ -493,7 +492,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+2'],
     mac: ['Alt+Cmd+2'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Heading 3
   {
@@ -502,7 +501,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+3'],
     mac: ['Alt+Cmd+3'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Bulleted list
   {
@@ -513,7 +512,7 @@ const generated: readonly ShortcutAction[] = [
     web: { win: [], mac: [] },
     webAlt: { win: 'Ctrl+Period' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Numbered list
   {
@@ -523,7 +522,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Slash'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert line break
   {
@@ -541,7 +540,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Enter'],
     mac: ['Cmd+Enter'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert column break
   {
@@ -550,7 +549,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+Enter'],
     mac: ['Shift+Cmd+Enter'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert non-breaking space
   {
@@ -586,7 +585,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+K'],
     mac: ['Cmd+K'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert comment
   {
@@ -596,7 +595,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Alt+M'], mac: ['Alt+Cmd+A'] },
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Insert footnote
   {
@@ -605,7 +604,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+F'],
     mac: ['Alt+Cmd+F'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Insert endnote
   {
@@ -614,7 +613,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+D'],
     mac: ['Alt+Cmd+E'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Insert DATE field
   {
@@ -623,7 +622,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Alt+Shift+D'],
     mac: ['Ctrl+Shift+D'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert TIME field
   {
@@ -632,7 +631,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Alt+Shift+T'],
     mac: ['Ctrl+Shift+T'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Update fields
   {
@@ -641,17 +640,17 @@ const generated: readonly ShortcutAction[] = [
     win: ['F9'],
     mac: ['F9'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Toggle field codes (all)
   {
     id: 'docs-078',
     scope: 'docs',
-    win: [],
+    win: ['Alt+F9'],
     mac: [],
     web: { win: ['Alt+F9'], mac: ['Alt+F9'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Track changes on/off
   {
@@ -661,7 +660,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+E'], mac: ['Shift+Cmd+E'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Spelling and grammar (Editor pane)
   {
@@ -670,7 +669,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['F7'],
     mac: ['F7'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Word count
   {
@@ -680,7 +679,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Shift+G'], mac: ['Shift+Cmd+G'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Zoom in
   {
@@ -707,7 +706,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+0'],
     mac: ['Cmd+0'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Expand or collapse the ribbon
   {
@@ -718,7 +717,7 @@ const generated: readonly ShortcutAction[] = [
     web: { win: [], mac: [] },
     webAlt: { win: 'Ctrl+F3' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Compact ribbon
   {
@@ -728,7 +727,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Alt+K'], mac: ['Alt+Cmd+K'] },
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Context menu key
   {
@@ -737,7 +736,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Shift+F10'],
     mac: ['Shift+F10'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Cycle panes
   {
@@ -776,10 +775,10 @@ const generated: readonly ShortcutAction[] = [
     id: 'docs-094',
     scope: 'docs',
     win: ['F1', 'Ctrl+Slash'],
-    mac: ['F1'],
+    mac: [],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Delete word left / right
   {
@@ -796,7 +795,13 @@ const generated: readonly ShortcutAction[] = [
 export const docsUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'docs-001',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "no in-frame key (Ctrl+N is Chromium-reserved); New document by menu item or the MS web address-bar route Word.new"',
+  },
+  {
+    id: 'docs-001',
+    part: 'web.mac',
     reason:
       'proposal has prose: "no in-frame key (Ctrl+N is Chromium-reserved); New document by menu item or the MS web address-bar route Word.new"',
   },
@@ -807,6 +812,18 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
       'desktop: proposal has prose: "menu-only, no accelerator (Ctrl+Shift+N is MS Normal style, see docs Normal style row)"; web: proposal has prose: "none (browser-reserved; no frame key)"',
   },
   {
+    id: 'docs-003',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action (capability-gated); MS Word web says Ctrl+O applies to the browser and prints no alternative or override setting, so the MS desktop key is kept ( where there is no Open action the browser keeps it"',
+  },
+  {
+    id: 'docs-003',
+    part: 'web.mac',
+    reason:
+      'proposal has prose: "Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action (capability-gated); MS Word web says Ctrl+O applies to the browser and prints no alternative or override setting, so the MS desktop key is kept ( where there is no Open action the browser keeps it"',
+  },
+  {
     id: 'docs-005',
     part: 'row',
     reason:
@@ -814,18 +831,8 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'docs-007',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
-  },
-  {
-    id: 'docs-007',
     part: 'desktop.mac',
-    reason: 'no mac chord in proposal_desktop',
-  },
-  {
-    id: 'docs-008',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    reason: "Microsoft prints no Mac key; keep today's Mac binding (contract 3.1)",
   },
   {
     id: 'docs-009',
@@ -835,7 +842,13 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'docs-011',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason:
+      'proposal has prose: "KEEP both; make the menu label show Ctrl+Y (MS) so the hint matches Word"',
+  },
+  {
+    id: 'docs-011',
+    part: 'desktop.mac',
     reason:
       'proposal has prose: "KEEP both; make the menu label show Ctrl+Y (MS) so the hint matches Word"',
   },
@@ -847,66 +860,96 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'docs-016',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason:
+      'proposal has prose: "KEEP; Mac menu accelerator should read Shift+Cmd+V (MS) - ProseMirror already pastes plain on it"',
+  },
+  {
+    id: 'docs-016',
+    part: 'desktop.mac',
     reason:
       'proposal has prose: "KEEP; Mac menu accelerator should read Shift+Cmd+V (MS) - ProseMirror already pastes plain on it"',
   },
   {
     id: 'docs-021',
-    part: 'web',
+    part: 'web.win',
     reason:
-      'proposal is conditional: "F5 / Cmd+Option+G (Ctrl+G is Find in the MS web Editing view and MS web prints no Editing-view Go To; F5 is the MS desktop Mac alternative; F5 reloads the browser, so preventDefault only while the frame has focus, validate)"',
+      'proposal is conditional: "F5 / Cmd+Option+G (Ctrl+G is Find in the MS web Editing view and MS web prints no Editing-view Go To; F5 is the MS desktop Windows Go To key, desktop Mac Go To is Cmd+Option+G; F5 reloads the browser, so preventDefault only while the frame has focus, validate)"',
+  },
+  {
+    id: 'docs-021',
+    part: 'web.mac',
+    reason:
+      'proposal is conditional: "F5 / Cmd+Option+G (Ctrl+G is Find in the MS web Editing view and MS web prints no Editing-view Go To; F5 is the MS desktop Windows Go To key, desktop Mac Go To is Cmd+Option+G; F5 reloads the browser, so preventDefault only while the frame has focus, validate)"',
   },
   {
     id: 'docs-025',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'proposal has prose: "Ctrl+Shift+D / Cmd+Shift+D (MS) if the mark exists"',
+  },
+  {
+    id: 'docs-025',
+    part: 'desktop.mac',
     reason: 'proposal has prose: "Ctrl+Shift+D / Cmd+Shift+D (MS) if the mark exists"',
   },
   {
     id: 'docs-026',
-    part: 'desktop',
+    part: 'desktop.win',
     reason: 'proposal has prose: "Mac Cmd+Shift+X (MS); Windows: none documented"',
   },
   {
     id: 'docs-026',
-    part: 'web.win',
-    reason: 'win: no web chord (not documented)',
+    part: 'desktop.mac',
+    reason: 'proposal has prose: "Mac Cmd+Shift+X (MS); Windows: none documented"',
   },
   {
     id: 'docs-027',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal is conditional: "Ctrl+Shift+Minus (-) / Cmd+Shift+Minus (-) (as printed by MS desktop; current Ctrl+, / Cmd+, needs a product decision)"',
+  },
+  {
+    id: 'docs-027',
+    part: 'web.mac',
     reason:
       'proposal is conditional: "Ctrl+Shift+Minus (-) / Cmd+Shift+Minus (-) (as printed by MS desktop; current Ctrl+, / Cmd+, needs a product decision)"',
   },
   {
     id: 'docs-028',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
-    id: 'docs-028',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    id: 'docs-033',
+    part: 'desktop.win',
+    reason: 'proposal has prose: "KEEP Ctrl+D. Optional alias Ctrl+Shift+F (MS)"',
   },
   {
     id: 'docs-033',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: 'proposal has prose: "KEEP Ctrl+D. Optional alias Ctrl+Shift+F (MS)"',
   },
   {
     id: 'docs-037',
-    part: 'desktop',
+    part: 'desktop.win',
     reason:
       'proposal has prose: "Ctrl+Shift+H (MS). Conflicts with the shell\'s Back to Home (see Back to Home row)"',
   },
   {
     id: 'docs-037',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    part: 'desktop.mac',
+    reason:
+      'proposal has prose: "Ctrl+Shift+H (MS). Conflicts with the shell\'s Back to Home (see Back to Home row)"',
   },
   {
     id: 'docs-038',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "none on web (Ctrl+Shift+W / Cmd+Shift+W close the browser window and Chromium reserves them); action not in UniWork Docs"',
+  },
+  {
+    id: 'docs-038',
+    part: 'web.mac',
     reason:
       'proposal has prose: "none on web (Ctrl+Shift+W / Cmd+Shift+W close the browser window and Chromium reserves them); action not in UniWork Docs"',
   },
@@ -917,24 +960,25 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'docs-039',
-    part: 'desktop',
+    part: 'desktop.win',
     reason:
       'proposal has prose: "Windows: Ctrl+Space (keep). Mac: needs a decision (Control+Space is Apple\'s input-source switch)"',
   },
   {
     id: 'docs-039',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    part: 'desktop.mac',
+    reason:
+      'proposal has prose: "Windows: Ctrl+Space (keep). Mac: needs a decision (Control+Space is Apple\'s input-source switch)"',
   },
   {
     id: 'docs-042',
-    part: 'desktop',
+    part: 'desktop.win',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
     id: 'docs-042',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    part: 'desktop.mac',
+    reason: 'KEEP on a row that names several sub-actions',
   },
   {
     id: 'docs-050',
@@ -944,28 +988,40 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'docs-052',
-    part: 'web',
+    part: 'web.win',
+    reason: 'proposal has prose: "none on web (Ctrl+T / Cmd+T are Chromium-reserved: new tab)"',
+  },
+  {
+    id: 'docs-052',
+    part: 'web.mac',
     reason: 'proposal has prose: "none on web (Ctrl+T / Cmd+T are Chromium-reserved: new tab)"',
   },
   {
     id: 'docs-053',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "none on web (Ctrl+Shift+T / Cmd+Shift+T are Chromium-reserved: restore tab)"',
+  },
+  {
+    id: 'docs-053',
+    part: 'web.mac',
     reason:
       'proposal has prose: "none on web (Ctrl+Shift+T / Cmd+Shift+T are Chromium-reserved: restore tab)"',
   },
   {
     id: 'docs-054',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
-    id: 'docs-054',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    id: 'docs-055',
+    part: 'desktop.win',
+    reason:
+      'proposal has prose: "Ctrl+Shift+N / Cmd+Shift+N (MS); free it by removing New window\'s accelerator"',
   },
   {
     id: 'docs-055',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason:
       'proposal has prose: "Ctrl+Shift+N / Cmd+Shift+N (MS); free it by removing New window\'s accelerator"',
   },
@@ -976,19 +1032,14 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
       'desktop: proposal has prose: "Ctrl+Shift+S (MS) once Save As moves to F12"; web: proposal is conditional: "Ctrl+Shift+S / not documented (once Save As is F12 only)"',
   },
   {
-    id: 'docs-060',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
-  },
-  {
     id: 'docs-061',
-    part: 'desktop',
+    part: 'desktop.win',
     reason: 'proposal has prose: "none until MS documents one"',
   },
   {
     id: 'docs-061',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    part: 'desktop.mac',
+    reason: 'proposal has prose: "none until MS documents one"',
   },
   {
     id: 'docs-062',
@@ -1010,39 +1061,57 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'docs-072',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason:
+      'proposal has prose: "Win: Ctrl+Alt+M (MS); Paragraph dialog moves off it. Mac: keep Alt+Cmd+A"',
+  },
+  {
+    id: 'docs-072',
+    part: 'desktop.mac',
     reason:
       'proposal has prose: "Win: Ctrl+Alt+M (MS); Paragraph dialog moves off it. Mac: keep Alt+Cmd+A"',
   },
   {
     id: 'docs-078',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'docs-079',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'docs-079',
+    part: 'desktop.mac',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
     id: 'docs-081',
-    part: 'desktop',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    part: 'desktop.win',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
+  },
+  {
+    id: 'docs-081',
+    part: 'desktop.mac',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'docs-085',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Scroll / Cmd+Scroll"',
-  },
-  {
-    id: 'docs-086',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Scroll / Cmd+Scroll"',
   },
   {
     id: 'docs-087',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'proposal has prose: "same"',
+  },
+  {
+    id: 'docs-087',
+    part: 'desktop.mac',
     reason: 'proposal has prose: "same"',
   },
   {
@@ -1059,13 +1128,30 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'docs-093',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal is conditional: "Shift+F5 / Shift+F5 (once track changes has a jump-to-change command)"',
+  },
+  {
+    id: 'docs-093',
+    part: 'web.mac',
     reason:
       'proposal is conditional: "Shift+F5 / Shift+F5 (once track changes has a jump-to-change command)"',
   },
   {
     id: 'docs-094',
-    part: 'web',
+    part: 'desktop.mac',
+    reason: "Microsoft prints no Mac key; keep today's Mac binding (contract 3.1)",
+  },
+  {
+    id: 'docs-094',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "no in-frame key (MS Word web: F1 \'applies to the web browser\'); the shortcut sheet is reached by a menu item or button"',
+  },
+  {
+    id: 'docs-094',
+    part: 'web.mac',
     reason:
       'proposal has prose: "no in-frame key (MS Word web: F1 \'applies to the web browser\'); the shortcut sheet is reached by a menu item or button"',
   },
@@ -1077,13 +1163,15 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'docs-096',
-    part: 'desktop',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    part: 'desktop.win',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'docs-096',
-    part: 'web.win',
-    reason: 'the browser keeps the Microsoft key',
+    part: 'desktop.mac',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'docs-096',
@@ -1094,11 +1182,16 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
     id: 'docs-097',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Left|Right (word), Ctrl+Up|Down (paragraph), Home / End (line), Ctrl+Home / End (document), Shift added to select / Option+Left|Right (word), Cmd+Up|Down (paragraph), Cmd+Left|Right (line) (native browser editing)"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Left|Right (word), Ctrl+Up|Down (paragraph), Home / End (line), Ctrl+Home / End (document), Shift added to select / Option+Left|Right (word), Cmd+Up|Down (paragraph), Cmd+Left|Right (line) (native browser editing)"',
   },
   {
     id: 'docs-098',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'docs-098',
+    part: 'desktop.mac',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
@@ -1130,6 +1223,75 @@ export const docsUnmapped: readonly UnmappedShortcut[] = [
     part: 'row',
     reason:
       'desktop: same as web, and web is unmapped; web: proposal has prose: "none until a Paste Special feature exists; MS desktop key then: not documented / Cmd+Control+V"',
+  },
+]
+
+export const docsNotes: readonly ShortcutNote[] = [
+  {
+    id: 'docs-003',
+    part: 'web',
+    detail:
+      'ALT-PROPOSED without a single chord: ", not Chromium-reserved); where there is no Open action the"',
+  },
+  {
+    id: 'docs-007',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-008',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-026',
+    part: 'web.win',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-028',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-037',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-039',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-042',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-054',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-060',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-061',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-086',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'docs-096',
+    part: 'web',
+    detail: 'the browser keeps the Microsoft key',
   },
 ]
 // @generated-end

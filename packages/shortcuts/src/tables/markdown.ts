@@ -2,7 +2,7 @@
 // by scripts/gen-tables.mjs from tests/fixtures/shortcuts.csv: change the CSV and
 // regenerate, or put hand-maintained rows in `manual` below.
 import { mergeRows } from '../table'
-import type { ShortcutAction, UnmappedShortcut } from '../types'
+import type { ShortcutAction, ShortcutNote, UnmappedShortcut } from '../types'
 
 // @generated-begin
 const generated: readonly ShortcutAction[] = [
@@ -12,8 +12,9 @@ const generated: readonly ShortcutAction[] = [
     scope: 'markdown',
     win: ['Ctrl+O'],
     mac: ['Cmd+O'],
+    web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save
   {
@@ -22,7 +23,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+S'],
     mac: ['Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save As
   {
@@ -31,7 +32,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['F12'],
     mac: ['Shift+Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Print
   {
@@ -40,17 +41,18 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+P'],
     mac: ['Cmd+P'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Close document
   {
     id: 'markdown-005',
     scope: 'markdown',
-    win: [],
+    win: ['Ctrl+W'],
     mac: [],
+    web: { win: [], mac: [] },
     webAlt: { win: 'Alt+Shift+W' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Undo
   {
@@ -77,7 +79,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+X'],
     mac: ['Cmd+X'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Copy
   {
@@ -86,7 +88,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+C'],
     mac: ['Cmd+C'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Paste
   {
@@ -95,7 +97,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+V'],
     mac: ['Cmd+V'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Paste text only
   {
@@ -104,7 +106,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+V'],
     mac: ['Shift+Cmd+V'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Select all
   {
@@ -113,7 +115,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+A'],
     mac: ['Cmd+A'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Find
   {
@@ -123,7 +125,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+F'],
     web: { win: ['Ctrl+F', 'Ctrl+G'], mac: ['Cmd+F'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Find next / repeat Find
   {
@@ -138,11 +140,11 @@ const generated: readonly ShortcutAction[] = [
   {
     id: 'markdown-015',
     scope: 'markdown',
-    win: [],
+    win: ['Ctrl+H'],
     mac: [],
     web: { win: ['Ctrl+H'], mac: ['Ctrl+H'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Bold
   {
@@ -151,7 +153,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+B'],
     mac: ['Cmd+B'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Italic
   {
@@ -160,7 +162,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+I'],
     mac: ['Cmd+I'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Strikethrough
   {
@@ -170,17 +172,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Shift+Cmd+X'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
-  },
-  // Toggle source / edit view
-  {
-    id: 'markdown-021',
-    scope: 'markdown',
-    win: [],
-    mac: [],
-    web: { win: ['Ctrl+E'], mac: ['Cmd+E'] },
-    match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Heading 1
   {
@@ -189,7 +181,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+1'],
     mac: ['Alt+Cmd+1'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Heading 2
   {
@@ -198,7 +190,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+2'],
     mac: ['Alt+Cmd+2'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Heading 3
   {
@@ -207,7 +199,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+3'],
     mac: ['Alt+Cmd+3'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Normal text (paragraph)
   {
@@ -217,7 +209,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     webAlt: { win: 'Ctrl+Alt+0', mac: 'Alt+Cmd+0' },
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Bulleted list
   {
@@ -228,7 +220,7 @@ const generated: readonly ShortcutAction[] = [
     web: { win: [], mac: [] },
     webAlt: { win: 'Ctrl+Period' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Numbered list
   {
@@ -238,7 +230,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+Slash'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert hyperlink
   {
@@ -247,7 +239,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+K'],
     mac: ['Cmd+K'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert line break
   {
@@ -265,7 +257,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+D'],
     mac: ['Cmd+D'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Zoom in
   {
@@ -292,7 +284,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+0'],
     mac: ['Cmd+0'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Expand or collapse the ribbon
   {
@@ -303,35 +295,48 @@ const generated: readonly ShortcutAction[] = [
     web: { win: [], mac: [] },
     webAlt: { win: 'Ctrl+F3' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
 ]
 
 export const markdownUnmapped: readonly UnmappedShortcut[] = [
   {
+    id: 'markdown-001',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action (capability-gated); MS Word web says Ctrl+O applies to the browser and prints no alternative or override setting, so the MS desktop key is kept ( where there is no Open action the browser keeps it"',
+  },
+  {
+    id: 'markdown-001',
+    part: 'web.mac',
+    reason:
+      'proposal has prose: "Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action (capability-gated); MS Word web says Ctrl+O applies to the browser and prints no alternative or override setting, so the MS desktop key is kept ( where there is no Open action the browser keeps it"',
+  },
+  {
     id: 'markdown-005',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
-    id: 'markdown-005',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
-  },
-  {
     id: 'markdown-015',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'markdown-018',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "KEEP (no underline mark in Markdown); if ever added: Ctrl+U / Cmd+U (MS web)"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "KEEP (no underline mark in Markdown); if ever added: Ctrl+U / Cmd+U (MS web)"',
   },
   {
     id: 'markdown-019',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal is conditional: "Ctrl+Shift+S / Cmd+Shift+X (Windows: MS prints no key, current Ctrl+Shift+S stays once Save As is F12 only; Mac: Cmd+Shift+S goes to Save As)"',
+  },
+  {
+    id: 'markdown-019',
+    part: 'web.mac',
     reason:
       'proposal is conditional: "Ctrl+Shift+S / Cmd+Shift+X (Windows: MS prints no key, current Ctrl+Shift+S stays once Save As is F12 only; Mac: Cmd+Shift+S goes to Save As)"',
   },
@@ -344,32 +349,35 @@ export const markdownUnmapped: readonly UnmappedShortcut[] = [
     id: 'markdown-020',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "KEEP Ctrl+E / Cmd+E for the source toggle (MS web Ctrl+E = Center; Markdown has no alignment)"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "none: Ctrl+E / Cmd+E belongs to the source toggle (markdown-021); inline code stays on the toolbar and backticks (MS web prints no inline-code key; pick a free chord with"',
   },
   {
     id: 'markdown-021',
-    part: 'desktop',
-    reason: 'KEEP on a row that names several sub-actions',
+    part: 'row',
+    reason:
+      'desktop: KEEP on a row that names several sub-actions; web: proposal has prose: "KEEP Ctrl+E / Cmd+E for the source toggle (ours-only; MS web Ctrl+E = Center, Markdown has no alignment; the only action on this chord, markdown-020 gave it up)"',
   },
   {
     id: 'markdown-025',
-    part: 'desktop',
+    part: 'desktop.win',
     reason: 'proposal has prose: "Ctrl+Shift+N / Cmd+Shift+N (MS) when the shell frees it"',
   },
   {
-    id: 'markdown-026',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    id: 'markdown-025',
+    part: 'desktop.mac',
+    reason: 'proposal has prose: "Ctrl+Shift+N / Cmd+Shift+N (MS) when the shell frees it"',
   },
   {
     id: 'markdown-027',
-    part: 'desktop',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    part: 'desktop.win',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'markdown-027',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+    part: 'desktop.mac',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'markdown-028',
@@ -386,28 +394,54 @@ export const markdownUnmapped: readonly UnmappedShortcut[] = [
     id: 'markdown-036',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Scroll / Cmd+Scroll"',
-  },
-  {
-    id: 'markdown-037',
-    part: 'web.mac',
-    reason: 'mac: no web chord (not documented)',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Ctrl+Scroll / Cmd+Scroll"',
   },
   {
     id: 'markdown-038',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
   },
   {
     id: 'markdown-039',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'markdown-040',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
+  },
+]
+
+export const markdownNotes: readonly ShortcutNote[] = [
+  {
+    id: 'markdown-001',
+    part: 'web',
+    detail:
+      'ALT-PROPOSED without a single chord: ", not Chromium-reserved); where there is no Open action the"',
+  },
+  {
+    id: 'markdown-005',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'markdown-026',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'markdown-027',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
+  },
+  {
+    id: 'markdown-037',
+    part: 'web.mac',
+    detail: 'no web chord (not documented)',
   },
 ]
 // @generated-end

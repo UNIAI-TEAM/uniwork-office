@@ -2,7 +2,7 @@
 // by scripts/gen-tables.mjs from tests/fixtures/shortcuts.csv: change the CSV and
 // regenerate, or put hand-maintained rows in `manual` below.
 import { mergeRows } from '../table'
-import type { ShortcutAction, UnmappedShortcut } from '../types'
+import type { ShortcutAction, ShortcutNote, UnmappedShortcut } from '../types'
 
 // @generated-begin
 const generated: readonly ShortcutAction[] = [
@@ -14,7 +14,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+N'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Open presentation
   {
@@ -22,8 +22,9 @@ const generated: readonly ShortcutAction[] = [
     scope: 'slides',
     win: ['Ctrl+O'],
     mac: ['Cmd+O'],
+    web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save
   {
@@ -32,7 +33,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+S'],
     mac: ['Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Save As
   {
@@ -41,7 +42,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+S'],
     mac: ['Shift+Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Print
   {
@@ -50,7 +51,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+P'],
     mac: ['Cmd+P'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Close presentation
   {
@@ -60,7 +61,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+W'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Undo
   {
@@ -75,7 +76,7 @@ const generated: readonly ShortcutAction[] = [
   {
     id: 'slides-08',
     scope: 'slides',
-    win: [],
+    win: ['Ctrl+Y'],
     mac: [],
     web: { win: ['Ctrl+Y'], mac: ['Cmd+Y'] },
     match: 'key',
@@ -88,7 +89,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+V'],
     mac: ['Ctrl+Cmd+V'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Copy formatting
   {
@@ -97,7 +98,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+C'],
     mac: ['Shift+Cmd+C'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Paste formatting
   {
@@ -107,7 +108,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Shift+Cmd+V'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Select all (objects / slides)
   {
@@ -117,7 +118,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+A'], mac: ['Cmd+A'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // New slide
   {
@@ -127,7 +128,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Shift+Cmd+N'],
     web: { win: ['Ctrl+M'], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Duplicate selected slide
   {
@@ -136,17 +137,17 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+D'],
     mac: ['Shift+Cmd+D'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Duplicate selected object
   {
     id: 'slides-16',
     scope: 'slides',
-    win: [],
+    win: ['Ctrl+D'],
     mac: [],
     web: { win: ['Ctrl+D'], mac: ['Cmd+D'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Start slide show from the beginning
   {
@@ -156,7 +157,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Shift+Cmd+Enter', 'F5'],
     web: { win: ['Ctrl+F5'], mac: ['Shift+Cmd+Enter'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Start slide show from the current slide
   {
@@ -166,7 +167,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+Enter'],
     web: { win: ['Ctrl+Shift+F5'], mac: ['Shift+Cmd+F5'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Presenter view
   {
@@ -175,7 +176,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Alt+F5'],
     mac: ['Alt+Enter'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Show: hide pointer / navigation buttons
   {
@@ -185,7 +186,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+H'],
     mac: ['Cmd+I'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Group
   {
@@ -195,7 +196,7 @@ const generated: readonly ShortcutAction[] = [
     mac: [],
     web: { win: ['Ctrl+G'], mac: ['Alt+Cmd+G'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Ungroup
   {
@@ -205,7 +206,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Alt+Shift+Cmd+G'],
     web: { win: ['Ctrl+Shift+G'], mac: ['Alt+Shift+Cmd+G'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Regroup
   {
@@ -214,7 +215,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+J'],
     mac: ['Alt+Cmd+J'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Insert comment
   {
@@ -223,7 +224,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+M'],
     mac: ['Shift+Cmd+M'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Bold
   {
@@ -232,7 +233,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+B'],
     mac: ['Cmd+B'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Italic
   {
@@ -241,7 +242,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+I'],
     mac: ['Cmd+I'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Underline
   {
@@ -250,7 +251,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+U'],
     mac: ['Cmd+U'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Clear character formatting
   {
@@ -259,7 +260,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Space'],
     mac: ['Ctrl+Space'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Find
   {
@@ -268,7 +269,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+F'],
     mac: ['Cmd+F'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Replace
   {
@@ -277,7 +278,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+H'],
     mac: ['Shift+Cmd+H'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Next placeholder / commit text (Ctrl+Enter)
   {
@@ -306,7 +307,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+O'],
     mac: ['Alt+Cmd+O'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Toggle Outline and Thumbnail panes (Ctrl+Shift+Tab)
   {
@@ -317,17 +318,17 @@ const generated: readonly ShortcutAction[] = [
     web: { win: [], mac: [] },
     webAlt: { win: 'Alt+Shift+O', mac: 'Alt+Shift+O' },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Expand or collapse ribbon
   {
     id: 'slides-71',
     scope: 'slides',
-    win: [],
+    win: ['Ctrl+F1'],
     mac: [],
     web: { win: ['Ctrl+F1'], mac: ['Alt+Cmd+R'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Help
   {
@@ -337,30 +338,38 @@ const generated: readonly ShortcutAction[] = [
     mac: ['F1'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
 ]
 
 export const slidesUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'slides-01',
-    part: 'web',
+    part: 'web.win',
     reason:
       'proposal has prose: "no in-app key; Ctrl+N / Cmd+N stay the browser\'s; New by File menu / documents-list button (MS web equivalent = the PowerPoint.new address-bar route) / same"',
   },
   {
-    id: 'slides-06',
-    part: 'web.win',
-    reason: 'win: Ctrl+W is browser-reserved',
+    id: 'slides-01',
+    part: 'web.mac',
+    reason:
+      'proposal has prose: "no in-app key; Ctrl+N / Cmd+N stay the browser\'s; New by File menu / documents-list button (MS web equivalent = the PowerPoint.new address-bar route) / same"',
   },
   {
-    id: 'slides-06',
+    id: 'slides-02',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action; MS PowerPoint web says Ctrl+O applies to the browser and prints no alternative or override setting, so the MS desktop key is kept ( where there is no Open action the browser keeps it"',
+  },
+  {
+    id: 'slides-02',
     part: 'web.mac',
-    reason: 'mac: Cmd+W is browser-reserved',
+    reason:
+      'proposal has prose: "Ctrl+O / Cmd+O handled in the frame where UniWork has an Open action; MS PowerPoint web says Ctrl+O applies to the browser and prints no alternative or override setting, so the MS desktop key is kept ( where there is no Open action the browser keeps it"',
   },
   {
     id: 'slides-08',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
@@ -371,23 +380,29 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'slides-12',
-    part: 'web',
+    part: 'web.win',
     reason:
-      'proposal has prose: "Ctrl+Shift+V / Cmd+Shift+V = paste text only (MS web); Paste formatting: no key"',
+      'proposal has prose: "no web key for Paste formatting (Ctrl+Shift+V / Cmd+Shift+V is Paste text, unformatted on MS web: shell-07, docs-016); Paste formatting by ribbon / context menu"',
+  },
+  {
+    id: 'slides-12',
+    part: 'web.mac',
+    reason:
+      'proposal has prose: "no web key for Paste formatting (Ctrl+Shift+V / Cmd+Shift+V is Paste text, unformatted on MS web: shell-07, docs-016); Paste formatting by ribbon / context menu"',
   },
   {
     id: 'slides-13',
-    part: 'desktop',
+    part: 'desktop.win',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
-    id: 'slides-14',
-    part: 'web.mac',
-    reason: 'mac: no web chord (none)',
+    id: 'slides-13',
+    part: 'desktop.mac',
+    reason: 'KEEP on a row that names several sub-actions',
   },
   {
     id: 'slides-16',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
@@ -447,13 +462,13 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
     id: 'slides-28',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "G, then Right / Left arrow, then Enter (Return) / same"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "G, then Right / Left arrow, then Enter (Return) / same"',
   },
   {
     id: 'slides-29',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
   },
   {
     id: 'slides-30',
@@ -487,11 +502,17 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'slides-36',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'slides-37',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'proposal has prose: "mac: add Cmd+Option+G (MS); ours Cmd+G also stays"',
+  },
+  {
+    id: 'slides-37',
+    part: 'desktop.mac',
     reason: 'proposal has prose: "mac: add Cmd+Option+G (MS); ours Cmd+G also stays"',
   },
   {
@@ -503,13 +524,13 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
     id: 'slides-40',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Arrow keys / Arrow keys (Ctrl+Arrow fine step kept)"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Arrow keys / Arrow keys (Ctrl+Arrow fine step kept)"',
   },
   {
     id: 'slides-41',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Shift+Arrow / Shift+Arrow"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Shift+Arrow / Shift+Arrow"',
   },
   {
     id: 'slides-42',
@@ -544,7 +565,8 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'slides-51',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'slides-52',
@@ -589,7 +611,12 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'slides-62',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason: 'KEEP on a row that names several sub-actions',
+  },
+  {
+    id: 'slides-62',
+    part: 'desktop.mac',
     reason: 'KEEP on a row that names several sub-actions',
   },
   {
@@ -612,8 +639,15 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'slides-66',
-    part: 'desktop',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    part: 'desktop.win',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
+  },
+  {
+    id: 'slides-66',
+    part: 'desktop.mac',
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'slides-67',
@@ -629,7 +663,7 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'slides-71',
-    part: 'desktop',
+    part: 'desktop.mac',
     reason: "KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
@@ -640,19 +674,25 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'slides-73',
-    part: 'web',
+    part: 'web.win',
+    reason: 'proposal has prose: "no key: F1 stays the browser\'s; Help by button / none"',
+  },
+  {
+    id: 'slides-73',
+    part: 'web.mac',
     reason: 'proposal has prose: "no key: F1 stays the browser\'s; Help by button / none"',
   },
   {
     id: 'slides-74',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "Esc / Esc"',
   },
   {
     id: 'slides-75',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'slides-76',
@@ -668,7 +708,32 @@ export const slidesUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'slides-dialog-keys',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
+  },
+]
+
+export const slidesNotes: readonly ShortcutNote[] = [
+  {
+    id: 'slides-02',
+    part: 'web',
+    detail:
+      'ALT-PROPOSED without a single chord: ", not Chromium-reserved); where there is no Open action the"',
+  },
+  {
+    id: 'slides-06',
+    part: 'web.win',
+    detail: 'Ctrl+W is browser-reserved',
+  },
+  {
+    id: 'slides-06',
+    part: 'web.mac',
+    detail: 'Cmd+W is browser-reserved',
+  },
+  {
+    id: 'slides-14',
+    part: 'web.mac',
+    detail: 'no web chord (none)',
   },
 ]
 // @generated-end

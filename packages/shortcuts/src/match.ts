@@ -34,6 +34,34 @@ const NAMED_EVENT_KEYS: Readonly<Record<string, readonly string[]>> = {
   ContextMenu: ['ContextMenu', 'Apps'],
 }
 
+/** The `Input` fields of Electron's `before-input-event` (main process). */
+export interface ElectronInputLike {
+  readonly key: string
+  readonly code: string
+  readonly control: boolean
+  readonly alt: boolean
+  readonly shift: boolean
+  readonly meta: boolean
+  readonly isAutoRepeat?: boolean
+  readonly isComposing?: boolean
+}
+
+/** An Electron `before-input-event` input as a matcher event. Electron gives
+ * no AltGraph state, so on Windows every Ctrl+Alt chord is treated as AltGr
+ * there and never matches (see `matchChord`). */
+export function fromElectronInput(input: ElectronInputLike): ShortcutKeyEvent {
+  return {
+    key: input.key,
+    code: input.code,
+    ctrlKey: input.control,
+    altKey: input.alt,
+    shiftKey: input.shift,
+    metaKey: input.meta,
+    repeat: input.isAutoRepeat,
+    isComposing: input.isComposing,
+  }
+}
+
 /** Composition in progress (Telex/VNI/IME): no shortcut may fire. */
 export function isComposingEvent(event: ShortcutKeyEvent): boolean {
   return event.isComposing === true || event.keyCode === 229
@@ -91,14 +119,13 @@ export function matchChord(
   const parsed = parseChord(chord)
   if (!parsed) return false
   // AltGr arrives as Ctrl+Alt on Windows: a Ctrl+Alt chord must not fire
-  // while the user types an AltGr character.
-  if (
-    platform === 'win' &&
-    parsed.ctrl &&
-    parsed.alt &&
-    event.getModifierState?.('AltGraph') === true
-  ) {
-    return false
+  // while the user types an AltGr character. An event that cannot report
+  // AltGraph (Electron input, synthetic events) is assumed to be AltGr.
+  if (platform === 'win' && parsed.ctrl && parsed.alt) {
+    const altGraph = event.getModifierState
+      ? event.getModifierState('AltGraph')
+      : event.ctrlKey && event.altKey
+    if (altGraph) return false
   }
   return modifiersMatch(parsed, event, platform) && keyMatches(parsed, event, match)
 }
@@ -115,15 +142,21 @@ export function chordsFor(
   return alt ? [...web, alt] : web
 }
 
-/** First action whose chord matches the event, or null. Table order breaks ties. */
+/**
+ * First action whose chord matches the event, or null. Table order breaks
+ * ties. Only rows of `context` take part (rows without a context when it is
+ * omitted), so slide-show keys never shadow editing keys and vice versa.
+ */
 export function matchShortcut(
   event: ShortcutKeyEvent,
   table: readonly ShortcutAction[],
   platform: ShortcutPlatform,
   surface: ShortcutSurface,
+  context?: string,
 ): ShortcutAction | null {
   if (isComposingEvent(event)) return null
   for (const action of table) {
+    if (action.context !== context) continue
     if (action.guard.noRepeat && event.repeat) continue
     for (const chord of chordsFor(action, platform, surface)) {
       if (matchChord(chord, event, platform, action.match)) return action
@@ -138,5 +171,6 @@ export function createMatcher(table: readonly ShortcutAction[]) {
     event: ShortcutKeyEvent,
     platform: ShortcutPlatform,
     surface: ShortcutSurface,
-  ): ShortcutAction | null => matchShortcut(event, table, platform, surface)
+    context?: string,
+  ): ShortcutAction | null => matchShortcut(event, table, platform, surface, context)
 }

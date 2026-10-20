@@ -43,8 +43,9 @@ export interface PlatformChords {
 export type ShortcutMatch = 'key' | 'code'
 
 export interface ShortcutGuard {
-  /** The action owns a Ctrl+Alt chord on Windows, which AltGr also produces;
-   * the matcher rejects events with `getModifierState('AltGraph')`. */
+  /** Marker: the action owns a Ctrl+Alt chord on Windows, which AltGr also
+   * produces. The matcher applies the AltGr check to every Windows Ctrl+Alt
+   * chord whether or not this is set; table locks require it on such rows. */
   readonly altGraph?: boolean
   /** Auto-repeated keydowns (`event.repeat`) do not fire the action. */
   readonly noRepeat?: boolean
@@ -58,8 +59,8 @@ export interface ShortcutAction {
   readonly id: string
   readonly scope: ShortcutScope
   /** A mode inside the scope with its own keymap (`slideshow`: PowerPoint
-   * slide-show keys). Chords only collide within one scope and context; the
-   * caller passes the matcher the rows of the active context. */
+   * slide-show keys). Chords only collide within one scope and context;
+   * `matchShortcut` matches a row only when its context is the one passed. */
   readonly context?: string
   /** Desktop chords (Microsoft desktop Office: Windows column, Mac column). */
   readonly win: readonly Chord[]
@@ -74,10 +75,19 @@ export interface ShortcutAction {
   readonly guard: ShortcutGuard
 }
 
-/** A CSV row (or one platform of it) the generator could not turn into chords. */
+/** A CSV row (or one platform of it) the generator could not turn into
+ * chords: a key a module slice still has to add by hand (`manual`). */
 export interface UnmappedShortcut {
   readonly id: string
-  /** Which part is missing: the whole row, or one surface/platform of it. */
-  readonly part: 'row' | 'desktop' | 'web' | 'desktop.win' | 'desktop.mac' | 'web.win' | 'web.mac'
+  /** Which part is missing: the whole row, or one surface and platform of it. */
+  readonly part: 'row' | `${ShortcutSurface}.${ShortcutPlatform}`
   readonly reason: string
+}
+
+/** A remark on a mapped row that is not a missing key (the browser keeps the
+ * Microsoft key, a reserved chord was dropped, Microsoft prints no web key). */
+export interface ShortcutNote {
+  readonly id: string
+  readonly part: 'web' | `web.${ShortcutPlatform}`
+  readonly detail: string
 }

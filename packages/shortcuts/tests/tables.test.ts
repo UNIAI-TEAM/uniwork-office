@@ -5,13 +5,16 @@ import {
   FIXTURE_PATH,
   MODULES,
   buildTables,
+  chordsInRow,
   parseCsv,
   renderTableFile,
   tablePath,
 } from '../scripts/gen-tables.mjs'
 import {
   BROWSER_RESERVED,
+  SHORTCUT_NOTES,
   SHORTCUT_TABLES,
+  SHORTCUT_UNMAPPED,
   chordsFor,
   isBrowserReserved,
   isValidChord,
@@ -20,30 +23,15 @@ import {
   type ShortcutPlatform,
   type ShortcutSurface,
 } from '../src/index'
-import { commonUnmapped } from '../src/tables/common'
-import { docsUnmapped } from '../src/tables/docs'
-import { htmlUnmapped } from '../src/tables/html'
-import { markdownUnmapped } from '../src/tables/markdown'
-import { pdfUnmapped } from '../src/tables/pdf'
-import { sheetsUnmapped } from '../src/tables/sheets'
-import { shellUnmapped } from '../src/tables/shell'
-import { slidesUnmapped } from '../src/tables/slides'
 
 const PLATFORMS: readonly ShortcutPlatform[] = ['win', 'mac']
 const SURFACES: readonly ShortcutSurface[] = ['desktop', 'web']
 const csvRows = parseCsv(readFileSync(FIXTURE_PATH, 'utf8')) as Record<string, string>[]
 const csvIds = new Set(csvRows.map((row) => row.id))
 const allActions = Object.values(SHORTCUT_TABLES).flat()
-const allUnmapped = [
-  ...commonUnmapped,
-  ...shellUnmapped,
-  ...docsUnmapped,
-  ...sheetsUnmapped,
-  ...slidesUnmapped,
-  ...pdfUnmapped,
-  ...htmlUnmapped,
-  ...markdownUnmapped,
-]
+const allUnmapped = Object.values(SHORTCUT_UNMAPPED).flat()
+const allNotes = Object.values(SHORTCUT_NOTES).flat()
+const csvById = new Map(csvRows.map((row) => [row.id, row]))
 
 describe('table locks', () => {
   it('(i) no two actions share a chord in the same scope, context, surface and platform', () => {
@@ -82,8 +70,8 @@ describe('table locks', () => {
     expect(reservedAlts).toEqual([])
   })
 
-  it('(iii) every table row and unmapped id exists in the CSV snapshot', () => {
-    const missing = [...allActions, ...allUnmapped]
+  it('(iii) every table row, unmapped and note id exists in the CSV snapshot', () => {
+    const missing = [...allActions, ...allUnmapped, ...allNotes]
       .map((row) => row.id)
       .filter((id) => !csvIds.has(id))
     expect(missing).toEqual([])
@@ -118,6 +106,65 @@ describe('table locks', () => {
         ) && !action.guard.altGraph,
     )
     expect(unguarded.map((action) => action.id)).toEqual([])
+  })
+
+  it('every desktop chord is printed in its own CSV row (MS, proposal or today columns)', () => {
+    const untraced = allActions.flatMap((action) =>
+      PLATFORMS.flatMap((platform) => {
+        const inRow = chordsInRow(csvById.get(action.id), platform) as Set<string>
+        return action[platform]
+          .filter((chord) => !inRow.has(chord))
+          .map((chord) => `${action.id} ${platform}: ${chord}`)
+      }),
+    )
+    expect(untraced).toEqual([])
+  })
+
+  it('an action with no chord on a surface and platform says why (RS-table M3)', () => {
+    const explained = new Set(
+      [...allUnmapped, ...allNotes.filter((note) => note.part.startsWith('web'))].map(
+        (entry) => `${entry.id}|${entry.part}`,
+      ),
+    )
+    const silent = allActions.flatMap((action) =>
+      SURFACES.flatMap((surface) =>
+        PLATFORMS.filter((platform) => chordsFor(action, platform, surface).length === 0)
+          .map((platform) => `${surface}.${platform}`)
+          .filter(
+            (part) =>
+              !explained.has(`${action.id}|${part}`) &&
+              !explained.has(`${action.id}|${part.split('.')[0]}`),
+          )
+          .map((part) => `${action.id} ${part}`),
+      ),
+    )
+    expect(silent).toEqual([])
+  })
+
+  it('unmapped lists missing keys only; notes live apart (RS-table L6)', () => {
+    expect(allUnmapped.every((entry) => entry.part === 'row' || entry.part.includes('.'))).toBe(
+      true,
+    )
+    const notes = allUnmapped.filter((entry) =>
+      /^(the browser keeps|\S+ is browser-reserved|no web chord \(|webAlt keeps)/.test(
+        entry.reason,
+      ),
+    )
+    expect(notes).toEqual([])
+  })
+
+  it('reserves the Chromium tab and exit keys on both platforms (RS-table L2)', () => {
+    expect(isBrowserReserved('Ctrl+Shift+Q', 'win')).toBe(true)
+    for (const chord of [
+      'Ctrl+PageDown',
+      'Ctrl+PageUp',
+      'Alt+Cmd+Right',
+      'Alt+Cmd+Left',
+      'Shift+Cmd+BracketRight',
+      'Shift+Cmd+BracketLeft',
+    ]) {
+      expect(isBrowserReserved(chord, 'mac')).toBe(true)
+    }
   })
 
   it('maps the rows the contract calls out', () => {
@@ -181,6 +228,78 @@ describe('generator', () => {
     const tables = buildTables([row])
     expect(tables.docs.actions).toEqual([])
     expect(tables.docs.unmapped.map((u: { part: string }) => u.part)).toEqual(['row'])
+  })
+
+  it('keeps the confirmed platform when KEEP fails on the other (RS-table M2)', () => {
+    const row = {
+      id: 'docs-903',
+      group: 'docs',
+      action: 'Example',
+      ms_win: 'Ctrl+W',
+      ms_mac: 'Control+W',
+      status: 'same',
+      desktop_today: 'Win: Ctrl+W; Mac: none',
+      web_today: 'none',
+      proposal_desktop: 'KEEP',
+      proposal_web: 'Ctrl+W / not documented',
+    }
+    const { actions, unmapped } = buildTables([row]).docs
+    expect(actions[0]).toMatchObject({ id: 'docs-903', win: ['Ctrl+W'], mac: [] })
+    expect(unmapped).toContainEqual(
+      expect.objectContaining({ id: 'docs-903', part: 'desktop.mac' }),
+    )
+    expect(unmapped.map((u: { part: string }) => u.part)).not.toContain('desktop.win')
+  })
+
+  it('does not copy a neutral chord to macOS when Microsoft prints no Mac key (RS-table L3)', () => {
+    const row = {
+      id: 'docs-904',
+      group: 'docs',
+      action: 'Help',
+      ms_win: 'F1',
+      ms_mac: 'not documented',
+      status: 'same',
+      desktop_today: 'F1 / Cmd+/',
+      web_today: 'none',
+      proposal_desktop: 'F1',
+      proposal_web: 'F1 / not documented',
+    }
+    const { actions, unmapped } = buildTables([row]).docs
+    expect(actions[0]).toMatchObject({ win: ['F1'], mac: [] })
+    expect(unmapped).toContainEqual(
+      expect.objectContaining({ id: 'docs-904', part: 'desktop.mac' }),
+    )
+  })
+
+  it('marks editing commands noRepeat and lets undo, zoom and navigation repeat (RS-table M1)', () => {
+    const row = (id: string, action: string, chord: string) => ({
+      id,
+      group: 'docs',
+      action,
+      ms_win: chord,
+      ms_mac: 'not documented',
+      status: 'same',
+      desktop_today: chord,
+      web_today: chord,
+      proposal_desktop: `Win: ${chord}`,
+      proposal_web: `Win: ${chord}`,
+    })
+    const guards = Object.fromEntries(
+      buildTables([
+        row('docs-905', 'Save', 'Ctrl+S'),
+        row('docs-906', 'Undo', 'Ctrl+Z'),
+        row('docs-907', 'Zoom in', 'Ctrl+Plus'),
+        row('docs-908', 'Extend selection', 'Ctrl+Shift+Down'),
+        row('docs-909', 'Heading 1', 'Ctrl+Alt+1'),
+      ]).docs.actions.map((a: ShortcutAction) => [a.id, a.guard]),
+    )
+    expect(guards).toEqual({
+      'docs-905': { noRepeat: true },
+      'docs-906': {},
+      'docs-907': {},
+      'docs-908': {},
+      'docs-909': { altGraph: true, noRepeat: true },
+    })
   })
 
   it('drops browser-reserved web chords and keeps ALT-PROPOSED chords as webAlt', () => {

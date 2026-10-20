@@ -60,6 +60,7 @@ export const BROWSER_RESERVED = {
     'Ctrl+Shift+Tab',
     'Ctrl+PageDown',
     'Ctrl+PageUp',
+    'Ctrl+Shift+Q',
     'Alt+F4',
   ],
   mac: [
@@ -72,6 +73,12 @@ export const BROWSER_RESERVED = {
     'Cmd+Q',
     'Ctrl+Tab',
     'Ctrl+Shift+Tab',
+    'Ctrl+PageDown',
+    'Ctrl+PageUp',
+    'Alt+Cmd+Right',
+    'Alt+Cmd+Left',
+    'Shift+Cmd+BracketRight',
+    'Shift+Cmd+BracketLeft',
   ],
 }
 
@@ -405,11 +412,24 @@ function parseSegment(text, platform, proposal) {
   return { found, keep: found.length === 0 }
 }
 
+/** { win, mac, missing } once every platform is resolved; { error } when no
+ * platform got a chord. `missing[platform]` says why one platform has none. */
+function settle(result, missing) {
+  const reasons = Object.values(missing)
+  if (reasons.length > 0 && result.win.length + result.mac.length === 0) {
+    return { error: [...new Set(reasons)].join('; ') }
+  }
+  return { ...result, missing }
+}
+
 /**
- * Parses one proposal. Returns { win, mac } (chord lists, possibly empty) or
- * { error }. `resolveKeep(platform)` answers a bare KEEP for one platform.
+ * Parses one proposal. Returns { win, mac, missing } (chord lists, possibly
+ * empty) or { error }. `resolveKeep(platform)` answers a bare KEEP for one
+ * platform; a KEEP that fails on one platform keeps the other platform's
+ * chords. `macUndocumented`: a chord without Ctrl/Alt/Cmd (F1, Shift+F4)
+ * applies to Windows only, since Microsoft prints no Mac key for the row.
  */
-function parseProposal(proposal, resolveKeep) {
+function parseProposal(proposal, resolveKeep, { macUndocumented = false } = {}) {
   const text = cleanProposal(proposal)
   if (text === '') return { error: 'empty proposal' }
   if (caveatIn(proposal)) return { error: `proposal is conditional: "${proposal.trim()}"` }
@@ -425,15 +445,21 @@ function parseProposal(proposal, resolveKeep) {
     for (const f of parsed.found) {
       const side = segment.platform ?? f.side
       if (side !== 'mac') addUnique(result.win, f.chord)
-      if (side !== 'win') addUnique(result.mac, f.chord)
+      if (side === 'mac' || (side === 'neutral' && !macUndocumented)) {
+        addUnique(result.mac, f.chord)
+      }
     }
   }
+  const missing = {}
   for (const platform of keeps) {
     const kept = resolveKeep(platform)
-    if (kept.error) return kept
-    for (const chord of kept.chords) addUnique(result[platform], chord)
+    if (kept.error) missing[platform] = kept.error
+    else for (const chord of kept.chords) addUnique(result[platform], chord)
   }
-  return result
+  if (macUndocumented && result.mac.length === 0 && !missing.mac) {
+    missing.mac = "Microsoft prints no Mac key; keep today's Mac binding (contract 3.1)"
+  }
+  return settle(result, missing)
 }
 
 const NOT_DOCUMENTED_RE = /^(not documented|none|n\/a)$/i
@@ -454,24 +480,32 @@ function parsePositional(proposal, label, resolveKeep) {
   if (label.includes('/') && left !== right && sideOf(left) === sideOf(right)) {
     return { error: `"WIN / MAC" pair on a row with several sub-actions: "${proposal.trim()}"` }
   }
-  const result = { win: [], mac: [], notes: [] }
+  const result = { win: [], mac: [] }
+  const notes = []
+  const missing = {}
   for (const [platform, side] of [
     ['win', left],
     ['mac', right],
   ]) {
     if (NOT_DOCUMENTED_RE.test(side)) {
-      result.notes.push(`${platform}: no web chord (${side})`)
+      notes.push(note(`web.${platform}`, `no web chord (${side})`))
       continue
     }
     const parsed = parseSegment(side, platform, proposal)
     if (parsed.error) return parsed
     if (parsed.keep) {
       const kept = resolveKeep(platform)
-      if (kept.error) return kept
-      result[platform].push(...kept.chords)
+      if (kept.error) missing[platform] = kept.error
+      else result[platform].push(...kept.chords)
     } else for (const f of parsed.found) addUnique(result[platform], f.chord)
   }
-  return result
+  const settled = settle(result, missing)
+  return settled.error ? settled : { ...settled, notes }
+}
+
+/** A remark on a row that is not a missing key (a deliberate browser gap...). */
+function note(part, text) {
+  return { part, detail: text }
 }
 
 function keepResolver(row, surface) {
@@ -507,9 +541,11 @@ function resolveDesktop(row, web) {
   const proposal = row.proposal_desktop.trim()
   if (/^(same )?as web$/i.test(removeParentheticals(proposal).trim())) {
     if (web.error) return { error: 'same as web, and web is unmapped' }
-    return { win: web.win, mac: web.mac }
+    return { win: web.win, mac: web.mac, missing: web.missing }
   }
-  return parseProposal(proposal, keepResolver(row, 'desktop'))
+  return parseProposal(proposal, keepResolver(row, 'desktop'), {
+    macUndocumented: /^not documented$/i.test(row.ms_mac.trim()),
+  })
 }
 
 function resolveWeb(row) {
@@ -526,35 +562,67 @@ function resolveWeb(row) {
     if (first && first.start === 0 && first.chord && !compositeIn(after, found.slice(0, 2))) {
       webAlt = first.side === 'mac' ? { mac: first.chord } : { win: first.chord, mac: first.chord }
     } else {
-      notes.push(`ALT-PROPOSED without a single chord: "${after.slice(0, 60).trim()}"`)
+      notes.push(note('web', `ALT-PROPOSED without a single chord: "${after.slice(0, 60).trim()}"`))
     }
     proposal = proposal.slice(0, altAt) + (clauseEnd >= 0 ? after.slice(clauseEnd + 1) : '')
   }
   if (/^\s*KEEP\s+browser\b/i.test(proposal)) {
-    return { win: [], mac: [], webAlt, notes: [...notes, 'the browser keeps the Microsoft key'] }
+    return {
+      win: [],
+      mac: [],
+      webAlt,
+      notes: [...notes, note('web', 'the browser keeps the Microsoft key')],
+    }
   }
   const resolveKeep = keepResolver(row, 'web')
   const parsed =
     parsePositional(proposal, row.action, resolveKeep) ?? parseProposal(proposal, resolveKeep)
   if (parsed.error) return { error: parsed.error, webAlt, notes }
   notes.push(...(parsed.notes ?? []))
-  const out = { win: [], mac: [], webAlt, notes }
+  const out = { win: [], mac: [], missing: parsed.missing, webAlt, notes }
   const isAlt = ALT_BASES.has((row.proposal_web_basis ?? '').trim())
   for (const platform of ['win', 'mac']) {
     const chords = parsed[platform].filter((chord) => {
       if (!BROWSER_RESERVED[platform].includes(chord)) return true
-      notes.push(`${platform}: ${chord} is browser-reserved`)
+      notes.push(note(`web.${platform}`, `${chord} is browser-reserved`))
       return false
     })
     if (!isAlt) out[platform] = chords
     else if (chords.length > 0) {
       out.webAlt = { ...out.webAlt, [platform]: chords[0] }
       if (chords.length > 1) {
-        notes.push(`${platform}: webAlt keeps ${chords[0]}, drops ${chords.slice(1).join(', ')}`)
+        notes.push(
+          note(`web.${platform}`, `webAlt keeps ${chords[0]}, drops ${chords.slice(1).join(', ')}`),
+        )
       }
     }
   }
   return out
+}
+
+/** Actions a held key may repeat: undo/redo, zoom, size and indent steps,
+ * navigation, deletion and typed characters. Every other action (save, open,
+ * dialogs, formatting toggles, paste...) ignores auto-repeated keydowns. */
+const REPEATABLE_LABEL_RE =
+  /\b(undo|redo|repeat|zoom (in|out)|increase|decrease|next|previous|cycle|delete (word|char)|line break|non-breaking|optional hyphen)\b/i
+const REPEATABLE_KEYS = new Set([
+  'Up',
+  'Down',
+  'Left',
+  'Right',
+  'PageUp',
+  'PageDown',
+  'Home',
+  'End',
+  'Backspace',
+  'Delete',
+])
+
+function repeatable(label, chords) {
+  return (
+    REPEATABLE_LABEL_RE.test(label) ||
+    (chords.length > 0 && chords.every((chord) => REPEATABLE_KEYS.has(chord.split('+').pop())))
+  )
 }
 
 /** PowerPoint slide-show keys form their own keymap (MS lists them apart). */
@@ -566,9 +634,15 @@ function sameLists(a, b) {
   return a.length === b.length && a.every((x, i) => x === b[i])
 }
 
-/** Builds { [module]: { actions, unmapped } } from inventory rows. */
+/**
+ * Builds { [module]: { actions, unmapped, notes } } from inventory rows.
+ * `unmapped` names every missing key per surface and platform (or the whole
+ * row); `notes` holds remarks that are not missing keys.
+ */
 export function buildTables(rows) {
-  const tables = Object.fromEntries(MODULES.map((m) => [m, { actions: [], unmapped: [] }]))
+  const tables = Object.fromEntries(
+    MODULES.map((m) => [m, { actions: [], unmapped: [], notes: [] }]),
+  )
   const owners = new Map() // `${scope}|${context}|${surface}|${platform}|${chord}` → id
   for (const row of rows) {
     if (!MODULES.includes(row.group)) continue
@@ -602,11 +676,23 @@ export function buildTables(rows) {
       )
       continue
     }
-    if (desktop.error) unmapped('desktop', desktop.error)
-    if (web.error) unmapped('web', web.error)
-    for (const note of web.notes ?? []) {
-      const platform = note.startsWith('mac:') ? 'mac' : 'win'
-      unmapped(`web.${platform}`, note)
+    const explained = new Set()
+    const missingPart = (part, reason) => {
+      unmapped(part, reason)
+      explained.add(part)
+    }
+    for (const [surface, result] of [
+      ['desktop', desktop],
+      ['web', web],
+    ]) {
+      for (const platform of ['win', 'mac']) {
+        const reason = result.error ?? result.missing?.[platform]
+        if (reason) missingPart(`${surface}.${platform}`, reason)
+      }
+    }
+    for (const entry of web.notes ?? []) {
+      table.notes.push({ id: row.id, ...entry })
+      explained.add(entry.part)
     }
     // A chord belongs to the first row (CSV order) that claims it in a scope.
     for (const surface of ['desktop', 'web']) {
@@ -617,18 +703,20 @@ export function buildTables(rows) {
           const slot = `${row.group}|${context ?? ''}|${surface}|${platform}|${chord}`
           const owner = owners.get(slot)
           if (owner && owner !== row.id) {
-            unmapped(`${surface}.${platform}`, `${chord} is already ${owner}'s chord`)
+            missingPart(`${surface}.${platform}`, `${chord} is already ${owner}'s chord`)
             if (list.includes(chord)) list.splice(list.indexOf(chord), 1)
             else delete webAlt[platform]
           } else owners.set(slot, row.id)
         }
       }
     }
-    if (!desktop.error) {
-      for (const platform of ['win', 'mac']) {
-        if (keys.desktop[platform].length === 0) {
-          unmapped(`desktop.${platform}`, `no ${platform} chord in proposal_desktop`)
-        }
+    const silent = (part) => !explained.has(part) && !explained.has(part.split('.')[0])
+    for (const platform of ['win', 'mac']) {
+      if (keys.desktop[platform].length === 0 && silent(`desktop.${platform}`)) {
+        missingPart(`desktop.${platform}`, `no ${platform} chord in proposal_desktop`)
+      }
+      if (keys.web[platform].length === 0 && !webAlt?.[platform] && silent(`web.${platform}`)) {
+        missingPart(`web.${platform}`, `no ${platform} chord in proposal_web`)
       }
     }
     const total =
@@ -649,10 +737,33 @@ export function buildTables(rows) {
     const ctrlAlt = [...keys.desktop.win, ...keys.web.win, webAlt?.win ?? ''].some((c) =>
       c.startsWith('Ctrl+Alt+'),
     )
-    action.guard = ctrlAlt ? { altGraph: true } : {}
+    action.guard = {}
+    if (ctrlAlt) action.guard.altGraph = true
+    if (!repeatable(row.action, [...keys.desktop.win, ...keys.desktop.mac])) {
+      action.guard.noRepeat = true
+    }
     table.actions.push(action)
   }
   return tables
+}
+
+/** Every chord a row's Microsoft, proposal and current-binding columns print
+ * for one platform (a superset check for the table locks). */
+export function chordsInRow(row, platform) {
+  const out = new Set()
+  for (const column of [
+    `ms_${platform}`,
+    `ms_web_${platform}`,
+    'proposal_desktop',
+    'proposal_web',
+    'desktop_today',
+    'web_today',
+  ]) {
+    const text = normalizeVerboseKeys(row[column] ?? '')
+    for (const f of findChords(text, platform)) if (f.chord) out.add(f.chord)
+    for (const chord of todayChords(text)[platform]) out.add(chord)
+  }
+  return out
 }
 
 // ---------------------------------------------------------------- emit
@@ -721,15 +832,28 @@ function emitAction(action) {
   return lines
 }
 
-function emitUnmapped(entry) {
-  const reason = `    reason: ${str(comment(entry.reason))},`
+function emitEntry(entry, field) {
+  const label = `    ${field}: `
+  const text = `${label}${str(comment(entry[field]))},`
   return [
     '  {',
     `    id: ${str(entry.id)},`,
     `    part: ${str(entry.part)},`,
-    ...(reason.length <= PRINT_WIDTH ? [reason] : ['    reason:', `      ${reason.slice(12)}`]),
+    ...(text.length <= PRINT_WIDTH
+      ? [text]
+      : [`    ${field}:`, `      ${text.slice(label.length)}`]),
     '  },',
   ]
+}
+
+function emitList(lines, name, type, entries, field) {
+  if (entries.length === 0) {
+    lines.push(`export const ${name}: readonly ${type}[] = []`)
+    return
+  }
+  lines.push(`export const ${name}: readonly ${type}[] = [`)
+  for (const entry of entries) lines.push(...emitEntry(entry, field))
+  lines.push(']')
 }
 
 export const BEGIN_MARKER = '// @generated-begin'
@@ -747,15 +871,9 @@ export function generatedBlock(module, table) {
     lines.push(']')
   }
   lines.push('')
-  lines.push(
-    table.unmapped.length === 0
-      ? `export const ${module}Unmapped: readonly UnmappedShortcut[] = []`
-      : `export const ${module}Unmapped: readonly UnmappedShortcut[] = [`,
-  )
-  if (table.unmapped.length > 0) {
-    for (const entry of table.unmapped) lines.push(...emitUnmapped(entry))
-    lines.push(']')
-  }
+  emitList(lines, `${module}Unmapped`, 'UnmappedShortcut', table.unmapped, 'reason')
+  lines.push('')
+  emitList(lines, `${module}Notes`, 'ShortcutNote', table.notes, 'detail')
   lines.push(END_MARKER)
   return lines.join('\n')
 }
@@ -766,7 +884,7 @@ function freshFile(module, block) {
     '// by scripts/gen-tables.mjs from tests/fixtures/shortcuts.csv: change the CSV and',
     '// regenerate, or put hand-maintained rows in `manual` below.',
     "import { mergeRows } from '../table'",
-    "import type { ShortcutAction, UnmappedShortcut } from '../types'",
+    "import type { ShortcutAction, ShortcutNote, UnmappedShortcut } from '../types'",
     '',
     block,
     '',
@@ -813,12 +931,21 @@ function main(argv) {
       stale++
     } else writeFileSync(path, next)
   }
-  const mapped = MODULES.reduce((n, m) => n + tables[m].actions.length, 0)
+  const actions = MODULES.flatMap((m) => tables[m].actions)
   const unmappedRows = MODULES.reduce(
     (n, m) => n + tables[m].unmapped.filter((u) => u.part === 'row').length,
     0,
   )
-  console.log(`${mapped} actions, ${unmappedRows} unmapped rows`)
+  const covered = (pick) => actions.filter((a) => pick(a).length > 0).length
+  const web = (platform) => (a) => [
+    ...(a.web ?? a)[platform],
+    ...(a.webAlt?.[platform] ? [a.webAlt[platform]] : []),
+  ]
+  console.log(`${actions.length} actions, ${unmappedRows} unmapped rows`)
+  console.log(
+    `with a chord: desktop win ${covered((a) => a.win)}, desktop mac ${covered((a) => a.mac)}, ` +
+      `web win ${covered(web('win'))}, web mac ${covered(web('mac'))}`,
+  )
   if (stale > 0) process.exit(1)
 }
 

@@ -2,7 +2,7 @@
 // by scripts/gen-tables.mjs from tests/fixtures/shortcuts.csv: change the CSV and
 // regenerate, or put hand-maintained rows in `manual` below.
 import { mergeRows } from '../table'
-import type { ShortcutAction, UnmappedShortcut } from '../types'
+import type { ShortcutAction, ShortcutNote, UnmappedShortcut } from '../types'
 
 // @generated-begin
 const generated: readonly ShortcutAction[] = [
@@ -33,7 +33,7 @@ const generated: readonly ShortcutAction[] = [
     mac: ['Cmd+K'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Font dialog (Docs menu)
   {
@@ -42,7 +42,7 @@ const generated: readonly ShortcutAction[] = [
     win: ['Ctrl+D', 'Ctrl+Shift+F'],
     mac: ['Cmd+D'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
 ]
 
@@ -57,7 +57,7 @@ export const shellUnmapped: readonly UnmappedShortcut[] = [
     id: 'shell-02',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "n/a"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "n/a"',
   },
   {
     id: 'shell-03',
@@ -67,7 +67,13 @@ export const shellUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'shell-05',
-    part: 'desktop',
+    part: 'desktop.win',
+    reason:
+      'proposal has prose: "Add Ctrl+Y as a menu accelerator for Docs, Sheets, Slides and PDF; keep Ctrl+Shift+Z"',
+  },
+  {
+    id: 'shell-05',
+    part: 'desktop.mac',
     reason:
       'proposal has prose: "Add Ctrl+Y as a menu accelerator for Docs, Sheets, Slides and PDF; keep Ctrl+Shift+Z"',
   },
@@ -91,7 +97,13 @@ export const shellUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'shell-09',
-    part: 'web',
+    part: 'web.win',
+    reason:
+      'proposal has prose: "Ctrl+K / Cmd+K inside frames and Docs menu (Office key wins while a document is open, USER ADDENDUM 1)"',
+  },
+  {
+    id: 'shell-09',
+    part: 'web.mac',
     reason:
       'proposal has prose: "Ctrl+K / Cmd+K inside frames and Docs menu (Office key wins while a document is open, USER ADDENDUM 1)"',
   },
@@ -135,12 +147,13 @@ export const shellUnmapped: readonly UnmappedShortcut[] = [
     id: 'shell-17',
     part: 'row',
     reason:
-      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; web: proposal has prose: "n/a"',
+      'desktop: KEEP: no Microsoft win chord confirmed by today\'s binding; KEEP: no Microsoft mac chord confirmed by today\'s binding; web: proposal has prose: "n/a"',
   },
   {
     id: 'shell-18',
     part: 'row',
-    reason: "KEEP: no Microsoft win chord confirmed by today's binding",
+    reason:
+      "KEEP: no Microsoft win chord confirmed by today's binding; KEEP: no Microsoft mac chord confirmed by today's binding",
   },
   {
     id: 'shell-19',
@@ -161,6 +174,8 @@ export const shellUnmapped: readonly UnmappedShortcut[] = [
       'desktop: proposal has prose: "KEEP Esc / Enter; add isComposing / keyCode 229 to the window-level Esc listeners"; web: proposal has prose: "n/a"',
   },
 ]
+
+export const shellNotes: readonly ShortcutNote[] = []
 // @generated-end
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */

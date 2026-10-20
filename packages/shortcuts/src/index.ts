@@ -1,12 +1,18 @@
-import type { ShortcutAction, ShortcutPlatform, ShortcutScope } from './types'
-import { commonShortcuts } from './tables/common'
-import { shellShortcuts } from './tables/shell'
-import { docsShortcuts } from './tables/docs'
-import { sheetsShortcuts } from './tables/sheets'
-import { slidesShortcuts } from './tables/slides'
-import { pdfShortcuts } from './tables/pdf'
-import { htmlShortcuts } from './tables/html'
-import { markdownShortcuts } from './tables/markdown'
+import type {
+  ShortcutAction,
+  ShortcutNote,
+  ShortcutPlatform,
+  ShortcutScope,
+  UnmappedShortcut,
+} from './types'
+import { commonNotes, commonShortcuts, commonUnmapped } from './tables/common'
+import { shellNotes, shellShortcuts, shellUnmapped } from './tables/shell'
+import { docsNotes, docsShortcuts, docsUnmapped } from './tables/docs'
+import { sheetsNotes, sheetsShortcuts, sheetsUnmapped } from './tables/sheets'
+import { slidesNotes, slidesShortcuts, slidesUnmapped } from './tables/slides'
+import { pdfNotes, pdfShortcuts, pdfUnmapped } from './tables/pdf'
+import { htmlNotes, htmlShortcuts, htmlUnmapped } from './tables/html'
+import { markdownNotes, markdownShortcuts, markdownUnmapped } from './tables/markdown'
 
 export type {
   Chord,
@@ -14,6 +20,7 @@ export type {
   ShortcutAction,
   ShortcutGuard,
   ShortcutMatch,
+  ShortcutNote,
   ShortcutPlatform,
   ShortcutScope,
   ShortcutSurface,
@@ -23,12 +30,18 @@ export { chordToString, isValidChord, keyKind, parseChord, type ParsedChord } fr
 export {
   chordsFor,
   createMatcher,
+  fromElectronInput,
   isComposingEvent,
   matchChord,
   matchShortcut,
+  type ElectronInputLike,
   type ShortcutKeyEvent,
 } from './match'
-export { chordToElectronAccelerator, toElectronAccelerator } from './accelerator'
+export {
+  acceleratorSkipReason,
+  chordToElectronAccelerator,
+  toElectronAccelerator,
+} from './accelerator'
 export { formatChord, formatHint, hintParts, type ShortcutHintParts } from './hint'
 export { BROWSER_RESERVED, isBrowserReserved } from './browser-reserved'
 export { mergeRows } from './table'
@@ -42,14 +55,25 @@ export {
   shellShortcuts,
   slidesShortcuts,
 }
-export { commonUnmapped } from './tables/common'
-export { shellUnmapped } from './tables/shell'
-export { docsUnmapped } from './tables/docs'
-export { sheetsUnmapped } from './tables/sheets'
-export { slidesUnmapped } from './tables/slides'
-export { pdfUnmapped } from './tables/pdf'
-export { htmlUnmapped } from './tables/html'
-export { markdownUnmapped } from './tables/markdown'
+
+export {
+  commonNotes,
+  commonUnmapped,
+  docsNotes,
+  docsUnmapped,
+  htmlNotes,
+  htmlUnmapped,
+  markdownNotes,
+  markdownUnmapped,
+  pdfNotes,
+  pdfUnmapped,
+  sheetsNotes,
+  sheetsUnmapped,
+  shellNotes,
+  shellUnmapped,
+  slidesNotes,
+  slidesUnmapped,
+}
 
 export const SHORTCUT_TABLES: Readonly<Record<ShortcutScope, readonly ShortcutAction[]>> = {
   common: commonShortcuts,
@@ -60,6 +84,31 @@ export const SHORTCUT_TABLES: Readonly<Record<ShortcutScope, readonly ShortcutAc
   pdf: pdfShortcuts,
   html: htmlShortcuts,
   markdown: markdownShortcuts,
+}
+
+/** Keys each scope still lacks (per surface and platform): a module slice's
+ * `manual` backlog. */
+export const SHORTCUT_UNMAPPED: Readonly<Record<ShortcutScope, readonly UnmappedShortcut[]>> = {
+  common: commonUnmapped,
+  shell: shellUnmapped,
+  docs: docsUnmapped,
+  sheets: sheetsUnmapped,
+  slides: slidesUnmapped,
+  pdf: pdfUnmapped,
+  html: htmlUnmapped,
+  markdown: markdownUnmapped,
+}
+
+/** Remarks on mapped rows that are not missing keys. */
+export const SHORTCUT_NOTES: Readonly<Record<ShortcutScope, readonly ShortcutNote[]>> = {
+  common: commonNotes,
+  shell: shellNotes,
+  docs: docsNotes,
+  sheets: sheetsNotes,
+  slides: slidesNotes,
+  pdf: pdfNotes,
+  html: htmlNotes,
+  markdown: markdownNotes,
 }
 
 /** The action with this CSV row id in a scope's table, or undefined. */

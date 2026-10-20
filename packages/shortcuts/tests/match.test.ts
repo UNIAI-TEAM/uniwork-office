@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   createMatcher,
+  docsShortcuts,
+  fromElectronInput,
   matchChord,
   matchShortcut,
   type ShortcutAction,
@@ -201,5 +203,83 @@ describe('matchShortcut: surfaces and guards', () => {
     const match = createMatcher([save, heading1])
     const ctrlAlt1 = keyEvent({ key: '1', code: 'Digit1', ctrlKey: true, altKey: true })
     expect(match(ctrlAlt1, 'win', 'desktop')?.id).toBe('h1')
+  })
+})
+
+describe('AltGr guard without getModifierState (RS-table M4)', () => {
+  const plain = (init: Partial<ShortcutKeyEvent> & { key: string; code: string }) => ({
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    metaKey: false,
+    ...init,
+  })
+
+  it('treats Ctrl+Alt as possible AltGr on Windows when the event cannot tell', () => {
+    const event = plain({ key: '1', code: 'Digit1', ctrlKey: true, altKey: true })
+    expect(matchChord('Ctrl+Alt+1', event, 'win')).toBe(false)
+    expect(matchShortcut(event, [heading1], 'win', 'desktop')).toBeNull()
+  })
+
+  it('still matches other chords, and Option chords on macOS', () => {
+    expect(matchChord('Ctrl+S', plain({ key: 's', code: 'KeyS', ctrlKey: true }), 'win')).toBe(true)
+    const optionCmd1 = plain({ key: '¡', code: 'Digit1', altKey: true, metaKey: true })
+    expect(matchShortcut(optionCmd1, [heading1], 'mac', 'desktop')?.id).toBe('h1')
+  })
+
+  it('fromElectronInput maps before-input-event fields and keeps the guard on', () => {
+    const input = {
+      type: 'keyDown',
+      key: 's',
+      code: 'KeyS',
+      control: true,
+      alt: false,
+      shift: false,
+      meta: false,
+      isAutoRepeat: true,
+    }
+    expect(fromElectronInput(input)).toMatchObject({ key: 's', ctrlKey: true, repeat: true })
+    const altGr = fromElectronInput({ ...input, key: '1', code: 'Digit1', alt: true })
+    expect(matchShortcut(altGr, [heading1], 'win', 'desktop')).toBeNull()
+  })
+})
+
+describe('generated tables: auto-repeat (RS-table M1)', () => {
+  const ctrl = (key: string, code: string, repeat: boolean) =>
+    keyEvent({ key, code, ctrlKey: true, repeat })
+
+  it('an editing command (Save) ignores auto-repeat', () => {
+    expect(matchShortcut(ctrl('s', 'KeyS', false), docsShortcuts, 'win', 'desktop')?.id).toBe(
+      'docs-004',
+    )
+    expect(matchShortcut(ctrl('s', 'KeyS', true), docsShortcuts, 'win', 'desktop')).toBeNull()
+  })
+
+  it('undo and zoom may repeat', () => {
+    expect(matchShortcut(ctrl('z', 'KeyZ', true), docsShortcuts, 'win', 'desktop')?.id).toBe(
+      'docs-010',
+    )
+    expect(matchShortcut(ctrl('=', 'Equal', true), docsShortcuts, 'win', 'desktop')?.id).toBe(
+      'docs-082',
+    )
+  })
+})
+
+describe('matchShortcut: context (RS-table L4)', () => {
+  const hidePointer = action({
+    id: 'slides-32',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['Ctrl+H'],
+    mac: ['Ctrl+H'],
+  })
+  const replaceRow = { ...replace, scope: 'slides' as const }
+
+  it('matches only the rows of the active context', () => {
+    const ctrlH = keyEvent({ key: 'h', code: 'KeyH', ctrlKey: true })
+    const table = [hidePointer, replaceRow]
+    expect(matchShortcut(ctrlH, table, 'win', 'desktop')?.id).toBe('replace')
+    expect(matchShortcut(ctrlH, table, 'win', 'desktop', 'slideshow')?.id).toBe('slides-32')
+    expect(createMatcher(table)(ctrlH, 'win', 'desktop', 'slideshow')?.id).toBe('slides-32')
   })
 })

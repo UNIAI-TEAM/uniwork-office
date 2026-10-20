@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  acceleratorSkipReason,
   chordToElectronAccelerator,
   formatChord,
   formatHint,
@@ -44,6 +45,23 @@ describe('toElectronAccelerator', () => {
 
   it('returns null when the platform has no chord', () => {
     expect(toElectronAccelerator(winOnly, 'mac')).toBeNull()
+    expect(acceleratorSkipReason(winOnly, 'mac')).toMatch(/no desktop chord/)
+  })
+
+  it('keeps Windows Ctrl+Alt chords out of menus (AltGr), with a reason (RS-table M4)', () => {
+    const heading1 = action({
+      id: 'docs-056',
+      win: ['Ctrl+Alt+1'],
+      mac: ['Alt+Cmd+1'],
+      guard: { altGraph: true },
+    })
+    expect(toElectronAccelerator(heading1, 'win')).toBeNull()
+    expect(acceleratorSkipReason(heading1, 'win')).toMatch(/AltGr/)
+    expect(formatHint(heading1, 'win', 'desktop')).toBe('Ctrl+Alt+1')
+    expect(toElectronAccelerator(heading1, 'mac')).toBe('CmdOrCtrl+Alt+1')
+    expect(acceleratorSkipReason(heading1, 'mac')).toBeNull()
+    expect(toElectronAccelerator(winOnly, 'win')).toBeNull()
+    expect(acceleratorSkipReason(saveAs, 'win')).toBeNull()
   })
 
   it('writes punctuation keys as characters', () => {
