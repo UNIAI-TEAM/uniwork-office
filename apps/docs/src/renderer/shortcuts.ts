@@ -200,7 +200,6 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: 'zoom-out', group: 'view', labelKey: 'ribbonZoomOut', action: 'docs-083' },
   { id: 'zoom-100', group: 'view', labelKey: 'ribbonZoom100Tip', action: 'docs-084' },
   { id: 'formatting-marks', group: 'view', labelKey: 'ribbonShowMarks', action: 'docs-042' },
-  { id: 'styles-pane', group: 'view', labelKey: 'ribbonStylesPane', action: 'docs-059' },
   { id: 'ribbon-toggle', group: 'view', labelKey: 'ribbonCollapse', action: 'docs-086' },
   { id: 'ribbon-compact', group: 'view', labelKey: 'ribbonCompact', action: 'docs-087' },
 ]

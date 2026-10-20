@@ -61,6 +61,8 @@ function keydown(chord: Chord, extra: Partial<ShortcutKeyEvent> = {}): ShortcutK
     altKey: parsed.alt,
     shiftKey: parsed.shift,
     metaKey: parsed.cmd,
+    // a DOM event always has it; without it the matcher reads Windows Ctrl+Alt as AltGr
+    getModifierState: () => false,
     ...extra,
   }
 }
@@ -95,9 +97,9 @@ describe('Word keys per platform and surface', () => {
     expect(on('Shift+Cmd+S', 'mac')).toBe('save-as')
     // the old web handler compared key === 's', which Shift turns into 'S'
     expect(on('Shift+Cmd+S', 'mac', 'web')).toBe('save-as')
-    // Ctrl+Shift+S is Word's Apply Styles: the Styles pane, no longer Save As
-    expect(on('Ctrl+Shift+S', 'win')).toBe('styles-pane')
-    expect(on('Ctrl+Shift+S', 'win', 'web')).toBe('styles-pane')
+    // Ctrl+Shift+S is Word's Apply Styles (not bound yet), no longer Save As
+    expect(on('Ctrl+Shift+S', 'win')).toBeNull()
+    expect(on('Ctrl+Shift+S', 'win', 'web')).toBeNull()
   })
 
   it('redo answers to Ctrl+Y first and keeps Ctrl+Shift+Z', () => {
@@ -181,6 +183,10 @@ describe('Word keys per platform and surface', () => {
     expect(on('Ctrl+F3', 'win')).toBeNull()
     expect(on('Alt+Shift+Right', 'win', 'web')).toBe('indent')
     expect(on('Ctrl+M', 'win', 'web')).toBeNull()
+    // Mac web: the desktop Mac keys; Tab stays with the editor keymap
+    expect(on('Ctrl+Shift+M', 'mac', 'web')).toBe('indent')
+    expect(on('Shift+Cmd+M', 'mac', 'web')).toBe('outdent')
+    expect(on('Tab', 'win', 'web')).toBeNull()
     // the browser keeps Ctrl+T: no hanging indent key on the web
     expect(on('Ctrl+T', 'win', 'web')).toBeNull()
     expect(on('Ctrl+T', 'win')).toBe('hanging-indent')

@@ -1298,7 +1298,8 @@ export const docsNotes: readonly ShortcutNote[] = [
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
 const manual: readonly ShortcutAction[] = [
-  // Save As: Word's F12 / Shift+Cmd+S. Ctrl+Shift+S leaves it for Apply Styles (docs-059).
+  // Save As: Word's F12 / Shift+Cmd+S. Ctrl+Shift+S leaves it: Word binds it to Apply Styles
+  // (docs-059, not bound yet).
   // Web: the same keys (DESKTOP-FALLBACK), F12 only while the frame has focus
   {
     id: 'docs-005',
@@ -1306,7 +1307,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['F12'],
     mac: ['Shift+Cmd+S'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Redo: Word's Ctrl+Y first (menus show it); the old Ctrl+Shift+Z stays as an alias
   {
@@ -1324,7 +1325,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+V'],
     mac: ['Shift+Cmd+V'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Go To on web: Ctrl+G is Find there; F5 (reload) is not bound until tested in a browser
   {
@@ -1334,7 +1335,7 @@ const manual: readonly ShortcutAction[] = [
     mac: ['Alt+Cmd+G'],
     web: { win: [], mac: ['Alt+Cmd+G'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Strikethrough: Word for Mac only, Windows Word prints no key
   {
@@ -1343,7 +1344,7 @@ const manual: readonly ShortcutAction[] = [
     win: [],
     mac: ['Shift+Cmd+X'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Subscript: Word's Ctrl+Shift+Minus. Windows keeps the old Ctrl+Comma; Cmd+Comma is
   // Word for Mac's Preferences, so the Mac alias goes
@@ -1353,7 +1354,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+Minus', 'Ctrl+Comma'],
     mac: ['Shift+Cmd+Minus'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Superscript: Word's Ctrl+Shift+Plus plus the old Period alias; on Windows web
   // Ctrl+Period is the bulleted list (docs-060)
@@ -1364,7 +1365,7 @@ const manual: readonly ShortcutAction[] = [
     mac: ['Shift+Cmd+Equal', 'Cmd+Period'],
     web: { win: ['Ctrl+Shift+Equal'], mac: ['Shift+Cmd+Equal', 'Cmd+Period'] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Font dialog: Ctrl+D, Word's Ctrl+Shift+F alias on Windows
   {
@@ -1373,7 +1374,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+D', 'Ctrl+Shift+F'],
     mac: ['Cmd+D'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Clear character formatting: Ctrl+Space; the Mac key keeps today's Control+Space
   // until a product decision (it is also macOS' input-source switch)
@@ -1383,7 +1384,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+Space'],
     mac: ['Ctrl+Space'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Copy / paste formatting: Word's Ctrl+Alt+C/V. Desktop keeps the old Shift chords that
   // do not collide (Shift+Cmd+V is Paste text only); web drops Ctrl+Shift+C (DevTools)
@@ -1394,7 +1395,7 @@ const manual: readonly ShortcutAction[] = [
     mac: ['Alt+Cmd+C', 'Shift+Cmd+C'],
     web: { win: ['Ctrl+Alt+C'], mac: ['Alt+Cmd+C'] },
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   {
     id: 'docs-041',
@@ -1403,7 +1404,7 @@ const manual: readonly ShortcutAction[] = [
     mac: ['Alt+Cmd+V'],
     web: { win: ['Ctrl+Alt+V'], mac: ['Alt+Cmd+V'] },
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   // Formatting marks: Word's Ctrl+Shift+8; Mac keeps today's Cmd+8 (not documented)
   {
@@ -1412,17 +1413,18 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+8'],
     mac: ['Cmd+8'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Increase / decrease indent: Word's Ctrl+M / Ctrl+Shift+M; Word for Mac Control+Shift+M /
-  // Shift+Cmd+M (Cmd+M is the OS minimize). Web: Word web's Alt+Shift+Right/Left; its Tab /
-  // Shift+Tab stay with the editor keymap (list level, table cells)
+  // Shift+Cmd+M (Cmd+M is the OS minimize). Web: Word web's Alt+Shift+Right/Left on Windows and
+  // the desktop Mac keys on the Mac (DESKTOP-FALLBACK); Word web's Tab / Shift+Tab are left out
+  // because the editor keymap owns Tab (list level, tab character, table cells)
   {
     id: 'docs-050',
     scope: 'docs',
     win: ['Ctrl+M'],
     mac: ['Ctrl+Shift+M'],
-    web: { win: ['Alt+Shift+Right'], mac: [] },
+    web: { win: ['Alt+Shift+Right'], mac: ['Ctrl+Shift+M'] },
     match: 'key',
     guard: {},
   },
@@ -1431,7 +1433,7 @@ const manual: readonly ShortcutAction[] = [
     scope: 'docs',
     win: ['Ctrl+Shift+M'],
     mac: ['Shift+Cmd+M'],
-    web: { win: ['Alt+Shift+Left'], mac: [] },
+    web: { win: ['Alt+Shift+Left'], mac: ['Shift+Cmd+M'] },
     match: 'key',
     guard: {},
   },
@@ -1442,7 +1444,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+Q'],
     mac: ['Ctrl+Q'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Normal style: Word's Ctrl+Shift+N (New window is menu-only now) plus the old Ctrl+Alt+0,
   // which is the only web key (the browser keeps Ctrl+Shift+N)
@@ -1454,16 +1456,7 @@ const manual: readonly ShortcutAction[] = [
     web: { win: [], mac: [] },
     webAlt: { win: 'Ctrl+Alt+0', mac: 'Alt+Cmd+0' },
     match: 'key',
-    guard: { altGraph: true },
-  },
-  // Apply Styles: the Styles pane, on the Ctrl+Shift+S Save As gave up (Mac: not documented)
-  {
-    id: 'docs-059',
-    scope: 'docs',
-    win: ['Ctrl+Shift+S'],
-    mac: [],
-    match: 'key',
-    guard: {},
+    guard: { altGraph: true, noRepeat: true },
   },
   // Insert comment: Word's Ctrl+Alt+M (the Paragraph dialog is menu-only now) / Cmd+Option+A
   {
@@ -1472,7 +1465,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+Alt+M'],
     mac: ['Alt+Cmd+A'],
     match: 'key',
-    guard: { altGraph: true },
+    guard: { altGraph: true, noRepeat: true },
   },
   {
     id: 'docs-078',
@@ -1480,7 +1473,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['Alt+F9'],
     mac: ['Alt+F9'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   {
     id: 'docs-079',
@@ -1488,7 +1481,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+E'],
     mac: ['Shift+Cmd+E'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   {
     id: 'docs-081',
@@ -1496,7 +1489,7 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+Shift+G'],
     mac: ['Shift+Cmd+G'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Shortcut sheet: F1 (Word's Help) and the old Ctrl+/ on Windows. On the Mac F1 is Word's
   // Undo alias, so Cmd+/ stays. Web: menu item only (Word web leaves F1 to the browser)
@@ -1507,7 +1500,7 @@ const manual: readonly ShortcutAction[] = [
     mac: ['Cmd+Slash'],
     web: { win: [], mac: [] },
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
 ]
 

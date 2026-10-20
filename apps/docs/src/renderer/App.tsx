@@ -551,7 +551,6 @@ const APP_SHORTCUTS = [
   'word-count',
   'proofread',
   'formatting-marks',
-  'styles-pane',
 ] as const
 type AppShortcut = (typeof APP_SHORTCUTS)[number]
 const matchAppShortcut = createShortcutMatcher(APP_SHORTCUTS) as (
@@ -5701,7 +5700,6 @@ export function App() {
         // Word's spelling & grammar check
         proofread: () => ifDoc(runAiProofread),
         'formatting-marks': () => ifDoc(() => setShowMarks((v) => !v)),
-        'styles-pane': () => ifDoc(() => setShowStylesPane(true)),
       }
       if (run[command]()) e.preventDefault()
     }
