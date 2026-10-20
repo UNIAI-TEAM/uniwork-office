@@ -1,0 +1,205 @@
+import { describe, expect, it } from 'vitest'
+import {
+  createMatcher,
+  matchChord,
+  matchShortcut,
+  type ShortcutAction,
+  type ShortcutKeyEvent,
+} from '../src/index'
+
+function keyEvent(
+  init: Partial<ShortcutKeyEvent> & { key: string; code: string },
+  modifierState: Record<string, boolean> = {},
+): ShortcutKeyEvent {
+  return {
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    metaKey: false,
+    getModifierState: (name: string) => modifierState[name] === true,
+    ...init,
+  }
+}
+
+function action(partial: Partial<ShortcutAction> & { id: string }): ShortcutAction {
+  return { scope: 'docs', win: [], mac: [], match: 'key', guard: {}, ...partial }
+}
+
+const save = action({ id: 'save', win: ['Ctrl+S'], mac: ['Cmd+S'] })
+const heading1 = action({
+  id: 'h1',
+  win: ['Ctrl+Alt+1'],
+  mac: ['Alt+Cmd+1'],
+  guard: { altGraph: true },
+})
+const replace = action({ id: 'replace', win: ['Ctrl+H'], mac: ['Ctrl+H'] })
+const newDoc = action({
+  id: 'new',
+  win: ['Ctrl+N'],
+  mac: ['Cmd+N'],
+  web: { win: [], mac: [] },
+  webAlt: { win: 'Alt+Shift+N', mac: 'Alt+Shift+N' },
+})
+
+describe('matchChord: composition guard', () => {
+  it('ignores events while an IME (Telex/VNI) is composing', () => {
+    const event = keyEvent({ key: 's', code: 'KeyS', ctrlKey: true, isComposing: true })
+    expect(matchChord('Ctrl+S', event, 'win')).toBe(false)
+  })
+
+  it('ignores keyCode 229 (composition keydown in Chromium/Safari)', () => {
+    const event = keyEvent({ key: 'Process', code: 'KeyS', ctrlKey: true, keyCode: 229 })
+    expect(matchChord('Ctrl+S', event, 'win')).toBe(false)
+    expect(matchShortcut(event, [save], 'win', 'desktop')).toBeNull()
+  })
+
+  it('matches the same chord once composition ends', () => {
+    const event = keyEvent({ key: 's', code: 'KeyS', ctrlKey: true, isComposing: false })
+    expect(matchChord('Ctrl+S', event, 'win')).toBe(true)
+  })
+})
+
+describe('matchChord: AltGr guard', () => {
+  it('rejects Ctrl+Alt chords typed with AltGr on Windows', () => {
+    const event = keyEvent(
+      { key: '1', code: 'Digit1', ctrlKey: true, altKey: true },
+      { AltGraph: true },
+    )
+    expect(matchChord('Ctrl+Alt+1', event, 'win')).toBe(false)
+    expect(matchShortcut(event, [heading1], 'win', 'desktop')).toBeNull()
+  })
+
+  it('accepts the real Ctrl+Alt chord', () => {
+    const event = keyEvent({ key: '1', code: 'Digit1', ctrlKey: true, altKey: true })
+    expect(matchShortcut(event, [heading1], 'win', 'desktop')?.id).toBe('h1')
+  })
+
+  it('does not apply the Windows AltGr rule to macOS Option', () => {
+    const event = keyEvent(
+      { key: '¡', code: 'Digit1', altKey: true, metaKey: true },
+      { AltGraph: true },
+    )
+    expect(matchShortcut(event, [heading1], 'mac', 'desktop')?.id).toBe('h1')
+  })
+})
+
+describe('matchChord: letters by key, case-insensitive', () => {
+  it('matches with Caps Lock on (key arrives upper-case)', () => {
+    const event = keyEvent({ key: 'S', code: 'KeyS', ctrlKey: true }, { CapsLock: true })
+    expect(matchChord('Ctrl+S', event, 'win')).toBe(true)
+  })
+
+  it('requires Shift exactly as the chord says', () => {
+    const shifted = keyEvent({ key: 'S', code: 'KeyS', ctrlKey: true, shiftKey: true })
+    expect(matchChord('Ctrl+S', shifted, 'win')).toBe(false)
+    expect(matchChord('Ctrl+Shift+S', shifted, 'win')).toBe(true)
+  })
+
+  it('follows the layout: Dvorak "s" is on the physical ; key', () => {
+    const event = keyEvent({ key: 's', code: 'Semicolon', ctrlKey: true })
+    expect(matchChord('Ctrl+S', event, 'win')).toBe(true)
+    expect(matchChord('Ctrl+S', event, 'win', 'code')).toBe(false)
+  })
+
+  it('falls back to the physical key when the layout types no Latin letter', () => {
+    const cyrillic = keyEvent({ key: 'ы', code: 'KeyS', ctrlKey: true })
+    expect(matchChord('Ctrl+S', cyrillic, 'win')).toBe(true)
+    const optionDeadKey = keyEvent({ key: 'å', code: 'KeyA', altKey: true, metaKey: true })
+    expect(matchChord('Alt+Cmd+A', optionDeadKey, 'mac')).toBe(true)
+  })
+})
+
+describe('matchChord: digits and punctuation by code', () => {
+  it('matches Ctrl+1 on AZERTY, where the unshifted digit key types "&"', () => {
+    const event = keyEvent({ key: '&', code: 'Digit1', ctrlKey: true })
+    expect(matchChord('Ctrl+1', event, 'win')).toBe(true)
+  })
+
+  it('reads shifted punctuation by the physical key (Ctrl+Shift+> is Shift+Period)', () => {
+    const event = keyEvent({ key: '>', code: 'Period', ctrlKey: true, shiftKey: true })
+    expect(matchChord('Ctrl+Shift+Period', event, 'win')).toBe(true)
+    expect(matchChord('Ctrl+Period', event, 'win')).toBe(false)
+  })
+
+  it('does not take the numeric keypad for a digit chord', () => {
+    const event = keyEvent({ key: '8', code: 'Numpad8', ctrlKey: true, shiftKey: true })
+    expect(matchChord('Ctrl+Shift+8', event, 'win')).toBe(false)
+  })
+})
+
+describe('matchChord: named keys', () => {
+  it('matches F-keys, arrows and Space', () => {
+    expect(matchChord('F12', keyEvent({ key: 'F12', code: 'F12' }), 'win')).toBe(true)
+    expect(matchChord('Shift+F4', keyEvent({ key: 'F4', code: 'F4', shiftKey: true }), 'mac')).toBe(
+      true,
+    )
+    expect(
+      matchChord(
+        'Alt+Shift+Up',
+        keyEvent({ key: 'ArrowUp', code: 'ArrowUp', altKey: true, shiftKey: true }),
+        'win',
+      ),
+    ).toBe(true)
+    expect(
+      matchChord('Ctrl+Space', keyEvent({ key: ' ', code: 'Space', ctrlKey: true }), 'win'),
+    ).toBe(true)
+  })
+})
+
+describe('matchChord: Mac vs Windows modifiers', () => {
+  const cmdS = keyEvent({ key: 's', code: 'KeyS', metaKey: true })
+  const ctrlS = keyEvent({ key: 's', code: 'KeyS', ctrlKey: true })
+
+  it('Cmd is the Mac primary modifier, Ctrl the Windows one', () => {
+    expect(matchShortcut(cmdS, [save], 'mac', 'desktop')?.id).toBe('save')
+    expect(matchShortcut(ctrlS, [save], 'mac', 'desktop')).toBeNull()
+    expect(matchShortcut(ctrlS, [save], 'win', 'desktop')?.id).toBe('save')
+    expect(matchShortcut(cmdS, [save], 'win', 'desktop')).toBeNull()
+  })
+
+  it('Mac Control is its own modifier, not Cmd', () => {
+    const controlH = keyEvent({ key: 'h', code: 'KeyH', ctrlKey: true })
+    const cmdH = keyEvent({ key: 'h', code: 'KeyH', metaKey: true })
+    expect(matchShortcut(controlH, [replace], 'mac', 'desktop')?.id).toBe('replace')
+    expect(matchShortcut(cmdH, [replace], 'mac', 'desktop')).toBeNull()
+  })
+
+  it('a Cmd chord never matches on Windows (the Windows key is not Cmd)', () => {
+    const winKeyS = keyEvent({ key: 's', code: 'KeyS', metaKey: true })
+    expect(matchChord('Cmd+S', winKeyS, 'win')).toBe(false)
+  })
+
+  it('an extra modifier blocks the match', () => {
+    const ctrlAltS = keyEvent({ key: 's', code: 'KeyS', ctrlKey: true, altKey: true })
+    expect(matchShortcut(ctrlAltS, [save], 'win', 'desktop')).toBeNull()
+  })
+})
+
+describe('matchShortcut: surfaces and guards', () => {
+  it('uses the web column and the web alternative on web only', () => {
+    const ctrlN = keyEvent({ key: 'n', code: 'KeyN', ctrlKey: true })
+    const altShiftN = keyEvent({ key: 'N', code: 'KeyN', altKey: true, shiftKey: true })
+    expect(matchShortcut(ctrlN, [newDoc], 'win', 'desktop')?.id).toBe('new')
+    expect(matchShortcut(ctrlN, [newDoc], 'win', 'web')).toBeNull()
+    expect(matchShortcut(altShiftN, [newDoc], 'win', 'web')?.id).toBe('new')
+    expect(matchShortcut(altShiftN, [newDoc], 'win', 'desktop')).toBeNull()
+  })
+
+  it('falls back to the desktop chords when an action has no web column', () => {
+    const ctrlS = keyEvent({ key: 's', code: 'KeyS', ctrlKey: true })
+    expect(matchShortcut(ctrlS, [save], 'win', 'web')?.id).toBe('save')
+  })
+
+  it('skips auto-repeat for noRepeat actions', () => {
+    const once = action({ id: 'once', win: ['Ctrl+S'], mac: [], guard: { noRepeat: true } })
+    const repeat = keyEvent({ key: 's', code: 'KeyS', ctrlKey: true, repeat: true })
+    expect(matchShortcut(repeat, [once], 'win', 'desktop')).toBeNull()
+    expect(matchShortcut(repeat, [save], 'win', 'desktop')?.id).toBe('save')
+  })
+
+  it('createMatcher binds the table', () => {
+    const match = createMatcher([save, heading1])
+    const ctrlAlt1 = keyEvent({ key: '1', code: 'Digit1', ctrlKey: true, altKey: true })
+    expect(match(ctrlAlt1, 'win', 'desktop')?.id).toBe('h1')
+  })
+})

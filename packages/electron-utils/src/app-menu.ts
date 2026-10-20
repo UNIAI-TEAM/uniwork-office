@@ -498,25 +498,37 @@ export function windowMenuTemplate(
   }
 }
 
+/** Accelerators that replace the roles' defaults, e.g. from
+ * `toElectronAccelerator()` of `@genoffice/shortcuts` (Redo = Ctrl+Y as in Office). */
+export type EditMenuAccelerators = Partial<
+  Record<'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll', string>
+>
+
 /** macOS keeps role:'editMenu' (Speech/Substitutions submenus etc.); elsewhere
- * the same items Electron would generate, with localized labels. */
+ * the same items Electron would generate, with localized labels. `accelerators`
+ * applies to that Windows/Linux expansion only; omitted items keep the role's. */
 export function editMenuTemplate(
   platform: NodeJS.Platform,
   labels: AppMenuLabels,
+  accelerators: EditMenuAccelerators = {},
 ): MenuItemConstructorOptions {
   if (platform === 'darwin') return { role: 'editMenu', label: labels.edit }
+  const item = (role: keyof EditMenuAccelerators): MenuItemConstructorOptions => {
+    const accelerator = accelerators[role]
+    return accelerator ? { role, label: labels[role], accelerator } : { role, label: labels[role] }
+  }
   return {
     label: labels.edit,
     submenu: [
-      { role: 'undo', label: labels.undo },
-      { role: 'redo', label: labels.redo },
+      item('undo'),
+      item('redo'),
       { type: 'separator' },
-      { role: 'cut', label: labels.cut },
-      { role: 'copy', label: labels.copy },
-      { role: 'paste', label: labels.paste },
+      item('cut'),
+      item('copy'),
+      item('paste'),
       { role: 'delete', label: labels.delete },
       { type: 'separator' },
-      { role: 'selectAll', label: labels.selectAll },
+      item('selectAll'),
     ],
   }
 }
@@ -525,11 +537,15 @@ let lastDetachedDevToolsTarget: WebContents | undefined
 
 /** role:'toggleDevTools' docks DevTools into the window, where the shell's
  * WebContentsView tabs are stacked above it and occlude it — open detached
- * instead, keeping the role's accelerator and toggle semantics. */
-export function toggleDevToolsItem(labels: AppMenuLabels): MenuItemConstructorOptions {
+ * instead, keeping the role's accelerator and toggle semantics. `accelerator`
+ * overrides that default (e.g. a shortcut-table entry). */
+export function toggleDevToolsItem(
+  labels: AppMenuLabels,
+  accelerator: string = process.platform === 'darwin' ? 'Alt+Command+I' : 'Ctrl+Shift+I',
+): MenuItemConstructorOptions {
   return {
     label: labels.toggleDevTools,
-    accelerator: process.platform === 'darwin' ? 'Alt+Command+I' : 'Ctrl+Shift+I',
+    accelerator,
     click: async () => {
       const { webContents } = await import('electron')
       const focused = webContents.getFocusedWebContents()
