@@ -1173,4 +1173,61 @@ describe('UNI-1961 live-row Lưu trữ (shelve)', () => {
       await service.releaseAllEditLocks()
     }
   })
+
+  it('propagates binding persistence failures on shelve/unshelve actions and logs without mutating on refreshMetadataFor (R3-5)', async () => {
+    const { call, service } = await setup()
+    stubServer()
+    const origDocLive = { ...DOCS.doc_live }
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const opened = (await call(UNIWORK_DOC_CHANNELS.openDocument, 'doc_live')) as {
+        ok: boolean
+        value: { path: string }
+      }
+      expect(opened.ok).toBe(true)
+      const livePath = opened.value.path
+
+      // Injected write failure during shelveDocument returns failed result and leaves binding editable
+      vi.spyOn(service.store, 'write').mockRejectedValueOnce(new Error('EACCES'))
+      const failedShelve = await call(UNIWORK_DOC_CHANNELS.shelveDocument, 'doc_live')
+      expect(failedShelve).toEqual({ ok: false, error: 'server_error' })
+      expect(service.isReadOnly(livePath)).toBe(false)
+      expect(service.commentContext(livePath)).toMatchObject({ level: 'manage' })
+      expect(service.store.lookup(livePath)?.binding.shelved).toBeUndefined()
+
+      // Injected write failure during refreshMetadataFor logs and leaves binding unchanged
+      DOCS.doc_live = { ...origDocLive, shelved_at: '2026-10-20T01:00:00Z' }
+      vi.spyOn(service.store, 'write').mockRejectedValueOnce(new Error('EACCES'))
+      await service.refreshMetadataFor('doc_live')
+      expect(warnSpy).toHaveBeenCalled()
+      expect(service.isReadOnly(livePath)).toBe(false)
+      expect(service.commentContext(livePath)).toMatchObject({ level: 'manage' })
+      expect(service.store.lookup(livePath)?.binding.shelved).toBeUndefined()
+
+      // Next refresh without write failure persists shelved policy
+      await service.refreshMetadataFor('doc_live')
+      expect(service.isReadOnly(livePath)).toBe(true)
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        access: 'view',
+        level: 'manage',
+        shelved: true,
+      })
+
+      // Injected write failure during unshelveDocument returns failed result and leaves binding shelved
+      vi.spyOn(service.store, 'write').mockRejectedValueOnce(new Error('EACCES'))
+      const failedUnshelve = await call(UNIWORK_DOC_CHANNELS.unshelveDocument, 'doc_live')
+      expect(failedUnshelve).toEqual({ ok: false, error: 'server_error' })
+      expect(service.isReadOnly(livePath)).toBe(true)
+      expect(service.commentContext(livePath)).toMatchObject({ level: 'view' })
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        access: 'view',
+        level: 'manage',
+        shelved: true,
+      })
+    } finally {
+      warnSpy.mockRestore()
+      DOCS.doc_live = origDocLive
+      await service.releaseAllEditLocks()
+    }
+  })
 })
