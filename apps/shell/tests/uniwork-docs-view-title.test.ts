@@ -9,6 +9,7 @@ import { UNIWORK_DOC_STRINGS, tUniworkDocs } from '../src/main/uniwork-docs/stri
 import { viewVersionOfPath, withViewVersionTitle } from '../src/main/uniwork-docs/view-title'
 
 const DOC = '01J8X4DOC0N1P2Q3R4S5T6U7'
+const inStore = (path: string) => path.startsWith('/home/u/store/')
 const copy = (key: string) => `/home/u/store/default/acc_1/${key}/Q4 plan.docx`
 
 describe('viewVersionOfPath', () => {
@@ -38,28 +39,36 @@ describe('viewVersionOfPath', () => {
 describe('withViewVersionTitle', () => {
   it('appends the short read-only form for a version copy, in the UI language', () => {
     const path = copy(`${DOC}@v2`)
-    expect(withViewVersionTitle('Q4 plan.docx', path, 'vi')).toBe(
+    expect(withViewVersionTitle('Q4 plan.docx', path, 'vi', inStore)).toBe(
       'Q4 plan.docx · phiên bản 2, chỉ đọc',
     )
-    expect(withViewVersionTitle('Q4 plan.docx', path, 'en')).toBe(
+    expect(withViewVersionTitle('Q4 plan.docx', path, 'en', inStore)).toBe(
       'Q4 plan.docx · version 2, read-only',
     )
     // every other UI language reads English, like the other shell dialogs
-    expect(withViewVersionTitle('Q4 plan.docx', path, 'zh')).toBe(
+    expect(withViewVersionTitle('Q4 plan.docx', path, 'zh', inStore)).toBe(
       'Q4 plan.docx · version 2, read-only',
     )
   })
 
   it('leaves every other title alone', () => {
-    expect(withViewVersionTitle('Q4 plan.docx', copy(DOC), 'vi')).toBe('Q4 plan.docx')
-    expect(withViewVersionTitle('Untitled', undefined, 'vi')).toBe('Untitled')
-    expect(withViewVersionTitle('UniWork Office', '', 'en')).toBe('UniWork Office')
+    expect(withViewVersionTitle('Q4 plan.docx', copy(DOC), 'vi', inStore)).toBe('Q4 plan.docx')
+    expect(withViewVersionTitle('Untitled', undefined, 'vi', inStore)).toBe('Untitled')
+    expect(withViewVersionTitle('UniWork Office', '', 'en', inStore)).toBe('UniWork Office')
+  })
+
+  it('suffixes only paths inside the store: a plain @v2 folder elsewhere stays plain', () => {
+    const outside = '/home/u/work/report@v2/Plan.docx'
+    expect(withViewVersionTitle('Plan.docx', outside, 'en', inStore)).toBe('Plan.docx')
+    expect(withViewVersionTitle('Plan.docx', copy(`${DOC}@v2`), 'en', inStore)).toBe(
+      'Plan.docx · version 2, read-only',
+    )
   })
 
   it('is idempotent: a title that already carries the suffix is not suffixed twice', () => {
     const path = copy(`${DOC}@v2`)
-    const once = withViewVersionTitle('Q4 plan.docx', path, 'vi')
-    expect(withViewVersionTitle(once, path, 'vi')).toBe(once)
+    const once = withViewVersionTitle('Q4 plan.docx', path, 'vi', inStore)
+    expect(withViewVersionTitle(once, path, 'vi', inStore)).toBe(once)
   })
 })
 

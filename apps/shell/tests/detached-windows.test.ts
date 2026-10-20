@@ -521,6 +521,26 @@ describe('tear-off', () => {
   })
 })
 
+describe('docking a decorated window back', () => {
+  it('hands the raw file name to the tab strip, not the decorated window title', () => {
+    detached.setDetachedTitleDecorator((_p, title) => `${title} · version 2, read-only`)
+    const h = { band: vi.fn(() => null), preview: vi.fn(), dock: vi.fn() }
+    detached.setDockHost(h)
+    detached.createDetachedEditorWindow({
+      view: fakeView(31) as never,
+      kind: 'docs',
+      title: 'Q4 plan.docx',
+      filePath: '/store/x@v2/Q4 plan.docx',
+      applyMenuFor: () => {},
+      tearOffAt: { x: 5, y: 5 },
+    })
+    expect(instances[0]!.title).toBe('Q4 plan.docx · version 2, read-only')
+    const tab = detached.takeTornTab()
+    expect(tab!.title).toBe('Q4 plan.docx')
+    detached.setDetachedTitleDecorator((_p, title) => title)
+  })
+})
+
 describe('docking a natively dragged window', () => {
   const band = { x: 100, y: 200 - 8, width: 1000, height: 56 }
 

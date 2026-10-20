@@ -21,13 +21,18 @@ export function viewVersionOfPath(path: string): number | null {
   return Number.isSafeInteger(version) ? version : null
 }
 
-/** `title` with the read-only version suffix when `path` is a version copy; idempotent */
+/**
+ * `title` with the read-only version suffix when `path` is a version copy; idempotent.
+ * `inStore` keeps a plain user folder named `*@vN` out: only the UniWork working-copy
+ * store holds version copies.
+ */
 export function withViewVersionTitle(
   title: string,
   path: string | undefined,
   lang: string,
+  inStore: (path: string) => boolean,
 ): string {
-  const version = path ? viewVersionOfPath(path) : null
+  const version = path && inStore(path) ? viewVersionOfPath(path) : null
   if (version === null) return title
   const suffix = tUniworkDocs(lang, 'viewVersionSuffix', { version })
   return title.endsWith(` · ${suffix}`) ? title : `${title} · ${suffix}`

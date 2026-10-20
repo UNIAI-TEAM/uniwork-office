@@ -3703,6 +3703,8 @@ function createShellWindow(): void {
     activeDocRefresh.gainedFocus(tabManager?.activeFilePath())
   })
 
+  const inUniworkStore = (path: string): boolean =>
+    uniworkDocs?.service.store.isInside(path) === true
   const manager = new TabManager(
     win,
     () => {
@@ -3727,11 +3729,11 @@ function createShellWindow(): void {
     // the tab strip is interface chrome, so its height follows the scale
     () => currentUiScale,
     // UNI-2033: a read-only copy of an older version says so in its title
-    (filePath, title) => withViewVersionTitle(title, filePath, currentLang()),
+    (filePath, title) => withViewVersionTitle(title, filePath, currentLang(), inUniworkStore),
   )
   tabManager = manager
   setDetachedTitleDecorator((filePath, title) =>
-    withViewVersionTitle(title, filePath, currentLang()),
+    withViewVersionTitle(title, filePath, currentLang(), inUniworkStore),
   )
 
   // Docking: a detached window dragged over this window's tab strip hands its

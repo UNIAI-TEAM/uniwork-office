@@ -448,7 +448,9 @@ function releaseDetached(rec: DetachedRecord): DetachedTab {
   clearDockHover(rec)
   rec.released = true
   if (torn?.rec === rec) torn = null
-  const title = win.isDestroyed() ? (filePath ? basename(filePath) : '') : win.getTitle()
+  // stored tab titles are the plain file name; the window title carries the
+  // localized read-only suffix, which the strip re-applies itself
+  const title = filePath ? basename(filePath) : win.isDestroyed() ? '' : win.getTitle()
   detached.delete(view.webContents.id)
   if (!win.isDestroyed()) {
     win.contentView.removeChildView(view)
