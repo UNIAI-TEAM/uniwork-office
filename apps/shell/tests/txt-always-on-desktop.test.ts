@@ -92,14 +92,58 @@ describe('Plain text in the desktop New menu', () => {
     }
   })
 
-  it('sits right under Markdown on the Home New cards', () => {
+  it('sits right under Markdown in the Home New list that feeds the New dropdown', () => {
     const home = readFileSync(resolve(import.meta.dirname, '../src/renderer/src/Home.tsx'), 'utf8')
-    const md = home.indexOf("ext: 'md',")
-    const txt = home.indexOf("ext: 'txt',")
-    const html = home.indexOf("ext: 'html',")
+    const list = home.slice(
+      home.indexOf('const NEW_ITEMS = ['),
+      home.indexOf('function renderQuickCards'),
+    )
+    const md = list.indexOf("ext: 'md',")
+    const txt = list.indexOf("ext: 'txt',")
+    const html = list.indexOf("ext: 'html',")
     expect(md).toBeGreaterThan(-1)
     expect(txt).toBeGreaterThan(md)
     expect(txt).toBeLessThan(html)
-    expect(home).toContain('window.aiOffice.newTxt(newFileOpts)')
+    expect(list).toContain('window.aiOffice.newTxt(newFileOpts)')
+    expect(home).toContain('newItems={NEW_ITEMS}')
+  })
+
+  it('is not one of the AI quick cards (quick create has no .txt)', () => {
+    const home = readFileSync(resolve(import.meta.dirname, '../src/renderer/src/Home.tsx'), 'utf8')
+    const start = home.indexOf('function renderQuickCards')
+    const body = home.slice(start, home.indexOf('data-tip={OPEN_LOCAL_EXTENSIONS}', start))
+    expect(body).not.toContain('NEW_ITEMS')
+    expect(body).toContain('QUICK_CARD_ITEMS.map')
+    expect(home).toMatch(/QUICK_CARD_ITEMS = NEW_ITEMS\.filter\(\(item\) => item\.ext !== 'txt'\)/)
+  })
+})
+
+describe('Plain text in the native New menus', () => {
+  const main = readFileSync(resolve(import.meta.dirname, '../src/main/index.ts'), 'utf8')
+
+  it('follows Markdown with a Plain text item that opens a blank .txt, in every New list', () => {
+    const marks = [...main.matchAll(/label: tm\('menuNewMarkdown'\)/g)].map((match) => match.index)
+    // the tab-bar "+" menu, File > New and the macOS Dock menu
+    expect(marks).toHaveLength(3)
+    for (const at of marks) {
+      const rest = main.slice(at + 1)
+      const next = rest.match(/label: tm\('(\w+)'\)/)
+      expect(next?.[1]).toBe('menuNewTxt')
+      expect(rest.slice(0, next!.index! + 40)).toContain('newTxtTab()')
+    }
+  })
+
+  it('gives the tab-bar + menu entry the Markdown icon', () => {
+    const at = main.indexOf("label: tm('menuNewTxt'), icon")
+    const alt = main.indexOf("label: tm('menuNewTxt'),\n        icon: menuIcons().md")
+    expect(Math.max(at, alt)).toBeGreaterThan(-1)
+  })
+
+  it('is labelled in every main-process string table (vi Văn bản, en Plain text)', () => {
+    const labels = [...main.matchAll(/menuNewTxt: '([^']*)'/g)].map((match) => match[1])
+    expect(labels).toHaveLength(21)
+    expect(labels.every(Boolean)).toBe(true)
+    expect(main).toMatch(/vi: \{[\s\S]*?menuNewTxt: 'Văn bản'/)
+    expect(main).toMatch(/en: \{[\s\S]*?menuNewTxt: 'Plain text'/)
   })
 })
