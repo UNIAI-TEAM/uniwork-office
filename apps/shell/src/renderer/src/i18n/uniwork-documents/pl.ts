@@ -189,4 +189,12 @@ export const pl = {
   uwLockLostGeneric: 'Już nie edytujesz. Twoje niezapisane zmiany wciąż tu są.',
   uwLockLostHeldBy: '{name} teraz edytuje. Twoje niezapisane zmiany wciąż tu są.',
   uwLockAcquireFailed: 'Nie udało się uzyskać dostępu do edycji. Spróbuj ponownie za kilka minut.',
+  uwChipSourceView: 'Tylko podgląd · Z {origin}',
+  uwTipSourceView:
+    'Ten plik jest załączony w {origin}{parent}. Zmiany nie zostaną zapisane. Aby mieć kopię, użyj opcji Pobierz na liście dokumentów.',
+  uwSourceViewSaveHint: 'Ten plik jest tylko do podglądu — zmiany nie są zapisywane.',
+  uwSourceOriginChat: 'Czat',
+  uwSourceOriginTask: 'Zadania',
+  uwSourceOriginMeeting: 'Spotkania',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>

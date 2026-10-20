@@ -187,4 +187,12 @@ export const cs = {
   uwLockLostGeneric: 'Již neupravujete. Vaše neuložené změny tu stále jsou.',
   uwLockLostHeldBy: '{name} nyní upravuje. Vaše neuložené změny tu stále jsou.',
   uwLockAcquireFailed: 'Nepodařilo se získat práva k úpravám. Zkuste to znovu za pár minut.',
+  uwChipSourceView: 'Pouze pro čtení · Z {origin}',
+  uwTipSourceView:
+    'Tento soubor je přiložen v {origin}{parent}. Změny se neuloží. Kopii získáte pomocí Stáhnout v seznamu dokumentů.',
+  uwSourceViewSaveHint: 'Tento soubor je pouze pro čtení — změny se neukládají.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Úkoly',
+  uwSourceOriginMeeting: 'Schůzky',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>
