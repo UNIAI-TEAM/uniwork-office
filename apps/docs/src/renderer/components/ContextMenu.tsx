@@ -13,10 +13,10 @@ import {
   mergeCells,
   splitCell,
 } from '@tiptap/pm/tables'
-import { platformShortcuts } from '@genoffice/i18n'
 import type { TextboxDisplay } from '@genoffice/docx-engine'
 
 import { useI18n, type StringKey } from '../i18n/locale'
+import { shortcutHint } from '../shortcuts'
 import { wordRangeAtCaret } from '../editor/comments'
 import {
   bringForward,
@@ -338,7 +338,7 @@ export function EditorContextMenu({
           <IconSparkle size={10} />
         </span>
       )}
-      {opts.key && <span className="ctx-key">{platformShortcuts(opts.key)}</span>}
+      {opts.key && <span className="ctx-key">{opts.key}</span>}
       {opts.submenuKey && <span className="ctx-arrow">›</span>}
     </button>
   )
@@ -394,27 +394,28 @@ export function EditorContextMenu({
         </>
       )}
       {item(t('appCut'), {
-        key: '⌘X',
+        key: shortcutHint('cut'),
         disabled: !hasSelection || !canEdit,
         onClick: run(() => clipboard('cut')),
       })}
       {item(t('appCopy'), {
-        key: '⌘C',
+        key: shortcutHint('copy'),
         disabled: !hasSelection,
         onClick: run(() => clipboard('copy')),
       })}
       {item(t('appPaste'), {
-        key: '⌘V',
+        key: shortcutHint('paste'),
         disabled: !canEdit,
         onClick: run(() => void pasteFromClipboard(editor)),
       })}
       {item(t('appPastePlain'), {
+        key: shortcutHint('paste-plain'),
         disabled: !canEdit,
         onClick: run(() => void pasteFromClipboard(editor, 'text')),
       })}
       <div className="ctx-sep" />
-      {item(t('appFontMenu'), { key: '⌘D', onClick: run(onFontDialog) })}
-      {item(t('appParagraphMenu'), { key: '⌥⌘M', onClick: run(onParagraphDialog) })}
+      {item(t('appFontMenu'), { key: shortcutHint('font-dialog'), onClick: run(onFontDialog) })}
+      {item(t('appParagraphMenu'), { onClick: run(onParagraphDialog) })}
       {inTable && (
         <>
           <div className="ctx-sep" />
@@ -601,7 +602,10 @@ export function EditorContextMenu({
       {(field || editor.isActive('instrField')) && onUpdateFields && (
         <>
           <div className="ctx-sep" />
-          {item(t('appUpdateField'), { key: 'F9', onClick: run(() => onUpdateFields()) })}
+          {item(t('appUpdateField'), {
+            key: shortcutHint('update-fields'),
+            onClick: run(() => onUpdateFields()),
+          })}
           {field && (
             <>
               {item(t('appToggleFieldCodes'), {
@@ -759,9 +763,14 @@ export function EditorContextMenu({
           })}
         </>
       ) : (
-        item(t('appHyperlinkMenu'), { key: '⌘K', disabled: !canEdit, onClick: run(onLink) })
+        item(t('appHyperlinkMenu'), {
+          key: shortcutHint('link'),
+          disabled: !canEdit,
+          onClick: run(onLink),
+        })
       )}
       {item(t('appNewComment'), {
+        key: shortcutHint('comment'),
         disabled: !canComment || (!canEdit && !commentsAllowed),
         onClick: run(onNewComment),
       })}

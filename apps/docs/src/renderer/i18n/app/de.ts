@@ -26,6 +26,7 @@ export const de = {
   appScLineBreak: 'Zeilenumbruch',
   appScNbsp: 'Geschütztes Leerzeichen',
   appScNbHyphen: 'Geschützter Bindestrich',
+  appScOptHyphen: 'Bedingter Trennstrich',
   appScGrowFont1: 'Schriftgrad um 1 pt vergrößern',
   appScShrinkFont1: 'Schriftgrad um 1 pt verkleinern',
   appScListDemote: 'Listenebene verringern',
@@ -224,7 +225,7 @@ export const de = {
   appAutoSave: 'Automatisches Speichern',
   appAutoSaveTip:
     'Automatisches Speichern (alle 30 Sekunden und wenn das Fenster den Fokus verliert)',
-  appSaveShortcutTip: 'Speichern (⌘S)',
+  appSaveShortcutTip: 'Speichern ({keys})',
   appUndo: 'Rückgängig',
   appRedo: 'Wiederholen',
   appStartOpening: 'Wird geöffnet…',

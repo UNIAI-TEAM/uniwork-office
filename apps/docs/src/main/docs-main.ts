@@ -186,6 +186,7 @@ import type {
 } from '../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../shared/ipc'
 import { ClickClaims } from '../shared/context-menu-claims'
+import { docsMenuAccelerator, type DocsMenuShortcut } from '../shared/docs-shortcuts'
 import { findDocxPath } from '../shared/open-file'
 import { atomicWriteFile, looksLikeZip } from './atomic-write'
 import {
@@ -6066,6 +6067,7 @@ export function setDocsMenuGate(gate: () => boolean): void {
 export function buildDocsMenu(): void {
   if (docsMenuGate && !docsMenuGate()) return
   const isMac = process.platform === 'darwin'
+  const acc = (item: DocsMenuShortcut) => docsMenuAccelerator(item, isMac ? 'mac' : 'win')
   const recent = readJson<string[]>(RECENT_PATH(), [])
     .filter((p) => existsSync(p))
     .slice(0, 10)
@@ -6104,16 +6106,16 @@ export function buildDocsMenu(): void {
     {
       label: tm('menuFile'),
       submenu: [
-        { label: tm('menuNewDoc'), accelerator: 'CmdOrCtrl+N', click: () => sendCommand('new') },
+        { label: tm('menuNewDoc'), accelerator: acc('new'), click: () => sendCommand('new') },
         {
+          // menu-only: Word's Ctrl+Shift+N / Shift+Cmd+N is Normal style (docs-055)
           label: tm('menuNewWindow'),
-          accelerator: 'Shift+CmdOrCtrl+N',
           click: () => {
             if (shellHooks) shellHooks.openTab(undefined, { newBlank: true })
             else markDocsNewBlank(createDocsWindow().webContents.id)
           },
         },
-        { label: tm('menuOpen'), accelerator: 'CmdOrCtrl+O', click: () => sendCommand('open') },
+        { label: tm('menuOpen'), accelerator: acc('open'), click: () => sendCommand('open') },
         { label: tm('menuOpenRecent'), submenu: recentSubmenu },
         ...(extraFileMenuItems.length > 0
           ? [{ type: 'separator' as const }, ...extraFileMenuItems]
@@ -6122,14 +6124,14 @@ export function buildDocsMenu(): void {
         shellHooks
           ? {
               label: tm('menuClose'),
-              accelerator: 'CmdOrCtrl+W',
+              accelerator: acc('close'),
               click: () => shellHooks?.closeActiveTab(),
             }
           : { role: 'close' as const, label: tm('menuClose') },
-        { label: tm('menuSave'), accelerator: 'CmdOrCtrl+S', click: () => sendCommand('save') },
+        { label: tm('menuSave'), accelerator: acc('save'), click: () => sendCommand('save') },
         {
           label: tm('menuSaveAs'),
-          accelerator: 'Shift+CmdOrCtrl+S',
+          accelerator: acc('saveAs'),
           click: () => sendCommand('save-as'),
         },
         { type: 'separator' },
@@ -6139,7 +6141,7 @@ export function buildDocsMenu(): void {
         { label: tm('menuExportImages'), click: () => sendCommand('export-images') },
         {
           label: tm('menuPrint'),
-          accelerator: 'CmdOrCtrl+P',
+          accelerator: acc('print'),
           // routed through the renderer: it opens the pagination preview first so each
           // printed sheet is exactly one editor page (WYSIWYG), then invokes docs:print
           click: () => sendCommand('print'),
@@ -6149,26 +6151,31 @@ export function buildDocsMenu(): void {
     {
       label: tm('menuEdit'),
       submenu: [
-        { label: tm('menuUndo'), accelerator: 'CmdOrCtrl+Z', click: () => sendCommand('undo') },
+        { label: tm('menuUndo'), accelerator: acc('undo'), click: () => sendCommand('undo') },
         {
+          // Word's Ctrl+Y / Cmd+Y; Shift+Ctrl+Z still redoes through the editor keymap
           label: tm('menuRedo'),
-          accelerator: 'Shift+CmdOrCtrl+Z',
+          accelerator: acc('redo'),
           click: () => sendCommand('redo'),
         },
         { type: 'separator' },
         { role: 'cut', label: tm('menuCut') },
         { role: 'copy', label: tm('menuCopy') },
         { role: 'paste', label: tm('menuPaste') },
-        { role: 'pasteAndMatchStyle', label: tm('menuPasteMatch') },
+        {
+          role: 'pasteAndMatchStyle',
+          label: tm('menuPasteMatch'),
+          accelerator: acc('pasteAndMatchStyle'),
+        },
         { type: 'separator' },
         {
           label: tm('menuFindReplace'),
-          accelerator: 'CmdOrCtrl+F',
+          accelerator: acc('find'),
           click: () => sendCommand('find'),
         },
         {
           label: tm('menuGoTo'),
-          accelerator: isMac ? 'Alt+Cmd+G' : 'Ctrl+G',
+          accelerator: acc('goto'),
           click: () => sendCommand('goto'),
         },
         { type: 'separator' },
@@ -6180,17 +6187,17 @@ export function buildDocsMenu(): void {
       submenu: [
         {
           label: tm('menuZoomIn'),
-          accelerator: 'CmdOrCtrl+=',
+          accelerator: acc('zoomIn'),
           click: () => sendCommand('zoom-in'),
         },
         {
           label: tm('menuZoomOut'),
-          accelerator: 'CmdOrCtrl+-',
+          accelerator: acc('zoomOut'),
           click: () => sendCommand('zoom-out'),
         },
         {
           label: tm('menuZoom100'),
-          accelerator: 'CmdOrCtrl+0',
+          accelerator: acc('zoom100'),
           click: () => sendCommand('zoom-100'),
         },
         {
@@ -6235,7 +6242,7 @@ export function buildDocsMenu(): void {
         { label: tm('menuInsertPageBreak'), click: () => sendCommand('insert-page-break') },
         {
           label: tm('menuInsertLink'),
-          accelerator: 'CmdOrCtrl+K',
+          accelerator: acc('link'),
           click: () => sendCommand('insert-link'),
         },
         { label: tm('menuInsertEquation'), click: () => sendCommand('insert-equation') },
@@ -6246,11 +6253,11 @@ export function buildDocsMenu(): void {
     {
       label: tm('menuFormat'),
       submenu: [
-        { label: tm('menuBold'), accelerator: 'CmdOrCtrl+B', click: () => sendCommand('bold') },
-        { label: tm('menuItalic'), accelerator: 'CmdOrCtrl+I', click: () => sendCommand('italic') },
+        { label: tm('menuBold'), accelerator: acc('bold'), click: () => sendCommand('bold') },
+        { label: tm('menuItalic'), accelerator: acc('italic'), click: () => sendCommand('italic') },
         {
           label: tm('menuUnderline'),
-          accelerator: 'CmdOrCtrl+U',
+          accelerator: acc('underline'),
           click: () => sendCommand('underline'),
         },
         { type: 'separator' },
@@ -6266,12 +6273,12 @@ export function buildDocsMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuFont'),
-          accelerator: 'CmdOrCtrl+D',
+          accelerator: acc('font'),
           click: () => sendCommand('font-dialog'),
         },
         {
+          // menu-only: Word's Ctrl+Alt+M inserts a comment (docs-072)
           label: tm('menuParagraph'),
-          accelerator: 'Alt+CmdOrCtrl+M',
           click: () => sendCommand('paragraph-dialog'),
         },
       ],
@@ -6377,7 +6384,7 @@ export function buildDocsMenu(): void {
       submenu: [
         {
           label: tm('menuShortcuts'),
-          accelerator: 'CmdOrCtrl+/',
+          accelerator: acc('shortcuts'),
           click: () => sendCommand('shortcuts'),
         },
         { type: 'separator' },

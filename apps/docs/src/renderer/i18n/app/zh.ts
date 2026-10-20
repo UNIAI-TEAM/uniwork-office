@@ -25,6 +25,7 @@ export const zh = {
   appScLineBreak: '换行符',
   appScNbsp: '不换行空格',
   appScNbHyphen: '不换行连字符',
+  appScOptHyphen: '可选连字符',
   appScGrowFont1: '增大字号 1 磅',
   appScShrinkFont1: '减小字号 1 磅',
   appScListDemote: '降低列表级别',
@@ -210,7 +211,7 @@ export const zh = {
   // Quick actions bar
   appAutoSave: '自动保存',
   appAutoSaveTip: '自动保存(每 30 秒及窗口失焦时)',
-  appSaveShortcutTip: '保存 (⌘S)',
+  appSaveShortcutTip: '保存 ({keys})',
   appUndo: '撤销',
   appRedo: '恢复',
   // Start screen
