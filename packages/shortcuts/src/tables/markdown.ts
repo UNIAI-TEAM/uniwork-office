@@ -447,7 +447,75 @@ export const markdownNotes: readonly ShortcutNote[] = [
 // @generated-end
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
-const manual: readonly ShortcutAction[] = []
+const manual: readonly ShortcutAction[] = [
+  // Redo: Ctrl+Y (Word); the existing Ctrl+Shift+Z / Cmd+Shift+Z stays
+  {
+    id: 'markdown-007',
+    scope: 'markdown',
+    win: ['Ctrl+Y', 'Ctrl+Shift+Z'],
+    mac: ['Cmd+Y', 'Shift+Cmd+Z'],
+    match: 'key',
+    guard: {},
+  },
+  // Replace: macOS keeps Control+H (the menu's Cmd+H is the system Hide role)
+  {
+    id: 'markdown-015',
+    scope: 'markdown',
+    win: ['Ctrl+H'],
+    mac: ['Ctrl+H'],
+    web: { win: ['Ctrl+H'], mac: ['Ctrl+H'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Strikethrough: Word for Mac's Shift+Cmd+X; on Windows Save As is F12 only, so Ctrl+Shift+S is free for it
+  {
+    id: 'markdown-019',
+    scope: 'markdown',
+    win: ['Ctrl+Shift+S'],
+    mac: ['Shift+Cmd+X'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Toggle source / edit view: ours-only, the only action on Ctrl+E now that inline code gave it up
+  {
+    id: 'markdown-021',
+    scope: 'markdown',
+    win: ['Ctrl+E'],
+    mac: ['Cmd+E'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Normal text: the existing Ctrl+Alt+0 keeps the primary slot until the shell frees Ctrl+Shift+N
+  {
+    id: 'markdown-025',
+    scope: 'markdown',
+    win: ['Ctrl+Alt+0'],
+    mac: ['Alt+Cmd+0'],
+    match: 'key',
+    guard: { altGraph: true, noRepeat: true },
+  },
+  // Bulleted list: Ctrl+Shift+L (Word) first, the existing Ctrl+Shift+8 stays as a second chord
+  {
+    id: 'markdown-026',
+    scope: 'markdown',
+    win: ['Ctrl+Shift+L', 'Ctrl+Shift+8'],
+    mac: ['Shift+Cmd+L', 'Shift+Cmd+8'],
+    web: { win: ['Ctrl+Shift+8'], mac: ['Shift+Cmd+8'] },
+    webAlt: { win: 'Ctrl+Period' },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Numbered list: the existing Ctrl+Shift+7 stays; the web adds Microsoft's Ctrl+/
+  {
+    id: 'markdown-027',
+    scope: 'markdown',
+    win: ['Ctrl+Shift+7'],
+    mac: ['Shift+Cmd+7'],
+    web: { win: ['Ctrl+Slash', 'Ctrl+Shift+7'], mac: ['Shift+Cmd+7'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+]
 
 export const markdownShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
 
