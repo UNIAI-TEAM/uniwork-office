@@ -1003,8 +1003,6 @@ function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = 
   }
   if (detail.file.versionId && next.baseVersion === detail.file.version) {
     next.baseVersionId = detail.file.versionId
-  } else if (next.baseVersion !== detail.file.version) {
-    delete next.baseVersionId
   }
   return next
 }
@@ -1188,6 +1186,8 @@ export class UniworkDocsService {
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
   /** working copies whose editor holds edits not written to the file yet */
   private readonly editorDirty = new Set<string>()
+  /** working copies opened under an explicit view-only launch restriction (`viewTicket` / `viewRequested`) */
+  private readonly viewOnlyLaunches = new Set<string>()
   /** id -> display name of one org's members; dropped when the selected org changes */
   private orgMemberNames = new Map<string, string>()
   /** the org whose member names the map holds (null = nothing cached) */
@@ -6696,25 +6696,31 @@ export class UniworkDocsService {
       const existing = await this.store.readDir(dir)
       if (!existing || existing.documentId !== id) continue
       const local = join(dir, existing.filename)
-      if (!this.store.exists(local)) continue
-      const preservedLevel = existing.level ?? (existing.access === 'edit' ? 'edit' : undefined)
-      const next: Binding = {
-        ...existing,
-        ...(preservedLevel ? { level: preservedLevel } : {}),
-      }
-      if (shelved) {
-        next.shelved = true
-        next.access = 'view'
-      } else {
-        delete next.shelved
-        next.access = accessFor(next.level ?? null)
-      }
-      if (shelved) await this.stopEditLock(local, true)
-      const written = await this.store.write(dir, next)
-      const fresh = written ? this.store.lookup(local) : null
+      const doc = this.store.lookup(local)
+      if (!doc || doc.binding.documentId !== id || !this.store.exists(doc.path)) continue
+      if (shelved) await this.stopEditLock(doc.path, true)
+      if (!this.sessionLive(session)) return
+      const viewOnlyLaunch = this.viewOnlyLaunches.has(pathKey(doc.path))
+      const fresh = await this.coordinator.updateBinding(doc, (latest) => {
+        const preservedLevel = viewOnlyLaunch
+          ? 'view'
+          : (latest.level ?? (latest.access === 'edit' ? 'edit' : undefined))
+        const next: Binding = {
+          ...latest,
+          ...(preservedLevel ? { level: preservedLevel } : {}),
+        }
+        if (shelved) {
+          next.shelved = true
+          next.access = 'view'
+        } else {
+          delete next.shelved
+          next.access = viewOnlyLaunch ? 'view' : accessFor(next.level ?? null)
+        }
+        return next
+      })
       if (fresh) {
-        this.publish(this.statusOf(fresh))
-        if (!shelved && fresh.binding.access === 'edit' && this.deps.isPathOpen(local)) {
+        this.notifyDocStateChanged(fresh.path)
+        if (!shelved && fresh.binding.access === 'edit' && this.deps.isPathOpen(fresh.path)) {
           this.startEditLock(fresh)
         }
       }
@@ -6753,16 +6759,23 @@ export class UniworkDocsService {
       const { bytes } = await this.api().downloadSource(input.workspaceId, input.sourceId)
       if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
       const resolvedTarget = resolve(target)
-      const tmp = join(
-        dirname(resolvedTarget),
-        `.${basename(resolvedTarget)}.${randomBytes(8).toString('hex')}.tmp`,
-      )
+      const tmp = join(dirname(resolvedTarget), `.uw-dl-${randomBytes(8).toString('hex')}.tmp`)
+      let createdTmp = false
       try {
-        await writeFile(tmp, bytes, { flag: 'wx' })
+        const existingStat = await lstat(resolvedTarget).catch(() => null)
+        const targetMode = existingStat?.isFile() ? existingStat.mode & 0o777 : 0o600
+        const handle = await open(tmp, 'wx', 0o600)
+        createdTmp = true
+        try {
+          await handle.writeFile(bytes)
+          await handle.chmod(targetMode)
+        } finally {
+          await handle.close()
+        }
         if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
         await rename(tmp, resolvedTarget)
       } catch (error) {
-        await unlink(tmp).catch(() => undefined)
+        if (createdTmp) await unlink(tmp).catch(() => undefined)
         throw error
       }
       return { path: target }
@@ -6914,7 +6927,7 @@ export class UniworkDocsService {
     if (!existing || existing.documentId !== documentId) return
     const local = join(dir, existing.filename)
     if (!this.store.exists(local)) return
-    if (KEEP_LOCAL_STATES.has(existing.state) || this.coordinator.isSaving(local)) return
+    if (this.coordinator.isSaving(local)) return
     let detail: DocumentDetail
     try {
       detail = await this.api().getDocument(documentId)
@@ -6926,17 +6939,69 @@ export class UniworkDocsService {
       if (verdict) await this.lockFromServer(documentId, verdict)
       return
     }
+    const currentIdentity = this.liveIdentity()
+    if (
+      !currentIdentity ||
+      currentIdentity.deploymentId !== identity.deploymentId ||
+      currentIdentity.accountId !== identity.accountId
+    ) {
+      return
+    }
     // the metadata read is async: a save may have started or settled, and an
-    // editor may have made the copy dirty, while it was in flight. The title is
-    // applied to the binding as it is NOW - never re-written from the one read
-    // before the await, which would clear that newer state (R1-4).
+    // editor may have made the copy dirty, while it was in flight. Shelving/ACL
+    // policy is applied to the latest binding through the coordinator's per-key
+    // chain independently of dirty/title handling (R1-7 residual), and the title
+    // is applied only when the copy is still clean and idle (R1-4).
     const latest = await this.store.readDir(dir)
     if (!latest || latest.documentId !== documentId) return
     const latestLocal = join(dir, latest.filename)
-    if (!this.store.exists(latestLocal)) return
-    if (KEEP_LOCAL_STATES.has(latest.state) || this.coordinator.isSaving(latestLocal)) return
-    if (detail.title === latest.title) return
-    await this.applyTitle(latest, detail.title, latestLocal, true)
+    const doc = this.store.lookup(latestLocal)
+    if (!doc || !this.store.exists(doc.path)) return
+    const shelved = Boolean(detail.shelvedAt)
+    const viewOnlyLaunch = this.viewOnlyLaunches.has(pathKey(doc.path))
+    if (shelved || viewOnlyLaunch || accessFor(detail.myLevel) !== 'edit') {
+      await this.stopEditLock(doc.path, true)
+    }
+    let policyChanged = false
+    const refreshed = await this.coordinator.updateBinding(doc, (cur) => {
+      if (cur.state === 'blocked') return null
+      const serverLevel =
+        docLevelOf(detail.myLevel) ?? cur.level ?? (cur.access === 'edit' ? 'edit' : undefined)
+      const nextLevel = serverLevel ? (viewOnlyLaunch ? 'view' : serverLevel) : undefined
+      const nextAccess: UniworkDocAccess =
+        viewOnlyLaunch || shelved ? 'view' : accessFor(nextLevel ?? detail.myLevel)
+      const curEffectiveLevel = cur.level ?? (cur.access === 'edit' ? 'edit' : 'view')
+      if (
+        Boolean(cur.shelved) === shelved &&
+        cur.access === nextAccess &&
+        (nextLevel ?? 'view') === curEffectiveLevel
+      ) {
+        return null
+      }
+      policyChanged = true
+      const next: Binding = { ...cur }
+      if (nextLevel) next.level = nextLevel
+      else delete next.level
+      if (shelved) {
+        next.shelved = true
+        next.access = 'view'
+      } else {
+        delete next.shelved
+        next.access = nextAccess
+      }
+      return next
+    })
+    const after = refreshed ?? this.store.lookup(doc.path)
+    if (!after || !this.store.exists(after.path)) return
+    if (policyChanged) {
+      this.notifyDocStateChanged(after.path)
+      if (!shelved && after.binding.access === 'edit' && this.deps.isPathOpen(after.path)) {
+        this.startEditLock(after)
+      }
+    }
+    if (KEEP_LOCAL_STATES.has(after.binding.state) || this.coordinator.isSaving(after.path)) return
+    if (detail.title === after.binding.title) return
+    await this.applyTitle(after.binding, detail.title, after.path, true)
   }
 
   /** the binding rewrite that follows a title change, plus the pushes it owes */
@@ -6975,7 +7040,12 @@ export class UniworkDocsService {
     const written = await this.store.write(dir, { ...doc, title, filename })
     const fresh = written ? this.store.lookup(path) : null
     if (fresh) this.publish(toStatus(fresh))
-    if (path !== local) this.deps.notifyPathRenamed?.(local, path)
+    if (path !== local) {
+      if (this.viewOnlyLaunches.delete(pathKey(local))) {
+        this.viewOnlyLaunches.add(pathKey(path))
+      }
+      this.deps.notifyPathRenamed?.(local, path)
+    }
     // the copy kept its name under an open editor: the title must still reach
     // the tab and the editor, so the shell re-titles the open tab/window by path
     // and the module follows through its own rename IPC (S18 `file.renamed`)
@@ -9121,6 +9191,8 @@ export class UniworkDocsService {
           // refused by the store's own hold and the copy opens with its old
           // binding - opening is fine, dropping `pendingIntent` is not
           const written = await this.store.write(dir, binding)
+          if (viewTicket || viewRequested) this.viewOnlyLaunches.add(pathKey(local))
+          else this.viewOnlyLaunches.delete(pathKey(local))
           return this.show(local, written ? binding : existing)
         }
       }
@@ -9184,6 +9256,8 @@ export class UniworkDocsService {
     // a refused write is never ignored, exactly as in the branch above: the
     // copy then reads as the binding that persisted, not the refused one
     const written = await this.store.write(dir, binding)
+    if (viewTicket || viewRequested) this.viewOnlyLaunches.add(pathKey(path))
+    else this.viewOnlyLaunches.delete(pathKey(path))
     return this.show(path, written ? binding : (existing ?? binding))
   }
 
