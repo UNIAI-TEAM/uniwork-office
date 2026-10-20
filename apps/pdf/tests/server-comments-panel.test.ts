@@ -324,6 +324,46 @@ describe('a comment that appears with the panel closed (G819-A02b)', () => {
   })
 })
 
+describe('closed-panel Save after a prepare Save (G819-A02c)', () => {
+  it('the comment made while the prepare receipt is still in flight ends on page 1 at the shift version', async () => {
+    const bridge = fakeBridge()
+    const { api, setOpen } = await mount(bridge)
+    await setOpen(false)
+    // the prepare Save (3 pages, nothing moved) has its page map, its receipt comes a moment later
+    await act(async () => {
+      api.current!.saved(
+        new Map([
+          [0, 0],
+          [1, 1],
+          [2, 2],
+        ]),
+      )
+      await flush()
+    })
+    // the other host comments on page 2 before the prepare receipt lands
+    bridge.comments.push(comment({ id: 'c2', anchor: makePdfAnchor(2, RECT) }))
+    await act(async () => {
+      bridge.receipt('ver-1')
+      await flush()
+    })
+    // the desktop deletes page 1 and saves: the anchored page 2 becomes page 1
+    await act(async () => {
+      api.current!.saved(
+        new Map([
+          [1, 0],
+          [2, 1],
+        ]),
+      )
+      bridge.receipt('ver-2')
+      await flush()
+    })
+    expect(bridge.anchors.mock.calls.map(([call]) => [call.versionId, call.anchors])).toEqual([
+      ['ver-1', [{ commentId: 'c2', anchor: makePdfAnchor(2, RECT), state: 'exact' }]],
+      ['ver-2', [{ commentId: 'c2', anchor: makePdfAnchor(1, RECT), state: 'exact' }]],
+    ])
+  })
+})
+
 describe('reveal (G8-15)', () => {
   it('comments.reveal opens the panel and moves the viewer to the right page and rect', async () => {
     const bridge = fakeBridge([comment({ id: 'c1', anchor: makePdfAnchor(3, RECT) })])
