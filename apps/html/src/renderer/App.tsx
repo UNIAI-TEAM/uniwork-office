@@ -1789,6 +1789,7 @@ export default function App() {
               readOnly={uniwork.readOnly}
               onCollapse={() => setAiOpen(false)}
               open={aiOpen}
+              dockHidden={canvasMode === 'present'}
               onExpand={() => setAiOpen(true)}
             />
           </div>

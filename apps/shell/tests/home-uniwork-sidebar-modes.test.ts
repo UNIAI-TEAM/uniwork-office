@@ -229,7 +229,7 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
     expect(workbenchNav()!.getAttribute('aria-current')).toBeNull()
     expect(uwPaneShown()).toBe(true)
     expect(uwNavItem('recent')!.getAttribute('aria-current')).toBe('page')
-    expect(uwPane()!.querySelector('.dh-title')!.textContent).toBe('Recent')
+    expect(uwPane()!.querySelector('.dh-main h1')!.textContent).toBe('Recent')
   })
 
   it('clicking a folder in the tree from My AI leaves the mode and opens that folder', async () => {
@@ -244,7 +244,7 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
 
     expect(myAiNav()!.getAttribute('aria-current')).toBeNull()
     expect(uwPaneShown()).toBe(true)
-    expect(uwPane()!.querySelector('.dh-title')!.textContent).toBe('Alpha Folder')
+    expect(uwPane()!.querySelector('.dh-main h1')!.textContent).toBe('Alpha Folder')
   })
 
   // UNI-1932 SB1-1: a dialog opened from the sidebar must not render inside the hidden pane

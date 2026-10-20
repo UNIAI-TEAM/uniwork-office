@@ -1,0 +1,58 @@
+/* The AI dock on a narrow viewport (the web frame on a tablet or phone, or a small window): the open
+   panel floats over the document instead of squeezing it. Shared by Docs, HTML, Markdown, PDF and
+   Slides (Sheets keeps its own 719 px block, its panel is a grid column). Import it AFTER the app's
+   own styles: the per-app `.ai-dock` rules have the same specificity and the later rule wins.
+   The breakpoints are OVERLAY_DOCK_MAX_PX / 520 (use-overlay-dock.ts), the same two Docs and HTML
+   already shipped. */
+
+/* 521-900 px: the dock keeps its 34 px rail slot in the row, the expanded panel overlays the document
+   from the panel's edge, and the document keeps width - 34;
+   a dock the user switched off (`ai-dock-off`, 0 wide) keeps no slot */
+@media (max-width: 900px) {
+  .app-main {
+    position: relative;
+  }
+
+  .app-main:has(> .ai-dock:not(.ai-dock-off)) {
+    padding-left: 34px;
+  }
+
+  html[data-ai-panel-side='right'] .app-main:has(> .ai-dock:not(.ai-dock-off)) {
+    padding-left: 0;
+    padding-right: 34px;
+  }
+
+  .ai-dock {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(var(--ai-panel-width, 360px), 100%);
+    background: var(--surface);
+  }
+
+  .ai-dock.collapsed {
+    width: 34px;
+  }
+
+  .ai-dock:not(.collapsed) {
+    box-shadow: var(--shadow-menu);
+  }
+
+  html[data-ai-panel-side='right'] .ai-dock {
+    left: auto;
+    right: 0;
+  }
+
+  .ai-dock .ai-panel-resizer {
+    display: none;
+  }
+}
+
+/* phones: an open panel is a full-width sheet; its header close button collapses it */
+@media (max-width: 520px) {
+  .ai-dock:not(.collapsed) {
+    width: 100%;
+  }
+}

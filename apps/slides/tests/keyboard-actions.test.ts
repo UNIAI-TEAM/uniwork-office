@@ -874,6 +874,22 @@ describe('Escape on the canvas', () => {
     },
   )
 
+  it('a real dialog in the document owns Escape, the AI dock overlay (data-overlay-dock) does not', () => {
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    document.body.append(dialog)
+    const blocked = vi.fn()
+    handleGlobalKeydown(makeCtx({ selectedIds: ['a'], setSelectedIds: blocked }), keydown('Escape'))
+    expect(blocked).not.toHaveBeenCalled()
+
+    // the panel at 521-900 px: dialog semantics, but the slide stays visible and clickable
+    dialog.setAttribute('aria-modal', 'true')
+    dialog.setAttribute('data-overlay-dock', '')
+    const setSelectedIds = vi.fn()
+    handleGlobalKeydown(makeCtx({ selectedIds: ['a'], setSelectedIds }), keydown('Escape'))
+    expect(setSelectedIds).toHaveBeenCalledWith([])
+  })
+
   it('leaves in-group editing untouched while an overlay is open', () => {
     const setSelectedIds = vi.fn()
     const setEnteredGroupId = vi.fn()

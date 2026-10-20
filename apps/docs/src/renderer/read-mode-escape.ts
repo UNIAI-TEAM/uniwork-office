@@ -1,5 +1,9 @@
-/** an open modal (Print, page setup, ...) or a surface that handles its own Esc */
-const OPEN_DIALOG = '.modal-backdrop, [role="dialog"], [aria-modal="true"]'
+/**
+ * an open modal (Print, page setup, ...) or a surface that handles its own Esc; the AI dock that
+ * overlays the document under 900 px (`data-overlay-dock`) is not one: Esc still leaves Read Mode
+ */
+const OPEN_DIALOG =
+  '.modal-backdrop, [role="dialog"]:not([data-overlay-dock]), [aria-modal="true"]:not([data-overlay-dock])'
 
 /**
  * Read Mode: Esc leaves it. Window capture phase, so the listener runs (and calls preventDefault)
