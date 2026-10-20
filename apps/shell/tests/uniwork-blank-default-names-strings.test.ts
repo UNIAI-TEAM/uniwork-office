@@ -14,6 +14,7 @@ const KEY = {
   xlsx: 'uhDefaultNameXlsx',
   pptx: 'uhDefaultNamePptx',
   md: 'uhDefaultNameMd',
+  txt: 'uhDefaultNameTxt',
   html: 'uhDefaultNameHtml',
   pdf: 'uhDefaultNamePdf',
 } as const

@@ -37,13 +37,14 @@ async function flush(): Promise<void> {
   }
 }
 
-const KINDS = ['page', 'docx', 'xlsx', 'pptx', 'md', 'html', 'pdf']
+const KINDS = ['page', 'docx', 'xlsx', 'pptx', 'md', 'txt', 'html', 'pdf']
 const LABELS_VI = [
   'UniNote',
   'Tài liệu Docs',
   'Bảng tính Sheets',
   'Trình chiếu Slides',
   'Tệp Markdown',
+  'Văn bản',
   'HTML',
   'PDF',
 ]
@@ -53,15 +54,17 @@ const LABELS_EN = [
   'Sheets spreadsheet',
   'Slides presentation',
   'Markdown file',
+  'Plain text',
   'HTML',
   'PDF',
 ]
-const EXTS = ['UniWork', '.docx', '.xlsx', '.pptx', '.md', '.html', '.pdf']
+const EXTS = ['UniWork', '.docx', '.xlsx', '.pptx', '.md', '.txt', '.html', '.pdf']
 const NAMES_VI: Record<string, string> = {
   docx: 'Tài liệu chưa đặt tên.docx',
   xlsx: 'Bảng tính chưa đặt tên.xlsx',
   pptx: 'Bản trình chiếu chưa đặt tên.pptx',
   md: 'Markdown chưa đặt tên.md',
+  txt: 'Văn bản chưa đặt tên.txt',
   html: 'Trang HTML chưa đặt tên.html',
   pdf: 'PDF chưa đặt tên.pdf',
   page: 'UniNote mới',
@@ -72,6 +75,7 @@ const NAMES_EN: Record<string, string> = {
   xlsx: 'Untitled spreadsheet.xlsx',
   pptx: 'Untitled presentation.pptx',
   md: 'Untitled markdown.md',
+  txt: 'Untitled text.txt',
   html: 'Untitled HTML page.html',
   pdf: 'Untitled PDF.pdf',
   page: 'New UniNote',
@@ -363,7 +367,7 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
       noDialog()
     })
 
-    it.each(['docx', 'xlsx', 'pptx', 'html', 'pdf'])(
+    it.each(['docx', 'xlsx', 'pptx', 'txt', 'html', 'pdf'])(
       '%s uses its own web default name',
       async (kind) => {
         await mount('vi')
