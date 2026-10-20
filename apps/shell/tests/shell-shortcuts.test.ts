@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { SHORTCUT_TABLES, findShortcut, type ShortcutPlatform } from '@genoffice/shortcuts'
+import {
+  SHORTCUT_NOTES,
+  SHORTCUT_TABLES,
+  findShortcut,
+  type ShortcutPlatform,
+} from '@genoffice/shortcuts'
 
 import {
   devToolsAccelerator,
@@ -240,5 +245,30 @@ describe('the rows the shell reads', () => {
     ['shell', 'shell-05'],
   ] as const)('%s %s exists', (scope, id) => {
     expect(findShortcut(scope, id)).toBeDefined()
+  })
+})
+
+describe('zoom aliases and web keys of the common rows', () => {
+  it.each([
+    [
+      'common-16',
+      ['Ctrl+Equal', 'Ctrl+Shift+Equal', 'Ctrl+NumpadAdd'],
+      ['Cmd+Equal', 'Shift+Cmd+Equal', 'Cmd+NumpadAdd'],
+    ],
+    ['common-17', ['Ctrl+Minus', 'Ctrl+NumpadSubtract'], ['Cmd+Minus', 'Cmd+NumpadSubtract']],
+    ['common-18', ['Ctrl+0', 'Ctrl+Numpad0'], ['Cmd+0', 'Cmd+Numpad0']],
+  ] as const)('%s keeps the main chord first and adds the aliases', (id, win, mac) => {
+    const row = findShortcut('common', id)
+    expect(row?.win).toEqual(win)
+    expect(row?.mac).toEqual(mac)
+  })
+
+  it('New and Close have no web chord, no temporary Alt+Shift stand-in, and say why', () => {
+    for (const id of ['common-01', 'common-07']) {
+      const row = findShortcut('common', id)
+      expect(row?.web).toEqual({ win: [], mac: [] })
+      expect(row?.webAlt).toBeUndefined()
+      expect(SHORTCUT_NOTES.common.some((note) => note.id === id && note.part === 'web')).toBe(true)
+    }
   })
 })

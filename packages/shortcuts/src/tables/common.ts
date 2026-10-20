@@ -326,18 +326,16 @@ const manual: readonly ShortcutAction[] = [
     win: ['Ctrl+N'],
     mac: ['Cmd+N'],
     web: { win: [], mac: [] },
-    webAlt: { win: 'Alt+Shift+N', mac: 'Alt+Shift+N' },
     match: 'key',
     guard: { noRepeat: true },
   },
-  // Close document / tab: Cmd+W on macOS (D7); the web build has Alt+Shift+W (MS web)
+  // Close document / tab: Cmd+W on macOS (D7); the web build keeps the browser's Ctrl+W
   {
     id: 'common-07',
     scope: 'common',
     win: ['Ctrl+W'],
     mac: ['Cmd+W'],
     web: { win: [], mac: [] },
-    webAlt: { win: 'Alt+Shift+W', mac: 'Alt+Shift+W' },
     match: 'key',
     guard: { noRepeat: true },
   },
@@ -355,24 +353,24 @@ const manual: readonly ShortcutAction[] = [
   {
     id: 'common-16',
     scope: 'common',
-    win: ['Ctrl+Equal'],
-    mac: ['Cmd+Equal'],
+    win: ['Ctrl+Equal', 'Ctrl+Shift+Equal', 'Ctrl+NumpadAdd'],
+    mac: ['Cmd+Equal', 'Shift+Cmd+Equal', 'Cmd+NumpadAdd'],
     match: 'key',
     guard: {},
   },
   {
     id: 'common-17',
     scope: 'common',
-    win: ['Ctrl+Minus'],
-    mac: ['Cmd+Minus'],
+    win: ['Ctrl+Minus', 'Ctrl+NumpadSubtract'],
+    mac: ['Cmd+Minus', 'Cmd+NumpadSubtract'],
     match: 'key',
     guard: {},
   },
   {
     id: 'common-18',
     scope: 'common',
-    win: ['Ctrl+0'],
-    mac: ['Cmd+0'],
+    win: ['Ctrl+0', 'Ctrl+Numpad0'],
+    mac: ['Cmd+0', 'Cmd+Numpad0'],
     match: 'key',
     guard: { noRepeat: true },
   },
@@ -404,4 +402,16 @@ export const commonShortcuts: readonly ShortcutAction[] = mergeRows(generated, m
 /** Why a manual row has no chord on a surface or platform, and remarks on manual rows:
  * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */
 export const commonManualUnmapped: readonly UnmappedShortcut[] = []
-export const commonManualNotes: readonly ShortcutNote[] = []
+export const commonManualNotes: readonly ShortcutNote[] = [
+  {
+    id: 'common-01',
+    part: 'web',
+    detail:
+      'the browser keeps Ctrl+N / Cmd+N (new window); New on the web is the Word.new route, no key',
+  },
+  {
+    id: 'common-07',
+    part: 'web',
+    detail: "the browser keeps Ctrl+W / Cmd+W (close tab); Close on the web is the browser's",
+  },
+]
