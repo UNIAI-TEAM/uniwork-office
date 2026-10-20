@@ -135,13 +135,15 @@ export interface UniworkDocsClient {
     } & UniworkListFilters,
   ): Promise<DocumentListResult>
   /** documents shared directly with the caller in one workspace (paged) */
-  listSharedWithMe(input: {
-    workspaceId: string
-    cursor?: string
-    limit?: number
-    /** UNI-1953: keep UniNote pages too (the Documents home); default files only */
-    includePages?: boolean
-  }): Promise<DocumentListResult>
+  listSharedWithMe(
+    input: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+      /** UNI-1953: keep UniNote pages too (the Documents home); default files only */
+      includePages?: boolean
+    } & UniworkListFilters,
+  ): Promise<DocumentListResult>
   /** DESKTOP-HOME: documents shared by the caller in one workspace (paged) */
   listSharedByMe(
     input: {
@@ -278,13 +280,16 @@ export interface UniworkDocsClient {
   restore(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /**
    * UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (`shelved=true`,
-   * shelved_at DESC, the flat list's cursor); only the type filter applies
+   * shelved_at DESC, the flat list's cursor); only the type filter and sort/order apply
    */
   listShelved(input: {
     workspaceId: string
     cursor?: string
     limit?: number
     format?: UniworkDocFormat
+    /** UNI-2047: SV-0 lets the shelf sort like the other lists */
+    sort?: UniworkListFilters['sort']
+    order?: UniworkListFilters['order']
   }): Promise<DocumentListResult>
   /** UNI-1961: the level fields of one document of any kind (folder/page/file) */
   documentManageRef(documentId: string): Promise<DocumentManageRef>
@@ -462,6 +467,18 @@ export function uniworkSourceId(value: string): string {
 /** UNI-1961: the sources list's filter values (D sources-schema.ts); anything else is not sent */
 const SOURCE_KINDS: ReadonlySet<string> = new Set(['chat', 'task', 'meeting', 'email'])
 const SOURCE_TYPES: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])
+/** UNI-2047: the sort keys the doclist routes accept (S3 plus the per-list SV-0..SV-3 keys) */
+const LIST_SORTS: ReadonlySet<string> = new Set([
+  'updated',
+  'name',
+  'size',
+  'editor',
+  'activity',
+  'shared',
+  'starred',
+  'deleted',
+  'shelved',
+])
 /**
  * SAVE-01 r2 (S01-R1-5): a `parent_id` that reaches the wire. Absent/null is
  * the caller's "no folder" (the field is then omitted - the absence IS the
@@ -659,6 +676,15 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       params.set('updated_from', updatedFrom)
       flatRequired = true
     }
+    // UNI-2047: sort/order/activity ride only when set and inside the server's
+    // vocabulary, so an unset call stays byte-identical to today's request
+    if (typeof input.sort === 'string' && LIST_SORTS.has(input.sort)) {
+      params.set('sort', input.sort)
+    }
+    if (input.order === 'asc' || input.order === 'desc') params.set('order', input.order)
+    if (input.activity === 'opened' || input.activity === 'edited') {
+      params.set('activity', input.activity)
+    }
     return flatRequired
   }
   /**
@@ -797,6 +823,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
+      applyListFilters(params, input)
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',
@@ -1134,7 +1161,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       params.set('limit', String(limit))
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
       // the shelf never sends parent_id or archived (shelved+archived is 400)
-      applyListFilters(params, { format: input.format })
+      applyListFilters(params, { format: input.format, sort: input.sort, order: input.order })
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',

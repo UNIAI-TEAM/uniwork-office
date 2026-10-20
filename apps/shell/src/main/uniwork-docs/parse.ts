@@ -280,6 +280,7 @@ function summaryRow(
     ...(systemKindOf(row.system_kind) ? { systemKind: 'my_folder' as const } : {}),
     ...editLockOf(row.edit_lock),
     ...shelvedFieldsOf(row),
+    ...doclistFieldsOf(row),
     ...fileSizeOf(row, kind),
     ...(row.origin === 'upload' || row.origin === 'created' ? { origin: row.origin } : {}),
   }
@@ -936,6 +937,115 @@ function shelvedFieldsOf(
     ...(typeof at === 'string' && at.length > 0 && at.length <= 64 ? { shelvedAt: at } : {}),
     ...(by ? { shelvedById: by } : {}),
     ...(row.admin_scope === true ? { adminScope: true } : {}),
+  }
+}
+
+/** a short non-empty string, or null (the lenient twin of `str`) */
+function optText(value: unknown, max: number): string | null {
+  return typeof value === 'string' && value.length > 0 && value.length <= max ? value : null
+}
+
+/**
+ * UNI-2047: `updated_by_user.avatar_url` loads with no auth header from the
+ * renderer, so only an absolute http(s) URL is kept; anything else is dropped.
+ */
+function avatarUrlOf(value: unknown): string | null {
+  const text = optText(value, 2048)
+  if (!text) return null
+  try {
+    const url = new URL(text)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? text : null
+  } catch {
+    return null
+  }
+}
+
+/** `updated_by_user{name, avatar_url}`; null (outside the org / not a person) or an odd block is absent */
+function updatedByUserOf(value: unknown): UniworkDocSummary['updatedByUser'] {
+  if (!isRecord(value)) return undefined
+  const name = optText(value.name, 256)
+  if (!name) return undefined
+  const avatarUrl = avatarUrlOf(value.avatar_url)
+  return { name, ...(avatarUrl ? { avatarUrl } : {}) }
+}
+
+/** `last_activity{kind, at}` of a recent row */
+function lastActivityOf(value: unknown): UniworkDocSummary['lastActivity'] {
+  if (!isRecord(value)) return undefined
+  const kind = value.kind
+  const at = optTimestamp(value.at)
+  if ((kind !== 'opened' && kind !== 'edited' && kind !== 'commented') || !at) return undefined
+  return { kind, at }
+}
+
+/**
+ * `shared{by, by_kind, by_name, at}` of a shared-with-me row. `at` is the only
+ * member the block cannot do without; an odd `by`/`by_kind`/`by_name` (a null
+ * name is an outsider) drops just that member.
+ */
+function sharedOf(value: unknown): UniworkDocSummary['shared'] {
+  if (!isRecord(value)) return undefined
+  const at = optTimestamp(value.at)
+  if (!at) return undefined
+  const byId = optId(value.by)
+  const byKind = optText(value.by_kind, 32)
+  const byName = optText(value.by_name, 256)
+  return {
+    ...(byId ? { byId } : {}),
+    ...(byKind ? { byKind } : {}),
+    ...(byName ? { byName } : {}),
+    at,
+  }
+}
+
+/** `share_summary{people, workspaces, links, latest_at}`: the three counts or nothing */
+function shareSummaryOf(value: unknown): UniworkDocSummary['shareSummary'] {
+  if (!isRecord(value)) return undefined
+  const people = shareCountOf(value.people)
+  const workspaces = shareCountOf(value.workspaces)
+  const links = shareCountOf(value.links)
+  if (people === null || workspaces === null || links === null) return undefined
+  const latestAt = optTimestamp(value.latest_at)
+  return { people, workspaces, links, ...(latestAt ? { latestAt } : {}) }
+}
+
+/**
+ * UNI-2047: the optional doclist fields of a list row (trash pair, owner,
+ * last editor, recent activity, sharer, share summary, star time). Each is read
+ * on its own: an odd value leaves just that key absent, never the row.
+ */
+function doclistFieldsOf(
+  row: Record<string, unknown>,
+): Pick<
+  UniworkDocSummary,
+  | 'archivedAt'
+  | 'archivedById'
+  | 'purgeAfter'
+  | 'isOwner'
+  | 'updatedByUser'
+  | 'lastActivity'
+  | 'shared'
+  | 'shareSummary'
+  | 'favoritedAt'
+> {
+  const archivedAt = optTimestamp(row.archived_at)
+  const archivedById = optId(row.archived_by)
+  const purgeAfter = optTimestamp(row.purge_after)
+  const updatedByUser = updatedByUserOf(row.updated_by_user)
+  const lastActivity = lastActivityOf(row.last_activity)
+  const shared = sharedOf(row.shared)
+  const shareSummary = shareSummaryOf(row.share_summary)
+  const favoritedAt = optTimestamp(row.favorited_at)
+  return {
+    ...(archivedAt ? { archivedAt } : {}),
+    ...(archivedById ? { archivedById } : {}),
+    ...(purgeAfter ? { purgeAfter } : {}),
+    ...(typeof row.is_owner === 'boolean' ? { isOwner: row.is_owner } : {}),
+    ...(updatedByUser ? { updatedByUser } : {}),
+    ...(lastActivity ? { lastActivity } : {}),
+    ...(shared ? { shared } : {}),
+    ...(shareSummary ? { shareSummary } : {}),
+    ...(favoritedAt ? { favoritedAt } : {}),
   }
 }
 
