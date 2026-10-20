@@ -400,7 +400,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(api.uniworkListChildren).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: 'ws-1', parentId: 'f-mine' }),
     )
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Thư mục của tôi')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Thư mục của tôi')
     expect(host.textContent).toContain('Ghi chú cá nhân.docx')
   })
 
@@ -1340,7 +1340,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
 
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Vanishing Leaf')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Vanishing Leaf')
     expect(host.querySelector('.uwf-crumbs [aria-current="page"]')?.textContent?.trim()).toBe(
       'Vanishing Leaf',
     )
@@ -1353,7 +1353,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     await flush()
 
     // Falls back to nearest live parent (Source Hub) and shows role="status" ufFolderGone notice
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Source Hub')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Source Hub')
     expect(host.querySelector('.uwf-crumbs [aria-current="page"]')?.textContent?.trim()).toBe(
       'Source Hub',
     )
@@ -1383,7 +1383,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
 
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Tài liệu của workspace')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Tài liệu của workspace')
     expect(host.querySelector('.uwf-crumbs')).toBeNull()
     const rootNotice = host.querySelector<HTMLElement>('.uwf-notice[role="status"]')
     expect(rootNotice).not.toBeNull()
@@ -1499,7 +1499,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       })
       await flush()
 
-      expect(host.querySelector('h1.dh-title')?.textContent).toBe('Source Hub')
+      expect(host.querySelector('.dh-main h1')?.textContent).toBe('Source Hub')
       expect(host.querySelector('.uwf-crumbs [aria-current="page"]')?.textContent?.trim()).toBe(
         'Source Hub',
       )
@@ -1544,7 +1544,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
 
     // Tree failed (empty index) and initialFolderId 'f-legal' returned not_found -> falls back to workspace root
     expect(sidebarSlot.querySelector('.uwf-side-state[role="alert"]')).not.toBeNull()
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Tài liệu của workspace')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Tài liệu của workspace')
     expect(host.querySelector('.uwf-crumbs')).toBeNull()
     const notice = host.querySelector<HTMLElement>('.uwf-notice[role="status"]')
     expect(notice).not.toBeNull()

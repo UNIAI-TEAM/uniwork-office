@@ -3802,6 +3802,7 @@ export function App() {
                   settings={aiSettings}
                   preset={aiPreset}
                   open={aiDockOpen}
+                  dockHidden={!!slideShow || !!presenter}
                   onExpand={toggleAi}
                   onCollapse={toggleAi}
                   onUndo={() => void undo()}

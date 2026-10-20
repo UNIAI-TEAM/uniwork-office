@@ -66,6 +66,30 @@ describe('Read Mode Esc', () => {
     expect(leave).not.toHaveBeenCalled()
   })
 
+  it('Esc leaves Read Mode on the first press with the AI panel overlay open at <= 900 px', () => {
+    const leave = vi.fn()
+    uninstall = installReadModeEscape(leave)
+    // what useOverlayDock puts on the dock while it floats over the document
+    const dock = document.createElement('div')
+    dock.className = 'ai-dock'
+    dock.setAttribute('role', 'dialog')
+    dock.setAttribute('aria-modal', 'true')
+    dock.setAttribute('data-overlay-dock', '')
+    container.appendChild(dock)
+    act(() => {
+      window.dispatchEvent(escape())
+    })
+    expect(leave).toHaveBeenCalledTimes(1)
+    // a real dialog next to it still owns Esc
+    const other = document.createElement('div')
+    other.setAttribute('role', 'dialog')
+    container.appendChild(other)
+    act(() => {
+      window.dispatchEvent(escape())
+    })
+    expect(leave).toHaveBeenCalledTimes(1)
+  })
+
   it('Esc inside a [data-esc-local] surface (comments composer) is left to that surface', () => {
     const leave = vi.fn()
     uninstall = installReadModeEscape(leave)

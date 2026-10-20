@@ -9,6 +9,7 @@ import {
   type AiModelPickerBridge,
   UniAiMark,
   composerNoteFor,
+  useOverlayDock,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -360,6 +361,7 @@ export function AiPanel({
   readOnly = false,
   onCollapse,
   open = true,
+  dockHidden = false,
   onExpand,
 }: {
   deps: HtmlAiDeps
@@ -377,6 +379,8 @@ export function AiPanel({
   onCollapse: () => void
   /** false while the dock is collapsed (the panel stays mounted, hidden) */
   open?: boolean
+  /** the dock is hidden by the frame (presenting): it is not an active dialog, whatever `open` says */
+  dockHidden?: boolean
   /** expand the dock: a send refused while collapsed opens it so the reason can be shown */
   onExpand?: () => void
 }): ReactElement {
@@ -576,6 +580,13 @@ export function AiPanel({
   const [panelWidth, setPanelWidth] = useState(() => clampPanelWidth(preferredWidthRef.current))
   const [resizing, setResizing] = useState(false)
   const asideRef = useRef<HTMLElement>(null)
+  // under 900 px the dock overlays the document: modal dialog, composer focus, Esc, focus return
+  useOverlayDock({
+    rootRef: asideRef,
+    open: open && !dockHidden,
+    onClose: onCollapse,
+    label: 'UniAI',
+  })
   const mountedRef = useRef(true)
 
   useEffect(() => {

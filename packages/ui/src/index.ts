@@ -124,7 +124,15 @@ export { AiErrorAction, type AiErrorActionProps } from './AiErrorAction'
 export { AiSaveDraftCard, type AiSaveDraftCardProps } from './AiSaveDraftCard'
 export { AI_SAVE_DRAFT_LABELS, type AiSaveDraftLabels } from './strings-ai-save-draft'
 export { ImageViewer, type ImageViewerLabels } from './image-viewer'
-export { trapTab, useModalKeys } from './modal-keys'
+export { focusableIn, trapTab, useModalKeys } from './modal-keys'
+export {
+  OVERLAY_DOCK_MAX_PX,
+  overlayDockQuery,
+  shouldCloseOnEscape,
+  shouldFocusComposer,
+  useOverlayDock,
+  type OverlayDockOptions,
+} from './use-overlay-dock'
 export {
   removeBackground,
   sampleBackgroundColors,

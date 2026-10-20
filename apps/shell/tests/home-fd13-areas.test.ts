@@ -1651,7 +1651,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       alphaCard.click()
     })
     await flush()
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Alpha Folder')
 
     const tabs = host.querySelectorAll<HTMLButtonElement>(
       '[role="tablist"][aria-label="Area"] [role="tab"]',
@@ -1667,7 +1667,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       tabs[0]!.click() // back to UniWork
     })
     await flush()
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Alpha Folder')
 
     // a non-workspace sub-view survives the same round trip
     const trashNav = host.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!
@@ -1675,7 +1675,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       trashNav.click()
     })
     await flush()
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Trash')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Trash')
 
     await act(async () => {
       tabs[1]!.click()
@@ -1685,7 +1685,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       tabs[0]!.click()
     })
     await flush()
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Trash')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Trash')
   })
   it('resets the UniWork sub-view and open folder to the workspace root on a workspace switch (VDH-7)', async () => {
     await mountHome()
@@ -1698,7 +1698,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       alphaCard.click()
     })
     await flush()
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Alpha Folder')
 
     await act(async () => {
       host.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!.click()
@@ -1719,7 +1719,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(
       host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
     ).toBe('workspace')
-    expect(host.querySelector('h1.dh-title')?.textContent).not.toBe('Alpha Folder')
+    expect(host.querySelector('.dh-main h1')?.textContent).not.toBe('Alpha Folder')
     expect(host.textContent).toContain('Marketing Plan.docx')
     expect(api.uniworkListChildren).toHaveBeenLastCalledWith(
       expect.objectContaining({ workspaceId: 'ws-2', parentId: null }),
@@ -1738,7 +1738,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       alphaCard.click()
     })
     await flush()
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Alpha Folder')
 
     await act(async () => {
       host.querySelector<HTMLButtonElement>('.nav-item[data-nav="trash"]')!.click()
@@ -1772,7 +1772,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(
       host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
     ).toBe('workspace')
-    expect(host.querySelector('h1.dh-title')?.textContent).not.toBe('Alpha Folder')
+    expect(host.querySelector('.dh-main h1')?.textContent).not.toBe('Alpha Folder')
     expect(host.textContent).toContain('Root Cloud Doc.docx')
 
     // A signed-in -> signed-in account switch clears them the same way
@@ -1783,7 +1783,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       alphaCard2.click()
     })
     await flush()
-    expect(host.querySelector('h1.dh-title')?.textContent).toBe('Alpha Folder')
+    expect(host.querySelector('.dh-main h1')?.textContent).toBe('Alpha Folder')
 
     const account3: AccountStatus = {
       ...account2,
@@ -1797,7 +1797,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(
       host.querySelector<HTMLElement>('.nav-item[aria-current="page"]')?.getAttribute('data-nav'),
     ).toBe('workspace')
-    expect(host.querySelector('h1.dh-title')?.textContent).not.toBe('Alpha Folder')
+    expect(host.querySelector('.dh-main h1')?.textContent).not.toBe('Alpha Folder')
     expect(host.textContent).toContain('Root Cloud Doc.docx')
   })
 })

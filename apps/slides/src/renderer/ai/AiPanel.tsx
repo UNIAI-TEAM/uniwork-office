@@ -13,6 +13,7 @@ import {
   composerNoteFor,
   isComposerPopupOpen,
   useUniworkDisclosureAck,
+  useOverlayDock,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -338,6 +339,8 @@ interface AiPanelProps {
   } | null
   /** false shows only the collapsed rail; the component stays mounted so panel state survives */
   open?: boolean
+  /** the dock is hidden by the frame (slideshow / presenter view): it is not an active dialog, whatever `open` says */
+  dockHidden?: boolean
   /** expand from the collapsed rail */
   onExpand?: () => void
   onCollapse?: () => void
@@ -449,6 +452,7 @@ export function AiPanel({
   settings,
   preset,
   open = true,
+  dockHidden = false,
   onExpand,
   onCollapse,
   onPathChange,
@@ -569,6 +573,13 @@ export function AiPanel({
   const preferredWidthRef = useRef(PANEL_WIDTH_DEFAULT)
   const [panelWidth, setPanelWidth] = useState(() => clampPanelWidth(preferredWidthRef.current))
   const asideRef = useRef<HTMLElement>(null)
+  // under 900 px the dock overlays the document: modal dialog, composer focus, Esc, focus return
+  useOverlayDock({
+    rootRef: asideRef,
+    open: open && !dockHidden,
+    onClose: () => onCollapse?.(),
+    label: t('aiPanelTitle'),
+  })
 
   // The .ai-dock wrapper owns the animated width (Excel-parity 180ms slide);
   // it tracks the resizable panel width through this variable

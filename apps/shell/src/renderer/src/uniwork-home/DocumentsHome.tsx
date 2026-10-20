@@ -1300,6 +1300,38 @@ export function DocumentsHome({
     return subView === 'my-folder' ? resolvedMyFolderId : null
   }
 
+  /** the open folder's own menu in its header (UNI-1979): the card menu minus the card, no Share */
+  const openFolderMenu = (id: string): FolderMenuItem[] => {
+    const node = index.get(id)
+    const items: FolderMenuItem[] = [
+      {
+        id: 'new',
+        label: t('ufNewSubfolder'),
+        onSelect: () => folderActions.openCreate(id, true),
+      },
+    ]
+    if (!node || id === resolvedMyFolderId) return items
+    items.push(
+      {
+        id: 'rename',
+        label: t('ufRename'),
+        onSelect: () => folderActions.openRename({ id, title: node.title }),
+      },
+      {
+        id: 'move',
+        label: t('ufMoveTo'),
+        onSelect: () =>
+          folderActions.startMove({
+            id,
+            kind: 'folder',
+            parentId: node.parentId,
+            title: node.title,
+          }),
+      },
+    )
+    return items
+  }
+
   const docMenuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] => {
     const items: FolderMenuItem[] = []
     const archived = doc.archived === true || subView === 'trash'
@@ -1578,6 +1610,9 @@ export function DocumentsHome({
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const nameDialog = folderActions.nameDialog
+  // an open folder (not searching): the breadcrumb leaf is its one title, the actions share the row
+  const folderHeader =
+    subView === 'workspace' && folderId !== null && !query && shownPath.length > 0
 
   return (
     <div
@@ -1590,14 +1625,58 @@ export function DocumentsHome({
         : sidebarContent}
 
       <div className="dh-main uwf-main">
-        {subView === 'workspace' && folderId !== null && !query && (
-          <BrowserCrumbs path={shownPath} onOpen={openFolderInWorkspace} />
-        )}
-
-        <div className="dh-toolbar">
-          <div className="dh-title-group">
-            <h1 className="dh-title">{currentHeading}</h1>
-          </div>
+        <div className={`dh-toolbar${folderHeader ? ' dh-toolbar-folder' : ''}`}>
+          {folderHeader && folderId !== null ? (
+            <BrowserCrumbs
+              path={shownPath}
+              onOpen={openFolderInWorkspace}
+              leafActions={
+                <>
+                  {folderId !== resolvedMyFolderId && (
+                    <button
+                      type="button"
+                      className="uwf-crumb-rename"
+                      aria-label={t('ufRename')}
+                      title={t('ufRename')}
+                      onClick={() =>
+                        folderActions.openRename({
+                          id: folderId,
+                          title: index.get(folderId)?.title ?? currentHeading,
+                        })
+                      }
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                  )}
+                  <FolderMenu
+                    label={t('ufActionsFor', { name: currentHeading })}
+                    items={openFolderMenu(folderId)}
+                    dataFor="open-folder"
+                    tabbable
+                    open={openMenuId === 'open-folder'}
+                    onOpenChange={(o) => setOpenMenuId(o ? 'open-folder' : null)}
+                  />
+                </>
+              }
+            />
+          ) : (
+            <div className="dh-title-group">
+              <h1 className="dh-title">{currentHeading}</h1>
+            </div>
+          )}
           {workspaces.length > 0 && (
             <select
               className="home-uw-ws dh-ws-select"
@@ -1612,7 +1691,7 @@ export function DocumentsHome({
               ))}
             </select>
           )}
-          <div className="dh-toolbar-spacer" />
+          {!folderHeader && <div className="dh-toolbar-spacer" />}
           <div className="dh-search-box" role="search">
             <svg
               className="dh-search-icon"
@@ -1656,40 +1735,42 @@ export function DocumentsHome({
               </button>
             )}
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary dh-toolbar-btn dh-btn-upload"
-            onClick={() => setUploadModal(true)}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+          <div className="dh-toolbar-actions">
+            <button
+              type="button"
+              className="btn btn-secondary dh-toolbar-btn dh-btn-upload"
+              onClick={() => setUploadModal(true)}
             >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            {t('uhUpload')}
-          </button>
-          <NewMenu
-            label={t('uhCreateNew')}
-            hasFolderRow={hasFolderRow}
-            unavailable={unavailableKinds}
-            unavailableHint={t('uhCreateUnavailableHint')}
-            busy={creating}
-            share={{ checked: shareWithWorkspace, onChange: setShareWithWorkspace }}
-            onPick={(kind) => {
-              if (kind === 'folder') createFolderHere()
-              else void createNow(kind, false)
-            }}
-          />
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              {t('uhUpload')}
+            </button>
+            <NewMenu
+              label={t('uhCreateNew')}
+              hasFolderRow={hasFolderRow}
+              unavailable={unavailableKinds}
+              unavailableHint={t('uhCreateUnavailableHint')}
+              busy={creating}
+              share={{ checked: shareWithWorkspace, onChange: setShareWithWorkspace }}
+              onPick={(kind) => {
+                if (kind === 'folder') createFolderHere()
+                else void createNow(kind, false)
+              }}
+            />
+          </div>
         </div>
 
         {subView !== 'trash' && subView !== 'archive' && (

@@ -6,7 +6,9 @@ import {
   type AiModelPickerBridge,
   UniAiMark,
   composerNoteFor,
+  useOverlayDock,
 } from '@genoffice/ui'
+import { NARROW_VIEWPORT_MAX_PX } from '../narrow-layout'
 import React, { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import {
@@ -414,6 +416,14 @@ export function AiChatPanel({
   const stickToBottomRef = useRef(true)
   const [dragOver, setDragOver] = useState(false)
   const asideRef = useRef<HTMLElement | null>(null)
+  // under 719 px the panel overlays the grid (styles.css): modal dialog, composer focus, Esc, focus return
+  useOverlayDock({
+    rootRef: asideRef,
+    open: isOpen,
+    onClose: onCollapse,
+    label: 'UniAI',
+    maxWidthPx: NARROW_VIEWPORT_MAX_PX,
+  })
   const [resizing, setResizing] = useState(false)
   /** data-URL previews for image attachments, keyed by path (Genspark composer thumbnails) */
   const [attachmentPreviews, setAttachmentPreviews] = useState<Record<string, string>>({})

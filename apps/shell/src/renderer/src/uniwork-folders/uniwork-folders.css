@@ -389,6 +389,91 @@
   color: var(--text-muted);
 }
 
+/* UNI-1979: the open folder's header row. The crumbs share the toolbar with the
+   search and the create actions, never wrap, and give up width in order: the
+   home crumb and the ancestors first (shrink 1000 against the leaf's 1, down to
+   a floor), the leaf last. */
+.dh-toolbar .uwf-crumbs ol {
+  flex-wrap: nowrap;
+}
+
+.uwf-crumb-root {
+  flex: 0 1000 auto;
+  min-width: 2.25rem;
+}
+
+.uwf-crumb-ancestor {
+  flex: 0 1000 auto;
+  min-width: 2.5rem;
+}
+
+.uwf-crumb-ancestor .uwf-crumb-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.uwf-crumb-leaf {
+  flex: 0 1 auto;
+  min-width: 2.5rem;
+}
+
+/* in the header row the leaf also keeps room for the pencil and the "…" menu
+   (2 x 28px + gaps), so they never slide under a neighbour */
+.dh-toolbar .uwf-crumb-leaf {
+  min-width: calc(2.5rem + 60px);
+}
+
+/* V1979-1: the crumbs box floor for 3 and 4 crumbs (home + ancestors + leaf + 2px
+   gaps); the two-crumb floor is on .dh-toolbar-folder > .uwf-crumbs. The :has()
+   rules out-rank that rule whichever stylesheet loads last. */
+.dh-toolbar.dh-toolbar-folder > .uwf-crumbs:has(li:nth-child(3)) {
+  min-width: calc(2.25rem + 5rem + 60px + 4px);
+}
+
+.dh-toolbar.dh-toolbar-folder > .uwf-crumbs:has(li:nth-child(4)) {
+  min-width: calc(2.25rem + 7.5rem + 60px + 6px);
+}
+
+.uwf-crumb-heading {
+  flex: 0 1 auto;
+  min-width: 2.5rem;
+  max-width: none;
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.uwf-crumb-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.uwf-crumb-rename {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.uwf-crumb-rename:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.uwf-crumb-rename:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* ── search chips ── */
 
 .uwf-chips {
@@ -518,9 +603,39 @@
   .uwf-sort,
   .uwf-chip,
   .uwf-crumb-btn,
+  .uwf-crumb-rename,
   .uwf-new-folder,
   .uwf-location-btn {
     min-height: 44px;
+  }
+
+  /* the header's pencil and "…" are 44 x 44 targets side by side (web
+     pointer-coarse:min-h-11 min-w-11); the menu wrapper grows with its button so
+     the absolutely positioned button never spills onto the pencil */
+  .uwf-crumb-rename {
+    min-width: 44px;
+  }
+
+  .uwf-crumb .uw-row-menu.uwf-menu {
+    width: 44px;
+    height: 44px;
+  }
+
+  .dh-toolbar .uwf-crumb-leaf {
+    min-width: calc(2.5rem + 92px);
+  }
+
+  /* the same box floors with the leaf's 92px reserve */
+  .dh-toolbar.dh-toolbar-folder > .uwf-crumbs {
+    min-width: calc(2.25rem + 2.5rem + 92px + 2px);
+  }
+
+  .dh-toolbar.dh-toolbar-folder > .uwf-crumbs:has(li:nth-child(3)) {
+    min-width: calc(2.25rem + 5rem + 92px + 4px);
+  }
+
+  .dh-toolbar.dh-toolbar-folder > .uwf-crumbs:has(li:nth-child(4)) {
+    min-width: calc(2.25rem + 7.5rem + 92px + 6px);
   }
 
   .uwf-tree .uwf-tree-row .uw-row-menu.uwf-menu .uw-row-menu-btn,

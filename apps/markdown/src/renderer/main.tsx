@@ -19,6 +19,7 @@ import 'katex/dist/katex.min.css'
 import './styles.css'
 // after styles.css: the shared AI panel skin overrides the per-app panel look
 import '@genoffice/ui/ai-panel.css'
+import '@genoffice/ui/ai-dock-narrow.css'
 import './markdown-themes.css'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
 import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
