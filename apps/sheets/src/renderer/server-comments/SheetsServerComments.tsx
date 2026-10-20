@@ -80,11 +80,16 @@ export interface SheetsServerCommentsProps {
   store?: ServerAnchorStore
 }
 
+function versionOf(c: CollabComment): string | null {
+  return typeof c.anchor_version_id === 'string' ? c.anchor_version_id : null
+}
+
 function rootsOf(ctl: CollabController): TrackedRoot[] {
   return [...ctl.threads, ...ctl.resolved].map((t) => ({
     id: t.id,
     anchor: t.root.anchor,
     anchor_state: t.root.anchor_state,
+    anchor_version_id: versionOf(t.root),
     deleted: t.deleted,
   }))
 }
@@ -93,7 +98,12 @@ function rootsOf(ctl: CollabController): TrackedRoot[] {
 function rootsFromComments(comments: readonly CollabComment[]): TrackedRoot[] {
   return comments
     .filter((c) => !c.parent_id && !c.deleted_at)
-    .map((c) => ({ id: c.id, anchor: c.anchor, anchor_state: c.anchor_state }))
+    .map((c) => ({
+      id: c.id,
+      anchor: c.anchor,
+      anchor_state: c.anchor_state,
+      anchor_version_id: versionOf(c),
+    }))
 }
 
 function threadOf(ctl: CollabController, id: string): CollabThreadView | undefined {
@@ -154,10 +164,26 @@ function InFileList(p: {
 export function SheetsServerComments(p: SheetsServerCommentsProps) {
   const { mode, view, lang, panelOpen } = p
   const store = p.store ?? serverAnchorStore
-  const source = useMemo(
-    () => createUniworkCommentsSource(mode.api, mode.path, 'comment'),
-    [mode.api, mode.path],
-  )
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const source = useMemo(() => {
+    const base = createUniworkCommentsSource(mode.api, mode.path, 'comment')
+    return {
+      ...base,
+      // a root made here is anchored on the live selection: it is in the live coordinates from the start
+      create: async (input: Parameters<typeof base.create>[0]) => {
+        const created = await base.create(input)
+        const root = created.comment
+        if (input.anchor && !root.parent_id) {
+          store.trackCreated(
+            { id: root.id, anchor: root.anchor, anchor_state: root.anchor_state },
+            viewRef.current.sheets(),
+          )
+        }
+        return created
+      },
+    }
+  }, [mode.api, mode.path, store])
   const platform = useMemo<CollabHostState['platform']>(
     () => (typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? 'mac' : 'other'),
     [],
@@ -175,8 +201,6 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   )
   const strings = useMemo(() => collabStrings(lang), [lang])
 
-  const viewRef = useRef(view)
-  viewRef.current = view
   // a new adapter object only when a location moved or a listed anchor changed (kit: stable adapter)
   const storeVersion = useSyncExternalStore(store.subscribe, store.getVersion)
   const adapter = useMemo(
@@ -209,7 +233,9 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   useEffect(() => {
     versionRef.current = mode.versionId
     setKnownVersion(mode.versionId)
-  }, [mode.versionId])
+    // roots anchored on this version are taken through the edits made from here on
+    store.markVersion(mode.versionId)
+  }, [mode.versionId, store])
 
   // after each Save receipt: one anchor map for every located (or lost) root, built from a fresh list
   // (with the panel closed nothing else lists, so a comment made since the first list would be missed).
@@ -249,6 +275,7 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
       if (payload.path && mode.path && payload.path !== mode.path) return
       versionRef.current = payload.versionId
       setKnownVersion(payload.versionId)
+      store.markVersion(payload.versionId)
       round.pending = payload.versionId
       if (!round.running) void drain()
     })
