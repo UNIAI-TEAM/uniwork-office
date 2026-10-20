@@ -20,6 +20,7 @@ import { pathKey } from '../../shared/path-key'
 import { DEFAULT_MAX_DOCUMENT_BYTES, formatSizeMB } from '../../shared/size-format'
 import type { AccountView } from './account-model'
 import { pickActiveWorkspace } from './active-workspace'
+import { formatListDate } from './doclist/format'
 import type { StringKey, TFunc } from './locale'
 
 /**
@@ -1573,22 +1574,15 @@ export function formatSaveTime(value: string, locale: string, now: Date = new Da
   ).format(at)
 }
 
-/** "10:42" for today, a medium date otherwise; '' when the server sent no usable time */
+/**
+ * A document's time as every Documents list reads it (the shared list date: clock today,
+ * "Yesterday, 16:30", `18/10`, `18/10/2025`); '' when the server sent no usable time so the
+ * row simply shows no meta
+ */
 export function formatWhen(iso: string, locale: string, now: Date = new Date()): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  try {
-    return new Intl.DateTimeFormat(
-      locale,
-      sameDay ? { timeStyle: 'short' } : { dateStyle: 'medium' },
-    ).format(date)
-  } catch {
-    return date.toISOString().slice(0, 10)
-  }
+  return formatListDate(date, now, locale)
 }
 
 /** "Updated 10:42 by Linh" for a picker row ('' when there is no time to show) */
