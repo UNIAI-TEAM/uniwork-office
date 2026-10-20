@@ -157,10 +157,26 @@ describe('installUniworkModuleSeams forwards refuseLockedPath (R1-be-3)', () => 
     expect(read('src/main/uniwork-docs/modules.ts')).toMatch(
       /refuseOpen: \(path: string\) => seam\.refuseLockedPath\(path\)/,
     )
-    // G8-02: the same installation carries the comment-author source
+    // G8-02: the same installation carries the comment-author source (UNI-1993: and the source views)
     expect(read('src/main/index.ts')).toMatch(
-      /installUniworkModuleSeams\(\s*uniworkService,\s*createCommentAuthorResolver\(\{\s*isBound: \(path\) => uniworkService\.isBound\(path\),\s*displayName: uniworkAccountDisplayName,\s*\}\),\s*\)/,
+      /installUniworkModuleSeams\(\s*uniworkService,\s*createCommentAuthorResolver\(\{\s*isBound: \(path\) => uniworkService\.isBound\(path\),\s*displayName: uniworkAccountDisplayName,\s*\}\),(?:(?:\s*\/\/[^\n]*)*\s*\{\s*registry: uniworkService\.sourceViews,\s*onSourceSave: \(path\) => sourceViewHint\(path\),\s*onSourceLocked: \(path\) => sourceViewHint\(path, true\),\s*\},)\s*\)/,
     )
+    // the one hint both entries share: a tab strip band, or a native box on a detached window
+    expect(read('src/main/index.ts')).toMatch(
+      /const sourceViewHint = createSourceSaveHint\(\{\s*hostForPath: sourceViewHostForPath,/,
+    )
+  })
+
+  it('will-quit disposes the source views after the edit-lock hold branch, before stopUniworkAccount', () => {
+    const source = read('src/main/index.ts')
+    const will = source.slice(source.indexOf("app.on('will-quit'"))
+    const hold = will.indexOf('quitAgainAfterWillQuit')
+    const dispose = will.indexOf('uniworkDocs?.service.disposeSourceViews()')
+    const stop = will.indexOf('stopUniworkAccount()')
+    expect(hold).toBeGreaterThan(-1)
+    // a held quit re-enters will-quit; the decrypted copies go on the pass that really quits
+    expect(dispose).toBeGreaterThan(hold)
+    expect(dispose).toBeLessThan(stop)
   })
 })
 

@@ -200,4 +200,13 @@ export const de = {
   uwLockLostHeldBy: '{name} bearbeitet gerade. Ihre ungespeicherten Änderungen sind noch da.',
   uwLockAcquireFailed:
     'Bearbeitungszugriff konnte nicht angefordert werden. Versuchen Sie es in ein paar Minuten erneut.',
+  uwChipSourceView: 'Nur Ansicht · Aus {origin}',
+  uwTipSourceView:
+    'Diese Datei ist in {origin}{parent} angehängt. Änderungen werden nicht gespeichert. Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
+  uwSourceViewSaveHint: 'Diese Datei ist nur zur Ansicht — Änderungen werden nicht gespeichert.',
+  uwSourceViewCopyHint: 'Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Aufgaben',
+  uwSourceOriginMeeting: 'Meetings',
+  uwSourceOriginEmail: 'E-Mail',
 } satisfies Record<keyof typeof zh, string>

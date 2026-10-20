@@ -192,4 +192,13 @@ export const id = {
   uwLockLostHeldBy:
     '{name} sedang mengedit sekarang. Perubahan Anda yang belum disimpan masih di sini.',
   uwLockAcquireFailed: 'Tidak dapat memperoleh akses pengeditan. Coba lagi dalam beberapa menit.',
+  uwChipSourceView: 'Hanya lihat · Dari {origin}',
+  uwTipSourceView:
+    'File ini dilampirkan di {origin}{parent}. Perubahan tidak akan disimpan. Untuk mendapatkan salinan, gunakan Unduh di daftar Dokumen.',
+  uwSourceViewSaveHint: 'File ini hanya untuk dilihat — perubahan tidak disimpan.',
+  uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Unduh di daftar Dokumen.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tugas',
+  uwSourceOriginMeeting: 'Rapat',
+  uwSourceOriginEmail: 'Email',
 } satisfies Record<keyof typeof zh, string>

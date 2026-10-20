@@ -195,4 +195,13 @@ export const pt = {
     '{name} está a editar agora. As suas alterações não guardadas ainda estão aqui.',
   uwLockAcquireFailed:
     'Não foi possível obter acesso de edição. Tente novamente dentro de alguns minutos.',
+  uwChipSourceView: 'Somente leitura · De {origin}',
+  uwTipSourceView:
+    'Este arquivo está anexado em {origin}{parent}. As alterações não serão salvas. Para obter uma cópia, use Baixar na lista de documentos.',
+  uwSourceViewSaveHint: 'Este arquivo é somente leitura — as alterações não são salvas.',
+  uwSourceViewCopyHint: 'Para obter uma cópia, use Baixar na lista de documentos.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tarefas',
+  uwSourceOriginMeeting: 'Reuniões',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>

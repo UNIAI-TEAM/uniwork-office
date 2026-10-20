@@ -184,4 +184,13 @@ export const he = {
   uwLockLostGeneric: 'אתה כבר לא עורך. השינויים שלך שלא נשמרו עדיין כאן.',
   uwLockLostHeldBy: '{name} עורך כעת. השינויים שלך שלא נשמרו עדיין כאן.',
   uwLockAcquireFailed: 'לא ניתן היה לקבל גישת עריכה. נסה שוב בעוד כמה דקות.',
+  uwChipSourceView: 'לצפייה בלבד · מתוך {origin}',
+  uwTipSourceView:
+    'קובץ זה מצורף ב{origin}{parent}. שינויים לא יישמרו. כדי לקבל עותק, השתמשו בהורדה ברשימת המסמכים.',
+  uwSourceViewSaveHint: 'קובץ זה לצפייה בלבד — שינויים לא נשמרים.',
+  uwSourceViewCopyHint: 'כדי לקבל עותק, השתמשו בהורדה ברשימת המסמכים.',
+  uwSourceOriginChat: 'צ׳אט',
+  uwSourceOriginTask: 'משימות',
+  uwSourceOriginMeeting: 'פגישות',
+  uwSourceOriginEmail: 'אימייל',
 } satisfies Record<keyof typeof zh, string>

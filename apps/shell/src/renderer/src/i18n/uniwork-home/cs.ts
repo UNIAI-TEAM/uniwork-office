@@ -126,6 +126,15 @@ export const cs = {
   uhSourceDownloaded: 'Staženo: {name}',
   uhSourceShowInFolder: 'Zobrazit ve složce',
   uhSourceDownloadFailed: 'Soubor se nepodařilo stáhnout. Zkuste to znovu.',
+  uhSourceOpen: 'Otevřít (pouze pro čtení)',
+  uhSourceOpening: 'Otevírá se {name}…',
+  uhSourceOpenFailed: 'Soubor se nepodařilo otevřít. Zkuste to znovu.',
+  uhSourceOpenGone: 'Soubor se nepodařilo otevřít: byl smazán nebo k němu už nemáte přístup.',
+  uhSourceOpenOffline:
+    'Soubor se nepodařilo otevřít, protože služba UniWork není dostupná. Zkontrolujte připojení a zkuste to znovu.',
+  uhSourceOpenTooLarge:
+    'Tento soubor je příliš velký na otevření v aplikaci. Stáhněte si ho místo toho.',
+  uhSourceOpenRetry: 'Zkusit znovu',
   uhColSize: 'Velikost',
   uhGroupBy: 'Seskupit podle',
   uhGroupByFolder: 'Složka',

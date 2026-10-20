@@ -201,4 +201,15 @@ export const fr = {
     '{name} modifie actuellement. Vos changements non enregistrés sont toujours là.',
   uwLockAcquireFailed:
     'Impossible d’obtenir l’accès en modification. Réessayez dans quelques minutes.',
+  uwChipSourceView: 'Lecture seule · Depuis {origin}',
+  uwTipSourceView:
+    'Ce fichier est joint dans {origin}{parent}. Les modifications ne seront pas enregistrées. Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
+  uwSourceViewSaveHint:
+    'Ce fichier est en lecture seule — les modifications ne sont pas enregistrées.',
+  uwSourceViewCopyHint:
+    'Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tâches',
+  uwSourceOriginMeeting: 'Réunions',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>

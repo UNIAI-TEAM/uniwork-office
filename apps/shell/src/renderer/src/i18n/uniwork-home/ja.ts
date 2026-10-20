@@ -126,6 +126,15 @@ export const ja = {
   uhSourceDownloaded: '{name} をダウンロードしました',
   uhSourceShowInFolder: 'フォルダーに表示',
   uhSourceDownloadFailed: 'ファイルをダウンロードできませんでした。もう一度お試しください。',
+  uhSourceOpen: '開く（閲覧のみ）',
+  uhSourceOpening: '{name} を開いています…',
+  uhSourceOpenFailed: 'ファイルを開けませんでした。もう一度お試しください。',
+  uhSourceOpenGone: 'ファイルを開けませんでした。削除されたか、閲覧する権限がなくなりました。',
+  uhSourceOpenOffline:
+    'UniWork に接続できないため、ファイルを開けませんでした。接続を確認して、もう一度お試しください。',
+  uhSourceOpenTooLarge:
+    'このファイルは大きすぎて、アプリでは開けません。代わりにダウンロードしてください。',
+  uhSourceOpenRetry: 'もう一度試す',
   uhColSize: 'サイズ',
   uhGroupBy: 'グループ化',
   uhGroupByFolder: 'フォルダー',

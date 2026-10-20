@@ -126,6 +126,16 @@ export const fr = {
   uhSourceDownloaded: '{name} téléchargé',
   uhSourceShowInFolder: 'Afficher dans le dossier',
   uhSourceDownloadFailed: 'Impossible de télécharger le fichier. Réessayez.',
+  uhSourceOpen: 'Ouvrir (lecture seule)',
+  uhSourceOpening: 'Ouverture de {name}…',
+  uhSourceOpenFailed: "Impossible d'ouvrir le fichier. Réessayez.",
+  uhSourceOpenGone:
+    "Impossible d'ouvrir le fichier : il a été supprimé ou vous n'y avez plus accès.",
+  uhSourceOpenOffline:
+    "Impossible d'ouvrir le fichier car UniWork est injoignable. Vérifiez votre connexion et réessayez.",
+  uhSourceOpenTooLarge:
+    "Ce fichier est trop volumineux pour être ouvert dans l'application. Téléchargez-le plutôt.",
+  uhSourceOpenRetry: 'Réessayer',
   uhColSize: 'Taille',
   uhGroupBy: 'Regrouper par',
   uhGroupByFolder: 'Dossier',

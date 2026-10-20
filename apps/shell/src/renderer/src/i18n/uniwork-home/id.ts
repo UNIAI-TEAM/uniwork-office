@@ -125,6 +125,15 @@ export const id = {
   uhSourceDownloaded: '{name} diunduh',
   uhSourceShowInFolder: 'Tampilkan di folder',
   uhSourceDownloadFailed: 'Tidak dapat mengunduh file. Coba lagi.',
+  uhSourceOpen: 'Buka (hanya lihat)',
+  uhSourceOpening: 'Membuka {name}…',
+  uhSourceOpenFailed: 'Tidak dapat membuka file. Coba lagi.',
+  uhSourceOpenGone:
+    'Tidak dapat membuka file: file telah dihapus atau Anda tidak lagi memiliki akses.',
+  uhSourceOpenOffline:
+    'Tidak dapat membuka file karena UniWork tidak dapat dijangkau. Periksa koneksi Anda lalu coba lagi.',
+  uhSourceOpenTooLarge: 'File ini terlalu besar untuk dibuka di aplikasi. Unduh saja.',
+  uhSourceOpenRetry: 'Coba lagi',
   uhColSize: 'Ukuran',
   uhGroupBy: 'Kelompokkan menurut',
   uhGroupByFolder: 'Folder',

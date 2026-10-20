@@ -116,6 +116,10 @@ function wired(
     /** the deployment this build runs against (default: the last owner's) */
     activeDeployment?: string | null
     pickSaveDialog?: () => Promise<string | null>
+    /** UNI-1993: the one startup sweep shared with the source-view opener */
+    startupSweep?: Promise<unknown>
+    sweepSources?: () => Promise<void>
+    dropSources?: () => Promise<void>
   } = {},
 ) {
   const storeRoot = join(base, 'store')
@@ -301,6 +305,9 @@ function wired(
     pickSaveDialog: options.pickSaveDialog ?? (async () => null),
     pushChanged: () => undefined,
     now: () => clock,
+    ...(options.startupSweep ? { startupSweep: options.startupSweep } : {}),
+    ...(options.sweepSources ? { sweepSources: options.sweepSources } : {}),
+    ...(options.dropSources ? { dropSources: options.dropSources } : {}),
   })
   return {
     ...center,
@@ -909,5 +916,58 @@ describe('A106 (UNI-1362): wired Sync Center refuses saveMyCopy targets inside t
     })
     expect(await h.controller.saveMyCopy('doc-1')).toEqual({ ok: false, code: 'other' })
     expect(existsSync(insideTarget)).toBe(false)
+  })
+})
+
+describe('UNI-1993 C1: the source views ride the sync center cadence', () => {
+  it('every poll also sweeps the closed source tabs, and a failing sweep never breaks the poll', async () => {
+    const sweepSources = vi.fn(async () => undefined)
+    const h = wired({ docs: [{ key: 'doc-1' }], sweepSources })
+    await h.notePoll(true)
+    await h.notePoll(undefined)
+    expect(sweepSources).toHaveBeenCalledTimes(2)
+
+    const failing = wired({
+      docs: [{ key: 'doc-1' }],
+      sweepSources: async () => {
+        throw new Error('disk')
+      },
+    })
+    await expect(failing.notePoll(true)).resolves.toBeUndefined()
+  })
+
+  it('a changed account drops the source views once; the same account again does not', async () => {
+    const dropSources = vi.fn(async () => undefined)
+    const h = wired({ docs: [{ key: 'doc-1' }], dropSources })
+    await h.noteAccount()
+    const first = dropSources.mock.calls.length
+    await h.noteAccount()
+    expect(dropSources).toHaveBeenCalledTimes(first)
+    h.setScope(null)
+    await h.noteAccount()
+    expect(dropSources).toHaveBeenCalledTimes(first + 1)
+    h.setScope({ deploymentId: 'dep-1', accountId: 'acc-2' })
+    await h.noteAccount()
+    expect(dropSources).toHaveBeenCalledTimes(first + 2)
+  })
+
+  it('a startup sweep handed in is THE sweep: the center does not remove the root a second time', async () => {
+    const root = join(base, 'userData', 'uniwork-drafts-preview')
+    const survivor = join(root, 'sources-now', 'ab', 'Plan.docx')
+    mkdirSync(join(root, 'sources-now', 'ab'), { recursive: true })
+    writeFileSync(survivor, 'written after the shared sweep')
+    wired({ docs: [{ key: 'doc-1' }], startupSweep: Promise.resolve() })
+    // an own removal of the root would take this file (a source written after the shared sweep)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(existsSync(survivor)).toBe(true)
+  })
+
+  it('wiring.ts builds one startup sweep and hands the same promise to the service and the center', () => {
+    const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
+    expect(source).toContain('startPreviewStartupSweep(')
+    expect(source).toContain('sourceViewStartupSweep: previewStartupSweep')
+    expect(source).toContain('startupSweep: previewStartupSweep')
+    expect(source).toContain('sweepSources: () => service.sweepSourceViews()')
+    expect(source).toContain('dropSources: () => service.dropSourceViews()')
   })
 })

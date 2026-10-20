@@ -72,6 +72,7 @@ import {
   onDocRenamed,
   onTreeChanged,
   onUploadProgress,
+  openSource,
   pickUploadFile,
   renameDocument,
   restoreDocument,
@@ -79,6 +80,7 @@ import {
   uploadDocument,
 } from '../uniwork-library-api'
 import { openPageOnWeb } from '../uniwork-page-web'
+import { publishUniworkNotice } from '../uniwork-notice-bus'
 import { announce } from '../uniwork-live'
 import {
   DEFAULT_DOCUMENTS_HOME_FILTERS,
@@ -127,6 +129,7 @@ import {
   shelvedDescendantIds,
 } from './ShelvedDocumentsView'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
+import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
 import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
 import '../uniwork-folders/uniwork-folders.css'
@@ -912,6 +915,66 @@ export function DocumentsHome({
         onClick: () => void window.aiOffice.revealPath(path),
       },
     })
+  }
+
+  // UNI-1993: a source row's Open (view only): main downloads a temp copy and opens it in its
+  // editor tab as a view-only source; nothing is said when it works, each failure follows the
+  // contract (3.4). A click burst (click, click, dblclick) opens one tab, not a stack of them.
+  const openingSourcesRef = useRef<Set<string>>(new Set())
+  const openSourceFile = async (source: UniworkSourceFile): Promise<void> => {
+    const extension = sourceOpenExtension(source)
+    if (!extension) {
+      await downloadSourceFile(source)
+      return
+    }
+    if (openingSourcesRef.current.has(source.id)) return
+    openingSourcesRef.current.add(source.id)
+    announce(t('uhSourceOpening', { name: source.name }))
+    let res: Awaited<ReturnType<typeof openSource>>
+    try {
+      res = await openSource({
+        workspaceId,
+        sourceId: source.id,
+        name: source.name,
+        extension,
+        mimeType: source.mimeType,
+        sizeBytes: source.sizeBytes,
+        updatedAt: source.updatedAt,
+        origin: source.source,
+        // the parent's kind and title only: its id never leaves the row
+        parent: { kind: source.parent.kind, title: source.parent.title },
+      })
+    } finally {
+      openingSourcesRef.current.delete(source.id)
+    }
+    if (res.ok) return
+    const failure = sourceOpenFailureOf(res.error)
+    switch (failure.kind) {
+      case 'gone':
+        setToast({ message: t('uhSourceOpenGone'), tone: 'error' })
+        // the row is stale: read the list again so it goes
+        setListTick((n) => n + 1)
+        return
+      case 'offline':
+        setToast({
+          message: t('uhSourceOpenOffline'),
+          tone: 'error',
+          action: { label: t('uhSourceOpenRetry'), onClick: () => void openSourceFile(source) },
+        })
+        return
+      case 'too_large':
+        setToast({
+          message: t('uhSourceOpenTooLarge'),
+          tone: 'error',
+          action: { label: t('uhSourceDownload'), onClick: () => void downloadSourceFile(source) },
+        })
+        return
+      case 'notice':
+        publishUniworkNotice({ phase: 'failed', error: failure.error })
+        return
+      default:
+        setToast({ message: t('uhSourceOpenFailed'), tone: 'error' })
+    }
   }
 
   // CT1-4: the page exists already, so an opening that fails says that, not "failed"
@@ -2209,6 +2272,7 @@ export function DocumentsHome({
                           source={row.source}
                           menuOpen={openMenuId === row.id}
                           onMenuOpenChange={(o) => setOpenMenuId(o ? row.id : null)}
+                          onOpen={(source) => void openSourceFile(source)}
                           onDownload={(source) => void downloadSourceFile(source)}
                         />
                       )
