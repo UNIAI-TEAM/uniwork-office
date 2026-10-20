@@ -344,6 +344,42 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
     )
   })
 
+  it('rereads the shelf when an unshelve or a trash finds the row gone (another client moved it first)', async () => {
+    await mount()
+    await openArchive()
+    expect(api.uniworkListShelved).toHaveBeenCalledTimes(1)
+    api.uniworkUnshelveDocument!.mockResolvedValueOnce({ ok: false, error: 'not_found' })
+    await act(async () => {
+      row('doc-a')!.querySelector<HTMLButtonElement>('button.dh-shelved-unshelve')!.click()
+    })
+    await flush()
+    expect(host.querySelector('.uw-act-toast')?.textContent).toContain(
+      'Không bỏ lưu trữ được. Chưa có gì thay đổi.',
+    )
+    expect(api.uniworkListShelved).toHaveBeenCalledTimes(2)
+
+    api.uniworkTrashShelvedDocument!.mockResolvedValueOnce({ ok: false, error: 'not_found' })
+    const items = await openMenu('doc-a')
+    await act(async () => {
+      items[2]!.click()
+    })
+    await flush()
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('.modal-buttons .btn-primary')!.click()
+    })
+    await flush()
+    expect(api.uniworkTrashShelvedDocument).toHaveBeenCalledWith('doc-a')
+    expect(api.uniworkListShelved).toHaveBeenCalledTimes(3)
+
+    // any other failure keeps the list as it is: nothing to reread
+    api.uniworkUnshelveDocument!.mockResolvedValueOnce({ ok: false, error: 'server_error' })
+    await act(async () => {
+      row('doc-a')!.querySelector<HTMLButtonElement>('button.dh-shelved-unshelve')!.click()
+    })
+    await flush()
+    expect(api.uniworkListShelved).toHaveBeenCalledTimes(3)
+  })
+
   it('the ⋯ menu offers Mở, Bỏ lưu trữ and Chuyển vào thùng rác; trash confirms first, then moves it and rereads', async () => {
     await mount()
     await openArchive()
