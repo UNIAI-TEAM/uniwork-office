@@ -30,6 +30,11 @@ import {
 import { frameDocVersion, type FrameDocVersion } from './doc-version'
 import { frameMentionAccess } from './mention-access'
 import { frameRevealRouter, type RevealPort } from './reveal-router'
+import {
+  createFrameViewVersion,
+  frameOpenVersionId,
+  type FrameVersionViewProps,
+} from './version-view'
 
 /** what the frame API needs from the frame client (the real client has it all) */
 export type FrameCommentsClient = Pick<FramePort, 'whenInitialized' | 'request'> & RevealPort
@@ -58,6 +63,13 @@ export interface FrameCommentsExtras {
   canListMembers?: boolean
   /** `comments.shareView`: grant `view` to a mentioned user (the host fixes the level) */
   shareView?(input: { path?: string; userId: string }): Promise<CommentsReply<{ ok: true }>>
+  /**
+   * UNI-2033: the kit's `onViewVersion`; exists only with the effective `commentsViewVersion`
+   * capability (see ./version-view). Answers `{opened}`, never rejects.
+   */
+  viewVersion?: FrameVersionViewProps['onViewVersion']
+  /** UNI-2033: the kit's `openVersionId`: the open file's server version id, undefined while unknown */
+  openVersionId?(): string | undefined
 }
 
 /**
@@ -87,6 +99,7 @@ export function createFrameCommentsApi(
 ): UniworkCommentsApi & FrameCommentsExtras {
   const version = hooks.version ?? frameDocVersion
   const mention = hooks.session ? frameMentionAccess(hooks.session) : null
+  const viewVersion = hooks.session ? createFrameViewVersion(client, hooks.session) : undefined
   const call = <K extends FrameRequestType>(
     type: K,
     payload: FrameRequests[K]['payload'],
@@ -137,6 +150,8 @@ export function createFrameCommentsApi(
             call('comments.shareView', { user_id: userId }),
         }
       : {}),
+    ...(viewVersion ? { viewVersion } : {}),
+    openVersionId: () => frameOpenVersionId(version, hooks.session ?? {}),
     context: () =>
       envelope(async (): Promise<CommentsContextResult> => {
         const session = (await client.whenInitialized()) as CommentsSession

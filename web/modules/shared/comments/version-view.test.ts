@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { createMockPort } from '../../../docs/bridge/testing/mock-port'
+import type { Capabilities } from '../../../docs/protocol/types'
 import { frameCommentsClaim } from '../discussion/claim'
 import {
   createFrameCommentsApi,
@@ -16,12 +17,13 @@ import {
 
 const COMMENT_ID = '01J8X4CMTN0000000000000001'
 
-function framePort(capabilities: Record<string, boolean>) {
+function framePort(capabilities: Capabilities) {
   const mock = createMockPort({
     documentId: 'doc-1',
     capabilities: { save: true, ...capabilities },
     commentsLevel: 'edit',
   } as never)
+  mock.init()
   return mock
 }
 
@@ -87,7 +89,7 @@ describe('createFrameViewVersion', () => {
 describe('frameOpenVersionId', () => {
   it('is the versionId the host gave in api.open, then the one a landed save made current', () => {
     const version = createFrameDocVersion()
-    const session = { documentId: 'doc-1' }
+    const session = {}
     expect(frameOpenVersionId(version, session)).toBeUndefined()
     version.noteOpened({ path: 'p', versionId: 'ver-1' })
     expect(frameOpenVersionId(version, session)).toBe('ver-1')
@@ -114,7 +116,11 @@ describe('frameVersionViewProps', () => {
     version.noteOpened({ path: 'p', versionId: 'ver-9' })
 
     const granted = framePort({ comments: true, commentsViewVersion: true })
-    const withGrant = frameVersionViewProps(granted.port, await granted.port.whenInitialized(), version)
+    const withGrant = frameVersionViewProps(
+      granted.port,
+      await granted.port.whenInitialized(),
+      version,
+    )
     expect(withGrant.openVersionId).toBe('ver-9')
     expect(withGrant.onViewVersion).toBeTypeOf('function')
 

@@ -193,7 +193,10 @@ describe('UNI-2033 commentsViewVersion gating', () => {
   it('a grant without the comments capability still sends nothing', async () => {
     const { host, client, frameWin } = setup({
       getInit: async () =>
-        baseInit({ capabilities: { save: true, commentsViewVersion: true }, commentsLevel: undefined }),
+        baseInit({
+          capabilities: { save: true, commentsViewVersion: true },
+          commentsLevel: undefined,
+        }),
     })
     await host.whenReady()
     await client.whenInitialized()
