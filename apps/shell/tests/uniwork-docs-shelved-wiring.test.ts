@@ -68,14 +68,16 @@ afterEach(() => {
 })
 
 async function setup() {
+  // Dynamic import after vi.mock('../src/main/uniwork-auth') so wiring binds the mocked auth module.
   const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
   const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
+  const openedPaths = new Set<string>()
   const wc = {
     isDestroyed: () => false,
     isLoadingMainFrame: () => false,
     send: () => undefined,
   }
-  createUniworkDocs(
+  const handle = createUniworkDocs(
     {
       handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
         handlers.set(channel, fn),
@@ -83,19 +85,30 @@ async function setup() {
     {
       shellWindow: () => null,
       shellContents: () => wc as never,
-      openPath: () => true,
+      openPath: (path) => {
+        openedPaths.add(path)
+        return true
+      },
       refuseLockedPath: () => false,
-      isPathOpen: () => false,
+      isPathOpen: (path) => openedPaths.has(path),
       requestModuleSave: () => false,
       reloadPath: () => undefined,
       activePath: () => undefined,
       reveal: () => undefined,
       lang: () => 'en',
       defaultSaveDir: () => dir,
-      openPaths: () => [],
-      closePath: async () => true,
-      confirmClosePath: async () => true,
-      closePathNow: () => undefined,
+      openPaths: () => [...openedPaths],
+      closePath: async (path) => {
+        openedPaths.delete(path)
+        return true
+      },
+      confirmClosePath: async (path) => {
+        openedPaths.delete(path)
+        return true
+      },
+      closePathNow: (path) => {
+        openedPaths.delete(path)
+      },
       aiHistoryPaths: () => [],
       forgetAiHistory: () => undefined,
       notifyPathRenamed: vi.fn(),
@@ -107,7 +120,7 @@ async function setup() {
     expect(handler, `handler for ${channel}`).toBeTypeOf('function')
     return handler!(null, ...args)
   }
-  return { handlers, call }
+  return { handlers, call, service: handle.service }
 }
 
 interface Seen {
@@ -143,7 +156,7 @@ const DOCS: Record<string, Record<string, unknown>> = {
       filename: 'Plan.docx',
       mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       size_bytes: 3,
-      checksum_sha256: 'a'.repeat(64),
+      checksum_sha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
     },
   },
   fold_s1: {
@@ -165,6 +178,20 @@ const DOCS: Record<string, Record<string, unknown>> = {
     shelved_at: '2026-10-15T09:00:00Z',
   },
   page_live: { title: 'Live notes', kind: 'page', my_level: 'manage' },
+  doc_live: {
+    title: 'Live.docx',
+    kind: 'file',
+    my_level: 'manage',
+    file: {
+      file_id: 'f_live',
+      version_id: 'v_live',
+      version: 1,
+      filename: 'Live.docx',
+      mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      size_bytes: 3,
+      checksum_sha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
+    },
+  },
 }
 
 function stubServer(): Seen[] {
@@ -269,6 +296,33 @@ function stubServer(): Seen[] {
           document: docBody(docId, docFields),
           my_level: typeof my_level === 'string' ? my_level : '',
           admin_scope: admin_scope === true,
+        })
+      }
+      const download = /^\/api\/v1\/documents\/([^/]+)\/download$/.exec(url.pathname)
+      if (download && method === 'GET') {
+        return new Response(new Uint8Array([1, 2, 3]), { status: 200 })
+      }
+      const editLock = /^\/api\/v1\/documents\/([^/]+)\/edit-lock(?:\/([^/]+))?$/.exec(url.pathname)
+      if (editLock) {
+        const docId = editLock[1]!
+        const base = DOCS[docId]
+        if (base?.shelved_at) {
+          return reply(409, { error: { code: 'document_shelved', message: 'Shelved' } })
+        }
+        if (method === 'DELETE') return new Response(null, { status: 204 })
+        return reply(200, {
+          server_time: '2026-10-20T00:00:00Z',
+          lock: {
+            lock_id: 'l_1',
+            document_id: docId,
+            holder: { id: 'u_1', display_name: 'Alice' },
+            client: 'desktop',
+            acquired_at: '2026-10-20T00:00:00Z',
+            expires_at: '2026-10-20T00:05:00Z',
+            heartbeat_interval_ms: 60_000,
+            ttl_ms: 300_000,
+            held_by_me: true,
+          },
         })
       }
       const detail = /^\/api\/v1\/documents\/([^/]+)$/.exec(url.pathname)
@@ -647,5 +701,82 @@ describe('UNI-1961 live-row Lưu trữ (shelve)', () => {
       error: 'forbidden',
     })
     expect(posts(seen)).toEqual([])
+  })
+
+  it('opens a shelved file read-only without altering its ACL, and refreshes open copies across shelve and unshelve (R1-7)', async () => {
+    const { call, service } = await setup()
+    const seen = stubServer()
+    try {
+      const shelvedOpen = (await call(UNIWORK_DOC_CHANNELS.openDocument, 'doc_s1')) as {
+        ok: boolean
+        value: { path: string }
+      }
+      expect(shelvedOpen.ok).toBe(true)
+      const shelvedPath = shelvedOpen.value.path
+      expect(service.isReadOnly(shelvedPath)).toBe(true)
+      expect(await service.docStatus(shelvedPath)).toMatchObject({
+        access: 'view',
+        commentsLevel: 'view',
+      })
+      expect(service.commentContext(shelvedPath)).toMatchObject({ level: 'view' })
+      expect(service.store.lookup(shelvedPath)?.binding).toMatchObject({
+        access: 'view',
+        level: 'manage',
+        shelved: true,
+      })
+      expect(seen.some((s) => s.url.pathname === '/api/v1/documents/doc_s1/edit-lock')).toBe(false)
+
+      const liveOpen = (await call(UNIWORK_DOC_CHANNELS.openDocument, 'doc_live')) as {
+        ok: boolean
+        value: { path: string }
+      }
+      expect(liveOpen.ok).toBe(true)
+      const livePath = liveOpen.value.path
+      expect(service.isReadOnly(livePath)).toBe(false)
+      expect(await service.docStatus(livePath)).toMatchObject({
+        access: 'edit',
+        commentsLevel: 'manage',
+      })
+      expect(service.commentContext(livePath)).toMatchObject({ level: 'manage' })
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        access: 'edit',
+        level: 'manage',
+      })
+
+      const shelvedRes = (await call(UNIWORK_DOC_CHANNELS.shelveDocument, 'doc_live')) as {
+        ok: boolean
+      }
+      expect(shelvedRes.ok).toBe(true)
+      expect(service.isReadOnly(livePath)).toBe(true)
+      expect(await service.docStatus(livePath)).toMatchObject({
+        access: 'view',
+        commentsLevel: 'view',
+      })
+      expect(service.commentContext(livePath)).toMatchObject({ level: 'view' })
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        access: 'view',
+        level: 'manage',
+        shelved: true,
+      })
+
+      const unshelvedRes = (await call(UNIWORK_DOC_CHANNELS.unshelveDocument, 'doc_live')) as {
+        ok: boolean
+      }
+      expect(unshelvedRes.ok).toBe(true)
+      expect(service.isReadOnly(livePath)).toBe(false)
+      expect(await service.docStatus(livePath)).toMatchObject({
+        access: 'edit',
+        commentsLevel: 'manage',
+      })
+      expect(service.commentContext(livePath)).toMatchObject({ level: 'manage' })
+      const restoredBinding = service.store.lookup(livePath)?.binding
+      expect(restoredBinding).toMatchObject({
+        access: 'edit',
+        level: 'manage',
+      })
+      expect(restoredBinding?.shelved).toBeUndefined()
+    } finally {
+      await service.releaseAllEditLocks()
+    }
   })
 })
