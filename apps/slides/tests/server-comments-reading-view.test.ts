@@ -36,6 +36,8 @@ vi.mock('../src/renderer/ai/AiPanel', () => ({
 }))
 
 import { App } from '../src/renderer/App'
+import { resetForTest } from '../src/renderer/capabilities'
+import { LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 
 const PATH = 'C:/u/uniwork-documents/dep/user/doc1/deck.pptx'
 
@@ -91,6 +93,8 @@ function installApis(): void {
     getAnimations: () => Promise.resolve([]),
     getTransition: () => Promise.resolve(null),
     listFonts: () => Promise.resolve([]),
+    // no capability table = the desktop shell (every capability on, all ribbon tabs)
+    capabilities: undefined,
     uniworkState: () => Promise.resolve({ bound: true, readOnly: true }),
   }
   const fallbacks: Record<string, unknown> = {}
@@ -145,6 +149,7 @@ beforeEach(() => {
   localStorage.clear()
   revealHandlers = new Set()
   installApis()
+  resetForTest()
 })
 
 afterEach(() => {
@@ -160,7 +165,10 @@ async function bootApp(): Promise<HTMLElement> {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
-  await act(async () => root!.render(createElement(App)))
+  setModuleLang('en')
+  await act(async () =>
+    root!.render(createElement(LocaleProvider, { initial: 'en', children: createElement(App) })),
+  )
   await settle()
   return container
 }
@@ -199,7 +207,7 @@ describe('slides App: server comments in Reading view (view-only deck)', () => {
     await act(async () => tab!.dispatchEvent(new MouseEvent('click', { bubbles: true })))
     const toggle = () =>
       [...host.querySelectorAll<HTMLButtonElement>('button.rb-big')].find((b) =>
-        b.textContent?.startsWith('Comments'),
+        b.textContent?.startsWith('Comments Pane'),
       )
     expect(toggle()).toBeDefined()
 
