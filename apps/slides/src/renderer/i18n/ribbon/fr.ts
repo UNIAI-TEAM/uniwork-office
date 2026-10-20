@@ -378,9 +378,9 @@ export const fr = {
   ribbonGroupStartShow: 'Démarrage du diaporama',
   ribbonFromBeginning: 'À partir du début',
   ribbonFromBeginningTip:
-    'Diaporama plein écran à partir de la diapositive 1 (F5 ; les diapositives masquées sont ignorées)',
+    'Diaporama plein écran à partir de la diapositive 1 (les diapositives masquées sont ignorées)',
   ribbonFromCurrent: 'À partir de la diapositive actuelle',
-  ribbonFromCurrentTip: 'Diaporama plein écran à partir de la diapositive actuelle (⇧F5)',
+  ribbonFromCurrentTip: 'Diaporama plein écran à partir de la diapositive actuelle',
   ribbonPresenterView: 'Mode Présentateur',
   ribbonPresenterViewTip:
     "Mode Présentateur : notes / diapositive suivante / minuteur / stylet ; avec plusieurs écrans, le diaporama s'affiche en plein écran sur l'autre",

@@ -369,9 +369,9 @@ export const pt = {
   ribbonGroupStartShow: 'Iniciar Apresentação de Slides',
   ribbonFromBeginning: 'Do Começo',
   ribbonFromBeginningTip:
-    'Apresentação em tela cheia a partir do slide 1 (F5; slides ocultos são ignorados)',
+    'Apresentação em tela cheia a partir do slide 1 (slides ocultos são ignorados)',
   ribbonFromCurrent: 'Do Slide Atual',
-  ribbonFromCurrentTip: 'Apresentação em tela cheia a partir do slide atual (⇧F5)',
+  ribbonFromCurrentTip: 'Apresentação em tela cheia a partir do slide atual',
   ribbonPresenterView: 'Modo de Exibição do Apresentador',
   ribbonPresenterViewTip:
     'Modo do apresentador: anotações / próximo slide / cronômetro / caneta; com várias telas, a apresentação vai para tela cheia na outra',

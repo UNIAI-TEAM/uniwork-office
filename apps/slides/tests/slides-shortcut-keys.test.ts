@@ -4,6 +4,9 @@
  * PowerPoint for the web's in the web frame. Each chord fires its command, the
  * old colliding chords no longer do, and IME composition / AltGr never fire.
  */
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleGlobalKeydown } from '../src/renderer/keyboard-actions'
 import { slidesHint, slidesTipKbd } from '../src/renderer/shortcuts'
@@ -369,6 +372,18 @@ describe('hints and menu accelerators come from the table', () => {
     expect(slidesHint('slides-23', 'win')).toBe('Ctrl+Shift+F5')
     expect(slidesHint('slides-14', 'mac')).toBe('')
     expect(slidesTipKbd('slides-14')).toBe('Ctrl+M')
+  })
+
+  it('ribbon tooltips and File menu keys carry no hand-written chord', () => {
+    const dir = join(dirname(fileURLToPath(import.meta.url)), '../src/renderer')
+    for (const file of ['Ribbon.tsx', 'RibbonHomeTab.tsx', 'RibbonInsertTab.tsx']) {
+      const src = readFileSync(join(dir, 'components', file), 'utf8')
+      expect(src, file).not.toMatch(/data-tip-kbd=(["']|\{(?!slidesTipKbd))/)
+      expect(src, file).not.toMatch(/file-menu-key">[^{]/)
+    }
+    // the show tooltips' key comes from data-tip-kbd, not from the translated text
+    const en = readFileSync(join(dir, 'i18n/ribbon/en.ts'), 'utf8')
+    expect(en).not.toMatch(/ribbonFrom(Beginning|Current)Tip: '[^']*F5/)
   })
 
   it('menu accelerators', () => {

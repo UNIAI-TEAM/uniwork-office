@@ -375,10 +375,9 @@ export const ja = {
   // Slide show
   ribbonGroupStartShow: 'スライドショーの開始',
   ribbonFromBeginning: '最初から',
-  ribbonFromBeginningTip:
-    'スライド 1 から全画面でスライドショーを開始（F5；非表示スライドはスキップ）',
+  ribbonFromBeginningTip: 'スライド 1 から全画面でスライドショーを開始（非表示スライドはスキップ）',
   ribbonFromCurrent: '現在のスライドから',
-  ribbonFromCurrentTip: '現在のスライドから全画面でスライドショーを開始（⇧F5）',
+  ribbonFromCurrentTip: '現在のスライドから全画面でスライドショーを開始',
   ribbonPresenterView: '発表者ツール',
   ribbonPresenterViewTip:
     '発表者ツール：ノート/次のスライド/タイマー/ペン；マルチディスプレイ時はもう一方の画面で全画面放映',

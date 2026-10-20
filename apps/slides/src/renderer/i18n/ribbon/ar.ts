@@ -357,9 +357,9 @@ export const ar = {
   ribbonAnimDelayTip: 'مدة التأخير بعد التشغيل قبل البدء (ثوانٍ)',
   ribbonGroupStartShow: 'بدء عرض الشرائح',
   ribbonFromBeginning: 'من البداية',
-  ribbonFromBeginningTip: 'عرض بملء الشاشة من الشريحة 1 (F5؛ تُتخطى الشرائح المخفية)',
+  ribbonFromBeginningTip: 'عرض بملء الشاشة من الشريحة 1 (تُتخطى الشرائح المخفية)',
   ribbonFromCurrent: 'من الشريحة الحالية',
-  ribbonFromCurrentTip: 'عرض بملء الشاشة من الشريحة الحالية (⇧F5)',
+  ribbonFromCurrentTip: 'عرض بملء الشاشة من الشريحة الحالية',
   ribbonPresenterView: 'طريقة عرض مقدم العرض',
   ribbonPresenterViewTip:
     'طريقة عرض مقدم العرض: ملاحظات / الشريحة التالية / مؤقت / قلم؛ مع عدة شاشات يعمل العرض بملء الشاشة على الشاشة الأخرى',

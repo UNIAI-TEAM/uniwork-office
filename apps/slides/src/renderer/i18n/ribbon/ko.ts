@@ -368,10 +368,9 @@ export const ko = {
   // Slide show
   ribbonGroupStartShow: '슬라이드 쇼 시작',
   ribbonFromBeginning: '처음부터',
-  ribbonFromBeginningTip:
-    '1번 슬라이드부터 전체 화면으로 슬라이드 쇼 시작(F5, 숨긴 슬라이드는 건너뜀)',
+  ribbonFromBeginningTip: '1번 슬라이드부터 전체 화면으로 슬라이드 쇼 시작(숨긴 슬라이드는 건너뜀)',
   ribbonFromCurrent: '현재 슬라이드부터',
-  ribbonFromCurrentTip: '현재 슬라이드부터 전체 화면으로 슬라이드 쇼 시작(⇧F5)',
+  ribbonFromCurrentTip: '현재 슬라이드부터 전체 화면으로 슬라이드 쇼 시작',
   ribbonPresenterView: '발표자 보기',
   ribbonPresenterViewTip:
     '발표자 보기: 노트/다음 슬라이드/타이머/펜, 여러 모니터 사용 시 다른 화면에서 전체 화면으로 진행',

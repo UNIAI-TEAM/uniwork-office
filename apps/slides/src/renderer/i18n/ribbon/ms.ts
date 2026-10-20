@@ -371,9 +371,9 @@ export const ms = {
   ribbonAnimDelayTip: 'Lengah selepas pencetus sebelum bermula (saat)',
   ribbonGroupStartShow: 'Mulakan Tayangan Slaid',
   ribbonFromBeginning: 'Dari Awal',
-  ribbonFromBeginningTip: 'Tayangan skrin penuh dari slaid 1 (F5; slaid tersembunyi dilangkau)',
+  ribbonFromBeginningTip: 'Tayangan skrin penuh dari slaid 1 (slaid tersembunyi dilangkau)',
   ribbonFromCurrent: 'Dari Slaid Semasa',
-  ribbonFromCurrentTip: 'Tayangan skrin penuh dari slaid semasa (⇧F5)',
+  ribbonFromCurrentTip: 'Tayangan skrin penuh dari slaid semasa',
   ribbonPresenterView: 'Pandangan Penyampai',
   ribbonPresenterViewTip:
     'Pandangan penyampai: nota / slaid seterusnya / pemasa / pen; dengan berbilang paparan, tayangan berjalan skrin penuh pada paparan yang satu lagi',

@@ -360,9 +360,9 @@ export const en = {
   ribbonAnimDelayTip: 'Delay after the trigger before starting (seconds)',
   ribbonGroupStartShow: 'Start Slide Show',
   ribbonFromBeginning: 'From Beginning',
-  ribbonFromBeginningTip: 'Full-screen show from slide 1 (F5; hidden slides skipped)',
+  ribbonFromBeginningTip: 'Full-screen show from slide 1 (hidden slides skipped)',
   ribbonFromCurrent: 'From Current Slide',
-  ribbonFromCurrentTip: 'Full-screen show from the current slide (⇧F5)',
+  ribbonFromCurrentTip: 'Full-screen show from the current slide',
   ribbonPresenterView: 'Presenter View',
   ribbonPresenterViewTip:
     'Presenter view: notes / next slide / timer / pen; with multiple displays the show runs full screen on the other one',

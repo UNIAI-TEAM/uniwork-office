@@ -367,9 +367,9 @@ export const hi = {
   ribbonAnimDelayTip: 'ट्रिगर के बाद प्रारंभ होने से पहले विलंब (सेकंड)',
   ribbonGroupStartShow: 'स्लाइड शो प्रारंभ करें',
   ribbonFromBeginning: 'शुरुआत से',
-  ribbonFromBeginningTip: 'स्लाइड 1 से पूर्ण स्क्रीन शो (F5; छिपी स्लाइड छोड़ दी जाती हैं)',
+  ribbonFromBeginningTip: 'स्लाइड 1 से पूर्ण स्क्रीन शो (छिपी स्लाइड छोड़ दी जाती हैं)',
   ribbonFromCurrent: 'वर्तमान स्लाइड से',
-  ribbonFromCurrentTip: 'वर्तमान स्लाइड से पूर्ण स्क्रीन शो (⇧F5)',
+  ribbonFromCurrentTip: 'वर्तमान स्लाइड से पूर्ण स्क्रीन शो',
   ribbonPresenterView: 'प्रस्तुतकर्ता दृश्य',
   ribbonPresenterViewTip:
     'प्रस्तुतकर्ता दृश्य: नोट्स / अगली स्लाइड / टाइमर / पेन; कई डिस्प्ले होने पर शो दूसरे डिस्प्ले पर पूर्ण स्क्रीन चलता है',

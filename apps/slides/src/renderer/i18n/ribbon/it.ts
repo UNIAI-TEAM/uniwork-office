@@ -379,9 +379,9 @@ export const it = {
   ribbonGroupStartShow: 'Avvia Presentazione',
   ribbonFromBeginning: "Dall'Inizio",
   ribbonFromBeginningTip:
-    'Presentazione a schermo intero dalla diapositiva 1 (F5; le diapositive nascoste vengono saltate)',
+    'Presentazione a schermo intero dalla diapositiva 1 (le diapositive nascoste vengono saltate)',
   ribbonFromCurrent: 'Dalla Diapositiva Corrente',
-  ribbonFromCurrentTip: 'Presentazione a schermo intero dalla diapositiva corrente (⇧F5)',
+  ribbonFromCurrentTip: 'Presentazione a schermo intero dalla diapositiva corrente',
   ribbonPresenterView: 'Visualizzazione Relatore',
   ribbonPresenterViewTip:
     "Visualizzazione relatore: note / diapositiva successiva / timer / penna; con più schermi la presentazione va a schermo intero sull'altro",

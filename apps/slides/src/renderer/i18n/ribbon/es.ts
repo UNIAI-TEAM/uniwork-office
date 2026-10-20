@@ -377,9 +377,9 @@ export const es = {
   ribbonGroupStartShow: 'Iniciar presentación con diapositivas',
   ribbonFromBeginning: 'Desde el principio',
   ribbonFromBeginningTip:
-    'Presentación a pantalla completa desde la diapositiva 1 (F5; se omiten las diapositivas ocultas)',
+    'Presentación a pantalla completa desde la diapositiva 1 (se omiten las diapositivas ocultas)',
   ribbonFromCurrent: 'Desde la diapositiva actual',
-  ribbonFromCurrentTip: 'Presentación a pantalla completa desde la diapositiva actual (⇧F5)',
+  ribbonFromCurrentTip: 'Presentación a pantalla completa desde la diapositiva actual',
   ribbonPresenterView: 'Vista Moderador',
   ribbonPresenterViewTip:
     'Vista Moderador: notas / diapositiva siguiente / temporizador / lápiz; con varias pantallas, la presentación se muestra a pantalla completa en la otra',

@@ -1,6 +1,7 @@
 /** Home tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import { useState } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
+import { slidesTipKbd } from '../shortcuts'
 import { ColorPicker, isSymbolFontFamily, partitionFontFamilies, UniAiMark } from '@genoffice/ui'
 import { saveEditSelection } from '../TextEditOverlay'
 import { armColorInput } from '../color-input'
@@ -68,9 +69,6 @@ import {
   NUMBER_PRESETS,
   bulletRunText,
 } from '../bullet-presets'
-
-/** The New Slide screentip shows the platform's real chord: ⇧⌘N on mac, Ctrl+M elsewhere. */
-const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 
 // Symbol fonts (Wingdings & co.) render their own name as pictographs, so the
 // picker shows those names in the UI font (like Word) instead of the font itself.
@@ -363,6 +361,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             disabled={!hasDoc}
             onClick={() => onSlideShow(slideShowFromStart)}
             data-tip={t(slideShowFromStart ? 'ribbonFromBeginningTip' : 'ribbonFromCurrentTip')}
+            data-tip-kbd={slidesTipKbd(slideShowFromStart ? 'slides-22' : 'slides-23')}
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">
@@ -442,7 +441,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             disabled={!hasDoc}
             onClick={onAddSlide}
             data-tip={platformShortcuts(t('ribbonNewSlideTip'))}
-            data-tip-kbd={IS_MAC ? '⇧⌘N' : 'Ctrl+M'}
+            data-tip-kbd={slidesTipKbd('slides-14')}
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">
@@ -1432,7 +1431,8 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
           className="rb-big"
           disabled={!hasDoc}
           onClick={onFindReplace}
-          data-tip={platformShortcuts('⌘F')}
+          data-tip={t('ribbonFindReplace')}
+          data-tip-kbd={slidesTipKbd('slides-60')}
         >
           <span className="rb-big-icon">
             <IconFind size={BIG} />

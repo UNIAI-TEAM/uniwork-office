@@ -369,9 +369,9 @@ export const ru = {
   ribbonAnimDelayTip: 'Задержка после запуска до начала (секунды)',
   ribbonGroupStartShow: 'Начать слайд-шоу',
   ribbonFromBeginning: 'С начала',
-  ribbonFromBeginningTip: 'Полноэкранный показ с 1-го слайда (F5; скрытые слайды пропускаются)',
+  ribbonFromBeginningTip: 'Полноэкранный показ с 1-го слайда (скрытые слайды пропускаются)',
   ribbonFromCurrent: 'С текущего слайда',
-  ribbonFromCurrentTip: 'Полноэкранный показ с текущего слайда (⇧F5)',
+  ribbonFromCurrentTip: 'Полноэкранный показ с текущего слайда',
   ribbonPresenterView: 'Режим докладчика',
   ribbonPresenterViewTip:
     'Режим докладчика: заметки / следующий слайд / таймер / перо; при нескольких мониторах показ идёт во весь экран на другом',

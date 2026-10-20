@@ -126,6 +126,7 @@ import { RibbonTabScroller } from './RibbonTabScroller'
 import { ShapeGalleryContent } from './ShapeGalleryPopover'
 import { autoContextTabForElement, contextTabForElement, type ContextTab } from './context-tabs'
 import { cap, isViewOnly, isWeb } from '../capabilities'
+import { slidesHint, slidesTipKbd } from '../shortcuts'
 
 /** Electron on macOS: file commands live in the native menu bar, traffic lights sit in the tab row */
 const IS_MAC = navigator.platform.toLowerCase().includes('mac') && !isWeb()
@@ -1104,6 +1105,12 @@ function ShapeFillMenu({
   )
 }
 
+/** The File menu's key label from the slides shortcut table; none when the action has no key here. */
+function FileMenuKey({ id }: { id: string }) {
+  const hint = slidesHint(id)
+  return hint ? <span className="file-menu-key">{hint}</span> : null
+}
+
 export function Ribbon({
   hasDoc,
   deckEmpty,
@@ -1788,7 +1795,7 @@ export function Ribbon({
                       onOpen()
                     }}
                   >
-                    {t('ribbonFileOpen')} <span className="file-menu-key">Ctrl+O</span>
+                    {t('ribbonFileOpen')} <FileMenuKey id="slides-02" />
                   </button>
                 )}
                 {cap('save') && (
@@ -1799,7 +1806,7 @@ export function Ribbon({
                       onSave()
                     }}
                   >
-                    {t('ribbonFileSave')} <span className="file-menu-key">Ctrl+S</span>
+                    {t('ribbonFileSave')} <FileMenuKey id="slides-03" />
                   </button>
                 )}
                 {cap('saveAs') && (
@@ -1810,7 +1817,7 @@ export function Ribbon({
                       onSaveAs()
                     }}
                   >
-                    {t('ribbonFileSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                    {t('ribbonFileSaveAs')} <FileMenuKey id="slides-04" />
                   </button>
                 )}
                 {cap('exportPdf') && (
@@ -1844,7 +1851,7 @@ export function Ribbon({
                       onPrint()
                     }}
                   >
-                    {t('ribbonFilePrint')} <span className="file-menu-key">Ctrl+P</span>
+                    {t('ribbonFilePrint')} <FileMenuKey id="slides-05" />
                   </button>
                 )}
                 {cap('saveAs') && (
@@ -2501,6 +2508,7 @@ export function Ribbon({
                 disabled={!hasDoc}
                 onClick={() => onSlideShow(true)}
                 data-tip={t('ribbonFromBeginningTip')}
+                data-tip-kbd={slidesTipKbd('slides-22')}
               >
                 <span className="rb-big-icon">
                   <IconPlayFromStart size={BIG} />
@@ -2512,6 +2520,7 @@ export function Ribbon({
                 disabled={!hasDoc}
                 onClick={() => onSlideShow(false)}
                 data-tip={t('ribbonFromCurrentTip')}
+                data-tip-kbd={slidesTipKbd('slides-23')}
               >
                 <span className="rb-big-icon">
                   <IconPlayCurrent size={BIG} />

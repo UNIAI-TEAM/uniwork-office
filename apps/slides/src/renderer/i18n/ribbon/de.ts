@@ -375,9 +375,9 @@ export const de = {
   ribbonGroupStartShow: 'Bildschirmpräsentation starten',
   ribbonFromBeginning: 'Von Beginn an',
   ribbonFromBeginningTip:
-    'Vollbildpräsentation ab Folie 1 (F5; ausgeblendete Folien werden übersprungen)',
+    'Vollbildpräsentation ab Folie 1 (ausgeblendete Folien werden übersprungen)',
   ribbonFromCurrent: 'Ab aktueller Folie',
-  ribbonFromCurrentTip: 'Vollbildpräsentation ab der aktuellen Folie (⇧F5)',
+  ribbonFromCurrentTip: 'Vollbildpräsentation ab der aktuellen Folie',
   ribbonPresenterView: 'Referentenansicht',
   ribbonPresenterViewTip:
     'Referentenansicht: Notizen / nächste Folie / Timer / Stift; bei mehreren Bildschirmen läuft die Präsentation im Vollbild auf dem anderen',

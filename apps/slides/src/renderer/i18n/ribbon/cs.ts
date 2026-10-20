@@ -362,10 +362,9 @@ export const cs = {
   ribbonAnimDelayTip: 'Zpoždění po spuštění před zahájením (sekundy)',
   ribbonGroupStartShow: 'Spustit prezentaci',
   ribbonFromBeginning: 'Od začátku',
-  ribbonFromBeginningTip:
-    'Prezentace na celé obrazovce od snímku 1 (F5; skryté snímky se přeskočí)',
+  ribbonFromBeginningTip: 'Prezentace na celé obrazovce od snímku 1 (skryté snímky se přeskočí)',
   ribbonFromCurrent: 'Od aktuálního snímku',
-  ribbonFromCurrentTip: 'Prezentace na celé obrazovce od aktuálního snímku (⇧F5)',
+  ribbonFromCurrentTip: 'Prezentace na celé obrazovce od aktuálního snímku',
   ribbonPresenterView: 'Zobrazení prezentujícího',
   ribbonPresenterViewTip:
     'Zobrazení prezentujícího: poznámky / další snímek / časovač / pero; při více monitorech běží prezentace na celé obrazovce na tom druhém',

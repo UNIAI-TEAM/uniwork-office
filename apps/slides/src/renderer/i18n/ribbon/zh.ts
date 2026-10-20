@@ -358,9 +358,9 @@ export const zh = {
   // Slide show
   ribbonGroupStartShow: '开始放映幻灯片',
   ribbonFromBeginning: '从头开始',
-  ribbonFromBeginningTip: '从第 1 页开始全屏放映（F5；隐藏页跳过）',
+  ribbonFromBeginningTip: '从第 1 页开始全屏放映（隐藏页跳过）',
   ribbonFromCurrent: '从当前幻灯片开始',
-  ribbonFromCurrentTip: '从当前页开始全屏放映（⇧F5）',
+  ribbonFromCurrentTip: '从当前页开始全屏放映',
   ribbonPresenterView: '演示者视图',
   ribbonPresenterViewTip: '演示者视图：备注/下一张/计时/画笔；多显示器时另一屏全屏放映',
   ribbonCustomShow: '自定义放映',

@@ -370,9 +370,9 @@ export const pl = {
   ribbonAnimDelayTip: 'Opóźnienie rozpoczęcia po wyzwoleniu (sekundy)',
   ribbonGroupStartShow: 'Rozpocznij pokaz slajdów',
   ribbonFromBeginning: 'Od początku',
-  ribbonFromBeginningTip: 'Pokaz pełnoekranowy od slajdu 1 (F5; ukryte slajdy są pomijane)',
+  ribbonFromBeginningTip: 'Pokaz pełnoekranowy od slajdu 1 (ukryte slajdy są pomijane)',
   ribbonFromCurrent: 'Od bieżącego slajdu',
-  ribbonFromCurrentTip: 'Pokaz pełnoekranowy od bieżącego slajdu (⇧F5)',
+  ribbonFromCurrentTip: 'Pokaz pełnoekranowy od bieżącego slajdu',
   ribbonPresenterView: 'Widok prezentera',
   ribbonPresenterViewTip:
     'Widok prezentera: notatki / następny slajd / czasomierz / pióro; przy wielu ekranach pokaz działa na pełnym ekranie na drugim ekranie',

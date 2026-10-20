@@ -354,9 +354,9 @@ export const he = {
   ribbonAnimDelayTip: 'השהיה אחרי ההפעלה לפני ההתחלה (שניות)',
   ribbonGroupStartShow: 'התחלת הצגת שקופיות',
   ribbonFromBeginning: 'מההתחלה',
-  ribbonFromBeginningTip: 'הצגה במסך מלא משקופית 1 (F5; שקופיות מוסתרות מדולגות)',
+  ribbonFromBeginningTip: 'הצגה במסך מלא משקופית 1 (שקופיות מוסתרות מדולגות)',
   ribbonFromCurrent: 'מהשקופית הנוכחית',
-  ribbonFromCurrentTip: 'הצגה במסך מלא מהשקופית הנוכחית (⇧F5)',
+  ribbonFromCurrentTip: 'הצגה במסך מלא מהשקופית הנוכחית',
   ribbonPresenterView: 'תצוגת מציג',
   ribbonPresenterViewTip:
     'תצוגת מציג: הערות / השקופית הבאה / טיימר / עט; עם מספר צגים ההצגה רצה במסך מלא בצג השני',

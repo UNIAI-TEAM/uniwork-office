@@ -359,9 +359,9 @@ export const th = {
   ribbonAnimDelayTip: 'หน่วงเวลาหลังทริกเกอร์ก่อนเริ่ม (วินาที)',
   ribbonGroupStartShow: 'เริ่มการนำเสนอสไลด์',
   ribbonFromBeginning: 'ตั้งแต่ต้น',
-  ribbonFromBeginningTip: 'นำเสนอเต็มหน้าจอตั้งแต่สไลด์ 1 (F5 ข้ามสไลด์ที่ซ่อน)',
+  ribbonFromBeginningTip: 'นำเสนอเต็มหน้าจอตั้งแต่สไลด์ 1 (ข้ามสไลด์ที่ซ่อน)',
   ribbonFromCurrent: 'จากสไลด์ปัจจุบัน',
-  ribbonFromCurrentTip: 'นำเสนอเต็มหน้าจอจากสไลด์ปัจจุบัน (⇧F5)',
+  ribbonFromCurrentTip: 'นำเสนอเต็มหน้าจอจากสไลด์ปัจจุบัน',
   ribbonPresenterView: 'มุมมองผู้นำเสนอ',
   ribbonPresenterViewTip:
     'มุมมองผู้นำเสนอ: บันทึกย่อ/สไลด์ถัดไป/ตัวจับเวลา/ปากกา เมื่อมีหลายจอ อีกจอจะแสดงการนำเสนอแบบเต็มหน้าจอ',

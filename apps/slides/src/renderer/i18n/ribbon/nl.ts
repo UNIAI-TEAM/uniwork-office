@@ -372,9 +372,9 @@ export const nl = {
   ribbonGroupStartShow: 'Diavoorstelling starten',
   ribbonFromBeginning: 'Vanaf begin',
   ribbonFromBeginningTip:
-    "Voorstelling op volledig scherm vanaf dia 1 (F5; verborgen dia's worden overgeslagen)",
+    "Voorstelling op volledig scherm vanaf dia 1 (verborgen dia's worden overgeslagen)",
   ribbonFromCurrent: 'Vanaf huidige dia',
-  ribbonFromCurrentTip: 'Voorstelling op volledig scherm vanaf de huidige dia (⇧F5)',
+  ribbonFromCurrentTip: 'Voorstelling op volledig scherm vanaf de huidige dia',
   ribbonPresenterView: 'Weergave voor presentator',
   ribbonPresenterViewTip:
     'Weergave voor presentator: notities / volgende dia / timer / pen; bij meerdere schermen wordt de voorstelling op het andere scherm op volledig scherm weergegeven',

@@ -368,9 +368,9 @@ export const id = {
   ribbonAnimDelayTip: 'Penundaan setelah pemicu sebelum dimulai (detik)',
   ribbonGroupStartShow: 'Mulai Peragaan Slide',
   ribbonFromBeginning: 'Dari Awal',
-  ribbonFromBeginningTip: 'Peragaan layar penuh dari slide 1 (F5; slide tersembunyi dilewati)',
+  ribbonFromBeginningTip: 'Peragaan layar penuh dari slide 1 (slide tersembunyi dilewati)',
   ribbonFromCurrent: 'Dari Slide Saat Ini',
-  ribbonFromCurrentTip: 'Peragaan layar penuh dari slide saat ini (⇧F5)',
+  ribbonFromCurrentTip: 'Peragaan layar penuh dari slide saat ini',
   ribbonPresenterView: 'Tampilan Penyaji',
   ribbonPresenterViewTip:
     'Tampilan penyaji: catatan / slide berikutnya / pengatur waktu / pena; dengan beberapa layar, peragaan berjalan layar penuh di layar lainnya',
