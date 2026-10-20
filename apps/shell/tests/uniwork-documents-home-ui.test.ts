@@ -2763,4 +2763,49 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
   })
+
+  it("Shared with me: Move never starts at the folder browsed before it, nor at the owner's folder (UNI-1961 FS2-1)", async () => {
+    const shared = {
+      id: 'doc-shared',
+      workspaceId: 'ws-1',
+      title: 'Được chia sẻ.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T08:00:00.000Z',
+      kind: 'file',
+      visibility: 'restricted',
+      myLevel: 'edit',
+    } satisfies DocumentsHomeDoc
+    // the same row once with no parent, once carrying the owner's folder id (not the recipient's place)
+    const sharedUnder = { ...shared, id: 'doc-shared-under', parentId: 'f-legal' }
+    api.uniworkListChildren!.mockImplementation(async (q: { parentId: string | null }) =>
+      ok({ items: q.parentId === 'f-board' ? [] : rootItems, nextCursor: null }),
+    )
+    api.uniworkListSharedWithMe!.mockImplementation(async () =>
+      ok({ documents: [shared, sharedUnder], nextCursor: null }),
+    )
+    await mountHome()
+
+    // browse a folder first, then switch to Shared with me: the open folder id stays in state
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>(
+          '.dh-folder-card[data-folder-id="f-board"] .dh-folder-open',
+        )!
+        .click()
+    })
+    await flush()
+    await clickNavItem('shared-with-me')
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-shared"]')).not.toBeNull()
+
+    expect(await openMovePickerFor('doc-shared')).toBe('Đường dẫn: Tài liệu (gốc)')
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+    })
+    await flush()
+    expect(await openMovePickerFor('doc-shared-under')).toBe('Đường dẫn: Tài liệu (gốc)')
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+    })
+    await flush()
+  })
 })
