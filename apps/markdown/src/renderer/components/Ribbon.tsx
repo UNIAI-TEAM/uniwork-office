@@ -323,7 +323,7 @@ export function Ribbon({
       expand: t('ribbonExpand'),
     },
     {
-      action: findShortcut('common', 'common-10'),
+      action: findShortcut('markdown', 'markdown-037'),
       surface: markdownSurface(),
     },
   )

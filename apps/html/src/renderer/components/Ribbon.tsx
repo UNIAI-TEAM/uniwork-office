@@ -165,7 +165,7 @@ export function Ribbon(p: Props) {
       expand: t('ribbonExpand'),
     },
     {
-      action: findShortcut('common', 'common-10'),
+      action: findShortcut('html', 'html-023'),
       surface: htmlSurface(),
     },
   )
