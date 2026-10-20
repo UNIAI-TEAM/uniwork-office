@@ -20,7 +20,6 @@ export const vi = {
   uhQuickPptx: 'Trình chiếu',
   uhQuickPage: 'UniNote',
   uhQuickMd: 'Tệp Markdown',
-  uhQuickTxt: 'Văn bản',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
   uhNewMenuPage: 'UniNote',

@@ -1430,6 +1430,11 @@ export type NewDocFormat = (typeof NEW_DOC_FORMATS)[number]
 export const NEW_DOC_KINDS = ['page', ...NEW_DOC_FORMATS] as const
 export type NewDocKind = (typeof NEW_DOC_KINDS)[number]
 
+/** The Quick create strip: every kind but Plain text, which lives only in the New menu (UNI-2046, user 2026-10-21). */
+export const QUICK_CREATE_KINDS = NEW_DOC_KINDS.filter(
+  (kind): kind is Exclude<NewDocKind, 'txt'> => kind !== 'txt',
+)
+
 /**
  * A library row with what S18 reads beyond the summary: the action flags main
  * derives from my_level, and whether the row was archived from this dialog.

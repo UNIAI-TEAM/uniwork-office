@@ -20,7 +20,6 @@ export const zhTW = {
   uhQuickPptx: '簡報',
   uhQuickPage: 'UniNote',
   uhQuickMd: 'Markdown 檔案',
-  uhQuickTxt: 'Plain text',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
   uhNewMenuPage: 'UniNote',

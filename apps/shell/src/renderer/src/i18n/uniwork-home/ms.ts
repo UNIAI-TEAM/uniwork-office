@@ -20,7 +20,6 @@ export const ms = {
   uhQuickPptx: 'Pembentangan',
   uhQuickPage: 'UniNote',
   uhQuickMd: 'Fail Markdown',
-  uhQuickTxt: 'Plain text',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
   uhNewMenuPage: 'UniNote',

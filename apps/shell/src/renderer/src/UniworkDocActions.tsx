@@ -149,14 +149,14 @@ export function ActionModal({
   )
 }
 
-/** the label of each kind the New document dialog and the Quick create strip offer (the web's names) */
+/** the label of each kind the New document dialog and the Quick create strip offer (the web's names); Plain text is not in the strip, so its label is the New menu's */
 export const NEW_KIND_LABEL_KEY: Record<NewDocKind, StringKey> = {
   page: 'uhQuickPage',
   docx: 'uhQuickDocx',
   xlsx: 'uhQuickXlsx',
   pptx: 'uhQuickPptx',
   md: 'uhQuickMd',
-  txt: 'uhQuickTxt',
+  txt: 'uhNewMenuTxt',
   html: 'uhQuickHtml',
   pdf: 'uhQuickPdf',
 }

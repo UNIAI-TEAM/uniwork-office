@@ -20,7 +20,6 @@ export const nl = {
   uhQuickPptx: 'Presentatie',
   uhQuickPage: 'UniNote',
   uhQuickMd: 'Markdownbestand',
-  uhQuickTxt: 'Plain text',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
   uhNewMenuPage: 'UniNote',

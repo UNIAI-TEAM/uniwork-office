@@ -20,7 +20,6 @@ export const ko = {
   uhQuickPptx: '프레젠테이션',
   uhQuickPage: 'UniNote',
   uhQuickMd: 'Markdown 파일',
-  uhQuickTxt: 'Plain text',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
   uhNewMenuPage: 'UniNote',

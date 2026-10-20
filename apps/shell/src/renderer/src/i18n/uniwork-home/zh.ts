@@ -19,7 +19,6 @@ export const zh = {
   uhQuickPptx: '演示',
   uhQuickPage: 'UniNote',
   uhQuickMd: 'Markdown 文件',
-  uhQuickTxt: 'Plain text',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
   uhNewMenuPage: 'UniNote',

@@ -20,7 +20,6 @@ export const id = {
   uhQuickPptx: 'Presentasi',
   uhQuickPage: 'UniNote',
   uhQuickMd: 'File Markdown',
-  uhQuickTxt: 'Plain text',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
   uhNewMenuPage: 'UniNote',

@@ -20,7 +20,6 @@ export const ar = {
   uhQuickPptx: 'عرض تقديمي',
   uhQuickPage: 'UniNote',
   uhQuickMd: 'ملف Markdown',
-  uhQuickTxt: 'Plain text',
   uhQuickHtml: 'HTML',
   uhQuickPdf: 'PDF',
   uhNewMenuPage: 'UniNote',
