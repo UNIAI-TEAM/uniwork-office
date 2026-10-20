@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const vi = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Tài liệu (gốc)',
   ufTreeLabel: 'Thư mục',
   ufContentsLabel: 'Nội dung thư mục',
   ufRecent: 'Gần đây',
