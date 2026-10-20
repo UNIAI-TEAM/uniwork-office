@@ -1066,4 +1066,51 @@ describe('UNI-1961 live-row Lưu trữ (shelve)', () => {
       await service.releaseAllEditLocks()
     }
   })
+
+  it('retains baseVersionId and comment context when reopening an older dirty copy against a newer server head (R2-3)', async () => {
+    const { call, service } = await setup()
+    stubServer()
+    const origDocLive = { ...DOCS.doc_live }
+    try {
+      const opened = (await call(UNIWORK_DOC_CHANNELS.openDocument, 'doc_live')) as {
+        ok: boolean
+        value: { path: string }
+      }
+      expect(opened.ok).toBe(true)
+      const livePath = opened.value.path
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        baseVersion: 1,
+        baseVersionId: 'v_live',
+      })
+      expect(service.commentContext(livePath)).toMatchObject({ versionId: 'v_live' })
+
+      // Make local copy dirty on version 1, advance server head to version 2, then reopen
+      writeFileSync(livePath, new Uint8Array([9, 8, 7, 6]))
+      await service.refreshPath(livePath)
+      DOCS.doc_live = {
+        ...origDocLive,
+        revision: '8',
+        current_version: 2,
+        file: {
+          ...(origDocLive.file as Record<string, unknown>),
+          version: 2,
+          version_id: 'v_live_2',
+        },
+      }
+
+      const reopened = (await call(UNIWORK_DOC_CHANNELS.openDocument, 'doc_live')) as {
+        ok: boolean
+        value: { path: string }
+      }
+      expect(reopened.ok).toBe(true)
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        baseVersion: 1,
+        baseVersionId: 'v_live',
+      })
+      expect(service.commentContext(livePath)).toMatchObject({ versionId: 'v_live' })
+    } finally {
+      DOCS.doc_live = origDocLive
+      await service.releaseAllEditLocks()
+    }
+  })
 })
