@@ -2447,6 +2447,12 @@ export function Home() {
       action: () => window.aiOffice.newMarkdown(newFileOpts),
     },
     {
+      ext: 'txt',
+      title: t('newTxt'),
+      sub: '.txt',
+      action: () => window.aiOffice.newTxt(newFileOpts),
+    },
+    {
       ext: 'html',
       title: t('newHtml'),
       sub: '.html',

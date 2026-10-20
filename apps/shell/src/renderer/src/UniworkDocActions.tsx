@@ -156,6 +156,7 @@ export const NEW_KIND_LABEL_KEY: Record<NewDocKind, StringKey> = {
   xlsx: 'uhQuickXlsx',
   pptx: 'uhQuickPptx',
   md: 'uhQuickMd',
+  txt: 'uhQuickTxt',
   html: 'uhQuickHtml',
   pdf: 'uhQuickPdf',
 }

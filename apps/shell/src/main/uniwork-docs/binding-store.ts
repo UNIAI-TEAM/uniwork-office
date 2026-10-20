@@ -239,7 +239,7 @@ export function hasLegacyIntentFiles(dir: string): boolean {
 }
 
 const SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$/
-const FORMATS: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])
+const FORMATS: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'txt', 'html'])
 const STATES: ReadonlySet<string> = new Set([
   'ready',
   'dirty',

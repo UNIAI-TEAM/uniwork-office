@@ -1419,8 +1419,8 @@ export function retryActionOf(state: PickerState): PickerAction {
 
 // ── Create, rename, archive (S18) ───────────────────────
 
-/** the file formats a new blank document can have (D's blank route; UNI-1953 adds md / html / pdf) */
-export const NEW_DOC_FORMATS = ['docx', 'xlsx', 'pptx', 'md', 'html', 'pdf'] as const
+/** the file formats a new blank document can have (D's blank route; UNI-1953 adds md / html / pdf, UNI-2046 txt) */
+export const NEW_DOC_FORMATS = ['docx', 'xlsx', 'pptx', 'md', 'txt', 'html', 'pdf'] as const
 export type NewDocFormat = (typeof NEW_DOC_FORMATS)[number]
 
 /**

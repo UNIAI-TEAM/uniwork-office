@@ -32,7 +32,9 @@ afterAll(() => rmSync(temp, { recursive: true, force: true }))
 
 describe('a .txt on the desktop (UNI-1905 behaviour)', () => {
   it('is a declared file association with a mimeType', () => {
-    const association = config.fileAssociations.find((entry: { ext: string }) => entry.ext === 'txt')
+    const association = config.fileAssociations.find(
+      (entry: { ext: string }) => entry.ext === 'txt',
+    )
     expect(association, 'no txt file association').toBeTruthy()
     expect(association.mimeType).toBe('text/plain')
   })

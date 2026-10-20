@@ -18,7 +18,7 @@ import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/document
 
 /**
  * UNI-1959 UW-NEW-MENU: the Documents home "New" button opens the web's menu
- * (UniNote, Docs/Sheets/Slides, Markdown, HTML, PDF, then the "Share with
+ * (UniNote, Docs/Sheets/Slides, Markdown, Plain text, HTML, PDF, then the "Share with
  * workspace" toggle; Folder first inside an open folder). Picking a row creates
  * at once with the web's default name in the open place and opens it; no
  * name / type / location dialog. The Quick create strip creates the same way.
@@ -289,6 +289,7 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
       expect(roles).toEqual([
         'menuitem', // UniNote
         'separator',
+        'menuitem',
         'menuitem',
         'menuitem',
         'menuitem',
