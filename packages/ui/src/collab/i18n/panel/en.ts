@@ -29,8 +29,11 @@ export const en = {
   collabAnchorSlide: 'Slide {slide}',
   collabAnchorPage: 'Page {page}',
   collabAnchorStale: 'The location may have changed',
-  collabAnchorLost: 'The commented location can no longer be found',
+  collabAnchorLost: 'The commented passage is not in the current version',
   collabGoToAnchor: 'Go to location',
+  collabAnchorViewVersion: 'View in version {n}',
+  collabVersionViewBanner: 'You are viewing version {n} (read-only)',
+  collabVersionViewUnavailable: 'This version could not be opened',
 
   // thread, actions, history
   collabResolved: 'Resolved',

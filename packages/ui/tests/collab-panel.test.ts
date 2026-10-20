@@ -1063,11 +1063,11 @@ describe('lost thread: View in version N', () => {
 
   it('click calls the handler once with the root comment id and the number', async () => {
     const onViewVersion = vi.fn(() => ({ opened: true }))
-    await mount(
-      fakeSource(list([lostRow(), cm({ id: 'r', parent_id: 'l' })])),
-      host(),
-      { adapter: ad(), openVersionId: 'v-head', onViewVersion },
-    )
+    await mount(fakeSource(list([lostRow(), cm({ id: 'r', parent_id: 'l' })])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-head',
+      onViewVersion,
+    })
     await act(async () => {
       viewBtn()!.click()
       await flush()

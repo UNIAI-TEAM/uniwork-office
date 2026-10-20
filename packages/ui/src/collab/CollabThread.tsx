@@ -32,6 +32,7 @@ import type {
   CollabPermissions,
   CollabStrings,
   CollabThreadView,
+  CollabViewVersion,
 } from './use-collab-threads'
 import type {
   CollabAnchor,
@@ -564,6 +565,10 @@ export interface CollabThreadProps {
   formatTime?(iso: string | undefined): string
   /** called before a resolve / reopen so the panel puts focus back on that button after the move */
   onKeepFocus?(threadId: string): void
+  /** the version the editor shows: the "View in version N" action is hidden when it is the anchor's version */
+  openVersionId?: string
+  /** absent: no "View in version N" action */
+  onViewVersion?: CollabViewVersion
 }
 
 function CollabThreadImpl(p: CollabThreadProps) {
@@ -583,6 +588,9 @@ function CollabThreadImpl(p: CollabThreadProps) {
   const [historyFor, setHistoryFor] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const [viewing, setViewing] = useState(false)
+  const [viewFailed, setViewFailed] = useState(false)
+  const viewingRef = useRef(false)
   const replyBtnRef = useRef<HTMLButtonElement>(null)
   const itemRef = useRef<HTMLLIElement>(null)
   /** the control that opened history / edit / delete, for focus return */
@@ -639,6 +647,35 @@ function CollabThreadImpl(p: CollabThreadProps) {
       await fn()
     } catch {
       setFailed(true)
+    }
+  }
+
+  // a lost anchor is only viewable in the version it was kept on: offer that version (never when it is open already)
+  const versionNo = root.anchor_version_no
+  const canViewVersion =
+    comment &&
+    !thread.deleted &&
+    !!root.anchor &&
+    thread.anchorState === 'lost' &&
+    typeof versionNo === 'number' &&
+    Number.isInteger(versionNo) &&
+    versionNo > 0 &&
+    !!p.onViewVersion &&
+    !(root.anchor_version_id && root.anchor_version_id === p.openVersionId)
+
+  const viewVersion = async (no: number) => {
+    if (viewingRef.current || !p.onViewVersion) return
+    viewingRef.current = true
+    setViewing(true)
+    setViewFailed(false)
+    try {
+      const out = await p.onViewVersion({ commentId: root.id, versionNo: no })
+      if (out && out.opened === false) setViewFailed(true)
+    } catch {
+      setViewFailed(true)
+    } finally {
+      viewingRef.current = false
+      setViewing(false)
     }
   }
 
@@ -818,6 +855,16 @@ function CollabThreadImpl(p: CollabThreadProps) {
                     {strings.collabGoToAnchor}
                   </button>
                 )}
+                {isRoot && canViewVersion && (
+                  <button
+                    type="button"
+                    className="collab-link"
+                    disabled={viewing}
+                    onClick={() => void viewVersion(versionNo as number)}
+                  >
+                    {format(strings.collabAnchorViewVersion ?? '', { n: versionNo as number })}
+                  </button>
+                )}
                 <ActionsMenu
                   label={strings.collabActions ?? ''}
                   items={menuItems}
@@ -949,6 +996,11 @@ function CollabThreadImpl(p: CollabThreadProps) {
       {failed && (
         <p className="collab-why collab-why--err" role="alert">
           {strings.collabActionFailed}
+        </p>
+      )}
+      {viewFailed && (
+        <p className="collab-why collab-why--err" role="alert">
+          {strings.collabVersionViewUnavailable}
         </p>
       )}
       {showComposer && (

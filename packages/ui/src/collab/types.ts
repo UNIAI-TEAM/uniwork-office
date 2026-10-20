@@ -38,6 +38,10 @@ export interface CollabComment {
   revision?: number
   anchor?: CollabAnchor | null
   anchor_state?: string | null
+  /** the version the server kept the anchor on (a `lost` anchor keeps its old one) */
+  anchor_version_id?: string | null
+  /** the ordinal of `anchor_version_id`; null when the version row is gone. Read by the "View in version N" action. */
+  anchor_version_no?: number | null
   resolved_at?: string | null
   /** set = a tombstone ("the content was deleted") */
   deleted_at?: string | null

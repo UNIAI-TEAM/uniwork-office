@@ -29,8 +29,11 @@ export const vi = {
   collabAnchorSlide: 'Trang chiếu {slide}',
   collabAnchorPage: 'Trang {page}',
   collabAnchorStale: 'Vị trí có thể đã thay đổi',
-  collabAnchorLost: 'Không còn tìm thấy vị trí được bình luận',
+  collabAnchorLost: 'Đoạn được bình luận không còn trong bản hiện tại',
   collabGoToAnchor: 'Đến vị trí',
+  collabAnchorViewVersion: 'Xem ở phiên bản {n}',
+  collabVersionViewBanner: 'Bạn đang xem phiên bản {n} (chỉ đọc)',
+  collabVersionViewUnavailable: 'Không mở được phiên bản này',
 
   // thread, actions, history
   collabResolved: 'Đã giải quyết',
