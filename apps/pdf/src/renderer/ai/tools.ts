@@ -2673,7 +2673,10 @@ function editInsertedTextTool(deps: PdfAiDeps, input: Record<string, unknown>): 
     newHex === undefined &&
     input.align === undefined
   ) {
-    return err('Pass at least one of text, font_size, color, align', summary)
+    return err(
+      `Pass at least one of text, font_size, color, align${colorNote ? ` (${colorNote})` : ''}`,
+      summary,
+    )
   }
   const text =
     input.text === undefined ? cur.text : String(input.text).replace(/\r\n/g, '\n').trim()

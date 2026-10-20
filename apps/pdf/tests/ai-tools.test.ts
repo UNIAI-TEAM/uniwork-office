@@ -3011,6 +3011,38 @@ describe('optional color parameter (UNI-1385)', () => {
       }
     })
 
+    it('edit_inserted_text with only an unusable colour still errors, with the note', async () => {
+      const PLAIN = 'Pass at least one of text, font_size, color, align'
+      const mk = () =>
+        makeDeps({
+          textInserts: () => [
+            {
+              id: 'dabc',
+              input: {
+                pageIndex: 1,
+                origin: [100, 700],
+                text: 'Hello',
+                fontSize: 14,
+                color: [9, 9, 9],
+              },
+            },
+          ],
+        })
+      const noted = await executePdfTool(
+        mk(),
+        call('edit_inserted_text', { id: 'dabc', color: 'black' }),
+      )
+      expect(noted.isError).toBe(true)
+      expect(noted.output).toContain(PLAIN)
+      expect(noted.output).toContain('color ignored: use #RRGGBB')
+      const empty = await executePdfTool(
+        mk(),
+        call('edit_inserted_text', { id: 'dabc', color: '' }),
+      )
+      expect(empty.isError).toBe(true)
+      expect(empty.output).toBe(PLAIN)
+    })
+
     it('markup_text leaves the colour to the app on "" and "black" and notes only the latter', async () => {
       for (const [color, noted] of [
         ['', false],
