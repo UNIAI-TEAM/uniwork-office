@@ -1802,6 +1802,25 @@ export class SaveCoordinator {
     })
   }
 
+  /**
+   * Mutate `doc`'s binding against the latest stored binding inside the
+   * per-key serialized chain (`serializeBinding`). Returns `null` when the
+   * document is no longer bound, or the current `BoundDocument` without
+   * writing when `patch` returns `null`.
+   */
+  async updateBinding(
+    doc: BoundDocument,
+    patch: (latest: Binding) => Binding | null,
+  ): Promise<BoundDocument | null> {
+    return this.serializeBinding(doc.key, async () => {
+      const latest = this.deps.store.lookup(doc.path)
+      if (!latest || latest.binding.documentId !== doc.binding.documentId) return null
+      const next = patch(latest.binding)
+      if (!next) return latest
+      return this.writeBinding(latest, next)
+    })
+  }
+
   /** the binding write itself, always run inside the per-key chain */
   private async writeBinding(doc: BoundDocument, binding: Binding): Promise<BoundDocument> {
     const next: BoundDocument = { ...doc, binding }
