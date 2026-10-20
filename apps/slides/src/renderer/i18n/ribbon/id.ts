@@ -48,14 +48,11 @@ export const id = {
   ribbonPasteTipDisabled: 'Tempel (salin atau potong elemen kanvas terlebih dahulu)',
   ribbonCutTip: 'Potong (⌘X)',
   ribbonCopyTip: 'Salin (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Penyalin Format (pilih elemen terlebih dahulu; ⌘⇧C salin format / ⌘⇧V tempel format)',
+  ribbonBrushTipNoSelection: 'Penyalin Format (pilih elemen terlebih dahulu)',
   ribbonBrushTipContinuous: 'Penyalin Format mode berkelanjutan (tekan Esc untuk keluar)',
   ribbonBrushTipOnce: 'Penyalin Format mode sekali pakai (klik elemen target untuk menerapkan)',
-  ribbonBrushTipHasFormat:
-    'Penyalin Format (klik untuk sekali / klik ganda untuk berkelanjutan; ⌘⇧C salin format / ⌘⇧V tempel format)',
-  ribbonBrushTipDefault:
-    'Penyalin Format (klik untuk menyalin dan menerapkan format; ⌘⇧C salin format / ⌘⇧V tempel format)',
+  ribbonBrushTipHasFormat: 'Penyalin Format (klik untuk sekali / klik ganda untuk berkelanjutan)',
+  ribbonBrushTipDefault: 'Penyalin Format (klik untuk menyalin dan menerapkan format)',
   ribbonGroupSlides: 'Slide',
   ribbonNewSlide: 'Slide Baru',
   ribbonNewSlideTip: 'Slide kosong baru (mempertahankan latar belakang tata letak slide saat ini)',
@@ -368,9 +365,9 @@ export const id = {
   ribbonAnimDelayTip: 'Penundaan setelah pemicu sebelum dimulai (detik)',
   ribbonGroupStartShow: 'Mulai Peragaan Slide',
   ribbonFromBeginning: 'Dari Awal',
-  ribbonFromBeginningTip: 'Peragaan layar penuh dari slide 1 (F5; slide tersembunyi dilewati)',
+  ribbonFromBeginningTip: 'Peragaan layar penuh dari slide 1 (slide tersembunyi dilewati)',
   ribbonFromCurrent: 'Dari Slide Saat Ini',
-  ribbonFromCurrentTip: 'Peragaan layar penuh dari slide saat ini (⇧F5)',
+  ribbonFromCurrentTip: 'Peragaan layar penuh dari slide saat ini',
   ribbonPresenterView: 'Tampilan Penyaji',
   ribbonPresenterViewTip:
     'Tampilan penyaji: catatan / slide berikutnya / pengatur waktu / pena; dengan beberapa layar, peragaan berjalan layar penuh di layar lainnya',

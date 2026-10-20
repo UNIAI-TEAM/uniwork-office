@@ -96,6 +96,7 @@ import type {
   OpenResult,
 } from '../shared/ipc'
 import { buildPrintDocumentHtml } from '../shared/print-html'
+import { slidesMenuAccelerator, type SlidesMenuShortcut } from '../shared/slides-shortcuts'
 import { tm } from './i18n-main'
 import {
   attachedIds,
@@ -2040,13 +2041,14 @@ export function buildSlidesMenu(): Menu {
       cmd,
     )
   const isMac = process.platform === 'darwin'
+  const acc = (item: SlidesMenuShortcut) => slidesMenuAccelerator(item, isMac ? 'mac' : 'win')
   const labels = appMenuLabels(getUiLang())
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
       label: tm('menuFile'),
       submenu: [
-        { label: tm('menuOpen'), accelerator: 'CmdOrCtrl+O', click: () => send('open') },
+        { label: tm('menuOpen'), accelerator: acc('open'), click: () => send('open') },
         {
           // Detached second editor window on the same saved file: it attaches to
           // the shared session (openAndBuild), so both windows co-edit live
@@ -2061,20 +2063,20 @@ export function buildSlidesMenu(): Menu {
           ? [{ type: 'separator' as const }, ...extraFileMenuItems]
           : []),
         { type: 'separator' },
-        { label: tm('menuSave'), accelerator: 'CmdOrCtrl+S', click: () => send('save') },
-        { label: tm('menuSaveAs'), accelerator: 'CmdOrCtrl+Shift+S', click: () => send('save-as') },
+        { label: tm('menuSave'), accelerator: acc('save'), click: () => send('save') },
+        { label: tm('menuSaveAs'), accelerator: acc('saveAs'), click: () => send('save-as') },
         { type: 'separator' },
         // The ribbon's File tab is Windows-only, so without these macOS had no way
         // to export or print at all
         { label: tm('menuExportPdf'), click: () => send('export-pdf') },
         { label: tm('menuExportImages'), click: () => send('export-images') },
-        { label: tm('menuPrint'), accelerator: 'CmdOrCtrl+P', click: () => send('print') },
+        { label: tm('menuPrint'), accelerator: acc('print'), click: () => send('print') },
         { type: 'separator' },
         closeActiveTabHook
           ? {
               // closes the tab on every platform (the hook only exists in tab mode)
               label: tm('menuClose'),
-              accelerator: 'CmdOrCtrl+W',
+              accelerator: acc('close'),
               click: () => closeActiveTabHook?.(),
             }
           : isMac
@@ -2086,8 +2088,9 @@ export function buildSlidesMenu(): Menu {
       label: tm('menuEdit'),
       submenu: [
         // Undo/redo are sent to the renderer: text-editing state uses native execCommand, otherwise document history
-        { label: tm('menuUndo'), accelerator: 'CmdOrCtrl+Z', click: () => send('undo') },
-        { label: tm('menuRedo'), accelerator: 'Shift+CmdOrCtrl+Z', click: () => send('redo') },
+        { label: tm('menuUndo'), accelerator: acc('undo'), click: () => send('undo') },
+        // PowerPoint's Ctrl+Y / Cmd+Y; Shift+Ctrl+Z still redoes through the renderer handler
+        { label: tm('menuRedo'), accelerator: acc('redo'), click: () => send('redo') },
         { type: 'separator' },
         // Cut/copy/paste forward the same way: in text state the renderer calls back to the native clipboard; in canvas state the element clipboard is used
         { label: tm('menuCut'), accelerator: 'CmdOrCtrl+X', click: () => send('cut') },
@@ -2106,8 +2109,8 @@ export function buildSlidesMenu(): Menu {
           accelerator: 'CmdOrCtrl+0',
           click: () => send('zoom-reset'),
         },
-        { type: 'separator' },
-        toggleDevToolsItem(labels),
+        // Developer Tools only in dev builds, like Docs and Sheets (UNI-2011 P0)
+        ...(app.isPackaged ? [] : [{ type: 'separator' as const }, toggleDevToolsItem(labels)]),
       ],
     },
     helpMenuTemplate(labels),

@@ -46,15 +46,13 @@ export const it = {
   ribbonPasteTipDisabled: 'Incolla (copia o taglia prima un elemento del canvas)',
   ribbonCutTip: 'Taglia (⌘X)',
   ribbonCopyTip: 'Copia (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Copia formato (seleziona prima un elemento; ⌘⇧C copia il formato / ⌘⇧V applica il formato)',
+  ribbonBrushTipNoSelection: 'Copia formato (seleziona prima un elemento)',
   ribbonBrushTipContinuous: 'Copia formato in modalità continua (premi Esc per uscire)',
   ribbonBrushTipOnce:
     "Copia formato in modalità singola (fai clic sull'elemento di destinazione per applicare)",
   ribbonBrushTipHasFormat:
-    'Copia formato (clic per una volta / doppio clic per la modalità continua; ⌘⇧C copia il formato / ⌘⇧V applica il formato)',
-  ribbonBrushTipDefault:
-    'Copia formato (fai clic per copiare e applicare la formattazione; ⌘⇧C copia il formato / ⌘⇧V applica il formato)',
+    'Copia formato (clic per una volta / doppio clic per la modalità continua)',
+  ribbonBrushTipDefault: 'Copia formato (fai clic per copiare e applicare la formattazione)',
   ribbonGroupSlides: 'Diapositive',
   ribbonNewSlide: 'Nuova Diapositiva',
   ribbonNewSlideTip:
@@ -379,9 +377,9 @@ export const it = {
   ribbonGroupStartShow: 'Avvia Presentazione',
   ribbonFromBeginning: "Dall'Inizio",
   ribbonFromBeginningTip:
-    'Presentazione a schermo intero dalla diapositiva 1 (F5; le diapositive nascoste vengono saltate)',
+    'Presentazione a schermo intero dalla diapositiva 1 (le diapositive nascoste vengono saltate)',
   ribbonFromCurrent: 'Dalla Diapositiva Corrente',
-  ribbonFromCurrentTip: 'Presentazione a schermo intero dalla diapositiva corrente (⇧F5)',
+  ribbonFromCurrentTip: 'Presentazione a schermo intero dalla diapositiva corrente',
   ribbonPresenterView: 'Visualizzazione Relatore',
   ribbonPresenterViewTip:
     "Visualizzazione relatore: note / diapositiva successiva / timer / penna; con più schermi la presentazione va a schermo intero sull'altro",

@@ -739,7 +739,146 @@ export const slidesNotes: readonly ShortcutNote[] = [
 // @generated-end
 
 /** Hand-maintained rows: an entry with a generated id replaces that row. */
-const manual: readonly ShortcutAction[] = []
+const manual: readonly ShortcutAction[] = [
+  // Redo: PowerPoint's Ctrl+Y / Cmd+Y first (menus show it); the old Shift+Z chord stays
+  {
+    id: 'slides-08',
+    scope: 'slides',
+    win: ['Ctrl+Y', 'Ctrl+Shift+Z'],
+    mac: ['Cmd+Y', 'Shift+Cmd+Z'],
+    match: 'key',
+    guard: {},
+  },
+  // Duplicate object: PowerPoint for Mac's Control+D first, the old Cmd+D stays
+  {
+    id: 'slides-16',
+    scope: 'slides',
+    win: ['Ctrl+D'],
+    mac: ['Ctrl+D', 'Cmd+D'],
+    web: { win: ['Ctrl+D'], mac: ['Cmd+D'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Move the selected slides one up / down (the handler reads the direction from the key)
+  {
+    id: 'slides-19',
+    scope: 'slides',
+    win: ['Ctrl+Up', 'Ctrl+Down'],
+    mac: ['Cmd+Up', 'Cmd+Down'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Move the selected slides to the start / end
+  {
+    id: 'slides-20',
+    scope: 'slides',
+    win: ['Ctrl+Shift+Up', 'Ctrl+Shift+Down'],
+    mac: ['Shift+Cmd+Up', 'Shift+Cmd+Down'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Start the show from the beginning: F5; PowerPoint for Mac adds Shift+Cmd+Return
+  {
+    id: 'slides-22',
+    scope: 'slides',
+    win: ['F5'],
+    mac: ['Shift+Cmd+Enter', 'F5'],
+    web: { win: ['Ctrl+F5'], mac: ['Shift+Cmd+Enter'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Group: PowerPoint for Mac's Cmd+Option+G first, the old Cmd+G stays on the desktop
+  {
+    id: 'slides-37',
+    scope: 'slides',
+    win: ['Ctrl+G'],
+    mac: ['Alt+Cmd+G', 'Cmd+G'],
+    web: { win: ['Ctrl+G'], mac: ['Alt+Cmd+G'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Ungroup: PowerPoint for Mac's Cmd+Option+Shift+G first, the old Shift+Cmd+G stays
+  {
+    id: 'slides-38',
+    scope: 'slides',
+    win: ['Ctrl+Shift+G'],
+    mac: ['Alt+Shift+Cmd+G', 'Shift+Cmd+G'],
+    web: { win: ['Ctrl+Shift+G'], mac: ['Alt+Shift+Cmd+G'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Rotate the selection 15 degrees right / left (direction from the key)
+  {
+    id: 'slides-43',
+    scope: 'slides',
+    win: ['Alt+Right', 'Alt+Left'],
+    mac: ['Alt+Right', 'Alt+Left'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Show keys (context 'slideshow': they never shadow the editor's keys). Bare keys trace to
+  // the CSV row text; B / W / Period / Comma match by character (AZERTY types "." on Shift+;)
+  // slides-25: next slide / animation
+  {
+    id: 'slides-25',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['N', 'Enter', 'PageDown', 'Right', 'Down', 'Space'],
+    mac: ['N', 'Enter', 'PageDown', 'Right', 'Down', 'Space'],
+    match: 'key',
+    guard: {},
+  },
+  // slides-26: previous slide / animation; the Mac Delete key arrives as Backspace
+  {
+    id: 'slides-26',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['P', 'PageUp', 'Left', 'Up', 'Backspace'],
+    mac: ['P', 'PageUp', 'Left', 'Up', 'Backspace'],
+    match: 'key',
+    guard: {},
+  },
+  // slides-27: first / last slide (the handler reads the direction from the key)
+  {
+    id: 'slides-27',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['Home', 'End'],
+    mac: ['Home', 'End'],
+    match: 'key',
+    guard: {},
+  },
+  // slides-29: end the show; PowerPoint for Mac adds Hyphen and Cmd+Period, the web Esc only
+  {
+    id: 'slides-29',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['Escape'],
+    mac: ['Escape', 'Minus', 'Cmd+Period'],
+    web: { win: ['Escape'], mac: ['Escape'] },
+    match: 'key',
+    guard: {},
+  },
+  // slides-30: black (B, Period) / white (W, Comma) screen; the Mac Shift+B / Shift+W are read by show-keys.ts (the chord trace skips Shift+letter)
+  {
+    id: 'slides-30',
+    scope: 'slides',
+    context: 'slideshow',
+    win: ['B', 'Period', 'W', 'Comma'],
+    mac: ['B', 'Period', 'W', 'Comma'],
+    match: 'key',
+    guard: {},
+  },
+  // Insert hyperlink; Ask AI is button-only now (contract D2/D4, OFFICE-WINS)
+  {
+    id: 'slides-59',
+    scope: 'slides',
+    win: ['Ctrl+K'],
+    mac: ['Cmd+K'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+]
 
 export const slidesShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
 

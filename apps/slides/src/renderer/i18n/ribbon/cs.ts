@@ -46,14 +46,11 @@ export const cs = {
   ribbonPasteTipDisabled: 'Vložit (nejprve zkopírujte nebo vyjměte prvek na plátně)',
   ribbonCutTip: 'Vyjmout (⌘X)',
   ribbonCopyTip: 'Kopírovat (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Kopírovat formát (nejprve vyberte prvek; ⌘⇧C kopírovat formát / ⌘⇧V vložit formát)',
+  ribbonBrushTipNoSelection: 'Kopírovat formát (nejprve vyberte prvek)',
   ribbonBrushTipContinuous: 'Kopírovat formát – souvislý režim (ukončíte klávesou Esc)',
   ribbonBrushTipOnce: 'Kopírovat formát – jednorázový režim (klikněte na cílový prvek pro použití)',
-  ribbonBrushTipHasFormat:
-    'Kopírovat formát (kliknutí = jednou / dvojklik = souvisle; ⌘⇧C kopírovat formát / ⌘⇧V vložit formát)',
-  ribbonBrushTipDefault:
-    'Kopírovat formát (kliknutím zkopírujete a použijete formátování; ⌘⇧C kopírovat formát / ⌘⇧V vložit formát)',
+  ribbonBrushTipHasFormat: 'Kopírovat formát (kliknutí = jednou / dvojklik = souvisle)',
+  ribbonBrushTipDefault: 'Kopírovat formát (kliknutím zkopírujete a použijete formátování)',
   ribbonGroupSlides: 'Snímky',
   ribbonNewSlide: 'Nový snímek',
   ribbonNewSlideTip: 'Nový prázdný snímek (zachová pozadí rozložení aktuálního snímku)',
@@ -362,10 +359,9 @@ export const cs = {
   ribbonAnimDelayTip: 'Zpoždění po spuštění před zahájením (sekundy)',
   ribbonGroupStartShow: 'Spustit prezentaci',
   ribbonFromBeginning: 'Od začátku',
-  ribbonFromBeginningTip:
-    'Prezentace na celé obrazovce od snímku 1 (F5; skryté snímky se přeskočí)',
+  ribbonFromBeginningTip: 'Prezentace na celé obrazovce od snímku 1 (skryté snímky se přeskočí)',
   ribbonFromCurrent: 'Od aktuálního snímku',
-  ribbonFromCurrentTip: 'Prezentace na celé obrazovce od aktuálního snímku (⇧F5)',
+  ribbonFromCurrentTip: 'Prezentace na celé obrazovce od aktuálního snímku',
   ribbonPresenterView: 'Zobrazení prezentujícího',
   ribbonPresenterViewTip:
     'Zobrazení prezentujícího: poznámky / další snímek / časovač / pero; při více monitorech běží prezentace na celé obrazovce na tom druhém',
