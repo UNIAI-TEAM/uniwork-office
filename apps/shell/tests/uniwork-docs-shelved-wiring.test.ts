@@ -1230,4 +1230,171 @@ describe('UNI-1961 live-row Lưu trữ (shelve)', () => {
       await service.releaseAllEditLocks()
     }
   })
+
+  it('discards a stale shelved metadata GET overtaken by the app’s own unshelve and keeps edit/manage policy and edit lock across a subsequent refresh (R4-1)', async () => {
+    const { call, service } = await setup()
+    const seen = stubServer()
+    const origDocS1 = { ...DOCS.doc_s1 }
+    const baseFetch = globalThis.fetch
+    let releaseStaleGet: (() => void) | undefined
+    let markStaleGetEntered: () => void = () => undefined
+    const staleGetEntered = new Promise<void>((r) => {
+      markStaleGetEntered = r
+    })
+    let gateLockDelete = false
+    let releaseLockDelete: (() => void) | undefined
+    let markLockDeleteEntered: () => void = () => undefined
+    const lockDeleteEntered = new Promise<void>((r) => {
+      markLockDeleteEntered = r
+    })
+    try {
+      const opened = (await call(UNIWORK_DOC_CHANNELS.openDocument, 'doc_s1')) as {
+        ok: boolean
+        value: { path: string }
+      }
+      expect(opened.ok).toBe(true)
+      const shelvedPath = opened.value.path
+      expect(service.isReadOnly(shelvedPath)).toBe(true)
+      expect(service.store.lookup(shelvedPath)?.binding).toMatchObject({
+        access: 'view',
+        level: 'manage',
+        shelved: true,
+      })
+      expect(seen.some((s) => s.url.pathname === '/api/v1/documents/doc_s1/edit-lock')).toBe(false)
+
+      let gateNextDetailGet = true
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string, init: RequestInit = {}) => {
+          const url = new URL(String(input))
+          const method = init.method ?? 'GET'
+          if (
+            gateNextDetailGet &&
+            method === 'GET' &&
+            url.pathname === '/api/v1/documents/doc_s1'
+          ) {
+            gateNextDetailGet = false
+            const staleRes = await baseFetch(input, init)
+            markStaleGetEntered()
+            await new Promise<void>((r) => {
+              releaseStaleGet = r
+            })
+            return staleRes
+          }
+          if (
+            gateLockDelete &&
+            method === 'DELETE' &&
+            url.pathname === '/api/v1/documents/doc_s1/edit-lock/l_1'
+          ) {
+            gateLockDelete = false
+            markLockDeleteEntered()
+            await new Promise<void>((r) => {
+              releaseLockDelete = r
+            })
+            return baseFetch(input, init)
+          }
+          if (method === 'POST' && url.pathname === '/api/v1/documents/doc_s1/unshelve') {
+            const res = await baseFetch(input, init)
+            DOCS.doc_s1 = { ...origDocS1, shelved_at: undefined }
+            return res
+          }
+          return baseFetch(input, init)
+        }),
+      )
+
+      // Begin a real metadata refresh that captures the shelved response before unshelve
+      const staleRefresh = service.refreshMetadataFor('doc_s1')
+      await staleGetEntered
+
+      // Complete the app's own unshelve while the stale metadata GET is still in flight
+      const unshelvedRes = (await call(UNIWORK_DOC_CHANNELS.unshelveDocument, 'doc_s1')) as {
+        ok: boolean
+      }
+      expect(unshelvedRes.ok).toBe(true)
+      expect(service.isReadOnly(shelvedPath)).toBe(false)
+      await vi.waitFor(async () => {
+        expect(await service.docStatus(shelvedPath)).toMatchObject({
+          access: 'edit',
+          commentsLevel: 'manage',
+          lockSession: expect.objectContaining({ phase: 'held' }),
+        })
+      })
+      expect(service.commentContext(shelvedPath)).toMatchObject({ level: 'manage' })
+      const restoredBinding = service.store.lookup(shelvedPath)?.binding
+      expect(restoredBinding).toMatchObject({
+        access: 'edit',
+        level: 'manage',
+      })
+      expect(restoredBinding?.shelved).toBeUndefined()
+
+      // Release the older shelved GET and verify it does not reverse the app's own unshelve or drop the edit lock
+      releaseStaleGet?.()
+      await staleRefresh
+      expect(service.isReadOnly(shelvedPath)).toBe(false)
+      expect(await service.docStatus(shelvedPath)).toMatchObject({
+        access: 'edit',
+        commentsLevel: 'manage',
+        lockSession: expect.objectContaining({ phase: 'held' }),
+      })
+      expect(service.commentContext(shelvedPath)).toMatchObject({ level: 'manage' })
+      const afterStaleBinding = service.store.lookup(shelvedPath)?.binding
+      expect(afterStaleBinding).toMatchObject({
+        access: 'edit',
+        level: 'manage',
+      })
+      expect(afterStaleBinding?.shelved).toBeUndefined()
+      expect(
+        seen.some(
+          (s) =>
+            s.method === 'DELETE' && s.url.pathname === '/api/v1/documents/doc_s1/edit-lock/l_1',
+        ),
+      ).toBe(false)
+
+      // Another ordinary refresh against the now-unshelved server keeps edit/manage and the edit lock
+      await service.refreshMetadataFor('doc_s1')
+      expect(service.isReadOnly(shelvedPath)).toBe(false)
+      expect(await service.docStatus(shelvedPath)).toMatchObject({
+        access: 'edit',
+        commentsLevel: 'manage',
+        lockSession: expect.objectContaining({ phase: 'held' }),
+      })
+      expect(service.commentContext(shelvedPath)).toMatchObject({ level: 'manage' })
+      const afterFreshBinding = service.store.lookup(shelvedPath)?.binding
+      expect(afterFreshBinding).toMatchObject({
+        access: 'edit',
+        level: 'manage',
+      })
+      expect(afterFreshBinding?.shelved).toBeUndefined()
+
+      // Also verify the inner queued updateBinding guard when a shelved refresh resolves its GET
+      // and enters stopEditLock before unshelve, then queues updateBinding after unshelve completes
+      DOCS.doc_s1 = { ...origDocS1 }
+      gateLockDelete = true
+      const queuedStaleRefresh = service.refreshMetadataFor('doc_s1')
+      await lockDeleteEntered
+
+      const reUnshelved = (await call(UNIWORK_DOC_CHANNELS.unshelveDocument, 'doc_s1')) as {
+        ok: boolean
+      }
+      expect(reUnshelved.ok).toBe(true)
+      expect(service.isReadOnly(shelvedPath)).toBe(false)
+
+      releaseLockDelete?.()
+      await queuedStaleRefresh
+      expect(service.isReadOnly(shelvedPath)).toBe(false)
+      await vi.waitFor(async () => {
+        expect(await service.docStatus(shelvedPath)).toMatchObject({
+          access: 'edit',
+          commentsLevel: 'manage',
+          lockSession: expect.objectContaining({ phase: 'held' }),
+        })
+      })
+      expect(service.store.lookup(shelvedPath)?.binding.shelved).toBeUndefined()
+    } finally {
+      releaseStaleGet?.()
+      releaseLockDelete?.()
+      DOCS.doc_s1 = origDocS1
+      await service.releaseAllEditLocks()
+    }
+  })
 })
