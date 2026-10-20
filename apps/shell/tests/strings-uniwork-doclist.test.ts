@@ -58,7 +58,8 @@ describe('uniwork doclist string shard', () => {
   })
 
   it('never says "Hạn chế" for the private pill, in any locale', () => {
-    for (const lang of LANGS) expect(table(lang).dlAccessRestricted).not.toMatch(/Hạn chế|Restricted/)
+    for (const lang of LANGS)
+      expect(table(lang).dlAccessRestricted).not.toMatch(/Hạn chế|Restricted/)
   })
 
   it('names no internal code, git or GitHub word in any locale', () => {

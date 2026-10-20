@@ -19,7 +19,7 @@ describe('groupOf', () => {
     }
   })
 
-  it('lists each screen\'s groups in display order', () => {
+  it("lists each screen's groups in display order", () => {
     expect(groupIdsFor('recent')).toEqual(['today', 'yesterday', 'this_week', 'earlier'])
     expect(groupIdsFor('shared')).toEqual(['this_week', 'earlier'])
     expect(groupIdsFor('trash')).toEqual(['deleting_soon', 'more_than_7_days'])

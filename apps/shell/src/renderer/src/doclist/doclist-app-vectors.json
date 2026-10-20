@@ -421,9 +421,9 @@
       },
       {
         "bytes": 1023,
-        "en": "1023 B",
-        "label": "largest byte count",
-        "vi": "1023 B"
+        "en": "1,023 B",
+        "label": "largest byte count (the locale groups thousands)",
+        "vi": "1.023 B"
       },
       {
         "bytes": 1024,
@@ -472,266 +472,112 @@
   "columns": {
     "cases": [
       {
-        "columns": [
-          "select",
-          "name",
-          "access",
-          "editor",
-          "updated",
-          "size",
-          "actions"
-        ],
+        "columns": ["select", "name", "access", "editor", "updated", "size", "actions"],
         "screen": "workspace",
         "width": 1400
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "access",
-          "editor",
-          "updated",
-          "size",
-          "actions"
-        ],
+        "columns": ["select", "name", "access", "editor", "updated", "size", "actions"],
         "screen": "workspace",
         "width": 992
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "access",
-          "editor",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "access", "editor", "updated", "actions"],
         "screen": "workspace",
         "width": 991
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "access",
-          "editor",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "access", "editor", "updated", "actions"],
         "screen": "workspace",
         "width": 896
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "access",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "access", "updated", "actions"],
         "screen": "workspace",
         "width": 895
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "access",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "access", "updated", "actions"],
         "screen": "workspace",
         "width": 688
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "updated", "actions"],
         "screen": "workspace",
         "width": 687
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "updated", "actions"],
         "screen": "workspace",
         "width": 300
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "activity",
-          "access",
-          "editor",
-          "updated",
-          "size",
-          "actions"
-        ],
+        "columns": ["select", "name", "activity", "access", "editor", "updated", "size", "actions"],
         "screen": "recent",
         "width": 1200
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "activity",
-          "access",
-          "editor",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "activity", "access", "editor", "updated", "actions"],
         "screen": "recent",
         "width": 1167
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "activity",
-          "access",
-          "editor",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "activity", "access", "editor", "updated", "actions"],
         "screen": "recent",
         "width": 1072
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "activity",
-          "access",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "activity", "access", "updated", "actions"],
         "screen": "recent",
         "width": 1071
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "activity",
-          "access",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "activity", "access", "updated", "actions"],
         "screen": "recent",
         "width": 864
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "activity",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "activity", "updated", "actions"],
         "screen": "recent",
         "width": 863
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "deleted",
-          "access",
-          "editor",
-          "updated",
-          "size",
-          "actions"
-        ],
+        "columns": ["select", "name", "deleted", "access", "editor", "updated", "size", "actions"],
         "screen": "trash",
         "width": 1200
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "shared_with",
-          "access",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "shared_with", "access", "updated", "actions"],
         "screen": "shared-by-me",
         "width": 900
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "shelved",
-          "access",
-          "editor",
-          "updated",
-          "size",
-          "actions"
-        ],
+        "columns": ["select", "name", "shelved", "access", "editor", "updated", "size", "actions"],
         "screen": "shelved",
         "width": 1300
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "starred",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "starred", "updated", "actions"],
         "screen": "starred",
         "width": 700
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "shared",
-          "access",
-          "editor",
-          "updated",
-          "size",
-          "actions"
-        ],
+        "columns": ["select", "name", "shared", "access", "editor", "updated", "size", "actions"],
         "screen": "shared",
         "width": 1200
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "updated",
-          "size",
-          "actions"
-        ],
+        "columns": ["select", "name", "updated", "size", "actions"],
         "screen": "device",
         "width": 1200
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "updated",
-          "size",
-          "actions"
-        ],
+        "columns": ["select", "name", "updated", "size", "actions"],
         "screen": "device",
         "width": 640
       },
       {
-        "columns": [
-          "select",
-          "name",
-          "updated",
-          "actions"
-        ],
+        "columns": ["select", "name", "updated", "actions"],
         "screen": "device",
         "width": 639
       }
