@@ -59,7 +59,9 @@ Avatars (UNI-1986): the host rewrites `avatar_url` of comments, mentions and `me
 same-origin path `/api/v1/office-frame/documents/<documentId>/avatars/<userId>` (ULIDs, upper case) or to `""`; no
 protocol field, message or CSP change (`img-src 'self' data: blob:` stays). `shared/avatar/loader.ts` fetches that path
 with `Authorization: Bearer <frame token>` (the AI client's token: `getToken`, one `refreshToken('unauthorized')` retry
-after a 401), `credentials: 'omit'`, `mode: 'same-origin'`, and never sends the token to any other url. It accepts only
+after a 401), `credentials: 'omit'`, `mode: 'same-origin'`, `redirect: 'error'`, and never sends the token to any other url: only the exact
+path `/api/v1/office-frame/documents/<ULID>/avatars/<ULID>` is fetched (any other prefix or id shape is refused). It
+refuses a body whose Content-Length is over 2 MiB before reading it, and accepts only
 `image/png|jpeg|gif|webp` up to 2 MiB (never SVG), keeps at most 64 `blob:` urls (least recently used revoked, all
 revoked on dispose), runs one request per path at a time and four in all, and remembers a 404 (or a refused body) for
 5 minutes. The collab kit (`packages/ui/src/collab/avatar-source.tsx`) shows initials until the `blob:` url is ready and

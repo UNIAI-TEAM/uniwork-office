@@ -51,7 +51,7 @@ export interface FrameDiscussionProps {
   /** the panel opened / closed (the mount narrows the editor while it is open) */
   onOpenChange?(open: boolean): void
   handle?: Ref<FrameDiscussionHandle>
-  /** where this frame's avatar photos come from; unset = `window.uniworkAvatars` (none: initials only) */
+  /** where this frame's avatar photos come from; unset = `window.uniworkAvatars` (none: plain `<img src>`, as on desktop) */
   avatars?: FrameAvatars
 }
 

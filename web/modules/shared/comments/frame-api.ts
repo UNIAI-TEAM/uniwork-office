@@ -186,8 +186,9 @@ export function frameAvatars(client: Pick<FramePort, 'getToken' | 'refreshToken'
 }
 
 /**
- * Sets `window.uniworkComments` (and `window.uniworkAvatars` when the client has a frame token) once `init` granted `comments` (effective capabilities); resolves
- * with the API, or null when the frame has no comments (nothing is installed, no request is sent).
+ * Sets `window.uniworkComments` (and `window.uniworkAvatars` when the client has a frame token)
+ * once `init` granted `comments` (effective capabilities); resolves with the API, or null when the
+ * frame has no comments (nothing is installed, no request is sent).
  */
 export async function installFrameComments(
   client: FrameCommentsClient,

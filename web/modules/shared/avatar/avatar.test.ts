@@ -80,6 +80,32 @@ describe('isAvatarPath', () => {
     expect(isAvatarPath(`${P1}?x=1`)).toBe(false)
     expect(isAvatarPath('')).toBe(false)
   })
+
+  const DOC_ID = '01HDOC00000000000000000000'
+  it.each([
+    `//evil.test${P1}`,
+    `${P1}/../../ai`,
+    `/api/v1/office-frame/documents/${DOC_ID}/../avatars/${U1}`,
+    `/api/v1/office-frame%2Fdocuments/${DOC_ID}/avatars/${U1}`,
+    `${P1}%2F..`,
+    `\\evil.test${P1}`,
+    `/api/v1/office-frame/documents/${DOC_ID}\\avatars/${U1}`,
+    `${P1}?x=1`,
+    `${P1}#f`,
+    `${P1}\n`,
+    `${P1}/`,
+    `https://app.test${P1}`,
+    `/api/v1/office-frame/documents/${DOC_ID}/ai/credentials`,
+    P1.replace('/office-frame/', '/Office-Frame/'),
+    `/x${P1.replace('/api/v1', '')}`,
+    `/x/office-frame/documents/${DOC_ID}/avatars/${U1}`,
+    `/api${P1.replace('/api/v1', '')}`,
+    `/api/v1/office-frame/documents/a/avatars/b`,
+    `/api/v1/office-frame/documents/${DOC_ID}/avatars/ai`,
+    `/api/v1/office-frame/documents/${DOC_ID}/avatars/-${U1.slice(1)}`,
+  ])('refuses the trick path %j', (url) => {
+    expect(isAvatarPath(url)).toBe(false)
+  })
 })
 
 describe('createAvatarLoader', () => {
@@ -92,6 +118,7 @@ describe('createAvatarLoader', () => {
     expect(calls[0]!.url).toBe(`${ORIGIN}${P1}`)
     expect(calls[0]!.init.credentials).toBe('omit')
     expect(calls[0]!.init.mode).toBe('same-origin')
+    expect(calls[0]!.init.redirect).toBe('error')
     expect(new Headers(calls[0]!.init.headers).get('authorization')).toBe('Bearer tok-1')
   })
 

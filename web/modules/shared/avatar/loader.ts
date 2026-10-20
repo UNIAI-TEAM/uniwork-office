@@ -25,9 +25,10 @@ const ALLOWED_TYPES: ReadonlySet<string> = new Set([
   'image/webp',
 ])
 
-const AVATAR_PATH = /^\/(?:[\w-]+\/)*office-frame\/documents\/[\w-]+\/avatars\/[\w-]+$/
+const AVATAR_PATH =
+  /^\/api\/v1\/office-frame\/documents\/[0-9A-Za-z]{26}\/avatars\/[0-9A-Za-z]{26}$/
 
-/** a path of the avatar route (no query, no host): the only urls the frame token may go to */
+/** exactly `/api/v1/office-frame/documents/<ULID>/avatars/<ULID>` (no query, no host): the only urls the frame token may go to */
 export function isAvatarPath(url: string): boolean {
   return AVATAR_PATH.test(url)
 }
@@ -76,6 +77,7 @@ export function createAvatarLoader(options: AvatarLoaderOptions): AvatarLoader {
       headers: { Authorization: `Bearer ${token}` },
       credentials: 'omit',
       mode: 'same-origin',
+      redirect: 'error',
       signal: ctl.signal,
     })
   }
@@ -96,6 +98,8 @@ export function createAvatarLoader(options: AvatarLoaderOptions): AvatarLoader {
       if (!res.ok) return null
       const type = (res.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase()
       if (!ALLOWED_TYPES.has(type)) return remember()
+      // refuse an announced oversize body before buffering it; the real bytes are checked below
+      if (Number(res.headers.get('content-length')) > AVATAR_MAX_BYTES) return remember()
       const blob = await res.blob()
       if (blob.size > AVATAR_MAX_BYTES) return remember()
       if (mine !== epoch) return null
