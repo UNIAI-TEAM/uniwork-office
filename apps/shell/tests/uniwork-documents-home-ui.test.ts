@@ -1624,10 +1624,12 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(docRow).not.toBeNull()
     const docSubpath = docRow.querySelector<HTMLElement>('.dh-doc-subpath')!
     expect(docSubpath).not.toBeNull()
-    expect(docSubpath.getAttribute('title')).toBe('UniWork › Division › Region › Country › Branch')
+    expect(docSubpath.getAttribute('title')).toBe(
+      'Tài liệu (gốc) › Division › Region › Country › Branch',
+    )
     expect(docSubpath.querySelector('[aria-hidden="true"]')?.textContent).toBe('… › Branch ›')
     expect(docSubpath.querySelector('.uw-sr-only')?.textContent).toBe(
-      'Đường dẫn: UniWork › Division › Region › Country › Branch',
+      'Đường dẫn: Tài liệu (gốc) › Division › Region › Country › Branch',
     )
 
     // Folder search card also has aria-hidden short path + .uw-sr-only full path + title attribute
@@ -1637,10 +1639,10 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(folderCard).not.toBeNull()
     const folderSubpath = folderCard.querySelector<HTMLElement>('.dh-doc-subpath')!
     expect(folderSubpath).not.toBeNull()
-    expect(folderSubpath.getAttribute('title')).toBe('UniWork › Finance › FY2026')
+    expect(folderSubpath.getAttribute('title')).toBe('Tài liệu (gốc) › Finance › FY2026')
     expect(folderSubpath.querySelector('[aria-hidden="true"]')?.textContent).toBe('… › FY2026 ›')
     expect(folderSubpath.querySelector('.uw-sr-only')?.textContent).toBe(
-      'Đường dẫn: UniWork › Finance › FY2026',
+      'Đường dẫn: Tài liệu (gốc) › Finance › FY2026',
     )
   })
 
@@ -2720,14 +2722,14 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     await mountHome()
 
     // root: no parentId -> picker opens at the (null) open folder, i.e. the root
-    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: UniWork')
+    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: Tài liệu (gốc)')
     await act(async () => {
       document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
     })
     await flush()
 
     // folder card without parentId -> falls back to the open folder (root) too
-    expect(await openMovePickerFor('f-orphan')).toBe('Đường dẫn: UniWork')
+    expect(await openMovePickerFor('f-orphan')).toBe('Đường dẫn: Tài liệu (gốc)')
     await act(async () => {
       document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
     })
@@ -2736,7 +2738,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     // Shared with me (entered from the root): the row lists, and Move does not crash or invent a parent
     await clickNavItem('shared-with-me')
     expect(host.querySelector('.dh-doc-row[data-doc-id="doc-orphan"]')).not.toBeNull()
-    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: UniWork')
+    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: Tài liệu (gốc)')
     await act(async () => {
       document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
     })
@@ -2753,7 +2755,9 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
     expect(host.querySelector('.dh-doc-row[data-doc-id="doc-orphan"]')).not.toBeNull()
-    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: UniWork › Báo cáo HĐQT Q4')
+    expect(await openMovePickerFor('doc-orphan')).toBe(
+      'Đường dẫn: Tài liệu (gốc) › Báo cáo HĐQT Q4',
+    )
     await act(async () => {
       document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
     })

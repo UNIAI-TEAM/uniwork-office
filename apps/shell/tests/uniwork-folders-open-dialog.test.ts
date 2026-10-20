@@ -164,11 +164,11 @@ describe('Open from UniWork as the browser', () => {
     expect($('[role="tree"]')).toBeTruthy()
     expect($('.uw-pick-body')?.textContent).toContain('Recent.docx')
     // no tree row reads as the open folder while Recent is shown
-    expect(treeItem('UniWork').getAttribute('aria-selected')).toBe('false')
+    expect(treeItem('Documents (root)').getAttribute('aria-selected')).toBe('false')
   })
 
   it('a tree folder shows its contents; Recent comes back from its view button', async () => {
-    await click(treeItem('UniWork'))
+    await click(treeItem('Documents (root)'))
     expect(button(en.ufRecent).getAttribute('aria-pressed')).toBe('false')
     expect($$('.uwf-contents [role="option"]').map((o) => o.textContent)).toEqual([
       expect.stringContaining('Alpha'),
@@ -188,7 +188,7 @@ describe('Open from UniWork as the browser', () => {
   })
 
   it('in a folder the search box searches titles; Escape returns to the folder first', async () => {
-    await click(treeItem('UniWork'))
+    await click(treeItem('Documents (root)'))
     expect($<HTMLInputElement>('.uw-pick-search')!.placeholder).toBe(en.ufSearchPh)
     const recentCalls = api.uniworkListDocuments.mock.calls.length
     await search('ins')
@@ -218,7 +218,7 @@ describe('Open from UniWork as the browser', () => {
     await click(treeItem('Alpha'))
     await click(button('New document'))
     const location = $<HTMLButtonElement>('.modal.uw-act .uwf-location-btn')!
-    expect(location.textContent).toContain('UniWork › Alpha')
+    expect(location.textContent).toContain('Documents (root) › Alpha')
     // Recent: no folder, which is My Folder since SAVE-01 Q1 (main sends destination my_folder)
     await click(button('Cancel'))
     await click(button(en.ufRecent))
@@ -271,7 +271,7 @@ describe('Open from UniWork in Vietnamese (UNI-1958 rows 7, 10)', () => {
     await renderVi()
     expect($('.uw-pick-ws')!.getAttribute('aria-label')).toBe('Workspace')
     expect($('.uw-pick-ws optgroup')!.getAttribute('label')).toBe('Workspace')
-    await click(treeItem('UniWork'))
+    await click(treeItem('Tài liệu (gốc)'))
     expect($<HTMLInputElement>('.uw-pick-search')!.placeholder).toBe('Tìm theo tên trong workspace')
   })
 
