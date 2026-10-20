@@ -840,6 +840,14 @@ describe('server mode: reveal focus guard against the editor refocus', () => {
     expect(document.activeElement).toBe(editor)
   })
 
+  it('is still guarding at 1.4 s, when a late editor refocus lands', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { heading } = await revealed()
+    act(() => void vi.advanceTimersByTime(1400))
+    act(() => editor.focus())
+    expect(document.activeElement).toBe(heading)
+  })
+
   it('leaves focus alone when the thread heading is gone (panel closed)', async () => {
     await revealed()
     act(() => threadPane.close())
