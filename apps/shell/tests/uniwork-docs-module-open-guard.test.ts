@@ -159,8 +159,20 @@ describe('installUniworkModuleSeams forwards refuseLockedPath (R1-be-3)', () => 
     )
     // G8-02: the same installation carries the comment-author source (UNI-1993: and the source views)
     expect(read('src/main/index.ts')).toMatch(
-      /installUniworkModuleSeams\(\s*uniworkService,\s*createCommentAuthorResolver\(\{\s*isBound: \(path\) => uniworkService\.isBound\(path\),\s*displayName: uniworkAccountDisplayName,\s*\}\),(?:(?:\s*\/\/[^\n]*)*\s*\{\s*registry: uniworkService\.sourceViews,\s*onSourceSave: createSourceSaveHint\(\{ hostForPath: sourceViewHostForPath \}\),\s*\},)?\s*\)/,
+      /installUniworkModuleSeams\(\s*uniworkService,\s*createCommentAuthorResolver\(\{\s*isBound: \(path\) => uniworkService\.isBound\(path\),\s*displayName: uniworkAccountDisplayName,\s*\}\),(?:(?:\s*\/\/[^\n]*)*\s*\{\s*registry: uniworkService\.sourceViews,\s*onSourceSave: createSourceSaveHint\(\{ hostForPath: sourceViewHostForPath \}\),\s*\},)\s*\)/,
     )
+  })
+
+  it('will-quit disposes the source views after the edit-lock hold branch, before stopUniworkAccount', () => {
+    const source = read('src/main/index.ts')
+    const will = source.slice(source.indexOf("app.on('will-quit'"))
+    const hold = will.indexOf('quitAgainAfterWillQuit')
+    const dispose = will.indexOf('uniworkDocs?.service.disposeSourceViews()')
+    const stop = will.indexOf('stopUniworkAccount()')
+    expect(hold).toBeGreaterThan(-1)
+    // a held quit re-enters will-quit; the decrypted copies go on the pass that really quits
+    expect(dispose).toBeGreaterThan(hold)
+    expect(dispose).toBeLessThan(stop)
   })
 })
 

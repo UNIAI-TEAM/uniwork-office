@@ -265,6 +265,129 @@ describe('the explicit-Save hint', () => {
   })
 })
 
+describe('the explicit-Save hint in a detached editor window', () => {
+  // a detached window is a bare BrowserWindow around the editor view: no renderer listens there,
+  // so the sentence is a native message box on that window
+  const win = (label: string) => ({ label })
+  const hostSpy = () => {
+    const sent: unknown[] = []
+    return {
+      sent,
+      contents: { isDestroyed: () => false, send: (...args: unknown[]) => void sent.push(args) },
+    }
+  }
+  const make = (
+    detached: { label: string } | undefined,
+    notify: (w: { label: string }) => Promise<void>,
+  ) => {
+    const shell = hostSpy()
+    const hint = createSourceSaveHint({
+      hostForPath: () => shell.contents,
+      detached: { windowForPath: () => detached, notify },
+    })
+    return { shell, hint }
+  }
+
+  it('shows the native box on the detached window and sends nothing to a renderer', () => {
+    const w = win('detached-1')
+    const shown: Array<{ label: string }> = []
+    const { shell, hint } = make(w, (target) => {
+      shown.push(target)
+      return new Promise<void>(() => undefined)
+    })
+    hint('/x/sources-1/ab/Plan.docx')
+    expect(shown).toEqual([w])
+    expect(shell.sent).toEqual([])
+  })
+
+  it('keeps the shell-window path when no detached window shows the path', () => {
+    const shown: unknown[] = []
+    const { shell, hint } = make(undefined, async (target) => void shown.push(target))
+    hint('/x/sources-1/ab/Plan.docx')
+    expect(shown).toEqual([])
+    expect(shell.sent).toEqual([
+      ['uniwork-doc:source-view-hint', { path: '/x/sources-1/ab/Plan.docx' }],
+    ])
+  })
+
+  it('shows at most one box at a time per window, and again once it was dismissed', async () => {
+    const w = win('detached-1')
+    let calls = 0
+    let dismiss: () => void = () => undefined
+    const { hint } = make(w, () => {
+      calls++
+      return new Promise<void>((resolve) => {
+        dismiss = resolve
+      })
+    })
+    hint('/x/a.docx')
+    hint('/x/a.docx')
+    hint('/x/a.docx')
+    expect(calls).toBe(1)
+    dismiss()
+    await vi.waitFor(() => {
+      hint('/x/a.docx')
+      expect(calls).toBe(2)
+    })
+  })
+
+  it('throttles per window: a second detached window still gets its own box', () => {
+    const windows = new Map([
+      ['/x/a.docx', win('A')],
+      ['/x/b.docx', win('B')],
+    ])
+    const shown: string[] = []
+    const hint = createSourceSaveHint({
+      hostForPath: () => undefined,
+      detached: {
+        windowForPath: (path) => windows.get(path),
+        notify: (target) => {
+          shown.push(target.label)
+          return new Promise<void>(() => undefined)
+        },
+      },
+    })
+    hint('/x/a.docx')
+    hint('/x/b.docx')
+    hint('/x/a.docx')
+    expect(shown).toEqual(['A', 'B'])
+  })
+
+  it('a box that failed to show frees the window for the next Save', async () => {
+    const w = win('detached-1')
+    let calls = 0
+    const { hint } = make(w, () => {
+      calls++
+      return Promise.reject(new Error('window gone'))
+    })
+    hint('/x/a.docx')
+    await vi.waitFor(() => {
+      hint('/x/a.docx')
+      expect(calls).toBeGreaterThanOrEqual(2)
+    })
+  })
+
+  it('index.ts glue: the detached branch is a native box with the main-side sentence in every locale', () => {
+    const index = readFileSync(join(__dirname, '..', 'src/main/index.ts'), 'utf8')
+    const glue = index.slice(index.indexOf('createSourceSaveHint({'))
+    expect(glue.slice(0, 900)).toMatch(
+      /detached: \{[\s\S]*?dialog\.showMessageBox\([^)]*\{ type: 'info', message: tm\('uwSourceViewSaveHint'\) \}/,
+    )
+    const table = index.slice(
+      index.indexOf('const tMain = createI18n('),
+      index.indexOf('const tm = '),
+    )
+    // the shell's main table is per-locale (zh defines the key set, the type check covers the rest)
+    expect([...table.matchAll(/^ {4}uwSourceViewSaveHint:/gm)]).toHaveLength(
+      [...table.matchAll(/^ {2}(?:'zh-TW'|[a-z]{2}): \{$/gm)].length,
+    )
+    expect(table).toContain("uwSourceViewSaveHint: 'Tệp này chỉ để xem — thay đổi không được lưu.'")
+    expect(table).toContain(
+      'uwSourceViewSaveHint: "This file is view only — changes aren\'t saved."',
+    )
+  })
+})
+
 describe('main-side entries that act on a path must not touch a source view', () => {
   const index = readFileSync(join(__dirname, '..', 'src/main/index.ts'), 'utf8')
 
