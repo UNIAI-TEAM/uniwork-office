@@ -238,6 +238,55 @@ describe('UNI-1961 live-row Lưu trữ (shelve) in the Documents home', () => {
     )
   })
 
+  it('a shelved search hit offers no Rename or Move (the server answers 409 document_shelved)', async () => {
+    const hit = (over: Partial<DocumentsHomeDoc> & { id: string }): DocumentsHomeDoc => ({
+      workspaceId: 'ws-1',
+      title: `${over.id}.docx`,
+      format: 'docx',
+      updatedAt: '2026-10-12T09:00:00.000Z',
+      kind: 'file',
+      parentId: null,
+      myLevel: 'manage',
+      canManage: true,
+      canEdit: true,
+      ...over,
+    })
+    api.uniworkSearchDocuments!.mockResolvedValue(
+      ok({
+        items: [
+          hit({ id: 'hit-shelved', title: 'Hợp đồng cũ.docx', shelvedAt: '2026-10-01T09:00:00Z' }),
+          hit({ id: 'hit-live', title: 'Hợp đồng mới.docx' }),
+        ],
+        nextCursor: null,
+      }),
+    )
+    await mount()
+    const input = host.querySelector<HTMLInputElement>('input.uwf-own-search')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        input,
+        'Hợp đồng',
+      )
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await flush()
+    const ids = (items: HTMLButtonElement[]) =>
+      items.map((i) => i.getAttribute('data-folder-action'))
+
+    const shelved = ids(await menuOf('.dh-doc-row[data-doc-id="hit-shelved"]'))
+    expect(shelved).toContain('open')
+    expect(shelved).not.toContain('rename')
+    expect(shelved).not.toContain('move')
+    expect(shelved).not.toContain('offline')
+    expect(shelved).not.toContain('shelve')
+    await act(async () => {
+      document.body.click()
+    })
+
+    const live = ids(await menuOf('.dh-doc-row[data-doc-id="hit-live"]'))
+    expect(live).toEqual(expect.arrayContaining(['open', 'rename', 'move', 'shelve']))
+  })
+
   it('speaks the web English copy', async () => {
     localStorage.setItem('genoffice.lang', 'en')
     await mount('en')
