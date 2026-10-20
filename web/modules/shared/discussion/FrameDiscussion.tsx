@@ -8,12 +8,15 @@
  * toggle (Accessibility Floor G8); another panel opening closes it without touching focus.
  */
 import {
+  AvatarSourceProvider,
   CollabComposer,
   CollabPanel,
   collabStrings,
   useCollabThreads,
+  useFrameAvatarSource,
   type CollabController,
   type CollabHostState,
+  type FrameAvatars,
   type CollabLevel,
   type CollabSource,
 } from '@genoffice/ui/collab'
@@ -48,11 +51,14 @@ export interface FrameDiscussionProps {
   /** the panel opened / closed (the mount narrows the editor while it is open) */
   onOpenChange?(open: boolean): void
   handle?: Ref<FrameDiscussionHandle>
+  /** where this frame's avatar photos come from; unset = `window.uniworkAvatars` (none: initials only) */
+  avatars?: FrameAvatars
 }
 
 export function FrameDiscussion(p: FrameDiscussionProps) {
   const { source, documentId, level, myUserId, lang, platform, onOpenChange } = p
   const strings = collabStrings(lang)
+  const avatarSource = useFrameAvatarSource(p.avatars)
   const host = useMemo<CollabHostState>(
     () => ({
       documentId,
@@ -100,7 +106,7 @@ export function FrameDiscussion(p: FrameDiscussionProps) {
   }
 
   return (
-    <>
+    <AvatarSourceProvider value={avatarSource}>
       <div className="uw-disc-bar">
         <button
           ref={toggleRef}
@@ -132,6 +138,6 @@ export function FrameDiscussion(p: FrameDiscussionProps) {
           />
         )}
       </div>
-    </>
+    </AvatarSourceProvider>
   )
 }

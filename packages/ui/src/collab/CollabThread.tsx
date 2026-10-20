@@ -18,6 +18,7 @@ import {
 import { format } from '@genoffice/i18n'
 import { useModalKeys } from '../modal-keys'
 import { AnchorLabel, type AnchorLabelStrings } from './AnchorLabel'
+import { AvatarFace } from './avatar-source'
 import { CollabBody } from './CollabBody'
 import {
   applyMentionEdit,
@@ -127,13 +128,9 @@ function initials(name: string): string {
 }
 
 /** photo with initials fallback: a load error (404, offline, CSP img-src block) swaps back to
-    initials; the flag tracks which url failed, so a url change renders the new photo */
+    initials; the flag tracks which src failed, so a url change renders the new photo */
 function CommentAvatar(p: { url: string | undefined; name: string }) {
-  const [badFor, setBadFor] = useState<string | null>(null)
-  if (!p.url || badFor === p.url) return <>{initials(p.name)}</>
-  return (
-    <img src={p.url} alt="" referrerPolicy="no-referrer" onError={() => setBadFor(p.url ?? null)} />
-  )
+  return <AvatarFace url={p.url} initials={initials(p.name)} />
 }
 
 function copyText(text: string): void {

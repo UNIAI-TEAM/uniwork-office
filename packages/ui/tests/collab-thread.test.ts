@@ -6,7 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { format } from '@genoffice/i18n'
 import { CollabComposer } from '../src/collab/CollabComposer'
 import { CollabPanel } from '../src/collab/CollabPanel'
-import { AvatarSourceProvider, type AvatarSource } from '../src/collab/avatar-source'
+import {
+  AvatarSourceProvider,
+  useFrameAvatarSource,
+  type AvatarSource,
+} from '../src/collab/avatar-source'
 import { formatCollabTime } from '../src/collab/CollabThread'
 import { useCollabThreads, type CollabController } from '../src/collab/use-collab-threads'
 import type { CollabHostState, CollabSource } from '../src/collab/types'
@@ -825,5 +829,36 @@ describe('avatars through the frame source (UNI-1986)', () => {
     await mountWith(one(''), avatars)
     expect(avatars.load).not.toHaveBeenCalled()
     expect($('[data-comment-id="a"] .collab-av')!.textContent).toBe('AL')
+  })
+
+  it('useFrameAvatarSource makes one source per host, disposes it on unmount, none without a frame', async () => {
+    const made: Array<{ load: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }> = []
+    const frame = {
+      createSource: () => {
+        const s = { load: vi.fn(async () => null), dispose: vi.fn() }
+        made.push(s)
+        return s
+      },
+    }
+    let seen: AvatarSource | null | undefined
+    const Probe = (p: { frame: typeof frame | undefined }) => {
+      seen = useFrameAvatarSource(p.frame)
+      return null
+    }
+    await act(async () => {
+      root.render(createElement(Probe, { frame }))
+      await flush()
+    })
+    expect(made).toHaveLength(1)
+    expect(seen).toBe(made[0])
+    expect(made[0]!.dispose).not.toHaveBeenCalled()
+    act(() => root.unmount())
+    expect(made[0]!.dispose).toHaveBeenCalledTimes(1)
+    root = createRoot(el)
+    await act(async () => {
+      root.render(createElement(Probe, { frame: undefined }))
+      await flush()
+    })
+    expect(seen).toBeNull()
   })
 })

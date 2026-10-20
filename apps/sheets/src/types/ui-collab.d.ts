@@ -7,7 +7,7 @@
  * use-collab-threads.ts, uniwork-source.ts, CollabPanel.tsx, CollabThread.tsx, strings.ts,
  * live-region.ts); `type-checks/ui-collab-shim.ts` fails `npm run typecheck` when they drift.
  */
-import type { ReactElement, ReactNode } from 'react'
+import type { Provider, ReactElement, ReactNode } from 'react'
 import type { Lang } from '@genoffice/i18n'
 
 export type CollabLevel = 'view' | 'comment' | 'edit' | 'manage'
@@ -193,6 +193,15 @@ export interface UniworkCommentsLike {
   shareView?(input: { path: string; userId: string }): Promise<CollabReply<{ ok: true }>>
   canListMembers?: boolean
 }
+
+/** the picture source of a frame (`@genoffice/ui/collab` avatar-source) */
+export interface AvatarSource {
+  load(url: string, signal: AbortSignal): Promise<string | null>
+  dispose?(): void
+}
+export const AvatarSourceProvider: Provider<AvatarSource | null>
+/** the avatar source of this web frame (null on desktop); disposed when the host unmounts */
+export function useFrameAvatarSource(): AvatarSource | null
 
 export function createUniworkCommentsSource(
   api: UniworkCommentsLike,

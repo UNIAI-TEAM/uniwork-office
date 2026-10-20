@@ -23,6 +23,7 @@ import {
 } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import {
+  AvatarSourceProvider,
   CollabComposer,
   CollabPanel,
   collabStrings,
@@ -30,6 +31,7 @@ import {
   loadDraft,
   sendAnchorMap,
   useCollabThreads,
+  useFrameAvatarSource,
   type CollabActions,
   type CollabAnchorAdapter,
   type CollabController,
@@ -397,6 +399,7 @@ export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
     saveFirstText,
     ...opts
   } = p
+  const avatars = useFrameAvatarSource()
   const comments = usePdfServerComments({ ...opts, open })
   apiRef.current = comments
   useEffect(
@@ -421,14 +424,16 @@ export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
   }, [open, comments])
   if (!open) return null
   return (
-    <PdfCommentsPanel
-      comments={comments}
-      {...(panelId ? { id: panelId } : {})}
-      lang={opts.lang}
-      onClose={onClose}
-      {...(onFocusOpener ? { onFocusOpener } : {})}
-      {...(inFile ? { inFile } : {})}
-      {...(comments.needsSave ? { saveFirst: saveFirstText } : {})}
-    />
+    <AvatarSourceProvider value={avatars}>
+      <PdfCommentsPanel
+        comments={comments}
+        {...(panelId ? { id: panelId } : {})}
+        lang={opts.lang}
+        onClose={onClose}
+        {...(onFocusOpener ? { onFocusOpener } : {})}
+        {...(inFile ? { inFile } : {})}
+        {...(comments.needsSave ? { saveFirst: saveFirstText } : {})}
+      />
+    </AvatarSourceProvider>
   )
 }

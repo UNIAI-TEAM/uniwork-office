@@ -13,12 +13,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { Lang } from '@genoffice/i18n'
 import {
   COMMENTS_REVEAL_WAIT_MS,
+  AvatarSourceProvider,
   CollabComposer,
   CollabPanel,
   announcePolite,
   collabStrings,
   formatCollabTime,
   useCollabThreads,
+  useFrameAvatarSource,
   type CollabController,
   type CollabHostState,
   type CollabThreadView,
@@ -144,6 +146,7 @@ function InFileList(p: {
 }
 
 export function SheetsServerComments(p: SheetsServerCommentsProps) {
+  const avatars = useFrameAvatarSource()
   const { mode, view, lang, panelOpen } = p
   const store = p.store ?? serverAnchorStore
   const source = useMemo(
@@ -377,35 +380,37 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   // a view or comment caller cannot save the file, so a "save first" prompt would lead nowhere
   const needsSave = !knownVersion && mode.level !== 'view' && mode.level !== 'comment'
   return (
-    <div className="sheets-server-comments">
-      <CollabPanel
-        className="sheets-server-panel"
-        controller={ctl}
-        strings={strings}
-        onClose={p.onClosePanel}
-        renderComposer={(slot) => <CollabComposer {...slot} strings={strings} />}
-        inFile={
-          p.inFile.length > 0
-            ? {
-                count: p.inFile.length,
-                content: (
-                  <InFileList
-                    threads={p.inFile}
-                    activeSheet={activeSheet}
-                    neutralAuthor={p.neutralAuthor}
-                    lang={lang}
-                    resolvedLabel={strings.collabResolved ?? ''}
-                  />
-                ),
-              }
-            : undefined
-        }
-      />
-      {needsSave && (
-        <p className="collab-pnote collab-pnote--warn sheets-server-save-first">
-          {p.saveFirstMessage}
-        </p>
-      )}
-    </div>
+    <AvatarSourceProvider value={avatars}>
+      <div className="sheets-server-comments">
+        <CollabPanel
+          className="sheets-server-panel"
+          controller={ctl}
+          strings={strings}
+          onClose={p.onClosePanel}
+          renderComposer={(slot) => <CollabComposer {...slot} strings={strings} />}
+          inFile={
+            p.inFile.length > 0
+              ? {
+                  count: p.inFile.length,
+                  content: (
+                    <InFileList
+                      threads={p.inFile}
+                      activeSheet={activeSheet}
+                      neutralAuthor={p.neutralAuthor}
+                      lang={lang}
+                      resolvedLabel={strings.collabResolved ?? ''}
+                    />
+                  ),
+                }
+              : undefined
+          }
+        />
+        {needsSave && (
+          <p className="collab-pnote collab-pnote--warn sheets-server-save-first">
+            {p.saveFirstMessage}
+          </p>
+        )}
+      </div>
+    </AvatarSourceProvider>
   )
 }
