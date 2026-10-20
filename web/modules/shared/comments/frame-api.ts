@@ -30,11 +30,7 @@ import {
 import { frameDocVersion, type FrameDocVersion } from './doc-version'
 import { frameMentionAccess } from './mention-access'
 import { frameRevealRouter, type RevealPort } from './reveal-router'
-import {
-  createFrameViewVersion,
-  frameOpenVersionId,
-  type FrameVersionViewProps,
-} from './version-view'
+import { createFrameViewVersion, frameOpenVersionId } from './version-view'
 
 /** what the frame API needs from the frame client (the real client has it all) */
 export type FrameCommentsClient = Pick<FramePort, 'whenInitialized' | 'request'> & RevealPort
@@ -63,13 +59,6 @@ export interface FrameCommentsExtras {
   canListMembers?: boolean
   /** `comments.shareView`: grant `view` to a mentioned user (the host fixes the level) */
   shareView?(input: { path?: string; userId: string }): Promise<CommentsReply<{ ok: true }>>
-  /**
-   * UNI-2033: the kit's `onViewVersion`; exists only with the effective `commentsViewVersion`
-   * capability (see ./version-view). Answers `{opened}`, never rejects.
-   */
-  viewVersion?: FrameVersionViewProps['onViewVersion']
-  /** UNI-2033: the kit's `openVersionId`: the open file's server version id, undefined while unknown */
-  openVersionId?(): string | undefined
 }
 
 /**
@@ -150,8 +139,10 @@ export function createFrameCommentsApi(
             call('comments.shareView', { user_id: userId }),
         }
       : {}),
-    ...(viewVersion ? { viewVersion } : {}),
-    openVersionId: () => frameOpenVersionId(version, hooks.session ?? {}),
+    // UNI-2033: only with the effective `commentsViewVersion` capability (see ./version-view)
+    ...(viewVersion
+      ? { openVersion: ({ commentId, versionNo }) => viewVersion({ commentId, versionNo }) }
+      : {}),
     context: () =>
       envelope(async (): Promise<CommentsContextResult> => {
         const session = (await client.whenInitialized()) as CommentsSession
@@ -159,7 +150,7 @@ export function createFrameCommentsApi(
         return {
           documentId: session.documentId,
           // the bridges note every open/save; before the first one, init's open payload
-          versionId: version.current().versionId ?? session.open?.file.versionId ?? null,
+          versionId: frameOpenVersionId(version, session) ?? null,
           ...(isReadOnlyProfile(session)
             ? { level: 'view' as const }
             : isLevel(session.commentsLevel)

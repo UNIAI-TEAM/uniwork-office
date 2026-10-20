@@ -1,6 +1,6 @@
 /**
- * UNI-2033 (T4): the bridge half of "view the version an anchor was kept in". The kit gets
- * `onViewVersion` only with the effective `commentsViewVersion` capability, and `openVersionId`
+ * UNI-2033 (T4): the bridge half of "view the version an anchor was kept in". The editors get
+ * `openVersion` only with the effective `commentsViewVersion` capability, and the open version id
  * is the `FileMeta.versionId` the host gave in `api.open` (or the one a landed save made current).
  */
 import { describe, expect, it } from 'vitest'
@@ -12,7 +12,6 @@ import {
   createFrameDocVersion,
   createFrameViewVersion,
   frameOpenVersionId,
-  frameVersionViewProps,
 } from './index'
 
 const COMMENT_ID = '01J8X4CMTN0000000000000001'
@@ -107,54 +106,6 @@ describe('frameOpenVersionId', () => {
       },
     }
     expect(frameOpenVersionId(version, session)).toBe('ver-init')
-  })
-})
-
-describe('frameVersionViewProps', () => {
-  it('gives the kit both props with the grant and only openVersionId without it', async () => {
-    const version = createFrameDocVersion()
-    version.noteOpened({ path: 'p', versionId: 'ver-9' })
-
-    const granted = framePort({ comments: true, commentsViewVersion: true })
-    const withGrant = frameVersionViewProps(
-      granted.port,
-      await granted.port.whenInitialized(),
-      version,
-    )
-    expect(withGrant.openVersionId).toBe('ver-9')
-    expect(withGrant.onViewVersion).toBeTypeOf('function')
-
-    const plain = framePort({ comments: true })
-    const without = frameVersionViewProps(plain.port, await plain.port.whenInitialized(), version)
-    expect(without.openVersionId).toBe('ver-9')
-    expect(without.onViewVersion).toBeUndefined()
-    expect('onViewVersion' in without).toBe(false)
-  })
-})
-
-describe('window.uniworkComments extras', () => {
-  it('viewVersion exists only with the effective grant and openVersionId follows the open file', async () => {
-    const version = createFrameDocVersion()
-    version.noteOpened({ path: 'p', versionId: 'ver-5' })
-
-    const granted = framePort({ comments: true, commentsViewVersion: true })
-    granted.override('comments.viewVersion', () => ({ opened: true }))
-    const api = createFrameCommentsApi(granted.port, {
-      version,
-      session: await granted.port.whenInitialized(),
-    })
-    expect(api.openVersionId?.()).toBe('ver-5')
-    await expect(api.viewVersion!({ commentId: COMMENT_ID, versionNo: 4 })).resolves.toEqual({
-      opened: true,
-    })
-
-    const plain = framePort({ comments: true })
-    const bare = createFrameCommentsApi(plain.port, {
-      version,
-      session: await plain.port.whenInitialized(),
-    })
-    expect(bare.viewVersion).toBeUndefined()
-    expect(bare.openVersionId?.()).toBe('ver-5')
   })
 })
 
