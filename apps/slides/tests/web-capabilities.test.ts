@@ -173,6 +173,20 @@ describe('Ribbon gating', () => {
     ).toBe(true)
   })
 
+  it('web with the host grants: File > Open prints the key the frame answers, per platform', () => {
+    setCaps({ ...WEB_DEFAULTS, open: true })
+    const el = mountRibbon()
+    act(() => (el.querySelector('.ribbon-tab-file') as HTMLButtonElement).click())
+    const open = (): string[] =>
+      texts(el.querySelector('.file-menu') as HTMLElement).filter((t) => /^Open/.test(t))
+    expect(open()).toEqual(['Open… Ctrl+O'])
+    act(() => (el.querySelector('.ribbon-tab-file') as HTMLButtonElement).click())
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
+    act(() => (el.querySelector('.ribbon-tab-file') as HTMLButtonElement).click())
+    expect(open()).toEqual(['Open… ⌘O'])
+    vi.restoreAllMocks()
+  })
+
   it('view-only web frame: no save entries, only the tabs that do not edit', () => {
     setCaps({ ...WEB_DEFAULTS, save: false, saveAs: false })
     const el = mountRibbon()

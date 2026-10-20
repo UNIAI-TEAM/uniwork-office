@@ -246,6 +246,17 @@ describe('group / ungroup / regroup', () => {
   })
 })
 
+describe('Open (slides-02) on the web surface', () => {
+  it.each([
+    [WIN, 'o', ctrl],
+    [MAC, 'o', cmd],
+  ])('%s: %s %o is left to the frame, which owns it when the host grants open', (p, k, mod) => {
+    vi.mocked(capabilities.isWeb).mockReturnValue(true)
+    const e = press(makeCtx({ selectedIds: ['a'] }), k, mod, p)
+    expect(e.defaultPrevented).toBe(false)
+  })
+})
+
 describe('start the show', () => {
   it.each([
     [WIN, 'F5', {}, true],
