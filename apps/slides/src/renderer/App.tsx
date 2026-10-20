@@ -164,7 +164,7 @@ import type {
 import type { PathCmd } from './edit-points'
 import { createPreviewTracker, type EditPointsCommit } from './edit-points-actions'
 import { FIT_WIDTH, NARROW_FRAME_PX } from './app-constants'
-import { aiDockShouldYield, useWindowWidth } from './narrow-dock'
+import { aiDockShouldYield, COMMENTS_PANE_PX, useWindowWidth } from './narrow-dock'
 import { StageRuler } from './components/StageRuler'
 import { formatRulerValue, type RulerUnit } from './ruler-ticks'
 import * as fileActions from './file-actions'
@@ -3874,7 +3874,10 @@ export function App() {
               (() => {
                 // Reading view: page fills the available area, click/arrow keys to turn pages, Esc to exit
                 const availH = Math.max(240, winSize.h - 40 - 112 - 24 - 76)
-                const availW = Math.max(320, winSize.w - 120)
+                const availW = Math.max(
+                  320,
+                  winSize.w - 120 - (showComments && serverComments ? COMMENTS_PANE_PX : 0),
+                )
                 const readW = Math.round(
                   Math.min(availW, availH * (slide.widthPx / slide.heightPx)),
                 )
