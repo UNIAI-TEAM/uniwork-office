@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
+import { isCancelKey } from './shortcuts'
 
 /**
  * Modal contract shared by the .pdf-modal dialogs: Escape cancels (unless the
@@ -17,7 +18,7 @@ export function useModalDialog(
   useEffect(() => {
     if (!escape) return
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
+      if (isCancelKey(event)) {
         event.preventDefault()
         onCancel()
       }

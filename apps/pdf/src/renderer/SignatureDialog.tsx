@@ -5,6 +5,7 @@ import { cssRgb } from './DrawLayer'
 import type { TFunc } from './i18n/locale'
 import type { SavedSignature, SignatureData, SignatureStrokes } from '../shared/ipc'
 import { useModalDialog } from './modal-dialog'
+import { isConfirmKey } from './shortcuts'
 
 export type { SignatureData, SignatureStrokes }
 
@@ -359,7 +360,7 @@ export function SignatureDialog({
               placeholder={t('signTypePlaceholder')}
               autoFocus
               onChange={(e) => setTyped(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && confirm()}
+              onKeyDown={(e) => isConfirmKey(e) && confirm()}
             />
             <div className="pdf-sign-fontgrid">
               {SIGN_FONTS.map((f, i) => (

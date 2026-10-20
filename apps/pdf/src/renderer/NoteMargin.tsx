@@ -7,6 +7,7 @@ import { displayCommentAuthor } from './comment-author'
 import { flattenThread } from './note-threads'
 import type { NoteThreadItem } from './note-threads'
 import { CARD_PIN_ALIGN, layoutMarginCards } from './note-margin-layout'
+import { isCancelKey, matchPdfKey } from './shortcuts'
 
 /** Pencil glyph for rewriting an already-confirmed comment */
 const IconPencil = (): ReactElement => (
@@ -209,9 +210,9 @@ function NoteCard({
                   autoFocus
                   onChange={(e) => onEditChange(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    if (matchPdfKey(e, 'note')?.id === 'pdf-21') {
                       if (editingText.trim()) onEditSubmit(item)
-                    } else if (e.key === 'Escape') {
+                    } else if (isCancelKey(e, 'note')) {
                       e.preventDefault()
                       e.stopPropagation()
                       onEditCancel()
@@ -246,8 +247,8 @@ function NoteCard({
             placeholder={t('noteReplyPlaceholder')}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
-              else if (e.key === 'Escape') {
+              if (matchPdfKey(e, 'note')?.id === 'pdf-21') submit()
+              else if (isCancelKey(e, 'note')) {
                 e.preventDefault()
                 e.stopPropagation()
                 onClose()
@@ -323,8 +324,8 @@ function NoteDraftCard({
             onChange?.(e.target.value)
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
-            else if (e.key === 'Escape') {
+            if (matchPdfKey(e, 'note')?.id === 'pdf-21') submit()
+            else if (isCancelKey(e, 'note')) {
               e.preventDefault()
               e.stopPropagation()
               onCancel()
