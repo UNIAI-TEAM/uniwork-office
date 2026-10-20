@@ -6698,25 +6698,31 @@ export class UniworkDocsService {
       const existing = await this.store.readDir(dir)
       if (!existing || existing.documentId !== id) continue
       const local = join(dir, existing.filename)
-      if (!this.store.exists(local)) continue
-      const preservedLevel = existing.level ?? (existing.access === 'edit' ? 'edit' : undefined)
-      const next: Binding = {
-        ...existing,
-        ...(preservedLevel ? { level: preservedLevel } : {}),
-      }
-      if (shelved) {
-        next.shelved = true
-        next.access = 'view'
-      } else {
-        delete next.shelved
-        next.access = accessFor(next.level ?? null)
-      }
-      if (shelved) await this.stopEditLock(local, true)
-      const written = await this.store.write(dir, next)
-      const fresh = written ? this.store.lookup(local) : null
+      const doc = this.store.lookup(local)
+      if (!doc || doc.binding.documentId !== id || !this.store.exists(doc.path)) continue
+      if (shelved) await this.stopEditLock(doc.path, true)
+      if (!this.sessionLive(session)) return
+      const viewOnlyLaunch = this.viewOnlyLaunches.has(pathKey(doc.path))
+      const fresh = await this.coordinator.updateBinding(doc, (latest) => {
+        const preservedLevel = viewOnlyLaunch
+          ? 'view'
+          : (latest.level ?? (latest.access === 'edit' ? 'edit' : undefined))
+        const next: Binding = {
+          ...latest,
+          ...(preservedLevel ? { level: preservedLevel } : {}),
+        }
+        if (shelved) {
+          next.shelved = true
+          next.access = 'view'
+        } else {
+          delete next.shelved
+          next.access = viewOnlyLaunch ? 'view' : accessFor(next.level ?? null)
+        }
+        return next
+      })
       if (fresh) {
-        this.publish(this.statusOf(fresh))
-        if (!shelved && fresh.binding.access === 'edit' && this.deps.isPathOpen(local)) {
+        this.notifyDocStateChanged(fresh.path)
+        if (!shelved && fresh.binding.access === 'edit' && this.deps.isPathOpen(fresh.path)) {
           this.startEditLock(fresh)
         }
       }
