@@ -35,12 +35,7 @@ export function DocumentsSourceRow({
   const initial = owner ? (Array.from(owner)[0] ?? '').toUpperCase() : ''
   const download = () => onDownload(source)
   return (
-    <div
-      role="row"
-      data-source-id={source.id}
-      className="dh-doc-row dh-source-row"
-      onDoubleClick={download}
-    >
+    <div role="row" data-source-id={source.id} className="dh-doc-row dh-source-row">
       <div className="dh-cell-name" role="cell">
         <FileBadge ext={sourceExtension(source)} size={28} />
         <div style={{ minWidth: 0, flex: 1 }}>

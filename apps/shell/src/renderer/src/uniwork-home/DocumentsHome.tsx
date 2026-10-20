@@ -885,8 +885,17 @@ export function DocumentsHome({
 
   // UNI-1961: a source row's Download - the web's primary action for a file it
   // cannot view in place; the done note offers the file in its folder
+  // a click burst (click, click, dblclick) must open one save dialog, not a stack of them
+  const downloadingSourcesRef = useRef<Set<string>>(new Set())
   const downloadSourceFile = async (source: UniworkSourceFile): Promise<void> => {
-    const res = await downloadSource({ workspaceId, sourceId: source.id, name: source.name })
+    if (downloadingSourcesRef.current.has(source.id)) return
+    downloadingSourcesRef.current.add(source.id)
+    let res: Awaited<ReturnType<typeof downloadSource>>
+    try {
+      res = await downloadSource({ workspaceId, sourceId: source.id, name: source.name })
+    } finally {
+      downloadingSourcesRef.current.delete(source.id)
+    }
     if (!res.ok) {
       setToast({ message: t('uhSourceDownloadFailed'), tone: 'error' })
       return
