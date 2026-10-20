@@ -5,6 +5,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -37,6 +38,43 @@ const dialogs = vi.hoisted(() => ({
   save: { canceled: true } as { canceled: boolean; filePath?: string },
   saveOptions: [] as unknown[],
 }))
+
+const downloadHooks = vi.hoisted(() => ({
+  nextRandomBytes: null as Buffer | null,
+  onRename: null as ((src: string, dest: string) => void) | null,
+}))
+
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = (await importOriginal()) as { randomBytes: (size: number) => Buffer }
+  return {
+    ...actual,
+    randomBytes: (size: number) => {
+      if (downloadHooks.nextRandomBytes && size === 8) {
+        const buf = downloadHooks.nextRandomBytes
+        downloadHooks.nextRandomBytes = null
+        return buf
+      }
+      return actual.randomBytes(size)
+    },
+  }
+})
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = (await importOriginal()) as {
+    rename: (src: string, dest: string) => Promise<void>
+  }
+  return {
+    ...actual,
+    rename: async (src: string, dest: string) => {
+      if (downloadHooks.onRename) {
+        const hook = downloadHooks.onRename
+        downloadHooks.onRename = null
+        hook(String(src), String(dest))
+      }
+      return actual.rename(src, dest)
+    },
+  }
+})
 
 vi.mock('electron', () => ({
   app: { getPath: () => dir, configureHostResolver: () => undefined },
@@ -838,13 +876,18 @@ describe('the document sources IPC (UNI-1961)', () => {
       expect(fetches).toBe(0)
 
       const raceTarget = join(dir, 'race-target.docx')
-      let releaseFetch: (res: Response) => void = () => undefined
+      let releaseFetch: ((res: Response) => void) | undefined
+      let markFetchEntered: () => void = () => undefined
+      const fetchEntered = new Promise<void>((resolve) => {
+        markFetchEntered = resolve
+      })
       vi.stubGlobal(
         'fetch',
         vi.fn(
           () =>
             new Promise<Response>((resolve) => {
               releaseFetch = resolve
+              markFetchEntered()
             }),
         ),
       )
@@ -854,11 +897,9 @@ describe('the document sources IPC (UNI-1961)', () => {
         sourceId: 'task:src_1',
         name: 'Protected.docx',
       })
-      await vi.waitFor(() => {
-        expect(releaseFetch).not.toBeUndefined()
-      })
+      await fetchEntered
       symlinkSync(storeFile, raceTarget)
-      releaseFetch(new Response(new Uint8Array([7, 8, 9]), { status: 200 }))
+      releaseFetch!(new Response(new Uint8Array([7, 8, 9]), { status: 200 }))
       expect(await pending).toEqual({ ok: false, error: 'forbidden' })
       expect([...readFileSync(storeFile)]).toEqual([10, 20, 30])
     } finally {
@@ -866,7 +907,7 @@ describe('the document sources IPC (UNI-1961)', () => {
     }
   })
 
-  it('stages source downloads through an exclusive sibling temp file and preserves an existing destination on write failure (R1-5)', async () => {
+  it('stages source downloads through a private exclusive sibling temp file, preserves destination mode under permissive umask, and cleans up on write or rename failure (R1-5, R2-2, R2-7, R2-10)', async () => {
     const { handlers } = await setup()
     const subDir = join(dir, 'target-dir')
     mkdirSync(subDir, { recursive: true })
@@ -875,6 +916,7 @@ describe('the document sources IPC (UNI-1961)', () => {
     chmodSync(target, 0o600)
     chmodSync(subDir, 0o500)
     dialogs.save = { canceled: false, filePath: target }
+    const prevUmask = process.umask(0o002)
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(new Uint8Array([7, 8, 9, 10]), { status: 200 })),
@@ -889,7 +931,25 @@ describe('the document sources IPC (UNI-1961)', () => {
       expect([...readFileSync(target)]).toEqual([1, 2, 3, 4])
       expect(readdirSync(subDir)).toEqual(['existing.docx'])
 
+      // R2-7: rename failure after the staged file has been written cleans up the staged sibling and leaves target unchanged
       chmodSync(subDir, 0o700)
+      let stagedBytesAtRename: number[] = []
+      downloadHooks.onRename = (src) => {
+        stagedBytesAtRename = [...readFileSync(src)]
+        throw Object.assign(new Error('EXDEV'), { code: 'EXDEV' })
+      }
+      dialogs.save = { canceled: false, filePath: target }
+      const renameFailed = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(renameFailed).toEqual({ ok: false, error: 'server_error' })
+      expect(stagedBytesAtRename).toEqual([7, 8, 9, 10])
+      expect([...readFileSync(target)]).toEqual([1, 2, 3, 4])
+      expect(readdirSync(subDir)).toEqual(['existing.docx'])
+
+      // R2-2, R2-10: successful replacement preserves 0o600 mode even under permissive umask 0o002
       dialogs.save = { canceled: false, filePath: target }
       const saved = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
         workspaceId: 'ws_1',
@@ -898,9 +958,71 @@ describe('the document sources IPC (UNI-1961)', () => {
       })
       expect(saved).toEqual({ ok: true, value: { path: target } })
       expect([...readFileSync(target)]).toEqual([7, 8, 9, 10])
+      expect(statSync(target).mode & 0o777).toBe(0o600)
       expect(readdirSync(subDir)).toEqual(['existing.docx'])
     } finally {
+      downloadHooks.onRename = null
+      process.umask(prevUmask)
       chmodSync(subDir, 0o700)
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('downloads into a valid 240-byte destination basename using a short independent staging name (R2-4)', async () => {
+    const { handlers } = await setup()
+    const subDir = join(dir, 'long-dir')
+    mkdirSync(subDir, { recursive: true })
+    const longName = `${'a'.repeat(235)}.docx`
+    expect(Buffer.byteLength(longName, 'utf8')).toBe(240)
+    const longTarget = join(subDir, longName)
+    writeFileSync(longTarget, new Uint8Array([1, 2, 3, 4]))
+    dialogs.save = { canceled: false, filePath: longTarget }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array([7, 8, 9, 10]), { status: 200 })),
+    )
+    try {
+      const saved = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: longName,
+      })
+      expect(saved).toEqual({ ok: true, value: { path: longTarget } })
+      expect([...readFileSync(longTarget)]).toEqual([7, 8, 9, 10])
+      expect(readdirSync(subDir)).toEqual([longName])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('preserves both a colliding sibling and the destination on an exclusive staging EEXIST collision (R2-5, R2-11)', async () => {
+    const { handlers } = await setup()
+    const subDir = join(dir, 'collision-dir')
+    mkdirSync(subDir, { recursive: true })
+    const target = join(subDir, 'existing.docx')
+    writeFileSync(target, new Uint8Array([1, 2, 3, 4]))
+    const legacySibling = join(subDir, '.existing.docx.deadbeefdeadbeef.tmp')
+    const shortSibling = join(subDir, '.uw-dl-deadbeefdeadbeef.tmp')
+    writeFileSync(legacySibling, new Uint8Array([99, 98, 97]))
+    writeFileSync(shortSibling, new Uint8Array([99, 98, 97]))
+    downloadHooks.nextRandomBytes = Buffer.from('deadbeefdeadbeef', 'hex')
+    dialogs.save = { canceled: false, filePath: target }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array([7, 8, 9, 10]), { status: 200 })),
+    )
+    try {
+      const failed = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(failed).toEqual({ ok: false, error: 'server_error' })
+      expect([...readFileSync(target)]).toEqual([1, 2, 3, 4])
+      expect([...readFileSync(legacySibling)]).toEqual([99, 98, 97])
+      expect([...readFileSync(shortSibling)]).toEqual([99, 98, 97])
+    } finally {
+      downloadHooks.nextRandomBytes = null
       vi.unstubAllGlobals()
     }
   })
