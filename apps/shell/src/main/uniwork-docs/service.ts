@@ -6957,20 +6957,28 @@ export class UniworkDocsService {
     if (detail.shelvedAt) {
       await this.stopEditLock(doc.path, true)
       let policyChanged = false
-      const refreshed = await this.coordinator.updateBinding(doc, (cur) => {
-        if (cur.state === 'blocked') return null
-        if (cur.shelved && cur.access === 'view') return null
-        policyChanged = true
-        const preservedLevel = cur.level ?? (cur.access === 'edit' ? 'edit' : undefined)
-        return {
-          ...cur,
-          ...(preservedLevel ? { level: preservedLevel } : {}),
-          shelved: true,
-          access: 'view',
-        }
-      })
-      after = refreshed ?? this.store.lookup(doc.path)
-      if (policyChanged && after) this.notifyDocStateChanged(after.path)
+      try {
+        const refreshed = await this.coordinator.updateBinding(doc, (cur) => {
+          if (cur.state === 'blocked') return null
+          if (cur.shelved && cur.access === 'view') return null
+          policyChanged = true
+          const preservedLevel = cur.level ?? (cur.access === 'edit' ? 'edit' : undefined)
+          return {
+            ...cur,
+            ...(preservedLevel ? { level: preservedLevel } : {}),
+            shelved: true,
+            access: 'view',
+          }
+        })
+        after = refreshed ?? this.store.lookup(doc.path)
+        if (policyChanged && after) this.notifyDocStateChanged(after.path)
+      } catch (error) {
+        console.warn(
+          `uniwork docs: shelving policy refresh for ${documentId} could not be persisted:`,
+          error instanceof UniworkDocError ? error.code : 'unknown',
+        )
+        return
+      }
     }
     if (!after || !this.store.exists(after.path)) return
     if (KEEP_LOCAL_STATES.has(after.binding.state) || this.coordinator.isSaving(after.path)) return

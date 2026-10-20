@@ -1806,7 +1806,8 @@ export class SaveCoordinator {
    * Mutate `doc`'s binding against the latest stored binding inside the
    * per-key serialized chain (`serializeBinding`). Returns `null` when the
    * document is no longer bound, or the current `BoundDocument` without
-   * writing when `patch` returns `null`.
+   * writing when `patch` returns `null`. Propagates persistence failures
+   * rather than swallowing them (R3-5).
    */
   async updateBinding(
     doc: BoundDocument,
@@ -1817,7 +1818,15 @@ export class SaveCoordinator {
       if (!latest || latest.binding.documentId !== doc.binding.documentId) return null
       const next = patch(latest.binding)
       if (!next) return latest
-      return this.writeBinding(latest, next)
+      const written = await this.deps.store.write(latest.dir, next)
+      if (!written) {
+        this.activeSizeWarns.delete(latest.path)
+        this.publish(latest)
+        throw new Error('binding_write_refused')
+      }
+      const updated: BoundDocument = { ...latest, binding: next }
+      this.publish(updated)
+      return updated
     })
   }
 
