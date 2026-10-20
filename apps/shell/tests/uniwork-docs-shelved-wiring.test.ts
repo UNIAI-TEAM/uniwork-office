@@ -192,6 +192,20 @@ const DOCS: Record<string, Record<string, unknown>> = {
       checksum_sha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
     },
   },
+  doc_child: {
+    title: 'Child.docx',
+    kind: 'file',
+    my_level: 'manage',
+    file: {
+      file_id: 'f_child',
+      version_id: 'v_child',
+      version: 1,
+      filename: 'Child.docx',
+      mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      size_bytes: 3,
+      checksum_sha256: '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
+    },
+  },
 }
 
 function stubServer(): Seen[] {
@@ -280,7 +294,7 @@ function stubServer(): Seen[] {
         return reply(200, {
           document,
           batch_id: 'b_1',
-          affected: action === 'unshelve' && id === 'fold_s1' ? ['fold_s1', 'doc_child'] : [id],
+          affected: id === 'fold_s1' ? ['fold_s1', 'doc_child'] : [id],
         })
       }
       const adminSummary = /^\/api\/v1\/documents\/([^/]+)\/admin-summary$/.exec(url.pathname)
@@ -897,6 +911,158 @@ describe('UNI-1961 live-row Lưu trữ (shelve)', () => {
     } finally {
       DOCS.doc_live = origDocLive
       DOCS.doc_s1 = origDocS1
+      await service.releaseAllEditLocks()
+    }
+  })
+
+  it('preserves a concurrent binding commit during shelve lock release, restores legacy no-level bindings on unshelve, and refreshes affected open children in both directions (R2-1, R2-8, R2-9)', async () => {
+    const { call, service } = await setup()
+    const seen = stubServer()
+    const baseFetch = globalThis.fetch
+    let releaseLockDelete: (() => void) | undefined
+    let markLockDeleteEntered: () => void = () => undefined
+    const lockDeleteEntered = new Promise<void>((resolve) => {
+      markLockDeleteEntered = resolve
+    })
+    let holdLockDelete = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init: RequestInit = {}) => {
+        const url = new URL(String(input))
+        if (
+          holdLockDelete &&
+          init.method === 'DELETE' &&
+          url.pathname === '/api/v1/documents/doc_live/edit-lock/l_1'
+        ) {
+          holdLockDelete = false
+          markLockDeleteEntered()
+          await new Promise<void>((resolve) => {
+            releaseLockDelete = resolve
+          })
+        }
+        return baseFetch(input, init)
+      }),
+    )
+
+    try {
+      const liveOpen = (await call(UNIWORK_DOC_CHANNELS.openDocument, 'doc_live')) as {
+        ok: boolean
+        value: { path: string }
+      }
+      expect(liveOpen.ok).toBe(true)
+      const livePath = liveOpen.value.path
+      await vi.waitFor(() => {
+        expect(
+          seen.some(
+            (s) => s.method === 'POST' && s.url.pathname === '/api/v1/documents/doc_live/edit-lock',
+          ),
+        ).toBe(true)
+      })
+
+      // R2-1: hold edit-lock release during shelveDocument, settle a concurrent commitState, then release
+      holdLockDelete = true
+      const pendingShelve = call(UNIWORK_DOC_CHANNELS.shelveDocument, 'doc_live')
+      await lockDeleteEntered
+
+      const beforeCommit = service.store.lookup(livePath)
+      expect(beforeCommit).not.toBeNull()
+      const committedChecksum = '2'.repeat(64)
+      await service.coordinator.commitState(beforeCommit!, {
+        ...beforeCommit!.binding,
+        baseRevision: '8',
+        baseVersion: 2,
+        baseChecksum: committedChecksum,
+        baseVersionId: 'v_live_2',
+        state: 'saved',
+      })
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        baseRevision: '8',
+        baseVersion: 2,
+        baseChecksum: committedChecksum,
+        baseVersionId: 'v_live_2',
+        state: 'saved',
+      })
+
+      releaseLockDelete!()
+      expect((await pendingShelve) as { ok: boolean }).toMatchObject({ ok: true })
+      expect(service.isReadOnly(livePath)).toBe(true)
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        baseRevision: '8',
+        baseVersion: 2,
+        baseChecksum: committedChecksum,
+        baseVersionId: 'v_live_2',
+        state: 'saved',
+        shelved: true,
+        access: 'view',
+        level: 'manage',
+      })
+
+      // R2-8: legacy editable binding with no stored `level` shelves and unshelves back to edit
+      const bindingPath = join(dirname(livePath), 'binding.json')
+      const legacyRaw = JSON.parse(readFileSync(bindingPath, 'utf8')) as Record<string, unknown>
+      legacyRaw.access = 'edit'
+      delete legacyRaw.level
+      delete legacyRaw.shelved
+      writeFileSync(bindingPath, `${JSON.stringify(legacyRaw, null, 2)}\n`)
+      expect(service.store.lookup(livePath)?.binding.level).toBeUndefined()
+
+      expect(
+        (await call(UNIWORK_DOC_CHANNELS.shelveDocument, 'doc_live')) as { ok: boolean },
+      ).toMatchObject({ ok: true })
+      expect(service.isReadOnly(livePath)).toBe(true)
+      expect(service.store.lookup(livePath)?.binding).toMatchObject({
+        access: 'view',
+        shelved: true,
+      })
+
+      expect(
+        (await call(UNIWORK_DOC_CHANNELS.unshelveDocument, 'doc_live')) as { ok: boolean },
+      ).toMatchObject({ ok: true })
+      expect(service.isReadOnly(livePath)).toBe(false)
+      const restoredLegacy = service.store.lookup(livePath)?.binding
+      expect(restoredLegacy?.access).toBe('edit')
+      expect(restoredLegacy?.shelved).toBeUndefined()
+
+      // R2-9: open child named in `affected` follows parent shelve/unshelve in both directions
+      const childOpen = (await call(UNIWORK_DOC_CHANNELS.openDocument, 'doc_child')) as {
+        ok: boolean
+        value: { path: string }
+      }
+      expect(childOpen.ok).toBe(true)
+      const childPath = childOpen.value.path
+      expect(service.isReadOnly(childPath)).toBe(false)
+
+      expect(
+        (await call(UNIWORK_DOC_CHANNELS.shelveDocument, 'fold_s1')) as { ok: boolean },
+      ).toMatchObject({ ok: true })
+      expect(service.isReadOnly(childPath)).toBe(true)
+      expect(await service.docStatus(childPath)).toMatchObject({
+        access: 'view',
+        commentsLevel: 'view',
+      })
+      expect(service.commentContext(childPath)).toMatchObject({ level: 'view' })
+      expect(service.store.lookup(childPath)?.binding).toMatchObject({
+        access: 'view',
+        level: 'manage',
+        shelved: true,
+      })
+
+      expect(
+        (await call(UNIWORK_DOC_CHANNELS.unshelveDocument, 'fold_s1')) as { ok: boolean },
+      ).toMatchObject({ ok: true })
+      expect(service.isReadOnly(childPath)).toBe(false)
+      expect(await service.docStatus(childPath)).toMatchObject({
+        access: 'edit',
+        commentsLevel: 'manage',
+      })
+      expect(service.commentContext(childPath)).toMatchObject({ level: 'manage' })
+      const unshelvedChild = service.store.lookup(childPath)?.binding
+      expect(unshelvedChild).toMatchObject({
+        access: 'edit',
+        level: 'manage',
+      })
+      expect(unshelvedChild?.shelved).toBeUndefined()
+    } finally {
       await service.releaseAllEditLocks()
     }
   })
