@@ -207,6 +207,31 @@ describe('uniworkState answers the lock to the renderer', () => {
     expect(state).toEqual(expected)
   })
 
+  it('asks the quiet peekLocked, never isLocked: opening a locked file is not a refusal', async () => {
+    const { path, contents } = await openDocument()
+    const isLocked = vi.fn(() => true)
+    setUniworkDocumentPolicy({
+      isBound: (p) => p === path,
+      isReadOnly: (p) => p === path,
+      isLocked,
+      peekLocked: () => true,
+    })
+    const state = handlers.get(HTML_CHANNELS.uniworkState)!({ sender: contents })
+    expect(state).toEqual({ bound: true, readOnly: true, locked: true })
+    expect(isLocked).not.toHaveBeenCalled()
+  })
+
+  it('falls back to isLocked when the policy has no peekLocked', async () => {
+    const { path, contents } = await openDocument()
+    setUniworkDocumentPolicy({
+      isBound: (p) => p === path,
+      isReadOnly: (p) => p === path,
+      isLocked: () => true,
+    })
+    const state = handlers.get(HTML_CHANNELS.uniworkState)!({ sender: contents })
+    expect(state).toEqual({ bound: true, readOnly: true, locked: true })
+  })
+
   it('is not locked without a policy or without isLocked', async () => {
     const { contents } = await openDocument()
     expect(handlers.get(HTML_CHANNELS.uniworkState)!({ sender: contents })).toEqual({

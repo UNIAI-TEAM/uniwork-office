@@ -135,6 +135,26 @@ describe.each(MODULES)('%s sees a source view through the module seam', (_name, 
     expect(onSourceLocked).not.toHaveBeenCalled()
   })
 
+  it('a state query on the source path (peekLocked) reads locked without asking the shell for the hint', () => {
+    const service = serviceSeam()
+    const onSourceLocked = vi.fn()
+    installUniworkModuleSeams(service, null, { registry, onSourceLocked })
+    if (_name === 'html') {
+      expect(html.uniworkPeekLocked(SOURCE)).toBe(true)
+      expect(html.uniworkPeekLocked(BOUND)).toBe(false)
+      expect(html.uniworkPeekLocked(LOCAL)).toBe(false)
+      expect(onSourceLocked).not.toHaveBeenCalled()
+      // the refusal paths keep the hint
+      expect(html.uniworkIsLocked(SOURCE)).toBe(true)
+      expect(onSourceLocked).toHaveBeenCalledWith(SOURCE)
+    }
+    const wrapped = withSourceViews(service, registry, { onSourceLocked })
+    onSourceLocked.mockClear()
+    expect(wrapped.peekLocked?.(SOURCE)).toBe(true)
+    expect(wrapped.peekLocked?.(LOCAL)).toBe(false)
+    expect(onSourceLocked).not.toHaveBeenCalled()
+  })
+
   it('a user save is refused and fires no hook', () => {
     const service = serviceSeam()
     installUniworkModuleSeams(service, null, { registry })

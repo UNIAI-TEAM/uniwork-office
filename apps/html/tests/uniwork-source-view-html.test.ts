@@ -275,6 +275,71 @@ describe('F3: scripts never run in a source view', () => {
   })
 })
 
+describe('F3: a scripts-off frame is a fresh element, never a re-flagged one', () => {
+  /*
+   * Sandbox flags are read when a navigation starts. React applies an update in prop order (src, then
+   * sandbox), so flipping `sandbox` on a frame that already exists would start the real document's
+   * navigation under the old allow-scripts flags: the inline script ran in a frame whose attribute
+   * read "" afterwards. A frame that is created with its flags has no old flags.
+   */
+  it('replaces the frame element when the answer turns it scripts-off', async () => {
+    let answer!: (s: State) => void
+    const h = await mount(new Promise<State>((r) => (answer = r)))
+    open.push(h)
+    const before = h.frame()
+    expect(before).not.toBeNull()
+    await act(async () => {
+      answer({ bound: true, readOnly: true, locked: true })
+    })
+    await settle()
+    expect(h.frame()).not.toBe(before)
+    expect(h.frame()?.isConnected).toBe(true)
+    expect(h.frame()?.getAttribute('sandbox')).toBe('')
+  })
+
+  it('never gives a connected frame a real src before its sandbox is the empty one', async () => {
+    const seen: Array<{ connected: boolean; sandbox: string | null }> = []
+    const realSet = Element.prototype.setAttribute
+    vi.spyOn(Element.prototype, 'setAttribute').mockImplementation(function (
+      this: Element,
+      name: string,
+      value: string,
+    ) {
+      if (
+        this instanceof HTMLIFrameElement &&
+        name === 'src' &&
+        value.includes('html-preview://view-1')
+      )
+        seen.push({ connected: this.isConnected, sandbox: this.getAttribute('sandbox') })
+      return realSet.call(this, name, value)
+    })
+    let answer!: (s: State) => void
+    const h = await mount(new Promise<State>((r) => (answer = r)))
+    open.push(h)
+    await act(async () => {
+      answer({ bound: true, readOnly: true, locked: true })
+    })
+    await settle()
+    expect(seen.length).toBeGreaterThan(0)
+    // a navigation starts only for a connected frame: it must already carry the empty sandbox
+    for (const s of seen) if (s.connected) expect(s.sandbox).toBe('')
+    expect(h.frame()?.getAttribute('src')).toContain('html-preview://view-1')
+  })
+
+  it('keeps one element across a plain file answer (no needless reload)', async () => {
+    let answer!: (s: State) => void
+    const h = await mount(new Promise<State>((r) => (answer = r)))
+    open.push(h)
+    const before = h.frame()
+    await act(async () => {
+      answer({ bound: false, readOnly: false })
+    })
+    await settle()
+    expect(h.frame()).toBe(before)
+    expect(h.frame()?.getAttribute('sandbox')).toContain('allow-scripts')
+  })
+})
+
 describe('F3: the frame is released once, straight to its final document', () => {
   /**
    * Every src the preview iframe ever carried, transient ones included. A mutation record reads the

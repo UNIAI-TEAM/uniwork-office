@@ -17,6 +17,12 @@ export interface UniworkDocumentPolicy {
    */
   isLocked?(path: string): boolean
   /**
+   * The same verdict as `isLocked`, asked without side effects: the renderer's state query
+   * uses it so merely opening a locked file never counts as a refused action. Optional:
+   * a policy without it is asked through `isLocked`.
+   */
+  peekLocked?(path: string): boolean
+  /**
    * G5-11: consumes a one-shot capture request for `path` so a main-triggered
    * save writes the working copy to disk without firing the user-save hook.
    */
@@ -81,6 +87,11 @@ export function uniworkIsLocked(path: string | null | undefined): boolean {
   } catch {
     return false
   }
+}
+
+/** `uniworkIsLocked` for a plain state query: it must not look like a refusal to the shell. */
+export function uniworkPeekLocked(path: string | null | undefined): boolean {
+  return uniworkIsLocked(path)
 }
 
 /** Same file, ignoring separators and (on Windows) letter case, so a dialog pick of the open file matches. */

@@ -41,6 +41,11 @@ export interface UniworkModuleSeam {
    */
   isLocked?(path: string): boolean
   /**
+   * `isLocked` without side effects (the html state query asks it on every open). Optional:
+   * a seam without it is asked through `isLocked`.
+   */
+  peekLocked?(path: string): boolean
+  /**
    * G5-11: consumes a one-shot capture request for `path` so a main-triggered
    * save writes the working copy to disk without firing the user-save hook.
    */
