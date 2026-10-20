@@ -12,6 +12,7 @@ interface FakeWebContents {
   isDestroyed: ReturnType<typeof vi.fn>
   loadFile: ReturnType<typeof vi.fn>
   loadURL: ReturnType<typeof vi.fn>
+  on: ReturnType<typeof vi.fn>
   once: ReturnType<typeof vi.fn>
   send: ReturnType<typeof vi.fn>
   setWindowOpenHandler: ReturnType<typeof vi.fn>
@@ -30,6 +31,7 @@ function makeWebContents(): FakeWebContents {
     isDestroyed: vi.fn(() => false),
     loadFile: vi.fn(),
     loadURL: vi.fn(),
+    on: vi.fn(),
     once: vi.fn((event: string, listener: () => void) => listeners.set(event, listener)),
     send: vi.fn(),
     setWindowOpenHandler: vi.fn(),

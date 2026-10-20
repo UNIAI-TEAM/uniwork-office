@@ -1395,7 +1395,12 @@ function registerHtmlIpc(): void {
 
   ipcMain.handle(HTML_CHANNELS.uniworkState, (e): UniworkViewState => {
     const path = savePathByWc.get(e.sender.id)
-    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+    // `locked` only when set: a plain copy keeps the two-field answer
+    return {
+      bound: uniworkIsBound(path),
+      readOnly: uniworkIsReadOnly(path),
+      ...(uniworkIsLocked(path) ? { locked: true } : {}),
+    }
   })
 
   ipcMain.handle(HTML_CHANNELS.uniworkReadOnlySave, (e, filePath?: unknown) => {
@@ -1908,6 +1913,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     allowedByWc.set(wcId, new Set([openPath]))
   }
   installExternalLinkOpener(wc)
+  installReadOnlySaveKey(wc)
   wc.once('destroyed', () => {
     closePresentViewsOf(wcId)
     openPathByWc.delete(wcId)
@@ -1920,6 +1926,23 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     saveWaiters.get(wcId)?.(false)
     saveWaiters.delete(wcId)
     mcpSaveByWc.delete(wcId)
+  })
+}
+
+/**
+ * Ctrl/Cmd+S on a read-only UniWork copy explains the lock instead of saving. The renderer only
+ * hears the key while the focus is outside the preview frame (a frame, with or without scripts,
+ * keeps its own keys), so main takes it for every frame before the page or the menu sees it.
+ * Everything else, including Save As, keeps its normal path.
+ */
+function installReadOnlySaveKey(wc: WebContents): void {
+  wc.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.key.toLowerCase() !== 's') return
+    if (!(input.control || input.meta) || input.shift || input.alt) return
+    const path = savePathByWc.get(wc.id)
+    if (!path || !uniworkIsBound(path) || !uniworkIsReadOnly(path)) return
+    event.preventDefault()
+    if (!input.isAutoRepeat) uniworkReadOnlySave(path)
   })
 }
 
