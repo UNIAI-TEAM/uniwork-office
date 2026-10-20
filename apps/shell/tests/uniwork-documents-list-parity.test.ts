@@ -305,6 +305,34 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
     expect(api.revealPath).toHaveBeenCalledWith('C:\\Users\\me\\Downloads\\Biên bản họp.docx')
   })
 
+  it('a source row downloads once per click burst: two clicks or a click plus a double click (UNI-1961)', async () => {
+    // hold the first download open, as the native save dialog does
+    let release: (value: unknown) => void = () => {}
+    api.uniworkDownloadSource.mockImplementationOnce(
+      () => new Promise((resolve) => (release = resolve)),
+    )
+    await renderHome()
+    const row = host.querySelector<HTMLElement>('.dh-doc-row[data-source-id="src-1"]')!
+    const open = row.querySelector<HTMLButtonElement>('.dh-doc-open')!
+    await act(async () => {
+      open.click()
+      open.click()
+      row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    await flush()
+    expect(api.uniworkDownloadSource).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      release(ok({ path: 'C:\\Users\\me\\Downloads\\Biên bản họp.docx' }))
+    })
+    await flush()
+    // the burst is over: the next click is a new download
+    await act(async () => {
+      open.click()
+    })
+    await flush()
+    expect(api.uniworkDownloadSource).toHaveBeenCalledTimes(2)
+  })
+
   it('the row menu offers Download; a failed download says so', async () => {
     await renderHome()
     api.uniworkDownloadSource.mockResolvedValueOnce({ ok: false, error: 'network' })
