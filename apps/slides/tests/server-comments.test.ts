@@ -1087,6 +1087,26 @@ describe('ServerCommentsHost over the comments bridge', () => {
   })
 })
 
+describe('G819-A02b: a comment that appears with the pane closed is re-anchored on Save', () => {
+  it('a row created on the server after the first list is in the next anchor round', async () => {
+    const slides = deck('slide1', 'slide2', 'slide3')
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      open: false,
+      rows: [rootRow('x1', anchorOn(slides, 0))],
+    })
+    // the other host comments after this editor listed; a closed pane never lists again
+    h.server.rows.push(rootRow('x22', anchorOn(slides, 2)))
+    await h.save('v2')
+    const round = h.server.calls.filter((c) => c.op === 'anchors')
+    expect(round).toHaveLength(1)
+    const sent = round[0]!.input as { versionId: string; anchors: Array<{ commentId: string }> }
+    expect(sent.versionId).toBe('v2')
+    expect(sent.anchors.map((a) => a.commentId).sort()).toEqual(['x1', 'x22'])
+  })
+})
+
 describe('G8-14 fix r1: host behaviour', () => {
   const anchorRounds = (h: Awaited<ReturnType<typeof mountHost>>) =>
     h.server.calls.filter((c) => c.op === 'anchors')

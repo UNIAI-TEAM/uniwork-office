@@ -785,3 +785,91 @@ describe('server mode: the new-comment composer scrolls into view (V12-4)', () =
     }
   })
 })
+
+describe('server mode: anchors survive the reload after a Save (G819-A02a)', () => {
+  /** what saveOnce does once the saved bytes are re-parsed: a whole-document setContent */
+  const reloadFromSavedBytes = () => {
+    const json = editor.getJSON()
+    json.content?.forEach((n, i) => {
+      n.attrs = { ...n.attrs, docxIndex: i }
+    })
+    editor.commands.setContent(json)
+  }
+
+  it('a comment range that still exists after the reload goes out exact with its range', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({ body: 'note', anchor, anchor_state: 'exact' })
+    await mount(server, false)
+    reloadFromSavedBytes()
+    await act(async () => server.saved('v2'))
+    await flush()
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    expect(server.calls.anchors.mock.calls[0]![0].anchors).toEqual([
+      {
+        commentId: row.id,
+        state: 'exact',
+        anchor: expect.objectContaining({ path: [1], quote: 'third quarter' }),
+      },
+    ])
+  })
+
+  it('an edit before the Save moves the range; the reload keeps the moved range, not the old anchor', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({ body: 'note', anchor, anchor_state: 'exact' })
+    await mount(server, false)
+    editor.commands.insertContentAt(rangeOf('Revenue').from, 'Total ')
+    reloadFromSavedBytes()
+    await act(async () => server.saved('v2'))
+    await flush()
+    const sent = server.calls.anchors.mock.calls[0]![0].anchors
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toMatchObject({ commentId: row.id, state: 'exact' })
+    expect(sent[0].anchor).toMatchObject({
+      path: [1],
+      start: 'Total Revenue grew in the '.length,
+      quote: 'third quarter',
+    })
+  })
+
+  it('a range whose text is gone after the reload still goes out lost', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({ body: 'note', anchor, anchor_state: 'exact' })
+    await mount(server, false)
+    const block = editor.state.doc.child(0).nodeSize
+    editor.commands.deleteRange({ from: block, to: block + editor.state.doc.child(1).nodeSize })
+    reloadFromSavedBytes()
+    await act(async () => server.saved('v2'))
+    await flush()
+    expect(server.calls.anchors.mock.calls[0]![0].anchors).toEqual([
+      { commentId: row.id, state: 'lost', anchor },
+    ])
+  })
+})
+
+describe('server mode: a comment that appears with the panel closed is re-anchored on Save (G819-A02b)', () => {
+  it('a thread created on the server after the first list is in the next anchor PUT', async () => {
+    const server = fakeServer()
+    const first = server.add({
+      body: 'first',
+      anchor: encodeDocxAnchor(editor.state.doc, rangeOf('Intro'))!,
+      anchor_state: 'exact',
+    })
+    await mount(server, false)
+    // the other host comments after this editor listed; nothing here lists again while closed
+    const later = server.add({
+      body: 'from the other host',
+      anchor: encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!,
+      anchor_state: 'exact',
+    })
+    await act(async () => server.saved('v2'))
+    await flush()
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    const sent = server.calls.anchors.mock.calls[0]![0]
+    expect(sent.versionId).toBe('v2')
+    expect(sent.anchors.map((a) => a.commentId).sort()).toEqual([first.id, later.id].sort())
+    expect(sent.anchors.every((a) => a.state === 'exact')).toBe(true)
+  })
+})
