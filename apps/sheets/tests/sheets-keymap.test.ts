@@ -5,7 +5,13 @@
 import { describe, expect, it } from 'vitest'
 import { MetaKeys } from '@univerjs/ui'
 import { sheetsMenuAccelerator } from '../src/shared/sheets-shortcuts'
-import { chordsFor, findShortcut, parseChord } from '@genoffice/shortcuts'
+import {
+  chordsFor,
+  findShortcut,
+  matchShortcut,
+  parseChord,
+  sheetsShortcuts,
+} from '@genoffice/shortcuts'
 import {
   blocksUniverShortcut,
   chordToUniverBinding,
@@ -199,5 +205,58 @@ describe('menu accelerators', () => {
     expect(sheetsMenuAccelerator('saveAs', 'mac')).toBe('Shift+Command+S')
     expect(sheetsMenuAccelerator('redo', 'win')).toBe('CmdOrCtrl+Y')
     expect(sheetsMenuAccelerator('print', 'mac')).toBe('CmdOrCtrl+P')
+  })
+})
+
+describe('symbol chords match by character, digits by code (UNI-2011 rebase)', () => {
+  const key = (init: {
+    key: string
+    code: string
+    ctrlKey?: boolean
+    shiftKey?: boolean
+  }): Parameters<typeof matchShortcut>[0] => ({
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    repeat: false,
+    ...init,
+  })
+  const route = (event: Parameters<typeof matchShortcut>[0]) =>
+    matchShortcut(event, sheetsShortcuts, 'win', 'desktop')?.id
+
+  it('picks date and time by the typed character on a German layout', () => {
+    // German: ; is Shift+Comma, : is Shift+Period
+    expect(route(key({ key: ';', code: 'Comma', ctrlKey: true, shiftKey: true }))).toBe('sheets-76')
+    expect(route(key({ key: ':', code: 'Period', ctrlKey: true, shiftKey: true }))).toBe(
+      'sheets-77',
+    )
+  })
+
+  it('keeps the US positions working', () => {
+    expect(route(key({ key: ';', code: 'Semicolon', ctrlKey: true }))).toBe('sheets-76')
+    expect(route(key({ key: ':', code: 'Semicolon', ctrlKey: true, shiftKey: true }))).toBe(
+      'sheets-77',
+    )
+  })
+
+  it('keeps Ctrl+Shift+1..6 on the digit keys of an AZERTY layout', () => {
+    // AZERTY types & é " ' ( - on the digit row; Shift gives the digit
+    for (const [digit, id] of [
+      ['1', 'sheets-69'],
+      ['2', 'sheets-70'],
+      ['3', 'sheets-71'],
+      ['4', 'sheets-72'],
+      ['5', 'sheets-73'],
+      ['6', 'sheets-74'],
+    ] as const) {
+      expect(route(key({ key: digit, code: `Digit${digit}`, ctrlKey: true, shiftKey: true }))).toBe(
+        id,
+      )
+    }
+  })
+
+  it('does not fire the backquote chord from the German ´ dead key', () => {
+    expect(route(key({ key: 'Dead', code: 'Equal', ctrlKey: true }))).toBeUndefined()
   })
 })
