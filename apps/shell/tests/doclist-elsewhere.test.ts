@@ -5,7 +5,7 @@
  * is the shared DocList over the source files of the other modules (`uniworkListSources`): no
  * Chọn column (a source file cannot be selected) and no screen column (the app shows one workspace),
  * the type chips that apply to files, Người sửa = the file's owner, paging with Tải thêm, and the
- * loading / empty / error states. The workspace root keeps merging the same rows, as the web does.
+ * loading / empty / error states. The workspace root does not list these rows (UNI-2047 F-14).
  */
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -41,7 +41,7 @@ const ok = <T>(value: T): UniworkResult<T> => ({ ok: true, value })
 
 const source = (partial: Partial<UniworkSourceFile> & { id: string }): UniworkSourceFile => ({
   source: 'chat',
-  parent: { kind: 'chat', id: 'room-1', title: 'Phòng dự án' },
+  parent: { kind: 'chat_channel', id: 'room-1', title: 'Phòng dự án' },
   name: `${partial.id}.pdf`,
   mimeType: 'application/pdf',
   extension: 'pdf',
@@ -253,14 +253,13 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     await flush()
   }
 
-  it('lists Từ nơi khác last in the sub-nav (From elsewhere in English) and opens it from there', async () => {
+  it('opens Từ nơi khác from its sidebar section (From elsewhere in English), no longer a sub-nav item', async () => {
     await mount('workspace')
-    const labels = navLabels()
-    expect(labels[labels.length - 1]).toBe('Từ nơi khác')
-    const entry = Array.from(sidebarSlot.querySelectorAll('button')).find(
-      (b) => b.getAttribute('data-nav') === 'elsewhere',
-    )
+    expect(navLabels()).not.toContain('Từ nơi khác')
+    expect(sidebarSlot.querySelector('[data-nav="elsewhere"]')).toBeNull()
+    const entry = sidebarSlot.querySelector('.dl-side-sources [data-source="chat"]')
     await click(entry)
+    expect(lastCall('uniworkListSources')).toEqual({ workspaceId: 'ws-1', source: 'chat' })
     expect(sourceIds()).toEqual(['s-new', 's-old'])
     expect(host.querySelector('.dh-title')?.textContent).toBe('Từ nơi khác')
 
@@ -285,10 +284,10 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     expect(sourceIds()).toEqual(['s-new', 's-old'])
   })
 
-  it('draws the shared table: Tên · Truy cập · Người sửa gần nhất · Cập nhật · Dung lượng · Thao tác, no Chọn, no screen column', async () => {
+  it('draws the shared table: Tên · Người sửa gần nhất · Cập nhật · Dung lượng · Thao tác, no Chọn, no Truy cập (a source file has no level), no screen column', async () => {
     await mount('elsewhere')
     expect(host.querySelector('[role="table"]')).not.toBeNull()
-    expect(headers()).toEqual(['name', 'access', 'editor', 'updated', 'size', 'actions'])
+    expect(headers()).toEqual(['name', 'editor', 'updated', 'size', 'actions'])
     expect(host.querySelector('input[type="checkbox"]')).toBeNull()
     expect(host.querySelector('.dh-subtitle')?.textContent).toBe(
       'Tệp được gửi trong Trò chuyện, Cuộc họp, Email và Công việc của workspace này',
@@ -377,7 +376,8 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     expect(alert).not.toBeNull()
     expect(alert!.textContent).toMatch(/\S/)
     expect(sourceIds()).toEqual([])
-    expect(navLabels()).toContain('Từ nơi khác')
+    // UNI-2047 sidebar: the section is hidden while the route is not there, and back once it answers
+    expect(sidebarSlot.querySelector('.dl-side-sources')).toBeNull()
     sources = async () => ok({ items: SOURCES, nextCursor: null })
     const retry = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Thử lại'),
@@ -385,6 +385,7 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     if (retry) {
       await click(retry)
       expect(sourceIds()).toEqual(['s-new', 's-old'])
+      expect(sidebarSlot.querySelector('.dl-side-sources')).not.toBeNull()
     }
   })
 
@@ -415,9 +416,12 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     expect(sourceIds()).toEqual([])
   })
 
-  it('the workspace root keeps merging the same rows (the web does too)', async () => {
+  it('the workspace root no longer merges the same rows: they live here only (F-14, Q2=A)', async () => {
     await mount('workspace')
-    expect(api.uniworkListSources).toHaveBeenCalled()
-    expect(sourceIds()).toEqual(['s-new', 's-old'])
+    // the only sources read off the page is the sidebar's limit:1 probe (UNI-2047 sidebar)
+    expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual([
+      { workspaceId: 'ws-1', limit: 1 },
+    ])
+    expect(sourceIds()).toEqual([])
   })
 })

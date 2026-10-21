@@ -89,4 +89,19 @@ export const ar = {
   dlBulkConfirmTitleOther: 'هل تريد نقل {n} من المستندات إلى المهملات؟',
   dlBulkConfirmBody: 'تبقى العناصر في المهملات 30 يومًا ثم تُحذف نهائيًا.',
   dlTrashBanner30: 'تبقى العناصر في المهملات 30 يومًا ثم تُحذف نهائيًا.',
+  dlStarredUnavailableTitle: 'المستندات المميزة بنجمة غير متاحة على هذا الخادم بعد',
+  dlStarredUnavailableHint:
+    'يحتاج خادم UniWork لديك إلى تحديث ليتمكن من حفظ المستندات المميزة بنجمة. اطلب من مسؤول تحديثه ثم حاول مرة أخرى.',
+  dlElsewhereUnavailableTitle: 'من أماكن أخرى غير متاحة على هذا الخادم بعد',
+  dlElsewhereUnavailableHint:
+    'يحتاج خادم UniWork لديك إلى تحديث ليتمكن من عرض الملفات المرسلة في الدردشة والاجتماعات والبريد والمهام. اطلب من مسؤول تحديثه ثم حاول مرة أخرى.',
+  dlSourceOriginChat: 'أُرسل في الدردشة',
+  dlSourceOriginTask: 'من مهمة',
+  dlSourceOriginMeeting: 'من اجتماع',
+  dlSourceOriginEmail: 'من بريد إلكتروني',
+  dlSideSourceChat: 'الدردشة',
+  dlSideSourceMeeting: 'الاجتماعات',
+  dlSideSourceEmail: 'البريد الإلكتروني',
+  dlSideSourceTask: 'المهام',
+  dlSearchNoResults: 'لا توجد نتائج لـ “{query}”',
 } satisfies Record<keyof typeof zh, string>

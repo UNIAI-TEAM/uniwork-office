@@ -89,4 +89,19 @@ export const pl = {
   dlBulkConfirmTitleOther: 'Przenieść dokumenty ({n}) do kosza?',
   dlBulkConfirmBody: 'Elementy zostają w koszu przez 30 dni, a potem są usuwane na zawsze.',
   dlTrashBanner30: 'Elementy zostają w koszu przez 30 dni, a potem są usuwane na zawsze.',
+  dlStarredUnavailableTitle: 'Oznaczone gwiazdką nie są jeszcze dostępne na tym serwerze',
+  dlStarredUnavailableHint:
+    'Serwer UniWork wymaga aktualizacji, aby przechowywać dokumenty oznaczone gwiazdką. Poproś administratora o aktualizację i spróbuj ponownie.',
+  dlElsewhereUnavailableTitle: 'Z innych miejsc nie jest jeszcze dostępne na tym serwerze',
+  dlElsewhereUnavailableHint:
+    'Serwer UniWork wymaga aktualizacji, aby wyświetlać pliki wysłane na czacie, w spotkaniach, e-mailach i zadaniach. Poproś administratora o aktualizację i spróbuj ponownie.',
+  dlSourceOriginChat: 'Wysłano na czacie',
+  dlSourceOriginTask: 'Z zadania',
+  dlSourceOriginMeeting: 'Ze spotkania',
+  dlSourceOriginEmail: 'Z e-maila',
+  dlSideSourceChat: 'Czat',
+  dlSideSourceMeeting: 'Spotkania',
+  dlSideSourceEmail: 'E-mail',
+  dlSideSourceTask: 'Zadania',
+  dlSearchNoResults: 'Brak wyników dla „{query}”',
 } satisfies Record<keyof typeof zh, string>

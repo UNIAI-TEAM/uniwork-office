@@ -58,7 +58,7 @@ const SOURCE: UniworkSourceFile = {
   updatedAt: iso(2026, 10, 20, 16, 30),
   source: 'chat',
   owner: { id: 'u-lan', name: 'Lan Nguyễn' },
-  parent: { kind: 'chat', title: 'Kế toán' },
+  parent: { kind: 'chat_channel', title: 'Kế toán' },
 } as unknown as UniworkSourceFile
 
 describe('DocumentsHome renders its screens through the shared table (UNI-2047 A2a)', () => {
@@ -376,7 +376,7 @@ describe('DocumentsHome renders its screens through the shared table (UNI-2047 A
 
   it('lays "other sources" rows on the same columns as the header', async () => {
     sources = [SOURCE]
-    await mount()
+    await mount('elsewhere')
     const head = host.querySelectorAll('.dh-doc-table [role="columnheader"]').length
     const source = host.querySelector<HTMLElement>('[data-source-id="src-1"]')!
     expect(source).not.toBeNull()

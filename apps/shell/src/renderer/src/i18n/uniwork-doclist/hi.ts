@@ -88,4 +88,19 @@ export const hi = {
   dlBulkConfirmTitleOther: '{n} दस्तावेज़ ट्रैश में ले जाएँ?',
   dlBulkConfirmBody: 'आइटम 30 दिन तक ट्रैश में रहते हैं, फिर हमेशा के लिए हटा दिए जाते हैं।',
   dlTrashBanner30: 'आइटम 30 दिन तक ट्रैश में रहते हैं, फिर हमेशा के लिए हटा दिए जाते हैं।',
+  dlStarredUnavailableTitle: 'इस सर्वर पर तारांकित अभी उपलब्ध नहीं है',
+  dlStarredUnavailableHint:
+    'तारांकित दस्तावेज़ सहेजने के लिए आपके UniWork सर्वर को अपडेट करना होगा। किसी एडमिन से अपडेट करने को कहें, फिर दोबारा कोशिश करें।',
+  dlElsewhereUnavailableTitle: 'इस सर्वर पर अन्य जगहों से अभी उपलब्ध नहीं है',
+  dlElsewhereUnavailableHint:
+    'चैट, मीटिंग, ईमेल और कार्यों में भेजी गई फ़ाइलें दिखाने के लिए आपके UniWork सर्वर को अपडेट करना होगा। किसी एडमिन से अपडेट करने को कहें, फिर दोबारा कोशिश करें।',
+  dlSourceOriginChat: 'चैट में भेजा गया',
+  dlSourceOriginTask: 'किसी कार्य से',
+  dlSourceOriginMeeting: 'किसी मीटिंग से',
+  dlSourceOriginEmail: 'किसी ईमेल से',
+  dlSideSourceChat: 'चैट',
+  dlSideSourceMeeting: 'मीटिंग',
+  dlSideSourceEmail: 'ईमेल',
+  dlSideSourceTask: 'कार्य',
+  dlSearchNoResults: '“{query}” के लिए कोई परिणाम नहीं मिला',
 } satisfies Record<keyof typeof zh, string>

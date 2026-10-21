@@ -87,4 +87,19 @@ export const zhTW = {
   dlBulkConfirmTitleOther: '將 {n} 份文件移到資源回收筒？',
   dlBulkConfirmBody: '項目會在資源回收筒保留 30 天，之後永久刪除。',
   dlTrashBanner30: '項目會在資源回收筒保留 30 天，之後永久刪除。',
+  dlStarredUnavailableTitle: '此伺服器尚未支援星號',
+  dlStarredUnavailableHint:
+    '你的 UniWork 伺服器需要更新後才能儲存加星號的文件。請聯絡管理員更新，然後再試一次。',
+  dlElsewhereUnavailableTitle: '此伺服器尚未支援「來自其他位置」',
+  dlElsewhereUnavailableHint:
+    '你的 UniWork 伺服器需要更新後才能顯示聊天、會議、郵件和任務中傳送的檔案。請聯絡管理員更新，然後再試一次。',
+  dlSourceOriginChat: '傳送於聊天',
+  dlSourceOriginTask: '來自任務',
+  dlSourceOriginMeeting: '來自會議',
+  dlSourceOriginEmail: '來自郵件',
+  dlSideSourceChat: '聊天',
+  dlSideSourceMeeting: '會議',
+  dlSideSourceEmail: '電子郵件',
+  dlSideSourceTask: '工作',
+  dlSearchNoResults: '找不到「{query}」的結果',
 } satisfies Record<keyof typeof zh, string>

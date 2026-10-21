@@ -89,4 +89,19 @@ export const de = {
   dlBulkConfirmTitleOther: '{n} Dokumente in den Papierkorb verschieben?',
   dlBulkConfirmBody: 'Elemente bleiben 30 Tage im Papierkorb und werden dann endgültig gelöscht.',
   dlTrashBanner30: 'Elemente bleiben 30 Tage im Papierkorb und werden dann endgültig gelöscht.',
+  dlStarredUnavailableTitle: 'Markierte Dokumente sind auf diesem Server noch nicht verfügbar',
+  dlStarredUnavailableHint:
+    'Ihr UniWork-Server muss aktualisiert werden, damit er markierte Dokumente speichern kann. Bitten Sie eine Administratorin oder einen Administrator um das Update und versuchen Sie es dann erneut.',
+  dlElsewhereUnavailableTitle: 'Von anderswo ist auf diesem Server noch nicht verfügbar',
+  dlElsewhereUnavailableHint:
+    'Ihr UniWork-Server muss aktualisiert werden, damit er Dateien aus Chat, Meetings, E-Mail und Aufgaben anzeigen kann. Bitten Sie eine Administratorin oder einen Administrator um das Update und versuchen Sie es dann erneut.',
+  dlSourceOriginChat: 'Im Chat gesendet',
+  dlSourceOriginTask: 'Aus einer Aufgabe',
+  dlSourceOriginMeeting: 'Aus einem Meeting',
+  dlSourceOriginEmail: 'Aus einer E-Mail',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Meetings',
+  dlSideSourceEmail: 'E-Mail',
+  dlSideSourceTask: 'Aufgaben',
+  dlSearchNoResults: 'Keine Treffer für „{query}“',
 } satisfies Record<keyof typeof zh, string>

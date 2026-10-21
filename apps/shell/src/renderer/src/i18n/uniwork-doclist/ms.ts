@@ -90,4 +90,19 @@ export const ms = {
   dlBulkConfirmBody:
     'Item kekal dalam tong sampah selama 30 hari, kemudian dipadam selama-lamanya.',
   dlTrashBanner30: 'Item kekal dalam tong sampah selama 30 hari, kemudian dipadam selama-lamanya.',
+  dlStarredUnavailableTitle: 'Berbintang belum tersedia pada pelayan ini',
+  dlStarredUnavailableHint:
+    'Pelayan UniWork anda perlu dikemas kini sebelum dapat menyimpan dokumen berbintang. Minta pentadbir mengemas kininya, kemudian cuba lagi.',
+  dlElsewhereUnavailableTitle: 'Dari tempat lain belum tersedia pada pelayan ini',
+  dlElsewhereUnavailableHint:
+    'Pelayan UniWork anda perlu dikemas kini sebelum dapat memaparkan fail yang dihantar dalam Sembang, Mesyuarat, E-mel dan Tugasan. Minta pentadbir mengemas kininya, kemudian cuba lagi.',
+  dlSourceOriginChat: 'Dihantar dalam Sembang',
+  dlSourceOriginTask: 'Daripada tugasan',
+  dlSourceOriginMeeting: 'Daripada mesyuarat',
+  dlSourceOriginEmail: 'Daripada e-mel',
+  dlSideSourceChat: 'Sembang',
+  dlSideSourceMeeting: 'Mesyuarat',
+  dlSideSourceEmail: 'E-mel',
+  dlSideSourceTask: 'Tugasan',
+  dlSearchNoResults: 'Tiada hasil untuk “{query}”',
 } satisfies Record<keyof typeof zh, string>

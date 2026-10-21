@@ -67,7 +67,10 @@ import {
   splitEntriesByArea,
 } from './uniwork-docs-model'
 import { WorkErrorState, WorkNoWorkspace, WorkSkeleton } from './WorkErrorState'
-import { DocumentsHome } from './uniwork-home/DocumentsHome'
+import {
+  DocumentsHome,
+  type ElsewhereSource as DocumentsHomeElsewhereSource,
+} from './uniwork-home/DocumentsHome'
 import type { DocumentsHomeDoc, DocumentsHomeSubViewId } from './uniwork-home/documents-home-model'
 import type { FolderMenuItem } from './uniwork-folders/FolderMenu'
 import { useOfflineToggle } from './OfflineToggle'
@@ -1293,6 +1296,10 @@ export function Home() {
   const [uniworkSubViewByWs, setUniworkSubViewByWs] = useState<
     Record<string, DocumentsHomeSubViewId>
   >({})
+  // RV-16: the Từ nơi khác source row picked, kept with the sub-view per workspace
+  const [uniworkSourceByWs, setUniworkSourceByWs] = useState<
+    Record<string, DocumentsHomeElsewhereSource | null>
+  >({})
   const [uniworkSidebarSlot, setUniworkSidebarSlot] = useState<HTMLDivElement | null>(null)
   const [openingDocId, setOpeningDocId] = useState<string | null>(null)
   const [uwWsState, setUwWsState] = useState<WorkspaceListState>(() => ({
@@ -1386,6 +1393,7 @@ export function Home() {
     if (uniworkAccountRef.current !== null && uniworkAccountRef.current !== acctKey) {
       setUniworkFolderByWs({})
       setUniworkSubViewByWs({})
+      setUniworkSourceByWs({})
     }
     if (s !== null) uniworkAccountRef.current = acctKey
     setRecentsAccount(acctKey)
@@ -1470,6 +1478,7 @@ export function Home() {
     setUwWsState((prev) => ({ ...prev, workspaceId: nextWsId }))
     setUniworkFolderByWs((prev) => ({ ...prev, [nextWsId]: null }))
     setUniworkSubViewByWs((prev) => ({ ...prev, [nextWsId]: 'workspace' }))
+    setUniworkSourceByWs((prev) => ({ ...prev, [nextWsId]: null }))
     setChatMode(false)
     setEduMode(false)
     setSelectedProjectId(null)
@@ -3842,6 +3851,10 @@ export function Home() {
             onWorkspaceChange={selectUniworkWorkspace}
             initialFolderId={activeUwFolderId}
             initialSubView={activeUwSubView}
+            initialElsewhereSource={uniworkSourceByWs[activeUwWorkspaceId] ?? null}
+            onElsewhereSourceChange={(source) => {
+              setUniworkSourceByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: source }))
+            }}
             onSubViewChange={(sv) => {
               setUniworkSubViewByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: sv }))
             }}

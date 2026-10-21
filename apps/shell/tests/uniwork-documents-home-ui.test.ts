@@ -319,8 +319,8 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'shared-by-me',
       'archive',
       'trash',
-      'elsewhere',
     ])
+    // UNI-2047 sidebar: Từ nơi khác is a section of source rows below the folders, not a nav item
     expect(navButtons.map((b) => b.textContent?.trim())).toEqual([
       'Tài liệu của workspace',
       'Gần đây',
@@ -329,7 +329,6 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'Tôi đã chia sẻ',
       'Lưu trữ',
       'Thùng rác',
-      'Từ nơi khác',
     ])
 
     // 2. Top toolbar: h1 title, workspace switcher, search input, Tải lên, Tạo mới
