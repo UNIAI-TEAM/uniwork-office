@@ -130,7 +130,9 @@ export function parseDocumentLimits(raw: unknown): DocumentLimits {
     warn_ratio,
     warn_bytes,
     ...(chunked_upload_threshold_bytes !== undefined ? { chunked_upload_threshold_bytes } : {}),
-    folderUpload: parseFolderUploadBlock(obj.folder_upload),
+    // `folderUpload` is the spelling of a value this function already parsed: the cache
+    // reads the docs client's answer, which went through here once (FU-V1)
+    folderUpload: parseFolderUploadBlock(obj.folder_upload ?? obj.folderUpload),
     ...(upload_extensions ? { upload_extensions } : {}),
   }
 }
