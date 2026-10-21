@@ -66,4 +66,7 @@ export const it = {
   ufAreaLabel: 'Area',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'Nessuna cartella su questo dispositivo.',
+  ufCreateWorkspaceNote:
+    'Il nome della cartella sarà visibile a tutti nello spazio di lavoro. I documenti al suo interno restano visibili solo a te finché non li condividi.',
+  ufCardEmpty: 'Vuota',
 } satisfies Record<keyof typeof zh, string>

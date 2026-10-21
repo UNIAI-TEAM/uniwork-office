@@ -7,9 +7,9 @@ import { UNIWORK_ERROR_KEYS } from '../uniwork-docs-model'
 import type { UniworkDocErrorCode } from '../../../shared/home-api'
 import type { DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
 import {
-  archiveDocument,
   restoreDocument,
   shelveDocument,
+  trashDocument,
   trashShelvedDocument,
   unshelveDocument,
 } from '../uniwork-library-api'
@@ -138,21 +138,22 @@ export function bulkWorkFor(
   action: BulkActionId,
   screen: DocListScreen,
 ): (doc: DocumentsHomeDoc) => Promise<BulkWorkResult> {
-  const call = (id: string) => {
+  const call = (doc: DocumentsHomeDoc) => {
     switch (action) {
       case 'shelve':
-        return shelveDocument(id)
+        return shelveDocument(doc.id)
       case 'unshelve':
-        return unshelveDocument(id)
+        return unshelveDocument(doc.id)
       case 'restore':
-        return restoreDocument(id)
+        return restoreDocument(doc.id)
       case 'trash':
-        // a shelved row has its own trash call; every other screen archives
-        return screen === 'shelved' ? trashShelvedDocument(id) : archiveDocument(id)
+        // a shelved row has its own trash call; every other screen archives (a folder or a page
+        // through the kind-agnostic call, since the archive call is file-only)
+        return screen === 'shelved' ? trashShelvedDocument(doc.id) : trashDocument(doc)
     }
   }
   return async (doc) => {
-    const res = await call(doc.id)
+    const res = await call(doc)
     return res.ok
       ? { ok: true }
       : { ok: false, error: res.error, ...(res.retryable ? { retryable: true } : {}) }

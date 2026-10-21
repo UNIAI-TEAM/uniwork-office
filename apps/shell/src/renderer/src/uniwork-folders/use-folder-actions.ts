@@ -7,7 +7,13 @@ import { createFolder, moveDocument, renameDocument } from '../uniwork-library-a
 import type { FolderNameOutcome } from './FolderNameDialog'
 import type { PickedFolder } from './UniworkFolderPicker'
 import type { TreeRename } from './UniworkFolderTree'
-import { checkFolderName, folderActionFailure, type MovingItem } from './uniwork-folders-model'
+import {
+  checkFolderName,
+  folderActionFailure,
+  type FolderIndex,
+  type MovingItem,
+} from './uniwork-folders-model'
+import { newFolderIsWorkspaceVisible, type WorkspaceFolderCandidate } from './ws-folder'
 
 /** the name dialog: a new folder in `parentId` (null = root), or a rename from the contents list */
 export type NameDialogState =
@@ -17,6 +23,8 @@ export type NameDialogState =
       sub: boolean
       /** UNI-1959: the New menu's default name, filled in (the person may change it) */
       initial?: string
+      /** UNI-2066: the row the dialog was opened from, for a parent the folder index does not hold */
+      parentRow?: WorkspaceFolderCandidate
     }
   | { mode: 'rename'; id: string; title: string }
 
@@ -36,6 +44,7 @@ export function useFolderActions({
   onChanged,
   onCreated,
   notify,
+  index,
 }: {
   workspaceId: string
   /** re-read tree + open folder after an own action */
@@ -44,6 +53,8 @@ export function useFolderActions({
   onCreated?: (parentId: string | null) => void
   /** show a toast (`ok` = done note, `error` = refusal) */
   notify: (message: string, tone: 'ok' | 'error') => void
+  /** the folder index of the tree the host shows: tells whether a new folder is a workspace folder (UNI-2066) */
+  index: FolderIndex
 }) {
   const { t } = useI18n()
   const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null)
@@ -144,12 +155,21 @@ export function useFolderActions({
 
   return {
     nameDialog,
-    openCreate: (parentId: string | null, sub = false, options?: { initial?: string }) =>
+    /** UNI-2066: the open create dialog's folder shows its name to everyone in the workspace */
+    workspaceNote:
+      nameDialog?.mode === 'create' &&
+      newFolderIsWorkspaceVisible(nameDialog.parentId, index, nameDialog.parentRow),
+    openCreate: (
+      parentId: string | null,
+      sub = false,
+      options?: { initial?: string; parentRow?: WorkspaceFolderCandidate },
+    ) =>
       setNameDialog({
         mode: 'create',
         parentId,
         sub,
         ...(options?.initial ? { initial: options.initial } : {}),
+        ...(options?.parentRow ? { parentRow: options.parentRow } : {}),
       }),
     openRename: (doc: Pick<UniworkDocSummary, 'id' | 'title'>) =>
       setNameDialog({ mode: 'rename', id: doc.id, title: doc.title }),

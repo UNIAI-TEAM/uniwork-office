@@ -65,4 +65,7 @@ export const fr = {
   ufAreaLabel: 'Espace',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'Aucun dossier sur cet appareil pour le moment.',
+  ufCreateWorkspaceNote:
+    'Le nom du dossier sera visible par tous les membres de l’espace de travail. Les documents qu’il contient restent visibles uniquement par vous jusqu’à ce que vous les partagiez.',
+  ufCardEmpty: 'Vide',
 } satisfies Record<keyof typeof zh, string>

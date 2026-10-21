@@ -14,6 +14,7 @@ export type RowMenuActionId =
   | 'copy-link'
   | 'star'
   | 'unstar'
+  | 'new-subfolder'
   | 'rename'
   | 'move'
   | 'shelve'
@@ -40,6 +41,11 @@ export interface RowMenuInput {
   /** label of the offline toggle for this row (the app's own entry); null = no entry */
   offlineLabel: string | null
   label: (key: StringKey) => string
+  /**
+   * UNI-2066: may the person create inside this folder row (a workspace folder takes every
+   * human member, whatever the level); absent = the edit level, as rename and move read it.
+   */
+  canCreateInside?: boolean
 }
 
 // groups of the live screens: open | link | edit | keep (and the delete entry)
@@ -55,6 +61,7 @@ export function buildRowMenu({
   run,
   offlineLabel,
   label,
+  canCreateInside,
 }: RowMenuInput): RowMenuItem[] {
   const items: RowMenuItem[] = []
   const add = (
@@ -94,6 +101,10 @@ export function buildRowMenu({
   if (doc.kind !== 'folder') {
     if (doc.favoritedAt) add('unstar', label('dlActUnstar'), EDIT)
     else add('star', label('dlActStar'), EDIT)
+  }
+  // a folder takes new content by its own rule, wider than rename / move (UNI-2066)
+  if (doc.kind === 'folder' && !shelved && (canCreateInside ?? doc.canEdit === true)) {
+    add('new-subfolder', label('ufNewSubfolder'), EDIT)
   }
   if (doc.canEdit !== false && !shelved) {
     if (doc.canEdit === true) add('rename', label('dlActRename'), EDIT)

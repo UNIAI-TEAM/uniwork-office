@@ -66,4 +66,7 @@ export const de = {
   ufAreaLabel: 'Bereich',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'Noch keine Ordner auf diesem Gerät.',
+  ufCreateWorkspaceNote:
+    'Der Ordnername ist für alle im Arbeitsbereich sichtbar. Dokumente darin bleiben nur für Sie sichtbar, bis Sie sie teilen.',
+  ufCardEmpty: 'Leer',
 } satisfies Record<keyof typeof zh, string>

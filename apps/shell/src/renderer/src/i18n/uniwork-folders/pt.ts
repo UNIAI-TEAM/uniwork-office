@@ -64,4 +64,7 @@ export const pt = {
   ufActionsFor: 'Ações para {name}',
   ufAreaLabel: 'Área',
   ufNoDeviceFolders: 'Ainda não há pastas neste dispositivo.',
+  ufCreateWorkspaceNote:
+    'O nome da pasta será visível para todos no espaço de trabalho. Os documentos dentro dela continuam visíveis só para você até que os compartilhe.',
+  ufCardEmpty: 'Vazia',
 } satisfies Record<keyof typeof zh, string>

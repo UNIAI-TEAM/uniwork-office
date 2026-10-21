@@ -63,4 +63,7 @@ export const ar = {
   ufAreaLabel: 'المنطقة',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'لا توجد مجلدات على هذا الجهاز بعد.',
+  ufCreateWorkspaceNote:
+    'سيظهر اسم المجلد لجميع أعضاء مساحة العمل. تظل المستندات داخله مرئية لك وحدك إلى أن تشاركها.',
+  ufCardEmpty: 'فارغ',
 } satisfies Record<keyof typeof zh, string>

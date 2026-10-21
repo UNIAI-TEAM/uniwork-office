@@ -65,4 +65,7 @@ export const pl = {
   ufActionsFor: 'Działania dla {name}',
   ufAreaLabel: 'Obszar',
   ufNoDeviceFolders: 'Brak folderów na tym urządzeniu.',
+  ufCreateWorkspaceNote:
+    'Nazwa folderu będzie widoczna dla wszystkich w przestrzeni roboczej. Dokumenty w środku pozostaną widoczne tylko dla Ciebie, dopóki ich nie udostępnisz.',
+  ufCardEmpty: 'Pusty',
 } satisfies Record<keyof typeof zh, string>

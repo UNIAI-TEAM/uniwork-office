@@ -60,4 +60,7 @@ export const zh = {
   ufAreaLabel: '区域',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: '本机尚无文件夹。',
+  ufCreateWorkspaceNote:
+    '文件夹名称将对工作区中的所有人可见。其中的文档在你共享之前仍仅你自己可见。',
+  ufCardEmpty: '空',
 }

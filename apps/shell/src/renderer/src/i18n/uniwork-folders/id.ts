@@ -65,4 +65,7 @@ export const id = {
   ufAreaLabel: 'Area',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'Belum ada folder di perangkat ini.',
+  ufCreateWorkspaceNote:
+    'Nama folder akan terlihat oleh semua orang di ruang kerja. Dokumen di dalamnya tetap hanya terlihat oleh Anda sampai Anda membagikannya.',
+  ufCardEmpty: 'Kosong',
 } satisfies Record<keyof typeof zh, string>

@@ -65,4 +65,7 @@ export const ms = {
   ufActionsFor: 'Tindakan untuk {name}',
   ufAreaLabel: 'Kawasan',
   ufNoDeviceFolders: 'Belum ada folder pada peranti ini.',
+  ufCreateWorkspaceNote:
+    'Nama folder akan kelihatan kepada semua orang dalam ruang kerja. Dokumen di dalamnya kekal hanya boleh dilihat oleh anda sehingga anda berkongsinya.',
+  ufCardEmpty: 'Kosong',
 } satisfies Record<keyof typeof zh, string>

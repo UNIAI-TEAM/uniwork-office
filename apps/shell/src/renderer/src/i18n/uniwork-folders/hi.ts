@@ -64,4 +64,7 @@ export const hi = {
   ufAreaLabel: 'क्षेत्र',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'इस डिवाइस पर अभी कोई फ़ोल्डर नहीं है।',
+  ufCreateWorkspaceNote:
+    'फ़ोल्डर का नाम वर्कस्पेस में सभी को दिखाई देगा। इसके अंदर के दस्तावेज़ तब तक केवल आपको दिखेंगे, जब तक आप उन्हें साझा नहीं करते।',
+  ufCardEmpty: 'खाली',
 } satisfies Record<keyof typeof zh, string>

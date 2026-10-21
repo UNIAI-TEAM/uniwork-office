@@ -64,4 +64,7 @@ export const ko = {
   ufActionsFor: '{name} 작업',
   ufAreaLabel: '영역',
   ufNoDeviceFolders: '이 기기에 아직 폴더가 없습니다.',
+  ufCreateWorkspaceNote:
+    '폴더 이름은 워크스페이스의 모든 사람에게 표시됩니다. 안에 있는 문서는 공유하기 전까지 나만 볼 수 있습니다.',
+  ufCardEmpty: '비어 있음',
 } satisfies Record<keyof typeof zh, string>

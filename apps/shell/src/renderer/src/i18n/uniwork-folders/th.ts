@@ -64,4 +64,7 @@ export const th = {
   ufActionsFor: 'การทำงานสำหรับ {name}',
   ufAreaLabel: 'พื้นที่',
   ufNoDeviceFolders: 'ยังไม่มีโฟลเดอร์ในเครื่องนี้',
+  ufCreateWorkspaceNote:
+    'ชื่อโฟลเดอร์จะแสดงให้ทุกคนในเวิร์กสเปซเห็น เอกสารที่อยู่ภายในจะมีเพียงคุณที่เห็นได้จนกว่าคุณจะแชร์',
+  ufCardEmpty: 'ว่างเปล่า',
 } satisfies Record<keyof typeof zh, string>

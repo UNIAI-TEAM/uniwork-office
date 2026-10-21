@@ -990,6 +990,7 @@ export function UniworkOpenDialog({
             <UniworkBrowser
               key={state.workspaceId}
               workspaceId={state.workspaceId!}
+              myRole={state.workspaces.items.find((ws) => ws.id === state.workspaceId)?.myRole}
               variant="dialog"
               query={folderView ? folderQuery : ''}
               onClearQuery={() => {

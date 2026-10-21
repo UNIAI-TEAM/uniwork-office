@@ -65,4 +65,7 @@ export const cs = {
   ufAreaLabel: 'Oblast',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'V tomto zařízení zatím nejsou žádné složky.',
+  ufCreateWorkspaceNote:
+    'Název složky uvidí všichni v pracovním prostoru. Dokumenty uvnitř zůstanou viditelné jen pro vás, dokud je nesdílíte.',
+  ufCardEmpty: 'Prázdná',
 } satisfies Record<keyof typeof zh, string>

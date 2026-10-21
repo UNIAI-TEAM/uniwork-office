@@ -64,4 +64,7 @@ export const en = {
   ufAreaLabel: 'Area',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'No folders on this device yet.',
+  ufCreateWorkspaceNote:
+    'The folder name will show to everyone in the workspace. Documents inside stay visible only to you until you share them.',
+  ufCardEmpty: 'Empty',
 } satisfies Record<keyof typeof zh, string>

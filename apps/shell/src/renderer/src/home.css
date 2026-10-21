@@ -7149,6 +7149,13 @@ html[dir='rtl'] .quick-title-row {
   display: none;
 }
 
+.uw-act-note {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .uw-act-types {
   display: flex;
   flex-wrap: wrap;

@@ -68,8 +68,8 @@ import {
   type TreeRow,
 } from '../uniwork-folders/uniwork-folders-model'
 import { useFolderActions } from '../uniwork-folders/use-folder-actions'
+import { canCreateInsideFolder } from '../uniwork-folders/ws-folder'
 import {
-  archiveDocument,
   cancelUploadDocument,
   createDocument,
   createPage,
@@ -82,6 +82,7 @@ import {
   pickUploadFile,
   renameDocument,
   restoreDocument,
+  trashDocument,
   searchDocuments,
   uploadDocument,
 } from '../uniwork-library-api'
@@ -533,7 +534,10 @@ export function DocumentsHome({
     onChanged: refreshAll,
     onCreated: expandParent,
     notify: (message, tone) => setToast({ message, tone }),
+    index,
   })
+  // UNI-2066: my role in the open workspace (the workspace list's `myRole`); never guessed from a level
+  const myRole = workspaces.find((ws) => ws.id === workspaceId)?.myRole ?? null
 
   // Reset workspace-scoped state when workspaceId changes
   const prevWsRef = useRef(workspaceId)
@@ -1277,10 +1281,6 @@ export function DocumentsHome({
     folderActions.openCreate(parentId, true, { initial: t(NEW_DEFAULT_NAME_KEY.folder) })
   }
 
-  const hasFolderRow =
-    (subView === 'workspace' && folderId !== null) ||
-    (subView === 'my-folder' && resolvedMyFolderId !== null)
-
   const handleUploadDoc = async (
     input: DocTarget & { path: string; name: string },
   ): Promise<ActionOutcome> => {
@@ -1402,8 +1402,22 @@ export function DocumentsHome({
   }
   const openFolderEditable =
     subView === 'workspace' && folderId ? folderEditableRef.current.get(folderId) !== false : true
+  // UNI-2066: new content (Folder in the New menu, Upload, a drop) follows the create rule: a human
+  // workspace member adds to a workspace folder even at view level
+  const openFolderCreatable =
+    subView === 'workspace' && folderId
+      ? canCreateInsideFolder(
+          { id: folderId, kind: 'folder', canEdit: folderEditableRef.current.get(folderId) },
+          index,
+          myRole,
+        )
+      : true
+  const hasFolderRow =
+    (subView === 'workspace' && folderId !== null && openFolderCreatable) ||
+    (subView === 'my-folder' && resolvedMyFolderId !== null)
+
   const libraryEnabled =
-    (subView === 'workspace' || subView === 'my-folder') && !uploadModal && openFolderEditable
+    (subView === 'workspace' || subView === 'my-folder') && !uploadModal && openFolderCreatable
   const libraryDrop = useLibraryDrop({ enabled: libraryEnabled, onDrop: onLibraryDrop })
   // the window-level Drop to open overlay must stay out of a drag this zone owns
   const claimZoneDrag = (event: ReactDragEvent) => {
@@ -1462,7 +1476,8 @@ export function DocumentsHome({
     const doc = archiveTarget
     if (!doc) return
     setArchiveTarget(null)
-    const res = await archiveDocument(doc.id)
+    // a folder (or page) goes through the kind-agnostic trash call: the archive call reads a file block
+    const res = await trashDocument(doc)
     if (res.ok) {
       announce(t('uwDocArchived'))
       refreshAll()
@@ -1710,18 +1725,24 @@ export function DocumentsHome({
     return items
   }
 
+  // UNI-2066: may I create inside this folder: the edit level, or as a human workspace member in a
+  // workspace folder even at view level (rename / move / trash keep following the level)
+  const canCreateIn = (folder: DocumentsHomeDoc): boolean =>
+    canCreateInsideFolder({ ...folder, kind: 'folder' }, index, myRole)
+
   const folderCardMenuFor = (folder: DocumentsHomeDoc): FolderMenuItem[] => {
-    if (folder.canEdit === false) return []
+    const canCreate = canCreateIn(folder)
     // Mở leads every row menu (Rules board section 3); a viewer-only folder has no menu, the card opens it
+    if (folder.canEdit === false && !canCreate) return []
     const items: FolderMenuItem[] = [
       { id: 'open', label: t('dlActOpen'), onSelect: () => openFolderInWorkspace(folder.id) },
       {
         id: 'new',
         label: t('ufNewSubfolder'),
-        onSelect: () => folderActions.openCreate(folder.id, true),
+        onSelect: () => folderActions.openCreate(folder.id, true, { parentRow: folder }),
       },
     ]
-    if (!folderEditActionsOffered(folder)) return items
+    if (folder.canEdit === false || !folderEditActionsOffered(folder)) return items
     items.push(
       { id: 'rename', label: t('ufRename'), onSelect: () => folderActions.openRename(folder) },
       {
@@ -1752,14 +1773,18 @@ export function DocumentsHome({
   /** the open folder's own menu in its header (UNI-1979): the card menu minus the card, no Share */
   const openFolderMenu = (id: string): FolderMenuItem[] => {
     const node = index.get(id)
-    const items: FolderMenuItem[] = [
-      {
+    const items: FolderMenuItem[] = []
+    if (openFolderCreatable) {
+      items.push({
         id: 'new',
         label: t('ufNewSubfolder'),
         onSelect: () => folderActions.openCreate(id, true),
-      },
-    ]
-    if (!node || id === resolvedMyFolderId) return items
+      })
+    }
+    // the level of the open folder is known from the card it was opened by (unknown = offered)
+    if (!node || id === resolvedMyFolderId || folderEditableRef.current.get(id) === false) {
+      return items
+    }
     items.push(
       {
         id: 'rename',
@@ -1781,6 +1806,8 @@ export function DocumentsHome({
     return items
   }
 
+  const headerMenuItems = folderId ? openFolderMenu(folderId) : []
+
   // UNI-2047 A4: every row menu comes from the shared rules (doclist/row-menu.ts): the model owns
   // order, permissions, the delete-last rule; this host only says what it can run
   const rowMenuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] =>
@@ -1789,8 +1816,22 @@ export function DocumentsHome({
       doc,
       label: t,
       offlineLabel: offlineToggle.labelOf(doc.id),
+      // UNI-2066: a folder row takes a new subfolder by the create rule (the level, or a human member
+      // in a workspace folder); an unknown level stays out, as rename and move do
+      ...(doc.kind === 'folder'
+        ? {
+            canCreateInside:
+              doc.canEdit === true ||
+              canCreateInsideFolder({ ...doc, kind: 'folder', canEdit: false }, index, myRole),
+          }
+        : {}),
       run: {
         open: () => void openDoc(doc),
+        ...(doc.kind === 'folder'
+          ? {
+              'new-subfolder': () => folderActions.openCreate(doc.id, true, { parentRow: doc }),
+            }
+          : {}),
         offline: () =>
           offlineToggle.toggle({
             documentId: doc.id,
@@ -2237,7 +2278,7 @@ export function DocumentsHome({
               onOpen={openFolderInWorkspace}
               leafActions={
                 <>
-                  {folderId !== resolvedMyFolderId && (
+                  {folderId !== resolvedMyFolderId && openFolderEditable && (
                     <button
                       type="button"
                       className="uwf-crumb-rename"
@@ -2266,14 +2307,16 @@ export function DocumentsHome({
                       </svg>
                     </button>
                   )}
-                  <FolderMenu
-                    label={t('ufActionsFor', { name: currentHeading })}
-                    items={openFolderMenu(folderId)}
-                    dataFor="open-folder"
-                    tabbable
-                    open={openMenuId === 'open-folder'}
-                    onOpenChange={(o) => setOpenMenuId(o ? 'open-folder' : null)}
-                  />
+                  {headerMenuItems.length > 0 && (
+                    <FolderMenu
+                      label={t('ufActionsFor', { name: currentHeading })}
+                      items={headerMenuItems}
+                      dataFor="open-folder"
+                      tabbable
+                      open={openMenuId === 'open-folder'}
+                      onOpenChange={(o) => setOpenMenuId(o ? 'open-folder' : null)}
+                    />
+                  )}
                 </>
               }
             />
@@ -2541,6 +2584,10 @@ export function DocumentsHome({
                               {title}
                             </span>
                           )}
+                          {/* UNI-2066: `isEmpty` is computed for me by the server; only a real true says it */}
+                          {folder.isEmpty === true && (
+                            <span className="dh-folder-empty">{t('ufCardEmpty')}</span>
+                          )}
                         </button>
                         {menuItems.length > 0 && (
                           <span className="dh-folder-actions" onClick={(e) => e.stopPropagation()}>
@@ -2770,6 +2817,7 @@ export function DocumentsHome({
           }
           initial={nameDialog.mode === 'rename' ? nameDialog.title : (nameDialog.initial ?? '')}
           submitLabel={nameDialog.mode === 'rename' ? t('ufSave') : t('ufCreate')}
+          workspaceNote={folderActions.workspaceNote}
           onSubmit={folderActions.submitName}
           onCancel={folderActions.closeNameDialog}
         />

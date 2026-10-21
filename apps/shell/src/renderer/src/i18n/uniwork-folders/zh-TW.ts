@@ -61,4 +61,7 @@ export const zhTW = {
   ufAreaLabel: '區域',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: '本機尚無資料夾。',
+  ufCreateWorkspaceNote:
+    '資料夾名稱會顯示給工作區中的所有人。裡面的文件在你分享之前仍只有你看得到。',
+  ufCardEmpty: '空',
 } satisfies Record<keyof typeof zh, string>

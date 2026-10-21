@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import type {
   UniworkDocActionResult,
   UniworkDocSummary,
@@ -29,6 +37,7 @@ import { UniworkFolderPicker, type PickedFolder } from './UniworkFolderPicker'
 import { FolderGlyph, MyFolderGlyph } from './UniworkFolderTree'
 import {
   MY_FOLDER_LABEL_KEY,
+  buildFolderIndex,
   folderVisibilityTagOf,
   myFolderIdOf,
   type PathPart,
@@ -367,11 +376,13 @@ export function SaveDialog({
     })
   }, [workspaceId, nodes === null, refreshTree]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const folderIndex = useMemo(() => buildFolderIndex(nodes ?? []), [nodes])
   const actions = useFolderActions({
     workspaceId: workspaceId ?? '',
     onChanged: refreshTree,
     onCreated: setRevealIn,
     notify: (message, tone) => setToast({ message, tone }),
+    index: folderIndex,
   })
 
   const mineId = myFolderId ?? (nodes ? myFolderIdOf(nodes) : null)
@@ -498,6 +509,7 @@ export function SaveDialog({
           <FolderNameDialog
             title={nameDialog.sub ? t('ufNewSubfolder') : t('ufNewFolder')}
             submitLabel={t('ufCreate')}
+            workspaceNote={actions.workspaceNote}
             onSubmit={actions.submitName}
             onCancel={actions.closeNameDialog}
           />

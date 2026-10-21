@@ -27,6 +27,7 @@ import {
   type TreeRow,
 } from './uniwork-folders-model'
 import { useFolderActions } from './use-folder-actions'
+import { canCreateInsideFolder } from './ws-folder'
 import { useFolderBrowser, type SearchKind } from './use-folder-browser'
 import './uniwork-folders.css'
 
@@ -67,6 +68,7 @@ export function UniworkBrowser({
   offlineOf,
   onOffline,
   hidePages = false,
+  myRole,
 }: {
   workspaceId: string
   variant: 'dialog' | 'pane'
@@ -95,6 +97,8 @@ export function UniworkBrowser({
   onOffline?: (doc: UniworkDocSummary) => void
   /** UNI-1953: a picker cannot take a UniNote page, so its rows are left out (not counted as hidden) */
   hidePages?: boolean
+  /** UNI-2066: my role in this workspace (owner|admin|member|...); a human member creates inside a workspace folder at view level */
+  myRole?: string | null
 }) {
   const { t, dateLocale } = useI18n()
   const uid = useId()
@@ -108,6 +112,7 @@ export function UniworkBrowser({
     onChanged: browser.refresh,
     onCreated: browser.expandParent,
     notify: (message, tone) => setToast({ message, tone }),
+    index: browser.index,
   })
   const query = (hostQuery ?? ownDraft).trim()
   const { runSearch } = browser
@@ -186,14 +191,19 @@ export function UniworkBrowser({
       }
       return items
     }
-    if (!canEdit) return []
-    if (!folderEditActionsOffered(doc)) {
-      return [
-        { id: 'new', label: t('ufNewSubfolder'), onSelect: () => actions.openCreate(doc.id, true) },
-      ]
+    // UNI-2066: new content follows its own rule (a workspace folder takes every human member at
+    // view level); rename and move still follow the level
+    const newItem: FolderMenuItem = {
+      id: 'new',
+      label: t('ufNewSubfolder'),
+      onSelect: () => actions.openCreate(doc.id, true, { parentRow: doc }),
     }
+    if (!canEdit) {
+      return canCreateInsideFolder({ ...doc, canEdit }, browser.index, myRole) ? [newItem] : []
+    }
+    if (!folderEditActionsOffered(doc)) return [newItem]
     return [
-      { id: 'new', label: t('ufNewSubfolder'), onSelect: () => actions.openCreate(doc.id, true) },
+      newItem,
       { id: 'rename', label: t('ufRename'), onSelect: () => actions.openRename(doc) },
       move,
     ]
@@ -404,6 +414,7 @@ export function UniworkBrowser({
           }
           initial={nameDialog.mode === 'rename' ? nameDialog.title : ''}
           submitLabel={nameDialog.mode === 'rename' ? t('ufSave') : t('ufCreate')}
+          workspaceNote={actions.workspaceNote}
           onSubmit={actions.submitName}
           onCancel={actions.closeNameDialog}
         />

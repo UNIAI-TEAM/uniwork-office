@@ -131,9 +131,12 @@ export function Empty() {
   return <span className="dh-cell-empty">{EMPTY_CELL}</span>
 }
 
-/** the Truy cập pill (Riêng tư / Workspace / Được chia sẻ) and the line under it (Chủ sở hữu / Bạn: Sửa) */
+/** the Truy cập pill (Riêng tư / Workspace / Được chia sẻ) and the line under it (Chủ sở hữu / Bạn: Sửa); nothing for a folder */
 export function AccessContent({ doc }: { doc: DocumentsHomeDoc }) {
   const { t } = useI18n()
+  // UNI-2066: a folder has no access of its own to show (workspace folders are open to every
+  // member, the documents inside keep theirs), so its cell stays empty
+  if (doc.kind === 'folder') return null
   const pill = accessPill(doc)
   const level = levelLine(doc, t)
   return (

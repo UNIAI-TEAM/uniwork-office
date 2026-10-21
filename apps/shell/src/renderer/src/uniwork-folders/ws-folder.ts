@@ -96,3 +96,41 @@ export function workspaceFolderIntoMyFolder(
   if (!mine.has(target)) return false
   return ids.some((id) => index.has(id) && !mine.has(id))
 }
+
+/** The workspace roles of a person (not a viewer, guest or agent): they add content to a workspace folder. */
+export function isHumanMemberRole(role: string | null | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'member'
+}
+
+/**
+ * Whether a folder created under `parentId` (null = the workspace root) shows its name to the
+ * whole workspace: the root and a workspace folder do, My Folder and everything under it do not.
+ * A parent the index does not hold is judged from `parentRow` (the row the dialog was opened
+ * from); without either it is not a workspace folder (no guess, so no note). Ported from the
+ * web's `newFolderIsWorkspaceVisible`.
+ */
+export function newFolderIsWorkspaceVisible(
+  parentId: string | null,
+  index: FolderIndex,
+  parentRow?: WorkspaceFolderCandidate,
+): boolean {
+  if (parentId === null) return true
+  return isWorkspaceFolder({ ...parentRow, id: parentId, kind: parentRow?.kind ?? 'folder' }, index)
+}
+
+/**
+ * May the person create inside this folder: at the edit level (`canEdit` true, or not known yet,
+ * as the other folder menus read it), or as a human workspace member in a workspace folder even
+ * at the view level. Rename / move / trash do not take this rule: they follow the level. The role
+ * comes from the workspace list (`myRole`); an unknown role never widens the level. Ported from
+ * the web's `canCreateInsideFolder`.
+ */
+export function canCreateInsideFolder(
+  entry: WorkspaceFolderCandidate & { canEdit?: boolean },
+  index: FolderIndex,
+  role: string | null | undefined,
+): boolean {
+  if (entry.kind !== undefined && entry.kind !== 'folder') return false
+  if (entry.canEdit !== false) return true
+  return isHumanMemberRole(role) && isWorkspaceFolder(entry, index)
+}

@@ -267,8 +267,9 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
     expect(cell('doc-a', 'shelved')!.textContent).toContain('Lan Nguyễn')
     expect(cell('doc-a', 'shelved')!.textContent).toContain('05/03/2025')
 
-    // a restricted folder with no share scope is never guessed shared: Riêng tư
-    expect(cell('fold-b', 'access')!.querySelector('.dh-vis-badge')?.textContent).toBe('Riêng tư')
+    // a folder carries no access pill and no level line (UNI-2066 A1): its cell stays empty
+    expect(cell('fold-b', 'access')!.querySelector('.dh-vis-badge')).toBeNull()
+    expect(cell('fold-b', 'access')!.textContent).toBe('')
     expect(cell('fold-b', 'shelved')!.textContent).toContain('Cựu thành viên')
     // a shelved folder is a row that never browses: its title is no button
     expect(name('fold-b').querySelector('button.dh-doc-open')).toBeNull()

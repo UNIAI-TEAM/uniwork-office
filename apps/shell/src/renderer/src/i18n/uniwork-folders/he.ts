@@ -62,4 +62,7 @@ export const he = {
   ufAreaLabel: 'אזור',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'אין עדיין תיקיות במכשיר זה.',
+  ufCreateWorkspaceNote:
+    'שם התיקייה יוצג לכולם בסביבת העבודה. המסמכים שבתוכה יישארו גלויים רק לך עד שתשתף אותם.',
+  ufCardEmpty: 'ריקה',
 } satisfies Record<keyof typeof zh, string>

@@ -63,4 +63,7 @@ export const vi = {
   ufAreaLabel: 'Khu vực',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'Chưa có thư mục nào trên máy này.',
+  ufCreateWorkspaceNote:
+    'Tên thư mục sẽ hiện với mọi người trong workspace. Tài liệu bên trong vẫn chỉ mình bạn xem được cho tới khi bạn chia sẻ.',
+  ufCardEmpty: 'Trống',
 } satisfies Record<keyof typeof zh, string>

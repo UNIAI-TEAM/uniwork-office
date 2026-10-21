@@ -65,4 +65,7 @@ export const nl = {
   ufActionsFor: 'Acties voor {name}',
   ufAreaLabel: 'Gebied',
   ufNoDeviceFolders: 'Nog geen mappen op dit apparaat.',
+  ufCreateWorkspaceNote:
+    'De mapnaam is zichtbaar voor iedereen in de werkruimte. Documenten erin blijven alleen voor jou zichtbaar totdat je ze deelt.',
+  ufCardEmpty: 'Leeg',
 } satisfies Record<keyof typeof zh, string>

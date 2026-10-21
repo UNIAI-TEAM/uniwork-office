@@ -10,18 +10,22 @@ export type FolderNameOutcome = { ok: true } | { ok: false; field: DocNameError 
 /**
  * FD-11: name a new folder (New folder / New subfolder) or rename one from the
  * contents list. The name rule (NFC, trim, 1-255) is checked before any call;
- * `folder_name_taken` comes back from the server and shows at the field.
+ * `folder_name_taken` comes back from the server and shows at the field. A create
+ * under the workspace root or a workspace folder adds the workspace note.
  */
 export function FolderNameDialog({
   title,
   initial = '',
   submitLabel,
+  workspaceNote = false,
   onSubmit,
   onCancel,
 }: {
   title: string
   initial?: string
   submitLabel: string
+  /** a new folder whose name shows to everyone in the workspace (UNI-2066): a note under the field */
+  workspaceNote?: boolean
   onSubmit: (name: string) => Promise<FolderNameOutcome>
   onCancel: () => void
 }) {
@@ -79,7 +83,7 @@ export function FolderNameDialog({
             required
             aria-required="true"
             aria-invalid={error !== null}
-            aria-describedby={`${id}-error`}
+            aria-describedby={workspaceNote ? `${id}-note ${id}-error` : `${id}-error`}
             spellCheck={false}
             onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => {
@@ -87,6 +91,11 @@ export function FolderNameDialog({
               if (error) setError(null)
             }}
           />
+          {workspaceNote && (
+            <p id={`${id}-note`} className="uw-act-note">
+              {t('ufCreateWorkspaceNote')}
+            </p>
+          )}
           <FieldError id={`${id}-error`} error={error} keys={FOLDER_NAME_ERROR_KEYS} />
         </div>
         <div className="modal-buttons">

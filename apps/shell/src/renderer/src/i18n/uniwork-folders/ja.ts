@@ -65,4 +65,7 @@ export const ja = {
   ufAreaLabel: 'エリア',
   ufAreaUniwork: 'UniWork',
   ufNoDeviceFolders: 'この端末にはまだフォルダがありません。',
+  ufCreateWorkspaceNote:
+    'フォルダー名はワークスペースの全員に表示されます。中のドキュメントは、共有するまであなただけが見られます。',
+  ufCardEmpty: '空',
 } satisfies Record<keyof typeof zh, string>

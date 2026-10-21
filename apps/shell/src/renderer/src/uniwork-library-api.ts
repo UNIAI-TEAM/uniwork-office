@@ -187,6 +187,20 @@ export function archiveDocument(documentId: string): Promise<DocActionResult<unk
   return actions().uniworkArchiveDocument?.(documentId) ?? Promise.resolve(unavailable)
 }
 
+/**
+ * Chuyển vào thùng rác from a live row of any kind. The archive call reads a file block, so a
+ * folder (or a page) would fail it; those go through the kind-agnostic call the Lưu trữ shelf
+ * uses (same trash route, manage gate that does not read a file). A row with no kind is a file.
+ */
+export function trashDocument(doc: {
+  id: string
+  kind?: string | null
+}): Promise<DocActionResult<unknown>> {
+  return doc.kind === undefined || doc.kind === null || doc.kind === 'file'
+    ? archiveDocument(doc.id)
+    : trashShelvedDocument(doc.id)
+}
+
 /** UNI-2066: what trashing this folder moves; a missing bridge (an older main) is server_error */
 export function getArchiveImpact(
   documentId: string,

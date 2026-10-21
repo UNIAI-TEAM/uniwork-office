@@ -714,6 +714,14 @@
   white-space: nowrap;
 }
 
+/* UNI-2066: "Trống" on a folder card the server says holds nothing this person can see */
+.dh-folder-empty {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 /* Documents table (UNI-2047): the shared columns Chọn · Tên · [screen column] · Truy cập ·
    Người sửa gần nhất · Cập nhật · Dung lượng · Thao tác, each row a grid whose tracks DocList
    sets inline (the set of columns follows the table's width, not the window's). Cells carry the

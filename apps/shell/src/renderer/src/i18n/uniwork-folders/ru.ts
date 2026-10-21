@@ -65,4 +65,7 @@ export const ru = {
   ufActionsFor: 'Действия для {name}',
   ufAreaLabel: 'Область',
   ufNoDeviceFolders: 'На этом устройстве пока нет папок.',
+  ufCreateWorkspaceNote:
+    'Название папки увидят все в рабочем пространстве. Документы внутри остаются видны только вам, пока вы ими не поделитесь.',
+  ufCardEmpty: 'Пусто',
 } satisfies Record<keyof typeof zh, string>
