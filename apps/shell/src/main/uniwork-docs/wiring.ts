@@ -28,6 +28,7 @@ import {
   type UniworkFolderQuery,
   type UniworkMoveDocumentInput,
   type UniworkRemoteAction,
+  type UniworkResult,
   type UniworkSearchQuery,
   type UniworkSourceDownloadInput,
   type UniworkSourceListQuery,
@@ -36,6 +37,13 @@ import {
   type UniworkShelvedQuery,
 } from '../../shared/home-api'
 import { SOURCE_VIEW_CHANNELS } from '../../shared/source-view'
+import type { BatchUploadProgress } from '../../shared/folder-upload-api'
+import { createFolderUploadService } from './folder-upload/service'
+import type { FolderUploadService } from './folder-upload/service'
+import type { FolderUploadRunnerPort } from './folder-upload/runner-port'
+import type { FolderUploadRunnerHooks } from './folder-upload/wire'
+import { createSequentialRunner } from './folder-upload/sequential-runner'
+import type { FolderUploadLimits } from './folder-upload/types'
 import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
 import {
   applyUniworkProfile,
@@ -204,6 +212,21 @@ export interface UniworkDocsWiring {
   isAiRunning?(path: string): boolean
   /** G5-09 S5: stops the AI turn running in the editor showing `path` */
   stopAiRun?(path: string): void
+  /**
+   * UNI-2052: the batch side of the folder upload. `getLimits` reads the
+   * server's folder_upload limits (null = the server has none) and `runner`
+   * runs the 5 server routes. Absent = folder upload is off and several files
+   * go one by one through the single upload.
+   */
+  folderUpload?: {
+    getLimits(): FolderUploadLimits | null | Promise<FolderUploadLimits | null>
+    /**
+     * The runner, or a factory the host calls once with the list refresh (the
+     * same tree-changed push this app's own uploads use) so the runner can
+     * refresh the lists while a run goes.
+     */
+    runner: FolderUploadRunnerPort | ((hooks: FolderUploadRunnerHooks) => FolderUploadRunnerPort)
+  }
 }
 
 /** the one question a web link may ask: connect this install to the server it names? */
@@ -252,6 +275,108 @@ async function pickUploadFile(
   const path = picked.canceled ? undefined : picked.filePaths[0]
   if (!path) return null
   return { path, name: basename(path) }
+}
+
+/** UNI-2052: the native folder dialog; null when cancelled */
+async function pickUploadDirectory(wiring: UniworkDocsWiring): Promise<string | null> {
+  const parent = wiring.shellWindow()
+  const options: Electron.OpenDialogOptions = {
+    title: tUniworkDocs(wiring.lang(), 'uploadPickFolderTitle'),
+    properties: ['openDirectory'],
+  }
+  const picked = parent
+    ? await dialog.showOpenDialog(parent, options)
+    : await dialog.showOpenDialog(options)
+  return picked.canceled ? null : (picked.filePaths[0] ?? null)
+}
+
+/** UNI-2052: the native dialog for several files, filtered by the formats the upload takes */
+async function pickUploadFiles(
+  wiring: UniworkDocsWiring,
+  extensions: readonly string[],
+): Promise<string[]> {
+  const parent = wiring.shellWindow()
+  const options: Electron.OpenDialogOptions = {
+    title: tUniworkDocs(wiring.lang(), 'uploadPickFilesTitle'),
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: tUniworkDocs(wiring.lang(), 'uploadPickDocuments'), extensions: [...extensions] },
+    ],
+  }
+  const picked = parent
+    ? await dialog.showOpenDialog(parent, options)
+    : await dialog.showOpenDialog(options)
+  return picked.canceled ? [] : picked.filePaths
+}
+
+/**
+ * Planner limits of several files without a folder_upload block: no batch on
+ * the server, so a modest count and total keep a sequential run bounded. The
+ * per-file cap is the document limit the single upload enforces anyway.
+ */
+const SEQUENTIAL_MAX_FILES = 100
+const SEQUENTIAL_MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
+/** the server's own folder depth cap (`maxDocumentDepth`) */
+const SEQUENTIAL_MAX_DEPTH = 20
+
+/** the unavailable batch runner: only reached if a build wires limits without a runner */
+const NO_BATCH_RUNNER: FolderUploadRunnerPort = {
+  start() {
+    throw new Error('no batch runner wired')
+  },
+  cancel() {},
+  retry() {},
+  dismiss() {},
+}
+
+/** UNI-2052: the folder-upload service over this wiring's dialogs, the docs service and the injected runner */
+function createBatchUpload(
+  service: UniworkDocsService,
+  wiring: UniworkDocsWiring,
+  hooks: FolderUploadRunnerHooks,
+): FolderUploadService {
+  const wired = wiring.folderUpload?.runner
+  const runner = typeof wired === 'function' ? wired(hooks) : (wired ?? NO_BATCH_RUNNER)
+  const valueOf = async <T>(call: Promise<UniworkResult<T>>): Promise<T> => {
+    const answer = await call
+    if (!answer.ok) throw new Error(answer.error)
+    return answer.value
+  }
+  return createFolderUploadService({
+    pickDirectory: () => pickUploadDirectory(wiring),
+    pickFiles: (extensions) => pickUploadFiles(wiring, extensions),
+    folderTree: (workspaceId) => valueOf(service.folderTree(workspaceId)),
+    ensureMyFolder: async (workspaceId) => {
+      const folder = await valueOf(service.ensureMyFolder(workspaceId))
+      return { id: folder.id, title: folder.title }
+    },
+    getFolderUploadLimits: () => wiring.folderUpload?.getLimits() ?? null,
+    sequentialLimits: async () => ({
+      maxFiles: SEQUENTIAL_MAX_FILES,
+      maxTotalBytes: SEQUENTIAL_MAX_TOTAL_BYTES,
+      maxDepth: SEQUENTIAL_MAX_DEPTH,
+      perFileMaxBytes: (await service.limitsCache.get()).max_bytes,
+    }),
+    runner,
+    sequential: createSequentialRunner({
+      uploadOne: (input) => service.uploadDocument(input),
+      cancelOne: (uploadId) => service.cancelUpload(uploadId),
+      newUploadId: () => `seq-${randomUUID()}`,
+    }),
+  })
+}
+
+/** progress of a run goes to the window that started it; the shell window if that one is gone */
+function batchProgressSink(
+  wiring: UniworkDocsWiring,
+  sender: unknown,
+): (event: BatchUploadProgress) => void {
+  const starter = sender as WebContents | undefined
+  return (event) => {
+    const target = starter && !starter.isDestroyed() ? starter : wiring.shellContents()
+    if (target && !target.isDestroyed())
+      target.send(UNIWORK_DOC_CHANNELS.batchUploadProgress, event)
+  }
 }
 
 /**
@@ -941,6 +1066,35 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.cancelUpload, (_event, uploadId: unknown) => {
     if (typeof uploadId === 'string') service.cancelUpload(uploadId)
   })
+  // UNI-2052: folder / several files. Main reads the disk and plans; the renderer
+  // only sees pre-flights with relative paths and the pushed progress
+  const batchUpload = createBatchUpload(service, wiring, {
+    invalidate: (workspaceId) => treeChanged.notify(workspaceId),
+  })
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadFoldersAvailable, () =>
+    batchUpload.foldersAvailable(),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadPick, (_event, input: unknown) =>
+    batchUpload.pick(input),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadPreflight, (_event, input: unknown) =>
+    batchUpload.preflight(input),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadStart, (event, input: unknown) =>
+    batchUpload.start(
+      input,
+      batchProgressSink(wiring, (event as { sender?: unknown } | null)?.sender),
+    ),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadCancel, (_event, runId: unknown) =>
+    batchUpload.cancel(runId),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadRetry, (_event, runId: unknown) =>
+    batchUpload.retry(runId),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadDismiss, (_event, runId: unknown) =>
+    batchUpload.dismiss(runId),
+  )
   ipcMain.handle(
     UNIWORK_DOC_CHANNELS.renameDocument,
     (_event, documentId: unknown, name: unknown) =>

@@ -62,6 +62,12 @@ export class UniworkDocError extends Error {
     | 'unknown'
   /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.by_name */
   readonly byName?: string | null
+  /**
+   * UNI-2052: the flat `fields` of the server's error envelope (the numbers a
+   * folder-upload refusal names: `max`, `count`, `max_bytes`, `path`,
+   * `retry_after`...). Strings, finite numbers and booleans only; never nested.
+   */
+  readonly fields?: Record<string, unknown>
 
   constructor(
     code: UniworkDocErrorCode,
@@ -81,6 +87,7 @@ export class UniworkDocError extends Error {
       reason?: string
       lostReason?: UniworkDocError['lostReason']
       byName?: string | null
+      fields?: Record<string, unknown>
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -101,7 +108,27 @@ export class UniworkDocError extends Error {
     this.reason = extra.reason
     this.lostReason = extra.lostReason
     this.byName = extra.byName
+    this.fields = extra.fields
   }
+}
+
+const MAX_FIELD_ENTRIES = 16
+const MAX_FIELD_STRING = 512
+
+/** the flat, bounded part of an envelope's `fields`, or undefined when nothing is left */
+function flatFields(raw: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!raw) return undefined
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(raw).slice(0, MAX_FIELD_ENTRIES)) {
+    if (
+      (typeof value === 'string' && value.length <= MAX_FIELD_STRING) ||
+      (typeof value === 'number' && Number.isFinite(value)) ||
+      typeof value === 'boolean'
+    ) {
+      out[key] = value
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
 }
 
 const EDIT_LOCK_LOST_REASONS = new Set([
@@ -193,7 +220,8 @@ export function errorFromResponse(
 ): UniworkDocError {
   const envelope = readEnvelope(body)
   const serverCode = envelope?.code
-  const at = { status, ...(serverCode ? { serverCode } : {}) }
+  const fields = flatFields(envelope?.fields)
+  const at = { status, ...(serverCode ? { serverCode } : {}), ...(fields ? { fields } : {}) }
   // BIGUP-A1: an upload-session refusal carries its delay in
   // `fields.retry_after` (seconds) as well as in the `Retry-After` header the
   // server sets for its 429s; either spelling gives the same wait, and the

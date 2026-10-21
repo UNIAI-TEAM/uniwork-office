@@ -547,11 +547,17 @@ function fromAuthFailure(error: unknown): UniworkDocError {
 
 /** one request to a UniWork route (documents, and the Workbench's work routes) */
 export interface UniworkCall<T> {
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   route: string
   query?: URLSearchParams
   json?: unknown
   form?: FormData
+  /**
+   * UNI-2052: a raw request body (a file-backed Blob) with its own headers,
+   * for the folder-upload content route. A Blob can be sent again, so the
+   * one retry after a 401 refresh stays safe.
+   */
+  raw?: { body: Blob; headers?: Record<string, string> }
   idempotencyKey?: string
   /** the caller's abort (S18 upload cancel): aborts the request like a timeout */
   signal?: AbortSignal
@@ -585,6 +591,9 @@ export function createUniworkSend(
           Authorization: `Bearer ${token}`,
         }
         if (call.json !== undefined) headers['Content-Type'] = 'application/json'
+        if (call.raw) Object.assign(headers, call.raw.headers)
+        // the bearer is this call's, whatever headers a target listed
+        headers.Authorization = `Bearer ${token}`
         if (call.idempotencyKey) headers['Idempotency-Key'] = call.idempotencyKey
         const controller = new AbortController()
         let timedOut = false
@@ -620,6 +629,7 @@ export function createUniworkSend(
               signal: controller.signal,
               ...(call.json !== undefined ? { body: JSON.stringify(call.json) } : {}),
               ...(call.form ? { body: call.form } : {}),
+              ...(call.raw ? { body: call.raw.body } : {}),
             })
           } catch (error) {
             if (timedOut) throw new UniworkDocError('timeout')

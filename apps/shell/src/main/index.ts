@@ -127,6 +127,8 @@ import {
   createUniworkDocs,
   type UniworkDocsHandle,
 } from './uniwork-docs/wiring'
+import { createFolderUploadWiring } from './uniwork-docs/folder-upload/wire'
+import { DEFAULT_DOCUMENT_LIMITS } from './uniwork-docs/limits'
 import { offlineTabMenuItem, unpinTabDocument } from './uniwork-sync/offline-library/menu'
 import type { OfflineLibraryApi } from './uniwork-sync/offline-library/api'
 import { registerUniworkWork } from './uniwork-work/wiring'
@@ -4268,6 +4270,27 @@ const requestUniworkModuleSave = createModuleSaveRequester({
   flushPdfSave,
 })
 
+/**
+ * UNI-2052: the folder / several-files upload. Limits come from the docs
+ * service's cache once it exists (until then the server counts as having no
+ * folder uploads), the transport rides the signed-in session, and storage PUTs
+ * go through Node's global `fetch` (a file-backed Blob goes out with a
+ * Content-Length; Electron's `net.fetch` buffers or chunks a request body).
+ */
+const uniworkFolderUpload = createFolderUploadWiring({
+  limits: () => uniworkDocs?.service.limitsCache.get() ?? DEFAULT_DOCUMENT_LIMITS,
+  clientOptions: () => {
+    const profile = uniworkDeploymentProfile()
+    if (!profile) return null
+    return {
+      apiOrigin: profile.apiOrigin,
+      authorized: (call) => authorizedRequest(call),
+      isSignedIn: () => uniworkSessionIdentity() !== null,
+    }
+  },
+  storageFetch: (input, init) => fetch(input, init),
+})
+
 function uniworkDocsWiring() {
   /** every path a tab or detached editor window shows */
   const openPaths = (): string[] => [...(tabManager?.openFilePaths() ?? []), ...detachedFilePaths()]
@@ -4363,6 +4386,10 @@ function uniworkDocsWiring() {
       const target = webContentsForPath(path)
       if (!target || target.webContents.isDestroyed()) return
       clearAiRun(target.webContents.id)
+    },
+    folderUpload: {
+      getLimits: () => uniworkFolderUpload.getLimits(),
+      runner: uniworkFolderUpload.runner,
     },
   }
 }

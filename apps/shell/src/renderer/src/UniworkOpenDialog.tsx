@@ -3,6 +3,9 @@ import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { UniworkDocErrorCode, UniworkDocListPage, UniworkResult } from '../../shared/home-api'
 import { DEFAULT_MAX_DOCUMENT_BYTES } from '../../shared/size-format'
 import { DocPickerList } from './doclist/PickerList'
+import { FolderUploadLayer } from './uniwork-folder-upload/FolderUploadLayer'
+import { UploadMenu } from './uniwork-folder-upload/UploadMenu'
+import { useFolderUpload } from './uniwork-folder-upload/use-folder-upload'
 import { UniworkDocInfoPanel, type DocInfoLoad } from './UniworkDocInfoPanel'
 import {
   ActionToast,
@@ -431,6 +434,10 @@ export function UniworkOpenDialog({
     openById(result.value)
     return { ok: true }
   }
+
+  // UNI-2052: several files and whole folders go through the pre-flight and one overall bar
+  // a finished run refreshes the picker's list the way a retry does (the folder browser follows the tree-changed push itself)
+  const folderUpload = useFolderUpload({ onFinished: () => dispatch({ type: 'list-retry' }) })
 
   const createDoc = (input: Parameters<typeof createDocument>[0]) =>
     settleAction(createDocument(input)).then((r) => created(r, input.name))
@@ -885,9 +892,28 @@ export function UniworkOpenDialog({
           <h3 id="uw-pick-title">{t('uwPickTitle')}</h3>
           {state.workspaces.items.length > 0 && (
             <div className="uw-pick-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => setForm('upload')}>
-                {t('uwDocUpload')}
-              </button>
+              {folderUpload.available && folderUpload.foldersAvailable ? (
+                <UploadMenu
+                  className="btn btn-secondary"
+                  label={t('uwDocUpload')}
+                  onPickFiles={() => setForm('upload')}
+                  onPickFolder={() => {
+                    const target = defaultTarget()
+                    void folderUpload.pick(
+                      { workspaceId: target.workspaceId, folderId: target.folderId },
+                      'folder',
+                    )
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setForm('upload')}
+                >
+                  {t('uwDocUpload')}
+                </button>
+              )}
               <button type="button" className="btn btn-primary" onClick={() => setForm('new')}>
                 {t('uwDocNew')}
               </button>
@@ -1034,6 +1060,15 @@ export function UniworkOpenDialog({
             initialTarget={defaultTarget()}
             loadTree={loadFolderTree}
             pickFile={pickUploadFile}
+            pickFiles={
+              folderUpload.available
+                ? (target) =>
+                    folderUpload.pick(
+                      { workspaceId: target.workspaceId, folderId: target.folderId },
+                      'files',
+                    )
+                : undefined
+            }
             onUpload={uploadDoc}
             progress={upload}
             onCancel={cancelUpload}
@@ -1053,6 +1088,7 @@ export function UniworkOpenDialog({
             }}
           />
         )}
+        <FolderUploadLayer controller={folderUpload} />
         {toast && <ActionToast message={toast} onDone={clearToast} />}
         {offline.node}
       </div>

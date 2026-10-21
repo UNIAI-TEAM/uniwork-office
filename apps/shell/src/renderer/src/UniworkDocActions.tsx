@@ -431,6 +431,7 @@ export function UploadDocDialog({
   initialTarget,
   loadTree,
   pickFile,
+  pickFiles,
   onUpload,
   progress,
   onCancel,
@@ -439,6 +440,12 @@ export function UploadDocDialog({
   initialTarget: DocTarget
   loadTree: LoadFolderTree
   pickFile: () => Promise<{ path: string; name: string } | null>
+  /**
+   * UNI-2052: with the folder-upload bridge the picker takes several files and
+   * stages them for the pre-flight (it reads the location chosen below); true =
+   * something was staged, so this dialog has done its part and closes.
+   */
+  pickFiles?: (target: DocTarget) => Promise<boolean>
   onUpload: (input: DocTarget & { path: string; name: string }) => Promise<ActionOutcome>
   progress: UploadProgress | null
   onCancel: () => void
@@ -453,6 +460,14 @@ export function UploadDocDialog({
 
   const choose = () => {
     if (busy) return
+    if (pickFiles) {
+      void pickFiles(target)
+        .then((staged) => {
+          if (staged) onCancel()
+        })
+        .catch(() => undefined)
+      return
+    }
     void pickFile()
       .then((picked) => {
         if (picked) {
