@@ -2,7 +2,7 @@ import type { UniworkSourceFile } from '../../../shared/home-api'
 import { FileBadge } from '../FileBadge'
 import { useI18n } from '../locale'
 import { FolderMenu } from '../uniwork-folders/FolderMenu'
-import { Cell, DOC_ICON_SIZE, Empty, Person, trackOf } from '../doclist/cells'
+import { Cell, DOC_ICON_SIZE, Empty, Person, trackOf, useCompactTable } from '../doclist/cells'
 import type { ColumnId } from '../doclist/columns'
 import { formatBytes, formatListDate } from '../doclist/format'
 import { openable, sourceOriginLine } from './source-open-model'
@@ -41,6 +41,7 @@ export function DocumentsSourceRow({
   onDownload: (source: UniworkSourceFile) => void
 }) {
   const { t, dateLocale } = useI18n()
+  const compact = useCompactTable()
   const owner = source.owner?.name.trim() ?? ''
   const origin = sourceOriginLine(source, t)
   const download = () => onDownload(source)
@@ -122,7 +123,7 @@ export function DocumentsSourceRow({
       role="row"
       data-source-id={source.id}
       className="dh-doc-row dh-source-row"
-      style={{ gridTemplateColumns: trackOf(columns) }}
+      style={{ gridTemplateColumns: trackOf(columns, undefined, false, compact) }}
       onDoubleClick={primary}
     >
       {columns.map(cellFor)}

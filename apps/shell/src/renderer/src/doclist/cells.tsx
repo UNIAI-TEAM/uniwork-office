@@ -1,12 +1,13 @@
 // The cells of a Documents table row, one component per column kind. Rows
 // (DocRow, DocumentsSourceRow) lay them out in the order `visibleColumns`
 // gives; every cell is a `role="cell"` carrying its column id.
-import type { MouseEvent, ReactNode } from 'react'
+import { createContext, useContext, type MouseEvent, type ReactNode } from 'react'
 import { useI18n } from '../locale'
 import { shelverLabelOf, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
 import { ACCESS_PILL_KEY, accessPill, levelLine } from './access'
 import {
   BUTTON_ACTIONS_WIDTH,
+  COMPACT_WIDTH,
   hasButtonActions,
   type ColumnId,
   type DocListScreen,
@@ -22,18 +23,21 @@ export const DOC_ICON_SIZE = 32
 /**
  * Grid track of each column. The fixed widths are the ones `columns.ts` builds
  * its narrow ladder on (cell padding included); Tên takes what is left.
+ * V-LAYOUT F-06: Người sửa gần nhất takes 18px more than the ladder counts (the vi header "Người sửa
+ * gần nhất" + its cell padding is ~136px) and Tên's grid floor gives the same 18px back, so the sum
+ * of the floors, and every rung of the ladder (the web's), is unchanged.
  */
 const TRACK: Record<ColumnId, string> = {
   select: '32px',
-  name: 'minmax(184px, 3fr)',
+  name: 'minmax(166px, 3fr)',
   activity: 'minmax(118px, 1.3fr)',
   starred: 'minmax(118px, 1.3fr)',
   shared: 'minmax(118px, 1.3fr)',
   shared_with: 'minmax(118px, 1.3fr)',
   shelved: 'minmax(118px, 1.3fr)',
-  deleted: 'minmax(118px, 1.3fr)',
+  deleted: 'minmax(160px, 1.5fr)',
   access: 'minmax(120px, 1fr)',
-  editor: 'minmax(130px, 1.1fr)',
+  editor: 'minmax(148px, 1.1fr)',
   updated: '118px',
   size: '84px',
   actions: '76px',
@@ -49,15 +53,28 @@ const BUTTON_ACTIONS_TRACK = `${BUTTON_ACTIONS_WIDTH}px`
  */
 const STAR_ACTIONS_TRACK = 'var(--dh-star-actions-track, 76px)'
 
+/**
+ * `compact` is the table below the ladder (columns.ts `isCompact`): Tên takes what the fixed tracks
+ * leave, Cập nhật is a narrow track whose date wraps, and the button screens' actions track shrinks.
+ */
+/** whether the table the rows are in is below the ladder (DocList provides it; rows read it for their grid) */
+export const CompactTableContext = createContext(false)
+export const useCompactTable = (): boolean => useContext(CompactTableContext)
+
 export function trackOf(
   columns: readonly ColumnId[],
   screen?: DocListScreen,
   star = false,
+  compact = false,
 ): string {
   return columns
     .map((column) => {
+      if (compact && column === 'name') return `minmax(${COMPACT_WIDTH.name}px, 1fr)`
+      if (compact && column === 'updated') return `${COMPACT_WIDTH.updated}px`
       if (column !== 'actions') return TRACK[column]
-      if (screen && hasButtonActions(screen)) return BUTTON_ACTIONS_TRACK
+      if (screen && hasButtonActions(screen)) {
+        return compact ? `${COMPACT_WIDTH.buttonActions}px` : BUTTON_ACTIONS_TRACK
+      }
       return star ? STAR_ACTIONS_TRACK : TRACK[column]
     })
     .join(' ')
@@ -201,17 +218,20 @@ export function SpecialContent({
         <Stack
           main={doc.archivedByName?.trim() || EMPTY_CELL}
           sub={
-            <>
-              {date(doc.archivedAt)}
+            // the date gives way (ellipsis) before the countdown does
+            <span className="dh-deleted-sub">
+              <span className="dh-deleted-date">{date(doc.archivedAt)}</span>
               {left && (
                 <>
-                  {' · '}
-                  <span className={soon ? 'dh-days-left dh-days-soon' : 'dh-days-left'}>
+                  <span className="dh-deleted-sep">{' · '}</span>
+                  <span
+                    className={`dh-deleted-countdown dh-days-left${soon ? ' dh-days-soon' : ''}`}
+                  >
                     {left}
                   </span>
                 </>
               )}
-            </>
+            </span>
           }
         />
       )

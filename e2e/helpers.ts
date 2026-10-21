@@ -6,7 +6,12 @@
  * and never collide with a running install's single-instance lock.
  * Build first: `npm run build:all`.
  */
-import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
+import {
+  _electron as electron,
+  type ElectronApplication,
+  type Locator,
+  type Page,
+} from '@playwright/test'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -163,6 +168,29 @@ export async function openHomeFiles(page: Page): Promise<void> {
   }
   await page.locator('.home-area-panel .nav-item[data-nav="recent"]').click({ timeout: 30_000 })
   await page.locator('.home-hero').waitFor({ timeout: 15_000 })
+}
+
+/**
+ * The local Home lists (Recent, a folder's contents, search hits) are the shared DocList table:
+ * one `.dh-doc-row` per file or sub-folder, the name a `.dh-doc-open` button, its row menu the
+ * portalled `.uw-row-menu-list` whose items carry `data-folder-action`.
+ */
+export const HOME_ROWS = '.dh-doc-table .dh-doc-row'
+
+/** the name button of a Home list row whose name contains `text` */
+export function homeRowName(page: Page, text: string): Locator {
+  return page.locator(`${HOME_ROWS} .dh-doc-open`, { hasText: text })
+}
+
+/** the Home list row (file or sub-folder) whose name contains `text` */
+export function homeRow(page: Page, text: string): Locator {
+  // `has` matches inside the row, so it takes the name selector relative to it
+  return page.locator(HOME_ROWS, { has: page.locator('.dh-doc-open', { hasText: text }) })
+}
+
+/** one item of the open row menu, by its action id (open, move, rename, delete, ...) */
+export function rowMenuAction(page: Page, id: string): Locator {
+  return page.locator(`.uw-row-menu-list [data-folder-action="${id}"]`)
 }
 
 /**

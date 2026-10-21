@@ -13,7 +13,14 @@ import { FolderMenu, type FolderMenuItem } from '../uniwork-folders/FolderMenu'
 import { FolderGlyph } from '../uniwork-folders/UniworkFolderTree'
 import { isFolderEntry } from '../uniwork-folders/uniwork-folders-model'
 import { rowSizeBytes, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
-import { AccessContent, Cell, DOC_ICON_SIZE, EditorContent, trackOf } from './cells'
+import {
+  AccessContent,
+  Cell,
+  DOC_ICON_SIZE,
+  EditorContent,
+  trackOf,
+  useCompactTable,
+} from './cells'
 import { specialColumn, type ColumnId, type DocListScreen } from './columns'
 import { formatBytes, formatListDate } from './format'
 import { SpecialCell } from './special-cells'
@@ -120,6 +127,7 @@ export function DocRow({
   onOpen,
 }: DocRowProps) {
   const { t, dateLocale } = useI18n()
+  const compact = useCompactTable()
   const folder = isFolderEntry(doc)
   // a folder never opens from its row (the device list enters it), and a trashed file has no Mở in its menu either
   const opens = (!folder || screen === 'device') && screen !== 'trash' && !doc.archived
@@ -275,7 +283,9 @@ export function DocRow({
       aria-selected={selected || undefined}
       aria-busy={opening || undefined}
       className={`dh-doc-row${grouped ? ' grouped' : ''}${opening ? ' opening' : ''}${selected ? ' selected' : ''}${extra?.className ? ` ${extra.className}` : ''}`}
-      style={{ gridTemplateColumns: trackOf(columns, screen, screen === 'starred' && !!onUnstar) }}
+      style={{
+        gridTemplateColumns: trackOf(columns, screen, screen === 'starred' && !!onUnstar, compact),
+      }}
       draggable={extra?.draggable}
       onDragStart={extra?.onDragStart}
       onDragOver={extra?.onDragOver}

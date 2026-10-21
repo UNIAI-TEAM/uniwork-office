@@ -79,10 +79,11 @@ export function visibleColumns(
   screen: DocListScreen,
   docs: readonly DocumentsHomeDoc[],
   width?: number,
+  actionsExtra = 0,
 ): ColumnId[] {
   const ladder =
     specialPresent(screen, docs) || specialColumn(screen) === null ? screen : 'workspace'
-  const columns = columnsFor(ladder, width)
+  const columns = columnsFor(ladder, width, actionsExtra)
   // a source file of another module has no access level: its page has no Truy cập column (V-STATES
   // F-04), rather than "—" on every row
   return screen === 'elsewhere' ? columns.filter((column) => column !== 'access') : columns
