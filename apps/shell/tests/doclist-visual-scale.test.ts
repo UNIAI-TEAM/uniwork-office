@@ -15,7 +15,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkResult, UniworkWorkspaceRef } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
-import { DOC_ICON_SIZE } from '../src/renderer/src/doclist/cells'
+import { DOC_ICON_SIZE, trackOf } from '../src/renderer/src/doclist/cells'
 import { DocList, type DocListProps } from '../src/renderer/src/doclist/DocList'
 import { FilterBar } from '../src/renderer/src/doclist/FilterBar'
 import type { DocListScreen } from '../src/renderer/src/doclist/columns'
@@ -151,7 +151,8 @@ describe('the file icon is one 32px constant (A-REC row 16)', () => {
     expect(button!.closest('[data-col]')?.getAttribute('data-col')).toBe('actions')
     expect(button!.getAttribute('aria-label')).toBe('Bỏ gắn sao Kế hoạch.docx')
     expect(button!.getAttribute('title')).toBe('Bỏ gắn sao')
-    expect(button!.getAttribute('aria-pressed')).toBe('true')
+    // the name already states the action: no toggle state on top of it (RV7-6)
+    expect(button!.hasAttribute('aria-pressed')).toBe(false)
     // a row without a star time cannot tell: no button, never a dead one
     expect(host.querySelector('[data-doc-id="p"] .dh-star-btn')).toBeNull()
     await act(async () => {
@@ -159,6 +160,55 @@ describe('the file icon is one 32px constant (A-REC row 16)', () => {
     })
     expect(onUnstar).toHaveBeenCalledTimes(1)
     expect(onUnstar.mock.calls[0]![0]).toMatchObject({ id: 's' })
+  })
+
+  it('a double-click on the Sao button never opens the document (RV7-1)', async () => {
+    const onOpen = vi.fn()
+    const onUnstar = vi.fn()
+    await mount('starred', [rowOf(doc({ id: 's', favoritedAt: iso(2026, 10, 20, 9, 0) }))], {
+      onOpen,
+      onUnstar,
+    })
+    const dbl = () => new MouseEvent('dblclick', { bubbles: true, cancelable: true })
+    const star = host.querySelector<HTMLButtonElement>('[data-doc-id="s"] .dh-star-btn')!
+    await act(async () => {
+      star.dispatchEvent(dbl())
+    })
+    // the actions cell around the buttons is not a way into the document either
+    await act(async () => {
+      host.querySelector('[data-doc-id="s"] [data-col="actions"]')!.dispatchEvent(dbl())
+    })
+    expect(onOpen).not.toHaveBeenCalled()
+    // the row itself still opens on a double-click
+    await act(async () => {
+      host.querySelector('[data-doc-id="s"] [data-col="name"]')!.dispatchEvent(dbl())
+    })
+    expect(onOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it('the actions track grows for the two 44px coarse-pointer buttons only where the star is drawn (RV7-3)', async () => {
+    const columns = ['select', 'name', 'starred', 'updated', 'size', 'actions'] as const
+    const plain = trackOf(columns, 'starred')
+    expect(plain.endsWith(' 76px')).toBe(true)
+    expect(trackOf(columns, 'starred', true)).toBe(
+      plain.replace(/76px$/, 'var(--dh-star-actions-track, 76px)'),
+    )
+    // the shelf / trash track is its own wide one, star or not
+    expect(trackOf(columns, 'trash', true)).toBe(trackOf(columns, 'trash'))
+
+    const rows = [rowOf(doc({ id: 's', favoritedAt: iso(2026, 10, 20, 9, 0) }))]
+    const tracks = () => ({
+      head: host.querySelector<HTMLElement>('.dh-doc-head')!.style.gridTemplateColumns,
+      row: host.querySelector<HTMLElement>('.dh-doc-row')!.style.gridTemplateColumns,
+    })
+    await mount('starred', rows, { onUnstar: () => {} })
+    expect(tracks().head).toContain('var(--dh-star-actions-track')
+    expect(tracks().row).toBe(tracks().head)
+    // no star call from the host, or another screen: the track is the plain one
+    await mount('starred', rows)
+    expect(tracks().head).not.toContain('--dh-star-actions-track')
+    await mount('recent', rows, { onUnstar: () => {} })
+    expect(tracks().head).not.toContain('--dh-star-actions-track')
   })
 
   it('no onUnstar (the host has no star call) draws no Sao button even on a starred row', async () => {
@@ -296,7 +346,11 @@ describe('DocumentsHome: the Sao button of "Sao · ⋯" (A-REC row 12)', () => {
     vi.restoreAllMocks()
   })
 
-  async function mount(subView: DocumentsHomeSubViewId, lang: 'vi' | 'en' = 'vi') {
+  async function mount(
+    subView: DocumentsHomeSubViewId,
+    lang: 'vi' | 'en' = 'vi',
+    onOpenDocument: () => void = vi.fn(),
+  ) {
     await act(async () => {
       root.render(
         createElement(
@@ -306,7 +360,7 @@ describe('DocumentsHome: the Sao button of "Sao · ⋯" (A-REC row 12)', () => {
             workspaceId: 'ws-1',
             workspaces,
             onWorkspaceChange: vi.fn(),
-            onOpenDocument: vi.fn(),
+            onOpenDocument,
             sidebarHost: sidebarSlot,
             initialSubView: subView,
           }),
@@ -328,7 +382,7 @@ describe('DocumentsHome: the Sao button of "Sao · ⋯" (A-REC row 12)', () => {
       const star = actions.querySelector<HTMLButtonElement>('.dh-star-btn')
       expect(star, id).not.toBeNull()
       expect(star!.getAttribute('aria-label')).toBe(`Bỏ gắn sao ${id}.docx`)
-      expect(star!.getAttribute('aria-pressed')).toBe('true')
+      expect(star!.hasAttribute('aria-pressed')).toBe(false)
       // Sao first, then the "…"
       const buttons = Array.from(actions.querySelectorAll('button'))
       expect(buttons.indexOf(star!)).toBeLessThan(
@@ -359,14 +413,71 @@ describe('DocumentsHome: the Sao button of "Sao · ⋯" (A-REC row 12)', () => {
     )
   })
 
-  it('every other screen draws no Sao button: its rows cannot tell their star state', async () => {
-    for (const view of ['workspace', 'recent', 'shared-with-me', 'shared-by-me'] as const) {
+  it('a double-click on the Sao button opens nothing and asks for one unstar (RV7-1)', async () => {
+    const onOpenDocument = vi.fn()
+    const release = new Map<string, (value: UniworkResult<undefined>) => void>()
+    api.uniworkUnfavoriteDocument!.mockImplementation(
+      (id: string) =>
+        new Promise<UniworkResult<undefined>>((resolve) => {
+          release.set(id, resolve)
+        }),
+    )
+    await mount('starred', 'vi', onOpenDocument)
+    const star = host.querySelector<HTMLButtonElement>('[data-doc-id="a"] .dh-star-btn')!
+    // what a browser sends for a double-click: click, click, dblclick
+    await act(async () => {
+      star.click()
+    })
+    await act(async () => {
+      star.click()
+      star.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
+    })
+    expect(onOpenDocument).not.toHaveBeenCalled()
+    expect(api.uniworkUnfavoriteDocument).toHaveBeenCalledTimes(1)
+    // another row is not held up by the first one's call
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-doc-id="b"] .dh-star-btn')!.click()
+    })
+    expect(api.uniworkUnfavoriteDocument).toHaveBeenCalledTimes(2)
+    expect(api.uniworkUnfavoriteDocument!.mock.calls.map((call) => call[0])).toEqual(['a', 'b'])
+    // once the call is answered the document can be unstarred again (after a failed unstar, say)
+    await act(async () => {
+      release.get('a')!({ ok: false, error: 'server_error' })
+    })
+    await flush()
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-doc-id="a"] .dh-star-btn')!.click()
+    })
+    expect(api.uniworkUnfavoriteDocument).toHaveBeenCalledTimes(3)
+  })
+
+  it('every other screen draws no Sao button even when its rows carry a star time (RV7-7)', async () => {
+    const withStar = (id: string) => doc({ id, favoritedAt: iso(2026, 10, 20, 9, 0) })
+    const next = baseApi()
+    next.uniworkListChildren = vi.fn(async () => ok({ items: [withStar('w1')], nextCursor: null }))
+    next.uniworkListDocuments = vi.fn(async () =>
+      ok({ documents: [withStar('r1')], nextCursor: null }),
+    )
+    next.uniworkListSharedWithMe = vi.fn(async () =>
+      ok({ documents: [withStar('sw1')], nextCursor: null }),
+    )
+    next.uniworkListSharedByMe = vi.fn(async () =>
+      ok({ documents: [withStar('sb1')], nextCursor: null }),
+    )
+    install(next)
+    for (const [view, id] of [
+      ['workspace', 'w1'],
+      ['recent', 'r1'],
+      ['shared-with-me', 'sw1'],
+      ['shared-by-me', 'sb1'],
+    ] as const) {
       await act(async () => {
         root.unmount()
       })
       root = createRoot(host)
       await mount(view)
-      expect(rowIds().length, view).toBeGreaterThan(0)
+      // the row is on screen, has the data the Starred screen draws a Sao for, and has none
+      expect(rowIds(), view).toContain(id)
       expect(host.querySelector('.dh-star-btn'), view).toBeNull()
     }
   })
@@ -393,6 +504,14 @@ describe('the star colour is a theme token (CLAUDE.md rule 1)', () => {
     expect(tokens.slice(0, dark)).toMatch(/\n\s*--star:\s*#[0-9a-f]{3,8};/i)
     expect(tokens.slice(dark, system)).toMatch(/\n\s*--star:\s*#[0-9a-f]{3,8};/i)
     expect(tokens.slice(system)).toMatch(/\n\s*--star:\s*#[0-9a-f]{3,8};/i)
+  })
+
+  it('the board amber #f59e0b in light, the lighter amber on dark (RV7-5)', () => {
+    const dark = tokens.indexOf("[data-theme='dark'] {")
+    const system = tokens.indexOf('@media (prefers-color-scheme: dark)')
+    expect(tokens.slice(0, dark)).toMatch(/\n\s*--star:\s*#f59e0b;/i)
+    expect(tokens.slice(dark, system)).toMatch(/\n\s*--star:\s*#fbbf24;/i)
+    expect(tokens.slice(system)).toMatch(/\n\s*--star:\s*#fbbf24;/i)
   })
 
   it('the local list star (Home) has no raw #f5a623 left and reads the token', () => {
@@ -428,8 +547,37 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
       ruleOf(css, ".dh-doc-head > [role='columnheader'],\n.dh-doc-row > [role='cell']"),
     ).toMatch(/padding:\s*0 12px;/)
     expect(ruleOf(css, ".dh-doc-row > [role='cell']")).toMatch(/padding-block:\s*9px;/)
-    // the board's row is 9px + the 32px icon + 9px: the old 52px floor is gone
-    expect(ruleOf(css, '.dh-doc-row')).not.toMatch(/min-height:\s*52px/)
+    // the board's row is 9px + the 32px icon + 9px = 50px (+ its 1px rule): no min-height may
+    // hold a row above that, and the pieces that make it up are the ones pinned here
+    const cellPad = Number(
+      /padding-block:\s*(\d+)px;/.exec(ruleOf(css, ".dh-doc-row > [role='cell']"))![1],
+    )
+    expect(2 * cellPad + DOC_ICON_SIZE).toBe(50)
+    for (const selector of ['.dh-doc-row', ".dh-doc-row > [role='cell']"]) {
+      const floor = /min-height:\s*(\d+)px/.exec(ruleOf(css, selector))
+      expect(Number(floor?.[1] ?? 0), selector).toBeLessThanOrEqual(50)
+    }
+  })
+
+  it('the four fixed tracks keep 8px at the sides, in the head and in the rows', () => {
+    const fixed =
+      ":is([data-col='select'], [data-col='updated'], [data-col='size'], [data-col='actions'])"
+    const rule = ruleOf(css, `.dh-doc-head\n  > ${fixed},\n.dh-doc-row\n  > ${fixed}`)
+    expect(rule).toMatch(/padding-inline:\s*8px;/)
+    // the two buttons of "Sao · ⋯" (28 + 4 + 28) fill the 76px track's 60px of room exactly
+    expect(76 - 2 * 8).toBe(28 + 4 + 28)
+  })
+
+  it('on a coarse pointer the Starred actions track holds Sao 44 + gap 4 + "…" 44 (RV7-3)', () => {
+    const coarse = css.slice(css.indexOf('@media (pointer: coarse) {'))
+    const media = coarse.slice(0, coarse.indexOf('\n}\n'))
+    expect(media).toMatch(/\.dh-row-btn[^{]*\{[^}]*min-width:\s*44px;/)
+    const track = /--dh-star-actions-track:\s*(\d+)px;/.exec(media)
+    expect(track, 'the coarse track variable').not.toBeNull()
+    // 44 + 4 + 44 of buttons and the cell's 8px on each side
+    expect(Number(track![1])).toBeGreaterThanOrEqual(44 + 4 + 44 + 2 * 8)
+    // fine pointers keep the plain track: the variable is only set inside the media query
+    expect(css.replace(media, '')).not.toMatch(/--dh-star-actions-track:/)
   })
 
   it('a grouped row is 28px in from the 12px cell edge (40px, the board)', () => {
@@ -468,6 +616,9 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
     expect(chip).toMatch(/font-size:\s*13px;/)
     expect(ruleOf(css, '.dh-filter-type.has-icon')).toMatch(/padding-inline-start:\s*7px;/)
     expect(ruleOf(css, '.dh-filter-type.on')).toMatch(/font-weight:\s*500;/)
+    // an unpressed label is the quieter text token and hover returns to --text (RV7-4)
+    expect(chip).toMatch(/color:\s*var\(--text-secondary\);/)
+    expect(ruleOf(css, '.dh-filter-type:hover')).toMatch(/color:\s*var\(--text\);/)
     const select = ruleOf(css, '.dh-filter-chip')
     expect(select).toMatch(/height:\s*34px;/)
     expect(select).toMatch(/padding:\s*0 12px;/)

@@ -228,12 +228,16 @@ export function DocRow({
         )
       case 'actions':
         return (
-          <Cell key={col} col={col} onClick={(e) => e.stopPropagation()}>
+          <Cell
+            key={col}
+            col={col}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
             {onUnstar && doc.favoritedAt && (
               <button
                 type="button"
                 className="dh-row-btn dh-star-btn"
-                aria-pressed="true"
                 aria-label={`${t('dlActUnstar')} ${doc.title}`}
                 title={t('dlActUnstar')}
                 onClick={() => onUnstar(doc)}
@@ -271,7 +275,7 @@ export function DocRow({
       aria-selected={selected || undefined}
       aria-busy={opening || undefined}
       className={`dh-doc-row${grouped ? ' grouped' : ''}${opening ? ' opening' : ''}${selected ? ' selected' : ''}${extra?.className ? ` ${extra.className}` : ''}`}
-      style={{ gridTemplateColumns: trackOf(columns, screen) }}
+      style={{ gridTemplateColumns: trackOf(columns, screen, screen === 'starred' && !!onUnstar) }}
       draggable={extra?.draggable}
       onDragStart={extra?.onDragStart}
       onDragOver={extra?.onDragOver}
