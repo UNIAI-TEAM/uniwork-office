@@ -7,6 +7,7 @@ import type {
   UniworkFolderNode,
   UniworkResult,
 } from '../../../shared/home-api'
+import type { ShareErrorCode } from '../../../shared/share-api'
 import { DEFAULT_MAX_DOCUMENT_BYTES } from '../../../shared/size-format'
 import { pathKey } from '../../../shared/path-key'
 import { FileBadge } from '../FileBadge'
@@ -24,6 +25,7 @@ import {
 import { loadFolderTree, onTreeChanged } from '../uniwork-library-api'
 import { announce } from '../uniwork-live'
 import { currentWorkbenchBucket, isWorkbenchBucketCleared } from '../workbench-bucket'
+import { FirstSaveShare } from './FirstSaveShare'
 import { FolderNameDialog } from './FolderNameDialog'
 import { UniworkFolderPicker, type PickedFolder } from './UniworkFolderPicker'
 import { FolderGlyph, MyFolderGlyph } from './UniworkFolderTree'
@@ -33,6 +35,7 @@ import {
   myFolderIdOf,
   type PathPart,
 } from './uniwork-folders-model'
+import { shareFailureKey, shareWithWorkspace } from './first-save-share'
 import { useFolderActions } from './use-folder-actions'
 import './uniwork-folders.css'
 import './save-dialog.css'
@@ -101,6 +104,29 @@ function takeKept(path: string): SaveFailure | null {
   return entry.failure
 }
 
+/**
+ * A first-save share that failed after the save went through: the document stays saved (and
+ * private), so the host says so at a toast that outlives the dialog.
+ */
+let shareNotice: string | null = null
+const shareNoticeListeners = new Set<() => void>()
+
+function setShareNotice(next: string | null) {
+  shareNotice = next
+  for (const listener of shareNoticeListeners) listener()
+}
+
+function dismissShareNotice() {
+  setShareNotice(null)
+}
+
+function onShareNotice(listener: () => void): () => void {
+  shareNoticeListeners.add(listener)
+  return () => {
+    shareNoticeListeners.delete(listener)
+  }
+}
+
 function watchTab(key: string): () => void {
   watching.set(key, (watching.get(key) ?? 0) + 1)
   return () => {
@@ -113,6 +139,8 @@ function watchTab(key: string): () => void {
 function startFirstSave(
   input: UniworkFirstSaveInput,
   say: (failure: SaveFailure) => string,
+  /** the web's first-save share switch: share with the workspace once the save succeeded */
+  share?: { sayFailure: (error: ShareErrorCode) => string },
 ): Promise<FirstSaveResult> {
   const key = pathKey(input.tabPath)
   // the account the document is created for, as it is when the save is sent
@@ -120,6 +148,14 @@ function startFirstSave(
   const run = window.aiOffice
     .uniworkFirstSave(input)
     .catch((): FirstSaveResult => ({ ok: false, error: 'network' }))
+    .then(async (result): Promise<FirstSaveResult> => {
+      // only after the save succeeded; a refusal here never undoes the saved document
+      if (result.ok && share) {
+        const shared = await shareWithWorkspace(input.workspaceId, result.value.id)
+        if (!shared.ok) setShareNotice(share.sayFailure(shared.error))
+      }
+      return result
+    })
   running.set(key, run)
   // registered before any dialog's own handler, so it sees who still watches
   void run.then((result) => {
@@ -139,6 +175,7 @@ export function resetFirstSavesForTests(): void {
   running.clear()
   watching.clear()
   setUnshown([])
+  setShareNotice(null)
 }
 
 function Spinner() {
@@ -253,6 +290,8 @@ export function SaveDialog({
   const [step, setStep] = useState<'name' | 'pick'>('name')
   const [name, setName] = useState(base)
   const [target, setTarget] = useState<ShownTarget>({ kind: 'my_folder' })
+  // the web's first-save switch: a new document starts private, sharing is the person's choice
+  const [shareOn, setShareOn] = useState(false)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<SaveFailure | null>(null)
   const [resolveAttempt, setResolveAttempt] = useState(0)
@@ -397,8 +436,10 @@ export function SaveDialog({
         : { kind: 'my_folder' }
     setSaving(true)
     setFailure(null)
-    void startFirstSave({ tabPath: path, title, workspaceId: ws, target: wire }, (refused) =>
-      firstSaveErrorText(refused, t, dateLocale),
+    void startFirstSave(
+      { tabPath: path, title, workspaceId: ws, target: wire },
+      (refused) => firstSaveErrorText(refused, t, dateLocale),
+      shareOn ? { sayFailure: (error) => t(shareFailureKey(error)) } : undefined,
     ).then(settle)
   }
 
@@ -620,6 +661,12 @@ export function SaveDialog({
             </svg>
           </button>
         </div>
+        <FirstSaveShare
+          checked={shareOn}
+          alreadyShared={false}
+          disabled={busy}
+          onChange={setShareOn}
+        />
         <p className="uw-act-error" id={`${id}-error`} role={failure ? 'alert' : undefined}>
           {errorText}
         </p>
@@ -671,6 +718,7 @@ export function SaveDialogHost() {
   const holding = useRef(false)
   const seq = useRef(0)
   const kept = useSyncExternalStore(onUnshown, () => unshown)
+  const notice = useSyncExternalStore(onShareNotice, () => shareNotice)
   // a held push or kept result is being checked against the open tabs
   const [checking, setChecking] = useState(false)
 
@@ -748,14 +796,18 @@ export function SaveDialogHost() {
     })
   }, [request, checking, kept, show])
 
-  if (!request) return null
   return (
-    <SaveDialog
-      key={request.key}
-      path={request.path}
-      initialFailure={request.failure}
-      onClose={close}
-      onHold={hold}
-    />
+    <>
+      {request && (
+        <SaveDialog
+          key={request.key}
+          path={request.path}
+          initialFailure={request.failure}
+          onClose={close}
+          onHold={hold}
+        />
+      )}
+      {notice !== null && <ActionToast message={notice} tone="error" onDone={dismissShareNotice} />}
+    </>
   )
 }

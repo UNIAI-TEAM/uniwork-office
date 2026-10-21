@@ -33,4 +33,8 @@ export const hi = {
   usErrAlreadyBound: 'यह टैब पहले से एक UniWork दस्तावेज़ से जुड़ा है। हमेशा की तरह सहेजें।',
   usErrNotFound:
     'सहेजने वाली फ़ाइल या चुना गया फ़ोल्डर नहीं मिला। सहेजने की जगह फिर से चुनें और दोबारा कोशिश करें।',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

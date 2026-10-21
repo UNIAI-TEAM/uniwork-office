@@ -33,4 +33,8 @@ export const ru = {
   usErrAlreadyBound: 'Эта вкладка уже связана с документом UniWork. Сохраняйте как обычно.',
   usErrNotFound:
     'Не удалось найти сохраняемый файл или выбранную папку. Выберите место сохранения заново и повторите попытку.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

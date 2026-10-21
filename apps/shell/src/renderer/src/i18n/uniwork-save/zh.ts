@@ -28,4 +28,8 @@ export const zh = {
     '已在 UniWork 中创建“{title}”（ID {id}），但无法关联到此标签页，也无法移至回收站。请在 UniWork 中删除或使用该文档。',
   usErrAlreadyBound: '此标签页已关联到一个 UniWork 文档。请照常保存。',
   usErrNotFound: '找不到要保存的文件或所选文件夹。请重新选择保存位置后重试。',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 }

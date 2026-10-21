@@ -32,4 +32,8 @@ export const pt = {
   usErrAlreadyBound: 'Esta aba já está vinculada a um documento do UniWork. Salve como de costume.',
   usErrNotFound:
     'O arquivo a salvar ou a pasta escolhida não foi encontrado. Escolha onde salvar de novo e tente outra vez.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

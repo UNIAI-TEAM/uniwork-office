@@ -10,8 +10,10 @@ import {
   isDocTitleTooLong,
 } from '../uniwork-docs-model'
 import { loadFolderTree, moveDocument, renameDocument } from '../uniwork-library-api'
+import { FirstSaveShare } from './FirstSaveShare'
 import { nameParts } from './SaveDialog'
 import { UniworkFolderPicker, type PickedFolder } from './UniworkFolderPicker'
+import { shareFailureKey, shareWithWorkspace, useFirstSaveShareState } from './first-save-share'
 import { FolderGlyph, MyFolderGlyph } from './UniworkFolderTree'
 import {
   MY_FOLDER_LABEL_KEY,
@@ -70,6 +72,11 @@ function FirstSaveNameDialog({
   // what the server already holds: a retry after a refused move must not rename again
   const [savedTitle, setSavedTitle] = useState(request.title)
   const [savedParent, setSavedParent] = useState(request.parentId)
+  // the web's first-save switch: shown for a document the person manages, locked when already shared
+  const shareState = useFirstSaveShareState(request.documentId)
+  const [shareOn, setShareOn] = useState(false)
+  // the workspace already holds the grant this dialog wrote: a retry after a refused move must not write it again
+  const [shared, setShared] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
   const mounted = useRef(true)
 
@@ -123,6 +130,16 @@ function FirstSaveNameDialog({
           return
         }
         setSavedTitle(title)
+      }
+      if (shareState && !shareState.alreadyShared && shareOn && !shared) {
+        const result = await shareWithWorkspace(request.workspaceId, request.documentId)
+        if (!mounted.current) return
+        if (!result.ok) {
+          // like a refused move: the dialog stays and the save does not continue
+          setErrorKey(shareFailureKey(result.error))
+          return
+        }
+        setShared(true)
       }
       if (place.id !== savedParent) {
         const moved = await moveDocument({ documentId: request.documentId, parentId: place.id })
@@ -231,6 +248,14 @@ function FirstSaveNameDialog({
           </button>
         </div>
         <p className="ufs-hint">{t('usFirstHint')}</p>
+        {shareState && (
+          <FirstSaveShare
+            checked={shareOn || shared}
+            alreadyShared={shareState.alreadyShared}
+            disabled={busy}
+            onChange={setShareOn}
+          />
+        )}
         <p className="uw-act-error" id={`${id}-error`} role={errorKey ? 'alert' : undefined}>
           {errorKey ? t(errorKey) : ''}
         </p>
