@@ -60,15 +60,18 @@ describe('column order (Chọn · Tên · [đặc trưng] · Truy cập · Ngư�
   })
 
   // A-FIX4 m3: Trash and Lưu trữ draw a 176px actions track (a button before the …), 100px more
-  // than the others, so every rung is 100px further out or the row overflows the table
+  // than the others, so every rung is 100px further out or the row overflows the table. V-LAYOUT F-05:
+  // Trash's Deleted cell is 160px (a name over "date · countdown"), 42px more than the other screen columns
   it('narrows Trash and Lưu trữ with their wide actions track in mind', () => {
+    const rungs = { shelved: [752, 880, 976], trash: [800, 928, 1008] } as const
     for (const screen of ['trash', 'shelved'] as const) {
-      expect(columnsFor(screen, 751)).not.toContain('access')
-      expect(columnsFor(screen, 752)).toContain('access')
-      expect(columnsFor(screen, 879)).not.toContain('editor')
-      expect(columnsFor(screen, 880)).toContain('editor')
-      expect(columnsFor(screen, 975)).not.toContain('size')
-      expect(columnsFor(screen, 976)).toContain('size')
+      const [access, editor, size] = rungs[screen]
+      expect(columnsFor(screen, access - 1)).not.toContain('access')
+      expect(columnsFor(screen, access)).toContain('access')
+      expect(columnsFor(screen, editor - 1)).not.toContain('editor')
+      expect(columnsFor(screen, editor)).toContain('editor')
+      expect(columnsFor(screen, size - 1)).not.toContain('size')
+      expect(columnsFor(screen, size)).toContain('size')
     }
     // a screen with the 76px actions track keeps its rungs
     expect(columnsFor('recent', 655)).not.toContain('access')

@@ -77,6 +77,8 @@ const WIDTH = {
   editor: 130,
   size: 84,
 }
+/** V-LAYOUT F-05: the Trash cell holds a name over "20 thg 10 · Còn 13 ngày", the countdown never cut */
+const DELETED_WIDTH = 160
 /** the shelf's row carries a Bỏ lưu trữ button and the trash row a Khôi phục button before its "…": their actions track is wider */
 export const BUTTON_ACTIONS_WIDTH = 176
 export const hasButtonActions = (screen: DocListScreen): boolean =>
@@ -95,22 +97,23 @@ const NAME_FLOOR = 184
  * lượng (plus Người sửa with a screen column). Tên, Chọn, Cập nhật, Thao tác
  * and the screen column never hide.
  */
+const rem = (px: number): number => Math.ceil(px / REM) * REM
 function rungsOf(
-  special: boolean,
+  special: number,
   actions: number,
 ): Record<(typeof NARROW_HIDING_ORDER)[number], number> {
-  const rem = (px: number): number => Math.ceil(px / REM) * REM
-  const base =
-    WIDTH.select + WIDTH.updated + actions + (special ? WIDTH.special : 0) + BORDER + NAME_FLOOR
+  const base = WIDTH.select + WIDTH.updated + actions + special + BORDER + NAME_FLOOR
   const access = base + WIDTH.access
   const editor = access + WIDTH.editor
   return { access: rem(access), editor: rem(editor), size: rem(editor + WIDTH.size) }
 }
 const RUNGS = {
-  plain: rungsOf(false, WIDTH.actions),
-  special: rungsOf(true, WIDTH.actions),
-  /** Trash and Lưu trữ: always a screen column, and the wide actions track */
-  buttons: rungsOf(true, BUTTON_ACTIONS_WIDTH),
+  plain: rungsOf(0, WIDTH.actions),
+  special: rungsOf(WIDTH.special, WIDTH.actions),
+  /** Lưu trữ: always a screen column, and the wide actions track */
+  shelved: rungsOf(WIDTH.special, BUTTON_ACTIONS_WIDTH),
+  /** Trash: the same, with the wider Deleted cell */
+  trash: rungsOf(DELETED_WIDTH, BUTTON_ACTIONS_WIDTH),
 }
 /** the device list has only Dung lượng to hide */
 const DEVICE_SIZE_RUNG = 40 * REM
@@ -132,7 +135,16 @@ export function columnsFor(screen: DocListScreen, width?: number): ColumnId[] {
     ]
   }
   const special = SPECIAL[screen]
-  const rungs = RUNGS[hasButtonActions(screen) ? 'buttons' : special ? 'special' : 'plain']
+  const rungs =
+    RUNGS[
+      screen === 'trash'
+        ? 'trash'
+        : screen === 'shelved'
+          ? 'shelved'
+          : special
+            ? 'special'
+            : 'plain'
+    ]
   return [
     // a source file of another module cannot be selected: its page has no Chọn column
     ...(screen === 'elsewhere' ? [] : (['select'] as const)),
@@ -144,6 +156,51 @@ export function columnsFor(screen: DocListScreen, width?: number): ColumnId[] {
     ...(w >= rungs.size ? (['size'] as const) : []),
     'actions',
   ]
+}
+
+/**
+ * Below the ladder (V-LAYOUT F-01). The web ladder stops once Truy cập, Người sửa and Dung lượng are
+ * gone, but a 374px list (a 768 window) still needs 404-522px before Tên has its floor. Two more
+ * steps keep the row inside its box, narrowest last:
+ *  1. the screen column goes when the table cannot hold it next to Tên's floor (the Trash and Lưu trữ
+ *     rows keep their Khôi phục / Bỏ lưu trữ button: it is an action, not data);
+ *  2. the table is `compact`: Cập nhật is an 84px track whose date wraps onto two lines, Tên a flexible
+ *     one (floor 110px), the button screens' actions track 140px, and their Chọn column is dropped.
+ * Tên keeps >= 180px in a 374px box and >= 110px in a 326px one (a 720 window, the shell's minimum;
+ * the button screens' 389 / 341px boxes leave it 163 / 115px).
+ * Tables the ladder fits, and an unmeasured one, are left as they are.
+ */
+export const COMPACT_WIDTH = { updated: 84, name: 110, buttonActions: 140 }
+
+const usable = (width?: number): width is number =>
+  typeof width === 'number' && Number.isFinite(width) && width > 0
+
+/** the width under which a table cannot hold the full Tên floor next to Chọn, Cập nhật and Thao tác */
+export function isCompact(screen: DocListScreen, width?: number): boolean {
+  if (!usable(width)) return false
+  const actions = hasButtonActions(screen) ? BUTTON_ACTIONS_WIDTH : WIDTH.actions
+  return width < rem(WIDTH.select + NAME_FLOOR + WIDTH.updated + actions + BORDER)
+}
+
+/** the columns of `columnsFor`, less what the table's own width cannot hold below the ladder */
+export function fitColumns(
+  screen: DocListScreen,
+  columns: readonly ColumnId[],
+  width?: number,
+): ColumnId[] {
+  if (!usable(width)) return [...columns]
+  const special = SPECIAL[screen]
+  const specialWidth = screen === 'trash' ? DELETED_WIDTH : WIDTH.special
+  const actions = hasButtonActions(screen) ? BUTTON_ACTIONS_WIDTH : WIDTH.actions
+  const specialRung = rem(
+    WIDTH.select + NAME_FLOOR + WIDTH.updated + actions + specialWidth + BORDER,
+  )
+  const compact = isCompact(screen, width)
+  return columns.filter(
+    (column) =>
+      !(special !== null && column === special && width < specialRung) &&
+      !(compact && hasButtonActions(screen) && column === 'select'),
+  )
 }
 
 /** the screen column newest-first, except trash which runs oldest-deletion first (Q2); Cập nhật newest-first without one */

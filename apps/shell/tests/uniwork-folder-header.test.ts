@@ -326,9 +326,10 @@ describe('UNI-1979 open-folder header: one row, the folder name once', () => {
     const inline = ruleBody(container?.[1] ?? '', '.dh-toolbar-folder .dh-search-box')
     expect(inline).toMatch(/order:\s*0\b/)
     expect(inline).toMatch(/flex:\s*0\s+1\s+auto/)
-    // V1979-2: the inline search is 14rem at most and gives room back down to 12rem
-    expect(inline).toMatch(/width:\s*clamp\(12rem,\s*18cqw,\s*14rem\)/)
-    expect(inline).toMatch(/min-width:\s*12rem/)
+    // V1979-2: the inline search is 17rem at most and gives room back down to 15rem (V-LAYOUT F-11:
+    // 14rem cut the "Search folders and documents" placeholder)
+    expect(inline).toMatch(/width:\s*clamp\(15rem,\s*18cqw,\s*17rem\)/)
+    expect(inline).toMatch(/min-width:\s*15rem/)
     // never a viewport media query for the search position: the sidebars decide the width
     expect(homeCss).not.toMatch(/@media[^{]*\{\s*\.dh-toolbar-folder \.dh-search-box/)
   })

@@ -3,9 +3,11 @@ import type { UniworkSourceFile } from '../../../shared/home-api'
 import { useI18n } from '../locale'
 import type { FolderMenuItem } from '../uniwork-folders/FolderMenu'
 import type { DocumentsHomeDoc, DocumentsHomeTableRow } from '../uniwork-home/documents-home-model'
-import { trackOf } from './cells'
+import { CompactTableContext, trackOf } from './cells'
 import {
   COLUMN_LABEL_KEY,
+  fitColumns,
+  isCompact,
   isSortable,
   nextSort,
   specialColumn,
@@ -151,7 +153,9 @@ export function DocList({
   const present = specialPresent(screen, docs)
   const canSelect = (doc: DocumentsHomeDoc): boolean => !selectableFor || selectableFor(doc)
   const selectableDocs = docs.filter(canSelect)
-  const allColumns = visibleColumns(screen, docs, width > 0 ? width : undefined)
+  const measured = width > 0 ? width : undefined
+  const allColumns = fitColumns(screen, visibleColumns(screen, docs, measured), measured)
+  const compact = isCompact(screen, measured)
   // a list nothing on is selectable has no Chọn column
   const columns =
     selectableFor && selectableDocs.length === 0
@@ -173,7 +177,7 @@ export function DocList({
   )
 
   // the Sao button is drawn on the Starred screen only, and the track widens with it
-  const track = trackOf(columns, screen, screen === 'starred' && !!onUnstar)
+  const track = trackOf(columns, screen, screen === 'starred' && !!onUnstar, compact)
   const now = new Date()
   const special = specialColumn(screen)
 
@@ -310,36 +314,43 @@ export function DocList({
   }
 
   return (
-    <div ref={measure} className="dh-doc-table" role="table" aria-label={label}>
-      <div className="dh-doc-head" role="row" style={{ gridTemplateColumns: track }}>
-        {columns.map(headerFor)}
+    <CompactTableContext.Provider value={compact}>
+      <div
+        ref={measure}
+        className={compact ? 'dh-doc-table is-compact' : 'dh-doc-table'}
+        role="table"
+        aria-label={label}
+      >
+        <div className="dh-doc-head" role="row" style={{ gridTemplateColumns: track }}>
+          {columns.map(headerFor)}
+        </div>
+        {runs
+          ? runs.flatMap((run, index) => {
+              const open = run.id === null || !collapsed.has(run.id)
+              return [
+                run.id !== null && (
+                  <GroupHeader
+                    key={`group:${run.id}`}
+                    id={run.id}
+                    open={open}
+                    count={moreToLoad && index === runs.length - 1 ? undefined : run.rows.length}
+                    onToggle={onToggleGroup}
+                  />
+                ),
+                open ? (
+                  <div
+                    key={`body:${run.id}`}
+                    role="rowgroup"
+                    className="dh-group-body"
+                    data-group-body={run.id ?? undefined}
+                  >
+                    {run.rows.map((row) => rowFor(row, true))}
+                  </div>
+                ) : null,
+              ]
+            })
+          : sorted.map((row) => rowFor(row, false))}
       </div>
-      {runs
-        ? runs.flatMap((run, index) => {
-            const open = run.id === null || !collapsed.has(run.id)
-            return [
-              run.id !== null && (
-                <GroupHeader
-                  key={`group:${run.id}`}
-                  id={run.id}
-                  open={open}
-                  count={moreToLoad && index === runs.length - 1 ? undefined : run.rows.length}
-                  onToggle={onToggleGroup}
-                />
-              ),
-              open ? (
-                <div
-                  key={`body:${run.id}`}
-                  role="rowgroup"
-                  className="dh-group-body"
-                  data-group-body={run.id ?? undefined}
-                >
-                  {run.rows.map((row) => rowFor(row, true))}
-                </div>
-              ) : null,
-            ]
-          })
-        : sorted.map((row) => rowFor(row, false))}
-    </div>
+    </CompactTableContext.Provider>
   )
 }

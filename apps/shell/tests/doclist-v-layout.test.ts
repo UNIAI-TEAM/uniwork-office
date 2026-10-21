@@ -33,7 +33,8 @@ import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/document
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
-const src = (path: string): string => readFileSync(resolve(__dirname, '../src/renderer/src', path), 'utf8')
+const src = (path: string): string =>
+  readFileSync(resolve(__dirname, '../src/renderer/src', path), 'utf8')
 
 function ruleOf(css: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -59,18 +60,25 @@ const BOX_720_BUTTONS = 341
 const LISTS = DOC_LIST_SCREENS
 
 describe('F-01: every list fits the box it is in', () => {
+  // Trash and Lưu trữ lists sit in a slightly wider box (a 389 / 341 px one: no Archive-count badge)
+  const isButtons = (screen: DocListScreen): boolean => screen === 'trash' || screen === 'shelved'
   it.each(
     LISTS.flatMap((screen) =>
-      [BOX_768, BOX_720, BOX_768_BUTTONS, BOX_720_BUTTONS].map((w) => [screen, w] as const),
+      (isButtons(screen) ? [BOX_768_BUTTONS, BOX_720_BUTTONS] : [BOX_768, BOX_720]).map(
+        (w) => [screen, w] as const,
+      ),
     ),
-  )('%s at %i px: the row needs no more than the box and keeps Cập nhật + Thao tác', (screen, w) => {
-    const columns = fitColumns(screen, columnsFor(screen, w), w)
-    // the table border takes 2px of the box
-    expect(rowFloor(screen, columns, w)).toBeLessThanOrEqual(w - 2)
-    expect(columns).toContain('name')
-    expect(columns).toContain('updated')
-    expect(columns).toContain('actions')
-  })
+  )(
+    '%s at %i px: the row needs no more than the box and keeps Cập nhật + Thao tác',
+    (screen, w) => {
+      const columns = fitColumns(screen, columnsFor(screen, w), w)
+      // the table border takes 2px of the box
+      expect(rowFloor(screen, columns, w)).toBeLessThanOrEqual(w - 2)
+      expect(columns).toContain('name')
+      expect(columns).toContain('updated')
+      expect(columns).toContain('actions')
+    },
+  )
 
   it('drops Truy cập, Người sửa gần nhất, Dung lượng and the screen column in a 374 px box', () => {
     for (const screen of LISTS) {
@@ -81,12 +89,18 @@ describe('F-01: every list fits the box it is in', () => {
     }
   })
 
-  it('Tên keeps >= 180 px in a 374 px box and >= 120 px in a 326 px one', () => {
+  it('Tên keeps >= 180 px in a 374 px box and >= 110 px in a 326 px one (Trash / Lưu trữ: 389 / 341 px boxes, 160 / 110 px)', () => {
     for (const screen of LISTS) {
-      for (const [w, floor] of [
-        [BOX_768, 180],
-        [BOX_720, 120],
-      ] as const) {
+      const buttons = screen === 'trash' || screen === 'shelved'
+      for (const [w, floor] of (buttons
+        ? [
+            [BOX_768_BUTTONS, 160],
+            [BOX_720_BUTTONS, 110],
+          ]
+        : [
+            [BOX_768, 180],
+            [BOX_720, 110],
+          ]) as [number, number][]) {
         const columns = fitColumns(screen, columnsFor(screen, w), w)
         const fixed = tracksOf(trackOf(columns, screen, false, true))
           .filter((_, i) => columns[i] !== 'name')
@@ -106,23 +120,23 @@ describe('F-01: every list fits the box it is in', () => {
   })
 
   it('keeps the screen column down to the width where Tên still has its floor', () => {
-    expect(fitColumns('recent', columnsFor('recent', 528), 528)).toContain('activity')
-    expect(fitColumns('recent', columnsFor('recent', 527), 527)).not.toContain('activity')
+    expect(fitColumns('recent', columnsFor('recent', 544), 544)).toContain('activity')
+    expect(fitColumns('recent', columnsFor('recent', 543), 543)).not.toContain('activity')
   })
 
   it('compact: Cập nhật is a narrow wrapping track, Tên a flexible one', () => {
     const columns = fitColumns('workspace', columnsFor('workspace', BOX_768), BOX_768)
     const tracks = tracksOf(trackOf(columns, 'workspace', false, true))
     expect(tracks[columns.indexOf('updated')]).toBe('84px')
-    expect(tracks[columns.indexOf('name')]).toMatch(/^minmax\(120px, 1fr\)$/)
+    expect(tracks[columns.indexOf('name')]).toMatch(/^minmax\(110px, 1fr\)$/)
     expect(src('uniwork-home/documents-home.css')).toMatch(
-      /\.dh-doc-table\.is-compact \[data-col='updated'\][^{]*\{[^}]*white-space:\s*normal;/,
+      /\.dh-doc-table\.is-compact \.dh-doc-row \[data-col='updated'\]\s*\{[^}]*white-space:\s*normal;/,
     )
   })
 })
 
 describe('F-06 / V7-1: the headers fit their label', () => {
-  it('Người sửa gần nhất has 148px, and Dung lượng hides its idle sort arrow instead of clipping', () => {
+  it('Người sửa gần nhất has 148px (Tên gives 18px back), and an idle sort arrow takes no room', () => {
     const tracks = tracksOf(trackOf(columnsFor('recent', 2000), 'recent'))
     const columns = columnsFor('recent', 2000)
     expect(floorOf(tracks[columns.indexOf('editor')]!)).toBeGreaterThanOrEqual(148)
@@ -137,6 +151,19 @@ describe('F-06 / V7-1: the headers fit their label', () => {
     for (const screen of ['workspace', 'recent', 'starred', 'shared', 'shared-by-me'] as const) {
       expect(columnsFor(screen, 886)).toEqual(columnsFor(screen, 2000))
       expect(rowFloor(screen, columnsFor(screen, 886), 886)).toBeLessThanOrEqual(884)
+    }
+  })
+})
+
+describe('no rung of the ladder draws a row wider than its table', () => {
+  it.each(LISTS)('%s: the sum of the track floors fits at the width a column joins', (screen) => {
+    // a Trash / Lưu trữ list is never narrower than 341 px (a 720 window)
+    const least = screen === 'trash' || screen === 'shelved' ? 341 : 326
+    for (const w of [
+      326, 341, 400, 500, 544, 560, 600, 640, 700, 760, 800, 880, 960, 1024, 1100, 2000,
+    ].filter((w) => w >= least)) {
+      const columns = fitColumns(screen, columnsFor(screen, w), w)
+      expect(rowFloor(screen, columns, w), `${screen} at ${w}`).toBeLessThanOrEqual(w - 2)
     }
   })
 })
@@ -217,11 +244,11 @@ describe('F-07: one wrapping filter row', () => {
 })
 
 describe('F-11: the search field keeps room for its placeholder', () => {
-  it('has a 16rem floor (never wider than its row) in the title row and inline in a folder header', () => {
+  it('has a 15rem floor (never wider than its row) in the title row and inline in a folder header', () => {
     const css = src('uniwork-home/documents-home.css')
-    expect(ruleOf(css, '.dh-search-box')).toMatch(/min-width:\s*min\(16rem, 100%\);/)
+    expect(ruleOf(css, '.dh-search-box')).toMatch(/min-width:\s*min\(15rem, 100%\);/)
     expect(css).toMatch(
-      /@container \(min-width: 60rem\) \{\s*\.dh-toolbar-folder \.dh-search-box \{[^}]*min-width:\s*16rem;/,
+      /@container \(min-width: 60rem\) \{\s*\.dh-toolbar-folder \.dh-search-box \{[^}]*min-width:\s*15rem;/,
     )
   })
 })
