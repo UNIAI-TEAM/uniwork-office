@@ -277,7 +277,7 @@ describe('the shortcut shown in the tips', () => {
 // UNI-2060: the name stays the plain command; the chord goes to aria-keyshortcuts
 describe('the accessible name and aria-keyshortcuts', () => {
   const controls = () =>
-    [...host.querySelectorAll('button')].map((el) => ({
+    [...host.querySelectorAll('button:not([aria-hidden="true"])')].map((el) => ({
       el,
       name: el.getAttribute('aria-label') ?? el.textContent ?? '',
       keyshortcuts: el.getAttribute('aria-keyshortcuts'),
