@@ -319,6 +319,16 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
+  // Next / previous region (the shell cycles its window regions; Shift reverses). No repeat:
+  // a held key would flip focus between the regions on every keydown.
+  {
+    id: 'common-09',
+    scope: 'common',
+    win: ['F6', 'Shift+F6'],
+    mac: ['F6', 'Shift+F6'],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
 ]
 
 export const commonShortcuts: readonly ShortcutAction[] = mergeRows(generated, manual)
