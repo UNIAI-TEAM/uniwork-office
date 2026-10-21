@@ -775,7 +775,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  max-width: 100%;
+  /* the -6px margins hand the button 6px of the cell's padding at each side: "Dung lượng" (65px) in
+     a 68px content box, and "Người sửa gần nhất", keep their whole label */
+  max-width: calc(100% + 12px);
   height: 28px;
   padding: 0 6px;
   margin: 0 -6px;
@@ -1070,6 +1072,21 @@
   white-space: nowrap;
 }
 
+/* V-FIX2 N-02: the same line under Tên of a Trash row that has no Đã xóa column: who gives way
+   first (it can shrink to nothing), then the date; the countdown never shrinks */
+.dh-deleted-line {
+  display: flex;
+  min-width: 0;
+}
+
+.dh-deleted-who {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dh-deleted-sep {
   flex: none;
   white-space: pre;
@@ -1088,6 +1105,11 @@
 
 .dh-doc-table.is-compact .dh-doc-row [data-col='updated'] {
   white-space: normal;
+}
+
+/* V-FIX2 N-05: a compact table is short of room for Tên: its grouped rows give the 28px indent back */
+.dh-doc-table.is-compact .dh-doc-row.grouped {
+  --dh-group-indent: 0px;
 }
 
 .dh-col-size,
@@ -1494,15 +1516,26 @@
    segment shares the filter row with the type chips and the two selects sit at its far end,
    and "Mở tiếp" shows four cards for the last touches above the list. */
 .dh-title-group.dh-title-stack {
+  flex: 0 100 auto;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
+  /* V-FIX2 N-01: the one-row header (>= 1101px) must never outgrow its box: this group yields
+     first (the select, the search and the buttons keep their size) and its subtitle ellipsises;
+     the floor keeps the title itself whole. N-08: 10rem cut "From elsewhere" (175px at 24px) under
+     the select, so the floor is 11.5rem (184px); min-content cannot do it, the nowrap subtitle
+     counts its whole text there. Only the subtitle gives way */
+  min-width: 11.5rem;
 }
 
 .dh-subtitle {
+  max-width: 100%;
   margin: 0;
+  overflow: hidden;
   color: var(--text-secondary);
   font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dh-filter-bar.has-lead .dh-filter-chips + .dh-filter-chip {

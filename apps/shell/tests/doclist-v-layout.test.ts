@@ -149,6 +149,13 @@ describe('F-06 / V7-1: the headers fit their label', () => {
     )
   })
 
+  it('Dung lượng has 92px (Tên gives 8px back), wider than its 72px label plus the 16px padding', () => {
+    const columns = columnsFor('recent', 2000)
+    const tracks = tracksOf(trackOf(columns, 'recent'))
+    expect(tracks[columns.indexOf('size')]).toBe('92px')
+    expect(floorOf(tracks[columns.indexOf('name')]!)).toBe(158)
+  })
+
   it('still shows every column of a 1280 window (886 px box) on the screens that did', () => {
     for (const screen of ['workspace', 'recent', 'starred', 'shared', 'shared-by-me'] as const) {
       expect(columnsFor(screen, 886)).toEqual(columnsFor(screen, 2000))

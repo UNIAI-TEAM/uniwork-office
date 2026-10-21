@@ -16,12 +16,13 @@ import { rowSizeBytes, type DocumentsHomeDoc } from '../uniwork-home/documents-h
 import {
   AccessContent,
   Cell,
+  DeletedLine,
   DOC_ICON_SIZE,
   EditorContent,
   trackOf,
   useCompactTable,
 } from './cells'
-import { specialColumn, type ColumnId, type DocListScreen } from './columns'
+import { showsRowButton, specialColumn, type ColumnId, type DocListScreen } from './columns'
 import { formatBytes, formatListDate } from './format'
 import { SpecialCell } from './special-cells'
 
@@ -135,6 +136,8 @@ export function DocRow({
   // a folder never opens from its row (the device list enters it), and a trashed file has no Mở in its menu either
   const opens = (!folder || screen === 'device') && screen !== 'trash' && !doc.archived
   const special = specialColumn(screen)
+  // V-FIX2 N-02: a Trash row without its Đã xóa column says it under the name; a compact one has no Khôi phục button
+  const deletedLine = screen === 'trash' && !columns.includes('deleted') && !!doc.archivedAt
   const cellFor = (col: ColumnId) => {
     switch (col) {
       case 'select':
@@ -208,6 +211,11 @@ export function DocRow({
                     )}
                   </span>
                 )}
+                {deletedLine && (
+                  <span className="dh-doc-subpath">
+                    <DeletedLine doc={doc} now={now} />
+                  </span>
+                )}
                 {subline?.detail}
               </div>
             )}
@@ -256,7 +264,7 @@ export function DocRow({
                 <StarGlyph />
               </button>
             )}
-            {actions}
+            {showsRowButton(screen, compact) && actions}
             {menu.length > 0 && (
               <FolderMenu
                 label={t('ufActionsFor', { name: doc.title })}

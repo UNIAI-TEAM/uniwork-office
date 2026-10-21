@@ -9,6 +9,7 @@ import {
   BUTTON_ACTIONS_WIDTH,
   COMPACT_WIDTH,
   hasButtonActions,
+  showsRowButton,
   type ColumnId,
   type DocListScreen,
   type SpecialColumnId,
@@ -28,10 +29,12 @@ export const DOC_ICON_SIZE = 32
  * V-LAYOUT F-06: Người sửa gần nhất takes 18px more than the ladder counts (the vi header "Người sửa
  * gần nhất" + its cell padding is ~136px) and Tên's grid floor gives the same 18px back, so the sum
  * of the floors, and every rung of the ladder (the web's), is unchanged.
+ * V-FIX3 N-03b: Dung lượng takes 8px more (92px: the 12px semibold label measured ~72px, past the
+ * 68px content box and still ellipsised), Tên's floor gives the 8px back (158 instead of 166).
  */
 const TRACK: Record<ColumnId, string> = {
   select: '32px',
-  name: 'minmax(166px, 3fr)',
+  name: 'minmax(158px, 3fr)',
   activity: 'minmax(118px, 1.3fr)',
   starred: 'minmax(118px, 1.3fr)',
   shared: 'minmax(118px, 1.3fr)',
@@ -41,7 +44,7 @@ const TRACK: Record<ColumnId, string> = {
   access: 'minmax(120px, 1fr)',
   editor: 'minmax(148px, 1.1fr)',
   updated: '118px',
-  size: '84px',
+  size: '92px',
   actions: '76px',
 }
 
@@ -75,7 +78,8 @@ export function trackOf(
       if (compact && column === 'updated') return `${COMPACT_WIDTH.updated}px`
       if (column !== 'actions') return TRACK[column]
       if (screen && hasButtonActions(screen)) {
-        return compact ? `${COMPACT_WIDTH.buttonActions}px` : BUTTON_ACTIONS_TRACK
+        if (!compact) return BUTTON_ACTIONS_TRACK
+        return showsRowButton(screen, true) ? `${COMPACT_WIDTH.buttonActions}px` : TRACK[column]
       }
       return star ? STAR_ACTIONS_TRACK : TRACK[column]
     })
@@ -214,6 +218,38 @@ export function Stack({ main, sub }: { main: ReactNode; sub?: ReactNode }) {
     <span className="dh-special">
       <span className="dh-special-main">{main}</span>
       {sub ? <span className="dh-special-sub">{sub}</span> : null}
+    </span>
+  )
+}
+
+/**
+ * V-FIX2 N-02: what the Đã xóa column says (who, date, "Còn N ngày") as the one line under Tên of a
+ * Trash row that has no such column (the web's narrow row). Who gives way first, then the date: the
+ * countdown, the one datum of the page, is never cut.
+ */
+export function DeletedLine({ doc, now }: { doc: DocumentsHomeDoc; now: Date }) {
+  const { t, dateLocale } = useI18n()
+  if (!doc.archivedAt) return null
+  const who = doc.archivedByName?.trim()
+  const left = formatDaysLeft(doc.purgeAfter, now, t)
+  const soon = (daysLeft(doc.purgeAfter, now) ?? Infinity) <= DELETING_SOON_DAYS
+  return (
+    <span className="dh-deleted-line">
+      {who && (
+        <>
+          <span className="dh-deleted-who">{who}</span>
+          <span className="dh-deleted-sep">{' · '}</span>
+        </>
+      )}
+      <span className="dh-deleted-date">{formatListDate(doc.archivedAt, now, dateLocale, t)}</span>
+      {left && (
+        <>
+          <span className="dh-deleted-sep">{' · '}</span>
+          <span className={`dh-deleted-countdown dh-days-left${soon ? ' dh-days-soon' : ''}`}>
+            {left}
+          </span>
+        </>
+      )}
     </span>
   )
 }
