@@ -7,7 +7,15 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import {
+  accessibleShortcutProblems,
+  findDisplayChord,
+  findShortcut,
+  type ShortcutPlatform,
+  type ShortcutSurface,
+} from '@genoffice/shortcuts'
 import { describe, expect, it } from 'vitest'
+import { pdfPrevMatchProps, pdfTipProps } from '../src/renderer/shortcuts'
 
 const APP = fileURLToPath(new URL('../src/renderer/App.tsx', import.meta.url))
 const source = ts.createSourceFile(
@@ -66,5 +74,48 @@ describe('PDF toolbar buttons keep the chord out of their accessible name', () =
       )
     })
     expect(bad.map((tag) => `App.tsx:${tag.line}`)).toEqual([])
+  })
+})
+
+const PLATFORMS: ShortcutPlatform[] = ['win', 'mac']
+const SURFACES: ShortcutSurface[] = ['desktop', 'web']
+const ROWS = [
+  ...new Set(
+    [...readFileSync(APP, 'utf8').matchAll(/pdfTipProps\(t\('\w+'\), '(pdf-\d+)'\)/g)].map(
+      (m) => m[1]!,
+    ),
+  ),
+].filter((id) => id !== 'pdf-06')
+
+describe.each(PLATFORMS)('PDF toolbar props (%s)', (platform) => {
+  describe.each(SURFACES)('%s', (surface) => {
+    it.each(ROWS)('%s: plain name, platform aria-keyshortcuts, chord kept in the tooltip', (id) => {
+      const props = pdfTipProps('Command', id, platform, surface)
+      expect(
+        accessibleShortcutProblems(
+          { name: 'Command', keyshortcuts: props['aria-keyshortcuts'] },
+          findShortcut('pdf', id)!,
+          platform,
+          surface,
+        ),
+      ).toEqual([])
+      // the tooltip is the label plus the row's primary chord, as before
+      expect(props['data-tip']).toMatch(/^Command( \(.+\))?$/)
+    })
+
+    it('Next and Previous match each advertise only their own chords', () => {
+      const next = pdfTipProps('Next', 'pdf-06', platform, surface)
+      const prev = pdfPrevMatchProps('Previous', platform, surface)
+      const meta = platform === 'mac' ? 'Meta' : 'Control'
+      expect(next['aria-keyshortcuts']).toBe(`${meta}+G F3`)
+      expect(prev['aria-keyshortcuts']).toBe(
+        platform === 'mac' ? 'Shift+Meta+G Shift+F3' : 'Control+Shift+G Shift+F3',
+      )
+      expect(findDisplayChord('Next')).toBeNull()
+      expect(next['data-tip']).toBe(platform === 'mac' ? 'Next (⌘G)' : 'Next (Ctrl+G)')
+      expect(prev['data-tip']).toBe(
+        platform === 'mac' ? 'Previous (⇧⌘G)' : 'Previous (Ctrl+Shift+G)',
+      )
+    })
   })
 })

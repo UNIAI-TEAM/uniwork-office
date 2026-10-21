@@ -84,9 +84,9 @@ import {
   isCancelKey,
   isConfirmKey,
   matchPdfKey,
-  pdfPrevMatchTip,
+  pdfPrevMatchProps,
   pdfRibbonCollapseOptions,
-  pdfTip,
+  pdfTipProps,
   resolvePdfWindowKey,
   searchEnterDirection,
   onTextEditKeyDown,
@@ -6718,7 +6718,7 @@ export default function App() {
           <div className="rb-row">
             <button
               className="rb-icon"
-              data-tip={pdfTip(t('zoomOut'), 'pdf-09')}
+              {...pdfTipProps(t('zoomOut'), 'pdf-09')}
               aria-label={t('zoomOut')}
               onClick={zoomOut}
             >
@@ -6727,7 +6727,7 @@ export default function App() {
             <span className="tb-zoom">{Math.round(scale * 100)}%</span>
             <button
               className="rb-icon"
-              data-tip={pdfTip(t('zoomIn'), 'pdf-08')}
+              {...pdfTipProps(t('zoomIn'), 'pdf-08')}
               aria-label={t('zoomIn')}
               onClick={zoomIn}
             >
@@ -6737,7 +6737,7 @@ export default function App() {
         </div>
         <button
           className="rb-big"
-          data-tip={pdfTip(t('fitWidth'), 'pdf-11')}
+          {...pdfTipProps(t('fitWidth'), 'pdf-11')}
           onClick={() => {
             fitModeRef.current = 'width'
             recomputeFit()
@@ -6750,7 +6750,7 @@ export default function App() {
         </button>
         <button
           className="rb-big"
-          data-tip={pdfTip(t('fitPage'), 'pdf-11')}
+          {...pdfTipProps(t('fitPage'), 'pdf-11')}
           onClick={() => {
             fitModeRef.current = 'page'
             recomputeFit()
@@ -6768,7 +6768,7 @@ export default function App() {
   const searchBtn = (
     <button
       className={`rb-big${searchOpen ? ' active' : ''}`}
-      data-tip={pdfTip(t('search'), 'pdf-05')}
+      {...pdfTipProps(t('search'), 'pdf-05')}
       onClick={() => (searchOpen ? closeSearch() : openSearch())}
     >
       <span className="rb-big-icon">
@@ -6948,7 +6948,7 @@ export default function App() {
           {cap('save') && (
             <button
               className="qa-btn"
-              data-tip={pdfTip(t('save'), 'pdf-01')}
+              {...pdfTipProps(t('save'), 'pdf-01')}
               aria-label={t('save')}
               disabled={
                 (!dirty && !openBoxesDirty && !(uniwork.bound && !uniwork.readOnly)) ||
@@ -6962,8 +6962,8 @@ export default function App() {
           )}
           <button
             className="qa-btn"
-            data-tip={pdfTip(t('undo'), 'pdf-03')}
-            aria-label={pdfTip(t('undo'), 'pdf-03')}
+            {...pdfTipProps(t('undo'), 'pdf-03')}
+            aria-label={t('undo')}
             disabled={!history.canUndo}
             onClick={undo}
           >
@@ -6971,8 +6971,8 @@ export default function App() {
           </button>
           <button
             className="qa-btn"
-            data-tip={pdfTip(t('redo'), 'pdf-04')}
-            aria-label={pdfTip(t('redo'), 'pdf-04')}
+            {...pdfTipProps(t('redo'), 'pdf-04')}
+            aria-label={t('redo')}
             disabled={!history.canRedo}
             onClick={redo}
           >
@@ -7156,7 +7156,7 @@ export default function App() {
                   {cap('print') && (
                     <button
                       className="rb-big"
-                      data-tip={pdfTip(t('print'), 'pdf-07')}
+                      {...pdfTipProps(t('print'), 'pdf-07')}
                       disabled={printing}
                       onClick={openPrintDlg}
                     >
@@ -9275,7 +9275,7 @@ export default function App() {
                 </span>
                 <button
                   className="rb-icon"
-                  data-tip={pdfPrevMatchTip(t('searchPrev'))}
+                  {...pdfPrevMatchProps(t('searchPrev'))}
                   aria-label={t('searchPrev')}
                   disabled={activeMatches.length === 0}
                   onClick={() => searchStep(-1)}
@@ -9284,7 +9284,7 @@ export default function App() {
                 </button>
                 <button
                   className="rb-icon"
-                  data-tip={pdfTip(t('searchNext'), 'pdf-06')}
+                  {...pdfTipProps(t('searchNext'), 'pdf-06')}
                   aria-label={t('searchNext')}
                   disabled={activeMatches.length === 0}
                   onClick={() => searchStep(1)}
@@ -10103,7 +10103,7 @@ export default function App() {
             <div className="status-right">
               <button
                 className="zoom-btn"
-                data-tip={pdfTip(t('zoomOut'), 'pdf-09')}
+                {...pdfTipProps(t('zoomOut'), 'pdf-09')}
                 aria-label={t('zoomOut')}
                 onClick={zoomOut}
               >
@@ -10120,7 +10120,7 @@ export default function App() {
               />
               <button
                 className="zoom-btn"
-                data-tip={pdfTip(t('zoomIn'), 'pdf-08')}
+                {...pdfTipProps(t('zoomIn'), 'pdf-08')}
                 aria-label={t('zoomIn')}
                 onClick={zoomIn}
               >

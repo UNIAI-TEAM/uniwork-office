@@ -11,12 +11,15 @@
  * keymap. They go through the same matcher: no modifier, no IME composition.
  */
 import {
+  ariaKeyshortcuts,
   chordsFor,
   createMatcher,
   currentShortcutPlatform,
   findShortcut,
+  formatAriaChords,
   formatChord,
   formatHint,
+  parseChord,
   isComposingEvent,
   pdfShortcuts,
   type ShortcutAction,
@@ -235,4 +238,68 @@ export function pdfPrevMatchTip(
   if (!action) throw new Error('no pdf shortcut row pdf-06')
   const chord = chordsFor(action, platform, surface)[1]
   return chord ? `${label} (${formatChord(chord, platform)})` : label
+}
+
+/** `aria-keyshortcuts` value (`Control+Y`, `Meta+Y`) for a table row on this platform and surface; '' without a chord. */
+export function pdfAria(
+  id: string,
+  platform: ShortcutPlatform = currentShortcutPlatform(),
+  surface: ShortcutSurface = pdfSurface(),
+): string {
+  const action = findShortcut('pdf', id)
+  if (!action) throw new Error(`no pdf shortcut row ${id}`)
+  return ariaKeyshortcuts(action, platform, surface)
+}
+
+/**
+ * `pdf-06` lists Next and Previous together (`Ctrl+G`, `Ctrl+Shift+G`, `F3`, `Shift+F3`): a Shift chord
+ * whose unshifted twin is in the list is Previous's, the rest are Next's.
+ */
+function searchStepChords(
+  platform: ShortcutPlatform,
+  surface: ShortcutSurface,
+): { next: string[]; prev: string[] } {
+  const action = findShortcut('pdf', 'pdf-06')
+  if (!action) throw new Error('no pdf shortcut row pdf-06')
+  const chords = chordsFor(action, platform, surface)
+  const twin = (chord: string) => {
+    const p = parseChord(chord)
+    return p ? `${p.ctrl}${p.alt}${p.cmd}${p.key}` : chord
+  }
+  const plain = new Set(chords.filter((c) => !parseChord(c)?.shift).map(twin))
+  const prev = chords.filter((c) => parseChord(c)?.shift && plain.has(twin(c)))
+  return { next: chords.filter((c) => !prev.includes(c)), prev }
+}
+
+/**
+ * What a toolbar button spreads: the visible tooltip (`Redo (Ctrl+Y)`, unchanged) and the chord as
+ * `aria-keyshortcuts`. The button's accessible name stays the plain label (its text or `aria-label`).
+ */
+export function pdfTipProps(
+  label: string,
+  id: string,
+  platform: ShortcutPlatform = currentShortcutPlatform(),
+  surface: ShortcutSurface = pdfSurface(),
+): { 'data-tip': string; 'aria-keyshortcuts': string | undefined } {
+  const keys =
+    id === 'pdf-06'
+      ? formatAriaChords(searchStepChords(platform, surface).next, platform)
+      : pdfAria(id, platform, surface)
+  return {
+    'data-tip': pdfTip(label, id, platform, surface),
+    'aria-keyshortcuts': keys || undefined,
+  }
+}
+
+/** `pdfTipProps` for the Previous-match button: the Shift chords of `pdf-06`. */
+export function pdfPrevMatchProps(
+  label: string,
+  platform: ShortcutPlatform = currentShortcutPlatform(),
+  surface: ShortcutSurface = pdfSurface(),
+): { 'data-tip': string; 'aria-keyshortcuts': string | undefined } {
+  const keys = formatAriaChords(searchStepChords(platform, surface).prev, platform)
+  return {
+    'data-tip': pdfPrevMatchTip(label, platform, surface),
+    'aria-keyshortcuts': keys || undefined,
+  }
 }
