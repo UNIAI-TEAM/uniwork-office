@@ -88,8 +88,43 @@ function params(value: unknown): Record<string, string> {
   return out
 }
 
+/** null for a missing or drifted count: the page shows "—", never a made-up 0 */
+const count = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+
+/** the optional document-change fields: a drifted value reads as absent and never fails the row */
+function bool(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined
+}
+
+/** [{id, title}]: absent/null is undefined, a field that is not a list is [], unreadable entries are dropped */
+function sampleDocuments(value: unknown): { id: string; title: string }[] | undefined {
+  if (value === undefined || value === null) return undefined
+  if (!Array.isArray(value)) return []
+  const out: { id: string; title: string }[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue
+    const { id: docId, title } = entry as Record<string, unknown>
+    if (typeof docId !== 'string' || !docId) continue
+    out.push({ id: docId, title: typeof title === 'string' ? title : '' })
+  }
+  return out
+}
+
 function parseNotification(value: unknown): WorkNotification {
   const r = record(value)
+  const extra: Partial<WorkNotification> = {}
+  const n = count(r.count)
+  if (n !== null) extra.count = n
+  if (typeof r.updated_at === 'string') extra.updated_at = r.updated_at
+  const deleted = bool(r.resource_deleted)
+  if (deleted !== undefined) extra.resource_deleted = deleted
+  const lost = bool(r.resource_access_lost)
+  if (lost !== undefined) extra.resource_access_lost = lost
+  const commentGone = bool(r.comment_deleted)
+  if (commentGone !== undefined) extra.comment_deleted = commentGone
+  const samples = sampleDocuments(r.sample_documents)
+  if (samples !== undefined) extra.sample_documents = samples
   return {
     id: id(r.id),
     kind: text(r.kind),
@@ -101,14 +136,11 @@ function parseNotification(value: unknown): WorkNotification {
     params: params(r.params),
     read_at: optional(r.read_at),
     created_at: text(r.created_at),
+    ...extra,
   }
 }
 
 const SOURCES: readonly WorkHomeSource[] = ['tasks', 'meetings', 'notifications']
-
-/** null for a missing or drifted count: the page shows "—", never a made-up 0 */
-const count = (value: unknown): number | null =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
 
 /** the rows, or null when one of them (or the list itself) does not parse */
 function section<T>(value: unknown, one: (value: unknown) => T): T[] | null {

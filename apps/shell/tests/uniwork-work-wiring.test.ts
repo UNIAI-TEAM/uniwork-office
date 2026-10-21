@@ -170,3 +170,77 @@ describe('uniwork-work IPC', () => {
     expect(await setup({ profile: () => bad }).call(C.openWeb, { kind: 'onboarding' })).toBe(false)
   })
 })
+
+describe('uniwork-work IPC: notification documents (G3)', () => {
+  const PAGE = {
+    documents: [
+      { id: 'd_1', title: 'Budget', kind: 'docx', trashed: false, shelved: false, deleted: false },
+    ],
+    next_cursor: 'ndc1.next.mac',
+  }
+  const pageServer = () => vi.fn<FetchLike>(async () => json(200, PAGE))
+
+  it('answers the parsed page for a notification id', async () => {
+    const fetch = pageServer()
+    expect(await setup({}, fetch).call(C.notificationDocuments, 'n_9')).toEqual({
+      ok: true,
+      value: PAGE,
+    })
+    expect(new URL(fetch.mock.calls[0]![0]).pathname).toBe('/api/v1/me/notifications/n_9/documents')
+  })
+
+  it('carries the cursor and the limit from the renderer', async () => {
+    const fetch = pageServer()
+    await setup({}, fetch).call(C.notificationDocuments, 'n_9', { cursor: 'ndc1.a.b', limit: 20 })
+    const query = new URL(fetch.mock.calls[0]![0]).searchParams
+    expect(query.get('cursor')).toBe('ndc1.a.b')
+    expect(query.get('limit')).toBe('20')
+  })
+
+  it('a non-string id, a bad query or a bad cursor/limit never reaches the network', async () => {
+    const fetch = pageServer()
+    const { call } = setup({}, fetch)
+    expect(await call(C.notificationDocuments, { id: 'n_9' })).toEqual({
+      ok: false,
+      error: 'forbidden',
+    })
+    expect(await call(C.notificationDocuments, 'n_9', 'cursor')).toEqual({
+      ok: false,
+      error: 'server',
+    })
+    expect(await call(C.notificationDocuments, 'n_9', [])).toEqual({ ok: false, error: 'server' })
+    expect(await call(C.notificationDocuments, 'n_9', { cursor: 7 })).toEqual({
+      ok: false,
+      error: 'server',
+    })
+    expect(await call(C.notificationDocuments, 'n_9', { limit: '20' })).toEqual({
+      ok: false,
+      error: 'server',
+    })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('a null query is the first page', async () => {
+    const fetch = pageServer()
+    const reply = await setup({}, fetch).call(C.notificationDocuments, 'n_9', null)
+    expect(reply).toMatchObject({ ok: true })
+    expect(new URL(fetch.mock.calls[0]![0]).searchParams.has('cursor')).toBe(false)
+  })
+
+  it('turns 404, 403 and 400 into the work errors and never echoes the token', async () => {
+    const failing = (status: number, code: string) =>
+      setup(
+        {},
+        vi.fn<FetchLike>(async () => json(status, { error: { code, message: 'x' } })),
+      ).call(C.notificationDocuments, 'n_9')
+    expect(await failing(404, 'not_found')).toEqual({ ok: false, error: 'forbidden' })
+    expect(await failing(403, 'forbidden')).toEqual({ ok: false, error: 'forbidden' })
+    const bad = await failing(400, 'invalid_request')
+    expect(bad).toEqual({ ok: false, error: 'server' })
+    expect(JSON.stringify(bad)).not.toContain(TOKEN)
+    expect(await setup({ identity: () => null }).call(C.notificationDocuments, 'n_9')).toEqual({
+      ok: false,
+      error: 'signed-out',
+    })
+  })
+})

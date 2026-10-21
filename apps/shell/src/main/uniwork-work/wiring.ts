@@ -100,6 +100,17 @@ export function registerUniworkWork(ipcMain: IpcMain, deps: UniworkWorkDeps): vo
   handle(C.markNotificationsRead, (ids) =>
     api().markNotificationsRead(Array.isArray(ids) ? ids.map(str) : []),
   )
+  handle(C.notificationDocuments, (notificationId, q) => {
+    // the renderer's query is checked here: a wrong type is refused, never reinterpreted as a first page
+    if (q !== undefined && q !== null && (typeof q !== 'object' || Array.isArray(q))) {
+      throw new UniworkDocError('server_error')
+    }
+    const { cursor, limit } = (q ?? {}) as { cursor?: unknown; limit?: unknown }
+    if (cursor !== undefined && typeof cursor !== 'string')
+      throw new UniworkDocError('server_error')
+    if (limit !== undefined && typeof limit !== 'number') throw new UniworkDocError('server_error')
+    return api().notificationDocuments(str(notificationId), { cursor, limit })
+  })
   handle(C.createTask, (input) => api().createTask(input as WorkCreateTaskInput))
   handle(C.calendarEvents, (input) =>
     api().calendarEvents(input as { workspaceId: string; from: string; to: string }),

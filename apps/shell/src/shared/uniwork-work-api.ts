@@ -100,6 +100,37 @@ export interface WorkNotification {
   params: Record<string, string>
   read_at?: string
   created_at: string
+  /** `document_changed`: DISTINCT documents affected (a fold grows it) */
+  count?: number
+  /** RFC3339; a fold bumps it */
+  updated_at?: string
+  /** the single document the row names is trashed or purged */
+  resource_deleted?: boolean
+  /** the reader lost access to the document */
+  resource_access_lost?: boolean
+  /** the comment the row names is gone */
+  comment_deleted?: boolean
+  /** `document_changed`: up to 3 documents the reader can still read (ids and titles); [] when the field arrived unreadable */
+  sample_documents?: { id: string; title: string }[]
+}
+
+/** GET /me/notifications/{id}/documents -> `documents[]` (title and kind are '' when the server leaves them out) */
+export interface WorkNotificationDocument {
+  id: string
+  title: string
+  kind: string
+  /** in the trash and the caller manages it */
+  trashed: boolean
+  /** in the archive, still readable */
+  shelved: boolean
+  /** purged */
+  deleted: boolean
+}
+
+/** one page of the affected documents; `next_cursor` goes back verbatim, null at the end */
+export interface WorkNotificationDocumentPage {
+  documents: WorkNotificationDocument[]
+  next_cursor: string | null
 }
 
 export type WorkHomeSource = 'tasks' | 'meetings' | 'notifications'
@@ -190,6 +221,7 @@ export const UNIWORK_WORK_CHANNELS = {
   calendarEvents: 'uniwork-work:calendar-events',
   myProfile: 'uniwork-work:my-profile',
   markNotificationsRead: 'uniwork-work:mark-notifications-read',
+  notificationDocuments: 'uniwork-work:notification-documents',
   openWeb: 'uniwork-work:open-web',
   webUrl: 'uniwork-work:web-url',
 } as const
@@ -215,6 +247,14 @@ export interface UniworkWorkApi {
   myProfile(): Promise<UniworkWorkResult<WorkPerson>>
   /** POST /me/notifications/read: the caller's own ids (1-100); someone else's id is a 404 */
   markNotificationsRead(ids: string[]): Promise<UniworkWorkResult<null>>
+  /**
+   * GET /me/notifications/{id}/documents: the documents a `document_changed` row covers, 50 per page
+   * by default (limit 1-100). `cursor` is the previous page's `next_cursor`, untouched. Does not mark the row read.
+   */
+  notificationDocuments(
+    id: string,
+    q?: { cursor?: string; limit?: number },
+  ): Promise<UniworkWorkResult<WorkNotificationDocumentPage>>
   /** false when the target fails validation or no deployment profile is set */
   openWeb(target: WorkWebTarget): Promise<boolean>
   /** the URL openWeb would open (for Copy link), or null on the same conditions */
