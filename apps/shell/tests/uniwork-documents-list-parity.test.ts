@@ -541,11 +541,11 @@ describe('DocumentsHome Size column and short dates (UNI-1961 item 2)', () => {
     host.querySelector<HTMLElement>(`${selector} .${name}`)?.textContent?.trim()
 
   it.each([
-    ['vi', 'vi-VN', 'Dung lượng', '318 KB', '1,2 MB'],
-    ['en', 'en-US', 'Size', '318 KB', '1.2 MB'],
+    ['vi', 'vi-VN', 'Dung lượng', '318 KB'],
+    ['en', 'en-US', 'Size', '318 KB'],
   ] as const)(
     '%s: Chọn, Name, Access, editor, Updated, Size, then the actions (UNI-2047 shared rules)',
-    async (lang, locale, size, docSize, srcSize) => {
+    async (lang, locale, size, docSize) => {
       await renderHome(lang)
       const heads = Array.from(
         host.querySelectorAll<HTMLElement>('.dh-doc-head > [role="columnheader"]'),

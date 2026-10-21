@@ -89,4 +89,9 @@ export const ar = {
   dlBulkConfirmTitleOther: 'هل تريد نقل {n} من المستندات إلى المهملات؟',
   dlBulkConfirmBody: 'تبقى العناصر في المهملات 30 يومًا ثم تُحذف نهائيًا.',
   dlTrashBanner30: 'تبقى العناصر في المهملات 30 يومًا ثم تُحذف نهائيًا.',
+  dlStarredUnavailableTitle: 'المستندات المميزة بنجمة غير متاحة على هذا الخادم بعد',
+  dlStarredUnavailableHint:
+    'يحتاج خادم UniWork لديك إلى تحديث ليتمكن من حفظ المستندات المميزة بنجمة. اطلب من مسؤول تحديثه ثم حاول مرة أخرى.',
+  dlSourceSentIn: 'أُرسل في {origin}',
+  dlSearchNoResults: 'لا توجد نتائج لـ “{query}”',
 } satisfies Record<keyof typeof zh, string>

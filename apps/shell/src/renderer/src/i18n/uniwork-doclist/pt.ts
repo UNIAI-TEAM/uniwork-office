@@ -89,4 +89,9 @@ export const pt = {
   dlBulkConfirmTitleOther: 'Mover {n} documentos para a lixeira?',
   dlBulkConfirmBody: 'Os itens ficam 30 dias na lixeira e depois são excluídos para sempre.',
   dlTrashBanner30: 'Os itens ficam 30 dias na lixeira e depois são excluídos para sempre.',
+  dlStarredUnavailableTitle: 'Com estrela ainda não está disponível neste servidor',
+  dlStarredUnavailableHint:
+    'O servidor UniWork precisa de uma atualização para guardar documentos com estrela. Peça a um administrador para atualizá-lo e tente novamente.',
+  dlSourceSentIn: 'Enviado em {origin}',
+  dlSearchNoResults: 'Nenhum resultado para “{query}”',
 } satisfies Record<keyof typeof zh, string>

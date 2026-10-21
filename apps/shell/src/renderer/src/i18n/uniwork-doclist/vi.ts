@@ -89,4 +89,9 @@ export const vi = {
   dlBulkConfirmTitleOther: 'Chuyển {n} tài liệu vào thùng rác?',
   dlBulkConfirmBody: 'Các mục sẽ nằm trong thùng rác 30 ngày rồi bị xóa vĩnh viễn.',
   dlTrashBanner30: 'Các mục sẽ nằm trong thùng rác 30 ngày rồi bị xóa vĩnh viễn.',
+  dlStarredUnavailableTitle: 'Gắn sao chưa dùng được trên máy chủ này',
+  dlStarredUnavailableHint:
+    'Máy chủ UniWork của bạn cần được cập nhật để lưu tài liệu gắn sao. Hãy nhờ quản trị viên cập nhật rồi thử lại.',
+  dlSourceSentIn: 'Gửi trong {origin}',
+  dlSearchNoResults: 'Không có kết quả cho “{query}”',
 } satisfies Record<keyof typeof zh, string>

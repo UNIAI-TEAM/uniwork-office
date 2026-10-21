@@ -89,4 +89,9 @@ export const ru = {
   dlBulkConfirmTitleOther: 'Переместить документы ({n}) в корзину?',
   dlBulkConfirmBody: 'Элементы хранятся в корзине 30 дней, затем удаляются навсегда.',
   dlTrashBanner30: 'Элементы хранятся в корзине 30 дней, затем удаляются навсегда.',
+  dlStarredUnavailableTitle: 'Помеченные пока недоступны на этом сервере',
+  dlStarredUnavailableHint:
+    'Сервер UniWork нужно обновить, чтобы он мог хранить помеченные документы. Попросите администратора обновить его и повторите попытку.',
+  dlSourceSentIn: 'Отправлено в разделе «{origin}»',
+  dlSearchNoResults: 'Ничего не найдено по запросу «{query}»',
 } satisfies Record<keyof typeof zh, string>

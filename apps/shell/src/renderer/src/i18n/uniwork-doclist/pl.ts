@@ -89,4 +89,9 @@ export const pl = {
   dlBulkConfirmTitleOther: 'Przenieść dokumenty ({n}) do kosza?',
   dlBulkConfirmBody: 'Elementy zostają w koszu przez 30 dni, a potem są usuwane na zawsze.',
   dlTrashBanner30: 'Elementy zostają w koszu przez 30 dni, a potem są usuwane na zawsze.',
+  dlStarredUnavailableTitle: 'Oznaczone gwiazdką nie są jeszcze dostępne na tym serwerze',
+  dlStarredUnavailableHint:
+    'Serwer UniWork wymaga aktualizacji, aby przechowywać dokumenty oznaczone gwiazdką. Poproś administratora o aktualizację i spróbuj ponownie.',
+  dlSourceSentIn: 'Wysłano w: {origin}',
+  dlSearchNoResults: 'Brak wyników dla „{query}”',
 } satisfies Record<keyof typeof zh, string>

@@ -90,4 +90,9 @@ export const ms = {
   dlBulkConfirmBody:
     'Item kekal dalam tong sampah selama 30 hari, kemudian dipadam selama-lamanya.',
   dlTrashBanner30: 'Item kekal dalam tong sampah selama 30 hari, kemudian dipadam selama-lamanya.',
+  dlStarredUnavailableTitle: 'Berbintang belum tersedia pada pelayan ini',
+  dlStarredUnavailableHint:
+    'Pelayan UniWork anda perlu dikemas kini sebelum dapat menyimpan dokumen berbintang. Minta pentadbir mengemas kininya, kemudian cuba lagi.',
+  dlSourceSentIn: 'Dihantar dalam {origin}',
+  dlSearchNoResults: 'Tiada hasil untuk “{query}”',
 } satisfies Record<keyof typeof zh, string>

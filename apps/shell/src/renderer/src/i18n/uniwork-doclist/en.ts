@@ -88,4 +88,9 @@ export const en = {
   dlBulkConfirmTitleOther: 'Move {n} documents to the trash?',
   dlBulkConfirmBody: 'Items stay in the trash for 30 days, then are deleted forever.',
   dlTrashBanner30: 'Items stay in the trash for 30 days, then are deleted forever.',
+  dlStarredUnavailableTitle: 'Starred is not available on this server yet',
+  dlStarredUnavailableHint:
+    'Your UniWork server needs an update before it can keep starred documents. Ask an admin to update it, then try again.',
+  dlSourceSentIn: 'Sent in {origin}',
+  dlSearchNoResults: 'No results for “{query}”',
 } satisfies Record<keyof typeof zh, string>

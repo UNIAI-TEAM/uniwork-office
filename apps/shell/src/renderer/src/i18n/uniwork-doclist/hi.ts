@@ -88,4 +88,9 @@ export const hi = {
   dlBulkConfirmTitleOther: '{n} दस्तावेज़ ट्रैश में ले जाएँ?',
   dlBulkConfirmBody: 'आइटम 30 दिन तक ट्रैश में रहते हैं, फिर हमेशा के लिए हटा दिए जाते हैं।',
   dlTrashBanner30: 'आइटम 30 दिन तक ट्रैश में रहते हैं, फिर हमेशा के लिए हटा दिए जाते हैं।',
+  dlStarredUnavailableTitle: 'इस सर्वर पर तारांकित अभी उपलब्ध नहीं है',
+  dlStarredUnavailableHint:
+    'तारांकित दस्तावेज़ सहेजने के लिए आपके UniWork सर्वर को अपडेट करना होगा। किसी एडमिन से अपडेट करने को कहें, फिर दोबारा कोशिश करें।',
+  dlSourceSentIn: '{origin} में भेजा गया',
+  dlSearchNoResults: '“{query}” के लिए कोई परिणाम नहीं मिला',
 } satisfies Record<keyof typeof zh, string>

@@ -91,4 +91,9 @@ export const fr = {
     'Les éléments restent 30 jours dans la corbeille, puis sont supprimés définitivement.',
   dlTrashBanner30:
     'Les éléments restent 30 jours dans la corbeille, puis sont supprimés définitivement.',
+  dlStarredUnavailableTitle: 'Les suivis ne sont pas encore disponibles sur ce serveur',
+  dlStarredUnavailableHint:
+    'Votre serveur UniWork doit être mis à jour pour conserver les documents suivis. Demandez à un administrateur de le mettre à jour, puis réessayez.',
+  dlSourceSentIn: 'Envoyé dans {origin}',
+  dlSearchNoResults: 'Aucun résultat pour « {query} »',
 } satisfies Record<keyof typeof zh, string>

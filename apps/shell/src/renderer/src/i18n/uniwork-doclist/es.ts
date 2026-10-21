@@ -91,4 +91,9 @@ export const es = {
     'Los elementos permanecen 30 días en la papelera y luego se eliminan para siempre.',
   dlTrashBanner30:
     'Los elementos permanecen 30 días en la papelera y luego se eliminan para siempre.',
+  dlStarredUnavailableTitle: 'Destacados aún no está disponible en este servidor',
+  dlStarredUnavailableHint:
+    'Tu servidor de UniWork necesita una actualización para guardar documentos destacados. Pide a un administrador que lo actualice y vuelve a intentarlo.',
+  dlSourceSentIn: 'Enviado en {origin}',
+  dlSearchNoResults: 'Sin resultados para «{query}»',
 } satisfies Record<keyof typeof zh, string>

@@ -88,4 +88,9 @@ export const ja = {
   dlBulkConfirmTitleOther: '{n} 件のドキュメントをゴミ箱に移動しますか？',
   dlBulkConfirmBody: '項目はゴミ箱に 30 日間残り、その後完全に削除されます。',
   dlTrashBanner30: '項目はゴミ箱に 30 日間残り、その後完全に削除されます。',
+  dlStarredUnavailableTitle: 'このサーバーではまだスター付きを利用できません',
+  dlStarredUnavailableHint:
+    'UniWork サーバーを更新すると、スター付きのドキュメントを保存できるようになります。管理者に更新を依頼してから、もう一度お試しください。',
+  dlSourceSentIn: '{origin}で送信',
+  dlSearchNoResults: '「{query}」に一致する結果はありません',
 } satisfies Record<keyof typeof zh, string>

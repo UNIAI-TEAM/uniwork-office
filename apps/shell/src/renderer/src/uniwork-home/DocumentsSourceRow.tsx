@@ -5,7 +5,7 @@ import { FolderMenu } from '../uniwork-folders/FolderMenu'
 import { Cell, DOC_ICON_SIZE, Empty, Person, trackOf } from '../doclist/cells'
 import type { ColumnId } from '../doclist/columns'
 import { formatBytes, formatListDate } from '../doclist/format'
-import { openable } from './source-open-model'
+import { openable, sourceOriginLine } from './source-open-model'
 
 /** UNI-1961: a source file's badge format: its extension, else its name's */
 function sourceExtension(source: UniworkSourceFile): string {
@@ -18,8 +18,8 @@ function sourceExtension(source: UniworkSourceFile): string {
 /**
  * UNI-1961: one "other sources" row of the Documents table - a file attached
  * in chat, a task, a meeting or email, listed beside the documents as the web
- * does (D documents-library-row.tsx). It has no level or scope (Access "—"),
- * its editor is the owner. Its primary action (the name, Enter, a double click)
+ * does (D documents-library-row.tsx). It has no level or scope (its page has no Access column),
+ * its editor is the owner, and its name's sub-line says where it was sent (UNI-2047 F-04). Its primary action (the name, Enter, a double click)
  * is the web's: Open (view only) when the server and an editor module allow it
  * (UNI-1993), else Download; the menu lists Open first, then Download.
  */
@@ -41,6 +41,7 @@ export function DocumentsSourceRow({
 }) {
   const { t, dateLocale } = useI18n()
   const owner = source.owner?.name.trim() ?? ''
+  const origin = sourceOriginLine(source, t)
   const download = () => onDownload(source)
   const canOpen = openable(source)
   const open = () => onOpen(source)
@@ -55,6 +56,11 @@ export function DocumentsSourceRow({
               <button type="button" className="dh-doc-open" title={source.name} onClick={primary}>
                 {source.name}
               </button>
+              {origin && (
+                <span className="dh-doc-subpath" title={origin}>
+                  {origin}
+                </span>
+              )}
             </div>
           </Cell>
         )
@@ -101,7 +107,7 @@ export function DocumentsSourceRow({
         // a file of another module cannot be selected
         return <Cell key={col} col={col} />
       default:
-        // Truy cập and any screen column: nothing to say about a source file
+        // any screen column (Truy cập is not listed on this page): nothing to say about a source file
         return (
           <Cell key={col} col={col}>
             <Empty />

@@ -81,3 +81,9 @@
 .uw-pick-row.dh-pick-row.archived > .dh-pick-name > :not(.uw-pick-row-text) {
   opacity: 0.6;
 }
+
+/* V-STATES F-08: the second line under a picker row's name is --text-secondary, not --text-muted:
+   on the dark hover / keyboard fill (--hover) muted was 4.17:1, secondary is above 4.5:1 */
+.dh-picker .uw-pick-row-meta {
+  color: var(--text-secondary);
+}

@@ -176,12 +176,7 @@ describe('DocumentsHome: the states of the lists', () => {
 
   describe('F-03: Starred error states', () => {
     it.each([
-      [
-        'en',
-        'Starred is not available on this server yet',
-        /server .*(update|upgrade)/i,
-        'Try again',
-      ],
+      ['en', 'Starred is not available on this server yet', /server .*(update|upgrade)/i, 'Retry'],
       ['vi', 'Gắn sao chưa dùng được trên máy chủ này', /máy chủ .*cập nhật/i, 'Thử lại'],
     ] as const)(
       '%s: favorites 404 is "Starred is not available" with an icon, a reason and Retry, never the document-not-found line',
@@ -209,9 +204,12 @@ describe('DocumentsHome: the states of the lists', () => {
       await mount('starred')
       expect(api.uniworkListFavorites).toHaveBeenCalledTimes(1)
       favorites = async () =>
-        ok({ documents: [doc({ id: 'a', favoritedAt: iso(2026, 10, 20, 8, 0) })], nextCursor: null })
+        ok({
+          documents: [doc({ id: 'a', favoritedAt: iso(2026, 10, 20, 8, 0) })],
+          nextCursor: null,
+        })
       const button = Array.from(stateOf()!.querySelectorAll('button')).find(
-        (b) => b.textContent === 'Try again',
+        (b) => b.textContent === 'Retry',
       )
       await click(button)
       expect(api.uniworkListFavorites).toHaveBeenCalledTimes(2)
@@ -232,7 +230,7 @@ describe('DocumentsHome: the states of the lists', () => {
         )
         expect(state!.querySelector('.dl-state-title')?.textContent).toMatch(/\S/)
         expect(
-          Array.from(state!.querySelectorAll('button')).some((b) => b.textContent === 'Try again'),
+          Array.from(state!.querySelectorAll('button')).some((b) => b.textContent === 'Retry'),
         ).toBe(true)
       },
     )
@@ -367,7 +365,9 @@ describe('DocumentsHome: the states of the lists', () => {
         resolve(__dirname, '../src/renderer/src/doclist/doclist-state.css'),
         'utf8',
       )
-      expect(css).toMatch(/\.dh-search-input::-webkit-search-cancel-button\s*\{[^}]*display:\s*none/)
+      expect(css).toMatch(
+        /\.dh-search-input::-webkit-search-cancel-button\s*\{[^}]*display:\s*none/,
+      )
     })
   })
 

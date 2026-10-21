@@ -86,7 +86,6 @@ import {
   getDocumentsHomeNavEntry,
   docMatchesUpdated,
   hasActiveFilters,
-  mergeNewestFirst,
   rowMatchesType,
   sourceAuthorsOf,
   sourceMatchesFilters,
@@ -130,6 +129,7 @@ import { screenOfSubView, specialPresent, wireSortOf } from '../doclist/table-mo
 import { RecentSegmentControl, useRecentSegment } from '../doclist/RecentSegment'
 import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
+import { ListState } from '../doclist/ListState'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
 import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
@@ -731,19 +731,11 @@ export function DocumentsHome({
       })
   }, [workspaceId, subView, folderId, resolvedMyFolderId, wireFilters, wireSort, query, listTick])
 
-  // UNI-1961: as on the web, the sources merge only at the workspace root (no
-  // folder, no search); a failed sources read (an older server's 404/501 or any
-  // other) leaves the documents as they are
-  const rootSourcesWanted =
-    subView === 'workspace' &&
-    folderId === null &&
-    query.length === 0 &&
-    // UniNote is no file: the other-source list has nothing to show under it
-    filters.format !== 'page'
-  // UNI-2047 B4: the Từ nơi khác page lists the same rows on their own (a search lists the
+  // UNI-2047 B4 / V-STATES F-14: the files other modules sent (chat, tasks, meetings, email) are
+  // listed on the Từ nơi khác page only, never merged into the workspace root (a search lists the
   // workspace hits, as on every screen)
   const elsewhereView = subView === 'elsewhere' && query.length === 0
-  const sourcesWanted = rootSourcesWanted || elsewhereView
+  const sourcesWanted = elsewhereView
   const sourcesSeqRef = useRef(0)
   useEffect(() => {
     const seq = ++sourcesSeqRef.current
@@ -787,9 +779,8 @@ export function DocumentsHome({
         })
       })
   }, [workspaceId, sourcesWanted, wireFilters, listTick])
-  const sourcesMerged = rootSourcesWanted && sources.items.length > 0
-  // the source rows have a next page to ask for: merged into the root, or the whole page
-  const sourcesPaged = sourcesMerged || elsewhereView
+  // the source rows have a next page to ask for on their own page
+  const sourcesPaged = elsewhereView
 
   const loadMoreSources = () => {
     const cursor = sources.nextCursor
@@ -1312,6 +1303,7 @@ export function DocumentsHome({
       : page.status === 'error'
         ? (page.error ?? 'server_error')
         : null
+  const starredUnavailable = starredView && listError === 'not_found'
   const [shelvedBy, setShelvedBy] = useState<string | null>(null)
   useEffect(() => {
     setShelvedBy(null)
@@ -1720,9 +1712,8 @@ export function DocumentsHome({
     return { folders: myFolderFirst(ordered), files: split.files }
   }, [page.items, folderOrder, folderDesc, dateLocale])
 
-  // UNI-1961: the table's rows; at the root the source files join the documents
-  // newest first under the web's paging cutoff, and the home filters the server
-  // could not apply to them run here (the web's merge, use-documents-library.ts).
+  // UNI-1961: the table's rows: the documents, or on Từ nơi khác the source files, where the home
+  // filters the server could not apply to them run here (the web's use-documents-library.ts).
   // The table orders them itself (UNI-2047: header sort); the shelf lists folders as rows too.
   const tableRows = useMemo<DocumentsHomeTableRow[]>(() => {
     // the type chips the server cannot apply (UniNote, .txt on source files) and, on the shelf,
@@ -1752,28 +1743,14 @@ export function DocumentsHome({
           .map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
       )
     }
-    if (!sourcesMerged) {
-      return typed(files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })))
-    }
-    return typed(
-      mergeNewestFirst(page.items, sources.items, {
-        docs: page.nextCursor !== null,
-        sources: sources.nextCursor !== null,
-      }).filter((row) =>
-        row.type === 'source'
-          ? sourceMatchesFilters(row.source, wireFilters)
-          : row.doc.kind !== 'folder',
-      ),
-    )
+    return typed(files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })))
   }, [
     shelfView,
     starredView,
     elsewhereView,
     shelvedBy,
-    sourcesMerged,
     files,
     page.items,
-    page.nextCursor,
     sources,
     wireFilters,
     filters.format,
@@ -1836,7 +1813,8 @@ export function DocumentsHome({
         return folderId ? 'uhEmptyFolder' : 'uhEmptyWorkspace'
     }
   }, [query, filters, subView, folderId, recentSegment])
-  const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : t('ufNoResults', { query })
+  // a search has its own empty state (ListState); every other list says what it lacks
+  const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : ''
 
   const treeSelectedKey = useMemo(() => {
     if (sidebarIdle) return '\u0000none'
@@ -2259,18 +2237,21 @@ export function DocumentsHome({
         )}
 
         {listError && (
-          <div className="uw-pick-state" role="alert">
-            <p className="uw-pick-state-title">{t(UNIWORK_ERROR_KEYS[listError])}</p>
-            {errorActionOf(listError) === 'retry' && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setListTick((n) => n + 1)}
-              >
-                {t('acctRetry')}
-              </button>
-            )}
-          </div>
+          <ListState
+            kind="error"
+            // V-STATES F-03: an older server has no favorites route (404): Starred says so, it is
+            // not the "document no longer exists" line, and Thử lại asks again
+            glyph={starredUnavailable ? 'star' : 'error'}
+            title={
+              starredUnavailable ? t('dlStarredUnavailableTitle') : t(UNIWORK_ERROR_KEYS[listError])
+            }
+            hint={starredUnavailable ? t('dlStarredUnavailableHint') : undefined}
+            action={
+              starredView || errorActionOf(listError) === 'retry'
+                ? { label: t('acctRetry'), onClick: () => setListTick((n) => n + 1) }
+                : undefined
+            }
+          />
         )}
 
         {pageShown && (
@@ -2372,6 +2353,14 @@ export function DocumentsHome({
                         : t('uhShelvedEmptyDesc')}
                     </p>
                   </div>
+                ) : // V-STATES F-09: a search with no hit is the shared empty state with Xóa tìm kiếm
+                query.length > 0 ? (
+                  <ListState
+                    kind="empty"
+                    glyph="search"
+                    title={t('dlSearchNoResults', { query })}
+                    action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
+                  />
                 ) : (
                   <div className="dh-empty" role="status">
                     {emptyMessage}

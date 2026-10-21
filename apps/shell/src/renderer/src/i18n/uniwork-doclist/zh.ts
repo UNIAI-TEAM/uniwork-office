@@ -86,4 +86,9 @@ export const zh = {
   dlBulkConfirmTitleOther: '将 {n} 个文档移到回收站？',
   dlBulkConfirmBody: '项目会在回收站保留 30 天，之后永久删除。',
   dlTrashBanner30: '项目会在回收站保留 30 天，之后永久删除。',
+  dlStarredUnavailableTitle: '此服务器暂不支持星标',
+  dlStarredUnavailableHint:
+    '你的 UniWork 服务器需要更新后才能保存加星标的文档。请联系管理员更新，然后重试。',
+  dlSourceSentIn: '发送于{origin}',
+  dlSearchNoResults: '没有找到“{query}”的结果',
 }
