@@ -911,7 +911,6 @@ function AiModelPane({
                       <span
                         className="set-org-key-tag"
                         data-org-key-tag=""
-                        title={pickerStrings.orgKeyNote}
                         data-tip={pickerStrings.orgKeyNote}
                       >
                         {pickerStrings.orgKeyTag}

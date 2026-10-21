@@ -20,7 +20,6 @@ import type {
   UniworkCreateDocInput,
   UniworkCreatePageInput,
   UniworkCreateFolderInput,
-  UniworkCreateVisibility,
   UniworkDocAccess,
   UniworkDocActionError,
   UniworkDocActionResult,
@@ -820,16 +819,6 @@ async function readFileRange(
   } finally {
     await handle.close().catch(() => undefined)
   }
-}
-
-/**
- * UNI-1959: the one `visibility` a create may send. Only `workspace` ("Share
- * with workspace") goes out; anything else a hand-typed invoke carries is
- * dropped, so a private create and a create inside a shared folder (which the
- * server inherits) send no field at all.
- */
-function visibilityOf(input: { visibility?: unknown }): { visibility?: UniworkCreateVisibility } {
-  return input.visibility === 'workspace' ? { visibility: 'workspace' } : {}
 }
 
 /**
@@ -4995,7 +4984,6 @@ export class UniworkDocsService {
           format: input.format,
           title: name,
           ...target.create,
-          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
         // UNI-1959: a default-named blank (the menu / strip) is never saved yet - its
@@ -5027,7 +5015,6 @@ export class UniworkDocsService {
           workspaceId: target.workspaceId,
           title: name,
           ...target.create,
-          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
         this.pushTreeChangedFor(session, target.workspaceId)

@@ -359,6 +359,7 @@ import { WordCountDialog, type DocStats } from './components/WordCountDialog'
 import { AutoCorrectDialog } from './components/AutoCorrectDialog'
 import { PreferencesDialog } from './components/PreferencesDialog'
 import { applyCase, nextCaseMode, selectionText } from './editor/case-transform'
+import { toggleHiddenText } from './editor/hidden-text'
 import { stepHangingIndent, stepParagraphIndent } from './editor/indent'
 import { AppOnlyDialog } from './components/AppOnlyDialog'
 import { PasswordDialog } from './components/PasswordDialog'
@@ -506,6 +507,7 @@ const APP_SHORTCUTS = [
   'open',
   'print-preview',
   'find',
+  'find-next',
   'replace',
   'goto',
   'shortcuts',
@@ -520,6 +522,7 @@ const APP_SHORTCUTS = [
   'change-case',
   'all-caps',
   'small-caps',
+  'hidden-text',
   'clear-formatting',
   'align-left',
   'align-center',
@@ -1055,6 +1058,7 @@ export function App() {
   const [findFocusInput, setFindFocusInput] = useState(0)
   const [findFocusReplace, setFindFocusReplace] = useState(0)
   const [findFocusGoTo, setFindFocusGoTo] = useState(0)
+  const [findNext, setFindNext] = useState(0)
   // last pagination pass, read by the Go To tab (page / section / line targets)
   const pageLayoutRef = useRef<PageLayout | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -5638,6 +5642,10 @@ export function App() {
           openFind(setFindFocusInput)
           return true
         },
+        // Word's Shift+F4: the open panel steps to its next match; with it closed there is no
+        // query to repeat, so the key opens Find
+        'find-next': () =>
+          ifDoc(() => (showFind ? setFindNext((n) => n + 1) : openFind(setFindFocusInput))),
         replace: () => {
           openFind(setFindFocusReplace)
           return true
@@ -5660,6 +5668,7 @@ export function App() {
         'change-case': () => onTarget((ed) => applyCase(ed, nextCaseMode(selectionText(ed)))),
         'all-caps': () => toggleStyle('caps', 'all'),
         'small-caps': () => toggleStyle('caps', 'small'),
+        'hidden-text': () => onTarget(toggleHiddenText),
         'clear-formatting': () => onTarget((ed) => ed.chain().focus().unsetAllMarks().run()),
         'align-left': () => onTarget((ed) => setSelectionAlign(ed, 'left')),
         'align-center': () => onTarget((ed) => setSelectionAlign(ed, 'center')),
@@ -5716,6 +5725,7 @@ export function App() {
     runAiProofread,
     trackChangesForced,
     printDoc,
+    showFind,
   ])
 
   // double-click an inline equation / click an equation block's edit button (ones with LaTeX source) → reopen the equation dialog for editing
@@ -7374,6 +7384,7 @@ export function App() {
                 focusFindNonce={findFocusInput}
                 focusReplaceNonce={findFocusReplace}
                 focusGoToNonce={findFocusGoTo}
+                findNextNonce={findNext}
                 layout={() => pageLayoutRef.current}
               />
             )}

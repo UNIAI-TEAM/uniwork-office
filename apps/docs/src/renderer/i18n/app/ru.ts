@@ -26,6 +26,7 @@ export const ru = {
   appScLineBreak: 'Разрыв строки',
   appScNbsp: 'Неразрывный пробел',
   appScNbHyphen: 'Неразрывный дефис',
+  appScFindNext: 'Найти далее',
   appScOptHyphen: 'Мягкий перенос',
   appScGrowFont1: 'Увеличить шрифт на 1 пт',
   appScShrinkFont1: 'Уменьшить шрифт на 1 пт',

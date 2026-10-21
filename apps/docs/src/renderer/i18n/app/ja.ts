@@ -26,6 +26,7 @@ export const ja = {
   appScLineBreak: '改行',
   appScNbsp: '改行しないスペース',
   appScNbHyphen: '改行しないハイフン',
+  appScFindNext: '次を検索',
   appScOptHyphen: '任意指定のハイフン',
   appScGrowFont1: 'フォントサイズを 1 pt 拡大',
   appScShrinkFont1: 'フォントサイズを 1 pt 縮小',

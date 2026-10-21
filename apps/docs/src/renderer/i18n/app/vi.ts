@@ -26,6 +26,7 @@ export const vi = {
   appScLineBreak: 'Ngắt dòng',
   appScNbsp: 'Khoảng trắng không ngắt',
   appScNbHyphen: 'Dấu gạch nối không ngắt',
+  appScFindNext: 'Tìm tiếp',
   appScOptHyphen: 'Dấu gạch nối tùy chọn',
   appScGrowFont1: 'Tăng cỡ chữ 1 pt',
   appScShrinkFont1: 'Giảm cỡ chữ 1 pt',

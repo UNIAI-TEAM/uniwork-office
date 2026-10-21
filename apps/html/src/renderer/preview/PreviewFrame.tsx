@@ -16,6 +16,8 @@ function randomKey(): string {
 
 export interface PreviewFrameHandle {
   post(msg: ToInspector): void
+  /** the iframe element holds the host's focus: a real keystroke inside the page, not a forged message */
+  hasFocus(): boolean
 }
 
 interface Props {
@@ -57,7 +59,8 @@ interface Props {
  * Web frame, static (cap 'htmlPreviewScripts' off, or preview.html never answered): the bridge
  * hands over a copy without scripts, handlers or remote loads (`onStaticPreview`), shown through
  * srcdoc in a frame with an empty sandbox (no scripts, no same-origin, no forms, no popups) and
- * `credentialless`. No inspector runs there.
+ * `credentialless`. No inspector runs there, so keys pressed while focus is inside it (Ctrl+F1, F12,
+ * ...) never reach the app: a known gap of the static preview, not covered by the key relay.
  *
  * Every inspector message goes through the strict parser (inspector-validate.ts): the page's
  * own scripts share the inspector's realm and can forge anything it sends.
@@ -159,6 +162,7 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
       if (portMode) channelRef.current?.post(msg)
       else frameRef.current?.contentWindow?.postMessage(msg, '*')
     },
+    hasFocus: () => !!frameRef.current && document.activeElement === frameRef.current,
   }))
 
   return (

@@ -26,6 +26,7 @@ export const he = {
   appScLineBreak: 'מעבר שורה',
   appScNbsp: 'רווח בלתי מפריד',
   appScNbHyphen: 'מקף בלתי מפריד',
+  appScFindNext: 'חפש הבא',
   appScOptHyphen: 'מקף אופציונלי',
   appScGrowFont1: 'הגדל גופן בנקודה אחת',
   appScShrinkFont1: 'הקטן גופן בנקודה אחת',

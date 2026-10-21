@@ -83,6 +83,12 @@ const DELETED_WIDTH = 160
 export const BUTTON_ACTIONS_WIDTH = 176
 export const hasButtonActions = (screen: DocListScreen): boolean =>
   screen === 'shelved' || screen === 'trash'
+/**
+ * RV-3: Từ nơi khác draws neither Chọn (a source file of another module cannot be selected) nor
+ * Truy cập (it has no access level), so its ladder budgets neither.
+ */
+const hasSelectColumn = (screen: DocListScreen): boolean => screen !== 'elsewhere'
+const hasAccessColumn = (screen: DocListScreen): boolean => screen !== 'elsewhere'
 /** the table's 1px borders, both sides */
 const BORDER = 2
 /** the room Tên keeps before a column joins */
@@ -101,9 +107,11 @@ const rem = (px: number): number => Math.ceil(px / REM) * REM
 function rungsOf(
   special: number,
   actions: number,
+  screen?: DocListScreen,
 ): Record<(typeof NARROW_HIDING_ORDER)[number], number> {
-  const base = WIDTH.select + WIDTH.updated + actions + special + BORDER + NAME_FLOOR
-  const access = base + WIDTH.access
+  const select = screen && !hasSelectColumn(screen) ? 0 : WIDTH.select
+  const base = select + WIDTH.updated + actions + special + BORDER + NAME_FLOOR
+  const access = screen && !hasAccessColumn(screen) ? base : base + WIDTH.access
   const editor = access + WIDTH.editor
   return { access: rem(access), editor: rem(editor), size: rem(editor + WIDTH.size) }
 }
@@ -120,7 +128,7 @@ function rungsFor(
 ): Record<(typeof NARROW_HIDING_ORDER)[number], number> {
   if (screen === 'trash') return rungsOf(DELETED_WIDTH, BUTTON_ACTIONS_WIDTH)
   if (screen === 'shelved') return rungsOf(WIDTH.special, BUTTON_ACTIONS_WIDTH)
-  return rungsOf(SPECIAL[screen] ? WIDTH.special : 0, WIDTH.actions + actionsExtra)
+  return rungsOf(SPECIAL[screen] ? WIDTH.special : 0, WIDTH.actions + actionsExtra, screen)
 }
 /** the device list has only Dung lượng to hide */
 const DEVICE_SIZE_RUNG = 40 * REM
@@ -145,10 +153,10 @@ export function columnsFor(screen: DocListScreen, width?: number, actionsExtra =
   const rungs = rungsFor(screen, actionsExtra)
   return [
     // a source file of another module cannot be selected: its page has no Chọn column
-    ...(screen === 'elsewhere' ? [] : (['select'] as const)),
+    ...(hasSelectColumn(screen) ? (['select'] as const) : []),
     'name',
     ...(special ? [special] : []),
-    ...(w >= rungs.access ? (['access'] as const) : []),
+    ...(hasAccessColumn(screen) && w >= rungs.access ? (['access'] as const) : []),
     ...(w >= rungs.editor ? (['editor'] as const) : []),
     'updated',
     ...(w >= rungs.size ? (['size'] as const) : []),
@@ -177,7 +185,8 @@ const usable = (width?: number): width is number =>
 export function isCompact(screen: DocListScreen, width?: number, actionsExtra = 0): boolean {
   if (!usable(width)) return false
   const actions = hasButtonActions(screen) ? BUTTON_ACTIONS_WIDTH : WIDTH.actions + actionsExtra
-  return width < rem(WIDTH.select + NAME_FLOOR + WIDTH.updated + actions + BORDER)
+  const select = hasSelectColumn(screen) ? WIDTH.select : 0
+  return width < rem(select + NAME_FLOOR + WIDTH.updated + actions + BORDER)
 }
 
 /** the columns of `columnsFor`, less what the table's own width cannot hold below the ladder */
@@ -192,7 +201,12 @@ export function fitColumns(
   const specialWidth = screen === 'trash' ? DELETED_WIDTH : WIDTH.special
   const actions = hasButtonActions(screen) ? BUTTON_ACTIONS_WIDTH : WIDTH.actions + actionsExtra
   const specialRung = rem(
-    WIDTH.select + NAME_FLOOR + WIDTH.updated + actions + specialWidth + BORDER,
+    (hasSelectColumn(screen) ? WIDTH.select : 0) +
+      NAME_FLOOR +
+      WIDTH.updated +
+      actions +
+      specialWidth +
+      BORDER,
   )
   const compact = isCompact(screen, width, actionsExtra)
   return columns.filter(

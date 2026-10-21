@@ -26,6 +26,7 @@ export const ms = {
   appScLineBreak: 'Pemisah Baris',
   appScNbsp: 'Ruang Tak Putus',
   appScNbHyphen: 'Sengkang Tak Putus',
+  appScFindNext: 'Cari Seterusnya',
   appScOptHyphen: 'Sengkang Pilihan',
   appScGrowFont1: 'Besarkan Fon 1 pt',
   appScShrinkFont1: 'Kecilkan Fon 1 pt',

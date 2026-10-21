@@ -26,6 +26,7 @@ export const cs = {
   appScLineBreak: 'Zalomení řádku',
   appScNbsp: 'Pevná mezera',
   appScNbHyphen: 'Pevná pomlčka',
+  appScFindNext: 'Najít další',
   appScOptHyphen: 'Volitelné rozdělení',
   appScGrowFont1: 'Zvětšit písmo o 1 b.',
   appScShrinkFont1: 'Zmenšit písmo o 1 b.',

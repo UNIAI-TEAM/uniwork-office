@@ -60,6 +60,8 @@ interface FindPanelProps {
   focusReplaceNonce?: number
   /** Go To shortcut / menu: switch to the Go To tab */
   focusGoToNonce?: number
+  /** Shift+F4 bumps this to step to the next match while the panel is open */
+  findNextNonce?: number
   /** last pagination pass, for page / section / line targets */
   layout?: () => PageLayout | null
 }
@@ -116,6 +118,7 @@ export function FindPanel({
   focusFindNonce,
   focusReplaceNonce,
   focusGoToNonce,
+  findNextNonce,
   layout,
 }: FindPanelProps) {
   const { t } = useI18n()
@@ -348,6 +351,16 @@ export function FindPanel({
     },
     [flushPending, query, goTo],
   )
+
+  // Shift+F4 while the panel is open: the same step as Enter in the find field. A nonce the
+  // panel was mounted with is already spent (the key opened it instead of stepping).
+  const seenFindNext = useRef(findNextNonce ?? 0)
+  useEffect(() => {
+    if (!findNextNonce || findNextNonce === seenFindNext.current) return
+    seenFindNext.current = findNextNonce
+    setTab((cur) => (cur === 'goto' ? 'find' : cur))
+    step(1)
+  }, [findNextNonce, step])
 
   /** insert the replacement, splitting the block wherever the template had a paragraph mark */
   const applyReplacement = useCallback(

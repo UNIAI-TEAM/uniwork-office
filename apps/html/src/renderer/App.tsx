@@ -19,7 +19,13 @@ import {
 } from '@genoffice/electron-utils/headless-export'
 import { useI18n } from './i18n/locale'
 import { cap, platform } from './capabilities'
-import { htmlWindowCommand, type HtmlShortcutCommand } from './shortcuts'
+import {
+  createHtmlFrameKeyReplay,
+  hostHasUserActivation,
+  htmlFrameKeyClaims,
+  htmlWindowCommand,
+  type HtmlShortcutCommand,
+} from './shortcuts'
 import { LinkPopover } from './components/LinkPopover'
 import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { useNarrowFrame } from './narrow-frame'
@@ -745,6 +751,7 @@ export default function App() {
 
   // runPrint is declared further down; the inspector's relayed mod+P reaches it through this ref
   const runPrintRef = useRef<() => Promise<boolean>>(async () => false)
+  const frameKeyReplayRef = useRef(createHtmlFrameKeyReplay())
   const onInspectorMessage = useCallback(
     (msg: FromInspector) => {
       // a click that lands while the frame is reloading carries sids from the previous copy
@@ -758,6 +765,7 @@ export default function App() {
           msg.type === 'gx:scroll' ||
           msg.type === 'gx:zoom' ||
           msg.type === 'gx:navigateBlocked' ||
+          msg.type === 'gx:keyEvent' ||
           (msg.type === 'gx:keyCommand' && READ_ONLY_FRAME_KEYS.has(msg.command))
         )
       )
@@ -772,6 +780,7 @@ export default function App() {
             type: 'gx:printKey',
             claim: !!window.htmlApi.connectPreview && cap('print'),
           })
+          previewRef.current?.post({ type: 'gx:keyClaims', claims: htmlFrameKeyClaims() })
           // an edit reloaded the page under the reader: put it back where it was before selecting
           if (frameScrollRef.current !== null)
             previewRef.current?.post({ type: 'gx:scrollTo', y: frameScrollRef.current })
@@ -875,6 +884,18 @@ export default function App() {
         case 'gx:zoom':
           if (canvasModeRef.current !== 'present') setZoom((z) => clampZoom(z - msg.delta * 0.6))
           return
+        case 'gx:keyEvent': {
+          // focus is inside the frame: replay the table's app-level keys on the window; a page can
+          // forge this message, so it needs the frame to hold focus, a real key's user activation on the
+          // host, and Save / Save As are rate-limited (shortcuts.ts)
+          const replay = frameKeyReplayRef.current(msg, {
+            frameFocused: !!previewRef.current?.hasFocus(),
+            userActive: hostHasUserActivation(),
+            saving: savingRef.current,
+          })
+          if (replay) window.dispatchEvent(replay)
+          return
+        }
         case 'gx:keyCommand': {
           if (msg.command === 'print') {
             void runPrintRef.current()
