@@ -194,6 +194,7 @@ export const ru = {
   fuRefUnknownFiles: 'Эти файлы превышают ограничения загрузки.',
   fuBarPreparing: 'Подготовка «{name}»…',
   fuBarPreparingFiles: 'Подготовка загрузки…',
+  fuBarWaiting: 'Выполняются другие загрузки — ожидание начала…',
   fuBarRunning: 'Загрузка «{name}» — {done}/{total} файлов',
   fuBarRunningFiles: 'Загрузка — {done}/{total} файлов',
   fuBarCancelAll: 'Отменить всё',

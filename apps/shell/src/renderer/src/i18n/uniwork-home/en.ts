@@ -193,6 +193,7 @@ export const en = {
   fuRefUnknownFiles: 'These files are over the upload limits.',
   fuBarPreparing: 'Preparing “{name}”…',
   fuBarPreparingFiles: 'Preparing the upload…',
+  fuBarWaiting: 'Other uploads are running — waiting to start…',
   fuBarRunning: 'Uploading “{name}” — {done}/{total} files',
   fuBarRunningFiles: 'Uploading — {done}/{total} files',
   fuBarCancelAll: 'Cancel all',

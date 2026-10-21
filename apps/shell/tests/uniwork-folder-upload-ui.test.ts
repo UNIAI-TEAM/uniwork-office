@@ -526,6 +526,25 @@ describe('folder / multi-file upload screens', () => {
       expect(bars()[0]!.textContent).toContain('Đang tải lên — 3/12 tệp')
     })
 
+    it('FU-V6: a run held for a busy server says it is waiting, then goes back to preparing (vi + en)', async () => {
+      await mount()
+      await start()
+      await act(async () => bridge.emit(progressOf({ phase: 'waiting', done: 0 })))
+      expect(bars()[0]!.textContent).toContain('Đang có lượt tải lên khác chạy')
+      expect(bars()[0]!.textContent).not.toContain('Đang chuẩn bị')
+      expect(bars()[0]!.querySelector('button')?.textContent).toBe('Hủy tất cả')
+      await act(async () => bridge.emit(progressOf({ phase: 'planning', done: 0 })))
+      expect(bars()[0]!.textContent).toContain('Đang chuẩn bị')
+    })
+
+    it('FU-V6: en wording', async () => {
+      await mount('en')
+      await stage(preflightOf())
+      await click(buttonNamed('Upload', dialog()!))
+      await act(async () => bridge.emit(progressOf({ phase: 'waiting', done: 0 })))
+      expect(bars()[0]!.textContent).toContain('Other uploads are running')
+    })
+
     it('FU-V3: the bars sit in the main pane, not over the sidebar, and keep the 380px / 16px rules', async () => {
       const main = document.createElement('div')
       main.className = 'dh-main'

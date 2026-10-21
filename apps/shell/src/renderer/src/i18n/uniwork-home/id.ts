@@ -195,6 +195,7 @@ export const id = {
   fuRefUnknownFiles: 'File ini melebihi batas unggahan.',
   fuBarPreparing: 'Menyiapkan “{name}”…',
   fuBarPreparingFiles: 'Menyiapkan unggahan…',
+  fuBarWaiting: 'Unggahan lain sedang berjalan — menunggu untuk mulai…',
   fuBarRunning: 'Mengunggah “{name}” — {done}/{total} file',
   fuBarRunningFiles: 'Mengunggah — {done}/{total} file',
   fuBarCancelAll: 'Batalkan semua',

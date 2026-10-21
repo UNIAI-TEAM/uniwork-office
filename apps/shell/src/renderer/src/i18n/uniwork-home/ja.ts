@@ -198,6 +198,7 @@ export const ja = {
   fuRefUnknownFiles: 'これらのファイルはアップロードの上限を超えています。',
   fuBarPreparing: '「{name}」を準備しています…',
   fuBarPreparingFiles: 'アップロードを準備しています…',
+  fuBarWaiting: '他のアップロードが実行中です。開始を待っています…',
   fuBarRunning: '「{name}」をアップロード中 — {done}/{total} 件のファイル',
   fuBarRunningFiles: 'アップロード中 — {done}/{total} 件のファイル',
   fuBarCancelAll: 'すべてキャンセル',

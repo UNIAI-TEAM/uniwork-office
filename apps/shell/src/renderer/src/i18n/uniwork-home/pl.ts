@@ -197,6 +197,7 @@ export const pl = {
   fuRefUnknownFiles: 'Te pliki przekraczają limity przesyłania.',
   fuBarPreparing: 'Przygotowywanie „{name}”…',
   fuBarPreparingFiles: 'Przygotowywanie przesyłania…',
+  fuBarWaiting: 'Trwają inne przesyłania — oczekiwanie na rozpoczęcie…',
   fuBarRunning: 'Przesyłanie „{name}” — {done}/{total} plików',
   fuBarRunningFiles: 'Przesyłanie — {done}/{total} plików',
   fuBarCancelAll: 'Anuluj wszystko',

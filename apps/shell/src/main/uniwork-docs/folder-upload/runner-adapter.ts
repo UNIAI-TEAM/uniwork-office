@@ -110,7 +110,8 @@ export function createFolderUploadRunnerAdapter(deps: RunnerAdapterDeps): Folder
     run.failed = progress.failed + run.refused.length
     run.sentBytes = progress.sentBytes
     let phase: FolderUploadRunProgress['phase']
-    if (progress.phase === 'planning' || progress.phase === 'waiting') phase = 'planning'
+    if (progress.phase === 'planning') phase = 'planning'
+    else if (progress.phase === 'waiting') phase = 'waiting'
     else if (progress.phase === 'uploading' || progress.phase === 'retrying') {
       const left = progress.total - progress.done - progress.failed
       phase = progress.stored > 0 && progress.stored === left ? 'finishing' : 'uploading'

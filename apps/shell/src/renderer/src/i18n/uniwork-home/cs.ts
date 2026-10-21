@@ -195,6 +195,7 @@ export const cs = {
   fuRefUnknownFiles: 'Tyto soubory překračují limity nahrávání.',
   fuBarPreparing: 'Připravuje se „{name}“…',
   fuBarPreparingFiles: 'Připravuje se nahrávání…',
+  fuBarWaiting: 'Probíhají jiná nahrávání — čeká se na zahájení…',
   fuBarRunning: 'Nahrává se „{name}“ — {done}/{total} souborů',
   fuBarRunningFiles: 'Nahrává se — {done}/{total} souborů',
   fuBarCancelAll: 'Zrušit vše',

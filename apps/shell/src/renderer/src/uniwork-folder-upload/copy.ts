@@ -144,6 +144,8 @@ const FAILURE_REASON_KEYS: Record<string, StringKey> = {
   upload_session_busy: 'fuRepSessionBusy',
   unreadable: 'fuRepUnreadable',
   session: 'fuRepSession',
+  // the same sentence the single-file upload gives for a type no editor opens
+  unsupported_format: 'uwErrUnsupportedFormat',
 }
 
 /** One sentence per failure code; any `http_5nn` is the server-down sentence, a code this build does not know is the plain one */

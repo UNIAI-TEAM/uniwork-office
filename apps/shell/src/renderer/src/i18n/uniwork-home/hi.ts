@@ -197,6 +197,7 @@ export const hi = {
   fuRefUnknownFiles: 'ये फ़ाइलें अपलोड की सीमाओं से बड़ी हैं।',
   fuBarPreparing: '“{name}” तैयार हो रहा है…',
   fuBarPreparingFiles: 'अपलोड तैयार हो रहा है…',
+  fuBarWaiting: 'अन्य अपलोड चल रहे हैं — शुरू होने की प्रतीक्षा है…',
   fuBarRunning: '“{name}” अपलोड हो रहा है — {done}/{total} फ़ाइलें',
   fuBarRunningFiles: 'अपलोड हो रहा है — {done}/{total} फ़ाइलें',
   fuBarCancelAll: 'सब रद्द करें',

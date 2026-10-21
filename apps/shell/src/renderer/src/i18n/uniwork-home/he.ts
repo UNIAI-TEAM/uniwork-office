@@ -192,6 +192,7 @@ export const he = {
   fuRefUnknownFiles: 'הקבצים האלה חורגים ממגבלות ההעלאה.',
   fuBarPreparing: 'מכין את “{name}”…',
   fuBarPreparingFiles: 'מכין את ההעלאה…',
+  fuBarWaiting: 'העלאות אחרות פועלות — ממתין להתחלה…',
   fuBarRunning: 'מעלה את “{name}” — {done}/{total} קבצים',
   fuBarRunningFiles: 'מעלה — {done}/{total} קבצים',
   fuBarCancelAll: 'ביטול הכול',

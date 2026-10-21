@@ -196,6 +196,7 @@ export const nl = {
   fuRefUnknownFiles: 'Deze bestanden overschrijden de uploadlimieten.',
   fuBarPreparing: '“{name}” voorbereiden…',
   fuBarPreparingFiles: 'Upload voorbereiden…',
+  fuBarWaiting: 'Andere uploads lopen — wachten om te starten…',
   fuBarRunning: '“{name}” uploaden — {done}/{total} bestanden',
   fuBarRunningFiles: 'Uploaden — {done}/{total} bestanden',
   fuBarCancelAll: 'Alles annuleren',

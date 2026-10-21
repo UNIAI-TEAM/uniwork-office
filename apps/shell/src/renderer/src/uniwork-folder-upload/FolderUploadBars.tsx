@@ -47,6 +47,15 @@ function view(
         cancelable: true,
         clock: null,
       }
+    case 'waiting':
+      return {
+        tone: 'progress',
+        text: t('fuBarWaiting'),
+        percent: null,
+        action: null,
+        cancelable: true,
+        clock: null,
+      }
     case 'uploading':
     case 'finishing':
       return {

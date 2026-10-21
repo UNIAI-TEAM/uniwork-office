@@ -462,6 +462,23 @@ describe('whole-run errors', () => {
     expect((await settled(h)).phase).toBe('done')
   })
 
+  it('FU-V6: the run says it is waiting while a busy server holds it for Retry-After', async () => {
+    const h = setup()
+    h.transport.failNext(
+      'plan',
+      folderUploadApiError(429, 'folder_uploads_busy', { retry_after: 0 }),
+    )
+    file('Docs/a.docx')
+    startRun(h, await pickFolder(h))
+    expect((await settled(h)).phase).toBe('done')
+    const phases = h.events.map((e) => e.phase)
+    expect(phases).toContain('waiting')
+    // it goes back to planning once the wait is over, never straight to uploading
+    expect(phases.indexOf('planning', phases.indexOf('waiting'))).toBeGreaterThan(
+      phases.indexOf('waiting'),
+    )
+  })
+
   it('a refused plan fails the run with the server code', async () => {
     const h = setup()
     h.transport.failNext(

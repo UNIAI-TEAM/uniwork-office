@@ -198,6 +198,7 @@ export const es = {
   fuRefUnknownFiles: 'Estos archivos superan los límites de subida.',
   fuBarPreparing: 'Preparando «{name}»…',
   fuBarPreparingFiles: 'Preparando la subida…',
+  fuBarWaiting: 'Hay otras cargas en curso — esperando para empezar…',
   fuBarRunning: 'Subiendo «{name}» — {done}/{total} archivos',
   fuBarRunningFiles: 'Subiendo — {done}/{total} archivos',
   fuBarCancelAll: 'Cancelar todo',

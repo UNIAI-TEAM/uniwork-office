@@ -191,6 +191,7 @@ export const zh = {
   fuRefUnknownFiles: '这些文件超出上传限制。',
   fuBarPreparing: '正在准备“{name}”…',
   fuBarPreparingFiles: '正在准备上传…',
+  fuBarWaiting: '其他上传正在进行，正在等待开始…',
   fuBarRunning: '正在上传“{name}” — {done}/{total} 个文件',
   fuBarRunningFiles: '正在上传 — {done}/{total} 个文件',
   fuBarCancelAll: '全部取消',

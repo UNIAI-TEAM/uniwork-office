@@ -118,7 +118,8 @@ export type BatchUploadStartResult =
   { ok: true; runId: string } | { ok: false; error: BatchUploadStartError }
 
 export type BatchUploadPhase =
-  'planning' | 'uploading' | 'finishing' | 'done' | 'canceled' | 'failed'
+  /** `waiting`: a busy server holds the run for its Retry-After before it asks again */
+  'planning' | 'waiting' | 'uploading' | 'finishing' | 'done' | 'canceled' | 'failed'
 
 export interface BatchUploadFailure {
   /** relative path, root folder first (files mode: the file name) */

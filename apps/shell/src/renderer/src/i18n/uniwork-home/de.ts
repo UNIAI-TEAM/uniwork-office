@@ -200,6 +200,7 @@ export const de = {
   fuRefUnknownFiles: 'Diese Dateien überschreiten die Upload-Limits.',
   fuBarPreparing: '„{name}“ wird vorbereitet…',
   fuBarPreparingFiles: 'Upload wird vorbereitet…',
+  fuBarWaiting: 'Andere Uploads laufen – Warten auf den Start…',
   fuBarRunning: '„{name}“ wird hochgeladen — {done}/{total} Dateien',
   fuBarRunningFiles: 'Upload läuft — {done}/{total} Dateien',
   fuBarCancelAll: 'Alle abbrechen',

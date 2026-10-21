@@ -47,6 +47,7 @@ const SKIP_REASONS: ReadonlySet<string> = new Set<BatchUploadSkipReason>([
 
 const PHASES: ReadonlySet<string> = new Set<BatchUploadPhase>([
   'planning',
+  'waiting',
   'uploading',
   'finishing',
   'done',
