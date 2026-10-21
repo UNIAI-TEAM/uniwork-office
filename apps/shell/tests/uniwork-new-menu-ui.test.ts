@@ -522,27 +522,33 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
   describe('the Quick create strip', () => {
     it('a pill creates at once, with the default name, no dialog', async () => {
       await mount('vi')
-      await click(host.querySelector('.dh-quick-pill[data-quick-format="md"]'))
+      await click(host.querySelector('.dh-quick-pill[data-quick-format="xlsx"]'))
       expect(api.uniworkCreateDocument.mock.calls[0]![0]).toEqual({
         workspaceId: 'ws-1',
         folderId: 'f-mine',
-        name: 'Markdown chưa đặt tên.md',
-        format: 'md',
+        name: 'Bảng tính chưa đặt tên.xlsx',
+        format: 'xlsx',
       })
       expect(onOpenDocument).toHaveBeenCalledWith(expect.objectContaining({ id: 'new-file' }))
       noDialog()
     })
 
-    it('shows the extension on each pill, and has no Plain text pill (it lives only in the New menu)', async () => {
+    it('has only UniNote, DOCX, XLSX and PPTX pills; Markdown, HTML, PDF and Plain text live in the New menu', async () => {
       await mount('vi')
       const pills = Array.from(host.querySelectorAll<HTMLElement>('.dh-quick-pill'))
-      expect(pills.map((p) => p.getAttribute('data-quick-format'))).toEqual(
-        KINDS.filter((kind) => kind !== 'txt'),
-      )
+      expect(pills.map((p) => p.getAttribute('data-quick-format'))).toEqual([
+        'page',
+        'docx',
+        'xlsx',
+        'pptx',
+      ])
       expect(pills.map((p) => p.querySelector('.dh-quick-ext')?.textContent?.trim())).toEqual(
-        EXTS.filter((ext) => ext !== '.txt'),
+        EXTS.slice(0, 4),
       )
-      expect(host.querySelector('.dh-quick-row [data-quick-format="txt"]')).toBeNull()
+      for (const gone of ['md', 'txt', 'html', 'pdf'])
+        expect(host.querySelector(`.dh-quick-row [data-quick-format="${gone}"]`)).toBeNull()
+      await openMenu()
+      for (const kind of ['md', 'txt', 'html', 'pdf']) expect(row(kind)).not.toBeNull()
     })
 
     it('a UniNote pill creates the page at once and opens it on the web', async () => {
@@ -564,14 +570,14 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
         endpointMissing: true,
       })
       await mount('vi')
-      await click(host.querySelector('.dh-quick-pill[data-quick-format="pdf"]'))
+      await click(host.querySelector('.dh-quick-pill[data-quick-format="pptx"]'))
       expect(
         host
-          .querySelector('.dh-quick-pill[data-quick-format="pdf"]')
+          .querySelector('.dh-quick-pill[data-quick-format="pptx"]')
           ?.getAttribute('aria-disabled'),
       ).toBe('true')
       await openMenu()
-      expect(row('pdf')?.getAttribute('aria-disabled')).toBe('true')
+      expect(row('pptx')?.getAttribute('aria-disabled')).toBe('true')
     })
   })
 
