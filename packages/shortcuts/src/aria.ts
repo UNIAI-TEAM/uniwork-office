@@ -94,6 +94,16 @@ export function containsDisplayChord(text: string): boolean {
   return findDisplayChord(text) !== null
 }
 
+/**
+ * The key hint a visible label carries after its plain name: `'(Esc)'` for the label
+ * `'Exit (Esc)'` and the name `'Exit'`. Empty when the label is not the name plus a hint.
+ * Render the name as the control's text and this as an `aria-hidden` span, so the visible
+ * label stays whole while the accessible name stays plain.
+ */
+export function keyHintAfterName(label: string, name: string): string {
+  return label.startsWith(name) ? label.slice(name.length).trim() : ''
+}
+
 /** One rendered control as a lock test sees it. */
 export interface AccessibleShortcutControl {
   /** The accessible name: `aria-label`, else the text content. */

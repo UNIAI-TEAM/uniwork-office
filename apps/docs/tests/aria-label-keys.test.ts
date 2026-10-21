@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { createI18n, LANGS } from '@genoffice/i18n'
-import { findDisplayChord } from '@genoffice/shortcuts'
+import { findDisplayChord, keyHintAfterName } from '@genoffice/shortcuts'
 import { strings } from '../src/renderer/i18n/strings'
 
 const RENDERER = fileURLToPath(new URL('../src/renderer', import.meta.url))
@@ -97,5 +97,15 @@ describe('accessible-name strings carry no chord, in any locale', () => {
       }
     }
     expect(offenders.join('\n')).toBe('')
+  })
+
+  it('the Read Mode exit button keeps its whole visible label in every locale', () => {
+    for (const lang of LANGS) {
+      const hint = keyHintAfterName(
+        translate(lang, 'appExitReadMode'),
+        translate(lang, 'appExitReadModeName'),
+      )
+      expect(hint, lang).not.toBe('')
+    }
   })
 })

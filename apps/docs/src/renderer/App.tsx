@@ -348,6 +348,7 @@ import {
   shortcutHint,
   shortcutTip,
 } from './shortcuts'
+import { keyHintAfterName } from '@genoffice/shortcuts'
 import { setTableAutoFit, toggleRepeatHeaderRows } from './editor/table-properties'
 import { distributeSelectedColumns } from './editor/table-sizing'
 import {
@@ -7660,8 +7661,16 @@ export function App() {
               )}
             </div>
             {readMode && (
-              <button data-esc-local="" className="read-exit" onClick={() => setReadMode(false)}>
-                {t('appExitReadMode')}
+              <button
+                data-esc-local=""
+                className="read-exit"
+                aria-keyshortcuts="Escape"
+                onClick={() => setReadMode(false)}
+              >
+                {t('appExitReadModeName')}{' '}
+                <span aria-hidden="true">
+                  {keyHintAfterName(t('appExitReadMode'), t('appExitReadModeName'))}
+                </span>
               </button>
             )}
             {doc && serverMode && editor && (

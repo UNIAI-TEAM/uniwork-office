@@ -13,6 +13,7 @@ import {
   formatAriaChords,
   formatChord,
   formatHint,
+  keyHintAfterName,
   SHORTCUT_TABLES,
   type ShortcutAction,
   type ShortcutPlatform,
@@ -195,5 +196,20 @@ describe('accessibleShortcutProblems', () => {
         'desktop',
       ),
     ).toEqual(['md-source: aria-keyshortcuts is "Control+E", want "Meta+E" (mac, desktop)'])
+  })
+})
+
+describe('keyHintAfterName', () => {
+  it('returns the hint a label carries after its plain name', () => {
+    expect(keyHintAfterName('Exit Read Mode (Esc)', 'Exit Read Mode')).toBe('(Esc)')
+    expect(keyHintAfterName('Quitter le mode Lecture (Échap)', 'Quitter le mode Lecture')).toBe(
+      '(Échap)',
+    )
+    expect(keyHintAfterName('退出演示（Esc）', '退出演示')).toBe('（Esc）')
+  })
+
+  it('is empty when the label is the name, or does not start with it', () => {
+    expect(keyHintAfterName('Exit', 'Exit')).toBe('')
+    expect(keyHintAfterName('Leave (Esc)', 'Exit')).toBe('')
   })
 })

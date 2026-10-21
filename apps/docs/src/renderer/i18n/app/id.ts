@@ -235,6 +235,7 @@ export const id = {
   appSplitPaneLabel: 'Panel terpisah (pratinjau baca-saja, dapat digulir secara independen)',
   appRemoveSplit: 'Hapus Pemisahan',
   appExitReadMode: 'Keluar dari Mode Baca (Esc)',
+  appExitReadModeName: 'Keluar dari Mode Baca',
   appExpandAiPanel: 'Perluas panel pengeditan AI',
   appAiRail: 'AI',
   appPageOf: 'Halaman {current} dari {total}',

@@ -98,6 +98,7 @@ export {
   findDisplayChord,
   formatAriaChord,
   formatAriaChords,
+  keyHintAfterName,
   type AccessibleShortcutControl,
 } from './aria'
 export { BROWSER_RESERVED, isBrowserReserved } from './browser-reserved'
