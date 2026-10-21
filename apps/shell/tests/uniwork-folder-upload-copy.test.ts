@@ -165,7 +165,7 @@ describe('folder-upload copy', () => {
       expect(failureReasonMessage(vi, 'storage_quota_exceeded')).toContain('Đã hết dung lượng')
     })
 
-    it('FU-V5: unsupported_format reads as the app\'s own unsupported-type sentence', () => {
+    it("FU-V5: unsupported_format reads as the app's own unsupported-type sentence", () => {
       expect(failureReasonMessage(en, 'unsupported_format')).toBe(
         'This file type isn’t supported in UniWork Office.',
       )

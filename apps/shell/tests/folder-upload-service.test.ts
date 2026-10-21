@@ -228,7 +228,10 @@ describe('destination', () => {
     const { service, ensureMyFolder } = setup({ picked: { dir: join(root, 'Case') } })
     const sdo = await service.pick({ workspaceId: 'w', folderId: null, mode: 'folder' })
     expect(ensureMyFolder).toHaveBeenCalledWith('w')
-    expect(sdo?.target).toEqual({ workspaceId: 'w', folderId: 'my1', label: 'My Folder',
+    expect(sdo?.target).toEqual({
+      workspaceId: 'w',
+      folderId: 'my1',
+      label: 'My Folder',
       myFolder: true,
     })
   })
