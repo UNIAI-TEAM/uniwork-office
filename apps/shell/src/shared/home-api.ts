@@ -90,6 +90,14 @@ export interface AttachmentImageResult {
 import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type { FileExcerpt } from './file-excerpt'
 import type { DocumentTabKind } from './tabs-api'
+import type {
+  BatchUploadPickInput,
+  BatchUploadPreflightInput,
+  BatchUploadProgress,
+  BatchUploadStartInput,
+  BatchUploadStartResult,
+  PreflightSDO,
+} from './folder-upload-api'
 
 /** UI language; kept self-contained here (mirrors Lang in @genoffice/i18n) */
 
@@ -1514,6 +1522,23 @@ export interface HomeApi {
    * not hold - already finished, or a stale dialog - is a no-op.
    */
   uniworkCancelUploadDocument(uploadId: string): Promise<void>
+  /**
+   * UNI-2052: the native dialog for a folder or several files, as a preflight
+   * (null when cancelled). Absolute paths stay in main; the reply has none.
+   */
+  uniworkBatchUploadPick(input: BatchUploadPickInput): Promise<PreflightSDO | null>
+  /** UNI-2052: preflights for dropped paths (`getPathForFile`): loose files first, then each folder */
+  uniworkBatchUploadPreflight(input: BatchUploadPreflightInput): Promise<PreflightSDO[]>
+  /** UNI-2052: start a preflight; the run is then followed through the progress push */
+  uniworkBatchUploadStart(input: BatchUploadStartInput): Promise<BatchUploadStartResult>
+  /** UNI-2052: progress of a run (one total, never one per file); returns an unsubscribe */
+  onUniworkBatchUploadProgress(cb: (event: BatchUploadProgress) => void): () => void
+  /** UNI-2052: abort a run; what already landed stays. An unknown run id is a no-op */
+  uniworkBatchUploadCancel(runId: string): Promise<void>
+  /** UNI-2052: run the retryable failures of a finished run again */
+  uniworkBatchUploadRetry(runId: string): Promise<void>
+  /** UNI-2052: the report was closed without retrying */
+  uniworkBatchUploadDismiss(runId: string): Promise<void>
   /** S18: rename a document (the server keeps the title) */
   uniworkRenameDocument(
     documentId: string,
@@ -2185,6 +2210,20 @@ export const UNIWORK_DOC_CHANNELS = {
   uploadProgress: 'uniwork-doc:upload-progress',
   /** invoke(uploadId) -> abort a running upload; an unknown/finished id is a no-op (S18) */
   cancelUpload: 'uniwork-doc:cancel-upload',
+  /** invoke(input) -> the native dialog's pick as a folder / files preflight, or null when cancelled (UNI-2052) */
+  batchUploadPick: 'uniwork-doc:batch-upload-pick',
+  /** invoke(input) -> preflights for dropped absolute paths: one for the loose files, one per directory (UNI-2052) */
+  batchUploadPreflight: 'uniwork-doc:batch-upload-preflight',
+  /** invoke(input) -> start a preflight; answers the run id (UNI-2052) */
+  batchUploadStart: 'uniwork-doc:batch-upload-start',
+  /** push -> progress of a folder / files upload run (UNI-2052) */
+  batchUploadProgress: 'uniwork-doc:batch-upload-progress',
+  /** invoke(runId) -> abort a run; what already landed stays (UNI-2052) */
+  batchUploadCancel: 'uniwork-doc:batch-upload-cancel',
+  /** invoke(runId) -> run the retryable failures of a finished run again (UNI-2052) */
+  batchUploadRetry: 'uniwork-doc:batch-upload-retry',
+  /** invoke(runId) -> the report was closed without retrying: let the run go (UNI-2052) */
+  batchUploadDismiss: 'uniwork-doc:batch-upload-dismiss',
   /** invoke(documentId, name) -> rename (S18) */
   renameDocument: 'uniwork-doc:rename-document',
   /** invoke(documentId) -> archive (S18; there is no delete) */
