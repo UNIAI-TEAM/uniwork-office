@@ -619,6 +619,7 @@ export function EditorContextMenu({
           {field && (
             <>
               {item(t('appToggleFieldCodes'), {
+                shortcut: 'toggle-field-codes',
                 onClick: run(() => toggleFieldCodes(editor.view, field)),
               })}
               {item(t('appEditField'), {

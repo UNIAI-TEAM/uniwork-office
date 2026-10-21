@@ -61,6 +61,9 @@ import {
   toggleDropdown,
 } from './ribbon-tabs'
 
+/** the table rows that insert a field, by its instruction */
+const FIELD_ROWS: Readonly<Record<string, string>> = { DATE: 'field-date', TIME: 'field-time' }
+
 const SYMBOLS = [
   '—',
   '…',
@@ -1075,6 +1078,9 @@ export function InsertTab({
                 ).map(([instr, label]) => (
                   <button
                     key={instr}
+                    aria-keyshortcuts={
+                      (FIELD_ROWS[instr] && shortcutAria(FIELD_ROWS[instr])) || undefined
+                    }
                     onClick={() => {
                       onInsertField(instr)
                       setDropdown(() => null)
@@ -1138,6 +1144,7 @@ export function InsertTab({
             className="rb-big"
             disabled={!canComment || (isProtected && !commentsAllowed)}
             data-tip={canComment ? t('ribbonNewCommentTip') : t('ribbonNewCommentSelectTip')}
+            aria-keyshortcuts={shortcutAria('comment') || undefined}
             onClick={onNewComment}
           >
             <span className="rb-big-icon">

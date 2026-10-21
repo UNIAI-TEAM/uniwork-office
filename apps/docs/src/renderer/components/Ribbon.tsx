@@ -123,6 +123,8 @@ import {
   FALLBACK_STYLES,
   activeStyleKey as activeStyleKeyOf,
   collectUsedStyleIds,
+  defaultParagraphStyleId,
+  headingStyleId,
   quickStyleEntries,
   styleKeyOf,
   styleLabel,
@@ -693,6 +695,12 @@ const HIGHLIGHTS = [
 ]
 
 const LINE_SPACINGS = [1, 1.15, 1.5, 2, 2.5, 3]
+/** the table rows that set a preset line spacing, by its multiple */
+const LINE_SPACING_ROWS: Readonly<Record<number, string>> = {
+  1: 'spacing-1',
+  1.5: 'spacing-15',
+  2: 'spacing-2',
+}
 
 export { numberPresetLevels } from '../list-presets'
 
@@ -1552,6 +1560,16 @@ function RibbonInner({
   }
 
   /** Style cards, shared by the inline gallery and its overflow menu */
+  /** the table row (Normal, Heading 1-3) a gallery card answers to, if any */
+  const styleRow = (info: StyleInfo): string | undefined => {
+    if (info.type !== 'paragraph') return undefined
+    if (info.styleId === defaultParagraphStyleId(galleryStyles)) return 'style-normal'
+    return [1, 2, 3]
+      .map((level) =>
+        info.styleId === headingStyleId(galleryStyles, level) ? `style-h${level}` : undefined,
+      )
+      .find(Boolean)
+  }
   const renderStyleCards = (inMenu: boolean) => {
     const apply = (info: StyleInfo) => {
       applyStyle(info)
@@ -1570,6 +1588,7 @@ function RibbonInner({
               disabled={!canEdit || (!isChar && !!sub)}
               data-tip={label}
               data-style-id={info.styleId}
+              aria-keyshortcuts={(styleRow(info) && shortcutAria(styleRow(info)!)) || undefined}
               onClick={() => apply(info)}
             >
               <span className="style-card-preview" style={stylePreviewCss(info, docDefaults)}>
@@ -3380,6 +3399,7 @@ function RibbonInner({
                     className="rb-big"
                     disabled={!canEdit}
                     aria-label={t('ribbonPaste')}
+                    aria-keyshortcuts={shortcutAria('paste') || undefined}
                     onClick={() => pasteAs()}
                   >
                     <span className="rb-big-icon">
@@ -3409,7 +3429,11 @@ function RibbonInner({
                         <IconPasteMerge size={16} />
                         {t('appPasteMergeFormat')}
                       </button>
-                      <button role="menuitem" onClick={() => pasteAs('text')}>
+                      <button
+                        role="menuitem"
+                        aria-keyshortcuts={shortcutAria('paste-plain') || undefined}
+                        onClick={() => pasteAs('text')}
+                      >
                         <IconPasteText size={16} />
                         {t('appPasteTextOnly')}
                       </button>
@@ -3473,6 +3497,7 @@ function RibbonInner({
                     aria-pressed={!!painter}
                     data-tip={painter ? t('ribbonPainterActiveTip') : t('ribbonPainterTip')}
                     aria-label={painter ? t('ribbonPainterActiveTip') : t('ribbonPainterTip')}
+                    aria-keyshortcuts={shortcutAria('copy-format') || undefined}
                     onClick={onPainterClick}
                     onDoubleClick={onPainterDoubleClick}
                   >
@@ -3622,6 +3647,7 @@ function RibbonInner({
                     disabled={!canEdit}
                     data-tip={t('ribbonGrowFont')}
                     aria-label={t('ribbonGrowFont')}
+                    aria-keyshortcuts={shortcutAria('grow-font') || undefined}
                     onClick={() => stepFontSize(1)}
                   >
                     <IconGrowFont />
@@ -3631,6 +3657,7 @@ function RibbonInner({
                     disabled={!canEdit}
                     data-tip={t('ribbonShrinkFont')}
                     aria-label={t('ribbonShrinkFont')}
+                    aria-keyshortcuts={shortcutAria('shrink-font') || undefined}
                     onClick={() => stepFontSize(-1)}
                   >
                     <IconShrinkFont />
@@ -3641,6 +3668,8 @@ function RibbonInner({
                       className="rb-icon"
                       disabled={!canEdit}
                       data-tip={t('ribbonChangeCase')}
+                      aria-label={t('ribbonChangeCase')}
+                      aria-keyshortcuts={shortcutAria('change-case') || undefined}
                       onClick={() => setDropdown((v) => (v === 'case' ? null : 'case'))}
                     >
                       <IconChangeCase />
@@ -3677,6 +3706,7 @@ function RibbonInner({
                     disabled={!canEdit}
                     data-tip={t('ribbonClearFormatting')}
                     aria-label={t('ribbonClearFormatting')}
+                    aria-keyshortcuts={shortcutAria('clear-formatting') || undefined}
                     onClick={() => chain().unsetAllMarks().run()}
                   >
                     <IconClearFormat />
@@ -3716,16 +3746,15 @@ function RibbonInner({
                   {markBtn(
                     'strike',
                     fs.strike,
-                    {
-                      'data-tip': t('ribbonStrikethrough'),
-                      'aria-label': t('ribbonStrikethrough'),
-                    },
+                    keyedButton(t('ribbonStrikethrough'), t('ribbonStrikethrough'), 'strike'),
                     <s>ab</s>,
                   )}
                   <button
                     className={`rb-icon ${fs.vertAlign === 'subscript' ? 'active' : ''}`}
                     disabled={!canEdit}
                     data-tip={t('ribbonSubscript')}
+                    aria-label={t('ribbonSubscript')}
+                    aria-keyshortcuts={shortcutAria('subscript') || undefined}
                     onClick={() => toggleVertAlign('subscript')}
                   >
                     <IconSubscript />
@@ -3734,6 +3763,8 @@ function RibbonInner({
                     className={`rb-icon ${fs.vertAlign === 'superscript' ? 'active' : ''}`}
                     disabled={!canEdit}
                     data-tip={t('ribbonSuperscript')}
+                    aria-label={t('ribbonSuperscript')}
+                    aria-keyshortcuts={shortcutAria('superscript') || undefined}
                     onClick={() => toggleVertAlign('superscript')}
                   >
                     <IconSuperscript />
@@ -3854,6 +3885,7 @@ function RibbonInner({
                       disabled={!canEdit || !!sub}
                       data-tip={t('ribbonBullets')}
                       aria-label={t('ribbonBullets')}
+                      aria-keyshortcuts={shortcutAria('bullets') || undefined}
                       onClick={() => toggleList('bullet')}
                     >
                       <IconBullets />
@@ -3922,6 +3954,7 @@ function RibbonInner({
                       disabled={!canEdit || !!sub}
                       data-tip={t('ribbonNumbering')}
                       aria-label={t('ribbonNumbering')}
+                      aria-keyshortcuts={shortcutAria('numbering') || undefined}
                       onClick={() => toggleList('ordered')}
                     >
                       <IconNumbered />
@@ -4053,6 +4086,7 @@ function RibbonInner({
                     disabled={!canEdit || !!sub}
                     data-tip={t('ribbonDecreaseIndent')}
                     aria-label={t('ribbonDecreaseIndent')}
+                    aria-keyshortcuts={shortcutAria('outdent') || undefined}
                     onClick={() => changeIndent(-1)}
                   >
                     <IconIndentDec />
@@ -4062,6 +4096,7 @@ function RibbonInner({
                     disabled={!canEdit || !!sub}
                     data-tip={t('ribbonIncreaseIndent')}
                     aria-label={t('ribbonIncreaseIndent')}
+                    aria-keyshortcuts={shortcutAria('indent') || undefined}
                     onClick={() => changeIndent(1)}
                   >
                     <IconIndentInc />
@@ -4072,6 +4107,7 @@ function RibbonInner({
                     disabled={!hasDoc}
                     data-tip={t('ribbonShowMarks')}
                     aria-label={t('ribbonShowMarks')}
+                    aria-keyshortcuts={shortcutAria('formatting-marks') || undefined}
                     onClick={() => onShowMarks(!showMarks)}
                   >
                     <IconPilcrow />
@@ -4169,6 +4205,10 @@ function RibbonInner({
                           <button
                             key={s}
                             className={activeSpacing === s ? 'active' : ''}
+                            aria-keyshortcuts={
+                              (LINE_SPACING_ROWS[s] && shortcutAria(LINE_SPACING_ROWS[s])) ||
+                              undefined
+                            }
                             // presets are multiples: clear any atLeast/exact rule so they take effect
                             onClick={() =>
                               setParaAttr({ lineSpacing: s, lineRule: null, lineRawTwips: null })
@@ -4296,6 +4336,7 @@ function RibbonInner({
                   disabled={!hasDoc}
                   aria-pressed={!!showStylesPane}
                   data-tip={t('ribbonStylesPaneTip')}
+                  aria-keyshortcuts={shortcutAria('styles-pane') || undefined}
                   onClick={() => onShowStylesPane?.(!showStylesPane)}
                 >
                   <span className="rb-big-icon">
@@ -4317,6 +4358,7 @@ function RibbonInner({
                       className="rb-small"
                       disabled={!hasDoc}
                       data-tip={t('ribbonFindTip')}
+                      aria-keyshortcuts={shortcutAria('find') || undefined}
                       onClick={() => onFind?.()}
                     >
                       <IconSearch />
@@ -4326,6 +4368,7 @@ function RibbonInner({
                       className="rb-small"
                       disabled={!canEdit}
                       data-tip={t('ribbonReplaceTip')}
+                      aria-keyshortcuts={shortcutAria('replace') || undefined}
                       onClick={() => onReplace?.()}
                     >
                       <IconReplace />
@@ -4335,6 +4378,7 @@ function RibbonInner({
                       className="rb-small"
                       disabled={!hasDoc}
                       data-tip={t('ribbonSelectAllTip')}
+                      aria-keyshortcuts={shortcutAria('select-all') || undefined}
                       onClick={() => ed.chain().focus().selectAll().run()}
                     >
                       <IconSelectAll />

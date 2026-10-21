@@ -7727,6 +7727,7 @@ export function App() {
                   <button
                     className="status-item status-btn status-page"
                     data-tip={t('appGoToTitle')}
+                    aria-keyshortcuts={shortcutAria('goto') || undefined}
                     onClick={() => {
                       setShowFind(true)
                       setFindFocusGoTo((n) => n + 1)
@@ -7737,6 +7738,7 @@ export function App() {
                   <button
                     className="status-item status-btn status-wordcount"
                     data-tip={t('appWordCountTitle')}
+                    aria-keyshortcuts={shortcutAria('word-count') || undefined}
                     onClick={openStats}
                   >
                     {selectionWordCount > 0
