@@ -1,0 +1,47 @@
+import type { zh } from './zh'
+
+export const ja = {
+  askUniModeGroup: 'モード',
+  askUniModeChat: 'アシスタント',
+  askUniModeAsk: 'UNI に質問',
+  askUniTitle: 'UNI に質問',
+  askUniDescription:
+    'UNI は、このワークスペースで閲覧できるデータだけを根拠に、出典つきで回答します。',
+  askUniWorkspace: 'ワークスペース',
+  askUniEmptyTitle: 'チームの仕事について何を知りたいですか？',
+  askUniEmptyDescription:
+    'UNI はタスク、会議、参加中のチャット、メンバーを読み取り、常に出典を示して回答します。',
+  askUniPlaceholder: '仕事について UNI に質問…',
+  askUniSend: '送信',
+  askUniStop: '停止',
+  askUniStopped: '停止しました。回答は表示されません。',
+  askUniThinking: 'UNI が考えています…',
+  askUniNewChat: '新しいチャット',
+  askUniYou: 'あなた',
+  askUniUni: 'UNI',
+  askUniSources: '出典',
+  askUniKindDocument: 'ドキュメント',
+  askUniKindTask: 'タスク',
+  askUniKindMeeting: '会議',
+  askUniKindChat: 'チャット',
+  askUniKindMember: 'メンバー',
+  askUniOpenDocument: 'ドキュメントを開く',
+  askUniOpenBrowser: 'ブラウザーで開く',
+  askUniCitationLabel: '{kind}: {title} — {action}',
+  askUniCounter: '{used}/{max} 文字',
+  askUniLoading: '読み込み中…',
+  askUniSignedOut:
+    'UniWork アカウントにサインインすると、ワークスペースについて UNI に質問できます。',
+  askUniNoWorkspace: 'このアカウントには、質問できるワークスペースがまだありません。',
+  askUniNoticeNoSources: 'この質問に一致する、閲覧可能なデータはまだありません。',
+  askUniNoticeUnavailable: 'UNI はこの質問に回答できませんでした。',
+  askUniErrForbidden: 'このデータを閲覧する権限がありません。',
+  askUniErrQuota: '組織の今月の AI トークン上限に達しました。',
+  askUniErrRateLimited: '質問の間隔が短すぎます。1 分後にもう一度お試しください。',
+  askUniErrRateLimitedIn: '質問の間隔が短すぎます。{seconds} 秒後にもう一度お試しください。',
+  askUniErrDisabled: 'このサーバーでは AI が設定されていません。',
+  askUniErrOffline: 'オフラインです。インターネットに接続して、もう一度お試しください。',
+  askUniErrSession:
+    'UniWork のセッションが期限切れです。もう一度サインインして質問を続けてください。',
+  askUniErrDefault: '今は質問できません。しばらくしてからもう一度お試しください。',
+} satisfies Record<keyof typeof zh, string>

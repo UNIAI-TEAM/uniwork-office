@@ -7,6 +7,7 @@ import { emitAgentIntentNavigate } from './agent-intent-bus'
 import { buildMyAiContextPack, type MyAiContextPack } from './context-manager'
 import { useI18n } from './locale'
 import { useUniworkCloudStatus } from './UniworkCloudPane'
+import { AskUniPane, hasAskUniBridge } from './AskUniPane'
 import { recordAiTurnUsage } from './ai-usage-ledger'
 import { appendMyAiAudit } from './my-ai-audit'
 import {
@@ -352,7 +353,7 @@ interface Props {
 }
 
 export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElement {
-  const { lang } = useI18n()
+  const { lang, t } = useI18n()
   const vi = lang === 'vi'
   const cloud = useUniworkCloudStatus()
   const label = (a: string, b: string) => (vi ? a : b)
@@ -384,6 +385,8 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
   const skipPersistRef = useRef(false)
   const practiceChips = useMemo(() => practiceMyAiChips(practiceId), [practiceId])
   const [openGroup, setOpenGroup] = useState<GroupId | null>(null)
+  // Ask UNI is the workspace-question mode next to the chat; the toggle needs the shell bridge
+  const [mode, setMode] = useState<'chat' | 'ask'>('chat')
   const groupBtnRefs = useRef<Partial<Record<GroupId, HTMLButtonElement | null>>>({})
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [continueFiles, setContinueFiles] = useState<RecentEntry[]>([])
@@ -1948,22 +1951,60 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     </p>
   )
 
+  const askAvailable = hasAskUniBridge()
+  const askMode = askAvailable && mode === 'ask'
+
+  const modeToggle = askAvailable ? (
+    <div className="askuni-modes" role="group" aria-label={t('askUniModeGroup')}>
+      <button
+        type="button"
+        className={`askuni-mode${askMode ? '' : ' is-on'}`}
+        aria-pressed={!askMode}
+        onClick={() => setMode('chat')}
+      >
+        {t('askUniModeChat')}
+      </button>
+      <button
+        type="button"
+        className={`askuni-mode${askMode ? ' is-on' : ''}`}
+        aria-pressed={askMode}
+        onClick={() => setMode('ask')}
+      >
+        {t('askUniModeAsk')}
+      </button>
+    </div>
+  ) : null
+
+  const bar = (
+    <header className="new-chat-bar">
+      <h1 className="new-chat-title">{label('Trợ lý của bạn', 'My AI')}</h1>
+      {modeToggle}
+      {empty || askMode ? null : (
+        <button type="button" className="new-chat-ghost-btn" onClick={resetChat} disabled={busy}>
+          <Glyph>
+            <path d="M8 3.5v9M3.5 8h9" />
+          </Glyph>
+          {label('Chat mới', 'New chat')}
+        </button>
+      )}
+    </header>
+  )
+
+  if (askMode) {
+    return (
+      <main className="new-chat is-ask" aria-label={label('Trợ lý của bạn', 'My AI')}>
+        {bar}
+        <AskUniPane />
+      </main>
+    )
+  }
+
   return (
     <main
       className={`new-chat${empty ? ' is-empty' : ''}`}
       aria-label={label('Trợ lý của bạn', 'My AI')}
     >
-      <header className="new-chat-bar">
-        <h1 className="new-chat-title">{label('Trợ lý của bạn', 'My AI')}</h1>
-        {empty ? null : (
-          <button type="button" className="new-chat-ghost-btn" onClick={resetChat} disabled={busy}>
-            <Glyph>
-              <path d="M8 3.5v9M3.5 8h9" />
-            </Glyph>
-            {label('Chat mới', 'New chat')}
-          </button>
-        )}
-      </header>
+      {bar}
 
       <div className="new-chat-body">
         {empty ? (

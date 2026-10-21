@@ -44,11 +44,35 @@ function answer(
 }
 
 const CITATIONS: AskUniCitation[] = [
-  { sourceId: 's1', kind: 'document', title: 'Q3 plan.docx', quote: 'Budget is frozen until July', href: '/o/w/documents/1' },
-  { sourceId: 's2', kind: 'task', title: 'Fix invoice export', quote: 'Due Friday', href: '/o/w/tasks/2' },
-  { sourceId: 's3', kind: 'meeting', title: 'Weekly sync', quote: 'We agreed to ship', href: '/o/w/meetings/3' },
+  {
+    sourceId: 's1',
+    kind: 'document',
+    title: 'Q3 plan.docx',
+    quote: 'Budget is frozen until July',
+    href: '/o/w/documents/1',
+  },
+  {
+    sourceId: 's2',
+    kind: 'task',
+    title: 'Fix invoice export',
+    quote: 'Due Friday',
+    href: '/o/w/tasks/2',
+  },
+  {
+    sourceId: 's3',
+    kind: 'meeting',
+    title: 'Weekly sync',
+    quote: 'We agreed to ship',
+    href: '/o/w/meetings/3',
+  },
   { sourceId: 's4', kind: 'chat', title: '#ops', quote: 'Server is back', href: '/o/w/chat/4' },
-  { sourceId: 's5', kind: 'member', title: 'Lan Nguyen', quote: 'Finance lead', href: '/o/w/members/5' },
+  {
+    sourceId: 's5',
+    kind: 'member',
+    title: 'Lan Nguyen',
+    quote: 'Finance lead',
+    href: '/o/w/members/5',
+  },
 ]
 
 describe('Ask UNI mode (shell Home My AI)', () => {
@@ -86,12 +110,13 @@ describe('Ask UNI mode (shell Home My AI)', () => {
   }
 
   const composer = () => host.querySelector('textarea') as HTMLTextAreaElement
-  const sendBtn = () => host.querySelector(`button[aria-label="${en.askUniSend}"]`) as HTMLButtonElement
-  const stopBtn = () => host.querySelector(`button[aria-label="${en.askUniStop}"]`) as HTMLButtonElement
+  const sendBtn = () =>
+    host.querySelector(`button[aria-label="${en.askUniSend}"]`) as HTMLButtonElement
+  const stopBtn = () =>
+    host.querySelector(`button[aria-label="${en.askUniStop}"]`) as HTMLButtonElement
   const newChatBtn = () =>
     [...host.querySelectorAll('button')].find((b) => b.textContent?.includes(en.askUniNewChat)) as
-      | HTMLButtonElement
-      | undefined
+      HTMLButtonElement | undefined
 
   async function type(value: string): Promise<void> {
     await act(async () => {
@@ -154,7 +179,9 @@ describe('Ask UNI mode (shell Home My AI)', () => {
     })
 
     it('shows a signed-out note and no composer when not signed in', async () => {
-      askContext.mockResolvedValue(ctx({ signedIn: false, workspaces: [], currentWorkspaceId: null }))
+      askContext.mockResolvedValue(
+        ctx({ signedIn: false, workspaces: [], currentWorkspaceId: null }),
+      )
       await mount()
       expect(host.textContent).toContain(en.askUniSignedOut)
       expect(composer()).toBeNull()
@@ -192,11 +219,13 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       await mount('vi')
       await type('Task nào quá hạn?')
       await act(async () => {
-        ;(host.querySelector(`button[aria-label="${viStrings.askUniSend}"]`) as HTMLButtonElement).click()
+        ;(
+          host.querySelector(`button[aria-label="${viStrings.askUniSend}"]`) as HTMLButtonElement
+        ).click()
       })
       await flush()
       expect(ask.mock.calls[0]![0].locale).toBe('vi')
-      expect(host.textContent).toContain(viStrings.askUniTitle)
+      expect(host.querySelector(`[aria-label="${viStrings.askUniTitle}"]`)).not.toBeNull()
     })
 
     it('New chat starts a new conversation', async () => {
@@ -232,7 +261,9 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       await mount()
       await type('Via enter')
       await act(async () => {
-        composer().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }))
+        composer().dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }),
+        )
       })
       expect(ask).not.toHaveBeenCalled()
       await act(async () => {
@@ -317,7 +348,9 @@ describe('Ask UNI mode (shell Home My AI)', () => {
   describe('answer and sources', () => {
     it('renders the answer as safe Markdown (no raw HTML)', async () => {
       ask.mockResolvedValue(
-        answer('The **budget** is frozen.\n\n<img src=x onerror="alert(1)"><script>alert(2)</script>'),
+        answer(
+          'The **budget** is frozen.\n\n<img src=x onerror="alert(1)"><script>alert(2)</script>',
+        ),
       )
       await mount()
       await sendQuestion('Budget?')
@@ -472,7 +505,10 @@ describe('Ask UNI mode (shell Home My AI)', () => {
         root.render(
           h(LocaleProvider, {
             initial: 'en',
-            children: h(NewChatPane, { practiceId: 'general' as never, ensureWorkbench: () => undefined }),
+            children: h(NewChatPane, {
+              practiceId: 'general' as never,
+              ensureWorkbench: () => undefined,
+            }),
           }),
         )
       })
@@ -480,9 +516,9 @@ describe('Ask UNI mode (shell Home My AI)', () => {
     }
 
     const modeBtn = (label: string) =>
-      [...host.querySelectorAll('.new-chat-bar button')].find((b) => b.textContent?.trim() === label) as
-        | HTMLButtonElement
-        | undefined
+      [...host.querySelectorAll('.new-chat-bar button')].find(
+        (b) => b.textContent?.trim() === label,
+      ) as HTMLButtonElement | undefined
 
     it('adds a keyboard-reachable mode toggle next to the chat and switches to Ask UNI', async () => {
       await mountPane()
@@ -517,7 +553,10 @@ describe('Ask UNI mode (shell Home My AI)', () => {
         root.render(
           h(LocaleProvider, {
             initial: 'en',
-            children: h(NewChatPane, { practiceId: 'general' as never, ensureWorkbench: () => undefined }),
+            children: h(NewChatPane, {
+              practiceId: 'general' as never,
+              ensureWorkbench: () => undefined,
+            }),
           }),
         )
       })

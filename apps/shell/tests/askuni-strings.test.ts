@@ -32,14 +32,17 @@ describe('askuni string shard', () => {
   it.each([...LANGS])('locale %s keeps the same {params} as zh', (lang) => {
     const params = (v: string) => (v.match(/\{[a-zA-Z]+\}/g) ?? []).sort()
     const bad = referenceKeys.filter(
-      (k) => params(table(lang)[k] ?? '').join() !== params(askUniStrings.zh[k as 'askUniTitle']).join(),
+      (k) =>
+        params(table(lang)[k] ?? '').join() !== params(askUniStrings.zh[k as 'askUniTitle']).join(),
     )
     expect(bad).toEqual([])
   })
 
   it.each([...LANGS])('locale %s has no repository words or internal codes', (lang) => {
     const bad = Object.values(table(lang)).filter((v) =>
-      /genspark|genoffice|github|\bgit\b|\bUNI-\d|\bGO-[A-Z]?\d|\bG8-\d|\bS1[35]\b|ai_[a-z_]+/i.test(v),
+      /genspark|genoffice|github|\bgit\b|\bUNI-\d|\bGO-[A-Z]?\d|\bG8-\d|\bS1[35]\b|ai_[a-z_]+/i.test(
+        v,
+      ),
     )
     expect(bad).toEqual([])
   })
@@ -62,11 +65,21 @@ describe('askuni string shard', () => {
 
   it('writes the other locales properly, not as English copies', () => {
     // short proper nouns / loan words may legitimately match English
-    const allowed = new Set(['askUniUni', 'askUniTitle', 'askUniModeAsk', 'askUniCounter'])
+    const allowed = new Set([
+      'askUniUni',
+      'askUniTitle',
+      'askUniModeAsk',
+      'askUniModeGroup',
+      'askUniModeChat',
+      'askUniSources',
+      'askUniKindDocument',
+      'askUniCitationLabel',
+    ])
     for (const lang of LANGS) {
       if (lang === 'en') continue
       const same = referenceKeys.filter(
-        (k) => !allowed.has(k) && table(lang)[k] === (askUniStrings.en as Record<string, string>)[k],
+        (k) =>
+          !allowed.has(k) && table(lang)[k] === (askUniStrings.en as Record<string, string>)[k],
       )
       expect(same, `${lang} copies English for: ${same.join(', ')}`).toEqual([])
     }
@@ -80,7 +93,9 @@ describe('askuni string shard', () => {
     expect(vi.askUniSources).toBe('Nguồn')
     expect(en.askUniSources).toBe('Sources')
     expect(vi.askUniNoticeNoSources).toBe('Chưa có dữ liệu nào bạn được xem khớp với câu hỏi này.')
-    expect(en.askUniNoticeNoSources).toBe('Nothing you can see in this workspace matches this question yet.')
+    expect(en.askUniNoticeNoSources).toBe(
+      'Nothing you can see in this workspace matches this question yet.',
+    )
     expect(vi.askUniNoticeUnavailable).toBe('UNI chưa trả lời được câu này.')
     expect(en.askUniNoticeUnavailable).toBe("UNI couldn't answer this one.")
     expect(vi.askUniErrForbidden).toBe('Bạn không có quyền xem dữ liệu này.')

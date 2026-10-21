@@ -1,0 +1,47 @@
+import type { zh } from './zh'
+
+export const ms = {
+  askUniModeGroup: 'Mod',
+  askUniModeChat: 'Pembantu',
+  askUniModeAsk: 'Tanya UNI',
+  askUniTitle: 'Tanya UNI',
+  askUniDescription:
+    'UNI hanya menjawab daripada data yang anda boleh lihat dalam ruang kerja ini, berserta sumber.',
+  askUniWorkspace: 'Ruang kerja',
+  askUniEmptyTitle: 'Apa yang anda ingin tahu tentang kerja pasukan?',
+  askUniEmptyDescription:
+    'UNI membaca tugasan, mesyuarat, sembang yang anda sertai dan ahli — jawapan sentiasa menyertakan sumber.',
+  askUniPlaceholder: 'Tanya UNI tentang kerja anda…',
+  askUniSend: 'Hantar',
+  askUniStop: 'Henti',
+  askUniStopped: 'Dihentikan. Jawapan tidak akan dipaparkan.',
+  askUniThinking: 'UNI sedang berfikir…',
+  askUniNewChat: 'Sembang baharu',
+  askUniYou: 'Anda',
+  askUniUni: 'UNI',
+  askUniSources: 'Sumber',
+  askUniKindDocument: 'Dokumen',
+  askUniKindTask: 'Tugasan',
+  askUniKindMeeting: 'Mesyuarat',
+  askUniKindChat: 'Sembang',
+  askUniKindMember: 'Ahli',
+  askUniOpenDocument: 'Buka dokumen',
+  askUniOpenBrowser: 'Buka dalam pelayar',
+  askUniCitationLabel: '{kind}: {title} — {action}',
+  askUniCounter: '{used}/{max} aksara',
+  askUniLoading: 'Memuatkan…',
+  askUniSignedOut:
+    'Log masuk ke akaun UniWork anda untuk bertanya kepada UNI tentang ruang kerja anda.',
+  askUniNoWorkspace: 'Akaun anda belum mempunyai ruang kerja untuk ditanya.',
+  askUniNoticeNoSources:
+    'Belum ada data yang anda boleh lihat dalam ruang kerja ini yang sepadan dengan soalan ini.',
+  askUniNoticeUnavailable: 'UNI tidak dapat menjawab soalan ini.',
+  askUniErrForbidden: 'Anda tiada akses kepada data ini.',
+  askUniErrQuota: 'Organisasi telah menghabiskan kuota token AI bulan ini.',
+  askUniErrRateLimited: 'Anda bertanya terlalu laju; cuba lagi dalam satu minit.',
+  askUniErrRateLimitedIn: 'Anda bertanya terlalu laju; cuba lagi dalam {seconds} saat.',
+  askUniErrDisabled: 'AI belum dikonfigurasikan pada pelayan ini.',
+  askUniErrOffline: 'Anda luar talian. Sambung ke internet dan cuba lagi.',
+  askUniErrSession: 'Sesi UniWork anda telah tamat. Log masuk semula untuk terus bertanya.',
+  askUniErrDefault: 'Tidak dapat bertanya sekarang; cuba lagi nanti.',
+} satisfies Record<keyof typeof zh, string>
