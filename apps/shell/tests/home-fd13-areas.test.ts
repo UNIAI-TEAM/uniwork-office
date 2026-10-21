@@ -759,7 +759,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       'Device Full 1.docx',
     ])
 
-    // Switch sort back to newest-first before testing empty-page stop
+    // Flip the sort once more (newest first, a real date sort) before testing empty-page stop
     await act(async () => {
       updatedSort().click()
     })
@@ -817,19 +817,13 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     })
     await flush()
 
-    expect(api.starred).toHaveBeenCalledTimes(1)
+    // the header sort set in (c) is still active, and a sorted list drains its remaining pages:
+    // the second page is requested with the same group without waiting for Load more
+    expect(api.starred).toHaveBeenCalledTimes(2)
     expect(api.starred).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ offset: 0, group: 'Finance' }),
     )
-    expect(host.querySelector('.load-more')).not.toBeNull()
-
-    await act(async () => {
-      intersectCb!([{ isIntersecting: true }])
-    })
-    await flush()
-
-    expect(api.starred).toHaveBeenCalledTimes(2)
     expect(api.starred).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ offset: 1, group: 'Finance' }),

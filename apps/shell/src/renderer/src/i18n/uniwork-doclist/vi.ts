@@ -66,4 +66,6 @@ export const vi = {
   dlActPurge: 'Xóa vĩnh viễn',
   dlLinkCopied: 'Đã sao chép link',
   dlLinkCopyFailed: 'Không sao chép được link. Thử lại.',
+  dlSortAscending: '{label}, đang sắp xếp tăng dần',
+  dlSortDescending: '{label}, đang sắp xếp giảm dần',
 } satisfies Record<keyof typeof zh, string>

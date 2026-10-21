@@ -67,4 +67,6 @@ export const id = {
   dlActPurge: 'Delete permanently',
   dlLinkCopied: 'Link copied',
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
+  dlSortAscending: '{label}, sorted ascending',
+  dlSortDescending: '{label}, sorted descending',
 } satisfies Record<keyof typeof zh, string>

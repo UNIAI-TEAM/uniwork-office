@@ -40,7 +40,7 @@ import {
 import { formatBytes, formatListDate } from './doclist/format'
 import { readSort, writeSort } from './doclist/persist'
 import { useI18n } from './locale'
-import type { I18n, StringKey } from './locale'
+import type { StringKey } from './locale'
 import { CreditWallet } from './CreditWallet'
 import type { SettingsSectionId, SettingsTarget } from './SettingsModal'
 import { AccountEntry } from './AccountEntry'
@@ -170,18 +170,6 @@ function MoreDots() {
       <circle cx="12.8" cy="8" r="1.35" fill="currentColor" />
     </svg>
   )
-}
-
-function formatModified(mtimeMs: number, i18n: I18n): string {
-  const date = new Date(mtimeMs)
-  const now = new Date()
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const days = Math.round((startOfDay(now) - startOfDay(date)) / 86400000)
-  if (days <= 0) {
-    return `${i18n.t('today')} · ${date.toLocaleTimeString(i18n.dateLocale, { hour: '2-digit', minute: '2-digit' })}`
-  }
-  if (days === 1) return i18n.t('yesterday')
-  return date.toLocaleDateString(i18n.dateLocale, { month: 'short', day: 'numeric' })
 }
 
 function splitPath(path: string): string[] {
@@ -1369,10 +1357,9 @@ export function Home() {
   const composingRef = useRef(false)
   const searchSeq = useRef(0)
   const searchActive = searchQuery.trim().length > 0
-  // header sort of the local file tables (shared rules: click a header, aria-sort, remembered per account)
-  const [fileSort, setFileSort] = useState<SortSpec>(
-    () => readSort('device') ?? defaultSort('device'),
-  )
+  // header sort of the local file tables (shared rules: click a header, remembered per account);
+  // null until the user sorts: the lists then keep the order the main process gives and show no sorted header
+  const [fileSort, setFileSort] = useState<SortSpec | null>(() => readSort('device'))
   // width of the table the columns hide by (container, not window); 0 = not measured yet
   const [tableWidth, setTableWidth] = useState(0)
   const tableObserver = useRef<ResizeObserver | null>(null)
@@ -1966,9 +1953,7 @@ export function Home() {
   const tableClass = `recent-table${showSize ? '' : ' no-size'}`
 
   const sortLocalFiles = (files: RecentEntry[]): RecentEntry[] => {
-    const standard = fileSort.column === 'updated' && fileSort.dir === 'desc'
-    // newest-first keeps the order the main process lists them in
-    if (standard) return files
+    if (!fileSort) return files
     const read = (row: { entry: RecentEntry }, column: ColumnId): string | number | null => {
       if (column === 'name') return row.entry.name
       if (column === 'size') return row.entry.missing ? null : row.entry.sizeBytes
@@ -1982,17 +1967,19 @@ export function Home() {
   }
 
   const sortHeader = (column: ColumnId, label: string, className: string) => {
-    const active = fileSort.column === column
+    const active = fileSort?.column === column
+    // no table roles here (the rows are list items): the sort state is said on the button itself
     return (
-      <span
-        className={className}
-        role="columnheader"
-        aria-sort={active ? (fileSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-      >
+      <span className={className}>
         <button
           className="cloud-col-sort-btn"
+          aria-label={
+            active
+              ? t(fileSort.dir === 'asc' ? 'dlSortAscending' : 'dlSortDescending', { label })
+              : undefined
+          }
           onClick={() => {
-            const next = nextSort('device', fileSort, column)
+            const next = nextSort('device', fileSort ?? defaultSort('device'), column)
             setFileSort(next)
             writeSort('device', next)
           }}
@@ -2005,7 +1992,7 @@ export function Home() {
             fill="none"
             aria-hidden="true"
             className={active ? 'sort-arrow active' : 'sort-arrow'}
-            style={active && fileSort.dir === 'asc' ? { transform: 'rotate(180deg)' } : undefined}
+            style={active && fileSort?.dir === 'asc' ? { transform: 'rotate(180deg)' } : undefined}
           >
             <path
               d="M8 3v10M4.5 9.5L8 13l3.5-3.5"
@@ -2048,13 +2035,13 @@ export function Home() {
   useEffect(() => {
     if (!hasMore || loadingMore) return
     if (
-      !(fileSort.column === 'updated' && fileSort.dir === 'desc') ||
+      fileSort !== null ||
       areaEntries.length === 0 ||
       (lastPageLen >= PAGE_SIZE && areaEntries.length < PAGE_SIZE)
     ) {
       loadMoreRef.current()
     }
-  }, [fileSort.column, fileSort.dir, hasMore, loadingMore, areaEntries.length, lastPageLen])
+  }, [fileSort, hasMore, loadingMore, areaEntries.length, lastPageLen])
 
   const selectedPaths = areaEntries.filter((e) => selected.has(e.path)).map((e) => e.path)
   // UniWork documents have no local file to move or delete: they are never selectable
@@ -3409,7 +3396,9 @@ export function Home() {
           </p>
         )}
       </div>
-      <span className="search-time">{formatModified(hit.mtimeMs, i18n)}</span>
+      <span className="search-time">
+        {formatListDate(hit.mtimeMs, new Date(), i18n.dateLocale)}
+      </span>
     </li>
   )
 
@@ -3534,7 +3523,7 @@ export function Home() {
               ref={measureTable}
               className={`${tableClass}${folderSelectedPaths.length > 0 ? ' has-selection' : ''}`}
             >
-              <div className="recent-columns" role="row">
+              <div className="recent-columns">
                 <span className="col-check">
                   <input
                     type="checkbox"
@@ -3724,7 +3713,7 @@ export function Home() {
               ref={measureTable}
               className={`${tableClass}${selectedPaths.length > 0 ? ' has-selection' : ''}`}
             >
-              <div className="recent-columns" role="row">
+              <div className="recent-columns">
                 <span className="col-check">
                   <input
                     type="checkbox"
@@ -3828,7 +3817,7 @@ export function Home() {
             </p>
           ) : (
             <div ref={measureTable} className={tableClass}>
-              <div className="recent-columns" role="row">
+              <div className="recent-columns">
                 <span className="col-check">
                   <input
                     type="checkbox"

@@ -66,4 +66,6 @@ export const zhTW = {
   dlActPurge: '永久刪除',
   dlLinkCopied: '連結已複製',
   dlLinkCopyFailed: '無法複製連結，請再試一次。',
+  dlSortAscending: '{label}，遞增排序',
+  dlSortDescending: '{label}，遞減排序',
 } satisfies Record<keyof typeof zh, string>

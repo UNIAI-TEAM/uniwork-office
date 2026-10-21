@@ -65,4 +65,6 @@ export const zh = {
   dlActPurge: '永久删除',
   dlLinkCopied: '链接已复制',
   dlLinkCopyFailed: '无法复制链接，请重试。',
+  dlSortAscending: '{label}，升序排列',
+  dlSortDescending: '{label}，降序排列',
 }
