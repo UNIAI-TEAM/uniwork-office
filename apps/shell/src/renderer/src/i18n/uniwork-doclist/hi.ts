@@ -50,6 +50,10 @@ export const hi = {
   dlSegEdited: 'संपादित किए गए',
   dlRecentSubtitle: 'पिछले 30 दिनों में आपके खोले या संपादित किए गए दस्तावेज़',
   dlSearchIn: '{name} में खोजें',
+  dlNavElsewhere: 'अन्य जगहों से',
+  dlElsewhereSubtitle: 'इस वर्कस्पेस की चैट, मीटिंग, ईमेल और कार्यों में भेजी गई फ़ाइलें',
+  dlElsewhereEmpty:
+    'अभी कोई फ़ाइल नहीं है। चैट, कार्य, मीटिंग और ईमेल की जो फ़ाइलें आप देख सकते हैं, वे यहाँ दिखेंगी।',
   dlContinueTitle: 'जारी रखें',
   dlGroupCountOne: '{n} दस्तावेज़',
   dlGroupCountOther: '{n} दस्तावेज़',

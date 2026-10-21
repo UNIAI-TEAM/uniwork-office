@@ -50,6 +50,11 @@ export const ru = {
   dlSegEdited: 'Изменённые',
   dlRecentSubtitle: 'Документы, которые вы открывали или редактировали за последние 30 дней',
   dlSearchIn: 'Поиск в разделе «{name}»',
+  dlNavElsewhere: 'Из других мест',
+  dlElsewhereSubtitle:
+    'Файлы, отправленные в чате, встречах, почте и задачах этого рабочего пространства',
+  dlElsewhereEmpty:
+    'Файлов пока нет. Здесь появятся файлы из чатов, задач, встреч и почты, которые вам доступны.',
   dlContinueTitle: 'Продолжить',
   dlGroupCountOne: 'Документов: {n}',
   dlGroupCountOther: 'Документов: {n}',

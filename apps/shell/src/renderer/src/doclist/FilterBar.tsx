@@ -39,6 +39,8 @@ export interface FilterBarProps {
   authors: readonly UpdatedByOption[]
   /** a control that leads the row, before the type chips (Recent's Tất cả / Đã mở / Đã sửa) */
   lead?: ReactNode
+  /** type chips this screen's rows can never match (Từ nơi khác lists files only: no UniNote) */
+  hideTypes?: readonly DocumentsHomeTypeFilter[]
 }
 
 /**
@@ -46,7 +48,7 @@ export interface FilterBarProps {
  * then Người sửa and Cập nhật. The list reloads from its first page on every change. A screen
  * with a `lead` (Recent's segment) keeps it in this row, and the two selects sit at the far end.
  */
-export function FilterBar({ filters, onChange, authors, lead }: FilterBarProps) {
+export function FilterBar({ filters, onChange, authors, lead, hideTypes }: FilterBarProps) {
   const { t } = useI18n()
   const patch = (part: Partial<DocumentsHomeFilterState>) => onChange({ ...filters, ...part })
   return (
@@ -57,21 +59,23 @@ export function FilterBar({ filters, onChange, authors, lead }: FilterBarProps) 
         role="group"
         aria-label={t('uhFilterType').replace(/[:：]\s*$/, '')}
       >
-        {DOCUMENTS_HOME_TYPE_CHIPS.map((chip) => {
-          const on = filters.format === chip.value
-          return (
-            <button
-              key={chip.value}
-              type="button"
-              className={`dh-filter-type${on ? ' on' : ''}`}
-              data-chip={chip.value}
-              aria-pressed={on}
-              onClick={() => patch({ format: chip.value as DocumentsHomeTypeFilter })}
-            >
-              {chip.labelKey ? t(chip.labelKey) : chip.literal}
-            </button>
-          )
-        })}
+        {DOCUMENTS_HOME_TYPE_CHIPS.filter((chip) => !hideTypes?.includes(chip.value)).map(
+          (chip) => {
+            const on = filters.format === chip.value
+            return (
+              <button
+                key={chip.value}
+                type="button"
+                className={`dh-filter-type${on ? ' on' : ''}`}
+                data-chip={chip.value}
+                aria-pressed={on}
+                onClick={() => patch({ format: chip.value as DocumentsHomeTypeFilter })}
+              >
+                {chip.labelKey ? t(chip.labelKey) : chip.literal}
+              </button>
+            )
+          },
+        )}
       </div>
 
       <label className="dh-filter-chip">

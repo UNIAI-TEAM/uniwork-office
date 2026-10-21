@@ -50,6 +50,10 @@ export const he = {
   dlSegEdited: 'נערכו',
   dlRecentSubtitle: 'מסמכים שפתחת או ערכת ב-30 הימים האחרונים',
   dlSearchIn: 'חיפוש ב{name}',
+  dlNavElsewhere: 'ממקומות אחרים',
+  dlElsewhereSubtitle: 'קבצים שנשלחו בצ\'אט, בפגישות, בדוא"ל ובמשימות של סביבת העבודה הזו',
+  dlElsewhereEmpty:
+    'עדיין אין קבצים. כאן יופיעו קבצים מצ\'אט, ממשימות, מפגישות ומדוא"ל שאפשר לראות.',
   dlContinueTitle: 'המשך',
   dlGroupCountOne: 'מסמכים: {n}',
   dlGroupCountOther: 'מסמכים: {n}',

@@ -50,6 +50,10 @@ export const id = {
   dlSegEdited: 'Diedit',
   dlRecentSubtitle: 'Dokumen yang Anda buka atau edit dalam 30 hari terakhir',
   dlSearchIn: 'Cari di {name}',
+  dlNavElsewhere: 'Dari tempat lain',
+  dlElsewhereSubtitle: 'File yang dikirim di Obrolan, Rapat, Email, dan Tugas workspace ini',
+  dlElsewhereEmpty:
+    'Belum ada file. File dari obrolan, tugas, rapat, dan email yang dapat Anda lihat muncul di sini.',
   dlContinueTitle: 'Lanjutkan',
   dlGroupCountOne: '{n} dokumen',
   dlGroupCountOther: '{n} dokumen',

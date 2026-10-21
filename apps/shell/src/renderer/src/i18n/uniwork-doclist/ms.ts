@@ -50,6 +50,11 @@ export const ms = {
   dlSegEdited: 'Disunting',
   dlRecentSubtitle: 'Dokumen yang anda buka atau edit dalam 30 hari lepas',
   dlSearchIn: 'Cari dalam {name}',
+  dlNavElsewhere: 'Dari tempat lain',
+  dlElsewhereSubtitle:
+    'Fail yang dihantar dalam Sembang, Mesyuarat, E-mel dan Tugasan ruang kerja ini',
+  dlElsewhereEmpty:
+    'Belum ada fail. Fail daripada sembang, tugasan, mesyuarat dan e-mel yang boleh anda lihat muncul di sini.',
   dlContinueTitle: 'Teruskan',
   dlGroupCountOne: '{n} dokumen',
   dlGroupCountOther: '{n} dokumen',

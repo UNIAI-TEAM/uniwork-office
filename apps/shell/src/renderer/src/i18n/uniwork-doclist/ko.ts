@@ -50,6 +50,10 @@ export const ko = {
   dlSegEdited: '편집한 항목',
   dlRecentSubtitle: '지난 30일 동안 열거나 편집한 문서',
   dlSearchIn: '{name}에서 검색',
+  dlNavElsewhere: '다른 곳에서',
+  dlElsewhereSubtitle: '이 워크스페이스의 채팅, 회의, 이메일, 작업에서 보낸 파일',
+  dlElsewhereEmpty:
+    '아직 파일이 없습니다. 볼 수 있는 채팅, 작업, 회의, 이메일의 파일이 여기에 표시됩니다.',
   dlContinueTitle: '이어서 하기',
   dlGroupCountOne: '문서 {n}개',
   dlGroupCountOther: '문서 {n}개',

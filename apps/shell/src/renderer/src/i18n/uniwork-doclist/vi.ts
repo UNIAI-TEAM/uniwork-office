@@ -50,6 +50,11 @@ export const vi = {
   dlSegEdited: 'Đã sửa',
   dlRecentSubtitle: 'Tài liệu bạn đã mở hoặc sửa trong 30 ngày qua',
   dlSearchIn: 'Tìm trong {name}',
+  dlNavElsewhere: 'Từ nơi khác',
+  dlElsewhereSubtitle:
+    'Tệp được gửi trong Trò chuyện, Cuộc họp, Email và Công việc của workspace này',
+  dlElsewhereEmpty:
+    'Chưa có file nào. File trong trò chuyện, công việc, cuộc họp và email mà bạn xem được sẽ hiện ở đây.',
   dlContinueTitle: 'Mở tiếp',
   dlGroupCountOne: '{n} tài liệu',
   dlGroupCountOther: '{n} tài liệu',

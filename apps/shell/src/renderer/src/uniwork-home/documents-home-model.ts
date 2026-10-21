@@ -45,6 +45,7 @@ export type DocumentsHomeSubViewId =
   | 'shared-by-me'
   | 'archive'
   | 'trash'
+  | 'elsewhere'
 
 export type DocumentsHomeDataSource =
   | 'children-root'
@@ -55,6 +56,7 @@ export type DocumentsHomeDataSource =
   | 'trash'
   | 'shelved'
   | 'favorites'
+  | 'sources'
   | 'none'
 
 export interface DocumentsHomeNavEntry {
@@ -120,6 +122,14 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
     labelKey: 'uhNavTrash',
     available: true,
     source: 'trash',
+  },
+  {
+    id: 'elsewhere',
+    labelKey: 'dlNavElsewhere',
+    // UNI-2047 B4: the web's "From elsewhere": the files of Chat, Meetings, Email and Tasks, a page of
+    // their own (the workspace root keeps merging the same rows, as the web does)
+    available: true,
+    source: 'sources',
   },
 ] as const
 
@@ -734,6 +744,20 @@ export async function fetchDocumentsHomeSources(
     ...(params.filters.format ? { type: params.filters.format } : {}),
     ...(params.cursor ? { cursor: params.cursor } : {}),
   })
+}
+
+/**
+ * UNI-2047 B4: the Người sửa options of the Từ nơi khác page: the owners of the loaded source files
+ * (a source file's editor is its owner), once each; an owner with no name is left out, never an id.
+ */
+export function sourceAuthorsOf(sources: readonly UniworkSourceFile[]): readonly UpdatedByOption[] {
+  const seen = new Map<string, string>()
+  for (const source of sources) {
+    const id = source.owner?.id.trim()
+    const name = source.owner?.name.trim()
+    if (id && name && !seen.has(id)) seen.set(id, name)
+  }
+  return Array.from(seen, ([id, name]) => ({ id, name }))
 }
 
 /**

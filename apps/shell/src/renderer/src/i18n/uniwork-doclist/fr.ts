@@ -50,6 +50,11 @@ export const fr = {
   dlSegEdited: 'Modifiés',
   dlRecentSubtitle: 'Documents que vous avez ouverts ou modifiés ces 30 derniers jours',
   dlSearchIn: 'Rechercher dans {name}',
+  dlNavElsewhere: 'Depuis ailleurs',
+  dlElsewhereSubtitle:
+    'Fichiers envoyés dans les discussions, réunions, e-mails et tâches de cet espace de travail',
+  dlElsewhereEmpty:
+    'Aucun fichier pour le moment. Les fichiers des discussions, tâches, réunions et e-mails que vous pouvez lire apparaissent ici.',
   dlContinueTitle: 'Reprendre',
   dlGroupCountOne: '{n} document',
   dlGroupCountOther: '{n} documents',

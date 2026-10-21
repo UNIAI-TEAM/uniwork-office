@@ -11,6 +11,7 @@ export const DOC_LIST_SCREENS = [
   'shared-by-me',
   'shelved',
   'trash',
+  'elsewhere',
   'device',
 ] as const
 export type DocListScreen = (typeof DOC_LIST_SCREENS)[number]
@@ -33,6 +34,7 @@ const SPECIAL: Record<DocListScreen, SpecialColumnId | null> = {
   'shared-by-me': 'shared_with',
   shelved: 'shelved',
   trash: 'deleted',
+  elsewhere: null,
   device: null,
 }
 
@@ -132,7 +134,8 @@ export function columnsFor(screen: DocListScreen, width?: number): ColumnId[] {
   const special = SPECIAL[screen]
   const rungs = RUNGS[hasButtonActions(screen) ? 'buttons' : special ? 'special' : 'plain']
   return [
-    'select',
+    // a source file of another module cannot be selected: its page has no Chọn column
+    ...(screen === 'elsewhere' ? [] : (['select'] as const)),
     'name',
     ...(special ? [special] : []),
     ...(w >= rungs.access ? (['access'] as const) : []),

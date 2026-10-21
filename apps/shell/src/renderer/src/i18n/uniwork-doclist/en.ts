@@ -50,6 +50,10 @@ export const en = {
   dlSegEdited: 'Edited',
   dlRecentSubtitle: 'Documents you opened or edited in the last 30 days',
   dlSearchIn: 'Search in {name}',
+  dlNavElsewhere: 'From elsewhere',
+  dlElsewhereSubtitle: 'Files sent in Chat, Meetings, Email and Tasks of this workspace',
+  dlElsewhereEmpty:
+    'No files yet. Files from chat, tasks, meetings and email that you can read show up here.',
   dlContinueTitle: 'Continue',
   dlGroupCountOne: '{n} document',
   dlGroupCountOther: '{n} documents',

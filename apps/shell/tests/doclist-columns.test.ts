@@ -45,7 +45,7 @@ describe('column order (Chọn · Tên · [đặc trưng] · Truy cập · Ngư�
     expect(columnsFor('device', WIDE)).toEqual(['select', 'name', 'updated', 'size', 'actions'])
   })
 
-  it('knows the 7 UniWork screens and the device list', () => {
+  it('knows the 7 UniWork screens, Từ nơi khác (UNI-2047 B4) and the device list', () => {
     expect([...DOC_LIST_SCREENS]).toEqual([
       'workspace',
       'recent',
@@ -54,6 +54,7 @@ describe('column order (Chọn · Tên · [đặc trưng] · Truy cập · Ngư�
       'shared-by-me',
       'shelved',
       'trash',
+      'elsewhere',
       'device',
     ])
   })
@@ -103,7 +104,12 @@ describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy 
   it('never hides Chọn, Tên, the screen column, Cập nhật or Thao tác', () => {
     for (const screen of DOC_LIST_SCREENS.filter((s) => s !== 'device')) {
       const cols = columnsFor(screen, 0)
-      for (const keep of ['select', 'name', 'updated', 'actions'] as ColumnId[]) {
+      // Từ nơi khác files cannot be selected: that page has no Chọn column
+      const keeps: ColumnId[] =
+        screen === 'elsewhere'
+          ? ['name', 'updated', 'actions']
+          : ['select', 'name', 'updated', 'actions']
+      for (const keep of keeps) {
         expect(cols).toContain(keep)
       }
       const special = specialColumn(screen)

@@ -50,6 +50,11 @@ export const nl = {
   dlSegEdited: 'Bewerkt',
   dlRecentSubtitle: 'Documenten die je de afgelopen 30 dagen hebt geopend of bewerkt',
   dlSearchIn: 'Zoeken in {name}',
+  dlNavElsewhere: 'Van elders',
+  dlElsewhereSubtitle:
+    'Bestanden die zijn verstuurd in de chat, vergaderingen, e-mail en taken van deze werkruimte',
+  dlElsewhereEmpty:
+    'Nog geen bestanden. Bestanden uit chat, taken, vergaderingen en e-mail die je kunt zien, verschijnen hier.',
   dlContinueTitle: 'Verdergaan',
   dlGroupCountOne: '{n} document',
   dlGroupCountOther: '{n} documenten',
