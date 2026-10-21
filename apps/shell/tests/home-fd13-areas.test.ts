@@ -741,7 +741,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     //     list (201 < 202) drains the remaining page(s)
     const updatedSort = () =>
       Array.from(
-        host.querySelectorAll<HTMLButtonElement>('.recent-columns button.cloud-col-sort-btn'),
+        host.querySelectorAll<HTMLButtonElement>('[role="columnheader"] button.dh-sort-head'),
       ).find((h) => h.textContent === 'Updated')!
     expect(updatedSort().textContent).toContain('Updated')
     await act(async () => {
@@ -751,9 +751,11 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
 
     expect(api.recents).toHaveBeenCalledTimes(3)
     expect(api.recents).toHaveBeenNthCalledWith(3, expect.objectContaining({ offset: 201 }))
-    const rowNames = Array.from(host.querySelectorAll('.recent-list .recent-name')).map(
-      (el) => el.textContent,
-    )
+    const rowNames = Array.from(
+      host.querySelectorAll(
+        '.dh-doc-table .dh-doc-row .dh-doc-open, .dh-doc-table .dh-doc-row .dh-doc-title',
+      ),
+    ).map((el) => el.textContent)
     expect(rowNames).toEqual([
       'Device Oldest Tail 3.docx',
       'Device Short 2.docx',
@@ -1542,7 +1544,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     }
   })
 
-  it('defines every var(--x) used in home.css and uniwork-folders.css and enforces board tab metrics, coarse-pointer target size, and >= 4.5:1 .recent-path contrast (FE13-R1-3, FE13-R1-10, V13-2, V13-3)', async () => {
+  it('defines every var(--x) used in home.css and uniwork-folders.css and enforces board tab metrics, coarse-pointer target size, and >= 4.5:1 device list second-line contrast (FE13-R1-3, FE13-R1-10, V13-2, V13-3)', async () => {
     const tokensCss = readFileSync(
       resolve(__dirname, '../../../packages/ui/src/tokens.css'),
       'utf8',
@@ -1553,6 +1555,11 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       'utf8',
     )
     const tabbarCss = readFileSync(resolve(__dirname, '../src/renderer/src/tabbar.css'), 'utf8')
+    // the device list is the shared DocList: its second line is styled by the Documents table sheet
+    const docsCss = readFileSync(
+      resolve(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
+      'utf8',
+    )
 
     // FE13-R1-3: every var(--x) in home.css and uniwork-folders.css is defined in tokens.css or shell CSS
     const definedVars = new Set<string>()
@@ -1577,7 +1584,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     const cleanedHomeCss = homeCss
       .replace(/@keyframes\s+[\w-]+\s*\{(?:\{[^{}]*\}|[^{}])*\}/g, '')
       .replace(/@position-try\s+[\w-]+\s*\{[^{}]*\}/g, '')
-    style.textContent = `${tokensCss}\n${cleanedHomeCss}`
+    style.textContent = `${tokensCss}\n${cleanedHomeCss}\n${docsCss}`
     document.head.appendChild(style)
 
     try {
@@ -1586,7 +1593,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
 
       const tablist = host.querySelector<HTMLElement>('.home-area-tabs')!
       const tab = host.querySelector<HTMLElement>('.home-area-tab.active')!
-      const recentPath = host.querySelector<HTMLElement>('.recent-item .recent-path')!
+      const recentPath = host.querySelector<HTMLElement>('.dh-doc-row .dh-doc-subpath')!
 
       expect(window.getComputedStyle(tablist).padding).toBe('4px')
       expect(window.getComputedStyle(tab).minHeight).toBe('34px')
@@ -1624,7 +1631,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
         return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
       }
 
-      // Check computed property on .recent-path uses var(--text-secondary)
+      // Check computed property on the second line uses var(--text-secondary)
       expect(window.getComputedStyle(recentPath).color).toBe('var(--text-secondary)')
       const lightSec = tokensCss.match(
         /:root\s*\{[\s\S]*?--text-secondary:\s*(#[0-9a-fA-F]{6})/,
