@@ -5631,10 +5631,8 @@ export function App() {
         },
         // F12 is DevTools in the web frame: swallowed only where Save As exists
         'save-as': () => consumeWhen(cap('saveAs'), () => void save(true)),
-        open: () => {
-          if (cap('open')) void openFile()
-          return true
-        },
+        // Ctrl/Cmd+O stays the browser's own dialog where the host grants no Open
+        open: () => consumeWhen(cap('open'), () => void openFile()),
         'print-preview': () => ifDoc(() => setShowPagePreview(true)),
         find: () => {
           openFind(setFindFocusInput)
