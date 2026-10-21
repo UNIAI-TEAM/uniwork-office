@@ -5,6 +5,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { announce } from '../src/renderer/src/uniwork-live'
 import { FolderUploadLayer } from '../src/renderer/src/uniwork-folder-upload/FolderUploadLayer'
 import {
   useFolderUpload,
@@ -17,6 +18,8 @@ import {
   progressOf,
   type FakeFolderUploadBridge,
 } from './folder-upload-fake-bridge'
+
+vi.mock('../src/renderer/src/uniwork-live', () => ({ announce: vi.fn() }))
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -700,24 +703,37 @@ describe('folder / multi-file upload screens', () => {
       expect(onFinished).toHaveBeenCalledTimes(2)
     })
 
-    it('closing the report without a retry dismisses the batch', async () => {
+    it('"Đóng" on the report only closes the report: the bar and the batch stay (RV-FE #7)', async () => {
       await partial()
       await click(buttonNamed('Xem', bars()[0]!))
       await click(buttonNamed('Đóng', dialog()!))
-      expect(bridge.dismiss).toHaveBeenCalledWith({ runId: 'run-1' })
-      expect(bridge.retry).not.toHaveBeenCalled()
       expect(dialog()).toBeNull()
-      expect(bars()).toHaveLength(0)
+      expect(bridge.dismiss).not.toHaveBeenCalled()
+      expect(bridge.retry).not.toHaveBeenCalled()
+      expect(bars()).toHaveLength(1)
+      // the report can be opened again, and still offers the retry
+      await click(buttonNamed('Xem', bars()[0]!))
+      expect(buttonNamed('Thử lại các tệp lỗi', dialog()!)).toBeTruthy()
     })
 
-    it('Esc on the report is the same as closing it', async () => {
+    it('Esc on the report only closes it', async () => {
       await partial()
       await click(buttonNamed('Xem', bars()[0]!))
       await act(async () => {
         dialog()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
       })
-      expect(bridge.dismiss).toHaveBeenCalledWith({ runId: 'run-1' })
-      expect(bars()).toHaveLength(0)
+      expect(dialog()).toBeNull()
+      expect(bridge.dismiss).not.toHaveBeenCalled()
+      expect(bars()).toHaveLength(1)
+    })
+
+    it('a click on the overlay only closes the report', async () => {
+      await partial()
+      await click(buttonNamed('Xem', bars()[0]!))
+      await click(document.querySelector('.uw-act-overlay'))
+      expect(dialog()).toBeNull()
+      expect(bridge.dismiss).not.toHaveBeenCalled()
+      expect(bars()).toHaveLength(1)
     })
 
     it('× on the bar of a run that ended with failures dismisses it too', async () => {
@@ -746,6 +762,32 @@ describe('folder / multi-file upload screens', () => {
       expect(buttonNamed('Thử lại các tệp lỗi', d)).toBeUndefined()
       expect(d.textContent).toContain('Sửa các tệp này rồi tải lên lại.')
       expect(d.textContent).toContain('Đã hết dung lượng lưu trữ.')
+    })
+
+    it('a mixed report keeps the retry and still says what to do about the final failures (RV-FE #10)', async () => {
+      await partial()
+      await click(buttonNamed('Xem', bars()[0]!))
+      const d = dialog()!
+      expect(buttonNamed('Thử lại các tệp lỗi', d)).toBeTruthy()
+      expect(d.textContent).toContain('Sửa các tệp này rồi tải lên lại.')
+    })
+
+    it('a report whose failures are all retryable has no final hint', async () => {
+      await mount()
+      await stage(preflightOf())
+      await click(buttonNamed('Tải lên', dialog()!))
+      await act(async () =>
+        bridge.emit(
+          progressOf({
+            phase: 'done',
+            done: 39,
+            failed: 1,
+            failures: [{ path: 'a.docx', code: 'network', retryable: true }],
+          }),
+        ),
+      )
+      await click(buttonNamed('Xem', bars()[0]!))
+      expect(dialog()!.textContent).not.toContain('Sửa các tệp này rồi tải lên lại.')
     })
 
     it('a retry that cannot start says so and drops the bar', async () => {
@@ -886,6 +928,207 @@ describe('folder / multi-file upload screens', () => {
         expect(buttonNamed('Tải lên', d)?.getAttribute('aria-busy')).toBeNull()
       })
     }
+  })
+
+  describe('a run that failed as a whole says why (RV-FE #4)', () => {
+    const failedWith = async (
+      error: { code: string; retryAfterSeconds?: number },
+      extra: Partial<ReturnType<typeof progressOf>> = {},
+      sdo = preflightOf(),
+      lang: 'vi' | 'en' = 'vi',
+    ) => {
+      await mount(lang)
+      await stage(sdo)
+      await click(buttonNamed(lang === 'vi' ? 'Tải lên' : 'Upload', dialog()!))
+      await act(async () => bridge.emit(progressOf({ phase: 'failed', error, ...extra })))
+      return bars()[0]!.textContent ?? ''
+    }
+
+    it('too many uploads running reads as the busy sentence, folder and files', async () => {
+      expect(await failedWith({ code: 'folder_uploads_busy', retryAfterSeconds: 30 })).toContain(
+        'Đang có quá nhiều lượt tải thư mục. Hãy thử lại sau ít phút.',
+      )
+    })
+
+    it('files mode has its own busy sentence', async () => {
+      const text = await failedWith(
+        { code: 'folder_uploads_busy' },
+        {},
+        preflightOf({ mode: 'files', rootName: undefined, totals: { files: 3, bytes: 3 } }),
+        'en',
+      )
+      expect(text).toContain('Too many uploads are running. Try again in a few minutes.')
+    })
+
+    it('an expired batch says how many went up, from the run', async () => {
+      const text = await failedWith(
+        { code: 'folder_upload_expired' },
+        { done: 12, total: 40, rootTitle: 'Hồ sơ 2052' },
+      )
+      expect(text).toContain(
+        'Lượt tải lên “Hồ sơ 2052” đã hết hạn — 12/40 tệp đã lên. Hãy tải lại thư mục.',
+      )
+    })
+
+    it('403 on the destination reads as the permission sentence', async () => {
+      expect(await failedWith({ code: 'http_403' })).toContain(
+        'Bạn không có quyền tải lên thư mục đích.',
+      )
+    })
+
+    it('404 on the destination reads as the not-found sentence', async () => {
+      expect(await failedWith({ code: 'http_404' })).toContain('Không tìm thấy thư mục đích.')
+    })
+
+    it('any other error keeps the plain sentence', async () => {
+      expect(await failedWith({ code: 'start_failed' })).toContain(
+        'Không tải lên được “Hồ sơ 2052”',
+      )
+    })
+
+    it('a failed run that carries failures offers "Xem" and lists them', async () => {
+      const text = await failedWith(
+        { code: 'start_failed' },
+        { failures: [{ path: 'Hồ sơ/a.docx', code: 'unreadable', retryable: true }] },
+      )
+      expect(text).toContain('Xem')
+      await click(buttonNamed('Xem', bars()[0]!))
+      expect(dialog()!.textContent).toContain('Hồ sơ/a.docx')
+      // nothing finished at the server, so there is nothing for "retry" to run
+      expect(buttonNamed('Thử lại các tệp lỗi', dialog()!)).toBeUndefined()
+    })
+
+    it('a failed run without failures has no "Xem"', async () => {
+      await failedWith({ code: 'folder_uploads_busy' })
+      expect(buttonNamed('Xem', bars()[0]!)).toBeUndefined()
+    })
+  })
+
+  describe('one set of bars and one announcement per end state (RV-FE #8)', () => {
+    const startRun = async () => {
+      await stage(preflightOf())
+      await click(buttonNamed('Tải lên', dialog()!))
+    }
+
+    function TwoLayers() {
+      const first = useFolderUpload({ bridge: bridgeInUse })
+      const second = useFolderUpload({ bridge: bridgeInUse })
+      firstController = first
+      return createElement(
+        'div',
+        null,
+        createElement(FolderUploadLayer, { controller: first }),
+        showFirst ? createElement(FolderUploadLayer, { controller: first }) : null,
+        createElement(FolderUploadLayer, { controller: second }),
+      )
+    }
+    let firstController: FolderUploadController
+    let showFirst = true
+
+    const mountTwo = async () => {
+      showFirst = true
+      await act(async () => {
+        root.render(createElement(LocaleProvider, { initial: 'vi' }, createElement(TwoLayers)))
+      })
+      await flush()
+    }
+
+    it('two mounted layers show one bar per run', async () => {
+      await mountTwo()
+      await act(async () => {
+        bridge.preflight.mockResolvedValueOnce([preflightOf()])
+        await firstController.drop(TARGET, ['/disk/x'])
+      })
+      await flush()
+      await click(buttonNamed('Tải lên', dialog()!))
+      await act(async () => bridge.emit(progressOf({ phase: 'uploading', done: 5 })))
+      expect(bars()).toHaveLength(1)
+    })
+
+    it('the bars move to the layer that is left when the owner goes', async () => {
+      await mountTwo()
+      await act(async () => {
+        bridge.preflight.mockResolvedValueOnce([preflightOf()])
+        await firstController.drop(TARGET, ['/disk/x'])
+      })
+      await flush()
+      await click(buttonNamed('Tải lên', dialog()!))
+      showFirst = false
+      await act(async () => {
+        root.render(createElement(LocaleProvider, { initial: 'vi' }, createElement(TwoLayers)))
+      })
+      expect(bars()).toHaveLength(1)
+      expect(bars()[0]!.textContent).toContain('Đang chuẩn bị')
+    })
+
+    it('announces an end state once, even when a screen mounts again', async () => {
+      await mount()
+      await startRun()
+      vi.mocked(announce).mockClear()
+      await act(async () => bridge.emit(progressOf({ phase: 'done', done: 40, rootTitle: 'X' })))
+      expect(announce).toHaveBeenCalledTimes(1)
+      await act(async () => root.unmount())
+      root = createRoot(host)
+      await mount()
+      expect(bars()).toHaveLength(1)
+      expect(announce).toHaveBeenCalledTimes(1)
+    })
+
+    it('a retry that settles again is announced again', async () => {
+      await mount()
+      await startRun()
+      const failures = [{ path: 'a', code: 'network', retryable: true }]
+      await act(async () =>
+        bridge.emit(progressOf({ phase: 'done', done: 39, failed: 1, failures })),
+      )
+      vi.mocked(announce).mockClear()
+      await act(async () => controller.retry('run-1'))
+      await act(async () => bridge.emit(progressOf({ phase: 'done', done: 40 })))
+      expect(announce).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('the share switch of the pre-flight (RV-FE #11, #14)', () => {
+    it('a destination already shared with the workspace shows the switch ON and locked, with its sentence', async () => {
+      await mount()
+      await stage(preflightOf({ parentShared: true }))
+      const d = dialog()!
+      const share = d.querySelector<HTMLElement>('[role="switch"]')!
+      expect(share.getAttribute('aria-checked')).toBe('true')
+      expect(share.getAttribute('aria-disabled')).toBe('true')
+      expect(d.textContent).toContain(
+        'Thư mục đích đang chia sẻ với workspace nên các tệp cũng vậy.',
+      )
+      expect(d.textContent).not.toContain('Thư mục vẫn riêng tư.')
+      await click(share)
+      expect(share.getAttribute('aria-checked')).toBe('true')
+      await click(buttonNamed('Tải lên', d))
+      // the destination's own sharing covers the files: nothing is sent
+      expect(bridge.start).toHaveBeenLastCalledWith({
+        preflightId: 'pf-1',
+        shareWithWorkspace: false,
+      })
+    })
+
+    it('a destination that is not shared keeps the switch free', async () => {
+      await mount()
+      await stage(preflightOf({ parentShared: false }))
+      const share = dialog()!.querySelector<HTMLElement>('[role="switch"]')!
+      expect(share.getAttribute('aria-checked')).toBe('false')
+      expect(share.getAttribute('aria-disabled')).toBeNull()
+    })
+
+    it('a click on the words of the share row toggles the switch', async () => {
+      await mount()
+      await stage(preflightOf())
+      const d = dialog()!
+      const share = d.querySelector<HTMLElement>('[role="switch"]')!
+      expect(share.closest('label')).not.toBeNull()
+      await click(share.closest('label')!.querySelector('span'))
+      expect(share.getAttribute('aria-checked')).toBe('true')
+      await click(share.closest('label')!.querySelector('span'))
+      expect(share.getAttribute('aria-checked')).toBe('false')
+    })
   })
 
   describe('the runs outlive the screen (UNI-2052 Q6)', () => {

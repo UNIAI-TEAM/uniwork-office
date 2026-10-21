@@ -191,6 +191,8 @@ describe('pick', () => {
       totals: { files: 2, bytes: 300 },
       refusal: null,
       shareAvailable: true,
+      // a folder is never a workspace-shared parent (the web's isParentWorkspaceShared, UNI-1974)
+      parentShared: false,
     })
     expect(sdo!.skipped).toEqual([{ path: 'Case/.hidden.docx', reason: 'hidden' }])
     expect(sdo!.rootNamePreview).toBeUndefined()
@@ -265,6 +267,7 @@ describe('destination', () => {
     const { service } = setup({ treeFails: true, picked: { dir: join(root, 'Case') } })
     const sdo = await service.pick({ workspaceId: 'w', folderId: 'f1', mode: 'folder' })
     expect(sdo?.refusal).toEqual({ code: 'target_unavailable' })
+    expect(sdo?.parentShared).toBe(false)
   })
 
   it('answers target_unavailable for a folder that is not in the tree', async () => {
@@ -349,7 +352,12 @@ describe('preflight from a drop', () => {
       folderId: 'f1',
       paths: [loose, join(root, 'DirA')],
     })
-    expect(out[0]).toMatchObject({ mode: 'files', refusal: null, shareAvailable: false })
+    expect(out[0]).toMatchObject({
+      mode: 'files',
+      refusal: null,
+      shareAvailable: false,
+      parentShared: false,
+    })
     expect(out[1]).toMatchObject({
       mode: 'folder',
       refusal: { code: 'folder_upload_unavailable' },

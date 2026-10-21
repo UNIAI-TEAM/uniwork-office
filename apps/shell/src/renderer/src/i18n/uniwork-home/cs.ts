@@ -168,6 +168,7 @@ export const cs = {
   fuDlgShare: 'Sdílet s pracovním prostorem',
   fuDlgShareHintFolder: 'Platí pro všechny soubory v tomto nahrávání. Složky zůstanou soukromé.',
   fuDlgShareHintFiles: 'Platí pro všechny soubory v tomto nahrávání.',
+  fuDlgShareInherited: 'Cílová složka je sdílena s pracovním prostorem, takže jsou i soubory.',
   fuDlgStarting: 'Připravuje se…',
   fuDlgQueued: 'Čeká ještě {count} nahrávání.',
   fuDlgQueuedOne: 'Čeká ještě {count} nahrávání.',
@@ -209,6 +210,14 @@ export const cs = {
   fuBarCanceledNone: 'Nahrávání zrušeno',
   fuBarFailed: '„{name}“ se nepodařilo nahrát',
   fuBarFailedFiles: 'Soubory se nepodařilo nahrát',
+  fuBarBusy: 'Běží příliš mnoho nahrávání složek. Zkuste to znovu za několik minut.',
+  fuBarBusyFiles: 'Běží příliš mnoho nahrávání. Zkuste to znovu za několik minut.',
+  fuBarExpired:
+    'Nahrávání „{name}“ vypršelo — nahráno bylo {done}/{total} souborů. Nahrajte složku znovu.',
+  fuBarExpiredFiles:
+    'Nahrávání vypršelo — nahráno bylo {done}/{total} souborů. Nahrajte soubory znovu.',
+  fuDestForbidden: 'Nemáte oprávnění nahrávat do cílové složky.',
+  fuDestNotFound: 'Cílová složka nebyla nalezena. Možná byla smazána nebo přesunuta.',
   fuDropTitle: 'Puštěním nahrajete',
   fuDropHint: 'Soubory a složky půjdou do „{target}“',
   fuDropUnavailable: 'Nahrávání složek tu není k dispozici. Přetáhněte soubory jeden po druhém.',

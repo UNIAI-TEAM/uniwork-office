@@ -108,6 +108,8 @@ export function refusalMessage(
       })
     case 'nothing_to_upload':
       return t(files ? 'fuRefNothingFiles' : 'fuRefNothing')
+    case 'target_unavailable':
+      return t('fuDestNotFound')
     case 'segment_too_long':
       return t('fuRefSegment')
     case 'multiple_roots':
@@ -147,4 +149,33 @@ export function failureReasonMessage(t: TFunc, code: string): string {
 /** True when the report has something to retry: a failure the runner marked retryable */
 export function hasRetryable(failures: readonly FolderUploadFailure[]): boolean {
   return failures.some((failure) => failure.retryable)
+}
+
+/**
+ * The bar's sentence for a run that failed as a whole, by the code main saw:
+ * busy, an expired batch (some files did go up), no permission, destination gone.
+ * Null = no sentence for this code; the bar then says the plain "could not upload".
+ */
+export function runErrorMessage(
+  t: TFunc,
+  error: { code: string } | undefined,
+  run: { mode: FolderUploadMode; name: string; done: number; total: number },
+): string | null {
+  const files = run.mode === 'files'
+  switch (error?.code) {
+    case 'folder_uploads_busy':
+      return t(files ? 'fuBarBusyFiles' : 'fuBarBusy')
+    case 'folder_upload_expired':
+      return t(files ? 'fuBarExpiredFiles' : 'fuBarExpired', {
+        name: run.name,
+        done: run.done,
+        total: run.total,
+      })
+    case 'http_403':
+      return t('fuDestForbidden')
+    case 'http_404':
+      return t('fuDestNotFound')
+    default:
+      return null
+  }
 }

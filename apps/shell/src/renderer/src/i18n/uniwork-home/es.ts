@@ -169,6 +169,8 @@ export const es = {
   fuDlgShareHintFolder:
     'Se aplica a todos los archivos de esta subida. Las carpetas siguen siendo privadas.',
   fuDlgShareHintFiles: 'Se aplica a todos los archivos de esta subida.',
+  fuDlgShareInherited:
+    'La carpeta de destino está compartida con el espacio de trabajo, así que los archivos también.',
   fuDlgStarting: 'Preparando…',
   fuDlgQueued: 'Hay {count} subidas más en espera.',
   fuDlgQueuedOne: 'Hay {count} subida más en espera.',
@@ -211,6 +213,14 @@ export const es = {
   fuBarCanceledNone: 'Subida cancelada',
   fuBarFailed: 'No se pudo subir «{name}»',
   fuBarFailedFiles: 'No se pudieron subir los archivos',
+  fuBarBusy: 'Hay demasiadas subidas de carpetas en curso. Inténtalo de nuevo en unos minutos.',
+  fuBarBusyFiles: 'Hay demasiadas subidas en curso. Inténtalo de nuevo en unos minutos.',
+  fuBarExpired:
+    'La subida de «{name}» caducó — se subieron {done}/{total} archivos. Vuelve a subir la carpeta.',
+  fuBarExpiredFiles:
+    'La subida caducó — se subieron {done}/{total} archivos. Vuelve a subir los archivos.',
+  fuDestForbidden: 'No tienes permiso para subir archivos a la carpeta de destino.',
+  fuDestNotFound: 'No se encontró la carpeta de destino. Puede que se haya eliminado o movido.',
   fuDropTitle: 'Suelta para subir',
   fuDropHint: 'Los archivos y carpetas se subirán a «{target}»',
   fuDropUnavailable:

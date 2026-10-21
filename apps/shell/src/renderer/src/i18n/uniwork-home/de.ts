@@ -172,6 +172,7 @@ export const de = {
   fuDlgShare: 'Mit Arbeitsbereich teilen',
   fuDlgShareHintFolder: 'Gilt für jede Datei in diesem Upload. Die Ordner bleiben privat.',
   fuDlgShareHintFiles: 'Gilt für jede Datei in diesem Upload.',
+  fuDlgShareInherited: 'Der Zielordner ist mit dem Arbeitsbereich geteilt, daher auch die Dateien.',
   fuDlgStarting: 'Wird vorbereitet…',
   fuDlgQueued: '{count} weitere Uploads warten.',
   fuDlgQueuedOne: '{count} weiterer Upload wartet.',
@@ -214,6 +215,15 @@ export const de = {
   fuBarCanceledNone: 'Upload abgebrochen',
   fuBarFailed: '„{name}“ konnte nicht hochgeladen werden',
   fuBarFailedFiles: 'Die Dateien konnten nicht hochgeladen werden',
+  fuBarBusy: 'Es laufen zu viele Ordner-Uploads. Versuchen Sie es in einigen Minuten erneut.',
+  fuBarBusyFiles: 'Es laufen zu viele Uploads. Versuchen Sie es in einigen Minuten erneut.',
+  fuBarExpired:
+    'Der Upload von „{name}“ ist abgelaufen — {done}/{total} Dateien wurden hochgeladen. Laden Sie den Ordner erneut hoch.',
+  fuBarExpiredFiles:
+    'Der Upload ist abgelaufen — {done}/{total} Dateien wurden hochgeladen. Laden Sie die Dateien erneut hoch.',
+  fuDestForbidden: 'Sie haben keine Berechtigung, in den Zielordner hochzuladen.',
+  fuDestNotFound:
+    'Der Zielordner wurde nicht gefunden. Möglicherweise wurde er gelöscht oder verschoben.',
   fuDropTitle: 'Zum Hochladen ablegen',
   fuDropHint: 'Dateien und Ordner gehen nach „{target}“',
   fuDropUnavailable: 'Ordner-Upload ist hier nicht verfügbar. Legen Sie die Dateien einzeln ab.',

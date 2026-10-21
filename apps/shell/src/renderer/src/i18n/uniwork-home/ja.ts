@@ -170,6 +170,8 @@ export const ja = {
   fuDlgShareHintFolder:
     'このアップロードのすべてのファイルに適用されます。フォルダーは非公開のままです。',
   fuDlgShareHintFiles: 'このアップロードのすべてのファイルに適用されます。',
+  fuDlgShareInherited:
+    'アップロード先のフォルダーはワークスペースと共有されているため、ファイルも共有されます。',
   fuDlgStarting: '準備中…',
   fuDlgQueued: '他に {count} 件のアップロードが待機中です。',
   fuDlgQueuedOne: '他に {count} 件のアップロードが待機中です。',
@@ -211,6 +213,15 @@ export const ja = {
   fuBarCanceledNone: 'アップロードをキャンセルしました',
   fuBarFailed: '「{name}」をアップロードできませんでした',
   fuBarFailedFiles: 'ファイルをアップロードできませんでした',
+  fuBarBusy: 'フォルダーのアップロードが多数実行中です。数分後にもう一度お試しください。',
+  fuBarBusyFiles: 'アップロードが多数実行中です。数分後にもう一度お試しください。',
+  fuBarExpired:
+    '「{name}」のアップロードの有効期限が切れました — {done}/{total} 件のファイルはアップロード済みです。フォルダーをもう一度アップロードしてください。',
+  fuBarExpiredFiles:
+    'アップロードの有効期限が切れました — {done}/{total} 件のファイルはアップロード済みです。ファイルをもう一度アップロードしてください。',
+  fuDestForbidden: 'アップロード先のフォルダーにアップロードする権限がありません。',
+  fuDestNotFound:
+    'アップロード先のフォルダーが見つかりません。削除または移動された可能性があります。',
   fuDropTitle: 'ドロップしてアップロード',
   fuDropHint: 'ファイルとフォルダーは「{target}」に追加されます',
   fuDropUnavailable:

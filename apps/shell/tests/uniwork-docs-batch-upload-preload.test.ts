@@ -84,6 +84,7 @@ const SDO = {
   skipped: [{ path: 'Case/ln.docx', reason: 'link' }],
   refusal: null,
   shareAvailable: true,
+  parentShared: false,
 }
 
 describe('the object the renderer reads (window.uniworkFolderUpload)', () => {
@@ -203,6 +204,21 @@ describe('the batch-upload bridge', () => {
     const out = (await bridge.uniworkBatchUploadPick({})) as Record<string, unknown>
     expect(out).toEqual(SDO)
     expect(out).not.toHaveProperty('absolutePath')
+  })
+
+  it('narrows parentShared to a boolean: true only as true, absent or odd means false', async () => {
+    const shared = await loadBridge({ ...SDO, parentShared: true })
+    expect(
+      ((await shared.bridge.uniworkBatchUploadPick({})) as { parentShared: boolean }).parentShared,
+    ).toBe(true)
+    const { parentShared: _omit, ...without } = SDO
+    for (const reply of [without, { ...SDO, parentShared: 'yes' }, { ...SDO, parentShared: 1 }]) {
+      const loaded = await loadBridge(reply)
+      expect(
+        ((await loaded.bridge.uniworkBatchUploadPick({})) as { parentShared: boolean })
+          .parentShared,
+      ).toBe(false)
+    }
   })
 
   it('answers null for a pick reply that is not a preflight, [] for a bad preflight list', async () => {

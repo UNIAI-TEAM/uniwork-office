@@ -29,6 +29,13 @@ describe('folder-upload strings (uniwork-home shard)', () => {
       'fuBarPartial',
       'fuRepRetry',
       'fuDropTitle',
+      'fuBarBusy',
+      'fuBarBusyFiles',
+      'fuBarExpired',
+      'fuBarExpiredFiles',
+      'fuDestForbidden',
+      'fuDestNotFound',
+      'fuDlgShareInherited',
     ]) {
       expect(fuKeys).toContain(key)
     }
@@ -59,6 +66,17 @@ describe('folder-upload strings (uniwork-home shard)', () => {
     expect(vi.fuBarRunning).toBe('Đang tải lên “{name}” — {done}/{total} tệp')
     expect(en.fuBarRunning).toBe('Uploading “{name}” — {done}/{total} files')
     expect(vi.fuDlgShare).toBe('Chia sẻ với workspace')
+    // the whole-run sentences are the web's error.* / toast.expired* copy
+    expect(en.fuBarBusy).toBe('Too many folder uploads are running. Try again in a few minutes.')
+    expect(en.fuBarExpired).toBe(
+      'The upload of “{name}” expired — {done}/{total} files went up. Upload the folder again.',
+    )
+    expect(vi.fuDestNotFound).toBe(
+      'Không tìm thấy thư mục đích. Có thể nó đã bị xóa hoặc chuyển đi.',
+    )
+    expect(en.fuDlgShareInherited).toBe(
+      'The destination folder is shared with the workspace, so the files are too.',
+    )
     // Words that are the same as English in a few languages.
     const sameAsEn: Record<string, string[] | undefined> = {
       fuDlgRoot: ['id', 'ms', 'pl'],

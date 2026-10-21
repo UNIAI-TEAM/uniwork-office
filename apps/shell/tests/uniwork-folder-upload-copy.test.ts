@@ -133,6 +133,23 @@ describe('folder-upload copy', () => {
     })
   })
 
+  describe('a destination that cannot be reached (RV-FE #5)', () => {
+    it('target_unavailable names the destination, not the upload limits', () => {
+      expect(refusalMessage(en, { code: 'target_unavailable' }, 'folder', 'en-US')).toBe(
+        'The destination folder wasn’t found. It may have been deleted or moved.',
+      )
+      expect(refusalMessage(vi, { code: 'target_unavailable' }, 'files', 'vi-VN')).toBe(
+        'Không tìm thấy thư mục đích. Có thể nó đã bị xóa hoặc chuyển đi.',
+      )
+    })
+
+    it('folder_upload_unavailable keeps the plain over-the-limits sentence', () => {
+      expect(refusalMessage(en, { code: 'folder_upload_unavailable' }, 'folder', 'en-US')).toBe(
+        'This folder is over the upload limits.',
+      )
+    })
+  })
+
   describe('failure reasons', () => {
     it('one sentence per code, any http_5nn is the server-down sentence', () => {
       expect(failureReasonMessage(en, 'network')).toBe(

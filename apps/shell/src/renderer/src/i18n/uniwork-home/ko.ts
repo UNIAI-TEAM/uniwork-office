@@ -167,6 +167,7 @@ export const ko = {
   fuDlgShare: '워크스페이스와 공유',
   fuDlgShareHintFolder: '이번 업로드의 모든 파일에 적용됩니다. 폴더는 비공개로 유지됩니다.',
   fuDlgShareHintFiles: '이번 업로드의 모든 파일에 적용됩니다.',
+  fuDlgShareInherited: '대상 폴더가 워크스페이스와 공유되어 있어 파일도 함께 공유됩니다.',
   fuDlgStarting: '준비 중…',
   fuDlgQueued: '대기 중인 업로드가 {count}개 더 있습니다.',
   fuDlgQueuedOne: '대기 중인 업로드가 {count}개 더 있습니다.',
@@ -208,6 +209,14 @@ export const ko = {
   fuBarCanceledNone: '업로드가 취소되었습니다',
   fuBarFailed: '“{name}”을(를) 업로드할 수 없습니다',
   fuBarFailedFiles: '파일을 업로드할 수 없습니다',
+  fuBarBusy: '진행 중인 폴더 업로드가 너무 많습니다. 몇 분 후에 다시 시도하세요.',
+  fuBarBusyFiles: '진행 중인 업로드가 너무 많습니다. 몇 분 후에 다시 시도하세요.',
+  fuBarExpired:
+    '“{name}” 업로드가 만료되었습니다 — 파일 {done}/{total}개가 업로드되었습니다. 폴더를 다시 업로드하세요.',
+  fuBarExpiredFiles:
+    '업로드가 만료되었습니다 — 파일 {done}/{total}개가 업로드되었습니다. 파일을 다시 업로드하세요.',
+  fuDestForbidden: '대상 폴더에 업로드할 권한이 없습니다.',
+  fuDestNotFound: '대상 폴더를 찾을 수 없습니다. 삭제되었거나 이동되었을 수 있습니다.',
   fuDropTitle: '놓아서 업로드',
   fuDropHint: '파일과 폴더가 “{target}”(으)로 들어갑니다',
   fuDropUnavailable: '여기에서는 폴더 업로드를 사용할 수 없습니다. 파일을 하나씩 놓아 주세요.',

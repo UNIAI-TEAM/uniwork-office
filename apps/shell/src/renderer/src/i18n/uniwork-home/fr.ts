@@ -171,6 +171,8 @@ export const fr = {
   fuDlgShareHintFolder:
     'S’applique à chaque fichier de ce téléversement. Les dossiers restent privés.',
   fuDlgShareHintFiles: 'S’applique à chaque fichier de ce téléversement.',
+  fuDlgShareInherited:
+    'Le dossier de destination est partagé avec l’espace de travail, les fichiers le sont donc aussi.',
   fuDlgStarting: 'Préparation…',
   fuDlgQueued: '{count} autres téléversements sont en attente.',
   fuDlgQueuedOne: '{count} autre téléversement est en attente.',
@@ -212,6 +214,15 @@ export const fr = {
   fuBarCanceledNone: 'Téléversement annulé',
   fuBarFailed: 'Impossible de téléverser « {name} »',
   fuBarFailedFiles: 'Impossible de téléverser les fichiers',
+  fuBarBusy: 'Trop de téléversements de dossiers sont en cours. Réessayez dans quelques minutes.',
+  fuBarBusyFiles: 'Trop de téléversements sont en cours. Réessayez dans quelques minutes.',
+  fuBarExpired:
+    'Le téléversement de « {name} » a expiré — {done}/{total} fichiers ont été téléversés. Téléversez à nouveau le dossier.',
+  fuBarExpiredFiles:
+    'Le téléversement a expiré — {done}/{total} fichiers ont été téléversés. Téléversez à nouveau les fichiers.',
+  fuDestForbidden: 'Vous n’avez pas l’autorisation de téléverser dans le dossier de destination.',
+  fuDestNotFound:
+    'Le dossier de destination est introuvable. Il a peut-être été supprimé ou déplacé.',
   fuDropTitle: 'Déposez pour téléverser',
   fuDropHint: 'Les fichiers et dossiers iront dans « {target} »',
   fuDropUnavailable:

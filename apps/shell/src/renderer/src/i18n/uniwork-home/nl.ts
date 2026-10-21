@@ -169,6 +169,7 @@ export const nl = {
   fuDlgShare: 'Delen met werkruimte',
   fuDlgShareHintFolder: 'Geldt voor elk bestand in deze upload. De mappen blijven privé.',
   fuDlgShareHintFiles: 'Geldt voor elk bestand in deze upload.',
+  fuDlgShareInherited: 'De doelmap is gedeeld met de werkruimte, dus de bestanden ook.',
   fuDlgStarting: 'Voorbereiden…',
   fuDlgQueued: 'Er wachten nog {count} uploads.',
   fuDlgQueuedOne: 'Er wacht nog {count} upload.',
@@ -210,6 +211,15 @@ export const nl = {
   fuBarCanceledNone: 'Upload geannuleerd',
   fuBarFailed: '“{name}” kon niet worden geüpload',
   fuBarFailedFiles: 'De bestanden konden niet worden geüpload',
+  fuBarBusy:
+    'Er worden te veel mappen tegelijk geüpload. Probeer het over een paar minuten opnieuw.',
+  fuBarBusyFiles: 'Er lopen te veel uploads. Probeer het over een paar minuten opnieuw.',
+  fuBarExpired:
+    'De upload van “{name}” is verlopen — {done}/{total} bestanden zijn geüpload. Upload de map opnieuw.',
+  fuBarExpiredFiles:
+    'De upload is verlopen — {done}/{total} bestanden zijn geüpload. Upload de bestanden opnieuw.',
+  fuDestForbidden: 'Er is geen toestemming om naar de doelmap te uploaden.',
+  fuDestNotFound: 'De doelmap is niet gevonden. Mogelijk is de map verwijderd of verplaatst.',
   fuDropTitle: 'Loslaten om te uploaden',
   fuDropHint: 'Bestanden en mappen gaan naar “{target}”',
   fuDropUnavailable: 'Map uploaden is hier niet beschikbaar. Sleep de bestanden één voor één.',

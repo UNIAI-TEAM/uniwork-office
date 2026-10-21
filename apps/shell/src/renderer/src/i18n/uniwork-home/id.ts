@@ -168,6 +168,7 @@ export const id = {
   fuDlgShare: 'Bagikan dengan ruang kerja',
   fuDlgShareHintFolder: 'Berlaku untuk setiap file dalam unggahan ini. Folder tetap pribadi.',
   fuDlgShareHintFiles: 'Berlaku untuk setiap file dalam unggahan ini.',
+  fuDlgShareInherited: 'Folder tujuan dibagikan dengan ruang kerja, jadi file-nya juga.',
   fuDlgStarting: 'Menyiapkan…',
   fuDlgQueued: '{count} unggahan lain sedang menunggu.',
   fuDlgQueuedOne: '{count} unggahan lain sedang menunggu.',
@@ -209,6 +210,14 @@ export const id = {
   fuBarCanceledNone: 'Unggahan dibatalkan',
   fuBarFailed: '“{name}” tidak dapat diunggah',
   fuBarFailedFiles: 'File tidak dapat diunggah',
+  fuBarBusy: 'Terlalu banyak unggahan folder yang sedang berjalan. Coba lagi beberapa menit lagi.',
+  fuBarBusyFiles: 'Terlalu banyak unggahan yang sedang berjalan. Coba lagi beberapa menit lagi.',
+  fuBarExpired:
+    'Unggahan “{name}” kedaluwarsa — {done}/{total} file sudah terunggah. Unggah folder itu lagi.',
+  fuBarExpiredFiles:
+    'Unggahan kedaluwarsa — {done}/{total} file sudah terunggah. Unggah file itu lagi.',
+  fuDestForbidden: 'Anda tidak memiliki izin untuk mengunggah ke folder tujuan.',
+  fuDestNotFound: 'Folder tujuan tidak ditemukan. Mungkin sudah dihapus atau dipindahkan.',
   fuDropTitle: 'Lepaskan untuk mengunggah',
   fuDropHint: 'File dan folder akan masuk ke “{target}”',
   fuDropUnavailable: 'Unggah folder tidak tersedia di sini. Lepaskan file satu per satu.',

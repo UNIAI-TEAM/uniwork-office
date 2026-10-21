@@ -54,7 +54,7 @@ export interface FolderUploadController {
   cancelDialog(): void
   cancelRun(runId: string): void
   openReport(runId: string): void
-  /** the report was closed without a retry: the batch is dismissed */
+  /** Esc, the overlay or "Close" on the report: only the report goes, the bar and the batch stay */
   closeReport(runId: string): void
   retry(runId: string): Promise<void>
   /** × on a bar: a run that ended with failures is dismissed on the server, any other just disappears */
@@ -253,20 +253,15 @@ export function useFolderUpload({
 
   const openReport = useCallback((runId: string) => setReportRunId(runId), [])
 
-  const closeReport = useCallback(
-    (runId: string) => {
-      dismissOnServer(runId)
-      removeFolderUploadRun(runId)
-      setReportRunId((open) => (open === runId ? null : open))
-    },
-    [dismissOnServer],
-  )
+  const closeReport = useCallback((runId: string) => {
+    setReportRunId((open) => (open === runId ? null : open))
+  }, [])
 
   const retry = useCallback(
     async (runId: string): Promise<void> => {
       if (!bridge) return
       setReportRunId((open) => (open === runId ? null : open))
-      patchFolderUploadRun(runId, { phase: 'uploading', failed: 0, failures: [] })
+      patchFolderUploadRun(runId, { phase: 'uploading', failed: 0, failures: [], error: undefined })
       try {
         await bridge.retry({ runId })
       } catch {

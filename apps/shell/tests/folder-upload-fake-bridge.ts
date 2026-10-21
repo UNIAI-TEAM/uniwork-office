@@ -16,6 +16,7 @@ export function preflightOf(overrides: Partial<PreflightSDO> = {}): PreflightSDO
     skipped: [],
     refusal: null,
     shareAvailable: true,
+    parentShared: false,
     ...overrides,
   }
 }

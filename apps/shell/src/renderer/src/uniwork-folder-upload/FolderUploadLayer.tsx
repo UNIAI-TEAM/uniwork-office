@@ -1,6 +1,7 @@
 import { ActionToast } from '../UniworkDocActions'
 import { useI18n } from '../locale'
 import { FolderUploadBars } from './FolderUploadBars'
+import { useOwnsFolderUploadBars } from './bars-owner'
 import { FolderUploadDialog } from './FolderUploadDialog'
 import { FolderUploadReport } from './FolderUploadReport'
 import type { FolderUploadController } from './use-folder-upload'
@@ -10,6 +11,8 @@ export function FolderUploadLayer({ controller }: { controller: FolderUploadCont
   const { t } = useI18n()
   const first = controller.queue[0]
   const reporting = controller.runs.find((run) => run.reportOpen)
+  // a second mounted layer (the Open dialog over the home) leaves the bars to the first
+  const ownsBars = useOwnsFolderUploadBars()
   return (
     <>
       {first && (
@@ -31,13 +34,15 @@ export function FolderUploadLayer({ controller }: { controller: FolderUploadCont
           onClose={() => controller.closeReport(reporting.runId)}
         />
       )}
-      <FolderUploadBars
-        runs={controller.runs}
-        onCancel={controller.cancelRun}
-        onOpenReport={controller.openReport}
-        onOpenFolder={controller.onOpenFolder}
-        onClose={controller.closeRun}
-      />
+      {ownsBars && (
+        <FolderUploadBars
+          runs={controller.runs}
+          onCancel={controller.cancelRun}
+          onOpenReport={controller.openReport}
+          onOpenFolder={controller.onOpenFolder}
+          onClose={controller.closeRun}
+        />
+      )}
       {controller.notice && (
         <ActionToast message={t(controller.notice.key)} onDone={controller.clearNotice} />
       )}
