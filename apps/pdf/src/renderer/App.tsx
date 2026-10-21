@@ -6985,6 +6985,7 @@ export default function App() {
                 key={id}
                 className={`ribbon-tab ${collapse.tabClass(ribbonTab === id)}`}
                 data-tip={collapse.tabTip(ribbonTab === id)}
+                aria-keyshortcuts={collapse.tabKeyshortcuts(ribbonTab === id)}
                 onClick={() => {
                   collapse.onTabPress(ribbonTab === id)
                   setRibbonTab(id)
@@ -6997,6 +6998,7 @@ export default function App() {
               <button
                 className={`ribbon-tab ribbon-tab-context ${collapse.tabClass(ribbonTab === 'fillForm')}`}
                 data-tip={collapse.tabTip(ribbonTab === 'fillForm')}
+                aria-keyshortcuts={collapse.tabKeyshortcuts(ribbonTab === 'fillForm')}
                 onClick={() => {
                   collapse.onTabPress(ribbonTab === 'fillForm')
                   setRibbonTab('fillForm')
