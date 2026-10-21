@@ -20,6 +20,10 @@ describe('HTML app controls', () => {
   })
 
   it('Exit presentation is named without its key, Escape in aria-keyshortcuts', () => {
-    expect(APP).toMatch(/aria-label=\{t\('presentExitName'\)\}\s+aria-keyshortcuts="Escape"/)
+    // the plain name is the button text and the (Esc) hint an aria-hidden span, so the visible
+    // label contains the name (WCAG 2.5.3)
+    expect(APP).toMatch(
+      /className="present-exit"\s+aria-keyshortcuts="Escape"[^>]*>\s*\{t\('presentExitName'\)\}\s*<span aria-hidden="true">\s*\{keyHintAfterName\(t\('presentExit'\), t\('presentExitName'\)\)\}/,
+    )
   })
 })
