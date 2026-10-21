@@ -1,14 +1,15 @@
-// What a list remembers per account and screen: its sort and its collapsed
-// groups. Both live in the Workbench store, which is already one bucket per
-// UniWork account, under the allowed `uniwork.wb.` prefix. Values the code
-// does not know are dropped; a store that cannot be read or written leaves
-// the defaults, so a list always renders.
+// What a list remembers per account and screen: its sort, its collapsed
+// groups and the Recent segment. All live in the Workbench store, which is
+// already one bucket per UniWork account, under the allowed `uniwork.wb.`
+// prefix. Values the code does not know are dropped; a store that cannot be
+// read or written leaves the defaults, so a list always renders.
 import { wbStoreRead, wbStoreWrite } from '../workbench-store-client'
 import { DOC_LIST_SCREENS, isSortable, type DocListScreen, type SortSpec } from './columns'
 import { groupIdsFor, type GroupId } from './groups'
 
 export const DOCLIST_SORT_KEY = 'uniwork.wb.doclist.sort'
 export const DOCLIST_GROUPS_KEY = 'uniwork.wb.doclist.groups'
+export const DOCLIST_SEGMENT_KEY = 'uniwork.wb.doclist.segment'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -93,4 +94,17 @@ export function toggleGroup(screen: DocListScreen, id: GroupId): GroupId[] {
   const next = current.includes(id) ? current.filter((g) => g !== id) : [...current, id]
   writeCollapsedGroups(screen, next)
   return next.filter((g) => groupIdsFor(screen).includes(g))
+}
+
+/** the Recent screen's segment: Tất cả, Đã mở (last touch = opened) or Đã sửa (edited) */
+export type RecentSegment = 'all' | 'opened' | 'edited'
+
+/** the stored Recent segment (`{"recent":"opened"}`); anything else reads as Tất cả */
+export function readRecentSegment(): RecentSegment {
+  const value = readMap(DOCLIST_SEGMENT_KEY).recent
+  return value === 'opened' || value === 'edited' ? value : 'all'
+}
+
+export function writeRecentSegment(segment: RecentSegment): void {
+  writeMap(DOCLIST_SEGMENT_KEY, segment === 'all' ? {} : { recent: segment })
 }

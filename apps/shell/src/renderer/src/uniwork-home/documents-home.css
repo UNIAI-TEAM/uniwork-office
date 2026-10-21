@@ -1349,3 +1349,115 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* UNI-2047: day / week groups of Recent and Shared with me (doclist/GroupHeader) */
+.dh-doc-row.grouped {
+  padding-left: 28px;
+}
+
+.dh-group-row {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
+.dh-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dh-group-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.dh-group-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.dh-group-chevron {
+  flex: none;
+}
+
+.dh-group-toggle[aria-expanded='false'] .dh-group-chevron {
+  transform: rotate(-90deg);
+}
+
+/* Recent's screen column: a dot per kind of last touch, then the words */
+.dh-act-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-tertiary);
+}
+
+.dh-act-dot[data-kind='opened'] {
+  background: var(--tint-blue-fg);
+}
+
+.dh-act-dot[data-kind='edited'] {
+  background: var(--success);
+}
+
+.dh-act-dot[data-kind='commented'] {
+  background: var(--tint-violet-fg);
+}
+
+.dh-special-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Recent's Tất cả / Đã mở / Đã sửa segment (doclist/RecentSegment) */
+.dh-segment {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.dh-segment-btn {
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dh-segment-btn:hover {
+  color: var(--text);
+}
+
+.dh-segment-btn[aria-pressed='true'] {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.dh-segment-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

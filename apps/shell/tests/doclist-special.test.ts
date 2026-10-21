@@ -4,6 +4,8 @@
  * UNI-2047 A2c: the screen columns of Recent / Shared with me / Shared by me, the collapsible
  * day and week groups under them, and the Recent segment (Tất cả / Đã mở / Đã sửa).
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -582,7 +584,7 @@ describe('DocumentsHome: the Recent segment sends activity (UNI-2047 A2c)', () =
     await mount('recent')
     await click(seg('opened'))
     expect(lastCall('uniworkListDocuments')).toMatchObject({ activity: 'opened' })
-    expect(lastCall('uniworkListDocuments')).not.toHaveProperty('cursor')
+    expect(lastCall('uniworkListDocuments').cursor).toBeUndefined()
     expect(seg('opened')?.getAttribute('aria-pressed')).toBe('true')
     expect(seg('all')?.getAttribute('aria-pressed')).toBe('false')
     await click(seg('edited'))
@@ -663,10 +665,9 @@ describe('DocumentsHome: the Recent segment sends activity (UNI-2047 A2c)', () =
 })
 
 describe('the group indent is 28px (CSS)', () => {
-  it('documents-home.css indents a grouped row by 28px with theme tokens only', async () => {
-    const { readFileSync } = await import('node:fs')
+  it('documents-home.css indents a grouped row by 28px and styles the dot, header and segment', () => {
     const css = readFileSync(
-      new URL('../src/renderer/src/uniwork-home/documents-home.css', import.meta.url),
+      resolve(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
       'utf8',
     )
     expect(css).toMatch(/\.dh-doc-row\.grouped\s*\{[^}]*28px/)
