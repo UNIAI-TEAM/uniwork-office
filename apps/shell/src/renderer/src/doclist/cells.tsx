@@ -6,7 +6,7 @@ import { useI18n } from '../locale'
 import { shelverLabelOf, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
 import { ACCESS_PILL_KEY, accessPill, levelLine } from './access'
 import type { ColumnId, DocListScreen, SpecialColumnId } from './columns'
-import { EMPTY_CELL, activityKey, formatDaysLeft, formatListDate, formatShareWith } from './format'
+import { EMPTY_CELL, formatDaysLeft, formatListDate } from './format'
 import { DELETING_SOON_DAYS, daysLeft } from './groups'
 import { editorInitials, editorNameOf } from './table-model'
 
@@ -125,7 +125,7 @@ export function EditorContent({ doc }: { doc: DocumentsHomeDoc }) {
 }
 
 /** two lines: the main text and a muted 12px line under it */
-function Stack({ main, sub }: { main: ReactNode; sub?: ReactNode }) {
+export function Stack({ main, sub }: { main: ReactNode; sub?: ReactNode }) {
   return (
     <span className="dh-special">
       <span className="dh-special-main">{main}</span>
@@ -134,48 +134,30 @@ function Stack({ main, sub }: { main: ReactNode; sub?: ReactNode }) {
   )
 }
 
+/** the screen columns that have their own cell in special-cells.tsx */
+export type OwnSpecialColumn = 'activity' | 'shared' | 'shared_with'
+
 /**
- * The screen column of a row: what the screen is about. A row without the
- * field reads "—" (the column is only drawn once some loaded row has it).
+ * The screen column of a row on the screens without a cell of their own
+ * (special-cells.tsx has Recent, Shared with me and Shared by me): what the
+ * screen is about. A row without the field reads "—" (the column is only
+ * drawn once some loaded row has it).
  */
 export function SpecialContent({
   column,
   doc,
   now,
 }: {
-  column: SpecialColumnId
+  column: Exclude<SpecialColumnId, OwnSpecialColumn>
   doc: DocumentsHomeDoc
   now: Date
 }) {
   const { t, dateLocale } = useI18n()
   const date = (at: string | undefined) => formatListDate(at, now, dateLocale, t)
   switch (column) {
-    case 'activity': {
-      const key = doc.lastActivity ? activityKey(doc.lastActivity.kind) : null
-      if (!doc.lastActivity || !key) return <Empty />
-      return <Stack main={t(key)} sub={date(doc.lastActivity.at)} />
-    }
     case 'starred':
       return doc.favoritedAt ? (
         <Stack main={date(doc.favoritedAt)} sub={t('dlStarredByYou')} />
-      ) : (
-        <Empty />
-      )
-    case 'shared':
-      return doc.shared ? (
-        <Stack
-          main={doc.shared.byName ? <Person name={doc.shared.byName} /> : EMPTY_CELL}
-          sub={date(doc.shared.at)}
-        />
-      ) : (
-        <Empty />
-      )
-    case 'shared_with':
-      return doc.shareSummary ? (
-        <Stack
-          main={formatShareWith(doc.shareSummary, t)}
-          sub={doc.shareSummary.latestAt ? date(doc.shareSummary.latestAt) : undefined}
-        />
       ) : (
         <Empty />
       )

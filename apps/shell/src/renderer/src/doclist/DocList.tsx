@@ -14,6 +14,9 @@ import {
   type SortSpec,
 } from './columns'
 import { DocRow, type DocRowRename, type DocSubline } from './DocRow'
+import { GroupHeader } from './GroupHeader'
+import { groupRows, groupsActive, type GroupInput } from './groups'
+import { useCollapsedGroups } from './use-collapsed-groups'
 import { effectiveSort, sortTableRows, specialPresent, visibleColumns } from './table-model'
 
 export interface DocListProps {
@@ -39,6 +42,15 @@ export interface DocListProps {
   rename?: { docId: string } & DocRowRename
   /** a row of another module's file (the workspace root lists them with the documents) */
   renderSource?: (source: UniworkSourceFile, columns: readonly ColumnId[]) => ReactNode
+}
+
+/** the screens whose rows fall in day / week groups under their own column (Trash's groups are its own slice) */
+const GROUPED_SCREENS: readonly DocListScreen[] = ['recent', 'shared']
+
+/** the date a grouping screen files a row under */
+function groupInputOf(screen: DocListScreen, row: DocumentsHomeTableRow): GroupInput {
+  if (row.type !== 'doc') return {}
+  return { at: screen === 'recent' ? row.doc.lastActivity?.at : row.doc.shared?.at }
 }
 
 function SortArrow() {
@@ -118,6 +130,11 @@ export function DocList({
   const now = new Date()
   const special = specialColumn(screen)
 
+  // groups follow the screen column: only while it is there and the list is sorted by it
+  const [collapsed, toggleGroup] = useCollapsedGroups(screen)
+  const grouped = GROUPED_SCREENS.includes(screen) && present && groupsActive(screen, active)
+  const runs = grouped ? groupRows(screen, sorted, now, (row) => groupInputOf(screen, row)) : null
+
   const allSelected = docs.length > 0 && docs.every((doc) => selected.has(doc.id))
   const someSelected = !allSelected && docs.some((doc) => selected.has(doc.id))
   const allRef = useRef<HTMLInputElement>(null)
@@ -191,36 +208,54 @@ export function DocList({
     )
   }
 
+  const rowFor = (row: DocumentsHomeTableRow, inGroup: boolean) => {
+    if (row.type === 'source') {
+      return renderSource ? renderSource(row.source, columns) : null
+    }
+    const doc = row.doc
+    return (
+      <DocRow
+        key={row.id}
+        doc={doc}
+        screen={screen}
+        columns={columns}
+        now={now}
+        grouped={inGroup}
+        selected={selected.has(doc.id)}
+        onSelectedChange={(on) => toggleOne(doc.id, on)}
+        opening={openingId === doc.id}
+        subline={sublineFor?.(doc) ?? null}
+        rename={rename && rename.docId === doc.id ? rename : null}
+        actions={actionsFor?.(doc)}
+        menu={menuFor(doc)}
+        menuOpen={openMenuId === doc.id}
+        onMenuOpenChange={(open) => onOpenMenuChange(open ? doc.id : null)}
+        onOpen={onOpen}
+      />
+    )
+  }
+
   return (
     <div ref={measure} className="dh-doc-table" role="table" aria-label={label}>
       <div className="dh-doc-head" role="row" style={{ gridTemplateColumns: track }}>
         {columns.map(headerFor)}
       </div>
-      {sorted.map((row) => {
-        if (row.type === 'source') {
-          return renderSource ? renderSource(row.source, columns) : null
-        }
-        const doc = row.doc
-        return (
-          <DocRow
-            key={row.id}
-            doc={doc}
-            screen={screen}
-            columns={columns}
-            now={now}
-            selected={selected.has(doc.id)}
-            onSelectedChange={(on) => toggleOne(doc.id, on)}
-            opening={openingId === doc.id}
-            subline={sublineFor?.(doc) ?? null}
-            rename={rename && rename.docId === doc.id ? rename : null}
-            actions={actionsFor?.(doc)}
-            menu={menuFor(doc)}
-            menuOpen={openMenuId === doc.id}
-            onMenuOpenChange={(open) => onOpenMenuChange(open ? doc.id : null)}
-            onOpen={onOpen}
-          />
-        )
-      })}
+      {runs
+        ? runs.flatMap((run) => {
+            const open = run.id === null || !collapsed.has(run.id)
+            return [
+              run.id !== null && (
+                <GroupHeader
+                  key={`group:${run.id}`}
+                  id={run.id}
+                  open={open}
+                  onToggle={toggleGroup}
+                />
+              ),
+              ...(open ? run.rows.map((row) => rowFor(row, true)) : []),
+            ]
+          })
+        : sorted.map((row) => rowFor(row, false))}
     </div>
   )
 }

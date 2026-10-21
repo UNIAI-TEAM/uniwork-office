@@ -13,9 +13,10 @@ import { FolderMenu, type FolderMenuItem } from '../uniwork-folders/FolderMenu'
 import { FolderGlyph } from '../uniwork-folders/UniworkFolderTree'
 import { isFolderEntry } from '../uniwork-folders/uniwork-folders-model'
 import { rowSizeBytes, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
-import { AccessContent, Cell, EditorContent, SpecialContent, trackOf } from './cells'
+import { AccessContent, Cell, EditorContent, trackOf } from './cells'
 import { specialColumn, type ColumnId, type DocListScreen } from './columns'
 import { formatBytes, formatListDate } from './format'
+import { SpecialCell } from './special-cells'
 
 /** the second line under a name: where the row sits (a path), or which workspace shared it */
 export interface DocSubline {
@@ -38,6 +39,8 @@ export interface DocRowProps {
   screen: DocListScreen
   columns: readonly ColumnId[]
   now: Date
+  /** the row sits under a group header: it is indented */
+  grouped?: boolean
   selected: boolean
   onSelectedChange: (selected: boolean) => void
   opening: boolean
@@ -58,6 +61,7 @@ export function DocRow({
   screen,
   columns,
   now,
+  grouped,
   selected,
   onSelectedChange,
   opening,
@@ -187,7 +191,7 @@ export function DocRow({
         // the screen column; the table only lists it when it is this screen's own
         return col === special ? (
           <Cell key={col} col={col}>
-            <SpecialContent column={col} doc={doc} now={now} />
+            <SpecialCell column={col} doc={doc} now={now} />
           </Cell>
         ) : null
     }
@@ -199,7 +203,7 @@ export function DocRow({
       data-doc-id={doc.id}
       aria-selected={selected || undefined}
       aria-busy={opening || undefined}
-      className={`dh-doc-row${opening ? ' opening' : ''}${selected ? ' selected' : ''}`}
+      className={`dh-doc-row${grouped ? ' grouped' : ''}${opening ? ' opening' : ''}${selected ? ' selected' : ''}`}
       style={{ gridTemplateColumns: trackOf(columns, screen) }}
       onDoubleClick={() => {
         if (!rename && !folder) onOpen(doc)

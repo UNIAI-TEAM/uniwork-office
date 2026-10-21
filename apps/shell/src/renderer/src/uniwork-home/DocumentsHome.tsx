@@ -120,7 +120,8 @@ import { FilterBar, useDocListFilters } from '../doclist/FilterBar'
 import { buildRowMenu } from '../doclist/row-menu'
 import type { DocSubline } from '../doclist/DocRow'
 import { pruneSelection, selectedDocsOf } from '../doclist/selection'
-import { screenOfSubView, wireSortOf } from '../doclist/table-model'
+import { screenOfSubView, specialPresent, wireSortOf } from '../doclist/table-model'
+import { RecentSegmentControl, useRecentSegment } from '../doclist/RecentSegment'
 import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
@@ -321,6 +322,7 @@ export function DocumentsHome({
   const screen = screenOfSubView(subView)
   const [filters, setFilters, resetFilters] = useDocListFilters(screen)
   const [docSort, setDocSort] = useDocListSort(screen)
+  const [recentSegment, setRecentSegment] = useRecentSegment()
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const [searchDraft, setSearchDraft] = useState('')
   const [page, setPage] = useState<PageState>({
@@ -524,10 +526,15 @@ export function DocumentsHome({
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
   const listSeqRef = useRef(0)
+  // the Recent segment rides on the same filters: only Recent's route takes `activity`
+  const recentActivity = subView === 'recent' && recentSegment !== 'all' ? recentSegment : null
   const wireFilters = useMemo(
-    () => toUniworkListFilters(filters),
+    () => ({
+      ...toUniworkListFilters(filters),
+      ...(recentActivity ? { activity: recentActivity } : {}),
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filters.format, filters.updatedBy, filters.updatedPreset],
+    [filters.format, filters.updatedBy, filters.updatedPreset, recentActivity],
   )
   // the header sort goes to the server too (nothing until the person sorts: the server's own order)
   const wireSort = useMemo(
@@ -1983,6 +1990,12 @@ export function DocumentsHome({
         {shelfView && (
           <ShelvedToolbar items={page.items} shelvedBy={shelvedBy} onShelvedBy={setShelvedBy} />
         )}
+
+        {/* the segment needs the server's last_activity: without it (or an empty pick) it is not offered */}
+        {subView === 'recent' &&
+          (recentSegment !== 'all' || specialPresent('recent', page.items)) && (
+            <RecentSegmentControl value={recentSegment} onChange={setRecentSegment} />
+          )}
 
         <FilterBar
           filters={filters}
