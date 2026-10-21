@@ -181,6 +181,10 @@ describe('findDisplayChord', () => {
       'Eingabetaste ändern',
       'Entrée en matière',
       'Échapper les caractères',
+      // prose with a spaced plus: a translated modifier word is joined to its key (Maj+Entrée)
+      'CLI · ligne de commande + skill',
+      'Befehl + Enter',
+      'Maj + Entrée',
     ]) {
       expect(findDisplayChord(name), name).toBeNull()
     }
