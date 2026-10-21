@@ -42,14 +42,17 @@ export interface DocListProps {
   rename?: { docId: string } & DocRowRename
   /** a row of another module's file (the workspace root lists them with the documents) */
   renderSource?: (source: UniworkSourceFile, columns: readonly ColumnId[]) => ReactNode
+  /** false lists the rows flat on a screen that groups (Trash search hits carry no purge date) */
+  groups?: boolean
 }
 
-/** the screens whose rows fall in day / week groups under their own column (Trash's groups are its own slice) */
-const GROUPED_SCREENS: readonly DocListScreen[] = ['recent', 'shared']
+/** the screens whose rows fall in groups under their own column: day / week, or days left in the Trash */
+const GROUPED_SCREENS: readonly DocListScreen[] = ['recent', 'shared', 'trash']
 
-/** the date a grouping screen files a row under */
+/** what a grouping screen files a row under: a date, or the purge date in the Trash */
 function groupInputOf(screen: DocListScreen, row: DocumentsHomeTableRow): GroupInput {
   if (row.type !== 'doc') return {}
+  if (screen === 'trash') return { purgeAfter: row.doc.purgeAfter }
   return { at: screen === 'recent' ? row.doc.lastActivity?.at : row.doc.shared?.at }
 }
 
@@ -96,6 +99,7 @@ export function DocList({
   sublineFor,
   rename,
   renderSource,
+  groups = true,
 }: DocListProps) {
   const { t } = useI18n()
 
@@ -132,7 +136,8 @@ export function DocList({
 
   // groups follow the screen column: only while it is there and the list is sorted by it
   const [collapsed, toggleGroup] = useCollapsedGroups(screen)
-  const grouped = GROUPED_SCREENS.includes(screen) && present && groupsActive(screen, active)
+  const grouped =
+    groups && GROUPED_SCREENS.includes(screen) && present && groupsActive(screen, active)
   const runs = grouped ? groupRows(screen, sorted, now, (row) => groupInputOf(screen, row)) : null
 
   const allSelected = docs.length > 0 && docs.every((doc) => selected.has(doc.id))
@@ -249,10 +254,20 @@ export function DocList({
                   key={`group:${run.id}`}
                   id={run.id}
                   open={open}
+                  count={screen === 'trash' ? run.rows.length : undefined}
                   onToggle={toggleGroup}
                 />
               ),
-              ...(open ? run.rows.map((row) => rowFor(row, true)) : []),
+              open ? (
+                <div
+                  key={`body:${run.id}`}
+                  role="rowgroup"
+                  className="dh-group-body"
+                  data-group-body={run.id ?? undefined}
+                >
+                  {run.rows.map((row) => rowFor(row, true))}
+                </div>
+              ) : null,
             ]
           })
         : sorted.map((row) => rowFor(row, false))}
