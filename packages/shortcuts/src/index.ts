@@ -91,6 +91,16 @@ export {
   toElectronAccelerator,
 } from './accelerator'
 export { formatChord, formatHint, hintParts, type ShortcutHintParts } from './hint'
+export {
+  accessibleShortcutProblems,
+  ariaKeyshortcuts,
+  containsDisplayChord,
+  findDisplayChord,
+  formatAriaChord,
+  formatAriaChords,
+  keyHintAfterName,
+  type AccessibleShortcutControl,
+} from './aria'
 export { BROWSER_RESERVED, isBrowserReserved } from './browser-reserved'
 import { mergeNotes, mergeUnmapped } from './table'
 export { mergeNotes, mergeRows, mergeUnmapped, pruneUnmapped } from './table'

@@ -1,8 +1,13 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { findDisplayChord } from '@genoffice/shortcuts'
 
-import { shortcutHint, withShortcutHint } from '../src/renderer/src/home-shortcut-hints'
+import {
+  shortcutAria,
+  shortcutHint,
+  withShortcutHint,
+} from '../src/renderer/src/home-shortcut-hints'
 
 describe('Home tooltip hints', () => {
   it('shows the table chord per platform', () => {
@@ -28,5 +33,56 @@ describe('Home tooltip hints', () => {
     expect(open).toContain('data-tip={OPEN_LOCAL_EXTENSIONS}')
     expect(open).toContain("data-tip-kbd={shortcutHint('common-03') || undefined}")
     expect(open).not.toContain(' title=')
+  })
+
+  // UNI-2060: the card's name is its text; the chord goes to aria-keyshortcuts
+  it('the chord in ARIA notation per platform', () => {
+    expect(shortcutAria('common-01', 'win')).toBe('Control+N')
+    expect(shortcutAria('common-01', 'mac')).toBe('Meta+N')
+    expect(shortcutAria('common-03', 'win')).toBe('Control+O')
+    expect(shortcutAria('common-03', 'mac')).toBe('Meta+O')
+    expect(shortcutAria('common-does-not-exist', 'win')).toBe('')
+  })
+
+  it('the New document and Open cards carry aria-keyshortcuts and no chord in a name', () => {
+    const home = readFileSync(join(__dirname, '../src/renderer/src/Home.tsx'), 'utf8')
+    const cards = home.slice(home.indexOf('function renderQuickCards()'))
+    const quick = cards.slice(0, cards.indexOf('<FileBadge'))
+    expect(quick).toContain("'aria-keyshortcuts': shortcutAria('common-01') || undefined")
+    const open = cards.slice(cards.indexOf('onClick={() => void window.aiOffice.browse()}'))
+    expect(open.slice(0, open.indexOf('\n        >'))).toContain(
+      "aria-keyshortcuts={shortcutAria('common-03') || undefined}",
+    )
+    for (const [, label] of home.matchAll(/aria-label=\{([^}]*)\}/g)) {
+      expect(label, label).not.toMatch(/withShortcutHint|shortcutHint/)
+    }
+    expect(findDisplayChord(withShortcutHint('New document', 'common-01', 'win'))).toBe('Ctrl+N')
+  })
+
+  // UNI-2060 W1b: a table row that gives a control a tooltip hint must also give it aria-keyshortcuts
+  it('every renderer control whose hint comes from a table row also announces that row', () => {
+    const dir = join(__dirname, '../src/renderer/src')
+    const bound: string[] = []
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx$/.test(name)) continue
+      const text = readFileSync(join(dir, name), 'utf8')
+      for (const [, id] of text.matchAll(
+        /(?:withShortcutHint|shortcutHint)\([^)]*?'((?:common|shell)-\w+)'/g,
+      )) {
+        bound.push(`${name}:${id}`)
+        expect(text, `${name} ${id}`).toContain(`shortcutAria('${id}')`)
+      }
+    }
+    // the New document and Open cards; a new bound control adds its row here
+    expect(bound.sort()).toEqual(['Home.tsx:common-01', 'Home.tsx:common-03'])
+  })
+
+  it('no Shell renderer file builds a control name or tooltip from a chord formatter directly', () => {
+    const dir = join(__dirname, '../src/renderer/src')
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name) || name === 'home-shortcut-hints.ts') continue
+      const text = readFileSync(join(dir, name), 'utf8')
+      expect(text, name).not.toMatch(/\b(?:formatHint|formatChord|ariaKeyshortcuts)\(/)
+    }
   })
 })

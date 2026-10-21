@@ -239,6 +239,7 @@ export const pl = {
   appSplitPaneLabel: 'Podzielone okienko (podgląd tylko do odczytu, niezależne przewijanie)',
   appRemoveSplit: 'Usuń podział',
   appExitReadMode: 'Zamknij widok do czytania (Esc)',
+  appExitReadModeName: 'Zamknij widok do czytania',
   appExpandAiPanel: 'Rozwiń panel edycji AI',
   appAiRail: 'AI',
   appPageOf: 'Strona {current} z {total}',

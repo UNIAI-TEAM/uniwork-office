@@ -194,3 +194,33 @@ describe('Dropdown active option exposure', () => {
     ).toBe(6)
   })
 })
+
+describe('Dropdown option keyshortcuts', () => {
+  const BOUND: DropdownOption[] = [
+    { value: 'h1', label: 'Heading 1', keyshortcuts: 'Control+Alt+1' },
+    { value: 'p', label: 'Normal text', keyshortcuts: 'Control+Alt+0 Control+Shift+7' },
+    { value: 'x', label: 'Plain' },
+  ]
+
+  it('renders an option keyshortcuts as aria-keyshortcuts on that option only', () => {
+    mount({ options: BOUND })
+    press(host, 'ArrowDown')
+    const options = [...host.querySelectorAll<HTMLElement>('[role="option"]')]
+    expect(options.map((o) => o.getAttribute('aria-keyshortcuts'))).toEqual([
+      'Control+Alt+1',
+      'Control+Alt+0 Control+Shift+7',
+      null,
+    ])
+  })
+
+  it('leaves the option name plain', () => {
+    mount({ options: BOUND })
+    press(host, 'ArrowDown')
+    const options = [...host.querySelectorAll<HTMLElement>('[role="option"]')]
+    expect(options.map((o) => o.getAttribute('aria-label'))).toEqual([
+      'Heading 1',
+      'Normal text',
+      'Plain',
+    ])
+  })
+})

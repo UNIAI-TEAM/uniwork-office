@@ -10,6 +10,8 @@ export interface CtxItem {
   label: string
   /** Shortcut hint on the right */
   hint?: string
+  /** `aria-keyshortcuts` of the item (the hint is display-only and hidden from the accessible name) */
+  keys?: string
   disabled?: boolean
   danger?: boolean
   /** Check mark on the left (toggle items) */
@@ -104,13 +106,18 @@ export function ContextMenu({ x, y, items, onClose, keepEdit }: Props) {
       key={key}
       className={`ctx-item ${item.danger ? 'danger' : ''}${item.checked ? ' ctx-checked' : ''}`}
       disabled={item.disabled}
+      aria-keyshortcuts={item.keys || undefined}
       onClick={() => {
         onClose()
         item.onClick?.()
       }}
     >
       <span>{item.label}</span>
-      {item.hint && <span className="ctx-hint">{platformShortcuts(item.hint)}</span>}
+      {item.hint && (
+        <span className="ctx-hint" aria-hidden="true">
+          {platformShortcuts(item.hint)}
+        </span>
+      )}
     </button>
   )
 

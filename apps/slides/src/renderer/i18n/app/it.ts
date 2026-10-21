@@ -254,6 +254,7 @@ export const it = {
   appStatusBarSlide: 'Diapositiva {current} di {total}',
   appStatusBarReady: 'Pronto',
   appMediaCloseTitle: 'Chiudi (Esc)',
+  appMediaCloseName: 'Chiudi',
   appRehearseTitle: 'Prova intervalli',
   appRehearseSummary:
     "Il tempo totale della presentazione è stato {duration}. Vuoi salvare gli intervalli delle diapositive per l'avanzamento automatico?",

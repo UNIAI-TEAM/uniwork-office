@@ -227,13 +227,13 @@ test.describe('markdown editor', () => {
 
       await editor.click()
       await editorPage.keyboard.press('ControlOrMeta+a')
-      await editorPage.getByLabel(/^Bold\b/).click()
+      await editorPage.getByLabel(/^Bold$/).click()
       await expect(editor.locator('strong')).toHaveText('Hello style')
 
       // quick-access row: save button writes the file, undo reverts the mark
       const qaRow = editorPage.locator('.ribbon-tabs')
       const saveButton = qaRow.locator('.qa-btn').first()
-      const undoButton = qaRow.getByLabel(/^Undo/)
+      const undoButton = qaRow.getByLabel(/^Undo$/)
       await saveButton.click()
       await expect(editorPage.locator('.status-save')).toHaveText(/Saved/)
       const saved = await readFile(mdPath, 'utf8')

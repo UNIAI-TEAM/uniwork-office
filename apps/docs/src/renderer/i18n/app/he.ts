@@ -222,6 +222,7 @@ export const he = {
   appSplitPaneLabel: 'חלונית מפוצלת (תצוגה מקדימה לקריאה בלבד, גלילה עצמאית)',
   appRemoveSplit: 'הסרת פיצול',
   appExitReadMode: 'יציאה ממצב קריאה (Esc)',
+  appExitReadModeName: 'יציאה ממצב קריאה',
   appExpandAiPanel: 'הרחבת חלונית עריכת ה-AI',
   appAiRail: 'AI',
   appPageOf: 'עמוד {current} מתוך {total}',

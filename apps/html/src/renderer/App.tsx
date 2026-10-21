@@ -22,12 +22,14 @@ import { cap, platform } from './capabilities'
 import {
   createHtmlFrameKeyReplay,
   hostHasUserActivation,
+  htmlAria,
   htmlFrameKeyClaims,
   htmlWindowCommand,
   type HtmlShortcutCommand,
 } from './shortcuts'
 import { LinkPopover } from './components/LinkPopover'
 import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
+import { keyHintAfterName } from '@genoffice/shortcuts'
 import { useNarrowFrame } from './narrow-frame'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
 import { textWithPendingStyles } from './document/pending-draft'
@@ -1792,6 +1794,9 @@ export default function App() {
     prevMatch: t('prevMatch'),
     nextMatch: t('nextMatch'),
     closeEsc: t('closeEsc'),
+    prevName: t('prevName'),
+    nextName: t('nextName'),
+    closeName: t('closeName'),
     replace: t('replace'),
     replaceAll: t('replaceAll'),
   }
@@ -1926,9 +1931,13 @@ export default function App() {
                   <button
                     type="button"
                     className="present-exit"
+                    aria-keyshortcuts="Escape"
                     onClick={() => setCanvasMode('edit')}
                   >
-                    {t('presentExit')}
+                    {t('presentExitName')}
+                    <span aria-hidden="true">
+                      {keyHintAfterName(t('presentExit'), t('presentExitName'))}
+                    </span>
                   </button>
                 )}
                 {visualEdit &&
@@ -2055,6 +2064,7 @@ export default function App() {
                 type="button"
                 className="zoom-btn"
                 aria-label={t('zoomOut')}
+                aria-keyshortcuts={htmlAria('zoomOut') || undefined}
                 onClick={zoomOut}
                 disabled={zoom <= MIN_ZOOM}
               >
@@ -2074,6 +2084,7 @@ export default function App() {
                 type="button"
                 className="zoom-btn"
                 aria-label={t('zoomIn')}
+                aria-keyshortcuts={htmlAria('zoomIn') || undefined}
                 onClick={zoomIn}
                 disabled={zoom >= MAX_ZOOM}
               >

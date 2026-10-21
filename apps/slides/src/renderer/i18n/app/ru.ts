@@ -247,6 +247,7 @@ export const ru = {
   appStatusBarSlide: 'Слайд {current} из {total}',
   appStatusBarReady: 'Готово',
   appMediaCloseTitle: 'Закрыть (Esc)',
+  appMediaCloseName: 'Закрыть',
   appRehearseTitle: 'Настройка времени',
   appRehearseSummary:
     'Общая продолжительность показа: {duration}. Сохранить время показа слайдов для автоматической смены?',

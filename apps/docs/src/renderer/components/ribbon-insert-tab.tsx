@@ -15,7 +15,7 @@ import {
 } from '../editor/cover-pages'
 import { startShapeDrawMode } from '../editor/shape-draw'
 import { useI18n, type StringKey } from '../i18n/locale'
-import { shortcutHint } from '../shortcuts'
+import { shortcutAria, shortcutHint } from '../shortcuts'
 import { useModalKeys } from './modal-keys'
 import {
   IconBook,
@@ -60,6 +60,9 @@ import {
   setParaAttrs,
   toggleDropdown,
 } from './ribbon-tabs'
+
+/** the table rows that insert a field, by its instruction */
+const FIELD_ROWS: Readonly<Record<string, string>> = { DATE: 'field-date', TIME: 'field-time' }
 
 const SYMBOLS = [
   '—',
@@ -771,6 +774,7 @@ export function InsertTab({
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonPageBreakTip', { keys: shortcutHint('page-break') })}
+            aria-keyshortcuts={shortcutAria('page-break') || undefined}
             onClick={() => insertPageBreakAt(editor)}
           >
             <span className="rb-big-icon">
@@ -1074,6 +1078,9 @@ export function InsertTab({
                 ).map(([instr, label]) => (
                   <button
                     key={instr}
+                    aria-keyshortcuts={
+                      (FIELD_ROWS[instr] && shortcutAria(FIELD_ROWS[instr])) || undefined
+                    }
                     onClick={() => {
                       onInsertField(instr)
                       setDropdown(() => null)
@@ -1099,6 +1106,7 @@ export function InsertTab({
               className="rb-small"
               disabled={!hasDoc}
               data-tip={t('ribbonLinkTip', { keys: shortcutHint('link') })}
+              aria-keyshortcuts={shortcutAria('link') || undefined}
               onClick={() => setLinkOpen(true)}
             >
               <IconLink size={14} /> {t('ribbonLink')}
@@ -1136,6 +1144,7 @@ export function InsertTab({
             className="rb-big"
             disabled={!canComment || (isProtected && !commentsAllowed)}
             data-tip={canComment ? t('ribbonNewCommentTip') : t('ribbonNewCommentSelectTip')}
+            aria-keyshortcuts={shortcutAria('comment') || undefined}
             onClick={onNewComment}
           >
             <span className="rb-big-icon">

@@ -253,6 +253,7 @@ export const fr = {
   appStatusBarSlide: 'Diapositive {current} sur {total}',
   appStatusBarReady: 'Prêt',
   appMediaCloseTitle: 'Fermer (Échap)',
+  appMediaCloseName: 'Fermer',
   appRehearseTitle: 'Vérification du minutage',
   appRehearseSummary:
     'La durée totale du diaporama était de {duration}. Voulez-vous enregistrer le minutage des diapositives pour le défilement automatique ?',

@@ -1,7 +1,7 @@
 /** Insert tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import type { InsertKind } from '../../shared/ipc'
 import { platformShortcuts } from '@genoffice/i18n'
-import { slidesTipKbd } from '../shortcuts'
+import { slidesAriaProp, slidesTipKbd } from '../shortcuts'
 import { WORDART_PRESETS, wordArtStrokePx } from '@genoffice/ui'
 import {
   CHART_GALLERY,
@@ -106,6 +106,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
             onClick={onAddSlide}
             data-tip={platformShortcuts(t('ribbonNewSlideTip'))}
             data-tip-kbd={slidesTipKbd('slides-14')}
+            aria-keyshortcuts={slidesAriaProp('slides-14')}
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">
@@ -370,6 +371,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
           }}
           onClick={onOpenLink}
           title={hasSelection || editing ? t('ribbonLinkTip') : t('ribbonLinkTipDisabled')}
+          aria-keyshortcuts={slidesAriaProp('slides-59')}
         >
           <span className="rb-big-icon">
             <IconLink size={BIG} />
@@ -404,6 +406,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
           disabled={!hasDoc}
           onClick={onNewComment}
           data-tip={t(serverComments ? 'ribbonNewCommentServerTip' : 'ribbonNewCommentTip')}
+          aria-keyshortcuts={slidesAriaProp('slides-47')}
         >
           <span className="rb-big-icon">
             <IconComment size={BIG} />

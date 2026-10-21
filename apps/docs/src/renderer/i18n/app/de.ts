@@ -246,6 +246,7 @@ export const de = {
   appSplitPaneLabel: 'Geteilter Bereich (schreibgeschützte Vorschau, unabhängig scrollbar)',
   appRemoveSplit: 'Teilung aufheben',
   appExitReadMode: 'Lesemodus beenden (Esc)',
+  appExitReadModeName: 'Lesemodus beenden',
   appExpandAiPanel: 'KI-Bearbeitungsbereich erweitern',
   appAiRail: 'AI',
   appPageOf: 'Seite {current} von {total}',

@@ -248,6 +248,7 @@ export const ja = {
   appSplitPaneLabel: '分割ウィンドウ(読み取り専用プレビュー、独立してスクロール可能)',
   appRemoveSplit: '分割の解除',
   appExitReadMode: '閲覧モードを終了 (Esc)',
+  appExitReadModeName: '閲覧モードを終了',
   appExpandAiPanel: 'AI 編集パネルを展開',
   appAiRail: 'AI',
   // Status bar / word count

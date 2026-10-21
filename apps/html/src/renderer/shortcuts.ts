@@ -8,6 +8,7 @@
  * and Close stay with the desktop menu / web host and are not handled here.
  */
 import {
+  ariaKeyshortcuts,
   createMatcher,
   currentShortcutPlatform,
   findShortcut,
@@ -124,6 +125,21 @@ export function htmlHint(
 /** a trailing "(⌘S)" / "(Ctrl+S)" of a translated label: the old hand-written hint */
 const TRAILING_HINT = /\s*[(（][^()（）]*(?:⌘|⌃|⌥|⇧|Ctrl|Cmd|Alt\b|Shift)[^()（）]*[)）]\s*$/
 
+/** `aria-keyshortcuts` value (`Control+S`, `Meta+S`) for a command on this platform and surface; '' when it has none */
+export function htmlAria(
+  command: HtmlShortcutCommand,
+  platform: ShortcutPlatform = currentShortcutPlatform(),
+  surface: ShortcutSurface = htmlSurface(),
+): string {
+  const action = findShortcut('html', ROWS[command])
+  return action ? ariaKeyshortcuts(action, platform, surface) : ''
+}
+
+/** an accessible name: the label without any hand-written hint, never a chord (that is `htmlAria`) */
+export function htmlPlainLabel(label: string): string {
+  return label.replace(TRAILING_HINT, '')
+}
+
 /** a tooltip: the label without any hand-written hint, then the table's chord */
 export function withHtmlHint(
   label: string,
@@ -131,7 +147,7 @@ export function withHtmlHint(
   platform?: ShortcutPlatform,
   surface?: ShortcutSurface,
 ): string {
-  const bare = label.replace(TRAILING_HINT, '')
+  const bare = htmlPlainLabel(label)
   const hint = htmlHint(command, platform, surface)
   return hint ? `${bare} (${hint})` : bare
 }

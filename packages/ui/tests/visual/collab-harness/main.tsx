@@ -25,6 +25,7 @@ import {
   THREAD_WITH_REPLIES,
   TOMBSTONES,
   anchorTrio,
+  cm,
   docx,
   pdf,
   pptx,
@@ -63,6 +64,8 @@ interface Scenario {
   /** anchors the editor cannot find (shown as "stale") */
   stale?: CollabAnchor[]
   activeSheet?: string
+  /** pass a fake onViewVersion (the host's "View in version N" handler) to the controller */
+  viewVersion?: boolean
   steps?: Step[]
   /** the state only holds while its control keeps focus: it autoplays alone (?only=<id>) or on Replay, never in the all-sections view */
   needsFocus?: boolean
@@ -117,6 +120,33 @@ const SCENARIOS: Scenario[] = [
     note: 'Ordered by page.',
     source: { comments: pdfTrio.comments },
     stale: pdfTrio.stale,
+  },
+  {
+    id: 's12-lost-version',
+    group: 'S12',
+    title: 'List · docx lost anchor with "View in version N" (TVF-2)',
+    note: 'The root lost comment shows the link in its own wrapping row above Reply · … · Resolve; its reply and the exact comment have no such row.',
+    source: {
+      comments: [
+        cm({
+          id: 'v-exact',
+          anchor: docx('Net revenue grew 12%'),
+          body: 'An anchored comment that still resolves.',
+        }),
+        cm({
+          id: 'v-lost',
+          anchor: docx('Gone text'),
+          anchor_state: 'lost',
+          anchor_version_id: 'v-old',
+          anchor_version_no: 3,
+          body: 'The text this was attached to has been deleted.',
+          author_id: ME,
+          display_name: 'You',
+        }),
+        cm({ id: 'v-reply', parent_id: 'v-lost', body: 'Open the old version to see it.' }),
+      ],
+    },
+    viewVersion: true,
   },
   {
     id: 's12-resolved',
@@ -453,7 +483,13 @@ function Panel({ s, lang, autoplay }: { s: Scenario; lang: Lang; autoplay: boole
       activeSheet: () => s.activeSheet,
     }
   }, [s, kind])
-  const ctl = useCollabThreads(source, host, { adapter, strings })
+  const ctl = useCollabThreads(source, host, {
+    adapter,
+    strings,
+    ...(s.viewVersion
+      ? { openVersionId: 'v-head', onViewVersion: () => ({ opened: true }) }
+      : undefined),
+  })
   const ctlRef = useRef(ctl)
   ctlRef.current = ctl
   const frame = useRef<HTMLDivElement>(null)
