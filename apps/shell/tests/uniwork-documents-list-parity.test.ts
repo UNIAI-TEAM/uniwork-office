@@ -15,7 +15,6 @@ import { formatListDate } from '../src/renderer/src/doclist/format'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import {
   fetchDocumentsHomeSources,
-  mergeNewestFirst,
   rowSizeBytes,
   sourceMatchesFilters,
   type DocumentsHomeApiAdapter,
@@ -62,54 +61,6 @@ const source = (over: Partial<UniworkSourceFile> & { id: string }): UniworkSourc
   canOpenInApp: true,
   canSave: false,
   ...over,
-})
-
-describe('mergeNewestFirst - the web root merge of documents and sources (UNI-1961 item 1)', () => {
-  const at = (day: number) => `2026-10-${String(day).padStart(2, '0')}T08:00:00.000Z`
-
-  it('sorts both lists newest first when neither has more pages', () => {
-    const rows = mergeNewestFirst(
-      [doc({ id: 'd17', updatedAt: at(17) }), doc({ id: 'd12', updatedAt: at(12) })],
-      [source({ id: 's19', updatedAt: at(19) }), source({ id: 's14', updatedAt: at(14) })],
-      { docs: false, sources: false },
-    )
-    expect(rows.map((row) => row.id)).toEqual(['source:s19', 'd17', 'source:s14', 'd12'])
-    expect(rows[0]).toMatchObject({ type: 'source', source: { id: 's19' } })
-    expect(rows[1]).toMatchObject({ type: 'doc', doc: { id: 'd17' } })
-  })
-
-  it('hides rows older than the oldest loaded row of a list that still has pages', () => {
-    const docs = [doc({ id: 'd17', updatedAt: at(17) }), doc({ id: 'd15', updatedAt: at(15) })]
-    const sources = [
-      source({ id: 's19', updatedAt: at(19) }),
-      source({ id: 's10', updatedAt: at(10) }),
-    ]
-    // docs has more: nothing older than its oldest loaded row (the 15th) shows yet
-    expect(
-      mergeNewestFirst(docs, sources, { docs: true, sources: false }).map((r) => r.id),
-    ).toEqual(['source:s19', 'd17', 'd15'])
-    // both page: the later cutoff wins
-    expect(
-      mergeNewestFirst(docs, [source({ id: 's16', updatedAt: at(16) })], {
-        docs: true,
-        sources: true,
-      }).map((r) => r.id),
-    ).toEqual(['d17', 'source:s16'])
-    // an empty list that still pages sets no bound
-    expect(mergeNewestFirst(docs, [], { docs: false, sources: true }).map((r) => r.id)).toEqual([
-      'd17',
-      'd15',
-    ])
-  })
-
-  it('sinks a row with no usable date to the end', () => {
-    const rows = mergeNewestFirst(
-      [doc({ id: 'dx', updatedAt: '' })],
-      [source({ id: 's1', updatedAt: at(1) })],
-      { docs: false, sources: false },
-    )
-    expect(rows.map((row) => row.id)).toEqual(['source:s1', 'dx'])
-  })
 })
 
 describe('fetchDocumentsHomeSources (UNI-1961 item 1)', () => {

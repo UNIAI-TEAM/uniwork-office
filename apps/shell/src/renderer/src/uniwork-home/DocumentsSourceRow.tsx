@@ -17,11 +17,12 @@ function sourceExtension(source: UniworkSourceFile): string {
 
 /**
  * UNI-1961: one "other sources" row of the Documents table - a file attached
- * in chat, a task, a meeting or email, listed beside the documents as the web
- * does (D documents-library-row.tsx). It has no level or scope (its page has no Access column),
- * its editor is the owner, and its name's sub-line says where it was sent (UNI-2047 F-04). Its primary action (the name, Enter, a double click)
- * is the web's: Open (view only) when the server and an editor module allow it
- * (UNI-1993), else Download; the menu lists Open first, then Download.
+ * in chat, a task, a meeting or email, listed on the From elsewhere page as the web does
+ * (D documents-library-row.tsx). It has no level or scope (its page has no Access column), its
+ * editor is the owner, and its name's sub-line says where it was sent (UNI-2047 F-04). Its
+ * primary action (the name, Enter, a double click) is the web's: Open (view only) when the server
+ * and an editor module allow it (UNI-1993), else Download; the menu lists Open first, then
+ * Download.
  */
 export function DocumentsSourceRow({
   source,

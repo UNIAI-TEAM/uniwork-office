@@ -370,10 +370,10 @@ export function DocumentsHome({
     loadingMore: false,
   })
   const [listTick, setListTick] = useState(0)
-  // UNI-1961: the workspace root also lists the files of the other modules
-  // (the web's "other sources"), paged on their own
+  // UNI-1961 / V-STATES F-14: the files of the other modules (the web's "other sources"), read and
+  // paged on their own on the Từ nơi khác page only
   const [sources, setSources] = useState<{
-    /** the read of the first page: Từ nơi khác shows it; the root merge ignores a failed one */
+    /** the read of the first page: a failed one is the Từ nơi khác page's list error */
     status: 'idle' | 'loading' | 'ready' | 'error'
     error?: UniworkDocErrorCode
     items: UniworkSourceFile[]
@@ -779,8 +779,6 @@ export function DocumentsHome({
         })
       })
   }, [workspaceId, sourcesWanted, wireFilters, listTick])
-  // the source rows have a next page to ask for on their own page
-  const sourcesPaged = elsewhereView
 
   const loadMoreSources = () => {
     const cursor = sources.nextCursor
@@ -809,7 +807,7 @@ export function DocumentsHome({
 
   const loadMore = () => {
     // UNI-1961: "Load more" asks both lists for their next page (the web's rule)
-    if (sourcesPaged) loadMoreSources()
+    if (elsewhereView) loadMoreSources()
     if (!page.nextCursor || page.loadingMore || page.status !== 'ready') return
     const cursor = page.nextCursor
     const seq = listSeqRef.current
@@ -2447,7 +2445,7 @@ export function DocumentsHome({
                 </p>
               )}
 
-              {(page.nextCursor || (sourcesPaged && sources.nextCursor)) && (
+              {(page.nextCursor || (elsewhereView && sources.nextCursor)) && (
                 <div className="dh-load-more-row">
                   <button
                     type="button"
