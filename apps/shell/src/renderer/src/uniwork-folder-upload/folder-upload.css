@@ -5,7 +5,7 @@
   width: min(480px, calc(var(--ui-vw) * 92));
 }
 
-.fu-desc {
+.fu-dialog .fu-desc {
   margin: 4px 0 0;
   color: var(--text-secondary);
   font-size: 13px;
@@ -37,14 +37,14 @@
   font-weight: 600;
 }
 
-.fu-note {
+.fu-dialog .fu-note {
   margin: 10px 0 0;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.35;
 }
 
-.fu-summary {
+.fu-dialog .fu-summary {
   margin: 14px 0 0;
   color: var(--text);
   font-size: 14px;
@@ -74,7 +74,7 @@
   margin: 0;
 }
 
-.fu-refusal-title {
+.fu-dialog .fu-refusal-title {
   font-size: 13px;
   font-weight: 600;
 }
