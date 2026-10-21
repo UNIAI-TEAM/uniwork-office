@@ -12,6 +12,11 @@ import {
   useFolderUpload,
   type FolderUploadController,
 } from '../src/renderer/src/uniwork-folder-upload/use-folder-upload'
+import {
+  resetZipDownloadStore,
+  runZipDownload,
+} from '../src/renderer/src/uniwork-zip-download/zip-download-store'
+import { fakeZipBridge } from './uniwork-zip-fake-bridge'
 import type { FolderUploadBridge } from '../src/renderer/src/uniwork-folder-upload/bridge'
 import {
   createFakeFolderUploadBridge,
@@ -607,6 +612,58 @@ describe('folder / multi-file upload screens', () => {
       })
       expect(region.style.width).toBe('268px')
       main.remove()
+    })
+
+    it('splits a narrow pane only while a zip bar is on screen, alone it keeps the 380px cap', async () => {
+      const main = document.createElement('div')
+      main.className = 'dh-main'
+      const rect = { left: 0, right: 750, top: 0, bottom: 700, width: 750, height: 700 }
+      main.getBoundingClientRect = () => ({
+        ...rect,
+        x: rect.left,
+        y: rect.top,
+        toJSON: () => rect,
+      })
+      document.body.appendChild(main)
+      try {
+        await mount()
+        await start()
+        const region = document.querySelector<HTMLElement>('.fu-bars')!
+        expect(region.style.width).toBe('380px')
+        await act(async () => {
+          await runZipDownload({
+            bridge: fakeZipBridge(),
+            workspaceId: 'ws-1',
+            screen: 'workspace',
+            docs: [
+              {
+                id: 'a',
+                workspaceId: 'ws-1',
+                title: 'a.docx',
+                format: 'docx',
+                updatedAt: '2026-10-21T02:00:00.000Z',
+                kind: 'file',
+                parentId: null,
+              },
+              {
+                id: 'b',
+                workspaceId: 'ws-1',
+                title: 'b.docx',
+                format: 'docx',
+                updatedAt: '2026-10-21T02:00:00.000Z',
+                kind: 'file',
+                parentId: null,
+              },
+            ],
+          })
+        })
+        // 750 pane: 16 + 351 + 16 + 351 + 16; the upload bars keep the left half
+        expect(region.style.width).toBe('351px')
+        expect(region.style.left).toBe('16px')
+      } finally {
+        resetZipDownloadStore()
+        main.remove()
+      }
     })
 
     it('applies progress that arrives before the start call has answered', async () => {

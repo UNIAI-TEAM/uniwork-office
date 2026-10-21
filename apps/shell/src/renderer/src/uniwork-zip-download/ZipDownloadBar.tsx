@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import { formatBytes } from '../doclist/format'
 import { useI18n } from '../locale'
 import { announce } from '../uniwork-live'
+import { useFolderUploadBarsShown } from '../uniwork-folder-upload/folder-upload-store'
 import { viewOf } from './copy'
 import { cancelZipRun, closeZipRun, useZipRuns, type StoredZipRun } from './zip-download-store'
 import './zip-download.css'
@@ -114,7 +115,7 @@ const BARS_SPLIT_BELOW = BARS_MAX_WIDTH * 2 + BARS_GUTTER * 3
  * the 380px cap inside it, at its right edge (the folder-upload bars take the left). With no
  * pane on screen the stylesheet's corner holds.
  */
-function useMainPaneBars(active: boolean): CSSProperties | undefined {
+function useMainPaneBars(active: boolean, shared: boolean): CSSProperties | undefined {
   const [style, setStyle] = useState<CSSProperties | undefined>(undefined)
   useLayoutEffect(() => {
     if (!active) return
@@ -129,9 +130,9 @@ function useMainPaneBars(active: boolean): CSSProperties | undefined {
         setStyle(undefined)
         return
       }
-      // a narrow pane splits between the two bar stacks, so they never overlap
+      // a narrow pane splits between the two bar stacks only while both are on screen
       const width =
-        box.width < BARS_SPLIT_BELOW
+        shared && box.width < BARS_SPLIT_BELOW
           ? (box.width - BARS_GUTTER * 3) / 2
           : Math.min(BARS_MAX_WIDTH, box.width - BARS_GUTTER * 2)
       setStyle({ left: box.right - BARS_GUTTER - width, right: 'auto', width })
@@ -144,7 +145,7 @@ function useMainPaneBars(active: boolean): CSSProperties | undefined {
       window.removeEventListener('resize', measure)
       observer?.disconnect()
     }
-  }, [active])
+  }, [active, shared])
   return style
 }
 
@@ -152,7 +153,7 @@ function useMainPaneBars(active: boolean): CSSProperties | undefined {
 export function ZipDownloadBar() {
   const { t } = useI18n()
   const runs = useZipRuns()
-  const paneStyle = useMainPaneBars(runs.length > 0)
+  const paneStyle = useMainPaneBars(runs.length > 0, useFolderUploadBarsShown())
   if (runs.length === 0) return null
   return (
     <div className="zd-bars" style={paneStyle} role="region" aria-label={t('dlActDownload')}>

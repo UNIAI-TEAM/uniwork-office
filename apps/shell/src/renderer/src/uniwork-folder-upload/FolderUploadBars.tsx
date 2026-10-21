@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import { announce } from '../uniwork-live'
 import { useI18n, type StringKey, type TFunc } from '../locale'
+import { useZipRuns } from '../uniwork-zip-download/zip-download-store'
 import { pluralKey, runErrorMessage } from './copy'
 import type { FolderUploadRun } from './use-folder-upload'
 import './folder-upload.css'
@@ -227,7 +228,7 @@ const BARS_SPLIT_BELOW = BARS_MAX_WIDTH * 2 + BARS_GUTTER * 3
  * is measured, so the bars keep the same 16px gutter and 380px cap inside it;
  * with no pane on screen (a host without one) the stylesheet's corner holds.
  */
-function useMainPaneBars(active: boolean): CSSProperties | undefined {
+function useMainPaneBars(active: boolean, shared: boolean): CSSProperties | undefined {
   const [style, setStyle] = useState<CSSProperties | undefined>(undefined)
   useLayoutEffect(() => {
     if (!active) return
@@ -245,7 +246,7 @@ function useMainPaneBars(active: boolean): CSSProperties | undefined {
       setStyle({
         left: box.left + BARS_GUTTER,
         width:
-          box.width < BARS_SPLIT_BELOW
+          shared && box.width < BARS_SPLIT_BELOW
             ? (box.width - BARS_GUTTER * 3) / 2
             : Math.min(BARS_MAX_WIDTH, box.width - BARS_GUTTER * 2),
       })
@@ -258,7 +259,7 @@ function useMainPaneBars(active: boolean): CSSProperties | undefined {
       window.removeEventListener('resize', measure)
       observer?.disconnect()
     }
-  }, [active])
+  }, [active, shared])
   return style
 }
 
@@ -277,7 +278,7 @@ export function FolderUploadBars({
   onClose: (runId: string) => void
 }) {
   const { t } = useI18n()
-  const paneStyle = useMainPaneBars(runs.length > 0)
+  const paneStyle = useMainPaneBars(runs.length > 0, useZipRuns().length > 0)
   if (runs.length === 0) return null
   return (
     <div className="fu-bars" style={paneStyle} role="region" aria-label={t('uhUpload')}>

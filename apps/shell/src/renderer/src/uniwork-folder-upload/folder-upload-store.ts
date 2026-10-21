@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import type {
   FolderUploadBridge,
   FolderUploadFailure,
@@ -102,6 +103,15 @@ export function folderUploadRuns(
   bridge: FolderUploadBridge | null,
 ): readonly StoredFolderUploadRun[] {
   return bridge !== null && bridge === attached ? runs : NO_RUNS
+}
+
+/** Whether any upload bar is on screen, for the zip bar to share the pane with */
+export function useFolderUploadBarsShown(): boolean {
+  return useSyncExternalStore(subscribeFolderUploadStore, barsShown, barsShown)
+}
+
+function barsShown(): boolean {
+  return runs.length > 0
 }
 
 export function subscribeFolderUploadStore(listener: () => void): () => void {

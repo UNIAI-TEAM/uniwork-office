@@ -14,6 +14,12 @@ import {
 import { viewOf } from '../src/renderer/src/uniwork-zip-download/copy'
 import { zipDownloadBridge } from '../src/renderer/src/uniwork-library-api'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
+import {
+  attachFolderUploadStore,
+  resetFolderUploadStore,
+  startFolderUploadRun,
+} from '../src/renderer/src/uniwork-folder-upload/folder-upload-store'
+import { createFakeFolderUploadBridge } from './folder-upload-fake-bridge'
 import { fakeZipBridge, type FakeZipBridge } from './uniwork-zip-fake-bridge'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -137,23 +143,54 @@ describe('ZipDownloadBar (UNI-2068 ZB)', () => {
     expect(li.firstChild!.nodeName).toBe('BDI')
   })
 
-  it('splits a narrow pane with the folder-upload bars (TVZ-1)', async () => {
+  const withPane = async (width: number, run: () => Promise<void>) => {
     const pane = document.createElement('div')
     pane.className = 'dh-main'
     pane.getBoundingClientRect = () =>
-      ({ left: 0, right: 750, width: 750, top: 0, bottom: 600, height: 600 }) as DOMRect
+      ({ left: 0, right: width, width, top: 0, bottom: 600, height: 600 }) as DOMRect
     document.body.appendChild(pane)
     try {
-      await mount()
-      await start(files(2))
-      const style = (host.querySelector('.zd-bars') as HTMLElement).style
-      // 750 pane: 16 + 351 + 16 + 351 + 16; the zip bar takes the right half
-      expect(style.width).toBe('351px')
-      expect(style.left).toBe('383px')
+      await run()
     } finally {
       pane.remove()
+      resetFolderUploadStore()
     }
-  })
+  }
+  const zipStyle = () => (host.querySelector('.zd-bars') as HTMLElement).style
+
+  it('splits a narrow pane with the folder-upload bars while both are on screen (TVZ-1)', async () =>
+    withPane(750, async () => {
+      const uploadBridge = createFakeFolderUploadBridge()
+      attachFolderUploadStore(uploadBridge)
+      await mount()
+      await start(files(2))
+      // alone, the zip bar keeps the old rule: min(380, 750 - 32)
+      expect(zipStyle().width).toBe('380px')
+      await act(async () => {
+        startFolderUploadRun(uploadBridge, {
+          runId: 'u1',
+          mode: 'folder',
+          name: 'Board',
+          targetLabel: 'Library',
+          phase: 'uploading',
+          done: 0,
+          failed: 0,
+          total: 4,
+          failures: [],
+        })
+      })
+      // 750 pane: 16 + 351 + 16 + 351 + 16; the zip bar takes the right half
+      expect(zipStyle().width).toBe('351px')
+      expect(zipStyle().left).toBe('383px')
+    }))
+
+  it('keeps the whole 380px cap when it is the only bar stack in a 750 px pane', async () =>
+    withPane(750, async () => {
+      await mount()
+      await start(files(2))
+      expect(zipStyle().width).toBe('380px')
+      expect(zipStyle().left).toBe('354px')
+    }))
 
   it('a clean result leaves on its own after 10 s; one with lines waits for the close mark', async () => {
     vi.useFakeTimers()
