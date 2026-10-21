@@ -18,6 +18,7 @@ import type {
   UniworkTreeChangedEvent,
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { formatListDate } from '../src/renderer/src/doclist/format'
 import { UniworkBrowser } from '../src/renderer/src/uniwork-folders/UniworkBrowser'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
@@ -240,6 +241,28 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
     expect(hiddenLine.id).toBeTruthy()
     expect($('[role="listbox"]')?.getAttribute('aria-describedby')).toBe(hiddenLine.id)
     expect($('.uwf-own-search')?.getAttribute('aria-describedby')).toBe(hiddenLine.id)
+  })
+
+  it('lists the contents on the compact picker columns (UNI-2047 B2)', async () => {
+    children[''] = [
+      entry('d1', 'Report.docx', { updatedByName: 'Linh Tran', updatedAt: '2026-10-01T10:00:00Z' }),
+      asFolder('b', 'Beta'),
+    ]
+    await render()
+    expect($('.dh-picker-head')?.textContent).toBe('NameLast edited byUpdated')
+    const row = $$('[role="option"]').find((el) => el.textContent?.includes('Report.docx'))!
+    expect(row.querySelector('[data-col="editor"] .dh-person-name')?.textContent).toBe('Linh Tran')
+    expect(row.querySelector('[data-col="updated"]')?.textContent).toBe(
+      formatListDate('2026-10-01T10:00:00Z', new Date(), 'en-US'),
+    )
+    // the old "Updated … by Linh" second line is gone: the columns say it
+    expect(row.querySelector('.uw-pick-row-meta')).toBeNull()
+    // a folder is a row of the same list, Tên first
+    const beta = $$('[role="option"]').find((el) => el.textContent?.includes('Beta'))!
+    expect(beta.querySelector('[data-col="name"] .uwf-row-icon')).not.toBeNull()
+    // nothing to tick or sort in a picker
+    expect($('.uwf-contents input[type="checkbox"], .uwf-contents .dh-sort-head')).toBeNull()
+    expect($('[role="listbox"]')?.getAttribute('aria-label')).toBe(en.ufContentsLabel)
   })
 
   it('opens a folder from the tree, shows its breadcrumb and goes back by it', async () => {
@@ -952,8 +975,11 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     const bundleCss = `${foldersCss}\n${homeCss.replace(/@position-try[^{]*\{[^}]*\}/g, '')}`
 
     await render()
-    const regularMeta = $<HTMLElement>('.uw-pick-row-meta:not(.uwf-path)')!
-    expect(regularMeta).toBeTruthy()
+    // UNI-2047 B2: the rows carry their editor and date as columns, so a plain second line (the
+    // Open dialog's workspace name) is probed with a stand-in inside the same list
+    const regularMeta = document.createElement('span')
+    regularMeta.className = 'uw-pick-row-meta'
+    $('.uwf-contents .uw-pick-row')!.append(regularMeta)
 
     // Trigger search so BrowserContents renders <span class="uw-pick-row-meta uwf-path">
     await type($<HTMLInputElement>('.uwf-own-search')!, 'bud')
