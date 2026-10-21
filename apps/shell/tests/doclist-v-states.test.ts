@@ -245,6 +245,112 @@ describe('DocumentsHome: the states of the lists', () => {
     })
   })
 
+  describe('RV-1: From elsewhere on a server without the sources route', () => {
+    const retryButton = () =>
+      Array.from(stateOf()?.querySelectorAll('button') ?? []).find(
+        (b) => b.textContent === 'Retry' || b.textContent === 'Thử lại',
+      )
+
+    it.each([
+      [
+        'en',
+        'From elsewhere is not available on this server yet',
+        /server .*(update|upgrade)/i,
+        'Retry',
+      ],
+      ['vi', 'Từ nơi khác chưa dùng được trên máy chủ này', /máy chủ .*cập nhật/i, 'Thử lại'],
+    ] as const)(
+      '%s: sources 404 is "From elsewhere is not available" with an icon, a reason and Retry, never the document-not-found line',
+      async (lang, title, reason, retry) => {
+        sources = async () => ({ ok: false, error: 'not_found' })
+        await mount('elsewhere', lang)
+        const state = stateOf()
+        expect(state, 'the shared list state').not.toBeNull()
+        expect(state!.getAttribute('role')).toBe('alert')
+        expect(state!.querySelector('svg.dl-state-icon')).not.toBeNull()
+        expect(state!.querySelector('.dl-state-title')?.textContent).toBe(title)
+        expect(state!.querySelector('.dl-state-hint')?.textContent).toMatch(reason)
+        expect(state!.textContent).not.toMatch(/no longer exists|không còn tồn tại/i)
+        expect(retryButton()?.textContent).toBe(retry)
+        // the entry stays in the nav
+        expect(navLabels()).toContain(lang === 'en' ? 'From elsewhere' : 'Từ nơi khác')
+      },
+    )
+
+    it('Retry reads the sources route again and shows the rows once the server answers', async () => {
+      sources = async () => ({ ok: false, error: 'not_found' })
+      await mount('elsewhere')
+      expect(api.uniworkListSources).toHaveBeenCalledTimes(1)
+      sources = async () => ok({ items: [source({ id: 's-1' })], nextCursor: null })
+      await click(retryButton())
+      expect(api.uniworkListSources).toHaveBeenCalledTimes(2)
+      expect(stateOf()).toBeNull()
+      expect(host.textContent).toContain('s-1.pdf')
+    })
+
+    it.each(['server_error', 'network'] as const)(
+      'any other error (%s) is the generic list error with its own sentence and Retry',
+      async (error) => {
+        sources = async () => ({ ok: false, error })
+        await mount('elsewhere')
+        const state = stateOf()
+        expect(state).not.toBeNull()
+        expect(state!.querySelector('.dl-state-title')?.textContent).not.toMatch(
+          /not available on this server/,
+        )
+        expect(state!.querySelector('.dl-state-title')?.textContent).toMatch(/\S/)
+        expect(retryButton()).toBeDefined()
+      },
+    )
+
+    it('a 404 on Starred keeps its own wording, not the From elsewhere one', async () => {
+      favorites = async () => ({ ok: false, error: 'not_found' })
+      await mount('starred')
+      expect(stateOf()!.querySelector('.dl-state-title')?.textContent).toBe(
+        'Starred is not available on this server yet',
+      )
+    })
+  })
+
+  describe('RV-5: Retry only where asking again can help', () => {
+    const retryButton = () =>
+      Array.from(stateOf()?.querySelectorAll('button') ?? []).find((b) => b.textContent === 'Retry')
+
+    it.each(['forbidden', 'not_signed_in', 'session_expired'] as const)(
+      'Starred with %s has no Retry (a sign-in problem, as on the other lists)',
+      async (error) => {
+        favorites = async () => ({ ok: false, error })
+        await mount('starred')
+        expect(stateOf()).not.toBeNull()
+        expect(retryButton()).toBeUndefined()
+      },
+    )
+
+    it.each(['forbidden', 'not_signed_in', 'session_expired'] as const)(
+      'From elsewhere with %s has no Retry',
+      async (error) => {
+        sources = async () => ({ ok: false, error })
+        await mount('elsewhere')
+        expect(stateOf()).not.toBeNull()
+        expect(retryButton()).toBeUndefined()
+      },
+    )
+
+    it.each([
+      ['starred', 'not_found'],
+      ['starred', 'server_error'],
+      ['starred', 'timeout'],
+      ['elsewhere', 'not_found'],
+      ['elsewhere', 'server_error'],
+      ['elsewhere', 'timeout'],
+    ] as const)('%s keeps Retry for %s', async (view, error) => {
+      favorites = async () => ({ ok: false, error })
+      sources = async () => ({ ok: false, error })
+      await mount(view)
+      expect(retryButton()).toBeDefined()
+    })
+  })
+
   describe('F-04: From elsewhere rows', () => {
     const SOURCES = [
       source({ id: 's-chat', name: 'hop-dong.pdf' }),
