@@ -9,8 +9,10 @@
  * the same rows (shared/docs-shortcuts.ts), so a key changes in one place.
  */
 import {
+  ariaKeyshortcuts,
   chordsFor,
   currentShortcutPlatform,
+  formatAriaChords,
   formatChord,
   formatHint,
   matchShortcut,
@@ -279,6 +281,22 @@ export function shortcutHint(
   if (def.native)
     return def.native[platform][0] ? formatChord(def.native[platform][0], platform) : ''
   return def.action ? formatHint(docsShortcut(def.action), platform, surface) : ''
+}
+
+/**
+ * The command's keys for `aria-keyshortcuts` (`Control+B`, `Meta+B`), or '' without one.
+ * The control's accessible name stays the plain command name: the chord goes here and in the
+ * tooltip (`shortcutHint` / `shortcutTip`) only.
+ */
+export function shortcutAria(
+  id: string,
+  platform: ShortcutPlatform = SHORTCUT_PLATFORM,
+  surface: ShortcutSurface = shortcutSurface(),
+): string {
+  const def = BY_ID.get(id)
+  if (!def) throw new Error(`unknown docs shortcut ${id}`)
+  if (def.native) return formatAriaChords(def.native[platform], platform)
+  return def.action ? ariaKeyshortcuts(docsShortcut(def.action), platform, surface) : ''
 }
 
 /** A tooltip's label with the command's primary key appended: `Redo (Ctrl+Y)`; the bare label without one. */

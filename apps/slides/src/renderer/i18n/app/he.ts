@@ -234,6 +234,7 @@ export const he = {
   appStatusBarSlide: 'שקופית {current} מתוך {total}',
   appStatusBarReady: 'מוכן',
   appMediaCloseTitle: 'סגור (Esc)',
+  appMediaCloseName: 'סגור',
   appRehearseTitle: 'חזרה על תזמונים',
   appRehearseSummary:
     'משך ההצגה הכולל היה {duration}. האם לשמור את תזמוני השקופיות למעבר אוטומטי בין שקופיות?',

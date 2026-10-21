@@ -1,7 +1,7 @@
 /** Home tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import { useState } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
-import { brushTipKbd, slidesTipKbd } from '../shortcuts'
+import { brushTipKbd, slidesAriaProp, slidesPlainLabel, slidesTipKbd } from '../shortcuts'
 import { ColorPicker, isSymbolFontFamily, partitionFontFamilies, UniAiMark } from '@genoffice/ui'
 import { saveEditSelection } from '../TextEditOverlay'
 import { armColorInput } from '../color-input'
@@ -305,7 +305,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             disabled={!hasSelection}
             onClick={onCut}
             data-tip={t('ribbonCutTip')}
-            aria-label={t('ribbonCutTip')}
+            aria-label={slidesPlainLabel(t('ribbonCutTip'))}
           >
             <IconCut size={14} />
           </button>
@@ -314,7 +314,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             disabled={!hasSelection}
             onClick={onCopy}
             data-tip={t('ribbonCopyTip')}
-            aria-label={t('ribbonCopyTip')}
+            aria-label={slidesPlainLabel(t('ribbonCopyTip'))}
           >
             <IconCopy size={14} />
           </button>
@@ -322,6 +322,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             className={`rb-icon${brushMode ? ' on' : ''}`}
             disabled={!hasSelection}
             data-tip-kbd={brushTipKbd()}
+            aria-keyshortcuts={slidesAriaProp(['slides-11', 'slides-12'])}
             data-tip={
               !hasSelection
                 ? t('ribbonBrushTipNoSelection')
@@ -363,6 +364,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             onClick={() => onSlideShow(slideShowFromStart)}
             data-tip={t(slideShowFromStart ? 'ribbonFromBeginningTip' : 'ribbonFromCurrentTip')}
             data-tip-kbd={slidesTipKbd(slideShowFromStart ? 'slides-22' : 'slides-23')}
+            aria-keyshortcuts={slidesAriaProp(slideShowFromStart ? 'slides-22' : 'slides-23')}
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">
@@ -443,6 +445,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             onClick={onAddSlide}
             data-tip={platformShortcuts(t('ribbonNewSlideTip'))}
             data-tip-kbd={slidesTipKbd('slides-14')}
+            aria-keyshortcuts={slidesAriaProp('slides-14')}
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">
@@ -825,6 +828,9 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
                 className="rb-icon"
                 disabled={!editing && !hasSelection}
                 data-tip={title}
+                aria-keyshortcuts={slidesAriaProp(
+                  kind === 'bold' ? 'slides-48' : kind === 'italic' ? 'slides-49' : 'slides-50',
+                )}
                 aria-label={title}
                 onMouseDown={(e) => {
                   e.preventDefault()
@@ -1434,6 +1440,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
           onClick={onFindReplace}
           data-tip={t('ribbonFindReplace')}
           data-tip-kbd={slidesTipKbd('slides-60')}
+          aria-keyshortcuts={slidesAriaProp('slides-60')}
         >
           <span className="rb-big-icon">
             <IconFind size={BIG} />

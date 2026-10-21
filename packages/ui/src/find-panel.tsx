@@ -10,6 +10,14 @@ export interface FindPanelStrings {
   prevMatch: string
   nextMatch: string
   closeEsc: string
+  /**
+   * Plain accessible names for the three buttons above, whose strings are tooltips that carry the
+   * chord. When given, the name is the plain command and the chord is announced through
+   * `aria-keyshortcuts` (Shift+Enter / Enter / Escape); absent, the tooltip string is the name.
+   */
+  prevName?: string
+  nextName?: string
+  closeName?: string
   replace: string
   replaceAll: string
 }
@@ -251,7 +259,8 @@ export function FindPanel({ target, strings, onClose, focusRequest }: FindPanelP
           className="find-btn"
           data-find-step="prev"
           data-tip={strings.prevMatch}
-          aria-label={strings.prevMatch}
+          aria-label={strings.prevName ?? strings.prevMatch}
+          aria-keyshortcuts={strings.prevName ? 'Shift+Enter' : undefined}
           onClick={() => step(-1)}
           disabled={count === 0}
         >
@@ -262,7 +271,8 @@ export function FindPanel({ target, strings, onClose, focusRequest }: FindPanelP
           className="find-btn"
           data-find-step="next"
           data-tip={strings.nextMatch}
-          aria-label={strings.nextMatch}
+          aria-label={strings.nextName ?? strings.nextMatch}
+          aria-keyshortcuts={strings.nextName ? 'Enter' : undefined}
           onClick={() => step(1)}
           disabled={count === 0}
         >
@@ -272,7 +282,8 @@ export function FindPanel({ target, strings, onClose, focusRequest }: FindPanelP
           type="button"
           className="find-btn find-close"
           data-tip={strings.closeEsc}
-          aria-label={strings.closeEsc}
+          aria-label={strings.closeName ?? strings.closeEsc}
+          aria-keyshortcuts={strings.closeName ? 'Escape' : undefined}
           onClick={close}
         >
           ✕

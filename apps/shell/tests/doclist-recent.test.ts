@@ -320,12 +320,9 @@ describe('DocumentsHome: the Recent screen on the recent-canvas layout (UNI-2047
       const bar = host.querySelector<HTMLElement>('.dh-filter-bar')!
       expect(bar.classList.contains('has-lead')).toBe(true)
       const kids = Array.from(bar.children).map((el) => el.className.split(' ')[0])
-      expect(kids.slice(0, 4)).toEqual([
-        'dh-segment',
-        'dh-filter-chips',
-        'dh-filter-chip',
-        'dh-filter-chip',
-      ])
+      // N-04: the two selects are one group, so they never split across the row
+      expect(kids.slice(0, 3)).toEqual(['dh-segment', 'dh-filter-chips', 'dh-filter-selects'])
+      expect(bar.querySelectorAll('.dh-filter-selects > .dh-filter-chip')).toHaveLength(2)
       // no second row of its own for the segment
       expect(host.querySelectorAll('.dh-segment').length).toBe(1)
       expect(bar.contains(host.querySelector('.dh-segment'))).toBe(true)
@@ -430,6 +427,12 @@ describe('documents-home.css: the Recent layout (UNI-2047 A-REC)', () => {
     expect(css).toMatch(/\.dh-continue-card\b/)
     expect(css).toMatch(/\.dh-continue-preview\b/)
     expect(css).toMatch(/\.dh-filter-bar\.has-lead\b/)
+  })
+  it('pushes the select pair (not a single select) to the far end of a lead row (N-04)', () => {
+    expect(css).toMatch(
+      /\.dh-filter-bar\.has-lead \.dh-filter-selects\s*\{[^}]*margin-inline-start:\s*auto;/,
+    )
+    expect(css).not.toMatch(/\.dh-filter-chips \+ \.dh-filter-chip/)
   })
   it('lays the cards out four across and two below 960px, like the folder grid', () => {
     expect(css).toMatch(/\.dh-continue-grid\s*\{[^}]*repeat\(4,/)

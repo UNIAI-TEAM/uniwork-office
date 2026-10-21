@@ -123,6 +123,8 @@ import {
   FALLBACK_STYLES,
   activeStyleKey as activeStyleKeyOf,
   collectUsedStyleIds,
+  defaultParagraphStyleId,
+  headingStyleId,
   quickStyleEntries,
   styleKeyOf,
   styleLabel,
@@ -133,7 +135,7 @@ import { HeaderFooterTab, type HfAction, type HfEditingInfo } from './ribbon-hf-
 import { PasteSpecialDialog } from './PasteSpecialDialog'
 import { FILE_MENU_FIXED_QUERY, closeOnResize, fileMenuAnchor } from './file-menu-anchor'
 import { cap, saveCopyAvailable } from '../capabilities'
-import { createShortcutMatcher, shortcutHint, shortcutSurface } from '../shortcuts'
+import { createShortcutMatcher, shortcutAria, shortcutHint, shortcutSurface } from '../shortcuts'
 import { docsShortcut } from '../../shared/docs-shortcuts'
 import { fontFamiliesFor, isEastAsianFontName, systemFamiliesBesidesCandidates } from '../font-list'
 import {
@@ -693,6 +695,12 @@ const HIGHLIGHTS = [
 ]
 
 const LINE_SPACINGS = [1, 1.15, 1.5, 2, 2.5, 3]
+/** the table rows that set a preset line spacing, by its multiple */
+const LINE_SPACING_ROWS: Readonly<Record<number, string>> = {
+  1: 'spacing-1',
+  1.5: 'spacing-15',
+  2: 'spacing-2',
+}
 
 export { numberPresetLevels } from '../list-presets'
 
@@ -711,10 +719,30 @@ function keepDocumentFocus(e: ReactMouseEvent<HTMLDivElement>) {
   if (target.closest('button')) e.preventDefault()
 }
 
-/** a File-menu row's key hint, read from the shortcut table (nothing when the command has no key here) */
+/** a File-menu row's key hint, read from the shortcut table (nothing when the command has no key here);
+ * hidden from the row's accessible name, which the row's aria-keyshortcuts completes */
 function FileMenuKey({ command }: { command: string }) {
   const keys = shortcutHint(command)
-  return keys ? <span className="file-menu-key">{keys}</span> : null
+  return keys ? (
+    <span className="file-menu-key" aria-hidden="true">
+      {keys}
+    </span>
+  ) : null
+}
+
+interface ButtonLabel {
+  'data-tip': string
+  'aria-label': string
+  'aria-keyshortcuts'?: string
+}
+
+/** Tooltip, plain accessible name and `aria-keyshortcuts` of a ribbon button bound to a command */
+function keyedButton(name: string, tip: string, command: string): ButtonLabel {
+  return {
+    'data-tip': tip,
+    'aria-label': name,
+    'aria-keyshortcuts': shortcutAria(command) || undefined,
+  }
 }
 
 function RibbonInner({
@@ -1532,6 +1560,16 @@ function RibbonInner({
   }
 
   /** Style cards, shared by the inline gallery and its overflow menu */
+  /** the table row (Normal, Heading 1-3) a gallery card answers to, if any */
+  const styleRow = (info: StyleInfo): string | undefined => {
+    if (info.type !== 'paragraph') return undefined
+    if (info.styleId === defaultParagraphStyleId(galleryStyles)) return 'style-normal'
+    return [1, 2, 3]
+      .map((level) =>
+        info.styleId === headingStyleId(galleryStyles, level) ? `style-h${level}` : undefined,
+      )
+      .find(Boolean)
+  }
   const renderStyleCards = (inMenu: boolean) => {
     const apply = (info: StyleInfo) => {
       applyStyle(info)
@@ -1550,6 +1588,7 @@ function RibbonInner({
               disabled={!canEdit || (!isChar && !!sub)}
               data-tip={label}
               data-style-id={info.styleId}
+              aria-keyshortcuts={(styleRow(info) && shortcutAria(styleRow(info)!)) || undefined}
               onClick={() => apply(info)}
             >
               <span className="style-card-preview" style={stylePreviewCss(info, docDefaults)}>
@@ -2002,12 +2041,11 @@ function RibbonInner({
     ed.commands.focus()
   }
 
-  const markBtn = (name: string, active: boolean, title: string, label: ReactNode) => (
+  const markBtn = (name: string, active: boolean, title: ButtonLabel, label: ReactNode) => (
     <button
       className={`rb-icon ${active ? 'active' : ''}`}
       disabled={!canEdit}
-      data-tip={title}
-      aria-label={title}
+      {...title}
       onClick={() => chain().toggleMark(name).run()}
     >
       {label}
@@ -2017,14 +2055,13 @@ function RibbonInner({
   const shapeMarkBtn = (
     name: 'bold' | 'italic' | 'underline',
     active: boolean,
-    title: string,
+    title: ButtonLabel,
     label: ReactNode,
   ) => (
     <button
       className={`rb-icon ${active ? 'active' : ''}`}
       disabled={!canEdit}
-      data-tip={title}
-      aria-label={title}
+      {...title}
       onClick={() => shapeTextCommand.toggleMark(name, active)}
     >
       {label}
@@ -2033,14 +2070,13 @@ function RibbonInner({
 
   const shapeAlignBtn = (
     align: 'left' | 'center' | 'right' | 'justify',
-    title: string,
+    title: ButtonLabel,
     icon: ReactNode,
   ) => (
     <button
       className={`rb-icon ${shapeTextActive.align === align ? 'active' : ''}`}
       disabled={!canEdit}
-      data-tip={title}
-      aria-label={title}
+      {...title}
       onClick={() => shapeTextCommand.setAlign(align)}
     >
       {icon}
@@ -2076,6 +2112,7 @@ function RibbonInner({
                       setDropdown(null)
                       onOpen()
                     }}
+                    aria-keyshortcuts={shortcutAria('open') || undefined}
                   >
                     {t('ribbonOpen')} <FileMenuKey command="open" />
                   </button>
@@ -2087,6 +2124,7 @@ function RibbonInner({
                       setDropdown(null)
                       onSave()
                     }}
+                    aria-keyshortcuts={shortcutAria('save') || undefined}
                   >
                     {t('ribbonSave')} <FileMenuKey command="save" />
                   </button>
@@ -2098,6 +2136,7 @@ function RibbonInner({
                       setDropdown(null)
                       onSaveAs()
                     }}
+                    aria-keyshortcuts={shortcutAria('save-as') || undefined}
                   >
                     {t('ribbonSaveAs')} <FileMenuKey command="save-as" />
                   </button>
@@ -2131,6 +2170,7 @@ function RibbonInner({
                       setDropdown(null)
                       onPrint()
                     }}
+                    aria-keyshortcuts={shortcutAria('print') || undefined}
                   >
                     {t('appFilePrint')} <FileMenuKey command="print" />
                   </button>
@@ -2145,6 +2185,7 @@ function RibbonInner({
             key={tabName}
             className={`ribbon-tab ${collapse.tabClass(tab === tabName)}`}
             data-tip={collapse.tabTip(tab === tabName)}
+            aria-keyshortcuts={collapse.tabKeyshortcuts(tab === tabName)}
             onClick={() => {
               collapse.onTabPress(tab === tabName)
               lastRegularTab.current = tabName
@@ -2162,6 +2203,7 @@ function RibbonInner({
               key={tableTab}
               className={`ribbon-tab ${collapse.tabClass(tab === tableTab)}`}
               data-tip={collapse.tabTip(tab === tableTab)}
+              aria-keyshortcuts={collapse.tabKeyshortcuts(tab === tableTab)}
               onClick={() => {
                 collapse.onTabPress(tab === tableTab)
                 setTab(tableTab)
@@ -2177,6 +2219,7 @@ function RibbonInner({
               key={imageTab}
               className={`ribbon-tab ${collapse.tabClass(tab === imageTab)}`}
               data-tip={collapse.tabTip(tab === imageTab)}
+              aria-keyshortcuts={collapse.tabKeyshortcuts(tab === imageTab)}
               onClick={() => {
                 collapse.onTabPress(tab === imageTab)
                 setTab(imageTab)
@@ -2192,6 +2235,7 @@ function RibbonInner({
               key={shapeTab}
               className={`ribbon-tab ${collapse.tabClass(tab === shapeTab)}`}
               data-tip={collapse.tabTip(tab === shapeTab)}
+              aria-keyshortcuts={collapse.tabKeyshortcuts(tab === shapeTab)}
               onClick={() => {
                 collapse.onTabPress(tab === shapeTab)
                 setTab(shapeTab)
@@ -2304,19 +2348,31 @@ function RibbonInner({
                       {shapeMarkBtn(
                         'bold',
                         shapeTextActive.bold,
-                        t('ribbonBoldTip', { keys: shortcutHint('bold') }),
+                        keyedButton(
+                          t('appFontBold'),
+                          t('ribbonBoldTip', { keys: shortcutHint('bold') }),
+                          'bold',
+                        ),
                         <b>B</b>,
                       )}
                       {shapeMarkBtn(
                         'italic',
                         shapeTextActive.italic,
-                        t('ribbonItalicTip', { keys: shortcutHint('italic') }),
+                        keyedButton(
+                          t('appFontItalic'),
+                          t('ribbonItalicTip', { keys: shortcutHint('italic') }),
+                          'italic',
+                        ),
                         <i>I</i>,
                       )}
                       {shapeMarkBtn(
                         'underline',
                         shapeTextActive.underline,
-                        t('ribbonUnderlineTip', { keys: shortcutHint('underline') }),
+                        keyedButton(
+                          t('appUnderline'),
+                          t('ribbonUnderlineTip', { keys: shortcutHint('underline') }),
+                          'underline',
+                        ),
                         <u>U</u>,
                       )}
                       <div className="rb-split-wrap">
@@ -2356,22 +2412,38 @@ function RibbonInner({
                     <div className="rb-row">
                       {shapeAlignBtn(
                         'left',
-                        t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') }),
+                        keyedButton(
+                          t('appScAlignLeft'),
+                          t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') }),
+                          'align-left',
+                        ),
                         <IconAlignLeft />,
                       )}
                       {shapeAlignBtn(
                         'center',
-                        t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') }),
+                        keyedButton(
+                          t('appScAlignCenter'),
+                          t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') }),
+                          'align-center',
+                        ),
                         <IconAlignCenter />,
                       )}
                       {shapeAlignBtn(
                         'right',
-                        t('ribbonAlignRightTip', { keys: shortcutHint('align-right') }),
+                        keyedButton(
+                          t('appScAlignRight'),
+                          t('ribbonAlignRightTip', { keys: shortcutHint('align-right') }),
+                          'align-right',
+                        ),
                         <IconAlignRight />,
                       )}
                       {shapeAlignBtn(
                         'justify',
-                        t('ribbonJustifyTip', { keys: shortcutHint('align-justify') }),
+                        keyedButton(
+                          t('appScJustify'),
+                          t('ribbonJustifyTip', { keys: shortcutHint('align-justify') }),
+                          'align-justify',
+                        ),
                         <IconAlignJustify />,
                       )}
                     </div>
@@ -2525,17 +2597,29 @@ function RibbonInner({
                     [
                       'left',
                       <IconAlignLeft key="l" />,
-                      t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') }),
+                      keyedButton(
+                        t('appScAlignLeft'),
+                        t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') }),
+                        'align-left',
+                      ),
                     ],
                     [
                       'center',
                       <IconAlignCenter key="c" />,
-                      t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') }),
+                      keyedButton(
+                        t('appScAlignCenter'),
+                        t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') }),
+                        'align-center',
+                      ),
                     ],
                     [
                       'right',
                       <IconAlignRight key="r" />,
-                      t('ribbonAlignRightTip', { keys: shortcutHint('align-right') }),
+                      keyedButton(
+                        t('appScAlignRight'),
+                        t('ribbonAlignRightTip', { keys: shortcutHint('align-right') }),
+                        'align-right',
+                      ),
                     ],
                   ] as const
                 ).map(([value, icon, label]) => (
@@ -2547,8 +2631,7 @@ function RibbonInner({
                         : 'table-tool-button'
                     }
                     disabled={!canEdit}
-                    data-tip={label}
-                    aria-label={label}
+                    {...label}
                     onClick={() => {
                       if (!canEdit) return
                       editor
@@ -3316,6 +3399,7 @@ function RibbonInner({
                     className="rb-big"
                     disabled={!canEdit}
                     aria-label={t('ribbonPaste')}
+                    aria-keyshortcuts={shortcutAria('paste') || undefined}
                     onClick={() => pasteAs()}
                   >
                     <span className="rb-big-icon">
@@ -3345,7 +3429,11 @@ function RibbonInner({
                         <IconPasteMerge size={16} />
                         {t('appPasteMergeFormat')}
                       </button>
-                      <button role="menuitem" onClick={() => pasteAs('text')}>
+                      <button
+                        role="menuitem"
+                        aria-keyshortcuts={shortcutAria('paste-plain') || undefined}
+                        onClick={() => pasteAs('text')}
+                      >
                         <IconPasteText size={16} />
                         {t('appPasteTextOnly')}
                       </button>
@@ -3382,8 +3470,11 @@ function RibbonInner({
                   <button
                     className="rb-small"
                     disabled={!canEdit}
-                    data-tip={t('ribbonCutTip', { keys: shortcutHint('cut') })}
-                    aria-label={t('ribbonCutTip', { keys: shortcutHint('cut') })}
+                    {...keyedButton(
+                      t('appCut'),
+                      t('ribbonCutTip', { keys: shortcutHint('cut') }),
+                      'cut',
+                    )}
                     onClick={() => clipboard('cut')}
                   >
                     <IconCut />
@@ -3391,8 +3482,11 @@ function RibbonInner({
                   <button
                     className="rb-small"
                     disabled={!hasDoc}
-                    data-tip={t('ribbonCopyTip', { keys: shortcutHint('copy') })}
-                    aria-label={t('ribbonCopyTip', { keys: shortcutHint('copy') })}
+                    {...keyedButton(
+                      t('appCopy'),
+                      t('ribbonCopyTip', { keys: shortcutHint('copy') }),
+                      'copy',
+                    )}
                     onClick={() => clipboard('copy')}
                   >
                     <IconCopy />
@@ -3403,6 +3497,7 @@ function RibbonInner({
                     aria-pressed={!!painter}
                     data-tip={painter ? t('ribbonPainterActiveTip') : t('ribbonPainterTip')}
                     aria-label={painter ? t('ribbonPainterActiveTip') : t('ribbonPainterTip')}
+                    aria-keyshortcuts={shortcutAria('copy-format') || undefined}
                     onClick={onPainterClick}
                     onDoubleClick={onPainterDoubleClick}
                   >
@@ -3552,6 +3647,7 @@ function RibbonInner({
                     disabled={!canEdit}
                     data-tip={t('ribbonGrowFont')}
                     aria-label={t('ribbonGrowFont')}
+                    aria-keyshortcuts={shortcutAria('grow-font') || undefined}
                     onClick={() => stepFontSize(1)}
                   >
                     <IconGrowFont />
@@ -3561,6 +3657,7 @@ function RibbonInner({
                     disabled={!canEdit}
                     data-tip={t('ribbonShrinkFont')}
                     aria-label={t('ribbonShrinkFont')}
+                    aria-keyshortcuts={shortcutAria('shrink-font') || undefined}
                     onClick={() => stepFontSize(-1)}
                   >
                     <IconShrinkFont />
@@ -3571,6 +3668,8 @@ function RibbonInner({
                       className="rb-icon"
                       disabled={!canEdit}
                       data-tip={t('ribbonChangeCase')}
+                      aria-label={t('ribbonChangeCase')}
+                      aria-keyshortcuts={shortcutAria('change-case') || undefined}
                       onClick={() => setDropdown((v) => (v === 'case' ? null : 'case'))}
                     >
                       <IconChangeCase />
@@ -3607,6 +3706,7 @@ function RibbonInner({
                     disabled={!canEdit}
                     data-tip={t('ribbonClearFormatting')}
                     aria-label={t('ribbonClearFormatting')}
+                    aria-keyshortcuts={shortcutAria('clear-formatting') || undefined}
                     onClick={() => chain().unsetAllMarks().run()}
                   >
                     <IconClearFormat />
@@ -3616,26 +3716,45 @@ function RibbonInner({
                   {markBtn(
                     'bold',
                     fs.bold,
-                    t('ribbonBoldTip', { keys: shortcutHint('bold') }),
+                    keyedButton(
+                      t('appFontBold'),
+                      t('ribbonBoldTip', { keys: shortcutHint('bold') }),
+                      'bold',
+                    ),
                     <b>B</b>,
                   )}
                   {markBtn(
                     'italic',
                     fs.italic,
-                    t('ribbonItalicTip', { keys: shortcutHint('italic') }),
+                    keyedButton(
+                      t('appFontItalic'),
+                      t('ribbonItalicTip', { keys: shortcutHint('italic') }),
+                      'italic',
+                    ),
                     <i>I</i>,
                   )}
                   {markBtn(
                     'underline',
                     fs.underline,
-                    t('ribbonUnderlineTip', { keys: shortcutHint('underline') }),
+                    keyedButton(
+                      t('appUnderline'),
+                      t('ribbonUnderlineTip', { keys: shortcutHint('underline') }),
+                      'underline',
+                    ),
                     <u>U</u>,
                   )}
-                  {markBtn('strike', fs.strike, t('ribbonStrikethrough'), <s>ab</s>)}
+                  {markBtn(
+                    'strike',
+                    fs.strike,
+                    keyedButton(t('ribbonStrikethrough'), t('ribbonStrikethrough'), 'strike'),
+                    <s>ab</s>,
+                  )}
                   <button
                     className={`rb-icon ${fs.vertAlign === 'subscript' ? 'active' : ''}`}
                     disabled={!canEdit}
                     data-tip={t('ribbonSubscript')}
+                    aria-label={t('ribbonSubscript')}
+                    aria-keyshortcuts={shortcutAria('subscript') || undefined}
                     onClick={() => toggleVertAlign('subscript')}
                   >
                     <IconSubscript />
@@ -3644,6 +3763,8 @@ function RibbonInner({
                     className={`rb-icon ${fs.vertAlign === 'superscript' ? 'active' : ''}`}
                     disabled={!canEdit}
                     data-tip={t('ribbonSuperscript')}
+                    aria-label={t('ribbonSuperscript')}
+                    aria-keyshortcuts={shortcutAria('superscript') || undefined}
                     onClick={() => toggleVertAlign('superscript')}
                   >
                     <IconSuperscript />
@@ -3764,6 +3885,7 @@ function RibbonInner({
                       disabled={!canEdit || !!sub}
                       data-tip={t('ribbonBullets')}
                       aria-label={t('ribbonBullets')}
+                      aria-keyshortcuts={shortcutAria('bullets') || undefined}
                       onClick={() => toggleList('bullet')}
                     >
                       <IconBullets />
@@ -3832,6 +3954,7 @@ function RibbonInner({
                       disabled={!canEdit || !!sub}
                       data-tip={t('ribbonNumbering')}
                       aria-label={t('ribbonNumbering')}
+                      aria-keyshortcuts={shortcutAria('numbering') || undefined}
                       onClick={() => toggleList('ordered')}
                     >
                       <IconNumbered />
@@ -3963,6 +4086,7 @@ function RibbonInner({
                     disabled={!canEdit || !!sub}
                     data-tip={t('ribbonDecreaseIndent')}
                     aria-label={t('ribbonDecreaseIndent')}
+                    aria-keyshortcuts={shortcutAria('outdent') || undefined}
                     onClick={() => changeIndent(-1)}
                   >
                     <IconIndentDec />
@@ -3972,6 +4096,7 @@ function RibbonInner({
                     disabled={!canEdit || !!sub}
                     data-tip={t('ribbonIncreaseIndent')}
                     aria-label={t('ribbonIncreaseIndent')}
+                    aria-keyshortcuts={shortcutAria('indent') || undefined}
                     onClick={() => changeIndent(1)}
                   >
                     <IconIndentInc />
@@ -3982,6 +4107,7 @@ function RibbonInner({
                     disabled={!hasDoc}
                     data-tip={t('ribbonShowMarks')}
                     aria-label={t('ribbonShowMarks')}
+                    aria-keyshortcuts={shortcutAria('formatting-marks') || undefined}
                     onClick={() => onShowMarks(!showMarks)}
                   >
                     <IconPilcrow />
@@ -3991,8 +4117,11 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'left' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') })}
-                    aria-label={t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') })}
+                    {...keyedButton(
+                      t('appScAlignLeft'),
+                      t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') }),
+                      'align-left',
+                    )}
                     onClick={() => setSelectionAlign(ed, 'left')}
                   >
                     <IconAlignLeft />
@@ -4000,8 +4129,11 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'center' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') })}
-                    aria-label={t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') })}
+                    {...keyedButton(
+                      t('appScAlignCenter'),
+                      t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') }),
+                      'align-center',
+                    )}
                     onClick={() => setSelectionAlign(ed, 'center')}
                   >
                     <IconAlignCenter />
@@ -4009,8 +4141,11 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'right' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonAlignRightTip', { keys: shortcutHint('align-right') })}
-                    aria-label={t('ribbonAlignRightTip', { keys: shortcutHint('align-right') })}
+                    {...keyedButton(
+                      t('appScAlignRight'),
+                      t('ribbonAlignRightTip', { keys: shortcutHint('align-right') }),
+                      'align-right',
+                    )}
                     onClick={() => setSelectionAlign(ed, 'right')}
                   >
                     <IconAlignRight />
@@ -4018,8 +4153,11 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'justify' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonJustifyTip', { keys: shortcutHint('align-justify') })}
-                    aria-label={t('ribbonJustifyTip', { keys: shortcutHint('align-justify') })}
+                    {...keyedButton(
+                      t('appScJustify'),
+                      t('ribbonJustifyTip', { keys: shortcutHint('align-justify') }),
+                      'align-justify',
+                    )}
                     onClick={() => setSelectionAlign(ed, 'justify')}
                   >
                     <IconAlignJustify />
@@ -4067,6 +4205,10 @@ function RibbonInner({
                           <button
                             key={s}
                             className={activeSpacing === s ? 'active' : ''}
+                            aria-keyshortcuts={
+                              (LINE_SPACING_ROWS[s] && shortcutAria(LINE_SPACING_ROWS[s])) ||
+                              undefined
+                            }
                             // presets are multiples: clear any atLeast/exact rule so they take effect
                             onClick={() =>
                               setParaAttr({ lineSpacing: s, lineRule: null, lineRawTwips: null })
@@ -4194,6 +4336,7 @@ function RibbonInner({
                   disabled={!hasDoc}
                   aria-pressed={!!showStylesPane}
                   data-tip={t('ribbonStylesPaneTip')}
+                  aria-keyshortcuts={shortcutAria('styles-pane') || undefined}
                   onClick={() => onShowStylesPane?.(!showStylesPane)}
                 >
                   <span className="rb-big-icon">
@@ -4215,6 +4358,7 @@ function RibbonInner({
                       className="rb-small"
                       disabled={!hasDoc}
                       data-tip={t('ribbonFindTip')}
+                      aria-keyshortcuts={shortcutAria('find') || undefined}
                       onClick={() => onFind?.()}
                     >
                       <IconSearch />
@@ -4224,6 +4368,7 @@ function RibbonInner({
                       className="rb-small"
                       disabled={!canEdit}
                       data-tip={t('ribbonReplaceTip')}
+                      aria-keyshortcuts={shortcutAria('replace') || undefined}
                       onClick={() => onReplace?.()}
                     >
                       <IconReplace />
@@ -4233,6 +4378,7 @@ function RibbonInner({
                       className="rb-small"
                       disabled={!hasDoc}
                       data-tip={t('ribbonSelectAllTip')}
+                      aria-keyshortcuts={shortcutAria('select-all') || undefined}
                       onClick={() => ed.chain().focus().selectAll().run()}
                     >
                       <IconSelectAll />

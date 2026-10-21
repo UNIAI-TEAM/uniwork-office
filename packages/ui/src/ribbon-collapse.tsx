@@ -31,7 +31,9 @@
  */
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
 import {
+  ariaKeyshortcuts,
   currentShortcutPlatform,
+  formatAriaChord,
   formatHint,
   matchShortcut,
   type ShortcutAction,
@@ -43,6 +45,10 @@ const IS_MAC = typeof navigator !== 'undefined' && navigator.platform.toLowerCas
 
 export const RIBBON_TOGGLE_SHORTCUT = IS_MAC ? '⌥⌘R' : 'Ctrl+F1'
 export const RIBBON_COMPACT_SHORTCUT = IS_MAC ? '⌥⌘K' : 'Ctrl+Alt+K'
+
+/** The same fallback keys as canonical chords, for `aria-keyshortcuts`. */
+const FALLBACK_TOGGLE_CHORD = { win: 'Ctrl+F1', mac: 'Alt+Cmd+R' } as const
+const FALLBACK_COMPACT_CHORD = { win: 'Ctrl+Alt+K', mac: 'Alt+Cmd+K' } as const
 
 /**
  * How much of the command band to show. `full` and `compact` both keep the band
@@ -267,6 +273,9 @@ export interface RibbonCollapse {
   readonly collapsed: boolean
   /** The collapse key as shown in tips (`Ctrl+F1`, `⌥⌘R`); empty when the action has no chord here */
   readonly shortcutLabel: string
+  /** The collapse key in `aria-keyshortcuts` notation (`Control+F1`, `Alt+Meta+R`); empty
+   * when the action has no chord here. The accessible name never carries the key. */
+  readonly ariaKeyshortcuts: string
   /** current band density; `'full'` when the call site did not opt in */
   readonly density: RibbonDensity
   /** true when the call site passed the compact labels */
@@ -285,6 +294,8 @@ export interface RibbonCollapse {
   readonly tabClass: (isActive: boolean) => string
   /** hover tip: the selected tab offers Collapse, every tab offers Expand while collapsed */
   readonly tabTip: (isActive: boolean) => string | undefined
+  /** `aria-keyshortcuts` for a tab: the keys its tip offers, or undefined when it offers none */
+  readonly tabKeyshortcuts: (isActive: boolean) => string | undefined
 }
 
 export function useRibbonCollapse(
@@ -298,6 +309,12 @@ export function useRibbonCollapse(
   const compactLabel = compactAction
     ? formatHint(compactAction, platform, surface)
     : RIBBON_COMPACT_SHORTCUT
+  const ariaShortcut = action
+    ? ariaKeyshortcuts(action, platform, surface)
+    : formatAriaChord(FALLBACK_TOGGLE_CHORD[platform], platform)
+  const compactAria = compactAction
+    ? ariaKeyshortcuts(compactAction, platform, surface)
+    : formatAriaChord(FALLBACK_COMPACT_CHORD[platform], platform)
   /** ` (key)` after a tip, or nothing when the surface has no key */
   const keyed = (text: string, key: string) => (key ? `${text} (${key})` : text)
   const compactEnabled = Boolean(labels.compact && labels.expandFull)
@@ -422,6 +439,13 @@ export function useRibbonCollapse(
       ? keyed(labels.expandFull ?? '', compactLabel)
       : `${keyed(labels.collapse, shortcutLabel)} · ${keyed(labels.compact ?? '', compactLabel)}`
   }
+  const tabKeyshortcuts = (isActive: boolean) => {
+    const keys = (...parts: string[]) => parts.filter(Boolean).join(' ') || undefined
+    if (collapsed) return keys(ariaShortcut)
+    if (!isActive) return undefined
+    if (!compactEnabled) return keys(ariaShortcut)
+    return density === 'compact' ? keys(compactAria) : keys(ariaShortcut, compactAria)
+  }
 
   const rootClass = `ribbon-collapsible${collapsed ? ' ribbon-collapsed' : ''}${
     density === 'compact' ? ' ribbon-compact' : ''
@@ -429,6 +453,7 @@ export function useRibbonCollapse(
   return {
     collapsed,
     shortcutLabel,
+    ariaKeyshortcuts: ariaShortcut,
     density,
     compactEnabled,
     rootRef,
@@ -439,6 +464,7 @@ export function useRibbonCollapse(
     onTabsDoubleClick,
     tabClass,
     tabTip,
+    tabKeyshortcuts,
   }
 }
 
@@ -479,7 +505,8 @@ export function RibbonCollapseButton({ state, label }: { state: RibbonCollapse; 
       type="button"
       className="ribbon-collapse-btn"
       data-tip={tip}
-      aria-label={tip}
+      aria-label={label}
+      aria-keyshortcuts={state.ariaKeyshortcuts || undefined}
       onMouseDown={(e) => e.preventDefault()}
       onClick={state.toggle}
     >
@@ -497,7 +524,8 @@ export function RibbonExpandButton({ state, label }: { state: RibbonCollapse; la
       type="button"
       className="ribbon-expand-btn"
       data-tip={tip}
-      aria-label={tip}
+      aria-label={label}
+      aria-keyshortcuts={state.ariaKeyshortcuts || undefined}
       onMouseDown={(e) => e.preventDefault()}
       onClick={state.toggle}
     >

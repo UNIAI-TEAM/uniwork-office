@@ -82,42 +82,45 @@ export function FilterBar({ filters, onChange, authors, lead, hideTypes }: Filte
         )}
       </div>
 
-      <label className="dh-filter-chip">
-        <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
-        <select
-          className="dh-filter-select"
-          data-filter="updatedBy"
-          aria-label={t('uhFilterModifiedBy')}
-          value={filters.updatedBy}
-          onChange={(e) => patch({ updatedBy: e.target.value })}
-        >
-          <option value="">{t('uhFilterAnyPerson')}</option>
-          {updatedByOptionsForSelect(authors, filters.updatedBy, t('uwEditLockSomeone')).map(
-            (author) => (
-              <option key={author.id} value={author.id}>
-                {author.name}
-              </option>
-            ),
-          )}
-        </select>
-      </label>
+      {/* one group, so the two selects wrap together and render at one width (N-04) */}
+      <div className="dh-filter-selects">
+        <label className="dh-filter-chip">
+          <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
+          <select
+            className="dh-filter-select"
+            data-filter="updatedBy"
+            aria-label={t('uhFilterModifiedBy')}
+            value={filters.updatedBy}
+            onChange={(e) => patch({ updatedBy: e.target.value })}
+          >
+            <option value="">{t('uhFilterAnyPerson')}</option>
+            {updatedByOptionsForSelect(authors, filters.updatedBy, t('uwEditLockSomeone')).map(
+              (author) => (
+                <option key={author.id} value={author.id}>
+                  {author.name}
+                </option>
+              ),
+            )}
+          </select>
+        </label>
 
-      <label className="dh-filter-chip">
-        <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
-        <select
-          className="dh-filter-select"
-          data-filter="updatedFrom"
-          aria-label={t('uhFilterUpdated')}
-          value={filters.updatedPreset}
-          onChange={(e) => patch({ updatedPreset: e.target.value as DocumentsHomeUpdatedPreset })}
-        >
-          {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {t(opt.labelKey)}
-            </option>
-          ))}
-        </select>
-      </label>
+        <label className="dh-filter-chip">
+          <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
+          <select
+            className="dh-filter-select"
+            data-filter="updatedFrom"
+            aria-label={t('uhFilterUpdated')}
+            value={filters.updatedPreset}
+            onChange={(e) => patch({ updatedPreset: e.target.value as DocumentsHomeUpdatedPreset })}
+          >
+            {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {t(opt.labelKey)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {hasActiveFilters(filters) && (
         <button

@@ -238,6 +238,7 @@ export const ms = {
   appSplitPaneLabel: 'Anak tetingkap terpisah (pratonton baca sahaja, tatal berasingan)',
   appRemoveSplit: 'Buang Pemisahan',
   appExitReadMode: 'Keluar Mod Baca (Esc)',
+  appExitReadModeName: 'Keluar Mod Baca',
   appExpandAiPanel: 'Kembangkan panel penyuntingan AI',
   appAiRail: 'AI',
   appPageOf: 'Halaman {current} daripada {total}',

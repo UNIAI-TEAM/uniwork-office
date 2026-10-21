@@ -240,6 +240,7 @@ export const it = {
   appSplitPaneLabel: 'Riquadro diviso (anteprima in sola lettura, scorrimento indipendente)',
   appRemoveSplit: 'Rimuovi divisione',
   appExitReadMode: 'Esci dalla modalità lettura (Esc)',
+  appExitReadModeName: 'Esci dalla modalità lettura',
   appExpandAiPanel: 'Espandi il pannello di modifica IA',
   appAiRail: 'IA',
   appPageOf: 'Pagina {current} di {total}',

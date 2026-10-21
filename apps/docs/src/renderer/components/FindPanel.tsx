@@ -518,7 +518,8 @@ export function FindPanel({
           type="button"
           className="find-btn find-close"
           data-tip={t('appCloseEsc')}
-          aria-label={t('appCloseEsc')}
+          aria-label={t('appClose')}
+          aria-keyshortcuts="Escape"
           onClick={close}
         >
           ✕
@@ -555,7 +556,8 @@ export function FindPanel({
               type="button"
               className="find-btn"
               data-tip={t('appPrevMatch')}
-              aria-label={t('appPrevMatch')}
+              aria-label={t('appGoToPrevious')}
+              aria-keyshortcuts="Shift+Enter"
               onClick={() => step(-1)}
               disabled={matches.length === 0 || scanning}
             >
@@ -565,7 +567,8 @@ export function FindPanel({
               type="button"
               className="find-btn"
               data-tip={t('appNextMatch')}
-              aria-label={t('appNextMatch')}
+              aria-label={t('appGoToNext')}
+              aria-keyshortcuts="Enter"
               onClick={() => step(1)}
               disabled={matches.length === 0 || scanning}
             >

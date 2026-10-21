@@ -8,8 +8,7 @@ import { openSource, source } from './helpers'
  * therefore the save path — no separate write route.
  */
 
-// the tooltip / aria-label carries the table's chord ("Source (Ctrl+E)"), so match the name by prefix
-const SOURCE_BUTTON = '.rb-btn[aria-label^="Source"]'
+const SOURCE_BUTTON = '.rb-btn[aria-label="Source"]'
 
 test('the source view shows the exact file text and routes edits through the editor', async ({
   page,
@@ -54,8 +53,8 @@ test('editor-shaped ribbon commands stand down while the source view is open', a
   await expect(page.locator('.source-textarea')).toBeVisible()
   // save stays live; formatting, which acts on an invisible selection, does not
   await expect(page.locator(SOURCE_BUTTON)).toBeEnabled()
-  await expect(page.locator('.rb-btn[aria-label^="Bold"]')).toBeDisabled()
-  await expect(page.locator('.rb-btn[aria-label^="Bullet list"]')).toBeDisabled()
+  await expect(page.locator('.rb-btn[aria-label="Bold"]')).toBeDisabled()
+  await expect(page.locator('.rb-btn[aria-label="Bullet list"]')).toBeDisabled()
 })
 
 test('a write that landed while the pane sat unfocused is picked up on refocus', async ({

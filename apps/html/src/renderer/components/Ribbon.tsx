@@ -9,7 +9,7 @@ import {
 import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n } from '../i18n/locale'
 import { cap } from '../capabilities'
-import { htmlSurface, withHtmlHint } from '../shortcuts'
+import { htmlAria, htmlPlainLabel, htmlSurface, withHtmlHint } from '../shortcuts'
 import { useRibbonFit } from './ribbon-fit'
 import type { StringKey } from '../i18n/locale'
 import type { InsertKind, InsertOptions } from '../document/insert-presets'
@@ -257,7 +257,8 @@ export function Ribbon(p: Props) {
             type="button"
             className="qa-btn"
             data-tip={withHtmlHint(t('save'), 'save')}
-            aria-label={withHtmlHint(t('save'), 'save')}
+            aria-label={htmlPlainLabel(t('save'))}
+            aria-keyshortcuts={htmlAria('save') || undefined}
             disabled={off || (!p.dirty && !p.uniworkBound)}
             onMouseDown={(e) => e.preventDefault()}
             onClick={p.onSave}
@@ -271,6 +272,7 @@ export function Ribbon(p: Props) {
             className="qa-btn qa-save-as"
             data-tip={withHtmlHint(t('saveAs'), 'saveAs')}
             aria-label={t('saveAs')}
+            aria-keyshortcuts={htmlAria('saveAs') || undefined}
             disabled={notReady}
             onMouseDown={(e) => e.preventDefault()}
             onClick={p.onSaveAs}
@@ -295,7 +297,8 @@ export function Ribbon(p: Props) {
           type="button"
           className="qa-btn"
           data-tip={withHtmlHint(t('undo'), 'undo')}
-          aria-label={withHtmlHint(t('undo'), 'undo')}
+          aria-label={htmlPlainLabel(t('undo'))}
+          aria-keyshortcuts={htmlAria('undo') || undefined}
           disabled={off || !p.canUndo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onUndo}
@@ -306,7 +309,8 @@ export function Ribbon(p: Props) {
           type="button"
           className="qa-btn"
           data-tip={withHtmlHint(t('redo'), 'redo')}
-          aria-label={withHtmlHint(t('redo'), 'redo')}
+          aria-label={htmlPlainLabel(t('redo'))}
+          aria-keyshortcuts={htmlAria('redo') || undefined}
           disabled={off || !p.canRedo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onRedo}
@@ -317,7 +321,8 @@ export function Ribbon(p: Props) {
           type="button"
           className="qa-btn"
           data-tip={withHtmlHint(t('findTip'), 'find')}
-          aria-label={withHtmlHint(t('findTip'), 'find')}
+          aria-label={htmlPlainLabel(t('findTip'))}
+          aria-keyshortcuts={htmlAria('find') || undefined}
           disabled={findOff}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onFind}

@@ -229,6 +229,7 @@ export const zhTW = {
   appStatusBarSlide: '投影片 {current} / {total}',
   appStatusBarReady: '就緒',
   appMediaCloseTitle: '關閉 (Esc)',
+  appMediaCloseName: '關閉',
   appRehearseTitle: '排練計時',
   appRehearseSummary: '本次放映總時長 {duration}。是否儲存每頁停留時間作為自動換頁時間？',
   appRehearseDiscard: '不儲存',

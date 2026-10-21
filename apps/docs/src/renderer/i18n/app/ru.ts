@@ -237,6 +237,7 @@ export const ru = {
   appSplitPaneLabel: 'Разделенная область (просмотр только для чтения, независимая прокрутка)',
   appRemoveSplit: 'Снять разделение',
   appExitReadMode: 'Выйти из режима чтения (Esc)',
+  appExitReadModeName: 'Выйти из режима чтения',
   appExpandAiPanel: 'Развернуть панель редактирования ИИ',
   appAiRail: 'ИИ',
   appPageOf: 'Страница {current} из {total}',

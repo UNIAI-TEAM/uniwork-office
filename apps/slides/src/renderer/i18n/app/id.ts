@@ -245,6 +245,7 @@ export const id = {
   appStatusBarSlide: 'Slide {current} dari {total}',
   appStatusBarReady: 'Siap',
   appMediaCloseTitle: 'Tutup (Esc)',
+  appMediaCloseName: 'Tutup',
   appRehearseTitle: 'Latih Pengaturan Waktu',
   appRehearseSummary:
     'Total waktu peragaan slide adalah {duration}. Simpan waktu setiap slide untuk perpindahan slide otomatis?',

@@ -206,3 +206,30 @@ describe('shared ImageViewer modal focus', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
+
+// UNI-2060: a close tip that names its key keeps the key out of the accessible name
+describe('the close button name', () => {
+  it('is the plain closeName, the key in aria-keyshortcuts, the tip unchanged', () => {
+    trigger.focus()
+    act(() =>
+      root.render(
+        createElement(ImageViewer, {
+          src: 'data:image/png;base64,',
+          labels: { ...LABELS, close: 'Close (Esc)', closeName: 'Close' },
+          onClose,
+        }),
+      ),
+    )
+    const close = host.querySelector<HTMLButtonElement>('[data-imgview-close]')!
+    expect(close.getAttribute('aria-label')).toBe('Close')
+    expect(close.getAttribute('aria-keyshortcuts')).toBe('Escape')
+    expect(close.getAttribute('title')).toBe('Close (Esc)')
+  })
+
+  it('stays the close label without a closeName', () => {
+    mountViewer()
+    const close = host.querySelector<HTMLButtonElement>('[data-imgview-close]')!
+    expect(close.getAttribute('aria-label')).toBe('Close')
+    expect(close.hasAttribute('aria-keyshortcuts')).toBe(false)
+  })
+})

@@ -20,6 +20,11 @@ export interface DropdownOption<K extends string = string> {
   readonly render?: React.ReactNode
   /** Shown but not pickable (placeholder rows like "Auto", unavailable modes). */
   readonly disabled?: boolean
+  /**
+   * ARIA key chord(s) that run this option's command from the keyboard (`aria-keyshortcuts` syntax,
+   * e.g. `Control+Alt+1`). The accessible name stays `label`; the chord is announced separately.
+   */
+  readonly keyshortcuts?: string
 }
 
 export function nextEnabledIndex(
@@ -193,6 +198,7 @@ export function Dropdown<K extends string>({
               disabled={o.disabled}
               aria-selected={o.value === value}
               aria-label={o.label}
+              aria-keyshortcuts={o.keyshortcuts || undefined}
               data-value={o.value}
               title={o.label}
               className={`gs-dd-item${o.value === value ? ' selected' : ''}${i === active && !o.disabled ? ' active' : ''}`}

@@ -249,6 +249,7 @@ export const ms = {
   appStatusBarSlide: 'Slaid {current} daripada {total}',
   appStatusBarReady: 'Sedia',
   appMediaCloseTitle: 'Tutup (Esc)',
+  appMediaCloseName: 'Tutup',
   appRehearseTitle: 'Raptai Pemasaan',
   appRehearseSummary:
     'Jumlah masa persembahan ialah {duration}. Adakah anda mahu menyimpan pemasaan slaid untuk peralihan slaid automatik?',

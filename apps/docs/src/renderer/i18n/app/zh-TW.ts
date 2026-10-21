@@ -219,6 +219,7 @@ export const zhTW = {
   appSplitPaneLabel: '分割窗格(唯讀預覽,可獨立捲動)',
   appRemoveSplit: '取消分割',
   appExitReadMode: '結束閱讀檢視 (Esc)',
+  appExitReadModeName: '結束閱讀檢視',
   appExpandAiPanel: '展開 AI 編輯面板',
   appAiRail: 'AI',
   appPageOf: '第 {current} 頁,共 {total} 頁',

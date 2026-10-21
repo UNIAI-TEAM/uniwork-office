@@ -831,6 +831,18 @@ function CollabThreadImpl(p: CollabThreadProps) {
             ) : (
               <div className="collab-bd">{renderBody(c, mentions)}</div>
             )}
+            {editing !== c.id && isRoot && canViewVersion && (
+              <div className="collab-lostver">
+                <button
+                  type="button"
+                  className="collab-link"
+                  disabled={viewing}
+                  onClick={() => void viewVersion(versionNo as number)}
+                >
+                  {format(strings.collabAnchorViewVersion ?? '', { n: versionNo as number })}
+                </button>
+              </div>
+            )}
             {editing !== c.id && (
               <div className="collab-acts">
                 {can.canWrite && !thread.deleted && p.renderComposer && (
@@ -850,16 +862,6 @@ function CollabThreadImpl(p: CollabThreadProps) {
                     onClick={() => p.adapter?.goTo(root.anchor!)}
                   >
                     {strings.collabGoToAnchor}
-                  </button>
-                )}
-                {isRoot && canViewVersion && (
-                  <button
-                    type="button"
-                    className="collab-link"
-                    disabled={viewing}
-                    onClick={() => void viewVersion(versionNo as number)}
-                  >
-                    {format(strings.collabAnchorViewVersion ?? '', { n: versionNo as number })}
                   </button>
                 )}
                 <ActionsMenu

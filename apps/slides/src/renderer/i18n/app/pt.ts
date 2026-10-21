@@ -252,6 +252,7 @@ export const pt = {
   appStatusBarSlide: 'Slide {current} de {total}',
   appStatusBarReady: 'Pronto',
   appMediaCloseTitle: 'Fechar (Esc)',
+  appMediaCloseName: 'Fechar',
   appRehearseTitle: 'Testar Intervalos',
   appRehearseSummary:
     'O tempo total da apresentação foi de {duration}. Deseja salvar os intervalos dos slides para o avanço automático?',

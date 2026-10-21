@@ -239,6 +239,7 @@ export const ar = {
   appStatusBarSlide: 'الشريحة {current} من {total}',
   appStatusBarReady: 'جاهز',
   appMediaCloseTitle: 'إغلاق (Esc)',
+  appMediaCloseName: 'إغلاق',
   appRehearseTitle: 'التمرن على التوقيت',
   appRehearseSummary:
     'المدة الإجمالية للعرض هي {duration}. هل تريد حفظ توقيتات الشرائح للتقدم التلقائي للشرائح؟',

@@ -32,6 +32,7 @@ import iconEditor from '../assets/icon-editor.png'
 import iconTranslate from '../assets/icon-translate.png'
 import type { RevisionDisplayMode } from '../editor/revision-view'
 import { TRANSLATE_LANGS, ribbonLangKey } from './translate-langs'
+import { shortcutAria } from '../shortcuts'
 import {
   IconAccept,
   IconAiPanel,
@@ -953,6 +954,7 @@ export function ReviewTab({
             className="rb-big"
             disabled={!hasDoc || !canComment || (isProtected && !commentsAllowed)}
             data-tip={canComment ? t('ribbonNewCommentTip') : t('ribbonNewCommentSelectTip')}
+            aria-keyshortcuts={shortcutAria('comment') || undefined}
             onClick={onNewComment}
           >
             <span className="rb-big-icon">
@@ -1081,6 +1083,7 @@ export function ReviewTab({
             className={`rb-big ${trackChanges ? 'active' : ''}`}
             disabled={!hasDoc || isProtected || trackChangesForced}
             data-tip={t('ribbonTrackChangesTip')}
+            aria-keyshortcuts={shortcutAria('track-changes') || undefined}
             onClick={() => onTrackChanges(!trackChanges)}
           >
             <span className="rb-big-icon">
@@ -1429,6 +1432,7 @@ export function ViewTab({
             className="rb-big"
             disabled={!hasDoc || viewMode !== 'print' || readMode}
             data-tip={t('ribbonPagePreviewTip')}
+            aria-keyshortcuts={shortcutAria('print-preview') || undefined}
             onClick={onPagePreview}
           >
             <span className="rb-big-icon">
@@ -1458,6 +1462,7 @@ export function ViewTab({
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonZoomOut')}
+            aria-keyshortcuts={shortcutAria('zoom-out') || undefined}
             onClick={() => onZoom(stepDocsZoom(zoom, -1))}
           >
             <span className="rb-big-icon">
@@ -1469,6 +1474,7 @@ export function ViewTab({
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonZoomIn')}
+            aria-keyshortcuts={shortcutAria('zoom-in') || undefined}
             onClick={() => onZoom(stepDocsZoom(zoom, 1))}
           >
             <span className="rb-big-icon">
@@ -1481,6 +1487,7 @@ export function ViewTab({
             disabled={!hasDoc}
             data-tip={t('ribbonZoom100Tip')}
             aria-label={t('ribbonZoom100Tip')}
+            aria-keyshortcuts={shortcutAria('zoom-100') || undefined}
             onClick={() => onZoom(100)}
           >
             <span className="rb-big-icon">
