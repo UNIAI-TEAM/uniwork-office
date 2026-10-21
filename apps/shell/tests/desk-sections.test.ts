@@ -113,7 +113,7 @@ describe('DeskInTray', () => {
     expect(host.textContent).toContain('Contract-012')
     // a person's comment: an info pill; the date is the picker list's Cập nhật cell (shared formatter)
     expect(host.querySelector('.wb-pill.is-info')!.textContent).toBe('Comment')
-    expect(host.querySelector('[role="option"] [data-col="updated"]')!.textContent).toMatch(
+    expect(host.querySelector('.uw-pick-row [data-col="updated"]')!.textContent).toMatch(
       /^\d{2}\/\d{2}(\/\d{4})?$|^[A-Z][a-z]{2} \d{1,2}(, \d{4})?$|^\d{2}:\d{2}$|^Yesterday, \d{2}:\d{2}$/,
     )
     await act(async () => button('Contract-012')!.click())
@@ -170,7 +170,7 @@ describe('DeskInTray', () => {
     const titles = () => host.querySelectorAll<HTMLButtonElement>('.wb-desk-row-title')
     expect(titles()).toHaveLength(8)
     // "Show more" sits under the list, not inside it as a fake row
-    expect(host.querySelector('[role="listbox"] .wb-link')).toBeNull()
+    expect(host.querySelector('.dh-picker ul .wb-link')).toBeNull()
     await act(async () => host.querySelector<HTMLButtonElement>('.wb-link')!.click())
     expect(titles()).toHaveLength(9)
     expect(document.activeElement).toBe(titles()[8])
@@ -213,7 +213,9 @@ describe('DeskInTray', () => {
     await render(
       createElement(DeskInTray, { home: home([comment]), signedIn: true, view: 'ready', local }),
     )
-    const list = host.querySelector('.dh-picker ul[role="listbox"]')!
+    // a plain list: the title button is the control, so no listbox / option / aria-selected
+    expect(host.querySelector('[role="listbox"], [role="option"], [aria-selected]')).toBeNull()
+    const list = host.querySelector('.dh-picker ul[role="list"]')!
     expect(list.getAttribute('aria-label')).toBe('Needs you')
     // the quiet picker header: Tên · Cập nhật (Người sửa joins once the card is wide enough), nothing sortable
     const head = host.querySelector('.dh-picker-head')!
@@ -231,10 +233,10 @@ describe('DeskInTray', () => {
       'Plan',
     ])
     for (const li of items) {
-      expect(li.querySelector('[role="option"] .wb-row-title')).not.toBeNull()
+      expect(li.querySelector(':scope > .uw-pick-row .wb-row-title')).not.toBeNull()
       // the pill sits beside the option in the same item
       expect(li.querySelector(':scope > .wb-desk-trail .wb-pill')).not.toBeNull()
-      expect(li.querySelector('[role="option"] [data-col="updated"]')).not.toBeNull()
+      expect(li.querySelector(':scope > .uw-pick-row [data-col="updated"]')).not.toBeNull()
     }
     // second line: why the row is here (the share names its workspace); the date of a
     // sync problem that has no save time reads as an empty cell, not a blank
@@ -261,7 +263,7 @@ describe('DeskInTray', () => {
       }),
     )
     await act(async () =>
-      host.querySelector<HTMLElement>('[role="option"] [data-col="updated"]')!.click(),
+      host.querySelector<HTMLElement>('.uw-pick-row [data-col="updated"]')!.click(),
     )
     await act(async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve()
