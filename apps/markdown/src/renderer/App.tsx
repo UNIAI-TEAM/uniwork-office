@@ -1293,6 +1293,9 @@ export default function App() {
     prevMatch: t('prevMatch'),
     nextMatch: t('nextMatch'),
     closeEsc: t('closeEsc'),
+    prevName: t('prevName'),
+    nextName: t('nextName'),
+    closeName: t('closeName'),
     replace: t('replace'),
     replaceAll: t('replaceAll'),
   }
