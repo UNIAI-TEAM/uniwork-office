@@ -206,7 +206,10 @@ describe('UNI-2047 A1b: the flat / folder / shared-by-me / trash lists forward s
       const params = req!.searchParams
       expect(params.get('sort')).toBe('name')
       expect(params.get('order')).toBe('desc')
-      expect(params.get('activity')).toBe('edited')
+      // A-FIX4 M2: updated_by / updated_from put Recent on the flat route, which has no activity
+      expect(params.get('activity')).toBe(
+        channel === UNIWORK_DOC_CHANNELS.listDocuments ? null : 'edited',
+      )
       expect(params.get('format')).toBe('docx')
       expect(params.get('updated_by')).toBe('u_1')
       expect(params.get('updated_from')).toBe('2026-10-01T00:00:00Z')
@@ -264,6 +267,22 @@ describe('UNI-2047 A-FIX2: the UniNote kind filter', () => {
     await call(channel, { workspaceId: 'ws_1', kind: 'page', ...extra })
     const [req] = server.lists()
     expect(req, 'a list request').toBeDefined()
+    expect(req!.searchParams.get('kind')).toBe('page')
+    expect(req!.searchParams.has('format')).toBe(false)
+  })
+
+  // A-FIX4 n3: a UniNote has no file format, the server answers 400 invalid_filter to both
+  it.each([
+    ['listDocuments', UNIWORK_DOC_CHANNELS.listDocuments, {}],
+    ['listChildren', UNIWORK_DOC_CHANNELS.listChildren, { parentId: 'fold_1' }],
+    ['listSharedByMe', UNIWORK_DOC_CHANNELS.listSharedByMe, {}],
+    ['listTrash', UNIWORK_DOC_CHANNELS.listTrash, {}],
+    ['listShelved', UNIWORK_DOC_CHANNELS.listShelved, {}],
+  ])('%s drops format when the kind is page', async (_name, channel, extra) => {
+    const call = await setup()
+    const server = stubServer()
+    await call(channel, { workspaceId: 'ws_1', kind: 'page', format: 'docx', ...extra })
+    const [req] = server.lists()
     expect(req!.searchParams.get('kind')).toBe('page')
     expect(req!.searchParams.has('format')).toBe(false)
   })

@@ -621,6 +621,39 @@ describe('DocumentsHome: the Recent segment sends activity (UNI-2047 A2c)', () =
     expect(rowCount()).toBe(4)
   })
 
+  // A-FIX4 M2: Người sửa / Cập nhật move Recent onto the flat /documents list, which has no activity
+  // filter and no activity sort: the segment is off while they are on, and Cập nhật is the sort
+  it('disables the segment while Người sửa or Cập nhật is set, and asks for no activity', async () => {
+    writeRecentSegment('edited')
+    writeSort('recent', { column: 'activity', dir: 'asc' })
+    await mount('recent')
+    expect(lastCall('uniworkListDocuments')).toMatchObject({ activity: 'edited' })
+    const pick = async (name: string, value: string) => {
+      const el = host.querySelector<HTMLSelectElement>(`select[data-filter="${name}"]`)!
+      await act(async () => {
+        el.value = value
+        el.dispatchEvent(new Event('change', { bubbles: true }))
+      })
+      await flush()
+    }
+    await pick('updatedFrom', '7d')
+    const call = lastCall('uniworkListDocuments')
+    expect(call).not.toHaveProperty('activity')
+    expect(call).toMatchObject({ sort: 'updated', order: 'desc' })
+    for (const value of ['all', 'opened', 'edited'] as const) {
+      expect(seg(value)?.disabled).toBe(true)
+    }
+    // the stored pick is kept for when the filter goes, but nothing shows it as applied
+    expect(seg('all')?.getAttribute('aria-pressed')).toBe('true')
+    expect(seg('edited')?.getAttribute('aria-pressed')).toBe('false')
+    expect(readRecentSegment()).toBe('edited')
+
+    await pick('updatedFrom', 'any')
+    expect(seg('edited')?.disabled).toBe(false)
+    expect(seg('edited')?.getAttribute('aria-pressed')).toBe('true')
+    expect(lastCall('uniworkListDocuments')).toMatchObject({ activity: 'edited' })
+  })
+
   it('is not drawn when the loaded rows have no last_activity (server field missing)', async () => {
     recentItems = RECENT.map((d) => ({ ...d, lastActivity: undefined }))
     await mount('recent')

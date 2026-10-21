@@ -52,6 +52,17 @@ describe('formatBytes', () => {
     }
   })
 
+  // A-FIX4 n5: a value that rounds up to 1024 is the next unit's 1, never "1,024 KB"
+  it('rolls over to the next unit after rounding', () => {
+    expect(formatBytes(1_048_575, 'vi-VN')).toBe('1 MB')
+    expect(formatBytes(1_048_575, 'en-US')).toBe('1 MB')
+    expect(formatBytes(1_073_741_823, 'en-US')).toBe('1 GB')
+    // 1023.4 KB still rounds to 1,023 KB
+    expect(formatBytes(1_047_900, 'en-US')).toBe('1,023 KB')
+    // the last unit has nowhere to roll to
+    expect(formatBytes(1023.9999 * 1024 ** 3, 'en-US')).toBe('1,024 GB')
+  })
+
   it('stops at GB', () => {
     expect(formatBytes(3 * 1024 ** 4, 'en')).toMatch(/GB$/)
   })

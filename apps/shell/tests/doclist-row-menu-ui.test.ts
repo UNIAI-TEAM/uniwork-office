@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider, useI18n } from '../src/renderer/src/locale'
 import { DocList } from '../src/renderer/src/doclist/DocList'
+import { DocumentsSourceRow } from '../src/renderer/src/uniwork-home/DocumentsSourceRow'
 import { copyDocLink } from '../src/renderer/src/doclist/copy-link'
 import {
   buildRowMenu,
@@ -106,6 +107,48 @@ describe('row menu in the shared table (UNI-2047 A4)', () => {
       text: el.textContent,
       danger: el.classList.contains('danger'),
     }))
+
+  // A-FIX4 m5: the … button is a tab stop, so the menu can be opened from the keyboard
+  it('puts the row … button in the tab order', async () => {
+    await mount()
+    expect(button()!.tabIndex).toBe(0)
+  })
+
+  it('puts the … button of an other-sources row in the tab order too', async () => {
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(DocumentsSourceRow, {
+            source: {
+              id: 's1',
+              source: 'chat',
+              parent: { kind: 'channel', id: 'c1', title: 'General' },
+              name: 'ghi-chu.pdf',
+              mimeType: 'application/pdf',
+              extension: 'pdf',
+              sizeBytes: 1024,
+              updatedAt: '2026-10-21T02:00:00.000Z',
+              owner: { id: 'u1', name: 'Lan' },
+              canOpenInApp: false,
+              canSave: true,
+            },
+            columns: ['select', 'name', 'updated', 'actions'],
+            menuOpen: false,
+            onMenuOpenChange: () => {},
+            onOpen: () => {},
+            onDownload: () => {},
+          }),
+        ),
+      )
+    })
+    const menuButton = host.querySelector<HTMLButtonElement>(
+      'button[data-folder-menu-for="source:s1"]',
+    )
+    expect(menuButton).not.toBeNull()
+    expect(menuButton!.tabIndex).toBe(0)
+  })
 
   it('draws the rules order with a divider between groups and the delete entry red, last', async () => {
     await mount()

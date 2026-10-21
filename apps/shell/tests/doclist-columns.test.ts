@@ -58,6 +58,22 @@ describe('column order (Chọn · Tên · [đặc trưng] · Truy cập · Ngư�
     ])
   })
 
+  // A-FIX4 m3: Trash and Lưu trữ draw a 176px actions track (a button before the …), 100px more
+  // than the others, so every rung is 100px further out or the row overflows the table
+  it('narrows Trash and Lưu trữ with their wide actions track in mind', () => {
+    for (const screen of ['trash', 'shelved'] as const) {
+      expect(columnsFor(screen, 751)).not.toContain('access')
+      expect(columnsFor(screen, 752)).toContain('access')
+      expect(columnsFor(screen, 879)).not.toContain('editor')
+      expect(columnsFor(screen, 880)).toContain('editor')
+      expect(columnsFor(screen, 975)).not.toContain('size')
+      expect(columnsFor(screen, 976)).toContain('size')
+    }
+    // a screen with the 76px actions track keeps its rungs
+    expect(columnsFor('recent', 655)).not.toContain('access')
+    expect(columnsFor('recent', 656)).toContain('access')
+  })
+
   it('no width means the full table', () => {
     expect(columnsFor('workspace')).toEqual(columnsFor('workspace', WIDE))
   })

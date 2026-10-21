@@ -85,6 +85,29 @@ describe('sort / order / activity are sent only when set', () => {
     ])
   })
 
+  // A-FIX4 M2: the flat /documents route takes sort = updated|name|size|editor and has no activity
+  // param; sort=activity there is a 400, and an activity filter would be ignored silently
+  it('listDocuments: the flat route drops activity and a sort it does not know', async () => {
+    const { api, seen } = setup()
+    const flat = { workspaceId: 'ws_1', updatedBy: 'u_1', activity: 'edited' } as const
+    await api.listDocuments({ ...flat, sort: 'activity', order: 'desc' })
+    await api.listDocuments({ ...flat, sort: 'shared', order: 'asc' })
+    await api.listDocuments({ ...flat, sort: 'size', order: 'asc' })
+    // a title search is the other thing that moves Recent onto the flat route
+    await api.listDocuments({
+      workspaceId: 'ws_1',
+      query: 'budget',
+      activity: 'opened',
+      sort: 'activity',
+    })
+    expect(seen).toEqual([
+      `${BASE}?limit=50&kind=file&updated_by=u_1&order=desc`,
+      `${BASE}?limit=50&kind=file&updated_by=u_1&order=asc`,
+      `${BASE}?limit=50&kind=file&updated_by=u_1&sort=size&order=asc`,
+      `${BASE}?q=budget&limit=50&kind=file`,
+    ])
+  })
+
   it('listChildren, listSharedByMe and listTrash take sort and order', async () => {
     const { api, seen } = setup()
     await api.listChildren({ workspaceId: 'ws_1', parentId: 'fold_1', sort: 'size', order: 'desc' })

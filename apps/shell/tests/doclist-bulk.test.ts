@@ -68,12 +68,15 @@ describe('runBulk: fan-out of one batch (UNI-2047 A5)', () => {
     expect(result.ok).toHaveLength(10)
   })
 
-  it('retries once when the server throttles (429 reaches the app as rate_limited / server_error)', async () => {
-    for (const error of ['rate_limited', 'server_error']) {
+  it('retries once when the server throttles (rate_limited, or a server_error main marked retryable)', async () => {
+    for (const first of [
+      { ok: false, error: 'rate_limited' },
+      { ok: false, error: 'server_error', retryable: true },
+    ] as const) {
       const calls: Record<string, number> = {}
       const work = vi.fn(async (d: DocumentsHomeDoc): Promise<BulkWorkResult> => {
         calls[d.id] = (calls[d.id] ?? 0) + 1
-        return calls[d.id] === 1 ? { ok: false, error } : OK
+        return calls[d.id] === 1 ? first : OK
       })
       const sleep = vi.fn(noSleep)
       const result = await runBulk(docs(3), work, { sleep })
@@ -89,6 +92,24 @@ describe('runBulk: fan-out of one batch (UNI-2047 A5)', () => {
     const result = await runBulk([doc('d1')], work, { sleep: noSleep })
     expect(work).toHaveBeenCalledTimes(2)
     expect(result.failed).toEqual([{ id: 'd1', error: 'rate_limited' }])
+  })
+
+  // A-FIX4 m4: a 500 after the server applied the change would answer conflict / not_found on the
+  // second call, so the item would count as failed although it went through
+  it('does not retry a server_error that is not a throttle, and a throttle is still one failure after the retry', async () => {
+    const plain = vi.fn(async (): Promise<BulkWorkResult> => ({ ok: false, error: 'server_error' }))
+    const result = await runBulk([doc('d1')], plain, { sleep: noSleep })
+    expect(plain).toHaveBeenCalledTimes(1)
+    expect(result.failed).toEqual([{ id: 'd1', error: 'server_error' }])
+
+    const throttled = vi.fn(async (): Promise<BulkWorkResult> => ({
+      ok: false,
+      error: 'server_error',
+      retryable: true,
+    }))
+    const again = await runBulk([doc('d1')], throttled, { sleep: noSleep })
+    expect(throttled).toHaveBeenCalledTimes(2)
+    expect(again.failed).toEqual([{ id: 'd1', error: 'server_error' }])
   })
 
   it('does not retry a refusal (forbidden, not_found, conflict)', async () => {

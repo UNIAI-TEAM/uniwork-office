@@ -75,11 +75,13 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
   let api: Record<string, ReturnType<typeof vi.fn>>
   let trash: DocumentsHomeDoc[]
   let shelf: DocumentsHomeDoc[]
+  let openDocument: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     localStorage.clear()
     localStorage.setItem('genoffice.lang', 'vi')
     document.documentElement.lang = 'vi'
+    openDocument = vi.fn()
     vi.useFakeTimers({ toFake: ['Date'], now: NOW })
     // handed over in a scrambled order on purpose: the table owns the order
     trash = [
@@ -172,7 +174,7 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
             workspaceId: 'ws-1',
             workspaces,
             onWorkspaceChange: vi.fn(),
-            onOpenDocument: vi.fn(),
+            onOpenDocument: openDocument,
             sidebarHost: sidebarSlot,
             initialSubView: subView,
           }),
@@ -401,6 +403,50 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
     await click(boxes[0])
     expect(boxes[0]!.checked).toBe(false)
     expect(all.indeterminate).toBe(true)
+  })
+
+  // A-FIX4 m2: select-all means the rows the person sees, and a closed group's rows are not seen
+  it('select-all takes the rows of open groups only', async () => {
+    await mount()
+    await click(groupRow('deleting_soon')!.querySelector('button'))
+    expect(rowIds()).toEqual(['t-c', 't-d', 't-e'])
+    await click(host.querySelector('.dh-doc-head [data-col="select"] input[type="checkbox"]'))
+    expect(host.querySelector('[data-bulk-count]')?.textContent).toBe('3 đã chọn')
+    // open the group again: its rows were never selected
+    await click(groupRow('deleting_soon')!.querySelector('button'))
+    const checked = Array.from(
+      host.querySelectorAll<HTMLInputElement>('.dh-doc-table [data-doc-id] input[type="checkbox"]'),
+    )
+      .filter((b) => b.checked)
+      .map((b) => b.closest('[data-doc-id]')!.getAttribute('data-doc-id'))
+    expect(checked).toEqual(['t-c', 't-d', 't-e'])
+  })
+
+  it('collapsing a group deselects its rows', async () => {
+    await mount()
+    await click(host.querySelector('.dh-doc-head [data-col="select"] input[type="checkbox"]'))
+    expect(host.querySelector('[data-bulk-count]')?.textContent).toBe('5 đã chọn')
+    await click(groupRow('deleting_soon')!.querySelector('button'))
+    expect(host.querySelector('[data-bulk-count]')?.textContent).toBe('3 đã chọn')
+    // the header box now stands for the three rows on screen
+    const all = host.querySelector<HTMLInputElement>(
+      '.dh-doc-head [data-col="select"] input[type="checkbox"]',
+    )!
+    expect(all.checked).toBe(true)
+  })
+
+  // A-FIX4 m6: a trashed row has no Mở in its menu, so its name and a double-click do not open it either
+  it('shows a trashed name as plain text and a double-click opens nothing', async () => {
+    await mount()
+    expect(host.querySelector('[data-doc-id="t-b"] .dh-doc-open')).toBeNull()
+    expect(host.querySelector('[data-doc-id="t-b"] .dh-doc-title')?.textContent).toBe('t-b')
+    await act(async () => {
+      host
+        .querySelector('[data-doc-id="t-b"]')!
+        .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    await flush()
+    expect(openDocument).not.toHaveBeenCalled()
   })
 
   it('opens a trashed row in the details panel from the menu, not the document', async () => {
