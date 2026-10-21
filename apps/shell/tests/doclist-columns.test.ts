@@ -71,14 +71,17 @@ describe('column order (Chọn · Tên · [đặc trưng] · Truy cập · Ngư�
 })
 
 describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy cập', () => {
-  it('walks the ladder on the workspace screen as the table narrows', () => {
+  it('walks the ladder on the workspace screen as the table narrows (34 / 42 / 47 rem)', () => {
     const at = (w: number) => columnsFor('workspace', w)
     expect(at(1400)).toContain('size')
-    expect(at(991)).not.toContain('size')
-    expect(at(991)).toContain('editor')
-    expect(at(895)).not.toContain('editor')
-    expect(at(895)).toContain('access')
-    expect(at(687)).not.toContain('access')
+    expect(at(752)).toContain('size')
+    expect(at(751)).not.toContain('size')
+    expect(at(751)).toContain('editor')
+    expect(at(672)).toContain('editor')
+    expect(at(671)).not.toContain('editor')
+    expect(at(671)).toContain('access')
+    expect(at(544)).toContain('access')
+    expect(at(543)).not.toContain('access')
   })
 
   it('never hides Chọn, Tên, the screen column, Cập nhật or Thao tác', () => {
@@ -92,10 +95,29 @@ describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy 
     }
   })
 
-  it('a screen with a screen column needs a wider table for each column', () => {
-    expect(columnsFor('workspace', 992)).toContain('size')
-    expect(columnsFor('recent', 992)).not.toContain('size')
-    expect(columnsFor('recent', 1168)).toContain('size')
+  it('a screen with a screen column needs a wider table for each column (41 / 49 / 54 rem)', () => {
+    expect(columnsFor('workspace', 752)).toContain('size')
+    expect(columnsFor('recent', 752)).not.toContain('size')
+    expect(columnsFor('recent', 864)).toContain('size')
+    expect(columnsFor('recent', 863)).not.toContain('size')
+    expect(columnsFor('recent', 784)).toContain('editor')
+    expect(columnsFor('recent', 783)).not.toContain('editor')
+    expect(columnsFor('recent', 656)).toContain('access')
+    expect(columnsFor('recent', 655)).not.toContain('access')
+  })
+
+  it('a ~870 px list shows every column on every screen', () => {
+    for (const screen of DOC_LIST_SCREENS.filter((s) => s !== 'device')) {
+      expect(columnsFor(screen, 870)).toEqual(columnsFor(screen, WIDE))
+    }
+  })
+
+  it('a ~710 px list hides at most Dung lượng, or Dung lượng + Người sửa with a screen column', () => {
+    for (const screen of DOC_LIST_SCREENS.filter((s) => s !== 'device')) {
+      const full = columnsFor(screen, WIDE)
+      const hidden = full.filter((c) => !columnsFor(screen, 710).includes(c))
+      expect(hidden).toEqual(specialColumn(screen) ? ['editor', 'size'] : ['size'])
+    }
   })
 
   it('on the device list only Dung lượng goes', () => {
