@@ -94,6 +94,12 @@ export interface AccountBoundaryDeps {
    * their capture save; returning `false` aborts the sign-out before tabs close.
    */
   lockStore?(owner: LastOwner | null, options?: LockOptions): Promise<LockOutcome>
+  /**
+   * UNI-2068: ends every zip download in flight (their temp files are removed). A download is
+   * the account's own: it is abandoned when the account goes away, never carried into the next
+   * session. Called once the sign-out is certain and again after it, and on an account switch.
+   */
+  abortZipDownloads?(): void
 }
 
 /** the account a working-copy path belongs to; null outside the root */
@@ -219,6 +225,7 @@ export class AccountBoundary {
     // the account is about to leave: capture N+1 from open tabs and lock its
     // durable store before the tabs close
     if (!(await this.lock(owner, options)).ok) return false
+    this.deps.abortZipDownloads?.()
     // a prompt or capture may have taken a while: close what still shows a working copy
     for (const path of this.pathsWhere(this.anyAccount)) this.deps.closeNow(path)
     this.lastOwner = null
@@ -228,6 +235,7 @@ export class AccountBoundary {
   /** After an explicit Sign out: the AI history of every working copy is deleted. */
   afterSignOut(): void {
     this.enforced = null
+    this.deps.abortZipDownloads?.()
     this.forgetWhere(this.anyAccount)
     this.deps.forgetLocks(this.anyAccount)
     // idempotent with beforeSignOut: whatever owner is left locks its store
@@ -297,6 +305,7 @@ export class AccountBoundary {
     // prompt is cancelled: they are not this account's copies to explain.
     this.deps.forgetLocks(foreign)
     if (previous && ownerKey(previous) !== key) {
+      this.deps.abortZipDownloads?.()
       // the other account is already live, so there is nothing left to cancel:
       // the switched-out account is locked exactly as on a confirmed sign-out
       // (N+1 parked, plaintext copies wiped, store locked). The plan is read
