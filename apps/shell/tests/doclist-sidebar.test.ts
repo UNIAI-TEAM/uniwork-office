@@ -649,3 +649,63 @@ describe('RV-17: with no root row, the sidebar "+" creates at the workspace root
     })
   })
 })
+
+// ---- VS-8: My Folder stand-in lines up with the top-level folder rows ----
+
+describe('VS-8: the My Folder stand-in lines up with the top-level rows when the root row is hidden', () => {
+  const standIn = () => sidebarSlot.querySelector<HTMLElement>('[data-my-folder-standin]')
+  const standInRules = () =>
+    cssRules(sidebarCss).filter((r) => r.selectors.some((s) => s.includes('.dh-my-folder-standin')))
+  const FIRST_LEVEL_INDENT = '4px'
+
+  it('the hideRoot tree carries a rootless class; the default tree (picker, Save dialog) does not', async () => {
+    await mount('workspace')
+    expect(sideTree()?.classList.contains('uwf-tree-rootless')).toBe(true)
+
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(UniworkFolderTree, {
+            nodes: NODES,
+            label: 'Cây thư mục',
+            expanded: new Set([ROOT_KEY]),
+            onExpandedChange: vi.fn(),
+            selectedKey: ROOT_KEY,
+            onOpen: vi.fn(),
+          }),
+        ),
+      )
+    })
+    await flush()
+    expect(host.querySelector('[role="tree"]')?.classList.contains('uwf-tree-rootless')).toBe(false)
+  })
+
+  it('the stand-in keeps its twisty slot and sits inside the sidebar tree container', async () => {
+    api.uniworkFolderTree.mockImplementation(async () => ok(NODES.filter((n) => !n.systemKind)))
+    await mount('workspace')
+    const row = standIn()
+    expect(row).not.toBeNull()
+    expect(row!.querySelector('.uwf-twisty')).not.toBeNull()
+    expect(row!.closest('.dh-sidebar-tree')).not.toBeNull()
+  })
+
+  it('the sidebar css gives the stand-in the first-level indent of a tree row, scoped to the sidebar tree', async () => {
+    const rule = standInRules().find((r) => /padding-inline-start/.test(r.body))
+    expect(rule).toBeDefined()
+    expect(rule!.selectors).toEqual(['.dh-sidebar-tree .dh-my-folder-standin'])
+    expect(rule!.body).toMatch(
+      new RegExp(`padding-inline-start:\s*${FIRST_LEVEL_INDENT}\s*;?\s*$`, 'm'),
+    )
+    // that is exactly the inline indent the tree draws on a level-1 row
+    await mount('workspace')
+    expect(rowOf('Alpha')?.style.paddingInlineStart).toBe(FIRST_LEVEL_INDENT)
+    // it must out-rank documents-home.css's own (reserved) 18px rule
+    const base = cssRules(readSrc('uniwork-home/documents-home.css')).find((r) =>
+      r.selectors.includes('.dh-my-folder-standin'),
+    )
+    expect(base?.body).toMatch(/padding-inline-start:\s*18px/)
+    expect(specificity(rule!.selectors[0]!)).toBeGreaterThan(specificity('.dh-my-folder-standin'))
+  })
+})
