@@ -121,6 +121,7 @@ describe('askuni string shard', () => {
   it('carries the keys the web has no wording for (offline, session, open document/browser)', () => {
     for (const key of [
       'askUniErrOffline',
+      'askUniKindOther',
       'askUniErrSession',
       'askUniErrRateLimitedIn',
       'askUniOpenDocument',

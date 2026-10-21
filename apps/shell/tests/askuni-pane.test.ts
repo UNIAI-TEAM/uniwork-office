@@ -321,6 +321,44 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       expect(sendBtn()).not.toBeNull()
     })
 
+    it('disables the composer while an ask is pending; Stop stays enabled and Enter does nothing', async () => {
+      let resolveAsk: (r: AskUniResult) => void = () => undefined
+      ask.mockImplementation(
+        () =>
+          new Promise<AskUniResult>((res) => {
+            resolveAsk = res
+          }),
+      )
+      await mount()
+      await sendQuestion('Slow one')
+      expect(composer().disabled).toBe(true)
+      expect(stopBtn().disabled).toBe(false)
+      expect(sendBtn()).toBeNull()
+      await act(async () => {
+        composer().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      })
+      expect(ask).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        resolveAsk(answer('Done'))
+      })
+      await flush()
+      expect(composer().disabled).toBe(false)
+      expect(document.activeElement).toBe(composer())
+    })
+
+    it('re-enables the composer and focuses it after Stop', async () => {
+      ask.mockImplementation(() => new Promise<AskUniResult>(() => undefined))
+      await mount()
+      await sendQuestion('Never answers')
+      expect(composer().disabled).toBe(true)
+      await act(async () => {
+        stopBtn().click()
+      })
+      await flush()
+      expect(composer().disabled).toBe(false)
+      expect(document.activeElement).toBe(composer())
+    })
+
     it('drops a late answer after New chat as well', async () => {
       let resolveAsk: (r: AskUniResult) => void = () => undefined
       ask.mockImplementation(
@@ -412,6 +450,68 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       expect(opened).toEqual(CITATIONS)
     })
 
+    it('renders a citation of kind other as a generic row with the open-in-browser affordance', async () => {
+      const other = {
+        sourceId: 's9',
+        kind: 'other',
+        title: 'Policy page',
+        quote: 'Remote work rules',
+        href: '/o/w/pages/9',
+      } as unknown as AskUniCitation
+      ask.mockResolvedValue(answer('See source', { citations: [other] }))
+      await mount()
+      await sendQuestion('Where?')
+      const row = host.querySelector('.askuni-source') as HTMLButtonElement
+      expect(row.getAttribute('data-kind')).toBe('other')
+      expect(row.querySelector('svg')?.childElementCount).toBeGreaterThan(0)
+      expect(row.textContent).toContain('Policy page')
+      expect(row.textContent).toContain('Remote work rules')
+      expect(row.textContent).toContain(en.askUniOpenBrowser)
+      expect(row.textContent).not.toContain(en.askUniOpenDocument)
+      const name = row.getAttribute('aria-label') ?? ''
+      expect(en.askUniKindOther).toBeTruthy()
+      expect(name).toContain(en.askUniKindOther)
+      expect(name).not.toContain('undefined')
+      expect(name).toContain('Policy page')
+      await act(async () => {
+        row.click()
+      })
+      expect(opened).toEqual([other])
+    })
+
+    it('maps a kind the app does not know to the generic row instead of crashing', async () => {
+      const odd = {
+        sourceId: 's10',
+        kind: 'brand_new_kind',
+        title: 'Mystery',
+        quote: '',
+        href: '/x',
+      } as unknown as AskUniCitation
+      ask.mockResolvedValue(answer('See source', { citations: [odd] }))
+      await mount()
+      await sendQuestion('Where?')
+      const row = host.querySelector('.askuni-source') as HTMLButtonElement
+      expect(en.askUniKindOther).toBeTruthy()
+      expect(row.getAttribute('aria-label')).toContain(en.askUniKindOther)
+      expect(row.getAttribute('aria-label')).not.toContain('undefined')
+      expect(row.querySelector('svg')?.childElementCount).toBeGreaterThan(0)
+    })
+
+    it('keeps [Sn] markers as plain text, matched or not, with no link', async () => {
+      ask.mockResolvedValue(
+        answer('Budget is frozen [S1] and the launch moved [S9].', {
+          citations: [CITATIONS[0]!],
+        }),
+      )
+      await mount()
+      await sendQuestion('Status?')
+      const text = host.querySelector('.askuni-answer-body')?.textContent ?? ''
+      expect(text).toContain('[S1]')
+      expect(text).toContain('[S9]')
+      expect(host.querySelector('.askuni-answer-body a')).toBeNull()
+      expect(host.querySelector('.askuni-answer-body button')).toBeNull()
+    })
+
     it('shows no source list for an answer without citations', async () => {
       await mount()
       await sendQuestion('Hello')
@@ -473,6 +573,25 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       await sendQuestion('Hello')
       expect(host.textContent).toContain(en.askUniErrDefault)
       expect(host.textContent).not.toContain('ipc broke')
+    })
+
+    it('offline explains that Ask UNI needs a connection and keeps the question for a retry', async () => {
+      ask.mockResolvedValueOnce({ ok: false, code: 'offline' })
+      ask.mockResolvedValueOnce(answer('Back online'))
+      await mount()
+      await sendQuestion('Find the contract')
+      expect(host.textContent).toContain(
+        'You are offline. Ask UNI needs a connection to search documents.',
+      )
+      expect(composer().value).toBe('Find the contract')
+      expect(composer().disabled).toBe(false)
+      await act(async () => {
+        sendBtn().click()
+      })
+      await flush()
+      expect(ask).toHaveBeenCalledTimes(2)
+      expect(ask.mock.calls[1]![0].question).toBe('Find the contract')
+      expect(host.textContent).toContain('Back online')
     })
 
     it('an error puts the question back into the empty composer', async () => {
