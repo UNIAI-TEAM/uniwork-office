@@ -11,6 +11,7 @@ import { UniworkOpenDialog } from '../src/renderer/src/UniworkOpenDialog'
 import {
   createFakeFolderUploadBridge,
   preflightOf,
+  progressOf,
   type FakeFolderUploadBridge,
 } from './folder-upload-fake-bridge'
 
@@ -163,5 +164,23 @@ describe('Upload in the Open dialog (UNI-2052)', () => {
     await click(headButton())
     await click(document.querySelector('.uw-act-file button'))
     expect(api.uniworkPickUploadFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('a finished run refreshes the picker list, which the run itself never touched', async () => {
+    bridge.pick.mockResolvedValueOnce(preflightOf({ rootName: 'Contracts' }))
+    await mount()
+    const listedBefore = api.uniworkListDocuments.mock.calls.length
+    await click(headButton())
+    await click(menuItem('folder'))
+    const confirm = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="folder-upload-dialog"] button'),
+    ).find((b) => b.textContent?.trim() === 'Upload')
+    await click(confirm)
+    expect(bridge.start).toHaveBeenCalledTimes(1)
+    // nothing is listed again while the run is still going
+    expect(api.uniworkListDocuments.mock.calls.length).toBe(listedBefore)
+    await act(async () => bridge.emit(progressOf({ phase: 'done', done: 40, total: 40 })))
+    await flush()
+    expect(api.uniworkListDocuments.mock.calls.length).toBe(listedBefore + 1)
   })
 })
