@@ -342,6 +342,11 @@ export interface UniworkDocSummary {
   shareSummary?: UniworkDocShareSummary
   /** favorites rows: when the caller starred the row (`favorited_at`) */
   favoritedAt?: string
+  /**
+   * UNI-2047 APP-SHARE-DIALOG: the server's `owner_kind` when the document belongs to another
+   * module (a work product); absent for an ordinary document. Such a row is never shared here.
+   */
+  ownerKind?: string
 }
 
 /** UNI-2047: the server's `updated_by_user`; `avatarUrl` is absolute http(s) and loads with no auth header */
@@ -2295,6 +2300,34 @@ export const UNIWORK_DOC_CHANNELS = {
   favoriteDocument: 'uniwork-doc:favorite-document',
   /** invoke(documentId) -> Bỏ gắn sao (UNI-2047 B6; idempotent) */
   unfavoriteDocument: 'uniwork-doc:unfavorite-document',
+} as const
+
+/**
+ * UNI-2047 APP-SHARE-DIALOG: the Share dialog's channels (handlers in
+ * main/uniwork-docs/share-service.ts, wired in wiring.ts; the renderer-facing
+ * types are shared/share-api.ts). Every channel answers a `ShareResult`.
+ */
+export const UNIWORK_SHARE_CHANNELS = {
+  /** invoke(documentId) -> the access overview (`GET /documents/{id}/shares`) */
+  get: 'uniwork-share:get',
+  /** invoke({documentId, items, dryRun?}) -> add / change / remove access, or its preview */
+  update: 'uniwork-share:update',
+  /** invoke({documentId, q?, cursor?, limit?}) -> people / workspaces / organization to share with */
+  candidates: 'uniwork-share:candidates',
+  /** invoke({documentId, expiresInDays?}) -> a new public link (token + url once) */
+  linkCreate: 'uniwork-share:link-create',
+  /** invoke({documentId, linkId}) -> revoke a public link */
+  linkRevoke: 'uniwork-share:link-revoke',
+  /** invoke() -> the selected organization's public-links policy (read only) */
+  settings: 'uniwork-share:settings',
+  /** invoke(documentId) -> the pending access requests (null value = no such route) */
+  requests: 'uniwork-share:requests',
+  /** invoke({documentId, requestId, level?}) -> approve a request */
+  requestApprove: 'uniwork-share:request-approve',
+  /** invoke({documentId, requestId}) -> decline a request */
+  requestDecline: 'uniwork-share:request-decline',
+  /** invoke(plan) -> share several documents the same way, one after another */
+  bulk: 'uniwork-share:bulk',
 } as const
 
 export const PROJECT_CHANNELS = {

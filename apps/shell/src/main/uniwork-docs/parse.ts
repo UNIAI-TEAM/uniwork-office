@@ -1040,6 +1040,7 @@ function doclistFieldsOf(
   | 'shared'
   | 'shareSummary'
   | 'favoritedAt'
+  | 'ownerKind'
 > {
   const archivedAt = optTimestamp(row.archived_at)
   const archivedById = optId(row.archived_by)
@@ -1049,6 +1050,7 @@ function doclistFieldsOf(
   const shared = sharedOf(row.shared)
   const shareSummary = shareSummaryOf(row.share_summary)
   const favoritedAt = optTimestamp(row.favorited_at)
+  const ownerKind = optId(row.owner_kind, 64)
   return {
     ...(archivedAt ? { archivedAt } : {}),
     ...(archivedById ? { archivedById } : {}),
@@ -1059,6 +1061,7 @@ function doclistFieldsOf(
     ...(shared ? { shared } : {}),
     ...(shareSummary ? { shareSummary } : {}),
     ...(favoritedAt ? { favoritedAt } : {}),
+    ...(ownerKind ? { ownerKind } : {}),
   }
 }
 

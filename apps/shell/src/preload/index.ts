@@ -96,6 +96,7 @@ import {
   HOME_CHANNELS,
   PROJECT_CHANNELS,
   UNIWORK_DOC_CHANNELS,
+  UNIWORK_SHARE_CHANNELS,
   UNIWORK_LOCK_REASONS,
 } from '../shared/home-api'
 import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../shared/home-api'
@@ -108,6 +109,20 @@ import type {
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
 import { UNIWORK_WORK_CHANNELS } from '../shared/uniwork-work-api'
+import type {
+  ShareAccess,
+  ShareAccessRequest,
+  ShareBulkResult,
+  ShareCandidatePage,
+  ShareLinkCreated,
+  ShareLinkRevokeInput,
+  ShareRejectedItem,
+  ShareRequestDecision,
+  ShareResult,
+  ShareSettings,
+  ShareUpdate,
+  UniworkShareApi,
+} from '../shared/share-api'
 import type {
   UniworkWorkApi,
   UniworkWorkResult,
@@ -1762,6 +1777,88 @@ const workApi: UniworkWorkApi = {
 }
 
 contextBridge.exposeInMainWorld('uniworkWork', workApi)
+
+/**
+ * UNI-2047 APP-SHARE-DIALOG: main answers every share call with a `ShareResult`;
+ * anything else is `malformed_response`. A failure keeps only its known fields, so
+ * a stray one main never meant to send does not reach the renderer.
+ */
+function asShareResult<T>(result: unknown): ShareResult<T> {
+  if (result && typeof result === 'object') {
+    const r = result as {
+      ok?: unknown
+      value?: unknown
+      error?: unknown
+      status?: unknown
+      rejected?: unknown
+      retryable?: unknown
+    }
+    if (r.ok === true) return { ok: true, value: r.value as T }
+    if (r.ok === false && typeof r.error === 'string' && r.error) {
+      return {
+        ok: false,
+        error: r.error as Extract<ShareResult<T>, { ok: false }>['error'],
+        ...(typeof r.status === 'number' ? { status: r.status } : {}),
+        ...(Array.isArray(r.rejected) ? { rejected: r.rejected as ShareRejectedItem[] } : {}),
+        ...(r.retryable === true ? { retryable: true } : {}),
+      }
+    }
+  }
+  return { ok: false, error: 'malformed_response' }
+}
+
+const shareApi: UniworkShareApi = {
+  async get(documentId) {
+    return asShareResult<ShareAccess>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.get, documentId),
+    )
+  },
+  async update(input) {
+    return asShareResult<ShareUpdate>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.update, input),
+    )
+  },
+  async candidates(input) {
+    return asShareResult<ShareCandidatePage>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.candidates, input),
+    )
+  },
+  async linkCreate(input) {
+    return asShareResult<ShareLinkCreated>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.linkCreate, input),
+    )
+  },
+  async linkRevoke(input) {
+    return asShareResult<ShareLinkRevokeInput>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.linkRevoke, input),
+    )
+  },
+  async settings() {
+    return asShareResult<ShareSettings>(await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.settings))
+  },
+  async requests(documentId) {
+    return asShareResult<ShareAccessRequest[] | null>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.requests, documentId),
+    )
+  },
+  async requestApprove(input) {
+    return asShareResult<ShareRequestDecision>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.requestApprove, input),
+    )
+  },
+  async requestDecline(input) {
+    return asShareResult<ShareRequestDecision>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.requestDecline, input),
+    )
+  },
+  async bulk(plan) {
+    return asShareResult<ShareBulkResult>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.bulk, plan),
+    )
+  },
+}
+
+contextBridge.exposeInMainWorld('uniworkShare', shareApi)
 
 // open documents dragged from the OS anywhere over Home or the tab strip
 installDropOpenBridge()

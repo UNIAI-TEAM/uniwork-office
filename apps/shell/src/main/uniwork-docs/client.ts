@@ -545,7 +545,7 @@ function fromAuthFailure(error: unknown): UniworkDocError {
 
 /** one request to a UniWork route (documents, and the Workbench's work routes) */
 export interface UniworkCall<T> {
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   route: string
   query?: URLSearchParams
   json?: unknown

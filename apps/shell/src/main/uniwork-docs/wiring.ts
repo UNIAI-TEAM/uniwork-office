@@ -13,6 +13,7 @@ import { showSaveDialogWithMemory } from '@genoffice/electron-utils'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
+  UNIWORK_SHARE_CHANNELS,
   type AccountStatus,
   type SignOutPlan,
   type SignOutProgress,
@@ -48,6 +49,7 @@ import {
   uniworkSessionIdentity,
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
+import { createShareClientProvider, createUniworkShareService } from './share-service'
 import {
   createUniworkComments,
   type DiscussionPushTarget,
@@ -905,6 +907,44 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.unfavoriteDocument, (_event, documentId: unknown) =>
     service.unfavoriteDocument(documentId as string),
+  )
+  // UNI-2047 APP-SHARE-DIALOG: the Share dialog's routes (one service, a result per call)
+  const shareService = createUniworkShareService({
+    client: createShareClientProvider({
+      profile: () => uniworkDeploymentProfile(),
+      authorized: (call) => authorizedRequest(call),
+      isSignedIn: () => uniworkSessionIdentity() !== null,
+    }),
+    isSignedIn: () => uniworkSessionIdentity() !== null,
+    selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
+  })
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.get, (_event, documentId: unknown) =>
+    shareService.get(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.update, (_event, input: unknown) =>
+    shareService.update(input as Parameters<typeof shareService.update>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.candidates, (_event, input: unknown) =>
+    shareService.candidates(input as Parameters<typeof shareService.candidates>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.linkCreate, (_event, input: unknown) =>
+    shareService.linkCreate(input as Parameters<typeof shareService.linkCreate>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.linkRevoke, (_event, input: unknown) =>
+    shareService.linkRevoke(input as Parameters<typeof shareService.linkRevoke>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.settings, () => shareService.settings())
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.requests, (_event, documentId: unknown) =>
+    shareService.requests(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.requestApprove, (_event, input: unknown) =>
+    shareService.requestApprove(input as Parameters<typeof shareService.requestApprove>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.requestDecline, (_event, input: unknown) =>
+    shareService.requestDecline(input as Parameters<typeof shareService.requestDecline>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.bulk, (_event, plan: unknown) =>
+    shareService.bulk(plan as Parameters<typeof shareService.bulk>[0]),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
     service.listSources((query ?? {}) as UniworkSourceListQuery),
