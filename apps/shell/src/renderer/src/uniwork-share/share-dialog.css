@@ -9,11 +9,18 @@
 }
 
 .uw-share-header {
+  position: sticky;
+  /* the modal pads 20px: pin to its outer edge and cover the padding so scrolled content never
+     shows above the title and the Close button stays reachable in a short window (SW-3) */
+  top: -20px;
+  z-index: 1;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin: -20px -20px 14px;
+  padding: 20px 20px 8px;
+  background: var(--surface);
 }
 
 .uw-share-header-text {
@@ -145,6 +152,13 @@
   color: var(--success);
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+/* some documents failed: the banner is a warning, success green only when everything worked */
+.uw-share-notice.warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--text);
 }
 
 .uw-share-warning {

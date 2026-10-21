@@ -262,7 +262,10 @@ function BulkShareBody({ docs, api, onClose, onChanged, onApplied }: BulkShareDi
 
       {result ? (
         <div className="uw-share-body" data-bulk-result ref={resultRef}>
-          <p role="status" className="uw-share-notice">
+          <p
+            role="status"
+            className={result.failed.length > 0 ? 'uw-share-notice warn' : 'uw-share-notice'}
+          >
             {t('shrBulkDone', { ok: result.ok.length, total: count })}
           </p>
           {result.failed.length > 0 && (

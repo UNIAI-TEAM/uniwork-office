@@ -284,6 +284,8 @@ describe('BulkShareDialog (UNI-2047 SD-C)', () => {
     expect(onClose).not.toHaveBeenCalled()
     const result = q('[data-bulk-result]')!
     expect(result.textContent).toContain(t('shrBulkDone', { ok: 1, total: 2 }))
+    // SW-4: a partial failure is a warning banner, never the green success one
+    expect(result.querySelector('[role="status"]')!.className).toBe('uw-share-notice warn')
     const lines = qa('[data-bulk-result] [data-bulk-failure]')
     expect(lines.map((l) => l.textContent)).toEqual([
       t('shrBulkErrorLine', { title: 'Doc Two', reason: t('shrBulkErrForbidden') }),
@@ -333,6 +335,8 @@ describe('BulkShareDialog (UNI-2047 SD-C)', () => {
     expect(plans(api)[0]!.link).toBe('create')
     // the dialog stays open on the links
     expect(onClose).not.toHaveBeenCalled()
+    // SW-4: everything worked, so the banner keeps the success tone
+    expect(q('[data-bulk-result] [role="status"]')!.className).toBe('uw-share-notice')
     const created = q('[data-bulk-links]')!
     expect(created.textContent).toContain(t('shrBulkLinksCreated'))
     expect(created.textContent).toContain(t('shrLinkUrlOnce'))

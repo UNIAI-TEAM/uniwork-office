@@ -424,6 +424,20 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
       expect(section('links')!.querySelector('[data-link-id] .uw-share-row-head')).not.toBeNull()
     })
 
+    // SW-3: the modal scrolls as a whole, so the header (title + Close) must stay pinned
+    it('the dialog header is sticky on the surface so Close stays visible while scrolling', () => {
+      const css = readFileSync(
+        join(__dirname, '../src/renderer/src/uniwork-share/share-dialog.css'),
+        'utf8',
+      )
+      const rule = css.match(/(?:^|\n)\.uw-share-header\s*\{([^}]*)\}/)?.[1]
+      expect(rule).toMatch(/position:\s*sticky/)
+      expect(rule).toMatch(/top:\s*-20px/)
+      expect(rule).toMatch(/background:\s*var\(--surface\)/)
+      const modal = css.match(/(?:^|\n)\.modal\.uw-act\.uw-share\s*\{([^}]*)\}/)?.[1]
+      expect(modal).toMatch(/overflow-y:\s*auto/)
+    })
+
     it('the head class has no flex basis and the basis class stays off column children', () => {
       const css = readFileSync(
         join(__dirname, '../src/renderer/src/uniwork-share/share-dialog.css'),
