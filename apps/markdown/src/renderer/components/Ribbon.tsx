@@ -102,6 +102,14 @@ interface Props {
 
 type BlockStyle = 'paragraph' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'quote' | 'codeBlock'
 
+/** block styles that have a row in the shortcut table (`markdown-022`..`025`) */
+const STYLE_COMMAND: Partial<Record<BlockStyle, MarkdownCommand>> = {
+  paragraph: 'paragraph',
+  h1: 'heading1',
+  h2: 'heading2',
+  h3: 'heading3',
+}
+
 const STYLE_LABEL: Record<BlockStyle, StringKey> = {
   paragraph: 'styleParagraph',
   h1: 'styleH1',
@@ -601,6 +609,7 @@ export function Ribbon({
                 options={(Object.keys(STYLE_LABEL) as BlockStyle[]).map((s) => ({
                   value: s,
                   label: t(STYLE_LABEL[s]),
+                  keyshortcuts: STYLE_COMMAND[s] ? markdownAria(STYLE_COMMAND[s]) : undefined,
                 }))}
                 onPick={(s) => editor && applyBlockStyle(editor, s)}
               />
