@@ -22,6 +22,7 @@ const doc = (partial: Partial<DocumentsHomeDoc> = {}): DocumentsHomeDoc => ({
 /** a host that can run every phase-1 action */
 const ALL: RowMenuActionId[] = [
   'open',
+  'offline',
   'copy-link',
   'rename',
   'move',
