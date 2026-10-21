@@ -34,3 +34,6 @@ docs/web-modules/slides-fidelity.md
 
 # Web frame fixtures: documents the e2e opens, kept exactly as authored.
 web/fixtures/
+
+# Byte copy of the web folder-upload test vectors (sha256 pinned in folder-upload-plan.test.ts).
+apps/shell/tests/fixtures/folder-upload-vectors.json
