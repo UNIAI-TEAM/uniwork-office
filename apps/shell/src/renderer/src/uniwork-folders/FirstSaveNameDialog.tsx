@@ -10,8 +10,10 @@ import {
   isDocTitleTooLong,
 } from '../uniwork-docs-model'
 import { loadFolderTree, moveDocument, renameDocument } from '../uniwork-library-api'
+import { FirstSaveShare } from './FirstSaveShare'
 import { nameParts } from './SaveDialog'
 import { UniworkFolderPicker, type PickedFolder } from './UniworkFolderPicker'
+import { announceShared, shareFailureKey, useFirstSaveShareState } from './first-save-share'
 import { FolderGlyph, MyFolderGlyph } from './UniworkFolderTree'
 import {
   MY_FOLDER_LABEL_KEY,
@@ -70,6 +72,11 @@ function FirstSaveNameDialog({
   // what the server already holds: a retry after a refused move must not rename again
   const [savedTitle, setSavedTitle] = useState(request.title)
   const [savedParent, setSavedParent] = useState(request.parentId)
+  // the web's first-save switch: shown for a document the person manages, locked when already shared
+  const shareState = useFirstSaveShareState(request.documentId)
+  const [shareOn, setShareOn] = useState(false)
+  // the workspace already holds the grant this dialog wrote: a retry after a refused move must not write it again
+  const [shared, setShared] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
   const mounted = useRef(true)
 
@@ -114,15 +121,30 @@ function FirstSaveNameDialog({
     setBusy(true)
     setErrorKey(null)
     try {
-      if (title !== savedTitle) {
-        const renamed = await renameDocument(request.documentId, title)
+      // the web's one PATCH: the title and, for a manager of a not-yet-shared document with the
+      // switch on, `visibility: workspace` (an unchanged title still goes out to carry it)
+      const wantShare = shareState !== null && !shareState.alreadyShared && shareOn && !shared
+      if (title !== savedTitle || wantShare) {
+        const renamed = await renameDocument(
+          request.documentId,
+          title,
+          wantShare ? { shareWithWorkspace: true } : undefined,
+        )
         if (!mounted.current) return
         if (!renamed.ok) {
-          setErrorKey(errorKeyOf(renamed.error))
+          setErrorKey(
+            wantShare && !(renamed.error in DOC_NAME_ERROR_KEYS)
+              ? shareFailureKey(renamed.error)
+              : errorKeyOf(renamed.error),
+          )
           nameRef.current?.focus()
           return
         }
         setSavedTitle(title)
+        if (wantShare) {
+          setShared(true)
+          announceShared(request.workspaceId, request.documentId)
+        }
       }
       if (place.id !== savedParent) {
         const moved = await moveDocument({ documentId: request.documentId, parentId: place.id })
@@ -231,6 +253,14 @@ function FirstSaveNameDialog({
           </button>
         </div>
         <p className="ufs-hint">{t('usFirstHint')}</p>
+        {shareState && (
+          <FirstSaveShare
+            checked={shareOn || shared}
+            alreadyShared={shareState.alreadyShared}
+            disabled={busy}
+            onChange={setShareOn}
+          />
+        )}
         <p className="uw-act-error" id={`${id}-error`} role={errorKey ? 'alert' : undefined}>
           {errorKey ? t(errorKey) : ''}
         </p>

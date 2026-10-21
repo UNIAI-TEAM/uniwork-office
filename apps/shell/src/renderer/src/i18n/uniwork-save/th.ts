@@ -30,4 +30,8 @@ export const th = {
     'สร้าง "{title}" (ID {id}) ใน UniWork แล้ว แต่เชื่อมกับแท็บนี้ไม่ได้และย้ายไปถังขยะก็ไม่ได้ โปรดลบหรือใช้เอกสารนั้นใน UniWork',
   usErrAlreadyBound: 'แท็บนี้เชื่อมกับเอกสาร UniWork อยู่แล้ว บันทึกได้ตามปกติ',
   usErrNotFound: 'ไม่พบไฟล์ที่จะบันทึกหรือโฟลเดอร์ที่เลือก โปรดเลือกที่บันทึกใหม่แล้วลองอีกครั้ง',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>
