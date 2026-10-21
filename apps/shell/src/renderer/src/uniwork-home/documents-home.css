@@ -1458,8 +1458,13 @@
   cursor: pointer;
 }
 
-.dh-segment-btn:hover {
+.dh-segment-btn:hover:not(:disabled) {
   color: var(--text);
+}
+
+.dh-segment-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .dh-segment-btn[aria-pressed='true'] {

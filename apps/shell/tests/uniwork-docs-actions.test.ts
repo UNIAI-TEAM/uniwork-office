@@ -149,6 +149,8 @@ function fakeServer(
     nameRefused?: boolean
     /** a conflict on archive/restore */
     lifecycleConflict?: boolean
+    /** the archive route answers this status (UNI-2047 A-FIX4: a throttle is marked retryable) */
+    archiveStatus?: { status: number; code: string; retryAfter?: string }
     /** D's `my_level` is omitempty: absent on a row the caller may not edit (default view) */
     omitMyLevel?: boolean
     /** an older row without the `file` block (omitempty): the title extension decides */
@@ -558,6 +560,16 @@ function fakeServer(
     if (archive) {
       const id = archive[1]!
       if (options.lifecycleConflict) return envelope(409, 'conflict')
+      if (options.archiveStatus) {
+        const { status, code, retryAfter } = options.archiveStatus
+        return new Response(JSON.stringify({ error: { code, message: 'x' } }), {
+          status,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(retryAfter ? { 'Retry-After': retryAfter } : {}),
+          },
+        })
+      }
       if (options.myFolderLocked) {
         return json(409, {
           error: { code: 'my_folder_locked', message: 'x', error_class: 'conflict' },
@@ -2745,6 +2757,35 @@ describe('rename, archive and restore', () => {
     expect(restore).toEqual({ ok: false, error: 'not_found' })
     expect(server.calls.map((c) => c.path)).toEqual([`/api/v1/documents/${DOC}`])
     expect(server.calls.some((c) => c.path.endsWith('/restore'))).toBe(false)
+  })
+})
+
+describe('UNI-2047 A-FIX4: an action failure says whether it is a throttle', () => {
+  it('marks a 429 / 503 as retryable (with or without a Retry-After)', async () => {
+    for (const archiveStatus of [
+      { status: 429, code: 'rate_limited', retryAfter: '2' },
+      { status: 429, code: 'rate_limited' },
+      { status: 503, code: 'unavailable' },
+    ]) {
+      const ctx = setup(fakeServer({ archiveStatus }))
+      expect(await ctx.service.archiveDocument(DOC)).toMatchObject({
+        ok: false,
+        error: 'server_error',
+        retryable: true,
+      })
+    }
+  })
+
+  it('leaves any other server_error (500, coded 409) unmarked, so a batch never repeats it', async () => {
+    for (const archiveStatus of [
+      { status: 500, code: 'internal' },
+      { status: 409, code: 'document_upload_invalid' },
+    ]) {
+      const ctx = setup(fakeServer({ archiveStatus }))
+      const res = await ctx.service.archiveDocument(DOC)
+      expect(res).toMatchObject({ ok: false, error: 'server_error' })
+      expect(res).not.toHaveProperty('retryable')
+    }
   })
 })
 

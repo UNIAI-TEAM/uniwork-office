@@ -527,8 +527,13 @@ export function DocumentsHome({
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
   const listSeqRef = useRef(0)
+  // Người sửa / Cập nhật put Recent on the flat list, which has no activity filter and no
+  // last-activity sort: the segment is off while they are on, and Cập nhật is the sort
+  const recentFlat =
+    subView === 'recent' && (filters.updatedBy.trim() !== '' || filters.updatedPreset !== 'any')
   // the Recent segment rides on the same filters: only Recent's route takes `activity`
-  const recentActivity = subView === 'recent' && recentSegment !== 'all' ? recentSegment : null
+  const recentActivity =
+    subView === 'recent' && !recentFlat && recentSegment !== 'all' ? recentSegment : null
   const wireFilters = useMemo(
     () => ({
       ...toUniworkListFilters(filters),
@@ -541,10 +546,16 @@ export function DocumentsHome({
   // order), except the Trash, which asks for Đã xóa oldest first from the first read like the web
   // so its groups hold across pages
   const trashDefault = subView === 'trash' && !docSort
+  const flatActivitySort = recentFlat && docSort?.column === 'activity'
   const wireSort = useMemo(
-    () => wireSortOf(docSort ?? (trashDefault ? defaultSort('trash') : null)),
+    () =>
+      wireSortOf(
+        flatActivitySort
+          ? defaultSort('workspace')
+          : (docSort ?? (trashDefault ? defaultSort('trash') : null)),
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [docSort?.column, docSort?.dir, trashDefault],
+    [docSort?.column, docSort?.dir, trashDefault, flatActivitySort],
   )
 
   useEffect(() => {
@@ -1219,16 +1230,13 @@ export function DocumentsHome({
     setShelvedBy(null)
   }, [workspaceId, subView])
   // UNI-2047: a selection belongs to one list: another screen, folder, search or filter starts clean,
-  // and a row that left the loaded list (renamed away, trashed, moved) is no longer selected
+  // (the prune below drops a row that left the table: renamed away, trashed, moved, filtered out)
   useEffect(() => {
     setSelected(new Set())
   }, [workspaceId, subView, folderId, query, wireFilters])
-  useEffect(() => {
-    setSelected((prev) => pruneSelection(prev, page.items))
-  }, [page.items])
 
-  // UNI-2047 A5: the bulk bar acts on the selected rows; the destructive one asks once first
-  const selectedDocs = useMemo(() => selectedDocsOf(page.items, selected), [page.items, selected])
+  // UNI-2047 A5: the bulk bar acts on the selected rows (`selectedDocs`, set once the table's rows
+  // are known below); the destructive one asks once first
   const [bulkTrashConfirm, setBulkTrashConfirm] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
   const bulkBusyRef = useRef(false)
@@ -1630,6 +1638,17 @@ export function DocumentsHome({
     filters.format,
   ])
 
+  // UNI-2047: the selection and the bulk bar act on the rows the person sees, not on everything
+  // loaded: the shelf's Lưu trữ bởi, the type chips and the source rows narrow the table
+  const visibleDocs = useMemo(
+    () => tableRows.flatMap((row) => (row.type === 'doc' ? [row.doc] : [])),
+    [tableRows],
+  )
+  useEffect(() => {
+    setSelected((prev) => pruneSelection(prev, visibleDocs))
+  }, [visibleDocs])
+  const selectedDocs = useMemo(() => selectedDocsOf(visibleDocs, selected), [visibleDocs, selected])
+
   const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
 
   const currentHeadingSpec = useMemo<
@@ -2026,7 +2045,11 @@ export function DocumentsHome({
         {/* the segment needs the server's last_activity: without it (or an empty pick) it is not offered */}
         {subView === 'recent' &&
           (recentSegment !== 'all' || specialPresent('recent', page.items)) && (
-            <RecentSegmentControl value={recentSegment} onChange={setRecentSegment} />
+            <RecentSegmentControl
+              value={recentFlat ? 'all' : recentSegment}
+              disabled={recentFlat}
+              onChange={setRecentSegment}
+            />
           )}
 
         <FilterBar
@@ -2184,7 +2207,7 @@ export function DocumentsHome({
                   <DocList
                     screen={screen}
                     rows={tableRows}
-                    sort={docSort}
+                    sort={flatActivitySort ? defaultSort('workspace') : docSort}
                     onSortChange={setDocSort}
                     selected={selected}
                     onSelectedChange={setSelected}

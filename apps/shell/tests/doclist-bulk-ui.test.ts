@@ -361,6 +361,43 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
     expect(api.uniworkArchiveDocument).not.toHaveBeenCalled()
   })
 
+  // A-FIX4 M1: the bar, the confirm and the batch act on the rows the person sees
+  it('shelf: select-all, then a "Lưu trữ bởi" filter, leaves only the visible rows selected', async () => {
+    const byLan = { shelvedById: 'u-lan', shelvedByName: 'Lan Nguyễn' }
+    const byHai = { shelvedById: 'u-hai', shelvedByName: 'Hải Lê' }
+    items = [
+      row({ id: 'doc-a', ...byLan }),
+      row({ id: 'doc-b', ...byHai }),
+      row({ id: 'doc-c', ...byHai }),
+    ].map((d) => ({ ...d, shelvedAt: '2026-10-19T08:00:00Z' }))
+    api.uniworkListShelved!.mockImplementation(async () =>
+      ok({ documents: items, nextCursor: null }),
+    )
+    await mount('archive')
+    await click(host.querySelector('.dh-doc-head [data-col="select"] input[type="checkbox"]'))
+    expect(bar()!.querySelector('[data-bulk-count]')?.textContent).toBe('3 đã chọn')
+
+    const select = host.querySelector<HTMLSelectElement>('select[data-filter="shelvedBy"]')!
+    await act(async () => {
+      select.value = 'u-lan'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+    expect(
+      Array.from(host.querySelectorAll('.dh-doc-table [data-doc-id]')).map((el) =>
+        el.getAttribute('data-doc-id'),
+      ),
+    ).toEqual(['doc-a'])
+    expect(bar()!.querySelector('[data-bulk-count]')?.textContent).toBe('1 đã chọn')
+
+    await click(bulk('trash'))
+    expect(document.body.querySelector('[role="dialog"]')!.textContent).toContain(
+      'Chuyển 1 tài liệu vào thùng rác?',
+    )
+    await click(document.body.querySelector('[data-bulk-confirm]'))
+    expect(api.uniworkTrashShelvedDocument!.mock.calls.map((c) => c[0])).toEqual(['doc-a'])
+  })
+
   it('trash screen: Khôi phục only', async () => {
     await mount('trash')
     await click(box('doc-a'))

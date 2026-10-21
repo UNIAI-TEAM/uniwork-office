@@ -481,6 +481,8 @@ const LIST_SORTS: ReadonlySet<string> = new Set([
   'deleted',
   'shelved',
 ])
+/** UNI-2047: the sort keys of the flat `/documents` route (S3); the other keys belong to the per-screen routes */
+const FLAT_LIST_SORTS: ReadonlySet<string> = new Set(['updated', 'name', 'size', 'editor'])
 /** UNI-2047: a sort key inside the server's vocabulary (also the IPC boundary's check) */
 export const isListSort = (value: unknown): value is UniworkListSort =>
   typeof value === 'string' && LIST_SORTS.has(value)
@@ -693,6 +695,16 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       params.set('activity', input.activity)
     }
     return flatRequired
+  }
+  /**
+   * The flat `/documents` route sorts by updated | name | size | editor only (any other key is a
+   * 400) and has no `activity` param (it would be ignored without a word): when Recent moves onto
+   * it, the Recent-only params are dropped here.
+   */
+  const dropRecentOnlyParams = (params: URLSearchParams): void => {
+    params.delete('activity')
+    const sort = params.get('sort')
+    if (sort !== null && !FLAT_LIST_SORTS.has(sort)) params.delete('sort')
   }
   /**
    * FD-11: one document's own fields, whatever its kind (a folder has no file
@@ -1281,11 +1293,12 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       // caller's recent scope. `q` and the non-forwardable updater/date filters
       // still need the flat workspace list.
       const flatRequired = applyListFilters(params, input)
+      const flat = q !== '' || flatRequired
+      if (flat) dropRecentOnlyParams(params)
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',
-        route:
-          q || flatRequired ? `/workspaces/${ws}/documents` : `/workspaces/${ws}/documents/recent`,
+        route: flat ? `/workspaces/${ws}/documents` : `/workspaces/${ws}/documents/recent`,
         query: params,
         timeoutMs: metadataTimeout,
         read: json,

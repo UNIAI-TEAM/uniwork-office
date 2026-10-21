@@ -58,6 +58,22 @@ describe('column order (Chọn · Tên · [đặc trưng] · Truy cập · Ngư�
     ])
   })
 
+  // A-FIX4 m3: Trash and Lưu trữ draw a 176px actions track (a button before the …), 100px more
+  // than the others, so every rung is 100px further out or the row overflows the table
+  it('narrows Trash and Lưu trữ with their wide actions track in mind', () => {
+    for (const screen of ['trash', 'shelved'] as const) {
+      expect(columnsFor(screen, 751)).not.toContain('access')
+      expect(columnsFor(screen, 752)).toContain('access')
+      expect(columnsFor(screen, 879)).not.toContain('editor')
+      expect(columnsFor(screen, 880)).toContain('editor')
+      expect(columnsFor(screen, 975)).not.toContain('size')
+      expect(columnsFor(screen, 976)).toContain('size')
+    }
+    // a screen with the 76px actions track keeps its rungs
+    expect(columnsFor('recent', 655)).not.toContain('access')
+    expect(columnsFor('recent', 656)).toContain('access')
+  })
+
   it('no width means the full table', () => {
     expect(columnsFor('workspace')).toEqual(columnsFor('workspace', WIDE))
   })
@@ -106,14 +122,19 @@ describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy 
     expect(columnsFor('recent', 655)).not.toContain('access')
   })
 
-  it('a ~870 px list shows every column on every screen', () => {
-    for (const screen of DOC_LIST_SCREENS.filter((s) => s !== 'device')) {
+  // Trash and Lưu trữ have their own, 100px wider rungs (A-FIX4 m3, pinned above)
+  const ON_76PX_ACTIONS = DOC_LIST_SCREENS.filter(
+    (s) => s !== 'device' && s !== 'trash' && s !== 'shelved',
+  )
+
+  it('a ~870 px list shows every column on the screens with the 76px actions track', () => {
+    for (const screen of ON_76PX_ACTIONS) {
       expect(columnsFor(screen, 870)).toEqual(columnsFor(screen, WIDE))
     }
   })
 
   it('a ~710 px list hides at most Dung lượng, or Dung lượng + Người sửa with a screen column', () => {
-    for (const screen of DOC_LIST_SCREENS.filter((s) => s !== 'device')) {
+    for (const screen of ON_76PX_ACTIONS) {
       const full = columnsFor(screen, WIDE)
       const hidden = full.filter((c) => !columnsFor(screen, 710).includes(c))
       expect(hidden).toEqual(specialColumn(screen) ? ['editor', 'size'] : ['size'])

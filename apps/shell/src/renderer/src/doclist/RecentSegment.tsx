@@ -24,9 +24,12 @@ export function useRecentSegment(): readonly [RecentSegment, (next: RecentSegmen
  */
 export function RecentSegmentControl({
   value,
+  disabled = false,
   onChange,
 }: {
   value: RecentSegment
+  /** the flat list (Người sửa / Cập nhật) cannot filter by last touch */
+  disabled?: boolean
   onChange: (next: RecentSegment) => void
 }) {
   const { t } = useI18n()
@@ -39,6 +42,7 @@ export function RecentSegmentControl({
           className="dh-segment-btn"
           data-seg={segment.value}
           aria-pressed={value === segment.value}
+          disabled={disabled}
           onClick={() => onChange(segment.value)}
         >
           {t(segment.labelKey)}

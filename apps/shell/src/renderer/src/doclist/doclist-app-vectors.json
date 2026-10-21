@@ -572,9 +572,14 @@
         "width": 1200
       },
       {
-        "columns": ["select", "name", "deleted", "access", "editor", "updated", "size", "actions"],
+        "columns": ["select", "name", "deleted", "access", "updated", "actions"],
         "screen": "trash",
         "width": 870
+      },
+      {
+        "columns": ["select", "name", "deleted", "access", "editor", "updated", "size", "actions"],
+        "screen": "trash",
+        "width": 976
       },
       {
         "columns": [
