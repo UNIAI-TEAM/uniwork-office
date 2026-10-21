@@ -92,7 +92,8 @@ export {
 } from './accelerator'
 export { formatChord, formatHint, hintParts, type ShortcutHintParts } from './hint'
 export { BROWSER_RESERVED, isBrowserReserved } from './browser-reserved'
-export { mergeRows } from './table'
+import { pruneUnmapped } from './table'
+export { mergeRows, pruneUnmapped } from './table'
 export {
   commonShortcuts,
   docsShortcuts,
@@ -135,17 +136,18 @@ export const SHORTCUT_TABLES: Readonly<Record<ShortcutScope, readonly ShortcutAc
 }
 
 /** Keys each scope still lacks (per surface and platform): the generator's
- * list (a module slice's `manual` backlog), then the module's own entries for
- * its manual rows (`<module>ManualUnmapped`). */
+ * list (a module slice's `manual` backlog) without the parts a manual row has
+ * since given a chord, then the module's own entries for its manual rows
+ * (`<module>ManualUnmapped`). */
 export const SHORTCUT_UNMAPPED: Readonly<Record<ShortcutScope, readonly UnmappedShortcut[]>> = {
-  common: [...commonUnmapped, ...commonManualUnmapped],
-  shell: [...shellUnmapped, ...shellManualUnmapped],
-  docs: [...docsUnmapped, ...docsManualUnmapped],
-  sheets: [...sheetsUnmapped, ...sheetsManualUnmapped],
-  slides: [...slidesUnmapped, ...slidesManualUnmapped],
-  pdf: [...pdfUnmapped, ...pdfManualUnmapped],
-  html: [...htmlUnmapped, ...htmlManualUnmapped],
-  markdown: [...markdownUnmapped, ...markdownManualUnmapped],
+  common: [...pruneUnmapped(commonUnmapped, commonShortcuts), ...commonManualUnmapped],
+  shell: [...pruneUnmapped(shellUnmapped, shellShortcuts), ...shellManualUnmapped],
+  docs: [...pruneUnmapped(docsUnmapped, docsShortcuts), ...docsManualUnmapped],
+  sheets: [...pruneUnmapped(sheetsUnmapped, sheetsShortcuts), ...sheetsManualUnmapped],
+  slides: [...pruneUnmapped(slidesUnmapped, slidesShortcuts), ...slidesManualUnmapped],
+  pdf: [...pruneUnmapped(pdfUnmapped, pdfShortcuts), ...pdfManualUnmapped],
+  html: [...pruneUnmapped(htmlUnmapped, htmlShortcuts), ...htmlManualUnmapped],
+  markdown: [...pruneUnmapped(markdownUnmapped, markdownShortcuts), ...markdownManualUnmapped],
 }
 
 /** Remarks on mapped rows that are not missing keys: generated, then the
