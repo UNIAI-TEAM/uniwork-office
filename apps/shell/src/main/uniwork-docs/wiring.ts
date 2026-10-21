@@ -20,6 +20,7 @@ import {
   type SignOutPromptRequest,
   type UniworkConflictAction,
   type UniworkCreateDocInput,
+  type UniworkCreatePageInput,
   type UniworkCreateFolderInput,
   type UniworkFirstSaveInput,
   type UniworkDocListQuery,
@@ -881,7 +882,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.createDocument, (_event, input: unknown) =>
     service.createDocument((input ?? {}) as UniworkCreateDocInput),
   )
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.pickUploadFile, () => service.pickUploadFile())
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.createPage, (_event, input: unknown) =>
+    service.createPage((input ?? {}) as UniworkCreatePageInput),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.pickUploadFile,() => service.pickUploadFile())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.uploadDocument, (_event, input: unknown) =>
     service.uploadDocument((input ?? {}) as UniworkUploadDocInput),
   )

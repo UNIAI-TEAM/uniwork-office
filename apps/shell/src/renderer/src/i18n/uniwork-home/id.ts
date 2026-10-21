@@ -18,6 +18,8 @@ export const id = {
   uhQuickDocx: 'Dokumen',
   uhQuickXlsx: 'Spreadsheet',
   uhQuickPptx: 'Presentasi',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: 'UniNote baru',
   uhQuickHintPrefix: 'Membuat dan mengunggah di sini disimpan ke',
   uhQuickHintSuffix: ', hanya terlihat oleh Anda. Bagikan atau Pindahkan bila perlu.',
   uhFilterType: 'Jenis:',

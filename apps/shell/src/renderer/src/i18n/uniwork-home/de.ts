@@ -18,6 +18,8 @@ export const de = {
   uhQuickDocx: 'Dokument',
   uhQuickXlsx: 'Tabelle',
   uhQuickPptx: 'Präsentation',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: 'Neue UniNote',
   uhQuickHintPrefix: 'Hier erstellte und hochgeladene Dateien werden in',
   uhQuickHintSuffix:
     ' gespeichert und sind nur für Sie sichtbar. Bei Bedarf teilen oder verschieben.',

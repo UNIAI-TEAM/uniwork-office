@@ -18,6 +18,8 @@ export const he = {
   uhQuickDocx: 'מסמך',
   uhQuickXlsx: 'גיליון אלקטרוני',
   uhQuickPptx: 'מצגת',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: 'UniNote חדש',
   uhQuickHintPrefix: 'יצירה והעלאה כאן נשמרות אל',
   uhQuickHintSuffix: ', גלוי רק לך. שתף או העבר בעת הצורך.',
   uhFilterType: 'סוג:',

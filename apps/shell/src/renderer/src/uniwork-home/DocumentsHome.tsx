@@ -63,6 +63,7 @@ import {
   archiveDocument,
   cancelUploadDocument,
   createDocument,
+  createPage,
   loadFolderTree,
   onDocRenamed,
   onTreeChanged,
@@ -791,6 +792,40 @@ export function DocumentsHome({
     return { ok: false, error: 'failed' }
   }
 
+  // UniNote pages open only on the web: create one, then hand it to the browser
+  const handleQuickUninote = async (): Promise<void> => {
+    const target = activeTargetFolder
+    let targetFolderId = target.folderId
+    if (!targetFolderId && typeof window.aiOffice?.uniworkEnsureMyFolder === 'function') {
+      const ensured = await window.aiOffice
+        .uniworkEnsureMyFolder(target.workspaceId)
+        .catch(() => ({ ok: false as const, error: 'network' as const }))
+      if (ensured.ok) {
+        targetFolderId = ensured.value.id
+        setMyFolderId(ensured.value.id)
+      }
+    }
+    const res = await createPage({
+      workspaceId: target.workspaceId,
+      folderId: targetFolderId,
+      name: t('uhNewUninoteTitle'),
+    })
+    if (!res.ok) {
+      const key = UNIWORK_ERROR_KEYS[res.error as UniworkDocErrorCode]
+      setToast({ message: key ? t(key) : t('uwDocActionFailed'), tone: 'error' })
+      return
+    }
+    refreshAll()
+    const ws = workspaces.find((w) => w.id === target.workspaceId)
+    const opened =
+      ws && ws.orgSlug && ws.slug
+        ? await window.uniworkWork
+            .openWeb({ kind: 'document', orgSlug: ws.orgSlug, wsSlug: ws.slug, id: res.value.id })
+            .catch(() => false)
+        : false
+    if (!opened) setToast({ message: t('uwDocActionFailed'), tone: 'error' })
+  }
+
   const handleUploadDoc = async (
     input: DocTarget & { path: string; name: string },
   ): Promise<ActionOutcome> => {
@@ -1291,6 +1326,15 @@ export function DocumentsHome({
         {subView !== 'trash' && (
           <div className="dh-quick-row">
             <span className="dh-quick-label">{t('uhQuickCreate')}</span>
+            <button
+              type="button"
+              className="dh-quick-pill"
+              data-quick-format="page"
+              onClick={() => void handleQuickUninote()}
+            >
+              <FileBadge ext="uninote" size={18} />
+              <span>{t('uhQuickUninote')}</span>
+            </button>
             <button
               type="button"
               className="dh-quick-pill"

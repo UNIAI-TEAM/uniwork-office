@@ -18,6 +18,8 @@ export const cs = {
   uhQuickDocx: 'Dokument',
   uhQuickXlsx: 'Tabulka',
   uhQuickPptx: 'Prezentace',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: 'Nový UniNote',
   uhQuickHintPrefix: 'Vytvoření a nahrání zde se uloží do',
   uhQuickHintSuffix: ', viditelné pouze pro vás. Sdílejte nebo přesuňte podle potřeby.',
   uhFilterType: 'Typ:',

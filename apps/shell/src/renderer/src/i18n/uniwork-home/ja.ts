@@ -18,6 +18,8 @@ export const ja = {
   uhQuickDocx: '文書',
   uhQuickXlsx: 'スプレッドシート',
   uhQuickPptx: 'プレゼンテーション',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: '新しいUniNote',
   uhQuickHintPrefix: 'このページでの新規作成とアップロードは',
   uhQuickHintSuffix: 'に保存され、あなただけが見られます。必要に応じて共有または移動してください。',
   uhFilterType: '種類:',

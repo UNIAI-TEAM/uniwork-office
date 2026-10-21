@@ -70,6 +70,8 @@ export interface CreateDocInput {
   format: NewDocFormat
 }
 
+export type CreatePageInput = Omit<CreateDocInput, 'format'>
+
 export interface UploadDocInput {
   workspaceId: string
   folderId: string | null
@@ -96,6 +98,7 @@ export interface DocRenamedEvent {
 
 interface ActionsBridge {
   uniworkCreateDocument?(input: CreateDocInput): Promise<DocActionResult<UniworkDocSummary>>
+  uniworkCreatePage?(input: CreatePageInput): Promise<DocActionResult<UniworkDocSummary>>
   uniworkPickUploadFile?(): Promise<{ path: string; name: string } | null>
   uniworkUploadDocument?(input: UploadDocInput): Promise<DocActionResult<UniworkDocSummary>>
   uniworkCancelUploadDocument?(uploadId: string): Promise<void>
@@ -124,6 +127,10 @@ function actions(): ActionsBridge {
 
 export function createDocument(input: CreateDocInput): Promise<DocActionResult<UniworkDocSummary>> {
   return actions().uniworkCreateDocument?.(input) ?? Promise.resolve(unavailable)
+}
+
+export function createPage(input: CreatePageInput): Promise<DocActionResult<UniworkDocSummary>> {
+  return actions().uniworkCreatePage?.(input) ?? Promise.resolve(unavailable)
 }
 
 export function pickUploadFile(): Promise<{ path: string; name: string } | null> {

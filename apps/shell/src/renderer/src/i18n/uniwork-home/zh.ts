@@ -17,6 +17,8 @@ export const zh = {
   uhQuickDocx: '文档',
   uhQuickXlsx: '表格',
   uhQuickPptx: '演示',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: '新建 UniNote',
   uhQuickHintPrefix: '在此页面新建和上传将保存到',
   uhQuickHintSuffix: '，仅你可见。按需共享或移动。',
   uhFilterType: '类型：',

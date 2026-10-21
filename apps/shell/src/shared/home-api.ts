@@ -465,6 +465,9 @@ export interface UniworkCreateDocInput {
   format: UniworkDocNewFormat
 }
 
+/** a UniNote page has no file format: the create-document input without it */
+export type UniworkCreatePageInput = Omit<UniworkCreateDocInput, 'format'>
+
 export interface UniworkUploadDocInput {
   workspaceId: string
   folderId: string | null
@@ -1170,6 +1173,10 @@ export interface HomeApi {
   uniworkCreateDocument(
     input: UniworkCreateDocInput,
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** create an empty UniNote page (opened on the web, never in the desktop) */
+  uniworkCreatePage(
+    input: UniworkCreatePageInput,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: main shows the native open dialog; null when the person cancelled */
   uniworkPickUploadFile(): Promise<{ path: string; name: string } | null>
   /** S18: upload a local file into a workspace/folder as one UniWork document */
@@ -1805,6 +1812,7 @@ export const UNIWORK_DOC_CHANNELS = {
   documentProperties: 'uniwork-doc:document-properties',
   /** invoke(input) -> create a blank document (S18) */
   createDocument: 'uniwork-doc:create-document',
+  createPage: 'uniwork-doc:create-page',
   /** invoke() -> the native open dialog's pick, or null when cancelled (S18) */
   pickUploadFile: 'uniwork-doc:pick-upload-file',
   /** invoke(input) -> upload a local file as one document (S18) */

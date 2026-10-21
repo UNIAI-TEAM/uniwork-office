@@ -18,6 +18,8 @@ export const ko = {
   uhQuickDocx: '문서',
   uhQuickXlsx: '스프레드시트',
   uhQuickPptx: '프레젠테이션',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: '새 UniNote',
   uhQuickHintPrefix: '이 페이지에서 새로 만들고 업로드하면',
   uhQuickHintSuffix: '에 저장되며 나만 볼 수 있습니다. 필요할 때 공유하거나 이동하세요.',
   uhFilterType: '유형:',

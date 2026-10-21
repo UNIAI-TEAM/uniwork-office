@@ -18,6 +18,8 @@ export const zhTW = {
   uhQuickDocx: '文件',
   uhQuickXlsx: '試算表',
   uhQuickPptx: '簡報',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: '新增 UniNote',
   uhQuickHintPrefix: '在此頁面新增和上傳將儲存到',
   uhQuickHintSuffix: '，僅你可見。按需共用或移動。',
   uhFilterType: '類型：',

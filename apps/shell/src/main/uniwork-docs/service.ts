@@ -8,6 +8,7 @@ import type {
   SignOutProgress,
   UniworkConflictChoice,
   UniworkCreateDocInput,
+  UniworkCreatePageInput,
   UniworkCreateFolderInput,
   UniworkDocAccess,
   UniworkDocActionError,
@@ -3966,6 +3967,29 @@ export class UniworkDocsService {
           idempotencyKey: this.newIdempotencyKey(),
         })
         // FD-11: a new document changes the folder's contents for every view
+        this.pushTreeChangedFor(session, target.workspaceId)
+        return created
+      },
+      { nameField: true },
+    )
+  }
+
+  /**
+   * Create an empty UniNote page. The desktop cannot open pages, so the caller
+   * only needs the id to hand it to the web app.
+   */
+  createPage(input: UniworkCreatePageInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(
+      async () => {
+        const session = this.captureActionSession()
+        const target = this.docTarget(input)
+        const name = requireName(input.name)
+        const created = await this.api().createPage({
+          workspaceId: target.workspaceId,
+          title: name,
+          ...target.create,
+          idempotencyKey: this.newIdempotencyKey(),
+        })
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
       },

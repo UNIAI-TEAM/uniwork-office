@@ -18,6 +18,8 @@ export const ru = {
   uhQuickDocx: 'Документ',
   uhQuickXlsx: 'Таблица',
   uhQuickPptx: 'Презентация',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: 'Новая UniNote',
   uhQuickHintPrefix: 'Созданные и загруженные здесь файлы сохраняются в',
   uhQuickHintSuffix: ', видимы только вам. Поделитесь или переместите при необходимости.',
   uhFilterType: 'Тип:',

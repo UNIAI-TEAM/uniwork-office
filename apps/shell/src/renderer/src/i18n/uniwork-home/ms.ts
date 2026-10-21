@@ -18,6 +18,8 @@ export const ms = {
   uhQuickDocx: 'Dokumen',
   uhQuickXlsx: 'Hamparan',
   uhQuickPptx: 'Pembentangan',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: 'UniNote baharu',
   uhQuickHintPrefix: 'Mencipta dan memuat naik di sini disimpan ke',
   uhQuickHintSuffix: ', hanya dilihat oleh anda. Kongsi atau Alihkan apabila perlu.',
   uhFilterType: 'Jenis:',

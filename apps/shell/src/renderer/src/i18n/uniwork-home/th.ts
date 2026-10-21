@@ -18,6 +18,8 @@ export const th = {
   uhQuickDocx: 'เอกสาร',
   uhQuickXlsx: 'สเปรดชีต',
   uhQuickPptx: 'งานนำเสนอ',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: 'UniNote ใหม่',
   uhQuickHintPrefix: 'การสร้างและอัปโหลดที่นี่จะบันทึกใน',
   uhQuickHintSuffix: ' ซึ่งคุณเท่านั้นที่เห็น แชร์หรือย้ายได้เมื่อต้องการ',
   uhFilterType: 'ประเภท:',

@@ -18,6 +18,8 @@ export const ar = {
   uhQuickDocx: 'مستند',
   uhQuickXlsx: 'جدول بيانات',
   uhQuickPptx: 'عرض تقديمي',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: 'UniNote جديد',
   uhQuickHintPrefix: 'يتم حفظ الإنشاء والرفع هنا في',
   uhQuickHintSuffix: '، ويكون مرئيًا لك فقط. شاركه أو انقله عند الحاجة.',
   uhFilterType: 'النوع:',

@@ -18,6 +18,8 @@ export const es = {
   uhQuickDocx: 'Documento',
   uhQuickXlsx: 'Hoja de cálculo',
   uhQuickPptx: 'Presentación',
+  uhQuickUninote: 'UniNote',
+  uhNewUninoteTitle: 'Nueva UniNote',
   uhQuickHintPrefix: 'Crear y subir aquí se guarda en',
   uhQuickHintSuffix: ', solo visible para ti. Comparte o mueve cuando sea necesario.',
   uhFilterType: 'Tipo:',

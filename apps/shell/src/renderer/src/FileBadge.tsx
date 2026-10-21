@@ -4,6 +4,8 @@ import iconPptx from './assets/file-pptx.svg'
 import iconPdf from './assets/file-pdf.svg'
 import iconMd from './assets/file-md.svg'
 import iconHtml from './assets/file-html.svg'
+// the web's UniNote tile (uniwork:packages/views/documents/uninote-icon.tsx), drawn static
+import iconUninote from './assets/file-uninote.svg'
 
 const FILE_ICONS: Record<string, string> = {
   docx: iconDocx,
@@ -15,6 +17,7 @@ const FILE_ICONS: Record<string, string> = {
   markdown: iconMd,
   html: iconHtml,
   htm: iconHtml,
+  uninote: iconUninote,
 }
 
 /** file-type icon by extension; an unknown extension gets a neutral letter tile */
