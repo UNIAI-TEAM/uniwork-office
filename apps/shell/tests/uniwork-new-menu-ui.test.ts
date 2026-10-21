@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -442,6 +442,73 @@ describe('UW-NEW-MENU (UNI-1959) DocumentsHome', () => {
       // a click on the disabled row creates nothing
       await click(row('pdf'))
       expect(api.uniworkCreateDocument).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('UNI-2038: a create is always private - no Share with workspace toggle', () => {
+    it.each(['vi', 'en'] as const)(
+      'the New menu has no share toggle and ends on its last file row (%s)',
+      async (lang) => {
+        await mount(lang)
+        await openMenu()
+        expect(toggle()).toBeNull()
+        expect(menu()!.querySelector('[role="menuitemcheckbox"], .dh-new-share')).toBeNull()
+        expect(menu()!.textContent).not.toMatch(/Share with workspace|Chia sẻ với workspace/)
+        const roles = Array.from(menu()!.children).map((c) => c.getAttribute('role'))
+        expect(roles).toEqual([
+          'menuitem',
+          'separator',
+          'menuitem',
+          'menuitem',
+          'menuitem',
+          'menuitem',
+          'menuitem',
+          'menuitem',
+          'menuitem',
+        ])
+      },
+    )
+
+    it.each(['vi', 'en'] as const)(
+      'the Quick create strip has no share toggle or live hint (%s)',
+      async (lang) => {
+        await mount(lang)
+        const strip = host.querySelector('.dh-quick-row')!
+        expect(
+          strip.querySelector('.dh-quick-share, [role="switch"], [role="checkbox"]'),
+        ).toBeNull()
+        expect(strip.querySelector('[role="status"], .dh-quick-share-hint')).toBeNull()
+        expect(strip.textContent).not.toMatch(/Share with workspace|Chia sẻ với workspace/)
+        expect(strip.querySelectorAll('.dh-quick-pill').length).toBeGreaterThan(0)
+      },
+    )
+
+    it('a strip pill and a menu pick (file and UniNote) send no visibility', async () => {
+      await mount('vi')
+      await click(host.querySelector('.dh-quick-pill[data-quick-format="docx"]'))
+      await click(host.querySelector('.dh-quick-pill[data-quick-format="page"]'))
+      await openMenu()
+      await click(row('xlsx'))
+      await openMenu()
+      await click(row('page'))
+      expect(api.uniworkCreateDocument.mock.calls.map((c) => c[0])).toHaveLength(2)
+      expect(api.uniworkCreatePage.mock.calls.map((c) => c[0])).toHaveLength(2)
+      for (const call of [
+        ...api.uniworkCreateDocument.mock.calls,
+        ...api.uniworkCreatePage.mock.calls,
+      ]) {
+        expect(call[0]).not.toHaveProperty('visibility')
+        expect(call[0]).not.toHaveProperty('share')
+      }
+    })
+
+    it('no locale shard keeps the share-toggle strings', () => {
+      const dir = join(__dirname, '../src/renderer/src/i18n/uniwork-home')
+      const files = readdirSync(dir).filter((f) => f.endsWith('.ts'))
+      expect(files.length).toBeGreaterThan(15)
+      for (const f of files) {
+        expect(readFileSync(join(dir, f), 'utf8'), f).not.toMatch(/uhNewShare/)
+      }
     })
   })
 
