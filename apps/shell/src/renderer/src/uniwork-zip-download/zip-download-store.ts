@@ -183,7 +183,21 @@ export async function runZipDownload(input: {
   const { bridge, workspaceId, screen, docs } = input
   if (!bridge || isZipDownloadBusy()) return false
   const plan = planZipDownload({ docs, workspaceId, screen })
-  if (plan.mode === 'none') return false
+  if (plan.mode === 'none') {
+    // every selected row was left out: show why instead of a press that does nothing
+    if (plan.skipped.length === 0) return false
+    addRun(
+      blank({
+        id: `none-${++localId}`,
+        kind: 'file',
+        phase: 'done',
+        total: docs.length,
+        planned: plan.skipped,
+        lines: plan.skipped,
+      }),
+    )
+    return true
+  }
   attach(bridge)
 
   pending += 1
@@ -215,6 +229,7 @@ export async function runZipDownload(input: {
                   title: doc.title,
                   reason: res.code === 'too_large' ? 'too_large' : 'failed',
                 },
+                ...plan.skipped,
               ],
             },
       )

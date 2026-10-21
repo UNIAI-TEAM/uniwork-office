@@ -234,8 +234,27 @@ describe('absent bridge', () => {
     expect(zipRuns()).toEqual([])
   })
 
+  it('a selection of only foreign rows shows a done 0/N run with the skip lines', async () => {
+    expect(await run([doc('x', { workspaceId: 'ws-2' }), doc('y', { workspaceId: 'ws-2' })])).toBe(
+      true,
+    )
+    expect(bridge.starts).toEqual([])
+    expect(bridge.files).toEqual([])
+    expect(zipRuns()[0]).toMatchObject({
+      phase: 'done',
+      ok: 0,
+      total: 2,
+      lines: [
+        { documentId: 'x', reason: 'other_workspace' },
+        { documentId: 'y', reason: 'other_workspace' },
+      ],
+    })
+    expect(isZipDownloadBusy()).toBe(false)
+  })
+
   it('a selection with nothing downloadable asks nothing of main', async () => {
-    expect(await run([doc('d', { kind: 'folder' })])).toBe(false)
+    expect(await run([])).toBe(false)
+    expect(zipRuns()).toEqual([])
     expect(bridge.starts).toEqual([])
     expect(bridge.files).toEqual([])
   })

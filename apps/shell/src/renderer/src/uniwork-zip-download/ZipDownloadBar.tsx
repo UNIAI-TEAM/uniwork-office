@@ -123,7 +123,7 @@ function useMainPaneBars(active: boolean): CSSProperties | undefined {
         return
       }
       const width = Math.min(BARS_MAX_WIDTH, box.width - BARS_GUTTER * 2)
-      setStyle({ left: box.right - BARS_GUTTER - width, width })
+      setStyle({ left: box.right - BARS_GUTTER - width, right: 'auto', width })
     }
     measure()
     window.addEventListener('resize', measure)

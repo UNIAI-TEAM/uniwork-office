@@ -172,6 +172,31 @@ describe('ZipDownloadBar (UNI-2068 ZB)', () => {
     expect(button('Cancel')).toBeUndefined()
   })
 
+  it('a failed single-file save reads the save sentence and keeps the rows left out', async () => {
+    await mount()
+    bridge.nextFile = { ok: false, path: null, code: 'write_failed' }
+    await start([doc('a'), doc('d', { kind: 'folder', title: 'Docs' })])
+    expect(text()).toContain('The file could not be saved there. Choose another folder.')
+    expect(text()).toContain('Docs: cannot be downloaded (not a file)')
+  })
+
+  it('places the bar inside the main pane with right auto, so rtl keeps it there', async () => {
+    const pane = document.createElement('div')
+    pane.className = 'dh-main'
+    pane.getBoundingClientRect = () => ({ left: 0, right: 900, width: 900 }) as DOMRect
+    document.body.appendChild(pane)
+    try {
+      await mount()
+      await start(files(2))
+      const wrap = host.querySelector<HTMLElement>('.zd-bars')!
+      expect(wrap.style.right).toBe('auto')
+      expect(wrap.style.left).not.toBe('')
+      expect(wrap.style.width).not.toBe('')
+    } finally {
+      pane.remove()
+    }
+  })
+
   it('canceled run: says so, with no Show in folder', async () => {
     await mount()
     await start(files(2))

@@ -138,9 +138,19 @@ export function viewOf(t: TFunc, run: RunFacts, formatSize: (bytes: number) => s
       return { ...base, tone: 'info', text: t('dlZipCanceled'), clock: CANCELED_CLOCK_MS }
     case 'failed': {
       if (run.kind === 'file') {
-        // the file's own line: "name: too large to download"
-        const summary = resultSummary(t, { ok: 0, total: run.total, lines: run.lines.slice(0, 1) })
-        return { ...base, tone: 'error', text: summary.lines[0] ?? t('dlZipFailed'), clock: null }
+        // the file's own line ("name: too large to download"), or the save sentence when the
+        // file could not be written; the rows left out follow as lines
+        const saveFailed = run.error === 'forbidden_target' || run.error === 'write_failed'
+        const own = resultSummary(t, { ok: 0, total: run.total, lines: run.lines.slice(0, 1) })
+        const rest = resultSummary(t, { ok: 0, total: run.total, lines: run.lines.slice(1) })
+        return {
+          ...base,
+          tone: 'error',
+          text: saveFailed ? t(errorKeyOf(run.error!)) : (own.lines[0] ?? t('dlZipFailed')),
+          lines: rest.lines,
+          more: rest.more,
+          clock: null,
+        }
       }
       return { ...base, tone: 'error', text: t(errorKeyOf(run.error ?? 'zip_failed')), clock: null }
     }
