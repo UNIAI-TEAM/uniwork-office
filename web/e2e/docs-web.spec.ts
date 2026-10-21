@@ -670,7 +670,7 @@ test('docs-web: File > Save as a copy on a locked-out tab (RFSH-5)', async ({ pa
   await ed.locator('.ribbon-tab-file').click()
   let labels = await fileMenuLabels(ed)
   expect(labels, 'locked-out File menu hides Save and Save As').toEqual(
-    expect.not.arrayContaining(['Save Ctrl+S', 'Save As… Ctrl+Shift+S']),
+    expect.not.arrayContaining(['Save Ctrl+S', 'Save As… F12']),
   )
   expect(labels).toContain(SAVE_COPY_ITEM)
   await ed.locator('.file-menu button', { hasText: SAVE_COPY_ITEM }).click()

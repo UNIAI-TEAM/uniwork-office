@@ -227,7 +227,7 @@ test.describe('markdown editor', () => {
 
       await editor.click()
       await editorPage.keyboard.press('ControlOrMeta+a')
-      await editorPage.getByLabel(/^Bold$/).click()
+      await editorPage.getByLabel(/^Bold\b/).click()
       await expect(editor.locator('strong')).toHaveText('Hello style')
 
       // quick-access row: save button writes the file, undo reverts the mark

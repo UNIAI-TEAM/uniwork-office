@@ -481,7 +481,12 @@ test('view-only without the save grant (vi, light)', async ({ page }) => {
   await shown(frame)
   await expect(frame.locator('.qa-btn').first()).toBeVisible()
   // no Save / Save As in the quick-access bar; Ctrl+S saves nothing
-  expect(await frame.locator('button.qa-btn[aria-label*="⌘S"]').count()).toBe(0)
+  // (the label carries the table's chord, Ctrl+S in a browser on Windows/Linux)
+  expect(
+    await frame
+      .locator('button.qa-btn[aria-label*="Ctrl+S"], button.qa-btn[aria-label*="⌘S"]')
+      .count(),
+  ).toBe(0)
   // the grid itself is locked (SH3): typing starts no editor and changes nothing, so the host never
   // hears of pending edits. The host banner is the one announcement of view-only: no red toast per
   // refused keystroke and no copy in the status bar (N3-05)
