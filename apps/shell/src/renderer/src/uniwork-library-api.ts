@@ -325,3 +325,39 @@ export function shelveDocument(
 ): Promise<DocActionResult<UniworkDocShelveResult>> {
   return settleAct(shelvedActions().uniworkShelveDocument?.(documentId))
 }
+
+// ── UNI-2047 B6: Gắn sao (Starred) ──────────────────────
+// The Starred list is read through the Documents home adapter (fetchDocumentsHomePage); these are
+// the two row commands. A host without them (an older shell) has no Gắn sao entry at all.
+
+interface FavoriteBridge {
+  uniworkFavoriteDocument?(documentId: string): Promise<DocActionResult<{ favoritedAt: string }>>
+  uniworkUnfavoriteDocument?(documentId: string): Promise<DocActionResult<{ documentId: string }>>
+}
+
+function favoriteActions(): FavoriteBridge {
+  return window.aiOffice as unknown as FavoriteBridge
+}
+
+/** whether this shell can star and unstar (both calls present) */
+export function canFavoriteDocuments(): boolean {
+  const bridge = favoriteActions()
+  return (
+    typeof bridge?.uniworkFavoriteDocument === 'function' &&
+    typeof bridge?.uniworkUnfavoriteDocument === 'function'
+  )
+}
+
+/** Gắn sao a document from its row (idempotent on the server) */
+export function favoriteDocument(
+  documentId: string,
+): Promise<DocActionResult<{ favoritedAt: string }>> {
+  return settleAct(favoriteActions().uniworkFavoriteDocument?.(documentId))
+}
+
+/** Bỏ gắn sao a document from its row (idempotent on the server) */
+export function unfavoriteDocument(
+  documentId: string,
+): Promise<DocActionResult<{ documentId: string }>> {
+  return settleAct(favoriteActions().uniworkUnfavoriteDocument?.(documentId))
+}

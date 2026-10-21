@@ -83,8 +83,9 @@ describe('listFavorites: the query string', () => {
       updatedFrom: '2026-10-01T00:00:00Z',
     })
     await api.listFavorites({ workspaceId: 'ws_1', sort: 'deleted' })
+    // an order with no sort is a 400 there as well, so it stays home too
     expect(seen.map((s) => s.url)).toEqual([
-      `${BASE}/favorites?limit=50&kind=document&order=desc`,
+      `${BASE}/favorites?limit=50&kind=document`,
       `${BASE}/favorites?limit=50&kind=document`,
     ])
   })
@@ -169,9 +170,11 @@ describe('favorite / unfavorite', () => {
     expect(seen).toEqual([{ url: `${ORIGIN}/api/v1/documents/doc_1/favorite`, method: 'DELETE' }])
   })
 
-  it('a 403 / 404 on either write is the usual typed error', async () => {
+  it('a 403 / 404 on either write is the usual typed error (403 reads as permission_revoked)', async () => {
     const forbidden = setup(() => json(403, { error: { code: 'forbidden', message: 'x' } }))
-    await expect(forbidden.api.favorite('doc_1')).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(forbidden.api.favorite('doc_1')).rejects.toMatchObject({
+      code: 'permission_revoked',
+    })
     const gone = setup(() => json(404, { error: { code: 'not_found', message: 'x' } }))
     await expect(gone.api.unfavorite('doc_1')).rejects.toMatchObject({ code: 'not_found' })
   })

@@ -296,12 +296,12 @@ describe('UNI-2047 B6: star and unstar over IPC', () => {
     expect(seen).toEqual([])
   })
 
-  it('a refusal comes back typed (forbidden)', async () => {
+  it('a refusal comes back typed (the usual 403 mapping)', async () => {
     const call = await setup()
     stubServer({ favorite: () => reply(403, { error: { code: 'forbidden', message: 'x' } }) })
     expect(await call(UNIWORK_DOC_CHANNELS.favoriteDocument, 'd1')).toMatchObject({
       ok: false,
-      error: 'forbidden',
+      error: 'permission_revoked',
     })
   })
 })

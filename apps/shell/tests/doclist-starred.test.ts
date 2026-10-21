@@ -74,9 +74,7 @@ describe('fetchDocumentsHomePage: starred', () => {
   const filters = { format: 'docx' as const, updatedBy: 'u-1', updatedFrom: '2026-10-01T00:00:00Z' }
 
   it('reads the favorites route with the type and the sort, and with no editor / date filter', async () => {
-    const uniworkListFavorites = vi.fn(async () =>
-      ok({ documents: STARRED, nextCursor: 'next-1' }),
-    )
+    const uniworkListFavorites = vi.fn(async () => ok({ documents: STARRED, nextCursor: 'next-1' }))
     const res = await fetchDocumentsHomePage({ uniworkListFavorites } as DocumentsHomeApiAdapter, {
       workspaceId: 'ws-1',
       subView: 'starred',
@@ -159,10 +157,7 @@ describe('row menu: Gắn sao / Bỏ gắn sao', () => {
   })
 
   it('has no entry when the host cannot run it (no dead item)', () => {
-    expect(items(doc({ id: 'p' }), ['open', 'rename']).map((i) => i.id)).toEqual([
-      'open',
-      'rename',
-    ])
+    expect(items(doc({ id: 'p' }), ['open', 'rename']).map((i) => i.id)).toEqual(['open', 'rename'])
     expect(
       items(doc({ id: 's', favoritedAt: iso(2026, 10, 20, 9, 0) }), ['open'], 'starred').map(
         (i) => i.id,
@@ -229,9 +224,7 @@ describe('DocumentsHome: the Starred screen', () => {
       uniworkListShelved: vi.fn(async () => empty()),
       uniworkListSources: vi.fn(async () => ok({ items: [], nextCursor: null })),
       uniworkSearchDocuments: vi.fn(async () => ok({ items: [], nextCursor: null })),
-      uniworkFavoriteDocument: vi.fn(async () =>
-        ok({ favoritedAt: iso(2026, 10, 21, 11, 0) }),
-      ),
+      uniworkFavoriteDocument: vi.fn(async () => ok({ favoritedAt: iso(2026, 10, 21, 11, 0) })),
       uniworkUnfavoriteDocument: vi.fn(async () => ok(undefined)),
       onUniworkTreeChanged: vi.fn(() => () => {}),
       onUniworkDocRenamed: vi.fn(() => () => {}),
@@ -445,7 +438,7 @@ describe('DocumentsHome: the Starred screen', () => {
       document.querySelectorAll<HTMLElement>('.uw-row-menu-list [role="menuitem"]'),
     ).find((el) => el.textContent?.trim() === 'Gắn sao')
     await click(item)
-    expect(document.body.textContent).toContain('Không gắn sao được')
+    expect(document.body.textContent).toContain('Không đổi được trạng thái gắn sao')
     expect(rowIds()).toEqual(['r1'])
   })
 

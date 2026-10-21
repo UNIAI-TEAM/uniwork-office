@@ -12,6 +12,8 @@ export type RowMenuActionId =
   | 'open'
   | 'offline'
   | 'copy-link'
+  | 'star'
+  | 'unstar'
   | 'rename'
   | 'move'
   | 'shelve'
@@ -87,6 +89,12 @@ export function buildRowMenu({
   // a page and a folder have no file to keep offline
   if (offlineLabel && doc.kind === 'file' && !shelved) add('offline', offlineLabel, OPEN)
   if (doc.kind !== 'folder') add('copy-link', label('dlActCopyLink'), LINK)
+  // Gắn sao / Bỏ gắn sao (UNI-2047 B6): only the Starred list carries the star time, so a row that
+  // has one offers Bỏ gắn sao and any other row Gắn sao (idempotent on the server); a viewer may star
+  if (doc.kind !== 'folder') {
+    if (doc.favoritedAt) add('unstar', label('dlActUnstar'), EDIT)
+    else add('star', label('dlActStar'), EDIT)
+  }
   if (doc.canEdit !== false && !shelved) {
     if (doc.canEdit === true) add('rename', label('dlActRename'), EDIT)
     add('move', label('dlActMove'), EDIT)

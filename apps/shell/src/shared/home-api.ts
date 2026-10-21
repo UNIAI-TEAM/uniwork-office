@@ -396,6 +396,11 @@ export interface UniworkDocShelveResult {
   affected: string[]
 }
 
+/** UNI-2047 B6: the answer of Gắn sao - when the server recorded the star */
+export interface UniworkDocFavoriteResult {
+  favoritedAt: string
+}
+
 /** FD-11: the three entry kinds the folder tree holds */
 export type UniworkEntryKind = 'folder' | 'file' | 'page'
 
@@ -409,7 +414,8 @@ export type UniworkSystemKind = 'my_folder'
 
 /**
  * DESKTOP-HOME: optional list filters for `listChildren`, `listDocuments`,
- * `listSharedByMe`, `listTrash`, `listSharedWithMe` and `listShelved`.
+ * `listSharedByMe`, `listTrash`, `listSharedWithMe`, `listShelved` and (UNI-2047 B6, only the type,
+ * the kind and the sort) `listFavorites`.
  * Unset = parameter omitted.
  */
 export interface UniworkListFilters {
@@ -1566,6 +1572,21 @@ export interface HomeApi {
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** UNI-1961: Lưu trữ - shelve a live item the caller manages (the row ⋯; files and pages) */
   uniworkShelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>>
+  /**
+   * UNI-2047 B6: the caller's stars in one workspace (`favorited_at` on each row, newest star first,
+   * paged). Only the type, the kind and the sort are read; an older server answers `not_found`.
+   */
+  uniworkListFavorites(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-2047 B6: Gắn sao (idempotent) */
+  uniworkFavoriteDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<UniworkDocFavoriteResult>>
+  /** UNI-2047 B6: Bỏ gắn sao (idempotent) */
+  uniworkUnfavoriteDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<{ documentId: string }>>
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
@@ -2268,6 +2289,12 @@ export const UNIWORK_DOC_CHANNELS = {
   trashShelvedDocument: 'uniwork-doc:trash-shelved-document',
   /** invoke(documentId) -> Lưu trữ a live item (UNI-1961) */
   shelveDocument: 'uniwork-doc:shelve-document',
+  /** invoke(q) -> the caller's stars in one workspace, newest star first (UNI-2047 B6, SV-2) */
+  listFavorites: 'uniwork-doc:list-favorites',
+  /** invoke(documentId) -> Gắn sao (UNI-2047 B6; idempotent) */
+  favoriteDocument: 'uniwork-doc:favorite-document',
+  /** invoke(documentId) -> Bỏ gắn sao (UNI-2047 B6; idempotent) */
+  unfavoriteDocument: 'uniwork-doc:unfavorite-document',
 } as const
 
 export const PROJECT_CHANNELS = {

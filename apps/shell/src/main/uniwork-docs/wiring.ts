@@ -896,6 +896,16 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listTrash, (_event, query: unknown) =>
     service.listTrash((query ?? {}) as UniworkDocListQuery),
   )
+  // UNI-2047 B6: Gắn sao (SV-2) - the list and the two star writes
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listFavorites, (_event, query: unknown) =>
+    service.listFavorites((query ?? {}) as Parameters<typeof service.listFavorites>[0]),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.favoriteDocument, (_event, documentId: unknown) =>
+    service.favoriteDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.unfavoriteDocument, (_event, documentId: unknown) =>
+    service.unfavoriteDocument(documentId as string),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
     service.listSources((query ?? {}) as UniworkSourceListQuery),
   )

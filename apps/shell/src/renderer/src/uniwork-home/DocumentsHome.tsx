@@ -99,9 +99,12 @@ import {
   type UpdatedByOption,
 } from './documents-home-model'
 import {
+  canFavoriteDocuments,
+  favoriteDocument,
   loadDocProperties,
   shelveDocument,
   trashShelvedDocument,
+  unfavoriteDocument,
   unshelveDocument,
 } from '../uniwork-library-api'
 import { UniworkDocInfoPanel, type DocInfoLoad } from '../UniworkDocInfoPanel'
@@ -179,6 +182,21 @@ function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
         >
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7v5l3 2" />
+        </svg>
+      )
+    case 'starred':
+      return (
+        <svg
+          className="dh-nav-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" />
         </svg>
       )
     case 'shared-with-me':
@@ -1222,6 +1240,7 @@ export function DocumentsHome({
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf's member filter and row commands.
   // The filter narrows the loaded pages only (the server has no shelved_by).
   const shelfView = subView === 'archive' && query.length === 0
+  const starredView = subView === 'starred' && query.length === 0
   // the trash list proper (a search inside it lists live hits on the plain table)
   const trashView = subView === 'trash' && query.length === 0
   const pageShown = page.status !== 'error' && (page.status === 'ready' || page.items.length > 0)
@@ -1297,6 +1316,22 @@ export function DocumentsHome({
         res.error === 'forbidden' ? t('uhShelvedNoPermission') : t('uhShelvedUnshelveFailed'),
       tone: 'error',
     })
+  }
+
+  // UNI-2047 B6: Gắn sao / Bỏ gắn sao from the row menu; an unstar rereads the Starred list, the
+  // row is gone from it (no optimistic update)
+  const handleFavorite = async (doc: DocumentsHomeDoc, star: boolean) => {
+    const res = star ? await favoriteDocument(doc.id) : await unfavoriteDocument(doc.id)
+    if (res.ok) {
+      const message = t(star ? 'uhStarDone' : 'uhUnstarDone', { title: doc.title })
+      announce(message)
+      setToast({ message, tone: 'ok' })
+      if (!star && subView === 'starred') setListTick((n) => n + 1)
+      return
+    }
+    // the document is gone (another client trashed it): reread the list, as the other row commands do
+    if (res.error === 'not_found') setListTick((n) => n + 1)
+    setToast({ message: t('uhStarFailed', { title: doc.title }), tone: 'error' })
   }
 
   // UNI-1961: shelve at once, then a toast whose Hoàn tác unshelves it (no optimistic update)
@@ -1491,6 +1526,13 @@ export function DocumentsHome({
             parentId: currentParentOf(doc),
             title: doc.title,
           }),
+        // UNI-2047 B6: no entry when this shell has no star IPC
+        ...(canFavoriteDocuments()
+          ? {
+              star: () => void handleFavorite(doc, true),
+              unstar: () => void handleFavorite(doc, false),
+            }
+          : {}),
         shelve: () => void handleShelve(doc),
         unshelve: () => void handleUnshelve(doc),
         // both confirm first: the dialog of the screen the row is on
@@ -1613,6 +1655,14 @@ export function DocumentsHome({
           .map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
       )
     }
+    // Gắn sao: the favorites route reads the type only, so the two filters narrow what is loaded
+    if (starredView) {
+      return typed(
+        files
+          .filter((doc) => docMatchesUpdated(doc, wireFilters))
+          .map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
+      )
+    }
     if (!sourcesMerged) {
       return typed(files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })))
     }
@@ -1628,6 +1678,7 @@ export function DocumentsHome({
     )
   }, [
     shelfView,
+    starredView,
     shelvedBy,
     sourcesMerged,
     files,
@@ -1678,6 +1729,8 @@ export function DocumentsHome({
         return 'uhEmptyMyFolder'
       case 'recent':
         return 'uhEmptyRecent'
+      case 'starred':
+        return 'uhEmptyStarred'
       case 'shared-with-me':
         return 'uhEmptySharedWithMe'
       case 'shared-by-me':

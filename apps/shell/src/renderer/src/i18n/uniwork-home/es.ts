@@ -89,6 +89,10 @@ export const es = {
   uhEmptySharedWithMe: 'Aún no se han compartido documentos contigo.',
   uhEmptySharedByMe: 'Aún no has compartido ningún documento.',
   uhEmptyTrash: 'La papelera está vacía.',
+  uhEmptyStarred: 'Aún no hay documentos destacados.',
+  uhStarDone: '{title} destacado',
+  uhUnstarDone: '{title} ya no está destacado',
+  uhStarFailed: 'No se pudo cambiar el destacado de {title}',
   uhEmptyFiltered: 'Ningún documento coincide con los filtros actuales.',
   uhTrashNote:
     'Los elementos en la papelera se pueden restaurar si tienes acceso de Administración.',

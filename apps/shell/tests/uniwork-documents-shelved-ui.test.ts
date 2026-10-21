@@ -210,12 +210,13 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
     expect(nav.map((b) => b.getAttribute('data-nav'))).toEqual([
       'workspace',
       'recent',
+      'starred',
       'shared-with-me',
       'shared-by-me',
       'archive',
       'trash',
     ])
-    expect(nav[4]!.textContent?.trim()).toBe('Lưu trữ')
+    expect(nav[5]!.textContent?.trim()).toBe('Lưu trữ')
   })
 
   it('loads the shelf and draws the web heading, intro, toolbar and columns, in the server order', async () => {

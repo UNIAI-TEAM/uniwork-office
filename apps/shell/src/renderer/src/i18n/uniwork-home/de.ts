@@ -90,6 +90,10 @@ export const de = {
   uhEmptySharedWithMe: 'Noch keine Dokumente für Sie freigegeben.',
   uhEmptySharedByMe: 'Sie haben noch keine Dokumente freigegeben.',
   uhEmptyTrash: 'Der Papierkorb ist leer.',
+  uhEmptyStarred: 'Noch keine markierten Dokumente.',
+  uhStarDone: '{title} markiert',
+  uhUnstarDone: 'Markierung von {title} entfernt',
+  uhStarFailed: 'Die Markierung von {title} konnte nicht geändert werden',
   uhEmptyFiltered: 'Keine Dokumente entsprechen den aktuellen Filtern.',
   uhTrashNote:
     'Elemente im Papierkorb können wiederhergestellt werden, wenn Sie Verwaltungszugriff haben.',

@@ -20,6 +20,7 @@ import {
   parseCommit,
   parseCommitLookup,
   parseDetail,
+  parseDocumentFavorite,
   parseDocumentList,
   parseDocumentRef,
   parseDocumentSummary,
@@ -48,7 +49,7 @@ import type {
 } from './parse'
 import { parseUploadSession, parseUploadSessionComplete } from './parse'
 import { parseDocumentManageRef, parseDocumentShelveResult, type DocumentManageRef } from './parse'
-import type { UniworkDocShelveResult } from '../../shared/home-api'
+import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../../shared/home-api'
 
 /**
  * Main-process client for the UniWork documents routes this app uses, and
@@ -161,6 +162,22 @@ export interface UniworkDocsClient {
       limit?: number
     } & UniworkListFilters,
   ): Promise<DocumentListResult>
+  /**
+   * UNI-2047 B6: the caller's stars in one workspace (`GET /workspaces/{ws}/documents/favorites`,
+   * SV-2), files and pages, `favorited_at` on each row. The route reads only the type, the kind, the
+   * sort and the paging: the editor / date / activity filters are not sent.
+   */
+  listFavorites(
+    input: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters,
+  ): Promise<DocumentListResult>
+  /** UNI-2047 B6: Gắn sao (`POST /documents/{id}/favorite`, idempotent) */
+  favorite(documentId: string): Promise<UniworkDocFavoriteResult>
+  /** UNI-2047 B6: Bỏ gắn sao (`DELETE /documents/{id}/favorite`, idempotent) */
+  unfavorite(documentId: string): Promise<void>
   /**
    * UNI-1961: the Documents home's "other sources" files
    * (`GET /workspaces/{ws}/documents/sources`, paged like the web's list)
@@ -888,6 +905,57 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         read: json,
       })
       return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async listFavorites(input) {
+      const params = new URLSearchParams()
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      // files and pages, no folders; a UniNote has no file format, so `format` stays off with it
+      const pages = input.kind === 'page'
+      params.set('kind', pages ? 'page' : 'document')
+      if (!pages && typeof input.format === 'string' && input.format) {
+        params.set('format', input.format)
+      }
+      // the route's own `starred` key and the four column keys; any other key is a 400 there, and
+      // so is an order without a sort
+      if (isListSort(input.sort) && (input.sort === 'starred' || FLAT_LIST_SORTS.has(input.sort))) {
+        params.set('sort', input.sort)
+        if (input.order === 'asc' || input.order === 'desc') params.set('order', input.order)
+      }
+      const ws = id(input.workspaceId)
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${ws}/documents/favorites`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      const page = parseDocumentList(raw, input.workspaceId)
+      return {
+        documents: page.documents.filter((doc) => doc.kind === 'file' || doc.kind === 'page'),
+        nextCursor: page.nextCursor,
+      }
+    },
+
+    async favorite(documentId) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/favorite`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentFavorite(raw, documentId)
+    },
+
+    async unfavorite(documentId) {
+      await send({
+        method: 'DELETE',
+        route: `/documents/${id(documentId)}/favorite`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
     },
 
     async listSources(input) {
