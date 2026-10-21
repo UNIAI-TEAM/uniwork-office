@@ -26,7 +26,7 @@ export const zh = {
   uhNewMenuXlsx: 'Sheets spreadsheet',
   uhNewMenuPptx: 'Slides presentation',
   uhNewMenuMd: 'Markdown file',
-  uhNewMenuTxt: 'Plain text',
+  uhNewMenuTxt: '纯文本',
   uhNewMenuHtml: 'HTML',
   uhNewMenuPdf: 'PDF',
   uhNewMenuFolder: 'Folder',

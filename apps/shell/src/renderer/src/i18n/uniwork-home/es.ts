@@ -27,7 +27,7 @@ export const es = {
   uhNewMenuXlsx: 'Sheets spreadsheet',
   uhNewMenuPptx: 'Slides presentation',
   uhNewMenuMd: 'Markdown file',
-  uhNewMenuTxt: 'Plain text',
+  uhNewMenuTxt: 'Texto sin formato',
   uhNewMenuHtml: 'HTML',
   uhNewMenuPdf: 'PDF',
   uhNewMenuFolder: 'Folder',

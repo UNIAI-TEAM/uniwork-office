@@ -7672,7 +7672,7 @@ export const strings = {
     newSheet: 'AI Sheets',
     newSlide: 'AI Slides',
     newMarkdown: 'AI Markdown',
-    newTxt: 'Văn bản',
+    newTxt: 'Văn bản thuần',
     newHtml: 'AI HTML',
     newPdf: 'AI PDF',
     openLocal: 'Mở tệp trên máy',
