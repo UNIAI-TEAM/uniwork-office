@@ -75,6 +75,8 @@ export function DocRow({
 }: DocRowProps) {
   const { t, dateLocale } = useI18n()
   const folder = isFolderEntry(doc)
+  // a folder never opens from its row, and a trashed file has no Mở in its menu either
+  const opens = !folder && screen !== 'trash' && !doc.archived
   const special = specialColumn(screen)
   const cellFor = (col: ColumnId) => {
     switch (col) {
@@ -113,7 +115,7 @@ export function DocRow({
               />
             ) : (
               <div className="dh-name-stack">
-                {folder ? (
+                {!opens ? (
                   <span className="dh-doc-title" title={doc.title}>
                     {doc.title}
                   </span>
@@ -181,6 +183,7 @@ export function DocRow({
                 label={t('ufActionsFor', { name: doc.title })}
                 items={menu}
                 dataFor={doc.id}
+                tabbable
                 open={menuOpen}
                 onOpenChange={onMenuOpenChange}
               />
@@ -206,7 +209,7 @@ export function DocRow({
       className={`dh-doc-row${grouped ? ' grouped' : ''}${opening ? ' opening' : ''}${selected ? ' selected' : ''}`}
       style={{ gridTemplateColumns: trackOf(columns, screen) }}
       onDoubleClick={() => {
-        if (!rename && !folder) onOpen(doc)
+        if (!rename && opens) onOpen(doc)
       }}
     >
       {columns.map(cellFor)}

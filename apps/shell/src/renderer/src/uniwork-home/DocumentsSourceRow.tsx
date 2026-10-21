@@ -91,6 +91,7 @@ export function DocumentsSourceRow({
                 { id: 'download', label: t('uhSourceDownload'), onSelect: download },
               ]}
               dataFor={`source:${source.id}`}
+              tabbable
               open={menuOpen}
               onOpenChange={onMenuOpenChange}
             />
