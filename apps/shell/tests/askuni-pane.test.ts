@@ -561,8 +561,9 @@ describe('Ask UNI mode (shell Home My AI)', () => {
         rows[0]!.click()
       })
       await flush()
-      const note = host.querySelector('[role="status"].askuni-open-note')
+      const note = host.querySelector('.askuni-open-note')
       expect(note?.textContent).toBe(en.askUniOpenFailed)
+      expect(note?.getAttribute('role')).toBeNull()
       expect(host.textContent?.split(en.askUniOpenFailed).length).toBe(2)
       await act(async () => {
         rows[1]!.click()
@@ -583,7 +584,7 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       expect(host.textContent).toContain(en.askUniOpenFailed)
     })
 
-    it('a signed-out open says the session needs signing in again', async () => {
+    it('a signed-out open shows the same note', async () => {
       ask.mockResolvedValue(answer('See sources', { citations: [CITATIONS[1]!] }))
       openCitation.mockResolvedValueOnce({ ok: false, code: 'signed_out' })
       await mount()
@@ -794,6 +795,24 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       expect(host.textContent).toContain(WS_A.name)
     })
 
+    it('scrolls to the latest turn again when the pane becomes visible', async () => {
+      const scrollIntoView = vi.fn()
+      const had = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView')
+      Element.prototype.scrollIntoView = scrollIntoView
+      try {
+        await mount('en', { visible: true })
+        await mount('en', { visible: false })
+        scrollIntoView.mockClear()
+        await mount('en', { visible: false })
+        expect(scrollIntoView).not.toHaveBeenCalled()
+        await mount('en', { visible: true })
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'end' })
+      } finally {
+        if (had) Object.defineProperty(Element.prototype, 'scrollIntoView', had)
+        else delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
+      }
+    })
+
     it('does not reload on becoming visible when the load was fine', async () => {
       await mount('en', { visible: true })
       await mount('en', { visible: false })
@@ -814,6 +833,26 @@ describe('Ask UNI mode (shell Home My AI)', () => {
         .map((m) => m[1]!.trim().split(/\s+/))
         .filter((v) => v.length === 4)
       expect(fourValue).toEqual([])
+    })
+
+    it('the failed state pads like the other notes (16px 28px)', () => {
+      const css = readFileSync(
+        resolve(__dirname, '../src/renderer/src/askuni.css'),
+        'utf8',
+      ).replace(/\/\*[\s\S]*?\*\//g, '')
+      const rule = css.match(/\.askuni-failed\s*\{([^}]*)\}/)?.[1] ?? ''
+      expect(rule).toMatch(/padding:\s*16px 28px\s*;/)
+    })
+
+    it('the answer body and the Sources block share one left edge', () => {
+      const css = readFileSync(
+        resolve(__dirname, '../src/renderer/src/askuni.css'),
+        'utf8',
+      ).replace(/\/\*[\s\S]*?\*\//g, '')
+      // the shared chat rule indents assistant paragraphs by 26px; inside the answer body that
+      // would double the body's own 26px indent
+      const rule = css.match(/\.askuni-answer-body\s+p\s*\{([^}]*)\}/)?.[1] ?? ''
+      expect(rule).toMatch(/padding-inline-start:\s*0\s*;/)
     })
 
     it('vi names the workspace like the rest of the shell vi copy', () => {
