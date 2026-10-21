@@ -6610,7 +6610,9 @@ export class UniworkDocsService {
   private listFiltersOf(q: UniworkListFilters): UniworkListFilters {
     return {
       // a UniNote has no file format: the server answers 400 invalid_filter to both together
-      ...(typeof q.format === 'string' && q.format && q.kind !== 'page' ? { format: q.format } : {}),
+      ...(typeof q.format === 'string' && q.format && q.kind !== 'page'
+        ? { format: q.format }
+        : {}),
       ...(q.kind === 'page' ? { kind: q.kind } : {}),
       ...(typeof q.updatedBy === 'string' && q.updatedBy ? { updatedBy: q.updatedBy } : {}),
       ...(typeof q.updatedFrom === 'string' && q.updatedFrom ? { updatedFrom: q.updatedFrom } : {}),
