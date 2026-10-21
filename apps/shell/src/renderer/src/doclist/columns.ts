@@ -75,6 +75,10 @@ const WIDTH = {
   editor: 130,
   size: 84,
 }
+/** the shelf's row carries a Bỏ lưu trữ button and the trash row a Khôi phục button before its "…": their actions track is wider */
+export const BUTTON_ACTIONS_WIDTH = 176
+export const hasButtonActions = (screen: DocListScreen): boolean =>
+  screen === 'shelved' || screen === 'trash'
 /** the table's 1px borders, both sides */
 const BORDER = 2
 /** the room Tên keeps before a column joins */
@@ -89,20 +93,23 @@ const NAME_FLOOR = 184
  * lượng (plus Người sửa with a screen column). Tên, Chọn, Cập nhật, Thao tác
  * and the screen column never hide.
  */
-function rungsOf(special: boolean): Record<(typeof NARROW_HIDING_ORDER)[number], number> {
+function rungsOf(
+  special: boolean,
+  actions: number,
+): Record<(typeof NARROW_HIDING_ORDER)[number], number> {
   const rem = (px: number): number => Math.ceil(px / REM) * REM
   const base =
-    WIDTH.select +
-    WIDTH.updated +
-    WIDTH.actions +
-    (special ? WIDTH.special : 0) +
-    BORDER +
-    NAME_FLOOR
+    WIDTH.select + WIDTH.updated + actions + (special ? WIDTH.special : 0) + BORDER + NAME_FLOOR
   const access = base + WIDTH.access
   const editor = access + WIDTH.editor
   return { access: rem(access), editor: rem(editor), size: rem(editor + WIDTH.size) }
 }
-const RUNGS = { plain: rungsOf(false), special: rungsOf(true) }
+const RUNGS = {
+  plain: rungsOf(false, WIDTH.actions),
+  special: rungsOf(true, WIDTH.actions),
+  /** Trash and Lưu trữ: always a screen column, and the wide actions track */
+  buttons: rungsOf(true, BUTTON_ACTIONS_WIDTH),
+}
 /** the device list has only Dung lượng to hide */
 const DEVICE_SIZE_RUNG = 40 * REM
 
@@ -123,7 +130,7 @@ export function columnsFor(screen: DocListScreen, width?: number): ColumnId[] {
     ]
   }
   const special = SPECIAL[screen]
-  const rungs = RUNGS[special ? 'special' : 'plain']
+  const rungs = RUNGS[hasButtonActions(screen) ? 'buttons' : special ? 'special' : 'plain']
   return [
     'select',
     'name',

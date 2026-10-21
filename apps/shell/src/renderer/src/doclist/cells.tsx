@@ -5,7 +5,13 @@ import type { MouseEvent, ReactNode } from 'react'
 import { useI18n } from '../locale'
 import { shelverLabelOf, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
 import { ACCESS_PILL_KEY, accessPill, levelLine } from './access'
-import type { ColumnId, DocListScreen, SpecialColumnId } from './columns'
+import {
+  BUTTON_ACTIONS_WIDTH,
+  hasButtonActions,
+  type ColumnId,
+  type DocListScreen,
+  type SpecialColumnId,
+} from './columns'
 import { EMPTY_CELL, formatDaysLeft, formatListDate } from './format'
 import { DELETING_SOON_DAYS, daysLeft } from './groups'
 import { editorInitials, editorNameOf } from './table-model'
@@ -30,13 +36,13 @@ const TRACK: Record<ColumnId, string> = {
   actions: '76px',
 }
 
-/** the shelf's row carries a Bỏ lưu trữ button and the trash row a Khôi phục button before its "…": their actions column is wider */
-const BUTTON_ACTIONS_TRACK = '176px'
+/** the shelf's row carries a Bỏ lưu trữ button and the trash row a Khôi phục button before its "…": their actions column is wider (columns.ts counts the same width in its ladder) */
+const BUTTON_ACTIONS_TRACK = `${BUTTON_ACTIONS_WIDTH}px`
 
 export function trackOf(columns: readonly ColumnId[], screen?: DocListScreen): string {
   return columns
     .map((column) =>
-      column === 'actions' && (screen === 'shelved' || screen === 'trash')
+      column === 'actions' && screen && hasButtonActions(screen)
         ? BUTTON_ACTIONS_TRACK
         : TRACK[column],
     )

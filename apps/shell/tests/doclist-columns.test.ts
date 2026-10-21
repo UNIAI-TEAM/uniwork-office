@@ -122,14 +122,19 @@ describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy 
     expect(columnsFor('recent', 655)).not.toContain('access')
   })
 
-  it('a ~870 px list shows every column on every screen', () => {
-    for (const screen of DOC_LIST_SCREENS.filter((s) => s !== 'device')) {
+  // Trash and Lưu trữ have their own, 100px wider rungs (A-FIX4 m3, pinned above)
+  const ON_76PX_ACTIONS = DOC_LIST_SCREENS.filter(
+    (s) => s !== 'device' && s !== 'trash' && s !== 'shelved',
+  )
+
+  it('a ~870 px list shows every column on the screens with the 76px actions track', () => {
+    for (const screen of ON_76PX_ACTIONS) {
       expect(columnsFor(screen, 870)).toEqual(columnsFor(screen, WIDE))
     }
   })
 
   it('a ~710 px list hides at most Dung lượng, or Dung lượng + Người sửa with a screen column', () => {
-    for (const screen of DOC_LIST_SCREENS.filter((s) => s !== 'device')) {
+    for (const screen of ON_76PX_ACTIONS) {
       const full = columnsFor(screen, WIDE)
       const hidden = full.filter((c) => !columnsFor(screen, 710).includes(c))
       expect(hidden).toEqual(specialColumn(screen) ? ['editor', 'size'] : ['size'])

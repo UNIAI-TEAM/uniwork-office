@@ -80,7 +80,13 @@ export function formatBytes(bytes: number | null | undefined, locale?: string | 
     value /= 1024
     unit += 1
   }
-  const digits = unit === 0 || value >= 10 ? 0 : 1
+  let digits = unit === 0 || value >= 10 ? 0 : 1
+  // 1023.9 KB rounds to 1,024: that is the next unit's 1, not "1,024 KB"
+  if (Number(value.toFixed(digits)) >= 1024 && unit < UNITS.length - 1) {
+    value = Number(value.toFixed(digits)) / 1024
+    unit += 1
+    digits = value >= 10 ? 0 : 1
+  }
   return `${new Intl.NumberFormat(locale || undefined, { maximumFractionDigits: digits }).format(value)} ${UNITS[unit]}`
 }
 
