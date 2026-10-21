@@ -42,7 +42,8 @@ export const pt = {
   askUniErrRateLimitedIn:
     'Você está perguntando rápido demais; tente novamente em {seconds} segundos.',
   askUniErrDisabled: 'A IA não está configurada neste servidor.',
-  askUniErrOffline: 'Você está offline. Conecte-se à internet e tente novamente.',
+  askUniErrOffline:
+    'Você está offline. Perguntar à UNI precisa de conexão para pesquisar documentos.',
   askUniErrSession: 'Sua sessão do UniWork expirou. Entre novamente para continuar perguntando.',
   askUniErrDefault: 'Não foi possível perguntar agora; tente novamente mais tarde.',
 } satisfies Record<keyof typeof zh, string>

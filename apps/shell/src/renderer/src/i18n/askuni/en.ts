@@ -38,7 +38,7 @@ export const en = {
   askUniErrRateLimited: 'You are asking too fast; try again in a minute.',
   askUniErrRateLimitedIn: 'You are asking too fast; try again in {seconds} seconds.',
   askUniErrDisabled: 'AI is not configured on this server.',
-  askUniErrOffline: 'You are offline. Connect to the internet and try again.',
+  askUniErrOffline: 'You are offline. Ask UNI needs a connection to search documents.',
   askUniErrSession: 'Your UniWork session has expired. Sign in again to keep asking.',
   askUniErrDefault: 'Could not ask right now; try again later.',
 } satisfies Record<keyof typeof zh, string>

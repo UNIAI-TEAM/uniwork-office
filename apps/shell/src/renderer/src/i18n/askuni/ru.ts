@@ -41,7 +41,8 @@ export const ru = {
   askUniErrRateLimited: 'Вы спрашиваете слишком быстро; повторите через минуту.',
   askUniErrRateLimitedIn: 'Вы спрашиваете слишком быстро; повторите через {seconds} с.',
   askUniErrDisabled: 'ИИ не настроен на этом сервере.',
-  askUniErrOffline: 'Нет подключения. Подключитесь к интернету и повторите.',
+  askUniErrOffline:
+    'Нет подключения к сети. Для вопросов к UNI нужно соединение, чтобы искать документы.',
   askUniErrSession: 'Сессия UniWork истекла. Войдите снова, чтобы продолжить.',
   askUniErrDefault: 'Сейчас задать вопрос не удаётся; повторите позже.',
 } satisfies Record<keyof typeof zh, string>

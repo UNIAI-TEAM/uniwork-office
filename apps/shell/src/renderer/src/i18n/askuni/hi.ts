@@ -41,7 +41,7 @@ export const hi = {
   askUniErrRateLimited: 'आप बहुत तेज़ी से पूछ रहे हैं; एक मिनट बाद फिर कोशिश करें।',
   askUniErrRateLimitedIn: 'आप बहुत तेज़ी से पूछ रहे हैं; {seconds} सेकंड बाद फिर कोशिश करें।',
   askUniErrDisabled: 'इस सर्वर पर AI कॉन्फ़िगर नहीं है।',
-  askUniErrOffline: 'आप ऑफ़लाइन हैं। इंटरनेट से जुड़ें और फिर कोशिश करें।',
+  askUniErrOffline: 'आप ऑफ़लाइन हैं। दस्तावेज़ खोजने के लिए "UNI से पूछें" को कनेक्शन चाहिए।',
   askUniErrSession:
     'आपका UniWork सत्र समाप्त हो गया है। पूछना जारी रखने के लिए फिर से साइन इन करें।',
   askUniErrDefault: 'अभी सवाल नहीं पूछा जा सका; बाद में फिर कोशिश करें।',

@@ -36,7 +36,7 @@ export const zh = {
   askUniErrRateLimited: '你提问太快了，请一分钟后再试。',
   askUniErrRateLimitedIn: '你提问太快了，请 {seconds} 秒后再试。',
   askUniErrDisabled: '此服务器尚未配置 AI。',
-  askUniErrOffline: '你已离线，请连接网络后重试。',
+  askUniErrOffline: '没有网络连接。问 UNI 需要联网才能搜索文档。',
   askUniErrSession: 'UniWork 登录已过期，请重新登录后继续提问。',
   askUniErrDefault: '现在无法提问，请稍后再试。',
 }

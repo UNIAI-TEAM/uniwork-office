@@ -39,7 +39,7 @@ export const cs = {
   askUniErrRateLimited: 'Ptáte se příliš rychle; zkuste to znovu za minutu.',
   askUniErrRateLimitedIn: 'Ptáte se příliš rychle; zkuste to znovu za {seconds} s.',
   askUniErrDisabled: 'AI není na tomto serveru nastavena.',
-  askUniErrOffline: 'Jste offline. Připojte se k internetu a zkuste to znovu.',
+  askUniErrOffline: 'Jste offline. Zeptat se UNI vyžaduje připojení k vyhledávání dokumentů.',
   askUniErrSession: 'Relace UniWork vypršela. Přihlaste se znovu a pokračujte v dotazech.',
   askUniErrDefault: 'Teď se nelze zeptat; zkuste to později.',
 } satisfies Record<keyof typeof zh, string>

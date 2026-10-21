@@ -41,7 +41,8 @@ export const fr = {
   askUniErrRateLimited: 'Vous posez vos questions trop vite ; réessayez dans une minute.',
   askUniErrRateLimitedIn: 'Vous posez vos questions trop vite ; réessayez dans {seconds} secondes.',
   askUniErrDisabled: 'L’IA n’est pas configurée sur ce serveur.',
-  askUniErrOffline: 'Vous êtes hors ligne. Connectez-vous à Internet puis réessayez.',
+  askUniErrOffline:
+    'Vous êtes hors ligne. Demander à UNI nécessite une connexion pour rechercher dans les documents.',
   askUniErrSession:
     'Votre session UniWork a expiré. Reconnectez-vous pour continuer à poser des questions.',
   askUniErrDefault: 'Impossible de poser la question pour le moment ; réessayez plus tard.',

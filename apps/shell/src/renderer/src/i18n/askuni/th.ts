@@ -38,7 +38,7 @@ export const th = {
   askUniErrRateLimited: 'คุณถามเร็วเกินไป ลองใหม่อีกครั้งในอีกหนึ่งนาที',
   askUniErrRateLimitedIn: 'คุณถามเร็วเกินไป ลองใหม่อีกครั้งใน {seconds} วินาที',
   askUniErrDisabled: 'เซิร์ฟเวอร์นี้ยังไม่ได้ตั้งค่า AI',
-  askUniErrOffline: 'คุณออฟไลน์อยู่ เชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่อีกครั้ง',
+  askUniErrOffline: 'คุณออฟไลน์อยู่ การถาม UNI ต้องมีการเชื่อมต่อเพื่อค้นหาเอกสาร',
   askUniErrSession: 'เซสชัน UniWork หมดอายุ ลงชื่อเข้าใช้อีกครั้งเพื่อถามต่อ',
   askUniErrDefault: 'ตอนนี้ยังถามไม่ได้ ลองใหม่ภายหลัง',
 } satisfies Record<keyof typeof zh, string>

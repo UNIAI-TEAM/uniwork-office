@@ -40,7 +40,7 @@ export const id = {
   askUniErrRateLimited: 'Anda bertanya terlalu cepat; coba lagi dalam satu menit.',
   askUniErrRateLimitedIn: 'Anda bertanya terlalu cepat; coba lagi dalam {seconds} detik.',
   askUniErrDisabled: 'AI belum dikonfigurasi di server ini.',
-  askUniErrOffline: 'Anda sedang offline. Hubungkan ke internet lalu coba lagi.',
+  askUniErrOffline: 'Anda sedang offline. Tanya UNI membutuhkan koneksi untuk mencari dokumen.',
   askUniErrSession: 'Sesi UniWork Anda telah berakhir. Masuk lagi untuk terus bertanya.',
   askUniErrDefault: 'Tidak dapat bertanya saat ini; coba lagi nanti.',
 } satisfies Record<keyof typeof zh, string>

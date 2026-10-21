@@ -37,7 +37,7 @@ export const zhTW = {
   askUniErrRateLimited: '你提問太快了，請一分鐘後再試。',
   askUniErrRateLimitedIn: '你提問太快了，請 {seconds} 秒後再試。',
   askUniErrDisabled: '此伺服器尚未設定 AI。',
-  askUniErrOffline: '你目前離線，請連上網路後重試。',
+  askUniErrOffline: '沒有網路連線。問 UNI 需要連線才能搜尋文件。',
   askUniErrSession: 'UniWork 登入已過期，請重新登入後繼續提問。',
   askUniErrDefault: '目前無法提問，請稍後再試。',
 } satisfies Record<keyof typeof zh, string>

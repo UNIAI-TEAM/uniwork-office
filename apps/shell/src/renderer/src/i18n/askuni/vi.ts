@@ -38,7 +38,7 @@ export const vi = {
   askUniErrRateLimited: 'Bạn hỏi quá nhanh, thử lại sau một phút.',
   askUniErrRateLimitedIn: 'Bạn hỏi quá nhanh, thử lại sau {seconds} giây.',
   askUniErrDisabled: 'AI chưa được cấu hình trên server.',
-  askUniErrOffline: 'Bạn đang ngoại tuyến. Hãy kết nối mạng rồi thử lại.',
+  askUniErrOffline: 'Không có kết nối mạng, Hỏi UNI cần kết nối để tìm tài liệu.',
   askUniErrSession: 'Phiên đăng nhập UniWork đã hết hạn. Hãy đăng nhập lại để tiếp tục hỏi.',
   askUniErrDefault: 'Không hỏi được lúc này, thử lại sau.',
 } satisfies Record<keyof typeof zh, string>

@@ -40,7 +40,7 @@ export const ja = {
   askUniErrRateLimited: '質問の間隔が短すぎます。1 分後にもう一度お試しください。',
   askUniErrRateLimitedIn: '質問の間隔が短すぎます。{seconds} 秒後にもう一度お試しください。',
   askUniErrDisabled: 'このサーバーでは AI が設定されていません。',
-  askUniErrOffline: 'オフラインです。インターネットに接続して、もう一度お試しください。',
+  askUniErrOffline: 'オフラインです。UNI への質問にはドキュメントを検索するための接続が必要です。',
   askUniErrSession:
     'UniWork のセッションが期限切れです。もう一度サインインして質問を続けてください。',
   askUniErrDefault: '今は質問できません。しばらくしてからもう一度お試しください。',

@@ -38,7 +38,7 @@ export const ko = {
   askUniErrRateLimited: '질문이 너무 빠릅니다. 1분 후에 다시 시도하세요.',
   askUniErrRateLimitedIn: '질문이 너무 빠릅니다. {seconds}초 후에 다시 시도하세요.',
   askUniErrDisabled: '이 서버에는 AI가 설정되어 있지 않습니다.',
-  askUniErrOffline: '오프라인 상태입니다. 인터넷에 연결한 뒤 다시 시도하세요.',
+  askUniErrOffline: '오프라인 상태입니다. UNI에게 질문하려면 문서를 검색할 연결이 필요합니다.',
   askUniErrSession: 'UniWork 세션이 만료되었습니다. 다시 로그인한 뒤 계속 질문하세요.',
   askUniErrDefault: '지금은 질문할 수 없습니다. 잠시 후 다시 시도하세요.',
 } satisfies Record<keyof typeof zh, string>

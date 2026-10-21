@@ -42,7 +42,7 @@ export const de = {
   askUniErrRateLimitedIn: 'Sie fragen zu schnell; versuchen Sie es in {seconds} Sekunden erneut.',
   askUniErrDisabled: 'KI ist auf diesem Server nicht konfiguriert.',
   askUniErrOffline:
-    'Sie sind offline. Stellen Sie eine Internetverbindung her und versuchen Sie es erneut.',
+    'Sie sind offline. UNI fragen braucht eine Verbindung, um Dokumente zu durchsuchen.',
   askUniErrSession:
     'Ihre UniWork-Sitzung ist abgelaufen. Melden Sie sich erneut an, um weiter zu fragen.',
   askUniErrDefault: 'Die Frage ist gerade nicht möglich; versuchen Sie es später erneut.',

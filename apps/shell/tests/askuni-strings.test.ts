@@ -40,7 +40,7 @@ describe('askuni string shard', () => {
 
   it.each([...LANGS])('locale %s has no repository words or internal codes', (lang) => {
     const bad = Object.values(table(lang)).filter((v) =>
-      /genspark|genoffice|github|\bgit\b|\bUNI-\d|\bGO-[A-Z]?\d|\bG8-\d|\bS1[35]\b|ai_[a-z_]+/i.test(
+      /genspark|genoffice|github|\bgit\b|\bUNI-\d|\bGO-[A-Z]?\d|\bG8-\d|\bS1[35]\b|ai_[a-z_]+|byok/i.test(
         v,
       ),
     )
@@ -106,6 +106,10 @@ describe('askuni string shard', () => {
     expect(en.askUniErrRateLimited).toBe('You are asking too fast; try again in a minute.')
     expect(vi.askUniErrDisabled).toBe('AI chưa được cấu hình trên server.')
     expect(en.askUniErrDisabled).toBe('AI is not configured on this server.')
+    expect(vi.askUniErrOffline).toBe('Không có kết nối mạng, Hỏi UNI cần kết nối để tìm tài liệu.')
+    expect(en.askUniErrOffline).toBe(
+      'You are offline. Ask UNI needs a connection to search documents.',
+    )
     expect(vi.askUniErrDefault).toBe('Không hỏi được lúc này, thử lại sau.')
     expect(en.askUniErrDefault).toBe('Could not ask right now; try again later.')
     expect(vi.askUniPlaceholder).toBe('Hỏi UNI về công việc…')

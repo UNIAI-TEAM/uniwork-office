@@ -41,7 +41,7 @@ export const ms = {
   askUniErrRateLimited: 'Anda bertanya terlalu laju; cuba lagi dalam satu minit.',
   askUniErrRateLimitedIn: 'Anda bertanya terlalu laju; cuba lagi dalam {seconds} saat.',
   askUniErrDisabled: 'AI belum dikonfigurasikan pada pelayan ini.',
-  askUniErrOffline: 'Anda luar talian. Sambung ke internet dan cuba lagi.',
+  askUniErrOffline: 'Anda luar talian. Tanya UNI memerlukan sambungan untuk mencari dokumen.',
   askUniErrSession: 'Sesi UniWork anda telah tamat. Log masuk semula untuk terus bertanya.',
   askUniErrDefault: 'Tidak dapat bertanya sekarang; cuba lagi nanti.',
 } satisfies Record<keyof typeof zh, string>

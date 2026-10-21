@@ -41,7 +41,8 @@ export const nl = {
   askUniErrRateLimited: 'Je stelt te snel vragen; probeer het over een minuut opnieuw.',
   askUniErrRateLimitedIn: 'Je stelt te snel vragen; probeer het over {seconds} seconden opnieuw.',
   askUniErrDisabled: 'AI is op deze server niet geconfigureerd.',
-  askUniErrOffline: 'Je bent offline. Maak verbinding met internet en probeer het opnieuw.',
+  askUniErrOffline:
+    'Je bent offline. Vraag het UNI heeft een verbinding nodig om documenten te doorzoeken.',
   askUniErrSession: 'Je UniWork-sessie is verlopen. Meld je opnieuw aan om verder te vragen.',
   askUniErrDefault: 'Vragen stellen lukt nu niet; probeer het later opnieuw.',
 } satisfies Record<keyof typeof zh, string>

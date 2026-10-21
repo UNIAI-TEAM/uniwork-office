@@ -42,7 +42,7 @@ export const es = {
   askUniErrRateLimitedIn:
     'Estás preguntando demasiado rápido; inténtalo de nuevo en {seconds} segundos.',
   askUniErrDisabled: 'La IA no está configurada en este servidor.',
-  askUniErrOffline: 'Estás sin conexión. Conéctate a internet e inténtalo de nuevo.',
+  askUniErrOffline: 'Estás sin conexión. Preguntar a UNI necesita conexión para buscar documentos.',
   askUniErrSession:
     'Tu sesión de UniWork ha caducado. Inicia sesión de nuevo para seguir preguntando.',
   askUniErrDefault: 'No se puede preguntar ahora; inténtalo más tarde.',

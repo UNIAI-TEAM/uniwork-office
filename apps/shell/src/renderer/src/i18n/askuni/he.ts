@@ -38,7 +38,7 @@ export const he = {
   askUniErrRateLimited: 'אתם שואלים מהר מדי; נסו שוב בעוד דקה.',
   askUniErrRateLimitedIn: 'אתם שואלים מהר מדי; נסו שוב בעוד {seconds} שניות.',
   askUniErrDisabled: 'ה-AI לא הוגדר בשרת הזה.',
-  askUniErrOffline: 'אתם במצב לא מקוון. התחברו לאינטרנט ונסו שוב.',
+  askUniErrOffline: 'אתם במצב לא מקוון. "שאלו את UNI" דורש חיבור כדי לחפש מסמכים.',
   askUniErrSession: 'פג תוקף ההתחברות ל-UniWork. היכנסו שוב כדי להמשיך לשאול.',
   askUniErrDefault: 'לא ניתן לשאול כרגע; נסו שוב מאוחר יותר.',
 } satisfies Record<keyof typeof zh, string>

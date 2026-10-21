@@ -39,7 +39,7 @@ export const ar = {
   askUniErrRateLimited: 'أنت تسأل بسرعة كبيرة؛ حاول مجددًا بعد دقيقة.',
   askUniErrRateLimitedIn: 'أنت تسأل بسرعة كبيرة؛ حاول مجددًا بعد {seconds} ثانية.',
   askUniErrDisabled: 'لم يتم إعداد الذكاء الاصطناعي على هذا الخادم.',
-  askUniErrOffline: 'أنت غير متصل. اتصل بالإنترنت وحاول مجددًا.',
+  askUniErrOffline: 'أنت غير متصل. يحتاج «اسأل UNI» إلى اتصال للبحث في المستندات.',
   askUniErrSession: 'انتهت جلسة UniWork. سجّل الدخول مجددًا لمتابعة الأسئلة.',
   askUniErrDefault: 'تعذّر إرسال السؤال الآن؛ حاول لاحقًا.',
 } satisfies Record<keyof typeof zh, string>
