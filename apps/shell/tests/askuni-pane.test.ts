@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
 import { createElement as h, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -6,6 +7,7 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import { AskUniPane } from '../src/renderer/src/AskUniPane'
 import { NewChatPane } from '../src/renderer/src/NewChatPane'
 import { en } from '../src/renderer/src/i18n/askuni/en'
+import { en as settingsEn } from '../src/renderer/src/i18n/settings/en'
 import { vi as viStrings } from '../src/renderer/src/i18n/askuni/vi'
 import type {
   AskUniCitation,
@@ -100,12 +102,12 @@ describe('Ask UNI mode (shell Home My AI)', () => {
     })
   }
 
-  async function mount(lang: 'en' | 'vi' = 'en'): Promise<void> {
+  async function mount(lang: 'en' | 'vi' = 'en', props: { visible?: boolean } = {}): Promise<void> {
     await act(async () => {
       root.render(
         h(LocaleProvider, {
           initial: lang,
-          children: h(AskUniPane),
+          children: h(AskUniPane, props),
         }),
       )
     })
@@ -349,6 +351,38 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       expect(document.activeElement).toBe(composer())
     })
 
+    it('moves focus to Stop when a question is sent', async () => {
+      ask.mockImplementation(() => new Promise<AskUniResult>(() => undefined))
+      await mount()
+      await sendQuestion('Slow one')
+      expect(stopBtn()).not.toBeNull()
+      expect(document.activeElement).toBe(stopBtn())
+    })
+
+    it('does not pull focus back to the composer when it moved elsewhere while pending', async () => {
+      ask.mockResolvedValueOnce(answer('First', { citations: [CITATIONS[0]!] }))
+      await mount()
+      await sendQuestion('First question')
+      let resolveAsk: (r: AskUniResult) => void = () => undefined
+      ask.mockImplementationOnce(
+        () =>
+          new Promise<AskUniResult>((res) => {
+            resolveAsk = res
+          }),
+      )
+      await sendQuestion('Second question')
+      const row = host.querySelector('.askuni-source') as HTMLButtonElement
+      await act(async () => {
+        row.focus()
+      })
+      expect(document.activeElement).toBe(row)
+      await act(async () => {
+        resolveAsk(answer('Second'))
+      })
+      await flush()
+      expect(document.activeElement).toBe(row)
+    })
+
     it('re-enables the composer and focuses it after Stop', async () => {
       ask.mockImplementation(() => new Promise<AskUniResult>(() => undefined))
       await mount()
@@ -425,6 +459,26 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       expect(rows[2]!.getAttribute('aria-label')).toContain(en.askUniKindMeeting)
       expect(rows[3]!.getAttribute('aria-label')).toContain(en.askUniKindChat)
       expect(rows[4]!.getAttribute('aria-label')).toContain(en.askUniKindMember)
+    })
+
+    it('shows each citation sourceId as a prefix so [Sn] in the answer can be matched', async () => {
+      const marked: AskUniCitation[] = [
+        { ...CITATIONS[0]!, sourceId: 'S1' },
+        { ...CITATIONS[1]!, sourceId: 'S2' },
+        { sourceId: 'S3', kind: 'other', title: 'Phoenix', quote: '', href: '' },
+      ]
+      ask.mockResolvedValue(answer('Budget is frozen [S1]', { citations: marked }))
+      await mount()
+      await sendQuestion('Where?')
+      const rows = [...host.querySelectorAll('.askuni-source')] as HTMLElement[]
+      expect(rows.map((r) => r.querySelector('.askuni-source-id')?.textContent)).toEqual([
+        'S1',
+        'S2',
+        'S3',
+      ])
+      expect(rows[0]!.textContent).toContain('S1')
+      // the accessible name stays kind + title first
+      expect(rows[0]!.getAttribute('aria-label')?.startsWith(en.askUniKindDocument)).toBe(true)
     })
 
     it('document rows say open document, other kinds say open in browser', async () => {
@@ -710,6 +764,62 @@ describe('Ask UNI mode (shell Home My AI)', () => {
     })
   })
 
+  describe('context load recovery', () => {
+    it('offers Try again when the workspace list fails and reruns the context load', async () => {
+      askContext.mockRejectedValueOnce(new Error('ipc broke'))
+      await mount()
+      expect(host.textContent).toContain(en.askUniErrDefault)
+      const retry = [...host.querySelectorAll('button')].find(
+        (b) => b.textContent?.trim() === settingsEn.setRetry,
+      ) as HTMLButtonElement
+      expect(retry).toBeDefined()
+      await act(async () => {
+        retry.click()
+      })
+      await flush()
+      expect(askContext).toHaveBeenCalledTimes(2)
+      expect(host.textContent).toContain(WS_A.name)
+      expect(composer()).not.toBeNull()
+    })
+
+    it('reloads the context when the pane becomes visible again after signed out', async () => {
+      askContext.mockResolvedValueOnce(ctx({ signedIn: false, workspaces: [] }))
+      await mount('en', { visible: true })
+      expect(host.textContent).toContain(en.askUniSignedOut)
+      await mount('en', { visible: false })
+      expect(askContext).toHaveBeenCalledTimes(1)
+      await mount('en', { visible: true })
+      expect(askContext).toHaveBeenCalledTimes(2)
+      expect(host.textContent).toContain(WS_A.name)
+    })
+
+    it('does not reload on becoming visible when the load was fine', async () => {
+      await mount('en', { visible: true })
+      await mount('en', { visible: false })
+      await mount('en', { visible: true })
+      expect(askContext).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('styles and copy', () => {
+    it('askuni.css uses logical inline spacing only (RTL locales ar and he)', () => {
+      const css = readFileSync(
+        new URL('../src/renderer/src/askuni.css', import.meta.url),
+        'utf8',
+      ).replace(/\/\*[\s\S]*?\*\//g, '')
+      expect(css).not.toMatch(/(padding|margin|border)-(left|right)\s*:/)
+      expect(css).not.toMatch(/(^|[\s{;])(left|right)\s*:/)
+      const fourValue = [...css.matchAll(/(?:padding|margin)\s*:\s*([^;]+);/g)]
+        .map((m) => m[1]!.trim().split(/\s+/))
+        .filter((v) => v.length === 4)
+      expect(fourValue).toEqual([])
+    })
+
+    it('vi names the workspace like the rest of the shell vi copy', () => {
+      expect(viStrings.askUniWorkspace).toBe('Workspace')
+    })
+  })
+
   describe('My AI pane wiring', () => {
     const noop = async () => null
     function chatBridge(): Record<string, unknown> {
@@ -768,7 +878,68 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       await act(async () => {
         chat!.click()
       })
-      expect(host.querySelector('.askuni-pane')).toBeNull()
+      // the pane stays mounted (hidden) so the conversation survives the switch
+      const pane = host.querySelector('.askuni-pane') as HTMLElement
+      expect(pane.closest('main')?.hasAttribute('hidden')).toBe(true)
+      expect(host.querySelector('.new-chat-bar')).not.toBeNull()
+    })
+
+    it('keeps the Ask UNI turns, conversation and draft across Assistant and back', async () => {
+      await mountPane()
+      await act(async () => {
+        modeBtn(en.askUniModeAsk)!.click()
+      })
+      await flush()
+      await type('First question')
+      await act(async () => {
+        sendBtn().click()
+      })
+      await flush()
+      await type('half a draft')
+      await act(async () => {
+        modeBtn(en.askUniModeChat)!.click()
+      })
+      await flush()
+      await act(async () => {
+        modeBtn(en.askUniModeAsk)!.click()
+      })
+      await flush()
+      const pane = host.querySelector('.askuni-pane') as HTMLElement
+      expect(pane.closest('main')?.hasAttribute('hidden')).toBe(false)
+      expect(pane.textContent).toContain('First question')
+      expect(pane.textContent).toContain('Plain answer')
+      expect(composer().value).toBe('half a draft')
+      expect(askContext).toHaveBeenCalledTimes(1)
+      await sendQuestion('Second question')
+      expect(ask.mock.calls[1]![0].conversationId).toBe('conv-1')
+    })
+
+    it('lets a pending answer land in the kept thread while Ask UNI is hidden', async () => {
+      let resolveAsk: (r: AskUniResult) => void = () => undefined
+      ask.mockImplementation(
+        () =>
+          new Promise<AskUniResult>((res) => {
+            resolveAsk = res
+          }),
+      )
+      await mountPane()
+      await act(async () => {
+        modeBtn(en.askUniModeAsk)!.click()
+      })
+      await flush()
+      await sendQuestion('Slow one')
+      await act(async () => {
+        modeBtn(en.askUniModeChat)!.click()
+      })
+      await act(async () => {
+        resolveAsk(answer('Landed while hidden'))
+      })
+      await flush()
+      await act(async () => {
+        modeBtn(en.askUniModeAsk)!.click()
+      })
+      await flush()
+      expect(host.querySelector('.askuni-pane')?.textContent).toContain('Landed while hidden')
     })
 
     it('hides the toggle when the shell bridge has no Ask UNI', async () => {
