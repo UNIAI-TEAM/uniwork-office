@@ -11,6 +11,7 @@ import type {
   UniworkWorkspaceRef,
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { DropToOpenOverlay } from '../src/renderer/src/Home'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
@@ -396,12 +397,34 @@ describe('folder / multi-file upload in the Documents home', () => {
       expect(host.querySelector('[data-testid="folder-upload-drop"]')).toBeNull()
     })
 
-    it("one file keeps today's single-file upload into the open place", async () => {
+    it('one file goes through the bridge like every other drop and starts at once', async () => {
+      bridge.preflight.mockResolvedValueOnce([
+        preflightOf({
+          mode: 'files',
+          rootName: undefined,
+          totals: { files: 1, bytes: 1024 },
+        }),
+      ])
       await mount()
       const event = await drop([droppedFile('one.docx')])
       // cancelled here so the window-level drop-to-open bridge stays out of the way
       expect(event.defaultPrevented).toBe(true)
-      expect(bridge.preflight).not.toHaveBeenCalled()
+      expect(bridge.preflight).toHaveBeenCalledTimes(1)
+      expect(bridge.preflight.mock.calls[0]![0]).toMatchObject({
+        workspaceId: 'ws-1',
+        paths: ['/disk/one.docx'],
+      })
+      // a clean single file needs no pre-flight dialog: the overall bar (with its cancel) is up
+      expect(bridge.start).toHaveBeenCalledTimes(1)
+      expect(host.ownerDocument.querySelector('[data-testid="folder-upload-bar"]')).not.toBeNull()
+      expect(api.uniworkUploadDocument).not.toHaveBeenCalled()
+    })
+
+    it("with no bridge one file keeps today's single-file upload into the open place", async () => {
+      delete (window as unknown as Record<string, unknown>).uniworkFolderUpload
+      await mount()
+      const event = await drop([droppedFile('one.docx')])
+      expect(event.defaultPrevented).toBe(true)
       expect(api.uniworkUploadDocument).toHaveBeenCalledTimes(1)
       expect(api.uniworkUploadDocument.mock.calls[0]![0]).toMatchObject({
         workspaceId: 'ws-1',
@@ -411,7 +434,8 @@ describe('folder / multi-file upload in the Documents home', () => {
       expect(onOpenDocument).toHaveBeenCalledTimes(1)
     })
 
-    it('a refused single file is said in a toast', async () => {
+    it('with no bridge a refused single file is said in a toast', async () => {
+      delete (window as unknown as Record<string, unknown>).uniworkFolderUpload
       api.uniworkUploadDocument.mockResolvedValueOnce({ ok: false, error: 'unsupported_format' })
       await mount()
       await drop([droppedFile('one.zip')])
@@ -544,6 +568,127 @@ describe('folder / multi-file upload in the Documents home', () => {
       const event = await drop([droppedFile('a.docx'), droppedFile('b.docx')])
       expect(event.defaultPrevented).toBe(false)
       expect(bridge.preflight).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Home\'s "Drop to open" overlay next to the zone', () => {
+    // the overlay listens on window like in Home; mounted beside the host so a real library drag reaches both
+    async function mountWithOverlay(): Promise<void> {
+      await mount()
+      const overlayHost = document.createElement('div')
+      document.body.appendChild(overlayHost)
+      overlayRoot = createRoot(overlayHost)
+      await act(async () => {
+        overlayRoot!.render(
+          createElement(LocaleProvider, { initial: 'vi' }, createElement(DropToOpenOverlay)),
+        )
+      })
+    }
+    let overlayRoot: Root | null = null
+    const homeOverlay = () => document.querySelector('.home-drop-overlay')
+    afterEach(async () => {
+      if (overlayRoot) {
+        const r = overlayRoot
+        await act(async () => r.unmount())
+        overlayRoot = null
+      }
+    })
+
+    it('stays hidden while the library zone owns the drag, and the zone card shows', async () => {
+      await mountWithOverlay()
+      await act(async () => {
+        library().dispatchEvent(dragEvent('dragenter', [droppedFile('a.docx')]))
+      })
+      expect(host.querySelector('[data-testid="folder-upload-drop"]')).not.toBeNull()
+      expect(homeOverlay()).toBeNull()
+      await act(async () => {
+        library().dispatchEvent(dragEvent('dragleave', [droppedFile('a.docx')]))
+      })
+      expect(homeOverlay()).toBeNull()
+    })
+
+    it('still shows for a file drag outside the zone', async () => {
+      await mountWithOverlay()
+      await act(async () => {
+        sidebarSlot.dispatchEvent(dragEvent('dragenter', [droppedFile('a.docx')]))
+      })
+      expect(homeOverlay()).not.toBeNull()
+    })
+
+    it('shows again when the drag leaves the zone for the rest of the window', async () => {
+      await mountWithOverlay()
+      const files = [droppedFile('a.docx')]
+      await act(async () => {
+        sidebarSlot.dispatchEvent(dragEvent('dragenter', files))
+        // moving into the zone: the new element is entered first, then the old one is left
+        library().dispatchEvent(dragEvent('dragenter', files))
+        sidebarSlot.dispatchEvent(dragEvent('dragleave', files))
+      })
+      expect(homeOverlay()).toBeNull()
+      await act(async () => {
+        // and out again
+        sidebarSlot.dispatchEvent(dragEvent('dragenter', files))
+        library().dispatchEvent(dragEvent('dragleave', files))
+      })
+      expect(homeOverlay()).not.toBeNull()
+    })
+
+    it('still shows over the list where the zone is not a zone', async () => {
+      await mountWithOverlay()
+      await click(sidebarSlot.querySelector('[data-nav="trash"]'))
+      await act(async () => {
+        library().dispatchEvent(dragEvent('dragenter', [droppedFile('a.docx')]))
+      })
+      expect(homeOverlay()).not.toBeNull()
+    })
+  })
+
+  describe('a folder the user may not edit', () => {
+    const folderItems: DocumentsHomeDoc[] = [
+      {
+        id: 'f-ro',
+        workspaceId: 'ws-1',
+        title: 'Chỉ xem',
+        kind: 'folder',
+        parentId: null,
+        updatedAt: '2026-10-17T08:00:00.000Z',
+        canEdit: false,
+      } as DocumentsHomeDoc,
+      {
+        id: 'f-rw',
+        workspaceId: 'ws-1',
+        title: 'Được sửa',
+        kind: 'folder',
+        parentId: null,
+        updatedAt: '2026-10-17T08:00:00.000Z',
+        canEdit: true,
+      } as DocumentsHomeDoc,
+    ]
+    const openCard = async (id: string) => {
+      api.uniworkListChildren.mockResolvedValue(ok({ items: folderItems, nextCursor: null }))
+      await mount()
+      await click(sidebarSlot.querySelector('[data-nav="workspace"]'))
+      await click(host.querySelector(`.dh-folder-card[data-folder-id="${id}"] .dh-folder-open`))
+      api.uniworkListChildren.mockResolvedValue(ok({ items: [], nextCursor: null }))
+    }
+
+    it('is not a drop zone: nothing is taken and drop-to-open keeps working', async () => {
+      await openCard('f-ro')
+      const event = await drop([droppedFile('a.docx'), droppedFile('b.docx')])
+      expect(event.defaultPrevented).toBe(false)
+      expect(bridge.preflight).not.toHaveBeenCalled()
+      await act(async () => {
+        library().dispatchEvent(dragEvent('dragenter', [droppedFile('a.docx')]))
+      })
+      expect(host.querySelector('[data-testid="folder-upload-drop"]')).toBeNull()
+    })
+
+    it('a folder the user may edit takes the drop', async () => {
+      bridge.preflight.mockResolvedValueOnce([preflightOf({ mode: 'files', rootName: undefined })])
+      await openCard('f-rw')
+      const event = await drop([droppedFile('a.docx'), droppedFile('b.docx')])
+      expect(event.defaultPrevented).toBe(true)
+      expect(bridge.preflight).toHaveBeenCalledTimes(1)
     })
   })
 })

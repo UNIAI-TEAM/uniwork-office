@@ -29,6 +29,7 @@ import { openLocalHint } from '../../shared/open-extensions'
 import { useDismissablePopover } from '@genoffice/ui'
 import { boxOf, clipBoxesOf, followMenuAnchor } from './folder-menu-anchor'
 import { fileCountLabel } from './counts'
+import { isDragClaimed } from './drag-claim'
 import type { SortSpec } from './doclist/columns'
 import { deviceFileMenu, deviceFolderMenu } from './doclist/device-menu'
 import { deviceRows } from './doclist/device-model'
@@ -1203,21 +1204,23 @@ function SidebarFooter({
  * hide the overlay mid-drag. Enter fires before the matching leave when
  * moving between elements, so the depth never dips to zero inside the window.
  */
-function DropToOpenOverlay(): ReactElement | null {
+export function DropToOpenOverlay(): ReactElement | null {
   const [visible, setVisible] = useState(false)
   useEffect(() => {
     let depth = 0
     const hasFiles = (ev: DragEvent): boolean => ev.dataTransfer?.types.includes('Files') ?? false
     // NB: the preload drop bridge also listens here and cancels file drags, so
-    // defaultPrevented can't discriminate anything at this layer — only zones
-    // that stopPropagation (none on Home) would keep us out entirely.
+    // defaultPrevented can't discriminate anything at this layer. A zone that
+    // owns the drag (the library list while Upload applies) claims the event
+    // instead, and its own overlay speaks for that drag. Enter and leave are
+    // skipped alike, so the depth only counts what this overlay showed for.
     const onDragEnter = (ev: DragEvent) => {
-      if (!hasFiles(ev)) return
+      if (!hasFiles(ev) || isDragClaimed(ev)) return
       depth += 1
       setVisible(true)
     }
     const onDragLeave = (ev: DragEvent) => {
-      if (!hasFiles(ev)) return
+      if (!hasFiles(ev) || isDragClaimed(ev)) return
       depth = Math.max(0, depth - 1)
       if (depth === 0) setVisible(false)
     }

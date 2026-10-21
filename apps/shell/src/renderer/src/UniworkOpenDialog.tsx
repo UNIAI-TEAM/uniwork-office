@@ -436,7 +436,8 @@ export function UniworkOpenDialog({
   }
 
   // UNI-2052: several files and whole folders go through the pre-flight and one overall bar
-  const folderUpload = useFolderUpload({})
+  // a finished run refreshes the picker's list the way a retry does (the folder browser follows the tree-changed push itself)
+  const folderUpload = useFolderUpload({ onFinished: () => dispatch({ type: 'list-retry' }) })
 
   const createDoc = (input: Parameters<typeof createDocument>[0]) =>
     settleAction(createDocument(input)).then((r) => created(r, input.name))

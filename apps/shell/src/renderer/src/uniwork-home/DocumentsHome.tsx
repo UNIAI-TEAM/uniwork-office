@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import type { DragEvent as ReactDragEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type {
   UniworkDocErrorCode,
@@ -36,7 +37,8 @@ import {
 } from '../uniwork-docs-model'
 import { DropOverlay } from '../uniwork-folder-upload/DropOverlay'
 import { FolderUploadLayer } from '../uniwork-folder-upload/FolderUploadLayer'
-import { planDrop, type DroppedItem } from '../uniwork-folder-upload/drop'
+import { claimDrag } from '../drag-claim'
+import { dragHasFiles, planDrop, type DroppedItem } from '../uniwork-folder-upload/drop'
 import { UploadMenu } from '../uniwork-folder-upload/UploadMenu'
 import { useFolderUpload } from '../uniwork-folder-upload/use-folder-upload'
 import { useLibraryDrop } from '../uniwork-folder-upload/use-library-drop'
@@ -475,6 +477,8 @@ export function DocumentsHome({
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
   const uploadRunRef = useRef(0)
+  // canEdit of every folder card the page has listed: how the host knows whether the open folder takes uploads
+  const folderEditableRef = useRef(new Map<string, boolean>())
   // DH1-R4-8: an in-flight upload must never call onOpenDocument after unmount
   useEffect(
     () => () => {
@@ -1345,7 +1349,7 @@ export function DocumentsHome({
     onOpenFolder: openFolderInWorkspace,
   })
 
-  // a dropped file that is alone keeps the one-file upload; its refusals have no dialog field, so they are toasts
+  // a dropped file that is alone and has no bridge to go through keeps the one-file upload; its refusals have no dialog field, so they are toasts
   const dropSingleFile = async (file: { path: string; name: string }): Promise<void> => {
     const outcome = await handleUploadDoc({ ...activeTargetFolder, ...file })
     if (outcome.ok || outcome.error === 'failed') return
@@ -1364,12 +1368,17 @@ export function DocumentsHome({
   const onLibraryDrop = (items: DroppedItem[]) => {
     const plan = planDrop(items)
     if (plan.kind === 'none') return
-    if (plan.kind === 'single') {
+    // with the bridge a lone file is a one-file pre-flight like any other drop: it starts at once with the overall bar and its Cancel
+    if (plan.kind === 'single' && !folderUpload.available) {
       void dropSingleFile(plan.file)
       return
     }
     if (!folderUpload.available) {
       folderUpload.notify('fuDropUnavailable')
+      return
+    }
+    if (plan.kind === 'single') {
+      void folderUpload.drop(activeTargetFolder, [plan.file.path])
       return
     }
     const folders = items.filter((item) => item.isDirectory === true).map((item) => item.path)
@@ -1385,10 +1394,32 @@ export function DocumentsHome({
 
   // the library list takes drops where Upload would put them: the open folder, or My Folder at the top
   const dropTargetLabel = activeTargetFolder.folderPath?.at(-1)?.title ?? myFolderLabel
-  const libraryDrop = useLibraryDrop({
-    enabled: (subView === 'workspace' || subView === 'my-folder') && !uploadModal,
-    onDrop: onLibraryDrop,
-  })
+  // a viewer's drop does nothing: the open folder's canEdit is known from the card it was opened by (unknown = leave enabled)
+  for (const item of page.items) {
+    if (item.kind === 'folder' && typeof item.canEdit === 'boolean') {
+      folderEditableRef.current.set(item.id, item.canEdit)
+    }
+  }
+  const openFolderEditable =
+    subView === 'workspace' && folderId ? folderEditableRef.current.get(folderId) !== false : true
+  const libraryEnabled =
+    (subView === 'workspace' || subView === 'my-folder') && !uploadModal && openFolderEditable
+  const libraryDrop = useLibraryDrop({ enabled: libraryEnabled, onDrop: onLibraryDrop })
+  // the window-level Drop to open overlay must stay out of a drag this zone owns
+  const claimZoneDrag = (event: ReactDragEvent) => {
+    if (libraryEnabled && dragHasFiles(event.dataTransfer)) claimDrag(event.nativeEvent)
+  }
+  const zoneHandlers = {
+    ...libraryDrop.handlers,
+    onDragEnter: (event: ReactDragEvent) => {
+      claimZoneDrag(event)
+      libraryDrop.handlers.onDragEnter(event)
+    },
+    onDragLeave: (event: ReactDragEvent) => {
+      claimZoneDrag(event)
+      libraryDrop.handlers.onDragLeave(event)
+    },
+  }
 
   const handleSaveDocRename = async (doc: DocumentsHomeDoc, rawBase: string) => {
     const { ext } = renameParts(doc.title, renameFormatOf(doc))
@@ -2197,7 +2228,7 @@ export function DocumentsHome({
           : null
         : sidebarContent}
 
-      <div className="dh-main uwf-main" {...libraryDrop.handlers}>
+      <div className="dh-main uwf-main" {...zoneHandlers}>
         {libraryDrop.over && <DropOverlay targetLabel={dropTargetLabel} box={libraryDrop.over} />}
         <div className={`dh-toolbar${folderHeader ? ' dh-toolbar-folder' : ''}`}>
           {folderHeader && folderId !== null ? (
