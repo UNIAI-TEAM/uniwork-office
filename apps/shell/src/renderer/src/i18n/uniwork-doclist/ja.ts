@@ -69,4 +69,15 @@ export const ja = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: '一括操作',
+  dlBulkSelected: '{n} 件を選択中',
+  dlBulkClear: '選択を解除',
+  dlBulkDoneShelve: '{ok}/{total} 件のドキュメントをアーカイブしました',
+  dlBulkDoneUnshelve: '{ok}/{total} 件のドキュメントのアーカイブを解除しました',
+  dlBulkDoneRestore: '{ok}/{total} 件のドキュメントを復元しました',
+  dlBulkDoneTrash: '{ok}/{total} 件のドキュメントをゴミ箱に移動しました',
+  dlBulkConfirmTitleOne: '{n} 件のドキュメントをゴミ箱に移動しますか？',
+  dlBulkConfirmTitleOther: '{n} 件のドキュメントをゴミ箱に移動しますか？',
+  dlBulkConfirmBody:
+    '項目はゴミ箱に 30 日間残り、その後完全に削除されます。管理権限のない項目はスキップされます。',
 } satisfies Record<keyof typeof zh, string>

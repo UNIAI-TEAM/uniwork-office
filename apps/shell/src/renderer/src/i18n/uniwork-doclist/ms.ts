@@ -69,4 +69,15 @@ export const ms = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Tindakan pukal',
+  dlBulkSelected: '{n} dipilih',
+  dlBulkClear: 'Kosongkan pilihan',
+  dlBulkDoneShelve: '{ok}/{total} dokumen diarkibkan',
+  dlBulkDoneUnshelve: '{ok}/{total} dokumen dikeluarkan daripada arkib',
+  dlBulkDoneRestore: '{ok}/{total} dokumen dipulihkan',
+  dlBulkDoneTrash: '{ok}/{total} dokumen dialihkan ke tong sampah',
+  dlBulkConfirmTitleOne: 'Alihkan {n} dokumen ke tong sampah?',
+  dlBulkConfirmTitleOther: 'Alihkan {n} dokumen ke tong sampah?',
+  dlBulkConfirmBody:
+    'Item kekal dalam tong sampah selama 30 hari, kemudian dipadam selama-lamanya. Item yang tidak dapat anda urus dilangkau.',
 } satisfies Record<keyof typeof zh, string>

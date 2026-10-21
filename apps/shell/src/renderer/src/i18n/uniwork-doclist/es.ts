@@ -69,4 +69,15 @@ export const es = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Acciones en bloque',
+  dlBulkSelected: '{n} seleccionados',
+  dlBulkClear: 'Borrar selección',
+  dlBulkDoneShelve: '{ok}/{total} documentos archivados',
+  dlBulkDoneUnshelve: '{ok}/{total} documentos desarchivados',
+  dlBulkDoneRestore: '{ok}/{total} documentos restaurados',
+  dlBulkDoneTrash: '{ok}/{total} documentos movidos a la papelera',
+  dlBulkConfirmTitleOne: '¿Mover {n} documento a la papelera?',
+  dlBulkConfirmTitleOther: '¿Mover {n} documentos a la papelera?',
+  dlBulkConfirmBody:
+    'Los elementos permanecen 30 días en la papelera y luego se eliminan para siempre. Se omiten los que no puedes gestionar.',
 } satisfies Record<keyof typeof zh, string>

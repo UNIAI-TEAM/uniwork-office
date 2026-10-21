@@ -69,4 +69,15 @@ export const he = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'פעולות מרוכזות',
+  dlBulkSelected: 'נבחרו {n}',
+  dlBulkClear: 'נקה בחירה',
+  dlBulkDoneShelve: '{ok}/{total} מסמכים הועברו לארכיון',
+  dlBulkDoneUnshelve: '{ok}/{total} מסמכים הוצאו מהארכיון',
+  dlBulkDoneRestore: '{ok}/{total} מסמכים שוחזרו',
+  dlBulkDoneTrash: '{ok}/{total} מסמכים הועברו לאשפה',
+  dlBulkConfirmTitleOne: 'להעביר {n} מסמכים לאשפה?',
+  dlBulkConfirmTitleOther: 'להעביר {n} מסמכים לאשפה?',
+  dlBulkConfirmBody:
+    'פריטים נשארים באשפה 30 יום ואז נמחקים לצמיתות. פריטים שאין לך הרשאה לנהל ידולגו.',
 } satisfies Record<keyof typeof zh, string>

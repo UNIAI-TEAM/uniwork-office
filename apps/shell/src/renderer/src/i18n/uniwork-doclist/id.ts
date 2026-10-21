@@ -69,4 +69,15 @@ export const id = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Tindakan massal',
+  dlBulkSelected: '{n} dipilih',
+  dlBulkClear: 'Hapus pilihan',
+  dlBulkDoneShelve: '{ok}/{total} dokumen diarsipkan',
+  dlBulkDoneUnshelve: '{ok}/{total} dokumen dikeluarkan dari arsip',
+  dlBulkDoneRestore: '{ok}/{total} dokumen dipulihkan',
+  dlBulkDoneTrash: '{ok}/{total} dokumen dipindahkan ke sampah',
+  dlBulkConfirmTitleOne: 'Pindahkan {n} dokumen ke sampah?',
+  dlBulkConfirmTitleOther: 'Pindahkan {n} dokumen ke sampah?',
+  dlBulkConfirmBody:
+    'Item tetap di sampah selama 30 hari, lalu dihapus permanen. Item yang tidak dapat Anda kelola dilewati.',
 } satisfies Record<keyof typeof zh, string>

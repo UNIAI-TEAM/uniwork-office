@@ -69,4 +69,15 @@ export const fr = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Actions groupées',
+  dlBulkSelected: '{n} sélectionné(s)',
+  dlBulkClear: 'Effacer la sélection',
+  dlBulkDoneShelve: '{ok}/{total} documents archivés',
+  dlBulkDoneUnshelve: '{ok}/{total} documents désarchivés',
+  dlBulkDoneRestore: '{ok}/{total} documents restaurés',
+  dlBulkDoneTrash: '{ok}/{total} documents déplacés vers la corbeille',
+  dlBulkConfirmTitleOne: 'Déplacer {n} document vers la corbeille ?',
+  dlBulkConfirmTitleOther: 'Déplacer {n} documents vers la corbeille ?',
+  dlBulkConfirmBody:
+    'Les éléments restent 30 jours dans la corbeille, puis sont supprimés définitivement. Ceux que vous ne pouvez pas gérer sont ignorés.',
 } satisfies Record<keyof typeof zh, string>

@@ -69,4 +69,15 @@ export const cs = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Hromadné akce',
+  dlBulkSelected: 'Vybráno: {n}',
+  dlBulkClear: 'Zrušit výběr',
+  dlBulkDoneShelve: 'Archivováno dokumentů: {ok}/{total}',
+  dlBulkDoneUnshelve: 'Zrušena archivace dokumentů: {ok}/{total}',
+  dlBulkDoneRestore: 'Obnoveno dokumentů: {ok}/{total}',
+  dlBulkDoneTrash: 'Do koše přesunuto dokumentů: {ok}/{total}',
+  dlBulkConfirmTitleOne: 'Přesunout dokumenty ({n}) do koše?',
+  dlBulkConfirmTitleOther: 'Přesunout dokumenty ({n}) do koše?',
+  dlBulkConfirmBody:
+    'Položky zůstanou v koši 30 dní a pak se trvale smažou. Položky, které nemůžete spravovat, se přeskočí.',
 } satisfies Record<keyof typeof zh, string>

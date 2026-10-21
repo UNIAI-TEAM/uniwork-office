@@ -69,4 +69,15 @@ export const th = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'การดำเนินการแบบกลุ่ม',
+  dlBulkSelected: 'เลือกแล้ว {n} รายการ',
+  dlBulkClear: 'ล้างการเลือก',
+  dlBulkDoneShelve: 'เก็บเข้าคลัง {ok}/{total} เอกสารแล้ว',
+  dlBulkDoneUnshelve: 'นำออกจากคลัง {ok}/{total} เอกสารแล้ว',
+  dlBulkDoneRestore: 'กู้คืน {ok}/{total} เอกสารแล้ว',
+  dlBulkDoneTrash: 'ย้าย {ok}/{total} เอกสารไปยังถังขยะแล้ว',
+  dlBulkConfirmTitleOne: 'ย้าย {n} เอกสารไปยังถังขยะหรือไม่',
+  dlBulkConfirmTitleOther: 'ย้าย {n} เอกสารไปยังถังขยะหรือไม่',
+  dlBulkConfirmBody:
+    'รายการจะอยู่ในถังขยะ 30 วัน แล้วจะถูกลบถาวร รายการที่คุณไม่มีสิทธิ์จัดการจะถูกข้าม',
 } satisfies Record<keyof typeof zh, string>

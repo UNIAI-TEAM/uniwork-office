@@ -69,4 +69,15 @@ export const pl = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Akcje zbiorcze',
+  dlBulkSelected: 'Zaznaczono: {n}',
+  dlBulkClear: 'Wyczyść zaznaczenie',
+  dlBulkDoneShelve: 'Zarchiwizowano dokumenty: {ok}/{total}',
+  dlBulkDoneUnshelve: 'Przywrócono z archiwum dokumenty: {ok}/{total}',
+  dlBulkDoneRestore: 'Przywrócono dokumenty: {ok}/{total}',
+  dlBulkDoneTrash: 'Przeniesiono do kosza dokumenty: {ok}/{total}',
+  dlBulkConfirmTitleOne: 'Przenieść dokumenty ({n}) do kosza?',
+  dlBulkConfirmTitleOther: 'Przenieść dokumenty ({n}) do kosza?',
+  dlBulkConfirmBody:
+    'Elementy zostają w koszu przez 30 dni, a potem są usuwane na zawsze. Elementy, którymi nie możesz zarządzać, są pomijane.',
 } satisfies Record<keyof typeof zh, string>

@@ -69,4 +69,15 @@ export const ko = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: '일괄 작업',
+  dlBulkSelected: '{n}개 선택됨',
+  dlBulkClear: '선택 해제',
+  dlBulkDoneShelve: '문서 {ok}/{total}개를 보관했습니다',
+  dlBulkDoneUnshelve: '문서 {ok}/{total}개의 보관을 해제했습니다',
+  dlBulkDoneRestore: '문서 {ok}/{total}개를 복원했습니다',
+  dlBulkDoneTrash: '문서 {ok}/{total}개를 휴지통으로 이동했습니다',
+  dlBulkConfirmTitleOne: '문서 {n}개를 휴지통으로 이동할까요?',
+  dlBulkConfirmTitleOther: '문서 {n}개를 휴지통으로 이동할까요?',
+  dlBulkConfirmBody:
+    '항목은 휴지통에 30일 동안 보관된 뒤 영구 삭제됩니다. 관리 권한이 없는 항목은 건너뜁니다.',
 } satisfies Record<keyof typeof zh, string>

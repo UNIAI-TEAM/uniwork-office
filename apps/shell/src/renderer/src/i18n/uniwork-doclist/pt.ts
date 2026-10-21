@@ -69,4 +69,15 @@ export const pt = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Ações em lote',
+  dlBulkSelected: '{n} selecionados',
+  dlBulkClear: 'Limpar seleção',
+  dlBulkDoneShelve: '{ok}/{total} documentos arquivados',
+  dlBulkDoneUnshelve: '{ok}/{total} documentos desarquivados',
+  dlBulkDoneRestore: '{ok}/{total} documentos restaurados',
+  dlBulkDoneTrash: '{ok}/{total} documentos movidos para a lixeira',
+  dlBulkConfirmTitleOne: 'Mover {n} documento para a lixeira?',
+  dlBulkConfirmTitleOther: 'Mover {n} documentos para a lixeira?',
+  dlBulkConfirmBody:
+    'Os itens ficam 30 dias na lixeira e depois são excluídos para sempre. Itens que você não pode gerenciar são ignorados.',
 } satisfies Record<keyof typeof zh, string>

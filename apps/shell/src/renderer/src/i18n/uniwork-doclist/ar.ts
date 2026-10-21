@@ -69,4 +69,15 @@ export const ar = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'إجراءات جماعية',
+  dlBulkSelected: 'تم تحديد {n}',
+  dlBulkClear: 'إلغاء التحديد',
+  dlBulkDoneShelve: 'تمت أرشفة {ok}/{total} من المستندات',
+  dlBulkDoneUnshelve: 'تم إلغاء أرشفة {ok}/{total} من المستندات',
+  dlBulkDoneRestore: 'تمت استعادة {ok}/{total} من المستندات',
+  dlBulkDoneTrash: 'تم نقل {ok}/{total} من المستندات إلى المهملات',
+  dlBulkConfirmTitleOne: 'هل تريد نقل {n} من المستندات إلى المهملات؟',
+  dlBulkConfirmTitleOther: 'هل تريد نقل {n} من المستندات إلى المهملات؟',
+  dlBulkConfirmBody:
+    'تبقى العناصر في المهملات 30 يومًا ثم تُحذف نهائيًا. يتم تخطي العناصر التي لا تملك صلاحية إدارتها.',
 } satisfies Record<keyof typeof zh, string>
