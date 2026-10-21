@@ -103,11 +103,14 @@ describe('hints', () => {
       'Ctrl+S',
     ])
     expect([win, mac].map((t) => sheetsHint('sheets-02', t))).toEqual(['Ctrl+O', '⌘O'])
-    // Find: Univer's Ctrl+F / Cmd+F on desktop, Excel for the web's Ctrl+F in the frame
-    expect([win, mac, web].map((t) => sheetsHint('sheets-43', t))).toEqual([
+    // Find: Univer's Ctrl+F / Cmd+F on desktop, Excel for the web's Ctrl+F in the frame; on a
+    // Mac in the frame Univer acts on Cmd+F first, so that is the key the hint leads with
+    const webMac = { platform: 'mac', surface: 'web' } as const
+    expect([win, mac, web, webMac].map((t) => sheetsHint('sheets-43', t))).toEqual([
       'Ctrl+F',
       '⌘F',
       'Ctrl+F',
+      '⌘F',
     ])
     expect(sheetsHint('sheets-07', win)).toBe('Ctrl+Z')
     expect(sheetsHint('sheets-07', mac)).toBe('⌘Z')
