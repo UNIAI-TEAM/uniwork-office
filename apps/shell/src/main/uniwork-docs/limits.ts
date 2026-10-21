@@ -24,12 +24,44 @@ export interface DocumentLimits {
    * "no chunked path" - the single-request flow with its own cap stays.
    */
   readonly chunked_upload_threshold_bytes?: number
+  /**
+   * UNI-2052: `documents.limits.folder_upload`. Null = the server has no
+   * folder uploads (an older one), so the entry points stay hidden; absent only
+   * on hand-built literals that predate the field (read as null).
+   */
+  readonly folderUpload?: FolderUploadLimitsBlock | null
+  /** UNI-2052: `documents.limits.upload_extensions` (lower case, no dot); absent = the app's own list */
+  readonly upload_extensions?: readonly string[]
 }
+
+/** `documents.limits.folder_upload` as the server spells it (e6-server contract section 8) */
+export interface FolderUploadLimitsBlock {
+  readonly max_files: number
+  /** folders one upload creates, the root included */
+  readonly max_folders: number
+  readonly max_total_bytes: number
+  readonly max_depth: number
+  /** concurrent storage PUTs */
+  readonly parallel: number
+  /** files per complete call */
+  readonly complete_batch: number
+}
+
+/** what a drifted or missing field of the block falls back to (the web client's defaults) */
+export const FOLDER_UPLOAD_DEFAULTS: FolderUploadLimitsBlock = Object.freeze({
+  max_files: 500,
+  max_folders: 500,
+  max_total_bytes: 2 * 1024 * 1024 * 1024,
+  max_depth: 20,
+  parallel: 6,
+  complete_batch: 50,
+})
 
 export const DEFAULT_DOCUMENT_LIMITS: DocumentLimits = Object.freeze({
   max_bytes: DEFAULT_MAX_DOCUMENT_BYTES,
   warn_ratio: DEFAULT_WARN_RATIO,
   warn_bytes: DEFAULT_WARN_BYTES,
+  folderUpload: null,
 })
 
 /** a non-array object, for the three shapes below (no shared guard in this package) */
@@ -61,6 +93,9 @@ function limitsObjectOf(raw: unknown): Record<string, unknown> | null {
  * `chunked_upload_threshold_bytes` (BIGUP-A1) is kept only when it is a safe
  * positive integer; anything else - absent, fractional, zero, negative, a
  * string - leaves the chunked path off, never a guessed threshold.
+ * `folder_upload` (UNI-2052) is `folderUpload: null` when the block is absent
+ * or not an object, else each field on its own falls back to the web default;
+ * `upload_extensions` keeps its clean entries and is absent when none remain.
  */
 export function parseDocumentLimits(raw: unknown): DocumentLimits {
   const obj = limitsObjectOf(raw)
@@ -88,11 +123,85 @@ export function parseDocumentLimits(raw: unknown): DocumentLimits {
       ? rawChunked
       : undefined
 
+  const upload_extensions = parseUploadExtensions(obj.upload_extensions)
+
   return {
     max_bytes,
     warn_ratio,
     warn_bytes,
     ...(chunked_upload_threshold_bytes !== undefined ? { chunked_upload_threshold_bytes } : {}),
+    folderUpload: parseFolderUploadBlock(obj.folder_upload),
+    ...(upload_extensions ? { upload_extensions } : {}),
+  }
+}
+
+function positiveInt(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 ? value : fallback
+}
+
+/** a block that is not an object stays absent: only the server knows whether folder uploads exist */
+function parseFolderUploadBlock(raw: unknown): FolderUploadLimitsBlock | null {
+  const block = objectOf(raw)
+  if (!block) return null
+  return {
+    max_files: positiveInt(block.max_files, FOLDER_UPLOAD_DEFAULTS.max_files),
+    max_folders: positiveInt(block.max_folders, FOLDER_UPLOAD_DEFAULTS.max_folders),
+    max_total_bytes: positiveInt(block.max_total_bytes, FOLDER_UPLOAD_DEFAULTS.max_total_bytes),
+    max_depth: positiveInt(block.max_depth, FOLDER_UPLOAD_DEFAULTS.max_depth),
+    parallel: positiveInt(block.parallel, FOLDER_UPLOAD_DEFAULTS.parallel),
+    complete_batch: positiveInt(block.complete_batch, FOLDER_UPLOAD_DEFAULTS.complete_batch),
+  }
+}
+
+/** entries that are not non-empty strings are dropped; an empty allow-list would refuse every file */
+function parseUploadExtensions(raw: unknown): readonly string[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const clean = raw.flatMap((entry): string[] => {
+    if (typeof entry !== 'string') return []
+    const ext = entry.trim().replace(/^\./, '').toLowerCase()
+    return ext ? [ext] : []
+  })
+  return clean.length > 0 ? clean : undefined
+}
+
+/**
+ * The planner limits and runner knobs of one upload from `documents.limits`
+ * (parallel clamped to 1-6, the complete lot to 1-50). Null = the server has no
+ * folder uploads: the entry points hide, there is no client fallback.
+ */
+export interface FolderUploadRunLimits {
+  maxFiles: number
+  /** folders the upload creates, root included */
+  maxFolders: number
+  maxTotalBytes: number
+  maxDepth: number
+  perFileMaxBytes: number
+  parallel: number
+  completeBatch: number
+  /** files above this need a probe in the plan; absent when storage is local */
+  chunkedThresholdBytes?: number
+  /** the server allow-list (lower case, no dot); absent = the app's own list */
+  uploadExtensions?: readonly string[]
+}
+
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, Math.floor(value)))
+
+export function folderUploadRunLimits(limits: DocumentLimits): FolderUploadRunLimits | null {
+  const block = limits.folderUpload
+  if (!block) return null
+  return {
+    maxFiles: block.max_files,
+    maxFolders: block.max_folders,
+    maxTotalBytes: block.max_total_bytes,
+    maxDepth: block.max_depth,
+    perFileMaxBytes: limits.max_bytes,
+    parallel: clamp(block.parallel, 1, 6),
+    completeBatch: clamp(block.complete_batch, 1, 50),
+    ...(limits.upload_extensions ? { uploadExtensions: limits.upload_extensions } : {}),
+    ...(limits.chunked_upload_threshold_bytes !== undefined
+      ? { chunkedThresholdBytes: limits.chunked_upload_threshold_bytes }
+      : {}),
   }
 }
 
