@@ -104,6 +104,8 @@ import {
   uniworkId,
   uniworkSourceId,
 } from './client'
+import { zipErrorOf } from './zip-download/runner'
+import type { FileDownloadResult } from '../../shared/zip-download-api'
 import {
   createUniworkEditLockClient,
   type UniworkEditLockClient,
@@ -6951,28 +6953,78 @@ export class UniworkDocsService {
       if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
       const { bytes } = await this.api().downloadSource(input.workspaceId, input.sourceId)
       if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
-      const resolvedTarget = resolve(target)
-      const tmp = join(dirname(resolvedTarget), `.uw-dl-${randomBytes(8).toString('hex')}.tmp`)
-      let createdTmp = false
-      try {
-        const existingStat = await lstat(resolvedTarget).catch(() => null)
-        const targetMode = existingStat?.isFile() ? existingStat.mode & 0o777 : 0o600
-        const handle = await open(tmp, 'wx', 0o600)
-        createdTmp = true
-        try {
-          await handle.writeFile(bytes)
-          await handle.chmod(targetMode)
-        } finally {
-          await handle.close()
-        }
-        if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
-        await rename(tmp, resolvedTarget)
-      } catch (error) {
-        if (createdTmp) await unlink(tmp).catch(() => undefined)
-        throw error
-      }
+      await this.writeBytesViaTemp(target, bytes)
       return { path: target }
     })
+  }
+
+  /**
+   * A downloaded file's bytes onto `target`: a `.uw-dl-*.tmp` beside it (exclusive, 0600), the
+   * target's own mode restored, a last forbidden-target check, then one rename. The temp file is
+   * removed on any failure, so no half file is left. Shared by the source and document downloads.
+   */
+  private async writeBytesViaTemp(target: string, bytes: Uint8Array): Promise<void> {
+    const resolvedTarget = resolve(target)
+    const tmp = join(dirname(resolvedTarget), `.uw-dl-${randomBytes(8).toString('hex')}.tmp`)
+    let createdTmp = false
+    try {
+      const existingStat = await lstat(resolvedTarget).catch(() => null)
+      const targetMode = existingStat?.isFile() ? existingStat.mode & 0o777 : 0o600
+      const handle = await open(tmp, 'wx', 0o600)
+      createdTmp = true
+      try {
+        await handle.writeFile(bytes)
+        await handle.chmod(targetMode)
+      } finally {
+        await handle.close()
+      }
+      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+      await rename(tmp, resolvedTarget)
+    } catch (error) {
+      if (createdTmp) await unlink(tmp).catch(() => undefined)
+      throw error
+    }
+  }
+
+  /**
+   * UNI-2068 (D4): the plain download of ONE document file when exactly one file of a bulk
+   * selection is downloadable (no zip job, no job slot). The save dialog suggests the file's own
+   * name and opens first; a canceled dialog reads nothing. The read is the open flow's streamed
+   * download, so a file past its 256 MiB cap answers `too_large`.
+   */
+  async downloadDocumentFile(input: unknown): Promise<FileDownloadResult> {
+    const fail = (code: NonNullable<FileDownloadResult['code']>): FileDownloadResult => ({
+      ok: false,
+      path: null,
+      code,
+    })
+    try {
+      const raw = (input ?? {}) as Record<string, unknown>
+      if (typeof raw.workspaceId !== 'string' || typeof raw.documentId !== 'string') {
+        return fail('server_error')
+      }
+      // refused ids never open the dialog
+      uniworkId(raw.workspaceId)
+      uniworkId(raw.documentId)
+      if (!this.deps.identity()) return fail('signed_out')
+      const target = (await this.deps.pickDownloadPath?.(sourceFileName(raw.suggestedName))) ?? null
+      if (!target) return fail('dialog_canceled')
+      if (await this.isForbiddenDownloadTarget(target)) return fail('forbidden_target')
+      const { bytes } = await this.api().downloadStream(raw.documentId, undefined)
+      if (await this.isForbiddenDownloadTarget(target)) return fail('forbidden_target')
+      await this.writeBytesViaTemp(target, bytes)
+      return { ok: true, path: target }
+    } catch (error) {
+      if (error instanceof UniworkDocError && error.code === 'forbidden') {
+        return fail('forbidden_target')
+      }
+      return fail(zipErrorOf(error).code)
+    }
+  }
+
+  /** UNI-2068: the zip download's target check - the same rule as every download here */
+  isDownloadTargetForbidden(target: string): Promise<boolean> {
+    return this.isForbiddenDownloadTarget(target)
   }
 
   /** UNI-1993: opens a Workspace source file as a view-only tab (see ./source-view) */

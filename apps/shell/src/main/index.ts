@@ -7342,6 +7342,8 @@ app.on('will-quit', (event) => {
   // not in before-quit: a close prompt can still veto the quit, and the tabs would then
   // lose their files and read as plain local documents
   uniworkDocs?.service.disposeSourceViews()
+  // UNI-2068: a zip download in flight is abandoned; its temp file must not outlive the app
+  uniworkDocs?.disposeZipDownloads()
   stopUniworkAccount()
   fileIndexer?.stop()
   fileIndexStore?.close()

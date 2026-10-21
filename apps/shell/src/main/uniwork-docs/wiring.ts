@@ -39,6 +39,9 @@ import {
 } from '../../shared/home-api'
 import { SOURCE_VIEW_CHANNELS } from '../../shared/source-view'
 import type { BatchUploadProgress } from '../../shared/folder-upload-api'
+import { ZIP_DOWNLOAD_CHANNELS, type ZipDownloadProgress } from '../../shared/zip-download-api'
+import { createZipDownloadClient } from './zip-download/client'
+import { createZipDownloadService } from './zip-download/service'
 import { createFolderUploadService } from './folder-upload/service'
 import type { FolderUploadService } from './folder-upload/service'
 import type { FolderUploadRunnerPort } from './folder-upload/runner-port'
@@ -410,6 +413,29 @@ async function pickDownloadPath(
   return picked.canceled || !picked.filePath ? null : picked.filePath
 }
 
+/**
+ * UNI-2068: the save dialog of a zip download. It opens in the folder of the last confirmed
+ * save, else in the OS Downloads folder (not the app's own save folder: a zip of documents is
+ * a download); one zip filter, and a canceled dialog is null.
+ */
+async function pickZipPath(wiring: UniworkDocsWiring, defaultName: string): Promise<string | null> {
+  const picked = await showSaveDialogWithMemory(
+    dialog,
+    wiring.shellWindow(),
+    { defaultPath: defaultName, filters: [{ name: 'ZIP', extensions: ['zip'] }] },
+    app.getPath('downloads'),
+  )
+  return picked.canceled || !picked.filePath ? null : picked.filePath
+}
+
+/** progress of a zip download goes to the window that started it, and to no other */
+function zipProgressSink(sender: unknown): (event: ZipDownloadProgress) => void {
+  const starter = sender as WebContents | undefined
+  return (event) => {
+    if (starter && !starter.isDestroyed()) starter.send(ZIP_DOWNLOAD_CHANNELS.progress, event)
+  }
+}
+
 function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
   const t = (key: Parameters<typeof tUniworkDocs>[1], title?: string) =>
     tUniworkDocs(wiring.lang(), key, { title })
@@ -487,6 +513,8 @@ export interface UniworkDocsHandle {
   capabilityRead(orgId: string): Promise<CapabilityRead>
   /** G5-05u: the offline library (S3 tab, the tab menu's pin/unpin, S11 refusals) */
   offline: OfflineLibraryApi
+  /** UNI-2068: quit - ends the zip downloads in flight and removes their temp files synchronously */
+  disposeZipDownloads(): void
 }
 
 /** the binding of a path as UniWork AI sees it (see UniworkDocsHandle.aiBinding) */
@@ -1108,6 +1136,17 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.downloadSource, (_event, input: unknown) =>
     service.downloadSource((input ?? {}) as UniworkSourceDownloadInput),
   )
+  // UNI-2068: the bulk bar's Download. `start` opens the save dialog first; the run's progress
+  // goes back to the window that asked (and only that one)
+  ipcMain.handle(ZIP_DOWNLOAD_CHANNELS.start, (event, input: unknown) =>
+    zipDownloads.start(input, zipProgressSink((event as { sender?: unknown } | null)?.sender)),
+  )
+  ipcMain.handle(ZIP_DOWNLOAD_CHANNELS.cancel, (_event, runId: unknown) =>
+    zipDownloads.cancel(runId),
+  )
+  ipcMain.handle(ZIP_DOWNLOAD_CHANNELS.downloadFile, (_event, input: unknown) =>
+    service.downloadDocumentFile(input),
+  )
   // UNI-1993: a source row's primary action opens a view-only tab; never throws across IPC
   ipcMain.handle(SOURCE_VIEW_CHANNELS.openSource, async (_event, input: unknown) => {
     try {
@@ -1333,9 +1372,33 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     treeChanged.cancel()
     feedRunning = false
   }
+  // UNI-2068: the bulk bar's zip download. Its client is rebuilt when the profile's origin
+  // changes (the same lifecycle as the docs service's own); signed out = no client.
+  let zipClient: { origin: string; client: ReturnType<typeof createZipDownloadClient> } | null =
+    null
+  const zipDownloads = createZipDownloadService({
+    pickPath: (defaultName) => pickZipPath(wiring, defaultName),
+    isForbiddenTarget: (target) => service.isDownloadTargetForbidden(target),
+    client: () => {
+      const profile = uniworkDeploymentProfile()
+      if (!profile || uniworkSessionIdentity() === null) return null
+      if (!zipClient || zipClient.origin !== profile.apiOrigin) {
+        zipClient = {
+          origin: profile.apiOrigin,
+          client: createZipDownloadClient({
+            apiOrigin: profile.apiOrigin,
+            authorized: (call) => authorizedRequest(call),
+            isSignedIn: () => uniworkSessionIdentity() !== null,
+          }),
+        }
+      }
+      return zipClient.client
+    },
+  })
   // Sign out and a sign-in as someone else close the previous account's
   // documents and delete their AI history (see account-boundary.ts)
   const boundary = new AccountBoundary({
+    abortZipDownloads: () => zipDownloads.abortAll('signed_out'),
     root: service.store.root,
     openPaths: () => wiring.openPaths(),
     closeDocument: (path) => wiring.closePath(path),
@@ -1482,6 +1545,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     aiBinding: (path) => uniworkAiBinding(service, path),
     capabilityRead: (orgId) => runtime.capabilityRead(orgId),
     offline: offlineApi,
+    disposeZipDownloads: () => zipDownloads.dispose(),
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
       let needsReload = !signedIn
