@@ -1,10 +1,11 @@
-import type {
-  AskUniCitation,
-  AskUniCitationKind,
-  AskUniErrorCode,
-  AskUniNotice,
-  AskUniRequest,
-  AskUniResult,
+import {
+  ASKUNI_MAX_RETRY_AFTER_SEC,
+  type AskUniCitation,
+  type AskUniCitationKind,
+  type AskUniErrorCode,
+  type AskUniNotice,
+  type AskUniRequest,
+  type AskUniResult,
 } from '../../shared/askuni-api'
 import {
   createUniworkSend,
@@ -25,12 +26,21 @@ import { UniworkDocError } from '../uniwork-docs/errors'
 /** an answer can take a while (retrieval + model), longer than a metadata read */
 const ASK_TIMEOUT_MS = TRANSFER_TIMEOUT_MS
 const ID = /^[A-Za-z0-9_-]{1,128}$/
+/** what the renderer receives from the server is bounded here, at the trust boundary */
+const MAX_TITLE = 300
+const MAX_QUOTE = 1000
+const MAX_CONTENT = 20_000
+/** a single-leading-slash path: no scheme, no `//host`, no backslash */
+const SAFE_HREF = /^\/(?!\/)[^\\\s]*$/
+/** control characters (and DEL) never belong in a link */
+const hasControl = (value: string): boolean =>
+  [...value].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f)
 
 export interface AskUniClient {
   ask(req: AskUniRequest): Promise<AskUniResult>
 }
 
-/** the server's citation kinds; the web calls the member kind `members` */
+/** the server's citation kinds; the web calls the member kind `members`; any other kind is `other` */
 const KINDS: Record<string, AskUniCitationKind> = {
   document: 'document',
   task: 'task',
@@ -68,7 +78,11 @@ function failure(error: unknown): AskUniResult {
     error instanceof UniworkDocError &&
     error.retryAfterMs !== undefined
   ) {
-    return { ok: false, code, retryAfterSec: Math.ceil(error.retryAfterMs / 1000) }
+    return {
+      ok: false,
+      code,
+      retryAfterSec: Math.min(ASKUNI_MAX_RETRY_AFTER_SEC, Math.ceil(error.retryAfterMs / 1000)),
+    }
   }
   return { ok: false, code }
 }
@@ -78,13 +92,21 @@ const text = (value: unknown): string | null => (typeof value === 'string' ? val
 function parseCitation(raw: unknown): AskUniCitation | null {
   if (!raw || typeof raw !== 'object') return null
   const c = raw as Record<string, unknown>
-  const kind = typeof c.kind === 'string' ? KINDS[c.kind] : undefined
+  if (typeof c.kind !== 'string') return null
+  const kind = Object.hasOwn(KINDS, c.kind) ? KINDS[c.kind] : 'other'
   const sourceId = text(c.source_id)
   const title = text(c.title)
   const quote = text(c.quote)
   const href = text(c.href)
-  if (!kind || sourceId === null || title === null || quote === null || href === null) return null
-  return { sourceId, kind, title, quote, href }
+  if (sourceId === null || title === null || quote === null || href === null) return null
+  return {
+    sourceId,
+    kind,
+    title: title.slice(0, MAX_TITLE),
+    quote: quote.slice(0, MAX_QUOTE),
+    // a bad href keeps the row, the app just offers no open for it
+    href: SAFE_HREF.test(href) && !hasControl(href) ? href : '',
+  }
 }
 
 function parseAnswer(raw: unknown): AskUniResult {
@@ -107,7 +129,7 @@ function parseAnswer(raw: unknown): AskUniResult {
     conversationId: body.conversation_id,
     message: {
       id: message.id,
-      content: message.content,
+      content: message.content.slice(0, MAX_CONTENT),
       citations,
       ...(notice ? { notice: message.notice as AskUniNotice } : {}),
     },

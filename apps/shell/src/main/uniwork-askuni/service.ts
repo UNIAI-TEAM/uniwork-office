@@ -71,38 +71,52 @@ export function createAskUniService(deps: AskUniServiceDeps): AskUniService {
   const now = deps.now ?? Date.now
   let cached: { scope: string | null; at: number; workspaces: AskUniWorkspace[] } | null = null
 
-  const readList = async (fresh: boolean): Promise<AskUniWorkspace[]> => {
+  /** the cached list of this scope, however old (stale-if-error), else null */
+  const cachedFor = (scope: string | null): AskUniWorkspace[] | null =>
+    cached && cached.scope === scope ? cached.workspaces : null
+
+  const readList = async (): Promise<AskUniWorkspace[]> => {
     const scope = deps.scopeKey()
-    if (!fresh && cached && cached.scope === scope && now() - cached.at < LIST_TTL_MS) {
+    if (cached && cached.scope === scope && now() - cached.at < LIST_TTL_MS) {
       return cached.workspaces
     }
     const workspaces = await deps.listWorkspaces()
-    cached = { scope, at: now(), workspaces }
+    // the account or org can switch while the list is on its way: that list
+    // belongs to the new scope, so it is not stored under the old key
+    if (deps.scopeKey() === scope) cached = { scope, at: now(), workspaces }
     return workspaces
   }
 
   return {
     async context() {
-      if (!deps.isSignedIn()) return { workspaces: [], currentWorkspaceId: null, signedIn: false }
+      if (!deps.isSignedIn()) {
+        cached = null
+        return { workspaces: [], currentWorkspaceId: null, signedIn: false }
+      }
+      let workspaces: AskUniWorkspace[]
       try {
-        const workspaces = await readList(true)
-        return {
-          workspaces,
-          currentWorkspaceId: pickCurrent(workspaces, deps.activeWorkspaceId()),
-          signedIn: true,
-        }
+        workspaces = await readList()
       } catch {
-        return { workspaces: [], currentWorkspaceId: null, signedIn: true }
+        // offline or a transient failure: keep showing the workspaces of this scope
+        workspaces = cachedFor(deps.scopeKey()) ?? []
+      }
+      return {
+        workspaces,
+        currentWorkspaceId: pickCurrent(workspaces, deps.activeWorkspaceId()),
+        signedIn: true,
       }
     },
 
     async ask(input) {
       const req = parseRequest(input)
       if (!req) return error()
-      if (!deps.isSignedIn()) return { ok: false, code: 'signed_out' }
+      if (!deps.isSignedIn()) {
+        cached = null
+        return { ok: false, code: 'signed_out' }
+      }
       let workspaces: AskUniWorkspace[]
       try {
-        workspaces = await readList(false)
+        workspaces = await readList()
       } catch (failure) {
         return { ok: false, code: askUniCodeOfError(failure) }
       }

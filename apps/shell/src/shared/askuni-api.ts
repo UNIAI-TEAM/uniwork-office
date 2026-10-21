@@ -15,7 +15,8 @@ export interface AskUniRequest {
   locale: AskUniLocale
 }
 
-export type AskUniCitationKind = 'document' | 'task' | 'meeting' | 'chat' | 'member'
+/** `other`: any kind the app has no row for (project, workload, email thread, ...) */
+export type AskUniCitationKind = 'document' | 'task' | 'meeting' | 'chat' | 'member' | 'other'
 
 export interface AskUniCitation {
   sourceId: string
@@ -24,6 +25,9 @@ export interface AskUniCitation {
   quote: string
   href: string
 }
+
+/** the longest wait a rate-limit reply can ask the composer to count down */
+export const ASKUNI_MAX_RETRY_AFTER_SEC = 3600
 
 export type AskUniNotice = 'no_sources' | 'empty_answer'
 
@@ -72,6 +76,7 @@ const KINDS: ReadonlySet<string> = new Set<AskUniCitationKind>([
   'meeting',
   'chat',
   'member',
+  'other',
 ])
 const CODES: ReadonlySet<string> = new Set<AskUniErrorCode>([
   'offline',
@@ -111,7 +116,7 @@ export function asAskUniResult(raw: unknown): AskUniResult {
       ok: false,
       code: r.code as AskUniErrorCode,
       ...(typeof wait === 'number' && Number.isFinite(wait) && wait >= 0
-        ? { retryAfterSec: wait }
+        ? { retryAfterSec: Math.min(ASKUNI_MAX_RETRY_AFTER_SEC, wait) }
         : {}),
     }
   }
