@@ -6306,6 +6306,7 @@ export class UniworkDocsService {
   renameDocument(
     documentId: string,
     name: string,
+    options?: { shareWithWorkspace?: boolean },
   ): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(
       async () => {
@@ -6321,15 +6322,28 @@ export class UniworkDocsService {
         if (ref.myLevel !== 'edit' && ref.myLevel !== 'manage') {
           throw new UniworkDocError('forbidden')
         }
-        if (title === ref.title) return this.summaryOf(ref)
-        const renamed = await this.api().rename({ documentId, revision: ref.revision, title })
+        // SD-D2, the web's first-save rule (first-save-naming.tsx): the PATCH also carries
+        // `visibility: "workspace"` only for a manager and only while the document is not
+        // already shared; only a literal true asks for it
+        const shareNow =
+          options?.shareWithWorkspace === true &&
+          ref.myLevel === 'manage' &&
+          ref.visibility !== 'workspace'
+        if (title === ref.title && !shareNow) return this.summaryOf(ref)
+        const renamed = await this.api().rename({
+          documentId,
+          revision: ref.revision,
+          title,
+          ...(shareNow ? { visibility: 'workspace' as const } : {}),
+        })
         // this service's own rename: only the revision it produced is its echo,
         // so a genuine later change for another revision is still followed (R1-6)
         this.selfRenamed.set(documentId, renamed.revision)
         // FD-11: the row's title changed for every view of the tree (not for a
         // no-op rename, which returned above)
         this.pushTreeChangedFor(session, renamed.summary.workspaceId)
-        await this.afterLocalRename(documentId, renamed.summary.title)
+        // a share-only PATCH keeps the title: the working copy has nothing to follow
+        if (title !== ref.title) await this.afterLocalRename(documentId, renamed.summary.title)
         return renamed.summary
       },
       { nameField: true },

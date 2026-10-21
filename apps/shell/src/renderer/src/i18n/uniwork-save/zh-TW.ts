@@ -29,4 +29,8 @@ export const zhTW = {
     '已在 UniWork 建立「{title}」（ID {id}），但無法連結到此分頁，也無法移至垃圾桶。請在 UniWork 刪除或使用該文件。',
   usErrAlreadyBound: '此分頁已連結到一份 UniWork 文件。請照常儲存。',
   usErrNotFound: '找不到要儲存的檔案或所選資料夾。請重新選擇儲存位置後再試一次。',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

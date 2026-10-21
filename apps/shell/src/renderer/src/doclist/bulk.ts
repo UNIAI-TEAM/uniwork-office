@@ -21,10 +21,16 @@ export const BULK_CONCURRENCY = 4
 const RETRY_DELAY_MS = 1000
 
 /** the row-menu actions a batch can run on many rows (Move takes one row in the app) */
-export type BulkActionId = Extract<RowMenuActionId, 'restore' | 'unshelve' | 'shelve' | 'trash'>
+export type BulkActionId = Extract<
+  RowMenuActionId,
+  'share' | 'restore' | 'unshelve' | 'shelve' | 'trash'
+>
 
-// Rules board §3 order: the keep actions first, the delete entry last
-const BULK_ORDER: readonly BulkActionId[] = ['restore', 'unshelve', 'shelve', 'trash']
+/** the ones that fan out over single-document calls here; Chia sẻ opens its own dialog and runs the bridge's bulk */
+export type BulkWorkActionId = Exclude<BulkActionId, 'share'>
+
+// Rules board §3 order: Chia sẻ first (the web's bar), the keep actions, the delete entry last
+const BULK_ORDER: readonly BulkActionId[] = ['share', 'restore', 'unshelve', 'shelve', 'trash']
 
 /** `retryable`: main marked the failure a throttle (429 / 503); nothing else is worth a second call */
 export type BulkWorkResult = { ok: true } | { ok: false; error: string; retryable?: boolean }
@@ -113,29 +119,44 @@ export async function runBulkAction<T extends { id: string }>(
 }
 
 /**
+ * Whether the Share dialog would let the viewer change this row's access: the row menu opens it
+ * for any reader, but only a manager (or an administering admin) gets its write half, and a
+ * shelved document gives access away only (the web's `canShareWrite`).
+ */
+function canShareWrite(doc: DocumentsHomeDoc): boolean {
+  return (doc.myLevel === 'manage' || doc.adminScope === true) && !doc.shelvedAt
+}
+
+/**
  * The actions of the bulk bar: the ids the row menu offers for every selected row (so the
- * permissions are the menu's, never a second copy of them).
+ * permissions are the menu's, never a second copy of them). Chia sẻ also needs every row
+ * manageable and the shell's Share bridge (`canShare`): never a dead button.
  */
 export function bulkActionsFor(
   screen: DocListScreen,
   docs: readonly DocumentsHomeDoc[],
+  canShare = false,
 ): BulkActionId[] {
   if (docs.length === 0) return []
   const stub = () => {}
   const run: Partial<Record<RowMenuActionId, () => void>> = {}
   for (const id of BULK_ORDER) run[id] = stub
-  return BULK_ORDER.filter((id) =>
-    docs.every((doc) =>
-      buildRowMenu({ screen, doc, run, offlineLabel: null, label: (key) => key }).some(
-        (item) => item.id === id,
+  return BULK_ORDER.filter(
+    (id) =>
+      (id !== 'share' || canShare) &&
+      docs.every(
+        (doc) =>
+          (id !== 'share' || canShareWrite(doc)) &&
+          buildRowMenu({ screen, doc, run, offlineLabel: null, label: (key) => key }).some(
+            (item) => item.id === id,
+          ),
       ),
-    ),
   )
 }
 
 /** the single-document call one batch item runs: the same calls the row menu uses */
 export function bulkWorkFor(
-  action: BulkActionId,
+  action: BulkWorkActionId,
   screen: DocListScreen,
 ): (doc: DocumentsHomeDoc) => Promise<BulkWorkResult> {
   const call = (id: string) => {
@@ -159,7 +180,7 @@ export function bulkWorkFor(
   }
 }
 
-const DONE_KEYS: Record<BulkActionId, StringKey> = {
+const DONE_KEYS: Record<BulkWorkActionId, StringKey> = {
   shelve: 'dlBulkDoneShelve',
   unshelve: 'dlBulkDoneUnshelve',
   restore: 'dlBulkDoneRestore',
@@ -168,7 +189,7 @@ const DONE_KEYS: Record<BulkActionId, StringKey> = {
 
 /** the toast of a finished batch: "3/5" counts, plus the commonest reason when some failed */
 export function bulkSummary(
-  action: BulkActionId,
+  action: BulkWorkActionId,
   result: BulkResult,
   t: TFunc,
 ): { message: string; tone: 'ok' | 'error' } {

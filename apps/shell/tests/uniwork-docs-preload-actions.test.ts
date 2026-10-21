@@ -13,7 +13,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { UNIWORK_DOC_CHANNELS } from '../src/shared/home-api'
 
 interface ActionsBridge {
-  uniworkRenameDocument(documentId: string, name: string): Promise<unknown>
+  uniworkRenameDocument(
+    documentId: string,
+    name: string,
+    options?: { shareWithWorkspace?: boolean },
+  ): Promise<unknown>
   uniworkArchiveDocument(documentId: string): Promise<unknown>
   uniworkCancelUploadDocument(uploadId: string): Promise<void>
   onUniworkUploadProgress(cb: (event: unknown) => void): () => void
@@ -366,5 +370,23 @@ describe('the document sources bridge (UNI-1961)', () => {
       ok: false,
       error: 'malformed_response',
     })
+  })
+})
+
+describe('SD-D2: the rename call carries the first-save share flag', () => {
+  it('forwards { shareWithWorkspace: true } as the third argument, and nothing when it is not asked for', async () => {
+    const { bridge, invoked } = await loadBridge({
+      ok: true,
+      value: { id: 'doc_1', title: 'A.docx' },
+    })
+    await bridge.uniworkRenameDocument('doc_1', 'A.docx', { shareWithWorkspace: true })
+    await bridge.uniworkRenameDocument('doc_1', 'B.docx')
+    await bridge.uniworkRenameDocument('doc_1', 'C.docx', { shareWithWorkspace: false })
+    const renames = invoked.filter((i) => i.channel === UNIWORK_DOC_CHANNELS.renameDocument)
+    expect(renames.map((r) => r.args)).toEqual([
+      ['doc_1', 'A.docx', { shareWithWorkspace: true }],
+      ['doc_1', 'B.docx'],
+      ['doc_1', 'C.docx'],
+    ])
   })
 })

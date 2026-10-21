@@ -1,5 +1,7 @@
 import type { UniworkDocEditLock, UniworkDocErrorCode } from '../../shared/home-api'
+import type { ShareRejectedItem } from '../../shared/share-api'
 import { isDecimalString } from './formats'
+import { parseRejectedItems } from './share-rejected'
 
 /**
  * A failed UniWork documents call. `code` is the user-facing code from the
@@ -62,6 +64,8 @@ export class UniworkDocError extends Error {
     | 'unknown'
   /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.by_name */
   readonly byName?: string | null
+  /** UNI-2047 SD-A: the refused items of a 422 `document_access_rejected` (an access update) */
+  readonly rejected?: ShareRejectedItem[]
 
   constructor(
     code: UniworkDocErrorCode,
@@ -81,6 +85,7 @@ export class UniworkDocError extends Error {
       reason?: string
       lostReason?: UniworkDocError['lostReason']
       byName?: string | null
+      rejected?: ShareRejectedItem[]
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -101,6 +106,7 @@ export class UniworkDocError extends Error {
     this.reason = extra.reason
     this.lostReason = extra.lostReason
     this.byName = extra.byName
+    this.rejected = extra.rejected
   }
 }
 
@@ -303,6 +309,14 @@ export function errorFromResponse(
   // UNI-1975: the server refuses sharing a folder (only documents are shared). The
   // app never sends it today; a user-facing refusal, not retried, not terminal.
   if (serverCode === 'folder_not_shareable') return new UniworkDocError('folder_not_shareable', at)
+  // UNI-2047 SD-A: an access update the server refused item by item; the list rides the error so
+  // the share dialog can name each refused person (a bare 422 stays the generic server_error)
+  if (serverCode === 'document_access_rejected') {
+    return new UniworkDocError('server_error', {
+      ...at,
+      rejected: parseRejectedItems(envelope?.fields?.rejected),
+    })
+  }
   // G5-06 (UNI-1352): the server's own verdicts, kept apart from the generic
   // forbidden/deleted a caller would otherwise act on. A capability kill
   // switch is a pause, not a permission denial; a swept intent is unknown,

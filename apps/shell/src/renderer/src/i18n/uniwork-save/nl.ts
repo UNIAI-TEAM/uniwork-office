@@ -34,4 +34,8 @@ export const nl = {
     'Dit tabblad is al gekoppeld aan een UniWork-document. Sla op zoals gewoonlijk.',
   usErrNotFound:
     'Het op te slaan bestand of de gekozen map is niet gevonden. Kies opnieuw waar je opslaat en probeer het nog eens.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

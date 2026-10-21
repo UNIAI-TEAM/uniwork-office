@@ -32,4 +32,8 @@ export const en = {
   usErrAlreadyBound: 'This tab is already linked to a UniWork document. Save as usual.',
   usErrNotFound:
     'The file to save or the chosen folder can’t be found. Choose where to save again and retry.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>
