@@ -378,6 +378,11 @@ describe('DocumentsHome: the states of the lists', () => {
         updatedAt: iso(2026, 10, 17, 9, 5),
       }),
       source({
+        id: 's-hash',
+        parent: { kind: 'chat', id: 'room-3', title: '#general' },
+        updatedAt: iso(2026, 10, 15, 9, 5),
+      }),
+      source({
         id: 's-new',
         source: 'wiki',
         parent: { kind: 'wiki', id: 'w-1', title: 'Quy trình' },
@@ -387,22 +392,22 @@ describe('DocumentsHome: the states of the lists', () => {
     const subline = (id: string) =>
       host.querySelector(`[data-source-id="${id}"] .dh-doc-subpath`)?.textContent ?? null
 
-    it('en: the Name sub-line is "Sent in <module> · <parent>"', async () => {
+    it('en: the Name sub-line is the origin, worded as the web module does (chat gets "#")', async () => {
       sources = async () => ok({ items: SOURCES, nextCursor: null })
       await mount('elsewhere', 'en')
-      expect(subline('s-chat')).toBe('Sent in Chat · phap-che')
-      expect(subline('s-task')).toBe('Sent in Tasks · Chuẩn bị họp HĐQT')
-      expect(subline('s-meet')).toBe('Sent in Meetings · Họp tuần')
-      expect(subline('s-mail')).toBe('Sent in Email · Re: Báo giá Q4')
+      expect(subline('s-chat')).toBe('Sent in Chat · #phap-che')
+      expect(subline('s-task')).toBe('From a task · Chuẩn bị họp HĐQT')
+      expect(subline('s-meet')).toBe('From a meeting · Họp tuần')
+      expect(subline('s-mail')).toBe('From an email · Re: Báo giá Q4')
     })
 
-    it('vi: the Name sub-line is "Gửi trong <module> · <parent>"', async () => {
+    it('vi: the Name sub-line is the origin, worded as the web module does (chat gets "#")', async () => {
       sources = async () => ok({ items: SOURCES, nextCursor: null })
       await mount('elsewhere', 'vi')
-      expect(subline('s-chat')).toBe('Gửi trong Chat · phap-che')
-      expect(subline('s-task')).toBe('Gửi trong Công việc · Chuẩn bị họp HĐQT')
-      expect(subline('s-meet')).toBe('Gửi trong Cuộc họp · Họp tuần')
-      expect(subline('s-mail')).toBe('Gửi trong Email · Re: Báo giá Q4')
+      expect(subline('s-chat')).toBe('Gửi trong Chat · #phap-che')
+      expect(subline('s-task')).toBe('Từ công việc · Chuẩn bị họp HĐQT')
+      expect(subline('s-meet')).toBe('Từ cuộc họp · Họp tuần')
+      expect(subline('s-mail')).toBe('Từ email · Re: Báo giá Q4')
     })
 
     it('a blank parent title leaves the module alone; a module this build has no name for shows its parent only', async () => {
@@ -410,6 +415,8 @@ describe('DocumentsHome: the states of the lists', () => {
       await mount('elsewhere', 'en')
       expect(subline('s-bare')).toBe('Sent in Chat')
       expect(subline('s-new')).toBe('Quy trình')
+      // only a chat parent is a channel: a title that already starts with "#" is not doubled
+      expect(subline('s-hash')).toBe('Sent in Chat · #general')
       expect(host.textContent).not.toMatch(/undefined|NaN/)
     })
 
