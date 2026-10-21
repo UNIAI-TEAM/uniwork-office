@@ -80,4 +80,5 @@ export const ru = {
   dlBulkConfirmTitleOther: 'Переместить документы ({n}) в корзину?',
   dlBulkConfirmBody:
     'Элементы хранятся в корзине 30 дней, затем удаляются навсегда. Элементы, которыми вы не можете управлять, пропускаются.',
+  dlTrashBanner30: 'Элементы хранятся в корзине 30 дней, затем удаляются навсегда.',
 } satisfies Record<keyof typeof zh, string>

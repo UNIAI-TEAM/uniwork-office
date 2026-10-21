@@ -80,4 +80,5 @@ export const ms = {
   dlBulkConfirmTitleOther: 'Alihkan {n} dokumen ke tong sampah?',
   dlBulkConfirmBody:
     'Item kekal dalam tong sampah selama 30 hari, kemudian dipadam selama-lamanya. Item yang tidak dapat anda urus dilangkau.',
+  dlTrashBanner30: 'Item kekal dalam tong sampah selama 30 hari, kemudian dipadam selama-lamanya.',
 } satisfies Record<keyof typeof zh, string>

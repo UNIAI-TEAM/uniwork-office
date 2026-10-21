@@ -80,4 +80,6 @@ export const nl = {
   dlBulkConfirmTitleOther: '{n} documenten naar de prullenbak verplaatsen?',
   dlBulkConfirmBody:
     'Items blijven 30 dagen in de prullenbak en worden daarna definitief verwijderd. Items die je niet kunt beheren worden overgeslagen.',
+  dlTrashBanner30:
+    'Items blijven 30 dagen in de prullenbak en worden daarna definitief verwijderd.',
 } satisfies Record<keyof typeof zh, string>

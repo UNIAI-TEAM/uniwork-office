@@ -1248,7 +1248,8 @@
   font-size: 11.5px;
 }
 
-.dh-shelved-unshelve {
+.dh-shelved-unshelve,
+.dh-trash-restore {
   height: 28px;
   padding: 0 10px;
   font-size: 12.5px;
@@ -1263,6 +1264,58 @@
 
 .dh-shelved-empty-desc {
   margin: 0;
+}
+
+/* UNI-2047 A2b: the Thùng rác groups. The header row spans the table and collapses its rows; the
+   rows of a group sit 28px in (the indent is the Tên cell's, so every other column keeps its place
+   under its header). */
+.dl-group-row {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
+.dl-group-head {
+  display: block;
+}
+
+.dl-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dl-group-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.dl-group-chevron {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.dl-group-chevron.closed {
+  transform: rotate(-90deg);
+}
+
+.dl-group-count {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+[data-group-body] .dh-cell-name {
+  padding-inline-start: calc(8px + 28px);
 }
 
 /* UNI-2047 A4: the Xem chi tiết panel of a row, over the right edge of the window */

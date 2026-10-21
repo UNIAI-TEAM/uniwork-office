@@ -80,4 +80,5 @@ export const id = {
   dlBulkConfirmTitleOther: 'Pindahkan {n} dokumen ke sampah?',
   dlBulkConfirmBody:
     'Item tetap di sampah selama 30 hari, lalu dihapus permanen. Item yang tidak dapat Anda kelola dilewati.',
+  dlTrashBanner30: 'Item tetap di sampah selama 30 hari, lalu dihapus permanen.',
 } satisfies Record<keyof typeof zh, string>

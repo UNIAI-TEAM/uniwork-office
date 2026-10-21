@@ -80,4 +80,5 @@ export const he = {
   dlBulkConfirmTitleOther: 'להעביר {n} מסמכים לאשפה?',
   dlBulkConfirmBody:
     'פריטים נשארים באשפה 30 יום ואז נמחקים לצמיתות. פריטים שאין לך הרשאה לנהל ידולגו.',
+  dlTrashBanner30: 'פריטים נשארים באשפה 30 יום ואז נמחקים לצמיתות.',
 } satisfies Record<keyof typeof zh, string>

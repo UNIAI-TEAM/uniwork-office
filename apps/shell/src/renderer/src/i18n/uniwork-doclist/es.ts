@@ -80,4 +80,6 @@ export const es = {
   dlBulkConfirmTitleOther: '¿Mover {n} documentos a la papelera?',
   dlBulkConfirmBody:
     'Los elementos permanecen 30 días en la papelera y luego se eliminan para siempre. Se omiten los que no puedes gestionar.',
+  dlTrashBanner30:
+    'Los elementos permanecen 30 días en la papelera y luego se eliminan para siempre.',
 } satisfies Record<keyof typeof zh, string>

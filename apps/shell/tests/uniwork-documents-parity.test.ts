@@ -264,10 +264,10 @@ describe('UNI-1957 Documents parity', () => {
       })
       await flush()
     }
-    const TRASH_NOTE = 'Mục trong thùng rác có thể khôi phục nếu bạn có quyền Quản lý.'
+    const TRASH_NOTE = 'Các mục sẽ nằm trong thùng rác 30 ngày rồi bị xóa vĩnh viễn.'
     const MY_FOLDER_NOTE = ['Riêng tư', 'chỉ bạn có quyền truy cập']
 
-    it('shows no banner and no private note in My Folder, while Trash keeps its note', async () => {
+    it('shows no banner and no private note in My Folder, while Trash keeps its 30-day note', async () => {
       await mount()
       await click(myFolderTitles()[0]!.closest<HTMLElement>('[role="treeitem"]')!)
       expect(host.querySelector('.dh-subview-banner')).toBeNull()

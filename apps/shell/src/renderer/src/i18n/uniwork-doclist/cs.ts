@@ -80,4 +80,5 @@ export const cs = {
   dlBulkConfirmTitleOther: 'Přesunout dokumenty ({n}) do koše?',
   dlBulkConfirmBody:
     'Položky zůstanou v koši 30 dní a pak se trvale smažou. Položky, které nemůžete spravovat, se přeskočí.',
+  dlTrashBanner30: 'Položky zůstanou v koši 30 dní a pak se trvale smažou.',
 } satisfies Record<keyof typeof zh, string>

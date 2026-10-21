@@ -80,4 +80,6 @@ export const it = {
   dlBulkConfirmTitleOther: 'Spostare {n} documenti nel cestino?',
   dlBulkConfirmBody:
     'Gli elementi restano nel cestino per 30 giorni, poi vengono eliminati definitivamente. Quelli che non puoi gestire vengono saltati.',
+  dlTrashBanner30:
+    'Gli elementi restano nel cestino per 30 giorni, poi vengono eliminati definitivamente.',
 } satisfies Record<keyof typeof zh, string>

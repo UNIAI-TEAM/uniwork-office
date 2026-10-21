@@ -80,4 +80,5 @@ export const ko = {
   dlBulkConfirmTitleOther: '문서 {n}개를 휴지통으로 이동할까요?',
   dlBulkConfirmBody:
     '항목은 휴지통에 30일 동안 보관된 뒤 영구 삭제됩니다. 관리 권한이 없는 항목은 건너뜁니다.',
+  dlTrashBanner30: '항목은 휴지통에 30일 동안 보관된 뒤 영구 삭제됩니다.',
 } satisfies Record<keyof typeof zh, string>

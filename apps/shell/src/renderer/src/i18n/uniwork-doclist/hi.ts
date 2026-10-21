@@ -80,4 +80,5 @@ export const hi = {
   dlBulkConfirmTitleOther: '{n} दस्तावेज़ ट्रैश में ले जाएँ?',
   dlBulkConfirmBody:
     'आइटम 30 दिन तक ट्रैश में रहते हैं, फिर हमेशा के लिए हटा दिए जाते हैं। जिन आइटम को आप प्रबंधित नहीं कर सकते, वे छोड़ दिए जाएँगे।',
+  dlTrashBanner30: 'आइटम 30 दिन तक ट्रैश में रहते हैं, फिर हमेशा के लिए हटा दिए जाते हैं।',
 } satisfies Record<keyof typeof zh, string>
