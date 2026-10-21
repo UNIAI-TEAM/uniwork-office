@@ -327,6 +327,36 @@ describe('installFrameComments: only with the effective comments capability', ()
     expect(target.uniworkComments).toBe(api)
   })
 
+  it('publishes window.uniworkAvatars (a loader factory on the frame token) with comments', async () => {
+    const p = framePort()
+    const target: Record<string, unknown> = {}
+    const port = {
+      ...p.port,
+      getToken: async () => 'tok-1',
+      refreshToken: async () => 'tok-2',
+    }
+    const pending = installFrameComments(port, {}, target)
+    p.mock.init()
+    await pending
+    const frame = target.uniworkAvatars as { createSource(): { load: unknown; dispose(): void } }
+    const a = frame.createSource()
+    const b = frame.createSource()
+    expect(a).not.toBe(b)
+    expect(a.load).toBeTypeOf('function')
+    a.dispose()
+    b.dispose()
+  })
+
+  it('publishes no avatar loader for a client without a frame token', async () => {
+    const p = framePort()
+    const target: Record<string, unknown> = {}
+    const pending = installFrameComments(p.port, {}, target)
+    p.mock.init()
+    await pending
+    expect(target.uniworkAvatars).toBeUndefined()
+    expect(target.uniworkComments).toBeDefined()
+  })
+
   it('installs nothing and sends nothing without it', async () => {
     const p = framePort({ comments: false })
     const target: Record<string, unknown> = {}

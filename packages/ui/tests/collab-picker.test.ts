@@ -11,6 +11,7 @@ import {
   useMentionSearch,
   type MentionRow,
 } from '../src/collab/MentionPicker'
+import { AvatarSourceProvider, type AvatarSource } from '../src/collab/avatar-source'
 import {
   PICKER_STRINGS,
   candidate,
@@ -345,5 +346,69 @@ describe('useMentionSearch', () => {
     expect(latest.rows).toEqual([])
     mount(source, 'm')
     expect(texts()).toEqual(['Searching…'])
+  })
+})
+
+describe('MentionPicker avatars (UNI-1986)', () => {
+  const PATH = '/api/v1/office-frame/documents/01HDOC/avatars/01HUSER'
+  const withAvatar = (url: string): MentionRow[] => [
+    { kind: 'candidate', key: 'a', candidate: { ...candidate('a', 'Minh Anh'), avatar_url: url } },
+  ]
+
+  async function renderWith(rows: MentionRow[], avatars: AvatarSource | null) {
+    await act(async () => {
+      root.render(
+        createElement(
+          AvatarSourceProvider,
+          { value: avatars },
+          createElement(MentionPicker, {
+            listboxId: 'lb',
+            label: 'Mention someone',
+            rows,
+            activeIndex: 0,
+            onPick: vi.fn(),
+          }),
+        ),
+      )
+      await Promise.resolve()
+    })
+  }
+
+  const avatar = () => host.querySelector('.collab-mention-avatar')!
+
+  it('loads a same-origin avatar path through the frame source and shows the blob url', async () => {
+    const source = { load: vi.fn(async () => 'blob:https://app/1') }
+    await renderWith(withAvatar(PATH), source)
+    expect(source.load).toHaveBeenCalledWith(PATH, expect.any(AbortSignal))
+    expect(avatar().querySelector('img')!.getAttribute('src')).toBe('blob:https://app/1')
+  })
+
+  it('shows initials while loading and when the source answers null', async () => {
+    let resolve!: (v: string | null) => void
+    const source = { load: vi.fn(() => new Promise<string | null>((r) => (resolve = r))) }
+    await renderWith(withAvatar(PATH), source)
+    expect(avatar().querySelector('img')).toBeNull()
+    expect(avatar().textContent).toBe('MA')
+    await act(async () => {
+      resolve(null)
+      await Promise.resolve()
+    })
+    expect(avatar().querySelector('img')).toBeNull()
+    expect(avatar().textContent).toBe('MA')
+  })
+
+  it('without a provider the url is used as before', async () => {
+    await renderWith(withAvatar('https://x/a.png'), null)
+    expect(avatar().querySelector('img')!.getAttribute('src')).toBe('https://x/a.png')
+  })
+
+  it('a failing image falls back to initials', async () => {
+    await renderWith(withAvatar('https://x/a.png'), null)
+    await act(async () => {
+      avatar().querySelector('img')!.dispatchEvent(new Event('error'))
+      await Promise.resolve()
+    })
+    expect(avatar().querySelector('img')).toBeNull()
+    expect(avatar().textContent).toBe('MA')
   })
 })
