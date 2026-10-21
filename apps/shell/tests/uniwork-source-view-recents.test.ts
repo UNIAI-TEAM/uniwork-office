@@ -42,7 +42,7 @@ async function openOne(name: string, extension: string): Promise<string> {
     sizeBytes: 1,
     updatedAt: 't',
     origin: 'chat',
-    parent: { kind: 'chat', title: 'x' },
+    parent: { kind: 'chat_channel', title: 'x' },
   })
   opener.disposeSync()
   if (!res.ok) throw new Error(res.error)

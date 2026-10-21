@@ -23,9 +23,10 @@ export function sourceOriginKeyOf(origin: string): StringKey | null {
 
 /**
  * The line under a source file's name on Từ nơi khác: where it came from, "Sent in Chat · #channel"
- * (V-STATES F-04, VS-3), from the row's module and its parent's title. A chat parent is a channel, so
- * it gets a "#" unless its title already has one. A parent without a title leaves the module alone;
- * a module this build has no name for shows its parent only; neither shows nothing.
+ * (V-STATES F-04, VS-3), from the row's module and its parent's title. Only a `chat_channel` parent
+ * gets a "#" (unless its title already has one): a `chat_dm` is a person or a group room. A parent
+ * without a title leaves the module alone; a module this build has no name for shows its parent
+ * only; neither shows nothing.
  */
 export function sourceOriginLine(
   source: Pick<UniworkSourceFile, 'source' | 'parent'>,
@@ -33,7 +34,8 @@ export function sourceOriginLine(
 ): string | null {
   const key = sourceOriginKeyOf(source.source)
   const title = source.parent.title.trim()
-  const parent = source.source === 'chat' && title && !title.startsWith('#') ? `#${title}` : title
+  const parent =
+    source.parent.kind === 'chat_channel' && title && !title.startsWith('#') ? `#${title}` : title
   return [key ? t(key) : '', parent].filter(Boolean).join(' · ') || null
 }
 

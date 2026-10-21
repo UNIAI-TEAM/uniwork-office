@@ -41,7 +41,7 @@ const ok = <T>(value: T): UniworkResult<T> => ({ ok: true, value })
 
 const source = (partial: Partial<UniworkSourceFile> & { id: string }): UniworkSourceFile => ({
   source: 'chat',
-  parent: { kind: 'chat', id: 'room-1', title: 'Phòng dự án' },
+  parent: { kind: 'chat_channel', id: 'room-1', title: 'Phòng dự án' },
   name: `${partial.id}.pdf`,
   mimeType: 'application/pdf',
   extension: 'pdf',

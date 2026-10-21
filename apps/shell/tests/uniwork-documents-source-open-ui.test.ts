@@ -101,7 +101,7 @@ describe('UNI-1993 Documents home: open a source file view only', () => {
         extension: 'pdf',
         mimeType: 'application/pdf',
         source: 'email',
-        parent: { kind: 'email', id: 'mail-1', title: 'Re: Báo giá Q4' },
+        parent: { kind: 'email_thread', id: 'mail-1', title: 'Re: Báo giá Q4' },
         updatedAt: '2026-10-17T08:00:00.000Z',
       }),
     ]
@@ -312,7 +312,7 @@ describe('UNI-1993 Documents home: open a source file view only', () => {
         sourceId: 'src-pdf',
         extension: 'pdf',
         origin: 'email',
-        parent: { kind: 'email', title: 'Re: Báo giá Q4' },
+        parent: { kind: 'email_thread', title: 'Re: Báo giá Q4' },
       }),
     )
     expect(api.uniworkDownloadSource).not.toHaveBeenCalled()

@@ -96,7 +96,7 @@ const input = (over: Partial<OpenSourceInput> = {}): OpenSourceInput => ({
   sizeBytes: BYTES.length,
   updatedAt: '2026-10-20T00:00:00Z',
   origin: 'chat',
-  parent: { kind: 'chat', title: 'Launch' },
+  parent: { kind: 'chat_channel', title: 'Launch' },
   ...over,
 })
 

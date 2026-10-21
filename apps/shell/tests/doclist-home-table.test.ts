@@ -58,7 +58,7 @@ const SOURCE: UniworkSourceFile = {
   updatedAt: iso(2026, 10, 20, 16, 30),
   source: 'chat',
   owner: { id: 'u-lan', name: 'Lan Nguyễn' },
-  parent: { kind: 'chat', title: 'Kế toán' },
+  parent: { kind: 'chat_channel', title: 'Kế toán' },
 } as unknown as UniworkSourceFile
 
 describe('DocumentsHome renders its screens through the shared table (UNI-2047 A2a)', () => {
