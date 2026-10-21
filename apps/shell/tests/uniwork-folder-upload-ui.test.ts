@@ -269,6 +269,40 @@ describe('folder / multi-file upload screens', () => {
       expect(d.textContent).toContain('Áp dụng cho mọi tệp trong lần tải lên này.')
     })
 
+    it.each([
+      ['vi', 'Thư mục của tôi'],
+      ['en', 'My Folder'],
+    ] as const)(
+      'FU-V2: a My Folder destination shows the localised name, not the stored title (%s)',
+      async (lang, expected) => {
+        await mount(lang)
+        await stage(
+          preflightOf({
+            mode: 'files',
+            rootName: undefined,
+            target: {
+              workspaceId: 'ws-1',
+              folderId: 'my1',
+              label: 'my-folder-raw',
+              myFolder: true,
+            },
+          }),
+        )
+        expect(dialog()?.querySelector('[data-testid="folder-upload-target"]')?.textContent).toBe(
+          expected,
+        )
+        expect(dialog()?.textContent).not.toContain('my-folder-raw')
+      },
+    )
+
+    it('FU-V2: a plain destination keeps its own title', async () => {
+      await mount('en')
+      await stage(preflightOf())
+      expect(
+        dialog()?.querySelector('[data-testid="folder-upload-target"]')?.textContent,
+      ).toBe('Báo cáo HĐQT Q4')
+    })
+
     it('en reads "1 file" at exactly one', async () => {
       await mount('en')
       await stage(preflightOf({ totals: { files: 1, bytes: 2900 } }))

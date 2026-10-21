@@ -1,6 +1,7 @@
 import { formatSizeMB } from '../../../shared/size-format'
 import { formatBytes } from '../doclist/format'
 import type { StringKey, TFunc } from '../locale'
+import { MY_FOLDER_LABEL_KEY } from '../uniwork-folders/uniwork-folders-model'
 import type {
   FolderUploadFailure,
   FolderUploadMode,
@@ -16,6 +17,11 @@ const GIB = 1024 * MIB
 /** one noun phrase whose English differs at 1 ("1 file" / "2 files"): the `One` key is read at exactly 1 */
 export function pluralKey<K extends string>(key: K, count: number): `${K}One` | K {
   return count === 1 ? (`${key}One` as `${K}One`) : key
+}
+
+/** the destination's name for the screen: My Folder is translated, any other folder keeps its own title */
+export function targetLabelOf(target: PreflightSDO['target'], t: TFunc): string {
+  return target.myFolder ? t(MY_FOLDER_LABEL_KEY) : target.label
 }
 
 export function formatCount(count: number, locale: string): string {

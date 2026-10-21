@@ -120,6 +120,7 @@ export function asPreflightSDO(raw: unknown): PreflightSDO | null {
       workspaceId: target.workspaceId,
       folderId: target.folderId as string | null,
       label: target.label,
+      ...(target.myFolder === true ? { myFolder: true as const } : {}),
     },
     totals: { files: totals.files, bytes: totals.bytes },
     skipped: r.skipped.map(skipOf).filter((skip): skip is BatchUploadSkip => skip !== null),
