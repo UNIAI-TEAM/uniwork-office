@@ -11,6 +11,7 @@
  * macOS). Open, Print and Close stay with the desktop menu / web host.
  */
 import {
+  ariaKeyshortcuts,
   createMatcher,
   currentShortcutPlatform,
   findShortcut,
@@ -153,6 +154,21 @@ export function markdownHint(
 /** a trailing "(⌘S)" / "(Ctrl+S)" of a translated label: the old hand-written hint */
 const TRAILING_HINT = /\s*[(（][^()（）]*(?:⌘|⌃|⌥|⇧|Ctrl|Cmd|Alt\b|Shift)[^()（）]*[)）]\s*$/
 
+/** `aria-keyshortcuts` value (`Control+S`, `Meta+S`) for a command on this platform and surface; '' when it has none */
+export function markdownAria(
+  command: MarkdownCommand,
+  platform: ShortcutPlatform = currentShortcutPlatform(),
+  surface: ShortcutSurface = markdownSurface(),
+): string {
+  const action = findShortcut('markdown', ROWS[command])
+  return action ? ariaKeyshortcuts(action, platform, surface) : ''
+}
+
+/** an accessible name: the label without any hand-written hint, never a chord (that is `markdownAria`) */
+export function markdownPlainLabel(label: string): string {
+  return label.replace(TRAILING_HINT, '')
+}
+
 /** a tooltip: the label without any hand-written hint, then the table's chord */
 export function withMarkdownHint(
   label: string,
@@ -160,7 +176,7 @@ export function withMarkdownHint(
   platform?: ShortcutPlatform,
   surface?: ShortcutSurface,
 ): string {
-  const bare = label.replace(TRAILING_HINT, '')
+  const bare = markdownPlainLabel(label)
   const hint = markdownHint(command, platform, surface)
   return hint ? `${bare} (${hint})` : bare
 }
