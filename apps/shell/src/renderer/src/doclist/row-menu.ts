@@ -23,6 +23,7 @@ export type RowMenuActionId =
   | 'unshelve'
   | 'trash'
   | 'restore'
+  | 'download'
   | 'details'
 
 export interface RowMenuItem extends FolderMenuItem {
@@ -48,6 +49,14 @@ export interface RowMenuInput {
    * human member, whatever the level); absent = the edit level, as rename and move read it.
    */
   canCreateInside?: boolean
+}
+
+/**
+ * UNI-2068: a row the bulk Download can take: a file, in the live list or on the shelf (the
+ * trash and a trashed row keep nothing to download). Pages and folders have no file.
+ */
+export function rowCanDownload(screen: DocListScreen, doc: DocumentsHomeDoc): boolean {
+  return screen !== 'trash' && doc.archived !== true && doc.kind === 'file'
 }
 
 // groups of the live screens: open | link | edit | keep (and the delete entry)
@@ -85,6 +94,7 @@ export function buildRowMenu({
 
   if (screen === 'shelved') {
     if (doc.kind !== 'folder') add('open', label('dlActOpen'), OPEN)
+    if (rowCanDownload(screen, doc)) add('download', label('dlActDownload'), OPEN)
     if (canManageShelved(doc)) {
       add('unshelve', label('dlActUnshelve'), OPEN)
       add('trash', label('dlActTrash'), KEEP, { danger: true, confirm: true })
@@ -101,6 +111,9 @@ export function buildRowMenu({
   // documents, trashed rows and My Folder out; it sits just before Sao chép link like the web's
   if (canShareRow(doc)) add('share', label('dlActShare'), LINK)
   if (doc.kind !== 'folder') add('copy-link', label('dlActCopyLink'), LINK)
+  // Tải xuống (UNI-2068): the bulk bar reads this entry for its gate; a host that gives the row
+  // menu no handler leaves the visible menu as it was
+  if (rowCanDownload(screen, doc)) add('download', label('dlActDownload'), LINK)
   // Gắn sao / Bỏ gắn sao (UNI-2047 B6): only the Starred list carries the star time, so a row that
   // has one offers Bỏ gắn sao and any other row Gắn sao (idempotent on the server); a viewer may star
   if (doc.kind !== 'folder') {

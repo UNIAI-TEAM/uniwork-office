@@ -25,6 +25,7 @@ import type {
   SourceViewResult,
   SourceViewState,
 } from '../../shared/source-view'
+import type { ZipDownloadBridge } from '../../shared/zip-download-api'
 import type { DocNameError, NewDocFormat } from './uniwork-docs-model'
 
 /**
@@ -269,6 +270,19 @@ export function downloadSource(
   input: UniworkSourceDownloadInput,
 ): Promise<UniworkResult<{ path: string | null }>> {
   return settleRead(actions().uniworkDownloadSource?.(input))
+}
+
+/**
+ * UNI-2068: the zip-download bridge (`window.aiOffice.zipDownload`), or null when this main does
+ * not have it: an older main leaves it absent and the bulk Download stays hidden.
+ */
+export function zipDownloadBridge(): ZipDownloadBridge | null {
+  if (typeof window === 'undefined') return null
+  const bridge = (window.aiOffice as unknown as { zipDownload?: ZipDownloadBridge } | undefined)
+    ?.zipDownload
+  return bridge && typeof bridge.start === 'function' && typeof bridge.downloadFile === 'function'
+    ? bridge
+    : null
 }
 
 /**

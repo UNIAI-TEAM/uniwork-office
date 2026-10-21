@@ -1,0 +1,135 @@
+/* UNI-2068 bulk Download progress and result bars. Chrome colors come from the shared tokens
+   only (CLAUDE.md theming rules). Placed by inline left / width from the main pane's box
+   (ZipDownloadBar); these are the fallback corner. */
+
+.zd-bars {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 115;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(var(--ui-vw) * 90));
+}
+
+.zd-bar {
+  padding: 10px 8px 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.zd-bar-ok {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.zd-bar-info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.zd-bar-warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.zd-bar-error {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.zd-bar-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.zd-bar-text {
+  min-width: 0;
+  flex: 1;
+  padding-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+.zd-bar-action,
+.zd-bar-close {
+  flex-shrink: 0;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.zd-bar-action {
+  padding: 0 8px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.zd-bar-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+}
+
+.zd-bar-action:hover,
+.zd-bar-close:hover {
+  background: var(--bg-hover-strong);
+}
+
+.zd-bar-action:focus-visible,
+.zd-bar-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* on a tinted bar the grey hover wash would drop the accent label under 4.5:1 in dark: the label
+   keeps the bar's own background and underlines, the close mark tints with its own colour */
+.zd-bar-ok .zd-bar-action:hover,
+.zd-bar-info .zd-bar-action:hover,
+.zd-bar-warn .zd-bar-action:hover,
+.zd-bar-error .zd-bar-action:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.zd-bar-ok .zd-bar-close:hover,
+.zd-bar-info .zd-bar-close:hover,
+.zd-bar-warn .zd-bar-close:hover,
+.zd-bar-error .zd-bar-close:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.zd-bar-lines {
+  margin: 6px 26px 0 0;
+  padding: 0 0 0 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.zd-bar-more {
+  list-style: none;
+  margin-left: -18px;
+  opacity: 0.85;
+}
+
+.zd-bar-meter {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 8px;
+  accent-color: var(--accent);
+}
