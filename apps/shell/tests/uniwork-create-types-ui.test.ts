@@ -39,6 +39,8 @@ async function flush(): Promise<void> {
 }
 
 const KINDS = ['page', 'docx', 'xlsx', 'pptx', 'md', 'html', 'pdf']
+// the Quick create strip keeps the first four (UNI-2047 N-05); the rest live in the New menu
+const QUICK_KINDS = KINDS.slice(0, 4)
 const LABELS_VI = ['UniNote', 'Văn bản', 'Bảng tính', 'Trình chiếu', 'Tệp Markdown', 'HTML', 'PDF']
 // the strip's pills: label, then the extension the pill shows
 const EXTS = ['UniWork', '.docx', '.xlsx', '.pptx', '.md', '.html', '.pdf']
@@ -202,14 +204,16 @@ describe('UW-CREATE-TYPES (UNI-1953) DocumentsHome', () => {
     document.querySelectorAll('.modal-backdrop, .uw-act').forEach((n) => n.remove())
   })
 
-  it('the Quick create strip lists the seven kinds in web order, UniNote first, with their extensions', async () => {
+  it('the Quick create strip lists UniNote, DOCX, XLSX and PPTX in web order with their extensions', async () => {
     await mount('vi')
     const pills = Array.from(host.querySelectorAll<HTMLElement>('.dh-quick-pill'))
-    expect(pills.map((p) => p.getAttribute('data-quick-format'))).toEqual(KINDS)
+    expect(pills.map((p) => p.getAttribute('data-quick-format'))).toEqual(QUICK_KINDS)
     expect(pills.map((p) => p.textContent?.trim())).toEqual(
-      LABELS_VI.map((label, i) => `${label}${EXTS[i]}`),
+      LABELS_VI.slice(0, 4).map((label, i) => `${label}${EXTS[i]}`),
     )
-    expect(pills.map((p) => p.querySelector('.dh-quick-ext')?.textContent)).toEqual(EXTS)
+    expect(pills.map((p) => p.querySelector('.dh-quick-ext')?.textContent)).toEqual(
+      EXTS.slice(0, 4),
+    )
     // every pill carries its type icon (the same marks the rows use)
     for (const pill of pills) expect(pill.querySelector('img, svg')).not.toBeNull()
   })
