@@ -241,15 +241,22 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
         onClick: native('paste'),
       },
       null,
-      { label: t('ribbonBold'), hint: '⌘B', onClick: onSel(() => styleActions.onFormat('bold')) },
+      {
+        label: t('ribbonBold'),
+        hint: '⌘B',
+        keys: slidesAria('slides-48'),
+        onClick: onSel(() => styleActions.onFormat('bold')),
+      },
       {
         label: t('ribbonItalic'),
         hint: '⌘I',
+        keys: slidesAria('slides-49'),
         onClick: onSel(() => styleActions.onFormat('italic')),
       },
       {
         label: t('ribbonUnderline'),
         hint: '⌘U',
+        keys: slidesAria('slides-50'),
         onClick: onSel(() => styleActions.onFormat('underline')),
       },
       null,
