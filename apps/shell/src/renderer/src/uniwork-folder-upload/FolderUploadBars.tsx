@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import { announce } from '../uniwork-live'
 import { useI18n, type StringKey, type TFunc } from '../locale'
 import { pluralKey, runErrorMessage } from './copy'
@@ -207,7 +207,48 @@ function Bar({
   )
 }
 
-/** One overall bar per run (never one per file), stacked at the foot of the library */
+const BARS_GUTTER = 16
+const BARS_MAX_WIDTH = 380
+
+/**
+ * FU-V3: the bars belong to the main pane (the library), not to the window's
+ * bottom-left corner where they covered the sidebar's own entries. The pane
+ * is measured, so the bars keep the same 16px gutter and 380px cap inside it;
+ * with no pane on screen (a host without one) the stylesheet's corner holds.
+ */
+function useMainPaneBars(active: boolean): CSSProperties | undefined {
+  const [style, setStyle] = useState<CSSProperties | undefined>(undefined)
+  useLayoutEffect(() => {
+    if (!active) return
+    const pane = document.querySelector<HTMLElement>('.dh-main')
+    if (!pane) {
+      setStyle(undefined)
+      return
+    }
+    const measure = () => {
+      const box = pane.getBoundingClientRect()
+      if (box.width <= 0) {
+        setStyle(undefined)
+        return
+      }
+      setStyle({
+        left: box.left + BARS_GUTTER,
+        width: Math.min(BARS_MAX_WIDTH, box.width - BARS_GUTTER * 2),
+      })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null
+    observer?.observe(pane)
+    return () => {
+      window.removeEventListener('resize', measure)
+      observer?.disconnect()
+    }
+  }, [active])
+  return style
+}
+
+/** One overall bar per run (never one per file), stacked at the foot of the main pane */
 export function FolderUploadBars({
   runs,
   onCancel,
@@ -222,9 +263,10 @@ export function FolderUploadBars({
   onClose: (runId: string) => void
 }) {
   const { t } = useI18n()
+  const paneStyle = useMainPaneBars(runs.length > 0)
   if (runs.length === 0) return null
   return (
-    <div className="fu-bars" role="region" aria-label={t('uhUpload')}>
+    <div className="fu-bars" style={paneStyle} role="region" aria-label={t('uhUpload')}>
       {runs.map((run) => (
         <Bar
           key={run.runId}

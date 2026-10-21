@@ -38,10 +38,10 @@
 }
 
 .fu-note {
-  margin: 6px 0 0;
+  margin: 10px 0 0;
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .fu-summary {
@@ -247,7 +247,8 @@
   line-height: 1.4;
 }
 
-/* one bar per run, stacked at the foot of the library; above the library dialogs, under the error toast */
+/* one bar per run, stacked at the foot of the main pane; above the library dialogs, under the error toast.
+   left / width are set inline from the pane's box (FolderUploadBars); these are the fallback corner */
 .fu-bars {
   position: fixed;
   bottom: 16px;
@@ -333,6 +334,23 @@
 .fu-bar-action:hover,
 .fu-bar-close:hover {
   background: var(--bg-hover-strong);
+}
+
+/* FU-V4: on a tinted bar the grey hover wash dropped the accent label under 4.5:1 in dark;
+   the label keeps the bar's own background and underlines instead, the close mark tints with its own colour */
+.fu-bar-ok .fu-bar-action:hover,
+.fu-bar-info .fu-bar-action:hover,
+.fu-bar-warn .fu-bar-action:hover,
+.fu-bar-error .fu-bar-action:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.fu-bar-ok .fu-bar-close:hover,
+.fu-bar-info .fu-bar-close:hover,
+.fu-bar-warn .fu-bar-close:hover,
+.fu-bar-error .fu-bar-close:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 
 .fu-bar-meter {

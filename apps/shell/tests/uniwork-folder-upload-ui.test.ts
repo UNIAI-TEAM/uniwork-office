@@ -526,6 +526,27 @@ describe('folder / multi-file upload screens', () => {
       expect(bars()[0]!.textContent).toContain('Đang tải lên — 3/12 tệp')
     })
 
+    it('FU-V3: the bars sit in the main pane, not over the sidebar, and keep the 380px / 16px rules', async () => {
+      const main = document.createElement('div')
+      main.className = 'dh-main'
+      const rect = { left: 300, right: 900, top: 0, bottom: 700, width: 600, height: 700 }
+      main.getBoundingClientRect = () => ({ ...rect, x: rect.left, y: rect.top, toJSON: () => rect })
+      document.body.appendChild(main)
+      await mount()
+      await start()
+      const region = document.querySelector<HTMLElement>('.fu-bars')!
+      expect(region.style.left).toBe('316px')
+      expect(region.style.width).toBe('380px')
+      // a narrow pane: the bar shrinks to the pane minus the two gutters
+      rect.width = 300
+      rect.right = 600
+      await act(async () => {
+        window.dispatchEvent(new Event('resize'))
+      })
+      expect(region.style.width).toBe('268px')
+      main.remove()
+    })
+
     it('applies progress that arrives before the start call has answered', async () => {
       let resolveStart!: (v: { ok: true; runId: string }) => void
       bridge.start.mockImplementationOnce(() => new Promise((resolve) => (resolveStart = resolve)))
