@@ -94,6 +94,9 @@ export const it = {
   dlStarredUnavailableTitle: 'Gli Speciali non sono ancora disponibili su questo server',
   dlStarredUnavailableHint:
     'Il tuo server UniWork deve essere aggiornato per conservare i documenti speciali. Chiedi a un amministratore di aggiornarlo, poi riprova.',
+  dlElsewhereUnavailableTitle: 'Da altrove non è ancora disponibile su questo server',
+  dlElsewhereUnavailableHint:
+    'Il tuo server UniWork deve essere aggiornato per mostrare i file inviati in Chat, Riunioni, Email e Attività. Chiedi a un amministratore di aggiornarlo, poi riprova.',
   dlSourceSentIn: 'Inviato in {origin}',
   dlSearchNoResults: 'Nessun risultato per “{query}”',
 } satisfies Record<keyof typeof zh, string>

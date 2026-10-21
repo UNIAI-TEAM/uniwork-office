@@ -94,6 +94,9 @@ export const nl = {
   dlStarredUnavailableTitle: 'Met ster is nog niet beschikbaar op deze server',
   dlStarredUnavailableHint:
     'Je UniWork-server moet worden bijgewerkt om documenten met een ster te kunnen bewaren. Vraag een beheerder om de update en probeer het daarna opnieuw.',
+  dlElsewhereUnavailableTitle: 'Van elders is nog niet beschikbaar op deze server',
+  dlElsewhereUnavailableHint:
+    'Je UniWork-server moet worden bijgewerkt om bestanden uit Chat, Vergaderingen, E-mail en Taken te kunnen tonen. Vraag een beheerder om de update en probeer het daarna opnieuw.',
   dlSourceSentIn: 'Verstuurd in {origin}',
   dlSearchNoResults: 'Geen resultaten voor “{query}”',
 } satisfies Record<keyof typeof zh, string>

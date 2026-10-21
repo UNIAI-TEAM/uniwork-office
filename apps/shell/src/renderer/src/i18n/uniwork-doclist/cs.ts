@@ -92,6 +92,9 @@ export const cs = {
   dlStarredUnavailableTitle: 'Dokumenty s hvězdičkou zatím na tomto serveru nejsou dostupné',
   dlStarredUnavailableHint:
     'Server UniWork je potřeba aktualizovat, aby uměl ukládat dokumenty s hvězdičkou. Požádejte správce o aktualizaci a zkuste to znovu.',
+  dlElsewhereUnavailableTitle: 'Soubory odjinud zatím na tomto serveru nejsou dostupné',
+  dlElsewhereUnavailableHint:
+    'Server UniWork je potřeba aktualizovat, aby uměl zobrazit soubory odeslané v chatu, schůzkách, e-mailech a úkolech. Požádejte správce o aktualizaci a zkuste to znovu.',
   dlSourceSentIn: 'Odesláno v: {origin}',
   dlSearchNoResults: 'Nic nenalezeno pro „{query}“',
 } satisfies Record<keyof typeof zh, string>

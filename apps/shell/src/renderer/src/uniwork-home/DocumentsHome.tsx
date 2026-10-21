@@ -1303,7 +1303,16 @@ export function DocumentsHome({
       : page.status === 'error'
         ? (page.error ?? 'server_error')
         : null
-  const starredUnavailable = starredView && listError === 'not_found'
+  // V-STATES F-03 / RV-1: an older server has no route for these two pages (404): they say so
+  // instead of the "document no longer exists" line; every other error is the generic list error
+  const unavailablePage: 'starred' | 'elsewhere' | null =
+    listError !== 'not_found' ? null : starredView ? 'starred' : elsewhereView ? 'elsewhere' : null
+  const unavailableKeys =
+    unavailablePage === 'starred'
+      ? ({ title: 'dlStarredUnavailableTitle', hint: 'dlStarredUnavailableHint' } as const)
+      : unavailablePage === 'elsewhere'
+        ? ({ title: 'dlElsewhereUnavailableTitle', hint: 'dlElsewhereUnavailableHint' } as const)
+        : null
   const [shelvedBy, setShelvedBy] = useState<string | null>(null)
   useEffect(() => {
     setShelvedBy(null)
@@ -2239,15 +2248,13 @@ export function DocumentsHome({
         {listError && (
           <ListState
             kind="error"
-            // V-STATES F-03: an older server has no favorites route (404): Starred says so, it is
-            // not the "document no longer exists" line, and Thử lại asks again
-            glyph={starredUnavailable ? 'star' : 'error'}
-            title={
-              starredUnavailable ? t('dlStarredUnavailableTitle') : t(UNIWORK_ERROR_KEYS[listError])
-            }
-            hint={starredUnavailable ? t('dlStarredUnavailableHint') : undefined}
+            glyph={unavailablePage === 'starred' ? 'star' : 'error'}
+            title={unavailableKeys ? t(unavailableKeys.title) : t(UNIWORK_ERROR_KEYS[listError])}
+            hint={unavailableKeys ? t(unavailableKeys.hint) : undefined}
+            // Thử lại where asking again can help: a missing route (the server may be updated) and
+            // the transient codes; never a sign-in problem
             action={
-              starredView || errorActionOf(listError) === 'retry'
+              unavailableKeys || errorActionOf(listError) === 'retry'
                 ? { label: t('acctRetry'), onClick: () => setListTick((n) => n + 1) }
                 : undefined
             }

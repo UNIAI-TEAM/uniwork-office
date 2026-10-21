@@ -90,6 +90,9 @@ export const zhTW = {
   dlStarredUnavailableTitle: '此伺服器尚未支援星號',
   dlStarredUnavailableHint:
     '你的 UniWork 伺服器需要更新後才能儲存加星號的文件。請聯絡管理員更新，然後再試一次。',
+  dlElsewhereUnavailableTitle: '此伺服器尚未支援「來自其他位置」',
+  dlElsewhereUnavailableHint:
+    '你的 UniWork 伺服器需要更新後才能顯示聊天、會議、郵件和任務中傳送的檔案。請聯絡管理員更新，然後再試一次。',
   dlSourceSentIn: '傳送於{origin}',
   dlSearchNoResults: '找不到「{query}」的結果',
 } satisfies Record<keyof typeof zh, string>

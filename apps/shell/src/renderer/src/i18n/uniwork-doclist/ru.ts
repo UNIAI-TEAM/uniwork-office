@@ -92,6 +92,9 @@ export const ru = {
   dlStarredUnavailableTitle: 'Помеченные пока недоступны на этом сервере',
   dlStarredUnavailableHint:
     'Сервер UniWork нужно обновить, чтобы он мог хранить помеченные документы. Попросите администратора обновить его и повторите попытку.',
+  dlElsewhereUnavailableTitle: 'Раздел «Из других мест» пока недоступен на этом сервере',
+  dlElsewhereUnavailableHint:
+    'Сервер UniWork нужно обновить, чтобы он мог показывать файлы, отправленные в чате, встречах, почте и задачах. Попросите администратора обновить его и повторите попытку.',
   dlSourceSentIn: 'Отправлено в разделе «{origin}»',
   dlSearchNoResults: 'Ничего не найдено по запросу «{query}»',
 } satisfies Record<keyof typeof zh, string>

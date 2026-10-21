@@ -94,6 +94,9 @@ export const es = {
   dlStarredUnavailableTitle: 'Destacados aún no está disponible en este servidor',
   dlStarredUnavailableHint:
     'Tu servidor de UniWork necesita una actualización para guardar documentos destacados. Pide a un administrador que lo actualice y vuelve a intentarlo.',
+  dlElsewhereUnavailableTitle: 'De otros lugares aún no está disponible en este servidor',
+  dlElsewhereUnavailableHint:
+    'Tu servidor de UniWork necesita una actualización para mostrar los archivos enviados en Chat, Reuniones, Correo y Tareas. Pide a un administrador que lo actualice y vuelve a intentarlo.',
   dlSourceSentIn: 'Enviado en {origin}',
   dlSearchNoResults: 'Sin resultados para «{query}»',
 } satisfies Record<keyof typeof zh, string>

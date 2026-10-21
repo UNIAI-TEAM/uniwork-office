@@ -90,6 +90,9 @@ export const th = {
   dlStarredUnavailableTitle: 'เซิร์ฟเวอร์นี้ยังไม่รองรับรายการติดดาว',
   dlStarredUnavailableHint:
     'เซิร์ฟเวอร์ UniWork ของคุณต้องอัปเดตก่อนจึงจะเก็บเอกสารที่ติดดาวได้ โปรดขอให้ผู้ดูแลระบบอัปเดต แล้วลองอีกครั้ง',
+  dlElsewhereUnavailableTitle: 'เซิร์ฟเวอร์นี้ยังไม่รองรับ “จากที่อื่น”',
+  dlElsewhereUnavailableHint:
+    'เซิร์ฟเวอร์ UniWork ของคุณต้องอัปเดตก่อนจึงจะแสดงไฟล์ที่ส่งในแชต การประชุม อีเมล และงานได้ โปรดขอให้ผู้ดูแลระบบอัปเดต แล้วลองอีกครั้ง',
   dlSourceSentIn: 'ส่งใน{origin}',
   dlSearchNoResults: 'ไม่พบผลลัพธ์สำหรับ “{query}”',
 } satisfies Record<keyof typeof zh, string>

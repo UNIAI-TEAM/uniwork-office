@@ -91,6 +91,9 @@ export const id = {
   dlStarredUnavailableTitle: 'Berbintang belum tersedia di server ini',
   dlStarredUnavailableHint:
     'Server UniWork Anda perlu diperbarui agar dapat menyimpan dokumen berbintang. Minta admin memperbaruinya, lalu coba lagi.',
+  dlElsewhereUnavailableTitle: 'Dari tempat lain belum tersedia di server ini',
+  dlElsewhereUnavailableHint:
+    'Server UniWork Anda perlu diperbarui agar dapat menampilkan file yang dikirim di Obrolan, Rapat, Email, dan Tugas. Minta admin memperbaruinya, lalu coba lagi.',
   dlSourceSentIn: 'Dikirim di {origin}',
   dlSearchNoResults: 'Tidak ada hasil untuk “{query}”',
 } satisfies Record<keyof typeof zh, string>

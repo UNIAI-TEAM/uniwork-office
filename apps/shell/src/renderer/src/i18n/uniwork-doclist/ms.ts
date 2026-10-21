@@ -93,6 +93,9 @@ export const ms = {
   dlStarredUnavailableTitle: 'Berbintang belum tersedia pada pelayan ini',
   dlStarredUnavailableHint:
     'Pelayan UniWork anda perlu dikemas kini sebelum dapat menyimpan dokumen berbintang. Minta pentadbir mengemas kininya, kemudian cuba lagi.',
+  dlElsewhereUnavailableTitle: 'Dari tempat lain belum tersedia pada pelayan ini',
+  dlElsewhereUnavailableHint:
+    'Pelayan UniWork anda perlu dikemas kini sebelum dapat memaparkan fail yang dihantar dalam Sembang, Mesyuarat, E-mel dan Tugasan. Minta pentadbir mengemas kininya, kemudian cuba lagi.',
   dlSourceSentIn: 'Dihantar dalam {origin}',
   dlSearchNoResults: 'Tiada hasil untuk “{query}”',
 } satisfies Record<keyof typeof zh, string>

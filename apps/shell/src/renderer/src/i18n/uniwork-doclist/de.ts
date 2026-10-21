@@ -92,6 +92,9 @@ export const de = {
   dlStarredUnavailableTitle: 'Markierte Dokumente sind auf diesem Server noch nicht verfügbar',
   dlStarredUnavailableHint:
     'Ihr UniWork-Server muss aktualisiert werden, damit er markierte Dokumente speichern kann. Bitten Sie eine Administratorin oder einen Administrator um das Update und versuchen Sie es dann erneut.',
+  dlElsewhereUnavailableTitle: 'Von anderswo ist auf diesem Server noch nicht verfügbar',
+  dlElsewhereUnavailableHint:
+    'Ihr UniWork-Server muss aktualisiert werden, damit er Dateien aus Chat, Meetings, E-Mail und Aufgaben anzeigen kann. Bitten Sie eine Administratorin oder einen Administrator um das Update und versuchen Sie es dann erneut.',
   dlSourceSentIn: 'Gesendet in {origin}',
   dlSearchNoResults: 'Keine Treffer für „{query}“',
 } satisfies Record<keyof typeof zh, string>

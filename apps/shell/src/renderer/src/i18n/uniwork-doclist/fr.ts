@@ -94,6 +94,9 @@ export const fr = {
   dlStarredUnavailableTitle: 'Les suivis ne sont pas encore disponibles sur ce serveur',
   dlStarredUnavailableHint:
     'Votre serveur UniWork doit être mis à jour pour conserver les documents suivis. Demandez à un administrateur de le mettre à jour, puis réessayez.',
+  dlElsewhereUnavailableTitle: "Depuis ailleurs n'est pas encore disponible sur ce serveur",
+  dlElsewhereUnavailableHint:
+    'Votre serveur UniWork doit être mis à jour pour afficher les fichiers envoyés dans le Chat, les Réunions, les E-mails et les Tâches. Demandez à un administrateur de le mettre à jour, puis réessayez.',
   dlSourceSentIn: 'Envoyé dans {origin}',
   dlSearchNoResults: 'Aucun résultat pour « {query} »',
 } satisfies Record<keyof typeof zh, string>

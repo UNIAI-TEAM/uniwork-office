@@ -91,6 +91,9 @@ export const en = {
   dlStarredUnavailableTitle: 'Starred is not available on this server yet',
   dlStarredUnavailableHint:
     'Your UniWork server needs an update before it can keep starred documents. Ask an admin to update it, then try again.',
+  dlElsewhereUnavailableTitle: 'From elsewhere is not available on this server yet',
+  dlElsewhereUnavailableHint:
+    'Your UniWork server needs an update before it can list files sent in Chat, Meetings, Email and Tasks. Ask an admin to update it, then try again.',
   dlSourceSentIn: 'Sent in {origin}',
   dlSearchNoResults: 'No results for “{query}”',
 } satisfies Record<keyof typeof zh, string>

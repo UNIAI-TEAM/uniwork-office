@@ -92,6 +92,9 @@ export const pl = {
   dlStarredUnavailableTitle: 'Oznaczone gwiazdką nie są jeszcze dostępne na tym serwerze',
   dlStarredUnavailableHint:
     'Serwer UniWork wymaga aktualizacji, aby przechowywać dokumenty oznaczone gwiazdką. Poproś administratora o aktualizację i spróbuj ponownie.',
+  dlElsewhereUnavailableTitle: 'Z innych miejsc nie jest jeszcze dostępne na tym serwerze',
+  dlElsewhereUnavailableHint:
+    'Serwer UniWork wymaga aktualizacji, aby wyświetlać pliki wysłane na czacie, w spotkaniach, e-mailach i zadaniach. Poproś administratora o aktualizację i spróbuj ponownie.',
   dlSourceSentIn: 'Wysłano w: {origin}',
   dlSearchNoResults: 'Brak wyników dla „{query}”',
 } satisfies Record<keyof typeof zh, string>

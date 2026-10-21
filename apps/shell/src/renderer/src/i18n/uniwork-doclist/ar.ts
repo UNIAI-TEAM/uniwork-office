@@ -92,6 +92,9 @@ export const ar = {
   dlStarredUnavailableTitle: 'المستندات المميزة بنجمة غير متاحة على هذا الخادم بعد',
   dlStarredUnavailableHint:
     'يحتاج خادم UniWork لديك إلى تحديث ليتمكن من حفظ المستندات المميزة بنجمة. اطلب من مسؤول تحديثه ثم حاول مرة أخرى.',
+  dlElsewhereUnavailableTitle: 'من أماكن أخرى غير متاحة على هذا الخادم بعد',
+  dlElsewhereUnavailableHint:
+    'يحتاج خادم UniWork لديك إلى تحديث ليتمكن من عرض الملفات المرسلة في الدردشة والاجتماعات والبريد والمهام. اطلب من مسؤول تحديثه ثم حاول مرة أخرى.',
   dlSourceSentIn: 'أُرسل في {origin}',
   dlSearchNoResults: 'لا توجد نتائج لـ “{query}”',
 } satisfies Record<keyof typeof zh, string>

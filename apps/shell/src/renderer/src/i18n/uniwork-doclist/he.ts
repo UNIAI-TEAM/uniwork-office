@@ -91,6 +91,9 @@ export const he = {
   dlStarredUnavailableTitle: 'מסומנים בכוכב עדיין לא זמינים בשרת הזה',
   dlStarredUnavailableHint:
     'שרת UniWork שלך צריך עדכון כדי לשמור מסמכים מסומנים בכוכב. בקשו ממנהל לעדכן אותו ונסו שוב.',
+  dlElsewhereUnavailableTitle: 'ממקומות אחרים עדיין לא זמין בשרת הזה',
+  dlElsewhereUnavailableHint:
+    'שרת UniWork שלך צריך עדכון כדי להציג קבצים שנשלחו בצ\'אט, בפגישות, בדוא"ל ובמשימות. בקשו ממנהל לעדכן אותו ונסו שוב.',
   dlSourceSentIn: 'נשלח ב{origin}',
   dlSearchNoResults: 'אין תוצאות עבור “{query}”',
 } satisfies Record<keyof typeof zh, string>

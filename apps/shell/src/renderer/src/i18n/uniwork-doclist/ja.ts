@@ -91,6 +91,9 @@ export const ja = {
   dlStarredUnavailableTitle: 'このサーバーではまだスター付きを利用できません',
   dlStarredUnavailableHint:
     'UniWork サーバーを更新すると、スター付きのドキュメントを保存できるようになります。管理者に更新を依頼してから、もう一度お試しください。',
+  dlElsewhereUnavailableTitle: 'このサーバーではまだ「他の場所から」を利用できません',
+  dlElsewhereUnavailableHint:
+    'UniWork サーバーを更新すると、チャット、会議、メール、タスクで送られたファイルを表示できるようになります。管理者に更新を依頼してから、もう一度お試しください。',
   dlSourceSentIn: '{origin}で送信',
   dlSearchNoResults: '「{query}」に一致する結果はありません',
 } satisfies Record<keyof typeof zh, string>
