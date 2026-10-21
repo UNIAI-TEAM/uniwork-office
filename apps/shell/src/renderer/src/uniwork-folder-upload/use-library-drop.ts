@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import { dragHasFiles, readDropped, type DroppedItem } from './drop'
 
@@ -37,6 +37,22 @@ export function useLibraryDrop({
   // dragenter / dragleave also fire for every child: only the depth reaching zero ends the hover
   const depth = useRef(0)
   const take = (event: ReactDragEvent) => enabled && dragHasFiles(event.dataTransfer)
+  const hovering = over !== null
+
+  // leaving the window mid-drag can eat the dragleave (Home's own overlay knows it too):
+  // while the hover shows, a window drop / dragend / blur ends it
+  useEffect(() => {
+    if (!hovering) return
+    const reset = () => {
+      depth.current = 0
+      setOver(null)
+    }
+    const events = ['drop', 'dragend', 'blur'] as const
+    for (const name of events) window.addEventListener(name, reset)
+    return () => {
+      for (const name of events) window.removeEventListener(name, reset)
+    }
+  }, [hovering])
   return {
     over: enabled ? over : null,
     handlers: {

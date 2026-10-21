@@ -166,6 +166,8 @@ export const it = {
   fuDlgShare: 'Condividi con lo spazio di lavoro',
   fuDlgShareHintFolder: 'Vale per ogni file di questo caricamento. Le cartelle restano private.',
   fuDlgShareHintFiles: 'Vale per ogni file di questo caricamento.',
+  fuDlgShareInherited:
+    'La cartella di destinazione è condivisa con lo spazio di lavoro, quindi lo sono anche i file.',
   fuDlgStarting: 'Preparazione…',
   fuDlgQueued: 'Ci sono altri {count} caricamenti in attesa.',
   fuDlgQueuedOne: 'Ce n’è ancora {count} in attesa.',
@@ -207,6 +209,15 @@ export const it = {
   fuBarCanceledNone: 'Caricamento annullato',
   fuBarFailed: 'Impossibile caricare «{name}»',
   fuBarFailedFiles: 'Impossibile caricare i file',
+  fuBarBusy: 'Ci sono troppi caricamenti di cartelle in corso. Riprova tra qualche minuto.',
+  fuBarBusyFiles: 'Ci sono troppi caricamenti in corso. Riprova tra qualche minuto.',
+  fuBarExpired:
+    'Il caricamento di «{name}» è scaduto — {done}/{total} file sono stati caricati. Carica di nuovo la cartella.',
+  fuBarExpiredFiles:
+    'Il caricamento è scaduto — {done}/{total} file sono stati caricati. Carica di nuovo i file.',
+  fuDestForbidden: 'Non hai l’autorizzazione per caricare nella cartella di destinazione.',
+  fuDestNotFound:
+    'La cartella di destinazione non è stata trovata. Potrebbe essere stata eliminata o spostata.',
   fuDropTitle: 'Rilascia per caricare',
   fuDropHint: 'File e cartelle andranno in «{target}»',
   fuDropUnavailable:

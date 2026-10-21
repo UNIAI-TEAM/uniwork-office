@@ -39,7 +39,7 @@ export function FolderUploadDialog({
     setExpanded(new Set())
   }, [preflight.preflightId])
 
-  const { mode, refusal, totals } = preflight
+  const { mode, refusal, totals, parentShared } = preflight
   const folderMode = mode === 'folder'
   const title = folderMode ? (preflight.rootNamePreview ?? preflight.rootName ?? '') : ''
   const renamed =
@@ -60,7 +60,8 @@ export function FolderUploadDialog({
   const submit = () => {
     if (refusal || starting) return
     // no switch (the server cannot share on upload) = private
-    onSubmit({ shareWithWorkspace: preflight.shareAvailable && share })
+    // a destination that shares already covers the files: nothing to send
+    onSubmit({ shareWithWorkspace: preflight.shareAvailable && !parentShared && share })
   }
 
   return (
@@ -177,23 +178,25 @@ export function FolderUploadDialog({
         )}
         {!refusal && preflight.shareAvailable && (
           <div className="fu-share">
-            <div className="fu-share-row">
+            <label className="fu-share-row">
               <span id={`${id}-share`}>{t('fuDlgShare')}</span>
               <button
                 type="button"
                 role="switch"
                 className="fu-switch"
-                aria-checked={share}
+                aria-checked={parentShared || share}
                 aria-labelledby={`${id}-share`}
                 aria-describedby={`${id}-share-hint`}
-                aria-disabled={starting || undefined}
+                aria-disabled={parentShared || starting || undefined}
                 onClick={() => {
-                  if (!starting) setShare((prev) => !prev)
+                  if (!parentShared && !starting) setShare((prev) => !prev)
                 }}
               />
-            </div>
+            </label>
             <p id={`${id}-share-hint`} className="fu-note">
-              {t(folderMode ? 'fuDlgShareHintFolder' : 'fuDlgShareHintFiles')}
+              {parentShared
+                ? t('fuDlgShareInherited')
+                : t(folderMode ? 'fuDlgShareHintFolder' : 'fuDlgShareHintFiles')}
             </p>
           </div>
         )}

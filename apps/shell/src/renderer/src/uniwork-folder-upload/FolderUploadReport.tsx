@@ -13,12 +13,15 @@ export function FolderUploadReport({
 }: {
   run: FolderUploadRun
   onRetry: () => void
-  /** closing without a retry: the batch is dismissed */
+  /** Esc, the overlay and "Close" only close the report; the bar's × dismisses the batch */
   onClose: () => void
 }) {
   const { t } = useI18n()
   const id = useId()
-  const canRetry = hasRetryable(run.failures)
+  // a run that failed as a whole left nothing at the server to retry
+  const canRetry = run.phase === 'done' && hasRetryable(run.failures)
+  // the retry cannot help a final failure: say what to do, also next to the ones it can
+  const needsFix = !canRetry || run.failures.some((failure) => !failure.retryable)
   return (
     <ActionModal
       labelledBy={`${id}-title`}
@@ -44,7 +47,7 @@ export function FolderUploadReport({
           </li>
         ))}
       </ul>
-      {!canRetry && <p className="fu-note">{t('fuRepFinalHint')}</p>}
+      {needsFix && <p className="fu-note">{t('fuRepFinalHint')}</p>}
       <div className="modal-buttons">
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           {t('fuRepClose')}

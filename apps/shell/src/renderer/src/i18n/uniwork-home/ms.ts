@@ -169,6 +169,7 @@ export const ms = {
   fuDlgShare: 'Kongsi dengan ruang kerja',
   fuDlgShareHintFolder: 'Terpakai untuk setiap fail dalam muat naik ini. Folder kekal peribadi.',
   fuDlgShareHintFiles: 'Terpakai untuk setiap fail dalam muat naik ini.',
+  fuDlgShareInherited: 'Folder destinasi dikongsi dengan ruang kerja, jadi fail juga begitu.',
   fuDlgStarting: 'Menyediakan…',
   fuDlgQueued: '{count} lagi muat naik sedang menunggu.',
   fuDlgQueuedOne: '{count} lagi muat naik sedang menunggu.',
@@ -210,6 +211,14 @@ export const ms = {
   fuBarCanceledNone: 'Muat naik dibatalkan',
   fuBarFailed: 'Tidak dapat memuat naik “{name}”',
   fuBarFailedFiles: 'Tidak dapat memuat naik fail',
+  fuBarBusy: 'Terlalu banyak muat naik folder sedang berjalan. Cuba lagi dalam beberapa minit.',
+  fuBarBusyFiles: 'Terlalu banyak muat naik sedang berjalan. Cuba lagi dalam beberapa minit.',
+  fuBarExpired:
+    'Muat naik “{name}” telah tamat tempoh — {done}/{total} fail telah dimuat naik. Muat naik folder itu semula.',
+  fuBarExpiredFiles:
+    'Muat naik telah tamat tempoh — {done}/{total} fail telah dimuat naik. Muat naik fail itu semula.',
+  fuDestForbidden: 'Anda tiada kebenaran untuk memuat naik ke folder destinasi.',
+  fuDestNotFound: 'Folder destinasi tidak ditemui. Ia mungkin telah dipadam atau dialihkan.',
   fuDropTitle: 'Lepaskan untuk memuat naik',
   fuDropHint: 'Fail dan folder akan dimasukkan ke “{target}”',
   fuDropUnavailable: 'Muat naik folder tidak tersedia di sini. Lepaskan fail satu demi satu.',

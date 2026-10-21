@@ -65,6 +65,26 @@ describe('the folder-upload run store', () => {
     })
   })
 
+  it('keeps the whole-run error of a failed event (RV-FE #4)', () => {
+    const bridge = createFakeFolderUploadBridge()
+    attachFolderUploadStore(bridge)
+    startFolderUploadRun(bridge, run())
+    bridge.emit(
+      progressOf({
+        phase: 'failed',
+        done: 12,
+        error: { code: 'folder_uploads_busy', retryAfterSeconds: 30 },
+      }),
+    )
+    expect(folderUploadRuns(bridge)[0]).toMatchObject({
+      phase: 'failed',
+      error: { code: 'folder_uploads_busy', retryAfterSeconds: 30 },
+    })
+    // a later event without an error does not wipe it
+    bridge.emit(progressOf({ phase: 'failed', done: 12 }))
+    expect(folderUploadRuns(bridge)[0]!.error?.code).toBe('folder_uploads_busy')
+  })
+
   it('files mode keeps the destination name whatever the event says', () => {
     const bridge = createFakeFolderUploadBridge()
     attachFolderUploadStore(bridge)

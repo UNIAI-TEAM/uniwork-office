@@ -1,12 +1,20 @@
 import { useEffect } from 'react'
 import { announce } from '../uniwork-live'
 import { useI18n, type StringKey, type TFunc } from '../locale'
-import { pluralKey } from './copy'
+import { pluralKey, runErrorMessage } from './copy'
 import type { FolderUploadRun } from './use-folder-upload'
 import './folder-upload.css'
 
 const SUCCESS_MS = 10_000
 const CANCELED_MS = 6_000
+
+/**
+ * `${runId}:${phase}` of every end state already said, for the life of the
+ * window: a bar that mounts again (a screen came back, a retry changed the
+ * count) must not say the same end again.
+ */
+const announced = new Set<string>()
+const END_PHASES = ['done', 'canceled', 'failed'] as const
 
 type Tone = 'progress' | 'ok' | 'info' | 'warn' | 'error'
 
@@ -64,9 +72,12 @@ function view(
     case 'failed':
       return {
         tone: 'error',
-        text: t(folder ? 'fuBarFailed' : 'fuBarFailedFiles', { name: run.name }),
+        text:
+          runErrorMessage(t, run.error, run) ??
+          t(folder ? 'fuBarFailed' : 'fuBarFailedFiles', { name: run.name }),
         percent: null,
-        action: null,
+        // a failed run that set files aside (could not open them) can say which
+        action: run.failures.length > 0 ? { label: 'fuBarView', onClick: handlers.onView } : null,
         cancelable: false,
         clock: null,
       }
@@ -117,12 +128,20 @@ function Bar({
   const bar = view(t, run, { onOpenFolder, onView: onOpenReport })
   const settled = bar.tone !== 'progress'
 
-  // an end state is said once; the running count is never announced (it changes too often)
+  // an end state is said once per run and phase; the running count is never announced (it changes too often)
   useEffect(() => {
-    if (settled) announce(bar.text, { assertive: bar.tone === 'warn' || bar.tone === 'error' })
+    if (!settled) {
+      // a retry is under way: its next end is news again
+      for (const phase of END_PHASES) announced.delete(`${run.runId}:${phase}`)
+      return
+    }
+    const key = `${run.runId}:${run.phase}`
+    if (announced.has(key)) return
+    announced.add(key)
+    announce(bar.text, { assertive: bar.tone === 'warn' || bar.tone === 'error' })
     // the text is the change; `t` is not stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settled, bar.text])
+  }, [settled, run.runId, run.phase])
 
   useEffect(() => {
     if (bar.clock === null) return

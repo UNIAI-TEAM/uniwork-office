@@ -170,6 +170,7 @@ export const pl = {
   fuDlgShare: 'Udostępnij obszarowi roboczemu',
   fuDlgShareHintFolder: 'Dotyczy każdego pliku w tym przesłaniu. Foldery pozostają prywatne.',
   fuDlgShareHintFiles: 'Dotyczy każdego pliku w tym przesłaniu.',
+  fuDlgShareInherited: 'Folder docelowy jest udostępniony obszarowi roboczemu, więc pliki również.',
   fuDlgStarting: 'Przygotowywanie…',
   fuDlgQueued: 'Czeka jeszcze {count} przesłań.',
   fuDlgQueuedOne: 'Czeka jeszcze {count} przesłanie.',
@@ -211,6 +212,14 @@ export const pl = {
   fuBarCanceledNone: 'Anulowano przesyłanie',
   fuBarFailed: 'Nie udało się przesłać „{name}”',
   fuBarFailedFiles: 'Nie udało się przesłać plików',
+  fuBarBusy: 'Trwa zbyt wiele przesyłań folderów. Spróbuj ponownie za kilka minut.',
+  fuBarBusyFiles: 'Trwa zbyt wiele przesyłań. Spróbuj ponownie za kilka minut.',
+  fuBarExpired:
+    'Przesyłanie „{name}” wygasło — przesłano {done}/{total} plików. Prześlij folder ponownie.',
+  fuBarExpiredFiles:
+    'Przesyłanie wygasło — przesłano {done}/{total} plików. Prześlij pliki ponownie.',
+  fuDestForbidden: 'Nie masz uprawnień do przesyłania do folderu docelowego.',
+  fuDestNotFound: 'Nie znaleziono folderu docelowego. Mógł zostać usunięty lub przeniesiony.',
   fuDropTitle: 'Upuść, aby przesłać',
   fuDropHint: 'Pliki i foldery trafią do „{target}”',
   fuDropUnavailable: 'Przesyłanie folderów nie jest tutaj dostępne. Upuszczaj pliki pojedynczo.',

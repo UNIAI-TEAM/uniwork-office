@@ -161,6 +161,12 @@
   gap: 12px;
   color: var(--text);
   font-size: 13px;
+  cursor: pointer;
+}
+
+/* a locked switch (the destination already shares) is not a click target */
+.fu-share-row:has(.fu-switch[aria-disabled='true']) {
+  cursor: default;
 }
 
 .fu-switch {

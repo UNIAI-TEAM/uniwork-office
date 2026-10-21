@@ -28,7 +28,11 @@ export interface StoredFolderUploadRun {
   total: number
   rootFolderId?: string
   failures: FolderUploadFailure[]
+  /** the run as a whole failed: why (busy, expired, no permission...), for the bar's sentence */
+  error?: FolderUploadRunError
 }
+
+export type FolderUploadRunError = NonNullable<FolderUploadProgressEvent['error']>
 
 const TERMINAL: readonly FolderUploadPhase[] = ['done', 'canceled', 'failed']
 /** events of a run the start call has not named yet are kept for this many runs */
@@ -68,6 +72,7 @@ function applyEvent(event: FolderUploadProgressEvent): void {
           rootFolderId: event.rootFolderId ?? run.rootFolderId,
           name: run.mode === 'folder' ? (event.rootTitle ?? run.name) : run.name,
           failures: event.failures ?? run.failures,
+          error: event.error ?? run.error,
         },
   )
   emit()

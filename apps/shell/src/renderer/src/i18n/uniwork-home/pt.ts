@@ -168,6 +168,8 @@ export const pt = {
   fuDlgShare: 'Compartilhar com o espaço de trabalho',
   fuDlgShareHintFolder: 'Vale para todos os arquivos deste envio. As pastas continuam privadas.',
   fuDlgShareHintFiles: 'Vale para todos os arquivos deste envio.',
+  fuDlgShareInherited:
+    'A pasta de destino está compartilhada com o espaço de trabalho, então os arquivos também estão.',
   fuDlgStarting: 'Preparando…',
   fuDlgQueued: 'Há mais {count} envios aguardando.',
   fuDlgQueuedOne: 'Há mais {count} envio aguardando.',
@@ -209,6 +211,14 @@ export const pt = {
   fuBarCanceledNone: 'Envio cancelado',
   fuBarFailed: 'Não foi possível enviar “{name}”',
   fuBarFailedFiles: 'Não foi possível enviar os arquivos',
+  fuBarBusy: 'Há envios de pastas demais em andamento. Tente novamente em alguns minutos.',
+  fuBarBusyFiles: 'Há envios demais em andamento. Tente novamente em alguns minutos.',
+  fuBarExpired:
+    'O envio de “{name}” expirou — {done}/{total} arquivos foram enviados. Envie a pasta novamente.',
+  fuBarExpiredFiles:
+    'O envio expirou — {done}/{total} arquivos foram enviados. Envie os arquivos novamente.',
+  fuDestForbidden: 'Você não tem permissão para enviar para a pasta de destino.',
+  fuDestNotFound: 'A pasta de destino não foi encontrada. Ela pode ter sido excluída ou movida.',
   fuDropTitle: 'Solte para enviar',
   fuDropHint: 'Arquivos e pastas irão para “{target}”',
   fuDropUnavailable: 'O envio de pastas não está disponível aqui. Solte os arquivos um por um.',
