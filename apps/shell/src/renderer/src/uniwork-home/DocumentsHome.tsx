@@ -1502,7 +1502,9 @@ export function DocumentsHome({
 
   const folderCardMenuFor = (folder: DocumentsHomeDoc): FolderMenuItem[] => {
     if (folder.canEdit === false) return []
+    // Mở leads every row menu (Rules board section 3); a viewer-only folder has no menu, the card opens it
     const items: FolderMenuItem[] = [
+      { id: 'open', label: t('dlActOpen'), onSelect: () => openFolderInWorkspace(folder.id) },
       {
         id: 'new',
         label: t('ufNewSubfolder'),
