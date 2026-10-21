@@ -60,6 +60,8 @@ function ShareDialogBody({
   const adminNoteId = useId()
   const shelvedNoteId = useId()
   const [status, setStatus] = useState('')
+  // counts the dialog's writes: the add picker reads its candidates again after each
+  const [writes, setWrites] = useState(0)
   const addInputFocused = useRef(false)
 
   const access = useShareAccess(shareApi, row.id, true)
@@ -99,6 +101,7 @@ function ShareDialogBody({
   }, [status])
 
   const onMutated = async (note: string) => {
+    setWrites((n) => n + 1)
     await access.refetch()
     onChanged?.()
     if (note) setStatus(note)
@@ -211,6 +214,7 @@ function ShareDialogBody({
             alreadySharedUserIds={[data.owner?.userId]}
             shelved={shelved}
             shelvedNoteId={lockedBy}
+            candidatesRefreshKey={writes}
             onMutated={onMutated}
           />
 

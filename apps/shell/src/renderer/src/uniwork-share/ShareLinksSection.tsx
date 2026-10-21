@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ShareLink, UniworkShareApi } from '../../../shared/share-api'
 import { useI18n } from '../locale'
-import { formatWhen, linkErrorKey, plural } from './share-model'
+import { bridgeFailed, formatWhen, linkErrorKey, plural } from './share-model'
 
 export interface ShareLinksSectionProps {
   api: UniworkShareApi
@@ -56,10 +56,12 @@ export function ShareLinksSection({
     setCreateError(null)
     setCopied(false)
     const days = Number.parseInt(expiry, 10)
-    const result = await api.linkCreate({
-      documentId,
-      ...(Number.isFinite(days) ? { expiresInDays: Math.min(90, Math.max(1, days)) } : {}),
-    })
+    const result = await api
+      .linkCreate({
+        documentId,
+        ...(Number.isFinite(days) ? { expiresInDays: Math.min(90, Math.max(1, days)) } : {}),
+      })
+      .catch(bridgeFailed)
     if (!result.ok) {
       setBusy(null)
       setCreateError({
@@ -77,7 +79,7 @@ export function ShareLinksSection({
     if (busy) return
     setBusy(link.id)
     setRevokeError(false)
-    const result = await api.linkRevoke({ documentId, linkId: link.id })
+    const result = await api.linkRevoke({ documentId, linkId: link.id }).catch(bridgeFailed)
     if (!result.ok) setRevokeError(true)
     else await onMutated('')
     setBusy(null)

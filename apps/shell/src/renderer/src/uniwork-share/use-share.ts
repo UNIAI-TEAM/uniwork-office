@@ -195,6 +195,8 @@ export function useShareCandidates(
   documentId: string,
   query: string,
   enabled: boolean,
+  /** bumped after a write: the list is asked for again, so "has access" and the keep / update chip are current */
+  refreshKey = 0,
 ): ShareCandidates {
   const [state, setState] = useState<{
     items: ShareCandidate[]
@@ -257,7 +259,7 @@ export function useShareCandidates(
     return () => {
       sequence.current++
     }
-  }, [enabled, fetchPage])
+  }, [enabled, fetchPage, refreshKey])
 
   return {
     items: state.items,

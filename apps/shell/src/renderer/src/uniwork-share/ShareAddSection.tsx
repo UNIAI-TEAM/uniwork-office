@@ -11,6 +11,7 @@ import { SHARE_LEVELS } from '../../../shared/share-api'
 import { useI18n } from '../locale'
 import {
   allowedLevelsForPrincipal,
+  bridgeFailed,
   levelLabel as levelText,
   rejectedReasonKey,
   shareErrorKey,
@@ -31,6 +32,8 @@ export interface ShareAddSectionProps {
   /** a shelved document gives nothing: the whole section reads, never writes */
   shelved: boolean
   shelvedNoteId?: string
+  /** bumped after every write of the dialog: the picker's list is read again */
+  candidatesRefreshKey?: number
   /** what a write changed: the dialog reloads the overview and tells the list owner */
   onMutated: (note: string) => Promise<void>
 }
@@ -43,6 +46,7 @@ export function ShareAddSection({
   alreadySharedUserIds,
   shelved,
   shelvedNoteId,
+  candidatesRefreshKey,
   onMutated,
 }: ShareAddSectionProps) {
   const { t } = useI18n()
@@ -102,7 +106,13 @@ export function ShareAddSection({
     setAnnouncement('')
   }, [open, documentId])
 
-  const candidatesQuery = useShareCandidates(api, documentId, debouncedQuery, open && opened)
+  const candidatesQuery = useShareCandidates(
+    api,
+    documentId,
+    debouncedQuery,
+    open && opened,
+    candidatesRefreshKey,
+  )
   const selectedKeys = useMemo(() => new Set(selected.map((s) => s.key)), [selected])
   const label = (level: string | null | undefined) => levelText(t, level)
   const rejectedReason = (code: string) => t(rejectedReasonKey(code))
@@ -202,7 +212,7 @@ export function ShareAddSection({
     setSubmitError(null)
     setRejectedByKey({})
     try {
-      const result = await api.update({ documentId, items, dryRun: false })
+      const result = await api.update({ documentId, items, dryRun: false }).catch(bridgeFailed)
       if (!result.ok) {
         handleFailure(result)
         return
@@ -226,7 +236,7 @@ export function ShareAddSection({
     setSubmitError(null)
     setRejectedByKey({})
     const items = buildItems()
-    const dry = await api.update({ documentId, items, dryRun: true })
+    const dry = await api.update({ documentId, items, dryRun: true }).catch(bridgeFailed)
     inFlight.current = false
     setPending(false)
     if (!dry.ok) {
@@ -334,7 +344,10 @@ export function ShareAddSection({
                 }
               }}
             >
-              {(onlyGroups ? (['view', 'comment', 'edit'] as const) : SHARE_LEVELS).map((level) => (
+              {(onlyGroups && commonLevel !== 'manage'
+                ? (['view', 'comment', 'edit'] as const)
+                : SHARE_LEVELS
+              ).map((level) => (
                 <option key={level} value={level}>
                   {label(level)}
                 </option>

@@ -1,10 +1,18 @@
 // Pure helpers of the Share dialog: which levels a principal may get, level ranking, the
 // diacritic-folding filter, plural picking and the copy key of each refusal. No React here.
-import type { ShareErrorCode, ShareLevel, SharePrincipalType } from '../../../shared/share-api'
+import type {
+  ShareErrorCode,
+  ShareLevel,
+  SharePrincipalType,
+  ShareResult,
+} from '../../../shared/share-api'
 import { SHARE_LEVELS } from '../../../shared/share-api'
 import type { StringKey } from '../locale'
 
 /** the app's `t` (or any function of the same shape) */
+/** a bridge call that rejects (stale preload, handler throw) reads like a failed network call */
+export const bridgeFailed = (): ShareResult<never> => ({ ok: false, error: 'network' })
+
 export type ShareT = (key: StringKey, params?: Record<string, string | number>) => string
 
 /**

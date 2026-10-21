@@ -10,6 +10,7 @@ import type {
 } from '../../../shared/share-api'
 import { useI18n } from '../locale'
 import {
+  bridgeFailed,
   foldSearchText,
   levelLabel as levelText,
   levelRank,
@@ -108,8 +109,10 @@ export function ShareAccessList({
 
   const formatSourceOrigin = (src: Pick<ShareSource, 'via' | 'principalType' | 'principalId'>) => {
     if (src.principalType === 'workspace' || src.via === 'member') {
+      // the dialog's lookup never answers empty: its unknown-name line must not read as a name here
+      const named = src.principalId ? workspaceName(src.principalId) : ''
       const name =
-        (src.principalId && workspaceName(src.principalId)) ||
+        (named !== t('shrWorkspaceUnknown') && named) ||
         (homeWorkspace && (!src.principalId || src.principalId === homeWorkspace.workspaceId)
           ? homeWorkspace.workspaceName
           : '')
@@ -250,7 +253,9 @@ export function ShareAccessList({
     setPending(true)
     setActionError(null)
     try {
-      const result = await api.update({ documentId, items: [item], dryRun: false })
+      const result = await api
+        .update({ documentId, items: [item], dryRun: false })
+        .catch(bridgeFailed)
       if (!result.ok) {
         setActionError(failureText(result.error, item))
         return
@@ -284,7 +289,7 @@ export function ShareAccessList({
       level: nextLevel,
       ...(nextLevel !== null ? { onExisting: 'update' as const } : {}),
     }
-    const dry = await api.update({ documentId, items: [item], dryRun: true })
+    const dry = await api.update({ documentId, items: [item], dryRun: true }).catch(bridgeFailed)
     inFlight.current = false
     setPending(false)
     if (!dry.ok) {

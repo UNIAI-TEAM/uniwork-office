@@ -5,7 +5,7 @@ import type {
   UniworkShareApi,
 } from '../../../shared/share-api'
 import { useI18n } from '../locale'
-import { levelLabel as levelText } from './share-model'
+import { bridgeFailed, levelLabel as levelText } from './share-model'
 import { useAccessRequests } from './use-share'
 
 export interface AccessRequestsSectionProps {
@@ -102,10 +102,11 @@ export function AccessRequestsSection({
     setBusyId({ id: row.id, action })
     const name = nameOf(row)
     const level = choices[row.id] ?? askedLevel(row.requestedLevel)
-    const result =
+    const result = await (
       action === 'approve'
-        ? await api.requestApprove({ documentId, requestId: row.id, level })
-        : await api.requestDecline({ documentId, requestId: row.id })
+        ? api.requestApprove({ documentId, requestId: row.id, level })
+        : api.requestDecline({ documentId, requestId: row.id })
+    ).catch(bridgeFailed)
     if (!result.ok) {
       if (result.error === 'access_request_closed') {
         setNotice({ kind: 'closed' })

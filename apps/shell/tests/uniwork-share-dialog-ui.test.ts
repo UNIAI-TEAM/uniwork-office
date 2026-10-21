@@ -12,6 +12,7 @@ import {
   type FakeShareApi,
   type FakeShareOptions,
 } from '../src/renderer/src/uniwork-share/fake-share-api'
+import type { UniworkShareApi } from '../src/shared/share-api'
 import { uniworkShareStrings } from '../src/renderer/src/i18n/strings-uniwork-share'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -65,14 +66,16 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
     options: FakeShareOptions = {},
     row: ShareDialogTarget = target(),
     lang: 'en' | 'vi' = 'en',
+    wrap: (fake: FakeShareApi) => UniworkShareApi = (fake) => fake,
   ): Promise<FakeShareApi> {
     const api = createFakeShareApi(options)
+    const bridge = wrap(api)
     await act(async () => {
       root.render(
         createElement(
           LocaleProvider,
           { initial: lang },
-          createElement(ShareDialog, { open: true, onClose, onChanged, row, api }),
+          createElement(ShareDialog, { open: true, onClose, onChanged, row, api: bridge }),
         ),
       )
     })
@@ -403,6 +406,114 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
     expect(create.getAttribute('aria-disabled')).toBe('true')
     await click(create)
     expect(calls(api, 'linkCreate')).toHaveLength(0)
+  })
+
+  describe('review fixes (SD-FIX1)', () => {
+    /** a bridge whose listed methods reject, as `ipcRenderer.invoke` does on a stale preload */
+    const rejecting =
+      (...methods: (keyof UniworkShareApi)[]) =>
+      (fake: FakeShareApi): UniworkShareApi =>
+        new Proxy(fake, {
+          get(target, prop, receiver) {
+            if (methods.includes(prop as keyof UniworkShareApi)) {
+              return () => Promise.reject(new Error('invoke failed'))
+            }
+            return Reflect.get(target, prop, receiver)
+          },
+        })
+
+    it('#1 a rejected dry run leaves the Share button usable and says it failed', async () => {
+      await open({}, target(), 'en', rejecting('update'))
+      await pick('Bình Phạm')
+      const submit = q<HTMLButtonElement>('[data-share-submit]')!
+      await click(submit)
+      expect(submit.getAttribute('aria-busy')).toBeNull()
+      expect(submit.textContent).toBe(t('shrSubmit'))
+      expect(section('add')!.querySelector('[role="alert"]')).toBeTruthy()
+    })
+
+    it('#1 a rejected row change shows the error instead of an unhandled rejection', async () => {
+      await open({}, target(), 'en', rejecting('update'))
+      await choose(
+        q<HTMLSelectElement>(`[aria-label="${t('shrLevelFor', { name: 'An Lê' })}"]`)!,
+        'edit',
+      )
+      expect(section('access')!.querySelector('[role="alert"]')).toBeTruthy()
+      expect(onChanged).not.toHaveBeenCalled()
+    })
+
+    it('#1 a rejected link create and request decision release the section', async () => {
+      await open({}, target(), 'en', rejecting('linkCreate', 'requestApprove'))
+      const links = section('links')!
+      const create = button(links, t('shrLinkCreate'))!
+      await click(create)
+      expect(links.textContent).toContain(t('shrLinkCreateFailed'))
+      expect(create.hasAttribute('disabled') || create.getAttribute('aria-busy') === 'true').toBe(
+        false,
+      )
+      const req = q('[data-request-id="rq_1"]')!
+      await click(button(req, t('shrReqApprove')))
+      expect(section('requests')!.textContent).toContain(t('shrReqDecisionFailed'))
+      expect(q('[data-request-id="rq_1"]')).toBeTruthy()
+    })
+
+    it('#2 Manage then a group-only pick keeps Manage in the select and shows the capped hint', async () => {
+      await open()
+      const select = q<HTMLSelectElement>('[data-common-level]')!
+      await choose(select, 'manage')
+      await pick('Acme')
+      expect(select.value).toBe('manage')
+      expect(Array.from(select.options).map((o) => o.value)).toContain('manage')
+      expect(section('add')!.textContent).toContain(t('shrLevelManageCappedHint'))
+    })
+
+    it('#2 a group-only pick without Manage chosen still hides Manage', async () => {
+      await open()
+      await pick('Acme')
+      const select = q<HTMLSelectElement>('[data-common-level]')!
+      expect(Array.from(select.options).map((o) => o.value)).toEqual(['view', 'comment', 'edit'])
+    })
+
+    it('#3 the picker asks the server again after a write, so a new grant shows as having access', async () => {
+      const api = await open()
+      await pick('Bình Phạm')
+      const before = calls(api, 'candidates').length
+      await click(q('[data-share-submit]'))
+      expect(row('user:u_binh')).toBeTruthy()
+      expect(calls(api, 'candidates').length).toBeGreaterThan(before)
+      const input = q<HTMLInputElement>('[data-share-section="add"] input[role="combobox"]')!
+      await click(input)
+      await flush()
+      const option = qa('[role="option"]').find((o) => o.textContent?.includes('Bình Phạm'))
+      expect(option?.textContent).toContain(
+        t('shrCandidateHasAccess', { level: t('shrLevelView') }),
+      )
+    })
+
+    it('#9 a source from an unknown workspace falls back to "workspace member", not the unknown-name line', async () => {
+      await open({ myLevel: 'edit' }, target({ myLevel: 'edit' }), 'en', (fake) => {
+        const real = fake.get
+        fake.get = async (documentId) => {
+          const result = await real(documentId)
+          if (!result.ok) return result
+          return {
+            ok: true,
+            value: {
+              ...result.value,
+              mySources: [
+                { via: 'member', level: 'edit', principalType: 'workspace', principalId: 'ws_x' },
+              ],
+            },
+          }
+        }
+        return fake
+      })
+      const text = section('access')!.textContent!
+      expect(text).toContain(
+        t('shrSourceItem', { level: t('shrLevelEdit'), source: t('shrViaMember') }),
+      )
+      expect(text).not.toContain(t('shrWorkspaceUnknown'))
+    })
   })
 
   describe('names come from the organization member list', () => {
