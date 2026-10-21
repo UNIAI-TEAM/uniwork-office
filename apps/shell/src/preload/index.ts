@@ -1737,6 +1737,10 @@ const workApi: UniworkWorkApi = {
   async openWeb(target) {
     return (await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.openWeb, target)) === true
   },
+  async webUrl(target) {
+    const url = await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.webUrl, target)
+    return typeof url === 'string' ? url : null
+  },
 }
 
 contextBridge.exposeInMainWorld('uniworkWork', workApi)

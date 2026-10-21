@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { placeMenu } from '../UniworkDocActions'
@@ -7,6 +7,10 @@ export interface FolderMenuItem {
   id: string
   label: string
   onSelect: () => void
+  /** items of one group sit together; a divider is drawn where the group changes */
+  group?: number
+  /** the destructive entry: danger colors */
+  danger?: boolean
 }
 
 /**
@@ -137,23 +141,29 @@ export function FolderMenu({
             onKeyDown={onMenuKey}
             onClick={(e) => e.stopPropagation()}
           >
-            {items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                role="menuitem"
-                tabIndex={-1}
-                className="uw-row-menu-item"
-                data-folder-action={item.id}
-                onClick={() => {
-                  onOpenChange(false)
-                  // park focus on the button so a modal opened by the item gives it back
-                  buttonRef.current?.focus()
-                  item.onSelect()
-                }}
-              >
-                {item.label}
-              </button>
+            {items.map((item, index) => (
+              <Fragment key={item.id}>
+                {index > 0 &&
+                  item.group !== undefined &&
+                  item.group !== items[index - 1]!.group && (
+                    <div className="uw-row-menu-sep" role="separator" />
+                  )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  tabIndex={-1}
+                  className={`uw-row-menu-item${item.danger ? ' danger' : ''}`}
+                  data-folder-action={item.id}
+                  onClick={() => {
+                    onOpenChange(false)
+                    // park focus on the button so a modal opened by the item gives it back
+                    buttonRef.current?.focus()
+                    item.onSelect()
+                  }}
+                >
+                  {item.label}
+                </button>
+              </Fragment>
             ))}
           </div>,
           document.body,

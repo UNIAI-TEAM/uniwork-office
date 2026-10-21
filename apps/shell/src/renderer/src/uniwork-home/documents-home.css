@@ -1226,3 +1226,22 @@
 .dh-shelved-empty-desc {
   margin: 0;
 }
+
+/* UNI-2047 A4: the Xem chi tiết panel of a row, over the right edge of the window */
+.dl-details {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 40;
+  display: flex;
+  width: min(320px, 100vw);
+  border-inline-start: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.dl-details .uw-info {
+  flex: 1 1 auto;
+  border-inline-start: none;
+  background: var(--surface);
+}
