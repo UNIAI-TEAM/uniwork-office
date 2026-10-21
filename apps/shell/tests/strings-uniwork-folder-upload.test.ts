@@ -5,8 +5,8 @@ import { uniworkHomeStrings } from '../src/renderer/src/i18n/strings-uniwork-hom
 /**
  * The fu* keys of the uniwork-home shard (UNI-2052 folder / multi-file upload):
  * zh defines the key set, vi + en are the glossary copy of the web's
- * documents.folder_upload.*, the other locales carry English until the
- * translation pass; no internal codes or git words in any sentence.
+ * documents.folder_upload.*, the other locales are translated (a few
+ * words are legitimately the same as English); no internal codes or git words in any sentence.
  */
 
 const table = (lang: (typeof LANGS)[number]) => uniworkHomeStrings[lang] as Record<string, string>
@@ -14,7 +14,7 @@ const fuKeys = Object.keys(table('zh'))
   .filter((k) => k.startsWith('fu'))
   .sort()
 const placeholdersOf = (s: string) => (s.match(/\{[a-zA-Z0-9]+\}/g) ?? []).sort().join(',')
-const UNTRANSLATED = LANGS.filter((l) => !['zh', 'vi', 'en'].includes(l))
+const OTHER_LOCALES = LANGS.filter((l) => !['zh', 'vi', 'en'].includes(l))
 
 describe('folder-upload strings (uniwork-home shard)', () => {
   it('has the keys the screens read', () => {
@@ -52,15 +52,22 @@ describe('folder-upload strings (uniwork-home shard)', () => {
     }
   })
 
-  it('vi and en are real copy, the other locales are the English placeholders', () => {
+  it('vi and en are real copy, the other locales are translated', () => {
     const vi = table('vi')
     const en = table('en')
     expect(vi.fuMenuFolder).toBe('Tải lên thư mục')
     expect(vi.fuBarRunning).toBe('Đang tải lên “{name}” — {done}/{total} tệp')
     expect(en.fuBarRunning).toBe('Uploading “{name}” — {done}/{total} files')
     expect(vi.fuDlgShare).toBe('Chia sẻ với workspace')
-    for (const lang of UNTRANSLATED) {
-      expect(fuKeys.filter((k) => table(lang)[k] !== en[k])).toEqual([])
+    // Words that are the same as English in a few languages.
+    const sameAsEn: Record<string, string[] | undefined> = {
+      fuDlgRoot: ['id', 'ms', 'pl'],
+      fuDlgSummaryOne: ['id', 'it'],
+    }
+    for (const lang of OTHER_LOCALES) {
+      const same = fuKeys.filter((k) => table(lang)[k] === en[k])
+      const allowed = ['fuDlgSkippedReason', ...fuKeys.filter((k) => sameAsEn[k]?.includes(lang))]
+      expect(same.filter((k) => !allowed.includes(k))).toEqual([])
     }
   })
 
