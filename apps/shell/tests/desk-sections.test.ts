@@ -253,7 +253,12 @@ describe('DeskInTray', () => {
 
   it('opens a row from anywhere on it, once', async () => {
     await render(
-      createElement(DeskInTray, { home: home([comment]), signedIn: true, view: 'ready', local: [] }),
+      createElement(DeskInTray, {
+        home: home([comment]),
+        signedIn: true,
+        view: 'ready',
+        local: [],
+      }),
     )
     await act(async () =>
       host.querySelector<HTMLElement>('[role="option"] [data-col="updated"]')!.click(),

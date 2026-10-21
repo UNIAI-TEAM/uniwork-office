@@ -54,6 +54,8 @@ export interface DocPickerListProps {
   titleOf?: (doc: UniworkDocSummary) => string
   /** the second line: where the row sits, or which workspace shared it */
   sublineFor?: (doc: UniworkDocSummary) => DocSubline | null
+  /** replaces the file badge (a row that is not a file, e.g. a notification); null keeps the badge */
+  iconFor?: (doc: UniworkDocSummary) => ReactNode
   /** replaces the title (rename in place); null keeps it */
   nameFor?: (doc: UniworkDocSummary) => ReactNode
   optionProps?: (doc: UniworkDocSummary, index: number) => PickerOptionProps
@@ -106,6 +108,7 @@ export function DocPickerList({
   stateOf,
   titleOf,
   sublineFor,
+  iconFor,
   nameFor,
   optionProps,
   trailing,
@@ -145,6 +148,7 @@ export function DocPickerList({
           const subline = pickerSublineOf(sublineFor?.(doc) ?? null, editor, showEditor)
           const { className: rowClass, ...rest } = optionProps?.(doc, index) ?? {}
           const renamed = nameFor?.(doc)
+          const icon = iconFor?.(doc)
           return (
             <li key={doc.id} role="presentation" className="uw-pick-item">
               <div
@@ -169,7 +173,9 @@ export function DocPickerList({
                     case 'name':
                       return (
                         <span key={column} data-col={column} className={COLUMN_CLASS[column]}>
-                          {folder ? (
+                          {icon ? (
+                            icon
+                          ) : folder ? (
                             <span className="uwf-row-icon">
                               <FolderGlyph />
                             </span>
