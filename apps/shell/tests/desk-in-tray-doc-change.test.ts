@@ -234,6 +234,13 @@ describe('document_changed tray row (G6)', () => {
     expect(work.markNotificationsRead).toHaveBeenCalledWith(['n1'])
   })
 
+  it('carries the whole notice sentence as the title attribute of the row name', async () => {
+    await tray([changedOne({})])
+    const name = host.querySelector<HTMLElement>('.wb-desk-row-title')!
+    expect(name.getAttribute('title')).toBe(name.textContent)
+    expect(name.textContent).not.toBe('')
+  })
+
   it('clears a one-document change with no title even when its open fails', async () => {
     api.uniworkOpenDocument.mockResolvedValueOnce({ ok: false, error: 'forbidden' })
     await tray([
@@ -375,9 +382,10 @@ describe('DocChangeDialog (G7)', () => {
     expect(old.textContent).toContain('Permanently deleted')
     expect(bin.querySelector('button')).toBeNull()
     expect(bin.textContent).toContain('Moved to trash')
-    // a blank title on a gone row is left out, the state still reads
-    const blank = items.find((li) => li.textContent === 'Permanently deleted')
+    // a blank title on a gone row reads as the muted untitled name, with the tag on the same line
+    const blank = items.find((li) => li.textContent === 'Untitled documentPermanently deleted')
     expect(blank).toBeTruthy()
+    expect(blank!.querySelector('.wb-docchange-name')?.textContent).toBe('Untitled document')
     expect(
       items.find((li) => li.textContent?.includes('Plan'))!.querySelector('button'),
     ).not.toBeNull()

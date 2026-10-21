@@ -197,7 +197,7 @@ export function DocChangeDialog({
               if (d.deleted || d.trashed)
                 return (
                   <li key={d.id} className="wb-docchange-row is-gone">
-                    {title ? <span className="wb-docchange-name">{title}</span> : null}
+                    <span className="wb-docchange-name">{title || t('wbDocChangeUntitled')}</span>
                     <span className="wb-docchange-tag">
                       {t(d.deleted ? 'wbDocChangeDeleted' : 'wbDocChangeInTrash')}
                     </span>

@@ -4740,6 +4740,21 @@ body.vib .home {
   background: var(--surface-subtle);
 }
 
+.uw-pick-row.is-gone .wb-pill {
+  opacity: 0.6;
+}
+
+/* a notice sentence wraps to two lines like the web inbox (line-clamp-2), so the verb and count
+   stay readable in the narrow Name column; the title attribute carries the whole sentence */
+.uw-pick-row .wb-desk-row-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* ── Documents behind a several-document change notice (DocChangeDialog) ── */
 .modal.wb-docchange {
   display: flex;

@@ -365,6 +365,7 @@ export function DeskInTray({
                   type="button"
                   id={`${titleId}-row${described.indexOf(d)}`}
                   className="wb-row-title wb-desk-row-title"
+                  title={d.title}
                 >
                   {d.title}
                 </button>
