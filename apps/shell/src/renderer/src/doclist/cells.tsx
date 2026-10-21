@@ -9,6 +9,7 @@ import {
   BUTTON_ACTIONS_WIDTH,
   COMPACT_WIDTH,
   hasButtonActions,
+  showsRowButton,
   type ColumnId,
   type DocListScreen,
   type SpecialColumnId,
@@ -73,7 +74,8 @@ export function trackOf(
       if (compact && column === 'updated') return `${COMPACT_WIDTH.updated}px`
       if (column !== 'actions') return TRACK[column]
       if (screen && hasButtonActions(screen)) {
-        return compact ? `${COMPACT_WIDTH.buttonActions}px` : BUTTON_ACTIONS_TRACK
+        if (!compact) return BUTTON_ACTIONS_TRACK
+        return showsRowButton(screen, true) ? `${COMPACT_WIDTH.buttonActions}px` : TRACK[column]
       }
       return star ? STAR_ACTIONS_TRACK : TRACK[column]
     })
@@ -169,6 +171,38 @@ export function Stack({ main, sub }: { main: ReactNode; sub?: ReactNode }) {
     <span className="dh-special">
       <span className="dh-special-main">{main}</span>
       {sub ? <span className="dh-special-sub">{sub}</span> : null}
+    </span>
+  )
+}
+
+/**
+ * V-FIX2 N-02: what the Đã xóa column says (who, date, "Còn N ngày") as the one line under Tên of a
+ * Trash row that has no such column (the web's narrow row). Who gives way first, then the date: the
+ * countdown, the one datum of the page, is never cut.
+ */
+export function DeletedLine({ doc, now }: { doc: DocumentsHomeDoc; now: Date }) {
+  const { t, dateLocale } = useI18n()
+  if (!doc.archivedAt) return null
+  const who = doc.archivedByName?.trim()
+  const left = formatDaysLeft(doc.purgeAfter, now, t)
+  const soon = (daysLeft(doc.purgeAfter, now) ?? Infinity) <= DELETING_SOON_DAYS
+  return (
+    <span className="dh-deleted-line">
+      {who && (
+        <>
+          <span className="dh-deleted-who">{who}</span>
+          <span className="dh-deleted-sep">{' · '}</span>
+        </>
+      )}
+      <span className="dh-deleted-date">{formatListDate(doc.archivedAt, now, dateLocale, t)}</span>
+      {left && (
+        <>
+          <span className="dh-deleted-sep">{' · '}</span>
+          <span className={`dh-deleted-countdown dh-days-left${soon ? ' dh-days-soon' : ''}`}>
+            {left}
+          </span>
+        </>
+      )}
     </span>
   )
 }

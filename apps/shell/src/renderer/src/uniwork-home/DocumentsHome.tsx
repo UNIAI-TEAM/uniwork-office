@@ -2189,7 +2189,11 @@ export function DocumentsHome({
           ) : (
             <div className={`dh-title-group${subtitleKey ? ' dh-title-stack' : ''}`}>
               <h1 className="dh-title">{currentHeading}</h1>
-              {subtitleKey && <p className="dh-subtitle">{t(subtitleKey)}</p>}
+              {subtitleKey && (
+                <p className="dh-subtitle" title={t(subtitleKey)}>
+                  {t(subtitleKey)}
+                </p>
+              )}
             </div>
           )}
           {workspaces.length > 0 && (

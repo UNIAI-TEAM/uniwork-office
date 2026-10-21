@@ -84,6 +84,13 @@ export const BUTTON_ACTIONS_WIDTH = 176
 export const hasButtonActions = (screen: DocListScreen): boolean =>
   screen === 'shelved' || screen === 'trash'
 /**
+ * V-FIX2 N-02: whether a row draws the buttons its screen gives it in a table of this kind. A compact
+ * Trash row (a 768 / 720 window) leaves Khôi phục to its "…" menu, which has the same entry: the
+ * 100px go to Tên.
+ */
+export const showsRowButton = (screen: DocListScreen, compact: boolean): boolean =>
+  !(screen === 'trash' && compact)
+/**
  * RV-3: Từ nơi khác draws neither Chọn (a source file of another module cannot be selected) nor
  * Truy cập (it has no access level), so its ladder budgets neither.
  */
@@ -171,7 +178,8 @@ export function columnsFor(screen: DocListScreen, width?: number, actionsExtra =
  *  1. the screen column goes when the table cannot hold it next to Tên's floor (the Trash and Lưu trữ
  *     rows keep their Khôi phục / Bỏ lưu trữ button: it is an action, not data);
  *  2. the table is `compact`: Cập nhật is an 84px track whose date wraps onto two lines, Tên a flexible
- *     one (floor 110px), the button screens' actions track 140px, and their Chọn column is dropped.
+ *     one (floor 110px), the shelf's actions track 140px (the Trash row has no button: "…" is 76px),
+ *     and their Chọn column is dropped.
  * Tên keeps >= 180px in a 374px box and >= 110px in a 326px one (a 720 window, the shell's minimum;
  * the button screens' 389 / 341px boxes leave it 163 / 115px).
  * Tables the ladder fits, and an unmeasured one, are left as they are.
