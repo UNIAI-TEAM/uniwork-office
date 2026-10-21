@@ -61,26 +61,46 @@ describe('document citations', () => {
 
   it.each([
     '',
-    '/',
-    `/acme/team/tasks/${DOC}`,
-    `/acme/documents/${DOC}`,
-    `/acme/team/documents/${DOC}/extra`,
-    `/acme/team/documents/${DOC}?x=1`,
-    `/acme/team/documents/${DOC}#h`,
-    `/acme/team/documents/${DOC}/`,
-    '/acme/team/documents/',
+    `//acme/team/documents/${DOC}`,
+    '//evil.example/acme/team/documents',
+    `https://evil.example/acme/team/documents/${DOC}`,
+    'javascript:alert(1)',
     '/acme/team/documents/a%2Fb',
     '/acme/team/documents/a b',
-    `//acme/team/documents/${DOC}`,
-    `https://evil.example/acme/team/documents/${DOC}`,
-    `/acme/team/documents/${'x'.repeat(129)}`,
-    '/acme/team/documents/..',
-    '/acme/team/documents/a.b',
-  ])('refuses the document href %j and opens nothing', async (href) => {
+    '\\evil.example\\documents',
+  ])('refuses the hostile document href %j and opens nothing', async (href) => {
     const { opener, openDocument, openExternal } = setup()
     expect(await opener.open({ kind: 'document', href })).toEqual({ ok: false, code: 'error' })
     expect(openDocument).not.toHaveBeenCalled()
     expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['/a/b/documents?folder=X', `${ORIGIN}/a/b/documents?folder=X`],
+    [`/acme/team/documents/${DOC}/extra`, `${ORIGIN}/acme/team/documents/${DOC}/extra`],
+    [`/acme/team/documents/${DOC}?x=1`, `${ORIGIN}/acme/team/documents/${DOC}?x=1`],
+    ['/acme/team/tasks/42', `${ORIGIN}/acme/team/tasks/42`],
+  ])(
+    'a document citation that is not a document page (%j) opens as the web page',
+    async (href, url) => {
+      const { opener, openDocument, openExternal } = setup()
+      expect(await opener.open({ kind: 'document', href })).toEqual({ ok: true })
+      expect(openDocument).not.toHaveBeenCalled()
+      expect(openExternal).toHaveBeenCalledWith(url)
+    },
+  )
+
+  it('a document the app cannot open (unsupported format) opens as the web page', async () => {
+    const unsupported = vi.fn(async (_id: string) => ({
+      ok: false as const,
+      error: 'unsupported_format' as const,
+    }))
+    const { opener, openExternal } = setup({ openDocument: unsupported })
+    expect(await opener.open({ kind: 'document', href: `/a/b/documents/${DOC}` })).toEqual({
+      ok: true,
+    })
+    expect(unsupported).toHaveBeenCalledWith(DOC)
+    expect(openExternal).toHaveBeenCalledWith(`${ORIGIN}/a/b/documents/${DOC}`)
   })
 
   it.each([
