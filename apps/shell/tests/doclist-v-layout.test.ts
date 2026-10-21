@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { trackOf } from '../src/renderer/src/doclist/cells'
 import {
+  COARSE_STAR_ACTIONS_EXTRA,
   DOC_LIST_SCREENS,
   columnsFor,
   fitColumns,
@@ -257,5 +258,48 @@ describe('V7-2: the pressed type chip in dark', () => {
   it('uses the accent text token (AA on the accent tint), not the plain accent', () => {
     const rule = ruleOf(src('uniwork-home/documents-home.css'), '.dh-filter-type.on')
     expect(rule).toMatch(/color:\s*var\(--accent-text\);/)
+  })
+})
+
+describe('RV7-9: the coarse Starred actions track reaches the ladder', () => {
+  // two 44px buttons: 108px against the 76px the ladder counts
+  const EXTRA = COARSE_STAR_ACTIONS_EXTRA
+  const rungs = (screen: DocListScreen, extra: number): number[] =>
+    ['access', 'editor', 'size'].map((column) => {
+      let w = 300
+      while (!columnsFor(screen, w, extra).includes(column as ColumnId)) w += 1
+      return w
+    })
+
+  it('is the 32px the coarse track adds to the fine one', () => {
+    expect(EXTRA).toBe(108 - 76)
+  })
+
+  it('moves every rung of Starred out so Cập nhật + Sao + ⋯ fit (the web ladder is untouched at 0)', () => {
+    const fine = rungs('starred', 0)
+    const coarse = rungs('starred', EXTRA)
+    expect(fine).toEqual([656, 784, 864])
+    expect(coarse).toEqual([688, 816, 896])
+  })
+
+  it('never draws a row wider than the table just above a rung', () => {
+    for (const w of [656, 688, 784, 816, 864, 896, 1000]) {
+      const columns = fitColumns('starred', columnsFor('starred', w, EXTRA), w, EXTRA)
+      const floors = tracksOf(trackOf(columns, 'starred', true, isCompact('starred', w, EXTRA)))
+        .map((track, i) => (columns[i] === 'actions' ? 108 : floorOf(track)))
+        .reduce((a, b) => a + b, 0)
+      expect(floors, `starred at ${w}`).toBeLessThanOrEqual(w - 2)
+    }
+  })
+
+  it('the compact threshold counts the wider track too', () => {
+    expect(isCompact('starred', 417, 0)).toBe(false)
+    expect(isCompact('starred', 417, EXTRA)).toBe(true)
+  })
+
+  it('only DocList decides: a fine pointer or a screen without the Sao adds nothing', () => {
+    const docList = src('doclist/DocList.tsx')
+    expect(docList).toMatch(/screen === 'starred' && onUnstar && isCoarsePointer\(\)/)
+    expect(docList).toMatch(/matchMedia\('\(pointer: coarse\)'\)/)
   })
 })
