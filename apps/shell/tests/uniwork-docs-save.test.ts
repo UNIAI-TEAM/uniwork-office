@@ -70,7 +70,7 @@ interface Call {
 }
 
 type Fault = {
-  route: 'upload' | 'commit' | 'lookup' | 'download' | 'detail'
+  route: 'upload' | 'commit' | 'lookup' | 'download' | 'detail' | 'version'
   /**
    * 'lost': the commit landed but its answer never arrived; 'dropped': the
    * request never reached the server (no commit row); 'no-checksum': the commit
@@ -150,6 +150,22 @@ function fakeServer(initial: {
       const fault = takeFault('detail')
       if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
       return json(200, { document: docJson() })
+    }
+    // UNI-2033: one numbered version; the fake names version N `ver_N` (older ones) like a commit does
+    const numbered = new RegExp(`^/api/v1/documents/${DOC}/versions/(\\d+)$`).exec(u.pathname)
+    if (numbered && call.method === 'GET') {
+      const fault = takeFault('version')
+      if (fault?.kind === 'network') throw new TypeError('fetch failed')
+      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
+      const no = Number(numbered[1])
+      if (no < 1 || no > state.version) return error(404, 'not_found')
+      return json(200, {
+        version: {
+          id: no === state.version ? `v${no}` : `ver_${no}`,
+          document_id: DOC,
+          version: no,
+        },
+      })
     }
     if (u.pathname === `/api/v1/documents/${DOC}/download`) {
       const fault = takeFault('download')
@@ -2538,5 +2554,145 @@ describe('the comments context of a bound copy (G8-12 §3.1)', () => {
     const notifySaved = withSavedSpy(ctx)
     await ctx.service.save(path)
     expect(notifySaved).not.toHaveBeenCalled()
+  })
+})
+
+// UNI-2033: open version N of a document read-only, from a lost comment's "View in version N"
+describe('the version view copy (UNI-2033)', () => {
+  const viewLaunch = (version: number) => ({
+    receiptId: 'r',
+    redeemedAt: '2026-09-30T10:01:02Z',
+    id: DOC,
+    organizationId: 'org_a',
+    workspaceId: 'ws_1',
+    title: 'Q4 plan',
+    operation: 'view' as const,
+    version,
+    revision: '41',
+    downloadPath: `/api/v1/documents/${DOC}/download?version=${version}`,
+  })
+  const versionLookups = (server: ReturnType<typeof fakeServer>) =>
+    server.calls.filter((c) => /\/versions\/\d+$/.test(c.path))
+
+  it('a view ticket for an older version keeps that version id as the comments context version', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, viewLaunch(2))
+    expect(opened.path).toContain(`${DOC}@v2`)
+    expect(binding(opened.path)).toMatchObject({
+      access: 'view',
+      baseVersion: 2,
+      baseVersionId: 'ver_2',
+    })
+    expect(ctx.service.commentContext(opened.path)).toMatchObject({
+      versionId: 'ver_2',
+      level: 'view',
+    })
+    expect(versionLookups(server).map((c) => c.path)).toEqual([
+      `/api/v1/documents/${DOC}/versions/2`,
+    ])
+  })
+
+  it('a failed version lookup leaves the id unset and the copy still opens read-only', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    server.faults.push({ route: 'version', kind: 500 })
+    const opened = await ctx.service.openFromServer(DOC, viewLaunch(2))
+    expect(opened.path).toContain(`${DOC}@v2`)
+    expect(binding(opened.path)).toMatchObject({ access: 'view', baseVersion: 2 })
+    expect(binding(opened.path).baseVersionId).toBeUndefined()
+    expect(ctx.service.commentContext(opened.path)?.versionId).toBeNull()
+  })
+
+  it('a network failure of the lookup is the same: unset, never a failed open', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    server.faults.push({ route: 'version', kind: 'network' })
+    const opened = await ctx.service.openFromServer(DOC, viewLaunch(1))
+    expect(binding(opened.path).baseVersionId).toBeUndefined()
+  })
+
+  it('reopening an existing @vN copy keeps (or fills) the version id', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    server.faults.push({ route: 'version', kind: 500 })
+    const first = await ctx.service.openFromServer(DOC, viewLaunch(2))
+    expect(binding(first.path).baseVersionId).toBeUndefined()
+    const again = await ctx.service.openFromServer(DOC, viewLaunch(2))
+    expect(again.path).toBe(first.path)
+    expect(binding(again.path)).toMatchObject({ baseVersion: 2, baseVersionId: 'ver_2' })
+  })
+
+  it('edit and non-view opens never look a version up', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    await ctx.service.openFromServer(DOC, { ...viewLaunch(0), operation: 'edit' })
+    await ctx.service.openFromServer(DOC, viewLaunch(0))
+    expect(binding(path)).toMatchObject({ baseVersionId: 'v3' })
+    expect(versionLookups(server)).toEqual([])
+  })
+
+  it('the head version needs no lookup: the document read already names its id', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, viewLaunch(3))
+    expect(binding(opened.path)).toMatchObject({ baseVersion: 3, baseVersionId: 'v3' })
+    expect(versionLookups(server)).toEqual([])
+  })
+
+  describe('openVersionView', () => {
+    it('opens the @vN copy read-only and holds the reveal of the comment for it', async () => {
+      const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+      const ctx = setup(server)
+      const revealComment = vi.fn()
+      ;(ctx.deps as Record<string, unknown>).revealComment = revealComment
+      const result = await ctx.service.openVersionView(DOC, 2, 'cmt_1')
+      expect(result.path).toContain(`${DOC}@v2`)
+      expect(ctx.deps.openPath).toHaveBeenLastCalledWith(result.path)
+      expect(binding(result.path)).toMatchObject({
+        access: 'view',
+        level: 'view',
+        baseVersion: 2,
+        baseVersionId: 'ver_2',
+      })
+      expect(server.calls.some((c) => c.url.endsWith('/download?version=2'))).toBe(true)
+      expect(revealComment.mock.calls).toEqual([[result.path, 'cmt_1']])
+    })
+
+    it('needs no launch ticket: it reads the document for the workspace and revision itself', async () => {
+      const server = fakeServer({ bytes: enc('v3'), myLevel: 'edit' })
+      const ctx = setup(server)
+      const result = await ctx.service.openVersionView(DOC, 1, 'cmt_1')
+      expect(binding(result.path)).toMatchObject({
+        workspaceId: 'ws_1',
+        orgId: 'org_a',
+        access: 'view',
+        baseVersion: 1,
+        baseRevision: '41',
+      })
+      expect(server.calls.some((c) => c.path.includes('/launch'))).toBe(false)
+    })
+
+    it('refuses a signed-out session and never reveals', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server, { signedIn: false })
+      const revealComment = vi.fn()
+      ;(ctx.deps as Record<string, unknown>).revealComment = revealComment
+      await expect(ctx.service.openVersionView(DOC, 2, 'cmt_1')).rejects.toMatchObject({
+        code: 'not_signed_in',
+      })
+      expect(revealComment).not.toHaveBeenCalled()
+    })
+
+    it('a version the server does not have fails the open and reveals nothing', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const revealComment = vi.fn()
+      ;(ctx.deps as Record<string, unknown>).revealComment = revealComment
+      server.faults.push({ route: 'download', kind: 404, code: 'not_found' })
+      await expect(ctx.service.openVersionView(DOC, 2, 'cmt_1')).rejects.toBeDefined()
+      expect(revealComment).not.toHaveBeenCalled()
+    })
   })
 })
