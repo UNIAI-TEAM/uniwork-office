@@ -542,6 +542,20 @@ h3.collab-cmh {
   white-space: nowrap;
 }
 
+/* the lost-anchor "View in version N" link has its own row above .collab-acts: a long label (vi) wraps here
+   instead of being cut in the one-line action row */
+.collab-lostver {
+  margin-top: 1px;
+  margin-left: -8px;
+}
+
+.collab-lostver .collab-link {
+  max-width: 100%;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .collab-replies-toggle {
   margin: 0 12px 6px;
 }

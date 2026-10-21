@@ -545,6 +545,16 @@ describe('visual r1 fixes (panel / thread)', () => {
     expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*text-overflow:\s*ellipsis/)
     expect(css).toMatch(/\.collab-acts \.collab-link\s*\{[^}]*white-space:\s*nowrap/)
   })
+
+  it('lets the View in version row (.collab-lostver) wrap instead of cutting the label (TVF-2)', () => {
+    const css = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+    const at = css.indexOf('.collab-lostver .collab-link {')
+    expect(at).toBeGreaterThan(-1)
+    const rule = css.slice(at, css.indexOf('}', at))
+    expect(rule).toMatch(/white-space:\s*normal/)
+    expect(rule).not.toMatch(/text-overflow:\s*ellipsis/)
+    expect(css).toMatch(/\.collab-lostver\s*\{[^}]*margin-left:\s*-8px/)
+  })
 })
 
 /* UNI-1970 (web dbc054a69) + UNI-1969 edit box (web d6aa9f82c): thread parity rows */

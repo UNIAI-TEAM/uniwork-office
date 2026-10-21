@@ -12,6 +12,7 @@ import {
 } from '../src/collab/use-collab-threads'
 import type { CollabAnchorAdapter, CollabHostState, CollabSource } from '../src/collab/types'
 import { COLLAB_LIVE_REGION_ID } from '../src/collab/live-region'
+import { collabStrings } from '../src/collab/strings'
 import { COMPOSER_STRINGS } from './collab-composer-fixtures'
 import {
   EN,
@@ -989,11 +990,51 @@ describe('lost thread: View in version N', () => {
     expect(b).toBeDefined()
     expect(b.tagName).toBe('BUTTON')
     expect(b.getAttribute('type')).toBe('button')
-    expect(b.closest('.collab-acts')).not.toBeNull()
+    // TVF-2: it sits in its own wrapping row above the one-line action row
+    expect(b.closest('.collab-lostver')).not.toBeNull()
+    expect(b.closest('.collab-acts')).toBeNull()
     // it replaces the hidden Go to location
     expect(goBtn()).toBeUndefined()
     // the lost label stays words
     expect($('.collab-anchor-state-lost')!.textContent).toBe(EN.collabAnchorLost)
+  })
+
+  it('vi: the root row holds the formatted label in .collab-lostver, .collab-acts has none (TVF-2)', async () => {
+    const VI = collabStrings('vi')
+    await mount(
+      fakeSource(list([lostRow()])),
+      host(),
+      { adapter: ad(), openVersionId: 'v-head', onViewVersion: vi.fn(), strings: VI },
+      { strings: VI },
+    )
+    const row = $('[data-comment-id="l"] .collab-lostver')!
+    expect(row).not.toBeNull()
+    const label = 'Xem ở phiên bản 3'
+    expect(VI.collabAnchorViewVersion).toBe('Xem ở phiên bản {n}')
+    expect([...row.querySelectorAll('button')].map((b) => b.textContent)).toEqual([label])
+    const acts = $('[data-comment-id="l"] .collab-acts')!
+    expect(acts.textContent).not.toContain(label)
+    expect(acts.textContent).not.toContain('phiên bản')
+    // the lost row comes first in the DOM, so Tab follows the reading order
+    expect(row.compareDocumentPosition(acts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('renders no .collab-lostver for a normal root or for the replies of a lost thread (TVF-2)', async () => {
+    await mount(
+      fakeSource(
+        list([
+          cm({ id: 'n', anchor: docx(9), anchor_version_no: 3 }),
+          lostRow(),
+          cm({ id: 'r', parent_id: 'l', anchor_version_no: 3 }),
+        ]),
+      ),
+      host(),
+      { adapter: ad(), openVersionId: 'v-head', onViewVersion: vi.fn() },
+    )
+    expect($('[data-comment-id="n"] .collab-lostver')).toBeNull()
+    expect($('[data-comment-id="r"] .collab-lostver')).toBeNull()
+    expect($$('.collab-lostver')).toHaveLength(1)
+    expect($('[data-comment-id="l"] .collab-lostver')).not.toBeNull()
   })
 
   it('is shown without an open version id too (it cannot equal the anchor version)', async () => {
