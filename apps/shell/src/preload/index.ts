@@ -647,6 +647,9 @@ const homeApi: HomeApi = {
   async newMarkdown(opts) {
     await ipcRenderer.invoke(HOME_CHANNELS.newMarkdown, opts)
   },
+  async newTxt(opts) {
+    await ipcRenderer.invoke(HOME_CHANNELS.newTxt, opts)
+  },
   async newHtml(opts) {
     await ipcRenderer.invoke(HOME_CHANNELS.newHtml, opts)
   },

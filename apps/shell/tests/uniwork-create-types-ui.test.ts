@@ -214,15 +214,25 @@ describe('UW-CREATE-TYPES (UNI-1953) DocumentsHome', () => {
     for (const pill of pills) expect(pill.querySelector('img, svg')).not.toBeNull()
   })
 
-  it('the New menu lists the same seven kinds in the same order, localized', async () => {
+  it('the New menu lists the strip kinds plus Plain text right under Markdown, localized', async () => {
     await mount('en')
     const menu = await openMenu()
     const rows = Array.from(
       menu.querySelectorAll<HTMLElement>('[role="menuitem"][data-new-kind]'),
     ).filter((row) => row.getAttribute('data-new-kind') !== 'folder')
-    expect(rows.map((r) => r.getAttribute('data-new-kind'))).toEqual(KINDS)
-    expect(rows.map((r) => r.querySelector('.dh-new-label')?.textContent)).toEqual(MENU_LABELS_EN)
-    expect(rows.map((r) => r.querySelector('.dh-new-ext')?.textContent)).toEqual(EXTS)
+    // UNI-2046: Plain text is in the menu only, the strip leaves it out
+    const withTxt = <T>(items: readonly T[], txt: T): T[] => [
+      ...items.slice(0, 5),
+      txt,
+      ...items.slice(5),
+    ]
+    expect(rows.map((r) => r.getAttribute('data-new-kind'))).toEqual(withTxt(KINDS, 'txt'))
+    expect(rows.map((r) => r.querySelector('.dh-new-label')?.textContent)).toEqual(
+      withTxt(MENU_LABELS_EN, 'Plain text'),
+    )
+    expect(rows.map((r) => r.querySelector('.dh-new-ext')?.textContent)).toEqual(
+      withTxt(EXTS, '.txt'),
+    )
   })
 
   it('picking Markdown creates at once: format md under the default name, in the same parent, opened like a docx', async () => {

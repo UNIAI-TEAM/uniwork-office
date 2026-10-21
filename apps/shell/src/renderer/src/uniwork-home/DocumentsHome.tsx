@@ -20,7 +20,7 @@ import {
   type UploadProgress,
 } from '../UniworkDocActions'
 import {
-  NEW_DOC_KINDS,
+  QUICK_CREATE_KINDS,
   UNIWORK_ERROR_KEYS,
   checkDocName,
   errorActionOf,
@@ -1959,7 +1959,7 @@ export function DocumentsHome({
         {subView !== 'trash' && subView !== 'archive' && (
           <div className="dh-quick-row">
             <span className="dh-quick-label">{t('uhQuickCreate')}</span>
-            {NEW_DOC_KINDS.map((kind) => (
+            {QUICK_CREATE_KINDS.map((kind) => (
               <button
                 key={kind}
                 type="button"

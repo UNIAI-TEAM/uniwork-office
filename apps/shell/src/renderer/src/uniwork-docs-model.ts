@@ -1420,9 +1420,14 @@ export function retryActionOf(state: PickerState): PickerAction {
 
 // ── Create, rename, archive (S18) ───────────────────────
 
-/** the file formats a new blank document can have (D's blank route; UNI-1953 adds md / html / pdf) */
-export const NEW_DOC_FORMATS = ['docx', 'xlsx', 'pptx', 'md', 'html', 'pdf'] as const
+/** the file formats a new blank document can have (D's blank route; UNI-1953 adds md / html / pdf, UNI-2046 txt) */
+export const NEW_DOC_FORMATS = ['docx', 'xlsx', 'pptx', 'md', 'txt', 'html', 'pdf'] as const
 export type NewDocFormat = (typeof NEW_DOC_FORMATS)[number]
+
+/** The formats the New document dialog offers: every one but Plain text, which lives only in the New menu (UNI-2046). */
+export const NEW_DIALOG_FORMATS = NEW_DOC_FORMATS.filter(
+  (format): format is Exclude<NewDocFormat, 'txt'> => format !== 'txt',
+)
 
 /**
  * What the Documents home offers to create, in the web's order (UNI-1953): UniNote
@@ -1430,6 +1435,11 @@ export type NewDocFormat = (typeof NEW_DOC_FORMATS)[number]
  */
 export const NEW_DOC_KINDS = ['page', ...NEW_DOC_FORMATS] as const
 export type NewDocKind = (typeof NEW_DOC_KINDS)[number]
+
+/** The Quick create strip: every kind but Plain text, which lives only in the New menu (UNI-2046, user 2026-10-21). */
+export const QUICK_CREATE_KINDS = NEW_DOC_KINDS.filter(
+  (kind): kind is Exclude<NewDocKind, 'txt'> => kind !== 'txt',
+)
 
 /**
  * A library row with what S18 reads beyond the summary: the action flags main

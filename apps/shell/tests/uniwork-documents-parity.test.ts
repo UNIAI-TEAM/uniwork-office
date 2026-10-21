@@ -13,7 +13,7 @@ import type {
   UniworkWorkspaceRef,
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
-import { NEW_DOC_KINDS } from '../src/renderer/src/uniwork-docs-model'
+import { QUICK_CREATE_KINDS } from '../src/renderer/src/uniwork-docs-model'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 
 /**
@@ -390,16 +390,16 @@ describe('UNI-1957 Documents parity', () => {
       expect(host.querySelector('.dh-quick-hint-icon')).toBeNull()
       const row = host.querySelector<HTMLElement>('.dh-quick-row')
       if (row) {
-        // the label, one pill per create kind (UNI-1953: UniNote + the six file formats),
+        // the label, one pill per quick create kind (UNI-1953: UniNote + the file formats, minus Plain text, UNI-2046),
         // then UNI-1959's share switch and its live hint - nothing else: no lock glyph, no link
         expect(Array.from(row.children).map((el) => el.tagName)).toEqual([
           'SPAN',
-          ...NEW_DOC_KINDS.map(() => 'BUTTON'),
+          ...QUICK_CREATE_KINDS.map(() => 'BUTTON'),
           'BUTTON',
           'P',
         ])
         expect(row.querySelector('[data-quick-format]')).not.toBeNull()
-        expect(row.children[NEW_DOC_KINDS.length + 1]!.getAttribute('role')).toBe('switch')
+        expect(row.children[QUICK_CREATE_KINDS.length + 1]!.getAttribute('role')).toBe('switch')
         expect(row.lastElementChild!.className).toBe('dh-quick-share-hint')
       }
       for (const text of NOTICE_VI) expect(host.textContent).not.toContain(text)

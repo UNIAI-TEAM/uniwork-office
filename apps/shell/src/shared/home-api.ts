@@ -149,7 +149,7 @@ export interface McpStatus {
   error?: string
 }
 
-export type UniworkDocFormat = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'html'
+export type UniworkDocFormat = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'html'
 export type UniworkDocAccess = 'edit' | 'view'
 export type UniworkSaveState =
   | 'ready'
@@ -453,8 +453,12 @@ export interface UniworkSourceFile {
   canSave: boolean
 }
 
-/** UNI-1961: the type filter the sources list takes (the web's `type`) */
-export type UniworkSourceType = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'html' | 'txt'
+/**
+ * UNI-1961: the type filter the sources list takes (the web's `type`). A txt filter is
+ * accepted here (it follows UniworkDocFormat) but the client does not send it: the
+ * sources list has no txt type.
+ */
+export type UniworkSourceType = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'html'
 
 export interface UniworkSourceListQuery {
   workspaceId: string
@@ -684,8 +688,8 @@ export type UniworkDocActionResult<T> =
       endpointMissing?: boolean
     }
 
-/** the file formats D's blank route generates (UNI-1953: the Office three plus md / html / pdf) */
-export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'html' | 'pdf'
+/** the file formats D's blank route generates (UNI-1953: the Office three plus md / html / pdf; UNI-2046: txt) */
+export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'txt' | 'html' | 'pdf'
 
 /**
  * UNI-1959: "Share with workspace" on a create. `workspace` is the only value
@@ -1259,6 +1263,8 @@ export interface HomeApi {
   submitAgentIntent(intent: AgentIntentDto): Promise<boolean>
   /** open a blank markdown editor tab */
   newMarkdown(opts?: NewFileOpts & { projectId?: string }): Promise<void>
+  /** a blank .txt in the default folder, opened in the markdown module as plain source */
+  newTxt(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** open a blank html editor tab */
   newHtml(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** drop entries from the recent list (does not touch the files) */
@@ -2047,6 +2053,7 @@ export const HOME_CHANNELS = {
   newSheet: 'home:new-sheet',
   newSlide: 'home:new-slide',
   newMarkdown: 'home:new-markdown',
+  newTxt: 'home:new-txt',
   newHtml: 'home:new-html',
   newPdf: 'home:new-pdf',
   removeRecent: 'home:remove-recent',

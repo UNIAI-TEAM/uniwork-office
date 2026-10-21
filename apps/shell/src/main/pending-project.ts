@@ -10,7 +10,7 @@
  * exists, so the user may take a while to save; the freshness check on the file
  * keeps an old file out), and a tab that closes forgets its binding.
  */
-export type PendingProjectKind = 'doc' | 'sheet' | 'slide' | 'markdown' | 'html' | 'pdf'
+export type PendingProjectKind = 'doc' | 'sheet' | 'slide' | 'markdown' | 'txt' | 'html' | 'pdf'
 
 export interface PendingProject {
   kind: PendingProjectKind

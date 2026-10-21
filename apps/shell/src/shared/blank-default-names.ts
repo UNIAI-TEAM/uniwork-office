@@ -6,7 +6,7 @@
  * never-saved blank document from an ordinary one after a restart (file
  * version 1 + one of these titles), which is the web's first-save predicate.
  */
-export type BlankDefaultKind = 'docx' | 'xlsx' | 'pptx' | 'md' | 'html' | 'pdf'
+export type BlankDefaultKind = 'docx' | 'xlsx' | 'pptx' | 'md' | 'txt' | 'html' | 'pdf'
 
 export const BLANK_DEFAULT_NAMES: Record<'vi' | 'en', Record<BlankDefaultKind, string>> = {
   vi: {
@@ -14,6 +14,7 @@ export const BLANK_DEFAULT_NAMES: Record<'vi' | 'en', Record<BlankDefaultKind, s
     xlsx: 'Bảng tính chưa đặt tên.xlsx',
     pptx: 'Bản trình chiếu chưa đặt tên.pptx',
     md: 'Markdown chưa đặt tên.md',
+    txt: 'Văn bản chưa đặt tên.txt',
     html: 'Trang HTML chưa đặt tên.html',
     pdf: 'PDF chưa đặt tên.pdf',
   },
@@ -22,6 +23,7 @@ export const BLANK_DEFAULT_NAMES: Record<'vi' | 'en', Record<BlankDefaultKind, s
     xlsx: 'Untitled spreadsheet.xlsx',
     pptx: 'Untitled presentation.pptx',
     md: 'Untitled markdown.md',
+    txt: 'Untitled text.txt',
     html: 'Untitled HTML page.html',
     pdf: 'Untitled PDF.pdf',
   },
