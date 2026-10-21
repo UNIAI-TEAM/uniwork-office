@@ -2,7 +2,9 @@ import type { UniworkSourceFile } from '../../../shared/home-api'
 import { FileBadge } from '../FileBadge'
 import { useI18n } from '../locale'
 import { FolderMenu } from '../uniwork-folders/FolderMenu'
-import { formatBytes, formatShortDate } from './documents-home-model'
+import { Cell, Empty, Person, trackOf } from '../doclist/cells'
+import type { ColumnId } from '../doclist/columns'
+import { formatBytes, formatListDate } from '../doclist/format'
 import { openable } from './source-open-model'
 
 /** UNI-1961: a source file's badge format: its extension, else its name's */
@@ -23,12 +25,15 @@ function sourceExtension(source: UniworkSourceFile): string {
  */
 export function DocumentsSourceRow({
   source,
+  columns,
   menuOpen,
   onMenuOpenChange,
   onOpen,
   onDownload,
 }: {
   source: UniworkSourceFile
+  /** the columns of the table it sits in, in order */
+  columns: readonly ColumnId[]
   menuOpen: boolean
   onMenuOpenChange: (open: boolean) => void
   onOpen: (source: UniworkSourceFile) => void
@@ -36,71 +41,83 @@ export function DocumentsSourceRow({
 }) {
   const { t, dateLocale } = useI18n()
   const owner = source.owner?.name.trim() ?? ''
-  const initial = owner ? (Array.from(owner)[0] ?? '').toUpperCase() : ''
   const download = () => onDownload(source)
   const canOpen = openable(source)
   const open = () => onOpen(source)
   const primary = canOpen ? open : download
+  const cellFor = (col: ColumnId) => {
+    switch (col) {
+      case 'name':
+        return (
+          <Cell key={col} col={col}>
+            <FileBadge ext={sourceExtension(source)} size={28} />
+            <div className="dh-name-stack">
+              <button type="button" className="dh-doc-open" title={source.name} onClick={primary}>
+                {source.name}
+              </button>
+            </div>
+          </Cell>
+        )
+      case 'editor':
+        return (
+          <Cell key={col} col={col}>
+            <Person name={owner || null} />
+          </Cell>
+        )
+      case 'updated':
+        return (
+          <Cell key={col} col={col}>
+            {formatListDate(source.updatedAt, new Date(), dateLocale, t)}
+          </Cell>
+        )
+      case 'size':
+        return (
+          <Cell key={col} col={col}>
+            {formatBytes(source.sizeBytes, dateLocale)}
+          </Cell>
+        )
+      case 'actions':
+        return (
+          <Cell
+            key={col}
+            col={col}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            <FolderMenu
+              label={t('ufActionsFor', { name: source.name })}
+              items={[
+                ...(canOpen ? [{ id: 'open', label: t('uhSourceOpen'), onSelect: open }] : []),
+                { id: 'download', label: t('uhSourceDownload'), onSelect: download },
+              ]}
+              dataFor={`source:${source.id}`}
+              open={menuOpen}
+              onOpenChange={onMenuOpenChange}
+            />
+          </Cell>
+        )
+      case 'select':
+        // a file of another module cannot be selected
+        return <Cell key={col} col={col} />
+      default:
+        // Truy cập and any screen column: nothing to say about a source file
+        return (
+          <Cell key={col} col={col}>
+            <Empty />
+          </Cell>
+        )
+    }
+  }
+
   return (
     <div
       role="row"
       data-source-id={source.id}
       className="dh-doc-row dh-source-row"
+      style={{ gridTemplateColumns: trackOf(columns) }}
       onDoubleClick={primary}
     >
-      <div className="dh-cell-name" role="cell">
-        <FileBadge ext={sourceExtension(source)} size={28} />
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <button type="button" className="dh-doc-open" title={source.name} onClick={primary}>
-            {source.name}
-          </button>
-        </div>
-      </div>
-
-      <div className="dh-cell-access" role="cell">
-        <span className="dh-cell-empty">—</span>
-      </div>
-
-      <div className="dh-cell-person" role="cell">
-        {owner ? (
-          <>
-            <span className="dh-avatar" aria-hidden="true">
-              {initial}
-            </span>
-            <span className="dh-person-name" title={owner}>
-              {owner}
-            </span>
-          </>
-        ) : (
-          <span className="dh-cell-empty">—</span>
-        )}
-      </div>
-
-      <div className="dh-cell-time" role="cell">
-        {formatShortDate(source.updatedAt, dateLocale)}
-      </div>
-
-      <div className="dh-cell-size" role="cell">
-        {formatBytes(source.sizeBytes, dateLocale)}
-      </div>
-
-      <div
-        className="dh-cell-actions"
-        role="cell"
-        onClick={(e) => e.stopPropagation()}
-        onDoubleClick={(e) => e.stopPropagation()}
-      >
-        <FolderMenu
-          label={t('ufActionsFor', { name: source.name })}
-          items={[
-            ...(canOpen ? [{ id: 'open', label: t('uhSourceOpen'), onSelect: open }] : []),
-            { id: 'download', label: t('uhSourceDownload'), onSelect: download },
-          ]}
-          dataFor={`source:${source.id}`}
-          open={menuOpen}
-          onOpenChange={onMenuOpenChange}
-        />
-      </div>
+      {columns.map(cellFor)}
     </div>
   )
 }
