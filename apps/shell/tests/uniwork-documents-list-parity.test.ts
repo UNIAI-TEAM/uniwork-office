@@ -243,7 +243,7 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
     sidebarSlot.remove()
   })
 
-  async function renderHome(lang: 'vi' | 'en' = 'vi') {
+  async function renderHome(lang: 'vi' | 'en' = 'vi', initialSubView?: 'elsewhere') {
     await act(async () => {
       root.render(
         createElement(
@@ -255,6 +255,7 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
             onWorkspaceChange: vi.fn(),
             onOpenDocument: vi.fn(),
             sidebarHost: sidebarSlot,
+            initialSubView,
           }),
         ),
       )
@@ -267,25 +268,30 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
       (row) => row.dataset.docId ?? `source:${row.dataset.sourceId}`,
     )
 
-  it('merges the source files into the root table newest first: Access "—", editor = owner', async () => {
+  it('the workspace root lists documents only: the source files live on the From elsewhere page (UNI-2047 F-14)', async () => {
     await renderHome()
-    expect(api.uniworkListSources).toHaveBeenCalledWith({ workspaceId: 'ws-1' })
-    expect(rowKeys()).toEqual(['source:src-1', 'doc-1', 'source:src-2', 'doc-2'])
-    // folders stay cards above the table (finding 6: the web root shows them too)
+    expect(api.uniworkListSources).not.toHaveBeenCalled()
+    expect(rowKeys()).toEqual(['doc-1', 'doc-2'])
+    // folders stay cards above the table
     expect(host.querySelectorAll('.dh-folder-card')).toHaveLength(1)
+    // the documents count says what the table shows: no source row is counted
+    expect(host.querySelector('.dh-docs-section .dh-section-count')?.textContent).toBe('2')
+  })
 
+  it('From elsewhere lists the source files newest first: no Access column, editor = owner', async () => {
+    await renderHome('vi', 'elsewhere')
+    expect(api.uniworkListSources).toHaveBeenCalledWith({ workspaceId: 'ws-1' })
+    expect(rowKeys()).toEqual(['source:src-1', 'source:src-2'])
     const row = host.querySelector<HTMLElement>('.dh-doc-row[data-source-id="src-1"]')!
     expect(row.querySelector('.dh-doc-open')?.textContent).toBe('Biên bản họp.docx')
-    expect(row.querySelector('.dh-cell-access')?.textContent?.trim()).toBe('—')
+    expect(row.querySelector('.dh-cell-access')).toBeNull()
     expect(row.querySelector('.dh-cell-person')?.textContent).toContain('Minh Trần')
     const ownerless = host.querySelector<HTMLElement>('.dh-doc-row[data-source-id="src-2"]')!
     expect(ownerless.querySelector('.dh-cell-person')?.textContent?.trim()).toBe('—')
-    // the documents count says what the table shows
-    expect(host.querySelector('.dh-docs-section .dh-section-count')?.textContent).toBe('4')
   })
 
   it('a source row downloads on its primary click and offers Show in folder', async () => {
-    await renderHome()
+    await renderHome('vi', 'elsewhere')
     const row = host.querySelector<HTMLElement>('.dh-doc-row[data-source-id="src-1"]')!
     await act(async () => {
       row.querySelector<HTMLButtonElement>('.dh-doc-open')!.click()
@@ -314,7 +320,7 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
     api.uniworkDownloadSource.mockImplementationOnce(
       () => new Promise((resolve) => (release = resolve)),
     )
-    await renderHome()
+    await renderHome('vi', 'elsewhere')
     const row = host.querySelector<HTMLElement>('.dh-doc-row[data-source-id="src-1"]')!
     const open = row.querySelector<HTMLButtonElement>('.dh-doc-open')!
     await act(async () => {
@@ -337,7 +343,7 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
   })
 
   it('the row menu offers Download; a failed download says so', async () => {
-    await renderHome()
+    await renderHome('vi', 'elsewhere')
     api.uniworkDownloadSource.mockResolvedValueOnce({ ok: false, error: 'network' })
     const row = host.querySelector<HTMLElement>('.dh-doc-row[data-source-id="src-2"]')!
     await act(async () => {
@@ -361,7 +367,6 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
 
   it('a source row never offers Lưu trữ (no manage level), while a managed document row does (UNI-1961)', async () => {
     rootItems[1] = { ...rootItems[1]!, canManage: true, myLevel: 'manage' }
-    await renderHome()
     const menuLabels = async (selector: string): Promise<(string | undefined)[]> => {
       await act(async () => {
         host.querySelector<HTMLButtonElement>(`${selector} .dh-cell-actions button`)!.click()
@@ -374,18 +379,22 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
       })
       return labels
     }
+    await renderHome('vi', 'elsewhere')
     expect(await menuLabels('.dh-doc-row[data-source-id="src-1"]')).toEqual(['Tải xuống'])
+    await act(async () => {
+      root.unmount()
+    })
+    root = createRoot(host)
+    await renderHome()
     expect(await menuLabels('.dh-doc-row[data-doc-id="doc-1"]')).toContain('Lưu trữ')
     expect(api.uniworkShelveDocument).not.toHaveBeenCalled()
   })
 
-  it('lists no sources inside a folder or in Recent, and a failing sources call leaves the documents', async () => {
+  it('reads no sources at the root, inside a folder or in Recent (UNI-2047 F-14)', async () => {
     api.uniworkListSources.mockResolvedValue({ ok: false, error: 'not_found' })
     await renderHome()
     expect(rowKeys()).toEqual(['doc-1', 'doc-2'])
     expect(host.querySelector('[role="alert"]')).toBeNull()
-
-    api.uniworkListSources.mockClear()
     await act(async () => {
       host.querySelector<HTMLButtonElement>('.dh-folder-open')!.click()
     })
@@ -398,7 +407,7 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
   })
 
   it('applies the home filters to source rows: type on the server, editor and date here', async () => {
-    await renderHome()
+    await renderHome('vi', 'elsewhere')
     await act(async () => {
       host.querySelector<HTMLButtonElement>('.dh-filter-bar [data-chip="pdf"]')!.click()
     })
@@ -406,16 +415,7 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
     expect(api.uniworkListSources).toHaveBeenLastCalledWith({ workspaceId: 'ws-1', type: 'pdf' })
   })
 
-  it('Load more pages both lists and keeps rows below what is on screen', async () => {
-    api.uniworkListChildren.mockImplementation(
-      async (q: { parentId: string | null; cursor?: string }) =>
-        q.cursor
-          ? ok({
-              items: [doc({ id: 'doc-old', updatedAt: '2026-10-01T08:00:00.000Z' })],
-              nextCursor: null,
-            })
-          : ok({ items: rootItems, nextCursor: 'docs-2' }),
-    )
+  it('Load more on From elsewhere pages the source list only', async () => {
     api.uniworkListSources.mockImplementation(async (q: { cursor?: string }) =>
       q.cursor
         ? ok({
@@ -424,29 +424,21 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
           })
         : ok({ items: sources, nextCursor: 'src-2' }),
     )
-    await renderHome()
-    // cutoff = the later of the two oldest loaded rows (doc-2 on the 12th, src-2 on the 14th)
-    expect(rowKeys()).toEqual(['source:src-1', 'doc-1', 'source:src-2'])
+    await renderHome('vi', 'elsewhere')
+    expect(rowKeys()).toEqual(['source:src-1', 'source:src-2'])
     const more = host.querySelector<HTMLButtonElement>('.dh-load-more-row button')!
     await act(async () => {
       more.click()
     })
     await flush()
-    expect(api.uniworkListChildren).toHaveBeenLastCalledWith(
-      expect.objectContaining({ cursor: 'docs-2' }),
-    )
     expect(api.uniworkListSources).toHaveBeenLastCalledWith({
       workspaceId: 'ws-1',
       cursor: 'src-2',
     })
-    expect(rowKeys()).toEqual([
-      'source:src-1',
-      'doc-1',
-      'source:src-2',
-      'doc-2',
-      'source:src-old',
-      'doc-old',
-    ])
+    expect(api.uniworkListChildren).not.toHaveBeenCalledWith(
+      expect.objectContaining({ cursor: expect.anything() }),
+    )
+    expect(rowKeys()).toEqual(['source:src-1', 'source:src-2', 'source:src-old'])
     expect(host.querySelector('.dh-load-more-row')).toBeNull()
   })
 })
@@ -524,7 +516,7 @@ describe('DocumentsHome Size column and short dates (UNI-1961 item 2)', () => {
     sidebarSlot.remove()
   })
 
-  async function renderHome(lang: 'vi' | 'en') {
+  async function renderHome(lang: 'vi' | 'en', initialSubView?: 'elsewhere') {
     localStorage.setItem('genoffice.lang', lang)
     await act(async () => {
       root.render(
@@ -537,6 +529,7 @@ describe('DocumentsHome Size column and short dates (UNI-1961 item 2)', () => {
             onWorkspaceChange: vi.fn(),
             onOpenDocument: vi.fn(),
             sidebarHost: sidebarSlot,
+            initialSubView,
           }),
         ),
       )
@@ -576,9 +569,30 @@ describe('DocumentsHome Size column and short dates (UNI-1961 item 2)', () => {
       // a page has no size: "—" (UNI-2047), like a folder or a missing file
       expect(cell('[data-doc-id="page-1"]', 'dh-cell-size')).toBe('—')
       expect(cell('[data-doc-id="page-1"]', 'dh-cell-time')).toBe(when('2026-10-16T08:00:00.000Z'))
+    },
+  )
+
+  it.each([
+    ['vi', 'vi-VN', 'Dung lượng', '1,2 MB'],
+    ['en', 'en-US', 'Size', '1.2 MB'],
+  ] as const)(
+    '%s: a source row on From elsewhere has the same size and date formats (UNI-2047 F-14)',
+    async (lang, locale, size, srcSize) => {
+      await renderHome(lang, 'elsewhere')
+      const heads = Array.from(
+        host.querySelectorAll<HTMLElement>('.dh-doc-head > [role="columnheader"]'),
+      )
+      expect(heads.map((el) => el.className)).toEqual([
+        'dh-col-name',
+        'dh-col-person',
+        'dh-col-time',
+        'dh-col-size',
+        'dh-col-actions',
+      ])
+      expect(heads[3]?.textContent).toBe(size)
       expect(cell('[data-source-id="src-1"]', 'dh-cell-size')).toBe(srcSize)
       expect(cell('[data-source-id="src-1"]', 'dh-cell-time')).toBe(
-        when('2026-10-19T08:00:00.000Z'),
+        formatListDate('2026-10-19T08:00:00.000Z', new Date(), locale),
       )
     },
   )

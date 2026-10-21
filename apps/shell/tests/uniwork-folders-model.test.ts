@@ -331,7 +331,7 @@ describe('search path', () => {
       short: 'UniWork › Alpha ›',
       full: 'UniWork › Alpha',
     })
-    expect(shortPath([], 'UniWork')).toEqual({ short: 'UniWork ›', full: 'UniWork' })
+    expect(shortPath([], 'UniWork')).toEqual({ short: 'UniWork', full: 'UniWork' })
   })
 })
 

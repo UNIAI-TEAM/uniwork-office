@@ -376,7 +376,7 @@ describe('DocumentsHome renders its screens through the shared table (UNI-2047 A
 
   it('lays "other sources" rows on the same columns as the header', async () => {
     sources = [SOURCE]
-    await mount()
+    await mount('elsewhere')
     const head = host.querySelectorAll('.dh-doc-table [role="columnheader"]').length
     const source = host.querySelector<HTMLElement>('[data-source-id="src-1"]')!
     expect(source).not.toBeNull()

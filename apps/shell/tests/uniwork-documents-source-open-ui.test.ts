@@ -164,6 +164,8 @@ describe('UNI-1993 Documents home: open a source file view only', () => {
               onWorkspaceChange: vi.fn(),
               onOpenDocument: vi.fn(),
               sidebarHost: sidebarSlot,
+              // UNI-2047 F-14: the source files are listed on From elsewhere, not on the root
+              initialSubView: 'elsewhere',
             }),
           ),
         ),

@@ -5,7 +5,7 @@
  * is the shared DocList over the source files of the other modules (`uniworkListSources`): no
  * Chọn column (a source file cannot be selected) and no screen column (the app shows one workspace),
  * the type chips that apply to files, Người sửa = the file's owner, paging with Tải thêm, and the
- * loading / empty / error states. The workspace root keeps merging the same rows, as the web does.
+ * loading / empty / error states. The workspace root does not list these rows (UNI-2047 F-14).
  */
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -285,10 +285,10 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     expect(sourceIds()).toEqual(['s-new', 's-old'])
   })
 
-  it('draws the shared table: Tên · Truy cập · Người sửa gần nhất · Cập nhật · Dung lượng · Thao tác, no Chọn, no screen column', async () => {
+  it('draws the shared table: Tên · Người sửa gần nhất · Cập nhật · Dung lượng · Thao tác, no Chọn, no Truy cập (a source file has no level), no screen column', async () => {
     await mount('elsewhere')
     expect(host.querySelector('[role="table"]')).not.toBeNull()
-    expect(headers()).toEqual(['name', 'access', 'editor', 'updated', 'size', 'actions'])
+    expect(headers()).toEqual(['name', 'editor', 'updated', 'size', 'actions'])
     expect(host.querySelector('input[type="checkbox"]')).toBeNull()
     expect(host.querySelector('.dh-subtitle')?.textContent).toBe(
       'Tệp được gửi trong Trò chuyện, Cuộc họp, Email và Công việc của workspace này',
@@ -415,9 +415,9 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     expect(sourceIds()).toEqual([])
   })
 
-  it('the workspace root keeps merging the same rows (the web does too)', async () => {
+  it('the workspace root no longer merges the same rows: they live here only (F-14, Q2=A)', async () => {
     await mount('workspace')
-    expect(api.uniworkListSources).toHaveBeenCalled()
-    expect(sourceIds()).toEqual(['s-new', 's-old'])
+    expect(api.uniworkListSources).not.toHaveBeenCalled()
+    expect(sourceIds()).toEqual([])
   })
 })
