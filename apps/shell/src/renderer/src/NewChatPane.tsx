@@ -387,6 +387,8 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
   const [openGroup, setOpenGroup] = useState<GroupId | null>(null)
   // Ask UNI is the workspace-question mode next to the chat; the toggle needs the shell bridge
   const [mode, setMode] = useState<'chat' | 'ask'>('chat')
+  // once opened, the Ask UNI pane stays mounted (hidden) so its conversation survives the toggle
+  const [askOpened, setAskOpened] = useState(false)
   const groupBtnRefs = useRef<Partial<Record<GroupId, HTMLButtonElement | null>>>({})
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [continueFiles, setContinueFiles] = useState<RecentEntry[]>([])
@@ -1968,7 +1970,10 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         type="button"
         className={`askuni-mode${askMode ? ' is-on' : ''}`}
         aria-pressed={askMode}
-        onClick={() => setMode('ask')}
+        onClick={() => {
+          setMode('ask')
+          setAskOpened(true)
+        }}
       >
         {t('askUniModeAsk')}
       </button>
@@ -1990,22 +1995,10 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     </header>
   )
 
-  if (askMode) {
-    return (
-      <main className="new-chat is-ask" aria-label={label('Trợ lý của bạn', 'My AI')}>
-        {bar}
-        <AskUniPane />
-      </main>
-    )
-  }
-
-  return (
-    <main
-      className={`new-chat${empty ? ' is-empty' : ''}`}
-      aria-label={label('Trợ lý của bạn', 'My AI')}
-    >
-      {bar}
-
+  // the chat body is skipped in Ask UNI mode; the Ask UNI pane stays mounted (hidden) once opened,
+  // and the header (with the focused toggle) is one element in both modes
+  const chatContent = (
+    <>
       <div className="new-chat-body">
         {empty ? (
           <div className="new-chat-hero">
@@ -2224,6 +2217,17 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
 
       {empty ? null : composer}
       {empty ? null : footnote}
+    </>
+  )
+
+  return (
+    <main
+      className={`new-chat${askMode ? ' is-ask' : empty ? ' is-empty' : ''}`}
+      aria-label={label('Trợ lý của bạn', 'My AI')}
+    >
+      {bar}
+      {askMode ? null : chatContent}
+      {askAvailable && askOpened ? <AskUniPane visible={askMode} /> : null}
     </main>
   )
 }

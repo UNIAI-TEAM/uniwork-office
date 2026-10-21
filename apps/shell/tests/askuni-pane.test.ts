@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createElement as h, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -804,7 +805,7 @@ describe('Ask UNI mode (shell Home My AI)', () => {
   describe('styles and copy', () => {
     it('askuni.css uses logical inline spacing only (RTL locales ar and he)', () => {
       const css = readFileSync(
-        new URL('../src/renderer/src/askuni.css', import.meta.url),
+        resolve(__dirname, '../src/renderer/src/askuni.css'),
         'utf8',
       ).replace(/\/\*[\s\S]*?\*\//g, '')
       expect(css).not.toMatch(/(padding|margin|border)-(left|right)\s*:/)
@@ -880,7 +881,7 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       })
       // the pane stays mounted (hidden) so the conversation survives the switch
       const pane = host.querySelector('.askuni-pane') as HTMLElement
-      expect(pane.closest('main')?.hasAttribute('hidden')).toBe(true)
+      expect(pane.hidden).toBe(true)
       expect(host.querySelector('.new-chat-bar')).not.toBeNull()
     })
 
@@ -905,7 +906,7 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       })
       await flush()
       const pane = host.querySelector('.askuni-pane') as HTMLElement
-      expect(pane.closest('main')?.hasAttribute('hidden')).toBe(false)
+      expect(pane.hidden).toBe(false)
       expect(pane.textContent).toContain('First question')
       expect(pane.textContent).toContain('Plain answer')
       expect(composer().value).toBe('half a draft')

@@ -74,6 +74,8 @@ describe('askuni string shard', () => {
       'askUniSources',
       'askUniKindDocument',
       'askUniCitationLabel',
+      // the shell vi copy says "workspace" (72 uses), like the web
+      'askUniWorkspace',
     ])
     for (const lang of LANGS) {
       if (lang === 'en') continue

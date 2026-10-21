@@ -6,7 +6,7 @@ export const vi = {
   askUniModeAsk: 'Hỏi UNI',
   askUniTitle: 'Hỏi UNI',
   askUniDescription: 'UNI chỉ trả lời từ dữ liệu bạn được xem trong workspace này, kèm nguồn.',
-  askUniWorkspace: 'Không gian làm việc',
+  askUniWorkspace: 'Workspace',
   askUniEmptyTitle: 'Bạn muốn biết gì về công việc của đội?',
   askUniEmptyDescription:
     'UNI đọc task, cuộc họp, chat bạn tham gia và thành viên — trả lời kèm nguồn.',

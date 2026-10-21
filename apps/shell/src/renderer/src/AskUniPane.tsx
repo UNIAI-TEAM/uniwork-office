@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement } from 'react'
 import { IconSend, IconStop, Markdown } from '@genoffice/ui'
 import '@genoffice/ui/markdown.css'
@@ -127,9 +127,10 @@ function KindIcon({ kind }: { kind: AskUniCitationKind }): ReactElement {
 /**
  * Ask UNI: the workspace-level question mode of the Home My AI pane. One conversation per
  * session (the id from the server is kept across turns, New chat drops it); the answer renders
- * as safe Markdown with a Sources list under it.
+ * as safe Markdown with a Sources list under it. The Home keeps the pane mounted while the chat
+ * mode is on (`visible` false), so the turns, conversation and draft survive the switch.
  */
-export function AskUniPane(): ReactElement {
+export function AskUniPane({ visible = true }: { visible?: boolean }): ReactElement {
   const { t, lang } = useI18n()
   const [context, setContext] = useState<ContextState>({ status: 'loading' })
   const [pickedWorkspace, setPickedWorkspace] = useState<string | null>(null)
@@ -138,7 +139,9 @@ export function AskUniPane(): ReactElement {
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
   const [openFailed, setOpenFailed] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const stopRef = useRef<HTMLButtonElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const conversationRef = useRef<string | undefined>(undefined)
   // bumped by Stop, New chat and a workspace switch: an answer for an older request is dropped
@@ -163,16 +166,42 @@ export function AskUniPane(): ReactElement {
     return () => {
       alive = false
     }
+  }, [reloadKey])
+
+  const reloadContext = useCallback(() => {
+    setSignedOut(false)
+    setContext({ status: 'loading' })
+    setReloadKey((k) => k + 1)
   }, [])
+
+  // a sign-in done elsewhere is picked up when the pane comes back into view
+  const needsReloadRef = useRef(false)
+  needsReloadRef.current =
+    context.status === 'failed' ||
+    signedOut ||
+    (context.status === 'ready' && !context.ctx.signedIn)
+  const wasVisibleRef = useRef(visible)
+  useEffect(() => {
+    if (visible && !wasVisibleRef.current && needsReloadRef.current) reloadContext()
+    wasVisibleRef.current = visible
+  }, [visible, reloadContext])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ block: 'end' })
   }, [turns, pending])
 
-  // the composer is disabled while an ask is pending: focus comes back when the ask settles
+  // the composer is disabled while an ask is pending: focus moves to Stop, and comes back to the
+  // composer when the ask settles, unless the user has put it somewhere else meanwhile
   const wasPendingRef = useRef(false)
   useEffect(() => {
-    if (wasPendingRef.current && !pending) inputRef.current?.focus()
+    if (pending && !wasPendingRef.current) {
+      stopRef.current?.focus()
+    } else if (!pending && wasPendingRef.current) {
+      const active = document.activeElement
+      if (!active || active === document.body || active === stopRef.current) {
+        inputRef.current?.focus()
+      }
+    }
     wasPendingRef.current = pending
   }, [pending])
 
@@ -282,7 +311,14 @@ export function AskUniPane(): ReactElement {
   if (context.status === 'loading') {
     body = <p className="askuni-note">{t('askUniLoading')}</p>
   } else if (context.status === 'failed') {
-    body = <p className="askuni-note">{t('askUniErrDefault')}</p>
+    body = (
+      <div className="askuni-failed">
+        <p className="askuni-note">{t('askUniErrDefault')}</p>
+        <button type="button" className="new-chat-ghost-btn" onClick={reloadContext}>
+          {t('setRetry')}
+        </button>
+      </div>
+    )
   } else if (!ctx?.signedIn || signedOut) {
     body = <p className="askuni-note">{t('askUniSignedOut')}</p>
   } else if (!workspaceId) {
@@ -376,6 +412,9 @@ export function AskUniPane(): ReactElement {
                           const body = (
                             <>
                               <KindIcon kind={kind} />
+                              <span className="askuni-source-id" aria-hidden="true">
+                                {c.sourceId}
+                              </span>
                               <span className="askuni-source-text">
                                 <span className="askuni-source-title">{c.title}</span>
                                 {c.quote ? (
@@ -450,6 +489,9 @@ export function AskUniPane(): ReactElement {
               </span>
               {pending ? (
                 <button
+                  // distinct keys: the Send button must not reuse the focused Stop node
+                  key="stop"
+                  ref={stopRef}
                   type="button"
                   className="new-chat-send is-stop"
                   onClick={stop}
@@ -460,6 +502,7 @@ export function AskUniPane(): ReactElement {
                 </button>
               ) : (
                 <button
+                  key="send"
                   type="button"
                   className="new-chat-send"
                   disabled={input.trim() === ''}
@@ -478,7 +521,7 @@ export function AskUniPane(): ReactElement {
   }
 
   return (
-    <section className="askuni-pane" aria-label={t('askUniTitle')}>
+    <section className="askuni-pane" aria-label={t('askUniTitle')} hidden={!visible}>
       {body}
     </section>
   )
