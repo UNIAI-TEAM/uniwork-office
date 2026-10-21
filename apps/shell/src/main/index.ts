@@ -327,6 +327,7 @@ import { UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { OPEN_DIALOG_EXTENSIONS } from '../shared/open-extensions'
 import { extractAllowedFileExcerpts } from './file-excerpts'
 import { isAllowedWbKey, type WbKvMap } from './workbench-db'
+import { ACTIVE_WORKSPACE_STORE_KEY } from './uniwork-askuni/service'
 import { WorkbenchAccounts, loadWorkbenchSnapshot } from './workbench-accounts'
 import { exportWorkbenchBackup, importWorkbenchBackup } from './workbench-backup'
 import {
@@ -4298,6 +4299,11 @@ function uniworkDocsWiring() {
     shellWindow: () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow : null),
     shellContents: () =>
       shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null,
+    // UNI-2069: Ask UNI starts on the workspace the Home doclist picked (same bucket + key)
+    activeWorkspaceId: () => {
+      const accounts = workbenchAccounts()
+      return accounts.dbFor(accounts.bucket())?.get(ACTIVE_WORKSPACE_STORE_KEY) || null
+    },
     openPath: (path: string) => openDocumentPath(path),
     // G5-04g: a newer-store working copy is locked, never routed to a module
     refuseLockedPath: (path: string) => refuseLockedOpenPath(uniworkDocs?.service, path),
