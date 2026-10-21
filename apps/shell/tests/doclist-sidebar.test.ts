@@ -510,28 +510,47 @@ describe('RV-13: the tile glyph keeps its tone at rest, on hover and on the curr
   })
 })
 
-describe('RV-14: the sidebar below the nav is one scrolling column (tree + sources)', () => {
-  it('the folders and the sources section share one scroller; the nav stays outside it', async () => {
+describe('RV-14 / VS-9: the whole Documents sidebar is one scrolling column (nav + tree + sources)', () => {
+  // the web's documents-sidebar.tsx is one `<nav class="flex min-h-0 flex-col overflow-y-auto">` around the
+  // nav rows, the folder tree and the sources section: a short window scrolls the nav away, the tree and
+  // the sources keep a normal-height viewport. A scroller only around the tree + sources left them 16px.
+  it('the sub-nav, the folders and the sources section all sit inside .dh-sidebar-wrap, with no scroller between', async () => {
     await mount('workspace')
-    const scroller = sourceSection()!.closest<HTMLElement>('.dl-side-scroll')
-    expect(scroller, 'a .dl-side-scroll column around the section').not.toBeNull()
-    expect(scroller!.contains(sidebarSlot.querySelector('.dh-sidebar-folders'))).toBe(true)
-    expect(scroller!.contains(sideTree())).toBe(true)
-    expect(scroller!.contains(sidebarSlot.querySelector('.dh-subnav'))).toBe(false)
-    // the scroller is a direct child of the sidebar wrap, after the nav
-    expect(scroller!.parentElement?.classList.contains('dh-sidebar-wrap')).toBe(true)
+    const wrap = sourceSection()!.closest<HTMLElement>('.dh-sidebar-wrap')
+    expect(wrap, 'the sidebar wrap around the section').not.toBeNull()
+    expect(wrap!.contains(sidebarSlot.querySelector('.dh-subnav'))).toBe(true)
+    expect(wrap!.contains(sidebarSlot.querySelector('.dh-sidebar-folders'))).toBe(true)
+    expect(wrap!.contains(sideTree())).toBe(true)
+    // the old inner column is gone: nothing between the wrap and its blocks is a scroller of its own
+    expect(sidebarSlot.querySelector('.dl-side-scroll')).toBeNull()
+    expect(sourceSection()!.parentElement).toBe(wrap)
+    expect(sidebarSlot.querySelector('.dh-sidebar-folders')!.parentElement).toBe(wrap)
+    expect(sidebarSlot.querySelector('.dh-subnav')!.parentElement).toBe(wrap)
   })
 
-  it('the css lets that column scroll and its children take their natural height', () => {
-    const body = (selector: string) =>
-      cssRules(sidebarCss).find((r) => r.selectors.includes(selector))?.body ?? ''
-    expect(body('.dl-side-scroll')).toMatch(/overflow-y:\s*auto/)
-    expect(body('.dl-side-scroll')).toMatch(/min-height:\s*0/)
-    expect(body('.dl-side-scroll')).toMatch(/flex:\s*1/)
-    // the folders block and the tree no longer squeeze or clip themselves inside it
-    expect(body('.dl-side-scroll .dh-sidebar-folders')).toMatch(/flex:\s*none/)
-    expect(body('.dl-side-scroll .dh-sidebar-tree')).toMatch(/flex:\s*none/)
-    expect(body('.dl-side-scroll .dh-sidebar-tree')).toMatch(/overflow(-y)?:\s*visible/)
+  it('the sources section comes after the folder tree, which comes after the nav', async () => {
+    await mount('workspace')
+    const nav = sidebarSlot.querySelector('.dh-subnav')!
+    const folders = sidebarSlot.querySelector('.dh-sidebar-folders')!
+    const follows = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(nav, folders)).toBe(true)
+    expect(follows(folders, sourceSection()!)).toBe(true)
+  })
+
+  it('the css makes the wrap the only scroller; the blocks keep their natural height', () => {
+    const rules = cssRules(sidebarCss)
+    const body = (selector: string) => rules.find((r) => r.selectors.includes(selector))?.body ?? ''
+    expect(body('.dh-sidebar-wrap')).toMatch(/overflow-y:\s*auto/)
+    expect(body('.dh-sidebar-wrap')).toMatch(/min-height:\s*0/)
+    // the sub-nav, the folders block and the tree no longer squeeze or clip themselves inside it
+    expect(body('.dh-sidebar-wrap > .dh-subnav')).toMatch(/flex:\s*none/)
+    expect(body('.dh-sidebar-wrap > .dh-sidebar-folders')).toMatch(/flex:\s*none/)
+    expect(body('.dh-sidebar-wrap .dh-sidebar-tree')).toMatch(/flex:\s*none/)
+    expect(body('.dh-sidebar-wrap .dh-sidebar-tree')).toMatch(/overflow(-y)?:\s*visible/)
+    // exactly one overflow scroller declared for the sidebar by this sheet
+    const scrollers = rules.filter((r) => /overflow(-y)?:\s*(auto|scroll)/.test(r.body))
+    expect(scrollers.flatMap((r) => r.selectors)).toEqual(['.dh-sidebar-wrap'])
   })
 })
 
