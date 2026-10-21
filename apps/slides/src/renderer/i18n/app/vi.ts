@@ -242,6 +242,7 @@ export const vi = {
   appStatusBarSlide: 'Trang chiếu {current} trên {total}',
   appStatusBarReady: 'Sẵn sàng',
   appMediaCloseTitle: 'Đóng (Esc)',
+  appMediaCloseName: 'Đóng',
   appRehearseTitle: 'Thử trước thời gian',
   appRehearseSummary:
     'Tổng thời gian cho buổi trình chiếu là {duration}. Bạn có muốn lưu thời gian trang chiếu để tự động chuyển trang không?',

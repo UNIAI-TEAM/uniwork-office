@@ -228,6 +228,7 @@ export const zh = {
   appStatusBarSlide: '幻灯片 {current} / {total}',
   appStatusBarReady: '就绪',
   appMediaCloseTitle: '关闭 (Esc)',
+  appMediaCloseName: '关闭',
   appRehearseTitle: '排练计时',
   appRehearseSummary: '本次放映总时长 {duration}。是否保存每页停留时间作为自动换片时间？',
   appRehearseDiscard: '不保存',

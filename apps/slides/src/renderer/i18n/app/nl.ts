@@ -255,6 +255,7 @@ export const nl = {
   appStatusBarSlide: 'Dia {current} van {total}',
   appStatusBarReady: 'Gereed',
   appMediaCloseTitle: 'Sluiten (Esc)',
+  appMediaCloseName: 'Sluiten',
   appRehearseTitle: 'Try-out',
   appRehearseSummary:
     'De totale duur van de voorstelling was {duration}. Wilt u de diatijden opslaan voor automatische diadoorloop?',

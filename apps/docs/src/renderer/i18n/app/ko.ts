@@ -246,6 +246,7 @@ export const ko = {
   appSplitPaneLabel: '분할 창(읽기 전용 미리 보기, 독립 스크롤 가능)',
   appRemoveSplit: '분할 제거',
   appExitReadMode: '읽기 모드 끝내기 (Esc)',
+  appExitReadModeName: '읽기 모드 끝내기',
   appExpandAiPanel: 'AI 편집 패널 펼치기',
   appAiRail: 'AI',
   // Status bar / word count

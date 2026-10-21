@@ -256,6 +256,7 @@ export const de = {
   appStatusBarSlide: 'Folie {current} von {total}',
   appStatusBarReady: 'Bereit',
   appMediaCloseTitle: 'Schließen (Esc)',
+  appMediaCloseName: 'Schließen',
   appRehearseTitle: 'Neue Einblendezeiten testen',
   appRehearseSummary:
     'Die Gesamtdauer der Bildschirmpräsentation betrug {duration}. Möchten Sie die Anzeigedauer der einzelnen Folien für den automatischen Folienwechsel speichern?',

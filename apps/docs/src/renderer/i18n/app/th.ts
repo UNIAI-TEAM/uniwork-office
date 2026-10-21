@@ -231,6 +231,7 @@ export const th = {
   appSplitPaneLabel: 'แยกหน้าต่าง (ตัวอย่างแบบอ่านอย่างเดียว เลื่อนแยกกันได้)',
   appRemoveSplit: 'ยกเลิกการแยก',
   appExitReadMode: 'ออกจากมุมมองการอ่าน (Esc)',
+  appExitReadModeName: 'ออกจากมุมมองการอ่าน',
   appExpandAiPanel: 'ขยายแผงแก้ไข AI',
   appAiRail: 'AI',
   appPageOf: 'หน้า {current} จาก {total}',

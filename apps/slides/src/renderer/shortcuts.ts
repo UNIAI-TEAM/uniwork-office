@@ -5,6 +5,7 @@
  * application menu reads the same rows through shared/slides-shortcuts.ts.
  */
 import {
+  ariaKeyshortcuts,
   formatHint,
   matchShortcut,
   slidesShortcuts,
@@ -47,4 +48,31 @@ export function brushTipKbd(): string | undefined {
 /** `data-tip-kbd` value: the hint, or undefined so an action without a key shows none. */
 export function slidesTipKbd(id: string): string | undefined {
   return slidesHint(id) || undefined
+}
+
+/**
+ * `aria-keyshortcuts` value (`Control+S`, `Meta+S`) for one or more table rows on this platform and
+ * surface (several rows: space-joined, as Format Painter's copy and paste keys); '' when none has a key.
+ */
+export function slidesAria(
+  ids: string | readonly string[],
+  platform: ShortcutPlatform = shortcutPlatform(),
+): string {
+  return (typeof ids === 'string' ? [ids] : ids)
+    .map((id) => ariaKeyshortcuts(slidesShortcut(id), platform, shortcutSurface()))
+    .filter(Boolean)
+    .join(' ')
+}
+
+/** `aria-keyshortcuts` attribute value: undefined (no attribute) when the rows have no key here. */
+export function slidesAriaProp(ids: string | readonly string[]): string | undefined {
+  return slidesAria(ids) || undefined
+}
+
+/** a trailing "(⌘S)" / "（⌘X）" / "(Ctrl+S)" of a translated label: the old hand-written hint */
+const TRAILING_HINT = /\s*[(（][^()（）]*(?:⌘|⌃|⌥|⇧|Ctrl|Cmd|Alt\b|Shift)[^()（）]*[)）]\s*$/
+
+/** an accessible name: the label without its hand-written hint, never a chord (that is `slidesAria`) */
+export function slidesPlainLabel(label: string): string {
+  return label.replace(TRAILING_HINT, '')
 }

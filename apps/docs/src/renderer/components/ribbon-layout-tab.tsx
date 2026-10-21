@@ -7,7 +7,7 @@ import { PaperSizeDialog } from './PaperSizeDialog'
 import { insertColumnBreak, insertTextWrappingBreak } from '../editor/page-break'
 import { setFloatingWrap, shapeWrapOf } from '../editor/floating-z-order'
 import { useI18n, type StringKey } from '../i18n/locale'
-import { shortcutHint } from '../shortcuts'
+import { shortcutAria, shortcutHint } from '../shortcuts'
 import { useMeasurement } from '../use-measurement'
 import {
   IconCaret,
@@ -526,7 +526,11 @@ export function LayoutTab({
             {dropdown === 'sectbreak' && (
               <div data-rb-panel="" className="layout-menu">
                 <div className="layout-menu-head">{t('ribbonBreaksPageGroup')}</div>
+                {/* the row is named by its title; the description (with the key) describes it */}
                 <button
+                  aria-label={t('ribbonBreakPage')}
+                  aria-description={t('ribbonBreakPageDesc', { keys: shortcutHint('page-break') })}
+                  aria-keyshortcuts={shortcutAria('page-break') || undefined}
                   onClick={() => {
                     insertPageBreakAt(editor)
                     setDropdown(() => null)
@@ -536,6 +540,11 @@ export function LayoutTab({
                   <span>{t('ribbonBreakPageDesc', { keys: shortcutHint('page-break') })}</span>
                 </button>
                 <button
+                  aria-label={t('ribbonBreakColumn')}
+                  aria-description={t('ribbonBreakColumnDesc', {
+                    keys: shortcutHint('column-break'),
+                  })}
+                  aria-keyshortcuts={shortcutAria('column-break') || undefined}
                   onClick={() => {
                     insertColumnBreak(editor)
                     setDropdown(() => null)

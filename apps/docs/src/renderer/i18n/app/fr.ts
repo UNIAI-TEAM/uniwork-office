@@ -244,6 +244,7 @@ export const fr = {
   appSplitPaneLabel: 'Volet fractionné (aperçu en lecture seule, défilement indépendant)',
   appRemoveSplit: 'Annuler le fractionnement',
   appExitReadMode: 'Quitter le mode Lecture (Échap)',
+  appExitReadModeName: 'Quitter le mode Lecture',
   appExpandAiPanel: "Développer le volet d'édition IA",
   appAiRail: 'AI',
   appPageOf: 'Page {current} sur {total}',

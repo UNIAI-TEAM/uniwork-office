@@ -229,6 +229,7 @@ export const en = {
   appSplitPaneLabel: 'Split pane (read-only preview, scrolls independently)',
   appRemoveSplit: 'Remove Split',
   appExitReadMode: 'Exit Read Mode (Esc)',
+  appExitReadModeName: 'Exit Read Mode',
   appExpandAiPanel: 'Expand the AI editing pane',
   appAiRail: 'AI',
   appPageOf: 'Page {current} of {total}',

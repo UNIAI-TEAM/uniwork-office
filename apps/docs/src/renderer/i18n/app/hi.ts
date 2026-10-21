@@ -233,6 +233,7 @@ export const hi = {
   appSplitPaneLabel: 'विभाजित फलक (केवल-पठन पूर्वावलोकन, स्वतंत्र स्क्रॉल)',
   appRemoveSplit: 'विभाजन हटाएँ',
   appExitReadMode: 'पठन मोड से बाहर निकलें (Esc)',
+  appExitReadModeName: 'पठन मोड से बाहर निकलें',
   appExpandAiPanel: 'AI संपादन पैनल विस्तृत करें',
   appAiRail: 'AI',
   appPageOf: 'पृष्ठ {current}, कुल {total}',

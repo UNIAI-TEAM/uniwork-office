@@ -78,7 +78,7 @@ import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 import type { AiSettings } from '@genoffice/ai-provider/browser'
 import { uiOp } from './editor/ops'
 import { cap, platform } from './capabilities'
-import { markdownWindowCommand } from './shortcuts'
+import { markdownAria, markdownWindowCommand } from './shortcuts'
 import { cleanDraftName } from '../shared/draft-name'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -1293,6 +1293,9 @@ export default function App() {
     prevMatch: t('prevMatch'),
     nextMatch: t('nextMatch'),
     closeEsc: t('closeEsc'),
+    prevName: t('prevName'),
+    nextName: t('nextName'),
+    closeName: t('closeName'),
     replace: t('replace'),
     replaceAll: t('replaceAll'),
   }
@@ -1477,6 +1480,7 @@ export default function App() {
                 type="button"
                 className="zoom-btn"
                 aria-label={t('zoomOut')}
+                aria-keyshortcuts={markdownAria('zoomOut') || undefined}
                 onClick={zoomOut}
                 disabled={zoom <= MIN_ZOOM}
               >
@@ -1496,6 +1500,7 @@ export default function App() {
                 type="button"
                 className="zoom-btn"
                 aria-label={t('zoomIn')}
+                aria-keyshortcuts={markdownAria('zoomIn') || undefined}
                 onClick={zoomIn}
                 disabled={zoom >= MAX_ZOOM}
               >
@@ -1529,6 +1534,7 @@ export default function App() {
             fitToWindow: t('imageFitWindow'),
             save: t('saveImageAs'),
             close: t('closeEsc'),
+            closeName: t('closeName'),
           }}
           onClose={() => setViewImage(null)}
           onSave={() => void window.markdownApi.saveImageAs(viewImage)}

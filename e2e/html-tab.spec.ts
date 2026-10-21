@@ -458,7 +458,7 @@ test.describe('html editor', () => {
       const editorPage = await waitForPageWithUrl(app, '://html/')
       await expect(editorPage.locator('.ribbon-body')).toBeVisible()
       const frame = editorPage.frameLocator('.preview-frame')
-      const undoBtn = editorPage.locator('.ribbon').getByRole('button', { name: /^Undo\b/ })
+      const undoBtn = editorPage.locator('.ribbon').getByRole('button', { name: /^Undo$/ })
       await expect(frame.locator('p.note')).toHaveText('Beta')
       await expect(undoBtn).toBeDisabled()
 

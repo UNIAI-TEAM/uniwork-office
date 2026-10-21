@@ -226,6 +226,7 @@ export const ar = {
   appSplitPaneLabel: 'جزء مقسوم (معاينة للقراءة فقط، تمرير مستقل)',
   appRemoveSplit: 'إزالة التقسيم',
   appExitReadMode: 'إنهاء وضع القراءة (Esc)',
+  appExitReadModeName: 'إنهاء وضع القراءة',
   appExpandAiPanel: 'توسيع لوحة تحرير الذكاء الاصطناعي',
   appAiRail: 'AI',
   appPageOf: 'الصفحة {current} من {total}',

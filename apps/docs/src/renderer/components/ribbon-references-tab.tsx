@@ -15,6 +15,7 @@ import { Dropdown } from '@genoffice/ui'
 import { AppOnlyNote } from './AppOnlyNote'
 import { PromptModal } from './PromptModal'
 import { cap } from '../capabilities'
+import { shortcutAria } from '../shortcuts'
 import { collectHeadings } from '../editor/headings'
 import { t, useI18n, type StringKey } from '../i18n/locale'
 import {
@@ -634,6 +635,7 @@ export function ReferencesTab({
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonFootnoteTip')}
+            aria-keyshortcuts={shortcutAria('footnote') || undefined}
             onClick={() => onInsertNote('footnote')}
           >
             <span className="rb-big-icon">
@@ -645,6 +647,7 @@ export function ReferencesTab({
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonEndnoteTip')}
+            aria-keyshortcuts={shortcutAria('endnote') || undefined}
             onClick={() => onInsertNote('endnote')}
           >
             <span className="rb-big-icon">
