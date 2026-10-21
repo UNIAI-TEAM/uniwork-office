@@ -28,7 +28,9 @@ describe('folder-upload.css', () => {
   })
 
   it('FU-V7: the rename note has room above it', () => {
-    expect(rule('.fu-note')).toMatch(/margin:\s*10px 0 0/)
+    expect(rule('.fu-dialog .fu-note')).toMatch(/margin:\s*10px 0 0/)
+    // .modal p (0,1,1) would otherwise beat a bare .fu-note (0,1,0)
+    expect(rule('.fu-note')).toBe('')
   })
 
   it('FU-V3: the bars keep a fixed corner as the fallback until the pane is measured', () => {

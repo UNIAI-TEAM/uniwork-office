@@ -58,6 +58,7 @@ import {
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
 import { createShareClientProvider, createUniworkShareService } from './share-service'
+import { registerUniworkAskUni } from '../uniwork-askuni'
 import {
   createUniworkComments,
   type DiscussionPushTarget,
@@ -131,6 +132,8 @@ import {
 
 export interface UniworkDocsWiring {
   shellWindow(): BrowserWindow | null
+  /** UNI-2069: the workspace the Home doclist last picked (its workbench-store key), for Ask UNI */
+  activeWorkspaceId?(): string | null
   shellContents(): WebContents | null
   openPath(path: string): boolean
   /**
@@ -1081,6 +1084,24 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.bulk, (_event, plan: unknown) =>
     shareService.bulk(plan as Parameters<typeof shareService.bulk>[0]),
   )
+  // UNI-2069: Ask UNI (`uniwork:askuni:*`); its workspace list and current pick are the doclist's
+  registerUniworkAskUni(ipcMain, {
+    profile: () => uniworkDeploymentProfile(),
+    authorized: (call) => authorizedRequest(call),
+    isSignedIn: () => uniworkSessionIdentity() !== null,
+    scopeKey: () => {
+      const identity = uniworkSessionIdentity()
+      return identity
+        ? `${identity.deploymentId}:${identity.accountId}:${uniworkAccount().status().org?.id ?? ''}`
+        : null
+    },
+    selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
+    activeWorkspaceId: () => wiring.activeWorkspaceId?.() ?? null,
+    packaged: app.isPackaged,
+    env: process.env,
+    openDocument: (documentId) => service.openDocument(documentId),
+    openExternal: (url) => shell.openExternal(url),
+  })
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
     service.listSources((query ?? {}) as UniworkSourceListQuery),
   )
