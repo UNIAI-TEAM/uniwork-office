@@ -1113,6 +1113,14 @@ function ShapeFillMenu({
   )
 }
 
+/** Format commands with a table row: the chord goes to `aria-keyshortcuts` of their button. */
+const FORMAT_SHORTCUT_ROWS: Partial<Record<FormatCmd, string>> = {
+  bold: 'slides-48',
+  italic: 'slides-49',
+  underline: 'slides-50',
+  removeFormat: 'slides-53',
+}
+
 /** The File menu's key label from the slides shortcut table; none when the action has no key here. */
 function FileMenuKey({ id }: { id: string }) {
   const hint = slidesHint(id)
@@ -1658,6 +1666,7 @@ export function Ribbon({
       disabled={!editing}
       data-tip={editing ? title : t('ribbonEditableHint', { title })}
       aria-label={title}
+      aria-keyshortcuts={slidesAriaProp(FORMAT_SHORTCUT_ROWS[cmd] ?? [])}
       onMouseDown={(e) => {
         e.preventDefault()
         if (editing) onFormat(cmd)
@@ -1964,6 +1973,7 @@ export function Ribbon({
                 key={tb}
                 className={`ribbon-tab ${collapse.tabClass(tab === tb)}`}
                 data-tip={collapse.tabTip(tab === tb)}
+                aria-keyshortcuts={collapse.tabKeyshortcuts(tab === tb)}
                 onClick={() => {
                   collapse.onTabPress(tab === tb)
                   setTab(tb)
@@ -1982,6 +1992,7 @@ export function Ribbon({
                 setTab(contextTab)
               }}
               data-tip={collapse.tabTip(tab === contextTab) ?? t(TAB_LABEL[contextTab])}
+              aria-keyshortcuts={collapse.tabKeyshortcuts(tab === contextTab)}
             >
               {t(TAB_LABEL[contextTab])}
             </button>
@@ -2562,6 +2573,7 @@ export function Ribbon({
                 disabled={!hasDoc}
                 onClick={() => onPresenterView(true)}
                 data-tip={t('ribbonPresenterViewTip')}
+                aria-keyshortcuts={slidesAriaProp('slides-24')}
               >
                 <span className="rb-big-icon">
                   <IconPresenterView size={BIG} />
@@ -2683,6 +2695,7 @@ export function Ribbon({
                 disabled={!hasDoc}
                 onClick={onNewComment}
                 data-tip={t(serverComments ? 'ribbonNewCommentServerTip' : 'ribbonNewCommentTip')}
+                aria-keyshortcuts={slidesAriaProp('slides-47')}
               >
                 <span className="rb-big-icon">
                   <IconComment size={BIG} />
@@ -2819,6 +2832,7 @@ export function Ribbon({
                 disabled={!hasDoc}
                 onClick={onZoomFit}
                 data-tip={t('ribbonFitWindowTip')}
+                aria-keyshortcuts={slidesAriaProp('slides-68')}
               >
                 <span className="rb-big-icon">
                   <IconFitWindow size={BIG} />

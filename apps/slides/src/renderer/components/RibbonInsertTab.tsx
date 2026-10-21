@@ -371,6 +371,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
           }}
           onClick={onOpenLink}
           title={hasSelection || editing ? t('ribbonLinkTip') : t('ribbonLinkTipDisabled')}
+          aria-keyshortcuts={slidesAriaProp('slides-59')}
         >
           <span className="rb-big-icon">
             <IconLink size={BIG} />
@@ -405,6 +406,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
           disabled={!hasDoc}
           onClick={onNewComment}
           data-tip={t(serverComments ? 'ribbonNewCommentServerTip' : 'ribbonNewCommentTip')}
+          aria-keyshortcuts={slidesAriaProp('slides-47')}
         >
           <span className="rb-big-icon">
             <IconComment size={BIG} />

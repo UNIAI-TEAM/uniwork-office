@@ -241,6 +241,7 @@ export const ja = {
   appStatusBarSlide: 'スライド {current} / {total}',
   appStatusBarReady: '準備完了',
   appMediaCloseTitle: '閉じる (Esc)',
+  appMediaCloseName: '閉じる',
   appRehearseTitle: 'リハーサル',
   appRehearseSummary:
     'スライドショーの所要時間は {duration} でした。各スライドの表示時間を自動切り替えのタイミングとして保存しますか？',

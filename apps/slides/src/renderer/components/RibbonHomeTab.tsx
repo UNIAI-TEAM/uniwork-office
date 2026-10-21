@@ -828,6 +828,9 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
                 className="rb-icon"
                 disabled={!editing && !hasSelection}
                 data-tip={title}
+                aria-keyshortcuts={slidesAriaProp(
+                  kind === 'bold' ? 'slides-48' : kind === 'italic' ? 'slides-49' : 'slides-50',
+                )}
                 aria-label={title}
                 onMouseDown={(e) => {
                   e.preventDefault()

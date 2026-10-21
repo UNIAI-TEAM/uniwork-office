@@ -141,9 +141,7 @@ describe.each<ShortcutPlatform>(['win', 'mac'])(
     it('no ribbon control carries a chord in its accessible name', () => {
       const controls = allControls(mount())
       expect(controls.length).toBeGreaterThan(40)
-      // the shared collapse / expand buttons live in packages/ui and are covered by its own lock test
-      const own = controls.filter((c) => !c.matches('.ribbon-collapse-btn, .ribbon-expand-btn'))
-      const bad = own
+      const bad = controls
         .map((c) => ({ name: nameOf(c), tag: c.outerHTML.slice(0, 120) }))
         .filter(({ name }) => findDisplayChord(name) !== null)
       expect(bad).toEqual([])
@@ -198,6 +196,65 @@ describe.each<ShortcutPlatform>(['win', 'mac'])(
         }
       }
       expect(seen.length).toBeGreaterThan(3)
+    })
+  },
+)
+
+describe.each<ShortcutPlatform>(['win', 'mac'])(
+  'Slides buttons whose tooltip shows no chord still carry their row (%s)',
+  (platform) => {
+    beforeEach(() => {
+      vi.spyOn(navigator, 'platform', 'get').mockReturnValue(
+        platform === 'mac' ? 'MacIntel' : 'Win32',
+      )
+    })
+
+    const want = (id: string) =>
+      ariaKeyshortcuts(findShortcut('slides', id)!, platform, shortcutSurface())
+
+    it('the selected ribbon tab announces the collapse key', () => {
+      const el = mount()
+      const selected = el.querySelector<HTMLElement>('.ribbon-tab.active')!
+      const keys = selected.getAttribute('aria-keyshortcuts')
+      expect(keys, 'selected tab').toBeTruthy()
+      expect(keys!.split(' ')[0]).toBe(
+        ariaKeyshortcuts(findShortcut('common', 'common-10')!, platform, shortcutSurface()),
+      )
+      for (const other of el.querySelectorAll<HTMLElement>(
+        '.ribbon-tab:not(.active):not(.ribbon-tab-file)',
+      )) {
+        expect(other.getAttribute('aria-keyshortcuts'), nameOf(other)).toBeNull()
+      }
+    })
+
+    it.each([
+      ['home', 'Bold', 'slides-48'],
+      ['home', 'Italic', 'slides-49'],
+      ['home', 'Underline', 'slides-50'],
+      ['home', 'Clear All Formatting', 'slides-53'],
+      ['insert', 'Link', 'slides-59'],
+      ['insert', 'Comment', 'slides-47'],
+      ['slideShow', 'Presenter View', 'slides-24'],
+      ['review', 'New Comment', 'slides-47'],
+      ['view', 'Fit to Window', 'slides-68'],
+    ])('%s tab: %s -> %s', (tabKey, name, id) => {
+      const el = mount()
+      const tabs = otherTabs(el)
+      const labels: Record<string, string> = {
+        home: 'Home',
+        insert: 'Insert',
+        slideShow: 'Slide Show',
+        review: 'Review',
+        view: 'View',
+      }
+      const tab = tabs.find((t) => t.textContent === labels[tabKey])!
+      act(() => tab.click())
+      const control = [...el.querySelectorAll<HTMLElement>('button')].find(
+        (b) => nameOf(b) === name || b.textContent?.trim() === name,
+      )
+      expect(control, `${name} button on ${tabKey}`).toBeTruthy()
+      expect(control!.getAttribute('aria-keyshortcuts')).toBe(want(id))
+      expect(findDisplayChord(nameOf(control!))).toBeNull()
     })
   },
 )
