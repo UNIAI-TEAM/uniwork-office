@@ -532,13 +532,14 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.querySelector('.folder-panel')).toBeNull()
     expect(host.textContent).toContain('Root Cloud Doc.docx')
 
-    // DocumentsHome sub-nav in UniWork area renders the 6 available entries (My Folder is a tree row; Lưu trữ since UNI-1961) and hides starred
+    // DocumentsHome sub-nav in UniWork area renders the 7 available entries (My Folder is a tree row; Lưu trữ since UNI-1961; Gắn sao since UNI-2047 B6)
     const uwNavIds = Array.from(host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item')).map(
       (el) => el.getAttribute('data-nav'),
     )
     expect(uwNavIds).toEqual([
       'workspace',
       'recent',
+      'starred',
       'shared-with-me',
       'shared-by-me',
       'archive',
