@@ -1478,3 +1478,185 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* UNI-2047 A-REC: Recent on the recent-canvas layout. The title sits over a muted subtitle, the
+   segment shares the filter row with the type chips and the two selects sit at its far end,
+   and "Mở tiếp" shows four cards for the last touches above the list. */
+.dh-title-group.dh-title-stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.dh-subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.dh-filter-bar.has-lead .dh-filter-chips + .dh-filter-chip {
+  margin-inline-start: auto;
+}
+
+.dh-continue {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dh-continue-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dh-continue-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dh-continue-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dh-continue-card:hover {
+  border-color: var(--border-control);
+  background: var(--hover);
+}
+
+.dh-continue-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dh-continue-card[aria-busy='true'] {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+/* the preview is a decorative sheet in the file type's tint (chrome: it follows the theme) */
+.dh-continue-preview {
+  --ct-bg: var(--tint-gray);
+  --ct-fg: var(--tint-gray-fg);
+  display: flex;
+  justify-content: center;
+  height: 116px;
+  background: var(--ct-bg);
+}
+
+.dh-continue-preview[data-type='docx'],
+.dh-continue-preview[data-type='page'] {
+  --ct-bg: var(--tint-blue);
+  --ct-fg: var(--tint-blue-fg);
+}
+
+.dh-continue-preview[data-type='xlsx'] {
+  --ct-bg: var(--tint-green);
+  --ct-fg: var(--tint-green-fg);
+}
+
+.dh-continue-preview[data-type='pptx'] {
+  --ct-bg: var(--tint-orange);
+  --ct-fg: var(--tint-orange-fg);
+}
+
+.dh-continue-preview[data-type='pdf'] {
+  --ct-bg: var(--danger-bg);
+  --ct-fg: var(--danger-text);
+}
+
+.dh-continue-preview[data-type='md'] {
+  --ct-bg: var(--tint-violet);
+  --ct-fg: var(--tint-violet-fg);
+}
+
+.dh-continue-preview[data-type='html'] {
+  --ct-bg: var(--tint-teal);
+  --ct-fg: var(--tint-teal-fg);
+}
+
+.dh-continue-sheet {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-end;
+  gap: 6px;
+  width: 70%;
+  height: 74%;
+  padding: 12px 12px 0;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--surface);
+}
+
+.dh-continue-line {
+  display: block;
+  width: 88%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+.dh-continue-line.accent {
+  width: 54%;
+  height: 7px;
+  background: var(--ct-fg);
+}
+
+.dh-continue-line.mid {
+  width: 80%;
+}
+
+.dh-continue-line.short {
+  width: 72%;
+}
+
+.dh-continue-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.dh-continue-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dh-continue-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-continue-when {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .dh-continue-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

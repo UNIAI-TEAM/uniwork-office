@@ -143,6 +143,8 @@ describe('DocList: the special cells and groups (UNI-2047 A2c)', () => {
       el.getAttribute('data-doc-id'),
     )
   const groupHeaders = () => Array.from(host.querySelectorAll<HTMLElement>('.dh-group-row'))
+  // a header reads "Hôm nay · 2 tài liệu" (A-REC): the label is what comes before the count
+  const labelOf = (el: Element) => (el.textContent ?? '').replace(/·.*$/, '').trim()
   const groupToggle = (label: string) =>
     groupHeaders()
       .map((row) => row.querySelector<HTMLButtonElement>('button'))
@@ -266,16 +268,11 @@ describe('DocList: the special cells and groups (UNI-2047 A2c)', () => {
   describe('groups', () => {
     it('Recent: Hôm nay / Hôm qua / Tuần này / Trước đó, rows under their header in order', async () => {
       await mount('recent', RECENT)
-      expect(groupHeaders().map((row) => row.textContent?.trim())).toEqual([
-        'Hôm nay',
-        'Hôm qua',
-        'Tuần này',
-        'Trước đó',
-      ])
+      expect(groupHeaders().map(labelOf)).toEqual(['Hôm nay', 'Hôm qua', 'Tuần này', 'Trước đó'])
       // headers sit between the rows of their group, in the one flat row order
       const order = Array.from(
         host.querySelectorAll('.dh-group-row, [role="row"][data-doc-id]'),
-      ).map((el) => el.getAttribute('data-doc-id') ?? el.textContent?.trim())
+      ).map((el) => el.getAttribute('data-doc-id') ?? labelOf(el))
       expect(order).toEqual([
         'Hôm nay',
         'r-today',
@@ -290,12 +287,7 @@ describe('DocList: the special cells and groups (UNI-2047 A2c)', () => {
 
     it('Recent in English', async () => {
       await mount('recent', RECENT, 'en')
-      expect(groupHeaders().map((row) => row.textContent?.trim())).toEqual([
-        'Today',
-        'Yesterday',
-        'This week',
-        'Earlier',
-      ])
+      expect(groupHeaders().map(labelOf)).toEqual(['Today', 'Yesterday', 'This week', 'Earlier'])
     })
 
     it('Shared with me: Tuần này / Trước đó by the date shared', async () => {
@@ -303,7 +295,7 @@ describe('DocList: the special cells and groups (UNI-2047 A2c)', () => {
         shared('s-new', iso(2026, 10, 20, 9, 0)),
         shared('s-old', iso(2026, 10, 12, 9, 0)),
       ])
-      expect(groupHeaders().map((row) => row.textContent?.trim())).toEqual(['Tuần này', 'Trước đó'])
+      expect(groupHeaders().map(labelOf)).toEqual(['Tuần này', 'Trước đó'])
     })
 
     it('Shared by me and Starred do not group', async () => {
@@ -381,12 +373,7 @@ describe('DocList: the special cells and groups (UNI-2047 A2c)', () => {
     it('still group when the screen column is sorted oldest first (the runs run the other way)', async () => {
       writeSort('recent', { column: 'activity', dir: 'asc' })
       await mount('recent', RECENT)
-      expect(groupHeaders().map((row) => row.textContent?.trim())).toEqual([
-        'Trước đó',
-        'Tuần này',
-        'Hôm qua',
-        'Hôm nay',
-      ])
+      expect(groupHeaders().map(labelOf)).toEqual(['Trước đó', 'Tuần này', 'Hôm qua', 'Hôm nay'])
     })
 
     it('a store that cannot be read or written still renders every group open, and toggling works in the session', async () => {
@@ -688,7 +675,9 @@ describe('DocumentsHome: the Recent segment sends activity (UNI-2047 A2c)', () =
   it('Recent shows its groups with the rows of the loaded page', async () => {
     await mount('recent')
     expect(
-      Array.from(host.querySelectorAll('.dh-group-row')).map((row) => row.textContent?.trim()),
+      Array.from(host.querySelectorAll('.dh-group-row')).map((row) =>
+        (row.textContent ?? '').replace(/·.*$/, '').trim(),
+      ),
     ).toEqual(['Hôm nay', 'Hôm qua', 'Tuần này', 'Trước đó'])
   })
 

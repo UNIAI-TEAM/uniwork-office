@@ -120,6 +120,7 @@ import {
 import { DocList } from '../doclist/DocList'
 import { defaultSort } from '../doclist/columns'
 import { copyDocLink } from '../doclist/copy-link'
+import { ContinueStrip, continueDocsOf } from '../doclist/ContinueStrip'
 import { FilterBar, useDocListFilters } from '../doclist/FilterBar'
 import { buildRowMenu } from '../doclist/row-menu'
 import type { DocSubline } from '../doclist/DocRow'
@@ -1627,6 +1628,12 @@ export function DocumentsHome({
     }
     const workspace = doc.workspaceName?.trim()
     if (subView === 'shared-with-me' && workspace) return { short: workspace, full: workspace }
+    if (subView === 'recent') {
+      // the board's "where" line: the folder the document sits in (the root has its own name; a
+      // folder the loaded tree does not hold is not guessed)
+      const parent = doc.parentId ? index.get(doc.parentId)?.title : t('ufRoot')
+      return parent ? { short: parent, full: parent } : null
+    }
     return null
   }
 
@@ -1723,7 +1730,9 @@ export function DocumentsHome({
 
   const emptyMessageKey = useMemo<StringKey | null>(() => {
     if (query.length > 0) return null
-    if (hasActiveFilters(filters)) return 'uhEmptyFiltered'
+    if (hasActiveFilters(filters) || (subView === 'recent' && recentSegment !== 'all')) {
+      return 'uhEmptyFiltered'
+    }
     switch (subView) {
       case 'my-folder':
         return 'uhEmptyMyFolder'
@@ -1741,7 +1750,7 @@ export function DocumentsHome({
       default:
         return folderId ? 'uhEmptyFolder' : 'uhEmptyWorkspace'
     }
-  }, [query, filters, subView, folderId])
+  }, [query, filters, subView, folderId, recentSegment])
   const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : t('ufNoResults', { query })
 
   const treeSelectedKey = useMemo(() => {
@@ -1871,6 +1880,16 @@ export function DocumentsHome({
   // an open folder (not searching): the breadcrumb leaf is its one title, the actions share the row
   const folderHeader =
     subView === 'workspace' && folderId !== null && !query && shownPath.length > 0
+  // the recent-canvas layout: subtitle under the title, a search named after the screen, "Mở tiếp"
+  // above the list (the app keeps its own Tải lên / Tạo mới / Tạo nhanh, which the board does not draw)
+  const recentView = subView === 'recent'
+  const searchLabel = recentView
+    ? t('dlSearchIn', { name: currentHeading })
+    : t('uhSearchPlaceholder')
+  const continueDocs =
+    recentView && !query && !hasActiveFilters(filters) && recentSegment === 'all'
+      ? continueDocsOf(page.status === 'error' ? [] : page.items)
+      : []
 
   return (
     <div
@@ -1931,8 +1950,9 @@ export function DocumentsHome({
               }
             />
           ) : (
-            <div className="dh-title-group">
+            <div className={`dh-title-group${recentView ? ' dh-title-stack' : ''}`}>
               <h1 className="dh-title">{currentHeading}</h1>
+              {recentView && <p className="dh-subtitle">{t('dlRecentSubtitle')}</p>}
             </div>
           )}
           {workspaces.length > 0 && (
@@ -1969,8 +1989,8 @@ export function DocumentsHome({
             <input
               className="dh-search-input uwf-own-search"
               type="search"
-              aria-label={t('uhSearchPlaceholder')}
-              placeholder={t('uhSearchPlaceholder')}
+              aria-label={searchLabel}
+              placeholder={searchLabel}
               value={searchDraft}
               spellCheck={false}
               onChange={(e) => setSearchDraft(e.target.value)}
@@ -2095,21 +2115,29 @@ export function DocumentsHome({
           <ShelvedToolbar items={page.items} shelvedBy={shelvedBy} onShelvedBy={setShelvedBy} />
         )}
 
-        {/* the segment needs the server's last_activity: without it (or an empty pick) it is not offered */}
-        {subView === 'recent' &&
-          (recentSegment !== 'all' || specialPresent('recent', page.items)) && (
-            <RecentSegmentControl
-              value={recentFlat ? 'all' : recentSegment}
-              disabled={recentFlat}
-              onChange={setRecentSegment}
-            />
-          )}
+        {continueDocs.length > 0 && (
+          <ContinueStrip
+            docs={continueDocs}
+            openingId={openingId}
+            onOpen={(doc) => void openDoc(doc)}
+          />
+        )}
 
         <FilterBar
           filters={filters}
           onChange={setFilters}
           authors={
             subView === 'shared-with-me' ? collectUpdatedByOptions(page.items) : knownAuthors
+          }
+          lead={
+            // the segment needs the server's last_activity: without it (or an empty pick) it is not offered
+            recentView && (recentSegment !== 'all' || specialPresent('recent', page.items)) ? (
+              <RecentSegmentControl
+                value={recentFlat ? 'all' : recentSegment}
+                disabled={recentFlat}
+                onChange={setRecentSegment}
+              />
+            ) : undefined
           }
         />
 
@@ -2222,7 +2250,7 @@ export function DocumentsHome({
               className={`dh-section dh-docs-section${shelfView ? ' dh-shelved-section' : ''} uwf-list`}
               aria-label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
             >
-              {!shelfView && (
+              {!shelfView && !recentView && (
                 <div className="dh-section-head">
                   <span className="dh-section-title">{t('uhSectionDocuments')}</span>
                   <span className="dh-section-count">{tableRows.length}</span>

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { useI18n } from '../locale'
 import {
   DEFAULT_DOCUMENTS_HOME_FILTERS,
@@ -37,17 +37,21 @@ export interface FilterBarProps {
   onChange: (next: DocumentsHomeFilterState) => void
   /** the people the loaded rows name as last editor (never a raw id) */
   authors: readonly UpdatedByOption[]
+  /** a control that leads the row, before the type chips (Recent's Tất cả / Đã mở / Đã sửa) */
+  lead?: ReactNode
 }
 
 /**
  * The quick filters every UniWork screen shares (Rules board): the type chips in one fixed order,
- * then Người sửa and Cập nhật. The list reloads from its first page on every change.
+ * then Người sửa and Cập nhật. The list reloads from its first page on every change. A screen
+ * with a `lead` (Recent's segment) keeps it in this row, and the two selects sit at the far end.
  */
-export function FilterBar({ filters, onChange, authors }: FilterBarProps) {
+export function FilterBar({ filters, onChange, authors, lead }: FilterBarProps) {
   const { t } = useI18n()
   const patch = (part: Partial<DocumentsHomeFilterState>) => onChange({ ...filters, ...part })
   return (
-    <div className="dh-filter-bar">
+    <div className={`dh-filter-bar${lead ? ' has-lead' : ''}`}>
+      {lead}
       <div
         className="dh-filter-chips"
         role="group"
