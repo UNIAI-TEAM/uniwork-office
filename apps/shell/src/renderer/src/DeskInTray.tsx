@@ -1,22 +1,42 @@
 import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { RecentEntry, UniworkDocStatus, UniworkDocSummary } from '../../shared/home-api'
-import type { WorkHomeSummary } from '../../shared/uniwork-work-api'
+import type { WorkHomeSummary, WorkNotification } from '../../shared/uniwork-work-api'
+import {
+  documentChangedFacts,
+  documentChangedHasPage,
+  noticeState,
+  opensDocumentList,
+} from './desk-doc-change'
 import {
   docNotifications,
   freshShared,
   initials,
   inTrayRows,
+  noteSentence,
+  notePillKey,
   syncProblems,
   type InTrayRow,
 } from './desk-model'
+import { DocChangeDialog } from './DocChangeDialog'
 import { DocPickerList } from './doclist/PickerList'
 import { useI18n, type StringKey } from './locale'
+import { publishUniworkNotice } from './uniwork-notice-bus'
 import { openUniworkDocument } from './uniwork-open'
 import { WorkbenchIcon } from './WorkbenchIcons'
-import { notificationKey, type OverviewView } from './work-home'
+import type { OverviewView } from './work-home'
 import type { WorkLoad } from './work-cache'
 import { WorkSkeleton, WorkStatePanel, WorkspacePickerContext } from './WorkErrorState'
+
+/** what a click on a note does, decided from the notice (see openNote) */
+interface NoteState {
+  /** a several-document change: opens the list of its documents */
+  list: boolean
+  /** deleted or out of reach: say why in the launch notice instead of opening */
+  notice: 'deleted' | 'forbidden' | null
+  /** no page to open (deleted, trashed or out of reach): the click only marks it read */
+  gone: boolean
+}
 
 /** px the picker keeps clear at a row's end: the pill (and, on a sync problem, Resolve) */
 const TRAIL_PILL = 128
@@ -56,6 +76,9 @@ export function DeskInTray({
   const [statuses, setStatuses] = useState<Record<string, UniworkDocStatus>>({})
   const [expanded, setExpanded] = useState(false)
   const listRef = useRef<HTMLUListElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
+  /** the change notice whose documents the list dialog shows */
+  const [listFor, setListFor] = useState<string | null>(null)
 
   useEffect(() => {
     if (!signedIn) {
@@ -122,11 +145,9 @@ export function DeskInTray({
   })
   const visible = expanded ? rows : rows.slice(0, TRAY_ROWS)
 
-  const openNote = async (id: string, documentId: string, title: string) => {
-    // a failed open keeps the reminder
-    if (!(await openUniworkDocument({ documentId, title }, window.aiOffice))) return
+  /** mark one notice read; a refusal is quiet: the row comes back with the next summary */
+  const markRead = async (id: string) => {
     const r = await window.uniworkWork.markNotificationsRead([id]).catch(() => null)
-    // a refusal is quiet: the row comes back with the next summary
     if (r?.ok)
       home.update((s) => ({
         ...s,
@@ -136,6 +157,28 @@ export function DeskInTray({
           unread: s.counts.unread === null ? null : Math.max(0, s.counts.unread - 1),
         },
       }))
+  }
+
+  const openNote = async (n: WorkNotification, state: NoteState, title: string) => {
+    if (state.list) {
+      // the list reads the documents itself; the notice is read as it opens
+      setListFor(n.id)
+      void markRead(n.id)
+      return
+    }
+    if (state.notice) {
+      // gone or out of reach: nothing to open, so say why and clear the reminder
+      publishUniworkNotice({ phase: 'failed', error: state.notice })
+      await markRead(n.id)
+      return
+    }
+    if (state.gone) {
+      await markRead(n.id)
+      return
+    }
+    // a failed open keeps the reminder
+    if (!(await openUniworkDocument({ documentId: n.resource_id, title }, window.aiOffice))) return
+    await markRead(n.id)
   }
 
   const describe = (
@@ -151,12 +194,46 @@ export function DeskInTray({
     pill: { tone: 'danger' | 'info' | 'neutral'; label: StringKey }
     /** a sync problem's visible next step; other rows show their time */
     resolve: boolean
+    /** the document is deleted or out of reach: the row is dimmed and only clears itself */
+    gone: boolean
     open: () => void
   } => {
     if (r.kind === 'note') {
       const n = r.note
-      const title = n.params.document ?? ''
       const actor = n.params.actor ?? ''
+      const changed = n.kind === 'document_changed'
+      const facts = changed ? documentChangedFacts(n) : null
+      const sentence = (() => {
+        const { key, params } = noteSentence(n)
+        return t(key, params)
+      })()
+      const list = opensDocumentList(n)
+      // a several-document change always opens its list; any other notice says when its document is gone
+      const verdict = list ? 'open' : noticeState(n)
+      const state: NoteState = {
+        list,
+        notice: verdict === 'deleted' ? 'deleted' : verdict === 'no_access' ? 'forbidden' : null,
+        gone: verdict !== 'open' || (changed && !documentChangedHasPage(n)),
+      }
+      // the document's name for the open notice and the row's title
+      const named = facts ? (facts.titles[0] ?? '') : (n.params.document ?? '')
+      const titles =
+        facts && facts.count > 1 && facts.titles.length > 0
+          ? [
+              facts.titles.join(', '),
+              facts.more > 0 ? t('wbDocChangeMore', { count: facts.more }) : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
+          : ''
+      // a change reads as its sentence; a comment, mention or resolved note names the document
+      const sentenceIsTitle = changed || !named
+      const title = sentenceIsTitle ? sentence : named
+      const sub = state.notice
+        ? t(state.notice === 'deleted' ? 'uwErrDeleted' : 'uwErrForbidden')
+        : sentenceIsTitle
+          ? titles
+          : sentence
       return {
         key: `n:${n.id}`,
         // a notification names a document but not its type: the person (or the inbox mark) is the icon
@@ -169,13 +246,11 @@ export function DeskInTray({
           <WorkbenchIcon id="inbox" size={24} tint="blue" />
         ),
         title,
-        sub: t(notificationKey(n.kind), n.params),
-        pill: {
-          tone: 'info',
-          label: n.kind === 'document_mentioned' ? 'wbDeskPillMention' : 'wbDeskPillComment',
-        },
+        sub,
+        pill: { tone: changed ? 'neutral' : 'info', label: notePillKey(n) },
         resolve: false,
-        open: () => void openNote(n.id, n.resource_id, title),
+        gone: state.gone,
+        open: () => void openNote(n, state, named),
       }
     }
     if (r.kind === 'shared') {
@@ -188,6 +263,7 @@ export function DeskInTray({
         sub: [t('wbDeskReasonShared'), d.workspaceName].filter(Boolean).join(' · '),
         pill: { tone: 'neutral', label: 'wbDeskPillShared' },
         resolve: false,
+        gone: false,
         open: () => void openUniworkDocument({ documentId: d.id, title: d.title }, window.aiOffice),
       }
     }
@@ -207,6 +283,7 @@ export function DeskInTray({
       sub: t(conflict ? 'wbDeskReasonConflict' : 'wbDeskReasonSync'),
       pill: { tone: 'danger', label: conflict ? 'wbDeskPillConflict' : 'wbDeskPillSync' },
       resolve: true,
+      gone: false,
       open: () =>
         void openUniworkDocument({ documentId: s.documentId, title: s.title }, window.aiOffice),
     }
@@ -252,7 +329,12 @@ export function DeskInTray({
   }
 
   return (
-    <section className="wb-desk-card wb-block" aria-labelledby={titleId}>
+    <section
+      ref={sectionRef}
+      tabIndex={-1}
+      className="wb-desk-card wb-block"
+      aria-labelledby={titleId}
+    >
       <div className="wb-desk-head">
         <h3 id={titleId}>{t('wbDeskInTray')}</h3>
         {rows.length > 0 ? <span className="wb-desk-count wb-num">{rows.length}</span> : null}
@@ -287,7 +369,10 @@ export function DeskInTray({
               )
             }}
             // the whole row opens (the title button's click bubbles here, so it opens once)
-            optionProps={(doc) => ({ onClick: byId.get(doc.id)?.open })}
+            optionProps={(doc) => {
+              const d = byId.get(doc.id)
+              return { onClick: d?.open, className: d?.gone ? 'is-gone' : undefined }
+            }}
             trailing={(doc) => {
               const d = byId.get(doc.id)
               if (!d) return null
@@ -321,6 +406,16 @@ export function DeskInTray({
           ) : null}
         </>
       )}
+      {listFor ? (
+        <DocChangeDialog
+          key={listFor}
+          notificationId={listFor}
+          onClose={() => setListFor(null)}
+          returnFocus={() =>
+            listRef.current?.querySelector<HTMLElement>('.wb-desk-row-title') ?? sectionRef.current
+          }
+        />
+      ) : null}
     </section>
   )
 }
