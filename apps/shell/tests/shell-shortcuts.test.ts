@@ -13,6 +13,7 @@ import {
   fileMenuAccelerators,
   fullScreenAccelerator,
   interfaceScaleAccelerators,
+  interfaceScaleAliasAccelerators,
   matchShellKey,
   menuAccelerator,
   shortcutPlatform,
@@ -181,10 +182,16 @@ describe('Region cycling (common-09)', () => {
     })
   })
 
-  it('works on macOS and lets a held key repeat', () => {
-    expect(
-      matchShellKey(input({ key: 'F6', code: 'F6', isAutoRepeat: true }), ctx({ platform: MAC })),
-    ).toEqual({ command: 'cycle-region', backwards: false })
+  it('works on macOS and ignores a held key (a repeat would flip focus back and forth)', () => {
+    expect(matchShellKey(input({ key: 'F6', code: 'F6' }), ctx({ platform: MAC }))).toEqual({
+      command: 'cycle-region',
+      backwards: false,
+    })
+    for (const platform of [WIN, MAC]) {
+      expect(
+        matchShellKey(input({ key: 'F6', code: 'F6', isAutoRepeat: true }), ctx({ platform })),
+      ).toBeNull()
+    }
   })
 
   it('Ctrl+F6 is not the shell’s key', () => {
@@ -200,8 +207,8 @@ describe('Developer tools (common-21)', () => {
     expect(matchShellKey(f12, ctx({ activeKind: 'home' }))).toEqual({ command: 'toggle-devtools' })
   })
 
-  it('F12 stays Save As in the modules that bind it (Sheets, HTML, Markdown; Docs once its row lands)', () => {
-    for (const kind of ['sheets', 'html', 'markdown'] as const) {
+  it('F12 stays Save As in the modules that bind it (Sheets, Docs, HTML, Markdown)', () => {
+    for (const kind of ['sheets', 'docs', 'html', 'markdown'] as const) {
       expect(matchShellKey(f12, ctx({ activeKind: kind }))).toBeNull()
     }
     // data-driven: whichever module table binds F12 keeps it
@@ -261,6 +268,19 @@ describe('zoom aliases and web keys of the common rows', () => {
     const row = findShortcut('common', id)
     expect(row?.win).toEqual(win)
     expect(row?.mac).toEqual(mac)
+  })
+
+  it('the alias chords of the scale rows are hidden-item accelerators (RS-delta-core M2)', () => {
+    expect(interfaceScaleAliasAccelerators(WIN)).toEqual({
+      zoomIn: ['Ctrl+Shift+=', 'Ctrl+numadd'],
+      zoomOut: ['Ctrl+numsub'],
+      zoomReset: ['Ctrl+num0'],
+    })
+    expect(interfaceScaleAliasAccelerators(MAC)).toEqual({
+      zoomIn: ['Shift+Command+=', 'Command+numadd'],
+      zoomOut: ['Command+numsub'],
+      zoomReset: ['Command+num0'],
+    })
   })
 
   it('New and Close have no web chord, no temporary Alt+Shift stand-in, and say why', () => {

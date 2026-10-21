@@ -49,7 +49,7 @@ import { PracticeHome } from './PracticeHome'
 import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
-import { withShortcutHint } from './home-shortcut-hints'
+import { shortcutHint, withShortcutHint } from './home-shortcut-hints'
 import { UniworkOpenCard } from './UniworkOpenCard'
 import { publishUniworkNotice } from './uniwork-notice-bus'
 import { openRecentEntry, openUniworkDocument } from './uniwork-open'
@@ -2496,8 +2496,8 @@ export function Home() {
         <button
           className="quick-card"
           onClick={() => void window.aiOffice.browse()}
-          title={withShortcutHint(t('openLocal'), 'common-03')}
           data-tip={OPEN_LOCAL_EXTENSIONS}
+          data-tip-kbd={shortcutHint('common-03') || undefined}
         >
           <span className="quick-folder">
             <FolderIcon size={18} />

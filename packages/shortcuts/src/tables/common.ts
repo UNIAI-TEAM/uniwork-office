@@ -339,14 +339,15 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
-  // Next / previous region (the shell cycles its window regions; Shift reverses)
+  // Next / previous region (the shell cycles its window regions; Shift reverses). No repeat:
+  // a held key would flip focus between the regions on every keydown.
   {
     id: 'common-09',
     scope: 'common',
     win: ['F6', 'Shift+F6'],
     mac: ['F6', 'Shift+F6'],
     match: 'key',
-    guard: {},
+    guard: { noRepeat: true },
   },
   // Zoom in / out / reset: on the Home page this is the interface scale, a document tab
   // keeps its own zoom keys. The Ctrl+Alt chords left (Excel's grid zoom, AltGr on Windows).

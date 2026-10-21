@@ -6,9 +6,13 @@ interface FakeItem {
   label?: string
   role?: string
   accelerator?: string
+  visible?: boolean
+  click?: () => void
   submenu?: { items: FakeItem[]; append(item: FakeItem): void }
 }
 const state = vi.hoisted(() => ({ items: [] as FakeItem[] }))
+const changeUiScale = vi.hoisted(() => vi.fn())
+vi.mock('../src/main/ui-scale', () => ({ changeUiScale }))
 
 vi.mock('electron', () => {
   const wrap = (template: Array<Record<string, unknown>>): { items: FakeItem[] } => ({
@@ -43,6 +47,7 @@ vi.mock('electron', () => {
 
 const { appMenuLabels, viewMenuTemplate } = await import('@genoffice/electron-utils')
 const { chromeFollowsUiScale, withViewMenu } = await import('../src/main/ui-scale-menu')
+const { interfaceScaleAliasAccelerators } = await import('../src/main/shell-shortcuts')
 
 const labels = {
   menuView: 'View',
@@ -59,7 +64,14 @@ function scaleItems(): FakeItem[] {
 }
 
 function accelerators(): string[] {
-  return state.items.flatMap((i) => i.submenu?.items.map((s) => s.accelerator ?? '') ?? [])
+  return state.items.flatMap(
+    (i) =>
+      i.submenu?.items.filter((s) => s.visible !== false).map((s) => s.accelerator ?? '') ?? [],
+  )
+}
+
+function hiddenItems(): FakeItem[] {
+  return state.items.flatMap((i) => i.submenu?.items.filter((s) => s.visible === false) ?? [])
 }
 
 beforeEach(() => {
@@ -89,10 +101,39 @@ describe('the interface-scale View items (R1-4)', () => {
     expect(accelerators()).toEqual(['CmdOrCtrl+=', 'CmdOrCtrl+-', '', 'CmdOrCtrl+0'])
   })
 
+  it('Home also binds the alias chords, on hidden items that run the same scale change (RS-delta-core M2)', () => {
+    withViewMenu('home', label, () => '/tmp/settings.json')
+    const aliases = interfaceScaleAliasAccelerators()
+    expect(hiddenItems().map((i) => i.accelerator)).toEqual([
+      ...(aliases.zoomIn ?? []),
+      ...(aliases.zoomOut ?? []),
+      ...(aliases.zoomReset ?? []),
+    ])
+    expect(hiddenItems().length).toBeGreaterThanOrEqual(4)
+    const direction = (item: FakeItem): number => {
+      changeUiScale.mockClear()
+      item.click?.()
+      expect(changeUiScale).toHaveBeenCalledTimes(1)
+      expect(changeUiScale.mock.calls[0]?.[0]).toBe('/tmp/settings.json')
+      return changeUiScale.mock.calls[0]?.[1] as number
+    }
+    const byAccelerator = new Map(hiddenItems().map((i) => [i.accelerator, i]))
+    for (const accelerator of aliases.zoomIn ?? []) {
+      expect(direction(byAccelerator.get(accelerator)!)).toBe(1)
+    }
+    for (const accelerator of aliases.zoomOut ?? []) {
+      expect(direction(byAccelerator.get(accelerator)!)).toBe(-1)
+    }
+    for (const accelerator of aliases.zoomReset ?? []) {
+      expect(direction(byAccelerator.get(accelerator)!)).toBe(0)
+    }
+  })
+
   it('gives Sheets the items without accelerators: its Ctrl+- and Ctrl+0 are Excel keys, Ctrl+Alt is AltGr', () => {
     withViewMenu('sheets', label, () => '/tmp/settings.json')
     expect(state.items.map((i) => i.label)).toEqual(['File', 'View', 'Help'])
     expect(accelerators()).toEqual(['', '', '', ''])
+    expect(hiddenItems()).toEqual([])
     expect(accelerators().some((a) => a.includes('Alt'))).toBe(false)
   })
 

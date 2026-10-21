@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, expect, it } from 'vitest'
 
 import { pdfPasswordKeyAction } from '../src/renderer/src/pdf-password-keys'
@@ -22,5 +25,15 @@ describe('PDF password prompt keys (shell-dialog-keys)', () => {
   it('the Escape that cancels an IME composition does not close the prompt', () => {
     expect(pdfPasswordKeyAction({ key: 'Escape', isComposing: true }, 'other')).toBeNull()
     expect(pdfPasswordKeyAction({ key: 'Escape', keyCode: 229 }, 'field')).toBeNull()
+  })
+
+  it('reads the composition fields of a real KeyboardEvent (accessors, not own properties)', () => {
+    const real = (key: string, init: KeyboardEventInit) =>
+      new KeyboardEvent('keydown', { key, ...init })
+    expect(pdfPasswordKeyAction(real('Enter', { isComposing: true }), 'field')).toBeNull()
+    expect(pdfPasswordKeyAction(real('Escape', { isComposing: true }), 'other')).toBeNull()
+    expect(pdfPasswordKeyAction(real('Enter', { keyCode: 229 }), 'field')).toBeNull()
+    expect(pdfPasswordKeyAction(real('Enter', {}), 'field')).toBe('submit')
+    expect(pdfPasswordKeyAction(real('Escape', {}), 'other')).toBe('cancel')
   })
 })

@@ -120,6 +120,28 @@ export function interfaceScaleAccelerators(
   return result
 }
 
+/**
+ * The alias chords of the interface-scale rows (Ctrl+Shift+=, the keypad keys and their Cmd twins)
+ * as menu accelerators. A menu item has one accelerator, so the aliases ride on hidden items. A
+ * chord the accelerator helper rejects (see `acceleratorSkipReason`) is left out.
+ */
+export function interfaceScaleAliasAccelerators(
+  platform: ShortcutPlatform = shortcutPlatform(),
+): Partial<Record<InterfaceScaleItem, readonly string[]>> {
+  const result: Partial<Record<InterfaceScaleItem, readonly string[]>> = {}
+  for (const [item, id] of Object.entries(SCALE_ROWS) as [InterfaceScaleItem, string][]) {
+    const action = findShortcut('common', id)
+    if (!action) continue
+    const primary = toElectronAccelerator(action, platform)
+    const aliases = action[platform]
+      .slice(1)
+      .map((chord) => toElectronAccelerator({ ...action, [platform]: [chord] }, platform))
+      .filter((accelerator): accelerator is string => !!accelerator && accelerator !== primary)
+    if (aliases.length > 0) result[item] = aliases
+  }
+  return result
+}
+
 /** The View menu items the shell adds to the menus it builds itself: Full screen
  * (F11 / Ctrl+Cmd+F) and, in a development build, Developer tools. */
 export function fullScreenAccelerator(
