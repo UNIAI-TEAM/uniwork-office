@@ -96,5 +96,9 @@ export const zh = {
   dlSourceOriginTask: '来自任务',
   dlSourceOriginMeeting: '来自会议',
   dlSourceOriginEmail: '来自邮件',
+  dlSideSourceChat: '聊天',
+  dlSideSourceMeeting: '会议',
+  dlSideSourceEmail: '邮件',
+  dlSideSourceTask: '任务',
   dlSearchNoResults: '没有找到“{query}”的结果',
 }

@@ -1,0 +1,55 @@
+/* UNI-2047 sidebar: the "Từ nơi khác" section of the Documents sidebar (web documents-sidebar.tsx),
+   semantic tokens only, both themes. The rows reuse .dh-nav-item; this file draws the module tile. */
+
+.dl-side-sources {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* the web's IconTile size xs, variant solid: a 20px square, 5px corners, a 12px glyph on the
+   module's saturated fill. The app's tint tokens carry the saturated colour as `-fg`; the glyph
+   reads --surface on it (white in light, the dark surface on the lighter dark-theme fill). */
+.dl-side-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--surface);
+}
+
+.dl-side-tile svg {
+  width: 12px;
+  height: 12px;
+}
+
+.dl-side-tile.tone-blue {
+  background: var(--tint-blue-fg);
+}
+
+.dl-side-tile.tone-violet {
+  background: var(--tint-violet-fg);
+}
+
+.dl-side-tile.tone-orange {
+  background: var(--tint-orange-fg);
+}
+
+.dl-side-tile.tone-green {
+  background: var(--tint-green-fg);
+}
+
+.dl-side-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

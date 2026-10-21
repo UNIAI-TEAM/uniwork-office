@@ -98,5 +98,9 @@ export const hi = {
   dlSourceOriginTask: 'किसी कार्य से',
   dlSourceOriginMeeting: 'किसी मीटिंग से',
   dlSourceOriginEmail: 'किसी ईमेल से',
+  dlSideSourceChat: 'चैट',
+  dlSideSourceMeeting: 'मीटिंग',
+  dlSideSourceEmail: 'ईमेल',
+  dlSideSourceTask: 'कार्य',
   dlSearchNoResults: '“{query}” के लिए कोई परिणाम नहीं मिला',
 } satisfies Record<keyof typeof zh, string>

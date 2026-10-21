@@ -376,7 +376,8 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     expect(alert).not.toBeNull()
     expect(alert!.textContent).toMatch(/\S/)
     expect(sourceIds()).toEqual([])
-    expect(navLabels()).toContain('Từ nơi khác')
+    // UNI-2047 sidebar: the section is hidden while the route is not there, and back once it answers
+    expect(sidebarSlot.querySelector('.dl-side-sources')).toBeNull()
     sources = async () => ok({ items: SOURCES, nextCursor: null })
     const retry = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Thử lại'),
@@ -384,6 +385,7 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     if (retry) {
       await click(retry)
       expect(sourceIds()).toEqual(['s-new', 's-old'])
+      expect(sidebarSlot.querySelector('.dl-side-sources')).not.toBeNull()
     }
   })
 
@@ -417,7 +419,9 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
   it('the workspace root no longer merges the same rows: they live here only (F-14, Q2=A)', async () => {
     await mount('workspace')
     // the only sources read off the page is the sidebar's limit:1 probe (UNI-2047 sidebar)
-    expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual([{ workspaceId: 'ws-1', limit: 1 }])
+    expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual([
+      { workspaceId: 'ws-1', limit: 1 },
+    ])
     expect(sourceIds()).toEqual([])
   })
 })

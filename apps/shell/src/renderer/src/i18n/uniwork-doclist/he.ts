@@ -98,5 +98,9 @@ export const he = {
   dlSourceOriginTask: 'ממשימה',
   dlSourceOriginMeeting: 'מפגישה',
   dlSourceOriginEmail: 'מאימייל',
+  dlSideSourceChat: 'צ׳אט',
+  dlSideSourceMeeting: 'פגישות',
+  dlSideSourceEmail: 'אימייל',
+  dlSideSourceTask: 'משימות',
   dlSearchNoResults: 'אין תוצאות עבור “{query}”',
 } satisfies Record<keyof typeof zh, string>

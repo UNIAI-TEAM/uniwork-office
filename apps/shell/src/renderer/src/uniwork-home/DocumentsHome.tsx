@@ -5,6 +5,7 @@ import type {
   UniworkDocErrorCode,
   UniworkDocSummary,
   UniworkFolderNode,
+  UniworkResult,
   UniworkSourceFile,
   UniworkWorkspaceRef,
 } from '../../../shared/home-api'
@@ -135,6 +136,71 @@ import { NewMenu } from './NewMenu'
 import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
+import './doclist-sidebar.css'
+
+/** a source module of Từ nơi khác (the web's DocumentSourceKind) */
+type ElsewhereSource = 'chat' | 'meeting' | 'email' | 'task'
+
+/**
+ * UNI-2047 sidebar: the web's SOURCE_KINDS, in its order, each drawn as its module is in the web
+ * app sidebar (module-icons.ts glyph, module-tones.ts tint): Chat blue, Meetings violet, Email
+ * orange, Tasks green.
+ */
+const ELSEWHERE_SOURCES: readonly {
+  source: ElsewhereSource
+  labelKey: StringKey
+  tone: 'blue' | 'violet' | 'orange' | 'green'
+}[] = [
+  { source: 'chat', labelKey: 'dlSideSourceChat', tone: 'blue' },
+  { source: 'meeting', labelKey: 'dlSideSourceMeeting', tone: 'violet' },
+  { source: 'email', labelKey: 'dlSideSourceEmail', tone: 'orange' },
+  { source: 'task', labelKey: 'dlSideSourceTask', tone: 'green' },
+]
+
+const SOURCE_ICON_NAMES: Record<ElsewhereSource, string> = {
+  chat: 'message-square',
+  meeting: 'video',
+  email: 'mail',
+  task: 'square-check-big',
+}
+
+/** the web module glyphs (lucide MessageSquare, Video, Mail, SquareCheckBig) */
+function SourceGlyph({ source }: { source: ElsewhereSource }) {
+  return (
+    <svg
+      data-icon={SOURCE_ICON_NAMES[source]}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {source === 'chat' && (
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      )}
+      {source === 'meeting' && (
+        <>
+          <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" />
+          <rect x="2" y="6" width="14" height="12" rx="2" />
+        </>
+      )}
+      {source === 'email' && (
+        <>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+        </>
+      )}
+      {source === 'task' && (
+        <>
+          <path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5" />
+          <path d="m9 11 3 3L22 4" />
+        </>
+      )}
+    </svg>
+  )
+}
 
 function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
   switch (id) {
@@ -344,6 +410,10 @@ export function DocumentsHome({
   const [subView, setSubView] = useState<DocumentsHomeSubViewId>(initialSubView)
   const [folderId, setFolderId] = useState<string | null>(initialFolderId)
   const [myFolderId, setMyFolderId] = useState<string | null>(null)
+  // UNI-2047 sidebar: the Từ nơi khác row picked (null = every module, the page opened otherwise)
+  const [elsewhereSource, setElsewhereSource] = useState<ElsewhereSource | null>(null)
+  // the workspaces whose sources route answered: the section shows once it has (the web's probe)
+  const [sourcesAnswered, setSourcesAnswered] = useState<Readonly<Record<string, boolean>>>({})
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY]))
   const [tree, setTree] = useState<TreeState>({ status: 'loading', nodes: [] })
   const [treeTick, setTreeTick] = useState(0)
@@ -462,6 +532,7 @@ export function DocumentsHome({
     setFolderId(null)
     setFolderNotice(null)
     setMyFolderId(null)
+    setElsewhereSource(null)
     setExpanded(new Set([ROOT_KEY]))
     resetFilters()
     setSearchDraft('')
@@ -737,6 +808,26 @@ export function DocumentsHome({
   const elsewhereView = subView === 'elsewhere' && query.length === 0
   const sourcesWanted = elsewhereView
   const sourcesSeqRef = useRef(0)
+  // UNI-2047 sidebar: as on the web (use-documents-library.ts), the Từ nơi khác section shows once
+  // the sources route has answered for this workspace; a 404 or a bridge without the call hides
+  // it, any other failure leaves the last answer alone
+  const noteSourcesAnswer = useCallback((ws: string, res: UniworkResult<unknown> | null) => {
+    if (res && !res.ok && res.error !== 'not_found') return
+    const answered = Boolean(res?.ok)
+    setSourcesAnswered((prev) => (prev[ws] === answered ? prev : { ...prev, [ws]: answered }))
+  }, [])
+  const sourcesProbedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (sourcesProbedRef.current === workspaceId) return
+    sourcesProbedRef.current = workspaceId
+    // the page reads the route itself: its answer stands for the probe
+    if (sourcesWanted) return
+    const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
+    void fetchDocumentsHomeSources(api, { workspaceId, filters: {}, limit: 1 })
+      .then((res) => noteSourcesAnswer(workspaceId, res))
+      .catch(() => {})
+  }, [workspaceId, sourcesWanted, noteSourcesAnswer])
+  const sourcesAvailable = sourcesAnswered[workspaceId] === true
   useEffect(() => {
     const seq = ++sourcesSeqRef.current
     setSources({
@@ -747,8 +838,13 @@ export function DocumentsHome({
     })
     if (!sourcesWanted) return
     const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
-    void fetchDocumentsHomeSources(api, { workspaceId, filters: wireFilters })
+    void fetchDocumentsHomeSources(api, {
+      workspaceId,
+      filters: wireFilters,
+      source: elsewhereSource,
+    })
       .then((res) => {
+        noteSourcesAnswer(workspaceId, res)
         if (sourcesSeqRef.current !== seq) return
         setSources(
           res?.ok
@@ -778,7 +874,7 @@ export function DocumentsHome({
           loadingMore: false,
         })
       })
-  }, [workspaceId, sourcesWanted, wireFilters, listTick])
+  }, [workspaceId, sourcesWanted, wireFilters, elsewhereSource, listTick, noteSourcesAnswer])
 
   const loadMoreSources = () => {
     const cursor = sources.nextCursor
@@ -786,7 +882,12 @@ export function DocumentsHome({
     const seq = sourcesSeqRef.current
     setSources((prev) => ({ ...prev, loadingMore: true }))
     const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
-    void fetchDocumentsHomeSources(api, { workspaceId, filters: wireFilters, cursor })
+    void fetchDocumentsHomeSources(api, {
+      workspaceId,
+      filters: wireFilters,
+      cursor,
+      source: elsewhereSource,
+    })
       .then((res) => {
         if (sourcesSeqRef.current !== seq) return
         setSources((prev) =>
@@ -914,6 +1015,12 @@ export function DocumentsHome({
       folderIdRef.current = null
       setFolderId(null)
     }
+  }
+
+  /** UNI-2047 sidebar: a Từ nơi khác row opens the page filtered to that module */
+  const openElsewhere = (source: ElsewhereSource) => {
+    setElsewhereSource(source)
+    selectSubView('elsewhere')
   }
 
   const openFolderInWorkspace = (id: string | null) => {
@@ -1774,7 +1881,11 @@ export function DocumentsHome({
   }, [visibleDocs])
   const selectedDocs = useMemo(() => selectedDocsOf(visibleDocs, selected), [visibleDocs, selected])
 
-  const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
+  // UNI-2047 sidebar: Từ nơi khác is its own section below the folders, as on the web
+  const navEntries = useMemo(
+    () => visibleDocumentsHomeNavEntries().filter((entry) => entry.id !== 'elsewhere'),
+    [],
+  )
 
   const currentHeadingSpec = useMemo<
     { kind: 'literal'; text: string } | { kind: 'key'; key: StringKey }
@@ -1922,6 +2033,7 @@ export function DocumentsHome({
           {tree.status === 'ready' && (
             <UniworkFolderTree
               idPrefix={`${uid}-tree`}
+              hideRoot
               nodes={tree.nodes}
               label={t('ufTreeLabel')}
               expanded={expanded}
@@ -1942,6 +2054,41 @@ export function DocumentsHome({
           )}
         </div>
       </div>
+      {sourcesAvailable && (
+        <div className="dl-side-sources" role="group" aria-labelledby={`${uid}-side-sources`}>
+          <div className="dh-sidebar-head">
+            <span className="dh-sidebar-label" id={`${uid}-side-sources`}>
+              {t('dlNavElsewhere')}
+            </span>
+          </div>
+          {ELSEWHERE_SOURCES.map((row) => {
+            const current =
+              !sidebarIdle && subView === 'elsewhere' && elsewhereSource === row.source
+            return (
+              <button
+                key={row.source}
+                type="button"
+                className={`dh-nav-item nav-item${current ? ' active' : ''}`}
+                data-source={row.source}
+                aria-current={current ? 'page' : undefined}
+                onClick={() => {
+                  onSidebarNavigate?.()
+                  openElsewhere(row.source)
+                }}
+              >
+                <span
+                  className={`dl-side-tile tone-${row.tone}`}
+                  data-tone={row.tone}
+                  aria-hidden="true"
+                >
+                  <SourceGlyph source={row.source} />
+                </span>
+                <span className="dl-side-label">{t(row.labelKey)}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 

@@ -99,5 +99,9 @@ export const vi = {
   dlSourceOriginTask: 'Từ công việc',
   dlSourceOriginMeeting: 'Từ cuộc họp',
   dlSourceOriginEmail: 'Từ email',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Họp',
+  dlSideSourceEmail: 'Email',
+  dlSideSourceTask: 'Công việc',
   dlSearchNoResults: 'Không có kết quả cho “{query}”',
 } satisfies Record<keyof typeof zh, string>

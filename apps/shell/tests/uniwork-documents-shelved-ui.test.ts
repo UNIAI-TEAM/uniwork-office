@@ -215,7 +215,6 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
       'shared-by-me',
       'archive',
       'trash',
-      'elsewhere',
     ])
     expect(nav[5]!.textContent?.trim()).toBe('Lưu trữ')
   })

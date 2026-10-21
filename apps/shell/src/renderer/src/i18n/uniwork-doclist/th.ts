@@ -97,5 +97,9 @@ export const th = {
   dlSourceOriginTask: 'จากงาน',
   dlSourceOriginMeeting: 'จากการประชุม',
   dlSourceOriginEmail: 'จากอีเมล',
+  dlSideSourceChat: 'แชต',
+  dlSideSourceMeeting: 'การประชุม',
+  dlSideSourceEmail: 'อีเมล',
+  dlSideSourceTask: 'งาน',
   dlSearchNoResults: 'ไม่พบผลลัพธ์สำหรับ “{query}”',
 } satisfies Record<keyof typeof zh, string>

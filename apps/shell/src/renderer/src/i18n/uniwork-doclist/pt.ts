@@ -99,5 +99,9 @@ export const pt = {
   dlSourceOriginTask: 'De uma tarefa',
   dlSourceOriginMeeting: 'De uma reunião',
   dlSourceOriginEmail: 'De um e-mail',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Reuniões',
+  dlSideSourceEmail: 'E-mail',
+  dlSideSourceTask: 'Tarefas',
   dlSearchNoResults: 'Nenhum resultado para “{query}”',
 } satisfies Record<keyof typeof zh, string>

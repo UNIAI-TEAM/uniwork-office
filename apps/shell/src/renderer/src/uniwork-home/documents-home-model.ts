@@ -696,17 +696,26 @@ export function docMatchesUpdated(doc: DocumentsHomeDoc, filters: UniworkListFil
 
 /**
  * UNI-1961: one page of the root's source files, with the home's format filter
- * as the sources `type`. Null when the bridge has no sources call.
+ * as the sources `type`. Null when the bridge has no sources call. `source` narrows to one
+ * module (a sidebar row of Từ nơi khác); `limit` is the sidebar's availability probe.
  */
 export async function fetchDocumentsHomeSources(
   api: DocumentsHomeApiAdapter,
-  params: { workspaceId: string; filters: UniworkListFilters; cursor?: string },
+  params: {
+    workspaceId: string
+    filters: UniworkListFilters
+    cursor?: string
+    source?: string | null
+    limit?: number
+  },
 ): Promise<UniworkResult<UniworkSourceListPage> | null> {
   if (typeof api.uniworkListSources !== 'function') return null
   return api.uniworkListSources({
     workspaceId: params.workspaceId,
+    ...(params.source ? { source: params.source } : {}),
     ...(params.filters.format ? { type: params.filters.format } : {}),
     ...(params.cursor ? { cursor: params.cursor } : {}),
+    ...(params.limit ? { limit: params.limit } : {}),
   })
 }
 

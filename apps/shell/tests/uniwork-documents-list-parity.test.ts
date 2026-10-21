@@ -222,7 +222,9 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
   it('the workspace root lists documents only: the source files live on the From elsewhere page (UNI-2047 F-14)', async () => {
     await renderHome()
     // the only sources read is the sidebar's limit:1 probe (UNI-2047 sidebar); nothing is merged
-    expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual([{ workspaceId: 'ws-1', limit: 1 }])
+    expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual([
+      { workspaceId: 'ws-1', limit: 1 },
+    ])
     expect(rowKeys()).toEqual(['doc-1', 'doc-2'])
     // folders stay cards above the table
     expect(host.querySelectorAll('.dh-folder-card')).toHaveLength(1)
@@ -356,7 +358,9 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
     })
     await flush()
     // the sidebar's limit:1 probe is the only read (UNI-2047 sidebar), once for the workspace
-    expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual([{ workspaceId: 'ws-1', limit: 1 }])
+    expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual([
+      { workspaceId: 'ws-1', limit: 1 },
+    ])
   })
 
   it('applies the home filters to source rows: type on the server, editor and date here', async () => {

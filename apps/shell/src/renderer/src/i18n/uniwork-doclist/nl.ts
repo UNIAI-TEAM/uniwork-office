@@ -101,5 +101,9 @@ export const nl = {
   dlSourceOriginTask: 'Uit een taak',
   dlSourceOriginMeeting: 'Uit een vergadering',
   dlSourceOriginEmail: 'Uit een e-mail',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Vergaderingen',
+  dlSideSourceEmail: 'E-mail',
+  dlSideSourceTask: 'Taken',
   dlSearchNoResults: 'Geen resultaten voor “{query}”',
 } satisfies Record<keyof typeof zh, string>

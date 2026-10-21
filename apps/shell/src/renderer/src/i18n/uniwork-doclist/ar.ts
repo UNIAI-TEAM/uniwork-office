@@ -99,5 +99,9 @@ export const ar = {
   dlSourceOriginTask: 'من مهمة',
   dlSourceOriginMeeting: 'من اجتماع',
   dlSourceOriginEmail: 'من بريد إلكتروني',
+  dlSideSourceChat: 'الدردشة',
+  dlSideSourceMeeting: 'الاجتماعات',
+  dlSideSourceEmail: 'البريد الإلكتروني',
+  dlSideSourceTask: 'المهام',
   dlSearchNoResults: 'لا توجد نتائج لـ “{query}”',
 } satisfies Record<keyof typeof zh, string>

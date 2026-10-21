@@ -98,5 +98,9 @@ export const id = {
   dlSourceOriginTask: 'Dari tugas',
   dlSourceOriginMeeting: 'Dari rapat',
   dlSourceOriginEmail: 'Dari email',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Rapat',
+  dlSideSourceEmail: 'Email',
+  dlSideSourceTask: 'Tugas',
   dlSearchNoResults: 'Tidak ada hasil untuk “{query}”',
 } satisfies Record<keyof typeof zh, string>

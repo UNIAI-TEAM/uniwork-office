@@ -98,5 +98,9 @@ export const ja = {
   dlSourceOriginTask: 'タスクから',
   dlSourceOriginMeeting: 'ミーティングから',
   dlSourceOriginEmail: 'メールから',
+  dlSideSourceChat: 'チャット',
+  dlSideSourceMeeting: '会議',
+  dlSideSourceEmail: 'メール',
+  dlSideSourceTask: 'タスク',
   dlSearchNoResults: '「{query}」に一致する結果はありません',
 } satisfies Record<keyof typeof zh, string>

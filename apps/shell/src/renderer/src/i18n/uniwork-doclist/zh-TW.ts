@@ -97,5 +97,9 @@ export const zhTW = {
   dlSourceOriginTask: '來自任務',
   dlSourceOriginMeeting: '來自會議',
   dlSourceOriginEmail: '來自郵件',
+  dlSideSourceChat: '聊天',
+  dlSideSourceMeeting: '會議',
+  dlSideSourceEmail: '電子郵件',
+  dlSideSourceTask: '工作',
   dlSearchNoResults: '找不到「{query}」的結果',
 } satisfies Record<keyof typeof zh, string>

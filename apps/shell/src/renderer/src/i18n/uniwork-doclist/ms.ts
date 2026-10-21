@@ -100,5 +100,9 @@ export const ms = {
   dlSourceOriginTask: 'Daripada tugasan',
   dlSourceOriginMeeting: 'Daripada mesyuarat',
   dlSourceOriginEmail: 'Daripada e-mel',
+  dlSideSourceChat: 'Sembang',
+  dlSideSourceMeeting: 'Mesyuarat',
+  dlSideSourceEmail: 'E-mel',
+  dlSideSourceTask: 'Tugasan',
   dlSearchNoResults: 'Tiada hasil untuk “{query}”',
 } satisfies Record<keyof typeof zh, string>

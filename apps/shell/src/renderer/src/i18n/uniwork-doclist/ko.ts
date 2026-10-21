@@ -98,5 +98,9 @@ export const ko = {
   dlSourceOriginTask: '작업에서',
   dlSourceOriginMeeting: '회의에서',
   dlSourceOriginEmail: '이메일에서',
+  dlSideSourceChat: '채팅',
+  dlSideSourceMeeting: '회의',
+  dlSideSourceEmail: '이메일',
+  dlSideSourceTask: '작업',
   dlSearchNoResults: '“{query}”에 대한 결과가 없습니다',
 } satisfies Record<keyof typeof zh, string>

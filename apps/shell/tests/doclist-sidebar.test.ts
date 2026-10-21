@@ -46,6 +46,9 @@ const NODES: UniworkFolderNode[] = [
   folder('f-mine', 'My Folder', [], { systemKind: 'my_folder' }),
 ]
 
+// My Folder shows its localized label, never the stored title
+const MY_FOLDER = 'Thư mục của tôi'
+
 const SOURCE: UniworkSourceFile = {
   id: 's-1',
   source: 'meeting',
@@ -176,7 +179,7 @@ describe('the Thư mục tree in the sidebar has no root row (web DocumentTree f
     await mount('workspace')
     expect(sideTree()).not.toBeNull()
     expect(sideTree()!.querySelector(`[role="treeitem"][data-key="${ROOT_KEY}"]`)).toBeNull()
-    expect(rowTitles()).toEqual(['My Folder', 'Alpha', 'Gamma'])
+    expect(rowTitles()).toEqual([MY_FOLDER, 'Alpha', 'Gamma'])
     expect(treeRows().map((r) => r.getAttribute('aria-level'))).toEqual(['1', '1', '1'])
     expect(treeRows().map((r) => r.getAttribute('aria-posinset'))).toEqual(['1', '2', '3'])
     expect(treeRows().every((r) => r.getAttribute('aria-setsize') === '3')).toBe(true)
@@ -194,11 +197,11 @@ describe('the Thư mục tree in the sidebar has no root row (web DocumentTree f
 
   it('keys walk the first level: arrows move, ArrowRight expands, ArrowLeft collapses then stays, Enter opens', async () => {
     await mount('workspace')
-    const first = rowOf('My Folder')!
+    const first = rowOf(MY_FOLDER)!
     await act(async () => first.focus())
     await key(first, 'ArrowUp')
     // nothing above the first row: focus stays on it, never on a hidden root
-    expect(document.activeElement).toBe(rowOf('My Folder'))
+    expect(document.activeElement).toBe(rowOf(MY_FOLDER))
     await key(document.activeElement, 'ArrowDown')
     expect(document.activeElement).toBe(rowOf('Alpha'))
     await key(document.activeElement, 'ArrowRight')
@@ -217,7 +220,7 @@ describe('the Thư mục tree in the sidebar has no root row (web DocumentTree f
     await key(document.activeElement, 'End')
     expect(document.activeElement).toBe(rowOf('Gamma'))
     await key(document.activeElement, 'Home')
-    expect(document.activeElement).toBe(rowOf('My Folder'))
+    expect(document.activeElement).toBe(rowOf(MY_FOLDER))
     await key(rowOf('Gamma'), 'Enter')
     expect(lastCall('uniworkListChildren')).toMatchObject({ parentId: 'f-gamma' })
     expect(rowOf('Gamma')!.getAttribute('aria-selected')).toBe('true')
@@ -295,19 +298,29 @@ describe('the Từ nơi khác section: four source rows (web SOURCE_KINDS)', () 
   it.each([
     ['vi', 'Từ nơi khác', ['Chat', 'Họp', 'Email', 'Công việc']],
     ['en', 'From elsewhere', ['Chat', 'Meetings', 'Email', 'Tasks']],
-  ] as const)('%s: a section labelled %s holding the rows in the web order', async (lang, title, labels) => {
-    await mount('workspace', lang)
-    const section = sourceSection()
-    expect(section, 'the sources section').not.toBeNull()
-    expect(section!.querySelector('.dh-sidebar-label')?.textContent).toBe(title)
-    expect(sourceRows().map((r) => r.dataset.source)).toEqual(['chat', 'meeting', 'email', 'task'])
-    expect(sourceRows().map((r) => r.querySelector('.dl-side-label')?.textContent)).toEqual(labels)
-    // the single nav item is gone: the section replaces it
-    expect(sidebarSlot.querySelector('[data-nav="elsewhere"]')).toBeNull()
-    expect(
-      Array.from(sidebarSlot.querySelectorAll('.dh-nav-label')).map((el) => el.textContent),
-    ).not.toContain(title)
-  })
+  ] as const)(
+    '%s: a section labelled %s holding the rows in the web order',
+    async (lang, title, labels) => {
+      await mount('workspace', lang)
+      const section = sourceSection()
+      expect(section, 'the sources section').not.toBeNull()
+      expect(section!.querySelector('.dh-sidebar-label')?.textContent).toBe(title)
+      expect(sourceRows().map((r) => r.dataset.source)).toEqual([
+        'chat',
+        'meeting',
+        'email',
+        'task',
+      ])
+      expect(sourceRows().map((r) => r.querySelector('.dl-side-label')?.textContent)).toEqual(
+        labels,
+      )
+      // the single nav item is gone: the section replaces it
+      expect(sidebarSlot.querySelector('[data-nav="elsewhere"]')).toBeNull()
+      expect(
+        Array.from(sidebarSlot.querySelectorAll('.dh-nav-label')).map((el) => el.textContent),
+      ).not.toContain(title)
+    },
+  )
 
   it('draws each row with its module tile and tint, as the web app sidebar draws the module', async () => {
     await mount('workspace')

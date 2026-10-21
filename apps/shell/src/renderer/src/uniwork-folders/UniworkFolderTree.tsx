@@ -93,6 +93,9 @@ function Chevron({ expanded }: { expanded: boolean }) {
  * picker, rows that cannot take the item stay visible but aria-disabled with
  * their reason shown on the row. My Folder shows its localized label (from
  * `systemKind`, never the stored title) and sits first among its siblings.
+ * `hideRoot` drops the root row (the Documents sidebar, as the web's folders
+ * tree: its nav item is the root); the top-level folders then sit at the first
+ * level, always shown.
  */
 export function UniworkFolderTree({
   nodes,
@@ -110,6 +113,7 @@ export function UniworkFolderTree({
   tagOf,
   checkLabel,
   idPrefix = 'uwf-tree',
+  hideRoot = false,
 }: {
   nodes: UniworkFolderNode[]
   label: string
@@ -130,15 +134,24 @@ export function UniworkFolderTree({
   /** SAVE-01 State 2: the selected row carries a check with this accessible name */
   checkLabel?: string
   idPrefix?: string
+  /** no root row: the top-level folders at the first level (the picker and dialogs keep it) */
+  hideRoot?: boolean
 }) {
   const { t } = useI18n()
   // `t` is not referentially stable: the memo keys on the translated string
   const rootTitle = t('ufRoot')
   const myFolderLabel = t(MY_FOLDER_LABEL_KEY)
-  const rows = useMemo(
-    () => treeRows(withMyFolderLabel(nodes, myFolderLabel), expanded, rootTitle),
-    [nodes, expanded, rootTitle, myFolderLabel],
-  )
+  const rows = useMemo(() => {
+    const labelled = withMyFolderLabel(nodes, myFolderLabel)
+    if (!hideRoot) return treeRows(labelled, expanded, rootTitle)
+    return treeRows(labelled, new Set([...expanded, ROOT_KEY]), rootTitle)
+      .slice(1)
+      .map((row) => ({
+        ...row,
+        level: row.level - 1,
+        parentKey: row.parentKey === ROOT_KEY ? null : row.parentKey,
+      }))
+  }, [nodes, expanded, rootTitle, myFolderLabel, hideRoot])
   const [focusKey, setFocusKey] = useState(selectedKey)
   const [menuKey, setMenuKey] = useState<string | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -148,12 +161,13 @@ export function UniworkFolderTree({
   // the open folder changed elsewhere (breadcrumb, contents): the tab stop follows it
   useEffect(() => setFocusKey(selectedKey), [selectedKey])
 
-  // a focused row hidden by a collapse or gone after a refresh hands the tab stop on
+  // a focused row hidden by a collapse or gone after a refresh hands the tab stop on (to the
+  // first drawn row when the selection is not drawn: no folder open in a root-less tree)
   const tabKey = rows.some((r) => r.key === focusKey)
     ? focusKey
     : rows.some((r) => r.key === selectedKey)
       ? selectedKey
-      : ROOT_KEY
+      : (rows[0]?.key ?? ROOT_KEY)
 
   useEffect(() => {
     if (!moveFocus.current) return
@@ -193,6 +207,9 @@ export function UniworkFolderTree({
         ?.onSelect()
     }
   }
+
+  // a root-less tree with no folder draws no empty tree
+  if (rows.length === 0) return null
 
   return (
     <ul className="uwf-tree" role="tree" aria-label={label} ref={listRef}>

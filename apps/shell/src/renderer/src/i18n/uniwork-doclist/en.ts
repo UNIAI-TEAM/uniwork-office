@@ -98,5 +98,9 @@ export const en = {
   dlSourceOriginTask: 'From a task',
   dlSourceOriginMeeting: 'From a meeting',
   dlSourceOriginEmail: 'From an email',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Meetings',
+  dlSideSourceEmail: 'Email',
+  dlSideSourceTask: 'Tasks',
   dlSearchNoResults: 'No results for “{query}”',
 } satisfies Record<keyof typeof zh, string>
