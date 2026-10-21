@@ -1004,6 +1004,8 @@
 }
 
 .dh-doc-subpath {
+  /* anchors the sr-only path label: unanchored it escapes the .dh-main clip and scrolls the window */
+  position: relative;
   display: block;
   overflow: hidden;
   color: var(--text-secondary);
