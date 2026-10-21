@@ -51,7 +51,7 @@ const doc = (over: Partial<DocumentsHomeDoc> & { id: string }): DocumentsHomeDoc
 
 const source = (over: Partial<UniworkSourceFile> & { id: string }): UniworkSourceFile => ({
   source: 'chat',
-  parent: { kind: 'chat', id: 'room-1', title: 'phap-che' },
+  parent: { kind: 'chat_channel', id: 'room-1', title: 'phap-che' },
   name: `${over.id}.pdf`,
   mimeType: 'application/pdf',
   extension: 'pdf',
@@ -369,18 +369,28 @@ describe('DocumentsHome: the states of the lists', () => {
       source({
         id: 's-mail',
         source: 'email',
-        parent: { kind: 'email', id: 'e-1', title: 'Re: Báo giá Q4' },
+        parent: { kind: 'email_thread', id: 'e-1', title: 'Re: Báo giá Q4' },
         updatedAt: iso(2026, 10, 18, 9, 5),
       }),
       source({
         id: 's-bare',
-        parent: { kind: 'chat', id: 'room-2', title: '  ' },
+        parent: { kind: 'chat_channel', id: 'room-2', title: '  ' },
         updatedAt: iso(2026, 10, 17, 9, 5),
       }),
       source({
         id: 's-hash',
-        parent: { kind: 'chat', id: 'room-3', title: '#general' },
+        parent: { kind: 'chat_channel', id: 'room-3', title: '#general' },
         updatedAt: iso(2026, 10, 15, 9, 5),
+      }),
+      source({
+        id: 's-dm',
+        parent: { kind: 'chat_dm', id: 'dm-1', title: 'Minh Trần' },
+        updatedAt: iso(2026, 10, 14, 9, 5),
+      }),
+      source({
+        id: 's-group',
+        parent: { kind: 'chat_dm', id: 'dm-2', title: 'Nhóm Kế toán' },
+        updatedAt: iso(2026, 10, 13, 9, 5),
       }),
       source({
         id: 's-new',
@@ -401,6 +411,20 @@ describe('DocumentsHome: the states of the lists', () => {
       expect(subline('s-mail')).toBe('From an email · Re: Báo giá Q4')
     })
 
+    it('en: a DM or group-room file is not a channel, so its parent title gets no "#" (RV-10)', async () => {
+      sources = async () => ok({ items: SOURCES, nextCursor: null })
+      await mount('elsewhere', 'en')
+      expect(subline('s-dm')).toBe('Sent in Chat · Minh Trần')
+      expect(subline('s-group')).toBe('Sent in Chat · Nhóm Kế toán')
+    })
+
+    it('vi: a DM or group-room file is not a channel, so its parent title gets no "#" (RV-10)', async () => {
+      sources = async () => ok({ items: SOURCES, nextCursor: null })
+      await mount('elsewhere', 'vi')
+      expect(subline('s-dm')).toBe('Gửi trong Chat · Minh Trần')
+      expect(subline('s-group')).toBe('Gửi trong Chat · Nhóm Kế toán')
+    })
+
     it('vi: the Name sub-line is the origin, worded as the web module does (chat gets "#")', async () => {
       sources = async () => ok({ items: SOURCES, nextCursor: null })
       await mount('elsewhere', 'vi')
@@ -415,7 +439,7 @@ describe('DocumentsHome: the states of the lists', () => {
       await mount('elsewhere', 'en')
       expect(subline('s-bare')).toBe('Sent in Chat')
       expect(subline('s-new')).toBe('Quy trình')
-      // only a chat parent is a channel: a title that already starts with "#" is not doubled
+      // only a chat_channel parent gets a "#": a title that already starts with "#" is not doubled
       expect(subline('s-hash')).toBe('Sent in Chat · #general')
       expect(host.textContent).not.toMatch(/undefined|NaN/)
     })
