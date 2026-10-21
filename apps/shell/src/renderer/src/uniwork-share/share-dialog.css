@@ -1,0 +1,829 @@
+/* Share dialog (UNI-2047 SD-B). Chrome colors are semantic tokens only; the dialog follows the
+   light / dark / system theme like every other app surface. */
+
+.modal.uw-act.uw-share {
+  width: min(600px, calc(var(--ui-vw) * 92));
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.uw-share-header {
+  position: sticky;
+  /* the modal pads 20px: pin to its outer edge and cover the padding so scrolled content never
+     shows above the title and the Close button stays reachable in a short window (SW-3) */
+  top: -20px;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -20px -20px 14px;
+  padding: 20px 20px 8px;
+  background: var(--surface);
+}
+
+.uw-share-header-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.uw-share-title {
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+
+.uw-share-close {
+  display: inline-flex;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.uw-share-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.uw-share-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-share-muted {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.uw-share-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.uw-share-loading {
+  margin: 0;
+  padding: 16px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.uw-share-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* notes: a quiet info box; warn = a confirm box that asks first; error = a failed load with Retry */
+.uw-share-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.uw-share-note.warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--text);
+}
+
+.uw-share-note.error {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.uw-share-note p {
+  margin: 0;
+}
+
+.uw-share-note-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.uw-share-warnings {
+  margin: 0;
+  padding: 0 0 0 16px;
+}
+
+.uw-share-notice {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--success-border);
+  border-radius: 8px;
+  background: var(--success-bg);
+  color: var(--success);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* some documents failed: the banner is a warning, success green only when everything worked */
+.uw-share-notice.warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--text);
+}
+
+.uw-share-warning {
+  margin: 0;
+  color: var(--warning-text);
+  font-size: 12px;
+}
+
+/* a section: a bordered card; plain = no card (the access list), flush = the card has no inner
+   padding because its own rows carry it; warn = the emergency-access card */
+.uw-share-section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.uw-share-section.plain {
+  padding: 0;
+  border: none;
+}
+
+.uw-share-section.flush {
+  gap: 0;
+  padding: 0;
+}
+
+.uw-share-section.warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.uw-share-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.uw-share-section-head.ruled {
+  justify-content: flex-start;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.uw-share-heading {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.uw-share-heading:focus-visible {
+  outline: none;
+  text-decoration: underline;
+}
+
+.uw-share-pad {
+  padding: 8px 12px;
+}
+
+.uw-share-icon {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+/* picker */
+.uw-share-picker {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.uw-share-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uw-share-chip {
+  display: inline-flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.uw-share-chip.rejected {
+  border-color: var(--danger-text);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.uw-share-chip-name {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-act-select.uw-share-chip-select {
+  width: auto;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.uw-share-chip-reason {
+  font-weight: 600;
+}
+
+.uw-share-chip-x {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.uw-share-chip-x:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.uw-share-chip-x:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.uw-share-listbox {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.uw-share-listbox-note {
+  padding: 8px 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.uw-share-group {
+  padding: 4px 0;
+}
+
+.uw-share-group-title {
+  padding: 4px 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.uw-share-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.uw-share-option:hover,
+.uw-share-option:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.uw-share-option[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.uw-share-option-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.uw-share-option-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.uw-share-option-name {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-share-option-sub {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-share-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.uw-share-badge.outline {
+  border: 1px solid var(--border);
+  background: transparent;
+}
+
+.uw-share-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.uw-share-more-error {
+  color: var(--danger-text);
+  font-size: 12px;
+}
+
+/* form rows */
+.uw-share-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.uw-share-form-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.uw-share-field {
+  display: flex;
+  width: 160px;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.uw-share-field.narrow {
+  width: 112px;
+}
+
+.uw-share-field .uw-act-label {
+  margin-bottom: 6px;
+}
+
+.uw-share-hint {
+  flex: 1 1 100%;
+}
+
+/* custom levels */
+.uw-share-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.uw-share-custom-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.uw-share-custom-summary {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.uw-share-custom-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.uw-share-custom-name {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 160px;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-share-custom-type {
+  flex: none;
+  width: 96px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* lists and rows */
+.uw-share-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uw-share-list > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.uw-share-list.bordered {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.uw-share-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.uw-share-row.stacked {
+  flex-direction: column;
+  /* .uw-share-row wraps; a wrapping column container sizes its row-line child at the
+     wrapped (two-line) height, which left ~35 px of dead space in every row */
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.uw-share-row.muted {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.uw-share-row-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+
+.uw-share-row-main {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 160px;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Title line inside a column container (.stacked / .uw-share-row-text): no flex-basis,
+   or the 160px basis of .uw-share-row-main would become a height. */
+.uw-share-row-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.uw-share-row-main.stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.uw-share-row-text {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 176px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.uw-share-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-share-row-name.strong {
+  font-weight: 600;
+}
+
+.uw-share-row-name.wrap {
+  flex: 1 1 160px;
+  font-size: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.uw-share-row-sub {
+  padding-left: 22px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.uw-share-row-controls {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.uw-share-row-controls.wrap {
+  flex-wrap: wrap;
+}
+
+.uw-act-select.uw-share-level-select {
+  width: 128px;
+}
+
+.uw-share-revoke {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.uw-share-linkbtn {
+  align-self: flex-start;
+  padding: 0 0 0 22px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.uw-share-linkbtn:hover {
+  color: var(--text);
+}
+
+.uw-share-linkbtn:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.uw-share-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  list-style: none;
+}
+
+.uw-share-message {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* a link made a moment ago: the URL shows once */
+.uw-share-created {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.uw-share-created p {
+  margin: 0;
+}
+
+.uw-share-url {
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.uw-share-skeleton {
+  display: inline-block;
+  width: 96px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--bg-hover-strong);
+}
+
+.uw-share-skeleton.wide {
+  width: 100%;
+  height: 40px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .uw-share-skeleton {
+    animation: uw-share-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes uw-share-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.uw-share-reason {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.uw-share-reason:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-share-reason[aria-invalid='true'] {
+  border-color: var(--danger-text);
+}
+
+.uw-share-reason-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.uw-share-reason-form .uw-share-row-line {
+  align-self: stretch;
+}
+
+/* Bulk Share dialog (UNI-2047 SD-C): the add area is the single dialog's; these are the workspace /
+   link choices, the checkbox, and the result list with the one-time links. Tokens only. */
+
+.uw-bulk-check {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.uw-bulk-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.uw-bulk-choices .uw-share-field {
+  width: auto;
+}
+
+.uw-bulk-failures {
+  display: flex;
+  max-height: 180px;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.uw-bulk-links {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.uw-bulk-link-list {
+  display: flex;
+  max-height: 240px;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.uw-bulk-link-list li {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.uw-bulk-link-title {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-bulk-link-url {
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

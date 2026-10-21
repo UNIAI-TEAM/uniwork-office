@@ -7,10 +7,12 @@ import type { StringKey } from '../locale'
 import type { FolderMenuItem } from '../uniwork-folders/FolderMenu'
 import { canManageShelved, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
 import type { DocListScreen } from './columns'
+import { canShareRow } from './share-gate'
 
 export type RowMenuActionId =
   | 'open'
   | 'offline'
+  | 'share'
   | 'copy-link'
   | 'star'
   | 'unstar'
@@ -95,6 +97,9 @@ export function buildRowMenu({
   add('open', label('dlActOpen'), OPEN)
   // a page and a folder have no file to keep offline
   if (offlineLabel && doc.kind === 'file' && !shelved) add('offline', offlineLabel, OPEN)
+  // Chia sẻ (UNI-2047 SD-C): any reader opens the dialog, the gate keeps folders, other modules'
+  // documents, trashed rows and My Folder out; it sits just before Sao chép link like the web's
+  if (canShareRow(doc)) add('share', label('dlActShare'), LINK)
   if (doc.kind !== 'folder') add('copy-link', label('dlActCopyLink'), LINK)
   // Gắn sao / Bỏ gắn sao (UNI-2047 B6): only the Starred list carries the star time, so a row that
   // has one offers Bỏ gắn sao and any other row Gắn sao (idempotent on the server); a viewer may star

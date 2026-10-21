@@ -6,6 +6,7 @@ import type { DocListScreen } from './columns'
 import { bulkActionsFor, type BulkActionId } from './bulk'
 
 const ACTION_LABEL: Record<BulkActionId, StringKey> = {
+  share: 'dlActShare',
   restore: 'dlActRestore',
   unshelve: 'dlActUnshelve',
   shelve: 'dlActShelve',
@@ -21,6 +22,7 @@ export function BulkBar({
   screen,
   docs,
   busy,
+  canShare = false,
   onAction,
   onClear,
 }: {
@@ -28,12 +30,14 @@ export function BulkBar({
   docs: readonly DocumentsHomeDoc[]
   /** a batch is running: the actions wait */
   busy: boolean
+  /** this shell has the Share bridge: Chia sẻ may show */
+  canShare?: boolean
   onAction: (id: BulkActionId) => void
   onClear: () => void
 }) {
   const { t } = useI18n()
   if (docs.length === 0) return null
-  const actions = bulkActionsFor(screen, docs)
+  const actions = bulkActionsFor(screen, docs, canShare)
   return (
     <div className="dl-bulk-bar" data-bulk-bar role="toolbar" aria-label={t('dlBulkToolbar')}>
       <span className="dl-bulk-count" data-bulk-count>

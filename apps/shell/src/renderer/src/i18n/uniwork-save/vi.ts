@@ -31,4 +31,8 @@ export const vi = {
   usErrAlreadyBound: 'Thẻ này đã gắn với một tài liệu UniWork. Hãy lưu như bình thường.',
   usErrNotFound:
     'Không tìm thấy tệp cần lưu hoặc thư mục đã chọn. Hãy chọn lại nơi lưu rồi thử lại.',
+  usShareToggle: 'Chia sẻ với workspace',
+  usShareHint: 'Mọi người trong workspace có thể xem tài liệu này',
+  usShareAlready: 'Đã chia sẻ với workspace',
+  usShareFailed: 'Không chia sẻ được. Kiểm tra lại đối tượng và mức quyền.',
 } satisfies Record<keyof typeof zh, string>

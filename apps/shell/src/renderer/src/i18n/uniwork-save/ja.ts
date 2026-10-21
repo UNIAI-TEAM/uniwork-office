@@ -34,4 +34,8 @@ export const ja = {
     'このタブはすでに UniWork のドキュメントに関連付けられています。通常どおり保存してください。',
   usErrNotFound:
     '保存するファイルまたは選択したフォルダーが見つかりません。保存先を選び直してから、もう一度お試しください。',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

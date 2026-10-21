@@ -442,6 +442,8 @@ export interface DocumentRef {
   myLevel: string | null
   archivedAt: string | null
   format: UniworkDocFormat | null
+  /** the document's `visibility` when the server sent a known one (SD-D2 first-save share rule) */
+  visibility: UniworkDocSummary['visibility'] | null
 }
 
 export function parseDocumentRef(raw: unknown): DocumentRef {
@@ -461,6 +463,7 @@ export function parseDocumentRef(raw: unknown): DocumentRef {
     myLevel: typeof myLevel === 'string' ? myLevel : null,
     archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
     format: kind === 'folder' ? null : formatOf(doc, title),
+    visibility: visibilityOf(doc.visibility) ?? null,
   }
 }
 
@@ -1074,6 +1077,7 @@ function doclistFieldsOf(
   | 'shared'
   | 'shareSummary'
   | 'favoritedAt'
+  | 'ownerKind'
 > {
   const archivedAt = optTimestamp(row.archived_at)
   const archivedById = optId(row.archived_by)
@@ -1083,6 +1087,7 @@ function doclistFieldsOf(
   const shared = sharedOf(row.shared)
   const shareSummary = shareSummaryOf(row.share_summary)
   const favoritedAt = optTimestamp(row.favorited_at)
+  const ownerKind = optId(row.owner_kind, 64)
   return {
     ...(archivedAt ? { archivedAt } : {}),
     ...(archivedById ? { archivedById } : {}),
@@ -1093,6 +1098,7 @@ function doclistFieldsOf(
     ...(shared ? { shared } : {}),
     ...(shareSummary ? { shareSummary } : {}),
     ...(favoritedAt ? { favoritedAt } : {}),
+    ...(ownerKind ? { ownerKind } : {}),
   }
 }
 

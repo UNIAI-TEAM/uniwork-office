@@ -1,5 +1,7 @@
 import type { UniworkDocEditLock, UniworkDocErrorCode } from '../../shared/home-api'
+import type { ShareRejectedItem } from '../../shared/share-api'
 import { isDecimalString } from './formats'
+import { parseRejectedItems } from './share-rejected'
 
 /**
  * A failed UniWork documents call. `code` is the user-facing code from the
@@ -68,6 +70,8 @@ export class UniworkDocError extends Error {
    * `retry_after`...). Strings, finite numbers and booleans only; never nested.
    */
   readonly fields?: Record<string, unknown>
+  /** UNI-2047 SD-A: the refused items of a 422 `document_access_rejected` (an access update) */
+  readonly rejected?: ShareRejectedItem[]
 
   constructor(
     code: UniworkDocErrorCode,
@@ -88,6 +92,7 @@ export class UniworkDocError extends Error {
       lostReason?: UniworkDocError['lostReason']
       byName?: string | null
       fields?: Record<string, unknown>
+      rejected?: ShareRejectedItem[]
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -109,6 +114,7 @@ export class UniworkDocError extends Error {
     this.lostReason = extra.lostReason
     this.byName = extra.byName
     this.fields = extra.fields
+    this.rejected = extra.rejected
   }
 }
 
@@ -335,6 +341,14 @@ export function errorFromResponse(
   // user-facing refusal, never retried and not terminal
   if (serverCode === 'folder_into_my_folder') {
     return new UniworkDocError('folder_into_my_folder', at)
+  }
+  // UNI-2047 SD-A: an access update the server refused item by item; the list rides the error so
+  // the share dialog can name each refused person (a bare 422 stays the generic server_error)
+  if (serverCode === 'document_access_rejected') {
+    return new UniworkDocError('server_error', {
+      ...at,
+      rejected: parseRejectedItems(envelope?.fields?.rejected),
+    })
   }
   // G5-06 (UNI-1352): the server's own verdicts, kept apart from the generic
   // forbidden/deleted a caller would otherwise act on. A capability kill
