@@ -455,3 +455,29 @@ describe('uniwork work client: notifications', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 })
+
+describe('uniwork work client: document-change rows in the home inbox', () => {
+  it('homeSummary keeps count, updated_at and sample_documents of a document_changed row', async () => {
+    const row = {
+      ...NOTE,
+      id: 'n_9',
+      kind: 'document_changed',
+      resource_type: 'document',
+      resource_id: 'd_1',
+      count: 3,
+      updated_at: '2026-10-21T07:01:00Z',
+      sample_documents: [{ id: 'd_1', title: 'Budget' }],
+    }
+    const fetch = server({
+      '/workspaces/ws_1/home': () => json(200, { ...HOME, inbox: [row, NOTE] }),
+    })
+    const { inbox } = await client(fetch).homeSummary('ws_1')
+    expect(inbox[0]).toMatchObject({
+      kind: 'document_changed',
+      count: 3,
+      updated_at: '2026-10-21T07:01:00Z',
+      sample_documents: [{ id: 'd_1', title: 'Budget' }],
+    })
+    expect(inbox[1]).not.toHaveProperty('sample_documents')
+  })
+})

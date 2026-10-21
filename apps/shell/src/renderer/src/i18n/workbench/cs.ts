@@ -1,5 +1,61 @@
 import type { zh } from './zh'
 import { en } from './en'
 
-// shortcut: English copy until this locale is translated (spec 6.8); replace the spread with real strings then
-export const cs = { ...en } satisfies Record<keyof typeof zh, string>
+// shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
+export const cs = {
+  ...en,
+  wbNotif_document_changed: '{actor} změnil(a) dokumenty: {count}',
+  wbNotif_document_changed_renamed_many: '{actor} přejmenoval(a) dokumenty: {count}',
+  wbNotif_document_changed_renamed_one: '{actor} přejmenoval(a) “{document}”',
+  wbNotif_document_changed_renamed_untitled: '{actor} přejmenoval(a) dokument',
+  wbNotif_document_changed_moved_many: '{actor} přesunul(a) dokumenty: {count}',
+  wbNotif_document_changed_moved_one: '{actor} přesunul(a) “{document}”',
+  wbNotif_document_changed_moved_untitled: '{actor} přesunul(a) dokument',
+  wbNotif_document_changed_trashed_many: '{actor} přesunul(a) do koše dokumenty: {count}',
+  wbNotif_document_changed_trashed_one: '{actor} přesunul(a) “{document}” do koše',
+  wbNotif_document_changed_trashed_untitled: '{actor} přesunul(a) dokument do koše',
+  wbNotif_document_changed_restored_many: '{actor} obnovil(a) dokumenty: {count}',
+  wbNotif_document_changed_restored_one: '{actor} obnovil(a) “{document}”',
+  wbNotif_document_changed_restored_untitled: '{actor} obnovil(a) dokument',
+  wbNotif_document_changed_deleted_many: '{actor} trvale smazal(a) dokumenty: {count}',
+  wbNotif_document_changed_deleted_one: '{actor} trvale smazal(a) “{document}”',
+  wbNotif_document_changed_deleted_untitled: '{actor} trvale smazal(a) dokument',
+  wbNotif_document_changed_shelved_many: '{actor} archivoval(a) dokumenty: {count}',
+  wbNotif_document_changed_shelved_one: '{actor} archivoval(a) “{document}”',
+  wbNotif_document_changed_shelved_untitled: '{actor} archivoval(a) dokument',
+  wbNotif_document_changed_unshelved_many: '{actor} vrátil(a) z archivu dokumenty: {count}',
+  wbNotif_document_changed_unshelved_one: '{actor} vrátil(a) z archivu “{document}”',
+  wbNotif_document_changed_unshelved_untitled: '{actor} vrátil(a) z archivu dokument',
+  wbNotif_document_changed_access_changed_many: '{actor} změnil(a) přístup k dokumentům: {count}',
+  wbNotif_document_changed_access_changed_one: '{actor} změnil(a) přístup k “{document}”',
+  wbNotif_document_changed_access_changed_untitled: '{actor} změnil(a) přístup k dokumentu',
+  wbNotif_document_changed_version_created_many:
+    '{actor} přidal(a) novou verzi k dokumentům: {count}',
+  wbNotif_document_changed_version_created_one: '{actor} přidal(a) novou verzi k “{document}”',
+  wbNotif_document_changed_version_created_untitled: '{actor} přidal(a) novou verzi k dokumentu',
+  wbNotif_document_changed_relocated_many:
+    '{actor} přesunul(a) do koše složku s vašimi dokumenty ({count}); dokumenty jsou nyní v kořeni pracovního prostoru',
+  wbNotif_document_changed_relocated_one:
+    '{actor} přesunul(a) do koše složku s vaším dokumentem “{document}”; dokument je nyní v kořeni pracovního prostoru',
+  wbNotif_document_changed_relocated_untitled:
+    '{actor} přesunul(a) do koše složku s jedním z vašich dokumentů; dokument je nyní v kořeni pracovního prostoru',
+  wbNotif_document_changed_generic_one: '{actor} změnil(a) “{document}”',
+  wbNotif_document_changed_generic_untitled: '{actor} změnil(a) dokument',
+  wbNotif_document_comment_resolved: '{actor} označil(a) komentář v “{document}” jako vyřešený.',
+  wbNotif_document_comment_resolved_untitled: '{actor} označil(a) komentář jako vyřešený.',
+  wbDeskPillChanged: 'Změněno',
+  wbDeskPillResolved: 'Vyřešeno',
+  wbDocChangeTitle: 'Změněné dokumenty',
+  wbDocChangeLoading: 'Načítání dokumentů',
+  wbDocChangeEmptyTitle: 'Nezůstal žádný dokument, který můžete číst',
+  wbDocChangeEmptyDesc: 'Tyto dokumenty byly smazány nebo k nim již nemáte přístup.',
+  wbDocChangeErrorTitle: 'Dokumenty se nepodařilo načíst',
+  wbDocChangeErrorDesc: 'Něco se pokazilo, zkuste to znovu',
+  wbDocChangeLoadMore: 'Načíst další',
+  wbDocChangeLoadingMore: 'Načítání…',
+  wbDocChangeDeleted: 'Trvale smazáno',
+  wbDocChangeInTrash: 'Přesunuto do koše',
+  wbDocChangeUntitled: 'Dokument bez názvu',
+  wbDocChangeMore: 'a dalších {count}',
+  wbNoticeNoAccess: 'K tomuto dokumentu nemáte přístup.',
+} satisfies Record<keyof typeof zh, string>

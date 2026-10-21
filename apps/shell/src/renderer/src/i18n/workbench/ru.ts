@@ -1,5 +1,61 @@
 import type { zh } from './zh'
 import { en } from './en'
 
-// shortcut: English copy until this locale is translated (spec 6.8); replace the spread with real strings then
-export const ru = { ...en } satisfies Record<keyof typeof zh, string>
+// shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
+export const ru = {
+  ...en,
+  wbNotif_document_changed: '{actor} изменил(а) документы: {count}',
+  wbNotif_document_changed_renamed_many: '{actor} переименовал(а) документы: {count}',
+  wbNotif_document_changed_renamed_one: '{actor} переименовал(а) “{document}”',
+  wbNotif_document_changed_renamed_untitled: '{actor} переименовал(а) документ',
+  wbNotif_document_changed_moved_many: '{actor} переместил(а) документы: {count}',
+  wbNotif_document_changed_moved_one: '{actor} переместил(а) “{document}”',
+  wbNotif_document_changed_moved_untitled: '{actor} переместил(а) документ',
+  wbNotif_document_changed_trashed_many: '{actor} переместил(а) документы в корзину: {count}',
+  wbNotif_document_changed_trashed_one: '{actor} переместил(а) “{document}” в корзину',
+  wbNotif_document_changed_trashed_untitled: '{actor} переместил(а) документ в корзину',
+  wbNotif_document_changed_restored_many: '{actor} восстановил(а) документы: {count}',
+  wbNotif_document_changed_restored_one: '{actor} восстановил(а) “{document}”',
+  wbNotif_document_changed_restored_untitled: '{actor} восстановил(а) документ',
+  wbNotif_document_changed_deleted_many: '{actor} окончательно удалил(а) документы: {count}',
+  wbNotif_document_changed_deleted_one: '{actor} окончательно удалил(а) “{document}”',
+  wbNotif_document_changed_deleted_untitled: '{actor} окончательно удалил(а) документ',
+  wbNotif_document_changed_shelved_many: '{actor} архивировал(а) документы: {count}',
+  wbNotif_document_changed_shelved_one: '{actor} архивировал(а) “{document}”',
+  wbNotif_document_changed_shelved_untitled: '{actor} архивировал(а) документ',
+  wbNotif_document_changed_unshelved_many: '{actor} вернул(а) из архива документы: {count}',
+  wbNotif_document_changed_unshelved_one: '{actor} вернул(а) из архива “{document}”',
+  wbNotif_document_changed_unshelved_untitled: '{actor} вернул(а) из архива документ',
+  wbNotif_document_changed_access_changed_many: '{actor} изменил(а) доступ к документам: {count}',
+  wbNotif_document_changed_access_changed_one: '{actor} изменил(а) доступ к “{document}”',
+  wbNotif_document_changed_access_changed_untitled: '{actor} изменил(а) доступ к документу',
+  wbNotif_document_changed_version_created_many:
+    '{actor} добавил(а) новую версию в документы: {count}',
+  wbNotif_document_changed_version_created_one: '{actor} добавил(а) новую версию в “{document}”',
+  wbNotif_document_changed_version_created_untitled: '{actor} добавил(а) новую версию в документ',
+  wbNotif_document_changed_relocated_many:
+    '{actor} переместил(а) в корзину папку с вашими документами ({count}); документы теперь в корне рабочего пространства',
+  wbNotif_document_changed_relocated_one:
+    '{actor} переместил(а) в корзину папку с вашим документом “{document}”; документ теперь в корне рабочего пространства',
+  wbNotif_document_changed_relocated_untitled:
+    '{actor} переместил(а) в корзину папку с одним из ваших документов; документ теперь в корне рабочего пространства',
+  wbNotif_document_changed_generic_one: '{actor} изменил(а) “{document}”',
+  wbNotif_document_changed_generic_untitled: '{actor} изменил(а) документ',
+  wbNotif_document_comment_resolved: '{actor} отметил(а) комментарий в “{document}” как решённый.',
+  wbNotif_document_comment_resolved_untitled: '{actor} отметил(а) комментарий как решённый.',
+  wbDeskPillChanged: 'Изменено',
+  wbDeskPillResolved: 'Решено',
+  wbDocChangeTitle: 'Изменённые документы',
+  wbDocChangeLoading: 'Загрузка документов',
+  wbDocChangeEmptyTitle: 'Не осталось документов, доступных вам для чтения',
+  wbDocChangeEmptyDesc: 'Эти документы удалены или у вас больше нет доступа.',
+  wbDocChangeErrorTitle: 'Не удалось загрузить документы',
+  wbDocChangeErrorDesc: 'Что-то пошло не так, повторите попытку',
+  wbDocChangeLoadMore: 'Показать ещё',
+  wbDocChangeLoadingMore: 'Загрузка…',
+  wbDocChangeDeleted: 'Удалён окончательно',
+  wbDocChangeInTrash: 'Перемещён в корзину',
+  wbDocChangeUntitled: 'Документ без названия',
+  wbDocChangeMore: 'и ещё {count}',
+  wbNoticeNoAccess: 'У вас нет доступа к этому документу.',
+} satisfies Record<keyof typeof zh, string>

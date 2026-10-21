@@ -34,6 +34,8 @@ const KINDS = [
   'email_hub_new_mail',
   'document_commented',
   'document_mentioned',
+  'document_changed',
+  'document_comment_resolved',
   'chat_mentioned',
   'chat_dm',
   'chat_thread_replied',
@@ -82,6 +84,30 @@ describe('workbench string shards', () => {
     expect(workbenchStrings.vi.wbNotif_task_assigned).toBe('{actor} đã giao bạn việc “{task}”')
     expect(workbenchStrings.en.wbNotif_task_assigned).toBe('{actor} assigned you “{task}”')
     expect(workbenchStrings.vi.wbNotifFallback).toBe('Thông báo mới')
+  })
+
+  it('words document changes like the web in vi and en, 33 sentence keys', () => {
+    const changed = referenceKeys.filter((k) => k.startsWith('wbNotif_document_changed'))
+    expect(changed).toHaveLength(33)
+    expect(workbenchStrings.vi.wbNotif_document_changed_renamed_one).toBe(
+      '{actor} đã đổi tên tài liệu “{document}”',
+    )
+    expect(workbenchStrings.en.wbNotif_document_changed_moved_many).toBe(
+      '{actor} moved {count} documents',
+    )
+    expect(workbenchStrings.en.wbNotif_document_comment_resolved_untitled).toBe(
+      '{actor} marked a comment as resolved.',
+    )
+    expect(workbenchStrings.vi.wbDeskPillChanged).toBe('Đã thay đổi')
+    expect(workbenchStrings.vi.wbDeskPillResolved).toBe('Đã giải quyết')
+  })
+
+  it.each(LANGS.filter((l) => l !== 'en'))('locale %s words the new notices itself', (lang) => {
+    const en = table('en')
+    const keys = referenceKeys.filter(
+      (k) => k.startsWith('wbNotif_document_changed') || k.startsWith('wbDocChange'),
+    )
+    expect(keys.filter((k) => table(lang)[k] === en[k])).toEqual([])
   })
 
   it('formal vi copy does not mix in English UI words', () => {

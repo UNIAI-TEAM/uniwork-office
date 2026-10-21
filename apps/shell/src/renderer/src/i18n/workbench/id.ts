@@ -1,5 +1,62 @@
 import type { zh } from './zh'
 import { en } from './en'
 
-// shortcut: English copy until this locale is translated (spec 6.8); replace the spread with real strings then
-export const id = { ...en } satisfies Record<keyof typeof zh, string>
+// shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
+export const id = {
+  ...en,
+  wbNotif_document_changed: '{actor} mengubah {count} dokumen',
+  wbNotif_document_changed_renamed_many: '{actor} mengganti nama {count} dokumen',
+  wbNotif_document_changed_renamed_one: '{actor} mengganti nama “{document}”',
+  wbNotif_document_changed_renamed_untitled: '{actor} mengganti nama sebuah dokumen',
+  wbNotif_document_changed_moved_many: '{actor} memindahkan {count} dokumen',
+  wbNotif_document_changed_moved_one: '{actor} memindahkan “{document}”',
+  wbNotif_document_changed_moved_untitled: '{actor} memindahkan sebuah dokumen',
+  wbNotif_document_changed_trashed_many: '{actor} memindahkan {count} dokumen ke sampah',
+  wbNotif_document_changed_trashed_one: '{actor} memindahkan “{document}” ke sampah',
+  wbNotif_document_changed_trashed_untitled: '{actor} memindahkan sebuah dokumen ke sampah',
+  wbNotif_document_changed_restored_many: '{actor} memulihkan {count} dokumen',
+  wbNotif_document_changed_restored_one: '{actor} memulihkan “{document}”',
+  wbNotif_document_changed_restored_untitled: '{actor} memulihkan sebuah dokumen',
+  wbNotif_document_changed_deleted_many: '{actor} menghapus permanen {count} dokumen',
+  wbNotif_document_changed_deleted_one: '{actor} menghapus permanen “{document}”',
+  wbNotif_document_changed_deleted_untitled: '{actor} menghapus permanen sebuah dokumen',
+  wbNotif_document_changed_shelved_many: '{actor} mengarsipkan {count} dokumen',
+  wbNotif_document_changed_shelved_one: '{actor} mengarsipkan “{document}”',
+  wbNotif_document_changed_shelved_untitled: '{actor} mengarsipkan sebuah dokumen',
+  wbNotif_document_changed_unshelved_many: '{actor} mengeluarkan {count} dokumen dari arsip',
+  wbNotif_document_changed_unshelved_one: '{actor} mengeluarkan “{document}” dari arsip',
+  wbNotif_document_changed_unshelved_untitled: '{actor} mengeluarkan sebuah dokumen dari arsip',
+  wbNotif_document_changed_access_changed_many: '{actor} mengubah akses ke {count} dokumen',
+  wbNotif_document_changed_access_changed_one: '{actor} mengubah akses ke “{document}”',
+  wbNotif_document_changed_access_changed_untitled: '{actor} mengubah akses ke sebuah dokumen',
+  wbNotif_document_changed_version_created_many:
+    '{actor} menambahkan versi baru ke {count} dokumen',
+  wbNotif_document_changed_version_created_one: '{actor} menambahkan versi baru ke “{document}”',
+  wbNotif_document_changed_version_created_untitled:
+    '{actor} menambahkan versi baru ke sebuah dokumen',
+  wbNotif_document_changed_relocated_many:
+    '{actor} memindahkan folder berisi {count} dokumen Anda ke sampah; dokumen kini berada di akar ruang kerja',
+  wbNotif_document_changed_relocated_one:
+    '{actor} memindahkan folder berisi “{document}” ke sampah; dokumen kini berada di akar ruang kerja',
+  wbNotif_document_changed_relocated_untitled:
+    '{actor} memindahkan folder berisi salah satu dokumen Anda ke sampah; dokumen kini berada di akar ruang kerja',
+  wbNotif_document_changed_generic_one: '{actor} mengubah “{document}”',
+  wbNotif_document_changed_generic_untitled: '{actor} mengubah sebuah dokumen',
+  wbNotif_document_comment_resolved: '{actor} menandai komentar di “{document}” sebagai selesai.',
+  wbNotif_document_comment_resolved_untitled: '{actor} menandai sebuah komentar sebagai selesai.',
+  wbDeskPillChanged: 'Berubah',
+  wbDeskPillResolved: 'Selesai',
+  wbDocChangeTitle: 'Dokumen yang berubah',
+  wbDocChangeLoading: 'Memuat dokumen',
+  wbDocChangeEmptyTitle: 'Tidak ada lagi dokumen yang dapat Anda baca',
+  wbDocChangeEmptyDesc: 'Dokumen ini telah dihapus atau Anda tidak lagi memiliki akses.',
+  wbDocChangeErrorTitle: 'Dokumen tidak dapat dimuat',
+  wbDocChangeErrorDesc: 'Terjadi kesalahan, coba lagi',
+  wbDocChangeLoadMore: 'Muat lainnya',
+  wbDocChangeLoadingMore: 'Memuat…',
+  wbDocChangeDeleted: 'Dihapus permanen',
+  wbDocChangeInTrash: 'Dipindahkan ke sampah',
+  wbDocChangeUntitled: 'Dokumen tanpa judul',
+  wbDocChangeMore: 'dan {count} lainnya',
+  wbNoticeNoAccess: 'Anda tidak memiliki akses ke dokumen ini.',
+} satisfies Record<keyof typeof zh, string>

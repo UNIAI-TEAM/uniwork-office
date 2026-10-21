@@ -138,6 +138,8 @@ import type {
   UniworkWorkResult,
   WorkCalendarEvent,
   WorkHomeSummary,
+  WorkNotificationDocument,
+  WorkNotificationDocumentPage,
   WorkPerson,
   WorkTask,
   WorkTaskStatus,
@@ -1866,6 +1868,38 @@ function asWorkResult<T>(result: unknown): UniworkWorkResult<T> {
   return { ok: false, error: 'server' }
 }
 
+/** a documents page rebuilt from the documented fields only, or null when the shape is wrong */
+function narrowNotificationDocumentPage(value: unknown): WorkNotificationDocumentPage | null {
+  if (!value || typeof value !== 'object') return null
+  const { documents, next_cursor: cursor } = value as { documents?: unknown; next_cursor?: unknown }
+  if (!Array.isArray(documents)) return null
+  if (cursor !== null && typeof cursor !== 'string') return null
+  const rows: WorkNotificationDocument[] = []
+  for (const row of documents) {
+    if (!row || typeof row !== 'object') return null
+    const r = row as Record<string, unknown>
+    if (
+      typeof r.id !== 'string' ||
+      typeof r.title !== 'string' ||
+      typeof r.kind !== 'string' ||
+      typeof r.trashed !== 'boolean' ||
+      typeof r.shelved !== 'boolean' ||
+      typeof r.deleted !== 'boolean'
+    ) {
+      return null
+    }
+    rows.push({
+      id: r.id,
+      title: r.title,
+      kind: r.kind,
+      trashed: r.trashed,
+      shelved: r.shelved,
+      deleted: r.deleted,
+    })
+  }
+  return { documents: rows, next_cursor: cursor }
+}
+
 const workApi: UniworkWorkApi = {
   async homeSummary(workspaceId) {
     return asWorkResult<WorkHomeSummary>(
@@ -1902,6 +1936,14 @@ const workApi: UniworkWorkApi = {
     return asWorkResult<null>(
       await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.markNotificationsRead, ids),
     )
+  },
+  async notificationDocuments(id, q) {
+    const reply = asWorkResult<unknown>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.notificationDocuments, id, q),
+    )
+    if (!reply.ok) return reply
+    const page = narrowNotificationDocumentPage(reply.value)
+    return page ? { ok: true, value: page } : { ok: false, error: 'server' }
   },
   async openWeb(target) {
     return (await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.openWeb, target)) === true

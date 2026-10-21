@@ -8,6 +8,9 @@ import {
   type UniworkSaveState,
 } from '../../shared/home-api'
 import type { WorkNotification, WorkRecentDocument } from '../../shared/uniwork-work-api'
+import { documentChangedSentenceKey, documentChangedTitleParams } from './desk-doc-change'
+import type { StringKey } from './locale'
+import { notificationKey } from './work-home'
 
 const PDF = /\.pdf$/i
 
@@ -22,11 +25,41 @@ export function applicableTools(paths: readonly string[]): DeskToolId[] {
   return paths.length === 1 && DESK_EXPORTABLE.test(paths[0]!) ? ['export-pdf'] : []
 }
 
-const DOC_KINDS = new Set(['document_commented', 'document_mentioned'])
+const DOC_KINDS = new Set([
+  'document_commented',
+  'document_mentioned',
+  'document_comment_resolved',
+  'document_changed',
+])
 
-/** unread comments and mentions on a document */
+/** unread comments, mentions, resolved comments and changes on a document (one row each, however many documents) */
 export function docNotifications(inbox: readonly WorkNotification[]): WorkNotification[] {
   return inbox.filter((n) => !n.read_at && n.resource_type === 'document' && DOC_KINDS.has(n.kind))
+}
+
+/** the sentence of a tray note and the params it places (a change row words itself by verb and shape) */
+export function noteSentence(n: WorkNotification): {
+  key: StringKey
+  params: Record<string, string>
+} {
+  if (n.kind === 'document_changed')
+    return { key: documentChangedSentenceKey(n), params: documentChangedTitleParams(n) }
+  if (n.kind === 'document_comment_resolved')
+    return {
+      key: n.params.document
+        ? 'wbNotif_document_comment_resolved'
+        : 'wbNotif_document_comment_resolved_untitled',
+      params: n.params,
+    }
+  return { key: notificationKey(n.kind), params: n.params }
+}
+
+/** the pill of a tray note */
+export function notePillKey(n: WorkNotification): StringKey {
+  if (n.kind === 'document_mentioned') return 'wbDeskPillMention'
+  if (n.kind === 'document_changed') return 'wbDeskPillChanged'
+  if (n.kind === 'document_comment_resolved') return 'wbDeskPillResolved'
+  return 'wbDeskPillComment'
 }
 
 const WEEK_MS = 7 * 86_400_000

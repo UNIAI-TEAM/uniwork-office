@@ -1,5 +1,60 @@
 import type { zh } from './zh'
 import { en } from './en'
 
-// shortcut: English copy until this locale is translated (spec 6.8); replace the spread with real strings then
-export const zhTW = { ...en } satisfies Record<keyof typeof zh, string>
+// shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
+export const zhTW = {
+  ...en,
+  wbNotif_document_changed: '{actor} 變更了 {count} 份文件',
+  wbNotif_document_changed_renamed_many: '{actor} 重新命名了 {count} 份文件',
+  wbNotif_document_changed_renamed_one: '{actor} 重新命名了 “{document}”',
+  wbNotif_document_changed_renamed_untitled: '{actor} 重新命名了一份文件',
+  wbNotif_document_changed_moved_many: '{actor} 移動了 {count} 份文件',
+  wbNotif_document_changed_moved_one: '{actor} 移動了 “{document}”',
+  wbNotif_document_changed_moved_untitled: '{actor} 移動了一份文件',
+  wbNotif_document_changed_trashed_many: '{actor} 將 {count} 份文件移至垃圾桶',
+  wbNotif_document_changed_trashed_one: '{actor} 將 “{document}” 移至垃圾桶',
+  wbNotif_document_changed_trashed_untitled: '{actor} 將一份文件移至垃圾桶',
+  wbNotif_document_changed_restored_many: '{actor} 還原了 {count} 份文件',
+  wbNotif_document_changed_restored_one: '{actor} 還原了 “{document}”',
+  wbNotif_document_changed_restored_untitled: '{actor} 還原了一份文件',
+  wbNotif_document_changed_deleted_many: '{actor} 永久刪除了 {count} 份文件',
+  wbNotif_document_changed_deleted_one: '{actor} 永久刪除了 “{document}”',
+  wbNotif_document_changed_deleted_untitled: '{actor} 永久刪除了一份文件',
+  wbNotif_document_changed_shelved_many: '{actor} 封存了 {count} 份文件',
+  wbNotif_document_changed_shelved_one: '{actor} 封存了 “{document}”',
+  wbNotif_document_changed_shelved_untitled: '{actor} 封存了一份文件',
+  wbNotif_document_changed_unshelved_many: '{actor} 取消封存了 {count} 份文件',
+  wbNotif_document_changed_unshelved_one: '{actor} 取消封存了 “{document}”',
+  wbNotif_document_changed_unshelved_untitled: '{actor} 取消封存了一份文件',
+  wbNotif_document_changed_access_changed_many: '{actor} 變更了 {count} 份文件的存取權限',
+  wbNotif_document_changed_access_changed_one: '{actor} 變更了 “{document}” 的存取權限',
+  wbNotif_document_changed_access_changed_untitled: '{actor} 變更了一份文件的存取權限',
+  wbNotif_document_changed_version_created_many: '{actor} 為 {count} 份文件新增了版本',
+  wbNotif_document_changed_version_created_one: '{actor} 為 “{document}” 新增了版本',
+  wbNotif_document_changed_version_created_untitled: '{actor} 為一份文件新增了版本',
+  wbNotif_document_changed_relocated_many:
+    '{actor} 將存放你 {count} 份文件的資料夾移至垃圾桶；這些文件已回到工作區根目錄',
+  wbNotif_document_changed_relocated_one:
+    '{actor} 將存放你的 “{document}” 的資料夾移至垃圾桶；該文件已回到工作區根目錄',
+  wbNotif_document_changed_relocated_untitled:
+    '{actor} 將存放你一份文件的資料夾移至垃圾桶；該文件已回到工作區根目錄',
+  wbNotif_document_changed_generic_one: '{actor} 變更了 “{document}”',
+  wbNotif_document_changed_generic_untitled: '{actor} 變更了一份文件',
+  wbNotif_document_comment_resolved: '{actor} 將 “{document}” 中的一則留言標為已解決。',
+  wbNotif_document_comment_resolved_untitled: '{actor} 將一則留言標為已解決。',
+  wbDeskPillChanged: '已變更',
+  wbDeskPillResolved: '已解決',
+  wbDocChangeTitle: '文件已變更',
+  wbDocChangeLoading: '正在載入文件',
+  wbDocChangeEmptyTitle: '沒有你可以閱讀的文件了',
+  wbDocChangeEmptyDesc: '這些文件已被刪除，或你已不再有權限查看。',
+  wbDocChangeErrorTitle: '無法載入文件',
+  wbDocChangeErrorDesc: '發生錯誤，請再試一次',
+  wbDocChangeLoadMore: '載入更多',
+  wbDocChangeLoadingMore: '載入中…',
+  wbDocChangeDeleted: '已永久刪除',
+  wbDocChangeInTrash: '已移至垃圾桶',
+  wbDocChangeUntitled: '未命名文件',
+  wbDocChangeMore: '還有 {count} 份',
+  wbNoticeNoAccess: '你沒有存取此文件的權限。',
+} satisfies Record<keyof typeof zh, string>
