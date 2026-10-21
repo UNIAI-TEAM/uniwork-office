@@ -62,7 +62,7 @@ import type {
   UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
-import type { UniworkDocShelveResult } from '../../shared/home-api'
+import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../../shared/home-api'
 import type {
   UniworkConflictAction,
   UniworkConflictIntentBlock,
@@ -6688,6 +6688,52 @@ export class UniworkDocsService {
       })
       const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
       return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /**
+   * UNI-2047 B6: the caller's stars in one workspace (SV-2, newest star first, paged). The route
+   * reads only the type, the kind, the sort and the paging, so the editor / date / activity filters
+   * stop here; an older server's 404 comes back as the usual `not_found` error result.
+   */
+  listFavorites(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const { format, kind, sort, order } = this.listFiltersOf(q)
+      const page = await this.api().listFavorites({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...(format ? { format } : {}),
+        ...(kind ? { kind } : {}),
+        ...(sort ? { sort } : {}),
+        ...(order ? { order } : {}),
+      })
+      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** UNI-2047 B6: Gắn sao - the server checks the view level and answers the same on a repeat */
+  favoriteDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocFavoriteResult>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      return this.api().favorite(documentId)
+    })
+  }
+
+  /** UNI-2047 B6: Bỏ gắn sao - a star that is not there is still a success on the server */
+  unfavoriteDocument(documentId: string): Promise<UniworkDocActionResult<{ documentId: string }>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.api().unfavorite(documentId)
+      return { documentId }
     })
   }
 

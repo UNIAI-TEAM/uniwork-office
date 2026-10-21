@@ -307,13 +307,14 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
 
-    // 1. Sidebar sub-nav order & omitted unavailable entries
+    // 1. Sidebar sub-nav order & omitted unavailable entries (UNI-2047 B6: Gắn sao is listed)
     const navButtons = Array.from(
       sidebarSlot.querySelectorAll<HTMLButtonElement>('.home-area-nav .nav-item'),
     )
     expect(navButtons.map((b) => b.getAttribute('data-nav'))).toEqual([
       'workspace',
       'recent',
+      'starred',
       'shared-with-me',
       'shared-by-me',
       'archive',
@@ -322,12 +323,12 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(navButtons.map((b) => b.textContent?.trim())).toEqual([
       'Tài liệu của workspace',
       'Gần đây',
+      'Gắn sao',
       'Được chia sẻ với tôi',
       'Tôi đã chia sẻ',
       'Lưu trữ',
       'Thùng rác',
     ])
-    expect(sidebarSlot.textContent).not.toContain('Gắn sao')
 
     // 2. Top toolbar: h1 title, workspace switcher, search input, Tải lên, Tạo mới
     const h1 = host.querySelector<HTMLHeadingElement>('h1.dh-title')

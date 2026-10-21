@@ -472,6 +472,19 @@ export function parseDocumentList(raw: unknown, workspaceId: string): DocumentLi
 }
 
 /**
+ * UNI-2047 B6: `POST /documents/{id}/favorite` answers `{favorite: {document_id, favorited_at, ...}}`
+ * (the live row, created or already there). It fails closed on a missing time and on an answer for
+ * another document, so a wrong body never reads as "starred".
+ */
+export function parseDocumentFavorite(raw: unknown, documentId: string): { favoritedAt: string } {
+  const favorite = record(record(raw).favorite)
+  if (favorite.document_id !== documentId) bad()
+  const favoritedAt = optTimestamp(favorite.favorited_at)
+  if (!favoritedAt) bad()
+  return { favoritedAt }
+}
+
+/**
  * UNI-1961: `GET /workspaces/{ws}/documents/sources`, read the way the web reads
  * it (D sources-schema.ts): the id, source, parent and name are required; every
  * other field takes its default when absent or mistyped. A body that is not a

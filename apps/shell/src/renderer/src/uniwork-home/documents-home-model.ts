@@ -54,6 +54,7 @@ export type DocumentsHomeDataSource =
   | 'shared-by-me'
   | 'trash'
   | 'shelved'
+  | 'favorites'
   | 'none'
 
 export interface DocumentsHomeNavEntry {
@@ -65,7 +66,7 @@ export interface DocumentsHomeNavEntry {
 
 /**
  * DESKTOP-HOME DH-1 sub-navigation entry table in exact board order (Desktop.dc.html:20-27).
- * Entries with `available: false` (Starred / Gắn sao, Archive / Lưu trữ, My Folder: a tree row) are hidden and not rendered.
+ * Entries with `available: false` (My Folder: a tree row) are hidden and not rendered.
  */
 export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
@@ -91,8 +92,9 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
     id: 'starred',
     labelKey: 'uhNavStarred',
-    available: false,
-    source: 'none',
+    // UNI-2047 B6: the server's SV-2 favorites route; an older server's 404 is the list error state
+    available: true,
+    source: 'favorites',
   },
   {
     id: 'shared-with-me',
@@ -352,6 +354,16 @@ export interface DocumentsHomeApiAdapter {
     } & UniworkListFilters &
       DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-2047 B6: Gắn sao - the SV-2 route reads the type, the kind and the sort only */
+  uniworkListFavorites?: (
+    q: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+      format?: UniworkListFilters['format']
+      kind?: UniworkListFilters['kind']
+    } & DocumentsHomeWireSort,
+  ) => Promise<UniworkResult<UniworkDocListPage>>
   /** UNI-1961: the Lưu trữ shelf (only the type filter applies there, and the sort) */
   uniworkListShelved?: (
     q: {
@@ -515,6 +527,24 @@ export async function fetchDocumentsHomePage(
       workspaceId,
       cursor,
       ...filters,
+      ...sortArgs,
+    })
+    return {
+      result: mapDocListPageResult(res),
+    }
+  }
+
+  if (subView === 'starred') {
+    if (typeof api.uniworkListFavorites !== 'function') {
+      return { result: { ok: true, value: { items: [], nextCursor: null } } }
+    }
+    // UNI-2047 B6: the favorites route takes the type and the sort, nothing else (Người sửa /
+    // Cập nhật narrow the loaded rows in the screen); a 404 from an older server is the error state
+    const res = await api.uniworkListFavorites({
+      workspaceId,
+      ...(cursor ? { cursor } : {}),
+      ...(filters.format ? { format: filters.format } : {}),
+      ...(filters.kind ? { kind: filters.kind } : {}),
       ...sortArgs,
     })
     return {

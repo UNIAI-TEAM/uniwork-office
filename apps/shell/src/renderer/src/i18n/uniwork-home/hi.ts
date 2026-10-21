@@ -90,6 +90,10 @@ export const hi = {
   uhEmptySharedWithMe: 'अभी तक आपके साथ कोई दस्तावेज़ साझा नहीं किया गया है।',
   uhEmptySharedByMe: 'आपने अभी तक कोई दस्तावेज़ साझा नहीं किया है।',
   uhEmptyTrash: 'ट्रैश खाली है।',
+  uhEmptyStarred: 'अभी कोई स्टार किया हुआ दस्तावेज़ नहीं है।',
+  uhStarDone: '{title} को स्टार किया गया',
+  uhUnstarDone: '{title} से स्टार हटाया गया',
+  uhStarFailed: '{title} का स्टार बदला नहीं जा सका',
   uhEmptyFiltered: 'कोई दस्तावेज़ वर्तमान फ़िल्टर से मेल नहीं खाता।',
   uhTrashNote:
     'यदि आपके पास प्रबंधन पहुँच है तो ट्रैश में मौजूद आइटम पुनर्स्थापित किए जा सकते हैं।',
