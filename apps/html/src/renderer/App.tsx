@@ -29,6 +29,7 @@ import {
 } from './shortcuts'
 import { LinkPopover } from './components/LinkPopover'
 import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
+import { keyHintAfterName } from '@genoffice/shortcuts'
 import { useNarrowFrame } from './narrow-frame'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
 import { textWithPendingStyles } from './document/pending-draft'
@@ -1930,11 +1931,13 @@ export default function App() {
                   <button
                     type="button"
                     className="present-exit"
-                    aria-label={t('presentExitName')}
                     aria-keyshortcuts="Escape"
                     onClick={() => setCanvasMode('edit')}
                   >
-                    {t('presentExit')}
+                    {t('presentExitName')}{' '}
+                    <span aria-hidden="true">
+                      {keyHintAfterName(t('presentExit'), t('presentExitName'))}
+                    </span>
                   </button>
                 )}
                 {visualEdit &&
