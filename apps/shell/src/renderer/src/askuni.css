@@ -1,0 +1,346 @@
+/* Ask UNI mode of the Home My AI pane: workspace Q&A with a sources list. Tokens only. */
+.askuni-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.askuni-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.askuni-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 20px;
+  padding-inline-start: 28px;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+}
+
+.askuni-workspace {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+}
+
+.askuni-workspace-label {
+  color: var(--text-secondary);
+}
+
+.askuni-workspace-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.askuni-workspace-select {
+  min-width: 0;
+  max-width: 260px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8, 8px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.askuni-workspace-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.askuni-pane[hidden] {
+  display: none;
+}
+
+.askuni-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px 28px;
+}
+
+.askuni-failed .askuni-note {
+  padding: 0;
+}
+
+.askuni-body {
+  padding-top: 20px;
+}
+
+.askuni-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.askuni-empty-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.askuni-empty-text {
+  margin: 0 auto;
+  max-width: 52ch;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.askuni-note {
+  margin: 0;
+  padding: 16px 28px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.askuni-note.is-quiet {
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.askuni-answer-body {
+  padding-inline-start: 26px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* the shared chat rule indents assistant paragraphs; the body already carries that indent */
+.new-chat-msg.is-assistant.askuni-answer .askuni-answer-body p {
+  padding-inline-start: 0;
+}
+
+.askuni-notice {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.askuni-sources {
+  margin: 12px 0 0;
+  margin-inline-start: 26px;
+}
+
+.askuni-sources-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.askuni-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.askuni-source {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8, 8px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background 150ms var(--new-chat-ease),
+    border-color 150ms var(--new-chat-ease);
+}
+
+.askuni-source:hover {
+  background: var(--hover);
+  border-color: var(--border-hover, var(--border));
+}
+
+.askuni-source.is-static {
+  cursor: default;
+}
+
+.askuni-source.is-static:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.askuni-source:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.askuni-source-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.askuni-source-id {
+  flex-shrink: 0;
+  margin-top: 1px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8, 8px);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 18px;
+  color: var(--text-secondary);
+}
+
+.askuni-source-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.askuni-source-title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.askuni-source-quote {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.askuni-source-action {
+  flex-shrink: 0;
+  max-width: 40%;
+  padding-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.askuni-composer .new-chat-composer-actions {
+  min-height: 32px;
+}
+
+.askuni-counter {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+/* narrow Home window (down to ~390px): tighter gutters, the action hint drops under the title */
+@media (max-width: 520px) {
+  .askuni-context {
+    padding: 10px 16px;
+  }
+
+  .askuni-body {
+    padding-inline: 16px;
+  }
+
+  .askuni-composer {
+    padding-inline: 16px;
+  }
+
+  .askuni-note,
+  .askuni-failed {
+    padding-inline: 16px;
+  }
+
+  .askuni-source {
+    flex-wrap: wrap;
+  }
+
+  .askuni-source-action {
+    max-width: none;
+    flex-basis: 100%;
+    padding-inline-start: 26px;
+  }
+}
+
+/* My AI header: the two-way mode switch between the chat and Ask UNI */
+.askuni-modes {
+  display: inline-flex;
+  gap: 2px;
+  margin-inline-end: auto;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8, 8px);
+  background: var(--surface-subtle, var(--surface));
+}
+
+.askuni-mode {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.askuni-mode:hover:not(.is-on) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.askuni-mode.is-on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-btn);
+}
+
+.askuni-mode:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .new-chat-bar:has(.askuni-modes) {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 8px 16px;
+  }
+}
