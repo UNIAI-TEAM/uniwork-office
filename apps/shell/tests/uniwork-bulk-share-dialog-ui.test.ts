@@ -293,6 +293,20 @@ describe('BulkShareDialog (UNI-2047 SD-C)', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('the result view keeps focus in the dialog (Close) so Esc still closes it', async () => {
+    await open({ bulkRefuses: { doc_2: 'forbidden' } })
+    await choose(q<HTMLSelectElement>('[data-bulk-workspace]')!, 'view')
+    await click(submit())
+    expect(q('[data-bulk-result]')).toBeTruthy()
+    expect(document.activeElement).toBe(q('[data-bulk-close]'))
+    await act(async () => {
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      )
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('names each failure by its own reason (not found, busy, folder, unknown)', async () => {
     await open({
       bulkRefuses: {

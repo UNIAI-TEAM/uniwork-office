@@ -125,6 +125,13 @@ function BulkShareBody({ docs, api, onClose, onChanged, onApplied }: BulkShareDi
   // the state flips after the click; the ref closes the gap for a fast second one
   const inFlight = useRef(false)
 
+  // the form's Submit button unmounts when the result view replaces it; focus goes to Close so
+  // Esc and the Tab trap (listening on the dialog) keep working
+  const resultRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (result) resultRef.current?.querySelector<HTMLElement>('[data-bulk-close]')?.focus()
+  }, [result])
+
   useEffect(() => {
     const trimmed = query.trim()
     if (!trimmed) {
@@ -254,7 +261,7 @@ function BulkShareBody({ docs, api, onClose, onChanged, onApplied }: BulkShareDi
       </header>
 
       {result ? (
-        <div className="uw-share-body" data-bulk-result>
+        <div className="uw-share-body" data-bulk-result ref={resultRef}>
           <p role="status" className="uw-share-notice">
             {t('shrBulkDone', { ok: result.ok.length, total: count })}
           </p>

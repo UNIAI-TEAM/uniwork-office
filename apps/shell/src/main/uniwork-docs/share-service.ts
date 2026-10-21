@@ -82,6 +82,12 @@ function isThrottle(error: unknown): boolean {
   return error instanceof UniworkDocError && (error.status === 429 || error.status === 503)
 }
 
+/** the renderer is untrusted: the web's own bounds, and a ceiling on how long one run can go */
+const MAX_BULK_DOCS = 500
+const MAX_BULK_PEOPLE = 100
+const MIN_LINK_DAYS = 1
+const MAX_LINK_DAYS = 90
+
 /**
  * A thrown error as the failure result of the contract: the server's own verdicts
  * keep their names (`document_access_rejected` carries the refused items), a 403 is
@@ -128,6 +134,7 @@ const isText = (value: unknown): value is string => typeof value === 'string' &&
 function isBulkPlan(plan: unknown): plan is ShareBulkPlan {
   if (!isObject(plan)) return false
   if (!Array.isArray(plan.docs) || !Array.isArray(plan.people)) return false
+  if (plan.docs.length > MAX_BULK_DOCS || plan.people.length > MAX_BULK_PEOPLE) return false
   if (!plan.docs.every((d) => isObject(d) && isText(d.id) && isText(d.workspaceId))) return false
   if (
     !plan.people.every(
@@ -143,7 +150,13 @@ function isBulkPlan(plan: unknown): plan is ShareBulkPlan {
   if (plan.onExisting !== 'update' && plan.onExisting !== 'keep') return false
   if (!['keep', 'none', 'view', 'comment', 'edit'].includes(plan.workspace as string)) return false
   if (!['keep', 'create', 'revoke'].includes(plan.link as string)) return false
-  return plan.expiresInDays === undefined || typeof plan.expiresInDays === 'number'
+  // a bad expiry would fail only at the link call, after the access update was already written
+  return (
+    plan.expiresInDays === undefined ||
+    (Number.isInteger(plan.expiresInDays) &&
+      (plan.expiresInDays as number) >= MIN_LINK_DAYS &&
+      (plan.expiresInDays as number) <= MAX_LINK_DAYS)
+  )
 }
 
 /** the access items one document gets: the same people, then its own home-workspace row */
@@ -179,12 +192,16 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
     }
   }
 
-  /** one call, repeated once after the wait when the server throttled it */
-  async function withRetry<T>(call: () => Promise<T>): Promise<T> {
+  /**
+   * one call, repeated once after the wait when the server throttled it. A call that is not
+   * idempotent (a link create) is repeated on a 429 only: a 503 may have come after the commit.
+   */
+  async function withRetry<T>(call: () => Promise<T>, idempotent = true): Promise<T> {
     try {
       return await call()
     } catch (error) {
       if (!isThrottle(error)) throw error
+      if (!idempotent && (error as UniworkDocError).status !== 429) throw error
       const asked = (error as UniworkDocError).retryAfterMs
       await wait(Math.min(asked ?? DEFAULT_THROTTLE_WAIT_MS, MAX_THROTTLE_WAIT_MS))
       return call()
@@ -202,7 +219,10 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
       await withRetry(() => client.updateDocumentAccess(doc.id, { items, dryRun: false }))
     }
     if (plan.link === 'create') {
-      const created = await withRetry(() => client.createDocumentLink(doc.id, plan.expiresInDays))
+      const created = await withRetry(
+        () => client.createDocumentLink(doc.id, plan.expiresInDays),
+        false,
+      )
       // a link nobody can copy is not a created link
       if (!created.url) throw new UniworkDocError('malformed_response')
       links.set(doc.id, created.url)

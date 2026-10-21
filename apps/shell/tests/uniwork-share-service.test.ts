@@ -550,6 +550,50 @@ describe('bulk: per document, one after another', () => {
     expect(client.updateDocumentAccess).toHaveBeenCalledTimes(3 + 1)
   })
 
+  it('a 503 on link create is not retried (a second live link could be created); a 429 still is', async () => {
+    const wait = vi.fn(async () => undefined)
+    const client = fakeClient({
+      createDocumentLink: vi.fn(async (id: string) => {
+        throw new UniworkDocError('server_error', { status: id === 'd1' ? 503 : 429 })
+      }),
+    })
+    const res = await service(client, { wait }).bulk(plan({ link: 'create', people: [] }))
+    expect(res).toMatchObject({
+      ok: true,
+      value: {
+        failed: [
+          { id: 'd1', error: 'server_error' },
+          { id: 'd2', error: 'server_error' },
+        ],
+      },
+    })
+    // d1: one try; d2: the 429 is retried once
+    expect(client.createDocumentLink).toHaveBeenCalledTimes(3)
+    expect(wait).toHaveBeenCalledTimes(1)
+  })
+
+  it('a bad expiry or an oversized plan is invalid_request before anything is written', async () => {
+    const client = fakeClient()
+    const s = service(client)
+    for (const expiresInDays of [0, 1.5, Number.NaN, 91, -3]) {
+      expect(await s.bulk(plan({ link: 'create', expiresInDays }))).toMatchObject({
+        ok: false,
+        error: 'invalid_request',
+      })
+    }
+    const docs = Array.from({ length: 501 }, (_, i) => ({ id: `d${i}`, workspaceId: 'ws_a' }))
+    expect(await s.bulk(plan({ docs }))).toMatchObject({ ok: false, error: 'invalid_request' })
+    const people = Array.from({ length: 101 }, (_, i) => ({
+      principalType: 'user' as const,
+      principalId: `u_${i}`,
+      level: 'view' as const,
+    }))
+    expect(await s.bulk(plan({ people }))).toMatchObject({ ok: false, error: 'invalid_request' })
+    expect(client.updateDocumentAccess).not.toHaveBeenCalled()
+    expect(client.createDocumentLink).not.toHaveBeenCalled()
+    expect(await s.bulk(plan({ link: 'create', expiresInDays: 90 }))).toMatchObject({ ok: true })
+  })
+
   it('shares each document once even when an id repeats', async () => {
     const client = fakeClient()
     await service(client).bulk(

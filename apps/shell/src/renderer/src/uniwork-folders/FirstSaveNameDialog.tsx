@@ -256,7 +256,7 @@ function FirstSaveNameDialog({
         {shareState && (
           <FirstSaveShare
             checked={shareOn || shared}
-            alreadyShared={shareState.alreadyShared}
+            alreadyShared={shareState.alreadyShared || shared}
             disabled={busy}
             onChange={setShareOn}
           />

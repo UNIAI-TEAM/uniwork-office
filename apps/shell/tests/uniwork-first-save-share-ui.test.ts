@@ -507,6 +507,25 @@ describe('FirstSaveNameDialog (a blank document from the New menu, the web first
     expect(calls.at(-1)).toBe('answer:continue')
   })
 
+  it('after the share went out and the move was refused, the switch stays on and locked', async () => {
+    await makePrivate()
+    await render()
+    await openNameDialog()
+    await vi.waitFor(() => expect(rowSwitch()).not.toBeNull())
+    await click(rowSwitch())
+    ;(window.aiOffice.uniworkMoveDocument as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: false,
+      error: 'forbidden',
+    })
+    await click($('.ufs-dialog .ufs-change'))
+    await click($$('[role="treeitem"]').find((el) => el.textContent?.includes('Dự án')))
+    await click($('.uwf-picker-confirm'))
+    await click($('.ufs-dialog button[type="submit"]'))
+    expect($('.ufs-dialog')).not.toBeNull()
+    expect(rowSwitch()?.getAttribute('aria-checked')).toBe('true')
+    expect(rowSwitch()?.getAttribute('aria-disabled')).toBe('true')
+  })
+
   it('with the switch off no share write happens', async () => {
     await makePrivate()
     await render()
