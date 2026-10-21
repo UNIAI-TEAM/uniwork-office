@@ -36,6 +36,10 @@ export const es = {
   ufMoveOutConfirm: 'Mover',
   ufTrashRelocated:
     'Los documentos de otras personas en esta carpeta volverán a sus propietarios, con sus permisos de acceso sin cambios.',
+  ufTrashTooLarge:
+    'La carpeta contiene demasiados elementos para enviarla a la papelera de una sola vez. Elimina primero su contenido por partes.',
+  ufTrashImpactError:
+    'No se pudo contar lo que hay en la carpeta. Vuelve a intentarlo antes de eliminarla.',
   ufFolderGone: 'Esta carpeta ya no está aquí.',
   ufFolderNoAccess: 'Ya no tienes acceso a esta carpeta.',
   ufNoPermission: 'No tienes permiso para cambiar esta carpeta.',

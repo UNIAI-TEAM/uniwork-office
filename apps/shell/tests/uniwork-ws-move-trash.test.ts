@@ -438,34 +438,82 @@ describe('A8 trashing one folder reads the archive impact', () => {
     expect(sentence()).toBe(false)
   })
 
-  it('has no sentence when the read fails, and the confirm still works', async () => {
+  const retry = () => $$('button').find((b) => b.textContent === docEn.uwActRetry)
+
+  it('blocks the confirm and offers a retry when the read fails; Cancel still works', async () => {
     fake({ ok: false, error: 'network' })
     const onConfirm = vi.fn()
-    await mount(confirm({ folderId: 'f1', onConfirm }))
+    const onCancel = vi.fn()
+    await mount(confirm({ folderId: 'f1', onConfirm, onCancel }))
     expect(sentence()).toBe(false)
-    await click(button(docEn.uwDocArchive))
-    expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(document.body.textContent).toContain(en.ufTrashImpactError)
+    expect(retry()).toBeDefined()
+    const go = button(docEn.uwDocArchive)
+    expect(go.getAttribute('aria-disabled')).toBe('true')
+    await click(go)
+    expect(onConfirm).not.toHaveBeenCalled()
+    await click($('.btn-secondary'))
+    expect(onCancel).toHaveBeenCalledTimes(1)
   })
 
-  it('has no sentence when the tree is too large, and the confirm still works', async () => {
-    fake(ok({ tooLarge: true }))
+  it('reads again on retry and unblocks the confirm when the answer comes', async () => {
+    impact = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, error: 'network' })
+      .mockResolvedValueOnce(ok({ tooLarge: false, folders: 1, documents: 2, relocatedCount: 1 }))
+    window.aiOffice = { uniworkArchiveImpact: impact } as unknown as HomeApi
     const onConfirm = vi.fn()
     await mount(confirm({ folderId: 'f1', onConfirm }))
-    expect(sentence()).toBe(false)
+    await click(retry()!)
+    await flush()
+    expect(impact).toHaveBeenCalledTimes(2)
+    expect(document.body.textContent).not.toContain(en.ufTrashImpactError)
+    expect(sentence()).toBe(true)
     await click(button(docEn.uwDocArchive))
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
-  it('has no sentence when the read throws, and the confirm still works', async () => {
+  it('blocks the confirm with the too-large text when the tree is too large; Cancel still works', async () => {
+    fake(ok({ tooLarge: true }))
+    const onConfirm = vi.fn()
+    const onCancel = vi.fn()
+    await mount(confirm({ folderId: 'f1', onConfirm, onCancel }))
+    expect(sentence()).toBe(false)
+    expect(document.body.textContent).toContain(en.ufTrashTooLarge)
+    expect(retry()).toBeUndefined()
+    await click(button(docEn.uwDocArchive))
+    expect(onConfirm).not.toHaveBeenCalled()
+    await click($('.btn-secondary'))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a throwing read as a failed read: blocked with a retry', async () => {
     impact = vi.fn(async () => {
       throw new Error('boom')
     })
     window.aiOffice = { uniworkArchiveImpact: impact } as unknown as HomeApi
     const onConfirm = vi.fn()
     await mount(confirm({ folderId: 'f1', onConfirm }))
-    expect(sentence()).toBe(false)
+    expect(document.body.textContent).toContain(en.ufTrashImpactError)
     await click(button(docEn.uwDocArchive))
-    expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(retry()).toBeDefined()
+  })
+
+  it('announces the relocated sentence and the blocking states in a live region (#4)', async () => {
+    fake(ok({ tooLarge: false, folders: 1, documents: 2, relocatedCount: 3 }))
+    await mount(confirm({ folderId: 'f1' }))
+    const line = $$('p').find((p) => p.textContent === en.ufTrashRelocated)
+    expect(line!.getAttribute('role')).toBe('status')
+  })
+
+  it('words the blocking states in vi and en like the web', () => {
+    expect(en.ufTrashImpactError).toBe(
+      "Couldn't count what's in the folder. Try again before deleting.",
+    )
+    expect(vi_.ufTrashImpactError).toBe('Không đếm được nội dung thư mục. Thử lại trước khi xóa.')
+    expect(en.ufTrashTooLarge).toMatch(/too many items/)
+    expect(vi_.ufTrashTooLarge).toMatch(/quá nhiều mục/)
   })
 
   it('waits for the read: the confirm is inert while it is pending', async () => {

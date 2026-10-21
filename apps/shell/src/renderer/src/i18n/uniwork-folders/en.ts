@@ -35,6 +35,9 @@ export const en = {
   ufMoveOutConfirm: 'Move',
   ufTrashRelocated:
     "Other people's documents in this folder go back to their owners, with their access unchanged.",
+  ufTrashTooLarge:
+    "The folder holds too many items, so it can't go to the trash in one go. Delete what's inside in parts first.",
+  ufTrashImpactError: "Couldn't count what's in the folder. Try again before deleting.",
   ufFolderGone: 'This folder is no longer here.',
   ufFolderNoAccess: 'You no longer have access to this folder.',
   ufNoPermission: "You don't have permission to change this folder.",

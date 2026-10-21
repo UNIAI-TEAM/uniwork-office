@@ -37,6 +37,10 @@ export const pl = {
   ufMoveOutConfirm: 'Przenieś',
   ufTrashRelocated:
     'Dokumenty innych osób w tym folderze wrócą do ich właścicieli, a ich dostęp pozostanie bez zmian.',
+  ufTrashTooLarge:
+    'Folder zawiera zbyt wiele elementów, by przenieść go do kosza za jednym razem. Najpierw usuń jego zawartość częściami.',
+  ufTrashImpactError:
+    'Nie udało się policzyć zawartości folderu. Spróbuj ponownie przed usunięciem.',
   ufFolderGone: 'Tego folderu już tu nie ma.',
   ufFolderNoAccess: 'Nie masz już dostępu do tego folderu.',
   ufNoPermission: 'Nie masz uprawnień do zmiany tego folderu.',

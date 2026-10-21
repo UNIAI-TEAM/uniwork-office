@@ -68,7 +68,7 @@ import {
   type TreeRow,
 } from '../uniwork-folders/uniwork-folders-model'
 import { useFolderActions } from '../uniwork-folders/use-folder-actions'
-import { canCreateInsideFolder } from '../uniwork-folders/ws-folder'
+import { canCreateInsideFolder, type WorkspaceFolderCandidate } from '../uniwork-folders/ws-folder'
 import {
   cancelUploadDocument,
   createDocument,
@@ -488,6 +488,8 @@ export function DocumentsHome({
   const uploadRunRef = useRef(0)
   // canEdit of every folder card the page has listed: how the host knows whether the open folder takes uploads
   const folderEditableRef = useRef(new Map<string, boolean>())
+  // UNI-2066: the folder cards seen so far, so the create note can judge an open folder the tree has not delivered yet
+  const folderRowRef = useRef(new Map<string, WorkspaceFolderCandidate>())
   // DH1-R4-8: an in-flight upload must never call onOpenDocument after unmount
   useEffect(
     () => () => {
@@ -1286,7 +1288,11 @@ export function DocumentsHome({
   const createFolderHere = () => {
     const parentId = activeTargetFolder.folderId
     if (parentId === null) return
-    folderActions.openCreate(parentId, true, { initial: t(NEW_DEFAULT_NAME_KEY.folder) })
+    const parentRow = folderRowRef.current.get(parentId)
+    folderActions.openCreate(parentId, true, {
+      initial: t(NEW_DEFAULT_NAME_KEY.folder),
+      ...(parentRow ? { parentRow } : {}),
+    })
   }
 
   const handleUploadDoc = async (
@@ -1406,6 +1412,14 @@ export function DocumentsHome({
   for (const item of page.items) {
     if (item.kind === 'folder' && typeof item.canEdit === 'boolean') {
       folderEditableRef.current.set(item.id, item.canEdit)
+    }
+    if (item.kind === 'folder') {
+      folderRowRef.current.set(item.id, {
+        id: item.id,
+        kind: 'folder',
+        ...(item.systemKind ? { systemKind: item.systemKind } : {}),
+        ...(item.visibility ? { visibility: item.visibility } : {}),
+      })
     }
   }
   const openFolderEditable =
@@ -1808,7 +1822,10 @@ export function DocumentsHome({
       items.push({
         id: 'new',
         label: t('ufNewSubfolder'),
-        onSelect: () => folderActions.openCreate(id, true),
+        onSelect: () => {
+          const parentRow = folderRowRef.current.get(id)
+          folderActions.openCreate(id, true, parentRow ? { parentRow } : undefined)
+        },
       })
     }
     // the level of the open folder is known from the card it was opened by (unknown = offered)

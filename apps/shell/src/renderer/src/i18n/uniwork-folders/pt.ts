@@ -36,6 +36,10 @@ export const pt = {
   ufMoveOutConfirm: 'Mover',
   ufTrashRelocated:
     'Os documentos de outras pessoas nesta pasta voltam para os respectivos proprietários, com o acesso inalterado.',
+  ufTrashTooLarge:
+    'A pasta tem itens demais para ir para a lixeira de uma só vez. Exclua antes o conteúdo dela por partes.',
+  ufTrashImpactError:
+    'Não foi possível contar o que há na pasta. Tente novamente antes de excluir.',
   ufFolderGone: 'Esta pasta não está mais aqui.',
   ufFolderNoAccess: 'Você não tem mais acesso a esta pasta.',
   ufNoPermission: 'Você não tem permissão para alterar esta pasta.',

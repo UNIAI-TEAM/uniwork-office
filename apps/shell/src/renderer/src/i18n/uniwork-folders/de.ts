@@ -37,6 +37,10 @@ export const de = {
   ufMoveOutConfirm: 'Verschieben',
   ufTrashRelocated:
     'Dokumente anderer Personen in diesem Ordner werden an ihre Eigentümer zurückgegeben; ihre Zugriffsrechte bleiben unverändert.',
+  ufTrashTooLarge:
+    'Der Ordner enthält zu viele Elemente, um ihn auf einmal in den Papierkorb zu verschieben. Löschen Sie zuerst den Inhalt in Teilen.',
+  ufTrashImpactError:
+    'Der Inhalt des Ordners konnte nicht gezählt werden. Versuchen Sie es erneut, bevor Sie löschen.',
   ufFolderGone: 'Dieser Ordner ist nicht mehr hier.',
   ufFolderNoAccess: 'Du hast keinen Zugriff mehr auf diesen Ordner.',
   ufNoPermission: 'Du hast keine Berechtigung, diesen Ordner zu ändern.',

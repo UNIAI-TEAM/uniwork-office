@@ -34,6 +34,9 @@ export const vi = {
   ufMoveOutConfirm: 'Chuyển',
   ufTrashRelocated:
     'Tài liệu của người khác trong thư mục này sẽ được trả về cho chủ sở hữu, giữ nguyên quyền truy cập.',
+  ufTrashTooLarge:
+    'Thư mục có quá nhiều mục nên chưa chuyển vào thùng rác được một lần. Hãy xóa từng phần bên trong trước.',
+  ufTrashImpactError: 'Không đếm được nội dung thư mục. Thử lại trước khi xóa.',
   ufFolderGone: 'Thư mục này không còn ở đây.',
   ufFolderNoAccess: 'Bạn không còn quyền truy cập thư mục này.',
   ufNoPermission: 'Bạn không có quyền thay đổi thư mục này.',

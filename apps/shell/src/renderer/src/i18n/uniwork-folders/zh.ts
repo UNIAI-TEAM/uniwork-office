@@ -31,6 +31,8 @@ export const zh = {
   ufMoveOutBody: '该文件夹及其名称将对整个工作区可见；其中的文档保持各自的访问权限',
   ufMoveOutConfirm: '移动',
   ufTrashRelocated: '此文件夹中其他人的文档将归还给其所有者，访问权限保持不变。',
+  ufTrashTooLarge: '文件夹中的项目过多，无法一次性移入回收站。请先分批删除其中的内容。',
+  ufTrashImpactError: '无法统计文件夹中的内容。请重试后再删除。',
   ufFolderGone: '此文件夹已不在这里。',
   ufFolderNoAccess: '你已无权访问此文件夹。',
   ufNoPermission: '你没有权限更改此文件夹。',

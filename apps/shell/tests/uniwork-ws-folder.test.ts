@@ -88,6 +88,12 @@ describe('myFolderSubtreeIds', () => {
     expect([...myFolderSubtreeIds(index)].sort()).toEqual(['MY', 'MY_A', 'MY_A1'])
     expect(myFolderSubtreeIds(noMyFolderIndex).size).toBe(0)
   })
+
+  it('returns the same Set for the same index (memoized per index), and a fresh one for another', () => {
+    expect(myFolderSubtreeIds(index)).toBe(myFolderSubtreeIds(index))
+    expect(myFolderSubtreeIds(noMyFolderIndex)).toBe(myFolderSubtreeIds(noMyFolderIndex))
+    expect(myFolderSubtreeIds(buildFolderIndex(tree))).not.toBe(myFolderSubtreeIds(index))
+  })
 })
 
 describe('isWorkspaceFolder', () => {

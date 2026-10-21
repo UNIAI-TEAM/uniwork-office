@@ -7156,6 +7156,12 @@ html[dir='rtl'] .quick-title-row {
   line-height: 1.4;
 }
 
+.uw-act-retry {
+  margin-inline-start: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
 .uw-act-types {
   display: flex;
   flex-wrap: wrap;

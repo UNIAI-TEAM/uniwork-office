@@ -36,6 +36,9 @@ export const ko = {
   ufMoveOutConfirm: '이동',
   ufTrashRelocated:
     '이 폴더에 있는 다른 사람의 문서는 접근 권한을 바꾸지 않고 소유자에게 돌아갑니다.',
+  ufTrashTooLarge:
+    '폴더에 항목이 너무 많아 한 번에 휴지통으로 옮길 수 없습니다. 먼저 안의 내용을 나누어 삭제해 주세요.',
+  ufTrashImpactError: '폴더 안의 항목 수를 확인하지 못했습니다. 삭제하기 전에 다시 시도해 주세요.',
   ufFolderGone: '이 폴더는 더 이상 여기에 없습니다.',
   ufFolderNoAccess: '더 이상 이 폴더에 접근할 권한이 없습니다.',
   ufNoPermission: '이 폴더를 변경할 권한이 없습니다.',

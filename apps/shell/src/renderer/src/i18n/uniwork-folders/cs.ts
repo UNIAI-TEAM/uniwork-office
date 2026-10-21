@@ -36,6 +36,9 @@ export const cs = {
   ufMoveOutConfirm: 'Přesunout',
   ufTrashRelocated:
     'Dokumenty ostatních lidí v této složce se vrátí jejich vlastníkům se zachovaným přístupem.',
+  ufTrashTooLarge:
+    'Složka obsahuje příliš mnoho položek, než aby šla přesunout do koše najednou. Nejdřív smažte její obsah po částech.',
+  ufTrashImpactError: 'Obsah složky se nepodařilo spočítat. Před smazáním to zkuste znovu.',
   ufFolderGone: 'Tato složka tu už není.',
   ufFolderNoAccess: 'K této složce již nemáte přístup.',
   ufNoPermission: 'Nemáte oprávnění tuto složku měnit.',

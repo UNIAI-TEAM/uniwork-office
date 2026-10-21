@@ -36,6 +36,9 @@ export const fr = {
   ufMoveOutConfirm: 'Déplacer',
   ufTrashRelocated:
     "Les documents d'autres personnes présents dans ce dossier seront rendus à leurs propriétaires, avec leurs accès inchangés.",
+  ufTrashTooLarge:
+    "Le dossier contient trop d'éléments pour être placé dans la corbeille en une seule fois. Supprimez d'abord son contenu par parties.",
+  ufTrashImpactError: 'Impossible de compter le contenu du dossier. Réessayez avant de supprimer.',
   ufFolderGone: "Ce dossier n'est plus ici.",
   ufFolderNoAccess: "Vous n'avez plus accès à ce dossier.",
   ufNoPermission: "Vous n'avez pas l'autorisation de modifier ce dossier.",

@@ -32,6 +32,8 @@ export const zhTW = {
   ufMoveOutBody: '此資料夾及其名稱將對整個工作區可見；其中的文件保持各自的存取權限',
   ufMoveOutConfirm: '移動',
   ufTrashRelocated: '此資料夾中其他人的文件將歸還給其擁有者，存取權限保持不變。',
+  ufTrashTooLarge: '資料夾中的項目過多，無法一次移入垃圾桶。請先分批刪除其中的內容。',
+  ufTrashImpactError: '無法統計資料夾中的內容。請重試後再刪除。',
   ufFolderGone: '此資料夾已不在這裡。',
   ufFolderNoAccess: '你已無權存取此資料夾。',
   ufNoPermission: '你沒有權限變更此資料夾。',

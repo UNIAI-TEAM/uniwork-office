@@ -36,6 +36,9 @@ export const ja = {
   ufMoveOutConfirm: '移動',
   ufTrashRelocated:
     'このフォルダー内の他の人のドキュメントは、アクセス権を変更せずに所有者へ戻されます。',
+  ufTrashTooLarge:
+    'フォルダ内の項目が多すぎるため、一度にごみ箱へ移動できません。先に中身を分けて削除してください。',
+  ufTrashImpactError: 'フォルダの中身を数えられませんでした。削除する前にもう一度お試しください。',
   ufFolderGone: 'このフォルダーはもうここにありません。',
   ufFolderNoAccess: 'このフォルダーへのアクセス権がなくなりました。',
   ufNoPermission: 'このフォルダーを変更する権限がありません。',

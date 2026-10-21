@@ -37,6 +37,10 @@ export const it = {
   ufMoveOutConfirm: 'Sposta',
   ufTrashRelocated:
     'I documenti di altre persone in questa cartella torneranno ai rispettivi proprietari, con i permessi di accesso invariati.',
+  ufTrashTooLarge:
+    'La cartella contiene troppi elementi per essere spostata nel cestino in un colpo solo. Elimina prima il suo contenuto a parti.',
+  ufTrashImpactError:
+    'Impossibile contare il contenuto della cartella. Riprova prima di eliminarla.',
   ufFolderGone: 'Questa cartella non è più qui.',
   ufFolderNoAccess: 'Non hai più accesso a questa cartella.',
   ufNoPermission: 'Non hai l’autorizzazione per modificare questa cartella.',

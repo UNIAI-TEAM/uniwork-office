@@ -2899,4 +2899,40 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     // the count says what the table shows
     expect(host.querySelector('.dh-docs-section .dh-section-count')?.textContent).toBe('1')
   })
+
+  it('judges the create note from the open folder row when the tree failed to load (UNI-2066 ws-fix1 #2)', async () => {
+    api.uniworkFolderTree.mockResolvedValue({ ok: false, error: 'server_error' })
+    rootItems = [
+      {
+        id: 'f-pub',
+        workspaceId: 'ws-1',
+        title: 'Kế hoạch chung',
+        format: null,
+        updatedAt: '2026-10-15T10:00:00.000Z',
+        kind: 'folder',
+        parentId: null,
+        visibility: 'workspace',
+        canEdit: true,
+      } as DocumentsHomeDoc,
+    ]
+    await mountHome('en')
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>(
+          '.dh-folder-card[data-folder-id="f-pub"] .dh-folder-open',
+        )!
+        .click()
+    })
+    await flush()
+    // the tree has not loaded, so the header crumbs are absent: the New menu's Folder row
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.dh-btn-create')!.click()
+    })
+    await flush()
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-new-kind="folder"]')!.click()
+    })
+    await flush()
+    expect(document.querySelector('.uw-act-note')).not.toBeNull()
+  })
 })

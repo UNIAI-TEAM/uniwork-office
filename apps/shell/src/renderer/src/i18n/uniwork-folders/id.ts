@@ -36,6 +36,9 @@ export const id = {
   ufMoveOutConfirm: 'Pindahkan',
   ufTrashRelocated:
     'Dokumen milik orang lain di folder ini akan dikembalikan kepada pemiliknya, dengan akses yang tetap sama.',
+  ufTrashTooLarge:
+    'Folder berisi terlalu banyak item sehingga tidak bisa dipindahkan ke tempat sampah sekaligus. Hapus isinya sebagian demi sebagian terlebih dahulu.',
+  ufTrashImpactError: 'Isi folder tidak dapat dihitung. Coba lagi sebelum menghapus.',
   ufFolderGone: 'Folder ini sudah tidak ada di sini.',
   ufFolderNoAccess: 'Anda tidak lagi memiliki akses ke folder ini.',
   ufNoPermission: 'Anda tidak memiliki izin untuk mengubah folder ini.',

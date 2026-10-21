@@ -564,8 +564,8 @@ export function UploadDocDialog({
  *
  * UNI-2066: for a folder (`folderId`) the impact is read when the confirm opens; when it
  * hands other people's documents back to their owners, one sentence (never a number)
- * says so. The read is advisory: a failure, "too large" or 0 adds no sentence and the
- * confirm works as soon as the read settles.
+ * says so. As on the web, the confirm waits for the read and stays blocked on a failed
+ * read (with a retry) and on a too-large folder; Cancel always works.
  */
 export function ArchiveConfirm({
   name,
@@ -581,9 +581,10 @@ export function ArchiveConfirm({
 }) {
   const { t } = useI18n()
   const id = useId()
-  const [impact, setImpact] = useState<'loading' | 'relocated' | 'none'>(
+  const [impact, setImpact] = useState<'loading' | 'relocated' | 'none' | 'tooLarge' | 'error'>(
     folderId ? 'loading' : 'none',
   )
+  const [readTick, setReadTick] = useState(0)
   useEffect(() => {
     if (!folderId) return
     let live = true
@@ -591,24 +592,46 @@ export function ArchiveConfirm({
     void getArchiveImpact(folderId)
       .then((res) => {
         if (!live) return
-        setImpact(
-          res.ok && !res.value.tooLarge && res.value.relocatedCount > 0 ? 'relocated' : 'none',
-        )
+        if (!res.ok) setImpact('error')
+        else if (res.value.tooLarge) setImpact('tooLarge')
+        else setImpact(res.value.relocatedCount > 0 ? 'relocated' : 'none')
       })
       .catch(() => {
-        if (live) setImpact('none')
+        if (live) setImpact('error')
       })
     return () => {
       live = false
     }
-  }, [folderId])
+  }, [folderId, readTick])
+  const blocked = impact === 'loading' || impact === 'tooLarge' || impact === 'error'
   return (
     <ActionModal labelledBy={`${id}-title`} onCancel={onCancel} initialFocus=".btn-secondary">
       <h3 id={`${id}-title`} className="uw-act-heading">
         {t('uwDocArchive')} · {name}
       </h3>
       <p>{t('uwDocArchiveConfirm', { name })}</p>
-      {impact === 'relocated' && <p>{t('ufTrashRelocated')}</p>}
+      {impact === 'relocated' && (
+        <p role="status" className="uw-act-note">
+          {t('ufTrashRelocated')}
+        </p>
+      )}
+      {impact === 'tooLarge' && (
+        <p role="alert" className="uw-act-error">
+          {t('ufTrashTooLarge')}
+        </p>
+      )}
+      {impact === 'error' && (
+        <p role="alert" className="uw-act-error">
+          {t('ufTrashImpactError')}{' '}
+          <button
+            type="button"
+            className="btn uw-act-retry"
+            onClick={() => setReadTick((n) => n + 1)}
+          >
+            {t('uwActRetry')}
+          </button>
+        </p>
+      )}
       <div className="modal-buttons">
         <button type="button" className="btn btn-secondary" onClick={onCancel}>
           {t('cancel')}
@@ -616,9 +639,9 @@ export function ArchiveConfirm({
         <button
           type="button"
           className="btn btn-primary"
-          aria-disabled={impact === 'loading' || undefined}
+          aria-disabled={blocked || undefined}
           onClick={() => {
-            if (impact !== 'loading') onConfirm()
+            if (!blocked) onConfirm()
           }}
         >
           {t('uwDocArchive')}

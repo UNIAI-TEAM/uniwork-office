@@ -37,6 +37,9 @@ export const ms = {
   ufMoveOutConfirm: 'Alih',
   ufTrashRelocated:
     'Dokumen milik orang lain dalam folder ini akan dikembalikan kepada pemiliknya, dengan akses yang kekal tidak berubah.',
+  ufTrashTooLarge:
+    'Folder mengandungi terlalu banyak item untuk dialihkan ke tong sampah sekali gus. Padam kandungannya secara berperingkat dahulu.',
+  ufTrashImpactError: 'Kandungan folder tidak dapat dikira. Cuba lagi sebelum memadam.',
   ufFolderGone: 'Folder ini tiada lagi di sini.',
   ufFolderNoAccess: 'Anda tidak lagi mempunyai akses kepada folder ini.',
   ufNoPermission: 'Anda tiada kebenaran untuk mengubah folder ini.',

@@ -37,6 +37,10 @@ export const nl = {
   ufMoveOutConfirm: 'Verplaatsen',
   ufTrashRelocated:
     'Documenten van anderen in deze map worden teruggezet naar hun eigenaars, met ongewijzigde toegang.',
+  ufTrashTooLarge:
+    'De map bevat te veel items om in één keer naar de prullenbak te verplaatsen. Verwijder eerst de inhoud in delen.',
+  ufTrashImpactError:
+    'De inhoud van de map kon niet worden geteld. Probeer het opnieuw voordat je verwijdert.',
   ufFolderGone: 'Deze map is hier niet meer.',
   ufFolderNoAccess: 'Je hebt geen toegang meer tot deze map.',
   ufNoPermission: 'Je hebt geen toestemming om deze map te wijzigen.',

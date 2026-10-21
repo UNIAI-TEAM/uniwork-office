@@ -26,8 +26,16 @@ export interface WorkspaceFolderCandidate {
   visibility?: 'private' | 'workspace' | 'restricted'
 }
 
-/** My Folder and every folder under it; empty when the index holds no My Folder. */
+const subtreeMemo = new WeakMap<FolderIndex, ReadonlySet<string>>()
+
+/**
+ * My Folder and every folder under it; empty when the index holds no My Folder. Memoized per
+ * index: the picker asks once per visible row on every render, and an index is never mutated
+ * after `buildFolderIndex`.
+ */
 export function myFolderSubtreeIds(index: FolderIndex): ReadonlySet<string> {
+  const memo = subtreeMemo.get(index)
+  if (memo) return memo
   const mine = new Set<string>()
   for (const info of index.values()) {
     if (info.systemKind === 'my_folder') {
@@ -40,6 +48,7 @@ export function myFolderSubtreeIds(index: FolderIndex): ReadonlySet<string> {
       }
     }
   }
+  subtreeMemo.set(index, mine)
   return mine
 }
 
