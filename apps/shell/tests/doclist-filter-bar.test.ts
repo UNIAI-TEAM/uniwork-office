@@ -311,10 +311,11 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       }
     })
 
-    it('does not send a type for UniNote: the pages are picked from what is loaded', async () => {
+    it('sends kind=page (never a format) for UniNote, and still narrows the loaded rows', async () => {
       await mount('workspace')
       await click(chip('page'))
       expect(lastCall('uniworkListChildren').format).toBeUndefined()
+      expect(lastCall('uniworkListChildren').kind).toBe('page')
       expect(pressed()).toEqual(['page'])
       expect(rowIds()).toEqual(['page-c'])
       await click(chip('all'))

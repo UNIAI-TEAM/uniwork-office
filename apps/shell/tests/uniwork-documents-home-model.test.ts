@@ -578,13 +578,14 @@ describe('the shared type chips (UNI-2047 A3)', () => {
     ])
   })
 
-  it('sends a file format and .txt to the server, never UniNote', () => {
+  it('sends a file format and .txt as format, and UniNote as kind', () => {
     const at = Date.UTC(2026, 9, 21)
     expect(toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'txt' }, at)).toEqual({
       format: 'txt',
     })
+    // UniNote is a kind, not a format: the server takes `kind=page` (and 400s on format + page)
     expect(toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'page' }, at)).toEqual(
-      {},
+      { kind: 'page' },
     )
     // UniNote still counts as an active filter (the Xóa bộ lọc button and the no-match state)
     expect(hasActiveFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'page' })).toBe(true)

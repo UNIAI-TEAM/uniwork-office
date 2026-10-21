@@ -251,6 +251,42 @@ describe('UNI-2047 A1b: the flat / folder / shared-by-me / trash lists forward s
   })
 })
 
+describe('UNI-2047 A-FIX2: the UniNote kind filter', () => {
+  it.each([
+    ['listDocuments', UNIWORK_DOC_CHANNELS.listDocuments, {}],
+    ['listChildren', UNIWORK_DOC_CHANNELS.listChildren, { parentId: 'fold_1' }],
+    ['listSharedByMe', UNIWORK_DOC_CHANNELS.listSharedByMe, {}],
+    ['listTrash', UNIWORK_DOC_CHANNELS.listTrash, {}],
+    ['listShelved', UNIWORK_DOC_CHANNELS.listShelved, {}],
+  ])('%s sends kind=page to the server when asked', async (_name, channel, extra) => {
+    const call = await setup()
+    const server = stubServer()
+    await call(channel, { workspaceId: 'ws_1', kind: 'page', ...extra })
+    const [req] = server.lists()
+    expect(req, 'a list request').toBeDefined()
+    expect(req!.searchParams.get('kind')).toBe('page')
+    expect(req!.searchParams.has('format')).toBe(false)
+  })
+
+  it('drops a kind other than page at the IPC boundary', async () => {
+    const call = await setup()
+    const server = stubServer()
+    await call(UNIWORK_DOC_CHANNELS.listTrash, { workspaceId: 'ws_1', kind: 'folder' })
+    await call(UNIWORK_DOC_CHANNELS.listTrash, { workspaceId: 'ws_1', kind: 7 })
+    for (const req of server.lists()) expect(req.searchParams.has('kind')).toBe(false)
+  })
+
+  it("shared with me has no kind on the server's route: it never leaves", async () => {
+    const call = await setup()
+    const server = stubServer()
+    await call(UNIWORK_DOC_CHANNELS.listSharedWithMe, { kind: 'page' })
+    for (const path of [SHARED_1, SHARED_2]) {
+      const [req] = server.at(path)
+      expect(req!.searchParams.has('kind'), path).toBe(false)
+    }
+  })
+})
+
 describe('UNI-2047 A1b: shared with me', () => {
   it('forwards format, updated_by, updated_from, sort and order to every workspace', async () => {
     const call = await setup()
