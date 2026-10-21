@@ -15,7 +15,7 @@ import {
 } from '../editor/cover-pages'
 import { startShapeDrawMode } from '../editor/shape-draw'
 import { useI18n, type StringKey } from '../i18n/locale'
-import { shortcutHint } from '../shortcuts'
+import { shortcutAria, shortcutHint } from '../shortcuts'
 import { useModalKeys } from './modal-keys'
 import {
   IconBook,
@@ -771,6 +771,7 @@ export function InsertTab({
             className="rb-big"
             disabled={!hasDoc}
             data-tip={t('ribbonPageBreakTip', { keys: shortcutHint('page-break') })}
+            aria-keyshortcuts={shortcutAria('page-break') || undefined}
             onClick={() => insertPageBreakAt(editor)}
           >
             <span className="rb-big-icon">
@@ -1099,6 +1100,7 @@ export function InsertTab({
               className="rb-small"
               disabled={!hasDoc}
               data-tip={t('ribbonLinkTip', { keys: shortcutHint('link') })}
+              aria-keyshortcuts={shortcutAria('link') || undefined}
               onClick={() => setLinkOpen(true)}
             >
               <IconLink size={14} /> {t('ribbonLink')}
