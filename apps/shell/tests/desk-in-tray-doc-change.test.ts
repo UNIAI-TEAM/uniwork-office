@@ -3,6 +3,8 @@
  */
 import { act, createElement, useState, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HomeApi, UniworkLaunchEvent, UniworkWorkspaceRef } from '../src/shared/home-api'
 import type {
@@ -257,6 +259,14 @@ describe('document_changed tray row (G6)', () => {
     await tray([changedOne({ params: { actor: 'Lan', verb: 'trashed' } })])
     const row = rowOf('Lan moved “Plan” to trash')!
     expect(row.className).toContain('is-gone')
+    // the pill is a sibling of the row inside li.uw-pick-item, so the dim rule must use ~
+    expect(row.nextElementSibling!.matches('.wb-desk-trail')).toBe(true)
+    expect(row.parentElement!.matches('.uw-pick-item')).toBe(true)
+    expect(row.querySelector('.wb-pill')).toBeNull()
+    expect(row.matches('.uw-pick-row.is-gone ~ .wb-desk-trail')).toBe(false)
+    expect(row.nextElementSibling!.querySelector('.wb-pill')).not.toBeNull()
+    const css = readFileSync(resolve(process.cwd(), 'src/renderer/src/home.css'), 'utf8')
+    expect(css).toMatch(/\.uw-pick-row\.is-gone ~ \.wb-desk-trail \.wb-pill \{\s*opacity: 0\.6;/)
     await click(button('Lan moved “Plan” to trash'))
     expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
     expect(dialog()).toBeNull()

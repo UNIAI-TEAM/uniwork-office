@@ -4740,7 +4740,7 @@ body.vib .home {
   background: var(--surface-subtle);
 }
 
-.uw-pick-row.is-gone .wb-pill {
+.uw-pick-row.is-gone ~ .wb-desk-trail .wb-pill {
   opacity: 0.6;
 }
 
