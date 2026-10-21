@@ -19,7 +19,7 @@ export type UniworkDocVisibility = 'private' | 'workspace' | 'restricted'
 export type UniworkDocAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
 
 export interface UniworkListFilters {
-  format?: UniworkDocFormat
+  format?: UniworkDocFormat | 'txt'
   updatedBy?: string
   updatedFrom?: string
 }
@@ -129,7 +129,11 @@ export function getDocumentsHomeNavEntry(id: DocumentsHomeSubViewId): DocumentsH
   )
 }
 
-export type DocumentsHomeTypeFilter = 'all' | UniworkDocFormat
+/**
+ * The type chips of the shared list rules. `page` (UniNote) is no server format: the server only
+ * knows the file formats (and `txt`), so a UniNote pick sends no type and narrows the loaded rows.
+ */
+export type DocumentsHomeTypeFilter = 'all' | 'page' | UniworkDocFormat | 'txt'
 export type DocumentsHomeUpdatedPreset = 'any' | '24h' | '7d' | '30d'
 export type DocumentsHomeSort = 'recent' | 'name'
 
@@ -145,18 +149,21 @@ export const DEFAULT_DOCUMENTS_HOME_FILTERS: DocumentsHomeFilterState = {
   updatedPreset: 'any',
 }
 
-export const DOCUMENTS_HOME_FORMAT_OPTIONS: readonly {
+/** the type chips, in the shared order of every screen (Rules board: Mọi loại · UniNote · .docx … .txt) */
+export const DOCUMENTS_HOME_TYPE_CHIPS: readonly {
   value: DocumentsHomeTypeFilter
   labelKey?: StringKey
   literal?: string
 }[] = [
-  { value: 'all', labelKey: 'uhFilterTypeAll' },
-  { value: 'docx', literal: 'DOCX (.docx)' },
-  { value: 'xlsx', literal: 'XLSX (.xlsx)' },
-  { value: 'pptx', literal: 'PPTX (.pptx)' },
-  { value: 'pdf', literal: 'PDF (.pdf)' },
-  { value: 'md', literal: 'Markdown (.md)' },
-  { value: 'html', literal: 'HTML (.html)' },
+  { value: 'all', labelKey: 'dlFilterAllTypes' },
+  { value: 'page', labelKey: 'dlFilterUniNote' },
+  { value: 'docx', literal: '.docx' },
+  { value: 'xlsx', literal: '.xlsx' },
+  { value: 'pptx', literal: '.pptx' },
+  { value: 'pdf', literal: '.pdf' },
+  { value: 'md', literal: '.md' },
+  { value: 'html', literal: '.html' },
+  { value: 'txt', literal: '.txt' },
 ]
 
 export const DOCUMENTS_HOME_UPDATED_OPTIONS: readonly {
@@ -195,7 +202,7 @@ export function toUniworkListFilters(
   nowMs: number = Date.now(),
 ): UniworkListFilters {
   const filters: UniworkListFilters = {}
-  if (state.format !== 'all') {
+  if (state.format !== 'all' && state.format !== 'page') {
     filters.format = state.format
   }
   const updatedBy = state.updatedBy.trim()
@@ -322,7 +329,8 @@ export interface DocumentsHomeApiAdapter {
       cursor?: string
       limit?: number
       includePages?: boolean
-    } & DocumentsHomeWireSort,
+    } & UniworkListFilters &
+      DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSharedByMe?: (
     q: {
@@ -346,7 +354,7 @@ export interface DocumentsHomeApiAdapter {
       workspaceId: string
       cursor?: string
       limit?: number
-      format?: UniworkDocFormat
+      format?: UniworkListFilters['format']
     } & DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSources?: (q: UniworkSourceListQuery) => Promise<UniworkResult<UniworkSourceListPage>>
@@ -457,9 +465,11 @@ export async function fetchDocumentsHomePage(
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
     // UNI-1953: a shared UniNote is listed too
+    // UNI-2047: the type / editor / date filters go to every workspace's route
     const res = await api.uniworkListSharedWithMe({
       ...(cursor ? { cursor } : {}),
       includePages: true,
+      ...filters,
       ...sortArgs,
     })
     return {
@@ -639,6 +649,36 @@ export function sourceMatchesFilters(
   if (filters.updatedFrom) {
     const since = Date.parse(filters.updatedFrom)
     const at = Date.parse(source.updatedAt)
+    if (!Number.isNaN(since) && (Number.isNaN(at) || at < since)) return false
+  }
+  return true
+}
+
+/**
+ * UNI-2047: the type chips the server cannot apply. UniNote is no file format, so the loaded rows
+ * are narrowed here and no source file (always a file) stays; `.txt` is applied to the source files
+ * here as well, whatever the sources route does with it.
+ */
+export function rowMatchesType(
+  row: DocumentsHomeTableRow,
+  format: DocumentsHomeTypeFilter,
+): boolean {
+  if (format === 'page') return row.type === 'doc' && row.doc.kind === 'page'
+  if (format === 'txt' && row.type === 'source') {
+    return row.source.extension.toLowerCase().replace(/^\./, '') === 'txt'
+  }
+  return true
+}
+
+/**
+ * UNI-2047: Người sửa / Cập nhật on rows the server could not filter (the shelf takes the type only,
+ * so those two narrow the loaded pages, like Lưu trữ bởi). A row without the field does not match.
+ */
+export function docMatchesUpdated(doc: DocumentsHomeDoc, filters: UniworkListFilters): boolean {
+  if (filters.updatedBy && doc.updatedById !== filters.updatedBy) return false
+  if (filters.updatedFrom) {
+    const since = Date.parse(filters.updatedFrom)
+    const at = Date.parse(doc.updatedAt)
     if (!Number.isNaN(since) && (Number.isNaN(at) || at < since)) return false
   }
   return true

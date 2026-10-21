@@ -205,8 +205,7 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
     })
     await flush()
   }
-  const goTo = (id: string) =>
-    click(sidebarSlot.querySelector(`.nav-item[data-nav="${id}"]`))
+  const goTo = (id: string) => click(sidebarSlot.querySelector(`.nav-item[data-nav="${id}"]`))
   const chip = (key: string) =>
     host.querySelector<HTMLButtonElement>(`.dh-filter-bar [data-chip="${key}"]`)
   const pressed = () =>
@@ -233,25 +232,28 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
     )
 
   describe('chips per screen', () => {
-    it.each(SCREENS)('%s shows the same chips in the same order, then Người sửa and Cập nhật', async (subView) => {
-      await remount(subView)
-      const bar = host.querySelector('.dh-filter-bar')
-      expect(bar, 'filter bar').not.toBeNull()
-      const chips = Array.from(bar!.querySelectorAll('[data-chip]'))
-      expect(chips.map((el) => [el.getAttribute('data-chip'), el.textContent?.trim()])).toEqual(
-        CHIPS.map(([key, label]) => [key, label]),
-      )
-      expect(chips.every((el) => el.tagName === 'BUTTON')).toBe(true)
-      // Mọi loại is on until a type is picked
-      expect(pressed()).toEqual(['all'])
-      expect(
-        Array.from(bar!.querySelectorAll('select')).map((el) => el.getAttribute('data-filter')),
-      ).toEqual(['updatedBy', 'updatedFrom'])
-      // the old inline type select, Truy cập and Nhóm theo are not part of the bar
-      expect(bar!.querySelector('select[data-filter="format"]')).toBeNull()
-      expect(bar!.querySelector('select[data-filter="groupBy"]')).toBeNull()
-      expect(bar!.querySelector('select[data-filter="access"]')).toBeNull()
-    })
+    it.each(SCREENS)(
+      '%s shows the same chips in the same order, then Người sửa and Cập nhật',
+      async (subView) => {
+        await remount(subView)
+        const bar = host.querySelector('.dh-filter-bar')
+        expect(bar, 'filter bar').not.toBeNull()
+        const chips = Array.from(bar!.querySelectorAll('[data-chip]'))
+        expect(chips.map((el) => [el.getAttribute('data-chip'), el.textContent?.trim()])).toEqual(
+          CHIPS.map(([key, label]) => [key, label]),
+        )
+        expect(chips.every((el) => el.tagName === 'BUTTON')).toBe(true)
+        // Mọi loại is on until a type is picked
+        expect(pressed()).toEqual(['all'])
+        expect(
+          Array.from(bar!.querySelectorAll('select')).map((el) => el.getAttribute('data-filter')),
+        ).toEqual(['updatedBy', 'updatedFrom'])
+        // the old inline type select, Truy cập and Nhóm theo are not part of the bar
+        expect(bar!.querySelector('select[data-filter="format"]')).toBeNull()
+        expect(bar!.querySelector('select[data-filter="groupBy"]')).toBeNull()
+        expect(bar!.querySelector('select[data-filter="access"]')).toBeNull()
+      },
+    )
 
     it('has Người sửa and Cập nhật labelled in Vietnamese', async () => {
       await mount('workspace')

@@ -3,9 +3,12 @@ import {
   collectUpdatedByOptions,
   DEFAULT_DOCUMENTS_HOME_FILTERS,
   DOCUMENTS_HOME_NAV_ENTRIES,
+  DOCUMENTS_HOME_TYPE_CHIPS,
+  docMatchesUpdated,
   fetchDocumentsHomePage,
   getDocumentsHomeNavEntry,
   hasActiveFilters,
+  rowMatchesType,
   splitAndSortItems,
   toUniworkListFilters,
   updatedByOptionsForSelect,
@@ -375,7 +378,7 @@ describe('DH1-W2 documents-home-model', () => {
       value: { items: [listDoc], nextCursor: 'list-next' },
     })
 
-    // shared-with-me is org-wide: sends { includePages } when no cursor and { cursor, includePages } when paging, never workspaceId or filters
+    // shared-with-me is org-wide: no workspaceId; the type / editor / date filters ride along (UNI-2047 A3) with { includePages }, and { cursor } when paging
     const swmRes = await fetchDocumentsHomePage(api, {
       subView: 'shared-with-me',
       workspaceId: 'ws-1',
@@ -383,7 +386,11 @@ describe('DH1-W2 documents-home-model', () => {
       myFolderId: null,
       filters,
     })
-    expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith({ includePages: true })
+    expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith({
+      includePages: true,
+      format: 'docx',
+      updatedBy: 'u-1',
+    })
     expect(swmRes.result).toEqual({
       ok: true,
       value: { items: [listDoc], nextCursor: 'list-next' },
@@ -400,6 +407,8 @@ describe('DH1-W2 documents-home-model', () => {
     expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({
       cursor: 'swm-cur-2',
       includePages: true,
+      format: 'docx',
+      updatedBy: 'u-1',
     })
 
     const sbmRes = await fetchDocumentsHomePage(api, {
@@ -537,5 +546,75 @@ describe('UNI-1961 documents-home-model: the Lưu trữ (Archive) shelf', () => 
       ok: true,
       value: { items: [shelvedDoc], nextCursor: 'shelf-next' },
     })
+  })
+})
+
+describe('the shared type chips (UNI-2047 A3)', () => {
+  const doc = (partial: Partial<DocumentsHomeDoc>): DocumentsHomeDoc => ({
+    id: 'd',
+    workspaceId: 'ws-1',
+    title: 'd',
+    format: 'docx',
+    updatedAt: '2026-10-20T08:00:00.000Z',
+    kind: 'file',
+    parentId: null,
+    ...partial,
+  })
+  const asRow = (d: DocumentsHomeDoc) => ({ type: 'doc' as const, id: d.id, doc: d })
+  const source = (extension: string) =>
+    ({ type: 'source' as const, id: 's', source: { extension } }) as never
+
+  it('lists the chips in the one shared order', () => {
+    expect(DOCUMENTS_HOME_TYPE_CHIPS.map((c) => c.value)).toEqual([
+      'all',
+      'page',
+      'docx',
+      'xlsx',
+      'pptx',
+      'pdf',
+      'md',
+      'html',
+      'txt',
+    ])
+  })
+
+  it('sends a file format and .txt to the server, never UniNote', () => {
+    const at = Date.UTC(2026, 9, 21)
+    expect(toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'txt' }, at)).toEqual({
+      format: 'txt',
+    })
+    expect(toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'page' }, at)).toEqual(
+      {},
+    )
+    // UniNote still counts as an active filter (the Xóa bộ lọc button and the no-match state)
+    expect(hasActiveFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'page' })).toBe(true)
+  })
+
+  it('narrows UniNote on the loaded rows and drops every source file under it', () => {
+    expect(rowMatchesType(asRow(doc({ kind: 'page', format: null })), 'page')).toBe(true)
+    expect(rowMatchesType(asRow(doc({})), 'page')).toBe(false)
+    expect(rowMatchesType(asRow(doc({ kind: 'folder', format: null })), 'page')).toBe(false)
+    expect(rowMatchesType(source('pdf'), 'page')).toBe(false)
+    expect(rowMatchesType(asRow(doc({})), 'all')).toBe(true)
+  })
+
+  it('keeps only .txt source files under .txt (the sources route may not apply it)', () => {
+    expect(rowMatchesType(source('txt'), 'txt')).toBe(true)
+    expect(rowMatchesType(source('.TXT'), 'txt')).toBe(true)
+    expect(rowMatchesType(source('md'), 'txt')).toBe(false)
+    expect(rowMatchesType(source('md'), 'md')).toBe(true)
+  })
+
+  it('matches Người sửa and Cập nhật on a loaded row, a row without the field does not match', () => {
+    const d = doc({ updatedById: 'u-1' })
+    expect(docMatchesUpdated(d, {})).toBe(true)
+    expect(docMatchesUpdated(d, { updatedBy: 'u-1' })).toBe(true)
+    expect(docMatchesUpdated(d, { updatedBy: 'u-2' })).toBe(false)
+    expect(docMatchesUpdated(doc({}), { updatedBy: 'u-1' })).toBe(false)
+    expect(docMatchesUpdated(d, { updatedFrom: '2026-10-19T00:00:00.000Z' })).toBe(true)
+    expect(docMatchesUpdated(d, { updatedFrom: '2026-10-21T00:00:00.000Z' })).toBe(false)
+    expect(
+      docMatchesUpdated(doc({ updatedAt: 'garbage' }), { updatedFrom: '2026-10-19T00:00:00.000Z' }),
+    ).toBe(false)
   })
 })

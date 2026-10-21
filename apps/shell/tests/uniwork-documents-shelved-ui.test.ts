@@ -228,10 +228,9 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
     expect(host.querySelector('.dh-shelved-intro')?.textContent).toBe(
       'Tài liệu đã xong việc được cất ở đây: giữ mãi, chỉ đọc, không bình luận. Bỏ lưu trữ đưa mục về như cũ. Ai xem được vẫn mở và tìm thấy (nhãn “Đã lưu trữ”). Lưu trữ một thư mục là lưu cả cây; cần quyền Quản lý.',
     )
-    // the live views' quick-create row, filter bar and folder cards are not on the shelf
+    // the live views' quick-create row and folder cards are not on the shelf; the shared filter bar is
     expect(host.querySelector('.dh-quick-row')).toBeNull()
-    // not rendered at all: an author display:flex beats the hidden attribute, so `hidden` would still paint it
-    expect(host.querySelector('.dh-filter-bar')).toBeNull()
+    expect(host.querySelectorAll('.dh-filter-bar [data-chip]')).toHaveLength(9)
     expect(host.querySelector('.dh-folders-section')).toBeNull()
     // the fixed-sort label is gone: the headers sort (UNI-2047)
     expect(host.querySelector('.dh-shelved-sort')).toBeNull()
@@ -474,10 +473,8 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
       ok({ documents: shelvedRows().slice(0, 1), nextCursor: null }),
     )
     // the type filter goes to the server
-    const type = host.querySelector<HTMLSelectElement>('select[data-filter="format"]')!
     await act(async () => {
-      type.value = 'xlsx'
-      type.dispatchEvent(new Event('change', { bubbles: true }))
+      host.querySelector<HTMLButtonElement>('.dh-filter-bar [data-chip="xlsx"]')!.click()
     })
     await flush()
     expect(api.uniworkListShelved).toHaveBeenLastCalledWith(
@@ -488,15 +485,15 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
     expect(empty?.textContent).toContain('Không mục nào khớp bộ lọc trong phần đã tải.')
   })
 
-  it('sends only the type filter to the shelf, not the live views updater/date filters', async () => {
+  it('sends only the type filter to the shelf: its updater/date filters narrow the loaded rows here', async () => {
     await mount()
+    await openArchive()
     const updated = host.querySelector<HTMLSelectElement>('select[data-filter="updatedFrom"]')!
     await act(async () => {
       updated.value = '7d'
       updated.dispatchEvent(new Event('change', { bubbles: true }))
     })
     await flush()
-    await openArchive()
     const q = api.uniworkListShelved!.mock.calls.at(-1)![0] as Record<string, unknown>
     expect(q.workspaceId).toBe('ws-1')
     expect(q.updatedFrom).toBeUndefined()

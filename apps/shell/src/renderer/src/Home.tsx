@@ -245,6 +245,7 @@ const FILTERS: { key: string; label: StringKey }[] = [
   { key: 'pdf', label: 'filterPdf' },
   { key: 'md', label: 'filterMd' },
   { key: 'html', label: 'filterHtml' },
+  { key: 'txt', label: 'filterTxt' },
 ]
 
 /** sidebar filter keys that stand for a family of extensions (mirrors recent-files.ts) */
@@ -252,7 +253,7 @@ const FILTER_FAMILY: Record<string, readonly string[]> = {
   docx: ['docx', 'doc'],
   xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'],
   pptx: ['pptx', 'ppt'],
-  md: ['md', 'markdown', 'txt', 'json'],
+  md: ['md', 'markdown'],
   html: ['html', 'htm'],
 }
 

@@ -79,33 +79,29 @@ import { openPageOnWeb } from '../uniwork-page-web'
 import { publishUniworkNotice } from '../uniwork-notice-bus'
 import { announce } from '../uniwork-live'
 import {
-  DEFAULT_DOCUMENTS_HOME_FILTERS,
-  DOCUMENTS_HOME_FORMAT_OPTIONS,
-  DOCUMENTS_HOME_UPDATED_OPTIONS,
   canManageShelved,
   collectUpdatedByOptions,
   fetchDocumentsHomePage,
   fetchDocumentsHomeSources,
   getDocumentsHomeNavEntry,
+  docMatchesUpdated,
   hasActiveFilters,
   mergeNewestFirst,
+  rowMatchesType,
   sourceMatchesFilters,
   splitAndSortItems,
   toUniworkListFilters,
-  updatedByOptionsForSelect,
   visibleDocumentsHomeNavEntries,
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
-  type DocumentsHomeFilterState,
   type DocumentsHomeSubViewId,
   type DocumentsHomeTableRow,
-  type DocumentsHomeTypeFilter,
-  type DocumentsHomeUpdatedPreset,
   type UpdatedByOption,
 } from './documents-home-model'
 import { shelveDocument, trashShelvedDocument, unshelveDocument } from '../uniwork-library-api'
 import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
 import { DocList } from '../doclist/DocList'
+import { FilterBar, useDocListFilters } from '../doclist/FilterBar'
 import type { DocSubline } from '../doclist/DocRow'
 import { screenOfSubView, wireSortOf } from '../doclist/table-model'
 import { useDocListSort } from '../doclist/use-doc-list-sort'
@@ -303,10 +299,10 @@ export function DocumentsHome({
   const openPathRef = useRef<string[]>(initialFolderId ? [initialFolderId] : [])
   const treeLoadingRef = useRef(false)
 
-  const [filters, setFilters] = useState<DocumentsHomeFilterState>(DEFAULT_DOCUMENTS_HOME_FILTERS)
   // UNI-2047: one table sorted from its headers, the sort remembered per screen; the grid view
-  // and Group by are gone
+  // and Group by are gone. The quick filters are per screen too (doclist/FilterBar).
   const screen = screenOfSubView(subView)
+  const [filters, setFilters, resetFilters] = useDocListFilters(screen)
   const [docSort, setDocSort] = useDocListSort(screen)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const [searchDraft, setSearchDraft] = useState('')
@@ -407,7 +403,7 @@ export function DocumentsHome({
     setFolderNotice(null)
     setMyFolderId(null)
     setExpanded(new Set([ROOT_KEY]))
-    setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)
+    resetFilters()
     setSearchDraft('')
     setKnownAuthors([])
   }
@@ -659,7 +655,12 @@ export function DocumentsHome({
   // UNI-1961: as on the web, the sources merge only at the workspace root (no
   // folder, no search); a failed sources read (an older server's 404/501 or any
   // other) leaves the documents as they are
-  const sourcesWanted = subView === 'workspace' && folderId === null && query.length === 0
+  const sourcesWanted =
+    subView === 'workspace' &&
+    folderId === null &&
+    query.length === 0 &&
+    // UniNote is no file: the other-source list has nothing to show under it
+    filters.format !== 'page'
   const sourcesSeqRef = useRef(0)
   useEffect(() => {
     const seq = ++sourcesSeqRef.current
@@ -1545,21 +1546,29 @@ export function DocumentsHome({
   // could not apply to them run here (the web's merge, use-documents-library.ts).
   // The table orders them itself (UNI-2047: header sort); the shelf lists folders as rows too.
   const tableRows = useMemo<DocumentsHomeTableRow[]>(() => {
+    // the type chips the server cannot apply (UniNote, .txt on source files) and, on the shelf,
+    // Người sửa / Cập nhật run on what is loaded
+    const typed = (rows: DocumentsHomeTableRow[]) =>
+      rows.filter((row) => rowMatchesType(row, filters.format))
     if (shelfView) {
-      return filterByShelver(page.items, shelvedBy).map((doc) => ({
-        type: 'doc' as const,
-        id: doc.id,
-        doc,
-      }))
+      return typed(
+        filterByShelver(page.items, shelvedBy)
+          .filter((doc) => docMatchesUpdated(doc, wireFilters))
+          .map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
+      )
     }
-    if (!sourcesMerged) return files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc }))
-    return mergeNewestFirst(page.items, sources.items, {
-      docs: page.nextCursor !== null,
-      sources: sources.nextCursor !== null,
-    }).filter((row) =>
-      row.type === 'source'
-        ? sourceMatchesFilters(row.source, wireFilters)
-        : row.doc.kind !== 'folder',
+    if (!sourcesMerged) {
+      return typed(files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })))
+    }
+    return typed(
+      mergeNewestFirst(page.items, sources.items, {
+        docs: page.nextCursor !== null,
+        sources: sources.nextCursor !== null,
+      }).filter((row) =>
+        row.type === 'source'
+          ? sourceMatchesFilters(row.source, wireFilters)
+          : row.doc.kind !== 'folder',
+      ),
     )
   }, [
     shelfView,
@@ -1570,6 +1579,7 @@ export function DocumentsHome({
     page.nextCursor,
     sources,
     wireFilters,
+    filters.format,
   ])
 
   const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
@@ -1595,7 +1605,7 @@ export function DocumentsHome({
 
   const emptyMessageKey = useMemo<StringKey | null>(() => {
     if (query.length > 0) return null
-    if (subView !== 'shared-with-me' && hasActiveFilters(filters)) return 'uhEmptyFiltered'
+    if (hasActiveFilters(filters)) return 'uhEmptyFiltered'
     switch (subView) {
       case 'my-folder':
         return 'uhEmptyMyFolder'
@@ -1960,103 +1970,18 @@ export function DocumentsHome({
           </p>
         )}
 
-        {/* UNI-1961: the shelf has its own toolbar (type + Lưu trữ bởi + fixed sort) */}
+        {/* UNI-1961: the shelf's intro and Lưu trữ bởi; its type / editor / date are the shared bar below */}
         {shelfView && (
-          <ShelvedToolbar
-            items={page.items}
-            format={filters.format}
-            onFormat={(format) => setFilters((prev) => ({ ...prev, format }))}
-            shelvedBy={shelvedBy}
-            onShelvedBy={setShelvedBy}
-          />
+          <ShelvedToolbar items={page.items} shelvedBy={shelvedBy} onShelvedBy={setShelvedBy} />
         )}
 
-        {!shelfView && subView !== 'shared-with-me' && (
-          <div className="dh-filter-bar">
-            <>
-              <label className="dh-filter-chip">
-                <span className="dh-filter-k">{t('uhFilterType')}</span>
-                <select
-                  className="dh-filter-select"
-                  data-filter="format"
-                  aria-label={t('uhFilterType')}
-                  value={filters.format}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      format: e.target.value as DocumentsHomeTypeFilter,
-                    }))
-                  }
-                >
-                  {DOCUMENTS_HOME_FORMAT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.labelKey ? t(opt.labelKey) : opt.literal}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="dh-filter-chip">
-                <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
-                <select
-                  className="dh-filter-select"
-                  data-filter="updatedBy"
-                  aria-label={t('uhFilterModifiedBy')}
-                  value={filters.updatedBy}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      updatedBy: e.target.value,
-                    }))
-                  }
-                >
-                  <option value="">{t('uhFilterAnyPerson')}</option>
-                  {updatedByOptionsForSelect(
-                    knownAuthors,
-                    filters.updatedBy,
-                    t('uwEditLockSomeone'),
-                  ).map((author) => (
-                    <option key={author.id} value={author.id}>
-                      {author.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="dh-filter-chip">
-                <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
-                <select
-                  className="dh-filter-select"
-                  data-filter="updatedFrom"
-                  aria-label={t('uhFilterUpdated')}
-                  value={filters.updatedPreset}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      updatedPreset: e.target.value as DocumentsHomeUpdatedPreset,
-                    }))
-                  }
-                >
-                  {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {t(opt.labelKey)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {hasActiveFilters(filters) && (
-                <button
-                  type="button"
-                  className="dh-filter-clear"
-                  onClick={() => setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)}
-                >
-                  {t('uhFilterClear')}
-                </button>
-              )}
-            </>
-          </div>
-        )}
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          authors={
+            subView === 'shared-with-me' ? collectUpdatedByOptions(page.items) : knownAuthors
+          }
+        />
 
         {page.status === 'loading' && page.items.length === 0 && (
           <div className="uw-pick-skeleton" role="status" aria-busy="true">
@@ -2178,12 +2103,12 @@ export function DocumentsHome({
                 shelfView ? (
                   <div className="dh-empty dh-shelved-empty" role="status">
                     <p className="dh-shelved-empty-title">
-                      {filters.format !== 'all' || shelvedBy !== null
+                      {hasActiveFilters(filters) || shelvedBy !== null
                         ? t('uhShelvedNoMatchTitle')
                         : t('uhShelvedEmptyTitle')}
                     </p>
                     <p className="dh-shelved-empty-desc">
-                      {filters.format !== 'all' || shelvedBy !== null
+                      {hasActiveFilters(filters) || shelvedBy !== null
                         ? t('uhShelvedNoMatchDesc')
                         : t('uhShelvedEmptyDesc')}
                     </p>

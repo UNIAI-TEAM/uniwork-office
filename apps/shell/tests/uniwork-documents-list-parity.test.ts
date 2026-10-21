@@ -399,10 +399,8 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
 
   it('applies the home filters to source rows: type on the server, editor and date here', async () => {
     await renderHome()
-    const typeSelect = host.querySelector<HTMLSelectElement>('select[data-filter="format"]')!
     await act(async () => {
-      typeSelect.value = 'pdf'
-      typeSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      host.querySelector<HTMLButtonElement>('.dh-filter-bar [data-chip="pdf"]')!.click()
     })
     await flush()
     expect(api.uniworkListSources).toHaveBeenLastCalledWith({ workspaceId: 'ws-1', type: 'pdf' })

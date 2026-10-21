@@ -413,7 +413,8 @@ export type UniworkSystemKind = 'my_folder'
  * Unset = parameter omitted.
  */
 export interface UniworkListFilters {
-  format?: UniworkDocFormat
+  /** a file format, or `txt` (the server takes it on every list route; documents themselves have no txt format) */
+  format?: UniworkDocFormat | 'txt'
   updatedBy?: string
   updatedFrom?: string
   /** UNI-2047: server-side sort key; unset = the route's own order, nothing sent */
@@ -447,7 +448,7 @@ export interface UniworkSourceFile {
 }
 
 /** UNI-1961: the type filter the sources list takes (the web's `type`) */
-export type UniworkSourceType = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'html'
+export type UniworkSourceType = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'html' | 'txt'
 
 export interface UniworkSourceListQuery {
   workspaceId: string

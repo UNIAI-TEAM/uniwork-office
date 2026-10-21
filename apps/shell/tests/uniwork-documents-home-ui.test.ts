@@ -439,12 +439,11 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.textContent).toContain('Báo cáo kết quả kinh doanh Q3-2026.docx')
     expect(host.textContent).toContain('Kế hoạch ngân sách 2027.xlsx')
 
-    // Filter by Loại = XLSX -> forwards format: 'xlsx' to uniworkListDocuments
+    // Filter by type = .xlsx chip -> forwards format: 'xlsx' to uniworkListDocuments
     const filterSelects = host.querySelectorAll<HTMLSelectElement>('.dh-filter-select')
-    expect(filterSelects).toHaveLength(3)
+    expect(filterSelects).toHaveLength(2)
     await act(async () => {
-      filterSelects[0]!.value = 'xlsx'
-      filterSelects[0]!.dispatchEvent(new Event('change', { bubbles: true }))
+      host.querySelector<HTMLButtonElement>('.dh-filter-bar [data-chip="xlsx"]')!.click()
     })
     await flush()
     expect(api.uniworkListDocuments).toHaveBeenLastCalledWith(
@@ -453,8 +452,8 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
 
     // Filter by Người sửa = u-minh -> forwards updatedBy: 'u-minh'
     await act(async () => {
-      filterSelects[1]!.value = 'u-minh'
-      filterSelects[1]!.dispatchEvent(new Event('change', { bubbles: true }))
+      filterSelects[0]!.value = 'u-minh'
+      filterSelects[0]!.dispatchEvent(new Event('change', { bubbles: true }))
     })
     await flush()
     expect(api.uniworkListDocuments).toHaveBeenLastCalledWith(
@@ -463,8 +462,8 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
 
     // Filter by Cập nhật = 7d -> forwards updatedFrom ISO timestamp
     await act(async () => {
-      filterSelects[2]!.value = '7d'
-      filterSelects[2]!.dispatchEvent(new Event('change', { bubbles: true }))
+      filterSelects[1]!.value = '7d'
+      filterSelects[1]!.dispatchEvent(new Event('change', { bubbles: true }))
     })
     await flush()
     expect(api.uniworkListDocuments).toHaveBeenLastCalledWith(
@@ -476,7 +475,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       }),
     )
 
-    // Shared with me -> org-wide: hides filter selects, sends {} (no workspaceId, no filters), and shows workspaceName in .dh-doc-subpath
+    // Shared with me -> org-wide: its own, clean filter bar (filters are per screen), sends no workspaceId and no filters, and shows workspaceName in .dh-doc-subpath
     api.uniworkListSharedWithMe.mockResolvedValueOnce(
       ok({
         documents: [
@@ -501,7 +500,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     )
     await clickNav('shared-with-me')
     expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ includePages: true })
-    expect(host.querySelectorAll('.dh-filter-select')).toHaveLength(0)
+    expect(host.querySelectorAll('.dh-filter-select')).toHaveLength(2)
     expect(host.querySelector('.dh-filter-clear')).toBeNull()
     expect(host.textContent).toContain('Đề xuất đối tác.docx')
     expect(host.querySelector('.dh-cell-name .dh-doc-subpath')?.textContent?.trim()).toBe(
@@ -540,12 +539,14 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     expect(host.textContent).toContain('Biên bản họp.docx')
 
-    // Shared by me -> uniworkListSharedByMe (filter bar visible again and forwards active filters)
+    // Shared by me -> uniworkListSharedByMe (its own filter bar: the Recent filters stay on Recent)
     await clickNav('shared-by-me')
-    expect(host.querySelectorAll('.dh-filter-select')).toHaveLength(3)
+    expect(host.querySelectorAll('.dh-filter-select')).toHaveLength(2)
     expect(api.uniworkListSharedByMe).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', format: 'xlsx', updatedBy: 'u-minh' }),
+      expect.objectContaining({ workspaceId: 'ws-1' }),
     )
+    expect(api.uniworkListSharedByMe.mock.calls.at(-1)![0]).not.toHaveProperty('format')
+    expect(api.uniworkListSharedByMe.mock.calls.at(-1)![0]).not.toHaveProperty('updatedBy')
     expect(host.textContent).toContain('Bản thảo hợp đồng.docx')
     expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Được chia sẻ')
     expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Bình luận')
