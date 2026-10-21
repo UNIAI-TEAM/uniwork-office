@@ -28,14 +28,14 @@ export const cs = {
   ufParentKind: 'Složka je v kořeni nebo v jiné složce.',
   ufNotShareable: 'Složky nelze sdílet. Sdílejte raději jednotlivé dokumenty.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'Složku pracovního prostoru nelze přesunout do složky Moje složka. Obnovte seznam a zkuste to znovu.',
+  ufDisabledWsFolder: 'Složku pracovního prostoru nelze přesunout do složky Moje složka',
+  ufMoveOutTitle: 'Přesunout tuto složku do pracovního prostoru?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'Složka a její název budou viditelné pro celý pracovní prostor; dokumenty uvnitř si zachovají vlastní přístup',
+  ufMoveOutConfirm: 'Přesunout',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'Dokumenty ostatních lidí v této složce se vrátí jejich vlastníkům se zachovaným přístupem.',
   ufFolderGone: 'Tato složka tu už není.',
   ufFolderNoAccess: 'K této složce již nemáte přístup.',
   ufNoPermission: 'Nemáte oprávnění tuto složku měnit.',

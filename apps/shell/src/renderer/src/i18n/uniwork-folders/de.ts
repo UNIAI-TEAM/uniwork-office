@@ -28,14 +28,15 @@ export const de = {
   ufParentKind: 'Ein Ordner liegt im Stammverzeichnis oder in einem anderen Ordner.',
   ufNotShareable: 'Ordner können nicht geteilt werden. Teile stattdessen jedes Dokument einzeln.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'Ein Ordner des Arbeitsbereichs kann nicht in „Mein Ordner“ verschoben werden. Aktualisiere die Liste und versuche es erneut.',
+  ufDisabledWsFolder:
+    'Ein Ordner des Arbeitsbereichs kann nicht in „Mein Ordner“ verschoben werden',
+  ufMoveOutTitle: 'Diesen Ordner in den Arbeitsbereich verschieben?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'Der Ordner und sein Name sind für den gesamten Arbeitsbereich sichtbar; die Dokumente darin behalten ihre eigenen Zugriffsrechte',
+  ufMoveOutConfirm: 'Verschieben',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'Dokumente anderer Personen in diesem Ordner werden an ihre Eigentümer zurückgegeben; ihre Zugriffsrechte bleiben unverändert.',
   ufFolderGone: 'Dieser Ordner ist nicht mehr hier.',
   ufFolderNoAccess: 'Du hast keinen Zugriff mehr auf diesen Ordner.',
   ufNoPermission: 'Du hast keine Berechtigung, diesen Ordner zu ändern.',

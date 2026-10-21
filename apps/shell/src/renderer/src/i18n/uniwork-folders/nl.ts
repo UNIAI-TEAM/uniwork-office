@@ -29,14 +29,14 @@ export const nl = {
   ufParentKind: 'Een map staat in de hoofdmap of in een andere map.',
   ufNotShareable: 'Mappen kunnen niet worden gedeeld. Deel in plaats daarvan elk document.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'Een werkruimtemap kan niet naar Mijn map worden verplaatst. Vernieuw de lijst en probeer het opnieuw.',
+  ufDisabledWsFolder: 'Een werkruimtemap kan niet naar Mijn map worden verplaatst',
+  ufMoveOutTitle: 'Deze map naar de werkruimte verplaatsen?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'De map en de naam ervan zijn zichtbaar voor de hele werkruimte; documenten in de map behouden hun eigen toegang',
+  ufMoveOutConfirm: 'Verplaatsen',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'Documenten van anderen in deze map worden teruggezet naar hun eigenaars, met ongewijzigde toegang.',
   ufFolderGone: 'Deze map is hier niet meer.',
   ufFolderNoAccess: 'Je hebt geen toegang meer tot deze map.',
   ufNoPermission: 'Je hebt geen toestemming om deze map te wijzigen.',

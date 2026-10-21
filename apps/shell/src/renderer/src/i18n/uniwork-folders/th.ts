@@ -28,14 +28,14 @@ export const th = {
   ufParentKind: 'โฟลเดอร์อยู่ได้เฉพาะที่ราก หรือในโฟลเดอร์อื่น',
   ufNotShareable: 'ไม่สามารถแชร์โฟลเดอร์ได้ ให้แชร์เอกสารทีละฉบับแทน',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'ไม่สามารถย้ายโฟลเดอร์ของพื้นที่ทำงานไปยังโฟลเดอร์ของฉันได้ รีเฟรชรายการแล้วลองอีกครั้ง',
+  ufDisabledWsFolder: 'ไม่สามารถย้ายโฟลเดอร์ของพื้นที่ทำงานไปยังโฟลเดอร์ของฉันได้',
+  ufMoveOutTitle: 'ย้ายโฟลเดอร์นี้ออกไปยังพื้นที่ทำงานหรือไม่?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'โฟลเดอร์และชื่อจะมองเห็นได้ทั้งพื้นที่ทำงาน ส่วนเอกสารภายในยังคงใช้สิทธิ์การเข้าถึงเดิม',
+  ufMoveOutConfirm: 'ย้าย',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'เอกสารของผู้อื่นในโฟลเดอร์นี้จะถูกส่งคืนให้เจ้าของ โดยสิทธิ์การเข้าถึงไม่เปลี่ยนแปลง',
   ufFolderGone: 'โฟลเดอร์นี้ไม่อยู่ที่นี่แล้ว',
   ufFolderNoAccess: 'คุณไม่มีสิทธิ์เข้าถึงโฟลเดอร์นี้อีกต่อไป',
   ufNoPermission: 'คุณไม่มีสิทธิ์เปลี่ยนแปลงโฟลเดอร์นี้',

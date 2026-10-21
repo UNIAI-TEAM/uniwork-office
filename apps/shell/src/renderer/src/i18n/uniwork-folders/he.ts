@@ -26,15 +26,13 @@ export const he = {
   ufCycle: 'אי אפשר להעביר תיקייה לתוך עצמה או לאחת מתיקיות המשנה שלה.',
   ufParentKind: 'תיקייה נמצאת בשורש או בתוך תיקייה אחרת.',
   ufNotShareable: 'לא ניתן לשתף תיקיות. שתפו כל מסמך בנפרד.',
-  ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufIntoMyFolder: 'לא ניתן להעביר תיקייה של סביבת העבודה אל התיקייה שלי. רענן את הרשימה ונסה שוב.',
+  ufDisabledWsFolder: 'לא ניתן להעביר תיקייה של סביבת העבודה אל התיקייה שלי',
+  ufMoveOutTitle: 'להעביר את התיקייה הזו אל סביבת העבודה?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
-  ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'התיקייה ושמה יהיו גלויים לכל סביבת העבודה; למסמכים שבתוכה תישמר הגישה המקורית שלהם',
+  ufMoveOutConfirm: 'העבר',
+  ufTrashRelocated: 'מסמכים של אנשים אחרים בתיקייה הזו יוחזרו לבעליהם, והגישה שלהם לא תשתנה.',
   ufFolderGone: 'התיקייה הזו כבר לא כאן.',
   ufFolderNoAccess: 'אין לך עוד גישה לתיקייה הזו.',
   ufNoPermission: 'אין לך הרשאה לשנות את התיקייה הזו.',

@@ -28,14 +28,14 @@ export const fr = {
   ufParentKind: 'Un dossier se trouve à la racine ou dans un autre dossier.',
   ufNotShareable: 'Les dossiers ne peuvent pas être partagés. Partagez plutôt chaque document.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    "Un dossier d'espace de travail ne peut pas être déplacé dans Mon dossier. Actualisez la liste et réessayez.",
+  ufDisabledWsFolder: "Un dossier d'espace de travail ne peut pas être déplacé dans Mon dossier",
+  ufMoveOutTitle: "Déplacer ce dossier vers l'espace de travail ?",
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    "Le dossier et son nom seront visibles par tout l'espace de travail ; les documents qu'il contient conservent leurs propres accès",
+  ufMoveOutConfirm: 'Déplacer',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    "Les documents d'autres personnes présents dans ce dossier seront rendus à leurs propriétaires, avec leurs accès inchangés.",
   ufFolderGone: "Ce dossier n'est plus ici.",
   ufFolderNoAccess: "Vous n'avez plus accès à ce dossier.",
   ufNoPermission: "Vous n'avez pas l'autorisation de modifier ce dossier.",

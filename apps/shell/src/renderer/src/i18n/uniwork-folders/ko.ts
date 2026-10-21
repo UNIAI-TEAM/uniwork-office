@@ -28,14 +28,14 @@ export const ko = {
   ufParentKind: '폴더는 루트나 다른 폴더 안에만 둘 수 있습니다.',
   ufNotShareable: '폴더는 공유할 수 없습니다. 문서를 하나씩 공유하세요.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    '작업 공간 폴더는 내 폴더로 이동할 수 없습니다. 목록을 새로 고침한 후 다시 시도하세요.',
+  ufDisabledWsFolder: '작업 공간 폴더는 내 폴더로 이동할 수 없습니다',
+  ufMoveOutTitle: '이 폴더를 작업 공간으로 옮기시겠습니까?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    '폴더와 이름은 작업 공간 전체에 표시됩니다. 폴더 안의 문서는 각자의 접근 권한을 그대로 유지합니다',
+  ufMoveOutConfirm: '이동',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    '이 폴더에 있는 다른 사람의 문서는 접근 권한을 바꾸지 않고 소유자에게 돌아갑니다.',
   ufFolderGone: '이 폴더는 더 이상 여기에 없습니다.',
   ufFolderNoAccess: '더 이상 이 폴더에 접근할 권한이 없습니다.',
   ufNoPermission: '이 폴더를 변경할 권한이 없습니다.',

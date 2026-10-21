@@ -28,14 +28,15 @@ export const it = {
   ufParentKind: "Una cartella si trova nella radice o in un'altra cartella.",
   ufNotShareable: 'Le cartelle non possono essere condivise. Condividi invece ogni documento.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    "Una cartella dello spazio di lavoro non può essere spostata in La mia cartella. Aggiorna l'elenco e riprova.",
+  ufDisabledWsFolder:
+    'Una cartella dello spazio di lavoro non può essere spostata in La mia cartella',
+  ufMoveOutTitle: 'Spostare questa cartella nello spazio di lavoro?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'La cartella e il suo nome saranno visibili a tutto lo spazio di lavoro; i documenti al suo interno mantengono i propri permessi di accesso',
+  ufMoveOutConfirm: 'Sposta',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'I documenti di altre persone in questa cartella torneranno ai rispettivi proprietari, con i permessi di accesso invariati.',
   ufFolderGone: 'Questa cartella non è più qui.',
   ufFolderNoAccess: 'Non hai più accesso a questa cartella.',
   ufNoPermission: 'Non hai l’autorizzazione per modificare questa cartella.',

@@ -28,14 +28,14 @@ export const ja = {
   ufParentKind: 'フォルダーはルートか別のフォルダーの中にのみ置けます。',
   ufNotShareable: 'フォルダーは共有できません。ドキュメントを個別に共有してください。',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'ワークスペースのフォルダーをマイフォルダーに移動することはできません。一覧を更新してから再度お試しください。',
+  ufDisabledWsFolder: 'ワークスペースのフォルダーをマイフォルダーに移動することはできません',
+  ufMoveOutTitle: 'このフォルダーをワークスペースに移動しますか?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'フォルダーとその名前はワークスペース全体に表示されます。フォルダー内のドキュメントは、それぞれのアクセス権をそのまま維持します',
+  ufMoveOutConfirm: '移動',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'このフォルダー内の他の人のドキュメントは、アクセス権を変更せずに所有者へ戻されます。',
   ufFolderGone: 'このフォルダーはもうここにありません。',
   ufFolderNoAccess: 'このフォルダーへのアクセス権がなくなりました。',
   ufNoPermission: 'このフォルダーを変更する権限がありません。',

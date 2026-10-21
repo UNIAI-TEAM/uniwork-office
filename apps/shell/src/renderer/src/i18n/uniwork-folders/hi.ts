@@ -27,14 +27,14 @@ export const hi = {
   ufParentKind: 'फ़ोल्डर रूट में या किसी दूसरे फ़ोल्डर में होता है।',
   ufNotShareable: 'फ़ोल्डर साझा नहीं किए जा सकते। इसके बजाय हर दस्तावेज़ अलग से साझा करें।',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'वर्कस्पेस का फ़ोल्डर “मेरा फ़ोल्डर” में नहीं ले जाया जा सकता। सूची रीफ़्रेश करके फिर से कोशिश करें।',
+  ufDisabledWsFolder: 'वर्कस्पेस का फ़ोल्डर “मेरा फ़ोल्डर” में नहीं ले जाया जा सकता',
+  ufMoveOutTitle: 'इस फ़ोल्डर को वर्कस्पेस में ले जाएँ?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'फ़ोल्डर और उसका नाम पूरे वर्कस्पेस को दिखेगा; इसके अंदर के दस्तावेज़ अपनी मौजूदा पहुँच बनाए रखेंगे',
+  ufMoveOutConfirm: 'ले जाएँ',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'इस फ़ोल्डर में दूसरों के दस्तावेज़ उनके मालिकों के पास वापस चले जाएँगे, और उनकी पहुँच नहीं बदलेगी।',
   ufFolderGone: 'यह फ़ोल्डर अब यहाँ नहीं है।',
   ufFolderNoAccess: 'अब आपके पास इस फ़ोल्डर तक पहुँच नहीं है।',
   ufNoPermission: 'आपको इस फ़ोल्डर को बदलने की अनुमति नहीं है।',

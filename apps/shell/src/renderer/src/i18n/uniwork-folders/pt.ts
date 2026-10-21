@@ -28,14 +28,14 @@ export const pt = {
   ufParentKind: 'Uma pasta fica na raiz ou dentro de outra pasta.',
   ufNotShareable: 'As pastas não podem ser compartilhadas. Compartilhe cada documento.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'Uma pasta do espaço de trabalho não pode ser movida para Minha pasta. Atualize a lista e tente novamente.',
+  ufDisabledWsFolder: 'Uma pasta do espaço de trabalho não pode ser movida para Minha pasta',
+  ufMoveOutTitle: 'Mover esta pasta para o espaço de trabalho?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'A pasta e o nome dela ficarão visíveis para todo o espaço de trabalho; os documentos dentro dela mantêm o próprio acesso',
+  ufMoveOutConfirm: 'Mover',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'Os documentos de outras pessoas nesta pasta voltam para os respectivos proprietários, com o acesso inalterado.',
   ufFolderGone: 'Esta pasta não está mais aqui.',
   ufFolderNoAccess: 'Você não tem mais acesso a esta pasta.',
   ufNoPermission: 'Você não tem permissão para alterar esta pasta.',

@@ -29,14 +29,14 @@ export const ru = {
   ufParentKind: 'Папка может находиться в корне или в другой папке.',
   ufNotShareable: 'Папки нельзя предоставлять в общий доступ. Делитесь каждым документом отдельно.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'Папку рабочего пространства нельзя переместить в «Мою папку». Обновите список и попробуйте снова.',
+  ufDisabledWsFolder: 'Папку рабочего пространства нельзя переместить в «Мою папку»',
+  ufMoveOutTitle: 'Переместить эту папку в рабочее пространство?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'Папка и её название будут видны всему рабочему пространству; документы внутри сохраняют собственный доступ',
+  ufMoveOutConfirm: 'Переместить',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'Документы других людей в этой папке вернутся их владельцам, а доступ к ним не изменится.',
   ufFolderGone: 'Этой папки здесь больше нет.',
   ufFolderNoAccess: 'У вас больше нет доступа к этой папке.',
   ufNoPermission: 'У вас нет прав на изменение этой папки.',

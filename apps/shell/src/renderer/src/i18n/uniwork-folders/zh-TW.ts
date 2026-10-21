@@ -26,15 +26,12 @@ export const zhTW = {
   ufCycle: '資料夾無法移動到自身或其子資料夾中。',
   ufParentKind: '資料夾只能位於根目錄或其他資料夾中。',
   ufNotShareable: '資料夾無法共用。請逐一共用文件。',
-  ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
-  ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
-  ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+  ufIntoMyFolder: '工作區資料夾不能移動到「我的資料夾」中。請重新整理清單後再試一次。',
+  ufDisabledWsFolder: '工作區資料夾不能移動到「我的資料夾」中',
+  ufMoveOutTitle: '要將此資料夾移出到工作區嗎？',
+  ufMoveOutBody: '此資料夾及其名稱將對整個工作區可見；其中的文件保持各自的存取權限',
+  ufMoveOutConfirm: '移動',
+  ufTrashRelocated: '此資料夾中其他人的文件將歸還給其擁有者，存取權限保持不變。',
   ufFolderGone: '此資料夾已不在這裡。',
   ufFolderNoAccess: '你已無權存取此資料夾。',
   ufNoPermission: '你沒有權限變更此資料夾。',

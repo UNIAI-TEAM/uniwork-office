@@ -29,14 +29,14 @@ export const pl = {
   ufParentKind: 'Folder znajduje się w katalogu głównym lub w innym folderze.',
   ufNotShareable: 'Folderów nie można udostępniać. Udostępniaj poszczególne dokumenty.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'Folderu obszaru roboczego nie można przenieść do Mojego folderu. Odśwież listę i spróbuj ponownie.',
+  ufDisabledWsFolder: 'Folderu obszaru roboczego nie można przenieść do Mojego folderu',
+  ufMoveOutTitle: 'Przenieść ten folder do obszaru roboczego?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'Folder i jego nazwa będą widoczne w całym obszarze roboczym; dokumenty w środku zachowają własny dostęp',
+  ufMoveOutConfirm: 'Przenieś',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'Dokumenty innych osób w tym folderze wrócą do ich właścicieli, a ich dostęp pozostanie bez zmian.',
   ufFolderGone: 'Tego folderu już tu nie ma.',
   ufFolderNoAccess: 'Nie masz już dostępu do tego folderu.',
   ufNoPermission: 'Nie masz uprawnień do zmiany tego folderu.',

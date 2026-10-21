@@ -29,14 +29,14 @@ export const ms = {
   ufParentKind: 'Folder terletak di akar atau di dalam folder lain.',
   ufNotShareable: 'Folder tidak boleh dikongsi. Kongsi setiap dokumen satu demi satu.',
   ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+    'Folder ruang kerja tidak boleh dipindahkan ke Folder Saya. Muat semula senarai dan cuba lagi.',
+  ufDisabledWsFolder: 'Folder ruang kerja tidak boleh dipindahkan ke Folder Saya',
+  ufMoveOutTitle: 'Alihkan folder ini keluar ke ruang kerja?',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'Folder dan namanya akan kelihatan kepada seluruh ruang kerja; dokumen di dalamnya mengekalkan aksesnya sendiri',
+  ufMoveOutConfirm: 'Alih',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'Dokumen milik orang lain dalam folder ini akan dikembalikan kepada pemiliknya, dengan akses yang kekal tidak berubah.',
   ufFolderGone: 'Folder ini tiada lagi di sini.',
   ufFolderNoAccess: 'Anda tidak lagi mempunyai akses kepada folder ini.',
   ufNoPermission: 'Anda tiada kebenaran untuk mengubah folder ini.',

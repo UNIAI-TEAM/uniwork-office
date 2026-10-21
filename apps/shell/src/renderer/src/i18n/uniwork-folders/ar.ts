@@ -26,15 +26,14 @@ export const ar = {
   ufCycle: 'لا يمكن نقل مجلد إلى نفسه أو إلى أحد مجلداته الفرعية.',
   ufParentKind: 'يوجد المجلد في الجذر أو داخل مجلد آخر.',
   ufNotShareable: 'لا يمكن مشاركة المجلدات. شارك كل مستند على حدة.',
-  ufIntoMyFolder:
-    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
-  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
-  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufIntoMyFolder: 'لا يمكن نقل مجلد مساحة العمل إلى مجلدي. حدّث القائمة وأعد المحاولة.',
+  ufDisabledWsFolder: 'لا يمكن نقل مجلد مساحة العمل إلى مجلدي',
+  ufMoveOutTitle: 'هل تريد نقل هذا المجلد إلى مساحة العمل؟',
   ufMoveOutBody:
-    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
-  ufMoveOutConfirm: 'Move',
+    'سيظهر المجلد واسمه لمساحة العمل بأكملها، وتحتفظ المستندات داخله بصلاحيات الوصول الخاصة بها',
+  ufMoveOutConfirm: 'نقل',
   ufTrashRelocated:
-    "Other people's documents in this folder go back to their owners, with their access unchanged.",
+    'تعود المستندات التي يملكها آخرون في هذا المجلد إلى أصحابها، مع بقاء صلاحيات الوصول كما هي.',
   ufFolderGone: 'لم يعد هذا المجلد هنا.',
   ufFolderNoAccess: 'لم تعد لديك صلاحية الوصول إلى هذا المجلد.',
   ufNoPermission: 'ليس لديك إذن لتغيير هذا المجلد.',
