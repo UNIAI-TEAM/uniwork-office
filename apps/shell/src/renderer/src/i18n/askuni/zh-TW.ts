@@ -24,6 +24,7 @@ export const zhTW = {
   askUniKindChat: '聊天',
   askUniKindMember: '成員',
   askUniOpenDocument: '開啟文件',
+  askUniKindOther: '其他',
   askUniOpenBrowser: '在瀏覽器中開啟',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} 個字元',

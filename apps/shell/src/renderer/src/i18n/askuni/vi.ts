@@ -25,6 +25,7 @@ export const vi = {
   askUniKindChat: 'Trò chuyện',
   askUniKindMember: 'Thành viên',
   askUniOpenDocument: 'Mở tài liệu',
+  askUniKindOther: 'Khác',
   askUniOpenBrowser: 'Mở trong trình duyệt',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} ký tự',

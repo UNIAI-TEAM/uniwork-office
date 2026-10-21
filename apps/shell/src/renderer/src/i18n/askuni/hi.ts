@@ -26,6 +26,7 @@ export const hi = {
   askUniKindChat: 'चैट',
   askUniKindMember: 'सदस्य',
   askUniOpenDocument: 'दस्तावेज़ खोलें',
+  askUniKindOther: 'अन्य',
   askUniOpenBrowser: 'ब्राउज़र में खोलें',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} अक्षर',

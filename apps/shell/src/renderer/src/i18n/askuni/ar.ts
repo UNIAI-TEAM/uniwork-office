@@ -26,6 +26,7 @@ export const ar = {
   askUniKindChat: 'محادثة',
   askUniKindMember: 'عضو',
   askUniOpenDocument: 'فتح المستند',
+  askUniKindOther: 'أخرى',
   askUniOpenBrowser: 'فتح في المتصفح',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} حرفًا',

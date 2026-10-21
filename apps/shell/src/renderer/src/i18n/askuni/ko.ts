@@ -25,6 +25,7 @@ export const ko = {
   askUniKindChat: '채팅',
   askUniKindMember: '구성원',
   askUniOpenDocument: '문서 열기',
+  askUniKindOther: '기타',
   askUniOpenBrowser: '브라우저에서 열기',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max}자',

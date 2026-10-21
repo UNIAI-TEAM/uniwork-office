@@ -26,6 +26,7 @@ export const ja = {
   askUniKindChat: 'チャット',
   askUniKindMember: 'メンバー',
   askUniOpenDocument: 'ドキュメントを開く',
+  askUniKindOther: 'その他',
   askUniOpenBrowser: 'ブラウザーで開く',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} 文字',

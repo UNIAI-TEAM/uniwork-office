@@ -26,6 +26,7 @@ export const de = {
   askUniKindChat: 'Unterhaltung',
   askUniKindMember: 'Mitglied',
   askUniOpenDocument: 'Dokument öffnen',
+  askUniKindOther: 'Sonstiges',
   askUniOpenBrowser: 'Im Browser öffnen',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} Zeichen',

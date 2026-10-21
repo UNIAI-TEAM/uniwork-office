@@ -23,6 +23,7 @@ export const zh = {
   askUniKindChat: '聊天',
   askUniKindMember: '成员',
   askUniOpenDocument: '打开文档',
+  askUniKindOther: '其他',
   askUniOpenBrowser: '在浏览器中打开',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} 个字符',

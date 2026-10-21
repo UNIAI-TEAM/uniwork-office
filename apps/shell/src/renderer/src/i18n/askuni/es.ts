@@ -26,6 +26,7 @@ export const es = {
   askUniKindChat: 'Conversación',
   askUniKindMember: 'Miembro',
   askUniOpenDocument: 'Abrir documento',
+  askUniKindOther: 'Otro',
   askUniOpenBrowser: 'Abrir en el navegador',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} caracteres',

@@ -26,6 +26,7 @@ export const cs = {
   askUniKindChat: 'Konverzace',
   askUniKindMember: 'Člen',
   askUniOpenDocument: 'Otevřít dokument',
+  askUniKindOther: 'Jiné',
   askUniOpenBrowser: 'Otevřít v prohlížeči',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} znaků',

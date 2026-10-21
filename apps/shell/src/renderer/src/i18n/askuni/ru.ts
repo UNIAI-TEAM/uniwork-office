@@ -26,6 +26,7 @@ export const ru = {
   askUniKindChat: 'Чат',
   askUniKindMember: 'Участник',
   askUniOpenDocument: 'Открыть документ',
+  askUniKindOther: 'Другое',
   askUniOpenBrowser: 'Открыть в браузере',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} симв.',

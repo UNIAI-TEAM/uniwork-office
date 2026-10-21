@@ -39,6 +39,7 @@ const KIND_KEYS: Record<AskUniCitationKind, StringKey> = {
   meeting: 'askUniKindMeeting',
   chat: 'askUniKindChat',
   member: 'askUniKindMember',
+  other: 'askUniKindOther',
 }
 
 const ERROR_KEYS: Record<Exclude<AskUniErrorCode, 'signed_out'>, StringKey> = {
@@ -59,6 +60,13 @@ function bridge(): Partial<AskUniBridge> {
 export function hasAskUniBridge(): boolean {
   const b = bridge()
   return typeof b.uniworkAskUni === 'function' && typeof b.uniworkAskUniContext === 'function'
+}
+
+/** a kind this build has no row for (an older app against a newer server) shows as the generic row */
+function knownKind(kind: string): AskUniCitationKind {
+  return Object.prototype.hasOwnProperty.call(KIND_KEYS, kind)
+    ? (kind as AskUniCitationKind)
+    : 'other'
 }
 
 function KindIcon({ kind }: { kind: AskUniCitationKind }): ReactElement {
@@ -88,6 +96,12 @@ function KindIcon({ kind }: { kind: AskUniCitationKind }): ReactElement {
       <>
         <circle cx="8" cy="5.8" r="2.3" />
         <path d="M3.5 13c.5-2.3 2.2-3.4 4.5-3.4s4 1.1 4.5 3.4" />
+      </>
+    ),
+    other: (
+      <>
+        <circle cx="8" cy="8" r="5.5" />
+        <path d="M5.5 8h.01M8 8h.01M10.5 8h.01" />
       </>
     ),
   }
@@ -159,6 +173,13 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
     bottomRef.current?.scrollIntoView?.({ block: 'end' })
   }, [turns, pending])
 
+  // the composer is disabled while an ask is pending: focus comes back when the ask settles
+  const wasPendingRef = useRef(false)
+  useEffect(() => {
+    if (wasPendingRef.current && !pending) inputRef.current?.focus()
+    wasPendingRef.current = pending
+  }, [pending])
+
   const nextId = () => ++turnIdRef.current
   const ctx = context.status === 'ready' ? context.ctx : null
   const workspaces = ctx?.workspaces ?? []
@@ -185,7 +206,6 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
     setTurns((prev) => [...prev, { id: nextId(), kind: 'user', text: question }])
     setInput('')
     setPending(true)
-    inputRef.current?.focus()
     let result: AskUniResult
     try {
       result = await b.uniworkAskUni({
@@ -219,7 +239,6 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
     requestRef.current += 1
     setPending(false)
     setTurns((prev) => [...prev, { id: nextId(), kind: 'stopped' }])
-    inputRef.current?.focus()
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -336,22 +355,23 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
                       <h3 className="askuni-sources-title">{t('askUniSources')}</h3>
                       <ul className="askuni-source-list">
                         {turn.citations.map((c, i) => {
+                          const kind = knownKind(c.kind)
                           const action =
-                            c.kind === 'document' ? t('askUniOpenDocument') : t('askUniOpenBrowser')
+                            kind === 'document' ? t('askUniOpenDocument') : t('askUniOpenBrowser')
                           return (
                             <li key={`${c.sourceId}-${i}`}>
                               <button
                                 type="button"
                                 className="askuni-source"
-                                data-kind={c.kind}
+                                data-kind={kind}
                                 aria-label={t('askUniCitationLabel', {
-                                  kind: t(KIND_KEYS[c.kind]),
+                                  kind: t(KIND_KEYS[kind]),
                                   title: c.title,
                                   action,
                                 })}
                                 onClick={() => onOpenCitation?.(c)}
                               >
-                                <KindIcon kind={c.kind} />
+                                <KindIcon kind={kind} />
                                 <span className="askuni-source-text">
                                   <span className="askuni-source-title">{c.title}</span>
                                   {c.quote ? (
@@ -381,6 +401,7 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
               rows={1}
               value={input}
               maxLength={MAX_QUESTION}
+              disabled={pending}
               aria-label={t('askUniPlaceholder')}
               placeholder={t('askUniPlaceholder')}
               onChange={(e) => setInput(e.target.value)}

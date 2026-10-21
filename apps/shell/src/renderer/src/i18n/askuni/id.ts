@@ -26,6 +26,7 @@ export const id = {
   askUniKindChat: 'Obrolan',
   askUniKindMember: 'Anggota',
   askUniOpenDocument: 'Buka dokumen',
+  askUniKindOther: 'Lainnya',
   askUniOpenBrowser: 'Buka di browser',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} karakter',

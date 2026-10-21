@@ -25,6 +25,7 @@ export const he = {
   askUniKindChat: 'שיחה',
   askUniKindMember: 'חבר צוות',
   askUniOpenDocument: 'פתיחת המסמך',
+  askUniKindOther: 'אחר',
   askUniOpenBrowser: 'פתיחה בדפדפן',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} תווים',

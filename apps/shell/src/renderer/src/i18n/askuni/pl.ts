@@ -26,6 +26,7 @@ export const pl = {
   askUniKindChat: 'Rozmowa',
   askUniKindMember: 'Członek',
   askUniOpenDocument: 'Otwórz dokument',
+  askUniKindOther: 'Inne',
   askUniOpenBrowser: 'Otwórz w przeglądarce',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} znaków',

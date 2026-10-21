@@ -25,6 +25,7 @@ export const th = {
   askUniKindChat: 'แชต',
   askUniKindMember: 'สมาชิก',
   askUniOpenDocument: 'เปิดเอกสาร',
+  askUniKindOther: 'อื่น ๆ',
   askUniOpenBrowser: 'เปิดในเบราว์เซอร์',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} อักขระ',

@@ -26,6 +26,7 @@ export const ms = {
   askUniKindChat: 'Sembang',
   askUniKindMember: 'Ahli',
   askUniOpenDocument: 'Buka dokumen',
+  askUniKindOther: 'Lain-lain',
   askUniOpenBrowser: 'Buka dalam pelayar',
   askUniCitationLabel: '{kind}: {title} — {action}',
   askUniCounter: '{used}/{max} aksara',
