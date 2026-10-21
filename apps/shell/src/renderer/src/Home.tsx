@@ -3057,7 +3057,7 @@ export function Home() {
     return (
       <DocList
         screen="device"
-        rows={deviceRows([], hits)}
+        rows={deviceRows([], hits, true)}
         sort={fileSort}
         onSortChange={(next) => {
           setFileSort(next)

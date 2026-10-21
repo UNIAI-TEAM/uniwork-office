@@ -16,13 +16,17 @@ const formatOf = (ext: string): UniworkDocFormat | null =>
 const isoOf = (ms: number | null): string =>
   ms !== null && Number.isFinite(ms) ? new Date(ms).toISOString() : ''
 
-export function deviceFileDoc(entry: RecentEntry): DocumentsHomeDoc {
+/**
+ * `keepTime`: show the file's own time even for a UniWork working copy (a search hit is a file on
+ * disk, so its time is the honest one; a Recent row of a copy shows — instead).
+ */
+export function deviceFileDoc(entry: RecentEntry, keepTime = false): DocumentsHomeDoc {
   return {
     id: entry.path,
     workspaceId: '',
     title: entry.name,
     format: formatOf(entry.ext),
-    updatedAt: isoOf(recentRowModifiedMs(entry)),
+    updatedAt: isoOf(keepTime && !entry.missing ? entry.mtimeMs : recentRowModifiedMs(entry)),
     kind: 'file',
     // a file that failed to stat has no size; a zero size reads as — too (rowSizeBytes)
     sizeBytes: entry.missing ? undefined : entry.sizeBytes,
@@ -46,6 +50,10 @@ const rowOf = (doc: DocumentsHomeDoc): DocumentsHomeTableRow => ({ type: 'doc', 
 export function deviceRows(
   folders: readonly FolderEntry[],
   files: readonly RecentEntry[],
+  keepTime = false,
 ): DocumentsHomeTableRow[] {
-  return [...folders.map(deviceFolderDoc).map(rowOf), ...files.map(deviceFileDoc).map(rowOf)]
+  return [
+    ...folders.map(deviceFolderDoc).map(rowOf),
+    ...files.map((file) => rowOf(deviceFileDoc(file, keepTime))),
+  ]
 }
