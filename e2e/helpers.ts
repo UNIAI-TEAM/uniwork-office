@@ -184,7 +184,8 @@ export function homeRowName(page: Page, text: string): Locator {
 
 /** the Home list row (file or sub-folder) whose name contains `text` */
 export function homeRow(page: Page, text: string): Locator {
-  return page.locator(HOME_ROWS, { has: homeRowName(page, text) })
+  // `has` matches inside the row, so it takes the name selector relative to it
+  return page.locator(HOME_ROWS, { has: page.locator('.dh-doc-open', { hasText: text }) })
 }
 
 /** one item of the open row menu, by its action id (open, move, rename, delete, ...) */
