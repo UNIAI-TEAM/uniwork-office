@@ -45,10 +45,21 @@ export function errorKeyOf(code: ZipDownloadErrorCode): StringKey {
   }
 }
 
+/** a "title: reason" line cut around its title, so the bar can isolate the title (rtl) */
+export interface LineParts {
+  before: string
+  title: string
+  after: string
+}
+
+const TITLE_MARK = '\u0001'
+
 export interface ResultSummary {
   headline: string
   /** at most RESULT_LINES_MAX "title: reason" lines */
   lines: string[]
+  /** the same lines, cut around the title */
+  parts: LineParts[]
   /** "and N more", or null when every line is shown */
   more: string | null
 }
@@ -59,14 +70,19 @@ export function resultSummary(
 ): ResultSummary {
   const shown = result.lines.slice(0, RESULT_LINES_MAX)
   const left = result.lines.length - shown.length
+  const titleOf = (line: ResultLine) => line.title.trim() || t('shrBulkUntitled')
   return {
     headline: t('dlBulkDoneDownload', { ok: result.ok, total: result.total }),
     lines: shown.map((line) =>
-      t('dlZipErrorLine', {
-        title: line.title.trim() || t('shrBulkUntitled'),
-        reason: t(reasonKeyOf(line.reason)),
-      }),
+      t('dlZipErrorLine', { title: titleOf(line), reason: t(reasonKeyOf(line.reason)) }),
     ),
+    parts: shown.map((line) => {
+      const [before = '', after = ''] = t('dlZipErrorLine', {
+        title: TITLE_MARK,
+        reason: t(reasonKeyOf(line.reason)),
+      }).split(TITLE_MARK)
+      return { before, title: titleOf(line), after }
+    }),
     more: left > 0 ? t(left === 1 ? 'dlZipMoreOne' : 'dlZipMore', { count: left }) : null,
   }
 }
@@ -92,6 +108,8 @@ export interface BarView {
   text: string
   /** the "title: reason" lines of a finished run (at most RESULT_LINES_MAX) */
   lines: string[]
+  /** the same lines cut around the title (`lines` is their plain text) */
+  lineParts: LineParts[]
   more: string | null
   /** 0-100 while bytes are coming; null = not known yet (preparing, or no total) */
   percent: number | null
@@ -106,7 +124,14 @@ export const DONE_CLOCK_MS = 10_000
 export const CANCELED_CLOCK_MS = 6_000
 
 export function viewOf(t: TFunc, run: RunFacts, formatSize: (bytes: number) => string): BarView {
-  const base = { lines: [], more: null, percent: null, cancelable: false, revealable: false }
+  const base = {
+    lines: [],
+    lineParts: [],
+    more: null,
+    percent: null,
+    cancelable: false,
+    revealable: false,
+  }
   switch (run.phase) {
     case 'saving':
     case 'building':
@@ -148,11 +173,19 @@ export function viewOf(t: TFunc, run: RunFacts, formatSize: (bytes: number) => s
           tone: 'error',
           text: saveFailed ? t(errorKeyOf(run.error!)) : (own.lines[0] ?? t('dlZipFailed')),
           lines: rest.lines,
+          lineParts: rest.parts,
           more: rest.more,
           clock: null,
         }
       }
-      return { ...base, tone: 'error', text: t(errorKeyOf(run.error ?? 'zip_failed')), clock: null }
+      const error = run.error ?? 'zip_failed'
+      // "two zips already running, wait" is a try-later condition, not a failure
+      return {
+        ...base,
+        tone: error === 'zip_busy' ? 'warn' : 'error',
+        text: t(errorKeyOf(error)),
+        clock: null,
+      }
     }
     case 'done': {
       const revealable = run.path !== null
@@ -170,6 +203,7 @@ export function viewOf(t: TFunc, run: RunFacts, formatSize: (bytes: number) => s
         tone: run.lines.length === 0 ? 'ok' : run.ok > 0 ? 'warn' : 'error',
         text: summary.headline,
         lines: summary.lines,
+        lineParts: summary.parts,
         more: summary.more,
         percent: null,
         cancelable: false,

@@ -114,7 +114,45 @@ describe('ZipDownloadBar (UNI-2068 ZB)', () => {
     expect(lines[5]!.textContent).toBe('and 2 more documents')
     await act(async () => button('Show in folder')!.click())
     expect(reveal).toHaveBeenCalledWith('/home/u/documents.zip')
-    expect(bars()).toHaveLength(0)
+    // it has skipped lines, so the bar stays until it is closed
+    expect(bars()).toHaveLength(1)
+  })
+
+  it('Show in folder keeps a bar that has skipped lines open (TVZ-4)', async () => {
+    await mount()
+    await start([...files(2), doc('p', { kind: 'page' })])
+    await push({ runId: zipRuns()[0]!.id, phase: 'done', fileCount: 2, path: '/b.zip' })
+    await act(async () => button('Show in folder')!.click())
+    expect(reveal).toHaveBeenCalledWith('/b.zip')
+    expect(bars()).toHaveLength(1)
+  })
+
+  it('wraps each line title in <bdi> and keeps the colon outside it (TVZ-5)', async () => {
+    await mount()
+    await start([...files(2), doc('p', { kind: 'page', title: 'Sprint retro' })])
+    await push({ runId: zipRuns()[0]!.id, phase: 'done', fileCount: 2, path: '/b.zip' })
+    const li = host.querySelector('[data-testid="zip-download-lines"] li')!
+    expect(li.querySelector('bdi')!.textContent).toBe('Sprint retro')
+    expect(li.textContent).toBe('Sprint retro: cannot be downloaded (not a file)')
+    expect(li.firstChild!.nodeName).toBe('BDI')
+  })
+
+  it('splits a narrow pane with the folder-upload bars (TVZ-1)', async () => {
+    const pane = document.createElement('div')
+    pane.className = 'dh-main'
+    pane.getBoundingClientRect = () =>
+      ({ left: 0, right: 750, width: 750, top: 0, bottom: 600, height: 600 }) as DOMRect
+    document.body.appendChild(pane)
+    try {
+      await mount()
+      await start(files(2))
+      const style = (host.querySelector('.zd-bars') as HTMLElement).style
+      // 750 pane: 16 + 351 + 16 + 351 + 16; the zip bar takes the right half
+      expect(style.width).toBe('351px')
+      expect(style.left).toBe('383px')
+    } finally {
+      pane.remove()
+    }
   })
 
   it('a clean result leaves on its own after 10 s; one with lines waits for the close mark', async () => {
@@ -159,7 +197,9 @@ describe('ZipDownloadBar (UNI-2068 ZB)', () => {
       await start(files(2))
       await push({ runId: zipRuns().at(-1)!.id, phase: 'failed', error })
       expect(bars().at(-1)!.textContent).toContain(message)
-      expect(bars().at(-1)!.className).toContain('zd-bar-error')
+      expect(bars().at(-1)!.className).toContain(
+        error.code === 'zip_busy' ? 'zd-bar-warn' : 'zd-bar-error',
+      )
       await act(async () => host.querySelector<HTMLElement>('.zd-bar-close')!.click())
     }
   })
@@ -265,6 +305,12 @@ describe('viewOf (UNI-2068 ZB)', () => {
     expect(viewOf(t, { ...run, lines }, String).tone).toBe('warn')
     expect(viewOf(t, { ...run, lines, ok: 0 }, String).tone).toBe('error')
     expect(viewOf(t, run, String).tone).toBe('ok')
+  })
+
+  it('zip_busy is a warning, other failures stay errors (TVZ-3)', () => {
+    const failed = { ...run, phase: 'failed' as const, ok: 0 }
+    expect(viewOf(t, { ...failed, error: 'zip_busy' }, String).tone).toBe('warn')
+    expect(viewOf(t, { ...failed, error: 'zip_failed' }, String).tone).toBe('error')
   })
 
   it('a done run without a saved path has no Show in folder', () => {

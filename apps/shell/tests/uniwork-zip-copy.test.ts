@@ -46,6 +46,7 @@ describe('zip result copy (UNI-2068 ZB)', () => {
     expect(resultSummary(tFor('en') as never, { ok: 2, total: 2, lines: [] })).toEqual({
       headline: 'Downloaded 2/2 documents',
       lines: [],
+      parts: [],
       more: null,
     })
   })

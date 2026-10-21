@@ -55,7 +55,8 @@ function Bar({ run }: { run: StoredZipRun }) {
             onClick={() => {
               const path = run.path
               if (path) void window.aiOffice.revealPath(path)
-              closeZipRun(run.id)
+              // skipped lines stay readable after the file manager opens
+              if (bar.lines.length === 0) closeZipRun(run.id)
             }}
           >
             {t('uhSourceShowInFolder')}
@@ -81,8 +82,12 @@ function Bar({ run }: { run: StoredZipRun }) {
       </div>
       {bar.lines.length > 0 && (
         <ul className="zd-bar-lines" data-testid="zip-download-lines">
-          {bar.lines.map((line, index) => (
-            <li key={index}>{line}</li>
+          {bar.lineParts.map((part, index) => (
+            <li key={index}>
+              {part.before}
+              <bdi>{part.title}</bdi>
+              {part.after}
+            </li>
           ))}
           {bar.more && <li className="zd-bar-more">{bar.more}</li>}
         </ul>
@@ -101,6 +106,8 @@ function Bar({ run }: { run: StoredZipRun }) {
 
 const BARS_GUTTER = 16
 const BARS_MAX_WIDTH = 380
+// under this pane width two 380px bars (folder upload left, zip right) would overlap
+const BARS_SPLIT_BELOW = BARS_MAX_WIDTH * 2 + BARS_GUTTER * 3
 
 /**
  * The bars belong to the main pane (the library): measured, so they keep the 16px gutter and
@@ -122,7 +129,11 @@ function useMainPaneBars(active: boolean): CSSProperties | undefined {
         setStyle(undefined)
         return
       }
-      const width = Math.min(BARS_MAX_WIDTH, box.width - BARS_GUTTER * 2)
+      // a narrow pane splits between the two bar stacks, so they never overlap
+      const width =
+        box.width < BARS_SPLIT_BELOW
+          ? (box.width - BARS_GUTTER * 3) / 2
+          : Math.min(BARS_MAX_WIDTH, box.width - BARS_GUTTER * 2)
       setStyle({ left: box.right - BARS_GUTTER - width, right: 'auto', width })
     }
     measure()

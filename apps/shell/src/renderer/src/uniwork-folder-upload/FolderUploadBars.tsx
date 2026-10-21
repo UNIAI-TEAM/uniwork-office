@@ -218,6 +218,8 @@ function Bar({
 
 const BARS_GUTTER = 16
 const BARS_MAX_WIDTH = 380
+// under this pane width a zip bar (UNI-2068, right) would overlap 380px bars, so the pane is split
+const BARS_SPLIT_BELOW = BARS_MAX_WIDTH * 2 + BARS_GUTTER * 3
 
 /**
  * FU-V3: the bars belong to the main pane (the library), not to the window's
@@ -242,7 +244,10 @@ function useMainPaneBars(active: boolean): CSSProperties | undefined {
       }
       setStyle({
         left: box.left + BARS_GUTTER,
-        width: Math.min(BARS_MAX_WIDTH, box.width - BARS_GUTTER * 2),
+        width:
+          box.width < BARS_SPLIT_BELOW
+            ? (box.width - BARS_GUTTER * 3) / 2
+            : Math.min(BARS_MAX_WIDTH, box.width - BARS_GUTTER * 2),
       })
     }
     measure()
