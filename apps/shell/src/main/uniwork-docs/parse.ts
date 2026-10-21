@@ -432,6 +432,8 @@ export interface DocumentRef {
   myLevel: string | null
   archivedAt: string | null
   format: UniworkDocFormat | null
+  /** the document's `visibility` when the server sent a known one (SD-D2 first-save share rule) */
+  visibility: UniworkDocSummary['visibility'] | null
 }
 
 export function parseDocumentRef(raw: unknown): DocumentRef {
@@ -451,6 +453,7 @@ export function parseDocumentRef(raw: unknown): DocumentRef {
     myLevel: typeof myLevel === 'string' ? myLevel : null,
     archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
     format: kind === 'folder' ? null : formatOf(doc, title),
+    visibility: visibilityOf(doc.visibility) ?? null,
   }
 }
 

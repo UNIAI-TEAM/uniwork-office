@@ -7,7 +7,6 @@ import type {
   UniworkFolderNode,
   UniworkResult,
 } from '../../../shared/home-api'
-import type { ShareErrorCode } from '../../../shared/share-api'
 import { DEFAULT_MAX_DOCUMENT_BYTES } from '../../../shared/size-format'
 import { pathKey } from '../../../shared/path-key'
 import { FileBadge } from '../FileBadge'
@@ -35,7 +34,7 @@ import {
   myFolderIdOf,
   type PathPart,
 } from './uniwork-folders-model'
-import { shareFailureKey, shareWithWorkspace } from './first-save-share'
+import { announceShared, shareFailureKey } from './first-save-share'
 import { useFolderActions } from './use-folder-actions'
 import './uniwork-folders.css'
 import './save-dialog.css'
@@ -140,7 +139,7 @@ function startFirstSave(
   input: UniworkFirstSaveInput,
   say: (failure: SaveFailure) => string,
   /** the web's first-save share switch: share with the workspace once the save succeeded */
-  share?: { sayFailure: (error: ShareErrorCode) => string },
+  share?: { sayFailure: (error: string) => string },
 ): Promise<FirstSaveResult> {
   const key = pathKey(input.tabPath)
   // the account the document is created for, as it is when the save is sent
@@ -149,10 +148,16 @@ function startFirstSave(
     .uniworkFirstSave(input)
     .catch((): FirstSaveResult => ({ ok: false, error: 'network' }))
     .then(async (result): Promise<FirstSaveResult> => {
-      // only after the save succeeded; a refusal here never undoes the saved document
+      // only after the save succeeded; a refusal here never undoes the saved document. The web's
+      // PATCH (title + visibility: workspace) goes out through the rename call: main reads the
+      // document's current revision, applies the web's manage / not-yet-shared rule, and a title
+      // that did not change is a share-only PATCH
       if (result.ok && share) {
-        const shared = await shareWithWorkspace(input.workspaceId, result.value.id)
-        if (!shared.ok) setShareNotice(share.sayFailure(shared.error))
+        const shared = await window.aiOffice
+          .uniworkRenameDocument(result.value.id, result.value.title, { shareWithWorkspace: true })
+          .catch((): UniworkDocActionResult<UniworkDocSummary> => ({ ok: false, error: 'network' }))
+        if (shared.ok) announceShared(input.workspaceId, result.value.id)
+        else setShareNotice(share.sayFailure(shared.error))
       }
       return result
     })

@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { ShareErrorCode, UniworkShareApi } from '../../../shared/share-api'
+import type { UniworkShareApi } from '../../../shared/share-api'
 import type { StringKey } from '../locale'
-
-/** a share-API call that failed (the bridge missing counts as `invalid_request`) */
-export type FirstSaveShareFailure = { ok: false; error: ShareErrorCode }
 
 /** the Share dialog's bridge; absent on a stale preload */
 function shareBridge(): UniworkShareApi | undefined {
@@ -14,39 +11,18 @@ function shareBridge(): UniworkShareApi | undefined {
 export const DOC_SHARE_CHANGED_EVENT = 'uniwork:doc-share-changed'
 
 /**
- * The web's first-save share, as the app can make it: the web writes the title and
- * `visibility: 'workspace'` in one PATCH; the app has no such PATCH, so the home-workspace row goes
- * in through the Share API (view level, the row the web's PATCH writes) once the document exists.
- * A failure leaves the document as it is.
+ * The web's first-save share is one `PATCH /documents/{id}` that writes the title and
+ * `visibility: "workspace"` together; the app sends it through `renameDocument(..., { shareWithWorkspace })`.
+ * Once it went through, the lists that show the document's row are told its share scope changed.
  */
-export async function shareWithWorkspace(
-  workspaceId: string,
-  documentId: string,
-): Promise<{ ok: true } | FirstSaveShareFailure> {
-  const bridge = shareBridge()
-  if (!bridge) return { ok: false, error: 'invalid_request' }
-  const result = await bridge
-    .update({
-      documentId,
-      items: [
-        {
-          principalType: 'workspace',
-          principalId: workspaceId,
-          level: 'view',
-          onExisting: 'update',
-        },
-      ],
-    })
-    .catch((): { ok: false; error: ShareErrorCode } => ({ ok: false, error: 'network' }))
-  if (!result.ok) return { ok: false, error: result.error }
+export function announceShared(workspaceId: string, documentId: string): void {
   window.dispatchEvent(
     new CustomEvent(DOC_SHARE_CHANGED_EVENT, { detail: { documentId, workspaceId } }),
   )
-  return { ok: true }
 }
 
 /** the sentence for a failed first-save share: the app's own for a refusal it already words, else the web's */
-export function shareFailureKey(error: ShareErrorCode): StringKey {
+export function shareFailureKey(error: string): StringKey {
   switch (error) {
     case 'forbidden':
       return 'uwErrForbidden'

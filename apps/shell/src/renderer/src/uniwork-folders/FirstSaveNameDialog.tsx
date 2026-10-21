@@ -13,7 +13,7 @@ import { loadFolderTree, moveDocument, renameDocument } from '../uniwork-library
 import { FirstSaveShare } from './FirstSaveShare'
 import { nameParts } from './SaveDialog'
 import { UniworkFolderPicker, type PickedFolder } from './UniworkFolderPicker'
-import { shareFailureKey, shareWithWorkspace, useFirstSaveShareState } from './first-save-share'
+import { announceShared, shareFailureKey, useFirstSaveShareState } from './first-save-share'
 import { FolderGlyph, MyFolderGlyph } from './UniworkFolderTree'
 import {
   MY_FOLDER_LABEL_KEY,
@@ -121,25 +121,30 @@ function FirstSaveNameDialog({
     setBusy(true)
     setErrorKey(null)
     try {
-      if (title !== savedTitle) {
-        const renamed = await renameDocument(request.documentId, title)
+      // the web's one PATCH: the title and, for a manager of a not-yet-shared document with the
+      // switch on, `visibility: workspace` (an unchanged title still goes out to carry it)
+      const wantShare = shareState !== null && !shareState.alreadyShared && shareOn && !shared
+      if (title !== savedTitle || wantShare) {
+        const renamed = await renameDocument(
+          request.documentId,
+          title,
+          wantShare ? { shareWithWorkspace: true } : undefined,
+        )
         if (!mounted.current) return
         if (!renamed.ok) {
-          setErrorKey(errorKeyOf(renamed.error))
+          setErrorKey(
+            wantShare && !(renamed.error in DOC_NAME_ERROR_KEYS)
+              ? shareFailureKey(renamed.error)
+              : errorKeyOf(renamed.error),
+          )
           nameRef.current?.focus()
           return
         }
         setSavedTitle(title)
-      }
-      if (shareState && !shareState.alreadyShared && shareOn && !shared) {
-        const result = await shareWithWorkspace(request.workspaceId, request.documentId)
-        if (!mounted.current) return
-        if (!result.ok) {
-          // like a refused move: the dialog stays and the save does not continue
-          setErrorKey(shareFailureKey(result.error))
-          return
+        if (wantShare) {
+          setShared(true)
+          announceShared(request.workspaceId, request.documentId)
         }
-        setShared(true)
       }
       if (place.id !== savedParent) {
         const moved = await moveDocument({ documentId: request.documentId, parentId: place.id })

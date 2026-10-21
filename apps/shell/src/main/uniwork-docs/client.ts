@@ -279,6 +279,8 @@ export interface UniworkDocsClient {
     documentId: string
     revision: string
     title: string
+    /** the web's first-save share: the server writes the title and the home-workspace row in one transaction */
+    visibility?: 'workspace'
   }): Promise<{ summary: UniworkDocSummary; revision: string }>
   /**
    * G5-12: `POST /documents/{id}/copies` - a standalone copy that keeps the
@@ -1200,7 +1202,11 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const raw = await send({
         method: 'PATCH',
         route: `/documents/${id(input.documentId)}`,
-        json: { revision: input.revision, title: input.title },
+        json: {
+          revision: input.revision,
+          title: input.title,
+          ...(input.visibility ? { visibility: input.visibility } : {}),
+        },
         timeoutMs: metadataTimeout,
         read: json,
       })

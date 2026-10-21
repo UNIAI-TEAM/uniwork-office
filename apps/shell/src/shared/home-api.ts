@@ -1533,6 +1533,12 @@ export interface HomeApi {
   uniworkRenameDocument(
     documentId: string,
     name: string,
+    /**
+     * SD-D2: the web's first-save share. `shareWithWorkspace` adds `visibility: "workspace"` to the
+     * same PATCH (manager of a not-yet-shared document only; main applies the rule), and an
+     * unchanged title still sends it
+     */
+    options?: { shareWithWorkspace?: boolean },
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: archive a document (never a hard delete) */
   uniworkArchiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>

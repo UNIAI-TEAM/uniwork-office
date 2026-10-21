@@ -1321,9 +1321,18 @@ const homeApi: HomeApi = {
     if (typeof uploadId !== 'string' || !uploadId) return
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.cancelUpload, uploadId)
   },
-  async uniworkRenameDocument(documentId: string, name: string) {
+  async uniworkRenameDocument(
+    documentId: string,
+    name: string,
+    options?: { shareWithWorkspace?: boolean },
+  ) {
     return asUniworkActionResult<UniworkDocSummary>(
-      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.renameDocument, documentId, name),
+      await ipcRenderer.invoke(
+        UNIWORK_DOC_CHANNELS.renameDocument,
+        documentId,
+        name,
+        ...(options?.shareWithWorkspace === true ? [{ shareWithWorkspace: true }] : []),
+      ),
     )
   },
   async uniworkArchiveDocument(documentId: string) {

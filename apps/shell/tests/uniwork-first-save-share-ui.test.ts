@@ -73,6 +73,7 @@ const summary = (id: string, title: string): UniworkDocSummary => ({
 let tabs: TabSummary[]
 let calls: string[]
 let firstSaveAnswer: () => Promise<UniworkDocActionResult<UniworkDocSummary>>
+let renameAnswer: () => Promise<UniworkDocActionResult<UniworkDocSummary>>
 let host: HTMLDivElement
 let root: Root
 let share: FakeShareApi
@@ -106,7 +107,7 @@ function installApi() {
       ok([{ id: WS, name: 'Team', orgId: 'o1', slug: 'team', orgSlug: 'org', myRole: 'member' }]),
     ),
     uniworkFolderTree: vi.fn(async () =>
-      ok([node('mf', 'My Folder', { systemKind: 'my_folder' })]),
+      ok([node('mf', 'My Folder', { systemKind: 'my_folder' }), node('f-proj', 'Dự án')]),
     ),
     onUniworkFirstSaveName: vi.fn((cb: (r: UniworkFirstSaveNameRequest) => void) => {
       nameListener = cb
@@ -117,10 +118,12 @@ function installApi() {
     uniworkFirstSaveNameAnswer: vi.fn(async (input: { requestId: string; answer: string }) => {
       if (input.answer !== 'shown') calls.push(`answer:${input.answer}`)
     }),
-    uniworkRenameDocument: vi.fn(async (id: string, title: string) => {
-      calls.push(`rename:${id}:${title}`)
-      return ok(summary(id, title))
-    }),
+    uniworkRenameDocument: vi.fn(
+      async (id: string, title: string, options?: { shareWithWorkspace?: boolean }) => {
+        calls.push(`rename:${id}:${title}${options?.shareWithWorkspace ? ':share' : ''}`)
+        return renameAnswer()
+      },
+    ),
     uniworkMoveDocument: vi.fn(async () => ok({ summary: summary(DOC, 'x'), renamedTo: null })),
   }
   window.aiOffice = new Proxy(fns as unknown as HomeApi, {
@@ -186,6 +189,8 @@ async function openNameDialog() {
 }
 
 const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel)
+const $$ = <T extends Element = HTMLElement>(sel: string) =>
+  Array.from(document.querySelectorAll<T>(sel))
 
 async function click(el: Element | null | undefined) {
   expect(el).toBeTruthy()
@@ -209,14 +214,9 @@ beforeEach(() => {
   calls = []
   shareChanged = []
   firstSaveAnswer = async () => ok(summary(DOC, 'Biên bản họp tuần 43.docx'))
+  renameAnswer = async () => ok(summary(DOC, 'Biên bản họp tuần 43.docx'))
   api = installApi()
   share = createFakeShareApi({ documentId: DOC })
-  // record the order of share writes against the save in `calls`
-  const update = share.update
-  share.update = vi.fn(async (input) => {
-    calls.push(`share:${input.documentId}`)
-    return update(input)
-  })
   ;(window as unknown as { uniworkShare: UniworkShareApi }).uniworkShare = share
   window.addEventListener('uniwork:doc-share-changed', onShareChanged)
   const map = new Map<string, string>()
@@ -338,18 +338,17 @@ describe('SaveDialog (first save of a new document to UniWork)', () => {
     expect($('.uws-dialog')).toBeNull()
   })
 
-  it('Lưu with the switch on shares with the workspace at view level only AFTER the save succeeded', async () => {
+  it('Lưu with the switch on sends the web PATCH (title + visibility) AFTER the save succeeded, not a Share API write', async () => {
     await render()
     await openSaveDialog()
     await click(rowSwitch())
     expect(rowSwitch()!.getAttribute('aria-checked')).toBe('true')
     await click(saveButton())
-    expect(calls).toEqual(['first-save:Biên bản họp tuần 43.docx', `share:${DOC}`])
-    expect(updates()).toHaveLength(1)
-    expect(updates()[0]!.args[0]).toEqual({
-      documentId: DOC,
-      items: [{ principalType: 'workspace', principalId: WS, level: 'view', onExisting: 'update' }],
-    })
+    expect(calls).toEqual([
+      'first-save:Biên bản họp tuần 43.docx',
+      `rename:${DOC}:Biên bản họp tuần 43.docx:share`,
+    ])
+    expect(updates()).toEqual([])
     expect($('.uws-dialog')).toBeNull()
     expect(toast()).toBeNull()
     // the lists that show the row learn that its share scope changed
@@ -362,19 +361,22 @@ describe('SaveDialog (first save of a new document to UniWork)', () => {
     await openSaveDialog()
     await click(rowSwitch())
     await click(saveButton())
-    expect(share.calls).toEqual([])
+    expect(calls).toEqual(['first-save:Biên bản họp tuần 43.docx'])
     expect($('.uws-dialog')).not.toBeNull()
     expect(rowSwitch()?.getAttribute('aria-checked')).toBe('true')
   })
 
   it('a share failure keeps the saved document, closes the dialog and says so at a toast with the web copy', async () => {
-    share.failNext('update', { ok: false, error: 'server_error', status: 500 })
+    renameAnswer = async () => ({ ok: false, error: 'server_error' })
     await render()
     await openSaveDialog()
     await click(rowSwitch())
     await click(saveButton())
     expect($('.uws-dialog')).toBeNull()
-    expect(calls).toEqual(['first-save:Biên bản họp tuần 43.docx', `share:${DOC}`])
+    expect(calls).toEqual([
+      'first-save:Biên bản họp tuần 43.docx',
+      `rename:${DOC}:Biên bản họp tuần 43.docx:share`,
+    ])
     const t = toast()!
     expect(t.getAttribute('role')).toBe('alert')
     expect(t.textContent).toContain('Không chia sẻ được. Kiểm tra lại đối tượng và mức quyền.')
@@ -382,7 +384,7 @@ describe('SaveDialog (first save of a new document to UniWork)', () => {
   })
 
   it("a share failure that is a permission refusal uses the app's own forbidden sentence", async () => {
-    share.failNext('update', { ok: false, error: 'forbidden', status: 403 })
+    renameAnswer = async () => ({ ok: false, error: 'forbidden' })
     await render('en')
     await openSaveDialog()
     await click(rowSwitch())
@@ -390,15 +392,17 @@ describe('SaveDialog (first save of a new document to UniWork)', () => {
     expect(toast()?.textContent).toContain(docEn.uwErrForbidden)
   })
 
-  it('without the share bridge (a stale preload) the save still completes and says the share failed', async () => {
-    delete (window as unknown as { uniworkShare?: unknown }).uniworkShare
+  it('a bridge that throws is a failed share, the save still stands', async () => {
+    renameAnswer = async () => {
+      throw new Error('ipc gone')
+    }
     await render()
     await openSaveDialog()
     await click(rowSwitch())
     await click(saveButton())
-    expect(calls).toEqual(['first-save:Biên bản họp tuần 43.docx'])
     expect($('.uws-dialog')).toBeNull()
     expect(toast()?.textContent).toContain('Không chia sẻ được')
+    expect(shareChanged).toEqual([])
   })
 
   it('the share row of a new document is never locked as "already shared"', async () => {
@@ -419,7 +423,7 @@ describe('FirstSaveNameDialog (a blank document from the New menu, the web first
     calls.length = 0
   }
 
-  it('a private document shows the switch off; with it on, Lưu shares, then continues', async () => {
+  it('a private document shows the switch off; with it on, Lưu sends ONE rename+share PATCH, then continues', async () => {
     await makePrivate()
     await render()
     await openNameDialog()
@@ -427,13 +431,9 @@ describe('FirstSaveNameDialog (a blank document from the New menu, the web first
     expect(rowSwitch()!.getAttribute('aria-checked')).toBe('false')
     await click(rowSwitch())
     await click($('.ufs-dialog button[type="submit"]'))
-    expect(share.calls.map((c) => c.method)).toEqual(['get', 'update'])
-    expect(updates()[0]!.args[0]).toEqual({
-      documentId: DOC,
-      items: [{ principalType: 'workspace', principalId: WS, level: 'view', onExisting: 'update' }],
-    })
-    expect(calls.at(-1)).toBe('answer:continue')
-    expect(calls.indexOf(`share:${DOC}`)).toBeLessThan(calls.indexOf('answer:continue'))
+    expect(share.calls.map((c) => c.method)).toEqual(['get'])
+    expect(calls).toEqual([`rename:${DOC}:Untitled document.docx:share`, 'answer:continue'])
+    expect(shareChanged).toEqual([{ documentId: DOC, workspaceId: WS }])
   })
 
   it('a document already shared with the workspace shows it on and locked and sends no share call', async () => {
@@ -451,8 +451,8 @@ describe('FirstSaveNameDialog (a blank document from the New menu, the web first
     expect(rowSwitch()!.getAttribute('aria-disabled')).toBe('true')
     expect(rowHint()?.textContent).toBe(vi_.usShareAlready)
     await click($('.ufs-dialog button[type="submit"]'))
-    expect(updates()).toEqual([])
-    expect(calls.at(-1)).toBe('answer:continue')
+    expect(calls).toEqual(['answer:continue'])
+    expect(shareChanged).toEqual([])
   })
 
   it('a person who cannot manage the document gets no switch (the web shows it for manage only)', async () => {
@@ -470,7 +470,7 @@ describe('FirstSaveNameDialog (a blank document from the New menu, the web first
     await render()
     await openNameDialog()
     await vi.waitFor(() => expect(rowSwitch()).not.toBeNull())
-    share.failNext('update', { ok: false, error: 'server_error', status: 500 })
+    renameAnswer = async () => ({ ok: false, error: 'server_error' })
     await click(rowSwitch())
     await click($('.ufs-dialog button[type="submit"]'))
     expect($('.ufs-dialog')).not.toBeNull()
@@ -478,11 +478,32 @@ describe('FirstSaveNameDialog (a blank document from the New menu, the web first
       'Không chia sẻ được. Kiểm tra lại đối tượng và mức quyền.',
     )
     expect(calls.some((c) => c.startsWith('answer:'))).toBe(false)
-    // a retry shares again and then continues; the rename is not repeated
-    const renames = calls.filter((c) => c.startsWith('rename:')).length
+    // a retry sends the PATCH again, then continues
+    renameAnswer = async () => ok(summary(DOC, 'Untitled document.docx'))
     await click($('.ufs-dialog button[type="submit"]'))
-    expect(updates()).toHaveLength(2)
-    expect(calls.filter((c) => c.startsWith('rename:')).length).toBe(renames)
+    expect(calls.filter((c) => c.endsWith(':share'))).toHaveLength(2)
+    expect(calls.at(-1)).toBe('answer:continue')
+    expect(shareChanged).toEqual([{ documentId: DOC, workspaceId: WS }])
+  })
+
+  it('a retry after a refused move does not send the share again', async () => {
+    await makePrivate()
+    await render()
+    await openNameDialog()
+    await vi.waitFor(() => expect(rowSwitch()).not.toBeNull())
+    await click(rowSwitch())
+    ;(window.aiOffice.uniworkMoveDocument as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: false,
+      error: 'forbidden',
+    })
+    await click($('.ufs-dialog .ufs-change'))
+    await click($$('[role="treeitem"]').find((el) => el.textContent?.includes('Dự án')))
+    await click($('.uwf-picker-confirm'))
+    await click($('.ufs-dialog button[type="submit"]'))
+    expect($('.ufs-dialog')).not.toBeNull()
+    expect(calls.filter((c) => c.endsWith(':share'))).toHaveLength(1)
+    await click($('.ufs-dialog button[type="submit"]'))
+    expect(calls.filter((c) => c.endsWith(':share'))).toHaveLength(1)
     expect(calls.at(-1)).toBe('answer:continue')
   })
 
@@ -492,7 +513,6 @@ describe('FirstSaveNameDialog (a blank document from the New menu, the web first
     await openNameDialog()
     await vi.waitFor(() => expect(rowSwitch()).not.toBeNull())
     await click($('.ufs-dialog button[type="submit"]'))
-    expect(updates()).toEqual([])
-    expect(calls.at(-1)).toBe('answer:continue')
+    expect(calls).toEqual(['answer:continue'])
   })
 })

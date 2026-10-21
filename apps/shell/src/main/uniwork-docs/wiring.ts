@@ -983,8 +983,13 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   })
   ipcMain.handle(
     UNIWORK_DOC_CHANNELS.renameDocument,
-    (_event, documentId: unknown, name: unknown) =>
-      service.renameDocument(documentId as string, name as string),
+    (_event, documentId: unknown, name: unknown, options: unknown) =>
+      service.renameDocument(documentId as string, name as string, {
+        shareWithWorkspace:
+          typeof options === 'object' &&
+          options !== null &&
+          (options as { shareWithWorkspace?: unknown }).shareWithWorkspace === true,
+      }),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.archiveDocument, (_event, documentId: unknown) =>
     service.archiveDocument(documentId as string),
