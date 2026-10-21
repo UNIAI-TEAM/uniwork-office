@@ -47,7 +47,8 @@ function ruleOf(css: string, selector: string): string {
 /** the px of a grid track: the fixed width, or the floor of a minmax(...) */
 const floorOf = (track: string): number => Number(/^(?:minmax\()?(\d+)px/.exec(track)![1])
 /** the grid tracks of a template (a space inside minmax(...) does not split) */
-const tracksOf = (template: string): string[] => template.match(/minmax\([^)]*\)|\S+/g) ?? []
+const tracksOf = (template: string): string[] =>
+  template.match(/(?:minmax|var)\([^)]*\)|\S+/g) ?? []
 /** the least width (px) a row of these columns needs inside the table: the sum of the track floors */
 const rowFloor = (screen: DocListScreen, columns: readonly ColumnId[], width: number): number =>
   tracksOf(trackOf(columns, screen, false, isCompact(screen, width)))

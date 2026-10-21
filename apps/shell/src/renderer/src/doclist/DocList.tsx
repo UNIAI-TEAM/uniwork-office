@@ -5,6 +5,7 @@ import type { FolderMenuItem } from '../uniwork-folders/FolderMenu'
 import type { DocumentsHomeDoc, DocumentsHomeTableRow } from '../uniwork-home/documents-home-model'
 import { CompactTableContext, trackOf } from './cells'
 import {
+  COARSE_STAR_ACTIONS_EXTRA,
   COLUMN_LABEL_KEY,
   fitColumns,
   isCompact,
@@ -78,6 +79,11 @@ function groupInputOf(screen: DocListScreen, row: DocumentsHomeTableRow): GroupI
   if (screen === 'trash') return { purgeAfter: row.doc.purgeAfter }
   return { at: screen === 'recent' ? row.doc.lastActivity?.at : row.doc.shared?.at }
 }
+
+const isCoarsePointer = (): boolean =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(pointer: coarse)').matches
 
 function SortArrow() {
   return (
@@ -154,8 +160,16 @@ export function DocList({
   const canSelect = (doc: DocumentsHomeDoc): boolean => !selectableFor || selectableFor(doc)
   const selectableDocs = docs.filter(canSelect)
   const measured = width > 0 ? width : undefined
-  const allColumns = fitColumns(screen, visibleColumns(screen, docs, measured), measured)
-  const compact = isCompact(screen, measured)
+  // RV7-9: a coarse pointer draws the Starred Sao + ⋯ as two 44px buttons: count the wider track
+  const extra =
+    screen === 'starred' && onUnstar && isCoarsePointer() ? COARSE_STAR_ACTIONS_EXTRA : 0
+  const allColumns = fitColumns(
+    screen,
+    visibleColumns(screen, docs, measured, extra),
+    measured,
+    extra,
+  )
+  const compact = isCompact(screen, measured, extra)
   // a list nothing on is selectable has no Chọn column
   const columns =
     selectableFor && selectableDocs.length === 0

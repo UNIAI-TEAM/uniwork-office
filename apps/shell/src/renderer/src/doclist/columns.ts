@@ -107,13 +107,20 @@ function rungsOf(
   const editor = access + WIDTH.editor
   return { access: rem(access), editor: rem(editor), size: rem(editor + WIDTH.size) }
 }
-const RUNGS = {
-  plain: rungsOf(0, WIDTH.actions),
-  special: rungsOf(WIDTH.special, WIDTH.actions),
-  /** Lưu trữ: always a screen column, and the wide actions track */
-  shelved: rungsOf(WIDTH.special, BUTTON_ACTIONS_WIDTH),
-  /** Trash: the same, with the wider Deleted cell */
-  trash: rungsOf(DELETED_WIDTH, BUTTON_ACTIONS_WIDTH),
+/**
+ * RV7-9: the px a coarse pointer adds to the Starred actions track while its rows draw the Sao button
+ * (two 44px buttons: 108px against the ladder's 76px; documents-home.css `--dh-star-actions-track`).
+ * DocList feeds it to the ladder, so the ⋯ is never clipped just above a rung.
+ */
+export const COARSE_STAR_ACTIONS_EXTRA = 32
+
+function rungsFor(
+  screen: DocListScreen,
+  actionsExtra: number,
+): Record<(typeof NARROW_HIDING_ORDER)[number], number> {
+  if (screen === 'trash') return rungsOf(DELETED_WIDTH, BUTTON_ACTIONS_WIDTH)
+  if (screen === 'shelved') return rungsOf(WIDTH.special, BUTTON_ACTIONS_WIDTH)
+  return rungsOf(SPECIAL[screen] ? WIDTH.special : 0, WIDTH.actions + actionsExtra)
 }
 /** the device list has only Dung lượng to hide */
 const DEVICE_SIZE_RUNG = 40 * REM
@@ -123,7 +130,7 @@ const DEVICE_SIZE_RUNG = 40 * REM
  * Chọn · Tên · [đặc trưng] · Truy cập · Người sửa gần nhất · Cập nhật ·
  * Dung lượng · Thao tác. No (or an unusable) width means the full table.
  */
-export function columnsFor(screen: DocListScreen, width?: number): ColumnId[] {
+export function columnsFor(screen: DocListScreen, width?: number, actionsExtra = 0): ColumnId[] {
   const w = typeof width === 'number' && Number.isFinite(width) ? width : Number.POSITIVE_INFINITY
   if (screen === 'device') {
     return [
@@ -135,16 +142,7 @@ export function columnsFor(screen: DocListScreen, width?: number): ColumnId[] {
     ]
   }
   const special = SPECIAL[screen]
-  const rungs =
-    RUNGS[
-      screen === 'trash'
-        ? 'trash'
-        : screen === 'shelved'
-          ? 'shelved'
-          : special
-            ? 'special'
-            : 'plain'
-    ]
+  const rungs = rungsFor(screen, actionsExtra)
   return [
     // a source file of another module cannot be selected: its page has no Chọn column
     ...(screen === 'elsewhere' ? [] : (['select'] as const)),
@@ -176,9 +174,9 @@ const usable = (width?: number): width is number =>
   typeof width === 'number' && Number.isFinite(width) && width > 0
 
 /** the width under which a table cannot hold the full Tên floor next to Chọn, Cập nhật and Thao tác */
-export function isCompact(screen: DocListScreen, width?: number): boolean {
+export function isCompact(screen: DocListScreen, width?: number, actionsExtra = 0): boolean {
   if (!usable(width)) return false
-  const actions = hasButtonActions(screen) ? BUTTON_ACTIONS_WIDTH : WIDTH.actions
+  const actions = hasButtonActions(screen) ? BUTTON_ACTIONS_WIDTH : WIDTH.actions + actionsExtra
   return width < rem(WIDTH.select + NAME_FLOOR + WIDTH.updated + actions + BORDER)
 }
 
@@ -187,15 +185,16 @@ export function fitColumns(
   screen: DocListScreen,
   columns: readonly ColumnId[],
   width?: number,
+  actionsExtra = 0,
 ): ColumnId[] {
   if (!usable(width)) return [...columns]
   const special = SPECIAL[screen]
   const specialWidth = screen === 'trash' ? DELETED_WIDTH : WIDTH.special
-  const actions = hasButtonActions(screen) ? BUTTON_ACTIONS_WIDTH : WIDTH.actions
+  const actions = hasButtonActions(screen) ? BUTTON_ACTIONS_WIDTH : WIDTH.actions + actionsExtra
   const specialRung = rem(
     WIDTH.select + NAME_FLOOR + WIDTH.updated + actions + specialWidth + BORDER,
   )
-  const compact = isCompact(screen, width)
+  const compact = isCompact(screen, width, actionsExtra)
   return columns.filter(
     (column) =>
       !(special !== null && column === special && width < specialRung) &&
