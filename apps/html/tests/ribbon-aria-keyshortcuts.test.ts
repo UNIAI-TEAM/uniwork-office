@@ -64,12 +64,17 @@ const QUICK_ACCESS: ReadonlyArray<{ command: HtmlShortcutCommand; row: string }>
 
 describe.each<ShortcutPlatform>(['win', 'mac'])('HTML ribbon accessible names (%s)', (platform) => {
   beforeEach(() => {
-    vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform === 'mac' ? 'MacIntel' : 'Win32')
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue(
+      platform === 'mac' ? 'MacIntel' : 'Win32',
+    )
   })
 
   it('no aria-label carries a chord', () => {
     const container = renderRibbon()
-    for (const el of container.querySelectorAll('[aria-label]')) {
+    // the shared collapse / expand buttons live in packages/ui and are covered by its own lock test
+    const own = '[aria-label]:not(.ribbon-collapse-btn):not(.ribbon-expand-btn)'
+    expect(container.querySelectorAll(own).length).toBeGreaterThan(5)
+    for (const el of container.querySelectorAll(own)) {
       expect(findDisplayChord(el.getAttribute('aria-label')!), el.outerHTML).toBeNull()
     }
   })
