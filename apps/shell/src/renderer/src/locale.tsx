@@ -66,7 +66,8 @@ interface LocaleValue {
   setLang: (lang: Lang) => void
 }
 
-const LocaleContext = createContext<LocaleValue>({ lang: 'zh', setLang: () => {} })
+const DEFAULT_LANG: Lang = 'zh'
+const LocaleContext = createContext<LocaleValue>({ lang: DEFAULT_LANG, setLang: () => {} })
 
 export function LocaleProvider({ initial, children }: { initial: Lang; children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(initial)
@@ -130,6 +131,7 @@ export function useI18n(): I18n {
     lang,
     setLang,
     t: (key, params) => translate(lang, key, params),
-    dateLocale: DATE_LOCALES[lang],
+    // a host that mounts the provider without a language still gets the default's locale
+    dateLocale: DATE_LOCALES[lang] ?? DATE_LOCALES[DEFAULT_LANG],
   }
 }

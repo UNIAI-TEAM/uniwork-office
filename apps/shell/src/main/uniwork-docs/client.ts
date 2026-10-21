@@ -288,6 +288,7 @@ export interface UniworkDocsClient {
     cursor?: string
     limit?: number
     format?: UniworkListFilters['format']
+    kind?: UniworkListFilters['kind']
     /** UNI-2047: SV-0 lets the shelf sort like the other lists */
     sort?: UniworkListFilters['sort']
     order?: UniworkListFilters['order']
@@ -668,6 +669,8 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     if (typeof input.format === 'string' && input.format) {
       params.set('format', input.format)
     }
+    // UNI-2047: the flat list's kind for the UniNote chip (overrides listDocuments' own kind)
+    if (input.kind === 'page') params.set('kind', 'page')
     const updatedBy =
       typeof input.updatedBy === 'string' ? input.updatedBy.trim().slice(0, 128) : ''
     if (updatedBy) {
@@ -1165,7 +1168,12 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       params.set('limit', String(limit))
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
       // the shelf never sends parent_id or archived (shelved+archived is 400)
-      applyListFilters(params, { format: input.format, sort: input.sort, order: input.order })
+      applyListFilters(params, {
+        format: input.format,
+        kind: input.kind,
+        sort: input.sort,
+        order: input.order,
+      })
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',

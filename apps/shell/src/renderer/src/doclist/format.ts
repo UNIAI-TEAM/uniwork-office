@@ -3,7 +3,7 @@
 // Pure and locale-driven; `now` is a parameter so the day boundaries are
 // testable. The strings they must produce are pinned by doclist-vectors.json.
 import { daysLeft } from './groups'
-import { docListText, type DocListKey, type DocListT } from './text'
+import { DEFAULT_LIST_LOCALE, docListText, type DocListKey, type DocListT } from './text'
 
 /** What an empty or unusable value reads as in a list cell. */
 export const EMPTY_CELL = '—'
@@ -30,26 +30,28 @@ function sameDay(a: Date, b: Date): boolean {
  * `18/10/2025` (en `Oct 18, 2025`) before. Empty or invalid reads as "—".
  * vi is written out by hand because ICU versions disagree on the separator of
  * a numeric vi date; en uses Intl for the month name only. `locale` is the
- * app's `dateLocale`: vi-* is Vietnamese, every other language reads as en.
+ * app's `dateLocale`: vi-* is Vietnamese, every other language (and a missing
+ * locale) reads as en.
  * `t` supplies the translated "yesterday" word (default: built-in vi/en copy).
  */
 export function formatListDate(
   at: string | number | Date | null | undefined,
   now: Date,
-  locale: string,
+  locale?: string | null,
   t?: DocListT,
 ): string {
   if (at === null || at === undefined || at === '') return EMPTY_CELL
   const date = at instanceof Date ? at : new Date(at)
   if (Number.isNaN(date.getTime())) return EMPTY_CELL
+  const tag = locale || DEFAULT_LIST_LOCALE
   const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}`
   if (sameDay(date, now)) return clock
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
   if (sameDay(date, yesterday)) {
-    return `${(t ?? docListText(locale))('dlDateYesterday')}, ${clock}`
+    return `${(t ?? docListText(tag))('dlDateYesterday')}, ${clock}`
   }
   const sameYear = date.getFullYear() === now.getFullYear()
-  if (isVietnamese(locale)) {
+  if (isVietnamese(tag)) {
     const day = `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`
     return sameYear ? day : `${day}/${date.getFullYear()}`
   }
@@ -68,7 +70,7 @@ const UNITS = ['B', 'KB', 'MB', 'GB'] as const
  * to show (no number, zero, a page or a folder) reads as "—"; UniNote never
  * has a size.
  */
-export function formatBytes(bytes: number | null | undefined, locale: string): string {
+export function formatBytes(bytes: number | null | undefined, locale?: string | null): string {
   if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes <= 0) {
     return EMPTY_CELL
   }

@@ -6606,6 +6606,7 @@ export class UniworkDocsService {
   private listFiltersOf(q: UniworkListFilters): UniworkListFilters {
     return {
       ...(typeof q.format === 'string' && q.format ? { format: q.format } : {}),
+      ...(q.kind === 'page' ? { kind: q.kind } : {}),
       ...(typeof q.updatedBy === 'string' && q.updatedBy ? { updatedBy: q.updatedBy } : {}),
       ...(typeof q.updatedFrom === 'string' && q.updatedFrom ? { updatedFrom: q.updatedFrom } : {}),
       ...(isListSort(q.sort) ? { sort: q.sort } : {}),
@@ -6690,12 +6691,13 @@ export class UniworkDocsService {
         throw new UniworkDocError('not_found')
       }
       // UNI-2047: the shelf takes the type filter and the sort, nothing else
-      const { format, sort, order } = this.listFiltersOf(q)
+      const { format, kind, sort, order } = this.listFiltersOf(q)
       const page = await this.api().listShelved({
         workspaceId: q.workspaceId,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
         ...(format ? { format } : {}),
+        ...(kind ? { kind } : {}),
         ...(sort ? { sort } : {}),
         ...(order ? { order } : {}),
       })
