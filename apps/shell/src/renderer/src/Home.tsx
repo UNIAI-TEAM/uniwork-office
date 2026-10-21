@@ -2742,8 +2742,8 @@ export function Home() {
       <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
         <path
           d="M8 1.9l1.9 3.85 4.25.62-3.07 3 .72 4.23L8 11.6l-3.8 2 .72-4.23-3.07-3 4.25-.62z"
-          fill={entry.starred ? '#f5a623' : 'none'}
-          stroke={entry.starred ? '#f5a623' : 'currentColor'}
+          fill={entry.starred ? 'currentColor' : 'none'}
+          stroke="currentColor"
           strokeWidth="1.2"
           strokeLinejoin="round"
         />

@@ -2403,6 +2403,12 @@ export function DocumentsHome({
                     actionsFor={
                       shelfView ? shelfActionsFor : trashView ? trashActionsFor : undefined
                     }
+                    // UNI-2047 B7: only Starred rows know their star state (the "Sao · ⋯" Sao button)
+                    onUnstar={
+                      starredView && canFavoriteDocuments()
+                        ? (doc) => void handleFavorite(doc, false)
+                        : undefined
+                    }
                     onOpen={(doc) => void openDoc(doc)}
                     sublineFor={trashView ? undefined : sublineFor}
                     groups={subView !== 'trash' || trashView}

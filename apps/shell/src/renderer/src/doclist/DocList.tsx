@@ -38,6 +38,8 @@ export interface DocListProps {
   menuFor: (doc: DocumentsHomeDoc) => FolderMenuItem[]
   /** a row's own buttons before its "…" menu */
   actionsFor?: (doc: DocumentsHomeDoc) => ReactNode
+  /** Bỏ gắn sao from the Sao button of a row that knows it is starred (the Starred screen) */
+  onUnstar?: (doc: DocumentsHomeDoc) => void
   onOpen: (doc: DocumentsHomeDoc) => void
   sublineFor?: (doc: DocumentsHomeDoc) => DocSubline | null
   /** the document being renamed in place, with its field's handlers */
@@ -115,6 +117,7 @@ export function DocList({
   onOpenMenuChange,
   menuFor,
   actionsFor,
+  onUnstar,
   onOpen,
   sublineFor,
   rename,
@@ -296,6 +299,7 @@ export function DocList({
         subline={sublineFor?.(doc) ?? null}
         rename={rename && rename.docId === doc.id ? rename : null}
         actions={actionsFor?.(doc)}
+        onUnstar={onUnstar}
         menu={menuFor(doc)}
         menuOpen={openMenuId === doc.id}
         onMenuOpenChange={(open) => onOpenMenuChange(open ? doc.id : null)}
