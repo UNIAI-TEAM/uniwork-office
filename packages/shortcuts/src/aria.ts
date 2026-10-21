@@ -69,11 +69,14 @@ export function ariaKeyshortcuts(
 /** Display-notation chords, as `formatChord` writes them and as hand-written tips spell them. */
 const DISPLAY_CHORD_PATTERNS: readonly RegExp[] = [
   // a modifier word joined to a key: Ctrl+E, Alt+Shift+W, Cmd+K, Control+E, Option+R, Ctrl+.
-  /\b(?:Ctrl|Control|Alt|Shift|Cmd|Command|Option|Opt|Meta|Win|AltGr)\s*\+\s*\S/i,
+  // and the translated modifiers the locale strings spell: Strg (de), Maj (fr), Mayús (es),
+  // Maiusc (it), Umschalt (de), Commande (fr), Befehl (de), Opción (es)
+  /\b(?:Ctrl|Control|Alt|Shift|Cmd|Command|Option|Opt|Meta|Win|AltGr|Strg|Maj|Mayús|Maiusc|Umschalt|Commande|Befehl|Opción)\s*\+\s*\S/i,
   // macOS glyph notation: ⌘E, ⌥⌘R, ⌃⇧F, ⇧F5
   /[⌘⌥⌃]|⇧\s*\S/,
-  // a bare key in a parenthesised hint: (F12), (Esc), (Del)
-  /\(\s*(?:F(?:[1-9]|1[0-9]|2[0-4])|Esc|Escape|Del|Delete|Tab|Enter|PgUp|PgDn)\s*\)/,
+  // a bare key in a parenthesised hint: (F12), (Esc), (Del), and the translated key names
+  // the locale strings use: (Échap), (Entrée), (Entrar), (Invio), (Eingabetaste), (Suppr), (Entf)
+  /\(\s*(?:F(?:[1-9]|1[0-9]|2[0-4])|Esc|Escape|Échap|Echap|Del|Delete|Suppr|Supr|Entf|Tab|Enter|Entrée|Entrar|Intro|Invio|Eingabetaste|Return|PgUp|PgDn)\s*\)/,
 ]
 
 /**

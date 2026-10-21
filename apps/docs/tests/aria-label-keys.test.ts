@@ -80,9 +80,8 @@ function nameKeys(): Map<string, string[]> {
   return direct
 }
 
-/** the English key names (Enter, Esc) are the ones a hand-written tip spells out */
-const namesChord = (name: string): boolean =>
-  findDisplayChord(name) !== null || /\((?:Shift\+)?(?:Enter|Esc)\)/.test(name)
+/** the detector knows modifier chords, glyphs and bare key names, in the locales' own spelling */
+const namesChord = (name: string): boolean => findDisplayChord(name) !== null
 
 describe('accessible-name strings carry no chord, in any locale', () => {
   it('every aria-label / button-text key is plain as it is', () => {
