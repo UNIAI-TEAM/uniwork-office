@@ -43,6 +43,8 @@ export interface DocListProps {
   actionsFor?: (doc: DocumentsHomeDoc) => ReactNode
   /** Bỏ gắn sao from the Sao button of a row that knows it is starred (the Starred screen) */
   onUnstar?: (doc: DocumentsHomeDoc) => void
+  /** the Access cell's button: open the Share dialog (the cell is text where the host gives none) */
+  onShare?: (doc: DocumentsHomeDoc) => void
   onOpen: (doc: DocumentsHomeDoc) => void
   sublineFor?: (doc: DocumentsHomeDoc) => DocSubline | null
   /** the document being renamed in place, with its field's handlers */
@@ -126,6 +128,7 @@ export function DocList({
   menuFor,
   actionsFor,
   onUnstar,
+  onShare,
   onOpen,
   sublineFor,
   rename,
@@ -319,6 +322,7 @@ export function DocList({
         rename={rename && rename.docId === doc.id ? rename : null}
         actions={actionsFor?.(doc)}
         onUnstar={onUnstar}
+        onShare={onShare}
         menu={menuFor(doc)}
         menuOpen={openMenuId === doc.id}
         onMenuOpenChange={(open) => onOpenMenuChange(open ? doc.id : null)}

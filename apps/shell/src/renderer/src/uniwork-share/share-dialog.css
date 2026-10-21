@@ -730,3 +730,74 @@
 .uw-share-reason-form .uw-share-row-line {
   align-self: stretch;
 }
+
+/* Bulk Share dialog (UNI-2047 SD-C): the add area is the single dialog's; these are the workspace /
+   link choices, the checkbox, and the result list with the one-time links. Tokens only. */
+
+.uw-bulk-check {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.uw-bulk-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.uw-bulk-choices .uw-share-field {
+  width: auto;
+}
+
+.uw-bulk-failures {
+  display: flex;
+  max-height: 180px;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.uw-bulk-links {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.uw-bulk-link-list {
+  display: flex;
+  max-height: 240px;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.uw-bulk-link-list li {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.uw-bulk-link-title {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-bulk-link-url {
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

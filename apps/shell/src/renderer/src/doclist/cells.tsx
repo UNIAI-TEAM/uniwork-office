@@ -1,7 +1,7 @@
 // The cells of a Documents table row, one component per column kind. Rows
 // (DocRow, DocumentsSourceRow) lay them out in the order `visibleColumns`
 // gives; every cell is a `role="cell"` carrying its column id.
-import { createContext, useContext, type MouseEvent, type ReactNode } from 'react'
+import { createContext, useContext, useId, type MouseEvent, type ReactNode } from 'react'
 import { useI18n } from '../locale'
 import { shelverLabelOf, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
 import { ACCESS_PILL_KEY, accessPill, levelLine } from './access'
@@ -15,7 +15,9 @@ import {
 } from './columns'
 import { EMPTY_CELL, formatDaysLeft, formatListDate } from './format'
 import { DELETING_SOON_DAYS, daysLeft } from './groups'
+import { accessCellName, canShareRow } from './share-gate'
 import { editorInitials, editorNameOf } from './table-model'
+import './access-button.css'
 
 /** the file / folder icon box of a table row (doclist-canvas: 32px on every screen) */
 export const DOC_ICON_SIZE = 32
@@ -127,16 +129,53 @@ export function Empty() {
   return <span className="dh-cell-empty">{EMPTY_CELL}</span>
 }
 
-/** the Truy cập pill (Riêng tư / Workspace / Được chia sẻ) and the line under it (Chủ sở hữu / Bạn: Sửa) */
-export function AccessContent({ doc }: { doc: DocumentsHomeDoc }) {
+/**
+ * The Truy cập pill (Riêng tư / Workspace / Được chia sẻ) and the line under it (Chủ sở hữu / Bạn: Sửa).
+ * On a row that passes the Share gate (`onShare` given) the pill and the line are ONE button that
+ * opens the Share dialog without opening the document; a manager reads "Quản lý quyền truy cập của …",
+ * anyone else "Xem quyền truy cập của …". The name is the command plus the visible text (label in
+ * name). Any other row stays text.
+ */
+export function AccessContent({
+  doc,
+  onShare,
+}: {
+  doc: DocumentsHomeDoc
+  onShare?: (doc: DocumentsHomeDoc) => void
+}) {
   const { t } = useI18n()
+  const commandId = useId()
+  const contentId = useId()
   const pill = accessPill(doc)
   const level = levelLine(doc, t)
-  return (
+  const content = (
     <>
       <span className={`dh-vis-badge dh-vis-${pill}`}>{t(ACCESS_PILL_KEY[pill])}</span>
       {level && <span className="dh-level-sub">{level}</span>}
     </>
+  )
+  if (!onShare || !canShareRow(doc)) return content
+  return (
+    <button
+      type="button"
+      className="dh-access-btn"
+      data-access-share
+      aria-labelledby={`${commandId} ${contentId}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        onShare(doc)
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
+      <span id={commandId} className="uw-sr-only">
+        {t(accessCellName(doc) === 'manage' ? 'shrAccessManageFor' : 'shrAccessViewFor', {
+          title: doc.title,
+        })}
+      </span>
+      <span id={contentId} className="dh-access-btn-content">
+        {content}
+      </span>
+    </button>
   )
 }
 

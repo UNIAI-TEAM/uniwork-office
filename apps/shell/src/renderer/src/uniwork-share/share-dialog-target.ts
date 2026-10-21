@@ -37,6 +37,11 @@ export function canManageTarget(row: Pick<ShareDialogTarget, 'myLevel' | 'adminS
   return row.myLevel === 'manage' || row.adminScope === true
 }
 
+/** whether this shell has the Share bridge (a stale preload has none: then no Share entry shows) */
+export function shareBridgeAvailable(): boolean {
+  return typeof window !== 'undefined' && !!window.uniworkShare
+}
+
 declare global {
   interface Window {
     /** the Share bridge (preload `uniwork-share:*` channels) */

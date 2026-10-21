@@ -3848,6 +3848,7 @@ export function Home() {
             key={`${recentsAccount}:${activeUwWorkspaceId}`}
             workspaceId={activeUwWorkspaceId}
             workspaces={uwWsState.workspaces}
+            organizationName={orgName}
             onWorkspaceChange={selectUniworkWorkspace}
             initialFolderId={activeUwFolderId}
             initialSubView={activeUwSubView}

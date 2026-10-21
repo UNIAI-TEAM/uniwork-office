@@ -78,6 +78,10 @@ import {
 import { openPageOnWeb } from '../uniwork-page-web'
 import { publishUniworkNotice } from '../uniwork-notice-bus'
 import { announce } from '../uniwork-live'
+import { DOC_SHARE_CHANGED_EVENT } from '../uniwork-folders/first-save-share'
+import { BulkShareDialog, type BulkShareDoc } from '../uniwork-share/BulkShareDialog'
+import { ShareDialog } from '../uniwork-share/ShareDialog'
+import { rowShareTarget, shareBridgeAvailable } from '../uniwork-share/share-dialog-target'
 import {
   canManageShelved,
   collectUpdatedByOptions,
@@ -116,6 +120,7 @@ import {
   bulkWorkFor,
   runBulkAction,
   type BulkActionId,
+  type BulkWorkActionId,
 } from '../doclist/bulk'
 import { DocList } from '../doclist/DocList'
 import { defaultSort } from '../doclist/columns'
@@ -360,6 +365,8 @@ function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
 export interface DocumentsHomeProps {
   workspaceId: string
   workspaces: UniworkWorkspaceRef[]
+  /** the selected organization's name, for the Share dialog's "via organization" lines */
+  organizationName?: string
   onWorkspaceChange: (workspaceId: string) => void
   onOpenDocument: (doc: UniworkDocSummary) => void
   openingId?: string | null
@@ -395,6 +402,7 @@ type PageState = {
 export function DocumentsHome({
   workspaceId,
   workspaces,
+  organizationName,
   onWorkspaceChange,
   onOpenDocument,
   openingId,
@@ -1442,11 +1450,12 @@ export function DocumentsHome({
   const [bulkTrashConfirm, setBulkTrashConfirm] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
   const bulkBusyRef = useRef(false)
-  const runBulkById = async (action: BulkActionId) => {
+  const runBulkById = async (action: BulkWorkActionId) => {
     // the ref answers a second click that lands before React re-renders
     if (bulkBusyRef.current) return
     const docs = selectedDocs
-    if (docs.length === 0 || !bulkActionsFor(screen, docs).includes(action)) return
+    if (docs.length === 0 || !bulkActionsFor(screen, docs, shareBridgeAvailable()).includes(action))
+      return
     bulkBusyRef.current = true
     setBulkBusy(true)
     const result = await runBulkAction({
@@ -1461,10 +1470,31 @@ export function DocumentsHome({
     if (tone === 'ok') announce(message)
     setToast({ message, tone })
   }
+  // UNI-2047 SD-C: the Share dialogs of a row and of the selection (see the mount below)
+  const [shareRow, setShareRow] = useState<DocumentsHomeDoc | null>(null)
+  const [bulkShareDocs, setBulkShareDocs] = useState<BulkShareDoc[] | null>(null)
+  const shareAvailable = shareBridgeAvailable()
   const onBulkAction = (action: BulkActionId) => {
     if (action === 'trash') setBulkTrashConfirm(true)
-    else void runBulkById(action)
+    else if (action === 'share') {
+      // a snapshot: the selection is cleared when the run settles, the result list still names the rows
+      setBulkShareDocs(
+        selectedDocs.map((doc) => ({
+          id: doc.id,
+          workspaceId: doc.workspaceId || workspaceId,
+          title: doc.title,
+        })),
+      )
+    } else void runBulkById(action)
   }
+  // UNI-2047 SD-C: one Share dialog for a row (Access cell, row menu) and one for the selection (bulk
+  // bar); a change refetches the list once (the pill and the level line may have moved), and so does
+  // the first-save share (the save dialogs announce it on `window`)
+  useEffect(() => {
+    const onShareChanged = () => setListTick((n) => n + 1)
+    window.addEventListener(DOC_SHARE_CHANGED_EVENT, onShareChanged)
+    return () => window.removeEventListener(DOC_SHARE_CHANGED_EVENT, onShareChanged)
+  }, [])
   const [shelvedTrashTarget, setShelvedTrashTarget] = useState<DocumentsHomeDoc | null>(null)
   // the ref answers a second click that lands before React re-renders
   const unshelvingRef = useRef<Set<string>>(new Set())
@@ -1707,6 +1737,8 @@ export function DocumentsHome({
             workspaceId: doc.workspaceId ?? workspaceId,
             name: doc.title,
           }),
+        // no entry when this shell has no Share bridge (a stale preload)
+        ...(shareAvailable ? { share: () => setShareRow(doc) } : {}),
         'copy-link': () => void handleCopyLink(doc),
         rename: () => setDocRename({ doc, error: null, busy: false }),
         move: () =>
@@ -2500,6 +2532,7 @@ export function DocumentsHome({
                     screen={screen}
                     docs={selectedDocs}
                     busy={bulkBusy}
+                    canShare={shareAvailable}
                     onAction={onBulkAction}
                     onClear={() => setSelected(new Set())}
                   />
@@ -2522,6 +2555,7 @@ export function DocumentsHome({
                     openMenuId={openMenuId}
                     onOpenMenuChange={setOpenMenuId}
                     menuFor={rowMenuFor}
+                    onShare={shareAvailable ? setShareRow : undefined}
                     actionsFor={
                       shelfView ? shelfActionsFor : trashView ? trashActionsFor : undefined
                     }
@@ -2646,6 +2680,34 @@ export function DocumentsHome({
             void runBulkById('trash')
           }}
           onCancel={() => setBulkTrashConfirm(false)}
+        />
+      )}
+
+      {shareRow && (
+        <ShareDialog
+          open
+          row={rowShareTarget(shareRow, organizationName)}
+          workspaces={workspaces}
+          onClose={() => setShareRow(null)}
+          onChanged={() => setListTick((n) => n + 1)}
+        />
+      )}
+
+      {bulkShareDocs && (
+        <BulkShareDialog
+          open
+          docs={bulkShareDocs}
+          onClose={() => setBulkShareDocs(null)}
+          onChanged={() => setListTick((n) => n + 1)}
+          onApplied={(result) => {
+            setSelected(new Set())
+            const message = t('shrBulkDone', {
+              ok: result.ok.length,
+              total: result.ok.length + result.failed.length,
+            })
+            if (result.failed.length === 0) announce(message)
+            setToast({ message, tone: result.failed.length === 0 ? 'ok' : 'error' })
+          }}
         />
       )}
 
