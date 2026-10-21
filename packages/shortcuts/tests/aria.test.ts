@@ -140,6 +140,52 @@ describe('findDisplayChord', () => {
     expect(findDisplayChord('Mở (Ctrl+O)')).toBe('Ctrl+O')
   })
 
+  it('finds the localized key names the translated strings really use', () => {
+    // each string below is a real translation in the locale shards
+    for (const name of [
+      'Fermer (Échap)',
+      'Quitter la présentation (Échap)',
+      'Suivant (Entrée)',
+      'Précédent (Maj+Entrée)',
+      'Siguiente (Entrar)',
+      'Anterior (Mayús+Entrar)',
+      'Weiter (Eingabetaste)',
+      'Zurück (Umschalt+Eingabetaste)',
+      'Successivo (Invio)',
+      'Precedente (Maiusc+Invio)',
+      'Öffnen Strg+O',
+      'Strg+Klicken',
+      'Maj+clic pour étendre la plage',
+      'Mayús+clic para ampliar el intervalo',
+      'Umschalt+Klick erweitert den Bereich',
+      'Maiusc+clic',
+      'Supprimer (Suppr)',
+      'Löschen (Entf)',
+    ]) {
+      expect(findDisplayChord(name), name).not.toBeNull()
+      expect(containsDisplayChord(name), name).toBe(true)
+    }
+    expect(findDisplayChord('Fermer (Échap)')).toBe('(Échap)')
+    expect(findDisplayChord('Précédent (Maj+Entrée)')).toBe('Maj+E')
+  })
+
+  it('leaves localized words that are not key names alone', () => {
+    for (const name of [
+      'Zoom (Beenden)',
+      'Zanikanie (wyjście)',
+      'Entrar na conta',
+      'Maj de la page',
+      'Invio di una email',
+      'Mayúsculas',
+      'Umschalten',
+      'Eingabetaste ändern',
+      'Entrée en matière',
+      'Échapper les caractères',
+    ]) {
+      expect(findDisplayChord(name), name).toBeNull()
+    }
+  })
+
   it('leaves plain command names alone', () => {
     for (const name of [
       'Source',
