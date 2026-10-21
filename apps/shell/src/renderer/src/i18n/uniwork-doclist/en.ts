@@ -79,4 +79,5 @@ export const en = {
   dlBulkConfirmTitleOther: 'Move {n} documents to the trash?',
   dlBulkConfirmBody:
     'Items stay in the trash for 30 days, then are deleted forever. Items you cannot manage are skipped.',
+  dlTrashBanner30: 'Items stay in the trash for 30 days, then are deleted forever.',
 } satisfies Record<keyof typeof zh, string>

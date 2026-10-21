@@ -80,4 +80,5 @@ export const pl = {
   dlBulkConfirmTitleOther: 'Przenieść dokumenty ({n}) do kosza?',
   dlBulkConfirmBody:
     'Elementy zostają w koszu przez 30 dni, a potem są usuwane na zawsze. Elementy, którymi nie możesz zarządzać, są pomijane.',
+  dlTrashBanner30: 'Elementy zostają w koszu przez 30 dni, a potem są usuwane na zawsze.',
 } satisfies Record<keyof typeof zh, string>

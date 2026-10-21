@@ -121,6 +121,7 @@ import { buildRowMenu } from '../doclist/row-menu'
 import type { DocSubline } from '../doclist/DocRow'
 import { pruneSelection, selectedDocsOf } from '../doclist/selection'
 import { screenOfSubView, wireSortOf } from '../doclist/table-model'
+import { TrashList } from '../doclist/trash'
 import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
@@ -1178,8 +1179,16 @@ export function DocumentsHome({
     setToast({ message: key ? t(key) : t('uwDocActionFailed'), tone: 'error' })
   }
 
+  // one restore per row at a time: the row button and the menu entry share it
+  const restoringRef = useRef<Set<string>>(new Set())
+  const [restoring, setRestoring] = useState<ReadonlySet<string>>(() => new Set())
   const handleRestoreDoc = async (doc: DocumentsHomeDoc) => {
+    if (restoringRef.current.has(doc.id)) return
+    restoringRef.current.add(doc.id)
+    setRestoring(new Set(restoringRef.current))
     const res = await restoreDocument(doc.id)
+    restoringRef.current.delete(doc.id)
+    setRestoring(new Set(restoringRef.current))
     if (res.ok) {
       announce(t('uwDocRestore'))
       refreshAll()
@@ -1192,6 +1201,8 @@ export function DocumentsHome({
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf's member filter and row commands.
   // The filter narrows the loaded pages only (the server has no shelved_by).
   const shelfView = subView === 'archive' && query.length === 0
+  // the trash list proper (a search inside it lists live hits on the plain table)
+  const trashView = subView === 'trash' && query.length === 0
   const pageShown = page.status !== 'error' && (page.status === 'ready' || page.items.length > 0)
   const [shelvedBy, setShelvedBy] = useState<string | null>(null)
   useEffect(() => {
@@ -1515,6 +1526,24 @@ export function DocumentsHome({
         onClick={() => void handleUnshelve(doc)}
       >
         {t('uhShelvedUnshelve')}
+      </button>
+    )
+  }
+
+  // the trash row's Khôi phục before its "…": the same entry the menu has, so the same permission
+  const trashActionsFor = (doc: DocumentsHomeDoc) => {
+    if (doc.canManage !== true) return null
+    const busy = restoring.has(doc.id)
+    return (
+      <button
+        type="button"
+        className="btn btn-secondary dh-trash-restore"
+        aria-label={`${t('dlActRestore')} ${doc.title}`}
+        disabled={busy}
+        aria-busy={busy || undefined}
+        onClick={() => void handleRestoreDoc(doc)}
+      >
+        {t('dlActRestore')}
       </button>
     )
   }
@@ -1972,7 +2001,7 @@ export function DocumentsHome({
           </div>
         )}
 
-        {subView === 'trash' && <p className="dh-subview-banner">{t('uhTrashNote')}</p>}
+        {subView === 'trash' && <p className="dh-subview-banner">{t('dlTrashBanner30')}</p>}
         {folderNotice && (
           <p className="uwf-notice" role="status">
             {t(folderNotice)}
@@ -2136,46 +2165,62 @@ export function DocumentsHome({
                     onAction={onBulkAction}
                     onClear={() => setSelected(new Set())}
                   />
-                  <DocList
-                    screen={screen}
-                    rows={tableRows}
-                    sort={docSort}
-                    onSortChange={setDocSort}
-                    selected={selected}
-                    onSelectedChange={setSelected}
-                    label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
-                    openingId={openingId}
-                    openMenuId={openMenuId}
-                    onOpenMenuChange={setOpenMenuId}
-                    menuFor={rowMenuFor}
-                    actionsFor={shelfView ? shelfActionsFor : undefined}
-                    onOpen={(doc) => void openDoc(doc)}
-                    sublineFor={sublineFor}
-                    rename={
-                      docRename
-                        ? {
-                            docId: docRename.doc.id,
-                            error: docRename.error,
-                            busy: docRename.busy,
-                            onSave: (value) => void handleSaveDocRename(docRename.doc, value),
-                            onCancel: () => setDocRename(null),
-                            onEdit: () =>
-                              setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
-                          }
-                        : undefined
-                    }
-                    renderSource={(source, columns) => (
-                      <DocumentsSourceRow
-                        key={`source:${source.id}`}
-                        source={source}
-                        columns={columns}
-                        menuOpen={openMenuId === `source:${source.id}`}
-                        onMenuOpenChange={(o) => setOpenMenuId(o ? `source:${source.id}` : null)}
-                        onOpen={(src) => void openSourceFile(src)}
-                        onDownload={(src) => void downloadSourceFile(src)}
-                      />
-                    )}
-                  />
+                  {trashView ? (
+                    <TrashList
+                      rows={tableRows}
+                      sort={docSort}
+                      onSortChange={setDocSort}
+                      selected={selected}
+                      onSelectedChange={setSelected}
+                      label={t('uhSectionDocuments')}
+                      openMenuId={openMenuId}
+                      onOpenMenuChange={setOpenMenuId}
+                      menuFor={rowMenuFor}
+                      actionsFor={trashActionsFor}
+                      onOpen={(doc) => void openDoc(doc)}
+                    />
+                  ) : (
+                    <DocList
+                      screen={screen}
+                      rows={tableRows}
+                      sort={docSort}
+                      onSortChange={setDocSort}
+                      selected={selected}
+                      onSelectedChange={setSelected}
+                      label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
+                      openingId={openingId}
+                      openMenuId={openMenuId}
+                      onOpenMenuChange={setOpenMenuId}
+                      menuFor={rowMenuFor}
+                      actionsFor={shelfView ? shelfActionsFor : undefined}
+                      onOpen={(doc) => void openDoc(doc)}
+                      sublineFor={sublineFor}
+                      rename={
+                        docRename
+                          ? {
+                              docId: docRename.doc.id,
+                              error: docRename.error,
+                              busy: docRename.busy,
+                              onSave: (value) => void handleSaveDocRename(docRename.doc, value),
+                              onCancel: () => setDocRename(null),
+                              onEdit: () =>
+                                setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
+                            }
+                          : undefined
+                      }
+                      renderSource={(source, columns) => (
+                        <DocumentsSourceRow
+                          key={`source:${source.id}`}
+                          source={source}
+                          columns={columns}
+                          menuOpen={openMenuId === `source:${source.id}`}
+                          onMenuOpenChange={(o) => setOpenMenuId(o ? `source:${source.id}` : null)}
+                          onOpen={(src) => void openSourceFile(src)}
+                          onDownload={(src) => void downloadSourceFile(src)}
+                        />
+                      )}
+                    />
+                  )}
                 </>
               )}
 

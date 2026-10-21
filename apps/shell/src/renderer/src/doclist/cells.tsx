@@ -30,13 +30,15 @@ const TRACK: Record<ColumnId, string> = {
   actions: '76px',
 }
 
-/** the shelf's row carries a Bỏ lưu trữ button before its "…": its actions column is wider */
-const SHELF_ACTIONS_TRACK = '176px'
+/** the shelf's row carries a Bỏ lưu trữ button and the trash row a Khôi phục button before its "…": their actions column is wider */
+const BUTTON_ACTIONS_TRACK = '176px'
 
 export function trackOf(columns: readonly ColumnId[], screen?: DocListScreen): string {
   return columns
     .map((column) =>
-      column === 'actions' && screen === 'shelved' ? SHELF_ACTIONS_TRACK : TRACK[column],
+      column === 'actions' && (screen === 'shelved' || screen === 'trash')
+        ? BUTTON_ACTIONS_TRACK
+        : TRACK[column],
     )
     .join(' ')
 }

@@ -80,4 +80,5 @@ export const de = {
   dlBulkConfirmTitleOther: '{n} Dokumente in den Papierkorb verschieben?',
   dlBulkConfirmBody:
     'Elemente bleiben 30 Tage im Papierkorb und werden dann endgültig gelöscht. Elemente, die Sie nicht verwalten können, werden übersprungen.',
+  dlTrashBanner30: 'Elemente bleiben 30 Tage im Papierkorb und werden dann endgültig gelöscht.',
 } satisfies Record<keyof typeof zh, string>

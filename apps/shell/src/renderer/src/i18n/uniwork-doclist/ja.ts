@@ -80,4 +80,5 @@ export const ja = {
   dlBulkConfirmTitleOther: '{n} 件のドキュメントをゴミ箱に移動しますか？',
   dlBulkConfirmBody:
     '項目はゴミ箱に 30 日間残り、その後完全に削除されます。管理権限のない項目はスキップされます。',
+  dlTrashBanner30: '項目はゴミ箱に 30 日間残り、その後完全に削除されます。',
 } satisfies Record<keyof typeof zh, string>

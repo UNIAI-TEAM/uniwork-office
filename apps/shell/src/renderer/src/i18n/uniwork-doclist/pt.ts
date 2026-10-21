@@ -80,4 +80,5 @@ export const pt = {
   dlBulkConfirmTitleOther: 'Mover {n} documentos para a lixeira?',
   dlBulkConfirmBody:
     'Os itens ficam 30 dias na lixeira e depois são excluídos para sempre. Itens que você não pode gerenciar são ignorados.',
+  dlTrashBanner30: 'Os itens ficam 30 dias na lixeira e depois são excluídos para sempre.',
 } satisfies Record<keyof typeof zh, string>

@@ -80,4 +80,6 @@ export const fr = {
   dlBulkConfirmTitleOther: 'Déplacer {n} documents vers la corbeille ?',
   dlBulkConfirmBody:
     'Les éléments restent 30 jours dans la corbeille, puis sont supprimés définitivement. Ceux que vous ne pouvez pas gérer sont ignorés.',
+  dlTrashBanner30:
+    'Les éléments restent 30 jours dans la corbeille, puis sont supprimés définitivement.',
 } satisfies Record<keyof typeof zh, string>

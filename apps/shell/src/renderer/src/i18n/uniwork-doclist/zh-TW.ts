@@ -78,4 +78,5 @@ export const zhTW = {
   dlBulkConfirmTitleOne: '將 {n} 份文件移到資源回收筒？',
   dlBulkConfirmTitleOther: '將 {n} 份文件移到資源回收筒？',
   dlBulkConfirmBody: '項目會在資源回收筒保留 30 天，之後永久刪除。你無權管理的項目會被略過。',
+  dlTrashBanner30: '項目會在資源回收筒保留 30 天，之後永久刪除。',
 } satisfies Record<keyof typeof zh, string>

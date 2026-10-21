@@ -80,4 +80,5 @@ export const th = {
   dlBulkConfirmTitleOther: 'ย้าย {n} เอกสารไปยังถังขยะหรือไม่',
   dlBulkConfirmBody:
     'รายการจะอยู่ในถังขยะ 30 วัน แล้วจะถูกลบถาวร รายการที่คุณไม่มีสิทธิ์จัดการจะถูกข้าม',
+  dlTrashBanner30: 'รายการจะอยู่ในถังขยะ 30 วัน แล้วจะถูกลบถาวร',
 } satisfies Record<keyof typeof zh, string>

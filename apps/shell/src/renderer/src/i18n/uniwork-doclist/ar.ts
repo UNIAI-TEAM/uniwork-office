@@ -80,4 +80,5 @@ export const ar = {
   dlBulkConfirmTitleOther: 'هل تريد نقل {n} من المستندات إلى المهملات؟',
   dlBulkConfirmBody:
     'تبقى العناصر في المهملات 30 يومًا ثم تُحذف نهائيًا. يتم تخطي العناصر التي لا تملك صلاحية إدارتها.',
+  dlTrashBanner30: 'تبقى العناصر في المهملات 30 يومًا ثم تُحذف نهائيًا.',
 } satisfies Record<keyof typeof zh, string>
