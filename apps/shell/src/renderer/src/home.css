@@ -6044,10 +6044,9 @@ html[dir='rtl'] .quick-title-row {
   cursor: default;
 }
 
-/* dim the icon and the text only: the row's controls (the "…" menu with Restore) stay legible */
+/* dim the icon only: the row's controls (the "…" menu with Restore) stay legible, and the picker grid dims the text cells itself (doclist-picker.css) */
 .uw-pick-row.disabled > img,
-.uw-pick-row.disabled > svg,
-.uw-pick-row.disabled > .uw-pick-row-text {
+.uw-pick-row.disabled > svg {
   opacity: 0.6;
 }
 
@@ -7330,11 +7329,6 @@ html[dir='rtl'] .quick-title-row {
 
 .uw-pick-row.archived .uw-pick-row-title {
   color: var(--text-muted);
-}
-
-/* parked, not unsupported: the title and the "Archived" line keep full opacity so they stay at 4.5:1 or better (muted token on the surface, light and dark); only the icon is dimmed */
-.uw-pick-row.archived > .uw-pick-row-text {
-  opacity: 1;
 }
 
 /* Restore is the only action of an archived row: always visible, not on hover only */
