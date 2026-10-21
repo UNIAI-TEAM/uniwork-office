@@ -2085,12 +2085,14 @@ body.vib .home {
    a 40px rail for the recents page toolbar. */
 .filter-pills {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  height: 40px;
-  padding: 0 3px;
+  /* V-LAYOUT F-02: the segment wraps inside its box (a 768 window leaves ~480px for nine pills) */
+  min-height: 40px;
+  max-width: 100%;
+  padding: 3px;
   border-radius: 10px;
   background: var(--checkbox-bg);
-  flex-shrink: 0;
 }
 
 .filter-pill {

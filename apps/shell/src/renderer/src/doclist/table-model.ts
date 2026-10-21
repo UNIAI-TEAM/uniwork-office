@@ -79,10 +79,11 @@ export function visibleColumns(
   screen: DocListScreen,
   docs: readonly DocumentsHomeDoc[],
   width?: number,
+  actionsExtra = 0,
 ): ColumnId[] {
   const ladder =
     specialPresent(screen, docs) || specialColumn(screen) === null ? screen : 'workspace'
-  return columnsFor(ladder, width)
+  return columnsFor(ladder, width, actionsExtra)
 }
 
 /**
