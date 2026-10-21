@@ -18,6 +18,7 @@ import {
   type MentionsSearchInput,
   type UniworkCommentsApi,
 } from '../../../../packages/electron-utils/src/comments-ipc'
+import type { FrameAvatars } from '../../../../packages/ui/src/collab/avatar-source'
 import type { FramePort, PortSession } from '../../../docs/bridge/frame-port'
 import {
   commentsAccess,
@@ -27,13 +28,18 @@ import {
   type FrameRequestType,
   type FrameRequests,
 } from '../../../docs/protocol/types'
+import { createAvatarLoader } from '../avatar/loader'
 import { frameDocVersion, type FrameDocVersion } from './doc-version'
 import { frameMentionAccess } from './mention-access'
 import { frameRevealRouter, type RevealPort } from './reveal-router'
 import { createFrameViewVersion, frameOpenVersionId } from './version-view'
 
 /** what the frame API needs from the frame client (the real client has it all) */
-export type FrameCommentsClient = Pick<FramePort, 'whenInitialized' | 'request'> & RevealPort
+export type FrameCommentsClient = Pick<
+  FramePort,
+  'whenInitialized' | 'request' | 'getToken' | 'refreshToken'
+> &
+  RevealPort
 
 export interface FrameCommentsHooks {
   /** the open document's version tracker; default: the frame page's `frameDocVersion` */
@@ -171,9 +177,24 @@ export function createFrameCommentsApi(
   }
 }
 
+/** `window.uniworkAvatars`: what the panels of this frame make their avatar source from */
+const AVATARS_BRIDGE_KEY = 'uniworkAvatars'
+
+/** a fresh loader per panel host (it owns blob urls and is disposed with the host) */
+export function frameAvatars(client: Pick<FramePort, 'getToken' | 'refreshToken'>): FrameAvatars {
+  return {
+    createSource: () =>
+      createAvatarLoader({
+        getToken: () => client.getToken!(),
+        refreshToken: (reason) => client.refreshToken!(reason),
+      }),
+  }
+}
+
 /**
- * Sets `window.uniworkComments` once `init` granted `comments` (effective capabilities); resolves
- * with the API, or null when the frame has no comments (nothing is installed, no request is sent).
+ * Sets `window.uniworkComments` (and `window.uniworkAvatars` when the client has a frame token)
+ * once `init` granted `comments` (effective capabilities); resolves with the API, or null when the
+ * frame has no comments (nothing is installed, no request is sent).
  */
 export async function installFrameComments(
   client: FrameCommentsClient,
@@ -198,6 +219,9 @@ export async function installFrameComments(
     ...createFrameCommentsApi(client, { session, ...hooks }),
     noEditor,
   }
+  // before uniworkComments: a panel that sees the comments API finds the avatar source too
+  const { getToken, refreshToken } = client
+  if (getToken && refreshToken) target[AVATARS_BRIDGE_KEY] = frameAvatars(client)
   target[COMMENTS_BRIDGE_KEY] = api
   return api
 }
