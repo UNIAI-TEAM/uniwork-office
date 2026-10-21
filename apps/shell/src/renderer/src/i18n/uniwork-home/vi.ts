@@ -27,7 +27,7 @@ export const vi = {
   uhNewMenuXlsx: 'Bảng tính Sheets',
   uhNewMenuPptx: 'Trình chiếu Slides',
   uhNewMenuMd: 'Tệp Markdown',
-  uhNewMenuTxt: 'Văn bản',
+  uhNewMenuTxt: 'Văn bản thuần',
   uhNewMenuHtml: 'HTML',
   uhNewMenuPdf: 'PDF',
   uhNewMenuFolder: 'Thư mục',
