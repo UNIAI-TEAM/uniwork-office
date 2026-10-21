@@ -2328,6 +2328,12 @@ export const UNIWORK_SHARE_CHANNELS = {
   requestDecline: 'uniwork-share:request-decline',
   /** invoke(plan) -> share several documents the same way, one after another */
   bulk: 'uniwork-share:bulk',
+  /** invoke({documentId, reason}) -> open a 24 h emergency (break-glass) grant */
+  breakGlassGrant: 'uniwork-share:break-glass-grant',
+  /** invoke({documentId, grantId}) -> end one emergency grant */
+  breakGlassRevoke: 'uniwork-share:break-glass-revoke',
+  /** invoke({cursor?, limit?}) -> one page of the selected organization's members */
+  members: 'uniwork-share:members',
 } as const
 
 export const PROJECT_CHANNELS = {

@@ -917,6 +917,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     }),
     isSignedIn: () => uniworkSessionIdentity() !== null,
     selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
+    selectedOrgSlug: () => uniworkAccount().status().org?.slug ?? null,
   })
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.get, (_event, documentId: unknown) =>
     shareService.get(documentId as string),
@@ -942,6 +943,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.requestDecline, (_event, input: unknown) =>
     shareService.requestDecline(input as Parameters<typeof shareService.requestDecline>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.breakGlassGrant, (_event, input: unknown) =>
+    shareService.breakGlassGrant(input as Parameters<typeof shareService.breakGlassGrant>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.breakGlassRevoke, (_event, input: unknown) =>
+    shareService.breakGlassRevoke(input as Parameters<typeof shareService.breakGlassRevoke>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.members, (_event, input: unknown) =>
+    shareService.members(input as Parameters<typeof shareService.members>[0]),
   )
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.bulk, (_event, plan: unknown) =>
     shareService.bulk(plan as Parameters<typeof shareService.bulk>[0]),

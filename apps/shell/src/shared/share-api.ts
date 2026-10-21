@@ -313,6 +313,41 @@ export interface ShareBulkResult {
   links: { id: string; url: string }[]
 }
 
+/** the reason of an emergency-access grant is 10-500 characters (code points, after a trim) */
+export const BREAK_GLASS_REASON_MIN = 10
+export const BREAK_GLASS_REASON_MAX = 500
+
+export interface ShareBreakGlassInput {
+  documentId: string
+  /** audited reason, 10-500 characters after the trim */
+  reason: string
+}
+
+export interface ShareBreakGlassRevokeInput {
+  documentId: string
+  grantId: string
+}
+
+/** one organization member (the web's member walk, `GET /orgs/{org}/members`) */
+export interface ShareMember {
+  userId: string
+  /** the display name, else the email */
+  displayName: string
+}
+
+export interface ShareMembersInput {
+  /** the previous page's `nextCursor`; omitted = the first page */
+  cursor?: string
+  /** 1-100; omitted = the largest page */
+  limit?: number
+}
+
+export interface ShareMemberPage {
+  members: ShareMember[]
+  /** `''` = the last page */
+  nextCursor: string
+}
+
 /**
  * What a share call may fail with. The server's own verdicts keep their names
  * (`document_access_rejected` carries `rejected`); the transport / permission
@@ -337,6 +372,7 @@ export type ShareErrorCode =
   | 'my_folder_locked'
   | 'folder_not_shareable'
   | 'break_glass_required'
+  | 'break_glass_reason_invalid'
   | 'access_request_closed'
 
 export type ShareResult<T> =
@@ -366,4 +402,12 @@ export interface UniworkShareApi {
   requestApprove(input: ShareRequestApproveInput): Promise<ShareResult<ShareRequestDecision>>
   requestDecline(input: ShareRequestDeclineInput): Promise<ShareResult<ShareRequestDecision>>
   bulk(plan: ShareBulkPlan): Promise<ShareResult<ShareBulkResult>>
+  /** open a 24 h read-only emergency grant (an administering workspace admin); null value = an answer with no readable grant */
+  breakGlassGrant(input: ShareBreakGlassInput): Promise<ShareResult<ShareBreakGlassGrant | null>>
+  /** end one live emergency grant by its id */
+  breakGlassRevoke(
+    input: ShareBreakGlassRevokeInput,
+  ): Promise<ShareResult<ShareBreakGlassRevokeInput>>
+  /** one page of the selected organization's members (the names of the people in the access list) */
+  members(input: ShareMembersInput): Promise<ShareResult<ShareMemberPage>>
 }

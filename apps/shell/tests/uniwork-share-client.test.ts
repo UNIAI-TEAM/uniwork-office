@@ -274,6 +274,125 @@ describe('access requests', () => {
   })
 })
 
+describe('break-glass (the web calls)', () => {
+  const GRANT = {
+    id: 'bg_1',
+    document_id: 'doc_1',
+    actor_id: 'u_admin',
+    actor_name: 'Admin',
+    level: 'view',
+    reason: 'Audit of the Q3 file',
+    granted_at: '2026-10-21T01:00:00Z',
+    expires_at: '2026-10-22T01:00:00Z',
+  }
+
+  it('POSTs /documents/{id}/break-glass with the reason and an Idempotency-Key, reads a bare grant', async () => {
+    const { client, seen } = setup(() => json(201, GRANT))
+    const grant = await client.createDocumentBreakGlass('doc_1', 'Audit of the Q3 file')
+    expect(seen[0]).toMatchObject({ url: `${API}/documents/doc_1/break-glass`, method: 'POST' })
+    expect(seen[0]!.body).toEqual({ reason: 'Audit of the Q3 file' })
+    expect(seen[0]!.headers['Idempotency-Key']).toMatch(/^[A-Za-z0-9-]{8,}$/)
+    expect(grant).toMatchObject({ id: 'bg_1', actorName: 'Admin', level: 'view' })
+  })
+
+  it('reads the enveloped grant ({grant}) too, and a grant it cannot read as null', async () => {
+    const wrapped = setup(() => json(201, { grant: GRANT }))
+    expect((await wrapped.client.createDocumentBreakGlass('doc_1', 'long enough reason'))?.id).toBe(
+      'bg_1',
+    )
+    const odd = setup(() => json(201, { nothing: true }))
+    await expect(
+      odd.client.createDocumentBreakGlass('doc_1', 'long enough reason'),
+    ).resolves.toBeNull()
+  })
+
+  it('a new key per call, so a retried click is a new grant and a replay is deduplicated by the server', async () => {
+    const { client, seen } = setup(() => json(201, GRANT))
+    await client.createDocumentBreakGlass('doc_1', 'long enough reason')
+    await client.createDocumentBreakGlass('doc_1', 'long enough reason')
+    expect(seen[0]!.headers['Idempotency-Key']).not.toBe(seen[1]!.headers['Idempotency-Key'])
+  })
+
+  it('refuses a reason outside 10-500 characters (counted as code points) before any request', async () => {
+    const { client, seen } = setup(() => json(201, GRANT))
+    for (const reason of ['', '   short   ', 'x'.repeat(501), 42 as never]) {
+      expect((await failure(client.createDocumentBreakGlass('doc_1', reason))).serverCode).toBe(
+        'break_glass_reason_invalid',
+      )
+    }
+    expect(seen).toHaveLength(0)
+    // ten emoji are ten characters, not twenty
+    await client.createDocumentBreakGlass('doc_1', '😀'.repeat(10))
+    expect(seen).toHaveLength(1)
+  })
+
+  it('keeps the server verdicts (reason invalid 422, break_glass_required 403) with their codes', async () => {
+    const invalid = setup(() => envelope(422, 'break_glass_reason_invalid', { min: 10, max: 500 }))
+    const e1 = await failure(invalid.client.createDocumentBreakGlass('doc_1', 'long enough reason'))
+    expect(e1).toMatchObject({ status: 422, serverCode: 'break_glass_reason_invalid' })
+    const required = setup(() => envelope(403, 'break_glass_required'))
+    expect(
+      (await failure(required.client.createDocumentBreakGlass('doc_1', 'long enough reason')))
+        .serverCode,
+    ).toBe('break_glass_required')
+  })
+
+  it('DELETEs /documents/{id}/break-glass/{grantId}; only {status:"ok"} is a revoke', async () => {
+    const { client, seen } = setup(() => json(200, { status: 'ok' }))
+    await client.revokeDocumentBreakGlass('doc_1', 'bg_1')
+    expect(seen[0]).toMatchObject({
+      url: `${API}/documents/doc_1/break-glass/bg_1`,
+      method: 'DELETE',
+    })
+    expect(seen[0]!.body).toBeUndefined()
+    const other = setup(() => json(200, { status: 'later' }))
+    expect((await failure(other.client.revokeDocumentBreakGlass('doc_1', 'bg_1'))).code).toBe(
+      'malformed_response',
+    )
+    const refuses = setup(() => json(200, { status: 'ok' }))
+    expect((await failure(refuses.client.revokeDocumentBreakGlass('doc_1', '../x'))).code).toBe(
+      'not_found',
+    )
+  })
+})
+
+describe('listOrgMembers (the web member walk, one page)', () => {
+  it('GETs /orgs/{slug}/members with the largest page and the cursor, reads id + display name', async () => {
+    const { client, seen } = setup(() =>
+      json(200, {
+        members: [
+          { user_id: 'u_1', display_name: 'Minh Trần', email: 'minh@acme.test' },
+          { user_id: 'u_2', display_name: '', email: 'an@acme.test' },
+        ],
+        next_cursor: 'c2',
+      }),
+    )
+    const page = await client.listOrgMembers({ orgSlug: 'acme', cursor: 'c1' })
+    expect(seen[0]).toMatchObject({ method: 'GET' })
+    expect(seen[0]!.url).toBe(`${API}/orgs/acme/members?limit=100&cursor=c1`)
+    expect(page.nextCursor).toBe('c2')
+    // a member with no display name falls back to the email, like the web
+    expect(page.members).toEqual([
+      { userId: 'u_1', displayName: 'Minh Trần' },
+      { userId: 'u_2', displayName: 'an@acme.test' },
+    ])
+  })
+
+  it('an empty next_cursor ends the walk (empty string); a slug that is not a slug never leaves', async () => {
+    const { client, seen } = setup(() => json(200, { members: [], next_cursor: null }))
+    expect((await client.listOrgMembers({ orgSlug: 'acme' })).nextCursor).toBe('')
+    expect((await failure(client.listOrgMembers({ orgSlug: '../x' }))).code).toBe('not_found')
+    expect(seen).toHaveLength(1)
+  })
+
+  it('a malformed page is malformed_response', async () => {
+    const { client } = setup(() => json(200, { nope: [] }))
+    expect((await failure(client.listOrgMembers({ orgSlug: 'acme' }))).code).toBe(
+      'malformed_response',
+    )
+  })
+})
+
 describe('error answers', () => {
   it('maps a throttle to retryAfterMs, an unsigned client to not_signed_in, a bare 403 to server_error', async () => {
     const { client } = setup(() => envelope(429, 'rate_limited'))

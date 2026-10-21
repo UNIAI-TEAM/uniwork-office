@@ -8,6 +8,7 @@ import {
 } from '../src/main/uniwork-docs/share-service'
 import type {
   ShareAccess,
+  ShareBreakGlassGrant,
   ShareBulkPlan,
   ShareLinkCreated,
   ShareUpdate,
@@ -39,6 +40,17 @@ const CREATED: ShareLinkCreated = {
   url: 'https://uniwork.example/p/t',
 }
 
+const GRANT: ShareBreakGlassGrant = {
+  id: 'bg_1',
+  documentId: 'doc_1',
+  actorId: 'u_admin',
+  actorName: 'Admin',
+  level: 'view',
+  reason: 'Audit of the Q3 file',
+  grantedAt: '2026-10-21T01:00:00Z',
+  expiresAt: '2026-10-22T01:00:00Z',
+}
+
 function fakeClient(over: Partial<UniworkShareClient> = {}): UniworkShareClient {
   return {
     getDocumentShares: vi.fn(async () => ACCESS),
@@ -53,6 +65,12 @@ function fakeClient(over: Partial<UniworkShareClient> = {}): UniworkShareClient 
     listAccessRequests: vi.fn(async () => []),
     approveAccessRequest: vi.fn(async () => ({ id: 'rq', status: 'approved', shareId: 's' })),
     declineAccessRequest: vi.fn(async () => ({ id: 'rq', status: 'declined', shareId: '' })),
+    createDocumentBreakGlass: vi.fn(async () => GRANT),
+    revokeDocumentBreakGlass: vi.fn(async () => undefined),
+    listOrgMembers: vi.fn(async () => ({
+      members: [{ userId: 'u_1', displayName: 'Minh Trần' }],
+      nextCursor: '',
+    })),
     ...over,
   }
 }
@@ -62,6 +80,7 @@ function service(client: UniworkShareClient, over: Partial<UniworkShareServiceDe
     client: () => client,
     isSignedIn: () => true,
     selectedOrgId: () => 'org_1',
+    selectedOrgSlug: () => 'acme',
     wait: async () => undefined,
     ...over,
   })
@@ -239,6 +258,92 @@ describe('the service answers every call with a result', () => {
     expect(await s.bulk(null as never)).toMatchObject({ ok: false, error: 'invalid_request' })
     expect(client.getDocumentShares).not.toHaveBeenCalled()
     expect(client.updateDocumentAccess).not.toHaveBeenCalled()
+  })
+})
+
+describe('break-glass and members', () => {
+  it('breakGlassGrant / breakGlassRevoke resolve with the client value', async () => {
+    const client = fakeClient()
+    const s = service(client)
+    expect(
+      await s.breakGlassGrant({ documentId: 'doc_1', reason: 'Audit of the Q3 file' }),
+    ).toEqual({
+      ok: true,
+      value: GRANT,
+    })
+    expect(client.createDocumentBreakGlass).toHaveBeenCalledWith('doc_1', 'Audit of the Q3 file')
+    expect(await s.breakGlassRevoke({ documentId: 'doc_1', grantId: 'bg_1' })).toEqual({
+      ok: true,
+      value: { documentId: 'doc_1', grantId: 'bg_1' },
+    })
+    expect(client.revokeDocumentBreakGlass).toHaveBeenCalledWith('doc_1', 'bg_1')
+  })
+
+  it('keeps break_glass_reason_invalid and break_glass_required by their own names', () => {
+    const invalid = new UniworkDocError('server_error', {
+      serverCode: 'break_glass_reason_invalid',
+      status: 422,
+    })
+    expect(shareErrorOf(invalid)).toEqual({
+      ok: false,
+      error: 'break_glass_reason_invalid',
+      status: 422,
+    })
+    const required = new UniworkDocError('server_error', {
+      serverCode: 'break_glass_required',
+      status: 403,
+    })
+    expect(shareErrorOf(required)).toEqual({
+      ok: false,
+      error: 'break_glass_required',
+      status: 403,
+    })
+  })
+
+  it('members reads one page of the selected organization by its slug', async () => {
+    const client = fakeClient()
+    const s = service(client)
+    expect(await s.members({ cursor: 'c1', limit: 50 })).toEqual({
+      ok: true,
+      value: { members: [{ userId: 'u_1', displayName: 'Minh Trần' }], nextCursor: '' },
+    })
+    expect(client.listOrgMembers).toHaveBeenCalledWith({ orgSlug: 'acme', cursor: 'c1', limit: 50 })
+    await s.members({})
+    expect(client.listOrgMembers).toHaveBeenLastCalledWith({ orgSlug: 'acme' })
+  })
+
+  it('members with no selected organization is not_found; signed out is not_signed_in', async () => {
+    const client = fakeClient()
+    expect(await service(client, { selectedOrgSlug: () => null }).members({})).toEqual({
+      ok: false,
+      error: 'not_found',
+    })
+    expect(await service(client, { isSignedIn: () => false }).members({})).toEqual({
+      ok: false,
+      error: 'not_signed_in',
+    })
+    expect(client.listOrgMembers).not.toHaveBeenCalled()
+  })
+
+  it('wrong-shaped input is invalid_request without calling the client', async () => {
+    const client = fakeClient()
+    const s = service(client)
+    expect(await s.breakGlassGrant({ documentId: 'doc_1' } as never)).toMatchObject({
+      ok: false,
+      error: 'invalid_request',
+    })
+    expect(await s.breakGlassGrant(null as never)).toMatchObject({
+      ok: false,
+      error: 'invalid_request',
+    })
+    expect(await s.breakGlassRevoke({ documentId: 'doc_1' } as never)).toMatchObject({
+      ok: false,
+      error: 'invalid_request',
+    })
+    expect(await s.members(7 as never)).toMatchObject({ ok: false, error: 'invalid_request' })
+    expect(client.createDocumentBreakGlass).not.toHaveBeenCalled()
+    expect(client.revokeDocumentBreakGlass).not.toHaveBeenCalled()
+    expect(client.listOrgMembers).not.toHaveBeenCalled()
   })
 })
 

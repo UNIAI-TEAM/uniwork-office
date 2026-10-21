@@ -28,6 +28,8 @@ export interface UniworkShareServiceDeps {
   isSignedIn(): boolean
   /** the selected organization (the links policy is read for it) */
   selectedOrgId(): string | null
+  /** the selected organization's slug (its member list is read by it) */
+  selectedOrgSlug(): string | null
   /** waits out a throttle between the two tries of one call; a test seam */
   wait?(ms: number): Promise<void>
 }
@@ -43,6 +45,7 @@ const KEPT_SERVER_CODES: ReadonlySet<string> = new Set<ShareErrorCode>([
   'my_folder_locked',
   'folder_not_shareable',
   'break_glass_required',
+  'break_glass_reason_invalid',
   'access_request_closed',
 ])
 
@@ -285,6 +288,39 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
       }
       const { documentId, requestId } = input
       return run((client) => client.declineAccessRequest(documentId, requestId))
+    },
+
+    breakGlassGrant(input) {
+      if (!isObject(input) || !isText(input.documentId) || typeof input.reason !== 'string') {
+        return Promise.resolve(invalidRequest())
+      }
+      const { documentId, reason } = input
+      return run((client) => client.createDocumentBreakGlass(documentId, reason))
+    },
+
+    breakGlassRevoke(input) {
+      if (!isObject(input) || !isText(input.documentId) || !isText(input.grantId)) {
+        return Promise.resolve(invalidRequest())
+      }
+      const { documentId, grantId } = input
+      return run(async (client) => {
+        await client.revokeDocumentBreakGlass(documentId, grantId)
+        return { documentId, grantId }
+      })
+    },
+
+    members(input) {
+      if (!isObject(input)) return Promise.resolve(invalidRequest())
+      const { cursor, limit } = input
+      return run((client) => {
+        const orgSlug = deps.selectedOrgSlug()
+        if (!orgSlug) throw new UniworkDocError('not_found')
+        return client.listOrgMembers({
+          orgSlug,
+          ...(typeof cursor === 'string' ? { cursor } : {}),
+          ...(typeof limit === 'number' ? { limit } : {}),
+        })
+      })
     },
 
     bulk(plan) {

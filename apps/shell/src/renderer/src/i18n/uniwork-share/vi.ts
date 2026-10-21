@@ -156,4 +156,14 @@ export const vi = {
   shrBgSelfShareError:
     'Quản trị viên không thể tự cấp quyền qua mục Chia sẻ. Hãy dùng Truy cập khẩn cấp (24 giờ, có ghi nhật ký).',
   shrBgViaBreakGlass: 'Truy cập khẩn cấp',
+  shrBgReasonLabel: 'Lý do truy cập khẩn cấp',
+  shrBgReasonHint:
+    'Chủ tài liệu sẽ được thông báo và hành động này được ghi vào nhật ký kiểm toán. Quyền Xem hết hạn sau 24 giờ.',
+  shrBgReasonCounter: '{count}/500',
+  shrBgConfirmButton: 'Mở quyền Xem (24 giờ)',
+  shrBgReasonTooShort: 'Hãy nhập lý do ít nhất 10 ký tự.',
+  shrBgReasonTooLong: 'Lý do tối đa 500 ký tự.',
+  shrBgSubmitFailed: 'Không mở được truy cập khẩn cấp. Thử lại.',
+  shrBgRevokeButton: 'Thu hồi',
+  shrBgRevokeFailed: 'Không thu hồi được truy cập khẩn cấp này. Thử lại.',
 } satisfies Record<keyof typeof zh, string>

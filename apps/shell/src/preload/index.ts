@@ -112,9 +112,12 @@ import { UNIWORK_WORK_CHANNELS } from '../shared/uniwork-work-api'
 import type {
   ShareAccess,
   ShareAccessRequest,
+  ShareBreakGlassGrant,
+  ShareBreakGlassRevokeInput,
   ShareBulkResult,
   ShareCandidatePage,
   ShareLinkCreated,
+  ShareMemberPage,
   ShareLinkRevokeInput,
   ShareRejectedItem,
   ShareRequestDecision,
@@ -1854,6 +1857,21 @@ const shareApi: UniworkShareApi = {
   async bulk(plan) {
     return asShareResult<ShareBulkResult>(
       await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.bulk, plan),
+    )
+  },
+  async breakGlassGrant(input) {
+    return asShareResult<ShareBreakGlassGrant | null>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.breakGlassGrant, input),
+    )
+  },
+  async breakGlassRevoke(input) {
+    return asShareResult<ShareBreakGlassRevokeInput>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.breakGlassRevoke, input),
+    )
+  },
+  async members(input) {
+    return asShareResult<ShareMemberPage>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.members, input),
     )
   },
 }

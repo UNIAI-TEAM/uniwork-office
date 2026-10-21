@@ -25,6 +25,11 @@ export interface ShareDialogProps {
   onChanged?: () => void
   /** opened from the inbox link: the access-requests heading takes focus */
   focusRequests?: boolean
+  /**
+   * Names of workspaces other than the document's own (the list that opened the dialog knows
+   * them); the member list the dialog reads names people from has no workspaces
+   */
+  workspaces?: readonly { id: string; name: string }[]
 }
 
 /**
@@ -46,6 +51,7 @@ function ShareDialogBody({
   api,
   onChanged,
   focusRequests = false,
+  workspaces,
 }: ShareDialogProps) {
   const { t } = useI18n()
   const shareApi = api ?? window.uniworkShare
@@ -64,7 +70,7 @@ function ShareDialogBody({
   const adminOnly =
     (data ? data.adminScope : row.adminScope === true) &&
     (data?.myLevel ?? row.myLevel) !== 'manage'
-  const directory = useShareDirectory(shareApi, row.id, canAdminister)
+  const directory = useShareDirectory(shareApi, canAdminister)
   const publicLinksEnabled = useShareSettings(shareApi, canAdminister)
 
   const shelved = !!row.shelvedAt
@@ -103,12 +109,12 @@ function ShareDialogBody({
 
   const workspaceName = (id: string): string =>
     (data?.homeWorkspace?.workspaceId === id && data.homeWorkspace.workspaceName) ||
-    directory.workspaceName(id) ||
+    workspaces?.find((w) => w.id === id)?.name ||
     (row.workspaceId === id && row.workspaceName ? row.workspaceName : '') ||
     t('shrWorkspaceUnknown')
   const storedWorkspace =
     data?.homeWorkspace?.workspaceName?.trim() ||
-    directory.workspaceName(row.workspaceId) ||
+    workspaces?.find((w) => w.id === row.workspaceId)?.name ||
     row.workspaceName ||
     ''
 
@@ -222,7 +228,14 @@ function ShareDialogBody({
           />
 
           {(adminOnly || (data.breakGlass?.length ?? 0) > 0) && (
-            <ShareBreakGlassSection grants={data.breakGlass ?? []} resolveName={memberName} />
+            <ShareBreakGlassSection
+              api={shareApi}
+              documentId={row.id}
+              grants={data.breakGlass ?? []}
+              resolveName={memberName}
+              canGrant={adminOnly}
+              onMutated={onMutated}
+            />
           )}
 
           {!archived && (

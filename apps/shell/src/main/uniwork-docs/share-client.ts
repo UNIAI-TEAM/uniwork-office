@@ -1,10 +1,15 @@
+import { randomUUID } from 'node:crypto'
 import {
+  BREAK_GLASS_REASON_MAX,
+  BREAK_GLASS_REASON_MIN,
   SHARE_LEVELS,
   SHARE_PRINCIPAL_TYPES,
   type ShareAccess,
   type ShareAccessRequest,
+  type ShareBreakGlassGrant,
   type ShareCandidatePage,
   type ShareLinkCreated,
+  type ShareMemberPage,
   type ShareRequestDecision,
   type ShareRequestLevel,
   type ShareSettings,
@@ -20,6 +25,9 @@ import {
 import { UniworkDocError } from './errors'
 import {
   parseAccessRequests,
+  parseBreakGlassGrant,
+  parseBreakGlassRevoke,
+  parseShareMembers,
   parseRequestDecision,
   parseShareAccess,
   parseShareCandidates,
@@ -45,6 +53,8 @@ import {
 const PRINCIPAL_ID = /^[A-Za-z0-9_-]{1,128}$/
 const MAX_CANDIDATES_LIMIT = 100
 const MAX_LINK_DAYS = 90
+const MAX_MEMBERS_LIMIT = 100
+const ORG_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/
 
 export interface UniworkShareClient {
   /** `GET /documents/{id}/shares` */
@@ -75,6 +85,16 @@ export interface UniworkShareClient {
   ): Promise<ShareRequestDecision>
   /** `POST .../access-requests/{id}/decline` */
   declineAccessRequest(documentId: string, requestId: string): Promise<ShareRequestDecision>
+  /** `POST /documents/{id}/break-glass` (a 24 h read-only grant); null = no readable grant in the answer */
+  createDocumentBreakGlass(documentId: string, reason: string): Promise<ShareBreakGlassGrant | null>
+  /** `DELETE /documents/{id}/break-glass/{grantId}` */
+  revokeDocumentBreakGlass(documentId: string, grantId: string): Promise<void>
+  /** `GET /orgs/{slug}/members`: one page (`limit` is capped at the server's 100) */
+  listOrgMembers(input: {
+    orgSlug: string
+    cursor?: string
+    limit?: number
+  }): Promise<ShareMemberPage>
 }
 
 /** a call this client will not send */
@@ -215,6 +235,52 @@ export function createUniworkShareClient(options: UniworkDocsClientOptions): Uni
         read: json,
       })
       return parseRequestDecision(raw)
+    },
+
+    async createDocumentBreakGlass(documentId, reason) {
+      // the web trims, then counts code points like the server counts runes
+      const trimmed = typeof reason === 'string' ? reason.trim() : ''
+      const length = Array.from(trimmed).length
+      if (length < BREAK_GLASS_REASON_MIN || length > BREAK_GLASS_REASON_MAX) {
+        throw new UniworkDocError('server_error', { serverCode: 'break_glass_reason_invalid' })
+      }
+      const raw = await send({
+        method: 'POST',
+        route: `${docRoute(documentId)}/break-glass`,
+        json: { reason: trimmed },
+        idempotencyKey: randomUUID(),
+        timeoutMs,
+        read: json,
+      })
+      return parseBreakGlassGrant(raw)
+    },
+
+    async revokeDocumentBreakGlass(documentId, grantId) {
+      const raw = await send({
+        method: 'DELETE',
+        route: `${docRoute(documentId)}/break-glass/${uniworkId(grantId)}`,
+        timeoutMs,
+        read: json,
+      })
+      parseBreakGlassRevoke(raw)
+    },
+
+    async listOrgMembers(input) {
+      // a slug is lowercase alphanumerics and dashes; anything else never leaves
+      if (!ORG_SLUG.test(input.orgSlug)) throw new UniworkDocError('not_found')
+      const query = new URLSearchParams()
+      // ask for the largest page so a big tenant needs as few reads as possible
+      const limit = Math.min(MAX_MEMBERS_LIMIT, Math.max(1, Math.floor(Number(input.limit) || 100)))
+      query.set('limit', String(limit))
+      if (input.cursor) query.set('cursor', input.cursor.slice(0, 512))
+      const raw = await send({
+        method: 'GET',
+        route: `/orgs/${input.orgSlug}/members`,
+        query,
+        timeoutMs,
+        read: json,
+      })
+      return parseShareMembers(raw)
     },
 
     async declineAccessRequest(documentId, requestId) {

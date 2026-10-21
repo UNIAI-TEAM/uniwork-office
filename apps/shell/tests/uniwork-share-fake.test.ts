@@ -323,3 +323,61 @@ describe('bulk and the test hooks', () => {
     expect(api.calls[0]!.args).toEqual([DOC])
   })
 })
+
+describe('break-glass and members', () => {
+  const REASON = 'Audit of the Q3 numbers'
+
+  it('an administering admin opens a grant that then shows in the overview, and can end it', async () => {
+    const api = createFakeShareApi({ adminScope: true, myLevel: '' })
+    const grant = ok<{ id: string; reason: string; level: string } | null>(
+      await api.breakGlassGrant({ documentId: DOC, reason: REASON }),
+    )
+    expect(grant).toMatchObject({ reason: REASON, level: 'view' })
+    const access = ok<ShareAccess>(await api.get(DOC))
+    expect(access.breakGlass).toHaveLength(1)
+    ok(await api.breakGlassRevoke({ documentId: DOC, grantId: grant!.id }))
+    expect(ok<ShareAccess>(await api.get(DOC)).breakGlass).toEqual([])
+  })
+
+  it('refuses a reason outside 10-500 characters like the server (422) and a non-admin (403)', async () => {
+    const admin = createFakeShareApi({ adminScope: true, myLevel: '' })
+    expect(await admin.breakGlassGrant({ documentId: DOC, reason: 'short' })).toMatchObject({
+      ok: false,
+      error: 'break_glass_reason_invalid',
+      status: 422,
+    })
+    expect(await admin.breakGlassGrant({ documentId: DOC, reason: 'x'.repeat(501) })).toMatchObject(
+      {
+        ok: false,
+        error: 'break_glass_reason_invalid',
+      },
+    )
+    const manager = createFakeShareApi()
+    expect(await manager.breakGlassGrant({ documentId: DOC, reason: REASON })).toMatchObject({
+      ok: false,
+      error: 'forbidden',
+      status: 403,
+    })
+    expect(await admin.breakGlassRevoke({ documentId: DOC, grantId: 'nope' })).toMatchObject({
+      ok: false,
+      error: 'not_found',
+    })
+  })
+
+  it('members pages the organization (people with names, the owner included)', async () => {
+    const api = createFakeShareApi()
+    const first = ok<{ members: { userId: string; displayName: string }[]; nextCursor: string }>(
+      await api.members({ limit: 3 }),
+    )
+    expect(first.members).toHaveLength(3)
+    expect(first.nextCursor).not.toBe('')
+    const all = ok<{ members: { userId: string; displayName: string }[]; nextCursor: string }>(
+      await api.members({}),
+    )
+    expect(all.nextCursor).toBe('')
+    expect(all.members.map((m) => m.userId)).toEqual(
+      expect.arrayContaining(['u_owner', 'u_minh', 'u_an']),
+    )
+    expect(all.members.find((m) => m.userId === 'u_minh')!.displayName).toBe('Minh Trần')
+  })
+})

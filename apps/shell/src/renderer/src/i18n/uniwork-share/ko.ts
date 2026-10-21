@@ -154,4 +154,14 @@ export const ko = {
   shrBgSelfShareError:
     "Admins can't grant themselves access through Share. Use Emergency access (24 hours, audited).",
   shrBgViaBreakGlass: 'Emergency access',
+  shrBgReasonLabel: 'Reason for emergency access',
+  shrBgReasonHint:
+    'The owner will be notified and this action is recorded in the audit log. View access expires after 24 hours.',
+  shrBgReasonCounter: '{count}/500',
+  shrBgConfirmButton: 'Grant view access (24h)',
+  shrBgReasonTooShort: 'Enter a reason of at least 10 characters.',
+  shrBgReasonTooLong: 'Reason must be 500 characters or fewer.',
+  shrBgSubmitFailed: 'Could not open emergency access. Try again.',
+  shrBgRevokeButton: 'Revoke',
+  shrBgRevokeFailed: 'Could not revoke this emergency access. Try again.',
 } satisfies Record<keyof typeof zh, string>

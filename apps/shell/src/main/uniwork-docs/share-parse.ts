@@ -11,6 +11,8 @@ import {
   type ShareLevel,
   type ShareLink,
   type ShareLinkCreated,
+  type ShareMember,
+  type ShareMemberPage,
   type SharePersonAccess,
   type SharePreview,
   type SharePreviewLevel,
@@ -181,6 +183,46 @@ function breakGlassOf(raw: unknown): ShareBreakGlassGrant | null {
     grantedAt: granted_at as string,
     expiresAt: expires_at as string,
   }
+}
+
+/**
+ * `POST /documents/{id}/break-glass`: the grant is either the body or `{grant}` (the web reads both);
+ * an answer with no readable grant is null (the write happened, the list will show it).
+ */
+export function parseBreakGlassGrant(raw: unknown): ShareBreakGlassGrant | null {
+  const body = isRecord(raw) && isRecord(raw.grant) ? raw.grant : raw
+  return breakGlassOf(body)
+}
+
+/** `DELETE /documents/{id}/break-glass/{grantId}`: only `{status:"ok"}` is an ended grant */
+export function parseBreakGlassRevoke(raw: unknown): void {
+  if (!isRecord(raw) || raw.status !== 'ok') bad()
+}
+
+/**
+ * `GET /orgs/{org}/members`: one page of people. The name is the display name, else the email
+ * (like the web); a row with neither, or no id, is dropped on its own. `nextCursor` is `''` on the
+ * last page.
+ */
+export function parseShareMembers(raw: unknown): ShareMemberPage {
+  const body = record(raw)
+  if (!Array.isArray(body.members)) bad()
+  const next = body.next_cursor
+  if (next !== null && next !== undefined && typeof next !== 'string') bad()
+  const members: ShareMember[] = []
+  for (const value of body.members) {
+    if (!isRecord(value)) continue
+    const userId = value.user_id
+    if (typeof userId !== 'string' || !userId) continue
+    const name =
+      typeof value.display_name === 'string' && value.display_name.trim()
+        ? value.display_name
+        : typeof value.email === 'string' && value.email.trim()
+          ? value.email
+          : ''
+    if (name) members.push({ userId, displayName: name })
+  }
+  return { members, nextCursor: typeof next === 'string' ? next : '' }
 }
 
 /** `GET /documents/{id}/shares` */

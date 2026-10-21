@@ -695,3 +695,38 @@
     opacity: 0.55;
   }
 }
+
+.uw-share-reason {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.uw-share-reason:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-share-reason[aria-invalid='true'] {
+  border-color: var(--danger-text);
+}
+
+.uw-share-reason-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.uw-share-reason-form .uw-share-row-line {
+  align-self: stretch;
+}

@@ -77,10 +77,13 @@ const CHANNEL_NAMES = {
   requestApprove: 'uniwork-share:request-approve',
   requestDecline: 'uniwork-share:request-decline',
   bulk: 'uniwork-share:bulk',
+  breakGlassGrant: 'uniwork-share:break-glass-grant',
+  breakGlassRevoke: 'uniwork-share:break-glass-revoke',
+  members: 'uniwork-share:members',
 } as const
 
 describe('the channel table', () => {
-  it('has exactly the ten uniwork-share channels', () => {
+  it('has exactly the thirteen uniwork-share channels', () => {
     expect(UNIWORK_SHARE_CHANNELS).toEqual(CHANNEL_NAMES)
   })
 })
@@ -266,6 +269,57 @@ describe('main: the handlers', () => {
     ])
   })
 
+  it('break-glass grant / revoke and one members page hit the web routes', async () => {
+    const { call } = await setup()
+    const seen = stubServer((s) => {
+      if (s.path.endsWith('/break-glass') && s.method === 'POST') {
+        return reply(201, {
+          grant: {
+            id: 'bg_1',
+            document_id: 'doc_1',
+            actor_id: 'u_a',
+            granted_at: '2026-10-21T01:00:00Z',
+            expires_at: '2026-10-22T01:00:00Z',
+          },
+        })
+      }
+      if (s.path.includes('/break-glass/')) return reply(200, { status: 'ok' })
+      return reply(200, { members: [{ user_id: 'u_1', display_name: 'Minh' }], next_cursor: 'c2' })
+    })
+    const granted = await call(CHANNEL_NAMES.breakGlassGrant, {
+      documentId: 'doc_1',
+      reason: 'Audit of the Q3 file',
+    })
+    expect(granted).toMatchObject({ ok: true, value: { id: 'bg_1' } })
+    expect(
+      await call(CHANNEL_NAMES.breakGlassRevoke, { documentId: 'doc_1', grantId: 'bg_1' }),
+    ).toEqual({
+      ok: true,
+      value: { documentId: 'doc_1', grantId: 'bg_1' },
+    })
+    expect(await call(CHANNEL_NAMES.members, { cursor: 'c1' })).toEqual({
+      ok: true,
+      value: { members: [{ userId: 'u_1', displayName: 'Minh' }], nextCursor: 'c2' },
+    })
+    expect(seen.map((s) => `${s.method} ${s.path.slice('/api/v1'.length)}${s.search}`)).toEqual([
+      'POST /documents/doc_1/break-glass',
+      'DELETE /documents/doc_1/break-glass/bg_1',
+      'GET /orgs/acme/members?limit=100&cursor=c1',
+    ])
+    expect(seen[0]!.body).toEqual({ reason: 'Audit of the Q3 file' })
+  })
+
+  it('a refused reason comes back as break_glass_reason_invalid (the 422 verdict)', async () => {
+    const { call } = await setup()
+    stubServer(() => reply(422, { error: { code: 'break_glass_reason_invalid', message: 'x' } }))
+    expect(
+      await call(CHANNEL_NAMES.breakGlassGrant, {
+        documentId: 'doc_1',
+        reason: 'long enough reason',
+      }),
+    ).toEqual({ ok: false, error: 'break_glass_reason_invalid', status: 422 })
+  })
+
   it('bulk shares each document in turn through the same routes', async () => {
     const { call } = await setup()
     const seen = stubServer((s) =>
@@ -316,6 +370,9 @@ interface ShareBridge {
   requestApprove(input: unknown): Promise<unknown>
   requestDecline(input: unknown): Promise<unknown>
   bulk(plan: unknown): Promise<unknown>
+  breakGlassGrant(input: unknown): Promise<unknown>
+  breakGlassRevoke(input: unknown): Promise<unknown>
+  members(input: unknown): Promise<unknown>
 }
 
 async function loadPreload(replyValue: unknown) {
@@ -361,6 +418,9 @@ describe('preload: window.uniworkShare', () => {
     await share!.requestApprove(input)
     await share!.requestDecline(input)
     await share!.bulk(input)
+    await share!.breakGlassGrant(input)
+    await share!.breakGlassRevoke(input)
+    await share!.members(input)
     expect(invoked.filter((i) => i.channel.startsWith('uniwork-share:'))).toEqual([
       { channel: CHANNEL_NAMES.get, args: ['doc_1'] },
       { channel: CHANNEL_NAMES.update, args: [input] },
@@ -372,6 +432,9 @@ describe('preload: window.uniworkShare', () => {
       { channel: CHANNEL_NAMES.requestApprove, args: [input] },
       { channel: CHANNEL_NAMES.requestDecline, args: [input] },
       { channel: CHANNEL_NAMES.bulk, args: [input] },
+      { channel: CHANNEL_NAMES.breakGlassGrant, args: [input] },
+      { channel: CHANNEL_NAMES.breakGlassRevoke, args: [input] },
+      { channel: CHANNEL_NAMES.members, args: [input] },
     ])
   })
 

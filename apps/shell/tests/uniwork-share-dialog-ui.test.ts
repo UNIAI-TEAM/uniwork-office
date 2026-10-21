@@ -94,9 +94,10 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
     })
     await flush()
   }
-  async function typeInto(input: HTMLInputElement, value: string) {
+  async function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
     await act(async () => {
-      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement
+      const set = Object.getOwnPropertyDescriptor(proto.prototype, 'value')!.set!
       set.call(input, value)
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
@@ -404,6 +405,200 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
     expect(calls(api, 'linkCreate')).toHaveLength(0)
   })
 
+  describe('names come from the organization member list', () => {
+    it('resolves the owner and every grant by the members call; no candidate read before the picker opens', async () => {
+      const api = await open()
+      expect(calls(api, 'members').length).toBeGreaterThan(0)
+      expect(calls(api, 'candidates')).toEqual([])
+      expect(row('owner:u_owner')!.textContent).toContain('Hoa Nguyễn')
+      expect(row('user:u_minh')!.textContent).toContain('Minh Trần')
+    })
+
+    it('walks every page (the last has no cursor) and keeps a skeleton, not "unknown", while pages are pending', async () => {
+      const api = createFakeShareApi()
+      const real = api.members
+      let first = true
+      api.members = (input) => {
+        // two pages of three, whatever the caller asks for
+        const page = first ? { limit: 3 } : { cursor: input.cursor, limit: 3 }
+        first = false
+        return real(page)
+      }
+      await act(async () => {
+        root.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'en' },
+            createElement(ShareDialog, { open: true, onClose, row: target(), api }),
+          ),
+        )
+      })
+      await flush()
+      expect(calls(api, 'members').length).toBeGreaterThan(1)
+      expect(row('user:u_minh')!.textContent).toContain('Minh Trần')
+      expect(row('user:u_an')!.textContent).toContain('An Lê')
+    })
+
+    it('someone who is not a member any more reads as an unknown member once the walk is done', async () => {
+      const api = createFakeShareApi()
+      const real = api.members
+      api.members = async (input) => {
+        const result = await real(input)
+        return result.ok
+          ? {
+              ok: true,
+              value: {
+                ...result.value,
+                members: result.value.members.filter((m) => m.userId !== 'u_an'),
+              },
+            }
+          : result
+      }
+      await act(async () => {
+        root.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'en' },
+            createElement(ShareDialog, { open: true, onClose, row: target(), api }),
+          ),
+        )
+      })
+      await flush()
+      expect(row('user:u_an')!.textContent).toContain(t('shrPersonUnknown'))
+    })
+
+    it('a failed later page keeps the names read so far and shows the partial line with Retry', async () => {
+      const api = createFakeShareApi()
+      const real = api.members
+      let n = 0
+      api.members = (input) => {
+        n++
+        if (n === 2) return Promise.resolve({ ok: false, error: 'network' } as const)
+        return real({ ...input, limit: 3 })
+      }
+      await act(async () => {
+        root.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'en' },
+            createElement(ShareDialog, { open: true, onClose, row: target(), api }),
+          ),
+        )
+      })
+      await flush()
+      const line = q('[data-share-members-error]')!
+      expect(line.textContent).toContain(t('shrMembersErrorPartial'))
+      await click(button(line, t('shrRetry')))
+      expect(q('[data-share-members-error]')).toBeNull()
+    })
+  })
+
+  describe('emergency access (break-glass)', () => {
+    const REASON = 'Audit of the Q3 numbers'
+    const openAdmin = () =>
+      open({ adminScope: true, myLevel: '' }, target({ myLevel: undefined, adminScope: true }))
+    const reasonBox = () => q<HTMLTextAreaElement>('[data-share-section="break-glass"] textarea')
+
+    it('an administering admin gets the reason form; a manager and a viewer do not', async () => {
+      await openAdmin()
+      const bg = section('break-glass')!
+      expect(bg.querySelector('textarea')).toBeTruthy()
+      expect(bg.textContent).toContain(t('shrBgReasonHint'))
+      expect(bg.textContent).toContain(t('shrBgReasonCounter', { count: 0 }))
+      await act(async () => root.unmount())
+      root = createRoot(host)
+      await open()
+      expect(section('break-glass')).toBeNull()
+    })
+
+    it('grants after a valid reason, trims it, lists the grant and counts characters live', async () => {
+      const api = await openAdmin()
+      await typeInto(reasonBox()!, `  ${REASON}  `)
+      expect(section('break-glass')!.textContent).toContain(
+        t('shrBgReasonCounter', { count: REASON.length }),
+      )
+      await click(button(section('break-glass')!, t('shrBgConfirmButton')))
+      expect(calls(api, 'breakGlassGrant')[0]!.args[0]).toEqual({
+        documentId: 'doc_1',
+        reason: REASON,
+      })
+      const rows = qa('[data-break-glass-id]')
+      expect(rows).toHaveLength(1)
+      expect(rows[0]!.textContent).toContain(REASON)
+      expect(section('break-glass')!.textContent).not.toContain(t('shrBgNoActiveGrants'))
+      expect(reasonBox()!.value).toBe('')
+      expect(onChanged).toHaveBeenCalled()
+    })
+
+    it('a reason that is too short or too long is refused in place, nothing is sent', async () => {
+      const api = await openAdmin()
+      await typeInto(reasonBox()!, 'too short')
+      expect(section('break-glass')!.textContent).toContain(t('shrBgReasonTooShort'))
+      await click(button(section('break-glass')!, t('shrBgConfirmButton')))
+      expect(calls(api, 'breakGlassGrant')).toEqual([])
+      await typeInto(reasonBox()!, 'x'.repeat(501))
+      expect(section('break-glass')!.textContent).toContain(t('shrBgReasonTooLong'))
+      await click(button(section('break-glass')!, t('shrBgConfirmButton')))
+      expect(calls(api, 'breakGlassGrant')).toEqual([])
+    })
+
+    it('the server verdict reason_invalid reads too short / too long by the typed length; other failures read the generic line', async () => {
+      const api = await openAdmin()
+      await typeInto(reasonBox()!, REASON)
+      api.failNext('breakGlassGrant', {
+        ok: false,
+        error: 'break_glass_reason_invalid',
+        status: 422,
+      })
+      await click(button(section('break-glass')!, t('shrBgConfirmButton')))
+      expect(section('break-glass')!.querySelector('[role="alert"]')!.textContent).toBe(
+        t('shrBgReasonTooShort'),
+      )
+      api.failNext('breakGlassGrant', { ok: false, error: 'network' })
+      await click(button(section('break-glass')!, t('shrBgConfirmButton')))
+      expect(section('break-glass')!.querySelector('[role="alert"]')!.textContent).toBe(
+        t('shrBgSubmitFailed'),
+      )
+      // the reason stays so the admin can retry
+      expect(reasonBox()!.value).toBe(REASON)
+    })
+
+    it('Revoke ends one grant by its id and the list refreshes; a failure says so and keeps it', async () => {
+      const api = await openAdmin()
+      await typeInto(reasonBox()!, REASON)
+      await click(button(section('break-glass')!, t('shrBgConfirmButton')))
+      const id = qa('[data-break-glass-id]')[0]!.getAttribute('data-break-glass-id')!
+
+      api.failNext('breakGlassRevoke', { ok: false, error: 'network' })
+      await click(button(section('break-glass')!, t('shrBgRevokeButton')))
+      expect(section('break-glass')!.querySelector('[role="alert"]')!.textContent).toBe(
+        t('shrBgRevokeFailed'),
+      )
+      expect(qa('[data-break-glass-id]')).toHaveLength(1)
+
+      await click(button(section('break-glass')!, t('shrBgRevokeButton')))
+      expect(calls(api, 'breakGlassRevoke').at(-1)!.args[0]).toEqual({
+        documentId: 'doc_1',
+        grantId: id,
+      })
+      expect(qa('[data-break-glass-id]')).toHaveLength(0)
+      expect(section('break-glass')!.textContent).toContain(t('shrBgNoActiveGrants'))
+    })
+
+    it('the revoke button names the person it ends', async () => {
+      await openAdmin()
+      await typeInto(reasonBox()!, REASON)
+      await click(button(section('break-glass')!, t('shrBgConfirmButton')))
+      const revoke = section('break-glass')!.querySelector<HTMLElement>(
+        '[data-break-glass-id] button',
+      )!
+      expect(revoke.getAttribute('aria-label')).toContain(t('shrBgRevokeButton'))
+      expect(revoke.getAttribute('aria-label')!.length).toBeGreaterThan(
+        t('shrBgRevokeButton').length,
+      )
+    })
+  })
+
   describe('error copy per code', () => {
     it('rejected items name the person and the reason on the chip', async () => {
       const api = await open()
@@ -478,7 +673,7 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
 
     it('the member directory failing shows the one line with Retry, the dialog keeps working', async () => {
       const api = createFakeShareApi()
-      api.failNext('candidates', { ok: false, error: 'network' })
+      api.failNext('members', { ok: false, error: 'network' })
       await act(async () => {
         root.render(
           createElement(

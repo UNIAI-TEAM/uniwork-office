@@ -3,9 +3,11 @@
 // access overview, atomic updates with per-item rejections, a dry run that writes nothing, the
 // public-links policy and limit, and an access request that can be handled once. Seeded with
 // one document: an owner, three people, the home workspace row, one link and one request.
+import { BREAK_GLASS_REASON_MAX, BREAK_GLASS_REASON_MIN } from '../../../shared/share-api'
 import type {
   ShareAccess,
   ShareAccessRequest,
+  ShareBreakGlassGrant,
   ShareBulkPlan,
   ShareBulkResult,
   ShareCandidate,
@@ -67,6 +69,12 @@ const WORKSPACES = [
 const ORG = { id: 'org_1', name: 'Acme', members: 40 }
 const HOME_WORKSPACE = 'ws_1'
 
+// the organization's members: the owner (who is not a candidate) and the people of the picker
+const MEMBERS = [
+  { id: 'u_owner', name: 'Hoa Nguyễn' },
+  ...PEOPLE.map((p) => ({ id: p.id, name: p.name })),
+]
+
 const keyOf = (type: string, id: string) => `${type}:${id}`
 
 export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi {
@@ -119,6 +127,8 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
       expiresAt: '2026-10-27T01:00:00Z',
     },
   ]
+
+  let breakGlass: ShareBreakGlassGrant[] = []
 
   const calls: FakeShareApi['calls'] = []
   const failures = new Map<keyof UniworkShareApi, Failure>()
@@ -175,7 +185,7 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
         owner: { userId: 'u_owner', level: 'manage', via: 'member' },
         shares: [...grants.values()].map((g) => ({ ...g })),
         links: links.map((l) => ({ ...l })),
-        breakGlass: [],
+        breakGlass: breakGlass.map((g) => ({ ...g })),
       },
     }
   }
@@ -397,6 +407,51 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
     requestApprove: (input) => call('requestApprove', [input], () => decide(input, true)),
 
     requestDecline: (input) => call('requestDecline', [input], () => decide(input, false)),
+
+    breakGlassGrant: (input) =>
+      call('breakGlassGrant', [input], () => {
+        if (!known(input.documentId)) return fail('not_found')
+        // only an administering admin (no level of their own) opens one
+        if (!adminScope) return fail('forbidden', 403)
+        const reason = input.reason.trim()
+        const length = Array.from(reason).length
+        if (length < BREAK_GLASS_REASON_MIN || length > BREAK_GLASS_REASON_MAX) {
+          return fail('break_glass_reason_invalid', 422)
+        }
+        const grantRow: ShareBreakGlassGrant = {
+          id: nextId('bg'),
+          documentId,
+          actorId: 'u_admin',
+          actorName: 'Admin An',
+          level: 'view',
+          reason,
+          grantedAt: NOW,
+          expiresAt: '2026-10-21T01:00:00Z',
+        }
+        breakGlass = [...breakGlass, grantRow]
+        return { ok: true, value: { ...grantRow } }
+      }),
+
+    breakGlassRevoke: (input) =>
+      call('breakGlassRevoke', [input], () => {
+        if (!known(input.documentId)) return fail('not_found')
+        if (!adminScope) return fail('forbidden', 403)
+        if (!breakGlass.some((g) => g.id === input.grantId)) return fail('not_found')
+        breakGlass = breakGlass.filter((g) => g.id !== input.grantId)
+        return { ok: true, value: { documentId: input.documentId, grantId: input.grantId } }
+      }),
+
+    members: (input) =>
+      call('members', [input], () => {
+        const start = input.cursor ? Number(input.cursor) || 0 : 0
+        const limit = input.limit && input.limit > 0 ? input.limit : MEMBERS.length
+        const page = MEMBERS.slice(start, start + limit).map((m) => ({
+          userId: m.id,
+          displayName: m.name,
+        }))
+        const next = start + limit < MEMBERS.length ? String(start + limit) : ''
+        return { ok: true, value: { members: page, nextCursor: next } }
+      }),
 
     bulk: (plan: ShareBulkPlan) =>
       call('bulk', [plan], () => {

@@ -1,7 +1,7 @@
 // Small hooks of the Share dialog over `UniworkShareApi`. No query library: each read keeps the
 // last answer while it reloads, a mutation's caller reloads what it changed, and a stale answer
 // (the document changed, the dialog closed) is dropped by a sequence number.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   ShareAccess,
   ShareAccessRequest,
@@ -88,39 +88,33 @@ export function useAccessRequests(
   return useShareQuery(() => api.requests(documentId), documentId, enabled)
 }
 
-/** pages of the member walk (50 per page) after which the walk stops with a "limit" line */
+/** pages of the member walk (100 per page) after which the walk stops with a "limit" line */
 const MAX_DIRECTORY_PAGES = 40
-const DIRECTORY_PAGE_SIZE = 50
+const DIRECTORY_PAGE_SIZE = 100
 
 /**
- * Why the directory is not whole: `first` = no page arrived, `partial` = a later page failed (the
- * walk stopped there), `limit` = the page bound was hit with a cursor left. Only the first two
- * can be retried.
+ * Why the member list is not whole: `first` = no page arrived, `partial` = a later page failed
+ * (the walk stopped there), `limit` = the page bound was hit with a cursor left. Only the first
+ * two can be retried.
  */
 export type ShareDirectoryError = 'first' | 'partial' | 'limit'
 
 export interface ShareDirectory {
-  rows: readonly ShareCandidate[]
   loading: boolean
   /** a name that is missing may sit on a page not loaded yet: not "unknown" */
   namesPending: boolean
   error: ShareDirectoryError | null
   retry: () => void
   userName: (userId: string) => string | undefined
-  workspaceName: (workspaceId: string) => string | undefined
 }
 
 /**
- * Names for the people and workspaces that appear in the access list. The bridge has no member
- * call, so the unfiltered candidate list (which carries every person, workspace and the
- * organization, with their display names) is read page after page while the dialog is open.
+ * Names for the people in the access list, from the organization's member list (what the web
+ * reads): `members` is walked page after page while the dialog is open. The picker's candidate
+ * list is not read for names.
  */
-export function useShareDirectory(
-  api: UniworkShareApi,
-  documentId: string,
-  enabled: boolean,
-): ShareDirectory {
-  const [rows, setRows] = useState<ShareCandidate[]>([])
+export function useShareDirectory(api: UniworkShareApi, enabled: boolean): ShareDirectory {
+  const [names, setNames] = useState<ReadonlyMap<string, string>>(() => new Map())
   const [cursor, setCursor] = useState<string | null>(null)
   const [pages, setPages] = useState(0)
   const [failed, setFailed] = useState<'first' | 'partial' | null>(null)
@@ -131,12 +125,13 @@ export function useShareDirectory(
   useEffect(() => {
     if (!enabled) return
     sequence.current++
-    setRows([])
+    setNames(new Map())
     setCursor(null)
     setPages(0)
     setFailed(null)
+    setFetching(false)
     setAttempt((n) => n + 1)
-  }, [enabled, documentId])
+  }, [enabled, api])
 
   // walk: fetch the page at `cursor` (null = first) while one is wanted
   const wanted =
@@ -146,11 +141,7 @@ export function useShareDirectory(
     const mine = sequence.current
     setFetching(true)
     void api
-      .candidates({
-        documentId,
-        limit: DIRECTORY_PAGE_SIZE,
-        ...(cursor ? { cursor } : {}),
-      })
+      .members({ limit: DIRECTORY_PAGE_SIZE, ...(cursor ? { cursor } : {}) })
       .catch((): ShareResult<never> => ({ ok: false, error: 'network' }))
       .then((result) => {
         if (mine !== sequence.current) return
@@ -159,30 +150,21 @@ export function useShareDirectory(
           setFailed(pages === 0 ? 'first' : 'partial')
           return
         }
-        setRows((prev) => [...prev, ...result.value.items])
+        setNames((prev) => {
+          const next = new Map(prev)
+          for (const member of result.value.members) next.set(member.userId, member.displayName)
+          return next
+        })
         setCursor(result.value.nextCursor || '')
         setPages((n) => n + 1)
       })
-  }, [wanted, fetching, attempt, api, documentId, cursor, pages])
-
-  const byUser = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const row of rows) if (row.principalType === 'user') map.set(row.principalId, row.name)
-    return map
-  }, [rows])
-  const byWorkspace = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const row of rows)
-      if (row.principalType === 'workspace') map.set(row.principalId, row.name)
-    return map
-  }, [rows])
+  }, [wanted, fetching, attempt, api, cursor, pages])
 
   const atLimit = enabled && pages >= MAX_DIRECTORY_PAGES && !!cursor
   const error: ShareDirectoryError | null = failed ?? (atLimit ? 'limit' : null)
   const loading = enabled && (fetching || wanted)
 
   return {
-    rows,
     loading,
     namesPending: loading || failed !== null,
     error,
@@ -190,8 +172,7 @@ export function useShareDirectory(
       setFailed(null)
       setAttempt((n) => n + 1)
     },
-    userName: (userId) => byUser.get(userId),
-    workspaceName: (workspaceId) => byWorkspace.get(workspaceId),
+    userName: (userId) => names.get(userId),
   }
 }
 
