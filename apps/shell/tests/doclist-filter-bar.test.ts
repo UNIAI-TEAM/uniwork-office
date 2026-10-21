@@ -398,6 +398,33 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       expect(pressed()).toEqual(['pdf'])
     })
 
+    it('holds Người sửa and Cập nhật in one group that follows the chips, in that order (N-04)', async () => {
+      await mount('workspace')
+      const bar = host.querySelector('.dh-filter-bar')!
+      const group = bar.querySelector(':scope > .dh-filter-selects')
+      expect(group, 'select pair group').not.toBeNull()
+      expect(
+        Array.from(group!.children).map((el) => [el.tagName, el.className]),
+      ).toEqual([
+        ['LABEL', 'dh-filter-chip'],
+        ['LABEL', 'dh-filter-chip'],
+      ])
+      expect(
+        Array.from(group!.querySelectorAll('select')).map((el) => el.getAttribute('data-filter')),
+      ).toEqual(['updatedBy', 'updatedFrom'])
+      // nothing else in the bar is a select chip: the pair never splits across the row
+      expect(bar.querySelectorAll(':scope > .dh-filter-chip')).toHaveLength(0)
+      expect(bar.querySelector('.dh-filter-chips')!.nextElementSibling).toBe(group)
+    })
+
+    it('keeps the clear button after the pair group (N-04)', async () => {
+      await mount('workspace')
+      await click(chip('docx'))
+      const bar = host.querySelector('.dh-filter-bar')!
+      const kids = Array.from(bar.children).map((el) => el.className.split(' ')[0])
+      expect(kids).toEqual(['dh-filter-chips', 'dh-filter-selects', 'dh-filter-clear'])
+    })
+
     it('clears a screen filters with the clear button', async () => {
       await mount('workspace')
       await click(chip('docx'))

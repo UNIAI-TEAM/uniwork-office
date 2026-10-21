@@ -252,6 +252,28 @@ describe('F-07: one wrapping filter row', () => {
   })
 })
 
+describe('N-04: the two filter selects are one equal-width pair', () => {
+  const css = src('uniwork-home/documents-home.css')
+  it('never splits: one nowrap group of two equal tracks, never wider than the row', () => {
+    const rule = ruleOf(css, '.dh-filter-selects')
+    expect(rule).toMatch(/display:\s*inline-grid;/)
+    expect(rule).toMatch(/grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/)
+    expect(rule).toMatch(/gap:\s*8px;/)
+    expect(rule).toMatch(/max-width:\s*100%;/)
+  })
+  it('lets a long member name ellipsise inside its select instead of widening the pair', () => {
+    expect(ruleOf(css, '.dh-filter-selects .dh-filter-chip')).toMatch(/min-width:\s*0;/)
+    const select = ruleOf(css, '.dh-filter-selects .dh-filter-select')
+    expect(select).toMatch(/min-width:\s*0;/)
+    expect(select).toMatch(/flex:\s*1 1 auto;/)
+    expect(select).toMatch(/text-overflow:\s*ellipsis;/)
+  })
+  it('uses tokens only', () => {
+    const block = css.slice(css.indexOf('.dh-filter-selects {'), css.indexOf('.dh-filter-clear {'))
+    expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)
+  })
+})
+
 describe('F-11: the search field keeps room for its placeholder', () => {
   it('has a 15rem floor (never wider than its row) in the title row and inline in a folder header', () => {
     const css = src('uniwork-home/documents-home.css')
