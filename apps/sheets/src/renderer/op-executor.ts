@@ -47,6 +47,7 @@ import { indexedFormulaText } from './formula-view'
 import { growSheetToFit } from './grid-growth'
 import { buildLazyChangePlan } from './lazy-plan'
 import { t } from './i18n/locale'
+import { sheetsHint } from './sheets-keymap'
 import type { PivotActionContext } from './pivot-actions'
 import { refreshPivotTables } from './pivot-actions'
 import {
@@ -540,7 +541,7 @@ async function applyChangePlanNow(
     undoBatch.settle()
     if (aiBulkUndoGate.dropped) {
       notices.push(
-        'this change is too large for the undo history — the [Undo] button and ⌘Z will not revert it',
+        `this change is too large for the undo history — the [Undo] button and ${sheetsHint('sheets-07')} will not revert it`,
       )
     }
     return notices.length > 0 ? { ok: true, notices } : { ok: true }

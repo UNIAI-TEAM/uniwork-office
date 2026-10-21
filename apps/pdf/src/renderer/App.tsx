@@ -74,7 +74,23 @@ import { CropDialog, CutoutDialog, cropImagePng } from './ImageDialogs'
 import { cropRect, flipPixels, multiplyAlpha } from './image-bake'
 import type { CropFractions, ImageBakeOp } from './image-bake'
 import { removeBackground, type PixelImage } from './cutout'
-import { clickMarkupTool, navAction, resetDocLoadState, shouldHandleDocumentUndo } from './keyNav'
+import {
+  clickMarkupTool,
+  navKeyAction,
+  resetDocLoadState,
+  shouldHandleDocumentUndo,
+} from './keyNav'
+import {
+  isCancelKey,
+  isConfirmKey,
+  matchPdfKey,
+  pdfPrevMatchTip,
+  pdfRibbonCollapseOptions,
+  pdfTip,
+  resolvePdfWindowKey,
+  searchEnterDirection,
+  textEditKeyAction,
+} from './shortcuts'
 import { rowOfVisIdx, spreadRows, stepPage } from './spread'
 import {
   captureViewState,
@@ -130,7 +146,6 @@ import {
   spliceCharColors,
 } from './color-runs'
 import type { CharStyle } from './color-runs'
-import { platformShortcuts } from '@genoffice/i18n'
 import {
   Dropdown,
   aiPanelInitiallyOpen,
@@ -350,10 +365,11 @@ type RibbonTab = (typeof RIBBON_TABS)[number]['id'] | 'fillForm'
 
 export default function App() {
   const { lang, t } = useI18n()
-  const collapse = useRibbonCollapse('genoffice-pdf-ribbon-collapsed', {
-    collapse: t('ribbonCollapse'),
-    expand: t('ribbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'genoffice-pdf-ribbon-collapsed',
+    { collapse: t('ribbonCollapse'), expand: t('ribbonExpand') },
+    pdfRibbonCollapseOptions(),
+  )
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [filePath, setFilePath] = useState('')
   const [status, setStatus] = useState<'loading' | 'error' | 'empty' | 'password' | 'ready'>(
@@ -6332,7 +6348,8 @@ export default function App() {
     return window.pdfApi.onPrintRequest(openPrintDlg)
   })
 
-  // Shortcuts: ⌘S/⌘F/⌘P/⌘±/⌘0 + page navigation (only ⌘ combos kept while an input control is focused)
+  // Shortcuts: the pdf table's chords (Save, Find, Print, zoom, fit, rotate, undo/redo) + page
+  // navigation (only table chords and plain keys; an IME composition and AltGr never fire)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (redactionRequestInFlightRef.current) return
@@ -6343,36 +6360,61 @@ export default function App() {
           target.tagName === 'TEXTAREA' ||
           target.tagName === 'SELECT' ||
           target.isContentEditable)
-      if (!shouldHandleDocumentUndo(e.target, e.key, e.metaKey || e.ctrlKey)) return
-      if (e.metaKey || e.ctrlKey) {
-        const k = e.key.toLowerCase()
-        if (k === 's') {
-          e.preventDefault()
-          if (cap('save')) void save()
-        } else if (k === 'z') {
-          e.preventDefault()
-          if (e.shiftKey) redo()
-          else undo()
-        } else if (k === 'f') {
-          e.preventDefault()
-          openSearch()
-        } else if (k === 'p' && !e.shiftKey) {
-          e.preventDefault()
-          if (cap('print')) openPrintDlg()
-        } else if (e.key === '=' || e.key === '+') {
-          e.preventDefault()
-          zoomIn()
-        } else if (e.key === '-') {
-          e.preventDefault()
-          zoomOut()
-        } else if (e.key === '0') {
-          e.preventDefault()
-          fitModeRef.current = 'width'
-          recomputeFit()
+      const effect = resolvePdfWindowKey(e, {
+        inEditable,
+        documentUndo: shouldHandleDocumentUndo(e.target, 'z', true),
+      })
+      const action = effect?.action
+      if (effect && action) {
+        if (effect.preventDefault) e.preventDefault()
+        switch (action.id) {
+          case 'pdf-01':
+            if (cap('save')) void save()
+            break
+          case 'pdf-02':
+            // Save As: the shell menu (desktop) or the host (web frame) owns the dialog; the key
+            // must not fall into Save and must reach the menu accelerator, so no preventDefault
+            break
+          case 'pdf-03':
+            undo()
+            break
+          case 'pdf-04':
+            redo()
+            break
+          case 'pdf-05':
+            openSearch()
+            break
+          case 'pdf-06':
+            if (searchOpen) searchStep(e.shiftKey ? -1 : 1)
+            else openSearch()
+            break
+          case 'pdf-07':
+            if (cap('print')) openPrintDlg()
+            break
+          case 'pdf-08':
+            zoomIn()
+            break
+          case 'pdf-09':
+            zoomOut()
+            break
+          case 'pdf-10':
+            applyScale(1, null)
+            break
+          case 'pdf-11':
+            fitModeRef.current = fitModeRef.current === 'width' ? 'page' : 'width'
+            recomputeFit()
+            break
+          case 'pdf-12': {
+            const error = rotateAllPages(effect.rotate ?? 90)
+            if (error) showNotice(error)
+            break
+          }
         }
         return
       }
-      if (e.key === 'Escape') {
+      // Any other Ctrl / Cmd chord belongs to the browser or the text field
+      if (e.metaKey || e.ctrlKey) return
+      if (isCancelKey(e, 'overlay')) {
         // Modal dialogs and local overlays own Escape; the states behind them must not react too
         if (
           e.defaultPrevented ||
@@ -6427,33 +6469,32 @@ export default function App() {
         return
       }
       if (inEditable) return
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selected) {
+      if (selected && matchPdfKey(e, 'selection')) {
         e.preventDefault()
         deleteSelected()
         return
       }
       // Shift+navigation extends the text layer's native selection (Excel/
-      // Word parity: Shift+→ grows the selection by a character). Swallowing
-      // it here turned the keys into page flips and froze the selection.
-      if (e.shiftKey && !window.getSelection()?.isCollapsed) return
+      // Word parity: Shift+→ grows the selection by a character); navKeyAction
+      // leaves every Shift chord but Shift+Space alone.
       const el = scrollRef.current
       if (!el) return
       const inThumbs = !!thumbsRef.current?.contains(document.activeElement)
-      const action = navAction(e.key, inThumbs)
-      if (!action) return
+      const nav = navKeyAction(e, inThumbs)
+      if (!nav) return
       e.preventDefault()
-      switch (action.type) {
+      switch (nav.type) {
         case 'scrollViewport':
-          el.scrollTop += action.dir * (el.clientHeight - 40)
+          el.scrollTop += nav.dir * (el.clientHeight - 40)
           break
         case 'scrollEdge':
-          el.scrollTop = action.edge === 'top' ? 0 : el.scrollHeight
+          el.scrollTop = nav.edge === 'top' ? 0 : el.scrollHeight
           break
         case 'scrollBy':
-          el.scrollTop += action.delta
+          el.scrollTop += nav.delta
           break
         case 'stepPage': {
-          const target = stepPage(visList, spread, currentPage, action.dir)
+          const target = stepPage(visList, spread, currentPage, nav.dir)
           scrollToPage(target)
           if (inThumbs) {
             const thumbEl = thumbsRef.current?.querySelector<HTMLElement>(
@@ -6669,7 +6710,7 @@ export default function App() {
               className="tb-page-input"
               value={pageInput}
               onChange={(e) => setPageInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && commitPageInput()}
+              onKeyDown={(e) => isConfirmKey(e, 'page-box') && commitPageInput()}
               onBlur={commitPageInput}
             />
             <span className="tb-page-total">{t('pageOf', { total: pageCount })}</span>
@@ -6677,7 +6718,7 @@ export default function App() {
           <div className="rb-row">
             <button
               className="rb-icon"
-              data-tip={t('zoomOut')}
+              data-tip={pdfTip(t('zoomOut'), 'pdf-09')}
               aria-label={t('zoomOut')}
               onClick={zoomOut}
             >
@@ -6686,7 +6727,7 @@ export default function App() {
             <span className="tb-zoom">{Math.round(scale * 100)}%</span>
             <button
               className="rb-icon"
-              data-tip={t('zoomIn')}
+              data-tip={pdfTip(t('zoomIn'), 'pdf-08')}
               aria-label={t('zoomIn')}
               onClick={zoomIn}
             >
@@ -6696,6 +6737,7 @@ export default function App() {
         </div>
         <button
           className="rb-big"
+          data-tip={pdfTip(t('fitWidth'), 'pdf-11')}
           onClick={() => {
             fitModeRef.current = 'width'
             recomputeFit()
@@ -6708,6 +6750,7 @@ export default function App() {
         </button>
         <button
           className="rb-big"
+          data-tip={pdfTip(t('fitPage'), 'pdf-11')}
           onClick={() => {
             fitModeRef.current = 'page'
             recomputeFit()
@@ -6725,7 +6768,7 @@ export default function App() {
   const searchBtn = (
     <button
       className={`rb-big${searchOpen ? ' active' : ''}`}
-      data-tip={`${t('search')} (${platformShortcuts('⌘F')})`}
+      data-tip={pdfTip(t('search'), 'pdf-05')}
       onClick={() => (searchOpen ? closeSearch() : openSearch())}
     >
       <span className="rb-big-icon">
@@ -6905,7 +6948,7 @@ export default function App() {
           {cap('save') && (
             <button
               className="qa-btn"
-              data-tip={`${t('save')} (${platformShortcuts('⌘S')})`}
+              data-tip={pdfTip(t('save'), 'pdf-01')}
               aria-label={t('save')}
               disabled={
                 (!dirty && !openBoxesDirty && !(uniwork.bound && !uniwork.readOnly)) ||
@@ -6919,8 +6962,8 @@ export default function App() {
           )}
           <button
             className="qa-btn"
-            data-tip={`${t('undo')} (${platformShortcuts('⌘Z')})`}
-            aria-label={`${t('undo')} (${platformShortcuts('⌘Z')})`}
+            data-tip={pdfTip(t('undo'), 'pdf-03')}
+            aria-label={pdfTip(t('undo'), 'pdf-03')}
             disabled={!history.canUndo}
             onClick={undo}
           >
@@ -6928,8 +6971,8 @@ export default function App() {
           </button>
           <button
             className="qa-btn"
-            data-tip={`${t('redo')} (${platformShortcuts('⇧⌘Z')})`}
-            aria-label={`${t('redo')} (${platformShortcuts('⇧⌘Z')})`}
+            data-tip={pdfTip(t('redo'), 'pdf-04')}
+            aria-label={pdfTip(t('redo'), 'pdf-04')}
             disabled={!history.canRedo}
             onClick={redo}
           >
@@ -7113,7 +7156,7 @@ export default function App() {
                   {cap('print') && (
                     <button
                       className="rb-big"
-                      data-tip={`${t('print')} (${platformShortcuts('⌘P')})`}
+                      data-tip={pdfTip(t('print'), 'pdf-07')}
                       disabled={printing}
                       onClick={openPrintDlg}
                     >
@@ -8831,17 +8874,15 @@ export default function App() {
                                             if (g) g.scrollLeft = e.currentTarget.scrollLeft
                                           }}
                                           onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                            const key = textEditKeyAction(e, textDraft.value === '')
+                                            if (key === 'commit') {
                                               e.preventDefault()
                                               commitTextDraft()
-                                            } else if (e.key === 'Escape') {
+                                            } else if (key === 'cancel') {
                                               e.preventDefault()
                                               e.stopPropagation()
                                               setTextDraft(null)
-                                            } else if (
-                                              (e.key === 'Backspace' || e.key === 'Delete') &&
-                                              textDraft.value === ''
-                                            ) {
+                                            } else if (key === 'delete-run') {
                                               // The editor is already empty: one more delete
                                               // press removes the run itself
                                               e.preventDefault()
@@ -9221,8 +9262,9 @@ export default function App() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') searchStep(e.shiftKey ? -1 : 1)
-                    else if (e.key === 'Escape') {
+                    const enterDir = searchEnterDirection(e)
+                    if (enterDir) searchStep(enterDir)
+                    else if (isCancelKey(e)) {
                       e.preventDefault()
                       closeSearch()
                     }
@@ -9240,7 +9282,7 @@ export default function App() {
                 </span>
                 <button
                   className="rb-icon"
-                  data-tip={t('searchPrev')}
+                  data-tip={pdfPrevMatchTip(t('searchPrev'))}
                   aria-label={t('searchPrev')}
                   disabled={activeMatches.length === 0}
                   onClick={() => searchStep(-1)}
@@ -9249,7 +9291,7 @@ export default function App() {
                 </button>
                 <button
                   className="rb-icon"
-                  data-tip={t('searchNext')}
+                  data-tip={pdfTip(t('searchNext'), 'pdf-06')}
                   aria-label={t('searchNext')}
                   disabled={activeMatches.length === 0}
                   onClick={() => searchStep(1)}
@@ -9731,8 +9773,8 @@ export default function App() {
                       setExtractInvalid(false)
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') confirmExtract()
-                      else if (e.key === 'Escape') {
+                      if (isConfirmKey(e)) confirmExtract()
+                      else if (isCancelKey(e)) {
                         e.preventDefault()
                         setExtractDlg(false)
                       }
@@ -9763,8 +9805,8 @@ export default function App() {
                       setSplitInvalid(false)
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') confirmSplit()
-                      else if (e.key === 'Escape') {
+                      if (isConfirmKey(e)) confirmSplit()
+                      else if (isCancelKey(e)) {
                         e.preventDefault()
                         setSplitDlg(false)
                       }
@@ -9825,8 +9867,8 @@ export default function App() {
                         setPrintInvalid(false)
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') confirmPrint()
-                        else if (e.key === 'Escape') {
+                        if (isConfirmKey(e)) confirmPrint()
+                        else if (isCancelKey(e)) {
                           e.preventDefault()
                           setPrintDlg(false)
                         }
@@ -9860,8 +9902,8 @@ export default function App() {
                         setMergeCountInvalid(false)
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') confirmMergePages()
-                        else if (e.key === 'Escape') {
+                        if (isConfirmKey(e)) confirmMergePages()
+                        else if (isCancelKey(e)) {
                           e.preventDefault()
                           setMergePagesDlg(false)
                         }
@@ -9922,8 +9964,8 @@ export default function App() {
                       setReplaceInvalid(false)
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') confirmReplace()
-                      else if (e.key === 'Escape') {
+                      if (isConfirmKey(e)) confirmReplace()
+                      else if (isCancelKey(e)) {
                         e.preventDefault()
                         setReplaceDlg(false)
                       }
@@ -10068,7 +10110,7 @@ export default function App() {
             <div className="status-right">
               <button
                 className="zoom-btn"
-                data-tip={t('zoomOut')}
+                data-tip={pdfTip(t('zoomOut'), 'pdf-09')}
                 aria-label={t('zoomOut')}
                 onClick={zoomOut}
               >
@@ -10085,7 +10127,7 @@ export default function App() {
               />
               <button
                 className="zoom-btn"
-                data-tip={t('zoomIn')}
+                data-tip={pdfTip(t('zoomIn'), 'pdf-08')}
                 aria-label={t('zoomIn')}
                 onClick={zoomIn}
               >

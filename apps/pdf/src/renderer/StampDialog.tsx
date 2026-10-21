@@ -5,6 +5,7 @@ import type { HeaderFooterConfig, WatermarkConfig } from './stamps'
 import type { TFunc } from './i18n/locale'
 import { ColorPickerPopover } from './ColorPicker'
 import { useModalDialog } from './modal-dialog'
+import { isCancelKey } from './shortcuts'
 
 /** Watermark / header-footer config dialog; on confirm App generates stamps and marks unsaved changes */
 export function StampDialog({
@@ -32,7 +33,7 @@ export function StampDialog({
       if (!colorWrapRef.current?.contains(event.target as Node)) setColorOpen(false)
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
+      if (isCancelKey(event)) {
         event.preventDefault()
         setColorOpen(false)
       }

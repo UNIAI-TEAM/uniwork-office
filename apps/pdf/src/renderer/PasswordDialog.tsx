@@ -9,6 +9,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useI18n } from './i18n/locale'
 import { IconAlert, IconEye, IconEyeOff } from './icons'
+import { isConfirmKey } from './shortcuts'
 
 export function PasswordDialog({
   fileName,
@@ -71,7 +72,7 @@ export function PasswordDialog({
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && value) onSubmit()
+                if (isConfirmKey(e) && value) onSubmit()
               }}
             />
             <button

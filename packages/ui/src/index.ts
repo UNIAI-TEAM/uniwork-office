@@ -50,6 +50,7 @@ export {
   FindPanel,
   type FindFocusRequest,
   type FindPanelStrings,
+  stepFindMatch,
   type FindTarget,
 } from './find-panel'
 export { findInText, foldCase, isWordChar, type FindOptions } from './find-text'
@@ -67,6 +68,7 @@ export {
   RIBBON_TOGGLE_SHORTCUT,
   type RibbonCollapse,
   type RibbonCollapseLabels,
+  type RibbonCollapseOptions,
   type RibbonDensity,
   type RibbonOverflow,
   type RibbonScrollMetrics,

@@ -132,7 +132,10 @@ describe('Plain text in the native New menus', () => {
   const main = readFileSync(resolve(import.meta.dirname, '../src/main/index.ts'), 'utf8')
 
   it('follows Markdown with a Plain text item that opens a blank .txt, in every New list', () => {
-    const marks = [...main.matchAll(/label: tm\('menuNewMarkdown'\)/g)].map((match) => match.index)
+    // the Markdown module's own File menu holds one New item (with the table accelerator), not a New list
+    const marks = [...main.matchAll(/label: tm\('menuNewMarkdown'\)(?!,\s*\.\.\.acc\()/g)].map(
+      (match) => match.index,
+    )
     // the tab-bar "+" menu, File > New and the macOS Dock menu
     expect(marks).toHaveLength(3)
     for (const at of marks) {

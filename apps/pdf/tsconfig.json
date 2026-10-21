@@ -3,7 +3,12 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      // resolve the workspace table from this checkout's sources (a worktree's node_modules
+      // may link into another checkout)
+      "@genoffice/shortcuts": ["../../packages/shortcuts/src/index.ts"]
+    }
   },
   "include": [
     "src",

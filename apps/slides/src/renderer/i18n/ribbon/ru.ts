@@ -47,15 +47,12 @@ export const ru = {
   ribbonPasteTipDisabled: 'Вставить (сначала скопируйте или вырежьте элемент на холсте)',
   ribbonCutTip: 'Вырезать (⌘X)',
   ribbonCopyTip: 'Копировать (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Формат по образцу (сначала выделите элемент; ⌘⇧C копировать формат / ⌘⇧V вставить формат)',
+  ribbonBrushTipNoSelection: 'Формат по образцу (сначала выделите элемент)',
   ribbonBrushTipContinuous: 'Формат по образцу, непрерывный режим (Esc — выход)',
   ribbonBrushTipOnce:
     'Формат по образцу, однократный режим (щёлкните целевой элемент, чтобы применить)',
-  ribbonBrushTipHasFormat:
-    'Формат по образцу (один щелчок — однократно / двойной — непрерывно; ⌘⇧C копировать формат / ⌘⇧V вставить формат)',
-  ribbonBrushTipDefault:
-    'Формат по образцу (щёлкните, чтобы скопировать и применить формат; ⌘⇧C копировать формат / ⌘⇧V вставить формат)',
+  ribbonBrushTipHasFormat: 'Формат по образцу (один щелчок — однократно / двойной — непрерывно)',
+  ribbonBrushTipDefault: 'Формат по образцу (щёлкните, чтобы скопировать и применить формат)',
   ribbonGroupSlides: 'Слайды',
   ribbonNewSlide: 'Создать слайд',
   ribbonNewSlideTip: 'Новый пустой слайд (наследует фон макета текущего слайда)',
@@ -369,9 +366,9 @@ export const ru = {
   ribbonAnimDelayTip: 'Задержка после запуска до начала (секунды)',
   ribbonGroupStartShow: 'Начать слайд-шоу',
   ribbonFromBeginning: 'С начала',
-  ribbonFromBeginningTip: 'Полноэкранный показ с 1-го слайда (F5; скрытые слайды пропускаются)',
+  ribbonFromBeginningTip: 'Полноэкранный показ с 1-го слайда (скрытые слайды пропускаются)',
   ribbonFromCurrent: 'С текущего слайда',
-  ribbonFromCurrentTip: 'Полноэкранный показ с текущего слайда (⇧F5)',
+  ribbonFromCurrentTip: 'Полноэкранный показ с текущего слайда',
   ribbonPresenterView: 'Режим докладчика',
   ribbonPresenterViewTip:
     'Режим докладчика: заметки / следующий слайд / таймер / перо; при нескольких мониторах показ идёт во весь экран на другом',

@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@genoffice/i18n": "*",
+    "@genoffice/shortcuts": "*",
     "@genoffice/pptx-render": "*",
     "@genoffice/agent-core": "*",
     "@genoffice/ai-provider": "*"

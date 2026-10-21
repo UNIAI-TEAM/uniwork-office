@@ -17,6 +17,12 @@
  * label is cut mid-word without a hint that more is there. The buttons are a visual
  * aid (aria-hidden, no tab stop): every control is already reachable by Tab.
  *
+ * The collapse (and compact) key can come from the caller's shortcut table instead of the
+ * hard-coded pair: pass `{ action }` (UNI-2011 common-10, or the module's own row such as
+ * docs-086 whose web key is Ctrl+F3) and the hook matches it with the package matcher
+ * (IME composition, AltGr and key-repeat guards, Mac / web chords) and shows its hint in the
+ * tips. A caller that passes nothing keeps Ctrl+F1 / ⌥⌘R.
+ *
  * Markup contract: the ribbon root carries `rootRef` + `rootClass`, the band
  * element carries `data-ribbon-body`, tabs render `tabClass` / `tabTip` and
  * call `onTabPress`. Ribbons without tabs use `RibbonCollapseButton` +
@@ -24,6 +30,14 @@
  * band's corner).
  */
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
+import {
+  currentShortcutPlatform,
+  formatHint,
+  matchShortcut,
+  type ShortcutAction,
+  type ShortcutPlatform,
+  type ShortcutSurface,
+} from '@genoffice/shortcuts'
 
 const IS_MAC = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac')
 
@@ -235,8 +249,24 @@ export interface RibbonCollapseLabels {
   readonly expandFull?: string
 }
 
+export interface RibbonCollapseOptions {
+  /** The collapse action of the caller's table (common-10, or the module's own row). Absent: the
+   * hard-coded Ctrl+F1 / ⌥⌘R. */
+  readonly action?: ShortcutAction
+  /** The compact-density action (docs-087). Absent: the hard-coded Ctrl+Alt+K / ⌥⌘K. Only read
+   * when the call site opted into the compact labels. */
+  readonly compactAction?: ShortcutAction
+  /** `web` inside a module frame in a browser (the capability reader's `platform() === 'web'`),
+   * `desktop` otherwise. Default `desktop`. */
+  readonly surface?: ShortcutSurface
+  /** Default: `currentShortcutPlatform()`. Mainly for tests. */
+  readonly platform?: ShortcutPlatform
+}
+
 export interface RibbonCollapse {
   readonly collapsed: boolean
+  /** The collapse key as shown in tips (`Ctrl+F1`, `⌥⌘R`); empty when the action has no chord here */
+  readonly shortcutLabel: string
   /** current band density; `'full'` when the call site did not opt in */
   readonly density: RibbonDensity
   /** true when the call site passed the compact labels */
@@ -260,7 +290,16 @@ export interface RibbonCollapse {
 export function useRibbonCollapse(
   storageKey: string,
   labels: RibbonCollapseLabels,
+  options: RibbonCollapseOptions = {},
 ): RibbonCollapse {
+  const { action, compactAction, surface = 'desktop' } = options
+  const platform = options.platform ?? currentShortcutPlatform()
+  const shortcutLabel = action ? formatHint(action, platform, surface) : RIBBON_TOGGLE_SHORTCUT
+  const compactLabel = compactAction
+    ? formatHint(compactAction, platform, surface)
+    : RIBBON_COMPACT_SHORTCUT
+  /** ` (key)` after a tip, or nothing when the surface has no key */
+  const keyed = (text: string, key: string) => (key ? `${text} (${key})` : text)
   const compactEnabled = Boolean(labels.compact && labels.expandFull)
   const [density, setDensity] = useState<RibbonDensity>(() =>
     compactEnabled
@@ -350,29 +389,38 @@ export function useRibbonCollapse(
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isRibbonToggleShortcut(e)) {
+      // a table action goes through the package matcher (composition, AltGr, repeat); without
+      // one the old hard-coded key answers
+      const isToggle = action
+        ? matchShortcut(e, [action], platform, surface) !== null
+        : isRibbonToggleShortcut(e)
+      if (isToggle) {
         e.preventDefault()
         toggle()
         return
       }
-      if (compactEnabled && isRibbonCompactShortcut(e)) {
+      if (!compactEnabled) return
+      const isCompact = compactAction
+        ? matchShortcut(e, [compactAction], platform, surface) !== null
+        : isRibbonCompactShortcut(e)
+      if (isCompact) {
         e.preventDefault()
         toggleCompact()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [toggle, toggleCompact, compactEnabled])
+  }, [toggle, toggleCompact, compactEnabled, action, compactAction, platform, surface])
 
   const tabClass = (isActive: boolean) => (isActive && !collapsed ? 'active' : '')
   const tabTip = (isActive: boolean) => {
-    if (collapsed) return `${labels.expand} (${RIBBON_TOGGLE_SHORTCUT})`
+    if (collapsed) return keyed(labels.expand, shortcutLabel)
     if (!isActive) return undefined
-    if (!compactEnabled) return `${labels.collapse} (${RIBBON_TOGGLE_SHORTCUT})`
+    if (!compactEnabled) return keyed(labels.collapse, shortcutLabel)
     // while compact the band toggle would collapse; offer both ways out
     return density === 'compact'
-      ? `${labels.expandFull} (${RIBBON_COMPACT_SHORTCUT})`
-      : `${labels.collapse} (${RIBBON_TOGGLE_SHORTCUT}) · ${labels.compact} (${RIBBON_COMPACT_SHORTCUT})`
+      ? keyed(labels.expandFull ?? '', compactLabel)
+      : `${keyed(labels.collapse, shortcutLabel)} · ${keyed(labels.compact ?? '', compactLabel)}`
   }
 
   const rootClass = `ribbon-collapsible${collapsed ? ' ribbon-collapsed' : ''}${
@@ -380,6 +428,7 @@ export function useRibbonCollapse(
   }`
   return {
     collapsed,
+    shortcutLabel,
     density,
     compactEnabled,
     rootRef,
@@ -424,7 +473,7 @@ function ChevronDown() {
 /** Corner button of the band for ribbons without tabs (no selected tab to press): shown only while expanded. */
 export function RibbonCollapseButton({ state, label }: { state: RibbonCollapse; label: string }) {
   if (state.collapsed) return null
-  const tip = `${label} (${RIBBON_TOGGLE_SHORTCUT})`
+  const tip = state.shortcutLabel ? `${label} (${state.shortcutLabel})` : label
   return (
     <button
       type="button"
@@ -442,7 +491,7 @@ export function RibbonCollapseButton({ state, label }: { state: RibbonCollapse; 
 /** Tab-row button for ribbons without tabs (nothing to press to expand): shown only while collapsed. */
 export function RibbonExpandButton({ state, label }: { state: RibbonCollapse; label: string }) {
   if (!state.collapsed) return null
-  const tip = `${label} (${RIBBON_TOGGLE_SHORTCUT})`
+  const tip = state.shortcutLabel ? `${label} (${state.shortcutLabel})` : label
   return (
     <button
       type="button"

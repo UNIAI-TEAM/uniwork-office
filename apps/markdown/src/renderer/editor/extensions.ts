@@ -10,6 +10,7 @@ import { CodeBlockView } from './CodeBlockView'
 import { ImageAwareLink, LocalImage } from './localImage'
 import { BlockDragHandle } from './blockDragHandle'
 import { BlockKeymap } from './blockKeymap'
+import { TableKeymap } from './tableKeymap'
 import { AiHighlight } from './aiHighlight'
 import { AiRunHistory } from './aiRunHistory'
 import { AiQueueAnchors } from './aiQueueAnchors'
@@ -34,6 +35,7 @@ import {
   StyledItalic,
   StyledListItem,
   StyledTaskItem,
+  TableStrike,
   renderTable,
 } from './markdownStyleRenderers'
 import { boundOrderedList, boundTable, boundTaskList } from './boundedTokenizers'
@@ -74,12 +76,15 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
       horizontalRule: false,
       hardBreak: false,
       listItem: false,
+      // re-added below without its own key: strikethrough is a table chord
+      strike: false,
       // re-added below: code after the other marks so it serializes innermost
       code: false,
     }),
     BlockStartEscapedParagraph,
     StyledBold,
     StyledItalic,
+    TableStrike,
     CodeSpan,
     StyledHeading,
     StyledHorizontalRule,
@@ -141,6 +146,7 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     WikiLinkResolve.configure(options.wikiLink ?? {}),
     BlockDragHandle,
     BlockKeymap,
+    TableKeymap,
     AiHighlight,
     AiRunHistory,
     AiQueueAnchors,

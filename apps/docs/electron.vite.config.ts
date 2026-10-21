@@ -15,6 +15,7 @@ const localAlias = {
     '../../packages/docx-engine/src/zip-splice.ts',
   ),
   '@genoffice/docx-engine': resolve(__dirname, '../../packages/docx-engine/src/index.ts'),
+  '@genoffice/shortcuts': resolve(__dirname, '../../packages/shortcuts/src/index.ts'),
 }
 
 export default defineConfig({
@@ -26,7 +27,12 @@ export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin({
-        exclude: ['@genoffice/docx-engine', '@genoffice/electron-utils', '@genoffice/font-metrics'],
+        exclude: [
+          '@genoffice/docx-engine',
+          '@genoffice/electron-utils',
+          '@genoffice/font-metrics',
+          '@genoffice/shortcuts',
+        ],
       }),
     ],
     resolve: { alias: localAlias },

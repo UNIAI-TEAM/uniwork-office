@@ -266,20 +266,21 @@ describe('markdown App on a UniWork copy', () => {
     },
   )
 
-  it('Ctrl+S on a UniWork copy is a plain Save (no dialog); only Ctrl+Shift+S is Save As', async () => {
+  it('Ctrl+S on a UniWork copy is a plain Save (no dialog); only F12 is Save As', async () => {
     const h = await mount({ bound: true, readOnly: false }, { ok: true, path: PATH })
     open.push(h)
-    const press = async (shiftKey: boolean) => {
+    const press = async (init: KeyboardEventInit) => {
       await act(async () => {
-        window.dispatchEvent(
-          new KeyboardEvent('keydown', { key: shiftKey ? 'S' : 's', ctrlKey: true, shiftKey }),
-        )
+        window.dispatchEvent(new KeyboardEvent('keydown', init))
       })
       await settle()
     }
-    await press(false)
+    await press({ key: 's', ctrlKey: true })
     expect(h.api.save.mock.calls.at(-1)?.[0]).toMatchObject({ mode: 'save' })
-    await press(true)
+    // Ctrl+Shift+S is Strikethrough now (the editor's); Save As is F12
+    await press({ key: 'S', ctrlKey: true, shiftKey: true })
+    expect(h.api.save).toHaveBeenCalledTimes(1)
+    await press({ key: 'F12', code: 'F12' })
     expect(h.api.save.mock.calls.at(-1)?.[0]).toMatchObject({ mode: 'saveAs' })
   })
 })

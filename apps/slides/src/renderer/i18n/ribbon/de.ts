@@ -48,14 +48,11 @@ export const de = {
   ribbonPasteTipDisabled: 'Einfügen (zuerst ein Canvas-Element kopieren oder ausschneiden)',
   ribbonCutTip: 'Ausschneiden (⌘X)',
   ribbonCopyTip: 'Kopieren (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Format übertragen (zuerst ein Element auswählen; ⌘⇧C Format kopieren / ⌘⇧V Format einfügen)',
+  ribbonBrushTipNoSelection: 'Format übertragen (zuerst ein Element auswählen)',
   ribbonBrushTipContinuous: 'Format übertragen – Dauermodus (Esc zum Beenden)',
   ribbonBrushTipOnce: 'Format übertragen – Einzelmodus (Zielelement anklicken, um es anzuwenden)',
-  ribbonBrushTipHasFormat:
-    'Format übertragen (Klick für einmal / Doppelklick für Dauermodus; ⌘⇧C Format kopieren / ⌘⇧V Format einfügen)',
-  ribbonBrushTipDefault:
-    'Format übertragen (klicken, um das Format zu kopieren und anzuwenden; ⌘⇧C Format kopieren / ⌘⇧V Format einfügen)',
+  ribbonBrushTipHasFormat: 'Format übertragen (Klick für einmal / Doppelklick für Dauermodus)',
+  ribbonBrushTipDefault: 'Format übertragen (klicken, um das Format zu kopieren und anzuwenden)',
   ribbonGroupSlides: 'Folien',
   ribbonNewSlide: 'Neue Folie',
   ribbonNewSlideTip: 'Neue leere Folie (übernimmt den Layouthintergrund der aktuellen Folie)',
@@ -375,9 +372,9 @@ export const de = {
   ribbonGroupStartShow: 'Bildschirmpräsentation starten',
   ribbonFromBeginning: 'Von Beginn an',
   ribbonFromBeginningTip:
-    'Vollbildpräsentation ab Folie 1 (F5; ausgeblendete Folien werden übersprungen)',
+    'Vollbildpräsentation ab Folie 1 (ausgeblendete Folien werden übersprungen)',
   ribbonFromCurrent: 'Ab aktueller Folie',
-  ribbonFromCurrentTip: 'Vollbildpräsentation ab der aktuellen Folie (⇧F5)',
+  ribbonFromCurrentTip: 'Vollbildpräsentation ab der aktuellen Folie',
   ribbonPresenterView: 'Referentenansicht',
   ribbonPresenterViewTip:
     'Referentenansicht: Notizen / nächste Folie / Timer / Stift; bei mehreren Bildschirmen läuft die Präsentation im Vollbild auf dem anderen',

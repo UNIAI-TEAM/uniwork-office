@@ -47,6 +47,7 @@ import {
   type PdfCommentsContext,
 } from './pdf-comments-context'
 import { makePdfAnchor, pointAnchorRect, type PdfAnchor } from './pdf-anchor'
+import { isCancelKey } from '../shortcuts'
 
 export interface PdfServerCommentsOptions {
   /** `window.uniworkComments` as the preload (or the web frame bridge) exposes it */
@@ -349,7 +350,7 @@ export function PdfCommentsPanel(p: PdfCommentsPanelProps) {
   // new-thread composer lets it fall through. It is dropped (with its page frame) and the panel closes.
   // An unedited AI draft is not dirty to the kit either, but it is not empty: it stays untouched.
   const onKeyDown = (e: ReactKeyboardEvent) => {
-    if (e.key !== 'Escape' || e.defaultPrevented || e.nativeEvent.isComposing) return
+    if (!isCancelKey(e) || e.defaultPrevented) return
     if (!baseRef.current.newThread || !(e.target as HTMLElement).closest('.collab-thread--new'))
       return
     if (!comments.cancelEmptyThread()) return

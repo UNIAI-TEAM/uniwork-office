@@ -1,21 +1,30 @@
 /**
- * The shortcut registry is what the Keyboard Shortcuts sheet
- * renders, so it has to stay honest: no chord listed twice on either platform,
- * every row translatable, and no menu accelerator missing from the list.
+ * The shortcut registry is what the Keyboard Shortcuts sheet renders and what
+ * App's handler, the editor keymap and the menu read, so it has to stay
+ * honest: every command points at a real docs table row, no chord is listed
+ * twice on a platform and surface, every row is translatable, and every menu
+ * accelerator is a table row the sheet lists.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { findShortcut, type ShortcutPlatform, type ShortcutSurface } from '@genoffice/shortcuts'
 import {
   SHORTCUTS,
   SHORTCUT_GROUPS,
+  shortcutChords,
   shortcutKeys,
-  type ShortcutDef,
+  visibleShortcuts,
 } from '../src/renderer/shortcuts'
+import { DOCS_MENU_SHORTCUTS } from '../src/shared/docs-shortcuts'
 import { strings } from '../src/renderer/i18n/strings'
 
-// alternates are listed as "A / B"; the separator has to keep ⌘/ itself intact
-const chords = (def: ShortcutDef, isMac: boolean) => shortcutKeys(def, isMac).split(' / ')
+const CASES: [ShortcutPlatform, ShortcutSurface][] = [
+  ['win', 'desktop'],
+  ['mac', 'desktop'],
+  ['win', 'web'],
+  ['mac', 'web'],
+]
 
 describe('shortcut registry', () => {
   it('has unique ids and known groups', () => {
@@ -25,13 +34,19 @@ describe('shortcut registry', () => {
     for (const def of SHORTCUTS) expect(groups.has(def.group)).toBe(true)
   })
 
-  it.each([
-    ['macOS', true],
-    ['Windows/Linux', false],
-  ])('binds every chord once on %s', (_platform, isMac) => {
+  it('points every command at one docs table row, or at editor-native keys', () => {
+    for (const def of SHORTCUTS) {
+      expect(!!def.action !== !!def.native, def.id).toBe(true)
+      if (def.action) expect(findShortcut('docs', def.action), def.id).toBeDefined()
+    }
+    const actions = SHORTCUTS.flatMap((def) => (def.action ? [def.action] : []))
+    expect(new Set(actions).size).toBe(actions.length)
+  })
+
+  it.each(CASES)('binds every chord once on %s %s', (platform, surface) => {
     const seen = new Map<string, string>()
     for (const def of SHORTCUTS) {
-      for (const chord of chords(def, isMac as boolean)) {
+      for (const chord of shortcutChords(def, platform, surface)) {
         expect(seen.get(chord), `${chord} is claimed by ${seen.get(chord)} and ${def.id}`).toBe(
           undefined,
         )
@@ -49,38 +64,64 @@ describe('shortcut registry', () => {
     }
   })
 
-  it('rewrites Mac notation for Windows/Linux', () => {
+  it('formats the keys per platform', () => {
     const byId = new Map(SHORTCUTS.map((def) => [def.id, def]))
-    const win = (id: string) => shortcutKeys(byId.get(id)!, false)
-    expect(win('save-as')).toBe('Ctrl+Shift+S')
-    expect(win('page-break')).toBe('Ctrl+Enter')
-    expect(win('nbsp')).toBe('Ctrl+Shift+Space')
-    expect(win('style-h1')).toBe('Ctrl+Alt+1')
-    expect(win('proofread')).toBe('F7')
-    // platform-specific keys come from the explicit override, not a rewrite
-    expect(win('endnote')).toBe('Ctrl+Alt+D')
-    expect(shortcutKeys(byId.get('endnote')!, true)).toBe('⌥⌘E')
+    const keys = (id: string, platform: ShortcutPlatform, surface: ShortcutSurface = 'desktop') =>
+      shortcutKeys(byId.get(id)!, platform, surface)
+    expect(keys('save-as', 'win')).toBe('F12')
+    expect(keys('save-as', 'mac')).toBe('⇧⌘S')
+    expect(keys('redo', 'win')).toBe('Ctrl+Y / Ctrl+Shift+Z')
+    expect(keys('redo', 'mac')).toBe('⌘Y / ⇧⌘Z')
+    expect(keys('page-break', 'win')).toBe('Ctrl+Enter')
+    expect(keys('style-h1', 'win')).toBe('Ctrl+Alt+1')
+    expect(keys('comment', 'win')).toBe('Ctrl+Alt+M')
+    expect(keys('comment', 'mac')).toBe('⌥⌘A')
+    expect(keys('endnote', 'win')).toBe('Ctrl+Alt+D')
+    expect(keys('endnote', 'mac')).toBe('⌥⌘E')
+    expect(keys('bullets', 'win')).toBe('Ctrl+Shift+L')
+    expect(keys('bullets', 'win', 'web')).toBe('Ctrl+.')
+    expect(keys('numbering', 'win', 'web')).toBe('Ctrl+/')
+    expect(keys('shortcuts', 'mac')).toBe('⌘/')
+  })
+
+  it('leaves commands without a key on this surface out of the sheet', () => {
+    const web = new Set(visibleShortcuts('win', 'web').map((def) => def.id))
+    // the browser keeps Ctrl+N / Ctrl+W, and F1 is the browser's help on the web
+    for (const id of ['new', 'close', 'shortcuts', 'hanging-indent'])
+      expect(web.has(id)).toBe(false)
+    expect(web.has('ribbon-toggle')).toBe(true)
+    const desktop = new Set(visibleShortcuts('win', 'desktop').map((def) => def.id))
+    for (const id of ['new', 'close', 'shortcuts', 'hanging-indent'])
+      expect(desktop.has(id)).toBe(true)
+    // Word for Windows prints no strikethrough key
+    expect(desktop.has('strike')).toBe(false)
+    expect(visibleShortcuts('mac', 'desktop').some((def) => def.id === 'strike')).toBe(true)
+  })
+
+  it('leaves the zoom keys out of the web sheet: the browser zooms the page', () => {
+    const web = new Set(visibleShortcuts('win', 'web').map((def) => def.id))
+    for (const id of ['zoom-in', 'zoom-out', 'zoom-100']) expect(web.has(id), id).toBe(false)
+    const desktop = new Set(visibleShortcuts('win', 'desktop').map((def) => def.id))
+    for (const id of ['zoom-in', 'zoom-out', 'zoom-100']) expect(desktop.has(id), id).toBe(true)
+  })
+
+  it('writes no file-menu key hint by hand', () => {
+    for (const file of ['components/Ribbon.tsx', 'App.tsx']) {
+      const source = readFileSync(join(__dirname, '../src/renderer', file), 'utf8')
+      const hand = source.match(/file-menu-key">[^{<]*[A-Za-z⌘⇧⌥][^<]*</g) ?? []
+      expect(hand, file).toEqual([])
+    }
   })
 
   it('lists every menu accelerator', () => {
+    const listed = new Set(SHORTCUTS.map((def) => def.action))
+    for (const [item, id] of Object.entries(DOCS_MENU_SHORTCUTS))
+      expect(listed.has(id), `${item} (${id}) is not in the shortcut sheet`).toBe(true)
+  })
+
+  it('writes no menu accelerator by hand', () => {
     const source = readFileSync(join(__dirname, '../src/main/docs-main.ts'), 'utf8')
-    const accelerators = [...source.matchAll(/accelerator: '([^']+)'/g)].map((m) => m[1])
-    expect(accelerators.length).toBeGreaterThan(15)
-    const listed = new Set(SHORTCUTS.flatMap((def) => chords(def, false)))
-    for (const accelerator of accelerators) {
-      // Electron writes modifiers in any order; the sheet renders Ctrl+Alt+Shift+key
-      const parts = accelerator.split('+')
-      const key = parts.pop()!
-      const mods = new Set(parts)
-      const normalized = [
-        mods.has('CmdOrCtrl') || mods.has('Ctrl') ? 'Ctrl' : null,
-        mods.has('Alt') ? 'Alt' : null,
-        mods.has('Shift') ? 'Shift' : null,
-        key,
-      ]
-        .filter(Boolean)
-        .join('+')
-      expect(listed.has(normalized), `${accelerator} is not in the shortcut sheet`).toBe(true)
-    }
+    expect(source.match(/accelerator: ['"`]/g) ?? []).toEqual([])
+    expect(source.match(/accelerator: acc\(/g)?.length).toBeGreaterThan(15)
   })
 })

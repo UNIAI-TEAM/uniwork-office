@@ -990,6 +990,10 @@
         post({ type: 'gx:keyCommand', command: 'print' })
         return
       }
+      // Cmd on macOS, Ctrl elsewhere: the host table's chords are exact, so Control+U on a Mac or
+      // Ctrl+Shift+K anywhere is not a command key
+      const cmdKey = /mac/i.test(navigator.platform) ? e.metaKey : e.ctrlKey
+      const inlineCommand = { b: 'bold', i: 'italic', u: 'underline', k: 'link' }
       if (editing) {
         const mod = (e.metaKey || e.ctrlKey) && !e.altKey
         if (e.key === 'Escape') {
@@ -1000,15 +1004,16 @@
         } else if (e.key === 'Enter' && mod) {
           e.preventDefault()
           finishEdit(true)
-        } else if (mod && (e.key.toLowerCase() === 'b' || e.key.toLowerCase() === 'i')) {
-          // bold / italic on a range selected inside the edited run: commit the run first, then
-          // hand the host the range again (its re-select after the commit cleared it) and the command
+        } else if (cmdKey && !e.altKey && !e.shiftKey && inlineCommand[e.key.toLowerCase()]) {
+          // bold / italic / underline / link on a range selected inside the edited run: commit the
+          // run first, then hand the host the range again (its re-select after the commit cleared
+          // it) and the command
           const range = textSelection()
           if (!range) return
           e.preventDefault()
           finishEdit(true)
           post(range)
-          post({ type: 'gx:keyCommand', command: e.key.toLowerCase() === 'b' ? 'bold' : 'italic' })
+          post({ type: 'gx:keyCommand', command: inlineCommand[e.key.toLowerCase()] })
         }
         return
       }
@@ -1057,7 +1062,8 @@
         ArrowRight: 'child',
         Escape: 'escape',
       }
-      const modKey = mod ? { k: 'askAi', b: 'bold', i: 'italic' }[e.key.toLowerCase()] : undefined
+      const modKey =
+        cmdKey && !e.altKey && !e.shiftKey ? inlineCommand[e.key.toLowerCase()] : undefined
       const altKey =
         e.altKey && !mod ? { ArrowUp: 'moveUp', ArrowDown: 'moveDown' }[e.key] : undefined
       const command = modKey || altKey || map[e.key]

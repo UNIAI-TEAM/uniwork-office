@@ -9,6 +9,7 @@
 import type { AgentSkill } from '@genoffice/agent-core'
 import type { AttachmentMeta } from '../../shared/desktop-api'
 import type { AiChatMessage } from './AiChatPanel'
+import { sheetsHint } from '../sheets-keymap'
 import type { MergeSourcesResult } from '../merge-workbooks'
 
 export const SPREADSHEET_ATTACHMENT_EXTS = new Set(['xlsx', 'xlsm', 'xls', 'csv', 'tsv'])
@@ -121,8 +122,8 @@ export function createMergeSkill(deps: MergeSkillDeps): AgentSkill {
           `New sheets: ${result.sheetNames.join(', ')}`,
           'Source formulas were imported as computed values.',
           result.undoSteps === null
-            ? 'The merge is too large for the undo history: it cannot be undone with [Undo] or ⌘Z; to revert it, the new sheets must be deleted.'
-            : 'Undo via the side panel [Undo] button or ⌘Z reverts the merge.',
+            ? `The merge is too large for the undo history: it cannot be undone with [Undo] or ${sheetsHint('sheets-07')}; to revert it, the new sheets must be deleted.`
+            : `Undo via the side panel [Undo] button or ${sheetsHint('sheets-07')} reverts the merge.`,
         ]
         if (skipped.length > 0) lines.push(`Skipped: ${skipped.join('; ')}`)
         return {

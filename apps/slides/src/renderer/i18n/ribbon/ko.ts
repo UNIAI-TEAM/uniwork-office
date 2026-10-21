@@ -48,14 +48,11 @@ export const ko = {
   ribbonPasteTipDisabled: '붙여넣기(먼저 캔버스 요소를 복사하거나 잘라내세요)',
   ribbonCutTip: '잘라내기(⌘X)',
   ribbonCopyTip: '복사(⌘C)',
-  ribbonBrushTipNoSelection:
-    '서식 복사(요소를 선택하면 사용 가능, ⌘⇧C 서식 복사 / ⌘⇧V 서식 붙여넣기)',
+  ribbonBrushTipNoSelection: '서식 복사(요소를 선택하면 사용 가능)',
   ribbonBrushTipContinuous: '서식 복사 연속 모드(Esc 키로 종료)',
   ribbonBrushTipOnce: '서식 복사 1회 모드(대상 요소를 클릭하여 적용)',
-  ribbonBrushTipHasFormat:
-    '서식 복사(한 번 클릭 시 1회 / 두 번 클릭 시 연속, ⌘⇧C 서식 복사 / ⌘⇧V 서식 붙여넣기)',
-  ribbonBrushTipDefault:
-    '서식 복사(클릭하여 서식을 복사하고 적용, ⌘⇧C 서식 복사 / ⌘⇧V 서식 붙여넣기)',
+  ribbonBrushTipHasFormat: '서식 복사(한 번 클릭 시 1회 / 두 번 클릭 시 연속)',
+  ribbonBrushTipDefault: '서식 복사(클릭하여 서식을 복사하고 적용)',
   // Home: slides
   ribbonGroupSlides: '슬라이드',
   ribbonNewSlide: '새 슬라이드',
@@ -368,10 +365,9 @@ export const ko = {
   // Slide show
   ribbonGroupStartShow: '슬라이드 쇼 시작',
   ribbonFromBeginning: '처음부터',
-  ribbonFromBeginningTip:
-    '1번 슬라이드부터 전체 화면으로 슬라이드 쇼 시작(F5, 숨긴 슬라이드는 건너뜀)',
+  ribbonFromBeginningTip: '1번 슬라이드부터 전체 화면으로 슬라이드 쇼 시작(숨긴 슬라이드는 건너뜀)',
   ribbonFromCurrent: '현재 슬라이드부터',
-  ribbonFromCurrentTip: '현재 슬라이드부터 전체 화면으로 슬라이드 쇼 시작(⇧F5)',
+  ribbonFromCurrentTip: '현재 슬라이드부터 전체 화면으로 슬라이드 쇼 시작',
   ribbonPresenterView: '발표자 보기',
   ribbonPresenterViewTip:
     '발표자 보기: 노트/다음 슬라이드/타이머/펜, 여러 모니터 사용 시 다른 화면에서 전체 화면으로 진행',

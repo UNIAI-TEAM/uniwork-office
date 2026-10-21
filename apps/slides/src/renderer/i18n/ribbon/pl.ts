@@ -46,15 +46,13 @@ export const pl = {
   ribbonPasteTipDisabled: 'Wklej (najpierw skopiuj lub wytnij element kanwy)',
   ribbonCutTip: 'Wytnij (⌘X)',
   ribbonCopyTip: 'Kopiuj (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Malarz formatów (najpierw zaznacz element; ⌘⇧C kopiuje format / ⌘⇧V wkleja format)',
+  ribbonBrushTipNoSelection: 'Malarz formatów (najpierw zaznacz element)',
   ribbonBrushTipContinuous: 'Malarz formatów w trybie ciągłym (naciśnij Esc, aby wyjść)',
   ribbonBrushTipOnce:
     'Malarz formatów w trybie pojedynczym (kliknij element docelowy, aby zastosować)',
   ribbonBrushTipHasFormat:
-    'Malarz formatów (kliknij dla jednego użycia / kliknij dwukrotnie dla trybu ciągłego; ⌘⇧C kopiuje format / ⌘⇧V wkleja format)',
-  ribbonBrushTipDefault:
-    'Malarz formatów (kliknij, aby skopiować i zastosować formatowanie; ⌘⇧C kopiuje format / ⌘⇧V wkleja format)',
+    'Malarz formatów (kliknij dla jednego użycia / kliknij dwukrotnie dla trybu ciągłego)',
+  ribbonBrushTipDefault: 'Malarz formatów (kliknij, aby skopiować i zastosować formatowanie)',
   ribbonGroupSlides: 'Slajdy',
   ribbonNewSlide: 'Nowy slajd',
   ribbonNewSlideTip: 'Nowy pusty slajd (zachowuje tło układu bieżącego slajdu)',
@@ -370,9 +368,9 @@ export const pl = {
   ribbonAnimDelayTip: 'Opóźnienie rozpoczęcia po wyzwoleniu (sekundy)',
   ribbonGroupStartShow: 'Rozpocznij pokaz slajdów',
   ribbonFromBeginning: 'Od początku',
-  ribbonFromBeginningTip: 'Pokaz pełnoekranowy od slajdu 1 (F5; ukryte slajdy są pomijane)',
+  ribbonFromBeginningTip: 'Pokaz pełnoekranowy od slajdu 1 (ukryte slajdy są pomijane)',
   ribbonFromCurrent: 'Od bieżącego slajdu',
-  ribbonFromCurrentTip: 'Pokaz pełnoekranowy od bieżącego slajdu (⇧F5)',
+  ribbonFromCurrentTip: 'Pokaz pełnoekranowy od bieżącego slajdu',
   ribbonPresenterView: 'Widok prezentera',
   ribbonPresenterViewTip:
     'Widok prezentera: notatki / następny slajd / czasomierz / pióro; przy wielu ekranach pokaz działa na pełnym ekranie na drugim ekranie',

@@ -46,14 +46,11 @@ export const ms = {
   ribbonPasteTipDisabled: 'Tampal (salin atau potong elemen kanvas dahulu)',
   ribbonCutTip: 'Potong (⌘X)',
   ribbonCopyTip: 'Salin (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Penyalin Format (pilih elemen dahulu; ⌘⇧C salin format / ⌘⇧V tampal format)',
+  ribbonBrushTipNoSelection: 'Penyalin Format (pilih elemen dahulu)',
   ribbonBrushTipContinuous: 'Penyalin Format mod berterusan (tekan Esc untuk keluar)',
   ribbonBrushTipOnce: 'Penyalin Format mod sekali (klik elemen sasaran untuk menggunakannya)',
-  ribbonBrushTipHasFormat:
-    'Penyalin Format (klik untuk sekali / dwiklik untuk berterusan; ⌘⇧C salin format / ⌘⇧V tampal format)',
-  ribbonBrushTipDefault:
-    'Penyalin Format (klik untuk menyalin dan menggunakan pemformatan; ⌘⇧C salin format / ⌘⇧V tampal format)',
+  ribbonBrushTipHasFormat: 'Penyalin Format (klik untuk sekali / dwiklik untuk berterusan)',
+  ribbonBrushTipDefault: 'Penyalin Format (klik untuk menyalin dan menggunakan pemformatan)',
   ribbonGroupSlides: 'Slaid',
   ribbonNewSlide: 'Slaid Baharu',
   ribbonNewSlideTip: 'Slaid kosong baharu (mengekalkan latar belakang tataletak slaid semasa)',
@@ -371,9 +368,9 @@ export const ms = {
   ribbonAnimDelayTip: 'Lengah selepas pencetus sebelum bermula (saat)',
   ribbonGroupStartShow: 'Mulakan Tayangan Slaid',
   ribbonFromBeginning: 'Dari Awal',
-  ribbonFromBeginningTip: 'Tayangan skrin penuh dari slaid 1 (F5; slaid tersembunyi dilangkau)',
+  ribbonFromBeginningTip: 'Tayangan skrin penuh dari slaid 1 (slaid tersembunyi dilangkau)',
   ribbonFromCurrent: 'Dari Slaid Semasa',
-  ribbonFromCurrentTip: 'Tayangan skrin penuh dari slaid semasa (⇧F5)',
+  ribbonFromCurrentTip: 'Tayangan skrin penuh dari slaid semasa',
   ribbonPresenterView: 'Pandangan Penyampai',
   ribbonPresenterViewTip:
     'Pandangan penyampai: nota / slaid seterusnya / pemasa / pen; dengan berbilang paparan, tayangan berjalan skrin penuh pada paparan yang satu lagi',

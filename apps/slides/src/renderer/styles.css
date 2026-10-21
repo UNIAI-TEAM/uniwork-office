@@ -6726,6 +6726,12 @@ body.show-curtain::after {
   line-height: 0;
 }
 
+/* Ctrl+H / Cmd+I in the show hide the pointer over everything, links included */
+.slideshow.ss-no-pointer,
+.slideshow.ss-no-pointer * {
+  cursor: none !important;
+}
+
 /* Page transition animations: CSS approximations of the Transitions-tab PowerPoint effects (applied to the entering page) */
 .slideshow .ss-anim-fade {
   animation: ss-fade 0.5s ease both;

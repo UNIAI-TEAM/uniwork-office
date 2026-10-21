@@ -48,15 +48,12 @@ export const es = {
   ribbonPasteTipDisabled: 'Pegar (primero copie o corte un elemento del lienzo)',
   ribbonCutTip: 'Cortar (⌘X)',
   ribbonCopyTip: 'Copiar (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Copiar formato (seleccione primero un elemento; ⌘⇧C copiar formato / ⌘⇧V pegar formato)',
+  ribbonBrushTipNoSelection: 'Copiar formato (seleccione primero un elemento)',
   ribbonBrushTipContinuous: 'Copiar formato en modo continuo (Esc para salir)',
   ribbonBrushTipOnce:
     'Copiar formato una sola vez (haga clic en el elemento de destino para aplicarlo)',
-  ribbonBrushTipHasFormat:
-    'Copiar formato (un clic para una vez / doble clic para modo continuo; ⌘⇧C copiar formato / ⌘⇧V pegar formato)',
-  ribbonBrushTipDefault:
-    'Copiar formato (haga clic para copiar y aplicar el formato; ⌘⇧C copiar formato / ⌘⇧V pegar formato)',
+  ribbonBrushTipHasFormat: 'Copiar formato (un clic para una vez / doble clic para modo continuo)',
+  ribbonBrushTipDefault: 'Copiar formato (haga clic para copiar y aplicar el formato)',
   ribbonGroupSlides: 'Diapositivas',
   ribbonNewSlide: 'Nueva diapositiva',
   ribbonNewSlideTip:
@@ -377,9 +374,9 @@ export const es = {
   ribbonGroupStartShow: 'Iniciar presentación con diapositivas',
   ribbonFromBeginning: 'Desde el principio',
   ribbonFromBeginningTip:
-    'Presentación a pantalla completa desde la diapositiva 1 (F5; se omiten las diapositivas ocultas)',
+    'Presentación a pantalla completa desde la diapositiva 1 (se omiten las diapositivas ocultas)',
   ribbonFromCurrent: 'Desde la diapositiva actual',
-  ribbonFromCurrentTip: 'Presentación a pantalla completa desde la diapositiva actual (⇧F5)',
+  ribbonFromCurrentTip: 'Presentación a pantalla completa desde la diapositiva actual',
   ribbonPresenterView: 'Vista Moderador',
   ribbonPresenterViewTip:
     'Vista Moderador: notas / diapositiva siguiente / temporizador / lápiz; con varias pantallas, la presentación se muestra a pantalla completa en la otra',

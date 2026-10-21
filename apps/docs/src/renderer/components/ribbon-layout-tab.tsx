@@ -7,6 +7,7 @@ import { PaperSizeDialog } from './PaperSizeDialog'
 import { insertColumnBreak, insertTextWrappingBreak } from '../editor/page-break'
 import { setFloatingWrap, shapeWrapOf } from '../editor/floating-z-order'
 import { useI18n, type StringKey } from '../i18n/locale'
+import { shortcutHint } from '../shortcuts'
 import { useMeasurement } from '../use-measurement'
 import {
   IconCaret,
@@ -532,7 +533,7 @@ export function LayoutTab({
                   }}
                 >
                   <b>{t('ribbonBreakPage')}</b>
-                  <span>{t('ribbonBreakPageDesc')}</span>
+                  <span>{t('ribbonBreakPageDesc', { keys: shortcutHint('page-break') })}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -541,7 +542,7 @@ export function LayoutTab({
                   }}
                 >
                   <b>{t('ribbonBreakColumn')}</b>
-                  <span>{t('ribbonBreakColumnDesc')}</span>
+                  <span>{t('ribbonBreakColumnDesc', { keys: shortcutHint('column-break') })}</span>
                 </button>
                 <button
                   onClick={() => {

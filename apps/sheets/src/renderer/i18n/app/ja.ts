@@ -130,7 +130,7 @@ export const ja = {
   appMoreItems: '+{count} 項目…',
   appTruncationNote: '先頭 {shown}/{total} 項目',
   // ExcelShell (name box / ribbon)
-  appGoToButtonTitle: 'ジャンプ（Go To、⌘G）',
+  appGoToButtonTitle: 'ジャンプ（Go To、{keys}）',
   appPivotChartHintIn: '現在のピボットテーブルからピボットグラフを作成',
   appPivotChartHintOut:
     '先にピボットテーブルの出力範囲内のセルを選択してから、グラフの種類を選択してください',
@@ -150,7 +150,7 @@ export const ja = {
   appAttachmentReadFailed: '{name}: 読み取りに失敗しました',
   appTooManyImages: '1 つのメッセージで送信できる画像は最大 {max} 枚です。超過分は無視されました',
   appAppliedRevision:
-    '適用しました（リビジョン {revision}）— ⌘Z で元に戻せます。⌘S でファイルに保存します。',
+    '適用しました（リビジョン {revision}）— {undoKeys} で元に戻せます。{saveKeys} でファイルに保存します。',
   appCannotReadImage: '画像ファイルを読み取れません。',
   appTableNotDeletable:
     'テーブル "{name}" は存在しないか、このセッションで作成されたものではありません。ファイルに元からあるテーブルは今のところ削除できません。',
@@ -164,9 +164,9 @@ export const ja = {
     'ピボットテーブルの定義がまだ読み込まれていません（または解析に失敗しました）。しばらくしてからもう一度お試しください。',
   appPivotNoChartData: 'このピボットテーブルにはグラフ化できるデータ行/データ列がありません。',
   appPivotChartInsertedTruncated:
-    'ピボットグラフを挿入しました（データ要素が多すぎるため切り捨てました）。保存（⌘S）でファイルに書き込みます。',
+    'ピボットグラフを挿入しました（データ要素が多すぎるため切り捨てました）。保存（{saveKeys}）でファイルに書き込みます。',
   appPivotChartInserted:
-    'ピボットグラフを挿入しました。ピボットテーブルの更新に連動します。保存（⌘S）でファイルに書き込みます。',
+    'ピボットグラフを挿入しました。ピボットテーブルの更新に連動します。保存（{saveKeys}）でファイルに書き込みます。',
   appSheetNoPivot: 'このシートにはピボットテーブルがありません。',
   appPivotNeedsFullLoad:
     'ピボットテーブルの更新には完全読み込みモードが必要です。このブックは大きすぎるため、ストリーミング読み込みのみ行われました。',
@@ -203,7 +203,7 @@ export const ja = {
   appPutCursorInPivot: '先に編集するピボットテーブルの出力範囲内にカーソルを置いてください。',
   appPivotNoCacheDef: 'このピボットテーブルにはキャッシュ定義がないため編集できません。',
   appPivotDefNotLoadedSave:
-    'このピボットテーブルの定義はまだ読み込まれていません。このセッションで編集した場合は、先に保存（⌘S）してから続行してください。',
+    'このピボットテーブルの定義はまだ読み込まれていません。このセッションで編集した場合は、先に保存（{saveKeys}）してから続行してください。',
   appPivotEditUnsupported: 'このピボットテーブルは現在編集できません: {reasons}',
   appPivotEditHasFeatures:
     'グループ化/フィルター/レポートフィルター/集計フィールドを含むピボットテーブルはレイアウト編集に未対応です。Excel で調整してください。',
@@ -213,12 +213,12 @@ export const ja = {
     'このピボットテーブルの集計方法（積、数値の個数など）はレイアウト編集に未対応です。',
   appPivotSourceSheetNotFound: 'ピボットテーブルのソースデータシート "{name}" が見つかりません。',
   appPivotLayoutUpdated:
-    'ピボットテーブルのレイアウトを更新しました。保存（⌘S）でファイルに書き込まれ、Excel で開くとキャッシュが再構築されます。',
+    'ピボットテーブルのレイアウトを更新しました。保存（{saveKeys}）でファイルに書き込まれ、Excel で開くとキャッシュが再構築されます。',
   appPivotEditFailed: 'ピボットテーブルを編集できませんでした。',
   appNoActiveSheet: 'アクティブなシートがありません。',
   appCurrentSheetNoPivot: '現在のシートにはピボットテーブルがありません。',
   appPivotsRefreshed:
-    '{count} 個のピボットテーブルを更新しました — 保存（⌘S）でファイルに書き込みます。',
+    '{count} 個のピボットテーブルを更新しました — 保存（{saveKeys}）でファイルに書き込みます。',
   appRefreshFailed: '更新に失敗しました。',
   appSlicerNeedsFile:
     '先に XLSX ファイルを開いてください。スライサーはファイル内のピボットテーブルに基づきます。',
@@ -236,7 +236,7 @@ export const ja = {
   appSlicerFilterFailed: 'スライサーのフィルターに失敗しました。',
   appSlicerKeepOne: 'スライサーでは少なくとも 1 つのメンバーを選択したままにしてください。',
   appSlicerApplied:
-    'スライサー "{name}" を適用しました。保存（⌘S）でフィルター後のピボットテーブルを書き込みます。',
+    'スライサー "{name}" を適用しました。保存（{saveKeys}）でフィルター後のピボットテーブルを書き込みます。',
   appSlicerCleared: 'スライサー "{name}" のフィルターを解除しました。',
   appSlicerRemoved: 'スライサー "{name}" を削除しました。メンバーはすべて元に戻りました。',
   appTimelineHintIn: '現在のピボットテーブルの日付フィールドにタイムラインを挿入',
@@ -247,7 +247,7 @@ export const ja = {
   appTimelineCreated:
     'タイムライン "{name}" を作成しました。月をクリックするとピボットテーブルをフィルターできます。',
   appTimelineApplied:
-    'タイムライン "{name}" を適用しました。保存（⌘S）でフィルター後のピボットテーブルを書き込みます。',
+    'タイムライン "{name}" を適用しました。保存（{saveKeys}）でフィルター後のピボットテーブルを書き込みます。',
   appTimelineCleared: 'タイムライン "{name}" のフィルターを解除しました。',
   appTimelineRemoved: 'タイムライン "{name}" を削除しました。メンバーはすべて元に戻りました。',
   appTimelineEmptyRange: '選択した月の範囲内にメンバーがありません。',
@@ -270,7 +270,7 @@ export const ja = {
     '現在のシートにオートフィルターがありません — もう一度オンにしてからお試しください。',
   appAdvFilterFailed: 'フィルターの詳細設定を適用できませんでした。',
   appAdvFilterApplied:
-    '詳細フィルター条件を適用しました — ⌘S で保存するとファイルに書き込まれます。',
+    '詳細フィルター条件を適用しました — {saveKeys} で保存するとファイルに書き込まれます。',
   appFlashFillNeedsLeft: 'フラッシュフィルには対象列の左側にデータ列が必要です。',
   appFlashFillNeedsRows: 'フラッシュフィルには少なくとも 2 行のデータが必要です。',
   appFlashFillNeedsExamples:
@@ -285,7 +285,7 @@ export const ja = {
   appSparklineNoSpace: '選択範囲の右側にスパークラインを配置するスペースがありません。',
   appSparklineOutsideGrid: 'スパークラインの配置先セルがワークシートのグリッド外です。',
   appSparklinesInserted:
-    'スパークラインを {count} 個挿入しました（選択範囲の右隣の列）。⌘S でファイルに保存します。',
+    'スパークラインを {count} 個挿入しました（選択範囲の右隣の列）。{saveKeys} でファイルに保存します。',
   appSaveHeldStranded:
     'ピボットテーブル/テーブルは、新規シートと行列の変更と同時には保存できません。先に構造を一度保存してから、ピボットテーブル/テーブルを追加してください。',
   appSaveSecondCanceled:
@@ -359,7 +359,7 @@ export const ja = {
   appPreviewSheetGone: 'プレビューしたシートが存在しません — プレビューを作成し直してください。',
   appWorkbookChangedSincePreview:
     'プレビュー後にブックが変更されました — プレビューを作成し直してください。',
-  appAppliedJournaled: '適用しました — 変更は記録済みです。⌘S でファイルに保存します。',
+  appAppliedJournaled: '適用しました — 変更は記録済みです。{saveKeys} でファイルに保存します。',
   appUndoCommitted: '元に戻す操作をコミットしました（リビジョン {revision}）。',
   appUndoFailed: '元に戻せません。',
   appAutoFilterCreateFailed: 'オートフィルターを作成できません。',
@@ -372,17 +372,19 @@ export const ja = {
   appChartInsertFailed: 'グラフを挿入できません。',
   appChartNeedsNumericColumn:
     '数値の列を少なくとも 1 つ含む範囲を選択してください（ヘッダーは省略可）。',
-  appChartInserted: 'グラフを挿入しました — 選択すると編集できます。⌘S でファイルに書き込みます。',
+  appChartInserted:
+    'グラフを挿入しました — 選択すると編集できます。{saveKeys} でファイルに書き込みます。',
   // Insert shape / image
   appShapeNeedsFile: '先に XLSX ファイルを開いてください。挿入した図形はファイルに書き込まれます。',
   appSelectCellFirst: '先にセルを選択してください。',
-  appTextBoxInserted: 'テキストボックスを挿入しました — 保存時にファイルへ書き込まれます（⌘S）。',
-  appShapeInserted: '図形を挿入しました — 保存時にファイルへ書き込まれます（⌘S）。',
+  appTextBoxInserted:
+    'テキストボックスを挿入しました — 保存時にファイルへ書き込まれます（{saveKeys}）。',
+  appShapeInserted: '図形を挿入しました — 保存時にファイルへ書き込まれます（{saveKeys}）。',
   appPictureNeedsFile:
     '先に XLSX ファイルを開いてください。挿入した画像はファイルに書き込まれます。',
   appPictureTooLarge: '20MB を超える画像はサポートされていません。',
   appPictureBadType: 'PNG、JPEG、GIF の画像のみサポートされています。',
-  appPictureInserted: '画像を挿入しました — 保存時にファイルへ書き込まれます（⌘S）。',
+  appPictureInserted: '画像を挿入しました — 保存時にファイルへ書き込まれます（{saveKeys}）。',
   // Tables
   appTableNeedsRows: 'テーブルにはヘッダー行と少なくとも 1 行のデータが必要です。',
   appTableTooWide: 'テーブルは最大 1,000 列までです。',
@@ -392,7 +394,7 @@ export const ja = {
     'この範囲は、このセッションで作成したテーブル "{name}" と重なっています。',
   appTablesNeedFile: '先に XLSX ファイルを開いてください。テーブルはファイルに書き込まれます。',
   appTableSelectRange: '先にデータ範囲を選択してください。先頭行がヘッダーになります。',
-  appTableCreated: 'テーブルを作成しました — ⌘S で保存します。',
+  appTableCreated: 'テーブルを作成しました — {saveKeys} で保存します。',
   appTableCreateFailed: 'テーブルを作成できません。',
   // Pivot-creation validation
   appPivotOnAddedSheet:
@@ -446,14 +448,16 @@ export const ja = {
   appOutlineNeedsFile:
     '先に XLSX ファイルを開いてください。アウトラインはファイルに書き込まれます。',
   appOutlineSelectFirst: '先にグループ化する行または列を選択してください。',
-  appDetailHidden: '詳細を非表示にしました — ⌘S で保存します。',
-  appDetailShown: '詳細を表示しました — ⌘S で保存します。',
+  appDetailHidden: '詳細を非表示にしました — {saveKeys} で保存します。',
+  appDetailShown: '詳細を表示しました — {saveKeys} で保存します。',
   appOutlineMaxLevel: '既に最も深いアウトラインレベル（7）です。',
   appNothingToUngroup: '選択範囲にグループ解除できるものがありません。',
-  appRowsGrouped: '行をグループ化しました — ⌘S で保存します。「詳細の非表示」で折りたためます。',
-  appColsGrouped: '列をグループ化しました — ⌘S で保存します。「詳細の非表示」で折りたためます。',
-  appRowsUngrouped: '行のグループを解除しました — ⌘S で保存します。',
-  appColsUngrouped: '列のグループを解除しました — ⌘S で保存します。',
+  appRowsGrouped:
+    '行をグループ化しました — {saveKeys} で保存します。「詳細の非表示」で折りたためます。',
+  appColsGrouped:
+    '列をグループ化しました — {saveKeys} で保存します。「詳細の非表示」で折りたためます。',
+  appRowsUngrouped: '行のグループを解除しました — {saveKeys} で保存します。',
+  appColsUngrouped: '列のグループを解除しました — {saveKeys} で保存します。',
   // Ribbon commands
   appSheetAdded: 'シートを追加しました — タブをダブルクリックすると名前を変更できます。',
   appSheetAddFailed: 'シートを追加できません。',
@@ -467,15 +471,15 @@ export const ja = {
   appProtectionWillWrite: 'シートの保護が有効になり、保存時にファイルに書き込まれます。',
   appProtectionWillRemove: '保存時にシートの保護が解除されます。',
   appZoom: 'ズーム {percent}%。',
-  appTopRowFrozen: '先頭行を固定しました — ⌘S で保存します。',
-  appFirstColFrozen: '先頭列を固定しました — ⌘S で保存します。',
+  appTopRowFrozen: '先頭行を固定しました — {saveKeys} で保存します。',
+  appFirstColFrozen: '先頭列を固定しました — {saveKeys} で保存します。',
   appFindMatchesCapped:
     '一致が多すぎます: 先頭 {count} 件のみ表示しています。検索条件を絞り込んでください。',
   appFindScanTruncated:
     '大きなシート: {cells} セルで検索を中断しました。結果が不完全な場合があります。',
   appReplaceNeedsFullLoad: '置換には完全読み込みモードが必要です — 検索をご利用ください。',
-  appGridlinesHiddenSave: '目盛線を非表示にしました — ⌘S で保存します。',
-  appGridlinesShownSave: '目盛線を表示しました — ⌘S で保存します。',
+  appGridlinesHiddenSave: '目盛線を非表示にしました — {saveKeys} で保存します。',
+  appGridlinesShownSave: '目盛線を表示しました — {saveKeys} で保存します。',
   appGridlinesHidden: '目盛線を非表示にしました。',
   appGridlinesShown: '目盛線を表示しました。',
   appShowingFormulas: '数式を表示しています — もう一度切り替えると値を表示します。',
@@ -492,9 +496,10 @@ export const ja = {
   appNoTraceArrows: '削除できるトレース矢印がありません。',
   appWorkbookStats:
     'ブックの統計情報：シート {sheets} 個 · データのあるセル {cells} 個 · 数式 {formulas} 個{note}。',
-  appFrozenAtSelection: '選択位置でウィンドウ枠を固定しました — ⌘S で保存します。',
+  appFrozenAtSelection: '選択位置でウィンドウ枠を固定しました — {saveKeys} で保存します。',
   appSelectCellsFirst: '先にセルを選択してください。',
-  appCellStyleApplied: 'セルのスタイルを適用しました — 書式編集と同様に記録されます（⌘S で保存）。',
+  appCellStyleApplied:
+    'セルのスタイルを適用しました — 書式編集と同様に記録されます（{saveKeys} で保存）。',
   appSelectRangeFirst: '先にセル範囲を選択してください。',
   appSettingNeedsFile: '先に XLSX ファイルを開いてください。この設定はファイルにのみ保存されます。',
   appTooManyCellsForSetting: 'この設定では 10,000 個未満のセルを選択してください。',
@@ -529,10 +534,10 @@ export const ja = {
   appOpeningWorkbook: 'ブックを開いています…',
   appOpenStalled: 'ブックを開けませんでした。',
   appOpenRetry: '再試行',
-  appOpened: '{name} を開きました — セルの編集は ⌘S でファイルに保存されます。',
+  appOpened: '{name} を開きました — セルの編集は {saveKeys} でファイルに保存されます。',
   appOpenFailed: 'ブックを開けません。',
   appPageSetupNeedsFile: '先に XLSX ファイルを開いてください。ページ設定はファイルに保存されます。',
-  appPageSetupRecorded: '{note} — ⌘S で保存します。',
+  appPageSetupRecorded: '{note} — {saveKeys} で保存します。',
   appOrientationPortrait: '印刷の向き：縦',
   appOrientationLandscape: '印刷の向き：横',
   appMarginsNormal: '余白：標準',
@@ -558,7 +563,7 @@ export const ja = {
   appHfNeedsFile:
     '先に XLSX ファイルを開いてください。ヘッダーとフッターはファイルに保存されます。',
   appActiveSheetUnavailable: 'アクティブなシートが利用できません。',
-  appHfUpdated: 'ヘッダーとフッターを更新しました — ⌘S で保存します。',
+  appHfUpdated: 'ヘッダーとフッターを更新しました — {saveKeys} で保存します。',
   appPdfNeedsFullLoad:
     'PDF エクスポートにはブックの完全読み込みが必要です — 読み込みの完了をお待ちください。',
   appPdfRendering: 'PDF をレンダリング中…',
@@ -630,13 +635,13 @@ export const ja = {
   appNoteNextTitle: '次のコメントへ移動',
   appShowCommentsTitle: '選択セルのコメント吹き出しを固定/固定解除',
   appStructuralShiftBlocked:
-    'このシートのグラフやテーブルが対象の行/列に固定されているため移動できず、構造変更は保存されませんでした。元に戻して(⌘Z)から再度保存してください。',
+    'このシートのグラフやテーブルが対象の行/列に固定されているため移動できず、構造変更は保存されませんでした。元に戻して({undoKeys})から再度保存してください。',
   appAiChangesNotSaved:
-    'AI の変更を適用しました(未保存)。⌘Z で元に戻せます。⌘S でファイルに保存します。',
+    'AI の変更を適用しました(未保存)。{undoKeys} で元に戻せます。{saveKeys} でファイルに保存します。',
   // Floating objects / chart editing
   appChartUpdated: 'グラフを更新しました。',
   appChartNotEditable: 'このグラフは編集できません。',
-  appChartEditRecorded: 'グラフの編集を記録しました — ⌘S で保存します。',
+  appChartEditRecorded: 'グラフの編集を記録しました — {saveKeys} で保存します。',
   appChartDeleted: 'グラフを削除しました。',
   appChartMoved: 'グラフを移動しました。',
   appVisualNotEditable: 'このオブジェクトは編集できません。',
@@ -644,14 +649,14 @@ export const ja = {
   appFileVisualMoveDeleteOnly:
     'ファイルに元からあるオブジェクトは移動と削除のみサポートされています。',
   appVisualNoMove: 'このオブジェクトは移動できません — その描画図形は編集できません。',
-  appVisualDeleted: 'オブジェクトを削除しました — ⌘S で保存します。',
-  appShapeTextUpdated: '図形のテキストを更新しました — ⌘S で保存します。',
-  appShapeMoved: '図形を移動しました — ⌘S で保存します。',
+  appVisualDeleted: 'オブジェクトを削除しました — {saveKeys} で保存します。',
+  appShapeTextUpdated: '図形のテキストを更新しました — {saveKeys} で保存します。',
+  appShapeMoved: '図形を移動しました — {saveKeys} で保存します。',
   appTabShapeFormat: '図形の書式',
   appShapeFill: '図形の塗りつぶし',
   appShapeOutline: '図形の枠線',
   appShapeNoOutline: '枠線なし',
-  appShapeStyleUpdated: '図形のスタイルを更新しました — ⌘S で保存します。',
+  appShapeStyleUpdated: '図形のスタイルを更新しました — {saveKeys} で保存します。',
   appDeleteShape: '図形の削除',
   appGroupShapeStyles: '図形のスタイル',
   // Names / internal links
@@ -659,7 +664,7 @@ export const ja = {
   appNamesNeedFile: '先に XLSX ファイルを開いてください。定義した名前はファイルに保存されます。',
   appNameGone: 'その名前は既に存在しません。',
   appNameApplyFailed: 'この名前を適用できません。',
-  appNamesUpdated: '名前を更新しました — ⌘S で保存します。',
+  appNamesUpdated: '名前を更新しました — {saveKeys} で保存します。',
   appLinkInternal: 'リンクはブック内を指しています：{location}',
   appLinkSheetNotFound: 'シート "{name}" が見つかりません。',
   appLinkJumpFailed: '{location} に移動できません。',
@@ -723,7 +728,7 @@ export const ja = {
   appAutoSaveTitle: '自動保存はクラウドファイルでのみ使用できます',
   appAutoSaveTip: '自動保存(30 秒ごと、およびウィンドウのフォーカスが外れたとき)',
   appExportPdfTitle: 'PDF としてエクスポート',
-  appSaveTitle: '保存（⌘S）',
+  appSaveTitle: '保存',
   appSaveAs: '名前を付けて保存',
   appUndo: '元に戻す',
   appRedo: 'やり直し',
@@ -732,7 +737,7 @@ export const ja = {
   appSavedState: '保存済み',
   appSavedLocally: 'ローカルに保存済み',
   appRevisionChip: 'リビジョン {revision}',
-  appOpenWorkbookTitle: 'ブックを開く（⌘O）',
+  appOpenWorkbookTitle: 'ブックを開く',
   appOpenXlsx: 'XLSX を開く',
   appHideAi: 'AI を非表示',
   appShowAi: 'AI を表示',
@@ -1211,7 +1216,7 @@ export const ja = {
   appSortZToA: '降順',
   appCustomSort: 'ユーザー設定の並べ替え…',
   appFilter: 'フィルター',
-  appFilterToggleDetail: '切り替え ⇧⌘L',
+  appFilterToggleDetail: '切り替え {keys}',
   appClear: 'クリア',
   appClearFilterTitle: 'フィルター条件をクリア',
   appReapply: '再適用',
@@ -1319,7 +1324,7 @@ export const ja = {
   // Home tab
   appGroupClipboard: 'クリップボード',
   appPaste: '貼り付け',
-  appPasteTitle: '貼り付け ⌘V',
+  appPasteTitle: '貼り付け',
   appPasteSpecial: '形式を選択して貼り付け',
   appPasteSpecialTitle: '値、数式、書式のみ貼り付け',
   appPasteValuesOnly: '値のみ',
@@ -1328,8 +1333,8 @@ export const ja = {
   appPasteColWidths: '列幅のみ',
   appPasteExceptBorders: '罫線を除くすべて',
   appPasteSpecialDialog: '形式を選択して貼り付け…',
-  appCutTitle: '切り取り ⌘X',
-  appCopyTitle: 'コピー ⌘C',
+  appCutTitle: '切り取り',
+  appCopyTitle: 'コピー',
   appFormatPainter: '書式のコピー/貼り付け',
   appFormatPainterTip: '書式のコピー/貼り付け — ダブルクリックで Esc まで連続適用',
   appFormatPainterLocked:
@@ -1423,7 +1428,7 @@ export const ja = {
   appClearFormats: '書式のクリア',
   appClearContents: '数式と値のクリア',
   appFind: '検索',
-  appFindTitle: '検索と選択 ⌘F',
+  appFindTitle: '検索と選択',
   appReplace: '置換',
   appGoTo: 'ジャンプ',
   appInsertCells: 'セルの挿入…',
@@ -1542,9 +1547,9 @@ export const ja = {
   appVisualSizeProperties: 'サイズとプロパティ…',
   appVisualHyperlink: 'ハイパーリンク…',
   appVisualDelete: '削除',
-  appVisualArranged: 'オブジェクトを更新しました — ⌘S で保存。',
+  appVisualArranged: 'オブジェクトを更新しました — {saveKeys} で保存。',
   appVisualCopied: 'オブジェクトをコピーしました。',
-  appVisualPasted: 'オブジェクトを貼り付けました — ⌘S で保存。',
+  appVisualPasted: 'オブジェクトを貼り付けました — {saveKeys} で保存。',
   appVisualNoCopy: 'このオブジェクトはコピーできません。',
   appVisualSelectTwo: 'Shift を押しながらクリックして 2 つ以上のオブジェクトを選択してください。',
   appVisualSelectThree: 'Shift を押しながらクリックして 3 つ以上のオブジェクトを選択してください。',

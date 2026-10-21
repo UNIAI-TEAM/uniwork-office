@@ -32,7 +32,7 @@ export const ms = {
   aiFootprintOverwritten: 'Sel berdata yang ditimpa: {count}',
   aiFootprintOverwrittenMin: 'Sel berdata yang ditimpa: sekurang-kurangnya {count}',
   aiFootprintNoOverwrite: 'Tiada data sedia ada ditimpa',
-  aiUndoTitle: 'Buat asal perubahan AI ini (sama seperti ⌘Z)',
+  aiUndoTitle: 'Buat asal perubahan AI ini (sama seperti {undoKeys})',
   aiUndo: 'Buat asal',
   aiPreviewAria: 'Pratonton perubahan',
   aiProposedChanges: 'Perubahan yang dicadangkan',
