@@ -164,6 +164,7 @@ export const es = {
   cancel: 'Cancelar',
   modePresent: 'Presentar',
   presentExit: 'Salir de la presentación (Esc)',
+  presentExitName: 'Salir de la presentación',
   presentInTab: 'En esta pestaña',
   presentFullscreen: 'Pantalla completa',
   presentNewTab: 'Nueva pestaña',

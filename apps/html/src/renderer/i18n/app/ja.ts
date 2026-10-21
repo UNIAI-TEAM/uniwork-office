@@ -163,6 +163,7 @@ export const ja = {
   cancel: 'キャンセル',
   modePresent: 'プレゼン',
   presentExit: 'プレゼンを終了（Esc）',
+  presentExitName: 'プレゼンを終了',
   presentInTab: 'このタブで',
   presentFullscreen: '全画面',
   presentNewTab: '新しいタブ',

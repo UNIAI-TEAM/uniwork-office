@@ -8,7 +8,7 @@ import type { PictureRenderNode } from '@genoffice/pptx-render'
 import type { ActionCtx } from './action-context'
 import type { CtxItem } from './components/ContextMenu'
 import { cap } from './capabilities'
-import { slidesHint } from './shortcuts'
+import { slidesAria, slidesHint } from './shortcuts'
 import { isEditableText } from './konva-adapter'
 import { restoreEditSelection } from './TextEditOverlay'
 import * as clipboardActions from './clipboard-actions'
@@ -493,18 +493,21 @@ export function buildCtxItems(ctx: ActionCtx): Array<CtxItem | null> {
               {
                 label: t('appCtxGroup'),
                 hint: slidesHint('slides-37'),
+                keys: slidesAria('slides-37'),
                 disabled: !canGroup,
                 onClick: () => void arrangeActions.groupSelected(ctx),
               },
               {
                 label: t('appCtxUngroup'),
                 hint: slidesHint('slides-38'),
+                keys: slidesAria('slides-38'),
                 disabled: !canUngroup,
                 onClick: () => void arrangeActions.ungroupSelected(ctx),
               },
               {
                 label: t('appCtxRegroup'),
                 hint: slidesHint('slides-39'),
+                keys: slidesAria('slides-39'),
                 disabled: !canRegroup,
                 onClick: () => void arrangeActions.regroupSelected(ctx),
               },

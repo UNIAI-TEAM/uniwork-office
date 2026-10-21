@@ -164,6 +164,7 @@ export const fr = {
   cancel: 'Annuler',
   modePresent: 'Présenter',
   presentExit: 'Quitter la présentation (Échap)',
+  presentExitName: 'Quitter la présentation',
   presentInTab: 'Dans cet onglet',
   presentFullscreen: 'Plein écran',
   presentNewTab: 'Nouvel onglet',

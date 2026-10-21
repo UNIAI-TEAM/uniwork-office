@@ -91,8 +91,11 @@ function press(init: KeyInit): void {
 }
 
 const collapsed = (ribbon: HTMLElement) => ribbon.classList.contains('ribbon-collapsed')
+// the tooltip names the key; the accessible name stays plain and the key is in aria-keyshortcuts
 const collapseTip = () =>
-  document.querySelector('.ribbon-collapse-btn')!.getAttribute('aria-label') ?? ''
+  document.querySelector('.ribbon-collapse-btn')!.getAttribute('data-tip') ?? ''
+const collapseKeys = () =>
+  document.querySelector('.ribbon-collapse-btn')!.getAttribute('aria-keyshortcuts') ?? ''
 
 describe('html ribbon collapse key (html-023)', () => {
   it('web: Ctrl+F3 collapses the ribbon and Ctrl+F1 does not', () => {
@@ -128,15 +131,21 @@ describe('html ribbon collapse key (html-023)', () => {
     host('web', 'win')
     renderRibbon()
     expect(collapseTip()).toMatch(/\(Ctrl\+F3\)$/)
+    expect(collapseKeys()).toBe('Control+F3')
+    expect(document.querySelector('.ribbon-collapse-btn')!.getAttribute('aria-label')).not.toMatch(
+      /Ctrl|F3/,
+    )
     cleanups.splice(0).forEach((cleanup) => cleanup())
 
     host('desktop', 'win')
     renderRibbon()
     expect(collapseTip()).toMatch(/\(Ctrl\+F1\)$/)
+    expect(collapseKeys()).toBe('Control+F1')
     cleanups.splice(0).forEach((cleanup) => cleanup())
 
     host('desktop', 'mac')
     renderRibbon()
     expect(collapseTip()).toMatch(/\(⌥⌘R\)$/)
+    expect(collapseKeys()).toBe('Alt+Meta+R')
   })
 })

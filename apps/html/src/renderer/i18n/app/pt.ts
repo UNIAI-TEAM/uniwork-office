@@ -164,6 +164,7 @@ export const pt = {
   cancel: 'Cancelar',
   modePresent: 'Apresentar',
   presentExit: 'Sair da apresentação (Esc)',
+  presentExitName: 'Sair da apresentação',
   presentInTab: 'Nesta guia',
   presentFullscreen: 'Tela cheia',
   presentNewTab: 'Nova guia',

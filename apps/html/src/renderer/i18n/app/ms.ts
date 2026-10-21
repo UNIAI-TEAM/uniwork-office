@@ -161,6 +161,7 @@ export const ms = {
   cancel: 'Batal',
   modePresent: 'Persembahan',
   presentExit: 'Keluar dari persembahan (Esc)',
+  presentExitName: 'Keluar dari persembahan',
   presentInTab: 'Dalam tab ini',
   presentFullscreen: 'Skrin penuh',
   presentNewTab: 'Tab baharu',

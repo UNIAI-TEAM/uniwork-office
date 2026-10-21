@@ -70,7 +70,7 @@ describe('Save of a .txt file', () => {
     const view = EditorView.findFromDOM(container.querySelector('.cm-editor') as HTMLElement)!
     expect(view.state.doc.toString()).toBe('---\n*x*\n1. first\n')
     await act(async () => view.dispatch({ changes: { from: 0, insert: 'note\n' } }))
-    const save = container.querySelector<HTMLButtonElement>('button[aria-label^="Save ("]')!
+    const save = container.querySelector<HTMLButtonElement>('button.qa-btn[aria-label="Save"]')!
     await act(async () => save.click())
     for (let i = 0; i < 5; i++) await act(async () => await new Promise((r) => setTimeout(r, 10)))
     expect(stubs.save).toHaveBeenCalledTimes(1)

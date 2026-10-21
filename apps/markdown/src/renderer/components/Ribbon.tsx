@@ -13,7 +13,13 @@ import {
 import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n } from '../i18n/locale'
 import { cap } from '../capabilities'
-import { markdownSurface, withMarkdownHint } from '../shortcuts'
+import {
+  markdownAria,
+  markdownPlainLabel,
+  markdownSurface,
+  withMarkdownHint,
+  type MarkdownCommand,
+} from '../shortcuts'
 import { OPEN_LINK_EVENT } from '../editor/tableKeymap'
 import { MARKDOWN_THEME_IDS, type MarkdownTheme } from '../../shared/markdown-theme'
 import type { StringKey } from '../i18n/locale'
@@ -249,14 +255,18 @@ function ThemePicker({
   )
 }
 
+/** `title` is the plain command name (the accessible name); the tooltip adds the `command` row's chord and
+ * the chord also goes to aria-keyshortcuts */
 function IconBtn({
   title,
+  command,
   active,
   disabled,
   onClick,
   children,
 }: {
   title: string
+  command?: MarkdownCommand
   active?: boolean
   disabled?: boolean
   onClick: () => void
@@ -266,8 +276,9 @@ function IconBtn({
     <button
       type="button"
       className={`rb-btn${active ? ' active' : ''}`}
-      data-tip={title}
-      aria-label={title}
+      data-tip={command ? withMarkdownHint(title, command) : title}
+      aria-label={markdownPlainLabel(title)}
+      aria-keyshortcuts={(command && markdownAria(command)) || undefined}
       disabled={disabled}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
@@ -446,7 +457,8 @@ export function Ribbon({
             type="button"
             className="qa-btn"
             data-tip={withMarkdownHint(t('save'), 'save')}
-            aria-label={withMarkdownHint(t('save'), 'save')}
+            aria-label={markdownPlainLabel(t('save'))}
+            aria-keyshortcuts={markdownAria('save') || undefined}
             disabled={disabled || (!dirty && !uniworkBound)}
             onMouseDown={(e) => e.preventDefault()}
             onClick={onSave}
@@ -460,6 +472,7 @@ export function Ribbon({
             className="qa-btn qa-save-as"
             data-tip={withMarkdownHint(t('saveAs'), 'saveAs')}
             aria-label={t('saveAs')}
+            aria-keyshortcuts={markdownAria('saveAs') || undefined}
             disabled={notReady}
             onMouseDown={(e) => e.preventDefault()}
             onClick={onSaveAs}
@@ -484,7 +497,8 @@ export function Ribbon({
           type="button"
           className="qa-btn"
           data-tip={withMarkdownHint(t('undo'), 'undo')}
-          aria-label={withMarkdownHint(t('undo'), 'undo')}
+          aria-label={markdownPlainLabel(t('undo'))}
+          aria-keyshortcuts={markdownAria('undo') || undefined}
           disabled={sourceHistory ? !sourceHistory.canUndo : off || !state?.canUndo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() =>
@@ -497,7 +511,8 @@ export function Ribbon({
           type="button"
           className="qa-btn"
           data-tip={withMarkdownHint(t('redo'), 'redo')}
-          aria-label={withMarkdownHint(t('redo'), 'redo')}
+          aria-label={markdownPlainLabel(t('redo'))}
+          aria-keyshortcuts={markdownAria('redo') || undefined}
           disabled={sourceHistory ? !sourceHistory.canRedo : off || !state?.canRedo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() =>
@@ -510,7 +525,8 @@ export function Ribbon({
           type="button"
           className="qa-btn"
           data-tip={withMarkdownHint(t('findTip'), 'find')}
-          aria-label={withMarkdownHint(t('findTip'), 'find')}
+          aria-label={markdownPlainLabel(t('findTip'))}
+          aria-keyshortcuts={markdownAria('find') || undefined}
           disabled={findOff}
           onMouseDown={(e) => e.preventDefault()}
           onClick={onFind}
@@ -598,7 +614,8 @@ export function Ribbon({
           <div className="ribbon-group">
             <div className="ribbon-group-items">
               <IconBtn
-                title={withMarkdownHint(t('bold'), 'bold')}
+                title={t('bold')}
+                command="bold"
                 active={state?.bold}
                 disabled={off}
                 onClick={() => toggleStyle(editor, 'bold')}
@@ -606,7 +623,8 @@ export function Ribbon({
                 <b>B</b>
               </IconBtn>
               <IconBtn
-                title={withMarkdownHint(t('italic'), 'italic')}
+                title={t('italic')}
+                command="italic"
                 active={state?.italic}
                 disabled={off}
                 onClick={() => toggleStyle(editor, 'italic')}
@@ -614,7 +632,8 @@ export function Ribbon({
                 <i>I</i>
               </IconBtn>
               <IconBtn
-                title={withMarkdownHint(t('strike'), 'strike')}
+                title={t('strike')}
+                command="strike"
                 active={state?.strike}
                 disabled={off}
                 onClick={() => toggleStyle(editor, 'strike')}
@@ -631,7 +650,8 @@ export function Ribbon({
               </IconBtn>
               <span className="rb-link-anchor" ref={linkAnchorRef}>
                 <IconBtn
-                  title={withMarkdownHint(t('link'), 'link')}
+                  title={t('link')}
+                  command="link"
                   active={state?.link}
                   disabled={off}
                   onClick={openLink}
@@ -675,7 +695,8 @@ export function Ribbon({
           <div className="ribbon-group">
             <div className="ribbon-group-items">
               <IconBtn
-                title={withMarkdownHint(t('bulletList'), 'bulletList')}
+                title={t('bulletList')}
+                command="bulletList"
                 active={state?.bullet}
                 disabled={off}
                 onClick={() => toggleList(editor, 'bullet')}
@@ -683,7 +704,8 @@ export function Ribbon({
                 <IconBullets size={ICON} />
               </IconBtn>
               <IconBtn
-                title={withMarkdownHint(t('orderedList'), 'orderedList')}
+                title={t('orderedList')}
+                command="orderedList"
                 active={state?.ordered}
                 disabled={off}
                 onClick={() => toggleList(editor, 'ordered')}
@@ -745,7 +767,8 @@ export function Ribbon({
           <div className="ribbon-group-items">
             {!sourceMode && (
               <IconBtn
-                title={withMarkdownHint(t('sourceView'), 'toggleSource')}
+                title={t('sourceView')}
+                command="toggleSource"
                 active={sourceViewOpen}
                 disabled={disabled}
                 onClick={onToggleSource}

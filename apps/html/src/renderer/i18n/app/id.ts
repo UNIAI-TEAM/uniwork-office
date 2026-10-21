@@ -162,6 +162,7 @@ export const id = {
   cancel: 'Batal',
   modePresent: 'Presentasi',
   presentExit: 'Keluar dari presentasi (Esc)',
+  presentExitName: 'Keluar dari presentasi',
   presentInTab: 'Di tab ini',
   presentFullscreen: 'Layar penuh',
   presentNewTab: 'Tab baru',

@@ -156,6 +156,7 @@ export const zh = {
   cancel: '取消',
   modePresent: '演示',
   presentExit: '退出演示（Esc）',
+  presentExitName: '退出演示',
   presentInTab: '在当前标签页',
   presentFullscreen: '全屏',
   presentNewTab: '新标签页',

@@ -163,6 +163,7 @@ export const vi = {
   cancel: 'Hủy',
   modePresent: 'Trình chiếu',
   presentExit: 'Thoát trình chiếu (Esc)',
+  presentExitName: 'Thoát trình chiếu',
   presentInTab: 'Trong thẻ này',
   presentFullscreen: 'Toàn màn hình',
   presentNewTab: 'Thẻ mới',

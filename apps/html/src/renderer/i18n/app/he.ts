@@ -159,6 +159,7 @@ export const he = {
   cancel: 'ביטול',
   modePresent: 'הצגה',
   presentExit: 'יציאה מההצגה (Esc)',
+  presentExitName: 'יציאה מההצגה',
   presentInTab: 'בכרטיסייה זו',
   presentFullscreen: 'מסך מלא',
   presentNewTab: 'כרטיסייה חדשה',

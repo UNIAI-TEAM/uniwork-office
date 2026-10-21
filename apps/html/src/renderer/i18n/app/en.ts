@@ -162,6 +162,7 @@ export const en = {
   cancel: 'Cancel',
   modePresent: 'Present',
   presentExit: 'Exit presentation (Esc)',
+  presentExitName: 'Exit presentation',
   presentInTab: 'In this tab',
   presentFullscreen: 'Fullscreen',
   presentNewTab: 'New tab',

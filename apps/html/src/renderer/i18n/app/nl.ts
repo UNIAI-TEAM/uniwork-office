@@ -165,6 +165,7 @@ export const nl = {
   cancel: 'Annuleren',
   modePresent: 'Presenteren',
   presentExit: 'Presentatie sluiten (Esc)',
+  presentExitName: 'Presentatie sluiten',
   presentInTab: 'In dit tabblad',
   presentFullscreen: 'Volledig scherm',
   presentNewTab: 'Nieuw tabblad',

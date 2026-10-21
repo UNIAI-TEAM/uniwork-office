@@ -163,6 +163,7 @@ export const hi = {
   cancel: 'रद्द करें',
   modePresent: 'प्रस्तुति',
   presentExit: 'प्रस्तुति से बाहर निकलें (Esc)',
+  presentExitName: 'प्रस्तुति से बाहर निकलें',
   presentInTab: 'इसी टैब में',
   presentFullscreen: 'पूर्ण स्क्रीन',
   presentNewTab: 'नया टैब',

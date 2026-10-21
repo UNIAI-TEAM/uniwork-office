@@ -160,6 +160,7 @@ export const pl = {
   cancel: 'Anuluj',
   modePresent: 'Prezentuj',
   presentExit: 'Zakończ prezentację (Esc)',
+  presentExitName: 'Zakończ prezentację',
   presentInTab: 'W tej karcie',
   presentFullscreen: 'Pełny ekran',
   presentNewTab: 'Nowa karta',

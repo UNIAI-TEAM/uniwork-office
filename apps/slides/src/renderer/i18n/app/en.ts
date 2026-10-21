@@ -240,6 +240,7 @@ export const en = {
   appStatusBarSlide: 'Slide {current} of {total}',
   appStatusBarReady: 'Ready',
   appMediaCloseTitle: 'Close (Esc)',
+  appMediaCloseName: 'Close',
   appRehearseTitle: 'Rehearse Timings',
   appRehearseSummary:
     'The total time for the slide show was {duration}. Do you want to save the slide timings for automatic slide advance?',
