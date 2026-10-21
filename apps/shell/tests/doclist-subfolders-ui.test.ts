@@ -136,8 +136,7 @@ describe('UNI-2047 B0 subfolders on workspace and folder pages', () => {
     )
   }
 
-  const ids = (items: HTMLButtonElement[]) =>
-    items.map((i) => i.getAttribute('data-folder-action'))
+  const ids = (items: HTMLButtonElement[]) => items.map((i) => i.getAttribute('data-folder-action'))
 
   it('keeps the subfolders as the "Thư mục" block above the table, never as table rows', async () => {
     await mount()
@@ -154,7 +153,9 @@ describe('UNI-2047 B0 subfolders on workspace and folder pages', () => {
     api.uniworkListChildren.mockClear()
     await act(async () => {
       host
-        .querySelector<HTMLButtonElement>('.dh-folder-card[data-folder-id="fold-m"] .dh-folder-open')!
+        .querySelector<HTMLButtonElement>(
+          '.dh-folder-card[data-folder-id="fold-m"] .dh-folder-open',
+        )!
         .click()
     })
     await flush()
