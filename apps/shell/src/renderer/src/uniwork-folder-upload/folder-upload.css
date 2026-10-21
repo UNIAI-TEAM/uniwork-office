@@ -1,0 +1,385 @@
+/* UNI-2052 folder / multi-file upload: pre-flight, report, progress bars, drop overlay.
+   Chrome colors come from the shared tokens only (CLAUDE.md theming rules). */
+
+.modal.uw-act.fu-dialog {
+  width: min(480px, calc(var(--ui-vw) * 92));
+}
+
+.fu-desc {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.fu-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 16px 0 0;
+  font-size: 13px;
+}
+
+.fu-meta dt {
+  color: var(--text-muted);
+}
+
+.fu-meta dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fu-meta-strong {
+  font-weight: 600;
+}
+
+.fu-note {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.fu-summary {
+  margin: 14px 0 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fu-refusal {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.fu-refusal svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.fu-refusal p {
+  margin: 0;
+}
+
+.fu-refusal-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fu-skipped {
+  margin-top: 14px;
+}
+
+.fu-skipped h4 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fu-skipped ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fu-skipped-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.fu-link {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.fu-link:hover {
+  text-decoration: underline;
+}
+
+.fu-link:focus-visible,
+.fu-bar-action:focus-visible,
+.fu-bar-close:focus-visible,
+.fu-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.fu-paths {
+  max-height: 128px;
+  margin-top: 4px;
+  padding: 6px 8px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.fu-paths li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fu-share {
+  margin-top: 16px;
+}
+
+.fu-share-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.fu-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border-control);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.fu-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--border-control);
+  transition: transform 0.12s ease;
+}
+
+.fu-switch[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.fu-switch[aria-checked='true']::after {
+  background: var(--surface);
+  transform: translateX(14px);
+}
+
+.fu-switch[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.fu-error {
+  margin-top: 10px;
+}
+
+.fu-failures {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 288px;
+  margin: 14px 0 0;
+  padding: 8px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  list-style: none;
+}
+
+.fu-failures li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fu-failure-path {
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fu-failure-reason {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* one bar per run, stacked at the foot of the library; above the library dialogs, under the error toast */
+.fu-bars {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 115;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(var(--ui-vw) * 90));
+}
+
+.fu-bar {
+  padding: 10px 8px 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.fu-bar-ok {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.fu-bar-info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.fu-bar-warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.fu-bar-error {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.fu-bar-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.fu-bar-text {
+  min-width: 0;
+  flex: 1;
+  padding-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+.fu-bar-action,
+.fu-bar-close {
+  flex-shrink: 0;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fu-bar-action {
+  padding: 0 8px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.fu-bar-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+}
+
+.fu-bar-action:hover,
+.fu-bar-close:hover {
+  background: var(--bg-hover-strong);
+}
+
+.fu-bar-meter {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 8px;
+  accent-color: var(--accent);
+}
+
+.fu-upload-menu {
+  min-width: 190px;
+}
+
+/* over the library only (placed by inline top/left/width/height); the list below takes the drop, so this never catches events */
+.fu-drop {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-overlay);
+  pointer-events: none;
+}
+
+.fu-drop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: min(420px, calc(var(--ui-vw) * 80));
+  padding: 28px 40px;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-16, 16px);
+  background: var(--surface);
+  box-shadow: var(--shadow-modal-strong);
+  color: var(--accent);
+  text-align: center;
+}
+
+.fu-drop-card strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.fu-drop-card span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fu-switch::after {
+    transition: none;
+  }
+}

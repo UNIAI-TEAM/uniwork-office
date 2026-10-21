@@ -20,6 +20,7 @@ import {
   type UploadProgress,
 } from '../UniworkDocActions'
 import {
+  DOC_NAME_ERROR_KEYS,
   QUICK_CREATE_KINDS,
   UNIWORK_ERROR_KEYS,
   checkDocName,
@@ -28,10 +29,17 @@ import {
   isDocTitleTooLong,
   renameFormatOf,
   renameParts,
+  uploadTooLargeTextOf,
   workspaceLabel,
   type DocNameError,
   type NewDocKind,
 } from '../uniwork-docs-model'
+import { DropOverlay } from '../uniwork-folder-upload/DropOverlay'
+import { FolderUploadLayer } from '../uniwork-folder-upload/FolderUploadLayer'
+import { planDrop, type DroppedItem } from '../uniwork-folder-upload/drop'
+import { UploadMenu } from '../uniwork-folder-upload/UploadMenu'
+import { useFolderUpload } from '../uniwork-folder-upload/use-folder-upload'
+import { useLibraryDrop } from '../uniwork-folder-upload/use-library-drop'
 import { BrowserCrumbs } from '../uniwork-folders/BrowserCrumbs'
 import { useOfflineToggle } from '../OfflineToggle'
 import { FolderMenu, type FolderMenuItem } from '../uniwork-folders/FolderMenu'
@@ -1331,6 +1339,57 @@ export function DocumentsHome({
     return { ok: false, error: 'failed' }
   }
 
+  // UNI-2052: several files and whole folders go through the pre-flight and one overall bar
+  const folderUpload = useFolderUpload({
+    onFinished: refreshAll,
+    onOpenFolder: openFolderInWorkspace,
+  })
+
+  // a dropped file that is alone keeps the one-file upload; its refusals have no dialog field, so they are toasts
+  const dropSingleFile = async (file: { path: string; name: string }): Promise<void> => {
+    const outcome = await handleUploadDoc({ ...activeTargetFolder, ...file })
+    if (outcome.ok || outcome.error === 'failed') return
+    const error = outcome.error
+    setToast({
+      message:
+        typeof error === 'object'
+          ? uploadTooLargeTextOf(error, t, dateLocale)
+          : error === 'unsupported_format' || error === 'too_large'
+            ? t(UNIWORK_ERROR_KEYS[error])
+            : t(DOC_NAME_ERROR_KEYS[error]),
+      tone: 'error',
+    })
+  }
+
+  const onLibraryDrop = (items: DroppedItem[]) => {
+    const plan = planDrop(items)
+    if (plan.kind === 'none') return
+    if (plan.kind === 'single') {
+      void dropSingleFile(plan.file)
+      return
+    }
+    if (!folderUpload.available) {
+      folderUpload.notify('fuDropUnavailable')
+      return
+    }
+    const folders = items.filter((item) => item.isDirectory === true).map((item) => item.path)
+    if (!folderUpload.foldersAvailable && folders.length > 0) {
+      folderUpload.notify('fuDropUnavailable')
+      const rest = plan.paths.filter((path) => !folders.includes(path))
+      if (rest.length === 0) return
+      void folderUpload.drop(activeTargetFolder, rest)
+      return
+    }
+    void folderUpload.drop(activeTargetFolder, plan.paths)
+  }
+
+  // the library list takes drops where Upload would put them: the open folder, or My Folder at the top
+  const dropTargetLabel = activeTargetFolder.folderPath?.at(-1)?.title ?? myFolderLabel
+  const libraryDrop = useLibraryDrop({
+    enabled: (subView === 'workspace' || subView === 'my-folder') && !uploadModal,
+    onDrop: onLibraryDrop,
+  })
+
   const handleSaveDocRename = async (doc: DocumentsHomeDoc, rawBase: string) => {
     const { ext } = renameParts(doc.title, renameFormatOf(doc))
     const checked = checkDocName(rawBase)
@@ -2138,7 +2197,8 @@ export function DocumentsHome({
           : null
         : sidebarContent}
 
-      <div className="dh-main uwf-main">
+      <div className="dh-main uwf-main" {...libraryDrop.handlers}>
+        {libraryDrop.over && <DropOverlay targetLabel={dropTargetLabel} box={libraryDrop.over} />}
         <div className={`dh-toolbar${folderHeader ? ' dh-toolbar-folder' : ''}`}>
           {folderHeader && folderId !== null ? (
             <BrowserCrumbs
@@ -2255,28 +2315,38 @@ export function DocumentsHome({
             )}
           </div>
           <div className="dh-toolbar-actions">
-            <button
-              type="button"
-              className="btn btn-secondary dh-toolbar-btn dh-btn-upload"
-              onClick={() => setUploadModal(true)}
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+            {folderUpload.available && folderUpload.foldersAvailable ? (
+              <UploadMenu
+                className="btn btn-secondary dh-toolbar-btn dh-btn-upload"
+                label={t('uhUpload')}
+                withIcon
+                onPickFiles={() => setUploadModal(true)}
+                onPickFolder={() => void folderUpload.pick(activeTargetFolder, 'folder')}
+              />
+            ) : (
+              <button
+                type="button"
+                className="btn btn-secondary dh-toolbar-btn dh-btn-upload"
+                onClick={() => setUploadModal(true)}
               >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              {t('uhUpload')}
-            </button>
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                {t('uhUpload')}
+              </button>
+            )}
             <NewMenu
               label={t('uhCreateNew')}
               hasFolderRow={hasFolderRow}
@@ -2597,6 +2667,9 @@ export function DocumentsHome({
           initialTarget={activeTargetFolder}
           loadTree={loadFolderTree}
           pickFile={pickUploadFile}
+          pickFiles={
+            folderUpload.available ? (target) => folderUpload.pick(target, 'files') : undefined
+          }
           onUpload={handleUploadDoc}
           progress={uploadProgress}
           onCancel={() => {
@@ -2684,6 +2757,8 @@ export function DocumentsHome({
       )}
 
       {offlineToggle.node}
+
+      <FolderUploadLayer controller={folderUpload} />
 
       {toast && (
         <ActionToast
