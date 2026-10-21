@@ -7,6 +7,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { LANGS } from '@genoffice/i18n'
 import {
   accessibleShortcutProblems,
   findDisplayChord,
@@ -44,6 +45,7 @@ async function load(platform: ShortcutPlatform) {
   const locale = await import('../src/renderer/i18n/locale')
   const shortcuts = await import('../src/renderer/shortcuts')
   const { docsShortcut } = await import('../src/shared/docs-shortcuts')
+  const { sectionSettingsFromXml } = await import('@genoffice/docx-engine')
   const { ribbonProps } = await import('./helpers/ribbon-props')
   locale.setModuleLang('en')
 
@@ -79,7 +81,16 @@ async function load(platform: ShortcutPlatform) {
     container,
     click,
     renderRibbon: () =>
-      render(react.createElement(Ribbon, ribbonProps(editor, computeFormatState(editor)))),
+      render(
+        react.createElement(Ribbon, {
+          ...ribbonProps(editor, computeFormatState(editor)),
+          // a page setup, so the Layout tab's Breaks menu is enabled
+          section: sectionSettingsFromXml(
+            '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440"' +
+              ' w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>',
+          ),
+        }),
+      ),
     renderMenu: () =>
       render(
         react.createElement(EditorContextMenu, {
@@ -287,6 +298,29 @@ function sources(dir: string): string[] {
 }
 
 describe('Docs sources', () => {
+  it('no aria-label is a string that names a chord, in any locale', async () => {
+    const locale = await import('../src/renderer/i18n/locale')
+    const keys = new Set<string>()
+    for (const file of sources(RENDERER)) {
+      const text = readFileSync(file, 'utf8')
+      for (const match of text.matchAll(/aria-label=\{t\('(\w+)'\)\}/g)) keys.add(match[1]!)
+    }
+    expect(keys.size).toBeGreaterThan(50)
+    const offenders: string[] = []
+    for (const lang of LANGS) {
+      locale.setModuleLang(lang)
+      for (const key of keys) {
+        const name = locale.t(key as Parameters<typeof locale.t>[0])
+        // the English key names (Enter, Esc) are the ones a hand-written tip spells out
+        if (findDisplayChord(name) || /\((?:Shift\+)?Enter\)/.test(name)) {
+          offenders.push(`${lang} ${key}: ${name}`)
+        }
+      }
+    }
+    locale.setModuleLang('en')
+    expect(offenders.join('\n')).toBe('')
+  })
+
   it('no aria-label is built from a hint or a {keys} tooltip', () => {
     const offenders: string[] = []
     for (const file of sources(RENDERER)) {

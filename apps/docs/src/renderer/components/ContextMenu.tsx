@@ -16,7 +16,7 @@ import {
 import type { TextboxDisplay } from '@genoffice/docx-engine'
 
 import { useI18n, type StringKey } from '../i18n/locale'
-import { shortcutHint } from '../shortcuts'
+import { shortcutAria, shortcutHint } from '../shortcuts'
 import { wordRangeAtCaret } from '../editor/comments'
 import {
   bringForward,
@@ -318,30 +318,40 @@ export function EditorContextMenu({
   const item = (
     label: string,
     opts: {
-      key?: string
+      /** the docs shortcut command whose key the row shows (and announces as aria-keyshortcuts) */
+      shortcut?: string
       disabled?: boolean
       onClick?: () => void
       submenuKey?: string
       ai?: boolean
     },
-  ) => (
-    <button
-      className="ctx-item"
-      disabled={opts.disabled}
-      data-tip={opts.ai ? t('appAiBadgeTip') : undefined}
-      onMouseEnter={() => setSubmenu(opts.submenuKey ?? null)}
-      onClick={opts.submenuKey ? undefined : opts.onClick}
-    >
-      <span className="ctx-label">{label}</span>
-      {opts.ai && (
-        <span className="copilot-badge copilot-badge-menu">
-          <IconSparkle size={10} />
-        </span>
-      )}
-      {opts.key && <span className="ctx-key">{opts.key}</span>}
-      {opts.submenuKey && <span className="ctx-arrow">›</span>}
-    </button>
-  )
+  ) => {
+    const key = opts.shortcut ? shortcutHint(opts.shortcut) : ''
+    return (
+      <button
+        className="ctx-item"
+        disabled={opts.disabled}
+        aria-keyshortcuts={(opts.shortcut && shortcutAria(opts.shortcut)) || undefined}
+        data-tip={opts.ai ? t('appAiBadgeTip') : undefined}
+        onMouseEnter={() => setSubmenu(opts.submenuKey ?? null)}
+        onClick={opts.submenuKey ? undefined : opts.onClick}
+      >
+        <span className="ctx-label">{label}</span>
+        {opts.ai && (
+          <span className="copilot-badge copilot-badge-menu">
+            <IconSparkle size={10} />
+          </span>
+        )}
+        {/* shown, but not part of the name: aria-keyshortcuts carries it */}
+        {key && (
+          <span className="ctx-key" aria-hidden="true">
+            {key}
+          </span>
+        )}
+        {opts.submenuKey && <span className="ctx-arrow">›</span>}
+      </button>
+    )
+  }
 
   return (
     <div
@@ -394,27 +404,27 @@ export function EditorContextMenu({
         </>
       )}
       {item(t('appCut'), {
-        key: shortcutHint('cut'),
+        shortcut: 'cut',
         disabled: !hasSelection || !canEdit,
         onClick: run(() => clipboard('cut')),
       })}
       {item(t('appCopy'), {
-        key: shortcutHint('copy'),
+        shortcut: 'copy',
         disabled: !hasSelection,
         onClick: run(() => clipboard('copy')),
       })}
       {item(t('appPaste'), {
-        key: shortcutHint('paste'),
+        shortcut: 'paste',
         disabled: !canEdit,
         onClick: run(() => void pasteFromClipboard(editor)),
       })}
       {item(t('appPastePlain'), {
-        key: shortcutHint('paste-plain'),
+        shortcut: 'paste-plain',
         disabled: !canEdit,
         onClick: run(() => void pasteFromClipboard(editor, 'text')),
       })}
       <div className="ctx-sep" />
-      {item(t('appFontMenu'), { key: shortcutHint('font-dialog'), onClick: run(onFontDialog) })}
+      {item(t('appFontMenu'), { shortcut: 'font-dialog', onClick: run(onFontDialog) })}
       {item(t('appParagraphMenu'), { onClick: run(onParagraphDialog) })}
       {inTable && (
         <>
@@ -603,7 +613,7 @@ export function EditorContextMenu({
         <>
           <div className="ctx-sep" />
           {item(t('appUpdateField'), {
-            key: shortcutHint('update-fields'),
+            shortcut: 'update-fields',
             onClick: run(() => onUpdateFields()),
           })}
           {field && (
@@ -764,13 +774,13 @@ export function EditorContextMenu({
         </>
       ) : (
         item(t('appHyperlinkMenu'), {
-          key: shortcutHint('link'),
+          shortcut: 'link',
           disabled: !canEdit,
           onClick: run(onLink),
         })
       )}
       {item(t('appNewComment'), {
-        key: shortcutHint('comment'),
+        shortcut: 'comment',
         disabled: !canComment || (!canEdit && !commentsAllowed),
         onClick: run(onNewComment),
       })}
