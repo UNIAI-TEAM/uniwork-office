@@ -403,9 +403,7 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       const bar = host.querySelector('.dh-filter-bar')!
       const group = bar.querySelector(':scope > .dh-filter-selects')
       expect(group, 'select pair group').not.toBeNull()
-      expect(
-        Array.from(group!.children).map((el) => [el.tagName, el.className]),
-      ).toEqual([
+      expect(Array.from(group!.children).map((el) => [el.tagName, el.className])).toEqual([
         ['LABEL', 'dh-filter-chip'],
         ['LABEL', 'dh-filter-chip'],
       ])
