@@ -62,14 +62,47 @@ export const NARROW_HIDING_ORDER = ['size', 'editor', 'access'] as const
 
 const REM = 16
 /**
- * Table width (px) a hideable column needs to show: the web's container rungs
- * (library-columns.ts) in px. With a screen column every rung is wider. Tên,
- * Chọn, Cập nhật, Thao tác and the screen column never hide.
+ * Fixed cell widths in px (cell padding included), the same numbers as the
+ * web's `docListSpec` (doclist/columns.ts): the table is fixed-layout and Name
+ * takes what is left, never less than NAME_FLOOR.
  */
-const RUNGS: Record<'plain' | 'special', Record<(typeof NARROW_HIDING_ORDER)[number], number>> = {
-  plain: { access: 43 * REM, editor: 56 * REM, size: 62 * REM },
-  special: { access: 54 * REM, editor: 67 * REM, size: 73 * REM },
+const WIDTH = {
+  select: 32,
+  updated: 118,
+  actions: 76,
+  special: 118,
+  access: 120,
+  editor: 130,
+  size: 84,
 }
+/** the table's 1px borders, both sides */
+const BORDER = 2
+/** the room Tên keeps before a column joins */
+const NAME_FLOOR = 184
+
+/**
+ * Table width (px) a hideable column needs to show, derived the way the web's
+ * `docListRungs` does: every column on screen up to and including it + the
+ * border + the Name floor, rounded up to the next rem. That is 34 / 42 / 47 rem
+ * for Truy cập / Người sửa / Dung lượng, and 41 / 49 / 54 rem with a screen
+ * column, so a ~870 px list shows everything and ~710 px hides at most Dung
+ * lượng (plus Người sửa with a screen column). Tên, Chọn, Cập nhật, Thao tác
+ * and the screen column never hide.
+ */
+function rungsOf(special: boolean): Record<(typeof NARROW_HIDING_ORDER)[number], number> {
+  const rem = (px: number): number => Math.ceil(px / REM) * REM
+  const base =
+    WIDTH.select +
+    WIDTH.updated +
+    WIDTH.actions +
+    (special ? WIDTH.special : 0) +
+    BORDER +
+    NAME_FLOOR
+  const access = base + WIDTH.access
+  const editor = access + WIDTH.editor
+  return { access: rem(access), editor: rem(editor), size: rem(editor + WIDTH.size) }
+}
+const RUNGS = { plain: rungsOf(false), special: rungsOf(true) }
 /** the device list has only Dung lượng to hide */
 const DEVICE_SIZE_RUNG = 40 * REM
 
