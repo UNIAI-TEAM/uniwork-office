@@ -115,6 +115,7 @@ import {
   type BulkActionId,
 } from '../doclist/bulk'
 import { DocList } from '../doclist/DocList'
+import { defaultSort } from '../doclist/columns'
 import { copyDocLink } from '../doclist/copy-link'
 import { FilterBar, useDocListFilters } from '../doclist/FilterBar'
 import { buildRowMenu } from '../doclist/row-menu'
@@ -537,11 +538,14 @@ export function DocumentsHome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filters.format, filters.updatedBy, filters.updatedPreset, recentActivity],
   )
-  // the header sort goes to the server too (nothing until the person sorts: the server's own order)
+  // the header sort goes to the server too: nothing until the person sorts (the server's own
+  // order), except the Trash, which asks for Đã xóa oldest first from the first read like the web
+  // so its groups hold across pages
+  const trashDefault = subView === 'trash' && !docSort
   const wireSort = useMemo(
-    () => wireSortOf(docSort),
+    () => wireSortOf(docSort ?? (trashDefault ? defaultSort('trash') : null)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [docSort?.column, docSort?.dir],
+    [docSort?.column, docSort?.dir, trashDefault],
   )
 
   useEffect(() => {
