@@ -15,23 +15,40 @@ const NAME_FLOOR = 168
 /** fixed cell widths in px, cell padding included */
 const WIDTH = { editor: 112, updated: 116 }
 /** what a row keeps clear for the buttons beside it (Details and "…" in the dialog) */
-const BUTTONS = 76
+export const PICKER_BUTTONS = 76
 /** the row's own padding, both sides */
 const PADDING = 16
 
-/**
- * List width (px) Người sửa needs to show: every column + the buttons' room +
- * the padding, rounded up to the next rem. Under it the editor moves under the
- * title (see `pickerSublineOf`). Tên and Cập nhật never hide.
- */
-export const PICKER_EDITOR_RUNG =
-  Math.ceil((NAME_FLOOR + WIDTH.editor + WIDTH.updated + BUTTONS + PADDING) / REM) * REM
+/** the room a coarse pointer adds to the buttons beside a row (the CSS grows --pick-trail by it) */
+export const PICKER_COARSE_EXTRA = 28
 
-/** the columns at a list width in px; no (or an unusable) width means all of them */
-export function pickerColumnsFor(width?: number): PickerColumnId[] {
-  const w = typeof width === 'number' && Number.isFinite(width) ? width : Number.POSITIVE_INFINITY
-  return w >= PICKER_EDITOR_RUNG ? [...PICKER_COLUMNS] : ['name', 'updated']
+/**
+ * List width (px) Người sửa needs to show: every column + the room the host
+ * keeps clear for its buttons (`reserve`) + the padding, rounded up to the
+ * next rem. Under it the editor moves under the title (see `pickerSublineOf`).
+ * Tên and Cập nhật never hide.
+ */
+export function pickerEditorRungFor(reserve: number = PICKER_BUTTONS): number {
+  return Math.ceil((NAME_FLOOR + WIDTH.editor + WIDTH.updated + reserve + PADDING) / REM) * REM
 }
+
+/** the rung for the Open dialog's own buttons (Details and "…") */
+export const PICKER_EDITOR_RUNG = pickerEditorRungFor()
+
+/**
+ * The columns at a list width in px; no (or an unusable) width means all of
+ * them. `reserve` is the px the host's buttons take at the row's end.
+ */
+export function pickerColumnsFor(
+  width?: number,
+  reserve: number = PICKER_BUTTONS,
+): PickerColumnId[] {
+  const w = typeof width === 'number' && Number.isFinite(width) ? width : Number.POSITIVE_INFINITY
+  return w >= pickerEditorRungFor(reserve) ? [...PICKER_COLUMNS] : ['name', 'updated']
+}
+
+/** Tên's floor once Người sửa is gone: it may shrink (ellipsis) so a row never runs under its buttons */
+const NAME_FLOOR_TWO = 96
 
 const TRACK: Record<PickerColumnId, string> = {
   name: `minmax(${NAME_FLOOR}px, 1fr)`,
@@ -41,7 +58,13 @@ const TRACK: Record<PickerColumnId, string> = {
 
 /** the grid tracks of a row and of the header above it */
 export function pickerTrackOf(columns: readonly PickerColumnId[]): string {
-  return columns.map((column) => TRACK[column]).join(' ')
+  return columns
+    .map((column) =>
+      column === 'name' && !columns.includes('editor')
+        ? `minmax(${NAME_FLOOR_TWO}px, 1fr)`
+        : TRACK[column],
+    )
+    .join(' ')
 }
 
 /**

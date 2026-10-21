@@ -265,6 +265,7 @@ export function DeskInTray({
             docs={described.map((d) => d.doc)}
             label={t('wbDeskInTray')}
             activeId={null}
+            semantics="list"
             listRef={listRef}
             reserve={described.some((d) => d.resolve) ? TRAIL_RESOLVE : TRAIL_PILL}
             iconFor={(doc) => byId.get(doc.id)?.icon ?? null}
