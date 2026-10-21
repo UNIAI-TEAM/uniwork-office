@@ -1,0 +1,234 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * UNI-2047 V-LAYOUT: the layout findings of visual r1. jsdom cannot measure layout, so the rules are
+ * pinned as the ladder's numbers (columns.ts / cells.tsx), the rendered markup and the CSS rule text.
+ *   F-01 every list fits its box at 768 / 720 (the column ladder has a rung below Access / Người sửa / Dung lượng)
+ *   F-05 the Trash "Deleted" cell never truncates its countdown
+ *   F-02 the local Home type segment wraps instead of scrolling the page
+ *   F-06 / V7-1 the column headers fit their label
+ *   F-07 type chips + Người sửa + Cập nhật flow as one wrapping row
+ *   F-11 the search field keeps room for its placeholder
+ *   V7-2 the pressed type chip reads >= 4.5:1 in dark
+ */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { LocaleProvider } from '../src/renderer/src/locale'
+import { trackOf } from '../src/renderer/src/doclist/cells'
+import {
+  DOC_LIST_SCREENS,
+  columnsFor,
+  fitColumns,
+  isCompact,
+  specialColumn,
+  type ColumnId,
+  type DocListScreen,
+} from '../src/renderer/src/doclist/columns'
+import { SpecialContent } from '../src/renderer/src/doclist/cells'
+import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
+
+const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+
+const src = (path: string): string => readFileSync(resolve(__dirname, '../src/renderer/src', path), 'utf8')
+
+function ruleOf(css: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = new RegExp(`(?:^|[{}]|\\*/)\\s*${escaped} \\{([^}]*)\\}`).exec(css)
+  expect(match, selector).not.toBeNull()
+  return match![1]!
+}
+
+/** the px of a grid track: the fixed width, or the floor of a minmax(...) */
+const floorOf = (track: string): number => Number(/^(?:minmax\()?(\d+)px/.exec(track)![1])
+/** the grid tracks of a template (a space inside minmax(...) does not split) */
+const tracksOf = (template: string): string[] => template.match(/minmax\([^)]*\)|\S+/g) ?? []
+/** the least width (px) a row of these columns needs inside the table: the sum of the track floors */
+const rowFloor = (screen: DocListScreen, columns: readonly ColumnId[], width: number): number =>
+  tracksOf(trackOf(columns, screen, false, isCompact(screen, width)))
+    .map(floorOf)
+    .reduce((a, b) => a + b, 0)
+
+const BOX_768 = 374
+const BOX_720 = 326
+const BOX_768_BUTTONS = 389
+const BOX_720_BUTTONS = 341
+const LISTS = DOC_LIST_SCREENS
+
+describe('F-01: every list fits the box it is in', () => {
+  it.each(
+    LISTS.flatMap((screen) =>
+      [BOX_768, BOX_720, BOX_768_BUTTONS, BOX_720_BUTTONS].map((w) => [screen, w] as const),
+    ),
+  )('%s at %i px: the row needs no more than the box and keeps Cập nhật + Thao tác', (screen, w) => {
+    const columns = fitColumns(screen, columnsFor(screen, w), w)
+    // the table border takes 2px of the box
+    expect(rowFloor(screen, columns, w)).toBeLessThanOrEqual(w - 2)
+    expect(columns).toContain('name')
+    expect(columns).toContain('updated')
+    expect(columns).toContain('actions')
+  })
+
+  it('drops Truy cập, Người sửa gần nhất, Dung lượng and the screen column in a 374 px box', () => {
+    for (const screen of LISTS) {
+      const columns = fitColumns(screen, columnsFor(screen, BOX_768), BOX_768)
+      for (const gone of ['access', 'editor', 'size'] as const) expect(columns).not.toContain(gone)
+      const special = screen === 'device' ? null : specialColumn(screen)
+      if (special) expect(columns).not.toContain(special)
+    }
+  })
+
+  it('Tên keeps >= 180 px in a 374 px box and >= 120 px in a 326 px one', () => {
+    for (const screen of LISTS) {
+      for (const [w, floor] of [
+        [BOX_768, 180],
+        [BOX_720, 120],
+      ] as const) {
+        const columns = fitColumns(screen, columnsFor(screen, w), w)
+        const fixed = tracksOf(trackOf(columns, screen, false, true))
+          .filter((_, i) => columns[i] !== 'name')
+          .map(floorOf)
+          .reduce((a, b) => a + b, 0)
+        expect(w - 2 - fixed, `${screen} at ${w}`).toBeGreaterThanOrEqual(floor)
+      }
+    }
+  })
+
+  it('a table wide enough for the ladder is not touched', () => {
+    for (const screen of LISTS) {
+      expect(fitColumns(screen, columnsFor(screen, 2000), 2000)).toEqual(columnsFor(screen, 2000))
+      expect(isCompact(screen, 2000)).toBe(false)
+      expect(isCompact(screen, undefined)).toBe(false)
+    }
+  })
+
+  it('keeps the screen column down to the width where Tên still has its floor', () => {
+    expect(fitColumns('recent', columnsFor('recent', 528), 528)).toContain('activity')
+    expect(fitColumns('recent', columnsFor('recent', 527), 527)).not.toContain('activity')
+  })
+
+  it('compact: Cập nhật is a narrow wrapping track, Tên a flexible one', () => {
+    const columns = fitColumns('workspace', columnsFor('workspace', BOX_768), BOX_768)
+    const tracks = tracksOf(trackOf(columns, 'workspace', false, true))
+    expect(tracks[columns.indexOf('updated')]).toBe('84px')
+    expect(tracks[columns.indexOf('name')]).toMatch(/^minmax\(120px, 1fr\)$/)
+    expect(src('uniwork-home/documents-home.css')).toMatch(
+      /\.dh-doc-table\.is-compact \[data-col='updated'\][^{]*\{[^}]*white-space:\s*normal;/,
+    )
+  })
+})
+
+describe('F-06 / V7-1: the headers fit their label', () => {
+  it('Người sửa gần nhất has 148px, and Dung lượng hides its idle sort arrow instead of clipping', () => {
+    const tracks = tracksOf(trackOf(columnsFor('recent', 2000), 'recent'))
+    const columns = columnsFor('recent', 2000)
+    expect(floorOf(tracks[columns.indexOf('editor')]!)).toBeGreaterThanOrEqual(148)
+    const css = src('uniwork-home/documents-home.css')
+    expect(ruleOf(css, '.dh-sort-head:not(.sorted) .dh-sort-arrow')).toMatch(/display:\s*none;/)
+    expect(css).toMatch(
+      /\.dh-sort-head:not\(\.sorted\):hover \.dh-sort-arrow[^{]*\{[^}]*display:\s*block;/,
+    )
+  })
+
+  it('still shows every column of a 1280 window (886 px box) on the screens that did', () => {
+    for (const screen of ['workspace', 'recent', 'starred', 'shared', 'shared-by-me'] as const) {
+      expect(columnsFor(screen, 886)).toEqual(columnsFor(screen, 2000))
+      expect(rowFloor(screen, columnsFor(screen, 886), 886)).toBeLessThanOrEqual(884)
+    }
+  })
+})
+
+describe('F-05: the Trash Deleted cell', () => {
+  let host: HTMLDivElement
+  let root: Root
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.append(host)
+    root = createRoot(host)
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+  })
+
+  const now = new Date('2026-10-21T05:00:00Z')
+  const trashed = {
+    id: 'd1',
+    workspaceId: 'ws-1',
+    title: 'a.docx',
+    format: 'docx',
+    updatedAt: '2026-10-01T00:00:00Z',
+    kind: 'file',
+    parentId: null,
+    archivedAt: '2026-10-08T05:00:00Z',
+    archivedByName: 'Nguyễn Thị Lan Anh',
+    purgeAfter: '2026-11-03T05:00:00Z',
+  } as unknown as DocumentsHomeDoc
+
+  it('keeps the date in its own ellipsising span and the countdown in one that never shrinks', () => {
+    act(() =>
+      root.render(
+        createElement(
+          LocaleProvider,
+          null,
+          createElement(SpecialContent, { column: 'deleted', doc: trashed, now }),
+        ),
+      ),
+    )
+    const sub = host.querySelector('.dh-special-sub')!
+    const date = sub.querySelector('.dh-deleted-date')
+    const left = sub.querySelector('.dh-days-left')
+    expect(date?.textContent).toBeTruthy()
+    expect(left?.textContent).toMatch(/\d/)
+    expect(sub.textContent).toContain(' · ')
+    const css = src('uniwork-home/documents-home.css')
+    expect(ruleOf(css, '.dh-deleted-sub')).toMatch(/display:\s*flex;/)
+    expect(ruleOf(css, '.dh-deleted-date')).toMatch(/text-overflow:\s*ellipsis;/)
+    expect(ruleOf(css, '.dh-deleted-countdown')).toMatch(/flex:\s*none;/)
+  })
+
+  it('gives the column the room for "20 thg 10 · Còn 13 ngày" (160px)', () => {
+    const columns = columnsFor('trash', 2000)
+    const tracks = tracksOf(trackOf(columns, 'trash'))
+    expect(floorOf(tracks[columns.indexOf('deleted')]!)).toBeGreaterThanOrEqual(160)
+  })
+})
+
+describe('F-02: the local Home type segment wraps', () => {
+  it('lets the pills wrap inside the box instead of scrolling the page', () => {
+    const rule = ruleOf(src('home.css'), '.filter-pills')
+    expect(rule).toMatch(/flex-wrap:\s*wrap;/)
+    expect(rule).toMatch(/max-width:\s*100%;/)
+    expect(rule).toMatch(/min-height:\s*40px;/)
+    expect(rule).not.toMatch(/[^-]height:\s*40px;/)
+    expect(rule).not.toMatch(/flex-shrink:\s*0;/)
+  })
+})
+
+describe('F-07: one wrapping filter row', () => {
+  it('the chip group dissolves into the bar, so the selects follow the chips on the same line', () => {
+    expect(ruleOf(src('uniwork-home/documents-home.css'), '.dh-filter-chips')).toMatch(
+      /display:\s*contents;/,
+    )
+  })
+})
+
+describe('F-11: the search field keeps room for its placeholder', () => {
+  it('has a 16rem floor (never wider than its row) in the title row and inline in a folder header', () => {
+    const css = src('uniwork-home/documents-home.css')
+    expect(ruleOf(css, '.dh-search-box')).toMatch(/min-width:\s*min\(16rem, 100%\);/)
+    expect(css).toMatch(
+      /@container \(min-width: 60rem\) \{\s*\.dh-toolbar-folder \.dh-search-box \{[^}]*min-width:\s*16rem;/,
+    )
+  })
+})
+
+describe('V7-2: the pressed type chip in dark', () => {
+  it('uses the accent text token (AA on the accent tint), not the plain accent', () => {
+    const rule = ruleOf(src('uniwork-home/documents-home.css'), '.dh-filter-type.on')
+    expect(rule).toMatch(/color:\s*var\(--accent-text\);/)
+  })
+})
