@@ -23,14 +23,25 @@ const RETRY_DELAY_MS = 1000
 /** the row-menu actions a batch can run on many rows (Move takes one row in the app) */
 export type BulkActionId = Extract<
   RowMenuActionId,
-  'share' | 'restore' | 'unshelve' | 'shelve' | 'trash'
+  'share' | 'restore' | 'unshelve' | 'download' | 'shelve' | 'trash'
 >
 
-/** the ones that fan out over single-document calls here; Chia sẻ opens its own dialog and runs the bridge's bulk */
-export type BulkWorkActionId = Exclude<BulkActionId, 'share'>
+/**
+ * the ones that fan out over single-document calls here; Chia sẻ opens its own dialog and runs the
+ * bridge's bulk, Tải xuống plans one file or one zip (uniwork-zip-download)
+ */
+export type BulkWorkActionId = Exclude<BulkActionId, 'share' | 'download'>
 
-// Rules board §3 order: Chia sẻ first (the web's bar), the keep actions, the delete entry last
-const BULK_ORDER: readonly BulkActionId[] = ['share', 'restore', 'unshelve', 'shelve', 'trash']
+// Rules board §3 order: Chia sẻ first (the web's bar), the keep actions with Tải xuống before the
+// archive entry (live: Share · Download · Archive · Trash; shelf: Unarchive · Download · Trash), the delete entry last
+const BULK_ORDER: readonly BulkActionId[] = [
+  'share',
+  'restore',
+  'unshelve',
+  'download',
+  'shelve',
+  'trash',
+]
 
 /** `retryable`: main marked the failure a throttle (429 / 503); nothing else is worth a second call */
 export type BulkWorkResult = { ok: true } | { ok: false; error: string; retryable?: boolean }
@@ -131,27 +142,30 @@ function canShareWrite(doc: DocumentsHomeDoc): boolean {
  * The actions of the bulk bar: the ids the row menu offers for every selected row (so the
  * permissions are the menu's, never a second copy of them). Chia sẻ also needs every row
  * manageable and the shell's Share bridge (`canShare`): never a dead button.
+ * Tải xuống is the exception (the web's rule): it shows when at least ONE selected row is a file
+ * (the rest are skipped and listed), and only with the zip bridge (`canDownload`).
  */
 export function bulkActionsFor(
   screen: DocListScreen,
   docs: readonly DocumentsHomeDoc[],
   canShare = false,
+  canDownload = false,
 ): BulkActionId[] {
   if (docs.length === 0) return []
   const stub = () => {}
   const run: Partial<Record<RowMenuActionId, () => void>> = {}
   for (const id of BULK_ORDER) run[id] = stub
-  return BULK_ORDER.filter(
-    (id) =>
+  const offers = (doc: DocumentsHomeDoc, id: BulkActionId) =>
+    buildRowMenu({ screen, doc, run, offlineLabel: null, label: (key) => key }).some(
+      (item) => item.id === id,
+    )
+  return BULK_ORDER.filter((id) => {
+    if (id === 'download') return canDownload && docs.some((doc) => offers(doc, id))
+    return (
       (id !== 'share' || canShare) &&
-      docs.every(
-        (doc) =>
-          (id !== 'share' || canShareWrite(doc)) &&
-          buildRowMenu({ screen, doc, run, offlineLabel: null, label: (key) => key }).some(
-            (item) => item.id === id,
-          ),
-      ),
-  )
+      docs.every((doc) => (id !== 'share' || canShareWrite(doc)) && offers(doc, id))
+    )
+  })
 }
 
 /** the single-document call one batch item runs: the same calls the row menu uses */

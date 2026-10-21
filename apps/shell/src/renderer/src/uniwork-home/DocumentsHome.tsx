@@ -37,6 +37,8 @@ import {
 } from '../uniwork-docs-model'
 import { DropOverlay } from '../uniwork-folder-upload/DropOverlay'
 import { FolderUploadLayer } from '../uniwork-folder-upload/FolderUploadLayer'
+import { ZipDownloadBar } from '../uniwork-zip-download/ZipDownloadBar'
+import { runZipDownload, useZipDownloadBusy } from '../uniwork-zip-download/zip-download-store'
 import { claimDrag } from '../drag-claim'
 import { dragHasFiles, planDrop, type DroppedItem } from '../uniwork-folder-upload/drop'
 import { UploadMenu } from '../uniwork-folder-upload/UploadMenu'
@@ -121,6 +123,7 @@ import {
   trashShelvedDocument,
   unfavoriteDocument,
   unshelveDocument,
+  zipDownloadBridge,
 } from '../uniwork-library-api'
 import { UniworkDocInfoPanel, type DocInfoLoad } from '../UniworkDocInfoPanel'
 import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
@@ -1602,9 +1605,21 @@ export function DocumentsHome({
   const [shareRow, setShareRow] = useState<DocumentsHomeDoc | null>(null)
   const [bulkShareDocs, setBulkShareDocs] = useState<BulkShareDoc[] | null>(null)
   const shareAvailable = shareBridgeAvailable()
+  // UNI-2068: Tải xuống plans one file or one zip in main; the bar and the result live in the zip store
+  const zipBusy = useZipDownloadBusy()
+  const zipAvailable = zipDownloadBridge() !== null
   const onBulkAction = (action: BulkActionId) => {
     if (action === 'trash') setBulkTrashConfirm(true)
-    else if (action === 'share') {
+    else if (action === 'download') {
+      void runZipDownload({
+        bridge: zipDownloadBridge(),
+        workspaceId,
+        screen,
+        docs: selectedDocs,
+      }).then((started) => {
+        if (started) setSelected(new Set())
+      })
+    } else if (action === 'share') {
       // a snapshot: the selection is cleared when the run settles, the result list still names the rows
       setBulkShareDocs(
         selectedDocs.map((doc) => ({
@@ -2736,8 +2751,9 @@ export function DocumentsHome({
                   <BulkBar
                     screen={screen}
                     docs={selectedDocs}
-                    busy={bulkBusy}
+                    busy={bulkBusy || zipBusy}
                     canShare={shareAvailable}
+                    canDownload={zipAvailable}
                     onAction={onBulkAction}
                     onClear={() => setSelected(new Set())}
                   />
@@ -2955,6 +2971,7 @@ export function DocumentsHome({
       {offlineToggle.node}
 
       <FolderUploadLayer controller={folderUpload} />
+      <ZipDownloadBar />
 
       {toast && (
         <ActionToast

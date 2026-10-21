@@ -180,6 +180,64 @@ describe('runBulkAction: one refresh at the end (UNI-2047 A5)', () => {
   })
 })
 
+describe('bulkActionsFor: Tải xuống takes the any-row rule (UNI-2068 ZB)', () => {
+  const viewer = (id: string, partial: Partial<DocumentsHomeDoc> = {}) =>
+    doc(id, { canManage: false, canEdit: false, ...partial })
+  const folder = (id: string) => doc(id, { kind: 'folder' })
+  const page = (id: string) => doc(id, { kind: 'page' })
+  const shelved = (id: string) => doc(id, { shelvedAt: '2026-10-19T08:00:00.000Z' })
+
+  it('is hidden without the zip bridge, whatever the rows', () => {
+    expect(bulkActionsFor('workspace', [doc('a'), doc('b')])).not.toContain('download')
+    expect(bulkActionsFor('workspace', [doc('a')], false, false)).not.toContain('download')
+  })
+
+  it('sits before Lưu trữ on the live list', () => {
+    expect(bulkActionsFor('workspace', [doc('a'), doc('b')], false, true)).toEqual([
+      'download',
+      'shelve',
+      'trash',
+    ])
+  })
+
+  it('shows for a viewer too: reading is enough to download', () => {
+    expect(bulkActionsFor('workspace', [viewer('v')], false, true)).toEqual(['download'])
+  })
+
+  it('one file among folders and pages is enough; the other actions still need every row', () => {
+    const mixed = [doc('a'), folder('f'), page('p')]
+    expect(bulkActionsFor('workspace', mixed, false, true)).toEqual(['download', 'trash'])
+    // the rest of the rule is untouched: trash needs a manager on every row, download does not
+    expect(
+      bulkActionsFor('workspace', [doc('a'), viewer('v', { kind: 'file' })], false, true),
+    ).toEqual(['download'])
+  })
+
+  it('a folder-only or page-only selection has no Download', () => {
+    expect(bulkActionsFor('workspace', [folder('f')], false, true)).not.toContain('download')
+    expect(bulkActionsFor('workspace', [folder('f'), page('p')], false, true)).not.toContain(
+      'download',
+    )
+  })
+
+  it('the shelf offers it between Bỏ lưu trữ and the trash', () => {
+    expect(bulkActionsFor('shelved', [shelved('a'), shelved('b')], false, true)).toEqual([
+      'unshelve',
+      'download',
+      'trash',
+    ])
+    expect(bulkActionsFor('shelved', [viewer('v', { shelvedAt: 'x' })], false, true)).toEqual([
+      'download',
+    ])
+  })
+
+  it('the trash screen and a trashed row have none', () => {
+    const trashed = (id: string) => doc(id, { archived: true })
+    expect(bulkActionsFor('trash', [trashed('a'), trashed('b')], false, true)).toEqual(['restore'])
+    expect(bulkActionsFor('workspace', [trashed('a')], false, true)).not.toContain('download')
+  })
+})
+
 describe('bulkActionsFor: the actions every selected row has (UNI-2047 A5)', () => {
   const MANAGER = (id: string) => doc(id)
   const live: DocListScreen[] = ['workspace', 'recent', 'shared', 'shared-by-me']

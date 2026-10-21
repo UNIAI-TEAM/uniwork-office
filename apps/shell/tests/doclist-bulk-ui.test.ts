@@ -6,6 +6,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkResult, UniworkWorkspaceRef } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { resetZipDownloadStore } from '../src/renderer/src/uniwork-zip-download/zip-download-store'
+import { fakeZipBridge, type FakeZipBridge } from './uniwork-zip-fake-bridge'
 import { BulkBar, BulkTrashConfirm } from '../src/renderer/src/doclist/BulkBar'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import type {
@@ -237,6 +239,7 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
   })
   afterEach(async () => {
     await act(async () => root.unmount())
+    resetZipDownloadStore()
     host.remove()
     sidebarSlot.remove()
   })
@@ -430,5 +433,151 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
     await click(box('doc-a'))
     expect(bar()).not.toBeNull()
     expect(host.querySelectorAll('[data-bulk-action]')).toHaveLength(0)
+  })
+
+  describe('Tải xuống (UNI-2068 ZB)', () => {
+    let zip: FakeZipBridge
+    const zipBar = () => host.querySelector('[data-testid="zip-download-bar"]')
+    beforeEach(() => {
+      zip = fakeZipBridge()
+      api.zipDownload = zip as unknown as ReturnType<typeof vi.fn>
+      api.revealPath = vi.fn(async () => undefined)
+    })
+
+    it('is absent while this main has no zip bridge', async () => {
+      delete api.zipDownload
+      await mount()
+      await click(box('doc-a'))
+      expect(bulk('download')).toBeNull()
+      expect(bulk('shelve')).not.toBeNull()
+    })
+
+    it('is a button between Lưu trữ and the rest once the bridge is there', async () => {
+      await mount()
+      await click(box('doc-a'))
+      expect(
+        Array.from(host.querySelectorAll('[data-bulk-action]')).map((e) =>
+          e.getAttribute('data-bulk-action'),
+        ),
+      ).toEqual(['download', 'shelve', 'trash'])
+      expect(bulk('download')!.textContent).toBe('Tải xuống')
+    })
+
+    it('shows for a page next to a file, not for a page alone', async () => {
+      items = [...items, row({ id: 'page-1', kind: 'page', format: null, title: 'Ghi chú' })]
+      await mount()
+      await click(box('page-1'))
+      expect(bulk('download')).toBeNull()
+      await click(box('doc-a'))
+      expect(bulk('download')).not.toBeNull()
+    })
+
+    it('the shelf lists folders as rows: a folder alone has no Download', async () => {
+      items = [...items, row({ id: 'fold', kind: 'folder', title: 'Hồ sơ' })]
+      await mount('archive')
+      await click(box('fold'))
+      expect(bulk('download')).toBeNull()
+    })
+
+    it('one file: a plain download named after it, no zip job, one result bar, selection cleared', async () => {
+      await mount()
+      await click(box('doc-b'))
+      await click(bulk('download'))
+      expect(zip.starts).toEqual([])
+      expect(zip.files).toEqual([
+        { workspaceId: 'ws-1', documentId: 'doc-b', suggestedName: 'doc-b.docx' },
+      ])
+      expect(zipBar()!.textContent).toContain('Đã tải xuống doc-b.docx')
+      expect(bar()).toBeNull()
+      // Hiện trong thư mục reveals the saved file
+      const reveal = Array.from(zipBar()!.querySelectorAll('button')).find(
+        (b) => b.textContent === 'Hiện trong thư mục',
+      )
+      await click(reveal)
+      expect(api.revealPath).toHaveBeenCalledWith('/tmp/doc-b.docx')
+      expect(zipBar()).toBeNull()
+    })
+
+    it('many files: one zip job with their ids, a bar that follows the run, then the result with the lines', async () => {
+      items = [...items, row({ id: 'page-1', kind: 'page', format: null, title: 'Ghi chú' })]
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(box('page-1'))
+      await click(bulk('download'))
+      expect(zip.starts).toEqual([{ workspaceId: 'ws-1', documentIds: ['doc-a', 'doc-b'] }])
+      expect(zipBar()!.getAttribute('data-phase')).toBe('building')
+      expect(zipBar()!.textContent).toContain('Đang chuẩn bị tệp nén…')
+      // the selection is released as soon as the run is accepted
+      expect(bar()).toBeNull()
+
+      await act(async () => {
+        zip.push({ runId: 'run-1', phase: 'downloading', bytes: 25, totalBytes: 100 })
+      })
+      expect(zipBar()!.textContent).toContain('Đang tải xuống… 25%')
+      expect(zipBar()!.querySelector('progress')!.value).toBe(25)
+
+      await act(async () => {
+        zip.push({
+          runId: 'run-1',
+          phase: 'done',
+          bytes: 100,
+          totalBytes: 100,
+          fileCount: 2,
+          path: '/home/u/documents.zip',
+        })
+      })
+      const text = zipBar()!.textContent ?? ''
+      expect(text).toContain('Đã tải xuống 2/3 tài liệu')
+      expect(text).toContain('Ghi chú: không tải được (không phải tệp)')
+      expect(text).toContain('Hiện trong thư mục')
+    })
+
+    it('Hủy on the bar cancels that run', async () => {
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('download'))
+      const cancel = Array.from(zipBar()!.querySelectorAll('button')).find(
+        (b) => b.textContent === 'Hủy',
+      )
+      await click(cancel)
+      expect(zip.canceled).toEqual(['run-1'])
+      await act(async () => {
+        zip.push({ runId: 'run-1', phase: 'canceled' })
+      })
+      expect(zipBar()!.textContent).toContain('Đã hủy tải xuống')
+    })
+
+    it('a cancelled save dialog keeps the selection and shows nothing', async () => {
+      zip.nextStart = { ok: false, code: 'dialog_canceled' }
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('download'))
+      expect(zipBar()).toBeNull()
+      expect(bar()!.querySelector('[data-bulk-count]')?.textContent).toBe('2 đã chọn')
+    })
+
+    it('the buttons wait while a download is under way, and the second press runs once', async () => {
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('download'))
+      await click(box('doc-c'))
+      await click(box('doc-a'))
+      for (const el of host.querySelectorAll<HTMLButtonElement>('[data-bulk-action]')) {
+        expect(el.disabled).toBe(true)
+      }
+      expect(zip.starts).toHaveLength(1)
+    })
+
+    it('the shelf downloads too', async () => {
+      await mount('archive')
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('download'))
+      expect(zip.starts[0]!.documentIds).toEqual(['doc-a', 'doc-b'])
+    })
   })
 })

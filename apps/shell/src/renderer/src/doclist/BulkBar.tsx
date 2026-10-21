@@ -9,6 +9,7 @@ const ACTION_LABEL: Record<BulkActionId, StringKey> = {
   share: 'dlActShare',
   restore: 'dlActRestore',
   unshelve: 'dlActUnshelve',
+  download: 'dlActDownload',
   shelve: 'dlActShelve',
   trash: 'dlActTrash',
 }
@@ -23,6 +24,7 @@ export function BulkBar({
   docs,
   busy,
   canShare = false,
+  canDownload = false,
   onAction,
   onClear,
 }: {
@@ -32,12 +34,14 @@ export function BulkBar({
   busy: boolean
   /** this shell has the Share bridge: Chia sẻ may show */
   canShare?: boolean
+  /** this shell has the zip-download bridge: Tải xuống may show */
+  canDownload?: boolean
   onAction: (id: BulkActionId) => void
   onClear: () => void
 }) {
   const { t } = useI18n()
   if (docs.length === 0) return null
-  const actions = bulkActionsFor(screen, docs, canShare)
+  const actions = bulkActionsFor(screen, docs, canShare, canDownload)
   return (
     <div className="dl-bulk-bar" data-bulk-bar role="toolbar" aria-label={t('dlBulkToolbar')}>
       <span className="dl-bulk-count" data-bulk-count>
