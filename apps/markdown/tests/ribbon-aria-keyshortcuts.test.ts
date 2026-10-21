@@ -91,8 +91,7 @@ describe.each<ShortcutPlatform>(['win', 'mac'])(
 
     it('no aria-label carries a chord', () => {
       const { container } = renderRibbon()
-      // the shared collapse / expand buttons live in packages/ui and are covered by its own lock test
-      const own = '[aria-label]:not(.ribbon-collapse-btn):not(.ribbon-expand-btn)'
+      const own = '[aria-label]'
       expect(container.querySelectorAll(own).length).toBeGreaterThan(5)
       for (const el of container.querySelectorAll(own)) {
         expect(findDisplayChord(el.getAttribute('aria-label')!), el.outerHTML).toBeNull()
