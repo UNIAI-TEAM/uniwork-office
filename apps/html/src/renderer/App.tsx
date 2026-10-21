@@ -1934,7 +1934,7 @@ export default function App() {
                     aria-keyshortcuts="Escape"
                     onClick={() => setCanvasMode('edit')}
                   >
-                    {t('presentExitName')}{' '}
+                    {t('presentExitName')}
                     <span aria-hidden="true">
                       {keyHintAfterName(t('presentExit'), t('presentExitName'))}
                     </span>

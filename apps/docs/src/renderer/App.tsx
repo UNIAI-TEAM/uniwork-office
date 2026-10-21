@@ -7667,7 +7667,7 @@ export function App() {
                 aria-keyshortcuts="Escape"
                 onClick={() => setReadMode(false)}
               >
-                {t('appExitReadModeName')}{' '}
+                {t('appExitReadModeName')}
                 <span aria-hidden="true">
                   {keyHintAfterName(t('appExitReadMode'), t('appExitReadModeName'))}
                 </span>

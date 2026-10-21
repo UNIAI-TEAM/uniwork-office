@@ -100,13 +100,15 @@ export function containsDisplayChord(text: string): boolean {
 }
 
 /**
- * The key hint a visible label carries after its plain name: `'(Esc)'` for the label
- * `'Exit (Esc)'` and the name `'Exit'`. Empty when the label is not the name plus a hint.
- * Render the name as the control's text and this as an `aria-hidden` span, so the visible
- * label stays whole while the accessible name stays plain.
+ * The key hint a visible label carries after its plain name, with its leading whitespace:
+ * `' (Esc)'` for the label `'Exit (Esc)'` and the name `'Exit'` (`'（Esc）'` where the label
+ * writes no space). Empty when the label is not the name plus a hint. Render the name as the
+ * control's text and this as an `aria-hidden` span, so the visible text is the label itself
+ * (name + hint) while the accessible name stays plain.
  */
 export function keyHintAfterName(label: string, name: string): string {
-  return label.startsWith(name) ? label.slice(name.length).trim() : ''
+  const rest = label.startsWith(name) ? label.slice(name.length) : ''
+  return rest.trim() ? rest : ''
 }
 
 /** One rendered control as a lock test sees it. */
