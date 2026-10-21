@@ -14,8 +14,8 @@ export function GroupHeader({
 }: {
   id: GroupId
   open: boolean
-  /** how many documents the group holds */
-  count: number
+  /** how many documents the group holds; absent while it may continue on the next page */
+  count?: number
   onToggle: (id: GroupId) => void
 }) {
   const { t } = useI18n()
@@ -45,9 +45,11 @@ export function GroupHeader({
             <path d="M2.5 3.5L5 6.5l2.5-3" />
           </svg>
           <span>{label}</span>
-          <span className="dh-group-count">
-            · {t(count === 1 ? 'dlGroupCountOne' : 'dlGroupCountOther', { n: count })}
-          </span>
+          {count !== undefined && (
+            <span className="dh-group-count">
+              · {t(count === 1 ? 'dlGroupCountOne' : 'dlGroupCountOther', { n: count })}
+            </span>
+          )}
         </button>
       </div>
     </div>

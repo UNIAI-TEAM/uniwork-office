@@ -1971,8 +1971,15 @@ export function DocumentsHome({
     : subView === 'elsewhere'
       ? 'dlElsewhereSubtitle'
       : null
+  // the strip ranks the loaded page by last touch, which is the server's own order only while
+  // Recent is on its default sort (Lần mở gần nhất, newest first)
+  const recentDefaultSort = !docSort || (docSort.column === 'activity' && docSort.dir === 'desc')
   const continueDocs =
-    recentView && !query && !hasActiveFilters(filters) && recentSegment === 'all'
+    recentView &&
+    recentDefaultSort &&
+    !query &&
+    !hasActiveFilters(filters) &&
+    recentSegment === 'all'
       ? continueDocsOf(page.status === 'error' ? [] : page.items)
       : []
 
@@ -2379,6 +2386,7 @@ export function DocumentsHome({
                     rows={tableRows}
                     sort={flatActivitySort ? defaultSort('workspace') : docSort}
                     onSortChange={setDocSort}
+                    moreToLoad={page.nextCursor !== null}
                     selected={selected}
                     onSelectedChange={setSelected}
                     label={
