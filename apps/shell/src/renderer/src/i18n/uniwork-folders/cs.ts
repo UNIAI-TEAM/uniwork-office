@@ -29,6 +29,13 @@ export const cs = {
   ufNotShareable: 'Složky nelze sdílet. Sdílejte raději jednotlivé dokumenty.',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'Tato složka tu už není.',
   ufFolderNoAccess: 'K této složce již nemáte přístup.',
   ufNoPermission: 'Nemáte oprávnění tuto složku měnit.',

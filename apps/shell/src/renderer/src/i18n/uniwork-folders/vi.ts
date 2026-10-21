@@ -28,6 +28,12 @@ export const vi = {
   ufNotShareable: 'Thư mục không chia sẻ được. Hãy chia sẻ từng tài liệu.',
   ufIntoMyFolder:
     'Thư mục của workspace không thể chuyển vào Thư mục của tôi. Hãy tải lại danh sách rồi thử lại.',
+  ufDisabledWsFolder: 'Không thể chuyển thư mục của workspace vào Thư mục của tôi',
+  ufMoveOutTitle: 'Chuyển thư mục ra workspace?',
+  ufMoveOutBody: 'Thư mục và tên sẽ hiện cho cả workspace; tài liệu bên trong vẫn giữ quyền như cũ',
+  ufMoveOutConfirm: 'Chuyển',
+  ufTrashRelocated:
+    'Tài liệu của người khác trong thư mục này sẽ được trả về cho chủ sở hữu, giữ nguyên quyền truy cập.',
   ufFolderGone: 'Thư mục này không còn ở đây.',
   ufFolderNoAccess: 'Bạn không còn quyền truy cập thư mục này.',
   ufNoPermission: 'Bạn không có quyền thay đổi thư mục này.',

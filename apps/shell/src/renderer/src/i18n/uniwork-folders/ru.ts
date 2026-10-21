@@ -30,6 +30,13 @@ export const ru = {
   ufNotShareable: 'Папки нельзя предоставлять в общий доступ. Делитесь каждым документом отдельно.',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'Этой папки здесь больше нет.',
   ufFolderNoAccess: 'У вас больше нет доступа к этой папке.',
   ufNoPermission: 'У вас нет прав на изменение этой папки.',

@@ -29,6 +29,13 @@ export const de = {
   ufNotShareable: 'Ordner können nicht geteilt werden. Teile stattdessen jedes Dokument einzeln.',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'Dieser Ordner ist nicht mehr hier.',
   ufFolderNoAccess: 'Du hast keinen Zugriff mehr auf diesen Ordner.',
   ufNoPermission: 'Du hast keine Berechtigung, diesen Ordner zu ändern.',

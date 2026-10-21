@@ -29,6 +29,13 @@ export const pt = {
   ufNotShareable: 'As pastas não podem ser compartilhadas. Compartilhe cada documento.',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'Esta pasta não está mais aqui.',
   ufFolderNoAccess: 'Você não tem mais acesso a esta pasta.',
   ufNoPermission: 'Você não tem permissão para alterar esta pasta.',

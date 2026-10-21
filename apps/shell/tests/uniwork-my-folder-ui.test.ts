@@ -239,9 +239,12 @@ describe('My Folder in the browser (tree + contents + breadcrumb)', () => {
     expect(menuActions()).toEqual(['new'])
   })
 
-  it('My Folder is still a move target, listed first under its label', async () => {
+  it('My Folder is still a move target for a document, listed first under its label', async () => {
     await mount(browser())
-    await contextMenu(treeItem('Beta'))
+    const option = $$('[role="option"]').find(
+      (el) => el.querySelector('.uw-pick-row-title')?.textContent === 'Report.docx',
+    )!
+    await contextMenu(option)
     await click($('[data-folder-action="move"]'))
     const picker = $('.uwf-picker')!
     const titles = Array.from(picker.querySelectorAll('.uwf-tree-title')).map(
@@ -256,7 +259,18 @@ describe('My Folder in the browser (tree + contents + breadcrumb)', () => {
     await click(
       Array.from(picker.querySelectorAll('button')).find((b) => b.textContent === uf.ufMove),
     )
-    expect(api.uniworkMoveDocument).toHaveBeenCalledWith({ documentId: 'b', parentId: 'mf' })
+    expect(api.uniworkMoveDocument).toHaveBeenCalledWith({ documentId: 'd1', parentId: 'mf' })
+  })
+
+  it('a workspace folder cannot be moved into My Folder: the row is locked with the reason (UNI-2066)', async () => {
+    await mount(browser())
+    await contextMenu(treeItem('Beta'))
+    await click($('[data-folder-action="move"]'))
+    const mine = Array.from($('.uwf-picker')!.querySelectorAll('[role="treeitem"]')).find(
+      (el) => el.querySelector('.uwf-tree-title')?.textContent === us.usMyFolder,
+    )!
+    expect(mine.getAttribute('aria-disabled')).toBe('true')
+    expect(mine.querySelector('.uwf-reason')?.textContent).toBe(uf.ufDisabledWsFolder)
   })
 
   it('the breadcrumb and the folder-change path name My Folder by its label', async () => {

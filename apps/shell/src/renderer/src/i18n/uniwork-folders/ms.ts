@@ -30,6 +30,13 @@ export const ms = {
   ufNotShareable: 'Folder tidak boleh dikongsi. Kongsi setiap dokumen satu demi satu.',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'Folder ini tiada lagi di sini.',
   ufFolderNoAccess: 'Anda tidak lagi mempunyai akses kepada folder ini.',
   ufNoPermission: 'Anda tiada kebenaran untuk mengubah folder ini.',

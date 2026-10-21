@@ -28,6 +28,13 @@ export const zhTW = {
   ufNotShareable: '資料夾無法共用。請逐一共用文件。',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: '此資料夾已不在這裡。',
   ufFolderNoAccess: '你已無權存取此資料夾。',
   ufNoPermission: '你沒有權限變更此資料夾。',

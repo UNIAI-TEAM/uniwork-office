@@ -207,6 +207,9 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
       uniworkListSources: vi.fn(async () => ok({ items: [], nextCursor: null })),
       uniworkSearchDocuments: vi.fn(async () => ok({ items: [], nextCursor: null })),
       uniworkArchiveDocument: vi.fn(async () => ({ ok: true, value: {} })),
+      uniworkArchiveImpact: vi.fn(async () =>
+        ok({ tooLarge: false, folders: 0, documents: 1, relocatedCount: 1 }),
+      ),
       uniworkRestoreDocument: vi.fn(async () => ({ ok: true, value: {} })),
       uniworkShelveDocument: vi.fn(async (id: string) => ({
         ok: true,
@@ -304,6 +307,15 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
     expect(api.uniworkListChildren!.mock.calls.length - lists).toBe(1)
     expect(api.uniworkFolderTree!.mock.calls.length - trees).toBe(1)
     expect(bar()).toBeNull()
+  })
+
+  it('trash of documents only has no relocated clause (UNI-2066 A8; the folder clause is pinned in uniwork-ws-move-trash.test.ts)', async () => {
+    await mount()
+    await click(box('doc-a'))
+    await click(bulk('trash'))
+    expect(document.body.querySelector('[role="dialog"]')!.textContent).not.toContain(
+      'trả về cho chủ sở hữu',
+    )
   })
 
   it('cancelling the confirm runs nothing and keeps the selection', async () => {

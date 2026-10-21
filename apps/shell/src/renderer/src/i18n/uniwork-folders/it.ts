@@ -29,6 +29,13 @@ export const it = {
   ufNotShareable: 'Le cartelle non possono essere condivise. Condividi invece ogni documento.',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'Questa cartella non è più qui.',
   ufFolderNoAccess: 'Non hai più accesso a questa cartella.',
   ufNoPermission: 'Non hai l’autorizzazione per modificare questa cartella.',

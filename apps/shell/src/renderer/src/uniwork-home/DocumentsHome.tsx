@@ -2629,6 +2629,7 @@ export function DocumentsHome({
       {archiveTarget && (
         <ArchiveConfirm
           name={archiveTarget.title}
+          folderId={archiveTarget.kind === 'folder' ? archiveTarget.id : undefined}
           onConfirm={() => void handleConfirmArchive()}
           onCancel={() => setArchiveTarget(null)}
         />
@@ -2645,6 +2646,7 @@ export function DocumentsHome({
       {bulkTrashConfirm && (
         <BulkTrashConfirm
           count={selectedDocs.length}
+          hasFolder={selectedDocs.some((doc) => doc.kind === 'folder')}
           onConfirm={() => {
             setBulkTrashConfirm(false)
             void runBulkById('trash')

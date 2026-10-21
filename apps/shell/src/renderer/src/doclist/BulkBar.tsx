@@ -63,10 +63,13 @@ export function BulkBar({
 /** the one confirm of a destructive batch (Chuyển vào thùng rác) */
 export function BulkTrashConfirm({
   count,
+  hasFolder = false,
   onConfirm,
   onCancel,
 }: {
   count: number
+  /** a selected row is a folder: one static clause says other people's documents inside go back to their owners (no impact read, no number) */
+  hasFolder?: boolean
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -82,7 +85,10 @@ export function BulkTrashConfirm({
       <h3 id={`${id}-title`} className="uw-act-heading">
         {t(count === 1 ? 'dlBulkConfirmTitleOne' : 'dlBulkConfirmTitleOther', { n: count })}
       </h3>
-      <p id={`${id}-body`}>{t('dlBulkConfirmBody')}</p>
+      <p id={`${id}-body`}>
+        {t('dlBulkConfirmBody')}
+        {hasFolder ? ` ${t('ufTrashRelocated')}` : null}
+      </p>
       <div className="modal-buttons">
         <button type="button" className="btn btn-secondary" data-bulk-cancel onClick={onCancel}>
           {t('cancel')}

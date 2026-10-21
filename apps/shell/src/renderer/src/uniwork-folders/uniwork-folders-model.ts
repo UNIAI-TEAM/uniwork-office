@@ -7,6 +7,7 @@ import type {
 } from '../../../shared/home-api'
 import type { StringKey } from '../locale'
 import { isOpenable, type DocNameError } from '../uniwork-docs-model'
+import { workspaceFolderIntoMyFolder } from './ws-folder'
 
 /**
  * FD-11 (UNI-1809) folder tree model: what UniworkFolderTree, UniworkBrowser
@@ -207,7 +208,7 @@ export function treeKey(
  * reason. `root` is a picker that places into folders only (SAVE-01 first
  * save, New / Upload whose top level is My Folder).
  */
-export type MoveBlock = 'current' | 'inside' | 'deep' | 'root' | null
+export type MoveBlock = 'current' | 'inside' | 'deep' | 'root' | 'my_folder' | null
 
 export interface MovingItem {
   id: string
@@ -220,6 +221,7 @@ export const MOVE_BLOCK_KEYS: Record<Exclude<MoveBlock, null>, StringKey> = {
   inside: 'ufDisabledInside',
   deep: 'ufDisabledDeep',
   root: 'usRootBlocked',
+  my_folder: 'ufDisabledWsFolder',
 }
 
 /**
@@ -236,6 +238,14 @@ export function moveBlockOf(
     if (folderPath(index, targetId).some((p) => p.id === moving.id)) return 'inside'
   }
   if (moving && targetId === moving.parentId) return 'current'
+  // UNI-2066: a workspace folder never lands in My Folder or under it (the server answers 422)
+  if (
+    moving?.kind === 'folder' &&
+    targetId !== null &&
+    workspaceFolderIntoMyFolder([moving.id], targetId, index)
+  ) {
+    return 'my_folder'
+  }
   const height = moving?.kind === 'folder' ? (index.get(moving.id)?.height ?? 1) : 1
   const targetDepth = targetId === null ? 0 : (index.get(targetId)?.depth ?? 0)
   return targetDepth + height > maxDepth ? 'deep' : null
@@ -413,6 +423,8 @@ export function folderActionFailure(
       return { key: 'ufCycle' }
     case 'document_parent_kind':
       return { key: 'ufParentKind' }
+    case 'folder_into_my_folder':
+      return { key: 'ufIntoMyFolder' }
     case 'folder_not_shareable':
       return { key: 'ufNotShareable' }
     case 'forbidden':

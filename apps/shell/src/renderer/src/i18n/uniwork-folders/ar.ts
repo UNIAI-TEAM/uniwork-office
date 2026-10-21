@@ -28,6 +28,13 @@ export const ar = {
   ufNotShareable: 'لا يمكن مشاركة المجلدات. شارك كل مستند على حدة.',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'لم يعد هذا المجلد هنا.',
   ufFolderNoAccess: 'لم تعد لديك صلاحية الوصول إلى هذا المجلد.',
   ufNoPermission: 'ليس لديك إذن لتغيير هذا المجلد.',

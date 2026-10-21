@@ -29,6 +29,13 @@ export const th = {
   ufNotShareable: 'ไม่สามารถแชร์โฟลเดอร์ได้ ให้แชร์เอกสารทีละฉบับแทน',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'โฟลเดอร์นี้ไม่อยู่ที่นี่แล้ว',
   ufFolderNoAccess: 'คุณไม่มีสิทธิ์เข้าถึงโฟลเดอร์นี้อีกต่อไป',
   ufNoPermission: 'คุณไม่มีสิทธิ์เปลี่ยนแปลงโฟลเดอร์นี้',

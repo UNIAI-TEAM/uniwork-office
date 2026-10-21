@@ -28,6 +28,13 @@ export const he = {
   ufNotShareable: 'לא ניתן לשתף תיקיות. שתפו כל מסמך בנפרד.',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'התיקייה הזו כבר לא כאן.',
   ufFolderNoAccess: 'אין לך עוד גישה לתיקייה הזו.',
   ufNoPermission: 'אין לך הרשאה לשנות את התיקייה הזו.',

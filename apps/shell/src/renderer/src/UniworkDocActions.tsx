@@ -18,6 +18,7 @@ import {
 import { FileBadge } from './FileBadge'
 import { placeMenu } from './menu-placement'
 import { UniworkFolderPicker } from './uniwork-folders/UniworkFolderPicker'
+import { getArchiveImpact } from './uniwork-library-api'
 import { MY_FOLDER_LABEL_KEY, type PathPart } from './uniwork-folders/uniwork-folders-model'
 
 /**
@@ -545,29 +546,66 @@ export function UploadDocDialog({
 /**
  * One-step confirmation before a document is archived (it can be restored
  * later). Focus starts on Cancel: the safe answer, not the destructive one.
+ *
+ * UNI-2066: for a folder (`folderId`) the impact is read when the confirm opens; when it
+ * hands other people's documents back to their owners, one sentence (never a number)
+ * says so. The read is advisory: a failure, "too large" or 0 adds no sentence and the
+ * confirm works as soon as the read settles.
  */
 export function ArchiveConfirm({
   name,
+  folderId,
   onConfirm,
   onCancel,
 }: {
   name: string
+  /** the folder being trashed: its impact is read for the relocated-documents sentence */
+  folderId?: string
   onConfirm: () => void
   onCancel: () => void
 }) {
   const { t } = useI18n()
   const id = useId()
+  const [impact, setImpact] = useState<'loading' | 'relocated' | 'none'>(
+    folderId ? 'loading' : 'none',
+  )
+  useEffect(() => {
+    if (!folderId) return
+    let live = true
+    setImpact('loading')
+    void getArchiveImpact(folderId)
+      .then((res) => {
+        if (!live) return
+        setImpact(
+          res.ok && !res.value.tooLarge && res.value.relocatedCount > 0 ? 'relocated' : 'none',
+        )
+      })
+      .catch(() => {
+        if (live) setImpact('none')
+      })
+    return () => {
+      live = false
+    }
+  }, [folderId])
   return (
     <ActionModal labelledBy={`${id}-title`} onCancel={onCancel} initialFocus=".btn-secondary">
       <h3 id={`${id}-title`} className="uw-act-heading">
         {t('uwDocArchive')} · {name}
       </h3>
       <p>{t('uwDocArchiveConfirm', { name })}</p>
+      {impact === 'relocated' && <p>{t('ufTrashRelocated')}</p>}
       <div className="modal-buttons">
         <button type="button" className="btn btn-secondary" onClick={onCancel}>
           {t('cancel')}
         </button>
-        <button type="button" className="btn btn-primary" onClick={onConfirm}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          aria-disabled={impact === 'loading' || undefined}
+          onClick={() => {
+            if (impact !== 'loading') onConfirm()
+          }}
+        >
           {t('uwDocArchive')}
         </button>
       </div>

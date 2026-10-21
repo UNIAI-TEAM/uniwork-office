@@ -30,6 +30,13 @@ export const nl = {
   ufNotShareable: 'Mappen kunnen niet worden gedeeld. Deel in plaats daarvan elk document.',
   ufIntoMyFolder:
     "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
+  ufDisabledWsFolder: "A workspace folder can't be moved into My Folder",
+  ufMoveOutTitle: 'Move this folder out to the workspace?',
+  ufMoveOutBody:
+    'The folder and its name will be visible to the whole workspace; documents inside keep their own access',
+  ufMoveOutConfirm: 'Move',
+  ufTrashRelocated:
+    "Other people's documents in this folder go back to their owners, with their access unchanged.",
   ufFolderGone: 'Deze map is hier niet meer.',
   ufFolderNoAccess: 'Je hebt geen toegang meer tot deze map.',
   ufNoPermission: 'Je hebt geen toestemming om deze map te wijzigen.',

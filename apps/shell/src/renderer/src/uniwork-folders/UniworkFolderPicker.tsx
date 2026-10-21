@@ -9,6 +9,7 @@ import { useI18n } from '../locale'
 import { ActionModal } from '../UniworkDocActions'
 import { UNIWORK_ERROR_KEYS } from '../uniwork-docs-model'
 import { onTreeChanged } from '../uniwork-library-api'
+import { MoveOutConfirm } from './MoveOutConfirm'
 import { UniworkFolderTree } from './UniworkFolderTree'
 import {
   MY_FOLDER_LABEL_KEY,
@@ -24,6 +25,7 @@ import {
   type PathPart,
   type TreeRow,
 } from './uniwork-folders-model'
+import { folderLeavesMyFolder } from './ws-folder'
 
 /** the folder the person chose: null = the workspace root, with its root-first path */
 export interface PickedFolder {
@@ -110,6 +112,8 @@ export function UniworkFolderPicker({
   const [chosen, setChosen] = useState<string | null>(initialFolderId)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY]))
   const [query, setQuery] = useState('')
+  // UNI-2066: the pick of a folder leaving My Folder waits here for the person's confirm
+  const [confirmingOut, setConfirmingOut] = useState<PickedFolder | null>(null)
   const myFolderLabel = t(MY_FOLDER_LABEL_KEY)
 
   useEffect(() => {
@@ -182,131 +186,150 @@ export function UniworkFolderPicker({
     </h3>
   )
   return (
-    <ActionModal
-      labelledBy={`${id}-title`}
-      className={`uwf-picker${className ? ` ${className}` : ''}`}
-      onCancel={onCancel}
-    >
-      {onBack || headerAction ? (
-        <div className="uwf-picker-head">
-          {onBack && (
-            <button
-              type="button"
-              className="uwf-picker-back"
-              aria-label={backLabel}
-              onClick={onBack}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path
-                  d="M10 3.5 5.5 8l4.5 4.5"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          )}
-          {heading}
-          {headerAction?.(chosenId)}
-        </div>
-      ) : (
-        heading
-      )}
-      {searchLabel && nodes && (
-        <div className="uwf-picker-search-wrap">
-          <svg
-            className="uwf-picker-search-icon"
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-          <input
-            className="uw-pick-search uwf-picker-search"
-            type="search"
-            aria-label={searchLabel}
-            placeholder={searchLabel}
-            value={query}
-            spellCheck={false}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' && query) {
-                e.preventDefault()
-                e.stopPropagation()
-                setQuery('')
-              }
-            }}
-          />
-        </div>
-      )}
-      <div className="uwf-picker-body">
-        {load.status === 'loading' && (
-          <p className="uwf-picker-state" role="status">
-            {t('uwPickLoading')}
-          </p>
+    <>
+      <ActionModal
+        labelledBy={`${id}-title`}
+        className={`uwf-picker${className ? ` ${className}` : ''}`}
+        onCancel={onCancel}
+      >
+        {onBack || headerAction ? (
+          <div className="uwf-picker-head">
+            {onBack && (
+              <button
+                type="button"
+                className="uwf-picker-back"
+                aria-label={backLabel}
+                onClick={onBack}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                  <path
+                    d="M10 3.5 5.5 8l4.5 4.5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
+            {heading}
+            {headerAction?.(chosenId)}
+          </div>
+        ) : (
+          heading
         )}
-        {load.status === 'error' && (
-          <div className="uwf-picker-state" role="alert">
-            <p>{t(UNIWORK_ERROR_KEYS[load.error])}</p>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setTick((n) => n + 1)}
+        {searchLabel && nodes && (
+          <div className="uwf-picker-search-wrap">
+            <svg
+              className="uwf-picker-search-icon"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              {t('acctRetry')}
-            </button>
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              className="uw-pick-search uwf-picker-search"
+              type="search"
+              aria-label={searchLabel}
+              placeholder={searchLabel}
+              value={query}
+              spellCheck={false}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && query) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setQuery('')
+                }
+              }}
+            />
           </div>
         )}
+        <div className="uwf-picker-body">
+          {load.status === 'loading' && (
+            <p className="uwf-picker-state" role="status">
+              {t('uwPickLoading')}
+            </p>
+          )}
+          {load.status === 'error' && (
+            <div className="uwf-picker-state" role="alert">
+              <p>{t(UNIWORK_ERROR_KEYS[load.error])}</p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setTick((n) => n + 1)}
+              >
+                {t('acctRetry')}
+              </button>
+            </div>
+          )}
+          {nodes && (
+            <UniworkFolderTree
+              idPrefix={`${id}-tree`}
+              nodes={filtered.nodes}
+              label={t('ufTreeLabel')}
+              expanded={shownExpanded}
+              onExpandedChange={setExpanded}
+              selectedKey={chosenId ?? ROOT_KEY}
+              onOpen={setChosen}
+              blockOf={blockOf}
+              tagOf={tagOf}
+              checkLabel={checkLabel}
+            />
+          )}
+        </div>
+        {note && <p className="uwf-picker-note">{note}</p>}
         {nodes && (
-          <UniworkFolderTree
-            idPrefix={`${id}-tree`}
-            nodes={filtered.nodes}
-            label={t('ufTreeLabel')}
-            expanded={shownExpanded}
-            onExpandedChange={setExpanded}
-            selectedKey={chosenId ?? ROOT_KEY}
-            onOpen={setChosen}
-            blockOf={blockOf}
-            tagOf={tagOf}
-            checkLabel={checkLabel}
-          />
+          <p className="uwf-picker-path" aria-live="polite">
+            {t('ufPathLabel', {
+              path: [t('ufRoot'), ...path.map((p) => p.title)].join(' › '),
+            })}
+          </p>
         )}
-      </div>
-      {note && <p className="uwf-picker-note">{note}</p>}
-      {nodes && (
-        <p className="uwf-picker-path" aria-live="polite">
-          {t('ufPathLabel', {
-            path: [t('ufRoot'), ...path.map((p) => p.title)].join(' › '),
-          })}
-        </p>
-      )}
-      <div className="modal-buttons">
-        {!onBack && (
-          <button type="button" className="btn btn-secondary" onClick={onCancel}>
-            {t('cancel')}
+        <div className="modal-buttons">
+          {!onBack && (
+            <button type="button" className="btn btn-secondary" onClick={onCancel}>
+              {t('cancel')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-primary uwf-picker-confirm"
+            aria-disabled={blocked || undefined}
+            onClick={() => {
+              if (blocked) return
+              const picked = { folderId: chosenId, path }
+              // a folder out of My Folder becomes visible to the workspace: ask before it is sent
+              if (moving?.kind === 'folder' && folderLeavesMyFolder([moving.id], chosenId, index)) {
+                setConfirmingOut(picked)
+                return
+              }
+              onPick(picked)
+            }}
+          >
+            {confirmLabelFor ? confirmLabelFor(chosenTitle) : confirmLabel}
           </button>
-        )}
-        <button
-          type="button"
-          className="btn btn-primary uwf-picker-confirm"
-          aria-disabled={blocked || undefined}
-          onClick={() => {
-            if (!blocked) onPick({ folderId: chosenId, path })
+        </div>
+      </ActionModal>
+      {confirmingOut && (
+        <MoveOutConfirm
+          onCancel={() => setConfirmingOut(null)}
+          onConfirm={() => {
+            const picked = confirmingOut
+            setConfirmingOut(null)
+            onPick(picked)
           }}
-        >
-          {confirmLabelFor ? confirmLabelFor(chosenTitle) : confirmLabel}
-        </button>
-      </div>
-    </ActionModal>
+        />
+      )}
+    </>
   )
 }
