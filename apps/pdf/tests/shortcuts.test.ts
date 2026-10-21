@@ -16,6 +16,7 @@ import {
   isContextKey,
   matchPdfKey,
   pdfHint,
+  pdfPrevMatchTip,
   pdfRibbonCollapseOptions,
   pdfTip,
   resolvePdfWindowKey,
@@ -558,6 +559,14 @@ describe('hints come from the table', () => {
     expect(pdfTip('Fit page', 'pdf-11', 'win', 'desktop')).toBe('Fit page (Ctrl+\\)')
     expect(pdfTip('Fit page', 'pdf-11', 'mac', 'desktop')).toBe('Fit page (⌘\\)')
     expect(pdfTip('Next match', 'pdf-06', 'win', 'desktop')).toMatch(/^Next match \(Ctrl\+/)
+  })
+
+  it('Previous match shows the Shift chord, Next keeps the plain one', () => {
+    expect(pdfPrevMatchTip('Previous', 'win', 'desktop')).toBe('Previous (Ctrl+Shift+G)')
+    expect(pdfPrevMatchTip('Previous', 'win', 'web')).toBe('Previous (Ctrl+Shift+G)')
+    expect(pdfPrevMatchTip('Previous', 'mac', 'desktop')).toBe('Previous (⇧⌘G)')
+    expect(pdfTip('Next', 'pdf-06', 'win', 'desktop')).toBe('Next (Ctrl+G)')
+    expect(pdfTip('Next', 'pdf-06', 'mac', 'desktop')).toBe('Next (⌘G)')
   })
 
   it('appends the key to a tooltip label', () => {

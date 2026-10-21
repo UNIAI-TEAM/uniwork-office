@@ -11,9 +11,11 @@
  * keymap. They go through the same matcher: no modifier, no IME composition.
  */
 import {
+  chordsFor,
   createMatcher,
   currentShortcutPlatform,
   findShortcut,
+  formatChord,
   formatHint,
   isComposingEvent,
   pdfShortcuts,
@@ -108,6 +110,48 @@ export function isCancelKey(event: PdfKeyEvent, context = 'dialog'): boolean {
   return isContextKey(event, context, 'Escape')
 }
 
+/**
+ * Ctrl+Enter (Cmd+Enter on a Mac) commits a margin note or an in-place text edit.
+ * Those rows (`pdf-21`, `pdf-24`) also hold Esc, Backspace and Delete, so the row
+ * id says nothing about which key was pressed: test the key, then the table.
+ */
+export function isCommitKey(
+  event: PdfKeyEvent,
+  context: string,
+  platform?: ShortcutPlatform,
+  surface?: ShortcutSurface,
+): boolean {
+  const e = nativeEvent(event)
+  return (
+    (e.ctrlKey || e.metaKey) &&
+    e.key === 'Enter' &&
+    matchPdfKey(event, context, platform, surface) !== null
+  )
+}
+
+/** What a keydown in the in-place text editor asks for. */
+export type TextEditKeyAction = 'commit' | 'cancel' | 'delete-run'
+
+/**
+ * The in-place text editor's reaction to a keydown: Ctrl/Cmd+Enter commits, Esc
+ * cancels, Backspace / Delete on an already empty draft removes the run. Any other
+ * key (a Backspace in a non-empty draft included) is the textarea's own: null.
+ */
+export function textEditKeyAction(
+  event: PdfKeyEvent,
+  draftEmpty: boolean,
+): TextEditKeyAction | null {
+  if (isCommitKey(event, 'text-edit')) return 'commit'
+  if (isCancelKey(event, 'text-edit')) return 'cancel'
+  if (
+    draftEmpty &&
+    (isContextKey(event, 'text-edit', 'Backspace') || isContextKey(event, 'text-edit', 'Delete'))
+  ) {
+    return 'delete-run'
+  }
+  return null
+}
+
 /** Enter (next) / Shift+Enter (previous) in the search box; null for any other key or an IME Enter. */
 export function searchEnterDirection(event: PdfKeyEvent): 1 | -1 | null {
   const e = nativeEvent(event)
@@ -150,4 +194,19 @@ export function pdfTip(
 ): string {
   const hint = pdfHint(id, platform, surface)
   return hint ? `${label} (${hint})` : label
+}
+
+/**
+ * The Previous-match button's tooltip: `pdf-06` lists Next first (Ctrl+G, F3) and
+ * Previous second (Ctrl+Shift+G, Shift+F3), so the label takes the second chord.
+ */
+export function pdfPrevMatchTip(
+  label: string,
+  platform: ShortcutPlatform = currentShortcutPlatform(),
+  surface: ShortcutSurface = pdfSurface(),
+): string {
+  const action = findShortcut('pdf', 'pdf-06')
+  if (!action) throw new Error('no pdf shortcut row pdf-06')
+  const chord = chordsFor(action, platform, surface)[1]
+  return chord ? `${label} (${formatChord(chord, platform)})` : label
 }

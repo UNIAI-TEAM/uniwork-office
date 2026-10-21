@@ -83,12 +83,13 @@ import {
 import {
   isCancelKey,
   isConfirmKey,
-  isContextKey,
   matchPdfKey,
+  pdfPrevMatchTip,
   pdfRibbonCollapseOptions,
   pdfTip,
   resolvePdfWindowKey,
   searchEnterDirection,
+  textEditKeyAction,
 } from './shortcuts'
 import { rowOfVisIdx, spreadRows, stepPage } from './spread'
 import {
@@ -8873,18 +8874,15 @@ export default function App() {
                                             if (g) g.scrollLeft = e.currentTarget.scrollLeft
                                           }}
                                           onKeyDown={(e) => {
-                                            if (matchPdfKey(e, 'text-edit')?.id === 'pdf-24') {
+                                            const key = textEditKeyAction(e, textDraft.value === '')
+                                            if (key === 'commit') {
                                               e.preventDefault()
                                               commitTextDraft()
-                                            } else if (isCancelKey(e, 'text-edit')) {
+                                            } else if (key === 'cancel') {
                                               e.preventDefault()
                                               e.stopPropagation()
                                               setTextDraft(null)
-                                            } else if (
-                                              (isContextKey(e, 'text-edit', 'Backspace') ||
-                                                isContextKey(e, 'text-edit', 'Delete')) &&
-                                              textDraft.value === ''
-                                            ) {
+                                            } else if (key === 'delete-run') {
                                               // The editor is already empty: one more delete
                                               // press removes the run itself
                                               e.preventDefault()
@@ -9284,7 +9282,7 @@ export default function App() {
                 </span>
                 <button
                   className="rb-icon"
-                  data-tip={pdfTip(t('searchPrev'), 'pdf-06')}
+                  data-tip={pdfPrevMatchTip(t('searchPrev'))}
                   aria-label={t('searchPrev')}
                   disabled={activeMatches.length === 0}
                   onClick={() => searchStep(-1)}
