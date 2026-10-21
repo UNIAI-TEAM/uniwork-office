@@ -174,6 +174,11 @@ for (const platform of ['win', 'mac'] as const) {
       expect(home.getAttribute('aria-keyshortcuts')?.split(' ')[0]).toBe(
         shortcuts.shortcutAria('ribbon-toggle'),
       )
+      // the compact density has no button of its own: the selected tab offers it too
+      const offered = (home.getAttribute('aria-keyshortcuts') ?? '').split(' ')
+      for (const chord of shortcuts.shortcutAria('ribbon-compact').split(' ')) {
+        expect(offered, `ribbon-compact ${chord}`).toContain(chord)
+      }
     })
 
     it('Insert and Layout tabs: page break, link and the break menu', async () => {
