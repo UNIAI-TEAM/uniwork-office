@@ -139,7 +139,7 @@ import './documents-home.css'
 import './doclist-sidebar.css'
 
 /** a source module of Từ nơi khác (the web's DocumentSourceKind) */
-type ElsewhereSource = 'chat' | 'meeting' | 'email' | 'task'
+export type ElsewhereSource = 'chat' | 'meeting' | 'email' | 'task'
 
 /**
  * UNI-2047 sidebar: the web's SOURCE_KINDS, in its order, each drawn as its module is in the web
@@ -373,6 +373,9 @@ export interface DocumentsHomeProps {
   /** sub-view to mount with (kept by the host so an area switch can restore it — VDH-7) */
   initialSubView?: DocumentsHomeSubViewId
   onSubViewChange?: (subView: DocumentsHomeSubViewId) => void
+  /** the Từ nơi khác source row kept by the host with the sub-view (RV-16); used only when the sub-view is Từ nơi khác */
+  initialElsewhereSource?: ElsewhereSource | null
+  onElsewhereSourceChange?: (source: ElsewhereSource | null) => void
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
 }
 
@@ -402,6 +405,8 @@ export function DocumentsHome({
   initialFolderId = null,
   initialSubView = 'workspace',
   onSubViewChange,
+  initialElsewhereSource = null,
+  onElsewhereSourceChange,
   onFolderChange,
 }: DocumentsHomeProps) {
   const { t, dateLocale } = useI18n()
@@ -411,7 +416,9 @@ export function DocumentsHome({
   const [folderId, setFolderId] = useState<string | null>(initialFolderId)
   const [myFolderId, setMyFolderId] = useState<string | null>(null)
   // UNI-2047 sidebar: the Từ nơi khác row picked (null = every module, the page opened otherwise)
-  const [elsewhereSource, setElsewhereSource] = useState<ElsewhereSource | null>(null)
+  const [elsewhereSource, setElsewhereSource] = useState<ElsewhereSource | null>(
+    initialSubView === 'elsewhere' ? initialElsewhereSource : null,
+  )
   // the workspaces whose sources route answered: the section shows once it has (the web's probe)
   const [sourcesAnswered, setSourcesAnswered] = useState<Readonly<Record<string, boolean>>>({})
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY]))
@@ -635,6 +642,12 @@ export function DocumentsHome({
   useEffect(() => {
     onSubViewChangeRef.current?.(subView)
   }, [subView])
+  // RV-16: the picked source travels with the sub-view so the same row is current after an area switch
+  const onElsewhereSourceChangeRef = useRef(onElsewhereSourceChange)
+  onElsewhereSourceChangeRef.current = onElsewhereSourceChange
+  useEffect(() => {
+    onElsewhereSourceChangeRef.current?.(elsewhereSource)
+  }, [elsewhereSource])
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
   const listSeqRef = useRef(0)
@@ -817,16 +830,25 @@ export function DocumentsHome({
     setSourcesAnswered((prev) => (prev[ws] === answered ? prev : { ...prev, [ws]: answered }))
   }, [])
   const sourcesProbedRef = useRef<string | null>(null)
+  const sourcesKnown = workspaceId in sourcesAnswered
   useEffect(() => {
-    if (sourcesProbedRef.current === workspaceId) return
-    sourcesProbedRef.current = workspaceId
     // the page reads the route itself: its answer stands for the probe
     if (sourcesWanted) return
+    if (sourcesKnown || sourcesProbedRef.current === workspaceId) return
+    sourcesProbedRef.current = workspaceId
+    // RV-15: only a definite answer (OK or 404) settles the probe; a transient failure frees it, so
+    // the next pass (workspace, page left, sidebar visible again) asks once more - no timer, no loop
+    const unsettle = () => {
+      if (sourcesProbedRef.current === workspaceId) sourcesProbedRef.current = null
+    }
     const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
     void fetchDocumentsHomeSources(api, { workspaceId, filters: {}, limit: 1 })
-      .then((res) => noteSourcesAnswer(workspaceId, res))
-      .catch(() => {})
-  }, [workspaceId, sourcesWanted, noteSourcesAnswer])
+      .then((res) => {
+        if (res && !res.ok && res.error !== 'not_found') unsettle()
+        noteSourcesAnswer(workspaceId, res)
+      })
+      .catch(unsettle)
+  }, [workspaceId, sourcesWanted, sourcesKnown, sidebarIdle, noteSourcesAnswer])
   const sourcesAvailable = sourcesAnswered[workspaceId] === true
   useEffect(() => {
     const seq = ++sourcesSeqRef.current
@@ -1967,128 +1989,129 @@ export function DocumentsHome({
           )
         })}
       </nav>
-      <div className="dh-sidebar-folders">
-        <div className="dh-sidebar-head">
-          <span className="dh-sidebar-label">{t('uhSidebarFolders')}</span>
-          <button
-            type="button"
-            className="dh-sidebar-add"
-            aria-label={t('uhNewFolder')}
-            title={t('uhNewFolder')}
-            onClick={() => {
-              onSidebarNavigate?.()
-              folderActions.openCreate(
-                subView === 'workspace' ? folderId : null,
-                subView === 'workspace' && folderId !== null,
-              )
-            }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
-        </div>
-        <div className="dh-sidebar-tree">
-          {/* My Folder lives in the tree; until the server has created it, this row stands in its place and creates it. */}
-          {tree.status !== 'loading' && !myFolderIdOf(tree.nodes) && (
+      {/* RV-14: the folders and the sources section scroll as one column below the nav (as the web) */}
+      <div className="dl-side-scroll">
+        <div className="dh-sidebar-folders">
+          <div className="dh-sidebar-head">
+            <span className="dh-sidebar-label">{t('uhSidebarFolders')}</span>
             <button
               type="button"
-              data-my-folder-standin=""
-              className={`uwf-tree-row dh-my-folder-standin${myFolderStandInCurrent ? ' selected' : ''}`}
-              aria-current={myFolderStandInCurrent ? 'page' : undefined}
+              className="dh-sidebar-add"
+              aria-label={t('uhNewFolder')}
+              title={t('uhNewFolder')}
               onClick={() => {
                 onSidebarNavigate?.()
-                selectSubView('my-folder')
+                // the tree has no root row (and so no root menu): as on the web, "+" makes a top-level folder
+                folderActions.openCreate(null, false)
               }}
             >
-              <span className="uwf-twisty" aria-hidden="true" />
-              <MyFolderGlyph />
-              <span className="uwf-tree-text">
-                <span className="uwf-tree-title">{myFolderLabel}</span>
-              </span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
             </button>
-          )}
-          {tree.status === 'loading' && (
-            <p className="uwf-side-state" role="status">
-              {t('uwPickLoading')}
-            </p>
-          )}
-          {tree.status === 'error' && (
-            <div className="uwf-side-state" role="alert">
-              <p>{t('ufTreeError')}</p>
-              <button type="button" className="btn btn-secondary" onClick={refreshAll}>
-                {t('acctRetry')}
-              </button>
-            </div>
-          )}
-          {tree.status === 'ready' && (
-            <UniworkFolderTree
-              idPrefix={`${uid}-tree`}
-              hideRoot
-              nodes={tree.nodes}
-              label={t('ufTreeLabel')}
-              expanded={expanded}
-              onExpandedChange={setExpanded}
-              selectedKey={treeSelectedKey}
-              onOpen={(id) => {
-                onSidebarNavigate?.()
-                openFolderInWorkspace(id)
-              }}
-              menuFor={treeMenuFor}
-              rename={folderActions.treeRename}
-              onRenameSave={(id, value) =>
-                folderActions.saveTreeRename(id, value, index.get(id)?.title ?? '')
-              }
-              onRenameCancel={folderActions.cancelTreeRename}
-              onRenameEdit={folderActions.clearTreeRenameError}
-            />
-          )}
-        </div>
-      </div>
-      {sourcesAvailable && (
-        <div className="dl-side-sources" role="group" aria-labelledby={`${uid}-side-sources`}>
-          <div className="dh-sidebar-head">
-            <span className="dh-sidebar-label" id={`${uid}-side-sources`}>
-              {t('dlNavElsewhere')}
-            </span>
           </div>
-          {ELSEWHERE_SOURCES.map((row) => {
-            const current =
-              !sidebarIdle && subView === 'elsewhere' && elsewhereSource === row.source
-            return (
+          <div className="dh-sidebar-tree">
+            {/* My Folder lives in the tree; until the server has created it, this row stands in its place and creates it. */}
+            {tree.status !== 'loading' && !myFolderIdOf(tree.nodes) && (
               <button
-                key={row.source}
                 type="button"
-                className={`dh-nav-item nav-item${current ? ' active' : ''}`}
-                data-source={row.source}
-                aria-current={current ? 'page' : undefined}
+                data-my-folder-standin=""
+                className={`uwf-tree-row dh-my-folder-standin${myFolderStandInCurrent ? ' selected' : ''}`}
+                aria-current={myFolderStandInCurrent ? 'page' : undefined}
                 onClick={() => {
                   onSidebarNavigate?.()
-                  openElsewhere(row.source)
+                  selectSubView('my-folder')
                 }}
               >
-                <span
-                  className={`dl-side-tile tone-${row.tone}`}
-                  data-tone={row.tone}
-                  aria-hidden="true"
-                >
-                  <SourceGlyph source={row.source} />
+                <span className="uwf-twisty" aria-hidden="true" />
+                <MyFolderGlyph />
+                <span className="uwf-tree-text">
+                  <span className="uwf-tree-title">{myFolderLabel}</span>
                 </span>
-                <span className="dl-side-label">{t(row.labelKey)}</span>
               </button>
-            )
-          })}
+            )}
+            {tree.status === 'loading' && (
+              <p className="uwf-side-state" role="status">
+                {t('uwPickLoading')}
+              </p>
+            )}
+            {tree.status === 'error' && (
+              <div className="uwf-side-state" role="alert">
+                <p>{t('ufTreeError')}</p>
+                <button type="button" className="btn btn-secondary" onClick={refreshAll}>
+                  {t('acctRetry')}
+                </button>
+              </div>
+            )}
+            {tree.status === 'ready' && (
+              <UniworkFolderTree
+                idPrefix={`${uid}-tree`}
+                hideRoot
+                nodes={tree.nodes}
+                label={t('ufTreeLabel')}
+                expanded={expanded}
+                onExpandedChange={setExpanded}
+                selectedKey={treeSelectedKey}
+                onOpen={(id) => {
+                  onSidebarNavigate?.()
+                  openFolderInWorkspace(id)
+                }}
+                menuFor={treeMenuFor}
+                rename={folderActions.treeRename}
+                onRenameSave={(id, value) =>
+                  folderActions.saveTreeRename(id, value, index.get(id)?.title ?? '')
+                }
+                onRenameCancel={folderActions.cancelTreeRename}
+                onRenameEdit={folderActions.clearTreeRenameError}
+              />
+            )}
+          </div>
         </div>
-      )}
+        {sourcesAvailable && (
+          <div className="dl-side-sources" role="group" aria-labelledby={`${uid}-side-sources`}>
+            <div className="dh-sidebar-head">
+              <span className="dh-sidebar-label" id={`${uid}-side-sources`}>
+                {t('dlNavElsewhere')}
+              </span>
+            </div>
+            {ELSEWHERE_SOURCES.map((row) => {
+              const current =
+                !sidebarIdle && subView === 'elsewhere' && elsewhereSource === row.source
+              return (
+                <button
+                  key={row.source}
+                  type="button"
+                  className={`dh-nav-item nav-item${current ? ' active' : ''}`}
+                  data-source={row.source}
+                  aria-current={current ? 'page' : undefined}
+                  onClick={() => {
+                    onSidebarNavigate?.()
+                    openElsewhere(row.source)
+                  }}
+                >
+                  <span
+                    className={`dl-side-tile tone-${row.tone}`}
+                    data-tone={row.tone}
+                    aria-hidden="true"
+                  >
+                    <SourceGlyph source={row.source} />
+                  </span>
+                  <span className="dl-side-label">{t(row.labelKey)}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 

@@ -1,6 +1,27 @@
 /* UNI-2047 sidebar: the "Từ nơi khác" section of the Documents sidebar (web documents-sidebar.tsx),
    semantic tokens only, both themes. The rows reuse .dh-nav-item; this file draws the module tile. */
 
+/* RV-14: below the nav the sidebar is one scrolling column, as on the web: the folder tree and the
+   sources section scroll together, so at the minimum window height nothing is squeezed or clipped.
+   Inside it the folders block and the tree take their natural height (their own flex / scroller
+   from documents-home.css would otherwise shrink the tree to nothing and clip the section). */
+.dl-side-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.dl-side-scroll .dh-sidebar-folders {
+  flex: none;
+}
+
+.dl-side-scroll .dh-sidebar-tree {
+  flex: none;
+  overflow: visible;
+}
+
 .dl-side-sources {
   display: flex;
   flex: none;
@@ -28,6 +49,15 @@
 .dl-side-tile svg {
   width: 12px;
   height: 12px;
+}
+
+/* RV-13: the rows are .nav-item rows, and home.css colours every svg inside one (.nav-item svg grey,
+   :hover --text, .active --accent). One rule per state, each more specific than its home.css
+   twin, keeps the glyph on its tile tone at rest, on hover and on the current row. */
+.nav-item .dl-side-tile svg,
+.nav-item:hover .dl-side-tile svg,
+.nav-item.active .dl-side-tile svg {
+  color: var(--surface);
 }
 
 .dl-side-tile.tone-blue {
