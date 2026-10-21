@@ -4,9 +4,15 @@
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { findShortcut, type ShortcutAction } from '@genoffice/shortcuts'
+import {
+  accessibleShortcutProblems,
+  findDisplayChord,
+  findShortcut,
+  type ShortcutAction,
+} from '@genoffice/shortcuts'
 import {
   RibbonCollapseButton,
+  RibbonExpandButton,
   useRibbonCollapse,
   type RibbonCollapse,
   type RibbonCollapseOptions,
@@ -35,6 +41,7 @@ function Ribbon(props: { options?: RibbonCollapseOptions; withCompact?: boolean 
     'div',
     { className: latest.rootClass, ref: latest.rootRef },
     createElement(RibbonCollapseButton, { state: latest, label: 'Collapse the ribbon' }),
+    createElement(RibbonExpandButton, { state: latest, label: 'Expand the ribbon' }),
   )
 }
 
@@ -243,7 +250,7 @@ describe('the shortcut shown in the tips', () => {
     mount({ options: { action: docs086, platform: 'win', surface: 'web' } })
     expect(latest.shortcutLabel).toBe('Ctrl+F3')
     expect(latest.tabTip(true)).toBe('Collapse (Ctrl+F3)')
-    expect(host.querySelector('.ribbon-collapse-btn')!.getAttribute('aria-label')).toBe(
+    expect(host.querySelector('.ribbon-collapse-btn')!.getAttribute('data-tip')).toBe(
       'Collapse the ribbon (Ctrl+F3)',
     )
 
@@ -264,5 +271,69 @@ describe('the shortcut shown in the tips', () => {
   it('falls back to the old label without an action', () => {
     mount()
     expect(latest.shortcutLabel).toMatch(/^(Ctrl\+F1|⌥⌘R)$/)
+  })
+})
+
+// UNI-2060: the name stays the plain command; the chord goes to aria-keyshortcuts
+describe('the accessible name and aria-keyshortcuts', () => {
+  const controls = () =>
+    [...host.querySelectorAll('button')].map((el) => ({
+      el,
+      name: el.getAttribute('aria-label') ?? el.textContent ?? '',
+      keyshortcuts: el.getAttribute('aria-keyshortcuts'),
+    }))
+
+  for (const platform of ['win', 'mac'] as const) {
+    for (const surface of ['desktop', 'web'] as const) {
+      it(`collapse / expand buttons: plain name, table chord (${platform}, ${surface})`, () => {
+        mount({ options: { action: docs086, platform, surface } })
+        const [collapse] = controls()
+        expect(collapse!.name).toBe('Collapse the ribbon')
+        expect(accessibleShortcutProblems(collapse!, docs086, platform, surface)).toEqual([])
+        // the tooltip keeps the chord
+        expect(collapse!.el.getAttribute('data-tip')).toBe(
+          latest.shortcutLabel
+            ? `Collapse the ribbon (${latest.shortcutLabel})`
+            : 'Collapse the ribbon',
+        )
+        expect(latest.ariaKeyshortcuts).toBe(collapse!.keyshortcuts ?? '')
+
+        act(() => latest.toggle())
+        const [expand] = controls()
+        expect(expand!.name).toBe('Expand the ribbon')
+        expect(accessibleShortcutProblems(expand!, docs086, platform, surface)).toEqual([])
+      })
+    }
+  }
+
+  it('the tab keyshortcuts follow the tab tips', () => {
+    const compactRow: ShortcutAction = {
+      id: 'docs-087',
+      scope: 'docs',
+      win: [],
+      mac: [],
+      web: { win: ['Ctrl+Alt+K'], mac: ['Alt+Cmd+K'] },
+      match: 'key',
+      guard: {},
+    }
+    mount({
+      withCompact: true,
+      options: { action: docs086, compactAction: compactRow, platform: 'win', surface: 'web' },
+    })
+    expect(latest.tabKeyshortcuts(false)).toBeUndefined()
+    expect(latest.tabKeyshortcuts(true)).toBe('Control+F3 Control+Alt+K')
+    act(() => latest.toggleCompact())
+    expect(latest.tabKeyshortcuts(true)).toBe('Control+Alt+K')
+    act(() => latest.toggle())
+    expect(latest.collapsed).toBe(true)
+    expect(latest.tabKeyshortcuts(false)).toBe('Control+F3')
+  })
+
+  it('falls back to the old chord without an action, never in the name', () => {
+    mount({ options: { platform: 'win' } })
+    expect(latest.ariaKeyshortcuts).toBe('Control+F1')
+    mount({ options: { platform: 'mac' } })
+    expect(latest.ariaKeyshortcuts).toBe('Alt+Meta+R')
+    for (const c of controls()) expect(findDisplayChord(c.name)).toBeNull()
   })
 })
