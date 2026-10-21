@@ -110,9 +110,9 @@ export function asZipDownloadProgress(raw: unknown): ZipDownloadProgress | null 
   let error: ZipDownloadProgress['error'] = null
   if (r.error !== null && r.error !== undefined) {
     const e = obj(r.error)
-    if (!e || !knownCode(e.code)) return null
+    if (!e) return null
     error = {
-      code: e.code,
+      code: knownCode(e.code) ? e.code : 'server_error',
       ...(count(e.retryAfterSeconds) ? { retryAfterSeconds: e.retryAfterSeconds } : {}),
     }
   }

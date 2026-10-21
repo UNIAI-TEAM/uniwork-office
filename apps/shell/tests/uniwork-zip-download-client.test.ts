@@ -199,6 +199,18 @@ describe('fetchZip', () => {
     expect(result).toEqual({ bytes: 6 })
   })
 
+  it('a body that ends cleanly short of its Content-Length is a network error', async () => {
+    const fetch = vi.fn<FetchLike>(
+      async () =>
+        new Response(zipBody([new Uint8Array([1, 2, 3])]), {
+          status: 200,
+          headers: { 'Content-Length': '100' },
+        }),
+    )
+    const error = await errorOf(client(fetch).fetchZip(target, async () => undefined))
+    expect(error.code).toBe('network')
+  })
+
   it('waits for the sink before it pulls the next chunk (backpressure)', async () => {
     const order: string[] = []
     const fetch = vi.fn<FetchLike>(

@@ -310,6 +310,16 @@ describe('the single file download (D4)', () => {
     expect(tmpLeft()).toEqual([])
   })
 
+  it('a server 403 on the file read is not reported as a forbidden target', async () => {
+    const { call } = await setup()
+    dialogs.save = { canceled: false, filePath: join(dir, 'Secret.docx') }
+    stubNetwork(() => json(403, { error: { code: 'document_access_denied', message: 'x' } }))
+    const result = (await call(ZIP_DOWNLOAD_CHANNELS.downloadFile, file)) as { code: string }
+    expect(result).toMatchObject({ ok: false, path: null })
+    expect(result.code).not.toBe('forbidden_target')
+    expect(readdirSync(dir)).toEqual([])
+  })
+
   it('a file past the in-memory cap answers too_large and leaves nothing', async () => {
     const { call } = await setup()
     dialogs.save = { canceled: false, filePath: join(dir, 'Big.docx') }

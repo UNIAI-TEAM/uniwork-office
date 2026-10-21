@@ -259,13 +259,6 @@ export function errorFromResponse(
   if (serverCode === CHANGE_CURSOR_EXPIRED || serverCode === CHANGE_CURSOR_INVALID) {
     return new UniworkDocError('server_error', at)
   }
-  // BIGUP-A1: the upload-session verdicts, each its own answer.
-  // `upload_session_expired` (410) is NOT a document tombstone: the session is
-  // gone, so it reads `not_found` - the caller drops its saved session and
-  // starts a new one. `upload_session_busy` (409) is a wait, never the
-  // terminal 409 below, and keeps the server's own 5 s delay. A too-small
-  // answer (422) is the threshold-drift fallback signal, and the three 422
-  // part/probe verdicts each keep their serverCode for the caller to act on.
   // UNI-2068: the zip download job's own verdicts. They come before the coded-410 ->
   // `deleted` branch and the generic 429 below: an expired download link is not a
   // deleted document, and a busy job slot is a refusal the user is told about at
@@ -289,6 +282,13 @@ export function errorFromResponse(
   if (serverCode === 'download_jobs_busy') {
     return new UniworkDocError('server_error', { ...retried, zip: 'zip_busy' })
   }
+  // BIGUP-A1: the upload-session verdicts, each its own answer.
+  // `upload_session_expired` (410) is NOT a document tombstone: the session is
+  // gone, so it reads `not_found` - the caller drops its saved session and
+  // starts a new one. `upload_session_busy` (409) is a wait, never the
+  // terminal 409 below, and keeps the server's own 5 s delay. A too-small
+  // answer (422) is the threshold-drift fallback signal, and the three 422
+  // part/probe verdicts each keep their serverCode for the caller to act on.
   if (serverCode === 'upload_session_expired') return new UniworkDocError('not_found', at)
   if (serverCode === 'upload_session_busy') return new UniworkDocError('server_error', retried)
   if (serverCode === 'upload_session_too_small') return new UniworkDocError('server_error', at)

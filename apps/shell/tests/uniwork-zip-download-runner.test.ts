@@ -269,6 +269,15 @@ describe('runZipDownload', () => {
     expect(h.calls).toContain('abort')
   })
 
+  it('an abort before the sink opens creates no temp file and no job', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const h = harness({}, controller.signal)
+    expect(await h.done).toMatchObject({ phase: 'canceled' })
+    expect(h.openSink).not.toHaveBeenCalled()
+    expect(h.client.createJob).not.toHaveBeenCalled()
+  })
+
   it('cancel while polling ends as canceled, removes the temp file, makes no more calls', async () => {
     const controller = new AbortController()
     const h = harness({}, controller.signal)

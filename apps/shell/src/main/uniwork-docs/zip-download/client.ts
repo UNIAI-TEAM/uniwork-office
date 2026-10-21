@@ -166,6 +166,10 @@ export function createZipDownloadClient(
             } finally {
               signal?.removeEventListener('abort', stop)
             }
+            // a clean end short of the declared length is a cut transfer, never a whole zip
+            if (totalBytes !== null && receivedBytes !== totalBytes) {
+              throw new UniworkDocError('network')
+            }
             return { bytes: receivedBytes }
           },
         })

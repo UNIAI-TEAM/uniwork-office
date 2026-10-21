@@ -161,11 +161,25 @@ describe('guards', () => {
         fileCount: null,
         skipped: [],
         path: null,
-        error: { code: 'bogus' },
+        error: 'x',
       },
     ]) {
       expect(asZipDownloadProgress(raw)).toBeNull()
     }
+  })
+
+  it('asZipDownloadProgress turns an unknown error code into server_error, keeping the event', () => {
+    const progress = asZipDownloadProgress({
+      runId: 'r',
+      phase: 'failed',
+      bytes: 0,
+      totalBytes: null,
+      fileCount: null,
+      skipped: [],
+      path: null,
+      error: { code: 'bogus' },
+    })
+    expect(progress).toMatchObject({ phase: 'failed', error: { code: 'server_error' } })
   })
 })
 

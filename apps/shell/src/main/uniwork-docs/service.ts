@@ -7015,7 +7015,12 @@ export class UniworkDocsService {
       await this.writeBytesViaTemp(target, bytes)
       return { ok: true, path: target }
     } catch (error) {
-      if (error instanceof UniworkDocError && error.code === 'forbidden') {
+      if (
+        error instanceof UniworkDocError &&
+        error.code === 'forbidden' &&
+        error.status === undefined
+      ) {
+        // the target check carries no status; a server 403 is not a folder problem
         return fail('forbidden_target')
       }
       return fail(zipErrorOf(error).code)

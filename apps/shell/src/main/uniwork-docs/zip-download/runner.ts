@@ -140,6 +140,8 @@ export async function runZipDownload(
   }
 
   try {
+    // a quit / sign-out between start and here must not create a temp file nobody removes
+    if (signal.aborted) return aborted()
     push('saving')
     try {
       sink = await deps.openSink()
