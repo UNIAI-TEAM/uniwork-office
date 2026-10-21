@@ -11,7 +11,8 @@ import { isAllowedOrigin, type DeploymentProfile } from '../uniwork-auth/deploym
 /**
  * Opens a citation of an Ask UNI answer. The renderer sends only `{ kind, href }` (the server's
  * path); this module decides what that means, so a hostile or odd href can never pick a URL:
- *  - a document opens in the app through the existing open-by-id path;
+ *  - a document opens in the app through the existing open-by-id path; a document href that is not
+ *    a document page (a folder) or a format the app cannot open falls through to the web page;
  *  - every other kind opens as the signed-in deployment's web page, and only when the resolved
  *    URL stays on that origin (https, or http to localhost on the dev channel).
  * Every outcome is an AskUniOpenResult, never a throw.
@@ -74,6 +75,7 @@ function webUrlOf(href: string, profile: DeploymentProfile): string | null {
   const path = href.split(/[?#]/, 1)[0] ?? ''
   if (/%(2f|5c)/i.test(path)) return null
   try {
+    // web origin = API origin until the server exposes its frontend origin (C6, same as uniwork-work/wiring.ts)
     const base = new URL(profile.apiOrigin)
     if (!isAllowedOrigin(base, profile.channel)) return null
     const url = new URL(href, base.origin)
@@ -94,9 +96,13 @@ export function createAskUniOpener(deps: AskUniOpenDeps): AskUniOpener {
       try {
         if (kind === 'document') {
           const id = DOCUMENT_HREF.exec(href)?.[1]
-          if (!id) return error()
-          const opened = await deps.openDocument(id)
-          return opened.ok ? { ok: true } : { ok: false, code: codeOfDocError(opened.error) }
+          if (id) {
+            const opened = await deps.openDocument(id)
+            if (opened.ok) return { ok: true }
+            if (opened.error !== 'unsupported_format') {
+              return { ok: false, code: codeOfDocError(opened.error) }
+            }
+          }
         }
         const url = webUrlOf(href, profile)
         if (!url) return error()
