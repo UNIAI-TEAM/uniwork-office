@@ -76,6 +76,6 @@ export const zh = {
   dlBulkDoneTrash: '已将 {ok}/{total} 个文档移到回收站',
   dlBulkConfirmTitleOne: '将 {n} 个文档移到回收站？',
   dlBulkConfirmTitleOther: '将 {n} 个文档移到回收站？',
-  dlBulkConfirmBody: '项目会在回收站保留 30 天，之后永久删除。你无权管理的项目会被跳过。',
+  dlBulkConfirmBody: '项目会在回收站保留 30 天，之后永久删除。',
   dlTrashBanner30: '项目会在回收站保留 30 天，之后永久删除。',
 }
