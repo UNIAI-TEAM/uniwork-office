@@ -14,18 +14,15 @@ import {
   ActionToast,
   ArchiveConfirm,
   NEW_KIND_LABEL_KEY,
-  RenameField,
   UploadDocDialog,
   type ActionOutcome,
   type DocTarget,
   type UploadProgress,
 } from '../UniworkDocActions'
 import {
-  DOC_NAME_ERROR_KEYS,
   NEW_DOC_KINDS,
   UNIWORK_ERROR_KEYS,
   checkDocName,
-  docExtension,
   errorActionOf,
   isDocNameError,
   isDocTitleTooLong,
@@ -50,7 +47,6 @@ import {
   expandParentAndAncestorsFor,
   folderEditActionsOffered,
   folderPath,
-  isFolderEntry,
   isMyFolder,
   labelMyFolderPath,
   liveFallback,
@@ -84,25 +80,15 @@ import { publishUniworkNotice } from '../uniwork-notice-bus'
 import { announce } from '../uniwork-live'
 import {
   DEFAULT_DOCUMENTS_HOME_FILTERS,
-  DEFAULT_DOCUMENTS_HOME_GROUP_BY,
   DOCUMENTS_HOME_FORMAT_OPTIONS,
-  DOCUMENTS_HOME_GROUP_BY,
-  DOCUMENTS_HOME_GROUP_BY_KEYS,
   DOCUMENTS_HOME_UPDATED_OPTIONS,
+  canManageShelved,
   collectUpdatedByOptions,
-  documentsHomeGroupLabel,
-  documentsHomeGroupable,
   fetchDocumentsHomePage,
   fetchDocumentsHomeSources,
-  formatAccessCell,
-  formatBytes,
-  formatShortDate,
-  formatUpdatedByCell,
   getDocumentsHomeNavEntry,
-  groupDocumentsHomeRows,
   hasActiveFilters,
   mergeNewestFirst,
-  rowSizeBytes,
   sourceMatchesFilters,
   splitAndSortItems,
   toUniworkListFilters,
@@ -111,23 +97,18 @@ import {
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
   type DocumentsHomeFilterState,
-  type DocumentsHomeGroupBy,
-  type DocumentsHomeRowGroup,
-  type DocumentsHomeSort,
   type DocumentsHomeSubViewId,
   type DocumentsHomeTableRow,
   type DocumentsHomeTypeFilter,
   type DocumentsHomeUpdatedPreset,
-  type DocumentsHomeViewMode,
   type UpdatedByOption,
 } from './documents-home-model'
 import { shelveDocument, trashShelvedDocument, unshelveDocument } from '../uniwork-library-api'
-import {
-  ShelvedTable,
-  ShelvedToolbar,
-  filterByShelver,
-  shelvedDescendantIds,
-} from './ShelvedDocumentsView'
+import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
+import { DocList } from '../doclist/DocList'
+import type { DocSubline } from '../doclist/DocRow'
+import { screenOfSubView, wireSortOf } from '../doclist/table-model'
+import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
@@ -277,10 +258,6 @@ export interface DocumentsHomeProps {
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
 }
 
-/** UNI-1961: a table row, or the header of a Group by group */
-type DocumentsHomeTableItem =
-  DocumentsHomeTableRow | { type: 'group'; id: string; group: DocumentsHomeRowGroup }
-
 type TreeState =
   | { status: 'loading'; nodes: UniworkFolderNode[] }
   | { status: 'ready'; nodes: UniworkFolderNode[] }
@@ -309,7 +286,7 @@ export function DocumentsHome({
   onSubViewChange,
   onFolderChange,
 }: DocumentsHomeProps) {
-  const { t, lang, dateLocale } = useI18n()
+  const { t, dateLocale } = useI18n()
   const uid = useId()
 
   const [subView, setSubView] = useState<DocumentsHomeSubViewId>(initialSubView)
@@ -327,9 +304,11 @@ export function DocumentsHome({
   const treeLoadingRef = useRef(false)
 
   const [filters, setFilters] = useState<DocumentsHomeFilterState>(DEFAULT_DOCUMENTS_HOME_FILTERS)
-  const [sort, setSort] = useState<DocumentsHomeSort>('recent')
-  const [viewMode, setViewMode] = useState<DocumentsHomeViewMode>('list')
-  const [groupBy, setGroupBy] = useState<DocumentsHomeGroupBy>(DEFAULT_DOCUMENTS_HOME_GROUP_BY)
+  // UNI-2047: one table sorted from its headers, the sort remembered per screen; the grid view
+  // and Group by are gone
+  const screen = screenOfSubView(subView)
+  const [docSort, setDocSort] = useDocListSort(screen)
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const [searchDraft, setSearchDraft] = useState('')
   const [page, setPage] = useState<PageState>({
     status: 'loading',
@@ -537,6 +516,12 @@ export function DocumentsHome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filters.format, filters.updatedBy, filters.updatedPreset],
   )
+  // the header sort goes to the server too (nothing until the person sorts: the server's own order)
+  const wireSort = useMemo(
+    () => wireSortOf(docSort),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [docSort?.column, docSort?.dir],
+  )
 
   useEffect(() => {
     const seq = ++listSeqRef.current
@@ -600,6 +585,7 @@ export function DocumentsHome({
       folderId,
       myFolderId: resolvedMyFolderId,
       filters: wireFilters,
+      sort: wireSort,
     })
       .then(({ result, ensuredMyFolder }) => {
         if (listSeqRef.current !== seq) return
@@ -668,7 +654,7 @@ export function DocumentsHome({
           error: 'network',
         })
       })
-  }, [workspaceId, subView, folderId, resolvedMyFolderId, wireFilters, query, listTick])
+  }, [workspaceId, subView, folderId, resolvedMyFolderId, wireFilters, wireSort, query, listTick])
 
   // UNI-1961: as on the web, the sources merge only at the workspace root (no
   // folder, no search); a failed sources read (an older server's 404/501 or any
@@ -759,6 +745,7 @@ export function DocumentsHome({
       myFolderId: resolvedMyFolderId,
       cursor,
       filters: wireFilters,
+      sort: wireSort,
     })
       .then(({ result }) => {
         if (listSeqRef.current !== seq) return
@@ -1192,6 +1179,19 @@ export function DocumentsHome({
   useEffect(() => {
     setShelvedBy(null)
   }, [workspaceId, subView])
+  // UNI-2047: a selection belongs to one list: another screen, folder, search or filter starts clean,
+  // and a row that left the loaded list (renamed away, trashed, moved) is no longer selected
+  useEffect(() => {
+    setSelected(new Set())
+  }, [workspaceId, subView, folderId, query, wireFilters])
+  useEffect(() => {
+    setSelected((prev) => {
+      if (prev.size === 0) return prev
+      const present = new Set(page.items.map((doc) => doc.id))
+      const next = new Set([...prev].filter((id) => present.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [page.items])
   const [shelvedTrashTarget, setShelvedTrashTarget] = useState<DocumentsHomeDoc | null>(null)
   // the ref answers a second click that lands before React re-renders
   const unshelvingRef = useRef<Set<string>>(new Set())
@@ -1468,17 +1468,92 @@ export function DocumentsHome({
     return items
   }
 
+  // the shelf's ⋯ menu: reading is allowed on a shelved item (a shelved folder never browses);
+  // putting it back or into the trash needs manage or admin scope
+  const shelfMenuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] => {
+    const menu: FolderMenuItem[] = []
+    if (doc.kind !== 'folder') {
+      menu.push({ id: 'open', label: t('open'), onSelect: () => void openDoc(doc) })
+    }
+    if (canManageShelved(doc)) {
+      menu.push(
+        {
+          id: 'unshelve',
+          label: t('uhShelvedUnshelve'),
+          onSelect: () => void handleUnshelve(doc),
+        },
+        {
+          id: 'trash',
+          label: t('uhShelvedMoveToTrash'),
+          onSelect: () => setShelvedTrashTarget(doc),
+        },
+      )
+    }
+    return menu
+  }
+
+  const shelfActionsFor = (doc: DocumentsHomeDoc) => {
+    if (!canManageShelved(doc)) return null
+    const busy = unshelving.has(doc.id)
+    return (
+      <button
+        type="button"
+        className="btn btn-secondary dh-shelved-unshelve"
+        aria-label={t('uhShelvedUnshelveItem', { title: doc.title })}
+        disabled={busy}
+        aria-busy={busy || undefined}
+        onClick={() => void handleUnshelve(doc)}
+      >
+        {t('uhShelvedUnshelve')}
+      </button>
+    )
+  }
+
+  // the second line under a name: the shelf's folder line, a search hit's path, or the workspace
+  // a shared-with-me row lives in
+  const sublineFor = (doc: DocumentsHomeDoc): DocSubline | null => {
+    if (shelfView) {
+      const full =
+        doc.path && doc.path.length > 0
+          ? doc.path.map((crumb) => crumb.title).join(' › ')
+          : t('uhShelvedPathRoot')
+      return { short: full, full }
+    }
+    if (doc.path) {
+      const hit = shortPath(
+        labelMyFolderPath(doc.path, resolvedMyFolderId, myFolderLabel),
+        t('ufRoot'),
+      )
+      return { short: hit.short, full: hit.full, path: true }
+    }
+    const workspace = doc.workspaceName?.trim()
+    if (subView === 'shared-with-me' && workspace) return { short: workspace, full: workspace }
+    return null
+  }
+
+  // the folder cards keep their own order: the server's position, or the name when the table sorts by it
+  const folderOrder = docSort?.column === 'name' ? 'name' : 'recent'
+  const folderDesc = folderOrder === 'name' && docSort?.dir === 'desc'
   const { folders, files } = useMemo(() => {
-    const split = splitAndSortItems(page.items, sort, dateLocale)
-    return { folders: myFolderFirst(split.folders), files: split.files }
-  }, [page.items, sort, dateLocale])
+    const split = splitAndSortItems(page.items, folderOrder, dateLocale)
+    const ordered = folderDesc ? [...split.folders].reverse() : split.folders
+    return { folders: myFolderFirst(ordered), files: split.files }
+  }, [page.items, folderOrder, folderDesc, dateLocale])
 
   // UNI-1961: the table's rows; at the root the source files join the documents
   // newest first under the web's paging cutoff, and the home filters the server
-  // could not apply to them run here (the web's merge, use-documents-library.ts)
+  // could not apply to them run here (the web's merge, use-documents-library.ts).
+  // The table orders them itself (UNI-2047: header sort); the shelf lists folders as rows too.
   const tableRows = useMemo<DocumentsHomeTableRow[]>(() => {
+    if (shelfView) {
+      return filterByShelver(page.items, shelvedBy).map((doc) => ({
+        type: 'doc' as const,
+        id: doc.id,
+        doc,
+      }))
+    }
     if (!sourcesMerged) return files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc }))
-    const merged = mergeNewestFirst(page.items, sources.items, {
+    return mergeNewestFirst(page.items, sources.items, {
       docs: page.nextCursor !== null,
       sources: sources.nextCursor !== null,
     }).filter((row) =>
@@ -1486,26 +1561,16 @@ export function DocumentsHome({
         ? sourceMatchesFilters(row.source, wireFilters)
         : row.doc.kind !== 'folder',
     )
-    if (sort !== 'name') return merged
-    const titleOf = (row: DocumentsHomeTableRow) =>
-      row.type === 'doc' ? row.doc.title : row.source.name
-    return [...merged].sort((a, b) =>
-      titleOf(a).localeCompare(titleOf(b), dateLocale, { numeric: true, sensitivity: 'base' }),
-    )
-  }, [sourcesMerged, files, page.items, page.nextCursor, sources, wireFilters, sort, dateLocale])
-
-  // UNI-1961: the web's Group by, on its list views only (never the root, a
-  // folder or a search); a group header row precedes its rows
-  const grouping = documentsHomeGroupable(subView) && query.length === 0
-  const tableItems = useMemo<DocumentsHomeTableItem[]>(() => {
-    if (!grouping || groupBy === 'none') return tableRows
-    const docs = tableRows.flatMap((row) => (row.type === 'doc' ? [row.doc] : []))
-    const myFolder = { id: resolvedMyFolderId, label: myFolderLabel }
-    return groupDocumentsHomeRows(docs, groupBy, index, myFolder).flatMap((group) => [
-      { type: 'group' as const, id: `group:${group.key}`, group },
-      ...group.rows.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
-    ])
-  }, [grouping, groupBy, tableRows, index, resolvedMyFolderId, myFolderLabel])
+  }, [
+    shelfView,
+    shelvedBy,
+    sourcesMerged,
+    files,
+    page.items,
+    page.nextCursor,
+    sources,
+    wireFilters,
+  ])
 
   const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
 
@@ -1906,183 +1971,90 @@ export function DocumentsHome({
           />
         )}
 
-        {!shelfView && (
+        {!shelfView && subView !== 'shared-with-me' && (
           <div className="dh-filter-bar">
-            {subView !== 'shared-with-me' && (
-              <>
-                <label className="dh-filter-chip">
-                  <span className="dh-filter-k">{t('uhFilterType')}</span>
-                  <select
-                    className="dh-filter-select"
-                    data-filter="format"
-                    aria-label={t('uhFilterType')}
-                    value={filters.format}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        format: e.target.value as DocumentsHomeTypeFilter,
-                      }))
-                    }
-                  >
-                    {DOCUMENTS_HOME_FORMAT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.labelKey ? t(opt.labelKey) : opt.literal}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <>
+              <label className="dh-filter-chip">
+                <span className="dh-filter-k">{t('uhFilterType')}</span>
+                <select
+                  className="dh-filter-select"
+                  data-filter="format"
+                  aria-label={t('uhFilterType')}
+                  value={filters.format}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      format: e.target.value as DocumentsHomeTypeFilter,
+                    }))
+                  }
+                >
+                  {DOCUMENTS_HOME_FORMAT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.labelKey ? t(opt.labelKey) : opt.literal}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-                <label className="dh-filter-chip">
-                  <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
-                  <select
-                    className="dh-filter-select"
-                    data-filter="updatedBy"
-                    aria-label={t('uhFilterModifiedBy')}
-                    value={filters.updatedBy}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        updatedBy: e.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">{t('uhFilterAnyPerson')}</option>
-                    {updatedByOptionsForSelect(
-                      knownAuthors,
-                      filters.updatedBy,
-                      t('uwEditLockSomeone'),
-                    ).map((author) => (
-                      <option key={author.id} value={author.id}>
-                        {author.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <label className="dh-filter-chip">
+                <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
+                <select
+                  className="dh-filter-select"
+                  data-filter="updatedBy"
+                  aria-label={t('uhFilterModifiedBy')}
+                  value={filters.updatedBy}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      updatedBy: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="">{t('uhFilterAnyPerson')}</option>
+                  {updatedByOptionsForSelect(
+                    knownAuthors,
+                    filters.updatedBy,
+                    t('uwEditLockSomeone'),
+                  ).map((author) => (
+                    <option key={author.id} value={author.id}>
+                      {author.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-                <label className="dh-filter-chip">
-                  <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
-                  <select
-                    className="dh-filter-select"
-                    data-filter="updatedFrom"
-                    aria-label={t('uhFilterUpdated')}
-                    value={filters.updatedPreset}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        updatedPreset: e.target.value as DocumentsHomeUpdatedPreset,
-                      }))
-                    }
-                  >
-                    {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {t(opt.labelKey)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <label className="dh-filter-chip">
+                <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
+                <select
+                  className="dh-filter-select"
+                  data-filter="updatedFrom"
+                  aria-label={t('uhFilterUpdated')}
+                  value={filters.updatedPreset}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      updatedPreset: e.target.value as DocumentsHomeUpdatedPreset,
+                    }))
+                  }
+                >
+                  {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {t(opt.labelKey)}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-                {hasActiveFilters(filters) && (
-                  <button
-                    type="button"
-                    className="dh-filter-clear"
-                    onClick={() => setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)}
-                  >
-                    {t('uhFilterClear')}
-                  </button>
-                )}
-              </>
-            )}
-
-            <div className="dh-view-tools">
-              {grouping && (
-                <label className="dh-filter-chip">
-                  <span className="dh-filter-k">{t('uhGroupBy')}</span>
-                  <select
-                    className="dh-group-select"
-                    data-filter="groupBy"
-                    aria-label={t('uhGroupBy')}
-                    value={groupBy}
-                    onChange={(e) => setGroupBy(e.target.value as DocumentsHomeGroupBy)}
-                  >
-                    {DOCUMENTS_HOME_GROUP_BY.map((id) => (
-                      <option key={id} value={id}>
-                        {t(DOCUMENTS_HOME_GROUP_BY_KEYS[id])}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              {hasActiveFilters(filters) && (
+                <button
+                  type="button"
+                  className="dh-filter-clear"
+                  onClick={() => setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)}
+                >
+                  {t('uhFilterClear')}
+                </button>
               )}
-              <button
-                type="button"
-                className="dh-sort-btn"
-                onClick={() => setSort((prev) => (prev === 'recent' ? 'name' : 'recent'))}
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16" />
-                </svg>
-                <span>{sort === 'recent' ? t('uhSortRecent') : t('uhSortName')}</span>
-              </button>
-              <div className="dh-view-toggle" role="group" aria-label={t('uhViewModeLabel')}>
-                <button
-                  type="button"
-                  className="dh-view-btn"
-                  data-view="list"
-                  aria-pressed={viewMode === 'list'}
-                  title={t('uhViewList')}
-                  aria-label={t('uhViewList')}
-                  onClick={() => setViewMode('list')}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="dh-view-btn"
-                  data-view="grid"
-                  aria-pressed={viewMode === 'grid'}
-                  title={t('uhViewGrid')}
-                  aria-label={t('uhViewGrid')}
-                  onClick={() => setViewMode('grid')}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+            </>
           </div>
         )}
 
@@ -2117,28 +2089,9 @@ export function DocumentsHome({
           </div>
         )}
 
-        {shelfView && pageShown && (
-          <ShelvedTable
-            items={filterByShelver(page.items, shelvedBy)}
-            filtered={filters.format !== 'all' || shelvedBy !== null}
-            dateLocale={dateLocale}
-            openingId={openingId}
-            nextCursor={page.nextCursor}
-            loadingMore={page.loadingMore}
-            moreError={page.moreError}
-            onLoadMore={loadMore}
-            isUnshelving={(documentId) => unshelving.has(documentId)}
-            onOpen={(doc) => void openDoc(doc)}
-            onUnshelve={(doc) => void handleUnshelve(doc)}
-            onTrash={setShelvedTrashTarget}
-            openMenuId={openMenuId}
-            onOpenMenuChange={setOpenMenuId}
-          />
-        )}
-
-        {pageShown && !shelfView && (
+        {pageShown && (
           <>
-            {folders.length > 0 && (
+            {!shelfView && folders.length > 0 && (
               <section className="dh-section dh-folders-section" aria-label={t('uhSectionFolders')}>
                 <div className="dh-section-head">
                   <span className="dh-section-title">{t('uhSectionFolders')}</span>
@@ -2211,203 +2164,76 @@ export function DocumentsHome({
             )}
 
             <section
-              className="dh-section dh-docs-section uwf-list"
-              aria-label={t('uhSectionDocuments')}
+              className={`dh-section dh-docs-section${shelfView ? ' dh-shelved-section' : ''} uwf-list`}
+              aria-label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
             >
-              <div className="dh-section-head">
-                <span className="dh-section-title">{t('uhSectionDocuments')}</span>
-                <span className="dh-section-count">{tableRows.length}</span>
-              </div>
+              {!shelfView && (
+                <div className="dh-section-head">
+                  <span className="dh-section-title">{t('uhSectionDocuments')}</span>
+                  <span className="dh-section-count">{tableRows.length}</span>
+                </div>
+              )}
 
               {tableRows.length === 0 ? (
-                <div className="dh-empty" role="status">
-                  {emptyMessage}
-                </div>
-              ) : (
-                <div
-                  className={`dh-doc-table${viewMode === 'grid' ? ' grid-mode' : ''}`}
-                  role="table"
-                  aria-label={t('uhSectionDocuments')}
-                >
-                  <div className="dh-doc-head" role="row">
-                    <div className="dh-col-name" role="columnheader">
-                      {t('uhColName')}
-                    </div>
-                    <div className="dh-col-access" role="columnheader">
-                      {t('uhColAccess')}
-                    </div>
-                    <div className="dh-col-person" role="columnheader">
-                      {t('uhColUpdatedBy')}
-                    </div>
-                    <div className="dh-col-time" role="columnheader">
-                      {t('uhColUpdatedAt')}
-                    </div>
-                    <div className="dh-col-size" role="columnheader">
-                      {t('uhColSize')}
-                    </div>
-                    <div
-                      className="dh-col-actions"
-                      role="columnheader"
-                      aria-label={t('uhColActions')}
-                    />
+                shelfView ? (
+                  <div className="dh-empty dh-shelved-empty" role="status">
+                    <p className="dh-shelved-empty-title">
+                      {filters.format !== 'all' || shelvedBy !== null
+                        ? t('uhShelvedNoMatchTitle')
+                        : t('uhShelvedEmptyTitle')}
+                    </p>
+                    <p className="dh-shelved-empty-desc">
+                      {filters.format !== 'all' || shelvedBy !== null
+                        ? t('uhShelvedNoMatchDesc')
+                        : t('uhShelvedEmptyDesc')}
+                    </p>
                   </div>
-
-                  {tableItems.map((row) => {
-                    if (row.type === 'group') {
-                      return (
-                        <div key={row.id} role="row" className="dh-group-row">
-                          <div role="rowheader" aria-colspan={6} className="dh-group-cell">
-                            <span className="dh-group-title">
-                              {documentsHomeGroupLabel(row.group, t)}
-                            </span>
-                            <span className="dh-group-count">{row.group.rows.length}</span>
-                          </div>
-                        </div>
-                      )
-                    }
-                    if (row.type === 'source') {
-                      return (
-                        <DocumentsSourceRow
-                          key={row.id}
-                          source={row.source}
-                          menuOpen={openMenuId === row.id}
-                          onMenuOpenChange={(o) => setOpenMenuId(o ? row.id : null)}
-                          onOpen={(source) => void openSourceFile(source)}
-                          onDownload={(source) => void downloadSourceFile(source)}
-                        />
-                      )
-                    }
-                    const doc = row.doc
-                    const access = formatAccessCell(doc, t, lang)
-                    const person = formatUpdatedByCell(doc)
-                    const menuItems = docMenuFor(doc)
-                    const renaming = docRename?.doc.id === doc.id ? docRename : null
-                    const isSearchHitPath = query.length > 0 && Boolean(doc.path)
-                    const searchPath = isSearchHitPath
-                      ? shortPath(
-                          labelMyFolderPath(doc.path!, resolvedMyFolderId, myFolderLabel),
-                          t('ufRoot'),
-                        )
-                      : subView === 'shared-with-me' && doc.workspaceName?.trim()
-                        ? { short: doc.workspaceName.trim(), full: doc.workspaceName.trim() }
-                        : null
-                    const isOpening = openingId === doc.id
-
-                    return (
-                      <div
-                        key={doc.id}
-                        role="row"
-                        data-doc-id={doc.id}
-                        aria-busy={isOpening || undefined}
-                        className={`dh-doc-row${isOpening ? ' opening' : ''}`}
-                        onDoubleClick={() => {
-                          if (!renaming && !isFolderEntry(doc)) void openDoc(doc)
-                        }}
-                      >
-                        <div className="dh-cell-name" role="cell">
-                          <FileBadge
-                            ext={doc.kind === 'page' ? 'page' : docExtension(doc)}
-                            size={28}
-                          />
-                          {renaming ? (
-                            <RenameField
-                              initial={renameParts(doc.title, renameFormatOf(doc)).base}
-                              label={doc.title}
-                              error={renaming.error}
-                              busy={renaming.busy}
-                              errorKeys={DOC_NAME_ERROR_KEYS}
-                              onSave={(val) => void handleSaveDocRename(doc, val)}
-                              onCancel={() => setDocRename(null)}
-                              onEdit={() =>
-                                setDocRename((prev) => (prev ? { ...prev, error: null } : null))
-                              }
-                            />
-                          ) : (
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <button
-                                type="button"
-                                className="dh-doc-open"
-                                title={doc.title}
-                                onClick={() => void openDoc(doc)}
-                              >
-                                {doc.title}
-                              </button>
-                              {searchPath && (
-                                <span
-                                  className={`dh-doc-subpath${isSearchHitPath ? ' uwf-path' : ''}`}
-                                  title={searchPath.full}
-                                >
-                                  {isSearchHitPath ? (
-                                    <>
-                                      <span aria-hidden="true">{searchPath.short}</span>
-                                      <span className="uw-sr-only">
-                                        {t('ufPathLabel', { path: searchPath.full })}
-                                      </span>
-                                    </>
-                                  ) : (
-                                    searchPath.short
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="dh-cell-access" role="cell">
-                          {access.visibilityLabel ? (
-                            <span className={`dh-vis-badge dh-vis-${access.tone}`}>
-                              {access.visibilityLabel}
-                            </span>
-                          ) : (
-                            <span className="dh-cell-empty">—</span>
-                          )}
-                          {access.levelLabel && (
-                            <span className="dh-level-sub">{access.levelLabel}</span>
-                          )}
-                        </div>
-
-                        <div className="dh-cell-person" role="cell">
-                          {person.name ? (
-                            <>
-                              <span className="dh-avatar" aria-hidden="true">
-                                {person.initial}
-                              </span>
-                              <span className="dh-person-name" title={person.name}>
-                                {person.name}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="dh-cell-empty">—</span>
-                          )}
-                        </div>
-
-                        <div className="dh-cell-time" role="cell">
-                          {formatShortDate(doc.updatedAt, dateLocale)}
-                        </div>
-
-                        <div className="dh-cell-size" role="cell">
-                          {formatBytes(rowSizeBytes(row), dateLocale)}
-                        </div>
-
-                        <div
-                          className="dh-cell-actions"
-                          role="cell"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {menuItems.length > 0 && (
-                            <FolderMenu
-                              label={t('ufActionsFor', { name: doc.title })}
-                              items={menuItems}
-                              dataFor={doc.id}
-                              open={openMenuId === doc.id}
-                              onOpenChange={(o) => setOpenMenuId(o ? doc.id : null)}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                ) : (
+                  <div className="dh-empty" role="status">
+                    {emptyMessage}
+                  </div>
+                )
+              ) : (
+                <DocList
+                  screen={screen}
+                  rows={tableRows}
+                  sort={docSort}
+                  onSortChange={setDocSort}
+                  selected={selected}
+                  onSelectedChange={setSelected}
+                  label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
+                  openingId={openingId}
+                  openMenuId={openMenuId}
+                  onOpenMenuChange={setOpenMenuId}
+                  menuFor={shelfView ? shelfMenuFor : docMenuFor}
+                  actionsFor={shelfView ? shelfActionsFor : undefined}
+                  onOpen={(doc) => void openDoc(doc)}
+                  sublineFor={sublineFor}
+                  rename={
+                    docRename
+                      ? {
+                          docId: docRename.doc.id,
+                          error: docRename.error,
+                          busy: docRename.busy,
+                          onSave: (value) => void handleSaveDocRename(docRename.doc, value),
+                          onCancel: () => setDocRename(null),
+                          onEdit: () =>
+                            setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
+                        }
+                      : undefined
+                  }
+                  renderSource={(source, columns) => (
+                    <DocumentsSourceRow
+                      key={`source:${source.id}`}
+                      source={source}
+                      columns={columns}
+                      menuOpen={openMenuId === `source:${source.id}`}
+                      onMenuOpenChange={(o) => setOpenMenuId(o ? `source:${source.id}` : null)}
+                      onOpen={(src) => void openSourceFile(src)}
+                      onDownload={(src) => void downloadSourceFile(src)}
+                    />
+                  )}
+                />
               )}
 
               {page.moreError && (

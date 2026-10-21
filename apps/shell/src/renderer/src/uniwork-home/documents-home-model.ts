@@ -7,14 +7,13 @@ import type {
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
+  UniworkListSort,
   UniworkResult,
   UniworkSourceFile,
   UniworkSourceListPage,
   UniworkSourceListQuery,
 } from '../../../shared/home-api'
-import type { Lang } from '@genoffice/i18n'
 import type { StringKey, TFunc } from '../locale'
-import { folderPath, type FolderIndex } from '../uniwork-folders/uniwork-folders-model'
 
 export type UniworkDocVisibility = 'private' | 'workspace' | 'restricted'
 export type UniworkDocAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
@@ -133,7 +132,6 @@ export function getDocumentsHomeNavEntry(id: DocumentsHomeSubViewId): DocumentsH
 export type DocumentsHomeTypeFilter = 'all' | UniworkDocFormat
 export type DocumentsHomeUpdatedPreset = 'any' | '24h' | '7d' | '30d'
 export type DocumentsHomeSort = 'recent' | 'name'
-export type DocumentsHomeViewMode = 'list' | 'grid'
 
 export interface DocumentsHomeFilterState {
   format: DocumentsHomeTypeFilter
@@ -260,99 +258,6 @@ export function updatedByOptionsForSelect(
   return [...options, { id: selected, name: fallbackName }]
 }
 
-export interface FormattedAccessCell {
-  visibilityLabel: string | null
-  levelLabel: string | null
-  isEmpty: boolean
-  tone: ShareScopeKind | 'none'
-}
-
-const LEVEL_KEYS: Record<UniworkDocAccessLevel, StringKey> = {
-  manage: 'uhLevelManage',
-  edit: 'uhLevelEdit',
-  comment: 'uhLevelComment',
-  view: 'uhLevelView',
-}
-
-export type ShareScopeKind =
-  'private' | 'people' | 'workspace' | 'workspaces' | 'organization' | 'multiple' | 'link'
-
-/** `one` form for a count, the shared plural otherwise (same split as `fileCountLabel`) */
-function isSingular(count: number, lang: Lang): boolean {
-  return new Intl.PluralRules(lang).select(count) === 'one'
-}
-
-/**
- * Port of the web's `shareScopeView` (packages/views/documents/document-share-scope-badge.tsx):
- * a live public link alone is "link"; no axis at all is "private"; two or more
- * of people / home workspace / other workspaces / organization is "multiple";
- * otherwise the single axis in the order people > home workspace > other
- * workspaces > organization. The public link never joins the axis count.
- */
-export function shareScopeView(
-  scope: UniworkDocShareScope,
-  t: TFunc,
-  lang: Lang,
-): { kind: ShareScopeKind; label: string } {
-  const hasUsers = scope.users > 0
-  const hasOtherWorkspaces = scope.workspaces > 0
-  const active = [hasUsers, scope.homeWorkspace, hasOtherWorkspaces, scope.organization].filter(
-    Boolean,
-  ).length
-  if (active === 0 && scope.publicLink) return { kind: 'link', label: t('uhScopePublicLink') }
-  if (active === 0) return { kind: 'private', label: t('uhVisPrivate') }
-  if (active >= 2) return { kind: 'multiple', label: t('uhScopeMultiple') }
-  if (hasUsers) {
-    const key = isSingular(scope.users, lang) ? 'uhScopePeopleOne' : 'uhScopePeople'
-    return { kind: 'people', label: t(key, { n: scope.users }) }
-  }
-  if (scope.homeWorkspace) return { kind: 'workspace', label: t('uhVisWorkspace') }
-  if (hasOtherWorkspaces) {
-    const key = isSingular(scope.workspaces, lang) ? 'uhScopeWorkspacesOne' : 'uhScopeWorkspaces'
-    return { kind: 'workspaces', label: t(key, { n: scope.workspaces }) }
-  }
-  return { kind: 'organization', label: t('uhScopeOrganization') }
-}
-
-/**
- * Formats the `Truy cập` column like the web row: the scope label comes only
- * from `doc.shareScope` (a row without it has no scope label, never one guessed
- * from `visibility`) and the level from `doc.myLevel` (omits `"Bạn: ..."` when
- * absent). `isEmpty` (`"—"`) when both are absent.
- */
-export function formatAccessCell(doc: DocumentsHomeDoc, t: TFunc, lang: Lang): FormattedAccessCell {
-  const scope = doc.shareScope ? shareScopeView(doc.shareScope, t, lang) : null
-  const lvlKey = doc.myLevel ? LEVEL_KEYS[doc.myLevel] : undefined
-  const levelLabel = lvlKey ? t('uhLevelPrefix', { level: t(lvlKey) }) : null
-  return {
-    visibilityLabel: scope?.label ?? null,
-    levelLabel,
-    isEmpty: scope === null && levelLabel === null,
-    tone: scope?.kind ?? 'none',
-  }
-}
-
-export interface FormattedUpdatedByCell {
-  name: string | null
-  initial: string | null
-}
-
-/**
- * Formats the `Người sửa gần nhất` column strictly from `doc.updatedByName`.
- * When `updatedByName` is absent or blank, returns `{ name: null, initial: null }` so UI prints `"—"`.
- */
-export function formatUpdatedByCell(doc: DocumentsHomeDoc): FormattedUpdatedByCell {
-  const name = doc.updatedByName?.trim()
-  if (!name) {
-    return { name: null, initial: null }
-  }
-  const firstChar = Array.from(name)[0] ?? ''
-  return {
-    name,
-    initial: firstChar ? firstChar.toUpperCase() : null,
-  }
-}
-
 /** Splits items into folders and files and sorts them according to the active sort order. */
 export function splitAndSortItems(
   items: readonly DocumentsHomeDoc[],
@@ -397,6 +302,12 @@ export function splitAndSortItems(
   return { folders, files }
 }
 
+/** UNI-2047: the sort a header click sends to the server (nothing sent = the server's own order) */
+export interface DocumentsHomeWireSort {
+  sort?: UniworkListSort
+  order?: 'asc' | 'desc'
+}
+
 /** Structural adapter for W1 HomeApi list endpoints (compatible before and after W1 merges). */
 export interface DocumentsHomeApiAdapter {
   uniworkListChildren?: (
@@ -406,24 +317,38 @@ export interface DocumentsHomeApiAdapter {
   uniworkListDocuments?: (
     q: UniworkDocListQuery & UniworkListFilters,
   ) => Promise<UniworkResult<UniworkDocListPage>>
-  uniworkListSharedWithMe?: (q?: {
-    cursor?: string
-    limit?: number
-    includePages?: boolean
-  }) => Promise<UniworkResult<UniworkDocListPage>>
+  uniworkListSharedWithMe?: (
+    q?: {
+      cursor?: string
+      limit?: number
+      includePages?: boolean
+    } & DocumentsHomeWireSort,
+  ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSharedByMe?: (
-    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+    q: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters &
+      DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListTrash?: (
-    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+    q: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters &
+      DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
-  /** UNI-1961: the Lưu trữ shelf (only the type filter applies there) */
-  uniworkListShelved?: (q: {
-    workspaceId: string
-    cursor?: string
-    limit?: number
-    format?: UniworkDocFormat
-  }) => Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-1961: the Lưu trữ shelf (only the type filter applies there, and the sort) */
+  uniworkListShelved?: (
+    q: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+      format?: UniworkDocFormat
+    } & DocumentsHomeWireSort,
+  ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSources?: (q: UniworkSourceListQuery) => Promise<UniworkResult<UniworkSourceListPage>>
 }
 
@@ -452,12 +377,17 @@ export async function fetchDocumentsHomePage(
     myFolderId?: string | null
     cursor?: string
     filters: UniworkListFilters
+    /** UNI-2047: the header sort; unset sends nothing */
+    sort?: DocumentsHomeWireSort | null
   },
 ): Promise<{
   result: UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>
   ensuredMyFolder?: UniworkFolderNode
 }> {
   const { workspaceId, subView, folderId, myFolderId, cursor, filters } = params
+  const sortArgs: DocumentsHomeWireSort = params.sort
+    ? { sort: params.sort.sort, order: params.sort.order }
+    : {}
 
   if (subView === 'workspace') {
     if (typeof api.uniworkListChildren !== 'function') {
@@ -468,6 +398,7 @@ export async function fetchDocumentsHomePage(
       parentId: folderId,
       cursor,
       ...filters,
+      ...sortArgs,
     })
     return {
       result: res,
@@ -496,6 +427,7 @@ export async function fetchDocumentsHomePage(
       parentId: targetFolderId,
       cursor,
       ...filters,
+      ...sortArgs,
     })
     return {
       result: res,
@@ -512,6 +444,7 @@ export async function fetchDocumentsHomePage(
       workspaceId,
       cursor,
       ...filters,
+      ...sortArgs,
       includePages: true,
     })
     return {
@@ -524,9 +457,11 @@ export async function fetchDocumentsHomePage(
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
     // UNI-1953: a shared UniNote is listed too
-    const res = await api.uniworkListSharedWithMe(
-      cursor ? { cursor, includePages: true } : { includePages: true },
-    )
+    const res = await api.uniworkListSharedWithMe({
+      ...(cursor ? { cursor } : {}),
+      includePages: true,
+      ...sortArgs,
+    })
     return {
       result: mapDocListPageResult(res),
     }
@@ -540,6 +475,7 @@ export async function fetchDocumentsHomePage(
       workspaceId,
       cursor,
       ...filters,
+      ...sortArgs,
     })
     const page = mapDocListPageResult(res)
     // UNI-1974: folders are not shareable; an older share the server still returns is no row here
@@ -564,6 +500,7 @@ export async function fetchDocumentsHomePage(
       workspaceId,
       cursor,
       ...filters,
+      ...sortArgs,
     })
     return {
       result: mapDocListPageResult(res),
@@ -580,6 +517,7 @@ export async function fetchDocumentsHomePage(
       workspaceId,
       ...(cursor ? { cursor } : {}),
       ...(filters.format ? { format: filters.format } : {}),
+      ...sortArgs,
     })
     return {
       result: mapDocListPageResult(res),
@@ -641,35 +579,6 @@ export function shelvedByOptionsOf(
 /** the web's canManageTrashed: `my_level` manage, or the admin_scope of a restricted row */
 export function canManageShelved(doc: DocumentsHomeDoc): boolean {
   return doc.canManage === true || doc.myLevel === 'manage' || doc.adminScope === true
-}
-
-/**
- * The web's `formatShortWhen` (D documents/document-format.ts): the time for
- * today, else a short day (+ year when not this year); vi is written out
- * dd/MM[/yyyy] because ICU versions disagree on its separator.
- */
-export function formatShortWhen(
-  at: string | null | undefined,
-  locale: string,
-  now: Date = new Date(),
-): string {
-  if (!at) return ''
-  const date = new Date(at)
-  if (Number.isNaN(date.getTime())) return ''
-  const sameYear = date.getFullYear() === now.getFullYear()
-  if (sameYear && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()) {
-    return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date)
-  }
-  if (locale.toLowerCase().startsWith('vi')) {
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const day = `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`
-    return sameYear ? day : `${day}/${date.getFullYear()}`
-  }
-  return new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(date)
 }
 
 /**
@@ -761,131 +670,4 @@ export function rowSizeBytes(row: DocumentsHomeTableRow): number | null {
   return row.doc.kind === 'file' && (row.doc.sizeBytes ?? 0) > 0
     ? (row.doc.sizeBytes ?? null)
     : null
-}
-
-/** UNI-1961: the web's byte formatter (D library-rows.ts `formatBytes`): "318 KB", "1.2 MB" */
-export function formatBytes(bytes: number | null | undefined, locale: string): string {
-  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes < 0) return ''
-  const units = ['B', 'KB', 'MB', 'GB']
-  let value = bytes
-  let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit += 1
-  }
-  const digits = unit === 0 || value >= 10 ? 0 : 1
-  return `${new Intl.NumberFormat(locale || undefined, { maximumFractionDigits: digits }).format(value)} ${units[unit]}`
-}
-
-/** UNI-1961: the web's library date (documents-library-row.tsx): Intl dateStyle short */
-export function formatShortDate(iso: string, locale: string): string {
-  const date = new Date(iso)
-  if (!iso || Number.isNaN(date.getTime())) return ''
-  try {
-    return new Intl.DateTimeFormat(locale || undefined, { dateStyle: 'short' }).format(date)
-  } catch {
-    return date.toISOString().slice(0, 10)
-  }
-}
-
-/** UNI-1961: the web's "Group by" options, in its order (D library-rows.ts `GROUP_BY`) */
-export const DOCUMENTS_HOME_GROUP_BY = ['folder', 'source', 'type', 'none'] as const
-export type DocumentsHomeGroupBy = (typeof DOCUMENTS_HOME_GROUP_BY)[number]
-
-/** the web's default (documents-page-view.tsx) */
-export const DEFAULT_DOCUMENTS_HOME_GROUP_BY: DocumentsHomeGroupBy = 'folder'
-
-export const DOCUMENTS_HOME_GROUP_BY_KEYS: Record<DocumentsHomeGroupBy, StringKey> = {
-  folder: 'uhGroupByFolder',
-  source: 'uhGroupBySource',
-  type: 'uhGroupByType',
-  none: 'uhGroupByNone',
-}
-
-/**
- * UNI-1961: where the web offers "Group by" - its list views (Recent, Shared
- * with me, Shared by me). The home root and a folder never group, and the
- * trash has its own table.
- */
-export function documentsHomeGroupable(subView: DocumentsHomeSubViewId): boolean {
-  return subView === 'recent' || subView === 'shared-with-me' || subView === 'shared-by-me'
-}
-
-export interface DocumentsHomeRowGroup {
-  /** stable id; also what the built-in groups are translated from */
-  key: string
-  /** a folder path (the only user-visible title); empty for the built-in groups */
-  title: string
-  rows: DocumentsHomeDoc[]
-}
-
-/** the format a row groups by: page, the file format, else its title's extension, else "file" */
-function groupFormatOf(doc: DocumentsHomeDoc): string {
-  if (doc.kind === 'page' || doc.kind === 'folder') return doc.kind
-  if (doc.format) return doc.format
-  const dot = doc.title.lastIndexOf('.')
-  return (dot > 0 ? doc.title.slice(dot + 1).toLowerCase() : '') || 'file'
-}
-
-/**
- * UNI-1961: the web's `groupRows` (D library-rows.ts) over the table's rows,
- * in first-seen order of the (already sorted) rows. Folder: the deepest folder
- * above the row, titled by its path (My Folder takes its label), else
- * `unfiled`; source: `origin:upload|created`, else `origin:documents`; type:
- * `type:<format>`; none: one group, which draws no header.
- */
-export function groupDocumentsHomeRows(
-  rows: readonly DocumentsHomeDoc[],
-  groupBy: DocumentsHomeGroupBy,
-  index: FolderIndex,
-  myFolder?: { id: string | null; label: string },
-): DocumentsHomeRowGroup[] {
-  if (groupBy === 'none') return [{ key: 'all', title: '', rows: [...rows] }]
-  const groups = new Map<string, DocumentsHomeRowGroup>()
-  const add = (key: string, title: string, row: DocumentsHomeDoc) => {
-    const group = groups.get(key) ?? { key, title, rows: [] }
-    group.rows.push(row)
-    groups.set(key, group)
-  }
-  for (const row of rows) {
-    if (groupBy === 'source') add(`origin:${row.origin ?? 'documents'}`, '', row)
-    else if (groupBy === 'type') add(`type:${groupFormatOf(row)}`, '', row)
-    else {
-      const path = folderPath(index, row.parentId ?? null)
-      const last = path.at(-1)
-      if (last) {
-        const title = path
-          .map((part) => (myFolder && part.id === myFolder.id ? myFolder.label : part.title))
-          .join(' / ')
-        add(`folder:${last.id}`, title, row)
-      } else add('unfiled', '', row)
-    }
-  }
-  return [...groups.values()]
-}
-
-/** the product names the web's type groups use in every language */
-const GROUP_TYPE_NAMES: Record<string, string> = {
-  page: 'UniNote',
-  docx: 'Docs',
-  xlsx: 'Sheets',
-  pptx: 'Slides',
-  pdf: 'PDF',
-  md: 'Markdown',
-  html: 'HTML',
-}
-
-/** UNI-1961: a group header's words (D documents-library-list.tsx `groupTitle`) */
-export function documentsHomeGroupLabel(group: DocumentsHomeRowGroup, t: TFunc): string {
-  if (group.title) return group.title
-  if (group.key === 'unfiled') return t('uhGroupUnfiled')
-  if (group.key === 'origin:upload') return t('uhOriginUpload')
-  if (group.key === 'origin:created') return t('uhOriginCreated')
-  if (group.key === 'origin:documents') return t('uhSectionDocuments')
-  if (group.key.startsWith('type:')) {
-    const format = group.key.slice(5)
-    if (format === 'folder') return t('uhSectionFolders')
-    return GROUP_TYPE_NAMES[format] ?? t('uhGroupTypeOther')
-  }
-  return ''
 }
