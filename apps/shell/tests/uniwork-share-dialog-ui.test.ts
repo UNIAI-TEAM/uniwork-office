@@ -435,6 +435,18 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
       expect(rule('.uw-share-row-head')).not.toMatch(/flex\s*:/)
       expect(rule('.uw-share-row-main')).toMatch(/flex:\s*1 1 160px/)
     })
+
+    // SD2-01: `.uw-share-row` wraps and `.stacked` only flips it to a column; a wrapping column
+    // container sized its row-line child at the two-line height (~35 px dead space per row).
+    it('the stacked row is a non-wrapping column', () => {
+      const css = readFileSync(
+        join(__dirname, '../src/renderer/src/uniwork-share/share-dialog.css'),
+        'utf8',
+      )
+      const rule = css.match(/(?:^|\n)\.uw-share-row\.stacked\s*\{([^}]*)\}/)?.[1]
+      expect(rule).toMatch(/flex-direction:\s*column/)
+      expect(rule).toMatch(/flex-wrap:\s*nowrap/)
+    })
   })
 
   describe('review fixes (SD-FIX1)', () => {

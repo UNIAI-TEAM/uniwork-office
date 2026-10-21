@@ -523,6 +523,9 @@
 
 .uw-share-row.stacked {
   flex-direction: column;
+  /* .uw-share-row wraps; a wrapping column container sizes its row-line child at the
+     wrapped (two-line) height, which left ~35 px of dead space in every row */
+  flex-wrap: nowrap;
   align-items: stretch;
   justify-content: flex-start;
   gap: 6px;
