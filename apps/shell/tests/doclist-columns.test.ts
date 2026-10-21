@@ -4,6 +4,7 @@ import {
   COLUMN_LABEL_KEY,
   defaultSort,
   DOC_LIST_SCREENS,
+  isCompact,
   isSortable,
   nextSort,
   specialColumn,
@@ -104,6 +105,26 @@ describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy 
     expect(at(543)).not.toContain('access')
   })
 
+  // RV-3: Từ nơi khác draws neither Chọn nor Truy cập, so its rungs budget neither (32 + 120 px less than
+  // the workspace list): Người sửa joins at 32 rem, Dung lượng at 38 rem
+  it('Từ nơi khác budgets no Chọn and no Truy cập column in its rungs', () => {
+    const at = (w: number) => columnsFor('elsewhere', w)
+    expect(at(2000)).toEqual(['name', 'editor', 'updated', 'size', 'actions'])
+    expect(at(608)).toContain('size')
+    expect(at(607)).not.toContain('size')
+    expect(at(512)).toContain('editor')
+    expect(at(511)).not.toContain('editor')
+    expect(at(2000)).not.toContain('access')
+  })
+
+  it('Từ nơi khác goes compact only once Tên cannot keep its floor next to Cập nhật + Thao tác', () => {
+    expect(isCompact('elsewhere', 384)).toBe(false)
+    expect(isCompact('elsewhere', 383)).toBe(true)
+    // the workspace list still pays for its Chọn column
+    expect(isCompact('workspace', 416)).toBe(false)
+    expect(isCompact('workspace', 415)).toBe(true)
+  })
+
   it('never hides Chọn, Tên, the screen column, Cập nhật or Thao tác', () => {
     for (const screen of DOC_LIST_SCREENS.filter((s) => s !== 'device')) {
       const cols = columnsFor(screen, 0)
@@ -142,8 +163,9 @@ describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy 
     }
   })
 
+  // Từ nơi khác has its own, 160px narrower ladder (RV-3, pinned above): ~710 px hides nothing there
   it('a ~710 px list hides at most Dung lượng, or Dung lượng + Người sửa with a screen column', () => {
-    for (const screen of ON_76PX_ACTIONS) {
+    for (const screen of ON_76PX_ACTIONS.filter((s) => s !== 'elsewhere')) {
       const full = columnsFor(screen, WIDE)
       const hidden = full.filter((c) => !columnsFor(screen, 710).includes(c))
       expect(hidden).toEqual(specialColumn(screen) ? ['editor', 'size'] : ['size'])

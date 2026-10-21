@@ -943,6 +943,14 @@ body.vib .home {
   background: var(--bg-content);
 }
 
+/* VS-4: a modal opened from inside the page (Open from UniWork) sits in .content, so a wheel over its
+   fixed overlay chains to this scroller and its bar shows through the blur: the page holds still while
+   the dialog is up, the bar's track stays so nothing shifts sideways */
+.content:has(.modal-overlay) {
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+
 /* one centered column: quick cards, toolbar and list share the same edges on
    any window width (cards no longer stop short of a full-width table) */
 .content > :is(.quick-start, .recents) {

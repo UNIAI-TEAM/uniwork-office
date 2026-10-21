@@ -611,6 +611,36 @@
         "width": 1200
       },
       {
+        "columns": ["name", "editor", "updated", "size", "actions"],
+        "screen": "elsewhere",
+        "width": 1400
+      },
+      {
+        "columns": ["name", "editor", "updated", "size", "actions"],
+        "screen": "elsewhere",
+        "width": 608
+      },
+      {
+        "columns": ["name", "editor", "updated", "actions"],
+        "screen": "elsewhere",
+        "width": 607
+      },
+      {
+        "columns": ["name", "editor", "updated", "actions"],
+        "screen": "elsewhere",
+        "width": 512
+      },
+      {
+        "columns": ["name", "updated", "actions"],
+        "screen": "elsewhere",
+        "width": 511
+      },
+      {
+        "columns": ["name", "updated", "actions"],
+        "screen": "elsewhere",
+        "width": 300
+      },
+      {
         "columns": ["select", "name", "updated", "size", "actions"],
         "screen": "device",
         "width": 1200

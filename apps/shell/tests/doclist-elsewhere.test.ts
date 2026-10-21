@@ -78,15 +78,8 @@ describe('the model: the Từ nơi khác page', () => {
 
   it('has its own screen with the workspace columns minus Chọn: no screen column, nothing to select', () => {
     expect(screenOfSubView('elsewhere')).toBe('elsewhere')
-    expect(columnsFor('elsewhere')).toEqual([
-      'name',
-      'access',
-      'editor',
-      'updated',
-      'size',
-      'actions',
-    ])
-    // narrow: Dung lượng, then Người sửa, then Truy cập hide as on the workspace list
+    expect(columnsFor('elsewhere')).toEqual(['name', 'editor', 'updated', 'size', 'actions'])
+    // narrow: Dung lượng, then Người sửa hide (it has no Truy cập column to hide)
     expect(columnsFor('elsewhere', 500)).toEqual(['name', 'updated', 'actions'])
     expect(defaultSort('elsewhere')).toEqual({ column: 'updated', dir: 'desc' })
     expect(isSortable('elsewhere', 'name')).toBe(true)

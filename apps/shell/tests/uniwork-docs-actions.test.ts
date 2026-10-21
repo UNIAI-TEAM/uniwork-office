@@ -1353,11 +1353,13 @@ describe('UW-CREATE-TYPES create kinds', () => {
   })
 })
 
-describe('UNI-1959 share with workspace on create', () => {
+// RV-19: the create-time Share with workspace toggle is gone (V-STATES): a create sends no
+// visibility, whatever a hand-typed invoke carries; first-save share goes through the rename PATCH
+describe('a create never sends visibility (RV-19, was UNI-1959 share with workspace on create)', () => {
   const post = (server: FakeServer, suffix: string) =>
     server.calls.find((c) => c.method === 'POST' && c.path.endsWith(suffix))!
 
-  it('sends visibility workspace on a blank file only when the input sets it', async () => {
+  it('sends no visibility on a blank file, whatever the input carries', async () => {
     const server = fakeServer()
     const ctx = setup(server)
     await ctx.service.createDocument({
@@ -1366,7 +1368,7 @@ describe('UNI-1959 share with workspace on create', () => {
       name: 'Shared.docx',
       format: 'docx',
       visibility: 'workspace',
-    })
+    } as never)
     await ctx.service.createDocument({
       workspaceId: WS,
       folderId: null,
@@ -1375,11 +1377,11 @@ describe('UNI-1959 share with workspace on create', () => {
     })
     const blanks = server.calls.filter((c) => c.path.endsWith('/documents/files/blank'))
     expect(blanks).toHaveLength(2)
-    expect(blanks[0]!.body).toMatchObject({ title: 'Shared.docx', visibility: 'workspace' })
-    expect(blanks[1]!.body).not.toHaveProperty('visibility')
+    expect(blanks[0]!.body).toMatchObject({ title: 'Shared.docx' })
+    for (const blank of blanks) expect(blank.body).not.toHaveProperty('visibility')
   })
 
-  it('sends visibility workspace on a UniNote only when the input sets it', async () => {
+  it('sends no visibility on a UniNote, whatever the input carries', async () => {
     const server = fakeServer()
     const ctx = setup(server)
     await ctx.service.createPage({
@@ -1387,16 +1389,12 @@ describe('UNI-1959 share with workspace on create', () => {
       folderId: 'fold_1',
       name: 'Shared note',
       visibility: 'workspace',
-    })
+    } as never)
     expect(post(server, `/${WS}/documents`).body).toEqual({
       kind: 'page',
       title: 'Shared note',
       parent_id: 'fold_1',
-      visibility: 'workspace',
     })
-    const plain = fakeServer()
-    await setup(plain).service.createPage({ workspaceId: WS, folderId: 'fold_1', name: 'Own note' })
-    expect(post(plain, `/${WS}/documents`).body).not.toHaveProperty('visibility')
   })
 
   it('never sends visibility on a folder, whatever the input carries (folders are not shareable)', async () => {
@@ -1411,20 +1409,6 @@ describe('UNI-1959 share with workspace on create', () => {
     const body = post(server, `/${WS}/documents`).body as Record<string, unknown>
     expect(body).toMatchObject({ kind: 'folder', title: 'Own folder', parent_id: 'fold_1' })
     expect(body).not.toHaveProperty('visibility')
-  })
-
-  it('ignores any visibility other than workspace (a hand-typed invoke)', async () => {
-    const server = fakeServer()
-    const ctx = setup(server)
-    await ctx.service.createDocument({
-      workspaceId: WS,
-      folderId: null,
-      name: 'X.docx',
-      format: 'docx',
-      visibility: 'restricted',
-    } as never)
-    const blank = server.calls.find((c) => c.path.endsWith('/documents/files/blank'))!
-    expect(blank.body).not.toHaveProperty('visibility')
   })
 
   it.each([404, 501])('a %s on the blank route says the endpoint is missing', async (status) => {
