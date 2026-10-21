@@ -520,13 +520,13 @@
   background: var(--surface);
 }
 
-.uwf-picker-state {
+.uw-act .uwf-picker-state {
   margin: 12px;
   color: var(--text-secondary);
   font-size: 13px;
 }
 
-.uwf-picker-path {
+.uw-act .uwf-picker-path {
   margin: 0 0 8px;
   overflow-wrap: anywhere;
   color: var(--text-secondary);

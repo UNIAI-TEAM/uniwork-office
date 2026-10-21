@@ -7149,8 +7149,9 @@ html[dir='rtl'] .quick-title-row {
   display: none;
 }
 
-.uw-act-note {
-  margin: 6px 0 0;
+/* scoped under the dialog (0,2,0): .modal p (0,1,1) would otherwise zero the margin and enlarge the type (UNI-2066 WS-V1) */
+.uw-act .uw-act-note {
+  margin: 8px 0 0;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.4;

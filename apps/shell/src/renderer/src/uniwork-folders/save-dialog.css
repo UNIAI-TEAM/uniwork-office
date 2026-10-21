@@ -57,7 +57,7 @@
   outline-offset: 1px;
 }
 
-.uws-hint {
+.uw-act .uws-hint {
   margin: 4px 0 8px;
   color: var(--text-secondary);
   font-size: 13px;
@@ -303,7 +303,7 @@
   margin-inline-start: 6px;
 }
 
-.uwf-picker-note {
+.uw-act .uwf-picker-note {
   margin: 8px 0 0;
   color: var(--text-secondary);
   font-size: 12px;
@@ -340,7 +340,7 @@
   font-weight: 500;
 }
 
-.ufs-share-hint {
+.uw-act .ufs-share-hint {
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
