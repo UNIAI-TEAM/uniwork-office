@@ -3,13 +3,16 @@
  * on Ctrl/Cmd+Enter. The table rows `pdf-21` / `pdf-24` also hold Esc, Backspace
  * and Delete, so a handler that tests the row id would commit on those keys.
  */
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { currentShortcutPlatform } from '@genoffice/shortcuts'
 import { createI18n } from '@genoffice/i18n'
 import { NoteMarginColumn, type NoteMarginThread } from '../src/renderer/NoteMargin'
-import { isCommitKey, textEditKeyAction } from '../src/renderer/shortcuts'
+import { isCommitKey, onTextEditKeyDown, textEditKeyAction } from '../src/renderer/shortcuts'
 import { strings } from '../src/renderer/i18n/strings'
 import type { TFunc } from '../src/renderer/i18n/locale'
 import type { NoteThreadItem } from '../src/renderer/note-threads'
@@ -285,5 +288,86 @@ describe('textEditKeyAction (the in-place text editor)', () => {
     expect(act1(PLAIN_ENTER())).toBeNull()
     expect(act1(keydown({ key: 'Escape', isComposing: true }))).toBeNull()
     expect(act1(keydown({ key: 'Backspace', keyCode: 229 }), true)).toBeNull()
+  })
+})
+
+describe('the in-place text editor textarea onKeyDown (App.tsx)', () => {
+  function mountEditor(value: string): {
+    textarea: HTMLTextAreaElement
+    calls: { commit: number; cancel: number; deleteRun: number }
+  } {
+    const calls = { commit: 0, cancel: 0, deleteRun: 0 }
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    mounted.push({ root, container })
+    act(() =>
+      root.render(
+        createElement('textarea', {
+          value,
+          onChange: () => undefined,
+          onKeyDown: (e: {
+            nativeEvent: KeyboardEvent
+            preventDefault(): void
+            stopPropagation(): void
+          }) =>
+            onTextEditKeyDown(e, value === '', {
+              commit: () => calls.commit++,
+              cancel: () => calls.cancel++,
+              deleteRun: () => calls.deleteRun++,
+            }),
+        }),
+      ),
+    )
+    return { textarea: container.querySelector('textarea')!, calls }
+  }
+
+  /** dispatches the key; true when nothing called preventDefault (the textarea keeps it) */
+  const press = (textarea: HTMLTextAreaElement, event: KeyboardEvent): boolean => {
+    act(() => {
+      textarea.dispatchEvent(event)
+    })
+    return !event.defaultPrevented
+  }
+
+  it('Esc cancels the edit and stays inside the editor', () => {
+    const { textarea, calls } = mountEditor('draft')
+    const outside = vi.fn()
+    document.addEventListener('keydown', outside)
+    const kept = press(textarea, ESC())
+    document.removeEventListener('keydown', outside)
+    expect(kept).toBe(false)
+    expect(calls).toEqual({ commit: 0, cancel: 1, deleteRun: 0 })
+    expect(outside).not.toHaveBeenCalled()
+  })
+
+  it('Ctrl/Cmd+Enter commits', () => {
+    const { textarea, calls } = mountEditor('draft')
+    expect(press(textarea, ENTER_COMMIT())).toBe(false)
+    expect(calls).toEqual({ commit: 1, cancel: 0, deleteRun: 0 })
+  })
+
+  it('Backspace edits a non-empty draft and only removes the run once it is empty', () => {
+    const filled = mountEditor('draft')
+    expect(press(filled.textarea, BACKSPACE())).toBe(true)
+    expect(filled.calls).toEqual({ commit: 0, cancel: 0, deleteRun: 0 })
+    const empty = mountEditor('')
+    expect(press(empty.textarea, BACKSPACE())).toBe(false)
+    expect(empty.calls).toEqual({ commit: 0, cancel: 0, deleteRun: 1 })
+  })
+
+  it("a plain Enter is the textarea's own (a line break), commits nothing", () => {
+    const { textarea, calls } = mountEditor('draft')
+    expect(press(textarea, PLAIN_ENTER())).toBe(true)
+    expect(calls).toEqual({ commit: 0, cancel: 0, deleteRun: 0 })
+  })
+
+  it('App.tsx wires the textarea through onTextEditKeyDown', () => {
+    const source = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../src/renderer/App.tsx'),
+      'utf8',
+    )
+    expect(source).toContain("onTextEditKeyDown(e, textDraft.value === ''")
+    expect(source).not.toMatch(/matchPdfKey([^)]*'text-edit')?.id/)
   })
 })

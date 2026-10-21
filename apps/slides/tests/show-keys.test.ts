@@ -366,4 +366,18 @@ describe('Mac Shift+B / Shift+W', () => {
     )
     expect(reduceShowKey(INITIAL_SHOW_KEYS, shiftB(), 'win')).toBeNull()
   })
+
+  it('read the physical key on a layout that types no ASCII, and are chords of the slides table', () => {
+    const cyrillic = (key: string, code: string) =>
+      new KeyboardEvent('keydown', { key, code, shiftKey: true })
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, cyrillic('И', 'KeyB'), 'mac')?.state.screen).toBe(
+      'black',
+    )
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, cyrillic('Ц', 'KeyW'), 'mac')?.state.screen).toBe(
+      'white',
+    )
+    const row = slidesShortcuts.find((r) => r.id === 'slides-30')
+    expect(row?.mac).toEqual(expect.arrayContaining(['Shift+B', 'Shift+W']))
+    expect(row?.win).not.toContain('Shift+B')
+  })
 })

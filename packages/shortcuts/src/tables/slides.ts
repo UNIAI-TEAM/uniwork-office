@@ -870,13 +870,13 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: {},
   },
-  // slides-30: black (B, Period) / white (W, Comma) screen; the Mac Shift+B / Shift+W are read by show-keys.ts (the chord trace skips Shift+letter)
+  // slides-30: black (B, Period) / white (W, Comma) screen; PowerPoint for Mac adds Shift+B / Shift+W
   {
     id: 'slides-30',
     scope: 'slides',
     context: 'slideshow',
     win: ['B', 'Period', 'W', 'Comma'],
-    mac: ['B', 'Period', 'W', 'Comma'],
+    mac: ['B', 'Shift+B', 'Period', 'W', 'Shift+W', 'Comma'],
     match: 'key',
     guard: {},
   },
