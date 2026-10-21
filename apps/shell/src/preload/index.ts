@@ -159,6 +159,12 @@ import {
   asPreflightList,
   asPreflightSDO,
 } from './folder-upload-guards'
+import {
+  asFileDownloadResult,
+  asZipDownloadProgress,
+  asZipStartResult,
+} from './zip-download-guards'
+import { ZIP_DOWNLOAD_CHANNELS, type ZipDownloadProgress } from '../shared/zip-download-api'
 import type {
   FolderUploadBridge,
   BatchUploadPickInput,
@@ -228,6 +234,13 @@ ipcRenderer.on(
     for (const cb of [...batchUploadProgressSubscribers]) cb(event)
   },
 )
+// UNI-2068: progress of a bulk zip download run (pushed to the window that started it)
+const zipDownloadProgressSubscribers = new Set<(event: ZipDownloadProgress) => void>()
+ipcRenderer.on(ZIP_DOWNLOAD_CHANNELS.progress, (_event: IpcRendererEvent, raw: unknown) => {
+  const event = asZipDownloadProgress(raw)
+  if (!event) return
+  for (const cb of [...zipDownloadProgressSubscribers]) cb(event)
+})
 // G5-11: sign-out progress (`waiting` while an in-flight save settles, `done` after)
 const signOutProgressSubscribers = new Set<(event: SignOutProgress) => void>()
 ipcRenderer.on(UNIWORK_DOC_CHANNELS.signOutProgress, (_event: IpcRendererEvent, raw: unknown) => {
@@ -1340,6 +1353,27 @@ const homeApi: HomeApi = {
     return asUniworkResult<{ path: string | null }>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.downloadSource, input),
     )
+  },
+  // UNI-2068: the Documents bulk bar's Download (a zip of the selected files, or one plain file)
+  zipDownload: {
+    async start(input) {
+      return asZipStartResult(await ipcRenderer.invoke(ZIP_DOWNLOAD_CHANNELS.start, input))
+    },
+    async cancel(runId: string) {
+      if (typeof runId !== 'string' || !runId) return
+      await ipcRenderer.invoke(ZIP_DOWNLOAD_CHANNELS.cancel, runId)
+    },
+    onProgress(cb) {
+      zipDownloadProgressSubscribers.add(cb)
+      return () => {
+        zipDownloadProgressSubscribers.delete(cb)
+      }
+    },
+    async downloadFile(input) {
+      return asFileDownloadResult(
+        await ipcRenderer.invoke(ZIP_DOWNLOAD_CHANNELS.downloadFile, input),
+      )
+    },
   },
   async uniworkOpenSource(input) {
     return asSourceOpenResult(await ipcRenderer.invoke(SOURCE_VIEW_CHANNELS.openSource, input))

@@ -105,6 +105,7 @@ import type {
   BatchUploadStartResult,
   PreflightSDO,
 } from './folder-upload-api'
+import type { ZipDownloadBridge } from './zip-download-api'
 
 /** UI language; kept self-contained here (mirrors Lang in @genoffice/i18n) */
 
@@ -1533,6 +1534,11 @@ export interface HomeApi {
   uniworkDownloadSource(
     input: UniworkSourceDownloadInput,
   ): Promise<UniworkResult<{ path: string | null }>>
+  /**
+   * UNI-2068: the bulk bar's Download as one zip (or one plain file); the save dialog opens in
+   * main. Absent on a main that predates it: the renderer then hides the action.
+   */
+  zipDownload?: ZipDownloadBridge
   /** UNI-1993: open a source row's file as a view-only tab (no document, no sync) */
   uniworkOpenSource(input: OpenSourceInput): Promise<SourceViewResult<OpenSourceValue>>
   /** UNI-1993: the tab chip's state of a path; null unless the path is a view-only source */
