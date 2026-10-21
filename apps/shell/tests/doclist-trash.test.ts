@@ -267,11 +267,13 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
     expect(css).toMatch(/\.dh-days-soon\s*\{[^}]*color:\s*var\(--danger-text\)/)
   })
 
-  it('orders by Đã xóa oldest first without asking the server, and groups the rows', async () => {
+  it('asks the server for Đã xóa oldest first from the first read, and groups the rows', async () => {
     await mount()
-    // the server's own order until the person sorts
+    // same as the web: the groups hold across pages only when the server pages in that order
     expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(0)
-    expect(lastCall('uniworkListTrash')).not.toHaveProperty('sort')
+    for (const [args] of api.uniworkListTrash!.mock.calls) {
+      expect(args).toMatchObject({ sort: 'deleted', order: 'asc' })
+    }
     expect(header('deleted')?.getAttribute('aria-sort')).toBe('ascending')
     expect(rowIds()).toEqual(['t-a', 't-b', 't-c', 't-d', 't-e'])
 
@@ -285,7 +287,7 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
     expect(groupOfRow('t-e')).toBe('more_than_7_days')
   })
 
-  it('sends the server sort when the person sorts, keeps the groups on Đã xóa and drops them on any other column', async () => {
+  it('sends the chosen server sort when the person sorts, keeps the groups on Đã xóa and drops them on any other column', async () => {
     await mount()
     await click(header('deleted')!.querySelector('button'))
     expect(lastCall('uniworkListTrash')).toMatchObject({ sort: 'deleted', order: 'desc' })
