@@ -739,9 +739,9 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     // (c) FE13-R3-5: sorting Cập nhật oldest-first (second click on the sorted header) over a partially loaded
     //     list (201 < 202) drains the remaining page(s)
     const updatedSort = () =>
-      Array.from(host.querySelectorAll<HTMLElement>('[role="columnheader"]'))
-        .find((h) => h.textContent === 'Updated')!
-        .querySelector<HTMLButtonElement>('button')!
+      Array.from(
+        host.querySelectorAll<HTMLButtonElement>('.recent-columns button.cloud-col-sort-btn'),
+      ).find((h) => h.textContent === 'Updated')!
     expect(updatedSort().textContent).toContain('Updated')
     await act(async () => {
       updatedSort().click()
