@@ -26,6 +26,7 @@ export const es = {
   appScLineBreak: 'Salto de línea',
   appScNbsp: 'Espacio de no separación',
   appScNbHyphen: 'Guion de no separación',
+  appScFindNext: 'Buscar siguiente',
   appScOptHyphen: 'Guion opcional',
   appScGrowFont1: 'Aumentar fuente 1 pto',
   appScShrinkFont1: 'Reducir fuente 1 pto',

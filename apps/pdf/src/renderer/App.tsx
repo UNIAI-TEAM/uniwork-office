@@ -89,7 +89,7 @@ import {
   pdfTip,
   resolvePdfWindowKey,
   searchEnterDirection,
-  textEditKeyAction,
+  onTextEditKeyDown,
 } from './shortcuts'
 import { rowOfVisIdx, spreadRows, stepPage } from './spread'
 import {
@@ -8873,22 +8873,15 @@ export default function App() {
                                             const g = draftGhostRef.current
                                             if (g) g.scrollLeft = e.currentTarget.scrollLeft
                                           }}
-                                          onKeyDown={(e) => {
-                                            const key = textEditKeyAction(e, textDraft.value === '')
-                                            if (key === 'commit') {
-                                              e.preventDefault()
-                                              commitTextDraft()
-                                            } else if (key === 'cancel') {
-                                              e.preventDefault()
-                                              e.stopPropagation()
-                                              setTextDraft(null)
-                                            } else if (key === 'delete-run') {
-                                              // The editor is already empty: one more delete
-                                              // press removes the run itself
-                                              e.preventDefault()
-                                              deleteDraftRun()
-                                            }
-                                          }}
+                                          onKeyDown={(e) =>
+                                            // An already empty editor: one more delete press
+                                            // removes the run itself
+                                            onTextEditKeyDown(e, textDraft.value === '', {
+                                              commit: commitTextDraft,
+                                              cancel: () => setTextDraft(null),
+                                              deleteRun: deleteDraftRun,
+                                            })
+                                          }
                                         />
                                         {draftStyles && (
                                           <div

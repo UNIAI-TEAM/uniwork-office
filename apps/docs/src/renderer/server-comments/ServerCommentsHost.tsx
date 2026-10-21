@@ -15,11 +15,13 @@ import type { CommentInfo } from '@genoffice/docx-engine'
 import type { Lang } from '@genoffice/i18n'
 import {
   COMMENTS_REVEAL_WAIT_MS,
+  AvatarSourceProvider,
   CollabComposer,
   CollabPanel,
   collabStrings,
   formatCollabTime,
   useCollabThreads,
+  useFrameAvatarSource,
   type CollabComment,
   type CollabComposerSlot,
   type CollabController,
@@ -151,6 +153,7 @@ function InFileList(p: {
 }
 
 export function ServerCommentsHost(p: ServerCommentsHostProps) {
+  const avatars = useFrameAvatarSource()
   const { mode, editor, lang, panelOpen } = p
   const source = useMemo(
     () => createUniworkCommentsSource(mode.api, mode.path, 'comment'),
@@ -522,34 +525,36 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
   // a view or comment caller cannot save the file, so a "save first" prompt would lead nowhere
   const needsSave = !knownVersion && mode.level !== 'view' && mode.level !== 'comment'
   return (
-    <div className="comments-pane docs-server-comments">
-      <CollabPanel
-        className="docs-server-panel"
-        controller={ctl}
-        strings={strings}
-        onClose={p.onClosePanel}
-        renderComposer={renderComposer}
-        inFile={
-          inFileCount > 0
-            ? {
-                count: inFileCount,
-                content: (
-                  <InFileList
-                    comments={p.inFileComments}
-                    neutralAuthor={p.neutralAuthor}
-                    lang={lang}
-                    resolvedLabel={strings.collabResolved ?? ''}
-                  />
-                ),
-              }
-            : undefined
-        }
-      />
-      {needsSave && (
-        <p className="collab-pnote collab-pnote--warn docs-server-save-first">
-          {p.saveFirstMessage}
-        </p>
-      )}
-    </div>
+    <AvatarSourceProvider value={avatars}>
+      <div className="comments-pane docs-server-comments">
+        <CollabPanel
+          className="docs-server-panel"
+          controller={ctl}
+          strings={strings}
+          onClose={p.onClosePanel}
+          renderComposer={renderComposer}
+          inFile={
+            inFileCount > 0
+              ? {
+                  count: inFileCount,
+                  content: (
+                    <InFileList
+                      comments={p.inFileComments}
+                      neutralAuthor={p.neutralAuthor}
+                      lang={lang}
+                      resolvedLabel={strings.collabResolved ?? ''}
+                    />
+                  ),
+                }
+              : undefined
+          }
+        />
+        {needsSave && (
+          <p className="collab-pnote collab-pnote--warn docs-server-save-first">
+            {p.saveFirstMessage}
+          </p>
+        )}
+      </div>
+    </AvatarSourceProvider>
   )
 }

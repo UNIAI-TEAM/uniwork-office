@@ -26,6 +26,7 @@ export const id = {
   appScLineBreak: 'Hentian Baris',
   appScNbsp: 'Spasi Tak Terpisah',
   appScNbHyphen: 'Tanda Hubung Tak Terpisah',
+  appScFindNext: 'Cari Berikutnya',
   appScOptHyphen: 'Tanda Hubung Opsional',
   appScGrowFont1: 'Perbesar Font 1 pt',
   appScShrinkFont1: 'Perkecil Font 1 pt',

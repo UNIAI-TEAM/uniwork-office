@@ -72,6 +72,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: 'paste-plain', group: 'edit', labelKey: 'appPastePlain', action: 'docs-016' },
   { id: 'select-all', group: 'edit', labelKey: 'appScSelectAll', action: 'docs-017' },
   { id: 'find', group: 'edit', labelKey: 'appFindPlaceholder', action: 'docs-018' },
+  { id: 'find-next', group: 'edit', labelKey: 'appScFindNext', action: 'docs-019' },
   { id: 'replace', group: 'edit', labelKey: 'appReplace', action: 'docs-020' },
   { id: 'goto', group: 'edit', labelKey: 'appGoToTitle', action: 'docs-021' },
   { id: 'shortcuts', group: 'edit', labelKey: 'appScTitle', action: 'docs-094' },
@@ -91,6 +92,7 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: 'change-case', group: 'text', labelKey: 'ribbonChangeCase', action: 'docs-034' },
   { id: 'all-caps', group: 'text', labelKey: 'appAllCaps', action: 'docs-035' },
   { id: 'small-caps', group: 'text', labelKey: 'appSmallCaps', action: 'docs-036' },
+  { id: 'hidden-text', group: 'text', labelKey: 'appHiddenText', action: 'docs-037' },
   { id: 'copy-format', group: 'text', labelKey: 'ribbonCopyFormat', action: 'docs-040' },
   { id: 'paste-format', group: 'text', labelKey: 'ribbonPasteFormat', action: 'docs-041' },
   {

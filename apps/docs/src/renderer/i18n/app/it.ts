@@ -26,6 +26,7 @@ export const it = {
   appScLineBreak: 'Interruzione di riga',
   appScNbsp: 'Spazio non divisibile',
   appScNbHyphen: 'Trattino non divisibile',
+  appScFindNext: 'Trova successivo',
   appScOptHyphen: 'Trattino facoltativo',
   appScGrowFont1: 'Aumenta carattere di 1 pt',
   appScShrinkFont1: 'Riduci carattere di 1 pt',

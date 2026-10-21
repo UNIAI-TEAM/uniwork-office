@@ -152,6 +152,32 @@ export function textEditKeyAction(
   return null
 }
 
+/** The React keydown event of the in-place text editor's textarea. */
+export interface TextEditKeyEvent {
+  readonly nativeEvent: KeyboardEvent
+  preventDefault(): void
+  stopPropagation(): void
+}
+
+/**
+ * The in-place text editor textarea's `onKeyDown`: runs the action `textEditKeyAction`
+ * reads off the key and claims the event for it; any other key stays the textarea's own.
+ */
+export function onTextEditKeyDown(
+  event: TextEditKeyEvent,
+  draftEmpty: boolean,
+  handlers: { commit(): void; cancel(): void; deleteRun(): void },
+): void {
+  const action = textEditKeyAction(event, draftEmpty)
+  if (!action) return
+  event.preventDefault()
+  // Esc must not also close the overlay behind the editor
+  if (action === 'cancel') event.stopPropagation()
+  if (action === 'commit') handlers.commit()
+  else if (action === 'cancel') handlers.cancel()
+  else handlers.deleteRun()
+}
+
 /** Enter (next) / Shift+Enter (previous) in the search box; null for any other key or an IME Enter. */
 export function searchEnterDirection(event: PdfKeyEvent): 1 | -1 | null {
   const e = nativeEvent(event)

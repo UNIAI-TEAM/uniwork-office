@@ -92,8 +92,8 @@ export {
 } from './accelerator'
 export { formatChord, formatHint, hintParts, type ShortcutHintParts } from './hint'
 export { BROWSER_RESERVED, isBrowserReserved } from './browser-reserved'
-import { pruneUnmapped } from './table'
-export { mergeRows, pruneUnmapped } from './table'
+import { mergeNotes, mergeUnmapped } from './table'
+export { mergeNotes, mergeRows, mergeUnmapped, pruneUnmapped } from './table'
 export {
   commonShortcuts,
   docsShortcuts,
@@ -137,30 +137,31 @@ export const SHORTCUT_TABLES: Readonly<Record<ShortcutScope, readonly ShortcutAc
 
 /** Keys each scope still lacks (per surface and platform): the generator's
  * list (a module slice's `manual` backlog) without the parts a manual row has
- * since given a chord, then the module's own entries for its manual rows
- * (`<module>ManualUnmapped`). */
+ * since given a chord, with the module's own entries for its manual rows
+ * (`<module>ManualUnmapped`) substituted for the generated entry of the same id
+ * and part (see `mergeUnmapped`). */
 export const SHORTCUT_UNMAPPED: Readonly<Record<ShortcutScope, readonly UnmappedShortcut[]>> = {
-  common: [...pruneUnmapped(commonUnmapped, commonShortcuts), ...commonManualUnmapped],
-  shell: [...pruneUnmapped(shellUnmapped, shellShortcuts), ...shellManualUnmapped],
-  docs: [...pruneUnmapped(docsUnmapped, docsShortcuts), ...docsManualUnmapped],
-  sheets: [...pruneUnmapped(sheetsUnmapped, sheetsShortcuts), ...sheetsManualUnmapped],
-  slides: [...pruneUnmapped(slidesUnmapped, slidesShortcuts), ...slidesManualUnmapped],
-  pdf: [...pruneUnmapped(pdfUnmapped, pdfShortcuts), ...pdfManualUnmapped],
-  html: [...pruneUnmapped(htmlUnmapped, htmlShortcuts), ...htmlManualUnmapped],
-  markdown: [...pruneUnmapped(markdownUnmapped, markdownShortcuts), ...markdownManualUnmapped],
+  common: mergeUnmapped(commonUnmapped, commonShortcuts, commonManualUnmapped),
+  shell: mergeUnmapped(shellUnmapped, shellShortcuts, shellManualUnmapped),
+  docs: mergeUnmapped(docsUnmapped, docsShortcuts, docsManualUnmapped),
+  sheets: mergeUnmapped(sheetsUnmapped, sheetsShortcuts, sheetsManualUnmapped),
+  slides: mergeUnmapped(slidesUnmapped, slidesShortcuts, slidesManualUnmapped),
+  pdf: mergeUnmapped(pdfUnmapped, pdfShortcuts, pdfManualUnmapped),
+  html: mergeUnmapped(htmlUnmapped, htmlShortcuts, htmlManualUnmapped),
+  markdown: mergeUnmapped(markdownUnmapped, markdownShortcuts, markdownManualUnmapped),
 }
 
-/** Remarks on mapped rows that are not missing keys: generated, then the
- * module's own (`<module>ManualNotes`). */
+/** Remarks on mapped rows that are not missing keys: generated (minus those a
+ * manual unmapped entry now covers), then the module's own (`<module>ManualNotes`). */
 export const SHORTCUT_NOTES: Readonly<Record<ShortcutScope, readonly ShortcutNote[]>> = {
-  common: [...commonNotes, ...commonManualNotes],
-  shell: [...shellNotes, ...shellManualNotes],
-  docs: [...docsNotes, ...docsManualNotes],
-  sheets: [...sheetsNotes, ...sheetsManualNotes],
-  slides: [...slidesNotes, ...slidesManualNotes],
-  pdf: [...pdfNotes, ...pdfManualNotes],
-  html: [...htmlNotes, ...htmlManualNotes],
-  markdown: [...markdownNotes, ...markdownManualNotes],
+  common: mergeNotes(commonNotes, commonManualNotes, commonManualUnmapped),
+  shell: mergeNotes(shellNotes, shellManualNotes, shellManualUnmapped),
+  docs: mergeNotes(docsNotes, docsManualNotes, docsManualUnmapped),
+  sheets: mergeNotes(sheetsNotes, sheetsManualNotes, sheetsManualUnmapped),
+  slides: mergeNotes(slidesNotes, slidesManualNotes, slidesManualUnmapped),
+  pdf: mergeNotes(pdfNotes, pdfManualNotes, pdfManualUnmapped),
+  html: mergeNotes(htmlNotes, htmlManualNotes, htmlManualUnmapped),
+  markdown: mergeNotes(markdownNotes, markdownManualNotes, markdownManualUnmapped),
 }
 
 /** The action with this CSV row id in a scope's table, or undefined. */

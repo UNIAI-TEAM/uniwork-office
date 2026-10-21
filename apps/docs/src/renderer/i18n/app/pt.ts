@@ -26,6 +26,7 @@ export const pt = {
   appScLineBreak: 'Quebra de Linha',
   appScNbsp: 'Espaço Não Separável',
   appScNbHyphen: 'Hífen Não Separável',
+  appScFindNext: 'Localizar Seguinte',
   appScOptHyphen: 'Hífen Opcional',
   appScGrowFont1: 'Aumentar Fonte em 1 pt',
   appScShrinkFont1: 'Diminuir Fonte em 1 pt',

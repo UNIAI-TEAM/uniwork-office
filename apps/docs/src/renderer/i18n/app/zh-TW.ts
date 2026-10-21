@@ -26,6 +26,7 @@ export const zhTW = {
   appScLineBreak: '換行符號',
   appScNbsp: '不分行空格',
   appScNbHyphen: '不分行連字號',
+  appScFindNext: '尋找下一個',
   appScOptHyphen: '選擇性連字號',
   appScGrowFont1: '放大字型 1 點',
   appScShrinkFont1: '縮小字型 1 點',

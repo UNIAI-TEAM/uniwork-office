@@ -54,7 +54,8 @@ function typesAscii(e: ShortcutKeyEvent): boolean {
 /**
  * What a matched show row does. The single-key rows are the slides table's `slideshow` rows
  * (slides-25..30); rows that hold two actions (Home / End, black / white) read it from the key:
- * by character, with the physical key for a layout that types no ASCII (Cyrillic B / W).
+ * by character, with the physical key for a layout that types no ASCII (Cyrillic B / W). The
+ * Mac Shift+B / Shift+W are chords of slides-30, so the same character read covers them.
  */
 function showOf(id: string, e: ShortcutKeyEvent): ShowKey | null {
   switch (id) {
@@ -76,17 +77,6 @@ function showOf(id: string, e: ShortcutKeyEvent): ShowKey | null {
 }
 
 /**
- * PowerPoint for Mac also blanks the show on Shift+B / Shift+W (slides-30). The table's
- * chord trace does not read a Shift+letter from the CSV text, so the two chords are read here.
- */
-function macShiftedScreen(e: ShortcutKeyEvent, platform: ShortcutPlatform): ShowKey | null {
-  if (platform !== 'mac' || !e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return null
-  const k = typesAscii(e) ? e.key.toLowerCase() : e.code
-  if (k === 'b' || k === 'KeyB') return 'black'
-  return k === 'w' || k === 'KeyW' ? 'white' : null
-}
-
-/**
  * Maps a keydown to the next state + action; null = not a show key (leave the event alone).
  * `platform` / `surface` pick the chords (PowerPoint for Mac's on macOS, the web's in the
  * web frame).
@@ -100,7 +90,7 @@ export function reduceShowKey(
   if (isComposingEvent(e)) return null
   const matched = matchShortcut(e, slidesShortcuts, platform, surface, SLIDESHOW_CONTEXT)
   if (matched?.id === 'slides-32') return { state, action: { type: 'pointer' } }
-  const show = matched ? showOf(matched.id, e) : macShiftedScreen(e, platform)
+  const show = matched ? showOf(matched.id, e) : null
   if (show === 'exit') {
     if (state.digits) return { state: { ...state, digits: '' }, action: NONE }
     return { state, action: { type: 'exit' } }

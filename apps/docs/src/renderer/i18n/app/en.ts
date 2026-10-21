@@ -26,6 +26,7 @@ export const en = {
   appScLineBreak: 'Line Break',
   appScNbsp: 'Non-breaking Space',
   appScNbHyphen: 'Non-breaking Hyphen',
+  appScFindNext: 'Find Next',
   appScOptHyphen: 'Optional Hyphen',
   appScGrowFont1: 'Increase Font Size 1 pt',
   appScShrinkFont1: 'Decrease Font Size 1 pt',

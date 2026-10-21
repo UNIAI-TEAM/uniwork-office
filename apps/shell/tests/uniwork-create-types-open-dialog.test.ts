@@ -146,8 +146,9 @@ describe('UniNote page rows in the Open dialog folder browser (UNI-1953)', () =>
   it('CT1-2: a page row carries the UniNote mark, a file row does not', async () => {
     setup()
     await mountInFolder()
-    expect(rowOf('p1')!.querySelector('rect[style*="tint-blue"]')).not.toBeNull()
-    expect(rowOf('d1')!.querySelector('rect[style*="tint-blue"]')).toBeNull()
+    // the UniNote tile (UNI-2050, option J): the 240-grid gradient tile, rx 48
+    expect(rowOf('p1')!.querySelector('svg[viewBox="0 0 240 240"] rect[rx="48"]')).not.toBeNull()
+    expect(rowOf('d1')!.querySelector('svg[viewBox="0 0 240 240"] rect[rx="48"]')).toBeNull()
     // not the docx tile its title extension would pick
     expect(rowOf('p1')!.querySelector('img')).toBeNull()
   })

@@ -20,6 +20,17 @@ export type ToInspector =
   | { type: 'gx:scrollTo'; y: number }
   /** claim = relay mod+P as the 'print' key command and suppress the browser's own dialog */
   | { type: 'gx:printKey'; claim: boolean }
+  /** chords the host replays for a key pressed in the frame: the frame cancels the browser's own action for them (web) */
+  | {
+      type: 'gx:keyClaims'
+      claims: Array<{
+        key: string
+        ctrlKey: boolean
+        altKey: boolean
+        shiftKey: boolean
+        metaKey: boolean
+      }>
+    }
 
 /** effective styles of the selected element (px numbers without unit, colours as #rrggbb, '' when transparent) */
 export interface ComputedSnapshot {
@@ -121,6 +132,23 @@ export type FromInspectorBody =
         | 'moveUp'
         | 'moveDown'
         | 'print'
+    }
+  /**
+   * a modifier chord or function key pressed while focus is inside the frame: the frame's keydown
+   * never reaches the host window, so the raw key goes over and the host matches it against its
+   * shortcut table (the frame holds no table of its own)
+   */
+  | {
+      type: 'gx:keyEvent'
+      key: string
+      code: string
+      ctrlKey: boolean
+      altKey: boolean
+      shiftKey: boolean
+      metaKey: boolean
+      altGraph: boolean
+      repeat: boolean
+      composing: boolean
     }
   /** ctrl/meta + wheel inside the frame (trackpad pinch); the host owns the zoom level */
   | { type: 'gx:zoom'; delta: number }

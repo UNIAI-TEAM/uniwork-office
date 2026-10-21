@@ -38,6 +38,7 @@ export type DataShapes = [
   Assert<Mutual<Shim.UniworkCommentsLike, Kit.UniworkCommentsLike>>,
   Assert<Mutual<Shim.AnchorSyncOutcome, Kit.AnchorSyncOutcome>>,
   Assert<Mutual<Shim.CollabLoadState, Kit.CollabLoadState>>,
+  Assert<Mutual<Shim.AvatarSource, Kit.AvatarSource>>,
   Assert<SameOn<Shim.CollabThreadView, Kit.CollabThreadView>>,
   Assert<Mutual<Shim.CollabNewThread, Kit.CollabNewThread>>,
   Assert<SameOn<Shim.CollabControllerOptions, Kit.CollabControllerOptions>>,
@@ -68,4 +69,6 @@ export const values: {
   announcePolite: typeof Shim.announcePolite
   COMMENTS_REVEAL_WAIT_MS: typeof Shim.COMMENTS_REVEAL_WAIT_MS
   COLLAB_LIVE_REGION_ID: typeof Shim.COLLAB_LIVE_REGION_ID
+  AvatarSourceProvider: typeof Shim.AvatarSourceProvider
+  useFrameAvatarSource: typeof Shim.useFrameAvatarSource
 } = KitValues

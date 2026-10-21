@@ -26,6 +26,7 @@ export const nl = {
   appScLineBreak: 'Regeleinde',
   appScNbsp: 'Harde spatie',
   appScNbHyphen: 'Harde afbreekstreep',
+  appScFindNext: 'Volgende zoeken',
   appScOptHyphen: 'Zachte afbreekstreep',
   appScGrowFont1: 'Tekengrootte 1 pt vergroten',
   appScShrinkFont1: 'Tekengrootte 1 pt verkleinen',
