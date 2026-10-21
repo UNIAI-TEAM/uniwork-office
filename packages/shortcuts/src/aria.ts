@@ -69,9 +69,11 @@ export function ariaKeyshortcuts(
 /** Display-notation chords, as `formatChord` writes them and as hand-written tips spell them. */
 const DISPLAY_CHORD_PATTERNS: readonly RegExp[] = [
   // a modifier word joined to a key: Ctrl+E, Alt+Shift+W, Cmd+K, Control+E, Option+R, Ctrl+.
-  // and the translated modifiers the locale strings spell: Strg (de), Maj (fr), Mayús (es),
-  // Maiusc (it), Umschalt (de), Commande (fr), Befehl (de), Opción (es)
-  /\b(?:Ctrl|Control|Alt|Shift|Cmd|Command|Option|Opt|Meta|Win|AltGr|Strg|Maj|Mayús|Maiusc|Umschalt|Commande|Befehl|Opción)\s*\+\s*\S/i,
+  /\b(?:Ctrl|Control|Alt|Shift|Cmd|Command|Option|Opt|Meta|Win|AltGr)\s*\+\s*\S/i,
+  // the translated modifiers the locale strings spell: Strg (de), Maj (fr), Mayús (es), Maiusc (it),
+  // Umschalt (de). Joined to the key with no space (Maj+Entrée), so prose such as
+  // "ligne de commande + skill" and words such as "Maj de la page" stay plain
+  /\b(?:Strg|Maj|Mayús|Maiusc|Umschalt)\+\S/i,
   // macOS glyph notation: ⌘E, ⌥⌘R, ⌃⇧F, ⇧F5
   /[⌘⌥⌃]|⇧\s*\S/,
   // a bare key in a parenthesised hint: (F12), (Esc), (Del), and the translated key names
