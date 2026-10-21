@@ -1167,13 +1167,14 @@ const manual: readonly ShortcutAction[] = [
   },
   // Find: Univer binds Ctrl+F / Cmd+F on desktop (the Excel Windows page prints no Find key);
   // Excel for the web's Ctrl+F in the frame. Excel for Mac's Shift+F5 is not added: Cmd+F
-  // stays Univer's
+  // stays Univer's. Univer binds both Cmd+F and Ctrl+F on a Mac (find-replace.shortcut.ts), so
+  // the web Mac hint leads with the Cmd chord
   {
     id: 'sheets-43',
     scope: 'sheets',
     win: ['Ctrl+F'],
     mac: ['Cmd+F'],
-    web: { win: ['Ctrl+F'], mac: ['Ctrl+F'] },
+    web: { win: ['Ctrl+F'], mac: ['Cmd+F', 'Ctrl+F'] },
     match: 'key',
     guard: { noRepeat: true },
   },
