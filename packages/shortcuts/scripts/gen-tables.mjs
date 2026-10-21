@@ -233,7 +233,10 @@ const MAC_WORDS = /^(command|cmd|⌘|option|opt|control)$/i
 
 /** "Ctrl+Minus sign (-)" → "Ctrl+-", "Ctrl+Zero (0)" → "Ctrl+0". */
 function normalizeVerboseKeys(text) {
-  return text.replace(/\+\s*([A-Za-z][A-Za-z' ]*?)\s*\(\s?(.)\s?\)/g, '+$2')
+  return text.replace(/\+\s*([A-Za-z][A-Za-z' ]*?)\s*\(\s?(.)\s?\)/g, (whole, name, key) =>
+    // "Shift+B or Period (.)" is two keys, not one key named "B or Period"
+    /\b(or|and)\b/i.test(name) ? whole : `+${key}`,
+  )
 }
 
 /** A note that makes the chord conditional ("defer", "once ...", "validate"). */

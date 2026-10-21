@@ -308,6 +308,12 @@ describe('generator', () => {
     )
     expect(inRow('slides-29', 'mac')).toEqual(expect.arrayContaining(['Escape', 'Minus']))
     expect(inRow('slides-30')).toEqual(expect.arrayContaining(['B', 'Period', 'W', 'Comma']))
+    // Shift+letter is traced too ("B or Shift+B or Period (.)" is not the key "Shift+.")
+    expect(inRow('slides-30', 'mac')).toEqual(
+      expect.arrayContaining(['B', 'Shift+B', 'W', 'Shift+W', 'Period', 'Comma']),
+    )
+    expect(inRow('slides-30', 'mac')).not.toContain('Shift+Period')
+    expect(inRow('slides-30')).not.toContain('Shift+B')
     expect(inRow('slides-31')).toContain('H')
     expect(inRow('pdf-14')).toEqual(
       expect.arrayContaining(['Space', 'Shift+Space', 'PageDown', 'PageUp']),

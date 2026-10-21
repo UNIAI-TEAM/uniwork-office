@@ -1189,6 +1189,16 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
+  // Spell check: apps/sheets has no spell-check command, so the row promises no key
+  // (the generated F7 would show in a hint and do nothing)
+  {
+    id: 'sheets-58',
+    scope: 'sheets',
+    win: [],
+    mac: [],
+    match: 'key',
+    guard: { noRepeat: true },
+  },
   // Format Cells: Excel for Mac prints "Cmd+1 or Ctrl+1"
   {
     id: 'sheets-61',
@@ -1651,8 +1661,23 @@ export const sheetsManualUnmapped: readonly UnmappedShortcut[] = [
   },
   {
     id: 'sheets-58',
-    part: 'row',
-    reason: 'F7 spell check: the key is in the table, but no spell-check command listens',
+    part: 'desktop.win',
+    reason: 'no spell-check command in apps/sheets (F7), so the row promises no key',
+  },
+  {
+    id: 'sheets-58',
+    part: 'desktop.mac',
+    reason: 'no spell-check command in apps/sheets (F7), so the row promises no key',
+  },
+  {
+    id: 'sheets-58',
+    part: 'web.win',
+    reason: 'no spell-check command in apps/sheets (F7), so the row promises no key',
+  },
+  {
+    id: 'sheets-58',
+    part: 'web.mac',
+    reason: 'no spell-check command in apps/sheets (F7), so the row promises no key',
   },
   {
     id: 'sheets-59',
