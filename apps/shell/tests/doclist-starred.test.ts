@@ -66,6 +66,7 @@ describe('the nav entry', () => {
       'shared-by-me',
       'archive',
       'trash',
+      'elsewhere',
     ])
   })
 })
