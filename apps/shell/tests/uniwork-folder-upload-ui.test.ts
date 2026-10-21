@@ -111,13 +111,21 @@ describe('folder / multi-file upload screens', () => {
       expect(controller.foldersAvailable).toBe(false)
     })
 
-    it('folders are offered when the bridge says so, or when it does not say', async () => {
+    it('folders are offered when the bridge says so', async () => {
       await mount()
       expect(controller.available).toBe(true)
       expect(controller.foldersAvailable).toBe(true)
-      bridgeInUse = createFakeFolderUploadBridge({ folders: 'absent' })
+      expect(bridge.foldersAvailable).toHaveBeenCalledTimes(1)
+    })
+
+    it('a bridge whose availability call fails offers no folders (files still work)', async () => {
+      bridgeInUse = createFakeFolderUploadBridge()
+      ;(bridgeInUse as FakeFolderUploadBridge).foldersAvailable.mockRejectedValueOnce(
+        new Error('x'),
+      )
       await mount()
-      expect(controller.foldersAvailable).toBe(true)
+      expect(controller.available).toBe(true)
+      expect(controller.foldersAvailable).toBe(false)
     })
 
     it('hides folders when the server has no folder-upload block', async () => {
@@ -127,13 +135,13 @@ describe('folder / multi-file upload screens', () => {
       expect(controller.foldersAvailable).toBe(false)
     })
 
-    it('subscribes to progress once and lets go on unmount', async () => {
+    it('subscribes to progress once and keeps listening after unmount (the store outlives the screen)', async () => {
       await mount()
       expect(bridge.listeners).toBe(1)
       await act(async () => {
         root.unmount()
       })
-      expect(bridge.listeners).toBe(0)
+      expect(bridge.listeners).toBe(1)
       root = createRoot(host)
     })
   })
@@ -409,7 +417,7 @@ describe('folder / multi-file upload screens', () => {
     })
 
     it('while the run starts the button reads "Đang chuẩn bị…" and the dialog cannot be dismissed', async () => {
-      let resolveStart!: (v: { runId: string }) => void
+      let resolveStart!: (v: { ok: true; runId: string }) => void
       bridge.start.mockImplementationOnce(() => new Promise((resolve) => (resolveStart = resolve)))
       await mount()
       await stage(preflightOf())
@@ -425,7 +433,7 @@ describe('folder / multi-file upload screens', () => {
       expect(bridge.start).toHaveBeenCalledTimes(1)
       expect(dialog()).not.toBeNull()
       await act(async () => {
-        resolveStart({ runId: 'run-1' })
+        resolveStart({ ok: true, runId: 'run-1' })
       })
       await flush()
       expect(dialog()).toBeNull()
@@ -482,7 +490,7 @@ describe('folder / multi-file upload screens', () => {
     })
 
     it('applies progress that arrives before the start call has answered', async () => {
-      let resolveStart!: (v: { runId: string }) => void
+      let resolveStart!: (v: { ok: true; runId: string }) => void
       bridge.start.mockImplementationOnce(() => new Promise((resolve) => (resolveStart = resolve)))
       await mount()
       await stage(preflightOf())
@@ -491,7 +499,7 @@ describe('folder / multi-file upload screens', () => {
         bridge.emit(progressOf({ runId: 'run-9', phase: 'uploading', done: 7 })),
       )
       await act(async () => {
-        resolveStart({ runId: 'run-9' })
+        resolveStart({ ok: true, runId: 'run-9' })
       })
       await flush()
       expect(bars()[0]!.textContent).toContain('7/40 tệp')
@@ -773,6 +781,166 @@ describe('folder / multi-file upload screens', () => {
       expect(dialog()!.querySelectorAll('[data-testid="folder-upload-failures"] li')).toHaveLength(
         2,
       )
+    })
+  })
+
+  describe('one file starts at once (UNI-2052 Q2)', () => {
+    const one = (over: Partial<ReturnType<typeof preflightOf>> = {}) =>
+      preflightOf({
+        preflightId: 'pf-one',
+        mode: 'files',
+        rootName: undefined,
+        totals: { files: 1, bytes: 2900 },
+        ...over,
+      })
+
+    it('a pre-flight of exactly one file with no refusal is started without a dialog or a share choice', async () => {
+      await mount()
+      await stage(one())
+      expect(dialog()).toBeNull()
+      expect(bridge.start).toHaveBeenCalledTimes(1)
+      expect(bridge.start).toHaveBeenCalledWith({
+        preflightId: 'pf-one',
+        shareWithWorkspace: false,
+      })
+      expect(controller.queue).toHaveLength(0)
+      expect(bars()).toHaveLength(1)
+    })
+
+    it('a picked single file is the same: pick answers true and the bar shows the overall run', async () => {
+      bridge.pick.mockResolvedValueOnce(one())
+      await mount()
+      let staged = false
+      await act(async () => {
+        staged = await controller.pick(TARGET, 'files')
+      })
+      await flush()
+      expect(staged).toBe(true)
+      expect(dialog()).toBeNull()
+      await act(async () => bridge.emit(progressOf({ phase: 'uploading', done: 0, total: 1 })))
+      expect(bars()[0]!.textContent).toContain('0/1 tệp')
+    })
+
+    it('still asks when something was skipped, the run is refused, or it is a folder', async () => {
+      await mount()
+      await stage(one({ skipped: [{ path: 'x.exe', reason: 'unsupported_format' }] }))
+      expect(dialog()).not.toBeNull()
+      await click(buttonNamed('Hủy', dialog()!))
+      await stage(one({ refusal: { code: 'too_large_total', limit: 10, actual: 20 } }))
+      expect(dialog()).not.toBeNull()
+      await click(buttonNamed('Hủy', dialog()!))
+      await stage(one({ mode: 'folder', rootName: 'A' }))
+      expect(dialog()).not.toBeNull()
+      expect(bridge.start).not.toHaveBeenCalled()
+    })
+
+    it('a file dropped next to a folder starts at once while the folder waits for its dialog', async () => {
+      await mount()
+      await stage(
+        one(),
+        preflightOf({ preflightId: 'pf-folder', mode: 'folder', rootName: 'Case' }),
+      )
+      expect(bridge.start).toHaveBeenCalledTimes(1)
+      expect(controller.queue.map((q) => q.preflightId)).toEqual(['pf-folder'])
+      expect(
+        dialog()?.querySelector('[data-testid="folder-upload-dialog"]')?.getAttribute('data-mode'),
+      ).toBe('folder')
+    })
+
+    it('a single file that cannot start says so as a notice, not a dialog', async () => {
+      bridge.start.mockResolvedValueOnce({ ok: false, error: 'unknown_preflight' })
+      await mount()
+      await stage(one())
+      expect(dialog()).toBeNull()
+      expect(bars()).toHaveLength(0)
+      expect(document.body.textContent).toContain('Không bắt đầu tải lên được.')
+    })
+  })
+
+  describe('what main answers to start and to the pre-flight (FU-C shapes)', () => {
+    it('hides the share switch and its hint when the share choice does not reach the server', async () => {
+      await mount()
+      await stage(preflightOf({ shareAvailable: false }))
+      const d = dialog()!
+      expect(d.querySelector('[role="switch"]')).toBeNull()
+      expect(d.textContent).not.toContain('Thư mục vẫn riêng tư.')
+      await click(buttonNamed('Tải lên', d))
+      expect(bridge.start).toHaveBeenCalledWith({
+        preflightId: 'pf-1',
+        shareWithWorkspace: false,
+      })
+    })
+
+    for (const error of ['refused', 'unknown_preflight', 'invalid_input'] as const) {
+      it(`start answering ${error} keeps the dialog with an error line and starts no run`, async () => {
+        bridge.start.mockResolvedValueOnce({ ok: false, error })
+        await mount()
+        await stage(preflightOf())
+        await click(buttonNamed('Tải lên', dialog()!))
+        const d = dialog()!
+        expect(d.querySelector('[role="alert"]')?.textContent).toBe(
+          'Không bắt đầu tải lên được. Thử lại sau ít phút.',
+        )
+        expect(bars()).toHaveLength(0)
+        expect(controller.queue).toHaveLength(1)
+        expect(buttonNamed('Tải lên', d)?.getAttribute('aria-busy')).toBeNull()
+      })
+    }
+  })
+
+  describe('the runs outlive the screen (UNI-2052 Q6)', () => {
+    const startRun = async () => {
+      await stage(preflightOf())
+      await click(buttonNamed('Tải lên', dialog()!))
+    }
+    const remount = async () => {
+      await act(async () => {
+        root.unmount()
+      })
+      root = createRoot(host)
+    }
+
+    it('a running run is still there, with its latest count, when the screen comes back', async () => {
+      await mount()
+      await startRun()
+      await act(async () => bridge.emit(progressOf({ phase: 'uploading', done: 5 })))
+      await remount()
+      // main kept sending while nothing was mounted
+      await act(async () => bridge.emit(progressOf({ phase: 'uploading', done: 12 })))
+      await mount()
+      expect(bars()).toHaveLength(1)
+      expect(bars()[0]!.textContent).toContain('12/40 tệp')
+      // and it goes on from there
+      await act(async () => bridge.emit(progressOf({ phase: 'uploading', done: 20 })))
+      expect(bars()[0]!.textContent).toContain('20/40 tệp')
+    })
+
+    it('a run that finished while the screen was away shows its end state, with its report', async () => {
+      await mount()
+      await startRun()
+      await remount()
+      await act(async () =>
+        bridge.emit(
+          progressOf({
+            phase: 'done',
+            done: 38,
+            failed: 2,
+            failures: [{ path: 'a.docx', code: 'network', retryable: true }],
+          }),
+        ),
+      )
+      await mount()
+      expect(bars()[0]!.textContent).toContain('38/40 tệp đã tải lên · 2 lỗi')
+      await click(buttonNamed('Xem', bars()[0]!))
+      expect(dialog()!.textContent).toContain('a.docx')
+    })
+
+    it('the host is told when a run settles even though a screen mounted later started listening', async () => {
+      await mount()
+      await startRun()
+      onFinished.mockClear()
+      await act(async () => bridge.emit(progressOf({ phase: 'done', done: 40 })))
+      expect(onFinished).toHaveBeenCalledTimes(1)
     })
   })
 })

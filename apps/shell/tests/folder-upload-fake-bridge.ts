@@ -15,6 +15,7 @@ export function preflightOf(overrides: Partial<PreflightSDO> = {}): PreflightSDO
     totals: { files: 40, bytes: 125.3 * 1024 * 1024 },
     skipped: [],
     refusal: null,
+    shareAvailable: true,
     ...overrides,
   }
 }
@@ -23,6 +24,7 @@ export interface FakeFolderUploadBridge extends FolderUploadBridge {
   pick: ReturnType<typeof vi.fn<FolderUploadBridge['pick']>>
   preflight: ReturnType<typeof vi.fn<FolderUploadBridge['preflight']>>
   start: ReturnType<typeof vi.fn<FolderUploadBridge['start']>>
+  foldersAvailable: ReturnType<typeof vi.fn<FolderUploadBridge['foldersAvailable']>>
   cancel: ReturnType<typeof vi.fn<FolderUploadBridge['cancel']>>
   retry: ReturnType<typeof vi.fn<FolderUploadBridge['retry']>>
   dismiss: ReturnType<typeof vi.fn<FolderUploadBridge['dismiss']>>
@@ -33,13 +35,17 @@ export interface FakeFolderUploadBridge extends FolderUploadBridge {
 
 /** In-memory bridge: every channel is a spy, `emit` plays main's pushed progress */
 export function createFakeFolderUploadBridge(
-  opts: { folders?: boolean | 'absent'; runId?: string } = {},
+  opts: { folders?: boolean; runId?: string } = {},
 ): FakeFolderUploadBridge {
   const listeners = new Set<(event: FolderUploadProgressEvent) => void>()
   const bridge = {
     pick: vi.fn<FolderUploadBridge['pick']>(async () => null),
     preflight: vi.fn<FolderUploadBridge['preflight']>(async () => []),
-    start: vi.fn<FolderUploadBridge['start']>(async () => ({ runId: opts.runId ?? 'run-1' })),
+    start: vi.fn<FolderUploadBridge['start']>(async () => ({
+      ok: true,
+      runId: opts.runId ?? 'run-1',
+    })),
+    foldersAvailable: vi.fn(async () => opts.folders !== false),
     cancel: vi.fn<FolderUploadBridge['cancel']>(async () => undefined),
     retry: vi.fn<FolderUploadBridge['retry']>(async () => undefined),
     dismiss: vi.fn<FolderUploadBridge['dismiss']>(async () => undefined),
@@ -54,9 +60,6 @@ export function createFakeFolderUploadBridge(
       return listeners.size
     },
   } as unknown as FakeFolderUploadBridge
-  if (opts.folders !== 'absent') {
-    bridge.foldersAvailable = vi.fn(async () => opts.folders !== false)
-  }
   return bridge
 }
 

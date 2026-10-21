@@ -133,6 +133,7 @@ import {
   asPreflightSDO,
 } from './folder-upload-guards'
 import type {
+  FolderUploadBridge,
   BatchUploadPickInput,
   BatchUploadPreflightInput,
   BatchUploadProgress,
@@ -1347,6 +1348,9 @@ const homeApi: HomeApi = {
       batchUploadProgressSubscribers.delete(cb)
     }
   },
+  async uniworkBatchUploadFoldersAvailable() {
+    return (await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.batchUploadFoldersAvailable)) === true
+  },
   async uniworkBatchUploadCancel(runId: string) {
     if (typeof runId !== 'string' || !runId) return
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.batchUploadCancel, runId)
@@ -1602,6 +1606,18 @@ void ipcRenderer
   .catch(() => undefined)
 
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
+// UNI-2052: the folder / multi-file upload as the renderer reads it (the same calls as above)
+const folderUploadApi: FolderUploadBridge = {
+  pick: (input) => homeApi.uniworkBatchUploadPick(input),
+  preflight: (input) => homeApi.uniworkBatchUploadPreflight(input),
+  start: (input) => homeApi.uniworkBatchUploadStart(input),
+  cancel: ({ runId }) => homeApi.uniworkBatchUploadCancel(runId),
+  retry: ({ runId }) => homeApi.uniworkBatchUploadRetry(runId),
+  dismiss: ({ runId }) => homeApi.uniworkBatchUploadDismiss(runId),
+  foldersAvailable: () => homeApi.uniworkBatchUploadFoldersAvailable(),
+  onProgress: (cb) => homeApi.onUniworkBatchUploadProgress(cb),
+}
+contextBridge.exposeInMainWorld('uniworkFolderUpload', folderUploadApi)
 // window.uniworkAiFlag: the home renderer's provider list mirrors the shell's UniWork AI flag
 installUniworkAiFlagBridge()
 

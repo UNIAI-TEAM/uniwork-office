@@ -130,3 +130,23 @@ export interface BatchUploadProgress {
   /** the run as a whole failed (for example folder_uploads_busy with its Retry-After) */
   error?: { code: string; retryAfterSeconds?: number }
 }
+
+/**
+ * `window.uniworkFolderUpload`: what the renderer reads. The preload builds it
+ * from the `uniworkBatchUpload*` methods of the aiOffice bridge, so the
+ * renderer never touches an IPC channel or a path.
+ */
+export interface FolderUploadBridge {
+  /** the picker (folder, or files with multiple selection) + its pre-flight; null = cancelled */
+  pick(input: BatchUploadPickInput): Promise<PreflightSDO | null>
+  /** dropped absolute paths: one files pre-flight for the loose files, then one per folder, in that order */
+  preflight(input: BatchUploadPreflightInput): Promise<PreflightSDO[]>
+  start(input: BatchUploadStartInput): Promise<BatchUploadStartResult>
+  cancel(input: { runId: string }): Promise<void>
+  retry(input: { runId: string }): Promise<void>
+  dismiss(input: { runId: string }): Promise<void>
+  /** false when the server has no folder_upload limits block: "Tải lên thư mục" is hidden */
+  foldersAvailable(): Promise<boolean>
+  /** progress pushed by main; the returned function unsubscribes */
+  onProgress(cb: (event: BatchUploadProgress) => void): () => void
+}

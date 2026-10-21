@@ -1071,6 +1071,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   const batchUpload = createBatchUpload(service, wiring, {
     invalidate: (workspaceId) => treeChanged.notify(workspaceId),
   })
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadFoldersAvailable, () =>
+    batchUpload.foldersAvailable(),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadPick, (_event, input: unknown) =>
     batchUpload.pick(input),
   )

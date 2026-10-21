@@ -17,8 +17,21 @@ interface Bridge {
   uniworkBatchUploadCancel(runId: string): Promise<void>
   uniworkBatchUploadRetry(runId: string): Promise<void>
   uniworkBatchUploadDismiss(runId: string): Promise<void>
+  uniworkBatchUploadFoldersAvailable(): Promise<unknown>
   onUniworkBatchUploadProgress(cb: (event: unknown) => void): () => void
   getPathForFile(file: File): string
+}
+
+/** window.uniworkFolderUpload: the object the renderer reads (shared FolderUploadBridge) */
+interface FolderUploadObject {
+  pick(input: unknown): Promise<unknown>
+  preflight(input: unknown): Promise<unknown>
+  start(input: unknown): Promise<unknown>
+  cancel(input: { runId: string }): Promise<void>
+  retry(input: { runId: string }): Promise<void>
+  dismiss(input: { runId: string }): Promise<void>
+  foldersAvailable(): Promise<boolean>
+  onProgress(cb: (event: unknown) => void): () => void
 }
 
 async function loadBridge(reply: unknown) {
@@ -48,7 +61,12 @@ async function loadBridge(reply: unknown) {
   await import('../src/preload/index')
   // the preload asks main for its cloud status once on load: not part of this bridge
   invoked.length = 0
-  return { bridge: exposed.aiOffice as unknown as Bridge, invoked, handlers }
+  return {
+    bridge: exposed.aiOffice as unknown as Bridge,
+    folderUpload: exposed.uniworkFolderUpload as unknown as FolderUploadObject | undefined,
+    invoked,
+    handlers,
+  }
 }
 
 afterEach(() => {
@@ -67,6 +85,88 @@ const SDO = {
   refusal: null,
   shareAvailable: true,
 }
+
+describe('the object the renderer reads (window.uniworkFolderUpload)', () => {
+  it('is exposed next to aiOffice with every method the renderer calls', async () => {
+    const { folderUpload } = await loadBridge(undefined)
+    expect(folderUpload).toBeDefined()
+    for (const name of [
+      'pick',
+      'preflight',
+      'start',
+      'cancel',
+      'retry',
+      'dismiss',
+      'foldersAvailable',
+      'onProgress',
+    ] as const) {
+      expect(folderUpload![name], name).toBeTypeOf('function')
+    }
+  })
+
+  it('forwards each call to its channel: inputs as sent, run controls by run id', async () => {
+    const { folderUpload, invoked } = await loadBridge(undefined)
+    const pick = { workspaceId: 'ws_1', folderId: null, mode: 'files' }
+    await folderUpload!.pick(pick)
+    await folderUpload!.preflight({ workspaceId: 'ws_1', folderId: null, paths: ['/a'] })
+    await folderUpload!.start({ preflightId: 'pf1', shareWithWorkspace: false })
+    await folderUpload!.cancel({ runId: 'r1' })
+    await folderUpload!.retry({ runId: 'r1' })
+    await folderUpload!.dismiss({ runId: 'r1' })
+    await folderUpload!.foldersAvailable()
+    expect(invoked.map((i) => i.channel)).toEqual([
+      UNIWORK_DOC_CHANNELS.batchUploadPick,
+      UNIWORK_DOC_CHANNELS.batchUploadPreflight,
+      UNIWORK_DOC_CHANNELS.batchUploadStart,
+      UNIWORK_DOC_CHANNELS.batchUploadCancel,
+      UNIWORK_DOC_CHANNELS.batchUploadRetry,
+      UNIWORK_DOC_CHANNELS.batchUploadDismiss,
+      UNIWORK_DOC_CHANNELS.batchUploadFoldersAvailable,
+    ])
+    expect(invoked[0].args).toEqual([pick])
+    expect(invoked[3].args).toEqual(['r1'])
+  })
+
+  it('answers the start result as main shaped it, and invalid_input for a bad reply', async () => {
+    expect(await (await loadBridge({ ok: true, runId: 'r1' })).folderUpload!.start({})).toEqual({
+      ok: true,
+      runId: 'r1',
+    })
+    expect(await (await loadBridge('x')).folderUpload!.start({})).toEqual({
+      ok: false,
+      error: 'invalid_input',
+    })
+  })
+
+  it('foldersAvailable is true only for a real true from main', async () => {
+    expect(await (await loadBridge(true)).folderUpload!.foldersAvailable()).toBe(true)
+    for (const bad of [false, undefined, null, 'true', 1, {}]) {
+      expect(await (await loadBridge(bad)).folderUpload!.foldersAvailable()).toBe(false)
+    }
+    expect(await (await loadBridge(true)).bridge.uniworkBatchUploadFoldersAvailable()).toBe(true)
+  })
+
+  it('onProgress delivers the narrowed push and returns the unsubscribe', async () => {
+    const { folderUpload, handlers } = await loadBridge(undefined)
+    const seen: unknown[] = []
+    const off = folderUpload!.onProgress((e) => seen.push(e))
+    const push = handlers.get(UNIWORK_DOC_CHANNELS.batchUploadProgress)!
+    const event = {
+      runId: 'r1',
+      phase: 'uploading',
+      done: 1,
+      failed: 0,
+      total: 2,
+      sentBytes: 5,
+      totalBytes: 10,
+    }
+    push(null, event)
+    expect(seen).toEqual([event])
+    off()
+    push(null, event)
+    expect(seen).toHaveLength(1)
+  })
+})
 
 describe('the batch-upload bridge', () => {
   it('invokes each channel with the renderer input', async () => {

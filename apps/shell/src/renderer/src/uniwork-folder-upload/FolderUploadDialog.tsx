@@ -59,7 +59,8 @@ export function FolderUploadDialog({
 
   const submit = () => {
     if (refusal || starting) return
-    onSubmit({ shareWithWorkspace: share })
+    // no switch (the server cannot share on upload) = private
+    onSubmit({ shareWithWorkspace: preflight.shareAvailable && share })
   }
 
   return (
@@ -174,7 +175,7 @@ export function FolderUploadDialog({
             </ul>
           </section>
         )}
-        {!refusal && (
+        {!refusal && preflight.shareAvailable && (
           <div className="fu-share">
             <div className="fu-share-row">
               <span id={`${id}-share`}>{t('fuDlgShare')}</span>

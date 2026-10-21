@@ -1539,6 +1539,8 @@ export interface HomeApi {
   uniworkBatchUploadRetry(runId: string): Promise<void>
   /** UNI-2052: the report was closed without retrying */
   uniworkBatchUploadDismiss(runId: string): Promise<void>
+  /** UNI-2052: whether the server takes folders; false = only loose files go up (one by one) */
+  uniworkBatchUploadFoldersAvailable(): Promise<boolean>
   /** S18: rename a document (the server keeps the title) */
   uniworkRenameDocument(
     documentId: string,
@@ -2224,6 +2226,8 @@ export const UNIWORK_DOC_CHANNELS = {
   batchUploadRetry: 'uniwork-doc:batch-upload-retry',
   /** invoke(runId) -> the report was closed without retrying: let the run go (UNI-2052) */
   batchUploadDismiss: 'uniwork-doc:batch-upload-dismiss',
+  /** invoke() -> whether the server takes folders (it sent a folder_upload limits block) (UNI-2052) */
+  batchUploadFoldersAvailable: 'uniwork-doc:batch-upload-folders-available',
   /** invoke(documentId, name) -> rename (S18) */
   renameDocument: 'uniwork-doc:rename-document',
   /** invoke(documentId) -> archive (S18; there is no delete) */

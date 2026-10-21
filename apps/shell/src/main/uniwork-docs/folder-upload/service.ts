@@ -51,6 +51,8 @@ export interface FolderUploadServiceDeps {
 }
 
 export interface FolderUploadService {
+  /** the server takes folders (it sent a folder_upload block); read fresh each call */
+  foldersAvailable(): Promise<boolean>
   pick(input: unknown): Promise<PreflightSDO | null>
   preflight(input: unknown): Promise<PreflightSDO[]>
   /** `sink` receives the run's progress (the window that started it) */
@@ -465,6 +467,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
   }
 
   return {
+    foldersAvailable: async () => (await deps.getFolderUploadLimits()) !== null,
     pick,
     preflight,
     start,

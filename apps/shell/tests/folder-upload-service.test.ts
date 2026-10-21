@@ -519,6 +519,13 @@ describe('start / cancel / retry / dismiss', () => {
   })
 })
 
+describe('foldersAvailable', () => {
+  it('is true when the server sent a folder_upload block and false when it did not', async () => {
+    expect(await setup().service.foldersAvailable()).toBe(true)
+    expect(await setup({ limits: null }).service.foldersAvailable()).toBe(false)
+  })
+})
+
 describe('the sequential fallback (no folder_upload block)', () => {
   it('runs files mode through the sequential runner, not the batch runner, and says there is no share flag', async () => {
     const a = file('a.docx', 3)

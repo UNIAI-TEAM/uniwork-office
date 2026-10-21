@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { StringKey } from '../locale'
 import {
   getFolderUploadBridge,
   type FolderUploadBridge,
-  type FolderUploadFailure,
   type FolderUploadMode,
-  type FolderUploadPhase,
-  type FolderUploadProgressEvent,
   type PreflightSDO,
 } from './bridge'
+import {
+  attachFolderUploadStore,
+  folderUploadRuns,
+  onFolderUploadSettled,
+  patchFolderUploadRun,
+  removeFolderUploadRun,
+  startFolderUploadRun,
+  subscribeFolderUploadStore,
+  type StoredFolderUploadRun,
+} from './folder-upload-store'
 
 /** Where an upload goes: the folder open on screen, or null for the workspace top (main uses My Folder) */
 export interface FolderUploadTarget {
@@ -17,18 +24,8 @@ export interface FolderUploadTarget {
 }
 
 /** One run the app is showing: its bar, and its report once it ended with failures */
-export interface FolderUploadRun {
-  runId: string
-  mode: FolderUploadMode
-  /** the folder's title (folder mode) or the destination's name (files mode) */
-  name: string
-  targetLabel: string
-  phase: FolderUploadPhase
-  done: number
-  failed: number
-  total: number
-  rootFolderId?: string
-  failures: FolderUploadFailure[]
+export interface FolderUploadRun extends StoredFolderUploadRun {
+  /** this screen has the run's report open (the report belongs to the screen that asked for it) */
   reportOpen: boolean
 }
 
@@ -66,16 +63,23 @@ export interface FolderUploadController {
   onOpenFolder?: (folderId: string) => void
 }
 
-const TERMINAL: readonly FolderUploadPhase[] = ['done', 'canceled', 'failed']
-/** events of a run the start call has not named yet are kept for this many runs */
-const EARLY_EVENTS_KEPT = 8
+/** A single file with nothing to explain starts at once: no dialog, no share choice (private, like a plain upload) */
+function startsAtOnce(sdo: PreflightSDO): boolean {
+  return (
+    sdo.mode === 'files' &&
+    sdo.totals.files === 1 &&
+    sdo.refusal === null &&
+    sdo.skipped.length === 0
+  )
+}
 
 /**
- * UNI-2052: the state of the folder / multi-file upload on one screen: the
- * pre-flights waiting for a decision, the runs under way and their reports.
- * Everything heavy happens in main behind the bridge; this only keeps what the
- * screen shows. `onFinished` runs when a run settles (the host may re-read its
- * list; main also invalidates, so a host that listens already can leave it out).
+ * UNI-2052: the folder / multi-file upload on one screen: the pre-flights
+ * waiting for a decision and the open report. The runs themselves are in the
+ * module-level store, so they outlive the screen. Everything heavy happens in
+ * main behind the bridge. `onFinished` runs when a run settles (the host may
+ * re-read its list; main also invalidates, so a host that listens already can
+ * leave it out).
  */
 export function useFolderUpload({
   onFinished,
@@ -88,24 +92,23 @@ export function useFolderUpload({
   bridge?: FolderUploadBridge | null
 }): FolderUploadController {
   const bridge = injected === undefined ? getFolderUploadBridge() : injected
-  const [foldersAvailable, setFoldersAvailable] = useState(!!bridge && !bridge.foldersAvailable)
+  const [foldersAvailable, setFoldersAvailable] = useState(false)
   const [queue, setQueue] = useState<readonly PreflightSDO[]>([])
   const [starting, setStarting] = useState(false)
   const [startFailed, setStartFailed] = useState(false)
-  const [runs, setRuns] = useState<readonly FolderUploadRun[]>([])
+  const stored = useSyncExternalStore(subscribeFolderUploadStore, () => folderUploadRuns(bridge))
+  const [reportRunId, setReportRunId] = useState<string | null>(null)
   const [notice, setNotice] = useState<FolderUploadNotice | null>(null)
-  const runsRef = useRef(runs)
-  runsRef.current = runs
-  const early = useRef(new Map<string, FolderUploadProgressEvent>())
+  const runs = useMemo<readonly FolderUploadRun[]>(
+    () => stored.map((run) => ({ ...run, reportOpen: run.runId === reportRunId })),
+    [stored, reportRunId],
+  )
   const finished = useRef(onFinished)
   finished.current = onFinished
   const startingRef = useRef(false)
 
   useEffect(() => {
-    if (!bridge?.foldersAvailable) {
-      setFoldersAvailable(!!bridge)
-      return
-    }
+    if (!bridge) return
     let live = true
     bridge
       .foldersAvailable()
@@ -116,47 +119,59 @@ export function useFolderUpload({
     }
   }, [bridge])
 
-  const applyEvent = useCallback((event: FolderUploadProgressEvent) => {
-    const known = runsRef.current.find((run) => run.runId === event.runId)
-    if (!known) {
-      // the start call has not answered with this id yet: keep the newest event for it
-      early.current.delete(event.runId)
-      early.current.set(event.runId, event)
-      while (early.current.size > EARLY_EVENTS_KEPT) {
-        early.current.delete(early.current.keys().next().value as string)
-      }
-      return
-    }
-    const settledNow = TERMINAL.includes(event.phase) && !TERMINAL.includes(known.phase)
-    setRuns((prev) =>
-      prev.map((run) =>
-        run.runId !== event.runId
-          ? run
-          : {
-              ...run,
-              phase: event.phase,
-              done: event.done,
-              failed: event.failed,
-              total: event.total,
-              rootFolderId: event.rootFolderId ?? run.rootFolderId,
-              name: run.mode === 'folder' ? (event.rootTitle ?? run.name) : run.name,
-              failures: event.failures ?? run.failures,
-            },
-      ),
-    )
-    if (settledNow) finished.current?.()
-  }, [])
-
+  // the store listens to main for good; this screen only has to be told when a run settles
   useEffect(() => {
-    if (!bridge) return
-    return bridge.onProgress(applyEvent)
-  }, [bridge, applyEvent])
+    if (bridge) attachFolderUploadStore(bridge)
+  }, [bridge])
 
-  const stage = useCallback((sdos: readonly PreflightSDO[]) => {
-    if (sdos.length === 0) return
-    setQueue((prev) => [...prev, ...sdos])
-    setStartFailed(false)
-  }, [])
+  useEffect(() => onFolderUploadSettled(() => finished.current?.()), [])
+
+  /** names the run the start call answered; false when main refused or the call failed */
+  const begin = useCallback(
+    async (sdo: PreflightSDO, shareWithWorkspace: boolean): Promise<boolean> => {
+      if (!bridge) return false
+      try {
+        const result = await bridge.start({ preflightId: sdo.preflightId, shareWithWorkspace })
+        if (!result.ok) return false
+        startFolderUploadRun(bridge, {
+          runId: result.runId,
+          mode: sdo.mode,
+          name:
+            sdo.mode === 'folder'
+              ? (sdo.rootNamePreview ?? sdo.rootName ?? sdo.target.label)
+              : sdo.target.label,
+          targetLabel: sdo.target.label,
+          phase: 'planning',
+          done: 0,
+          failed: 0,
+          total: sdo.totals.files,
+          failures: [],
+        })
+        return true
+      } catch {
+        return false
+      }
+    },
+    [bridge],
+  )
+
+  const stage = useCallback(
+    (sdos: readonly PreflightSDO[]) => {
+      if (sdos.length === 0) return
+      const waiting = sdos.filter((sdo) => !startsAtOnce(sdo))
+      for (const sdo of sdos) {
+        if (startsAtOnce(sdo)) {
+          void begin(sdo, false).then((started) => {
+            if (!started) setNotice({ key: 'fuDlgStartFailed' })
+          })
+        }
+      }
+      if (waiting.length === 0) return
+      setQueue((prev) => [...prev, ...waiting])
+      setStartFailed(false)
+    },
+    [begin],
+  )
 
   const notify = useCallback((key: StringKey) => setNotice({ key }), [])
 
@@ -206,38 +221,14 @@ export function useFolderUpload({
       startingRef.current = true
       setStarting(true)
       setStartFailed(false)
-      try {
-        const { runId } = await bridge.start({ preflightId: sdo.preflightId, shareWithWorkspace })
-        const run: FolderUploadRun = {
-          runId,
-          mode: sdo.mode,
-          name:
-            sdo.mode === 'folder'
-              ? (sdo.rootNamePreview ?? sdo.rootName ?? sdo.target.label)
-              : sdo.target.label,
-          targetLabel: sdo.target.label,
-          phase: 'planning',
-          done: 0,
-          failed: 0,
-          total: sdo.totals.files,
-          failures: [],
-          reportOpen: false,
-        }
-        runsRef.current = [...runsRef.current, run]
-        setRuns(runsRef.current)
-        setQueue((prev) => prev.filter((item) => item.preflightId !== sdo.preflightId))
-        // progress that beat the answer
-        const beat = early.current.get(runId)
-        early.current.delete(runId)
-        if (beat) applyEvent(beat)
-      } catch {
-        setStartFailed(true)
-      } finally {
-        startingRef.current = false
-        setStarting(false)
-      }
+      // a switch that does not reach the server (the one-by-one fallback) is never sent as ON
+      const started = await begin(sdo, shareWithWorkspace && sdo.shareAvailable)
+      if (started) setQueue((prev) => prev.filter((item) => item.preflightId !== sdo.preflightId))
+      else setStartFailed(true)
+      startingRef.current = false
+      setStarting(false)
     },
-    [bridge, queue, applyEvent],
+    [bridge, queue, begin],
   )
 
   const cancelDialog = useCallback(() => {
@@ -253,15 +244,6 @@ export function useFolderUpload({
     [bridge],
   )
 
-  const patchRun = useCallback((runId: string, patch: Partial<FolderUploadRun>) => {
-    setRuns((prev) => prev.map((run) => (run.runId === runId ? { ...run, ...patch } : run)))
-  }, [])
-
-  const removeRun = useCallback((runId: string) => {
-    runsRef.current = runsRef.current.filter((run) => run.runId !== runId)
-    setRuns(runsRef.current)
-  }, [])
-
   const dismissOnServer = useCallback(
     (runId: string) => {
       void bridge?.dismiss({ runId }).catch(() => undefined)
@@ -269,40 +251,39 @@ export function useFolderUpload({
     [bridge],
   )
 
-  const openReport = useCallback(
-    (runId: string) => patchRun(runId, { reportOpen: true }),
-    [patchRun],
-  )
+  const openReport = useCallback((runId: string) => setReportRunId(runId), [])
 
   const closeReport = useCallback(
     (runId: string) => {
       dismissOnServer(runId)
-      removeRun(runId)
+      removeFolderUploadRun(runId)
+      setReportRunId((open) => (open === runId ? null : open))
     },
-    [dismissOnServer, removeRun],
+    [dismissOnServer],
   )
 
   const retry = useCallback(
     async (runId: string): Promise<void> => {
       if (!bridge) return
-      patchRun(runId, { reportOpen: false, phase: 'uploading', failed: 0, failures: [] })
+      setReportRunId((open) => (open === runId ? null : open))
+      patchFolderUploadRun(runId, { phase: 'uploading', failed: 0, failures: [] })
       try {
         await bridge.retry({ runId })
       } catch {
         setNotice({ key: 'fuDlgStartFailed' })
-        removeRun(runId)
+        removeFolderUploadRun(runId)
       }
     },
-    [bridge, patchRun, removeRun],
+    [bridge],
   )
 
   const closeRun = useCallback(
     (runId: string) => {
-      const run = runsRef.current.find((item) => item.runId === runId)
+      const run = folderUploadRuns(bridge).find((item) => item.runId === runId)
       if (run && run.phase === 'done' && run.failed > 0) dismissOnServer(runId)
-      removeRun(runId)
+      removeFolderUploadRun(runId)
     },
-    [dismissOnServer, removeRun],
+    [bridge, dismissOnServer],
   )
 
   const clearNotice = useCallback(() => setNotice(null), [])

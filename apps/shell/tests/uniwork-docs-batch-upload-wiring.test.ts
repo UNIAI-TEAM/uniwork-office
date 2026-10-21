@@ -227,6 +227,7 @@ describe('the folder-upload channels', () => {
     expect(C.batchUploadRetry).toBe('uniwork-doc:batch-upload-retry')
     expect(C.batchUploadDismiss).toBe('uniwork-doc:batch-upload-dismiss')
     expect(C.batchUploadProgress).toBe('uniwork-doc:batch-upload-progress')
+    expect(C.batchUploadFoldersAvailable).toBe('uniwork-doc:batch-upload-folders-available')
   })
 
   it('registers a handler for each invoke channel', async () => {
@@ -238,11 +239,24 @@ describe('the folder-upload channels', () => {
       C.batchUploadCancel,
       C.batchUploadRetry,
       C.batchUploadDismiss,
+      C.batchUploadFoldersAvailable,
     ]) {
       expect(handlers.has(channel), channel).toBe(true)
     }
     // the progress channel is a push, never invoked
     expect(handlers.has(C.batchUploadProgress)).toBe(false)
+  })
+})
+
+describe('foldersAvailable', () => {
+  it('is true when the limits getter has a folder_upload block', async () => {
+    const { call } = await setup()
+    expect(await call(C.batchUploadFoldersAvailable)).toBe(true)
+  })
+
+  it('is false when the limits getter is not wired (an old server)', async () => {
+    const { call } = await setup(false)
+    expect(await call(C.batchUploadFoldersAvailable)).toBe(false)
   })
 })
 
