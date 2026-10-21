@@ -176,6 +176,19 @@ describe('DocList: the shared Documents table (UNI-2047 A2a)', () => {
       ;(el as HTMLElement).click()
     })
   }
+  // the language is the provider's first value: a new language is a fresh mount
+  const remountIn = async (
+    lang: 'vi' | 'en',
+    screen: DocListScreen,
+    rows: readonly DocumentsHomeTableRow[] = ROWS,
+    extra?: Partial<DocListProps>,
+  ) => {
+    await act(async () => {
+      root.unmount()
+    })
+    root = createRoot(host)
+    await mount(screen, rows, lang, extra)
+  }
   // the table measures itself when it mounts: a width is a fresh mount at that width
   const mountAtWidth = async (
     w: number,
@@ -257,7 +270,7 @@ describe('DocList: the shared Documents table (UNI-2047 A2a)', () => {
       ])
       expect(header('select')?.getAttribute('aria-label')).toBe('Chọn')
       expect(header('actions')?.getAttribute('aria-label')).toBe('Thao tác')
-      await mount('workspace', ROWS, 'en')
+      await remountIn('en', 'workspace')
       expect(words()).toEqual(['', 'Name', 'Access', 'Last edited by', 'Updated', 'Size', ''])
     })
 

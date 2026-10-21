@@ -357,11 +357,11 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.textContent).toContain('Báo cáo HĐQT Q4')
     expect(host.textContent).toContain('Hợp đồng & Pháp chế')
 
-    // 5. 5-column Tài liệu table: Tên | Truy cập | Người sửa gần nhất | Cập nhật | Thao tác (aria-label)
+    // 5. the shared Tài liệu table (UNI-2047): Chọn | Tên | Truy cập | Người sửa gần nhất | Cập nhật | Dung lượng | Thao tác
     const colHeaders = Array.from(
       host.querySelectorAll('.dh-doc-head > [role="columnheader"]'),
     ).map((el) => el.textContent?.trim())
-    expect(colHeaders.slice(0, 4)).toEqual(['Tên', 'Truy cập', 'Người sửa gần nhất', 'Cập nhật'])
+    expect(colHeaders.slice(1, 5)).toEqual(['Tên', 'Truy cập', 'Người sửa gần nhất', 'Cập nhật'])
     expect(host.querySelector('.dh-doc-head .dh-col-actions')?.getAttribute('aria-label')).toBe(
       'Thao tác',
     )
@@ -372,16 +372,17 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     const visBadges = Array.from(host.querySelectorAll('.dh-vis-badge')).map((el) =>
       el.textContent?.trim(),
     )
-    expect(visBadges).toEqual(['Riêng tư', 'Workspace'])
+    // a row with neither visibility nor share scope is never guessed shared: it reads Riêng tư
+    expect(visBadges).toEqual(['Riêng tư', 'Workspace', 'Riêng tư'])
     const levelSubs = Array.from(host.querySelectorAll('.dh-level-sub')).map((el) =>
       el.textContent?.trim(),
     )
-    expect(levelSubs).toEqual(['Bạn: Quản lý', 'Bạn: Chỉnh sửa'])
+    expect(levelSubs).toEqual(['Bạn: Quản lý', 'Bạn: Sửa'])
 
     const rows = Array.from(host.querySelectorAll('.dh-doc-row'))
     expect(rows).toHaveLength(3)
-    // Third document has neither visibility/myLevel nor updatedByName -> renders "—" in both cells
-    expect(rows[2]?.querySelector('.dh-cell-access')?.textContent?.trim()).toBe('—')
+    // Third document has neither visibility/myLevel nor updatedByName -> no level line, "—" for the editor
+    expect(rows[2]?.querySelector('.dh-level-sub')).toBeNull()
     expect(rows[2]?.querySelector('.dh-cell-person')?.textContent?.trim()).toBe('—')
 
     // Double-clicking a document row invokes onOpenDocument
@@ -506,8 +507,8 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.querySelector('.dh-cell-name .dh-doc-subpath')?.textContent?.trim()).toBe(
       'Phòng Tài chính',
     )
-    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('2 người')
-    expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Chỉnh sửa')
+    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Được chia sẻ')
+    expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Sửa')
 
     // Paging on shared-with-me forwards only { cursor } and appends documents
     api.uniworkListSharedWithMe.mockResolvedValueOnce(
@@ -546,8 +547,8 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       expect.objectContaining({ workspaceId: 'ws-1', format: 'xlsx', updatedBy: 'u-minh' }),
     )
     expect(host.textContent).toContain('Bản thảo hợp đồng.docx')
-    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('3 người')
-    expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Nhận xét')
+    expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Được chia sẻ')
+    expect(host.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Bình luận')
 
     // If shared-with-me is empty while filters are active from another sub-view, it shows uhEmptySharedWithMe (not uhEmptyFiltered)
     api.uniworkListSharedWithMe.mockResolvedValueOnce(ok({ documents: [], nextCursor: null }))
@@ -2199,8 +2200,8 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     canManage: true,
   })
 
-  // UNI-1958 row 1 (CS1-1): the Access cell is the web's share-scope badge
-  // (document-share-scope-badge.tsx shareScopeView), never guessed from `visibility`.
+  // UNI-1958 row 1 (CS1-1) -> UNI-2047: the Access cell is one of the shared rules' three pills
+  // (Riêng tư / Workspace / Được chia sẻ), never guessed from a missing `share_scope`.
   const scopedDoc = (
     id: string,
     shareScope: UniworkDocShareScope | undefined,
@@ -2220,76 +2221,75 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
   })
   const badgeOf = (id: string) =>
     host.querySelector(`.dh-doc-row[data-doc-id="${id}"] .dh-vis-badge`)?.textContent?.trim()
-  const SCOPE_CASES: [string, UniworkDocShareScope][] = [
-    ['users-1', { ...NO_SHARES, users: 1 }],
-    ['users-2', { ...NO_SHARES, users: 2 }],
-    ['home', { ...NO_SHARES, homeWorkspace: true }],
-    ['workspaces-1', { ...NO_SHARES, workspaces: 1 }],
-    ['workspaces-3', { ...NO_SHARES, workspaces: 3 }],
-    ['org', { ...NO_SHARES, organization: true }],
-    ['link', { ...NO_SHARES, publicLink: true }],
-    ['none', NO_SHARES],
-    ['two-axes', { ...NO_SHARES, users: 2, organization: true }],
-    ['home-users', { ...NO_SHARES, homeWorkspace: true, users: 1 }],
-    ['users-link', { ...NO_SHARES, users: 2, publicLink: true }],
+  const SCOPE_CASES: [string, UniworkDocShareScope, Partial<DocumentsHomeDoc>][] = [
+    ['users-1', { ...NO_SHARES, users: 1 }, {}],
+    ['users-2', { ...NO_SHARES, users: 2 }, {}],
+    ['home', { ...NO_SHARES, homeWorkspace: true }, { visibility: 'workspace' }],
+    ['workspaces-1', { ...NO_SHARES, workspaces: 1 }, {}],
+    ['workspaces-3', { ...NO_SHARES, workspaces: 3 }, {}],
+    ['org', { ...NO_SHARES, organization: true }, {}],
+    ['link', { ...NO_SHARES, publicLink: true }, {}],
+    ['none', NO_SHARES, {}],
+    ['two-axes', { ...NO_SHARES, users: 2, organization: true }, {}],
+    ['home-users', { ...NO_SHARES, homeWorkspace: true, users: 1 }, { visibility: 'workspace' }],
+    ['users-link', { ...NO_SHARES, users: 2, publicLink: true }, {}],
   ]
 
-  it('UNI-1958 row 1: each share_scope shape reads like the web Access cell (vi)', async () => {
-    rootItems = SCOPE_CASES.map(([id, scope]) => scopedDoc(id, scope))
+  it('UNI-2047: each share_scope shape reads as one of the three Access pills (vi)', async () => {
+    rootItems = SCOPE_CASES.map(([id, scope, extra]) => scopedDoc(id, scope, extra))
     await mountHome('vi')
     expect(Object.fromEntries(SCOPE_CASES.map(([id]) => [id, badgeOf(id)]))).toEqual({
-      'users-1': '1 người',
-      'users-2': '2 người',
+      'users-1': 'Được chia sẻ',
+      'users-2': 'Được chia sẻ',
       home: 'Workspace',
-      'workspaces-1': '1 workspace',
-      'workspaces-3': '3 workspace',
-      org: 'Tổ chức',
-      link: 'Liên kết công khai',
+      'workspaces-1': 'Được chia sẻ',
+      'workspaces-3': 'Được chia sẻ',
+      org: 'Được chia sẻ',
+      // a live public link alone counts as shared (Advisor 2026-10-21)
+      link: 'Được chia sẻ',
       none: 'Riêng tư',
-      'two-axes': 'Nhiều phạm vi',
-      'home-users': 'Nhiều phạm vi',
-      'users-link': '2 người',
+      'two-axes': 'Được chia sẻ',
+      'home-users': 'Workspace',
+      'users-link': 'Được chia sẻ',
     })
   })
 
-  it('UNI-1958 row 1: each share_scope shape reads like the web Access cell (en, plural forms)', async () => {
-    rootItems = SCOPE_CASES.map(([id, scope]) => scopedDoc(id, scope))
+  it('UNI-2047: each share_scope shape reads as one of the three Access pills (en)', async () => {
+    rootItems = SCOPE_CASES.map(([id, scope, extra]) => scopedDoc(id, scope, extra))
     await mountHome('en')
     expect(Object.fromEntries(SCOPE_CASES.map(([id]) => [id, badgeOf(id)]))).toEqual({
-      'users-1': '1 person',
-      'users-2': '2 people',
+      'users-1': 'Shared',
+      'users-2': 'Shared',
       home: 'Workspace',
-      'workspaces-1': '1 workspace',
-      'workspaces-3': '3 workspaces',
-      org: 'Organization',
-      link: 'Public link',
+      'workspaces-1': 'Shared',
+      'workspaces-3': 'Shared',
+      org: 'Shared',
+      link: 'Shared',
       none: 'Private',
-      'two-axes': 'Multiple scopes',
-      'home-users': 'Multiple scopes',
-      'users-link': '2 people',
+      'two-axes': 'Shared',
+      'home-users': 'Workspace',
+      'users-link': 'Shared',
     })
   })
 
-  it('UNI-1958 row 1: a row without share_scope shows "—" for the scope and keeps the level, never "Riêng tư" (vi)', async () => {
+  it('UNI-2047: a row without share_scope reads Riêng tư (never guessed shared) and keeps the level (vi)', async () => {
     rootItems = [scopedDoc('no-scope', undefined)]
     await mountHome('vi')
     const cell = host.querySelector('.dh-doc-row[data-doc-id="no-scope"] .dh-cell-access')!
-    expect(cell.querySelector('.dh-vis-badge')).toBeNull()
-    expect(cell.querySelector('.dh-cell-empty')?.textContent?.trim()).toBe('—')
-    expect(cell.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Chỉnh sửa')
-    expect(cell.textContent).not.toContain('Riêng tư')
+    expect(cell.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Riêng tư')
+    expect(cell.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Sửa')
   })
 
-  it('UNI-1958 row 1: a restricted document shared with two people reads "2 người" (vi) / "2 people" (en), not "Riêng tư"', async () => {
+  it('UNI-2047: a restricted document shared with two people reads "Được chia sẻ" (vi) / "Shared" (en)', async () => {
     rootItems = [restrictedDoc()]
     await mountHome('vi')
-    expect(badgeOf('doc-restricted')).toBe('2 người')
+    expect(badgeOf('doc-restricted')).toBe('Được chia sẻ')
     await act(async () => {
       root.unmount()
     })
     root = createRoot(host)
     await mountHome('en')
-    expect(badgeOf('doc-restricted')).toBe('2 people')
+    expect(badgeOf('doc-restricted')).toBe('Shared')
   })
 
   it('UNI-1958 row 5: the doc-row archive action is the web "Chuyển vào thùng rác" (menu, confirm, announce)', async () => {
@@ -2429,18 +2429,13 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(/flex:\s*none/.test(blanket) || /flex:\s*none|flex-grow:\s*0/.test(scoped)).toBe(true)
   })
 
-  it('CSS keeps the scrolling column children unshrinkable and collapses the two lowest-priority columns below 1100px (VDH-4)', () => {
+  it('CSS keeps the scrolling column children unshrinkable; the columns hide by the table width, not a media query (VDH-4 -> UNI-2047)', () => {
     const css = docsHomeCss()
     // wrapped toolbar/quick-row content must never shrink below content size inside the scrolling column
     expect(cssBlock(css, '.dh-main > *')).toMatch(/flex:\s*none/)
-    // narrow width: hide Truy cập + Người sửa, keep Tên/Cập nhật/Thao tác
-    const media = css.match(/@media \(max-width: 1100px\) \{([\s\S]*?)\n\}/)?.[1] ?? ''
-    expect(media).not.toBe('')
-    for (const sel of ['.dh-col-access', '.dh-col-person', '.dh-cell-access', '.dh-cell-person']) {
-      expect(cssBlock(media, sel), sel).toMatch(/display:\s*none/)
-    }
-    // grid template re-declared for the three remaining columns
-    expect(cssBlock(media, '.dh-doc-row')).toMatch(/grid-template-columns/)
+    // the columns come from DocList (container width, inline grid tracks): no viewport rule hides them
+    expect(css).not.toMatch(/@media \(max-width: 1100px\) \{\s*\.dh-doc-table/)
+    expect(css).not.toMatch(/grid-mode/)
   })
 
   it('CSS raises flagged sub-4.5 texts to --text-secondary and tints the selected sub-nav item with --accent-text (VDH-5)', () => {
@@ -2684,7 +2679,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(fileRow!.querySelector('.dh-cell-access .dh-vis-badge')?.textContent?.trim()).toBe(
       'Workspace',
     )
-    expect(fileRow!.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Chỉnh sửa')
+    expect(fileRow!.querySelector('.dh-level-sub')?.textContent?.trim()).toBe('Bạn: Sửa')
   })
 
   it('keeps a recipient row without parentId at the open folder: Move starts at the open folder in the workspace subView, at the root otherwise (UNI-1975 FS1-3)', async () => {

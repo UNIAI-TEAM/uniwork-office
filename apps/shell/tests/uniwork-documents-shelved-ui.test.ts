@@ -187,8 +187,8 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
   }
 
   const row = (id: string) => host.querySelector<HTMLElement>(`.dh-doc-row[data-doc-id="${id}"]`)
-  const cells = (id: string) =>
-    Array.from(row(id)?.querySelectorAll<HTMLElement>('[role="cell"]') ?? [])
+  const cell = (id: string, col: string) =>
+    row(id)?.querySelector<HTMLElement>(`[role="cell"][data-col="${col}"]`)
 
   async function openMenu(id: string): Promise<HTMLButtonElement[]> {
     const kebab = row(id)!.querySelector<HTMLButtonElement>('.uw-row-menu-btn')
@@ -233,47 +233,50 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
     // not rendered at all: an author display:flex beats the hidden attribute, so `hidden` would still paint it
     expect(host.querySelector('.dh-filter-bar')).toBeNull()
     expect(host.querySelector('.dh-folders-section')).toBeNull()
-    expect(host.querySelector('.dh-shelved-sort')?.textContent?.trim()).toBe('Lưu trữ gần nhất')
+    // the fixed-sort label is gone: the headers sort (UNI-2047)
+    expect(host.querySelector('.dh-shelved-sort')).toBeNull()
 
     const heads = Array.from(
-      host.querySelectorAll<HTMLElement>('.dh-shelved-table [role="columnheader"]'),
+      host.querySelectorAll<HTMLElement>('.dh-doc-table [role="columnheader"]'),
     )
     expect(heads.map((h) => h.textContent?.trim())).toEqual([
+      '',
       'Tên',
+      'Lưu trữ',
       'Truy cập',
-      'Lưu trữ bởi',
-      'Lưu trữ lúc',
+      'Người sửa gần nhất',
+      'Cập nhật',
+      'Dung lượng',
       '',
     ])
-    expect(heads[4]!.getAttribute('aria-label')).toBe('Thao tác')
-    // server order (shelved_at DESC), folders as rows, no client re-sort
+    expect(heads[7]!.getAttribute('aria-label')).toBe('Thao tác')
+    // the shelf's own column is the sorted one, newest shelved first (folders are rows too)
+    expect(heads[2]!.getAttribute('aria-sort')).toBe('descending')
     expect(
       Array.from(host.querySelectorAll('.dh-doc-row')).map((r) => r.getAttribute('data-doc-id')),
     ).toEqual(['doc-a', 'fold-b', 'doc-child', 'page-c'])
   })
 
-  it('draws each cell as the web does: path line, audience, shelver (member / former / system), short date', async () => {
+  it('draws each cell on the shared table: path line, access pill, shelver (member / former / system), date', async () => {
     await mount()
     await openArchive()
-    const [nameA, accessA, byA, atA] = cells('doc-a')
-    expect(nameA!.textContent).toContain('Báo cáo năm.docx')
-    expect(nameA!.querySelector('.dh-shelved-path')?.textContent).toBe('Tài liệu (gốc)')
-    expect(accessA!.textContent?.trim()).toBe('Workspace')
-    expect(byA!.textContent?.trim()).toBe('Lan Nguyễn')
-    expect(atA!.textContent?.trim()).toBe('05/03/2025')
+    const name = (id: string) => cell(id, 'name')!
+    expect(name('doc-a').textContent).toContain('Báo cáo năm.docx')
+    expect(name('doc-a').querySelector('.dh-doc-subpath')?.textContent).toBe('Tài liệu (gốc)')
+    expect(cell('doc-a', 'access')!.querySelector('.dh-vis-badge')?.textContent).toBe('Workspace')
+    expect(cell('doc-a', 'shelved')!.textContent).toContain('Lan Nguyễn')
+    expect(cell('doc-a', 'shelved')!.textContent).toContain('05/03/2025')
 
-    const [, accessB, byB] = cells('fold-b')
-    // restricted is the web's "Riêng tư" with a lock
-    expect(accessB!.textContent?.trim()).toBe('Riêng tư')
-    expect(accessB!.querySelector('.dh-shelved-lock')).not.toBeNull()
-    expect(byB!.textContent?.trim()).toBe('Cựu thành viên')
+    // a restricted folder with no share scope is never guessed shared: Riêng tư
+    expect(cell('fold-b', 'access')!.querySelector('.dh-vis-badge')?.textContent).toBe('Riêng tư')
+    expect(cell('fold-b', 'shelved')!.textContent).toContain('Cựu thành viên')
+    // a shelved folder is a row that never browses: its title is no button
+    expect(name('fold-b').querySelector('button.dh-doc-open')).toBeNull()
+    expect(name('fold-b').querySelector('.dh-doc-title')?.textContent).toBe('Hồ sơ 2024')
 
-    const [nameChild, accessChild] = cells('doc-child')
-    expect(nameChild!.querySelector('.dh-shelved-path')?.textContent).toBe('Hồ sơ 2024')
-    expect(accessChild!.textContent?.trim()).toBe('—')
+    expect(name('doc-child').querySelector('.dh-doc-subpath')?.textContent).toBe('Hồ sơ 2024')
 
-    const [, , byC] = cells('page-c')
-    expect(byC!.textContent?.trim()).toBe('Hệ thống')
+    expect(cell('page-c', 'shelved')!.textContent).toContain('Hệ thống')
   })
 
   it('offers Bỏ lưu trữ only to rows the viewer manages (my_level manage or admin_scope)', async () => {
@@ -539,26 +542,26 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
       'Finished documents are put away here: kept forever, read-only, no comments. Unarchiving an item restores it as before. Anyone who can see an item still opens and finds it (labelled “Archived”). Archiving a folder archives the whole tree; it needs Manage access.',
     )
     const heads = Array.from(
-      host.querySelectorAll<HTMLElement>('.dh-shelved-table [role="columnheader"]'),
+      host.querySelectorAll<HTMLElement>('.dh-doc-table [role="columnheader"]'),
     )
     expect(heads.map((h) => h.textContent?.trim())).toEqual([
+      '',
       'Name',
+      'Archived',
       'Access',
-      'Archived by',
-      'Archived at',
+      'Last edited by',
+      'Updated',
+      'Size',
       '',
     ])
-    expect(host.querySelector('.dh-shelved-sort')?.textContent?.trim()).toBe(
-      'Archived most recently',
-    )
     expect(row('doc-a')!.querySelector('button.dh-shelved-unshelve')?.textContent?.trim()).toBe(
       'Unarchive',
     )
-    expect(cells('doc-a')[0]!.querySelector('.dh-shelved-path')?.textContent).toBe(
+    expect(cell('doc-a', 'name')!.querySelector('.dh-doc-subpath')?.textContent).toBe(
       'Documents (root)',
     )
-    expect(cells('fold-b')[2]!.textContent?.trim()).toBe('Former member')
-    expect(cells('page-c')[2]!.textContent?.trim()).toBe('System')
+    expect(cell('fold-b', 'shelved')!.textContent).toContain('Former member')
+    expect(cell('page-c', 'shelved')!.textContent).toContain('System')
     const items = await openMenu('doc-a')
     expect(items.map((i) => i.textContent?.trim())).toEqual(['Open', 'Unarchive', 'Move to trash'])
   })
