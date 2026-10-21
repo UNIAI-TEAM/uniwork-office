@@ -70,6 +70,8 @@ export type DocActionResult<T> =
       name?: string
       sizeBytes?: number
       maxBytes?: number
+      /** UNI-2047: the server throttled (429 / 503): the same call may be tried once more */
+      retryable?: boolean
       /** FD-11: the depth cap of a document_too_deep */ max?: number
       /** UNI-1959: the server has no route for this create (404 / 501): disable that kind */
       endpointMissing?: boolean

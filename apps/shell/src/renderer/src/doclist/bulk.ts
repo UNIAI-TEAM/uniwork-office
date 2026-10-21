@@ -26,7 +26,8 @@ export type BulkActionId = Extract<RowMenuActionId, 'restore' | 'unshelve' | 'sh
 // Rules board §3 order: the keep actions first, the delete entry last
 const BULK_ORDER: readonly BulkActionId[] = ['restore', 'unshelve', 'shelve', 'trash']
 
-export type BulkWorkResult = { ok: true } | { ok: false; error: string }
+/** `retryable`: main marked the failure a throttle (429 / 503); nothing else is worth a second call */
+export type BulkWorkResult = { ok: true } | { ok: false; error: string; retryable?: boolean }
 
 export interface BulkResult {
   total: number
@@ -42,11 +43,13 @@ export interface BulkOptions {
 }
 
 /**
- * main maps the server's 429 (and 503) to server_error (uniwork-docs/errors.ts); a
- * rate_limited code is accepted too, should the bridge ever carry it
+ * main maps the server's 429 (and 503) to server_error and marks it `retryable`
+ * (uniwork-docs/service.ts); a rate_limited code is accepted too, should the bridge ever carry
+ * it. Any other server_error may already have been applied: a second call would answer
+ * conflict / not_found and count the item as failed although it went through.
  */
-function isThrottled(error: string): boolean {
-  return error === 'rate_limited' || error === 'server_error'
+function isThrottled(outcome: { error: string; retryable?: boolean }): boolean {
+  return outcome.error === 'rate_limited' || outcome.retryable === true
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -76,7 +79,7 @@ export async function runBulk<T extends { id: string }>(
       const index = next++
       const item = items[index]!
       let outcome = await attempt(item, work)
-      if (!outcome.ok && isThrottled(outcome.error)) {
+      if (!outcome.ok && isThrottled(outcome)) {
         await sleep(RETRY_DELAY_MS)
         outcome = await attempt(item, work)
       }
@@ -150,7 +153,9 @@ export function bulkWorkFor(
   }
   return async (doc) => {
     const res = await call(doc.id)
-    return res.ok ? { ok: true } : { ok: false, error: res.error }
+    return res.ok
+      ? { ok: true }
+      : { ok: false, error: res.error, ...(res.retryable ? { retryable: true } : {}) }
   }
 }
 
