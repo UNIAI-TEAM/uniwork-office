@@ -481,10 +481,13 @@ test('view-only without the save grant (vi, light)', async ({ page }) => {
   await shown(frame)
   await expect(frame.locator('.qa-btn').first()).toBeVisible()
   // no Save / Save As in the quick-access bar; Ctrl+S saves nothing
-  // (the label carries the table's chord, Ctrl+S in a browser on Windows/Linux)
+  // (the Save button is named "Lưu" in this locale and announces its chord, Control+S / Meta+S,
+  // in aria-keyshortcuts; neither may exist)
   expect(
     await frame
-      .locator('button.qa-btn[aria-label*="Ctrl+S"], button.qa-btn[aria-label*="⌘S"]')
+      .locator(
+        'button.qa-btn[aria-label="Lưu"], button.qa-btn[aria-keyshortcuts~="Control+S"], button.qa-btn[aria-keyshortcuts~="Meta+S"]',
+      )
       .count(),
   ).toBe(0)
   // the grid itself is locked (SH3): typing starts no editor and changes nothing, so the host never
