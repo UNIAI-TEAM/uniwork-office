@@ -31,4 +31,8 @@ export const ar = {
   usErrAlreadyBound: 'علامة التبويب هذه مرتبطة بالفعل بمستند في UniWork. احفظ كالمعتاد.',
   usErrNotFound:
     'تعذر العثور على الملف المراد حفظه أو المجلد المحدد. اختر مكان الحفظ مجددًا ثم أعد المحاولة.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

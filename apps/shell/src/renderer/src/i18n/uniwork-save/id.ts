@@ -33,4 +33,8 @@ export const id = {
   usErrAlreadyBound: 'Tab ini sudah ditautkan ke dokumen UniWork. Simpan seperti biasa.',
   usErrNotFound:
     'File yang akan disimpan atau folder yang dipilih tidak ditemukan. Pilih lokasi simpan lagi, lalu coba lagi.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

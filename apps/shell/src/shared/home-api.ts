@@ -342,6 +342,11 @@ export interface UniworkDocSummary {
   shareSummary?: UniworkDocShareSummary
   /** favorites rows: when the caller starred the row (`favorited_at`) */
   favoritedAt?: string
+  /**
+   * UNI-2047 APP-SHARE-DIALOG: the server's `owner_kind` when the document belongs to another
+   * module (a work product); absent for an ordinary document. Such a row is never shared here.
+   */
+  ownerKind?: string
 }
 
 /** UNI-2047: the server's `updated_by_user`; `avatarUrl` is absolute http(s) and loads with no auth header */
@@ -1518,6 +1523,12 @@ export interface HomeApi {
   uniworkRenameDocument(
     documentId: string,
     name: string,
+    /**
+     * SD-D2: the web's first-save share. `shareWithWorkspace` adds `visibility: "workspace"` to the
+     * same PATCH (manager of a not-yet-shared document only; main applies the rule), and an
+     * unchanged title still sends it
+     */
+    options?: { shareWithWorkspace?: boolean },
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: archive a document (never a hard delete) */
   uniworkArchiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
@@ -2285,6 +2296,40 @@ export const UNIWORK_DOC_CHANNELS = {
   favoriteDocument: 'uniwork-doc:favorite-document',
   /** invoke(documentId) -> Bỏ gắn sao (UNI-2047 B6; idempotent) */
   unfavoriteDocument: 'uniwork-doc:unfavorite-document',
+} as const
+
+/**
+ * UNI-2047 APP-SHARE-DIALOG: the Share dialog's channels (handlers in
+ * main/uniwork-docs/share-service.ts, wired in wiring.ts; the renderer-facing
+ * types are shared/share-api.ts). Every channel answers a `ShareResult`.
+ */
+export const UNIWORK_SHARE_CHANNELS = {
+  /** invoke(documentId) -> the access overview (`GET /documents/{id}/shares`) */
+  get: 'uniwork-share:get',
+  /** invoke({documentId, items, dryRun?}) -> add / change / remove access, or its preview */
+  update: 'uniwork-share:update',
+  /** invoke({documentId, q?, cursor?, limit?}) -> people / workspaces / organization to share with */
+  candidates: 'uniwork-share:candidates',
+  /** invoke({documentId, expiresInDays?}) -> a new public link (token + url once) */
+  linkCreate: 'uniwork-share:link-create',
+  /** invoke({documentId, linkId}) -> revoke a public link */
+  linkRevoke: 'uniwork-share:link-revoke',
+  /** invoke() -> the selected organization's public-links policy (read only) */
+  settings: 'uniwork-share:settings',
+  /** invoke(documentId) -> the pending access requests (null value = no such route) */
+  requests: 'uniwork-share:requests',
+  /** invoke({documentId, requestId, level?}) -> approve a request */
+  requestApprove: 'uniwork-share:request-approve',
+  /** invoke({documentId, requestId}) -> decline a request */
+  requestDecline: 'uniwork-share:request-decline',
+  /** invoke(plan) -> share several documents the same way, one after another */
+  bulk: 'uniwork-share:bulk',
+  /** invoke({documentId, reason}) -> open a 24 h emergency (break-glass) grant */
+  breakGlassGrant: 'uniwork-share:break-glass-grant',
+  /** invoke({documentId, grantId}) -> end one emergency grant */
+  breakGlassRevoke: 'uniwork-share:break-glass-revoke',
+  /** invoke({cursor?, limit?}) -> one page of the selected organization's members */
+  members: 'uniwork-share:members',
 } as const
 
 export const PROJECT_CHANNELS = {

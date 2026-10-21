@@ -125,6 +125,7 @@ interface ActionsBridge {
   uniworkRenameDocument?(
     documentId: string,
     name: string,
+    options?: { shareWithWorkspace?: boolean },
   ): Promise<DocActionResult<UniworkDocSummary>>
   uniworkArchiveDocument?(documentId: string): Promise<DocActionResult<unknown>>
   uniworkRestoreDocument?(documentId: string): Promise<DocActionResult<unknown>>
@@ -177,8 +178,14 @@ export function onUploadProgress(cb: (event: UploadProgressEvent) => void): () =
 export function renameDocument(
   documentId: string,
   name: string,
+  options?: { shareWithWorkspace?: boolean },
 ): Promise<DocActionResult<UniworkDocSummary>> {
-  return actions().uniworkRenameDocument?.(documentId, name) ?? Promise.resolve(unavailable)
+  const api = actions()
+  if (!api.uniworkRenameDocument) return Promise.resolve(unavailable)
+  // no third argument unless asked for: callers (and their mocks) of a plain rename see two
+  return options
+    ? api.uniworkRenameDocument(documentId, name, options)
+    : api.uniworkRenameDocument(documentId, name)
 }
 
 export function archiveDocument(documentId: string): Promise<DocActionResult<unknown>> {

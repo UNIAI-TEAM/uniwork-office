@@ -84,6 +84,8 @@ export interface DocRowProps {
    * knows it is starred (only the Starred list carries the star time): never a dead toggle.
    */
   onUnstar?: (doc: DocumentsHomeDoc) => void
+  /** the Access cell opens the Share dialog for this row (drawn as a button only on a row the gate lets share) */
+  onShare?: (doc: DocumentsHomeDoc) => void
   menu: FolderMenuItem[]
   menuOpen: boolean
   onMenuOpenChange: (open: boolean) => void
@@ -122,6 +124,7 @@ export function DocRow({
   rename,
   actions,
   onUnstar,
+  onShare,
   menu,
   menuOpen,
   onMenuOpenChange,
@@ -221,7 +224,7 @@ export function DocRow({
       case 'access':
         return (
           <Cell key={col} col={col}>
-            <AccessContent doc={doc} />
+            <AccessContent doc={doc} onShare={onShare} />
           </Cell>
         )
       case 'editor':

@@ -141,6 +141,8 @@ interface Call {
 function fakeServer(
   options: {
     myLevel?: string
+    /** the document's `visibility` (absent = the server sent none) */
+    visibility?: string
     bytes?: Uint8Array
     title?: string
     /** a 409 `conflict` on create/rename (never a name error: duplicate names are allowed) */
@@ -271,6 +273,7 @@ function fakeServer(
     title: options.title ?? 'Q4 plan.docx',
     kind: options.kind ?? 'file',
     myLevel: options.myLevel ?? 'manage',
+    visibility: options.visibility,
     bytes: options.bytes ?? enc('v1 bytes'),
     archived: false,
     revision: 41,
@@ -321,6 +324,7 @@ function fakeServer(
     revision: String(state.revision),
     current_version: 1,
     ...(options.omitMyLevel ? {} : { my_level: state.myLevel }),
+    ...(state.visibility && id === DOC ? { visibility: state.visibility } : {}),
     ...(state.archived && id === DOC ? { archived_at: '2026-10-13T09:00:00Z' } : {}),
     file: {
       file_id: `f_${id}`,
@@ -593,7 +597,11 @@ function fakeServer(
     }
     // rename (PATCH)
     if (u.pathname === `/api/v1/documents/${DOC}` && call.method === 'PATCH') {
-      const body = JSON.parse(String(init.body)) as { revision: string; title: string }
+      const body = JSON.parse(String(init.body)) as {
+        revision: string
+        title: string
+        visibility?: string
+      }
       call.body = body
       if (options.nameTaken) return envelope(409, 'conflict')
       if (options.nameRefused) return envelope(400, 'invalid_request')
@@ -614,6 +622,7 @@ function fakeServer(
         })
       }
       state.title = body.title
+      if (body.visibility) state.visibility = body.visibility
       state.revision += 1
       return json(200, { document: docJson(DOC) })
     }
@@ -2611,6 +2620,90 @@ describe('rename, archive and restore', () => {
     expect(ctx.pathRenames).toContainEqual({ oldPath: before, newPath: after })
     // a rename this service made is not re-announced to the renderer
     expect(ctx.renamed).toHaveLength(0)
+  })
+
+  describe('SD-D2: the web first-save share rides the rename PATCH (visibility: workspace)', () => {
+    const patchBody = (server: ReturnType<typeof fakeServer>) =>
+      server.calls.find((c) => c.method === 'PATCH')?.body
+
+    it('a manager of a private document sends title and visibility in one PATCH', async () => {
+      const server = fakeServer({ myLevel: 'manage', visibility: 'private' })
+      const ctx = setup(server)
+      const result = await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx', {
+        shareWithWorkspace: true,
+      })
+      expect(result.ok).toBe(true)
+      expect(server.calls.filter((c) => c.method === 'PATCH')).toHaveLength(1)
+      expect(patchBody(server)).toEqual({
+        revision: '41',
+        title: 'Q4 plan v2.docx',
+        visibility: 'workspace',
+      })
+    })
+
+    it('an unchanged title still sends the PATCH when sharing, and touches no working copy', async () => {
+      const server = fakeServer({ myLevel: 'manage' })
+      const ctx = setup(server)
+      const opened = await ctx.service.openDocument(DOC)
+      if (!opened.ok) throw new Error(opened.error)
+      const result = await ctx.service.renameDocument(DOC, 'Q4 plan.docx', {
+        shareWithWorkspace: true,
+      })
+      expect(result.ok).toBe(true)
+      expect(patchBody(server)).toEqual({
+        revision: '41',
+        title: 'Q4 plan.docx',
+        visibility: 'workspace',
+      })
+      expect(ctx.pathRenames).toEqual([])
+      expect(copiesIn(DOC)).toEqual(['Q4 plan.docx'])
+    })
+
+    it('an unchanged title without the share still sends nothing', async () => {
+      const server = fakeServer({ myLevel: 'manage' })
+      const ctx = setup(server)
+      const result = await ctx.service.renameDocument(DOC, 'Q4 plan.docx')
+      expect(result.ok).toBe(true)
+      expect(server.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0)
+    })
+
+    it('web rule: edit level never sends visibility (the rename still goes out)', async () => {
+      const server = fakeServer({ myLevel: 'edit' })
+      const ctx = setup(server)
+      const result = await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx', {
+        shareWithWorkspace: true,
+      })
+      expect(result.ok).toBe(true)
+      expect(patchBody(server)).toEqual({ revision: '41', title: 'Q4 plan v2.docx' })
+    })
+
+    it('web rule: an already workspace-shared document never sends visibility again', async () => {
+      const server = fakeServer({ myLevel: 'manage', visibility: 'workspace' })
+      const ctx = setup(server)
+      const result = await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx', {
+        shareWithWorkspace: true,
+      })
+      expect(result.ok).toBe(true)
+      expect(patchBody(server)).toEqual({ revision: '41', title: 'Q4 plan v2.docx' })
+    })
+
+    it('only a literal true counts: junk from a renderer is ignored', async () => {
+      const server = fakeServer({ myLevel: 'manage' })
+      const ctx = setup(server)
+      await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx', {
+        shareWithWorkspace: 'yes' as unknown as boolean,
+      })
+      expect(patchBody(server)).toEqual({ revision: '41', title: 'Q4 plan v2.docx' })
+    })
+
+    it('a refused PATCH is a failed share: forbidden maps like any rename refusal', async () => {
+      const server = fakeServer({ myLevel: 'manage', myFolderLocked: true })
+      const ctx = setup(server)
+      const result = await ctx.service.renameDocument(DOC, 'Q4 plan v2.docx', {
+        shareWithWorkspace: true,
+      })
+      expect(result).toEqual({ ok: false, error: 'my_folder_locked' })
+    })
   })
 
   it('refuses an empty name before any request', async () => {
