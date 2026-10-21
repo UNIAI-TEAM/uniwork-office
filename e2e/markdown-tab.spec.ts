@@ -233,7 +233,7 @@ test.describe('markdown editor', () => {
       // quick-access row: save button writes the file, undo reverts the mark
       const qaRow = editorPage.locator('.ribbon-tabs')
       const saveButton = qaRow.locator('.qa-btn').first()
-      const undoButton = qaRow.getByLabel(/^Undo/)
+      const undoButton = qaRow.getByLabel(/^Undo$/)
       await saveButton.click()
       await expect(editorPage.locator('.status-save')).toHaveText(/Saved/)
       const saved = await readFile(mdPath, 'utf8')
