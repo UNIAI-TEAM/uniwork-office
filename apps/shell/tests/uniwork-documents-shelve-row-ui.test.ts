@@ -165,13 +165,13 @@ describe('UNI-1961 live-row Lưu trữ (shelve) in the Documents home', () => {
     const shelve = action(fileItems, 'shelve')
     expect(shelve?.textContent?.trim()).toBe('Lưu trữ')
     // F2: the trash command beside it is a different command with its own words
-    expect(action(fileItems, 'archive')?.textContent?.trim()).toBe('Chuyển vào thùng rác')
+    expect(action(fileItems, 'trash')?.textContent?.trim()).toBe('Chuyển vào thùng rác')
     expect(fileItems.map((i) => i.textContent?.trim()).filter((l) => l === 'Lưu trữ')).toHaveLength(
       1,
     )
     const ids = fileItems.map((i) => i.getAttribute('data-folder-action'))
     expect(ids.indexOf('shelve')).toBeGreaterThan(-1)
-    expect(ids.indexOf('shelve')).toBeLessThan(ids.indexOf('archive'))
+    expect(ids.indexOf('shelve')).toBeLessThan(ids.indexOf('trash'))
     await act(async () => {
       document.body.click()
     })

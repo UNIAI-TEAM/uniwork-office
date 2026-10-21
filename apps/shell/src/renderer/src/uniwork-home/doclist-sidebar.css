@@ -1,0 +1,93 @@
+/* UNI-2047 sidebar: the "Từ nơi khác" section of the Documents sidebar (web documents-sidebar.tsx),
+   semantic tokens only, both themes. The rows reuse .dh-nav-item; this file draws the module tile. */
+
+/* RV-14 / VS-9: the whole Documents sidebar (sub-nav, folder tree, sources section) is one scrolling
+   column, as the web's documents-sidebar.tsx (one overflow-y-auto nav). The wrap is the only scroller:
+   at the minimum window height the user scrolls past the nav to the tree and the sources, which keep
+   a normal-height viewport instead of the sliver a scroller below a fixed nav left them. Nothing
+   inside it scrolls or shrinks on its own (documents-home.css gives the tree its own flex / scroller,
+   which would squeeze it to nothing here). At normal heights nothing overflows, so no bar shows. */
+.dh-sidebar-wrap {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.dh-sidebar-wrap > .dh-subnav,
+.dh-sidebar-wrap > .dh-sidebar-folders {
+  flex: none;
+}
+
+.dh-sidebar-wrap .dh-sidebar-tree {
+  flex: none;
+  overflow: visible;
+}
+
+.dl-side-sources {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px; /* + the wrap's 4px gap: the 6px this block had under the tree's old scroller */
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* the web's IconTile size xs, variant solid: a 20px square, 5px corners, a 12px glyph on the
+   module's saturated fill. The app's tint tokens carry the saturated colour as `-fg`; the glyph
+   reads --surface on it (white in light, the dark surface on the lighter dark-theme fill). */
+.dl-side-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--surface);
+}
+
+.dl-side-tile svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* RV-13: the rows are .nav-item rows, and home.css colours every svg inside one (.nav-item svg grey,
+   :hover --text, .active --accent). One rule per state, each more specific than its home.css
+   twin, keeps the glyph on its tile tone at rest, on hover and on the current row. */
+.nav-item .dl-side-tile svg,
+.nav-item:hover .dl-side-tile svg,
+.nav-item.active .dl-side-tile svg {
+  color: var(--surface);
+}
+
+.dl-side-tile.tone-blue {
+  background: var(--tint-blue-fg);
+}
+
+.dl-side-tile.tone-violet {
+  background: var(--tint-violet-fg);
+}
+
+.dl-side-tile.tone-orange {
+  background: var(--tint-orange-fg);
+}
+
+.dl-side-tile.tone-green {
+  background: var(--tint-green-fg);
+}
+
+.dl-side-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* VS-8: with the root row hidden the My Folder stand-in is a top-level row, not a child of the root.
+   documents-home.css keeps its old child indent (18px, written when it sat under the root row); here
+   it takes the 4px a level-1 tree row draws inline, so its twisty slot, glyph and label line up with
+   the folders below it. The folder picker and the Save dialog (root row visible) never render it. */
+.dh-sidebar-tree .dh-my-folder-standin {
+  padding-inline-start: 4px;
+}

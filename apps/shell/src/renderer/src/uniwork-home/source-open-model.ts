@@ -1,4 +1,43 @@
 import type { UniworkDocErrorCode, UniworkSourceFile } from '../../../shared/home-api'
+import type { StringKey, TFunc } from '../locale'
+
+/**
+ * The sub-line wording for the modules this build has a name for (the web's Chat, Tasks, Meetings,
+ * Email); a new one has none. These are whole phrases ("Sent in Chat", "From a task"), not the plural
+ * nav/filter labels (`uwSourceOrigin*`), which read wrong after "Sent in".
+ */
+export function sourceOriginKeyOf(origin: string): StringKey | null {
+  switch (origin) {
+    case 'chat':
+      return 'dlSourceOriginChat'
+    case 'task':
+      return 'dlSourceOriginTask'
+    case 'meeting':
+      return 'dlSourceOriginMeeting'
+    case 'email':
+      return 'dlSourceOriginEmail'
+    default:
+      return null
+  }
+}
+
+/**
+ * The line under a source file's name on Từ nơi khác: where it came from, "Sent in Chat · #channel"
+ * (V-STATES F-04, VS-3), from the row's module and its parent's title. Only a `chat_channel` parent
+ * gets a "#" (unless its title already has one): a `chat_dm` is a person or a group room. A parent
+ * without a title leaves the module alone; a module this build has no name for shows its parent
+ * only; neither shows nothing.
+ */
+export function sourceOriginLine(
+  source: Pick<UniworkSourceFile, 'source' | 'parent'>,
+  t: TFunc,
+): string | null {
+  const key = sourceOriginKeyOf(source.source)
+  const title = source.parent.title.trim()
+  const parent =
+    source.parent.kind === 'chat_channel' && title && !title.startsWith('#') ? `#${title}` : title
+  return [key ? t(key) : '', parent].filter(Boolean).join(' · ') || null
+}
 
 /**
  * UNI-1993 (UW-SOURCE-RO): can a source row open view only in the app? The server decides first

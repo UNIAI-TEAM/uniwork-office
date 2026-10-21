@@ -20,6 +20,7 @@ import type {
 import type { TabSummary } from '../src/shared/tabs-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { en as enDocs } from '../src/renderer/src/i18n/uniwork-documents/en'
+import { formatListDate } from '../src/renderer/src/doclist/format'
 import { UniworkOpenCard } from '../src/renderer/src/UniworkOpenCard'
 import {
   UniworkNotice,
@@ -248,10 +249,36 @@ describe('picker dialog', () => {
       enDocs.uwPickHiddenFormats.replace('{count}', '1'),
     )
     expect(rows()[0]!.getAttribute('aria-disabled')).toBe('false')
-    expect(rows()[0]!.textContent).toMatch(/Updated/)
+    // UNI-2047 B2: the compact picker columns replace the "Updated 10:42 by Linh" line
+    expect(rows()[0]!.textContent).not.toMatch(/Updated/)
+    expect(rows()[0]!.querySelector('[data-col="updated"]')!.textContent).toBe(
+      formatListDate('2026-04-02T09:30:00', new Date(), 'en-US'),
+    )
     // the highlight starts on the first document that can be opened
     expect(rows()[0]!.getAttribute('aria-selected')).toBe('true')
     expect(search().getAttribute('aria-activedescendant')).toBe(rows()[0]!.id)
+  })
+
+  it('lists on the compact picker columns: Name, Last edited by, Updated; nothing to select or sort (UNI-2047 B2)', async () => {
+    api.uniworkListDocuments.mockResolvedValue(
+      page([
+        { ...doc('b', 'Plan.docx', 'docx'), updatedByName: 'Linh Tran' },
+        doc('c', 'Sheet.xlsx', 'xlsx'),
+      ]),
+    )
+    await openPicker()
+    expect(host.querySelector('.dh-picker-head')!.textContent).toBe('NameLast edited byUpdated')
+    expect(rows()[0]!.querySelector('[data-col="editor"] .dh-avatar')!.textContent).toBe('LT')
+    expect(rows()[0]!.querySelector('[data-col="editor"] .dh-person-name')!.textContent).toBe(
+      'Linh Tran',
+    )
+    // a row that names no editor reads "—", never a made-up name
+    expect(rows()[1]!.querySelector('[data-col="editor"]')!.textContent).toBe('—')
+    expect(host.querySelector('.uw-pick-body input[type="checkbox"]')).toBeNull()
+    expect(host.querySelector('.uw-pick-body [aria-sort], .uw-pick-body .dh-sort-head')).toBeNull()
+    // still a listbox of options, one tab stop through the search box's activedescendant
+    expect(host.querySelector('#uw-pick-list')!.getAttribute('role')).toBe('listbox')
+    expect(rows().every((r) => r.getAttribute('role') === 'option')).toBe(true)
   })
 
   it('arrow keys move over the listed rows and Enter opens the highlighted one, then closes', async () => {

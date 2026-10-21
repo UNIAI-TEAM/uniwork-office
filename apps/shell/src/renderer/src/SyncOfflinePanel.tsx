@@ -394,26 +394,28 @@ export function SyncOfflinePanel({
       {offline.rows.length === 0 ? (
         <p className="sc-empty">{t('uwOfflineEmpty')}</p>
       ) : (
-        <table className="sc-table">
-          <caption className="sc-caption">{t('uwSyncTabOffline')}</caption>
-          <thead>
-            <tr>
-              <th scope="col" className="sc-col sc-col-doc">
-                {t('uwSyncColDoc')}
-              </th>
-              <th scope="col" className="sc-col sc-col-state">
-                {t('uwSyncColState')}
-              </th>
-              <th scope="col" className="sc-col sc-col-detail">
-                {t('uwSyncColDetail')}
-              </th>
-              <th scope="col" className="sc-col sc-col-actions">
-                <span className="sc-col-hidden">{t('uwSyncColActions')}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>{offline.rows.map(renderRow)}</tbody>
-        </table>
+        <div className="sc-table-wrap">
+          <table className="sc-table">
+            <caption className="sc-caption">{t('uwSyncTabOffline')}</caption>
+            <thead>
+              <tr>
+                <th scope="col" className="sc-col sc-col-doc">
+                  {t('uwSyncColDoc')}
+                </th>
+                <th scope="col" className="sc-col sc-col-state">
+                  {t('uwSyncColState')}
+                </th>
+                <th scope="col" className="sc-col sc-col-detail">
+                  {t('uwSyncColDetail')}
+                </th>
+                <th scope="col" className="sc-col sc-col-actions">
+                  <span className="sc-col-hidden">{t('uwSyncColActions')}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>{offline.rows.map(renderRow)}</tbody>
+          </table>
+        </div>
       )}
       {adding && (
         <UniworkOpenDialog

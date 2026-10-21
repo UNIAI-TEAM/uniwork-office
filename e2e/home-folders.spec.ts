@@ -11,7 +11,14 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { launchShell, closeAndSaveVideo, screenshotPath } from './helpers'
+import {
+  launchShell,
+  closeAndSaveVideo,
+  screenshotPath,
+  homeRow,
+  homeRowName,
+  rowMenuAction,
+} from './helpers'
 
 /**
  * Home "Folders" panel: the tree over the default save folder, the folder
@@ -61,7 +68,7 @@ test.describe('home folders panel', () => {
       // select Contracts → active tree row + its file
       await tree.locator('.tree-name', { hasText: 'Contracts' }).click()
       await expect(tree.locator('.tree-row.active .tree-name')).toHaveText('Contracts')
-      await expect(page.locator('.recent-list .recent-name', { hasText: 'deal.md' })).toBeVisible()
+      await expect(homeRowName(page, 'deal.md')).toBeVisible()
       await page.screenshot({ path: screenshotPath('home-folders-contracts') })
 
       // new folder from the sidebar header: lands under the selected folder
@@ -69,17 +76,12 @@ test.describe('home folders panel', () => {
       const input = page.locator('.folder-panel .tree .folder-rename-input')
       await input.fill('Drafts')
       await input.press('Enter')
-      await expect(
-        page.locator('.recent-list .folder-item .recent-name', { hasText: 'Drafts' }),
-      ).toBeVisible()
+      await expect(homeRow(page, 'Drafts').locator('.dh-folder-icon')).toBeVisible()
       expect(existsSync(join(root, 'Clients', 'Contracts', 'Drafts'))).toBe(true)
 
       // move deal.md → Personal through the picker
-      const dealRow = page.locator('.recent-row', {
-        has: page.locator('.recent-name', { hasText: 'deal.md' }),
-      })
-      await dealRow.locator('.more-btn').click()
-      await page.locator('.row-menu button', { hasText: 'Move to folder' }).click()
+      await homeRow(page, 'deal.md').locator('[data-folder-menu-for]').click()
+      await rowMenuAction(page, 'move').click()
       const picker = page.locator('.picker-modal')
       await expect(picker).toBeVisible()
       await picker
@@ -87,37 +89,29 @@ test.describe('home folders panel', () => {
         .click()
       await picker.locator('.btn-primary').click()
       await expect(picker).toHaveCount(0)
-      await expect(page.locator('.recent-list .recent-name', { hasText: 'deal.md' })).toHaveCount(0)
+      await expect(homeRowName(page, 'deal.md')).toHaveCount(0)
       expect(existsSync(join(root, 'Personal', 'deal.md'))).toBe(true)
       expect(existsSync(join(root, 'Clients', 'Contracts', 'deal.md'))).toBe(false)
 
       // rename Drafts → Final from the sub-folder row menu
-      const draftsRow = page.locator('.recent-row', {
-        has: page.locator('.recent-name', { hasText: 'Drafts' }),
-      })
-      await draftsRow.locator('.more-btn').click()
-      await page.locator('.folder-menu button', { hasText: 'Rename' }).click()
-      const renameInput = page.locator('.recent-list .rename-input')
+      await homeRow(page, 'Drafts').locator('[data-folder-menu-for]').click()
+      await rowMenuAction(page, 'rename').click()
+      const renameInput = page.locator('.dh-doc-table .uw-rename-input')
       await renameInput.fill('Final')
       await renameInput.press('Enter')
-      await expect(
-        page.locator('.recent-list .folder-item .recent-name', { hasText: 'Final' }),
-      ).toBeVisible()
+      await expect(homeRow(page, 'Final').locator('.dh-folder-icon')).toBeVisible()
       expect(existsSync(join(root, 'Clients', 'Contracts', 'Final'))).toBe(true)
 
       // delete Final (confirm dialog → trash)
-      const finalRow = page.locator('.recent-row', {
-        has: page.locator('.recent-name', { hasText: 'Final' }),
-      })
-      await finalRow.locator('.more-btn').click()
-      await page.locator('.folder-menu button.danger').click()
+      await homeRow(page, 'Final').locator('[data-folder-menu-for]').click()
+      await rowMenuAction(page, 'delete').click()
       await page.locator('.modal .btn-danger').click()
-      await expect(page.locator('.recent-list .recent-name', { hasText: 'Final' })).toHaveCount(0)
+      await expect(homeRowName(page, 'Final')).toHaveCount(0)
       expect(existsSync(join(root, 'Clients', 'Contracts', 'Final'))).toBe(false)
 
       // Personal now lists the moved file; the Recent view shows its location
       await tree.locator('.tree-name', { hasText: 'Personal' }).click()
-      await expect(page.locator('.recent-list .recent-name', { hasText: 'deal.md' })).toBeVisible()
+      await expect(homeRowName(page, 'deal.md')).toBeVisible()
       await page.screenshot({ path: screenshotPath('home-folders-personal') })
     } finally {
       await closeAndSaveVideo(launched, 'home-folders')
@@ -145,17 +139,15 @@ test.describe('home folders panel', () => {
       await expect(rootRows.nth(1)).toHaveAttribute('aria-expanded', 'true')
       await expect(tree.locator('.tree-name', { hasText: 'Projects' })).toBeVisible()
       await tree.locator('.tree-name', { hasText: 'Projects' }).click()
-      await expect(page.locator('.recent-list .recent-name', { hasText: 'plan.md' })).toBeVisible()
-      await expect(page.locator('.recent-list .recent-name', { hasText: 'Alpha' })).toBeVisible()
+      await expect(homeRowName(page, 'plan.md')).toBeVisible()
+      await expect(homeRowName(page, 'Alpha')).toBeVisible()
 
       // edits happen where the folder really is
       await page.locator('.folder-new-btn').click()
       const input = page.locator('.folder-panel .tree .folder-rename-input')
       await input.fill('Beta')
       await input.press('Enter')
-      await expect(
-        page.locator('.recent-list .folder-item .recent-name', { hasText: 'Beta' }),
-      ).toBeVisible()
+      await expect(homeRow(page, 'Beta').locator('.dh-folder-icon')).toBeVisible()
       expect(existsSync(join(extra, 'Projects', 'Beta'))).toBe(true)
       await page.screenshot({ path: screenshotPath('home-folders-extra-root') })
 
@@ -164,7 +156,7 @@ test.describe('home folders panel', () => {
       await rootRows.nth(1).locator('.folder-more-btn').click()
       await page.locator('.folder-menu button', { hasText: 'Remove from list' }).click()
       await expect(rootRows).toHaveCount(1)
-      await expect(page.locator('.recent-list .recent-name', { hasText: 'plan.md' })).toHaveCount(0)
+      await expect(homeRowName(page, 'plan.md')).toHaveCount(0)
       await expect
         .poll(() => {
           const settings = JSON.parse(readFileSync(join(userDataDir, 'app-settings.json'), 'utf8'))

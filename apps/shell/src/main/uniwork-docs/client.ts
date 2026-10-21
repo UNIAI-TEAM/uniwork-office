@@ -1,11 +1,11 @@
 import type {
-  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkDocNewFormat,
   UniworkDocSummary,
   UniworkFolderNode,
   UniworkListFilters,
+  UniworkListSort,
   UniworkSourceListPage,
   UniworkSourceListQuery,
   UniworkWorkspaceRef,
@@ -19,6 +19,7 @@ import {
   parseCommit,
   parseCommitLookup,
   parseDetail,
+  parseDocumentFavorite,
   parseDocumentList,
   parseDocumentRef,
   parseDocumentSummary,
@@ -47,7 +48,7 @@ import type {
 } from './parse'
 import { parseUploadSession, parseUploadSessionComplete } from './parse'
 import { parseDocumentManageRef, parseDocumentShelveResult, type DocumentManageRef } from './parse'
-import type { UniworkDocShelveResult } from '../../shared/home-api'
+import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../../shared/home-api'
 
 /**
  * Main-process client for the UniWork documents routes this app uses, and
@@ -135,13 +136,15 @@ export interface UniworkDocsClient {
     } & UniworkListFilters,
   ): Promise<DocumentListResult>
   /** documents shared directly with the caller in one workspace (paged) */
-  listSharedWithMe(input: {
-    workspaceId: string
-    cursor?: string
-    limit?: number
-    /** UNI-1953: keep UniNote pages too (the Documents home); default files only */
-    includePages?: boolean
-  }): Promise<DocumentListResult>
+  listSharedWithMe(
+    input: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+      /** UNI-1953: keep UniNote pages too (the Documents home); default files only */
+      includePages?: boolean
+    } & UniworkListFilters,
+  ): Promise<DocumentListResult>
   /** DESKTOP-HOME: documents shared by the caller in one workspace (paged) */
   listSharedByMe(
     input: {
@@ -158,6 +161,22 @@ export interface UniworkDocsClient {
       limit?: number
     } & UniworkListFilters,
   ): Promise<DocumentListResult>
+  /**
+   * UNI-2047 B6: the caller's stars in one workspace (`GET /workspaces/{ws}/documents/favorites`,
+   * SV-2), files and pages, `favorited_at` on each row. The route reads only the type, the kind, the
+   * sort and the paging: the editor / date / activity filters are not sent.
+   */
+  listFavorites(
+    input: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters,
+  ): Promise<DocumentListResult>
+  /** UNI-2047 B6: Gắn sao (`POST /documents/{id}/favorite`, idempotent) */
+  favorite(documentId: string): Promise<UniworkDocFavoriteResult>
+  /** UNI-2047 B6: Bỏ gắn sao (`DELETE /documents/{id}/favorite`, idempotent) */
+  unfavorite(documentId: string): Promise<void>
   /**
    * UNI-1961: the Documents home's "other sources" files
    * (`GET /workspaces/{ws}/documents/sources`, paged like the web's list)
@@ -224,8 +243,6 @@ export interface UniworkDocsClient {
       workspaceId: string
       format: UniworkDocNewFormat
       title: string
-      /** UNI-1959: "Share with workspace"; absent = the server's default (a document only; a folder is never shared) */
-      visibility?: UniworkCreateVisibility
       idempotencyKey: string
     } & UniworkCreateTarget,
   ): Promise<UniworkDocSummary>
@@ -234,8 +251,6 @@ export interface UniworkDocsClient {
     input: {
       workspaceId: string
       title: string
-      /** UNI-1959: "Share with workspace"; absent = the server's default (a document only; a folder is never shared) */
-      visibility?: UniworkCreateVisibility
       idempotencyKey: string
     } & UniworkCreateTarget,
   ): Promise<UniworkDocSummary>
@@ -278,13 +293,17 @@ export interface UniworkDocsClient {
   restore(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /**
    * UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (`shelved=true`,
-   * shelved_at DESC, the flat list's cursor); only the type filter applies
+   * shelved_at DESC, the flat list's cursor); only the type filter and sort/order apply
    */
   listShelved(input: {
     workspaceId: string
     cursor?: string
     limit?: number
-    format?: UniworkDocFormat
+    format?: UniworkListFilters['format']
+    kind?: UniworkListFilters['kind']
+    /** UNI-2047: SV-0 lets the shelf sort like the other lists */
+    sort?: UniworkListFilters['sort']
+    order?: UniworkListFilters['order']
   }): Promise<DocumentListResult>
   /** UNI-1961: the level fields of one document of any kind (folder/page/file) */
   documentManageRef(documentId: string): Promise<DocumentManageRef>
@@ -462,6 +481,23 @@ export function uniworkSourceId(value: string): string {
 /** UNI-1961: the sources list's filter values (D sources-schema.ts); anything else is not sent */
 const SOURCE_KINDS: ReadonlySet<string> = new Set(['chat', 'task', 'meeting', 'email'])
 const SOURCE_TYPES: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])
+/** UNI-2047: the sort keys the doclist routes accept (S3 plus the per-list SV-0..SV-3 keys) */
+const LIST_SORTS: ReadonlySet<string> = new Set([
+  'updated',
+  'name',
+  'size',
+  'editor',
+  'activity',
+  'shared',
+  'starred',
+  'deleted',
+  'shelved',
+])
+/** UNI-2047: the sort keys of the flat `/documents` route (S3); the other keys belong to the per-screen routes */
+const FLAT_LIST_SORTS: ReadonlySet<string> = new Set(['updated', 'name', 'size', 'editor'])
+/** UNI-2047: a sort key inside the server's vocabulary (also the IPC boundary's check) */
+export const isListSort = (value: unknown): value is UniworkListSort =>
+  typeof value === 'string' && LIST_SORTS.has(value)
 /**
  * SAVE-01 r2 (S01-R1-5): a `parent_id` that reaches the wire. Absent/null is
  * the caller's "no folder" (the field is then omitted - the absence IS the
@@ -647,6 +683,8 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     if (typeof input.format === 'string' && input.format) {
       params.set('format', input.format)
     }
+    // UNI-2047: the flat list's kind for the UniNote chip (overrides listDocuments' own kind)
+    if (input.kind === 'page') params.set('kind', 'page')
     const updatedBy =
       typeof input.updatedBy === 'string' ? input.updatedBy.trim().slice(0, 128) : ''
     if (updatedBy) {
@@ -659,7 +697,30 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       params.set('updated_from', updatedFrom)
       flatRequired = true
     }
+    // UNI-2047: sort/order/activity ride only when set and inside the server's
+    // vocabulary, so an unset call stays byte-identical to today's request
+    if (isListSort(input.sort)) {
+      params.set('sort', input.sort)
+    }
+    if (input.order === 'asc' || input.order === 'desc') params.set('order', input.order)
+    if (input.activity === 'opened' || input.activity === 'edited') {
+      params.set('activity', input.activity)
+    }
     return flatRequired
+  }
+  /**
+   * The flat `/documents` route sorts by updated | name | size | editor only (any other key is a
+   * 400) and has no `activity` param (it would be ignored without a word): when Recent moves onto
+   * it, the Recent-only params are dropped here (an order is dropped with the sort it belonged to).
+   */
+  const dropRecentOnlyParams = (params: URLSearchParams): void => {
+    params.delete('activity')
+    const sort = params.get('sort')
+    // an order with no sort is a 400 on the flat route: it goes with the sort it belonged to
+    if (sort !== null && !FLAT_LIST_SORTS.has(sort)) {
+      params.delete('sort')
+      params.delete('order')
+    }
   }
   /**
    * FD-11: one document's own fields, whatever its kind (a folder has no file
@@ -797,6 +858,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
+      applyListFilters(params, input)
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',
@@ -842,6 +904,57 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         read: json,
       })
       return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async listFavorites(input) {
+      const params = new URLSearchParams()
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      // files and pages, no folders; a UniNote has no file format, so `format` stays off with it
+      const pages = input.kind === 'page'
+      params.set('kind', pages ? 'page' : 'document')
+      if (!pages && typeof input.format === 'string' && input.format) {
+        params.set('format', input.format)
+      }
+      // the route's own `starred` key and the four column keys; any other key is a 400 there, and
+      // so is an order without a sort
+      if (isListSort(input.sort) && (input.sort === 'starred' || FLAT_LIST_SORTS.has(input.sort))) {
+        params.set('sort', input.sort)
+        if (input.order === 'asc' || input.order === 'desc') params.set('order', input.order)
+      }
+      const ws = id(input.workspaceId)
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${ws}/documents/favorites`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      const page = parseDocumentList(raw, input.workspaceId)
+      return {
+        documents: page.documents.filter((doc) => doc.kind === 'file' || doc.kind === 'page'),
+        nextCursor: page.nextCursor,
+      }
+    },
+
+    async favorite(documentId) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/favorite`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentFavorite(raw, documentId)
+    },
+
+    async unfavorite(documentId) {
+      await send({
+        method: 'DELETE',
+        route: `/documents/${id(documentId)}/favorite`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
     },
 
     async listSources(input) {
@@ -1022,7 +1135,6 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           // never silently demoted to a root create (S01-R1-5)
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
           ...(input.destination ? { destination: input.destination } : {}),
-          ...(input.visibility ? { visibility: input.visibility } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,
@@ -1041,7 +1153,6 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           // the same exclusive placement as createBlank (S01-R1-5)
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
           ...(input.destination ? { destination: input.destination } : {}),
-          ...(input.visibility ? { visibility: input.visibility } : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,
@@ -1134,7 +1245,12 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       params.set('limit', String(limit))
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
       // the shelf never sends parent_id or archived (shelved+archived is 400)
-      applyListFilters(params, { format: input.format })
+      applyListFilters(params, {
+        format: input.format,
+        kind: input.kind,
+        sort: input.sort,
+        order: input.order,
+      })
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',
@@ -1242,11 +1358,12 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       // caller's recent scope. `q` and the non-forwardable updater/date filters
       // still need the flat workspace list.
       const flatRequired = applyListFilters(params, input)
+      const flat = q !== '' || flatRequired
+      if (flat) dropRecentOnlyParams(params)
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',
-        route:
-          q || flatRequired ? `/workspaces/${ws}/documents` : `/workspaces/${ws}/documents/recent`,
+        route: flat ? `/workspaces/${ws}/documents` : `/workspaces/${ws}/documents/recent`,
         query: params,
         timeoutMs: metadataTimeout,
         read: json,

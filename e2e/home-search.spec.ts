@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
-import { launchShell, closeAndSaveVideo, screenshotPath } from './helpers'
+import { launchShell, closeAndSaveVideo, screenshotPath, homeRowName } from './helpers'
 
 /**
  * Home file search: names, folders and extracted content over the default
@@ -66,17 +66,17 @@ test.describe('home file search', () => {
 
       // content match across two formats; the index fills in the background
       await box.fill('budget')
-      const rows = page.locator('.search-row')
+      const rows = page.locator('.search-results .dh-doc-row')
       await expect(rows).toHaveCount(2, { timeout: 30_000 })
-      await expect(page.locator('.search-name', { hasText: 'meeting-notes.md' })).toBeVisible()
-      await expect(page.locator('.search-name', { hasText: 'landing.html' })).toBeVisible()
+      await expect(homeRowName(page, 'meeting-notes.md')).toBeVisible()
+      await expect(homeRowName(page, 'landing.html')).toBeVisible()
       await expect(page.locator('.search-snippet .search-hit').first()).toHaveText(/budget/i)
       await expect(page.locator('.recents-heading .file-count')).toHaveText('2 results')
 
       // CJK bigram inside a longer run, extracted from a docx
       await box.fill(HAN_REPORT)
       await expect(rows).toHaveCount(1, { timeout: 30_000 })
-      await expect(page.locator('.search-name')).toHaveText('quarterly-plan.docx')
+      await expect(page.locator('.search-results .dh-doc-open')).toHaveText('quarterly-plan.docx')
       await expect(page.locator('.search-snippet .search-hit')).toHaveText(HAN_REPORT)
       await page.screenshot({ path: screenshotPath('home-search-cjk') })
 
@@ -88,7 +88,7 @@ test.describe('home file search', () => {
       // name prefix match with the name highlighted, filter pills narrow it
       await box.fill('quart')
       await expect(rows).toHaveCount(1)
-      await expect(page.locator('.search-name .search-hit')).toHaveText('quart')
+      await expect(page.locator('.search-results .dh-doc-open .search-hit')).toHaveText('quart')
       await page.locator('.filter-pill', { hasText: 'Markdown' }).click()
       await expect(page.locator('.search-results .empty-hint')).toContainText('quart')
       await page.locator('.filter-pill', { hasText: 'All' }).click()
@@ -97,7 +97,9 @@ test.describe('home file search', () => {
       // a folder-name hit lights up the location label
       await box.fill('finance')
       await expect(rows).toHaveCount(1)
-      await expect(page.locator('.search-path .search-hit')).toHaveText('Finance')
+      await expect(page.locator('.search-results .dh-doc-subpath .search-hit')).toHaveText(
+        'Finance',
+      )
 
       // Escape clears; ⌘F / Ctrl+F focuses
       await box.press('Escape')
@@ -120,7 +122,8 @@ test.describe('home file search', () => {
       // opening a result switches to an editor tab
       await box.fill('meeting')
       await expect(rows).toHaveCount(1)
-      await rows.first().click()
+      // a row opens from its name button (the shared table), not from a click anywhere on it
+      await rows.first().locator('.dh-doc-open').click()
       await expect(page.locator('.tab-bar .tab-item', { hasText: 'meeting-notes' })).toBeVisible({
         timeout: 20_000,
       })

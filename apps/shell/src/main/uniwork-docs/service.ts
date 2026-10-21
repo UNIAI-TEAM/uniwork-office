@@ -20,7 +20,6 @@ import type {
   UniworkCreateDocInput,
   UniworkCreatePageInput,
   UniworkCreateFolderInput,
-  UniworkCreateVisibility,
   UniworkDocAccess,
   UniworkDocActionError,
   UniworkDocActionResult,
@@ -56,12 +55,13 @@ import type {
   UniworkSearchQuery,
   UniworkSharedPage,
   UniworkSharedQuery,
+  UniworkShelvedQuery,
   UniworkTreeChangedEvent,
   UniworkUploadDocInput,
   UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
-import type { UniworkDocShelveResult } from '../../shared/home-api'
+import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../../shared/home-api'
 import type {
   UniworkConflictAction,
   UniworkConflictIntentBlock,
@@ -96,6 +96,7 @@ import {
   type UniworkCreateTarget,
   type UniworkDocsClient,
   createUniworkDocsClient,
+  isListSort,
   uniworkId,
   uniworkSourceId,
 } from './client'
@@ -602,6 +603,59 @@ function parseOffsetCursor(cursor: string | undefined): number {
   return match ? Number(match[1]) : 0
 }
 
+/**
+ * UNI-2047: the merge order of "Shared with me". Every workspace answers in the
+ * server's own order, so the aggregate re-sorts by the requested key. Each key
+ * has its own default direction (the web's); a row without the key sorts last
+ * in either direction. Nothing requested = newest first, as before.
+ */
+function sharedComparator(
+  sort: UniworkListFilters['sort'],
+  order: UniworkListFilters['order'],
+): (a: UniworkDocSummary, b: UniworkDocSummary) => number {
+  const key = sort ?? 'updated'
+  const sortKey = (row: UniworkDocSummary): string | number | undefined => {
+    switch (key) {
+      case 'name':
+        return row.title
+      case 'size':
+        return row.sizeBytes
+      case 'editor':
+        return row.updatedByUser?.name ?? row.updatedByName
+      case 'shared':
+        return row.shared?.at
+      case 'activity':
+        return row.lastActivity?.at
+      case 'starred':
+        return row.favoritedAt
+      case 'deleted':
+        return row.archivedAt
+      case 'shelved':
+        return row.shelvedAt
+      default:
+        return row.updatedAt
+    }
+  }
+  const ascending = (order ?? (key === 'name' || key === 'editor' ? 'asc' : 'desc')) === 'asc'
+  return (a, b) => {
+    const left = sortKey(a)
+    const right = sortKey(b)
+    if (left !== right) {
+      if (left === undefined) return 1
+      if (right === undefined) return -1
+      const cmp =
+        key === 'name' || key === 'editor'
+          ? String(left).localeCompare(String(right))
+          : left < right
+            ? -1
+            : 1
+      return ascending ? cmp : -cmp
+    }
+    // a stable tie-break: newest first
+    return a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0
+  }
+}
+
 /** UNI-1961: a source file's suggested save name: its last segment, never a path */
 function sourceFileName(name: unknown): string {
   const last = typeof name === 'string' ? (name.split(/[\\/]/).pop() ?? '') : ''
@@ -768,16 +822,6 @@ async function readFileRange(
 }
 
 /**
- * UNI-1959: the one `visibility` a create may send. Only `workspace` ("Share
- * with workspace") goes out; anything else a hand-typed invoke carries is
- * dropped, so a private create and a create inside a shared folder (which the
- * server inherits) send no field at all.
- */
-function visibilityOf(input: { visibility?: unknown }): { visibility?: UniworkCreateVisibility } {
-  return input.visibility === 'workspace' ? { visibility: 'workspace' } : {}
-}
-
-/**
  * a trimmed, NFC-normalized name of 1..`max` runes (the server trims and
  * normalizes the same way, so the string the field shows is the one the server
  * stored). `max` defaults to the widest document cap; FD-11 passes the folder
@@ -832,9 +876,13 @@ async function actionResult<T>(
       options.flagMissingEndpoint === true &&
       error instanceof UniworkDocError &&
       (error.status === 404 || error.status === 501)
+    // UNI-2047: a throttle (429 / 503) is the one failure a batch may repeat once
+    const retryable =
+      error instanceof UniworkDocError && (error.status === 429 || error.status === 503)
     return {
       ok: false,
       error: code,
+      ...(retryable ? { retryable: true } : {}),
       ...(max === undefined ? {} : { max }),
       ...(documentId === undefined ? {} : { documentId }),
       ...(documentTitle === undefined ? {} : { documentTitle }),
@@ -4655,6 +4703,15 @@ export class UniworkDocsService {
       const org = this.deps.selectedOrg()
       if (!org) return { documents: [], nextCursor: null }
       const api = this.api()
+      // UNI-2047: type / updater / date filters and the sort go to every workspace
+      const { format, updatedBy, updatedFrom, sort, order } = this.listFiltersOf(query)
+      const filters: UniworkListFilters = {
+        ...(format ? { format } : {}),
+        ...(updatedBy ? { updatedBy } : {}),
+        ...(updatedFrom ? { updatedFrom } : {}),
+        ...(sort ? { sort } : {}),
+        ...(order ? { order } : {}),
+      }
       const workspaces = await api.listWorkspaces(org.id)
       const nameOf = new Map(workspaces.map((ws) => [ws.id, ws.name]))
       const merged = new Map<string, UniworkDocSummary>()
@@ -4669,6 +4726,7 @@ export class UniworkDocsService {
                 cursor,
                 limit: SHARED_PAGE_SIZE,
                 ...(query.includePages === true ? { includePages: true } : {}),
+                ...filters,
               })
             for (const doc of page.documents) {
               if (!merged.has(doc.id)) {
@@ -4683,9 +4741,9 @@ export class UniworkDocsService {
           } while (cursor && pages < SHARED_MAX_PAGES && merged.size < SHARED_MAX_ROWS)
         }),
       )
-      const all = [...merged.values()].sort((a, b) =>
-        a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
-      )
+      // each workspace answers in its own order, so the merge re-sorts by the
+      // requested key; no sort/order = newest first, as before
+      const all = [...merged.values()].sort(sharedComparator(sort, order))
       const limit = Math.min(
         SHARED_PAGE_SIZE,
         Math.max(1, Math.floor(Number(query.limit) || SHARED_PAGE_SIZE)),
@@ -4926,7 +4984,6 @@ export class UniworkDocsService {
           format: input.format,
           title: name,
           ...target.create,
-          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
         // UNI-1959: a default-named blank (the menu / strip) is never saved yet - its
@@ -4958,7 +5015,6 @@ export class UniworkDocsService {
           workspaceId: target.workspaceId,
           title: name,
           ...target.create,
-          ...visibilityOf(input),
           idempotencyKey: this.newIdempotencyKey(),
         })
         this.pushTreeChangedFor(session, target.workspaceId)
@@ -6521,15 +6577,35 @@ export class UniworkDocsService {
     if (names.size === 0) return rows
     return rows.map((row) => {
       const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
-      return updatedByName ? { ...row, updatedByName } : row
+      // UNI-2047: the trash's "deleted by"; a former member stays unnamed
+      const archivedByName = row.archivedById ? names.get(row.archivedById)?.trim() : undefined
+      return updatedByName || archivedByName
+        ? {
+            ...row,
+            ...(updatedByName ? { updatedByName } : {}),
+            ...(archivedByName ? { archivedByName } : {}),
+          }
+        : row
     })
   }
 
+  /**
+   * The IPC boundary of the list filters: a value outside the server's
+   * vocabulary (sort / order / activity) or of the wrong type is dropped, so an
+   * unset query stays today's request and a stray value never leaves.
+   */
   private listFiltersOf(q: UniworkListFilters): UniworkListFilters {
     return {
-      ...(typeof q.format === 'string' && q.format ? { format: q.format } : {}),
+      // a UniNote has no file format: the server answers 400 invalid_filter to both together
+      ...(typeof q.format === 'string' && q.format && q.kind !== 'page'
+        ? { format: q.format }
+        : {}),
+      ...(q.kind === 'page' ? { kind: q.kind } : {}),
       ...(typeof q.updatedBy === 'string' && q.updatedBy ? { updatedBy: q.updatedBy } : {}),
       ...(typeof q.updatedFrom === 'string' && q.updatedFrom ? { updatedFrom: q.updatedFrom } : {}),
+      ...(isListSort(q.sort) ? { sort: q.sort } : {}),
+      ...(q.order === 'asc' || q.order === 'desc' ? { order: q.order } : {}),
+      ...(q.activity === 'opened' || q.activity === 'edited' ? { activity: q.activity } : {}),
     }
   }
 
@@ -6602,23 +6678,68 @@ export class UniworkDocsService {
     })
   }
 
-  /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (paged, shelved_at DESC) */
-  listShelved(q: {
-    workspaceId: string
-    cursor?: string
-    limit?: number
-    format?: UniworkDocFormat
-  }): Promise<UniworkResult<UniworkDocListPage>> {
+  /**
+   * UNI-2047 B6: the caller's stars in one workspace (SV-2, newest star first, paged). The route
+   * reads only the type, the kind, the sort and the paging, so the editor / date / activity filters
+   * stop here; an older server's 404 comes back as the usual `not_found` error result.
+   */
+  listFavorites(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>> {
     return result(async () => {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
-      const { format } = this.listFiltersOf(q)
+      const { format, kind, sort, order } = this.listFiltersOf(q)
+      const page = await this.api().listFavorites({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...(format ? { format } : {}),
+        ...(kind ? { kind } : {}),
+        ...(sort ? { sort } : {}),
+        ...(order ? { order } : {}),
+      })
+      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** UNI-2047 B6: Gắn sao - the server checks the view level and answers the same on a repeat */
+  favoriteDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocFavoriteResult>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      return this.api().favorite(documentId)
+    })
+  }
+
+  /** UNI-2047 B6: Bỏ gắn sao - a star that is not there is still a success on the server */
+  unfavoriteDocument(documentId: string): Promise<UniworkDocActionResult<{ documentId: string }>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.api().unfavorite(documentId)
+      return { documentId }
+    })
+  }
+
+  /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (paged, shelved_at DESC) */
+  listShelved(q: UniworkShelvedQuery): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      // UNI-2047: the shelf takes the type filter and the sort, nothing else
+      const { format, kind, sort, order } = this.listFiltersOf(q)
       const page = await this.api().listShelved({
         workspaceId: q.workspaceId,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
         ...(format ? { format } : {}),
+        ...(kind ? { kind } : {}),
+        ...(sort ? { sort } : {}),
+        ...(order ? { order } : {}),
       })
       const documents = await this.enrichShelvedRows(q.workspaceId, page.documents)
       return { documents, nextCursor: page.nextCursor }

@@ -39,7 +39,8 @@ describe('viewport tokens under the zoomed frame', () => {
     const homeRoot = rule(src('home.css'), ':root')
     expect(homeRoot).toMatch(/--ui-vh:\s*1vh;/)
     expect(homeRoot).toMatch(/--ui-vw:\s*1vw;/)
-    expect(rule(src('home.css'), '.row-menu')).toMatch(
+    // the row menus (the device list's included) are FolderMenu's portalled list
+    expect(rule(src('home.css'), '.uw-row-menu-list')).toMatch(
       /max-height:\s*calc\(var\(--ui-vh\)\s*\*\s*100\s*-\s*16px\)/,
     )
   })

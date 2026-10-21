@@ -943,6 +943,14 @@ body.vib .home {
   background: var(--bg-content);
 }
 
+/* VS-4: a modal opened from inside the page (Open from UniWork) sits in .content, so a wheel over its
+   fixed overlay chains to this scroller and its bar shows through the blur: the page holds still while
+   the dialog is up, the bar's track stays so nothing shifts sideways */
+.content:has(.modal-overlay) {
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+
 /* one centered column: quick cards, toolbar and list share the same edges on
    any window width (cards no longer stop short of a full-width table) */
 .content > :is(.quick-start, .recents) {
@@ -2085,12 +2093,14 @@ body.vib .home {
    a 40px rail for the recents page toolbar. */
 .filter-pills {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  height: 40px;
-  padding: 0 3px;
+  /* V-LAYOUT F-02: the segment wraps inside its box (a 768 window leaves ~480px for nine pills) */
+  min-height: 40px;
+  max-width: 100%;
+  padding: 3px;
   border-radius: 10px;
   background: var(--checkbox-bg);
-  flex-shrink: 0;
 }
 
 .filter-pill {
@@ -2247,125 +2257,24 @@ body.vib .home {
   background: var(--danger-bg);
 }
 
-/* ---- file table ---- */
-
-/* no overflow clipping: row menus must be able to escape the card */
-.recent-table {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-.recent-columns,
-.recent-item {
-  display: grid;
-  grid-template-columns: 18px 24px minmax(0, 1fr) 120px 110px 76px 24px 28px;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-}
-
-.recent-columns {
-  padding-top: 11px;
-  padding-bottom: 11px;
-  border-bottom: 1px solid var(--border-subtle);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary);
-}
-
-/* header label starts at the icon column so it lines up with the file badges */
-.recent-columns .col-name {
-  grid-column: 2 / 4;
-}
-
-.col-size {
-  text-align: right;
-}
-
-.recent-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.recent-list li + li {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.recent-item {
-  width: 100%;
-  padding-top: 14px;
-  padding-bottom: 14px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.recent-list li:last-child .recent-item {
-  border-radius: 0 0 12px 12px;
-}
-
-.recent-row:hover .recent-item {
-  background: var(--surface-subtle);
-}
-
-/* checked rows keep the same gray as the sidebar's active item */
-.recent-row:has(.row-check:checked) .recent-item {
-  background: var(--bg-hover);
-}
-
-.recent-item:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.col-check {
-  display: flex;
-  align-items: center;
-}
-
-.col-check input {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  appearance: none;
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  background: var(--surface);
-  cursor: pointer;
-}
-
-.col-check input:checked {
-  border-color: var(--accent);
-  background: var(--accent)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.4 2.4 4.6-5' stroke='%23fff' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-    center / 10px 10px no-repeat;
-}
-
-/* checkboxes are always visible (mock: every row shows its checkbox) */
-.recent-item .row-check {
-  opacity: 1;
-}
-
-.recent-icon {
-  display: flex;
-  align-items: center;
-}
-
-.recent-name {
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* ---- the device list: the shared Documents table (doclist/DocList, screen `device`) ----
+   Home adds only what is the machine's own: the dimmed missing file, the drag hover on a
+   folder row and the Sao button beside the row menu */
 
 /* unavailable recents (disconnected drive / moved / deleted) stay listed, dimmed */
-.recent-item.missing .recent-name,
-.recent-item.missing .recent-path,
-.recent-item.missing .recent-icon {
+.dh-doc-row.missing .dh-cell-name {
   opacity: 0.55;
+}
+
+/* drag hover: an inset ring in the accent color, the same as the sidebar's folders */
+.dh-doc-row.drop-target {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: var(--accent-soft);
+}
+
+/* a search hit's snippet sits under its location, inside the name column */
+.dh-name-stack .search-snippet {
+  margin-top: 2px;
 }
 
 .star-btn {
@@ -2386,100 +2295,9 @@ body.vib .home {
   background: var(--bg-hover-subtle);
 }
 
-.recent-item:hover .star-btn,
+.star-btn:hover,
 .star-btn.starred {
-  opacity: 1;
-}
-
-.star-btn:hover {
-  color: #f5a623;
-}
-
-.rename-input {
-  min-width: 0;
-  padding: 3px 7px;
-  border: 1.5px solid var(--accent);
-  border-radius: 6px;
-  font: inherit;
-  font-size: 14px;
-  outline: none;
-  background: var(--surface);
-}
-
-.recent-path {
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.recent-time {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  white-space: nowrap;
-}
-
-.recent-size {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  white-space: nowrap;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.recent-actions {
-  position: relative;
-  display: flex;
-  justify-content: flex-end;
-  anchor-name: --row-actions;
-  anchor-scope: --row-actions;
-}
-
-.more-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: 8px;
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.more-btn:hover,
-.more-btn[aria-expanded='true'] {
-  background: var(--bg-hover-strong);
-  color: var(--text);
-}
-
-.row-menu {
-  position: fixed;
-  position-anchor: --row-actions;
-  top: calc(anchor(bottom) + 6px);
-  right: anchor(right);
-  position-try-fallbacks: flip-block, --row-menu-viewport;
-  position-visibility: anchors-visible;
-  z-index: 20;
-  box-sizing: border-box;
-  min-width: 160px;
-  max-height: calc(var(--ui-vh) * 100 - 16px);
-  overflow-y: auto;
-  padding: 6px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 10px 28px rgb(0 0 0 / 14%);
-  animation: menu-in 0.1s ease;
-}
-
-/* If neither side fits, keep the menu inside the viewport and scroll its items. */
-@position-try --row-menu-viewport {
-  top: 8px;
-  bottom: auto;
+  color: var(--star);
 }
 
 @keyframes menu-in {
@@ -2489,57 +2307,10 @@ body.vib .home {
   }
 }
 
-.row-menu button {
-  display: block;
-  width: 100%;
-  padding: 7px 10px;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  font: inherit;
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.row-menu button:hover {
-  background: var(--surface-subtle);
-}
-
-.row-menu button.danger {
-  color: var(--danger);
-}
-
-.row-menu button.danger:hover {
-  background: var(--danger-bg);
-}
-
 .row-menu-divider {
   height: 1px;
   margin: 5px 6px;
   background: var(--border-subtle);
-}
-
-/* "move to project": the project list expands in place under the trigger */
-.row-menu button.submenu-trigger {
-  display: flex;
-  align-items: center;
-}
-
-.submenu-chevron {
-  margin-left: auto;
-  transition: transform 0.1s;
-}
-
-.submenu-trigger[aria-expanded='true'] .submenu-chevron {
-  transform: rotate(180deg);
-}
-
-.row-menu .submenu {
-  margin: 2px 0 2px 8px;
-  padding-left: 6px;
-  border-left: 1px solid var(--border-subtle);
 }
 
 /* bulk move-to-project dropdown in the selection bar (anchored below the button) */
@@ -3106,8 +2877,7 @@ body.vib .home {
 }
 
 /* drag hover: an inset ring in the accent color, same for sidebar and table rows */
-.tree-row.drop-target,
-.recent-item.drop-target {
+.tree-row.drop-target {
   box-shadow: inset 0 0 0 2px var(--accent);
   background: var(--accent-soft);
 }
@@ -3214,14 +2984,6 @@ body.vib .home {
 
 .folder-heading {
   gap: 10px;
-}
-
-.folder-badge {
-  color: var(--text-secondary);
-}
-
-.recent-item.folder-item .recent-name {
-  font-weight: 500;
 }
 
 /* ---- move-to-folder picker ---- */
@@ -3564,33 +3326,6 @@ body.vib .home {
   color: var(--text-tertiary);
 }
 
-/* WPS-style sortable column header: label + direction arrow, click opens
-   the sort popover (.cloud-sort-menu) */
-.cloud-col-sort {
-  position: relative;
-  justify-self: start;
-}
-
-.cloud-col-sort-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 4px;
-  margin: -2px -4px;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  font: inherit;
-  letter-spacing: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-
-.cloud-col-sort-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
-
 /* Drag-over affordance while OS files hover anywhere over the window (the
    open itself is handled by the preload drop bridge, not this overlay) */
 .home-drop-overlay {
@@ -3650,18 +3385,6 @@ body.vib .home {
 
   .recents-toolbar {
     gap: 8px 12px;
-  }
-
-  .recent-columns,
-  .recent-item {
-    grid-template-columns: 18px 24px minmax(0, 1fr) 110px 24px 28px;
-  }
-
-  .recent-columns .col-path,
-  .recent-columns .col-size,
-  .recent-path,
-  .recent-size {
-    display: none;
   }
 }
 
@@ -4974,6 +4697,34 @@ body.vib .home {
   flex: none;
 }
 
+/* In tray rows on the picker list: the pill (and Resolve) sit at the row's end, in the room the list
+   keeps clear for them, so the date column lines up from row to row */
+.wb-desk-trail {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  /* the row's height centres the pill and Resolve without a transform */
+  pointer-events: none;
+}
+
+.wb-desk-trail > * {
+  pointer-events: auto;
+}
+
+/* the commenter's initials take the badge's 24px so Tên stays under its header */
+.dh-pick-name > .wb-desk-avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.wb-desk-more {
+  padding: 8px 8px 0;
+}
+
 .wb-desk-drawer-head {
   display: flex;
   flex-wrap: wrap;
@@ -6095,65 +5846,6 @@ textarea.wb-input {
   height: 14px;
 }
 
-.search-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.search-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 110px;
-  align-items: start;
-  gap: 12px;
-  padding: 9px 10px;
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-.search-row:hover,
-.search-row:focus-visible {
-  background: var(--hover);
-  outline: none;
-}
-
-.search-row .recent-icon {
-  margin-top: 1px;
-}
-
-.search-main {
-  min-width: 0;
-}
-
-.search-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-}
-
-.search-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.search-path {
-  flex-shrink: 1;
-  min-width: 0;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .search-snippet {
   margin: 4px 0 0;
   font-size: 13px;
@@ -6171,14 +5863,6 @@ textarea.wb-input {
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
-}
-
-.search-time {
-  font-size: 13px;
-  color: var(--text-tertiary);
-  white-space: nowrap;
-  text-align: right;
-  padding-top: 2px;
 }
 
 /* Extension labels like ".docx" read left-to-right even in the RTL UI */
@@ -6371,10 +6055,9 @@ html[dir='rtl'] .quick-title-row {
   cursor: default;
 }
 
-/* dim the icon and the text only: the row's controls (the "…" menu with Restore) stay legible */
+/* dim the icon only: the row's controls (the "…" menu with Restore) stay legible, and the picker grid dims the text cells itself (doclist-picker.css) */
 .uw-pick-row.disabled > img,
-.uw-pick-row.disabled > svg,
-.uw-pick-row.disabled > .uw-pick-row-text {
+.uw-pick-row.disabled > svg {
   opacity: 0.6;
 }
 
@@ -7598,6 +7281,9 @@ html[dir='rtl'] .quick-title-row {
   display: flex;
   flex-direction: column;
   min-width: 160px;
+  /* a long menu (the device list's, with every project to move to) scrolls instead of leaving the window */
+  max-height: calc(var(--ui-vh) * 100 - 16px);
+  overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -7624,6 +7310,23 @@ html[dir='rtl'] .quick-title-row {
   outline: none;
 }
 
+/* a divider between the groups of the shared row menu */
+.uw-row-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-subtle);
+}
+
+/* the destructive entry (Move to trash) */
+.uw-row-menu-item.danger {
+  color: var(--danger-text);
+}
+
+.uw-row-menu-item.danger:hover,
+.uw-row-menu-item.danger:focus-visible {
+  background: var(--danger-bg);
+}
+
 /* rename in place */
 .uw-rename {
   display: flex;
@@ -7637,11 +7340,6 @@ html[dir='rtl'] .quick-title-row {
 
 .uw-pick-row.archived .uw-pick-row-title {
   color: var(--text-muted);
-}
-
-/* parked, not unsupported: the title and the "Archived" line keep full opacity so they stay at 4.5:1 or better (muted token on the surface, light and dark); only the icon is dimmed */
-.uw-pick-row.archived > .uw-pick-row-text {
-  opacity: 1;
 }
 
 /* Restore is the only action of an archived row: always visible, not on hover only */

@@ -276,7 +276,9 @@ describe('Open from UniWork: workspaces and Shared with me', () => {
     expect(rows().map((r) => r.querySelector('.uw-pick-row-title')?.textContent)).toEqual([
       'Contract.docx',
     ])
-    expect(rows()[0]!.querySelector('.uw-pick-row-meta')?.textContent).toMatch(/^Legal · /)
+    // UNI-2047 B2: the workspace is the second line; the editor and the date are columns now
+    expect(rows()[0]!.querySelector('.uw-pick-row-meta')?.textContent).toBe('Legal')
+    expect(rows()[0]!.querySelector('[data-col="updated"]')).not.toBeNull()
   })
 
   it('an empty shared list says nothing was shared yet', async () => {

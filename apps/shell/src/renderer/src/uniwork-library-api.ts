@@ -1,6 +1,5 @@
 import type {
   UniworkCreateFolderInput,
-  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocListPage,
   UniworkDocProperties,
@@ -70,6 +69,8 @@ export type DocActionResult<T> =
       name?: string
       sizeBytes?: number
       maxBytes?: number
+      /** UNI-2047: the server throttled (429 / 503): the same call may be tried once more */
+      retryable?: boolean
       /** FD-11: the depth cap of a document_too_deep */ max?: number
       /** UNI-1959: the server has no route for this create (404 / 501): disable that kind */
       endpointMissing?: boolean
@@ -80,8 +81,6 @@ export interface CreateDocInput {
   folderId: string | null
   name: string
   format: NewDocFormat
-  /** UNI-1959: "Share with workspace"; absent = the server's default (a document only) */
-  visibility?: UniworkCreateVisibility
 }
 
 /** UNI-1953: a UniNote is a page, created through its own call and opened on the web */
@@ -89,7 +88,6 @@ export interface CreatePageInput {
   workspaceId: string
   folderId: string | null
   name: string
-  visibility?: UniworkCreateVisibility
 }
 
 export interface UploadDocInput {
@@ -322,4 +320,40 @@ export function shelveDocument(
   documentId: string,
 ): Promise<DocActionResult<UniworkDocShelveResult>> {
   return settleAct(shelvedActions().uniworkShelveDocument?.(documentId))
+}
+
+// ── UNI-2047 B6: Gắn sao (Starred) ──────────────────────
+// The Starred list is read through the Documents home adapter (fetchDocumentsHomePage); these are
+// the two row commands. A host without them (an older shell) has no Gắn sao entry at all.
+
+interface FavoriteBridge {
+  uniworkFavoriteDocument?(documentId: string): Promise<DocActionResult<{ favoritedAt: string }>>
+  uniworkUnfavoriteDocument?(documentId: string): Promise<DocActionResult<{ documentId: string }>>
+}
+
+function favoriteActions(): FavoriteBridge {
+  return window.aiOffice as unknown as FavoriteBridge
+}
+
+/** whether this shell can star and unstar (both calls present) */
+export function canFavoriteDocuments(): boolean {
+  const bridge = favoriteActions()
+  return (
+    typeof bridge?.uniworkFavoriteDocument === 'function' &&
+    typeof bridge?.uniworkUnfavoriteDocument === 'function'
+  )
+}
+
+/** Gắn sao a document from its row (idempotent on the server) */
+export function favoriteDocument(
+  documentId: string,
+): Promise<DocActionResult<{ favoritedAt: string }>> {
+  return settleAct(favoriteActions().uniworkFavoriteDocument?.(documentId))
+}
+
+/** Bỏ gắn sao a document from its row (idempotent on the server) */
+export function unfavoriteDocument(
+  documentId: string,
+): Promise<DocActionResult<{ documentId: string }>> {
+  return settleAct(favoriteActions().uniworkUnfavoriteDocument?.(documentId))
 }

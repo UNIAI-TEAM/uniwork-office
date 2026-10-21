@@ -251,10 +251,14 @@ export function breadcrumbOf(path: PathPart[], rootTitle: string): Crumb[] {
   return [root, { kind: 'more', hidden: path.slice(0, -2) }, ...items.slice(-2)]
 }
 
-/** a search hit's path: left-truncated to its direct parent, the full path for `title` */
+/**
+ * a search hit's path: left-truncated to its direct parent, the full path for `title`. A file
+ * directly in the root is the root's name alone: nothing follows it, so no trailing "›".
+ */
 export function shortPath(path: PathPart[], rootTitle: string): { short: string; full: string } {
   const full = [rootTitle, ...path.map((p) => p.title)].join(' › ')
-  if (path.length <= 1) return { short: `${full} ›`, full }
+  if (path.length === 0) return { short: full, full }
+  if (path.length === 1) return { short: `${full} ›`, full }
   return { short: `… › ${path[path.length - 1]!.title} ›`, full }
 }
 

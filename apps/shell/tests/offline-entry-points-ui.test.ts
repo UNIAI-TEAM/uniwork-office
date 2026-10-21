@@ -205,7 +205,7 @@ describe('Home recents "…" menu (UniWork rows)', () => {
 
   async function openRowMenu() {
     await act(async () => {
-      root.render(createElement(LocaleProvider, null, createElement(Home)))
+      root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(Home)))
     })
     await flush()
     // the UniWork area now renders DocumentsHome; open its Recent sub-view
@@ -327,7 +327,7 @@ describe('Home recents "…" menu (UniWork rows)', () => {
     syncCenter(library({ rows: [pinnedRow('uw-doc-1'), pinnedRow('doc-trashed')] }))
 
     await act(async () => {
-      root.render(createElement(LocaleProvider, null, createElement(Home)))
+      root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(Home)))
     })
     await flush()
 

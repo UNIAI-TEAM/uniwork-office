@@ -147,8 +147,11 @@
   gap: 18px;
   min-width: 0;
   min-height: 0;
-  padding: 20px 28px 36px;
+  /* doclist-canvas page padding: 24 top, 32 at the sides, 40 at the foot */
+  padding: 24px 32px 40px;
   overflow-y: auto;
+  /* the scroller anchors its absolutely positioned descendants, so they clip inside the list area */
+  position: relative;
 }
 
 /* every child keeps its content height: inside the scrolling column a
@@ -179,9 +182,9 @@
   margin: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -262,8 +265,8 @@
   .dh-toolbar-folder .dh-search-box {
     order: 0;
     flex: 0 1 auto;
-    width: clamp(12rem, 18cqw, 14rem);
-    min-width: 12rem;
+    width: clamp(15rem, 18cqw, 17rem);
+    min-width: 15rem;
   }
 
   /* V1979-2: with the search inline the select takes a smaller share, so the
@@ -279,7 +282,8 @@
   align-items: center;
   gap: 8px;
   width: 320px;
-  min-width: 180px;
+  /* V-LAYOUT F-11: room for "Search folders and documents"; the title row wraps before the field shrinks */
+  min-width: min(15rem, 100%);
   max-width: 100%;
   height: 36px;
   padding: 0 12px;
@@ -421,38 +425,6 @@
   background: var(--border);
 }
 
-.dh-new-share {
-  align-items: flex-start;
-  padding-block: 8px;
-}
-
-.dh-new-check {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin-top: 1px;
-  border: 1px solid var(--border-control);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
-}
-
-.dh-new-share[aria-checked='true'] .dh-new-check {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.dh-new-share-text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
 .dh-new-hint {
   min-height: 16px;
   color: var(--text-secondary);
@@ -511,64 +483,6 @@
   outline-offset: 1px;
 }
 
-/* the strip's own Share with workspace toggle (the web's QuickCreateRow) */
-.dh-quick-share {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.dh-quick-share:hover {
-  border-color: var(--border-control);
-  background: var(--hover);
-}
-
-.dh-quick-share:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.dh-quick-share[aria-disabled='true'] {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.dh-quick-check {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--border-control);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
-}
-
-.dh-quick-share[aria-checked='true'] .dh-quick-check {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.dh-quick-share-hint {
-  flex-basis: 100%;
-  min-height: 16px;
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
 .dh-subview-banner {
   display: flex;
   align-items: center;
@@ -594,13 +508,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
-  padding: 0 10px;
+  height: 34px;
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .dh-filter-chip:focus-within {
@@ -612,35 +526,33 @@
   white-space: nowrap;
 }
 
-.dh-filter-select,
-.dh-group-select {
+.dh-filter-select {
   height: 28px;
   padding: 0 4px;
   border: 0;
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   outline: none;
 }
 
-.dh-filter-select:focus-visible,
-.dh-group-select:focus-visible {
+.dh-filter-select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
 .dh-filter-clear {
-  height: 32px;
-  padding: 0 10px;
+  height: 34px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: var(--accent);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -649,61 +561,54 @@
   background: var(--hover);
 }
 
-.dh-view-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-inline-start: auto;
+/* UNI-2047: the type chips every screen shares (doclist/FilterBar). V-LAYOUT F-07: the group
+   dissolves into the bar, so the chips and the two selects are items of one wrapping row (the
+   board's), not a chip block with the selects pushed under it */
+.dh-filter-chips {
+  display: contents;
 }
 
-.dh-sort-btn {
+.dh-filter-type {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 32px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 16px;
   background: var(--surface);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.dh-sort-btn:hover {
+/* a chip with its 18px type badge starts closer to the badge (doclist-canvas chip) */
+.dh-filter-type.has-icon {
+  padding-inline-start: 7px;
+}
+
+.dh-filter-type > :is(img, svg) {
+  flex: none;
+}
+
+.dh-filter-type:hover {
   background: var(--hover);
   color: var(--text);
 }
 
-.dh-view-toggle {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+.dh-filter-type.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  /* V7-2: --accent on --accent-soft was 4.28:1 in dark; the text token is AA in both themes */
+  color: var(--accent-text);
+  font-weight: 500;
 }
 
-.dh-view-btn {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 26px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.dh-view-btn:hover {
-  color: var(--text);
-}
-
-.dh-view-btn[aria-pressed='true'] {
-  background: var(--tint-blue);
-  color: var(--tint-blue-fg);
+.dh-filter-type:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* Sections */
@@ -809,8 +714,10 @@
   white-space: nowrap;
 }
 
-/* Documents table (6 columns: Tên | Truy cập | Người sửa gần nhất | Cập nhật | Dung lượng | Thao tác;
-   UNI-1961: the web's Size column, right aligned) */
+/* Documents table (UNI-2047): the shared columns Chọn · Tên · [screen column] · Truy cập ·
+   Người sửa gần nhất · Cập nhật · Dung lượng · Thao tác, each row a grid whose tracks DocList
+   sets inline (the set of columns follows the table's width, not the window's). Cells carry the
+   padding, so the tracks are the widths the narrow ladder in doclist/columns.ts counts on. */
 .dh-doc-table {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -821,29 +728,119 @@
 .dh-doc-head,
 .dh-doc-row {
   display: grid;
-  grid-template-columns:
-    minmax(220px, 2.2fr)
-    minmax(130px, 1fr)
-    minmax(150px, 1.1fr)
-    minmax(110px, 0.9fr)
-    90px
-    72px;
   align-items: center;
-  gap: 12px;
-  padding: 0 14px;
+}
+
+.dh-doc-head > [role='columnheader'],
+.dh-doc-row > [role='cell'] {
+  min-width: 0;
+  padding: 0 12px;
+}
+
+/* doclist-canvas cell: 9px over and under, so a row is 9 + the 32px icon + 9 */
+.dh-doc-row > [role='cell'] {
+  padding-block: 9px;
+}
+
+/* the fixed tracks (Chọn, Cập nhật, Dung lượng, Thao tác) keep 8px at the sides: their widths are
+   the web's ladder numbers (doclist/columns.ts), and 12px would clip "Hôm qua, 16:30" or the two
+   28px buttons of "Sao · ⋯" */
+.dh-doc-head
+  > :is([data-col='select'], [data-col='updated'], [data-col='size'], [data-col='actions']),
+.dh-doc-row
+  > :is([data-col='select'], [data-col='updated'], [data-col='size'], [data-col='actions']) {
+  padding-inline: 8px;
 }
 
 .dh-doc-head {
-  height: 36px;
+  height: 38px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-subtle);
   color: var(--text-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 
+.dh-doc-head > [role='columnheader'] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-col-size {
+  text-align: right;
+}
+
+.dh-sort-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* the -6px margins hand the button 6px of the cell's padding at each side: "Dung lượng" (65px) in
+     a 68px content box, and "Người sửa gần nhất", keep their whole label */
+  max-width: calc(100% + 12px);
+  height: 28px;
+  padding: 0 6px;
+  margin: 0 -6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dh-sort-head > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dh-col-size .dh-sort-head {
+  flex-direction: row-reverse;
+}
+
+.dh-sort-head:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.dh-sort-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* the arrow reads on the sorted column, and on hover or keyboard focus of the others */
+.dh-sort-arrow {
+  flex: none;
+  opacity: 0;
+}
+
+.dh-sort-head:hover .dh-sort-arrow,
+.dh-sort-head:focus-visible .dh-sort-arrow,
+.dh-sort-head.sorted .dh-sort-arrow {
+  opacity: 1;
+}
+
+.dh-sort-head.sorted {
+  color: var(--text);
+}
+
+/* V-LAYOUT F-06: an idle arrow takes no room, so "Người sửa gần nhất" and "Dung lượng" keep the
+   whole header; it appears (taking its 14px) on hover or keyboard focus and on the sorted column */
+.dh-sort-head:not(.sorted) .dh-sort-arrow {
+  display: none;
+}
+
+.dh-sort-head:not(.sorted):hover .dh-sort-arrow,
+.dh-sort-head:not(.sorted):focus-visible .dh-sort-arrow {
+  display: block;
+}
+
+.dh-sort-head.desc .dh-sort-arrow {
+  transform: rotate(180deg);
+}
+
 .dh-doc-row {
-  min-height: 52px;
   border-bottom: 1px solid var(--border);
   font-size: 13px;
   cursor: pointer;
@@ -857,65 +854,33 @@
   background: var(--hover);
 }
 
+.dh-doc-row.selected {
+  background: var(--tint-blue);
+}
+
 .dh-doc-row.opening {
   opacity: 0.65;
   cursor: progress;
 }
 
-/* UNI-1961: a Group by header (the web's group heading) spans the table */
-.dh-group-row {
-  padding: 0 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-subtle);
-}
-
-.dh-group-cell {
+.dh-col-select,
+.dh-cell-select {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  font-size: 12px;
+  justify-content: center;
 }
 
-.dh-group-title {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.dh-check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
-.dh-group-count {
-  color: var(--text-secondary);
-}
-
-.dh-doc-table.grid-mode .dh-group-row {
-  grid-column: 1 / -1;
-  border-bottom: 0;
-  border-radius: 8px;
-}
-
-/* Grid view mode for documents */
-.dh-doc-table.grid-mode {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 12px;
-}
-
-.dh-doc-table.grid-mode .dh-doc-head {
-  display: none;
-}
-
-.dh-doc-table.grid-mode .dh-doc-row {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+.dh-check:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .dh-cell-name {
@@ -949,7 +914,24 @@
   color: var(--accent);
 }
 
+.dh-name-stack {
+  min-width: 0;
+  flex: 1;
+}
+
+.dh-doc-title {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dh-doc-subpath {
+  /* anchors the sr-only path label: unanchored it escapes the .dh-main clip and scrolls the window */
+  position: relative;
   display: block;
   overflow: hidden;
   color: var(--text-secondary);
@@ -969,15 +951,30 @@
 .dh-vis-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   width: fit-content;
-  color: var(--text);
-  font-size: 12.5px;
+  max-width: 100%;
+  padding: 2px 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.dh-vis-private {
-  color: var(--text-secondary);
+.dh-vis-restricted {
+  background: var(--tint-gray);
+  color: var(--tint-gray-fg);
+}
+
+.dh-vis-workspace {
+  background: var(--tint-blue);
+  color: var(--tint-blue-fg);
+}
+
+.dh-vis-shared {
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .dh-level-sub {
@@ -998,8 +995,8 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   background: var(--tint-blue);
   color: var(--tint-blue-fg);
@@ -1024,6 +1021,97 @@
   color: var(--text-secondary);
 }
 
+/* the screen column: the main line, and a muted 12px line under it */
+.dh-cell-special {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.dh-special {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dh-special-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-special-sub {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-days-soon {
+  color: var(--danger-text);
+}
+
+/* V-LAYOUT F-05: the Trash cell's second line is "date · countdown": the date gives way with an
+   ellipsis, the countdown (and its separator) never shrinks */
+.dh-deleted-sub {
+  display: flex;
+  min-width: 0;
+}
+
+.dh-deleted-date {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* V-FIX2 N-02: the same line under Tên of a Trash row that has no Đã xóa column: who gives way
+   first (it can shrink to nothing), then the date; the countdown never shrinks */
+.dh-deleted-line {
+  display: flex;
+  min-width: 0;
+}
+
+.dh-deleted-who {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-deleted-sep {
+  flex: none;
+  white-space: pre;
+}
+
+.dh-deleted-countdown {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* V-LAYOUT F-01: below the column ladder (doclist/columns.ts isCompact) Cập nhật is an 84px
+   track: the date wraps onto two lines instead of being cut */
+.dh-doc-table.is-compact [data-col='updated'] {
+  line-height: 1.3;
+}
+
+.dh-doc-table.is-compact .dh-doc-row [data-col='updated'] {
+  white-space: normal;
+}
+
+/* V-FIX2 N-05: a compact table is short of room for Tên: its grouped rows give the 28px indent back */
+.dh-doc-table.is-compact .dh-doc-row.grouped {
+  --dh-group-indent: 0px;
+}
+
 .dh-col-size,
 .dh-cell-size {
   text-align: right;
@@ -1032,6 +1120,7 @@
 .dh-cell-size {
   color: var(--text-secondary);
   font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -1076,6 +1165,21 @@
   color: var(--text);
 }
 
+/* UNI-2047 B7: the Sao of "Sao · ⋯" on a starred row (doclist/DocRow): a filled star in the star
+   token, Bỏ gắn sao on click */
+.dh-star-btn {
+  color: var(--star);
+}
+
+.dh-star-btn:hover {
+  color: var(--star);
+}
+
+.dh-star-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .dh-empty {
   padding: 28px 16px;
   border: 1px solid var(--border);
@@ -1101,10 +1205,16 @@
 @media (pointer: coarse) {
   .dh-nav-item,
   .dh-sidebar-add,
-  .dh-row-btn,
-  .dh-view-btn {
+  .dh-row-btn {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  /* the Starred actions track (doclist/cells.tsx STAR_ACTIONS_TRACK) holds Sao 44 + gap 4 + "…" 44
+     and the cell's 8px on each side; other screens' tracks stay as columns.ts counts them */
+  .dh-doc-head,
+  .dh-doc-row {
+    --dh-star-actions-track: 108px;
   }
 
   /* the card's "…" is 44px here (.uw-pick-info-btn) + the actions box's 12px: keep the name clear of both */
@@ -1134,33 +1244,9 @@
   }
 }
 
-/* VDH-4: below ~1100 px the columns cannot fit — collapse the lowest-priority
-   ones (Truy cập + Người sửa, and Dung lượng, which the web drops before the
-   editor) so Tên / Cập nhật / Thao tác always stay visible; grid cards keep every cell */
-@media (max-width: 1100px) {
-  .dh-doc-table:not(.grid-mode) .dh-col-access,
-  .dh-doc-table:not(.grid-mode) .dh-col-person,
-  .dh-doc-table:not(.grid-mode) .dh-col-size,
-  .dh-doc-table:not(.grid-mode) .dh-cell-access,
-  .dh-doc-table:not(.grid-mode) .dh-cell-person,
-  .dh-doc-table:not(.grid-mode) .dh-cell-size {
-    display: none;
-  }
-
-  .dh-doc-table:not(.grid-mode) .dh-doc-head,
-  .dh-doc-table:not(.grid-mode) .dh-doc-row {
-    grid-template-columns:
-      minmax(200px, 2.2fr)
-      minmax(110px, 0.9fr)
-      72px;
-  }
-}
-
 /* UNI-1961 (ARCHIVE-01): the Lưu trữ / Archive shelf, as the web's
-   DocumentsShelvedView: intro, toolbar (type, Lưu trữ bởi, fixed sort) and a
-   Tên / Truy cập / Lưu trữ bởi / Lưu trữ lúc / actions table. Narrow widths
-   drop Truy cập + Lưu trữ bởi, then Lưu trữ lúc; their values move under the
-   name as the web's ladder does. */
+   DocumentsShelvedView: intro, toolbar (type, Lưu trữ bởi) and the shared
+   Documents table with the Lưu trữ column (person + date). */
 .dh-shelved-head {
   display: flex;
   flex-direction: column;
@@ -1193,70 +1279,8 @@
   font-size: 11.5px;
 }
 
-.dh-shelved-sort {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  color: var(--text-secondary);
-  font-size: 12.5px;
-}
-
-.dh-shelved-table .dh-doc-head,
-.dh-shelved-table .dh-doc-row {
-  grid-template-columns:
-    minmax(220px, 2.2fr)
-    minmax(110px, 0.8fr)
-    minmax(150px, 1.1fr)
-    minmax(100px, 0.8fr)
-    150px;
-}
-
-.dh-shelved-name {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-.dh-shelved-title {
-  overflow: hidden;
-  color: var(--text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dh-shelved-meta-at,
-.dh-shelved-meta-by {
-  display: none;
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 11.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dh-shelved-access {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-}
-
-.dh-shelved-lock {
-  flex: none;
-  color: var(--text-secondary);
-}
-
-.dh-shelved-avatar::before {
-  content: attr(data-initial);
-}
-
-.dh-shelved-actions {
-  gap: 6px;
-}
-
-.dh-shelved-unshelve {
+.dh-shelved-unshelve,
+.dh-trash-restore {
   height: 28px;
   padding: 0 10px;
   font-size: 12.5px;
@@ -1273,36 +1297,410 @@
   margin: 0;
 }
 
-@media (max-width: 1100px) {
-  .dh-doc-table.dh-shelved-table:not(.grid-mode) .dh-doc-head,
-  .dh-doc-table.dh-shelved-table:not(.grid-mode) .dh-doc-row {
-    grid-template-columns:
-      minmax(200px, 2.2fr)
-      minmax(100px, 0.8fr)
-      150px;
-  }
-
-  .dh-shelved-table .dh-shelved-meta-by {
-    display: block;
-  }
+/* UNI-2047 A4: the Xem chi tiết panel of a row, over the right edge of the window */
+.dl-details {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 40;
+  display: flex;
+  width: min(320px, 100vw);
+  border-inline-start: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
 }
 
-@media (max-width: 760px) {
-  .dh-doc-table.dh-shelved-table:not(.grid-mode) .dh-doc-head,
-  .dh-doc-table.dh-shelved-table:not(.grid-mode) .dh-doc-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
+.dl-details .uw-info {
+  flex: 1 1 auto;
+  border-inline-start: none;
+  background: var(--surface);
+}
 
-  .dh-shelved-table .dh-col-time,
-  .dh-shelved-table .dh-cell-time {
-    display: none;
-  }
+/* UNI-2047 A5: the bar over the table while rows are selected */
+.dl-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--surface-subtle);
+  color: var(--text);
+}
 
-  .dh-shelved-table .dh-shelved-meta-at {
-    display: block;
-  }
+.dl-bulk-count {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
-  .dh-shelved-sort {
-    margin-left: 0;
+.dl-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dl-bulk-action {
+  min-height: 32px;
+  padding-block: 4px;
+  font-size: 13px;
+}
+
+.dl-bulk-action.danger {
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
+.dl-bulk-action.danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+
+.dl-bulk-clear {
+  margin-inline-start: auto;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dl-bulk-clear:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.dl-bulk-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* UNI-2047: the groups of Recent, Shared with me and the Thùng rác (doclist/GroupHeader). The
+   rows of a group sit 28px in; the indent is the Tên cell's, so every other column keeps its
+   place under its header. */
+.dh-doc-row.grouped {
+  --dh-group-indent: 28px;
+}
+
+.dh-doc-row.grouped .dh-cell-name {
+  padding-inline-start: calc(12px + var(--dh-group-indent));
+}
+
+.dh-group-count {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.dh-group-row {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
+.dh-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dh-group-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.dh-group-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.dh-group-chevron {
+  flex: none;
+}
+
+.dh-group-toggle[aria-expanded='false'] .dh-group-chevron {
+  transform: rotate(-90deg);
+}
+
+/* Recent's screen column: a dot per kind of last touch, then the words */
+.dh-act-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-tertiary);
+}
+
+.dh-act-dot[data-kind='opened'] {
+  background: var(--tint-blue-fg);
+}
+
+.dh-act-dot[data-kind='edited'] {
+  background: var(--success);
+}
+
+.dh-act-dot[data-kind='commented'] {
+  background: var(--tint-violet-fg);
+}
+
+.dh-special-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Recent's Tất cả / Đã mở / Đã sửa segment (doclist/RecentSegment) */
+/* doclist-canvas segment: a filled track, the picked one a raised thumb on it */
+.dh-segment {
+  --dh-segment-thumb-shadow: 0 1px 2px var(--border-strong);
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--bg-hover-subtle);
+}
+
+.dh-segment-btn {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dh-segment-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.dh-segment-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dh-segment-btn[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--dh-segment-thumb-shadow);
+}
+
+.dh-segment-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* UNI-2047 A-REC: Recent on the recent-canvas layout. The title sits over a muted subtitle, the
+   segment shares the filter row with the type chips and the two selects sit at its far end,
+   and "Mở tiếp" shows four cards for the last touches above the list. */
+.dh-title-group.dh-title-stack {
+  flex: 0 100 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  /* V-FIX2 N-01: the one-row header (>= 1101px) must never outgrow its box: this group yields
+     first (the select, the search and the buttons keep their size) and its subtitle ellipsises;
+     the floor keeps the title itself whole. N-08: 10rem cut "From elsewhere" (175px at 24px) under
+     the select, so the floor is 11.5rem (184px); min-content cannot do it, the nowrap subtitle
+     counts its whole text there. Only the subtitle gives way */
+  min-width: 11.5rem;
+}
+
+.dh-subtitle {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-filter-bar.has-lead .dh-filter-chips + .dh-filter-chip {
+  margin-inline-start: auto;
+}
+
+.dh-continue {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dh-continue-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dh-continue-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dh-continue-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dh-continue-card:hover {
+  border-color: var(--border-control);
+  background: var(--hover);
+}
+
+.dh-continue-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dh-continue-card[aria-busy='true'] {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+/* the preview is a decorative sheet in the file type's tint (chrome: it follows the theme) */
+.dh-continue-preview {
+  --ct-bg: var(--tint-gray);
+  --ct-fg: var(--tint-gray-fg);
+  display: flex;
+  justify-content: center;
+  height: 116px;
+  background: var(--ct-bg);
+}
+
+.dh-continue-preview[data-type='docx'],
+.dh-continue-preview[data-type='page'] {
+  --ct-bg: var(--tint-blue);
+  --ct-fg: var(--tint-blue-fg);
+}
+
+.dh-continue-preview[data-type='xlsx'] {
+  --ct-bg: var(--tint-green);
+  --ct-fg: var(--tint-green-fg);
+}
+
+.dh-continue-preview[data-type='pptx'] {
+  --ct-bg: var(--tint-orange);
+  --ct-fg: var(--tint-orange-fg);
+}
+
+.dh-continue-preview[data-type='pdf'] {
+  --ct-bg: var(--danger-bg);
+  --ct-fg: var(--danger-text);
+}
+
+.dh-continue-preview[data-type='md'] {
+  --ct-bg: var(--tint-violet);
+  --ct-fg: var(--tint-violet-fg);
+}
+
+.dh-continue-preview[data-type='html'] {
+  --ct-bg: var(--tint-teal);
+  --ct-fg: var(--tint-teal-fg);
+}
+
+.dh-continue-sheet {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-end;
+  gap: 6px;
+  width: 70%;
+  height: 74%;
+  padding: 12px 12px 0;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--surface);
+}
+
+.dh-continue-line {
+  display: block;
+  width: 88%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+.dh-continue-line.accent {
+  width: 54%;
+  height: 7px;
+  background: var(--ct-fg);
+}
+
+.dh-continue-line.mid {
+  width: 80%;
+}
+
+.dh-continue-line.short {
+  width: 72%;
+}
+
+.dh-continue-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.dh-continue-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dh-continue-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-continue-when {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .dh-continue-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

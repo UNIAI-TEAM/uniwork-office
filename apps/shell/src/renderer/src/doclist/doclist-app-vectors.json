@@ -1,0 +1,1208 @@
+{
+  "access": {
+    "cases": [
+      {
+        "label": "private, nobody else, view",
+        "my_level": "view",
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: View",
+          "vi": "Bạn: Xem"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "label": "private, comment",
+        "my_level": "comment",
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: Comment",
+          "vi": "Bạn: Bình luận"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "label": "private, edit",
+        "my_level": "edit",
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: Edit",
+          "vi": "Bạn: Sửa"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "label": "private, manage",
+        "my_level": "manage",
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: Manage",
+          "vi": "Bạn: Quản lý"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "label": "the app's own private visibility",
+        "my_level": "manage",
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: Manage",
+          "vi": "Bạn: Quản lý"
+        },
+        "visibility": "private"
+      },
+      {
+        "label": "workspace visibility",
+        "my_level": "view",
+        "pill": "workspace",
+        "pill_text": {
+          "en": "Workspace",
+          "vi": "Workspace"
+        },
+        "share_scope": {
+          "home_workspace": true,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: View",
+          "vi": "Bạn: Xem"
+        },
+        "visibility": "workspace"
+      },
+      {
+        "label": "shared with people",
+        "my_level": "comment",
+        "pill": "shared",
+        "pill_text": {
+          "en": "Shared",
+          "vi": "Được chia sẻ"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 2,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: Comment",
+          "vi": "Bạn: Bình luận"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "label": "shared with another workspace",
+        "my_level": "view",
+        "pill": "shared",
+        "pill_text": {
+          "en": "Shared",
+          "vi": "Được chia sẻ"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 1
+        },
+        "sub": {
+          "en": "You: View",
+          "vi": "Bạn: Xem"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "label": "shared with the organization",
+        "my_level": "view",
+        "pill": "shared",
+        "pill_text": {
+          "en": "Shared",
+          "vi": "Được chia sẻ"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": true,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: View",
+          "vi": "Bạn: Xem"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "label": "a live public link alone is shared",
+        "my_level": "manage",
+        "pill": "shared",
+        "pill_text": {
+          "en": "Shared",
+          "vi": "Được chia sẻ"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": true,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: Manage",
+          "vi": "Bạn: Quản lý"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "label": "people and a link",
+        "my_level": "edit",
+        "pill": "shared",
+        "pill_text": {
+          "en": "Shared",
+          "vi": "Được chia sẻ"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": true,
+          "users": 1,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: Edit",
+          "vi": "Bạn: Sửa"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "is_owner": true,
+        "label": "owner replaces the level line",
+        "my_level": "manage",
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "Owner",
+          "vi": "Chủ sở hữu"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "is_owner": true,
+        "label": "owner of a shared document",
+        "my_level": "manage",
+        "pill": "shared",
+        "pill_text": {
+          "en": "Shared",
+          "vi": "Được chia sẻ"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 1,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "Owner",
+          "vi": "Chủ sở hữu"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "is_owner": true,
+        "label": "owner of a workspace document",
+        "my_level": "manage",
+        "pill": "workspace",
+        "pill_text": {
+          "en": "Workspace",
+          "vi": "Workspace"
+        },
+        "share_scope": {
+          "home_workspace": true,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "Owner",
+          "vi": "Chủ sở hữu"
+        },
+        "visibility": "workspace"
+      },
+      {
+        "is_owner": false,
+        "label": "is_owner false shows the level",
+        "my_level": "edit",
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": {
+          "home_workspace": false,
+          "organization": false,
+          "public_link": false,
+          "users": 0,
+          "workspaces": 0
+        },
+        "sub": {
+          "en": "You: Edit",
+          "vi": "Bạn: Sửa"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "label": "no level and no scope",
+        "my_level": null,
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": null,
+        "sub": null,
+        "visibility": "restricted"
+      },
+      {
+        "label": "a level this client does not know",
+        "my_level": "superuser",
+        "pill": "workspace",
+        "pill_text": {
+          "en": "Workspace",
+          "vi": "Workspace"
+        },
+        "share_scope": null,
+        "sub": null,
+        "visibility": "workspace"
+      },
+      {
+        "label": "missing visibility and scope is never guessed",
+        "my_level": "view",
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": null,
+        "sub": {
+          "en": "You: View",
+          "vi": "Bạn: Xem"
+        },
+        "visibility": null
+      },
+      {
+        "admin_scope": true,
+        "label": "administrator without a level reads manage",
+        "my_level": null,
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": null,
+        "sub": {
+          "en": "You: Manage",
+          "vi": "Bạn: Quản lý"
+        },
+        "visibility": "restricted"
+      },
+      {
+        "admin_scope": true,
+        "label": "administrator with a level keeps it",
+        "my_level": "view",
+        "pill": "restricted",
+        "pill_text": {
+          "en": "Private",
+          "vi": "Riêng tư"
+        },
+        "share_scope": null,
+        "sub": {
+          "en": "You: View",
+          "vi": "Bạn: Xem"
+        },
+        "visibility": "restricted"
+      }
+    ]
+  },
+  "bytes": {
+    "cases": [
+      {
+        "bytes": null,
+        "en": "—",
+        "label": "no size (null)",
+        "vi": "—"
+      },
+      {
+        "bytes": 0,
+        "en": "—",
+        "label": "zero",
+        "vi": "—"
+      },
+      {
+        "bytes": -5,
+        "en": "—",
+        "label": "negative",
+        "vi": "—"
+      },
+      {
+        "bytes": 23,
+        "en": "23 B",
+        "label": "bytes",
+        "vi": "23 B"
+      },
+      {
+        "bytes": 1023,
+        "en": "1,023 B",
+        "label": "largest byte count (the locale groups thousands)",
+        "vi": "1.023 B"
+      },
+      {
+        "bytes": 1024,
+        "en": "1 KB",
+        "label": "exact KB",
+        "vi": "1 KB"
+      },
+      {
+        "bytes": 2970,
+        "en": "2.9 KB",
+        "label": "KB one decimal",
+        "vi": "2,9 KB"
+      },
+      {
+        "bytes": 10240,
+        "en": "10 KB",
+        "label": "10 KB is whole",
+        "vi": "10 KB"
+      },
+      {
+        "bytes": 325632,
+        "en": "318 KB",
+        "label": "KB from 10 up is whole",
+        "vi": "318 KB"
+      },
+      {
+        "bytes": 5033165,
+        "en": "4.8 MB",
+        "label": "MB one decimal",
+        "vi": "4,8 MB"
+      },
+      {
+        "bytes": 12582912,
+        "en": "12 MB",
+        "label": "10 units and up is whole",
+        "vi": "12 MB"
+      },
+      {
+        "bytes": 1610612736,
+        "en": "1.5 GB",
+        "label": "GB",
+        "vi": "1,5 GB"
+      }
+    ]
+  },
+  "columns": {
+    "cases": [
+      {
+        "columns": ["select", "name", "access", "editor", "updated", "size", "actions"],
+        "screen": "workspace",
+        "width": 1400
+      },
+      {
+        "columns": ["select", "name", "access", "editor", "updated", "size", "actions"],
+        "screen": "workspace",
+        "width": 870
+      },
+      {
+        "columns": ["select", "name", "access", "editor", "updated", "size", "actions"],
+        "screen": "workspace",
+        "width": 752
+      },
+      {
+        "columns": ["select", "name", "access", "editor", "updated", "actions"],
+        "screen": "workspace",
+        "width": 751
+      },
+      {
+        "columns": ["select", "name", "access", "editor", "updated", "actions"],
+        "screen": "workspace",
+        "width": 710
+      },
+      {
+        "columns": ["select", "name", "access", "editor", "updated", "actions"],
+        "screen": "workspace",
+        "width": 672
+      },
+      {
+        "columns": ["select", "name", "access", "updated", "actions"],
+        "screen": "workspace",
+        "width": 671
+      },
+      {
+        "columns": ["select", "name", "access", "updated", "actions"],
+        "screen": "workspace",
+        "width": 544
+      },
+      {
+        "columns": ["select", "name", "updated", "actions"],
+        "screen": "workspace",
+        "width": 543
+      },
+      {
+        "columns": ["select", "name", "updated", "actions"],
+        "screen": "workspace",
+        "width": 300
+      },
+      {
+        "columns": ["select", "name", "activity", "access", "editor", "updated", "size", "actions"],
+        "screen": "recent",
+        "width": 1200
+      },
+      {
+        "columns": ["select", "name", "activity", "access", "editor", "updated", "size", "actions"],
+        "screen": "recent",
+        "width": 870
+      },
+      {
+        "columns": ["select", "name", "activity", "access", "editor", "updated", "size", "actions"],
+        "screen": "recent",
+        "width": 864
+      },
+      {
+        "columns": ["select", "name", "activity", "access", "editor", "updated", "actions"],
+        "screen": "recent",
+        "width": 863
+      },
+      {
+        "columns": ["select", "name", "activity", "access", "editor", "updated", "actions"],
+        "screen": "recent",
+        "width": 784
+      },
+      {
+        "columns": ["select", "name", "activity", "access", "updated", "actions"],
+        "screen": "recent",
+        "width": 783
+      },
+      {
+        "columns": ["select", "name", "activity", "access", "updated", "actions"],
+        "screen": "recent",
+        "width": 710
+      },
+      {
+        "columns": ["select", "name", "activity", "access", "updated", "actions"],
+        "screen": "recent",
+        "width": 656
+      },
+      {
+        "columns": ["select", "name", "activity", "updated", "actions"],
+        "screen": "recent",
+        "width": 655
+      },
+      {
+        "columns": ["select", "name", "deleted", "access", "editor", "updated", "size", "actions"],
+        "screen": "trash",
+        "width": 1200
+      },
+      {
+        "columns": ["select", "name", "deleted", "access", "updated", "actions"],
+        "screen": "trash",
+        "width": 870
+      },
+      {
+        "columns": ["select", "name", "deleted", "access", "editor", "updated", "size", "actions"],
+        "screen": "trash",
+        "width": 1008
+      },
+      {
+        "columns": [
+          "select",
+          "name",
+          "shared_with",
+          "access",
+          "editor",
+          "updated",
+          "size",
+          "actions"
+        ],
+        "screen": "shared-by-me",
+        "width": 900
+      },
+      {
+        "columns": ["select", "name", "shelved", "access", "editor", "updated", "size", "actions"],
+        "screen": "shelved",
+        "width": 1300
+      },
+      {
+        "columns": ["select", "name", "starred", "access", "updated", "actions"],
+        "screen": "starred",
+        "width": 700
+      },
+      {
+        "columns": ["select", "name", "shared", "access", "editor", "updated", "size", "actions"],
+        "screen": "shared",
+        "width": 1200
+      },
+      {
+        "columns": ["name", "editor", "updated", "size", "actions"],
+        "screen": "elsewhere",
+        "width": 1400
+      },
+      {
+        "columns": ["name", "editor", "updated", "size", "actions"],
+        "screen": "elsewhere",
+        "width": 608
+      },
+      {
+        "columns": ["name", "editor", "updated", "actions"],
+        "screen": "elsewhere",
+        "width": 607
+      },
+      {
+        "columns": ["name", "editor", "updated", "actions"],
+        "screen": "elsewhere",
+        "width": 512
+      },
+      {
+        "columns": ["name", "updated", "actions"],
+        "screen": "elsewhere",
+        "width": 511
+      },
+      {
+        "columns": ["name", "updated", "actions"],
+        "screen": "elsewhere",
+        "width": 300
+      },
+      {
+        "columns": ["select", "name", "updated", "size", "actions"],
+        "screen": "device",
+        "width": 1200
+      },
+      {
+        "columns": ["select", "name", "updated", "size", "actions"],
+        "screen": "device",
+        "width": 640
+      },
+      {
+        "columns": ["select", "name", "updated", "actions"],
+        "screen": "device",
+        "width": 639
+      }
+    ]
+  },
+  "dates": {
+    "cases": [
+      {
+        "at": "2099-03-18T23:41:00",
+        "en": "23:41",
+        "vi": "23:41"
+      },
+      {
+        "at": "2099-03-18T00:07:00",
+        "en": "00:07",
+        "vi": "00:07"
+      },
+      {
+        "at": "2099-03-18T09:05:00",
+        "en": "09:05",
+        "vi": "09:05"
+      },
+      {
+        "at": "2099-03-17T16:30:00",
+        "en": "Yesterday, 16:30",
+        "vi": "Hôm qua, 16:30"
+      },
+      {
+        "at": "2099-03-17T00:00:00",
+        "en": "Yesterday, 00:00",
+        "vi": "Hôm qua, 00:00"
+      },
+      {
+        "at": "2099-03-16T23:59:00",
+        "en": "Mar 16",
+        "vi": "16/03"
+      },
+      {
+        "at": "2099-01-03T12:00:00",
+        "en": "Jan 3",
+        "vi": "03/01"
+      },
+      {
+        "at": "2098-03-18T12:00:00",
+        "en": "Mar 18, 2098",
+        "vi": "18/03/2098"
+      },
+      {
+        "at": "2098-12-31T22:15:00",
+        "en": "Dec 31, 2098",
+        "vi": "31/12/2098"
+      },
+      {
+        "at": "2098-12-31T22:15:00",
+        "en": "Yesterday, 22:15",
+        "now": "2099-01-01T07:00:00",
+        "vi": "Hôm qua, 22:15"
+      },
+      {
+        "at": "2099-03-31T08:00:00",
+        "en": "Yesterday, 08:00",
+        "now": "2099-04-01T00:30:00",
+        "vi": "Hôm qua, 08:00"
+      },
+      {
+        "at": null,
+        "en": "—",
+        "vi": "—"
+      },
+      {
+        "at": "",
+        "en": "—",
+        "vi": "—"
+      },
+      {
+        "at": "not a date",
+        "en": "—",
+        "vi": "—"
+      }
+    ],
+    "now": "2099-03-18T09:05:00"
+  },
+  "days_left": {
+    "cases": [
+      {
+        "days": 30,
+        "en": "30 days left",
+        "label": "30 days",
+        "purge_after": "2099-04-17T09:05:00",
+        "vi": "Còn 30 ngày"
+      },
+      {
+        "days": 7,
+        "en": "7 days left",
+        "label": "exactly 7 days",
+        "purge_after": "2099-03-25T09:05:00",
+        "vi": "Còn 7 ngày"
+      },
+      {
+        "days": 8,
+        "en": "8 days left",
+        "label": "7 days and a minute rounds up to 8",
+        "purge_after": "2099-03-25T09:06:00",
+        "vi": "Còn 8 ngày"
+      },
+      {
+        "days": 8,
+        "en": "8 days left",
+        "label": "8 days",
+        "purge_after": "2099-03-26T09:05:00",
+        "vi": "Còn 8 ngày"
+      },
+      {
+        "days": 2,
+        "en": "2 days left",
+        "label": "a day and an hour",
+        "purge_after": "2099-03-19T10:05:00",
+        "vi": "Còn 2 ngày"
+      },
+      {
+        "days": 1,
+        "en": "1 day left",
+        "label": "exactly one day",
+        "purge_after": "2099-03-19T09:05:00",
+        "vi": "Còn 1 ngày"
+      },
+      {
+        "days": 1,
+        "en": "1 day left",
+        "label": "under a day",
+        "purge_after": "2099-03-18T20:00:00",
+        "vi": "Còn 1 ngày"
+      },
+      {
+        "days": 1,
+        "en": "1 day left",
+        "label": "a minute",
+        "purge_after": "2099-03-18T09:06:00",
+        "vi": "Còn 1 ngày"
+      },
+      {
+        "days": 1,
+        "en": "1 day left",
+        "label": "already past stays at 1",
+        "purge_after": "2099-03-18T09:00:00",
+        "vi": "Còn 1 ngày"
+      },
+      {
+        "days": null,
+        "en": null,
+        "label": "no date",
+        "purge_after": null,
+        "vi": null
+      },
+      {
+        "days": null,
+        "en": null,
+        "label": "empty date",
+        "purge_after": "",
+        "vi": null
+      },
+      {
+        "days": null,
+        "en": null,
+        "label": "invalid date",
+        "purge_after": "not a date",
+        "vi": null
+      }
+    ],
+    "now": "2099-03-18T09:05:00"
+  },
+  "groups": {
+    "cases": [
+      {
+        "en": "Today",
+        "group": "today",
+        "input": {
+          "at": "2099-03-18T00:00:00"
+        },
+        "label": "recent: today 00:00 (Wed)",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Hôm nay"
+      },
+      {
+        "en": "Today",
+        "group": "today",
+        "input": {
+          "at": "2099-03-18T23:30:00"
+        },
+        "label": "recent: a time later today",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Hôm nay"
+      },
+      {
+        "en": "Yesterday",
+        "group": "yesterday",
+        "input": {
+          "at": "2099-03-17T23:59:00"
+        },
+        "label": "recent: yesterday 23:59 (Wed)",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Hôm qua"
+      },
+      {
+        "en": "Yesterday",
+        "group": "yesterday",
+        "input": {
+          "at": "2099-03-17T00:00:00"
+        },
+        "label": "recent: yesterday 00:00 (Wed)",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Hôm qua"
+      },
+      {
+        "en": "This week",
+        "group": "this_week",
+        "input": {
+          "at": "2099-03-16T23:59:00"
+        },
+        "label": "recent: Monday 23:59 is this week",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Tuần này"
+      },
+      {
+        "en": "This week",
+        "group": "this_week",
+        "input": {
+          "at": "2099-03-16T00:00:00"
+        },
+        "label": "recent: Monday 00:00 is this week",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Tuần này"
+      },
+      {
+        "en": "Earlier",
+        "group": "earlier",
+        "input": {
+          "at": "2099-03-15T23:59:00"
+        },
+        "label": "recent: Sunday 23:59 is earlier",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Trước đó"
+      },
+      {
+        "en": "Today",
+        "group": "today",
+        "input": {
+          "at": "2099-03-16T00:00:00"
+        },
+        "label": "recent: on a Monday, today",
+        "now": "2099-03-16T09:05:00",
+        "screen": "recent",
+        "vi": "Hôm nay"
+      },
+      {
+        "en": "Yesterday",
+        "group": "yesterday",
+        "input": {
+          "at": "2099-03-15T23:59:00"
+        },
+        "label": "recent: on a Monday, Sunday is yesterday",
+        "now": "2099-03-16T09:05:00",
+        "screen": "recent",
+        "vi": "Hôm qua"
+      },
+      {
+        "en": "Earlier",
+        "group": "earlier",
+        "input": {
+          "at": "2099-03-14T12:00:00"
+        },
+        "label": "recent: on a Monday, Saturday is earlier",
+        "now": "2099-03-16T09:05:00",
+        "screen": "recent",
+        "vi": "Trước đó"
+      },
+      {
+        "en": "Yesterday",
+        "group": "yesterday",
+        "input": {
+          "at": "2099-03-16T12:00:00"
+        },
+        "label": "recent: on a Tuesday, Monday is yesterday",
+        "now": "2099-03-17T09:05:00",
+        "screen": "recent",
+        "vi": "Hôm qua"
+      },
+      {
+        "en": "Earlier",
+        "group": "earlier",
+        "input": {
+          "at": "2099-03-15T12:00:00"
+        },
+        "label": "recent: on a Tuesday, Sunday is earlier",
+        "now": "2099-03-17T09:05:00",
+        "screen": "recent",
+        "vi": "Trước đó"
+      },
+      {
+        "en": "This week",
+        "group": "this_week",
+        "input": {
+          "at": "2099-03-16T00:00:00"
+        },
+        "label": "recent: on a Sunday, Monday 00:00 is this week",
+        "now": "2099-03-22T09:05:00",
+        "screen": "recent",
+        "vi": "Tuần này"
+      },
+      {
+        "en": "Earlier",
+        "group": "earlier",
+        "input": {
+          "at": "2099-03-15T23:59:00"
+        },
+        "label": "recent: on a Sunday, last Sunday is earlier",
+        "now": "2099-03-22T09:05:00",
+        "screen": "recent",
+        "vi": "Trước đó"
+      },
+      {
+        "en": "Yesterday",
+        "group": "yesterday",
+        "input": {
+          "at": "2099-03-21T12:00:00"
+        },
+        "label": "recent: on a Sunday, Saturday is yesterday",
+        "now": "2099-03-22T09:05:00",
+        "screen": "recent",
+        "vi": "Hôm qua"
+      },
+      {
+        "en": "Today",
+        "group": "today",
+        "input": {
+          "at": "2099-03-19T10:00:00"
+        },
+        "label": "recent: a date after now counts as today",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Hôm nay"
+      },
+      {
+        "en": "Earlier",
+        "group": "earlier",
+        "input": {
+          "at": null
+        },
+        "label": "recent: no date is earlier",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Trước đó"
+      },
+      {
+        "en": "Earlier",
+        "group": "earlier",
+        "input": {
+          "at": "not a date"
+        },
+        "label": "recent: invalid date is earlier",
+        "now": "2099-03-18T09:05:00",
+        "screen": "recent",
+        "vi": "Trước đó"
+      },
+      {
+        "en": "This week",
+        "group": "this_week",
+        "input": {
+          "at": "2099-03-18T08:00:00"
+        },
+        "label": "shared: today is this week",
+        "now": "2099-03-18T09:05:00",
+        "screen": "shared",
+        "vi": "Tuần này"
+      },
+      {
+        "en": "This week",
+        "group": "this_week",
+        "input": {
+          "at": "2099-03-17T23:00:00"
+        },
+        "label": "shared: yesterday is this week",
+        "now": "2099-03-18T09:05:00",
+        "screen": "shared",
+        "vi": "Tuần này"
+      },
+      {
+        "en": "This week",
+        "group": "this_week",
+        "input": {
+          "at": "2099-03-16T00:00:00"
+        },
+        "label": "shared: Monday 00:00 is this week",
+        "now": "2099-03-18T09:05:00",
+        "screen": "shared",
+        "vi": "Tuần này"
+      },
+      {
+        "en": "Earlier",
+        "group": "earlier",
+        "input": {
+          "at": "2099-03-15T23:59:00"
+        },
+        "label": "shared: Sunday 23:59 is earlier",
+        "now": "2099-03-18T09:05:00",
+        "screen": "shared",
+        "vi": "Trước đó"
+      },
+      {
+        "en": "This week",
+        "group": "this_week",
+        "input": {
+          "at": "2099-03-16T08:00:00"
+        },
+        "label": "shared: on a Monday, today is this week",
+        "now": "2099-03-16T09:05:00",
+        "screen": "shared",
+        "vi": "Tuần này"
+      },
+      {
+        "en": "Earlier",
+        "group": "earlier",
+        "input": {
+          "at": "2099-03-15T23:59:00"
+        },
+        "label": "shared: on a Monday, yesterday is earlier",
+        "now": "2099-03-16T09:05:00",
+        "screen": "shared",
+        "vi": "Trước đó"
+      },
+      {
+        "en": "Earlier",
+        "group": "earlier",
+        "input": {
+          "at": null
+        },
+        "label": "shared: no date is earlier",
+        "now": "2099-03-18T09:05:00",
+        "screen": "shared",
+        "vi": "Trước đó"
+      },
+      {
+        "en": "Deleting soon",
+        "group": "deleting_soon",
+        "input": {
+          "purgeAfter": "2099-03-25T09:05:00"
+        },
+        "label": "trash: 7 days left is deleting soon",
+        "now": "2099-03-18T09:05:00",
+        "screen": "trash",
+        "vi": "Sắp xóa vĩnh viễn"
+      },
+      {
+        "en": "More than 7 days left",
+        "group": "more_than_7_days",
+        "input": {
+          "purgeAfter": "2099-03-25T09:06:00"
+        },
+        "label": "trash: 7 days and a minute is the long group",
+        "now": "2099-03-18T09:05:00",
+        "screen": "trash",
+        "vi": "Còn trên 7 ngày"
+      },
+      {
+        "en": "Deleting soon",
+        "group": "deleting_soon",
+        "input": {
+          "purgeAfter": "2099-03-19T09:05:00"
+        },
+        "label": "trash: one day left",
+        "now": "2099-03-18T09:05:00",
+        "screen": "trash",
+        "vi": "Sắp xóa vĩnh viễn"
+      },
+      {
+        "en": "Deleting soon",
+        "group": "deleting_soon",
+        "input": {
+          "purgeAfter": "2099-03-18T09:00:00"
+        },
+        "label": "trash: already past is deleting soon",
+        "now": "2099-03-18T09:05:00",
+        "screen": "trash",
+        "vi": "Sắp xóa vĩnh viễn"
+      },
+      {
+        "en": "More than 7 days left",
+        "group": "more_than_7_days",
+        "input": {
+          "purgeAfter": "2099-04-17T09:05:00"
+        },
+        "label": "trash: 30 days left",
+        "now": "2099-03-18T09:05:00",
+        "screen": "trash",
+        "vi": "Còn trên 7 ngày"
+      },
+      {
+        "en": "More than 7 days left",
+        "group": "more_than_7_days",
+        "input": {
+          "purgeAfter": null
+        },
+        "label": "trash: no date is the long group",
+        "now": "2099-03-18T09:05:00",
+        "screen": "trash",
+        "vi": "Còn trên 7 ngày"
+      },
+      {
+        "en": "More than 7 days left",
+        "group": "more_than_7_days",
+        "input": {
+          "purgeAfter": "not a date"
+        },
+        "label": "trash: invalid date is the long group",
+        "now": "2099-03-18T09:05:00",
+        "screen": "trash",
+        "vi": "Còn trên 7 ngày"
+      }
+    ],
+    "labels": {
+      "deleting_soon": {
+        "en": "Deleting soon",
+        "vi": "Sắp xóa vĩnh viễn"
+      },
+      "earlier": {
+        "en": "Earlier",
+        "vi": "Trước đó"
+      },
+      "more_than_7_days": {
+        "en": "More than 7 days left",
+        "vi": "Còn trên 7 ngày"
+      },
+      "this_week": {
+        "en": "This week",
+        "vi": "Tuần này"
+      },
+      "today": {
+        "en": "Today",
+        "vi": "Hôm nay"
+      },
+      "yesterday": {
+        "en": "Yesterday",
+        "vi": "Hôm qua"
+      }
+    }
+  }
+}

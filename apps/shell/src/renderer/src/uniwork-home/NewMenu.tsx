@@ -8,20 +8,15 @@ import { NEW_DOC_KINDS, type NewDocKind } from '../uniwork-docs-model'
 import { FolderGlyph } from '../uniwork-folders/UniworkFolderTree'
 import { NEW_KIND_EXT, NEW_MENU_LABEL_KEY, type NewMenuKind } from './new-menu-model'
 
-/** the share toggle as the menu shows it (state lives in the home view, shared with the strip) */
-export interface NewMenuShare {
-  checked: boolean
-  onChange: (next: boolean) => void
-}
-
 /**
  * UNI-1959: the Documents home "New" button and the web's menu behind it
  * (documents-home-create.tsx `CreateMenu`): UniNote, a divider, the seven file
- * kinds, a divider, then "Share with workspace" with its hint; inside an open
- * folder a "Folder" row comes first, followed by a divider. Every row shows its
+ * kinds; inside an open folder a "Folder" row comes first, followed by a divider.
+ * A create is always private (web rule UNI-2038): there is no share toggle here, sharing
+ * is chosen at first save or in the Share dialog. Every row shows its
  * icon, its name and, right-aligned in muted mono, its extension. Menu-button
  * pattern: arrows move, Home / End jump, Enter / Space pick, Esc closes and
- * hands focus back to the button; a pick closes the menu, the toggle does not.
+ * hands focus back to the button; a pick closes the menu.
  */
 export function NewMenu({
   label,
@@ -29,7 +24,6 @@ export function NewMenu({
   unavailable,
   unavailableHint,
   busy,
-  share,
   onPick,
 }: {
   label: string
@@ -39,7 +33,6 @@ export function NewMenu({
   unavailable: ReadonlySet<NewDocKind>
   unavailableHint: string
   busy: boolean
-  share: NewMenuShare
   onPick: (kind: NewMenuKind) => void
 }) {
   const { t } = useI18n()
@@ -47,7 +40,6 @@ export function NewMenu({
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
-  const hintId = useId()
 
   useLayoutEffect(() => {
     if (!open) return
@@ -80,11 +72,9 @@ export function NewMenu({
 
   // a disabled row (a kind the server cannot create) is skipped, as the web's menu does
   const focusables = () =>
-    Array.from(
-      menuRef.current?.querySelectorAll<HTMLElement>(
-        '[role="menuitem"], [role="menuitemcheckbox"]',
-      ) ?? [],
-    ).filter((node) => node.getAttribute('aria-disabled') !== 'true')
+    Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []).filter(
+      (node) => node.getAttribute('aria-disabled') !== 'true',
+    )
 
   // initial focus: the first usable row
   useEffect(() => {
@@ -121,7 +111,6 @@ export function NewMenu({
   }
 
   const kinds: NewMenuKind[] = hasFolderRow ? ['folder', ...NEW_DOC_KINDS] : [...NEW_DOC_KINDS]
-  const hint = share.checked ? t('uhNewShareHint', { level: t('uhNewShareLevelView') }) : ''
 
   const row = (kind: NewMenuKind) => {
     const off = kind !== 'folder' && unavailable.has(kind)
@@ -220,42 +209,6 @@ export function NewMenu({
             onClick={(e) => e.stopPropagation()}
           >
             {items}
-            <div role="separator" className="dh-new-sep" />
-            <button
-              type="button"
-              role="menuitemcheckbox"
-              tabIndex={-1}
-              className="dh-new-item dh-new-share"
-              aria-checked={share.checked}
-              aria-disabled={busy || undefined}
-              aria-describedby={hintId}
-              onClick={() => {
-                if (busy) return
-                share.onChange(!share.checked)
-              }}
-            >
-              <span className="dh-new-check" aria-hidden="true">
-                {share.checked && (
-                  <svg width="12" height="12" viewBox="0 0 16 16">
-                    <path
-                      d="m3.5 8.5 3 3 6-7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </span>
-              <span className="dh-new-share-text">
-                <span className="dh-new-label">{t('uhNewShare')}</span>
-                {/* inside the item so aria-describedby resolves within it; a live region so a change is announced */}
-                <span id={hintId} role="status" className="dh-new-hint">
-                  {hint}
-                </span>
-              </span>
-            </button>
           </div>,
           document.body,
         )}
