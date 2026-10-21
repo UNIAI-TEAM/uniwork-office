@@ -125,6 +125,8 @@ export function asPreflightSDO(raw: unknown): PreflightSDO | null {
     skipped: r.skipped.map(skipOf).filter((skip): skip is BatchUploadSkip => skip !== null),
     refusal,
     shareAvailable: r.shareAvailable,
+    // absent or odd = the switch stays free
+    parentShared: r.parentShared === true,
   }
 }
 

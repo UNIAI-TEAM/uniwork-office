@@ -69,6 +69,13 @@ export interface PreflightSDO {
    * sequential fallback (a server without folder_upload), which has no such flag.
    */
   shareAvailable: boolean
+  /**
+   * The destination already shares with the workspace, so the files inherit it:
+   * the switch shows ON, locked, and nothing is sent. Same rule as the web
+   * (`isParentWorkspaceShared`): a folder is never a shared parent, so this is
+   * false for every destination the app can resolve today.
+   */
+  parentShared: boolean
 }
 
 /** `uniwork-doc:batch-upload-pick` */

@@ -96,6 +96,8 @@ interface Target {
   /** tree level of the destination for the depth check: workspace root 0, My Folder 1 */
   level: number
   siblingNames: string[]
+  /** shares with the workspace already: the web's rule, which a folder never meets (UNI-1974) */
+  shared: boolean
 }
 
 type Groups = { files: string[]; dirs: string[] }
@@ -166,11 +168,12 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
           label: hit.node.title,
           level: hit.level,
           siblingNames: hit.node.children.map((child) => child.title),
+          shared: false,
         }
       }
       // a My Folder the tree does not list yet is a root-level folder with nothing in it
       return folderId === null
-        ? { folderId: id, label: fallbackLabel, level: 1, siblingNames: [] }
+        ? { folderId: id, label: fallbackLabel, level: 1, siblingNames: [], shared: false }
         : null
     } catch {
       return null
@@ -192,6 +195,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
       skipped: [],
       refusal,
       shareAvailable,
+      parentShared: false,
     }
   }
 
@@ -251,6 +255,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
       skipped: plan.skipped,
       refusal: plan.refusal,
       shareAvailable: true,
+      parentShared: target.shared,
     }
   }
 
@@ -285,6 +290,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
       skipped: plan.skipped,
       refusal: plan.refusal,
       shareAvailable: !sequential,
+      parentShared: target.shared,
     }
   }
 
