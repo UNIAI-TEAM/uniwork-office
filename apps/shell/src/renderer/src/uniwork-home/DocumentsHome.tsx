@@ -1976,129 +1976,127 @@ export function DocumentsHome({
           )
         })}
       </nav>
-      {/* RV-14: the folders and the sources section scroll as one column below the nav (as the web) */}
-      <div className="dl-side-scroll">
-        <div className="dh-sidebar-folders">
-          <div className="dh-sidebar-head">
-            <span className="dh-sidebar-label">{t('uhSidebarFolders')}</span>
+      {/* RV-14 / VS-9: the wrap is the one scroller; nav, folders and sources scroll together (as the web) */}
+      <div className="dh-sidebar-folders">
+        <div className="dh-sidebar-head">
+          <span className="dh-sidebar-label">{t('uhSidebarFolders')}</span>
+          <button
+            type="button"
+            className="dh-sidebar-add"
+            aria-label={t('uhNewFolder')}
+            title={t('uhNewFolder')}
+            onClick={() => {
+              onSidebarNavigate?.()
+              // the tree has no root row (and so no root menu): as on the web, "+" makes a top-level folder
+              folderActions.openCreate(null, false)
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+        </div>
+        <div className="dh-sidebar-tree">
+          {/* My Folder lives in the tree; until the server has created it, this row stands in its place and creates it. */}
+          {tree.status !== 'loading' && !myFolderIdOf(tree.nodes) && (
             <button
               type="button"
-              className="dh-sidebar-add"
-              aria-label={t('uhNewFolder')}
-              title={t('uhNewFolder')}
+              data-my-folder-standin=""
+              className={`uwf-tree-row dh-my-folder-standin${myFolderStandInCurrent ? ' selected' : ''}`}
+              aria-current={myFolderStandInCurrent ? 'page' : undefined}
               onClick={() => {
                 onSidebarNavigate?.()
-                // the tree has no root row (and so no root menu): as on the web, "+" makes a top-level folder
-                folderActions.openCreate(null, false)
+                selectSubView('my-folder')
               }}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <span className="uwf-twisty" aria-hidden="true" />
+              <MyFolderGlyph />
+              <span className="uwf-tree-text">
+                <span className="uwf-tree-title">{myFolderLabel}</span>
+              </span>
             </button>
+          )}
+          {tree.status === 'loading' && (
+            <p className="uwf-side-state" role="status">
+              {t('uwPickLoading')}
+            </p>
+          )}
+          {tree.status === 'error' && (
+            <div className="uwf-side-state" role="alert">
+              <p>{t('ufTreeError')}</p>
+              <button type="button" className="btn btn-secondary" onClick={refreshAll}>
+                {t('acctRetry')}
+              </button>
+            </div>
+          )}
+          {tree.status === 'ready' && (
+            <UniworkFolderTree
+              idPrefix={`${uid}-tree`}
+              hideRoot
+              nodes={tree.nodes}
+              label={t('ufTreeLabel')}
+              expanded={expanded}
+              onExpandedChange={setExpanded}
+              selectedKey={treeSelectedKey}
+              onOpen={(id) => {
+                onSidebarNavigate?.()
+                openFolderInWorkspace(id)
+              }}
+              menuFor={treeMenuFor}
+              rename={folderActions.treeRename}
+              onRenameSave={(id, value) =>
+                folderActions.saveTreeRename(id, value, index.get(id)?.title ?? '')
+              }
+              onRenameCancel={folderActions.cancelTreeRename}
+              onRenameEdit={folderActions.clearTreeRenameError}
+            />
+          )}
+        </div>
+      </div>
+      {sourcesAvailable && (
+        <div className="dl-side-sources" role="group" aria-labelledby={`${uid}-side-sources`}>
+          <div className="dh-sidebar-head">
+            <span className="dh-sidebar-label" id={`${uid}-side-sources`}>
+              {t('dlNavElsewhere')}
+            </span>
           </div>
-          <div className="dh-sidebar-tree">
-            {/* My Folder lives in the tree; until the server has created it, this row stands in its place and creates it. */}
-            {tree.status !== 'loading' && !myFolderIdOf(tree.nodes) && (
+          {ELSEWHERE_SOURCES.map((row) => {
+            const current =
+              !sidebarIdle && subView === 'elsewhere' && elsewhereSource === row.source
+            return (
               <button
+                key={row.source}
                 type="button"
-                data-my-folder-standin=""
-                className={`uwf-tree-row dh-my-folder-standin${myFolderStandInCurrent ? ' selected' : ''}`}
-                aria-current={myFolderStandInCurrent ? 'page' : undefined}
+                className={`dh-nav-item nav-item${current ? ' active' : ''}`}
+                data-source={row.source}
+                aria-current={current ? 'page' : undefined}
                 onClick={() => {
                   onSidebarNavigate?.()
-                  selectSubView('my-folder')
+                  openElsewhere(row.source)
                 }}
               >
-                <span className="uwf-twisty" aria-hidden="true" />
-                <MyFolderGlyph />
-                <span className="uwf-tree-text">
-                  <span className="uwf-tree-title">{myFolderLabel}</span>
-                </span>
-              </button>
-            )}
-            {tree.status === 'loading' && (
-              <p className="uwf-side-state" role="status">
-                {t('uwPickLoading')}
-              </p>
-            )}
-            {tree.status === 'error' && (
-              <div className="uwf-side-state" role="alert">
-                <p>{t('ufTreeError')}</p>
-                <button type="button" className="btn btn-secondary" onClick={refreshAll}>
-                  {t('acctRetry')}
-                </button>
-              </div>
-            )}
-            {tree.status === 'ready' && (
-              <UniworkFolderTree
-                idPrefix={`${uid}-tree`}
-                hideRoot
-                nodes={tree.nodes}
-                label={t('ufTreeLabel')}
-                expanded={expanded}
-                onExpandedChange={setExpanded}
-                selectedKey={treeSelectedKey}
-                onOpen={(id) => {
-                  onSidebarNavigate?.()
-                  openFolderInWorkspace(id)
-                }}
-                menuFor={treeMenuFor}
-                rename={folderActions.treeRename}
-                onRenameSave={(id, value) =>
-                  folderActions.saveTreeRename(id, value, index.get(id)?.title ?? '')
-                }
-                onRenameCancel={folderActions.cancelTreeRename}
-                onRenameEdit={folderActions.clearTreeRenameError}
-              />
-            )}
-          </div>
-        </div>
-        {sourcesAvailable && (
-          <div className="dl-side-sources" role="group" aria-labelledby={`${uid}-side-sources`}>
-            <div className="dh-sidebar-head">
-              <span className="dh-sidebar-label" id={`${uid}-side-sources`}>
-                {t('dlNavElsewhere')}
-              </span>
-            </div>
-            {ELSEWHERE_SOURCES.map((row) => {
-              const current =
-                !sidebarIdle && subView === 'elsewhere' && elsewhereSource === row.source
-              return (
-                <button
-                  key={row.source}
-                  type="button"
-                  className={`dh-nav-item nav-item${current ? ' active' : ''}`}
-                  data-source={row.source}
-                  aria-current={current ? 'page' : undefined}
-                  onClick={() => {
-                    onSidebarNavigate?.()
-                    openElsewhere(row.source)
-                  }}
+                <span
+                  className={`dl-side-tile tone-${row.tone}`}
+                  data-tone={row.tone}
+                  aria-hidden="true"
                 >
-                  <span
-                    className={`dl-side-tile tone-${row.tone}`}
-                    data-tone={row.tone}
-                    aria-hidden="true"
-                  >
-                    <SourceGlyph source={row.source} />
-                  </span>
-                  <span className="dl-side-label">{t(row.labelKey)}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
+                  <SourceGlyph source={row.source} />
+                </span>
+                <span className="dl-side-label">{t(row.labelKey)}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 

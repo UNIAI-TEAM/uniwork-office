@@ -1,23 +1,23 @@
 /* UNI-2047 sidebar: the "Từ nơi khác" section of the Documents sidebar (web documents-sidebar.tsx),
    semantic tokens only, both themes. The rows reuse .dh-nav-item; this file draws the module tile. */
 
-/* RV-14: below the nav the sidebar is one scrolling column, as on the web: the folder tree and the
-   sources section scroll together, so at the minimum window height nothing is squeezed or clipped.
-   Inside it the folders block and the tree take their natural height (their own flex / scroller
-   from documents-home.css would otherwise shrink the tree to nothing and clip the section). */
-.dl-side-scroll {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
+/* RV-14 / VS-9: the whole Documents sidebar (sub-nav, folder tree, sources section) is one scrolling
+   column, as the web's documents-sidebar.tsx (one overflow-y-auto nav). The wrap is the only scroller:
+   at the minimum window height the user scrolls past the nav to the tree and the sources, which keep
+   a normal-height viewport instead of the sliver a scroller below a fixed nav left them. Nothing
+   inside it scrolls or shrinks on its own (documents-home.css gives the tree its own flex / scroller,
+   which would squeeze it to nothing here). At normal heights nothing overflows, so no bar shows. */
+.dh-sidebar-wrap {
   min-height: 0;
   overflow-y: auto;
 }
 
-.dl-side-scroll .dh-sidebar-folders {
+.dh-sidebar-wrap > .dh-subnav,
+.dh-sidebar-wrap > .dh-sidebar-folders {
   flex: none;
 }
 
-.dl-side-scroll .dh-sidebar-tree {
+.dh-sidebar-wrap .dh-sidebar-tree {
   flex: none;
   overflow: visible;
 }
@@ -27,7 +27,7 @@
   flex: none;
   flex-direction: column;
   gap: 2px;
-  margin-top: 6px;
+  margin-top: 2px; /* + the wrap's 4px gap: the 6px this block had under the tree's old scroller */
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
