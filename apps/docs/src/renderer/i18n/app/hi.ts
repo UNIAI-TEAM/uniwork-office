@@ -26,6 +26,7 @@ export const hi = {
   appScLineBreak: 'पंक्ति विराम',
   appScNbsp: 'अविच्छेद्य स्थान',
   appScNbHyphen: 'अविच्छेद्य हाइफ़न',
+  appScFindNext: 'अगला खोजें',
   appScOptHyphen: 'वैकल्पिक हाइफ़न',
   appScGrowFont1: 'फ़ॉन्ट आकार 1 pt बढ़ाएँ',
   appScShrinkFont1: 'फ़ॉन्ट आकार 1 pt घटाएँ',

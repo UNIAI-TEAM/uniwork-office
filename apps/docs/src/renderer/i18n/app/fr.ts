@@ -26,6 +26,7 @@ export const fr = {
   appScLineBreak: 'Saut de ligne',
   appScNbsp: 'Espace insécable',
   appScNbHyphen: "Trait d'union insécable",
+  appScFindNext: 'Rechercher suivant',
   appScOptHyphen: 'Trait d’union conditionnel',
   appScGrowFont1: 'Augmenter la police de 1 pt',
   appScShrinkFont1: 'Réduire la police de 1 pt',

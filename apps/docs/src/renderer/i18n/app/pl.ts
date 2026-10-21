@@ -26,6 +26,7 @@ export const pl = {
   appScLineBreak: 'Podział wiersza',
   appScNbsp: 'Spacja nierozdzielająca',
   appScNbHyphen: 'Łącznik nierozdzielający',
+  appScFindNext: 'Znajdź następne',
   appScOptHyphen: 'Łącznik opcjonalny',
   appScGrowFont1: 'Zwiększ czcionkę o 1 pkt',
   appScShrinkFont1: 'Zmniejsz czcionkę o 1 pkt',

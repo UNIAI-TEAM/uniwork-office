@@ -26,6 +26,7 @@ export const de = {
   appScLineBreak: 'Zeilenumbruch',
   appScNbsp: 'Geschütztes Leerzeichen',
   appScNbHyphen: 'Geschützter Bindestrich',
+  appScFindNext: 'Weitersuchen',
   appScOptHyphen: 'Bedingter Trennstrich',
   appScGrowFont1: 'Schriftgrad um 1 pt vergrößern',
   appScShrinkFont1: 'Schriftgrad um 1 pt verkleinern',
