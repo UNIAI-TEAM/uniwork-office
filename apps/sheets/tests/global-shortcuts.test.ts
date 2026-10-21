@@ -283,6 +283,31 @@ describe('Excel for the web', () => {
     expect(resolveGlobalShortcut(keyEvent('Equal', alt), WEB)).toEqual(cmd('autofn:SUM'))
     expect(resolveGlobalShortcut(keyEvent('KeyT', ctrlShift), WEB)).toBeNull()
   })
+
+  it('inserts the default chart with Alt+F1 (webAlt of sheets-46), on web only', () => {
+    expect(resolveGlobalShortcut(keyEvent('F1', alt), WEB)).toEqual(cmd('insert-chart:column'))
+    expect(resolveGlobalShortcut(keyEvent('F1', alt), WEB_MAC)).toBeNull()
+    expectUnbound(GRID, [['Alt+F1', keyEvent('F1', alt)]])
+    expectUnbound(MAC, [['Alt+F1', keyEvent('F1', alt)]])
+  })
+
+  it('keeps Alt+F1 off a text field, an in-cell edit and a modal', () => {
+    const webGuards = (over: Partial<GlobalShortcutGuards>): GlobalShortcutGuards => ({
+      ...WEB,
+      ...over,
+    })
+    const event = keyEvent('F1', alt)
+    expect(resolveGlobalShortcut(event, webGuards({ gridTarget: false }))).toBeNull()
+    expect(resolveGlobalShortcut(event, webGuards({ cellEditing: true }))).toBeNull()
+    expect(resolveGlobalShortcut(event, webGuards({ modalOpen: true }))).toBeNull()
+  })
+
+  it('leaves F1 to the browser: no help command is bound on any surface', () => {
+    for (const guards of [GRID, MAC, WEB, WEB_MAC]) {
+      expect(resolveGlobalShortcut(keyEvent('F1'), guards)).toBeNull()
+    }
+    expect(resolveGlobalShortcut(keyEvent('Slash', meta), MAC)).toBeNull()
+  })
 })
 
 describe('number-format and border shortcuts', () => {

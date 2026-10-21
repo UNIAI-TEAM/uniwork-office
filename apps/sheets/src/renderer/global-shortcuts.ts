@@ -94,6 +94,9 @@ const BINDINGS: readonly Binding[] = [
   { id: 'sheets-76', gate: 'sheet', action: command('insert-now:date') },
   { id: 'sheets-77', gate: 'sheet', action: command('insert-now:time') },
   { id: 'sheets-45', gate: 'sheet', action: command('insert-sheet') },
+  // Alt+F1 (web only) inserts the default chart; F11 (chart sheet) clashes with the Electron
+  // fullscreen role on desktop, so desktop has no chart chord
+  { id: 'sheets-46', gate: 'sheet', action: command('insert-chart:column') },
   { id: 'sheets-52', gate: 'sheet', action: command('flash-fill') },
   { id: 'sheets-12', gate: 'sheet', action: command('paste-special:value') },
   { id: 'sheets-11', gate: 'sheet', action: command('paste-special-open') },
