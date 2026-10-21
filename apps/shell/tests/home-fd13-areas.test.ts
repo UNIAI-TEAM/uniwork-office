@@ -1698,6 +1698,38 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     await flush()
     expect(host.querySelector('.dh-main h1')?.textContent).toBe('Trash')
   })
+  it('keeps the picked Từ nơi khác source with the sub-view across an area switch (RV-16)', async () => {
+    const listSources = vi.fn(async () => ok({ items: [], nextCursor: null }))
+    ;(api as unknown as Record<string, unknown>).uniworkListSources = listSources
+    await mountHome()
+
+    const meeting = host.querySelector<HTMLButtonElement>(
+      '.dl-side-sources [data-source="meeting"]',
+    )
+    expect(meeting).not.toBeNull()
+    await act(async () => {
+      meeting!.click()
+    })
+    await flush()
+    expect(listSources).toHaveBeenLastCalledWith({ workspaceId: 'ws-1', source: 'meeting' })
+
+    const tabs = host.querySelectorAll<HTMLButtonElement>(
+      '[role="tablist"][aria-label="Area"] [role="tab"]',
+    )
+    await act(async () => {
+      tabs[1]!.click()
+    })
+    await flush()
+    await act(async () => {
+      tabs[0]!.click()
+    })
+    await flush()
+
+    // the page is filtered again and the same source row is the current one
+    expect(listSources).toHaveBeenLastCalledWith({ workspaceId: 'ws-1', source: 'meeting' })
+    const current = host.querySelector<HTMLElement>('.dl-side-sources [aria-current="page"]')
+    expect(current?.getAttribute('data-source')).toBe('meeting')
+  })
   it('resets the UniWork sub-view and open folder to the workspace root on a workspace switch (VDH-7)', async () => {
     await mountHome()
 

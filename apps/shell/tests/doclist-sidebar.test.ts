@@ -10,6 +10,8 @@
  *    tile and tint, each opening the Từ nơi khác page filtered to that source. The section shows
  *    once the sources route has answered for the workspace and is hidden when it is not deployed.
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -125,7 +127,11 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-async function mount(subView: DocumentsHomeSubViewId = 'workspace', lang: 'vi' | 'en' = 'vi') {
+async function mount(
+  subView: DocumentsHomeSubViewId = 'workspace',
+  lang: 'vi' | 'en' = 'vi',
+  extra: Record<string, unknown> = {},
+) {
   localStorage.setItem('genoffice.lang', lang)
   await act(async () => {
     root.render(
@@ -139,6 +145,7 @@ async function mount(subView: DocumentsHomeSubViewId = 'workspace', lang: 'vi' |
           onOpenDocument: vi.fn(),
           sidebarHost: sidebarSlot,
           initialSubView: subView,
+          ...extra,
         }),
       ),
     )
@@ -426,5 +433,219 @@ describe('the Từ nơi khác section is hidden when the sources route is not th
       'Từ nơi khác chưa dùng được trên máy chủ này',
     )
     expect(sourceSection()).toBeNull()
+  })
+})
+
+// ---- fix3 (sidebar review r4): RV-13 .. RV-17 ----
+
+const readSrc = (rel: string) =>
+  readFileSync(resolve(__dirname, '../src/renderer/src', rel), 'utf8').replace(/\r\n/g, '\n')
+const homeCss = readSrc('home.css')
+const sidebarCss = readSrc('uniwork-home/doclist-sidebar.css')
+
+type CssRule = { selectors: string[]; body: string }
+/** the flat rules of a stylesheet (no @media nesting needed here): selector list + declaration text */
+function cssRules(css: string): CssRule[] {
+  const out: CssRule[] = []
+  const re = /([^{}]+)\{([^}]*)\}/g
+  for (const m of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(re)) {
+    out.push({
+      selectors: m[1]!
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+      body: m[2]!,
+    })
+  }
+  return out
+}
+/** specificity as a comparable number: ids, then classes / attributes / pseudo-classes, then elements */
+function specificity(selector: string): number {
+  const ids = (selector.match(/#[\w-]+/g) ?? []).length
+  const cls =
+    (selector.match(/\.[\w-]+/g) ?? []).length +
+    (selector.match(/\[[^\]]*\]/g) ?? []).length +
+    (selector.match(/(?<!:):[a-z-]+/g) ?? []).length
+  const els = (selector.replace(/[.#:[][^\s.#:[>+~]*/g, '').match(/[a-z][\w-]*/gi) ?? []).length
+  return ids * 10000 + cls * 100 + els
+}
+/** a selector as jsdom can match it: the dynamic pseudo-classes dropped */
+const staticOf = (selector: string) =>
+  selector.replace(/:(hover|active|focus-visible|focus)\b/g, '')
+
+describe('RV-13: the tile glyph keeps its tone at rest, on hover and on the current row', () => {
+  // home.css paints every svg inside a .nav-item row (grey, --text on hover, --accent on the
+  // current row). The source rows are .nav-item rows and the glyph is an svg inside one, so the
+  // tile's inherited `color: var(--surface)` loses to a rule on the svg element itself.
+  it('the glyph sits under .nav-item, so home.css recolours it unless a more specific rule wins', async () => {
+    await mount('workspace')
+    await click(sourceRows().find((r) => r.dataset.source === 'chat'))
+    const row = sourceRows().find((r) => r.dataset.source === 'chat')!
+    const glyph = row.querySelector<SVGElement>('.dl-side-tile svg')!
+    expect(row.classList.contains('active')).toBe(true)
+    // the glyph itself carries no class; the recolouring reaches it through its .nav-item ancestor
+    expect(glyph.closest('.nav-item')).toBe(row)
+
+    const recolours = cssRules(homeCss).flatMap((r) =>
+      /(^|[;\s])color:/.test(r.body)
+        ? r.selectors.filter((s) => /^\.nav-item\S* svg$/.test(s))
+        : [],
+    )
+    // rest, hover, current: the three states the web keeps white-on-tile
+    expect(recolours.sort()).toEqual([
+      '.nav-item svg',
+      '.nav-item.active svg',
+      '.nav-item:hover svg',
+    ])
+    const overrides = cssRules(sidebarCss).flatMap((r) =>
+      /color:\s*var\(--surface\)/.test(r.body)
+        ? r.selectors.filter((s) => glyph.matches(staticOf(s)))
+        : [],
+    )
+    for (const recolour of recolours) {
+      expect(glyph.matches(staticOf(recolour)), `${recolour} reaches the glyph`).toBe(true)
+      const winner = overrides.filter((o) => specificity(o) > specificity(recolour))
+      expect(winner.length, `a sidebar rule beating ${recolour}`).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('RV-14: the sidebar below the nav is one scrolling column (tree + sources)', () => {
+  it('the folders and the sources section share one scroller; the nav stays outside it', async () => {
+    await mount('workspace')
+    const scroller = sourceSection()!.closest<HTMLElement>('.dl-side-scroll')
+    expect(scroller, 'a .dl-side-scroll column around the section').not.toBeNull()
+    expect(scroller!.contains(sidebarSlot.querySelector('.dh-sidebar-folders'))).toBe(true)
+    expect(scroller!.contains(sideTree())).toBe(true)
+    expect(scroller!.contains(sidebarSlot.querySelector('.dh-subnav'))).toBe(false)
+    // the scroller is a direct child of the sidebar wrap, after the nav
+    expect(scroller!.parentElement?.classList.contains('dh-sidebar-wrap')).toBe(true)
+  })
+
+  it('the css lets that column scroll and its children take their natural height', () => {
+    const body = (selector: string) =>
+      cssRules(sidebarCss).find((r) => r.selectors.includes(selector))?.body ?? ''
+    expect(body('.dl-side-scroll')).toMatch(/overflow-y:\s*auto/)
+    expect(body('.dl-side-scroll')).toMatch(/min-height:\s*0/)
+    expect(body('.dl-side-scroll')).toMatch(/flex:\s*1/)
+    // the folders block and the tree no longer squeeze or clip themselves inside it
+    expect(body('.dl-side-scroll .dh-sidebar-folders')).toMatch(/flex:\s*none/)
+    expect(body('.dl-side-scroll .dh-sidebar-tree')).toMatch(/flex:\s*none/)
+    expect(body('.dl-side-scroll .dh-sidebar-tree')).toMatch(/overflow(-y)?:\s*visible/)
+  })
+})
+
+describe('RV-15: a transient probe error does not hide the section for the whole mount', () => {
+  const later = () => ok({ items: [], nextCursor: null })
+  const transient = { ok: false, error: 'network_error' } as never
+
+  it('a non-404 error leaves it hidden, then the next pass (sidebar visible again) probes once more and shows it', async () => {
+    let n = 0
+    sources = async () => (++n === 1 ? transient : later())
+    await mount('workspace')
+    expect(sourceSection()).toBeNull()
+    expect(api.uniworkListSources).toHaveBeenCalledTimes(1)
+    // no retry loop: more passes without a trigger never call again
+    await flush()
+    expect(api.uniworkListSources).toHaveBeenCalledTimes(1)
+
+    await mount('workspace', 'vi', { sidebarIdle: true })
+    await mount('workspace', 'vi', { sidebarIdle: false })
+    expect(api.uniworkListSources).toHaveBeenCalledTimes(2)
+    expect(sourceSection()).not.toBeNull()
+  })
+
+  it('a rejected probe retries the same way', async () => {
+    let n = 0
+    sources = async () => {
+      if (++n === 1) throw new Error('offline')
+      return later()
+    }
+    await mount('workspace')
+    expect(sourceSection()).toBeNull()
+    await mount('workspace', 'vi', { sidebarIdle: true })
+    await mount('workspace', 'vi', { sidebarIdle: false })
+    expect(sourceSection()).not.toBeNull()
+  })
+
+  it('a 404 is final: it is not probed again on the next pass', async () => {
+    sources = async () => ({ ok: false, error: 'not_found' })
+    await mount('workspace')
+    await mount('workspace', 'vi', { sidebarIdle: true })
+    await mount('workspace', 'vi', { sidebarIdle: false })
+    expect(api.uniworkListSources).toHaveBeenCalledTimes(1)
+    expect(sourceSection()).toBeNull()
+  })
+
+  it('an OK answer is not probed again either', async () => {
+    await mount('workspace')
+    await mount('workspace', 'vi', { sidebarIdle: true })
+    await mount('workspace', 'vi', { sidebarIdle: false })
+    expect(api.uniworkListSources).toHaveBeenCalledTimes(1)
+  })
+
+  it('a failed first page read on Từ nơi khác does not block the probe once the page is left', async () => {
+    let n = 0
+    sources = async () => (++n === 1 ? transient : later())
+    await mount('elsewhere')
+    expect(sourceSection()).toBeNull()
+    await click(workspaceNav())
+    expect(sourceSection()).not.toBeNull()
+  })
+})
+
+describe('RV-16: the picked source is kept with the sub-view by the host', () => {
+  it('mounts on the kept source: the page is filtered and its row is current', async () => {
+    await mount('elsewhere', 'vi', { initialElsewhereSource: 'meeting' })
+    expect(lastCall('uniworkListSources')).toEqual({ workspaceId: 'ws-1', source: 'meeting' })
+    expect(sourceRows().map((r) => r.getAttribute('aria-current'))).toEqual([
+      null,
+      'page',
+      null,
+      null,
+    ])
+  })
+
+  it('a kept source is ignored when the kept sub-view is not Từ nơi khác', async () => {
+    await mount('workspace', 'vi', { initialElsewhereSource: 'meeting' })
+    expect(sourceRows().every((r) => r.getAttribute('aria-current') === null)).toBe(true)
+  })
+
+  it('reports each pick to the host', async () => {
+    const seen: Array<string | null> = []
+    await mount('workspace', 'vi', {
+      onElsewhereSourceChange: (s: string | null) => seen.push(s),
+    })
+    await click(sourceRows().find((r) => r.dataset.source === 'email'))
+    expect(seen[seen.length - 1]).toBe('email')
+    await click(sourceRows().find((r) => r.dataset.source === 'chat'))
+    expect(seen[seen.length - 1]).toBe('chat')
+  })
+})
+
+describe('RV-17: with no root row, the sidebar "+" creates at the workspace root (as the web)', () => {
+  it('inside an open folder, "+" still creates a top-level folder', async () => {
+    const createFolder = vi.fn(async (i: { parentId: string | null; title: string }) =>
+      ok(folder('f-new', i.title)),
+    )
+    api.uniworkCreateFolder = createFolder
+    await mount('workspace')
+    await click(rowOf('Alpha'))
+    expect(workspaceNav()?.getAttribute('aria-current')).toBeNull()
+
+    await click(sidebarSlot.querySelector('.dh-sidebar-add'))
+    const input = document.querySelector<HTMLInputElement>('.modal input')!
+    expect(input).toBeTruthy()
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      set.call(input, 'Hợp đồng')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(document.querySelector('.modal button[type="submit"]'))
+    expect(createFolder).toHaveBeenLastCalledWith({
+      workspaceId: 'ws-1',
+      parentId: null,
+      title: 'Hợp đồng',
+    })
   })
 })
