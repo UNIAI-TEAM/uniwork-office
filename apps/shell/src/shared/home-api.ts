@@ -317,7 +317,74 @@ export interface UniworkDocSummary {
   sizeBytes?: number
   /** UNI-1961: the server's `origin` when it is one the web names (Group by Source) */
   origin?: 'upload' | 'created'
+  /**
+   * UNI-2047 doclist fields. Every one is optional and read leniently by main:
+   * a missing or malformed server value leaves the key absent, so a screen
+   * hides its column instead of guessing.
+   */
+  /** trash rows: the server's `archived_at` timestamp (`archived` stays the flag) */
+  archivedAt?: string
+  /** trash rows: the server's `archived_by` id */
+  archivedById?: string
+  /** trash rows: who trashed it, resolved by main from the workspace members like `shelvedByName` */
+  archivedByName?: string
+  /** trash rows: when the server purges the row (`purge_after`); "N days left" counts to it */
+  purgeAfter?: string
+  /** the caller owns the row (`is_owner`) */
+  isOwner?: boolean
+  /** the last editor as the server names them; absent outside the caller's org or for a non-person */
+  updatedByUser?: UniworkDocUpdatedByUser
+  /** recent rows: the caller's last opened/edited/commented touch */
+  lastActivity?: UniworkDocLastActivity
+  /** shared-with-me rows: who shared the row and when */
+  shared?: UniworkDocShared
+  /** shared-by-me rows: how widely the caller shared the row */
+  shareSummary?: UniworkDocShareSummary
+  /** favorites rows: when the caller starred the row (`favorited_at`) */
+  favoritedAt?: string
 }
+
+/** UNI-2047: the server's `updated_by_user`; `avatarUrl` is absolute http(s) and loads with no auth header */
+export interface UniworkDocUpdatedByUser {
+  name: string
+  avatarUrl?: string
+}
+
+/** UNI-2047: the server's `last_activity` on a recent row */
+export interface UniworkDocLastActivity {
+  kind: 'opened' | 'edited' | 'commented'
+  at: string
+}
+
+/** UNI-2047: the server's `shared` block on a shared-with-me row */
+export interface UniworkDocShared {
+  /** `shared.by`: the sharer's id */
+  byId?: string
+  /** `shared.by_kind`, kept as sent (the server may add kinds) */
+  byKind?: string
+  /** `shared.by_name`; absent when the sharer is outside the caller's org */
+  byName?: string
+  at: string
+}
+
+/**
+ * UNI-2047: the server's `share_summary` on a shared-by-me row. `people` are
+ * direct users, `links` are the live ones; `latestAt` is absent when nothing
+ * is shared.
+ */
+export interface UniworkDocShareSummary {
+  people: number
+  workspaces: number
+  links: number
+  latestAt?: string
+}
+
+/** UNI-2047: the sort keys a doclist route accepts (S3 plus the SV-0..SV-3 per-list keys) */
+export type UniworkListSort =
+  'updated' | 'name' | 'size' | 'editor' | 'activity' | 'shared' | 'starred' | 'deleted' | 'shelved'
+
+/** UNI-2047: the Recent segment (`activity` filter on `/documents/recent`) */
+export type UniworkListActivity = 'opened' | 'edited'
 
 /**
  * UNI-1961 (ARCHIVE-01): the answer of an unshelve or shelve - the item, and
@@ -327,6 +394,11 @@ export interface UniworkDocSummary {
 export interface UniworkDocShelveResult {
   document: UniworkDocSummary
   affected: string[]
+}
+
+/** UNI-2047 B6: the answer of Gắn sao - when the server recorded the star */
+export interface UniworkDocFavoriteResult {
+  favoritedAt: string
 }
 
 /** FD-11: the three entry kinds the folder tree holds */
@@ -342,12 +414,27 @@ export type UniworkSystemKind = 'my_folder'
 
 /**
  * DESKTOP-HOME: optional list filters for `listChildren`, `listDocuments`,
- * `listSharedByMe`, and `listTrash`. Unset = parameter omitted.
+ * `listSharedByMe`, `listTrash`, `listSharedWithMe`, `listShelved` and (UNI-2047 B6, only the type,
+ * the kind and the sort) `listFavorites`.
+ * Unset = parameter omitted.
  */
 export interface UniworkListFilters {
+  /** a file format; the server takes it on every list route */
   format?: UniworkDocFormat
+  /**
+   * UNI-2047: `page` = UniNote only (the flat `/documents` route's `kind`; a UniNote has no file
+   * format, so it never rides with `format`). Recent and Shared with me have no such param: the
+   * renderer narrows their loaded rows.
+   */
+  kind?: 'page'
   updatedBy?: string
   updatedFrom?: string
+  /** UNI-2047: server-side sort key; unset = the route's own order, nothing sent */
+  sort?: UniworkListSort
+  /** UNI-2047: sort direction; unset = the key's own default, nothing sent */
+  order?: 'asc' | 'desc'
+  /** UNI-2047: Recent only (`/documents/recent`): keep rows by their last touch */
+  activity?: UniworkListActivity
 }
 
 /**
@@ -482,8 +569,15 @@ export interface UniworkDocListPage {
   nextCursor: string | null
 }
 
-/** paged "shared with me" query; main aggregates the selected org's workspaces */
-export interface UniworkSharedQuery {
+/**
+ * paged "shared with me" query; main aggregates the selected org's workspaces.
+ * UNI-2047: the type / updater / date filters and the sort go to every
+ * workspace; a value outside the vocabulary is dropped, unset = today's call.
+ */
+export interface UniworkSharedQuery extends Pick<
+  UniworkListFilters,
+  'format' | 'updatedBy' | 'updatedFrom' | 'sort' | 'order'
+> {
   /** opaque cursor from the previous page; omit for the first page */
   cursor?: string
   /** page size, default 50, max 100 */
@@ -493,6 +587,19 @@ export interface UniworkSharedQuery {
 }
 
 export type UniworkSharedPage = UniworkDocListPage
+
+/**
+ * UNI-1961 / UNI-2047: the Lưu trữ shelf query. Only the type filter and the
+ * sort apply (`updatedBy` / `updatedFrom` / `activity` are never forwarded).
+ */
+export interface UniworkShelvedQuery extends Pick<
+  UniworkListFilters,
+  'format' | 'kind' | 'sort' | 'order'
+> {
+  workspaceId: string
+  cursor?: string
+  limit?: number
+}
 
 /**
  * The document properties panel (S17). Every name/time the server does not
@@ -566,6 +673,12 @@ export type UniworkDocActionResult<T> =
       sizeBytes?: number
       maxBytes?: number
       /**
+       * UNI-2047: the server throttled (429) or was briefly down (503), so the same call may be
+       * tried again once. Absent on every other failure: a `server_error` that is not a throttle
+       * may have been applied, and a second call would answer conflict / not_found.
+       */
+      retryable?: boolean
+      /**
        * FD-11 / B-R2-01: `document_too_deep` carries the depth cap so the
        * renderer can show it; D's `document_too_deep` has no `fields` map and
        * `max` is always the app constant 20 (matching the server's
@@ -590,21 +703,12 @@ export type UniworkDocActionResult<T> =
 /** the file formats D's blank route generates (UNI-1953: the Office three plus md / html / pdf; UNI-2046: txt) */
 export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'txt' | 'html' | 'pdf'
 
-/**
- * UNI-1959: "Share with workspace" on a create. `workspace` is the only value
- * the New menu sends (the request then carries `visibility: "workspace"`); the
- * field is absent for a private create. Documents only: a folder is never
- * shared (D answers 422 `folder_not_shareable`), so a folder create has no field.
- */
-export type UniworkCreateVisibility = 'workspace'
-
 export interface UniworkCreateDocInput {
   workspaceId: string
   /** ULID of the parent folder/page; null = the workspace root */
   folderId: string | null
   name: string
   format: UniworkDocNewFormat
-  visibility?: UniworkCreateVisibility
 }
 
 /** UNI-1953: a UniNote is a page, not a file format: it has its own create call */
@@ -613,7 +717,6 @@ export interface UniworkCreatePageInput {
   /** ULID of the parent folder/page; null = the caller's My Folder */
   folderId: string | null
   name: string
-  visibility?: UniworkCreateVisibility
 }
 
 export interface UniworkUploadDocInput {
@@ -1448,12 +1551,7 @@ export interface HomeApi {
   /** a document was renamed (here or elsewhere); returns an unsubscribe */
   onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void): () => void
   /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf, shelved_at newest first (paged) */
-  uniworkListShelved(q: {
-    workspaceId: string
-    cursor?: string
-    limit?: number
-    format?: UniworkDocFormat
-  }): Promise<UniworkResult<UniworkDocListPage>>
+  uniworkListShelved(q: UniworkShelvedQuery): Promise<UniworkResult<UniworkDocListPage>>
   /** UNI-1961: Bỏ lưu trữ - the item and its same-batch descendants the caller manages */
   uniworkUnshelveDocument(
     documentId: string,
@@ -1464,6 +1562,21 @@ export interface HomeApi {
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** UNI-1961: Lưu trữ - shelve a live item the caller manages (the row ⋯; files and pages) */
   uniworkShelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>>
+  /**
+   * UNI-2047 B6: the caller's stars in one workspace (`favorited_at` on each row, newest star first,
+   * paged). Only the type, the kind and the sort are read; an older server answers `not_found`.
+   */
+  uniworkListFavorites(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-2047 B6: Gắn sao (idempotent) */
+  uniworkFavoriteDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<UniworkDocFavoriteResult>>
+  /** UNI-2047 B6: Bỏ gắn sao (idempotent) */
+  uniworkUnfavoriteDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<{ documentId: string }>>
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
@@ -2166,6 +2279,12 @@ export const UNIWORK_DOC_CHANNELS = {
   trashShelvedDocument: 'uniwork-doc:trash-shelved-document',
   /** invoke(documentId) -> Lưu trữ a live item (UNI-1961) */
   shelveDocument: 'uniwork-doc:shelve-document',
+  /** invoke(q) -> the caller's stars in one workspace, newest star first (UNI-2047 B6, SV-2) */
+  listFavorites: 'uniwork-doc:list-favorites',
+  /** invoke(documentId) -> Gắn sao (UNI-2047 B6; idempotent) */
+  favoriteDocument: 'uniwork-doc:favorite-document',
+  /** invoke(documentId) -> Bỏ gắn sao (UNI-2047 B6; idempotent) */
+  unfavoriteDocument: 'uniwork-doc:unfavorite-document',
 } as const
 
 export const PROJECT_CHANNELS = {

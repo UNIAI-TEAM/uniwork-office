@@ -98,7 +98,7 @@ import {
   UNIWORK_DOC_CHANNELS,
   UNIWORK_LOCK_REASONS,
 } from '../shared/home-api'
-import type { UniworkDocShelveResult } from '../shared/home-api'
+import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
 import type {
   IntegrationsApi,
@@ -1226,6 +1226,21 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listTrash, q),
     )
   },
+  async uniworkListFavorites(q) {
+    return asUniworkResult<UniworkDocListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listFavorites, q),
+    )
+  },
+  async uniworkFavoriteDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocFavoriteResult>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.favoriteDocument, documentId),
+    )
+  },
+  async uniworkUnfavoriteDocument(documentId: string) {
+    return asUniworkActionResult<{ documentId: string }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.unfavoriteDocument, documentId),
+    )
+  },
   async uniworkListSources(q) {
     return asUniworkResult<UniworkSourceListPage>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listSources, q),
@@ -1739,6 +1754,10 @@ const workApi: UniworkWorkApi = {
   },
   async openWeb(target) {
     return (await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.openWeb, target)) === true
+  },
+  async webUrl(target) {
+    const url = await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.webUrl, target)
+    return typeof url === 'string' ? url : null
   },
 }
 

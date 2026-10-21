@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 // jsdom cannot measure layout, so the long-name clipping (UNI-1961 V1) is pinned as CSS rule text.
-// The name button lives in a plain block wrapper (`<div style="min-width:0;flex:1">`) inside the
+// The name button lives in a plain block wrapper (`.dh-name-stack`, min-width:0, flex:1) inside the
 // flex `.dh-cell-name`, so `flex: 1` / `min-width: 0` on the button do nothing there: an inline-block
 // button sizes to its text and prints over the next grid column unless it is a block capped at its
 // wrapper's width.
@@ -32,16 +32,14 @@ describe('documents table long names stay inside the name column (V1)', () => {
 
   it('the name cell is a grid item that may shrink below its content (all row contexts)', () => {
     expect(rule('.dh-cell-name')).toMatch(/min-width:\s*0/)
-    // the documents table row and the shelved table row share the grid-row rule
+    // every list screen (the shelf and the trash included) draws on the same grid-row rule
     expect(rule('.dh-doc-head,\n.dh-doc-row')).toMatch(/display:\s*grid/)
-    expect(css).toMatch(/\.dh-shelved-table \.dh-doc-row/)
+    expect(rule('.dh-name-stack')).toMatch(/min-width:\s*0/)
   })
 
-  it('the shelved name column and the group heading still clip with an ellipsis', () => {
-    expect(rule('.dh-shelved-name')).toMatch(/min-width:\s*0/)
-    expect(rule('.dh-shelved-title')).toMatch(/text-overflow:\s*ellipsis/)
-    const group = rule('.dh-group-title')
-    expect(group).toMatch(/min-width:\s*0/)
-    expect(group).toMatch(/text-overflow:\s*ellipsis/)
+  it('a folder row title clips with an ellipsis like the name button', () => {
+    const title = rule('.dh-doc-title')
+    expect(title).toMatch(/text-overflow:\s*ellipsis/)
+    expect(title).toMatch(/overflow:\s*hidden/)
   })
 })

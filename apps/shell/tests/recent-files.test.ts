@@ -20,10 +20,10 @@ describe('matchesExtFamily', () => {
     expect(matchesExtFamily('pptx', 'pptx')).toBe(true)
     expect(matchesExtFamily('markdown', 'md')).toBe(true)
     expect(matchesExtFamily('md', 'md')).toBe(true)
-    // the text app opens txt/json as source, so the sidebar "md" filter has to
-    // page them in the way Home's own filter families already do
-    expect(matchesExtFamily('txt', 'md')).toBe(true)
-    expect(matchesExtFamily('json', 'md')).toBe(true)
+    // UNI-2047: .txt is its own filter and the "md" filter no longer covers it (or .json)
+    expect(matchesExtFamily('txt', 'md')).toBe(false)
+    expect(matchesExtFamily('json', 'md')).toBe(false)
+    expect(matchesExtFamily('txt', 'txt')).toBe(true)
     expect(matchesExtFamily('csv', 'xlsx')).toBe(true)
     expect(matchesExtFamily('htm', 'html')).toBe(true)
   })
@@ -46,11 +46,11 @@ describe('matchesExtFamily', () => {
  */
 describe('sidebar filter families agree with the other two', () => {
   const FAMILIES: ReadonlyArray<readonly [string, Record<string, readonly string[]>]> = [
-    ['Home', { md: ['md', 'markdown', 'txt', 'json'] }],
-    ['search', { md: ['md', 'markdown', 'txt', 'json'] }],
+    ['Home', { md: ['md', 'markdown'] }],
+    ['search', { md: ['md', 'markdown'] }],
   ]
 
-  it.each(FAMILIES)('matches the %s family for the text app', (_name, family) => {
+  it.each(FAMILIES)('matches the %s .md family', (_name, family) => {
     for (const ext of family.md!) expect(matchesExtFamily(ext, 'md')).toBe(true)
   })
 })

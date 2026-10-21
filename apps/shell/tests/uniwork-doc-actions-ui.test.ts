@@ -823,22 +823,38 @@ describe('S18 archived row and archive confirm (FX4)', () => {
       css.match(new RegExp(`${selector.replace(/[.>]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
     // the row itself is not translucent (that would dim the menu popup with it)
     expect(block('.uw-pick-row.disabled')).not.toMatch(/opacity/)
-    // only the icon and the text are
-    expect(block('.uw-pick-row.disabled > .uw-pick-row-text')).toMatch(/opacity:\s*0\.6/)
+    // only the icon and the text cells are: the picker grid dims its cells, never the row
+    const picker = readFileSync(
+      join(__dirname, '../src/renderer/src/doclist/doclist-picker.css'),
+      'utf8',
+    )
+    expect(picker).toMatch(
+      /\.uw-pick-row\.dh-pick-row\.disabled > \[data-col\]\s*\{[^}]*opacity:\s*0\.6/,
+    )
+    // the old text-wrapper selector no longer matches any dialog row
+    expect(css).not.toContain('.uw-pick-row.disabled > .uw-pick-row-text')
   })
 
   it('V17b-02: an archived row keeps its text at full opacity on the muted token', () => {
     const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
-    const block = (selector: string) =>
-      css.match(new RegExp(`${selector.replace(/[.>]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
-    // declared after the .disabled dimming, same specificity, so it wins
-    expect(css.indexOf('.uw-pick-row.archived > .uw-pick-row-text')).toBeGreaterThan(
-      css.indexOf('.uw-pick-row.disabled > .uw-pick-row-text'),
+    const picker = readFileSync(
+      join(__dirname, '../src/renderer/src/doclist/doclist-picker.css'),
+      'utf8',
     )
-    expect(block('.uw-pick-row.archived > .uw-pick-row-text')).toMatch(/opacity:\s*1\s*;/)
-    expect(block('.uw-pick-row.archived .uw-pick-row-title')).toMatch(
+    const block = (source: string, selector: string) =>
+      source.match(new RegExp(`${selector.replace(/[.>[\]=]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ??
+      ''
+    // the picker's cells are declared after the .disabled dimming, same specificity, so it wins
+    expect(picker.indexOf('.uw-pick-row.dh-pick-row.archived > [data-col]')).toBeGreaterThan(
+      picker.indexOf('.uw-pick-row.dh-pick-row.disabled > [data-col]'),
+    )
+    expect(block(picker, '.uw-pick-row.dh-pick-row.archived > [data-col]')).toMatch(
+      /opacity:\s*1\s*;/,
+    )
+    expect(block(css, '.uw-pick-row.archived .uw-pick-row-title')).toMatch(
       /color:\s*var\(--text-muted\)/,
     )
+    expect(css).not.toContain('.uw-pick-row.archived > .uw-pick-row-text')
   })
 
   it('V17b-04: the active row has a ring only while focus is inside the list, not in the search', () => {

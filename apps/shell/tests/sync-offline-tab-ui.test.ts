@@ -809,3 +809,11 @@ describe('S3 unpin, cap and Add', () => {
     expect(add.getAttribute('aria-disabled')).toBeNull()
   })
 })
+
+describe('UNI-2047 B5: the offline table uses the shared frame', () => {
+  it('the table sits in the same bordered frame as the other sync tables', async () => {
+    await openS3(library())
+    const table = panel().querySelector('table.sc-table')!
+    expect(table.parentElement?.classList.contains('sc-table-wrap')).toBe(true)
+  })
+})

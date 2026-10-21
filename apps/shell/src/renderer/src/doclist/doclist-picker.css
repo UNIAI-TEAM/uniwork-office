@@ -1,0 +1,89 @@
+/* The compact picker list (Open dialog, folder browser): Tên + second line · Người sửa · Cập nhật.
+   Rows keep the dialog's own classes (.uw-pick-row and its states); only the layout inside a row is
+   a grid whose tracks PickerList sets inline, the same tracks as the header above the list. The
+   buttons the host puts beside a row (Details, "…") are absolutely placed at the row's end, so every
+   row keeps one fixed room for them and the columns line up from row to row. */
+.dh-picker {
+  --pick-trail: var(--pick-trail-base, 80px);
+  min-width: 0;
+}
+
+@media (pointer: coarse) {
+  .dh-picker {
+    --pick-trail: calc(var(--pick-trail-base, 80px) + 28px);
+  }
+}
+
+.dh-picker-head {
+  display: grid;
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--pick-trail) 0 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  /* stays over the rows while a long list scrolls under it */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.dh-picker-head > [data-col] {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tên starts over the title, not over the badge (24px badge + 12px gap) */
+.dh-picker-head > [data-col='name'] {
+  padding-left: 36px;
+}
+
+.dh-picker .uw-pick-item > .uw-pick-row.dh-pick-row {
+  display: grid;
+  align-items: center;
+  gap: 0;
+  padding-right: var(--pick-trail);
+}
+
+.dh-pick-row > [data-col] {
+  min-width: 0;
+  padding: 0 6px;
+}
+
+.dh-pick-row > .dh-pick-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 0;
+}
+
+.dh-pick-row > .dh-cell-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* a row that cannot open dims all its cells; an archived row is parked, not unsupported, so only its
+   badge stays dimmed and the title, the editor and the date keep full strength (4.5:1 muted on the surface) */
+.uw-pick-row.dh-pick-row.disabled > [data-col] {
+  opacity: 0.6;
+}
+
+.uw-pick-row.dh-pick-row.archived > [data-col] {
+  opacity: 1;
+}
+
+.uw-pick-row.dh-pick-row.archived > .dh-pick-name > :not(.uw-pick-row-text) {
+  opacity: 0.6;
+}
+
+/* V-STATES F-08: the second line under a picker row's name is --text-secondary, not --text-muted:
+   on the dark hover / keyboard fill (--hover) muted was 4.17:1, secondary is above 4.5:1 */
+.dh-picker .uw-pick-row-meta {
+  color: var(--text-secondary);
+}

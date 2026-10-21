@@ -33,6 +33,7 @@ import {
   type UniworkSourceListQuery,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
+  type UniworkShelvedQuery,
 } from '../../shared/home-api'
 import { SOURCE_VIEW_CHANNELS } from '../../shared/source-view'
 import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
@@ -895,6 +896,16 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listTrash, (_event, query: unknown) =>
     service.listTrash((query ?? {}) as UniworkDocListQuery),
   )
+  // UNI-2047 B6: Gắn sao (SV-2) - the list and the two star writes
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listFavorites, (_event, query: unknown) =>
+    service.listFavorites((query ?? {}) as Parameters<typeof service.listFavorites>[0]),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.favoriteDocument, (_event, documentId: unknown) =>
+    service.favoriteDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.unfavoriteDocument, (_event, documentId: unknown) =>
+    service.unfavoriteDocument(documentId as string),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
     service.listSources((query ?? {}) as UniworkSourceListQuery),
   )
@@ -943,7 +954,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf, Bỏ lưu trữ and trash from Lưu trữ
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listShelved, (_event, query: unknown) =>
-    service.listShelved((query ?? {}) as UniworkDocListQuery),
+    service.listShelved((query ?? {}) as UniworkShelvedQuery),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.unshelveDocument, (_event, documentId: unknown) =>
     service.unshelveDocument(documentId as string),

@@ -1250,3 +1250,55 @@ describe('SyncCenterPane visual review fixes (VIS-1..VIS-8)', () => {
     expect(host.querySelector('.sc-header')).toBeNull()
   })
 })
+
+describe('UNI-2047 B5: the sync tables read in the shared table style', () => {
+  const css = readFileSync(resolve(__dirname, '../src/renderer/src/sync-center.css'), 'utf8')
+  const ruleBody = (selector: string): string => {
+    const at = css.indexOf(`${selector} {`)
+    if (at < 0) throw new Error(`no css rule "${selector}"`)
+    return css.slice(css.indexOf('{', at), css.indexOf('}', at))
+  }
+
+  it('the table sits in a bordered, rounded frame like the document tables', async () => {
+    await render(fakeApi(snapshot()))
+    const table = host.querySelector('table.sc-table')!
+    expect(table.parentElement?.classList.contains('sc-table-wrap')).toBe(true)
+    const frame = ruleBody('.sc-table-wrap')
+    expect(frame).toContain('border: 1px solid var(--border)')
+    expect(frame).toContain('border-radius: 10px')
+    expect(frame).toContain('background: var(--surface)')
+    expect(frame).toContain('overflow: hidden')
+  })
+
+  it('the header is 36px with the shared 11.5px / 600 secondary text', () => {
+    const head = ruleBody('.sc-table thead th')
+    expect(head).toContain('height: 36px')
+    expect(head).toContain('padding: 0 8px')
+    expect(head).toContain('font-size: 11.5px')
+    expect(head).toContain('font-weight: 600')
+    expect(head).toContain('background: var(--surface-subtle)')
+    expect(head).toContain('color: var(--text-secondary)')
+    expect(head).toContain('border-bottom: 1px solid var(--border)')
+  })
+
+  it('a row is at least 52px, centred, with the shared hover and no rule under the last one', () => {
+    expect(ruleBody('.sc-row')).toContain('height: 52px')
+    expect(ruleBody('.sc-row > th,\n.sc-row > td')).toContain('vertical-align: middle')
+    expect(ruleBody('.sc-row > th,\n.sc-row > td')).not.toContain('background')
+    expect(ruleBody('.sc-row:hover,\n.sc-row:focus-within')).toContain('background: var(--hover)')
+    expect(ruleBody('.sc-row:last-child > th,\n.sc-row:last-child > td')).toContain(
+      'border-bottom: 0',
+    )
+  })
+
+  it('the document name reads like the shared name cell (13px / 600)', () => {
+    expect(ruleBody('.sc-doc')).toContain('font-weight: 600')
+    expect(ruleBody('.sc-doc-btn')).toContain('font-size: 13px')
+    expect(ruleBody('.sc-doc-btn')).toContain('font-weight: 600')
+    expect(ruleBody('.sc-doc-btn')).toContain('color: var(--text)')
+  })
+
+  it('the narrow card layout keeps the frame and takes the last row rule off', () => {
+    expect(css).toContain('.sc.is-narrow .sc-row:last-child')
+  })
+})

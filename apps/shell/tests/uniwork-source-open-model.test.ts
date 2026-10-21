@@ -12,7 +12,7 @@ import { openable, sourceOpenExtension } from '../src/renderer/src/uniwork-home/
 const row = (over: Partial<UniworkSourceFile> = {}): UniworkSourceFile => ({
   id: 's1',
   source: 'chat',
-  parent: { kind: 'chat', id: 'c1', title: 'Team' },
+  parent: { kind: 'chat_channel', id: 'c1', title: 'Team' },
   name: 'File.docx',
   mimeType: '',
   extension: 'docx',

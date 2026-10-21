@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type {
-  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocSummary,
   UniworkFolderNode,
+  UniworkResult,
   UniworkSourceFile,
   UniworkWorkspaceRef,
 } from '../../../shared/home-api'
@@ -14,18 +14,15 @@ import {
   ActionToast,
   ArchiveConfirm,
   NEW_KIND_LABEL_KEY,
-  RenameField,
   UploadDocDialog,
   type ActionOutcome,
   type DocTarget,
   type UploadProgress,
 } from '../UniworkDocActions'
 import {
-  DOC_NAME_ERROR_KEYS,
   QUICK_CREATE_KINDS,
   UNIWORK_ERROR_KEYS,
   checkDocName,
-  docExtension,
   errorActionOf,
   isDocNameError,
   isDocTitleTooLong,
@@ -50,7 +47,6 @@ import {
   expandParentAndAncestorsFor,
   folderEditActionsOffered,
   folderPath,
-  isFolderEntry,
   isMyFolder,
   labelMyFolderPath,
   liveFallback,
@@ -83,57 +79,127 @@ import { openPageOnWeb } from '../uniwork-page-web'
 import { publishUniworkNotice } from '../uniwork-notice-bus'
 import { announce } from '../uniwork-live'
 import {
-  DEFAULT_DOCUMENTS_HOME_FILTERS,
-  DEFAULT_DOCUMENTS_HOME_GROUP_BY,
-  DOCUMENTS_HOME_FORMAT_OPTIONS,
-  DOCUMENTS_HOME_GROUP_BY,
-  DOCUMENTS_HOME_GROUP_BY_KEYS,
-  DOCUMENTS_HOME_UPDATED_OPTIONS,
+  canManageShelved,
   collectUpdatedByOptions,
-  documentsHomeGroupLabel,
-  documentsHomeGroupable,
   fetchDocumentsHomePage,
   fetchDocumentsHomeSources,
-  formatAccessCell,
-  formatBytes,
-  formatShortDate,
-  formatUpdatedByCell,
   getDocumentsHomeNavEntry,
-  groupDocumentsHomeRows,
+  docMatchesUpdated,
   hasActiveFilters,
-  mergeNewestFirst,
-  rowSizeBytes,
+  rowMatchesType,
+  sourceAuthorsOf,
   sourceMatchesFilters,
   splitAndSortItems,
   toUniworkListFilters,
-  updatedByOptionsForSelect,
   visibleDocumentsHomeNavEntries,
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
-  type DocumentsHomeFilterState,
-  type DocumentsHomeGroupBy,
-  type DocumentsHomeRowGroup,
-  type DocumentsHomeSort,
   type DocumentsHomeSubViewId,
   type DocumentsHomeTableRow,
-  type DocumentsHomeTypeFilter,
-  type DocumentsHomeUpdatedPreset,
-  type DocumentsHomeViewMode,
   type UpdatedByOption,
 } from './documents-home-model'
-import { shelveDocument, trashShelvedDocument, unshelveDocument } from '../uniwork-library-api'
 import {
-  ShelvedTable,
-  ShelvedToolbar,
-  filterByShelver,
-  shelvedDescendantIds,
-} from './ShelvedDocumentsView'
+  canFavoriteDocuments,
+  favoriteDocument,
+  loadDocProperties,
+  shelveDocument,
+  trashShelvedDocument,
+  unfavoriteDocument,
+  unshelveDocument,
+} from '../uniwork-library-api'
+import { UniworkDocInfoPanel, type DocInfoLoad } from '../UniworkDocInfoPanel'
+import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
+import { BulkBar, BulkTrashConfirm } from '../doclist/BulkBar'
+import {
+  bulkActionsFor,
+  bulkSummary,
+  bulkWorkFor,
+  runBulkAction,
+  type BulkActionId,
+} from '../doclist/bulk'
+import { DocList } from '../doclist/DocList'
+import { defaultSort } from '../doclist/columns'
+import { copyDocLink } from '../doclist/copy-link'
+import { ContinueStrip, continueDocsOf } from '../doclist/ContinueStrip'
+import { FilterBar, useDocListFilters } from '../doclist/FilterBar'
+import { buildRowMenu } from '../doclist/row-menu'
+import type { DocSubline } from '../doclist/DocRow'
+import { pruneSelection, selectedDocsOf } from '../doclist/selection'
+import { screenOfSubView, specialPresent, wireSortOf } from '../doclist/table-model'
+import { RecentSegmentControl, useRecentSegment } from '../doclist/RecentSegment'
+import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
+import { ListState } from '../doclist/ListState'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
 import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
+import './doclist-sidebar.css'
+
+/** a source module of Từ nơi khác (the web's DocumentSourceKind) */
+export type ElsewhereSource = 'chat' | 'meeting' | 'email' | 'task'
+
+/**
+ * UNI-2047 sidebar: the web's SOURCE_KINDS, in its order, each drawn as its module is in the web
+ * app sidebar (module-icons.ts glyph, module-tones.ts tint): Chat blue, Meetings violet, Email
+ * orange, Tasks green.
+ */
+const ELSEWHERE_SOURCES: readonly {
+  source: ElsewhereSource
+  labelKey: StringKey
+  tone: 'blue' | 'violet' | 'orange' | 'green'
+}[] = [
+  { source: 'chat', labelKey: 'dlSideSourceChat', tone: 'blue' },
+  { source: 'meeting', labelKey: 'dlSideSourceMeeting', tone: 'violet' },
+  { source: 'email', labelKey: 'dlSideSourceEmail', tone: 'orange' },
+  { source: 'task', labelKey: 'dlSideSourceTask', tone: 'green' },
+]
+
+const SOURCE_ICON_NAMES: Record<ElsewhereSource, string> = {
+  chat: 'message-square',
+  meeting: 'video',
+  email: 'mail',
+  task: 'square-check-big',
+}
+
+/** the web module glyphs (lucide MessageSquare, Video, Mail, SquareCheckBig) */
+function SourceGlyph({ source }: { source: ElsewhereSource }) {
+  return (
+    <svg
+      data-icon={SOURCE_ICON_NAMES[source]}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {source === 'chat' && (
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      )}
+      {source === 'meeting' && (
+        <>
+          <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" />
+          <rect x="2" y="6" width="14" height="12" rx="2" />
+        </>
+      )}
+      {source === 'email' && (
+        <>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+        </>
+      )}
+      {source === 'task' && (
+        <>
+          <path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5" />
+          <path d="m9 11 3 3L22 4" />
+        </>
+      )}
+    </svg>
+  )
+}
 
 function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
   switch (id) {
@@ -183,6 +249,21 @@ function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
         >
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7v5l3 2" />
+        </svg>
+      )
+    case 'starred':
+      return (
+        <svg
+          className="dh-nav-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" />
         </svg>
       )
     case 'shared-with-me':
@@ -238,6 +319,23 @@ function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
           <path d="M10 12h4" />
         </svg>
       )
+    case 'elsewhere':
+      // an inbox tray: files that arrived from the other modules
+      return (
+        <svg
+          className="dh-nav-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+          <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+        </svg>
+      )
     case 'trash':
     default:
       return (
@@ -274,12 +372,11 @@ export interface DocumentsHomeProps {
   /** sub-view to mount with (kept by the host so an area switch can restore it — VDH-7) */
   initialSubView?: DocumentsHomeSubViewId
   onSubViewChange?: (subView: DocumentsHomeSubViewId) => void
+  /** the Từ nơi khác source row kept by the host with the sub-view (RV-16); used only when the sub-view is Từ nơi khác */
+  initialElsewhereSource?: ElsewhereSource | null
+  onElsewhereSourceChange?: (source: ElsewhereSource | null) => void
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
 }
-
-/** UNI-1961: a table row, or the header of a Group by group */
-type DocumentsHomeTableItem =
-  DocumentsHomeTableRow | { type: 'group'; id: string; group: DocumentsHomeRowGroup }
 
 type TreeState =
   | { status: 'loading'; nodes: UniworkFolderNode[] }
@@ -307,14 +404,22 @@ export function DocumentsHome({
   initialFolderId = null,
   initialSubView = 'workspace',
   onSubViewChange,
+  initialElsewhereSource = null,
+  onElsewhereSourceChange,
   onFolderChange,
 }: DocumentsHomeProps) {
-  const { t, lang, dateLocale } = useI18n()
+  const { t, dateLocale } = useI18n()
   const uid = useId()
 
   const [subView, setSubView] = useState<DocumentsHomeSubViewId>(initialSubView)
   const [folderId, setFolderId] = useState<string | null>(initialFolderId)
   const [myFolderId, setMyFolderId] = useState<string | null>(null)
+  // UNI-2047 sidebar: the Từ nơi khác row picked (null = every module, the page opened otherwise)
+  const [elsewhereSource, setElsewhereSource] = useState<ElsewhereSource | null>(
+    initialSubView === 'elsewhere' ? initialElsewhereSource : null,
+  )
+  // the workspaces whose sources route answered: the section shows once it has (the web's probe)
+  const [sourcesAnswered, setSourcesAnswered] = useState<Readonly<Record<string, boolean>>>({})
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY]))
   const [tree, setTree] = useState<TreeState>({ status: 'loading', nodes: [] })
   const [treeTick, setTreeTick] = useState(0)
@@ -326,10 +431,13 @@ export function DocumentsHome({
   const openPathRef = useRef<string[]>(initialFolderId ? [initialFolderId] : [])
   const treeLoadingRef = useRef(false)
 
-  const [filters, setFilters] = useState<DocumentsHomeFilterState>(DEFAULT_DOCUMENTS_HOME_FILTERS)
-  const [sort, setSort] = useState<DocumentsHomeSort>('recent')
-  const [viewMode, setViewMode] = useState<DocumentsHomeViewMode>('list')
-  const [groupBy, setGroupBy] = useState<DocumentsHomeGroupBy>(DEFAULT_DOCUMENTS_HOME_GROUP_BY)
+  // UNI-2047: one table sorted from its headers, the sort remembered per screen; the grid view
+  // and Group by are gone. The quick filters are per screen too (doclist/FilterBar).
+  const screen = screenOfSubView(subView)
+  const [filters, setFilters, resetFilters] = useDocListFilters(screen)
+  const [docSort, setDocSort] = useDocListSort(screen)
+  const [recentSegment, setRecentSegment] = useRecentSegment()
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const [searchDraft, setSearchDraft] = useState('')
   const [page, setPage] = useState<PageState>({
     status: 'loading',
@@ -338,20 +446,19 @@ export function DocumentsHome({
     loadingMore: false,
   })
   const [listTick, setListTick] = useState(0)
-  // UNI-1961: the workspace root also lists the files of the other modules
-  // (the web's "other sources"), paged on their own
+  // UNI-1961 / V-STATES F-14: the files of the other modules (the web's "other sources"), read and
+  // paged on their own on the Từ nơi khác page only
   const [sources, setSources] = useState<{
+    /** the read of the first page: a failed one is the Từ nơi khác page's list error */
+    status: 'idle' | 'loading' | 'ready' | 'error'
+    error?: UniworkDocErrorCode
     items: UniworkSourceFile[]
     nextCursor: string | null
     loadingMore: boolean
-  }>({ items: [], nextCursor: null, loadingMore: false })
+  }>({ status: 'idle', items: [], nextCursor: null, loadingMore: false })
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
 
   // Dialogs & inline actions
-  // UNI-1959: "Share with workspace" of the New menu and the strip: off by default, kept while
-  // this view is open, reset after a create from the strip (the web's page-view behaviour)
-  const [shareWithWorkspace, setShareWithWorkspace] = useState(false)
-  const quickShareHintId = useId()
   // UNI-1959: kinds the server answered 404 / 501 for: disabled for the session
   const [unavailableKinds, setUnavailableKinds] = useState<ReadonlySet<NewDocKind>>(new Set())
   const [creating, setCreating] = useState(false)
@@ -427,8 +534,9 @@ export function DocumentsHome({
     setFolderId(null)
     setFolderNotice(null)
     setMyFolderId(null)
+    setElsewhereSource(null)
     setExpanded(new Set([ROOT_KEY]))
-    setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)
+    resetFilters()
     setSearchDraft('')
     setKnownAuthors([])
   }
@@ -529,13 +637,44 @@ export function DocumentsHome({
   useEffect(() => {
     onSubViewChangeRef.current?.(subView)
   }, [subView])
+  // RV-16: the picked source travels with the sub-view so the same row is current after an area switch
+  const onElsewhereSourceChangeRef = useRef(onElsewhereSourceChange)
+  onElsewhereSourceChangeRef.current = onElsewhereSourceChange
+  useEffect(() => {
+    onElsewhereSourceChangeRef.current?.(elsewhereSource)
+  }, [elsewhereSource])
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
   const listSeqRef = useRef(0)
+  // Người sửa / Cập nhật put Recent on the flat list, which has no activity filter and no
+  // last-activity sort: the segment is off while they are on, and Cập nhật is the sort
+  const recentFlat =
+    subView === 'recent' && (filters.updatedBy.trim() !== '' || filters.updatedPreset !== 'any')
+  // the Recent segment rides on the same filters: only Recent's route takes `activity`
+  const recentActivity =
+    subView === 'recent' && !recentFlat && recentSegment !== 'all' ? recentSegment : null
   const wireFilters = useMemo(
-    () => toUniworkListFilters(filters),
+    () => ({
+      ...toUniworkListFilters(filters),
+      ...(recentActivity ? { activity: recentActivity } : {}),
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filters.format, filters.updatedBy, filters.updatedPreset],
+    [filters.format, filters.updatedBy, filters.updatedPreset, recentActivity],
+  )
+  // the header sort goes to the server too: nothing until the person sorts (the server's own
+  // order), except the Trash, which asks for Đã xóa oldest first from the first read like the web
+  // so its groups hold across pages
+  const trashDefault = subView === 'trash' && !docSort
+  const flatActivitySort = recentFlat && docSort?.column === 'activity'
+  const wireSort = useMemo(
+    () =>
+      wireSortOf(
+        flatActivitySort
+          ? defaultSort('workspace')
+          : (docSort ?? (trashDefault ? defaultSort('trash') : null)),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [docSort?.column, docSort?.dir, trashDefault, flatActivitySort],
   )
 
   useEffect(() => {
@@ -600,6 +739,7 @@ export function DocumentsHome({
       folderId,
       myFolderId: resolvedMyFolderId,
       filters: wireFilters,
+      sort: wireSort,
     })
       .then(({ result, ensuredMyFolder }) => {
         if (listSeqRef.current !== seq) return
@@ -668,26 +808,90 @@ export function DocumentsHome({
           error: 'network',
         })
       })
-  }, [workspaceId, subView, folderId, resolvedMyFolderId, wireFilters, query, listTick])
+  }, [workspaceId, subView, folderId, resolvedMyFolderId, wireFilters, wireSort, query, listTick])
 
-  // UNI-1961: as on the web, the sources merge only at the workspace root (no
-  // folder, no search); a failed sources read (an older server's 404/501 or any
-  // other) leaves the documents as they are
-  const sourcesWanted = subView === 'workspace' && folderId === null && query.length === 0
+  // UNI-2047 B4 / V-STATES F-14: the files other modules sent (chat, tasks, meetings, email) are
+  // listed on the Từ nơi khác page only, never merged into the workspace root (a search lists the
+  // workspace hits, as on every screen)
+  const elsewhereView = subView === 'elsewhere' && query.length === 0
+  const sourcesWanted = elsewhereView
   const sourcesSeqRef = useRef(0)
+  // UNI-2047 sidebar: as on the web (use-documents-library.ts), the Từ nơi khác section shows once
+  // the sources route has answered for this workspace; a 404 or a bridge without the call hides
+  // it, any other failure leaves the last answer alone
+  const noteSourcesAnswer = useCallback((ws: string, res: UniworkResult<unknown> | null) => {
+    if (res && !res.ok && res.error !== 'not_found') return
+    const answered = Boolean(res?.ok)
+    setSourcesAnswered((prev) => (prev[ws] === answered ? prev : { ...prev, [ws]: answered }))
+  }, [])
+  const sourcesProbedRef = useRef<string | null>(null)
+  const sourcesKnown = workspaceId in sourcesAnswered
+  useEffect(() => {
+    // the page reads the route itself: its answer stands for the probe
+    if (sourcesWanted) return
+    if (sourcesKnown || sourcesProbedRef.current === workspaceId) return
+    sourcesProbedRef.current = workspaceId
+    // RV-15: only a definite answer (OK or 404) settles the probe; a transient failure frees it, so
+    // the next pass (workspace, page left, sidebar visible again) asks once more - no timer, no loop
+    const unsettle = () => {
+      if (sourcesProbedRef.current === workspaceId) sourcesProbedRef.current = null
+    }
+    const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
+    void fetchDocumentsHomeSources(api, { workspaceId, filters: {}, limit: 1 })
+      .then((res) => {
+        if (res && !res.ok && res.error !== 'not_found') unsettle()
+        noteSourcesAnswer(workspaceId, res)
+      })
+      .catch(unsettle)
+  }, [workspaceId, sourcesWanted, sourcesKnown, sidebarIdle, noteSourcesAnswer])
+  const sourcesAvailable = sourcesAnswered[workspaceId] === true
   useEffect(() => {
     const seq = ++sourcesSeqRef.current
-    setSources({ items: [], nextCursor: null, loadingMore: false })
+    setSources({
+      status: sourcesWanted ? 'loading' : 'idle',
+      items: [],
+      nextCursor: null,
+      loadingMore: false,
+    })
     if (!sourcesWanted) return
     const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
-    void fetchDocumentsHomeSources(api, { workspaceId, filters: wireFilters })
+    void fetchDocumentsHomeSources(api, {
+      workspaceId,
+      filters: wireFilters,
+      source: elsewhereSource,
+    })
       .then((res) => {
-        if (sourcesSeqRef.current !== seq || !res?.ok) return
-        setSources({ items: res.value.items, nextCursor: res.value.nextCursor, loadingMore: false })
+        noteSourcesAnswer(workspaceId, res)
+        if (sourcesSeqRef.current !== seq) return
+        setSources(
+          res?.ok
+            ? {
+                status: 'ready',
+                items: res.value.items,
+                nextCursor: res.value.nextCursor,
+                loadingMore: false,
+              }
+            : {
+                status: 'error',
+                // a bridge without the call reads as a server that cannot answer
+                error: res ? res.error : 'server_error',
+                items: [],
+                nextCursor: null,
+                loadingMore: false,
+              },
+        )
       })
-      .catch(() => undefined)
-  }, [workspaceId, sourcesWanted, wireFilters, listTick])
-  const sourcesMerged = sourcesWanted && sources.items.length > 0
+      .catch(() => {
+        if (sourcesSeqRef.current !== seq) return
+        setSources({
+          status: 'error',
+          error: 'network',
+          items: [],
+          nextCursor: null,
+          loadingMore: false,
+        })
+      })
+  }, [workspaceId, sourcesWanted, wireFilters, elsewhereSource, listTick, noteSourcesAnswer])
 
   const loadMoreSources = () => {
     const cursor = sources.nextCursor
@@ -695,12 +899,18 @@ export function DocumentsHome({
     const seq = sourcesSeqRef.current
     setSources((prev) => ({ ...prev, loadingMore: true }))
     const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
-    void fetchDocumentsHomeSources(api, { workspaceId, filters: wireFilters, cursor })
+    void fetchDocumentsHomeSources(api, {
+      workspaceId,
+      filters: wireFilters,
+      cursor,
+      source: elsewhereSource,
+    })
       .then((res) => {
         if (sourcesSeqRef.current !== seq) return
         setSources((prev) =>
           res?.ok
             ? {
+                ...prev,
                 items: [...prev.items, ...res.value.items],
                 nextCursor: res.value.nextCursor,
                 loadingMore: false,
@@ -715,7 +925,7 @@ export function DocumentsHome({
 
   const loadMore = () => {
     // UNI-1961: "Load more" asks both lists for their next page (the web's rule)
-    if (sourcesMerged) loadMoreSources()
+    if (elsewhereView) loadMoreSources()
     if (!page.nextCursor || page.loadingMore || page.status !== 'ready') return
     const cursor = page.nextCursor
     const seq = listSeqRef.current
@@ -759,6 +969,7 @@ export function DocumentsHome({
       myFolderId: resolvedMyFolderId,
       cursor,
       filters: wireFilters,
+      sort: wireSort,
     })
       .then(({ result }) => {
         if (listSeqRef.current !== seq) return
@@ -821,6 +1032,12 @@ export function DocumentsHome({
       folderIdRef.current = null
       setFolderId(null)
     }
+  }
+
+  /** UNI-2047 sidebar: a Từ nơi khác row opens the page filtered to that module */
+  const openElsewhere = (source: ElsewhereSource) => {
+    setElsewhereSource(source)
+    selectSubView('elsewhere')
   }
 
   const openFolderInWorkspace = (id: string | null) => {
@@ -984,10 +1201,6 @@ export function DocumentsHome({
     }
   }
 
-  // what a create sends: the "Share with workspace" choice, for documents only (a folder is never shared)
-  const createVisibility = (): UniworkCreateVisibility | undefined =>
-    shareWithWorkspace ? 'workspace' : undefined
-
   /** My Folder when no folder is known yet: main also places a null-folder create there */
   const ensureTargetFolder = async (target: DocTarget): Promise<string | null> => {
     if (target.folderId) return target.folderId
@@ -1002,12 +1215,10 @@ export function DocumentsHome({
 
   // UNI-1959: a menu / strip pick creates at once - the web's default name, the open place -
   // then opens it. No name dialog: the name is asked on the first save.
-  const createNow = async (kind: NewDocKind, fromStrip: boolean): Promise<void> => {
+  const createNow = async (kind: NewDocKind): Promise<void> => {
     if (creatingRef.current || unavailableKinds.has(kind)) return
     creatingRef.current = true
     setCreating(true)
-    const visibility = createVisibility()
-    if (fromStrip) setShareWithWorkspace(false)
     try {
       const target = activeTargetFolder
       const folderIdToUse = await ensureTargetFolder(target)
@@ -1019,14 +1230,12 @@ export function DocumentsHome({
               workspaceId: target.workspaceId,
               folderId: folderIdToUse,
               name,
-              ...(visibility ? { visibility } : {}),
             })
           : await createDocument({
               workspaceId: target.workspaceId,
               folderId: folderIdToUse,
               name,
               format: kind,
-              ...(visibility ? { visibility } : {}),
             })
       if (res.ok) {
         refreshAll()
@@ -1173,8 +1382,16 @@ export function DocumentsHome({
     setToast({ message: key ? t(key) : t('uwDocActionFailed'), tone: 'error' })
   }
 
+  // one restore per row at a time: the row button and the menu entry share it
+  const restoringRef = useRef<Set<string>>(new Set())
+  const [restoring, setRestoring] = useState<ReadonlySet<string>>(() => new Set())
   const handleRestoreDoc = async (doc: DocumentsHomeDoc) => {
+    if (restoringRef.current.has(doc.id)) return
+    restoringRef.current.add(doc.id)
+    setRestoring(new Set(restoringRef.current))
     const res = await restoreDocument(doc.id)
+    restoringRef.current.delete(doc.id)
+    setRestoring(new Set(restoringRef.current))
     if (res.ok) {
       announce(t('uwDocRestore'))
       refreshAll()
@@ -1187,11 +1404,67 @@ export function DocumentsHome({
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf's member filter and row commands.
   // The filter narrows the loaded pages only (the server has no shelved_by).
   const shelfView = subView === 'archive' && query.length === 0
-  const pageShown = page.status !== 'error' && (page.status === 'ready' || page.items.length > 0)
+  const starredView = subView === 'starred' && query.length === 0
+  // the trash list proper (a search inside it lists live hits on the plain table)
+  const trashView = subView === 'trash' && query.length === 0
+  const pageShown = elsewhereView
+    ? page.status !== 'error' && sources.status === 'ready'
+    : page.status !== 'error' && (page.status === 'ready' || page.items.length > 0)
+  // the read that failed, for the error state: the sources' on Từ nơi khác, else the page's
+  const listError: UniworkDocErrorCode | null =
+    elsewhereView && sources.status === 'error'
+      ? (sources.error ?? 'server_error')
+      : page.status === 'error'
+        ? (page.error ?? 'server_error')
+        : null
+  // V-STATES F-03 / RV-1: an older server has no route for these two pages (404): they say so
+  // instead of the "document no longer exists" line; every other error is the generic list error
+  const unavailablePage: 'starred' | 'elsewhere' | null =
+    listError !== 'not_found' ? null : starredView ? 'starred' : elsewhereView ? 'elsewhere' : null
+  const unavailableKeys =
+    unavailablePage === 'starred'
+      ? ({ title: 'dlStarredUnavailableTitle', hint: 'dlStarredUnavailableHint' } as const)
+      : unavailablePage === 'elsewhere'
+        ? ({ title: 'dlElsewhereUnavailableTitle', hint: 'dlElsewhereUnavailableHint' } as const)
+        : null
   const [shelvedBy, setShelvedBy] = useState<string | null>(null)
   useEffect(() => {
     setShelvedBy(null)
   }, [workspaceId, subView])
+  // UNI-2047: a selection belongs to one list: another screen, folder, search or filter starts clean,
+  // (the prune below drops a row that left the table: renamed away, trashed, moved, filtered out)
+  useEffect(() => {
+    setSelected(new Set())
+  }, [workspaceId, subView, folderId, query, wireFilters])
+
+  // UNI-2047 A5: the bulk bar acts on the selected rows (`selectedDocs`, set once the table's rows
+  // are known below); the destructive one asks once first
+  const [bulkTrashConfirm, setBulkTrashConfirm] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const bulkBusyRef = useRef(false)
+  const runBulkById = async (action: BulkActionId) => {
+    // the ref answers a second click that lands before React re-renders
+    if (bulkBusyRef.current) return
+    const docs = selectedDocs
+    if (docs.length === 0 || !bulkActionsFor(screen, docs).includes(action)) return
+    bulkBusyRef.current = true
+    setBulkBusy(true)
+    const result = await runBulkAction({
+      docs,
+      work: bulkWorkFor(action, screen),
+      refresh: refreshAll,
+    })
+    bulkBusyRef.current = false
+    setBulkBusy(false)
+    setSelected(new Set())
+    const { message, tone } = bulkSummary(action, result, t)
+    if (tone === 'ok') announce(message)
+    setToast({ message, tone })
+  }
+  const onBulkAction = (action: BulkActionId) => {
+    if (action === 'trash') setBulkTrashConfirm(true)
+    else void runBulkById(action)
+  }
   const [shelvedTrashTarget, setShelvedTrashTarget] = useState<DocumentsHomeDoc | null>(null)
   // the ref answers a second click that lands before React re-renders
   const unshelvingRef = useRef<Set<string>>(new Set())
@@ -1226,6 +1499,27 @@ export function DocumentsHome({
         res.error === 'forbidden' ? t('uhShelvedNoPermission') : t('uhShelvedUnshelveFailed'),
       tone: 'error',
     })
+  }
+
+  // UNI-2047 B6: Gắn sao / Bỏ gắn sao from the row menu; an unstar rereads the Starred list, the
+  // row is gone from it (no optimistic update)
+  // the ref answers a second click on the same row (a double-click on its Sao) before React re-renders
+  const favoritingRef = useRef<Set<string>>(new Set())
+  const handleFavorite = async (doc: DocumentsHomeDoc, star: boolean) => {
+    if (favoritingRef.current.has(doc.id)) return
+    favoritingRef.current.add(doc.id)
+    const res = star ? await favoriteDocument(doc.id) : await unfavoriteDocument(doc.id)
+    favoritingRef.current.delete(doc.id)
+    if (res.ok) {
+      const message = t(star ? 'uhStarDone' : 'uhUnstarDone', { title: doc.title })
+      announce(message)
+      setToast({ message, tone: 'ok' })
+      if (!star && subView === 'starred') setListTick((n) => n + 1)
+      return
+    }
+    // the document is gone (another client trashed it): reread the list, as the other row commands do
+    if (res.error === 'not_found') setListTick((n) => n + 1)
+    setToast({ message: t('uhStarFailed', { title: doc.title }), tone: 'error' })
   }
 
   // UNI-1961: shelve at once, then a toast whose Hoàn tác unshelves it (no optimistic update)
@@ -1328,7 +1622,9 @@ export function DocumentsHome({
 
   const folderCardMenuFor = (folder: DocumentsHomeDoc): FolderMenuItem[] => {
     if (folder.canEdit === false) return []
+    // Mở leads every row menu (Rules board section 3); a viewer-only folder has no menu, the card opens it
     const items: FolderMenuItem[] = [
+      { id: 'open', label: t('dlActOpen'), onSelect: () => openFolderInWorkspace(folder.id) },
       {
         id: 'new',
         label: t('ufNewSubfolder'),
@@ -1395,119 +1691,210 @@ export function DocumentsHome({
     return items
   }
 
-  const docMenuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] => {
-    const items: FolderMenuItem[] = []
-    const archived = doc.archived === true || subView === 'trash'
-    if (archived) {
-      if (doc.canManage) {
-        items.push({
-          id: 'restore',
-          label: t('uwDocRestore'),
-          onSelect: () => void handleRestoreDoc(doc),
-        })
-      }
-      return items
-    }
-    // NET-OFF-01: Open first, then the pin/unpin item (hidden while the capability is off)
-    items.push({
-      id: 'open',
-      label: t('open'),
-      onSelect: () => void openDoc(doc),
-    })
-    // a shelved search hit is read-only: the server refuses its rename / move (409 document_shelved)
-    const shelved = Boolean(doc.shelvedAt)
-    // a page has no file to keep offline
-    const offlineLabel = doc.kind === 'page' || shelved ? null : offlineToggle.labelOf(doc.id)
-    if (offlineLabel) {
-      items.push({
-        id: 'offline',
-        label: offlineLabel,
-        onSelect: () =>
+  // UNI-2047 A4: every row menu comes from the shared rules (doclist/row-menu.ts): the model owns
+  // order, permissions, the delete-last rule; this host only says what it can run
+  const rowMenuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] =>
+    buildRowMenu({
+      screen,
+      doc,
+      label: t,
+      offlineLabel: offlineToggle.labelOf(doc.id),
+      run: {
+        open: () => void openDoc(doc),
+        offline: () =>
           offlineToggle.toggle({
             documentId: doc.id,
             workspaceId: doc.workspaceId ?? workspaceId,
             name: doc.title,
           }),
-      })
-    }
-    if (doc.canEdit !== false && !shelved) {
-      if (doc.canEdit === true) {
-        items.push({
-          id: 'rename',
-          label: t('uwDocRename'),
-          onSelect: () => setDocRename({ doc, error: null, busy: false }),
-        })
-      }
-      items.push({
-        id: 'move',
-        label: t('ufMoveTo'),
-        onSelect: () =>
+        'copy-link': () => void handleCopyLink(doc),
+        rename: () => setDocRename({ doc, error: null, busy: false }),
+        move: () =>
           folderActions.startMove({
             id: doc.id,
-            kind: 'file',
+            kind: doc.kind === 'folder' ? 'folder' : 'file',
             parentId: currentParentOf(doc),
             title: doc.title,
           }),
-      })
-    }
-    // UNI-1961: the web's row Lưu trữ (files and pages here; folder shelve is a residual)
-    if (doc.canManage === true && (doc.kind === 'file' || doc.kind === 'page') && !shelved) {
-      items.push({
-        id: 'shelve',
-        label: t('uhShelvedShelve'),
-        onSelect: () => void handleShelve(doc),
-      })
-    }
-    if (doc.canManage === true) {
-      items.push({
-        id: 'archive',
-        label: t('uwDocArchive'),
-        onSelect: () => setArchiveTarget(doc),
-      })
-    }
-    return items
+        // UNI-2047 B6: no entry when this shell has no star IPC
+        ...(canFavoriteDocuments()
+          ? {
+              star: () => void handleFavorite(doc, true),
+              unstar: () => void handleFavorite(doc, false),
+            }
+          : {}),
+        shelve: () => void handleShelve(doc),
+        unshelve: () => void handleUnshelve(doc),
+        // both confirm first: the dialog of the screen the row is on
+        trash: () => (screen === 'shelved' ? setShelvedTrashTarget(doc) : setArchiveTarget(doc)),
+        restore: () => void handleRestoreDoc(doc),
+        details: () => showDetails(doc),
+      },
+    })
+
+  const handleCopyLink = async (doc: DocumentsHomeDoc) => {
+    const copied = await copyDocLink(workspaces, doc.workspaceId || workspaceId, doc.id)
+    const message = t(copied ? 'dlLinkCopied' : 'dlLinkCopyFailed')
+    if (copied) announce(message)
+    setToast({ message, tone: copied ? 'ok' : 'error' })
   }
 
+  // the row's Xem chi tiết: the properties panel beside the table (read-only, one at a time)
+  const detailsRequest = useRef(0)
+  const [details, setDetails] = useState<{ id: string; title: string; load: DocInfoLoad } | null>(
+    null,
+  )
+  const showDetails = (doc: DocumentsHomeDoc) => {
+    const request = ++detailsRequest.current
+    setDetails({ id: doc.id, title: doc.title, load: { status: 'loading' } })
+    void loadDocProperties(doc.id).then((result) => {
+      if (request !== detailsRequest.current) return
+      setDetails({
+        id: doc.id,
+        title: doc.title,
+        load: result.ok
+          ? { status: 'ready', info: result.value }
+          : { status: 'error', error: result.error },
+      })
+    })
+  }
+  const closeDetails = () => {
+    detailsRequest.current++
+    setDetails(null)
+  }
+
+  const shelfActionsFor = (doc: DocumentsHomeDoc) => {
+    if (!canManageShelved(doc)) return null
+    const busy = unshelving.has(doc.id)
+    return (
+      <button
+        type="button"
+        className="btn btn-secondary dh-shelved-unshelve"
+        aria-label={t('uhShelvedUnshelveItem', { title: doc.title })}
+        disabled={busy}
+        aria-busy={busy || undefined}
+        onClick={() => void handleUnshelve(doc)}
+      >
+        {t('uhShelvedUnshelve')}
+      </button>
+    )
+  }
+
+  // the trash row's Khôi phục before its "…": the same entry the menu has, so the same permission
+  const trashActionsFor = (doc: DocumentsHomeDoc) => {
+    if (doc.canManage !== true) return null
+    const busy = restoring.has(doc.id)
+    return (
+      <button
+        type="button"
+        className="btn btn-secondary dh-trash-restore"
+        aria-label={`${t('dlActRestore')} ${doc.title}`}
+        disabled={busy}
+        aria-busy={busy || undefined}
+        onClick={() => void handleRestoreDoc(doc)}
+      >
+        {t('dlActRestore')}
+      </button>
+    )
+  }
+
+  // the second line under a name: the shelf's folder line, a search hit's path, or the workspace
+  // a shared-with-me row lives in
+  const sublineFor = (doc: DocumentsHomeDoc): DocSubline | null => {
+    if (shelfView) {
+      const full =
+        doc.path && doc.path.length > 0
+          ? doc.path.map((crumb) => crumb.title).join(' › ')
+          : t('uhShelvedPathRoot')
+      return { short: full, full }
+    }
+    if (doc.path) {
+      const hit = shortPath(
+        labelMyFolderPath(doc.path, resolvedMyFolderId, myFolderLabel),
+        t('ufRoot'),
+      )
+      return { short: hit.short, full: hit.full, path: true }
+    }
+    const workspace = doc.workspaceName?.trim()
+    if (subView === 'shared-with-me' && workspace) return { short: workspace, full: workspace }
+    if (subView === 'recent') {
+      // the board's "where" line: the folder the document sits in (the root has its own name; a
+      // folder the loaded tree does not hold is not guessed)
+      const parent = doc.parentId ? index.get(doc.parentId)?.title : t('ufRoot')
+      return parent ? { short: parent, full: parent } : null
+    }
+    return null
+  }
+
+  // the folder cards keep their own order: the server's position, or the name when the table sorts by it
+  const folderOrder = docSort?.column === 'name' ? 'name' : 'recent'
+  const folderDesc = folderOrder === 'name' && docSort?.dir === 'desc'
   const { folders, files } = useMemo(() => {
-    const split = splitAndSortItems(page.items, sort, dateLocale)
-    return { folders: myFolderFirst(split.folders), files: split.files }
-  }, [page.items, sort, dateLocale])
+    const split = splitAndSortItems(page.items, folderOrder, dateLocale)
+    const ordered = folderDesc ? [...split.folders].reverse() : split.folders
+    return { folders: myFolderFirst(ordered), files: split.files }
+  }, [page.items, folderOrder, folderDesc, dateLocale])
 
-  // UNI-1961: the table's rows; at the root the source files join the documents
-  // newest first under the web's paging cutoff, and the home filters the server
-  // could not apply to them run here (the web's merge, use-documents-library.ts)
+  // UNI-1961: the table's rows: the documents, or on Từ nơi khác the source files, where the home
+  // filters the server could not apply to them run here (the web's use-documents-library.ts).
+  // The table orders them itself (UNI-2047: header sort); the shelf lists folders as rows too.
   const tableRows = useMemo<DocumentsHomeTableRow[]>(() => {
-    if (!sourcesMerged) return files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc }))
-    const merged = mergeNewestFirst(page.items, sources.items, {
-      docs: page.nextCursor !== null,
-      sources: sources.nextCursor !== null,
-    }).filter((row) =>
-      row.type === 'source'
-        ? sourceMatchesFilters(row.source, wireFilters)
-        : row.doc.kind !== 'folder',
-    )
-    if (sort !== 'name') return merged
-    const titleOf = (row: DocumentsHomeTableRow) =>
-      row.type === 'doc' ? row.doc.title : row.source.name
-    return [...merged].sort((a, b) =>
-      titleOf(a).localeCompare(titleOf(b), dateLocale, { numeric: true, sensitivity: 'base' }),
-    )
-  }, [sourcesMerged, files, page.items, page.nextCursor, sources, wireFilters, sort, dateLocale])
+    // the type chips the server cannot apply (UniNote, .txt on source files) and, on the shelf,
+    // Người sửa / Cập nhật run on what is loaded
+    const typed = (rows: DocumentsHomeTableRow[]) =>
+      rows.filter((row) => rowMatchesType(row, filters.format))
+    // Từ nơi khác: the source files alone; Người sửa / Cập nhật run on what is loaded
+    if (elsewhereView) {
+      return typed(
+        sources.items
+          .filter((source) => sourceMatchesFilters(source, wireFilters))
+          .map((source) => ({ type: 'source' as const, id: `source:${source.id}`, source })),
+      )
+    }
+    if (shelfView) {
+      return typed(
+        filterByShelver(page.items, shelvedBy)
+          .filter((doc) => docMatchesUpdated(doc, wireFilters))
+          .map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
+      )
+    }
+    // Gắn sao: the favorites route reads the type only, so the two filters narrow what is loaded
+    if (starredView) {
+      return typed(
+        files
+          .filter((doc) => docMatchesUpdated(doc, wireFilters))
+          .map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
+      )
+    }
+    return typed(files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })))
+  }, [
+    shelfView,
+    starredView,
+    elsewhereView,
+    shelvedBy,
+    files,
+    page.items,
+    sources,
+    wireFilters,
+    filters.format,
+  ])
 
-  // UNI-1961: the web's Group by, on its list views only (never the root, a
-  // folder or a search); a group header row precedes its rows
-  const grouping = documentsHomeGroupable(subView) && query.length === 0
-  const tableItems = useMemo<DocumentsHomeTableItem[]>(() => {
-    if (!grouping || groupBy === 'none') return tableRows
-    const docs = tableRows.flatMap((row) => (row.type === 'doc' ? [row.doc] : []))
-    const myFolder = { id: resolvedMyFolderId, label: myFolderLabel }
-    return groupDocumentsHomeRows(docs, groupBy, index, myFolder).flatMap((group) => [
-      { type: 'group' as const, id: `group:${group.key}`, group },
-      ...group.rows.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
-    ])
-  }, [grouping, groupBy, tableRows, index, resolvedMyFolderId, myFolderLabel])
+  // UNI-2047: the selection and the bulk bar act on the rows the person sees, not on everything
+  // loaded: the shelf's Lưu trữ bởi, the type chips and the source rows narrow the table
+  const visibleDocs = useMemo(
+    () => tableRows.flatMap((row) => (row.type === 'doc' ? [row.doc] : [])),
+    [tableRows],
+  )
+  useEffect(() => {
+    setSelected((prev) => pruneSelection(prev, visibleDocs))
+  }, [visibleDocs])
+  const selectedDocs = useMemo(() => selectedDocsOf(visibleDocs, selected), [visibleDocs, selected])
 
-  const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
+  // UNI-2047 sidebar: Từ nơi khác is its own section below the folders, as on the web
+  const navEntries = useMemo(
+    () => visibleDocumentsHomeNavEntries().filter((entry) => entry.id !== 'elsewhere'),
+    [],
+  )
 
   const currentHeadingSpec = useMemo<
     { kind: 'literal'; text: string } | { kind: 'key'; key: StringKey }
@@ -1530,24 +1917,31 @@ export function DocumentsHome({
 
   const emptyMessageKey = useMemo<StringKey | null>(() => {
     if (query.length > 0) return null
-    if (subView !== 'shared-with-me' && hasActiveFilters(filters)) return 'uhEmptyFiltered'
+    if (hasActiveFilters(filters) || (subView === 'recent' && recentSegment !== 'all')) {
+      return 'uhEmptyFiltered'
+    }
     switch (subView) {
       case 'my-folder':
         return 'uhEmptyMyFolder'
       case 'recent':
         return 'uhEmptyRecent'
+      case 'starred':
+        return 'uhEmptyStarred'
       case 'shared-with-me':
         return 'uhEmptySharedWithMe'
       case 'shared-by-me':
         return 'uhEmptySharedByMe'
       case 'trash':
         return 'uhEmptyTrash'
+      case 'elsewhere':
+        return 'dlElsewhereEmpty'
       case 'workspace':
       default:
         return folderId ? 'uhEmptyFolder' : 'uhEmptyWorkspace'
     }
-  }, [query, filters, subView, folderId])
-  const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : t('ufNoResults', { query })
+  }, [query, filters, subView, folderId, recentSegment])
+  // a search has its own empty state (ListState); every other list says what it lacks
+  const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : ''
 
   const treeSelectedKey = useMemo(() => {
     if (sidebarIdle) return '\u0000none'
@@ -1582,6 +1976,7 @@ export function DocumentsHome({
           )
         })}
       </nav>
+      {/* RV-14 / VS-9: the wrap is the one scroller; nav, folders and sources scroll together (as the web) */}
       <div className="dh-sidebar-folders">
         <div className="dh-sidebar-head">
           <span className="dh-sidebar-label">{t('uhSidebarFolders')}</span>
@@ -1592,10 +1987,8 @@ export function DocumentsHome({
             title={t('uhNewFolder')}
             onClick={() => {
               onSidebarNavigate?.()
-              folderActions.openCreate(
-                subView === 'workspace' ? folderId : null,
-                subView === 'workspace' && folderId !== null,
-              )
+              // the tree has no root row (and so no root menu): as on the web, "+" makes a top-level folder
+              folderActions.openCreate(null, false)
             }}
           >
             <svg
@@ -1648,6 +2041,7 @@ export function DocumentsHome({
           {tree.status === 'ready' && (
             <UniworkFolderTree
               idPrefix={`${uid}-tree`}
+              hideRoot
               nodes={tree.nodes}
               label={t('ufTreeLabel')}
               expanded={expanded}
@@ -1668,6 +2062,41 @@ export function DocumentsHome({
           )}
         </div>
       </div>
+      {sourcesAvailable && (
+        <div className="dl-side-sources" role="group" aria-labelledby={`${uid}-side-sources`}>
+          <div className="dh-sidebar-head">
+            <span className="dh-sidebar-label" id={`${uid}-side-sources`}>
+              {t('dlNavElsewhere')}
+            </span>
+          </div>
+          {ELSEWHERE_SOURCES.map((row) => {
+            const current =
+              !sidebarIdle && subView === 'elsewhere' && elsewhereSource === row.source
+            return (
+              <button
+                key={row.source}
+                type="button"
+                className={`dh-nav-item nav-item${current ? ' active' : ''}`}
+                data-source={row.source}
+                aria-current={current ? 'page' : undefined}
+                onClick={() => {
+                  onSidebarNavigate?.()
+                  openElsewhere(row.source)
+                }}
+              >
+                <span
+                  className={`dl-side-tile tone-${row.tone}`}
+                  data-tone={row.tone}
+                  aria-hidden="true"
+                >
+                  <SourceGlyph source={row.source} />
+                </span>
+                <span className="dl-side-label">{t(row.labelKey)}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 
@@ -1676,6 +2105,28 @@ export function DocumentsHome({
   // an open folder (not searching): the breadcrumb leaf is its one title, the actions share the row
   const folderHeader =
     subView === 'workspace' && folderId !== null && !query && shownPath.length > 0
+  // the recent-canvas layout: subtitle under the title, a search named after the screen, "Mở tiếp"
+  // above the list (the app keeps its own Tải lên / Tạo mới / Tạo nhanh, which the board does not draw)
+  const recentView = subView === 'recent'
+  const searchLabel = recentView
+    ? t('dlSearchIn', { name: currentHeading })
+    : t('uhSearchPlaceholder')
+  const subtitleKey = recentView
+    ? 'dlRecentSubtitle'
+    : subView === 'elsewhere'
+      ? 'dlElsewhereSubtitle'
+      : null
+  // the strip ranks the loaded page by last touch, which is the server's own order only while
+  // Recent is on its default sort (Lần mở gần nhất, newest first)
+  const recentDefaultSort = !docSort || (docSort.column === 'activity' && docSort.dir === 'desc')
+  const continueDocs =
+    recentView &&
+    recentDefaultSort &&
+    !query &&
+    !hasActiveFilters(filters) &&
+    recentSegment === 'all'
+      ? continueDocsOf(page.status === 'error' ? [] : page.items)
+      : []
 
   return (
     <div
@@ -1736,8 +2187,13 @@ export function DocumentsHome({
               }
             />
           ) : (
-            <div className="dh-title-group">
+            <div className={`dh-title-group${subtitleKey ? ' dh-title-stack' : ''}`}>
               <h1 className="dh-title">{currentHeading}</h1>
+              {subtitleKey && (
+                <p className="dh-subtitle" title={t(subtitleKey)}>
+                  {t(subtitleKey)}
+                </p>
+              )}
             </div>
           )}
           {workspaces.length > 0 && (
@@ -1774,8 +2230,8 @@ export function DocumentsHome({
             <input
               className="dh-search-input uwf-own-search"
               type="search"
-              aria-label={t('uhSearchPlaceholder')}
-              placeholder={t('uhSearchPlaceholder')}
+              aria-label={searchLabel}
+              placeholder={searchLabel}
               value={searchDraft}
               spellCheck={false}
               onChange={(e) => setSearchDraft(e.target.value)}
@@ -1827,16 +2283,15 @@ export function DocumentsHome({
               unavailable={unavailableKinds}
               unavailableHint={t('uhCreateUnavailableHint')}
               busy={creating}
-              share={{ checked: shareWithWorkspace, onChange: setShareWithWorkspace }}
               onPick={(kind) => {
                 if (kind === 'folder') createFolderHere()
-                else void createNow(kind, false)
+                else void createNow(kind)
               }}
             />
           </div>
         </div>
 
-        {subView !== 'trash' && subView !== 'archive' && (
+        {subView !== 'trash' && subView !== 'archive' && subView !== 'elsewhere' && (
           <div className="dh-quick-row">
             <span className="dh-quick-label">{t('uhQuickCreate')}</span>
             {QUICK_CREATE_KINDS.map((kind) => (
@@ -1847,246 +2302,61 @@ export function DocumentsHome({
                 data-quick-format={kind}
                 aria-disabled={creating || unavailableKinds.has(kind) || undefined}
                 title={unavailableKinds.has(kind) ? t('uhCreateUnavailableHint') : undefined}
-                onClick={() => void createNow(kind, true)}
+                onClick={() => void createNow(kind)}
               >
                 <FileBadge ext={kind} size={18} />
                 <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
                 <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
               </button>
             ))}
-            <button
-              type="button"
-              role="switch"
-              className="dh-quick-share"
-              aria-checked={shareWithWorkspace}
-              aria-disabled={creating || undefined}
-              aria-describedby={quickShareHintId}
-              onClick={() => {
-                if (!creating) setShareWithWorkspace(!shareWithWorkspace)
-              }}
-            >
-              <span className="dh-quick-check" aria-hidden="true">
-                {shareWithWorkspace && (
-                  <svg width="12" height="12" viewBox="0 0 16 16">
-                    <path
-                      d="m3.5 8.5 3 3 6-7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </span>
-              <span>{t('uhNewShare')}</span>
-            </button>
-            {/* always mounted and one line tall, so the toggle neither moves the pills nor goes unannounced */}
-            <p id={quickShareHintId} role="status" className="dh-quick-share-hint">
-              {shareWithWorkspace ? t('uhNewShareHint', { level: t('uhNewShareLevelView') }) : ''}
-            </p>
           </div>
         )}
 
-        {subView === 'trash' && <p className="dh-subview-banner">{t('uhTrashNote')}</p>}
+        {subView === 'trash' && <p className="dh-subview-banner">{t('dlTrashBanner30')}</p>}
         {folderNotice && (
           <p className="uwf-notice" role="status">
             {t(folderNotice)}
           </p>
         )}
 
-        {/* UNI-1961: the shelf has its own toolbar (type + Lưu trữ bởi + fixed sort) */}
+        {/* UNI-1961: the shelf's intro and Lưu trữ bởi; its type / editor / date are the shared bar below */}
         {shelfView && (
-          <ShelvedToolbar
-            items={page.items}
-            format={filters.format}
-            onFormat={(format) => setFilters((prev) => ({ ...prev, format }))}
-            shelvedBy={shelvedBy}
-            onShelvedBy={setShelvedBy}
+          <ShelvedToolbar items={page.items} shelvedBy={shelvedBy} onShelvedBy={setShelvedBy} />
+        )}
+
+        {continueDocs.length > 0 && (
+          <ContinueStrip
+            docs={continueDocs}
+            openingId={openingId}
+            onOpen={(doc) => void openDoc(doc)}
           />
         )}
 
-        {!shelfView && (
-          <div className="dh-filter-bar">
-            {subView !== 'shared-with-me' && (
-              <>
-                <label className="dh-filter-chip">
-                  <span className="dh-filter-k">{t('uhFilterType')}</span>
-                  <select
-                    className="dh-filter-select"
-                    data-filter="format"
-                    aria-label={t('uhFilterType')}
-                    value={filters.format}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        format: e.target.value as DocumentsHomeTypeFilter,
-                      }))
-                    }
-                  >
-                    {DOCUMENTS_HOME_FORMAT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.labelKey ? t(opt.labelKey) : opt.literal}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          authors={
+            subView === 'shared-with-me'
+              ? collectUpdatedByOptions(page.items)
+              : subView === 'elsewhere'
+                ? sourceAuthorsOf(sources.items)
+                : knownAuthors
+          }
+          hideTypes={subView === 'elsewhere' ? ['page'] : undefined}
+          lead={
+            // the segment needs the server's last_activity: without it (or an empty pick) it is not offered
+            recentView && (recentSegment !== 'all' || specialPresent('recent', page.items)) ? (
+              <RecentSegmentControl
+                value={recentFlat ? 'all' : recentSegment}
+                disabled={recentFlat}
+                onChange={setRecentSegment}
+              />
+            ) : undefined
+          }
+        />
 
-                <label className="dh-filter-chip">
-                  <span className="dh-filter-k">{t('uhFilterModifiedBy')}</span>
-                  <select
-                    className="dh-filter-select"
-                    data-filter="updatedBy"
-                    aria-label={t('uhFilterModifiedBy')}
-                    value={filters.updatedBy}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        updatedBy: e.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">{t('uhFilterAnyPerson')}</option>
-                    {updatedByOptionsForSelect(
-                      knownAuthors,
-                      filters.updatedBy,
-                      t('uwEditLockSomeone'),
-                    ).map((author) => (
-                      <option key={author.id} value={author.id}>
-                        {author.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="dh-filter-chip">
-                  <span className="dh-filter-k">{t('uhFilterUpdated')}</span>
-                  <select
-                    className="dh-filter-select"
-                    data-filter="updatedFrom"
-                    aria-label={t('uhFilterUpdated')}
-                    value={filters.updatedPreset}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        updatedPreset: e.target.value as DocumentsHomeUpdatedPreset,
-                      }))
-                    }
-                  >
-                    {DOCUMENTS_HOME_UPDATED_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {t(opt.labelKey)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                {hasActiveFilters(filters) && (
-                  <button
-                    type="button"
-                    className="dh-filter-clear"
-                    onClick={() => setFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)}
-                  >
-                    {t('uhFilterClear')}
-                  </button>
-                )}
-              </>
-            )}
-
-            <div className="dh-view-tools">
-              {grouping && (
-                <label className="dh-filter-chip">
-                  <span className="dh-filter-k">{t('uhGroupBy')}</span>
-                  <select
-                    className="dh-group-select"
-                    data-filter="groupBy"
-                    aria-label={t('uhGroupBy')}
-                    value={groupBy}
-                    onChange={(e) => setGroupBy(e.target.value as DocumentsHomeGroupBy)}
-                  >
-                    {DOCUMENTS_HOME_GROUP_BY.map((id) => (
-                      <option key={id} value={id}>
-                        {t(DOCUMENTS_HOME_GROUP_BY_KEYS[id])}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <button
-                type="button"
-                className="dh-sort-btn"
-                onClick={() => setSort((prev) => (prev === 'recent' ? 'name' : 'recent'))}
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16" />
-                </svg>
-                <span>{sort === 'recent' ? t('uhSortRecent') : t('uhSortName')}</span>
-              </button>
-              <div className="dh-view-toggle" role="group" aria-label={t('uhViewModeLabel')}>
-                <button
-                  type="button"
-                  className="dh-view-btn"
-                  data-view="list"
-                  aria-pressed={viewMode === 'list'}
-                  title={t('uhViewList')}
-                  aria-label={t('uhViewList')}
-                  onClick={() => setViewMode('list')}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="dh-view-btn"
-                  data-view="grid"
-                  aria-pressed={viewMode === 'grid'}
-                  title={t('uhViewGrid')}
-                  aria-label={t('uhViewGrid')}
-                  onClick={() => setViewMode('grid')}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {page.status === 'loading' && page.items.length === 0 && (
+        {((page.status === 'loading' && page.items.length === 0) ||
+          (elsewhereView && sources.status === 'loading')) && (
           <div className="uw-pick-skeleton" role="status" aria-busy="true">
             <span className="uw-sr-only">{t('uwPickLoading')}</span>
             {[0, 1, 2].map((i) => (
@@ -2100,45 +2370,25 @@ export function DocumentsHome({
           </div>
         )}
 
-        {page.status === 'error' && (
-          <div className="uw-pick-state" role="alert">
-            <p className="uw-pick-state-title">
-              {t(UNIWORK_ERROR_KEYS[page.error ?? 'server_error'])}
-            </p>
-            {errorActionOf(page.error ?? 'server_error') === 'retry' && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setListTick((n) => n + 1)}
-              >
-                {t('acctRetry')}
-              </button>
-            )}
-          </div>
-        )}
-
-        {shelfView && pageShown && (
-          <ShelvedTable
-            items={filterByShelver(page.items, shelvedBy)}
-            filtered={filters.format !== 'all' || shelvedBy !== null}
-            dateLocale={dateLocale}
-            openingId={openingId}
-            nextCursor={page.nextCursor}
-            loadingMore={page.loadingMore}
-            moreError={page.moreError}
-            onLoadMore={loadMore}
-            isUnshelving={(documentId) => unshelving.has(documentId)}
-            onOpen={(doc) => void openDoc(doc)}
-            onUnshelve={(doc) => void handleUnshelve(doc)}
-            onTrash={setShelvedTrashTarget}
-            openMenuId={openMenuId}
-            onOpenMenuChange={setOpenMenuId}
+        {listError && (
+          <ListState
+            kind="error"
+            glyph={unavailablePage === 'starred' ? 'star' : 'error'}
+            title={unavailableKeys ? t(unavailableKeys.title) : t(UNIWORK_ERROR_KEYS[listError])}
+            hint={unavailableKeys ? t(unavailableKeys.hint) : undefined}
+            // Thử lại where asking again can help: a missing route (the server may be updated) and
+            // the transient codes; never a sign-in problem
+            action={
+              unavailableKeys || errorActionOf(listError) === 'retry'
+                ? { label: t('acctRetry'), onClick: () => setListTick((n) => n + 1) }
+                : undefined
+            }
           />
         )}
 
-        {pageShown && !shelfView && (
+        {pageShown && (
           <>
-            {folders.length > 0 && (
+            {!shelfView && folders.length > 0 && (
               <section className="dh-section dh-folders-section" aria-label={t('uhSectionFolders')}>
                 <div className="dh-section-head">
                   <span className="dh-section-title">{t('uhSectionFolders')}</span>
@@ -2211,203 +2461,109 @@ export function DocumentsHome({
             )}
 
             <section
-              className="dh-section dh-docs-section uwf-list"
-              aria-label={t('uhSectionDocuments')}
+              className={`dh-section dh-docs-section${shelfView ? ' dh-shelved-section' : ''} uwf-list`}
+              aria-label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
             >
-              <div className="dh-section-head">
-                <span className="dh-section-title">{t('uhSectionDocuments')}</span>
-                <span className="dh-section-count">{tableRows.length}</span>
-              </div>
+              {!shelfView && !recentView && !elsewhereView && (
+                <div className="dh-section-head">
+                  <span className="dh-section-title">{t('uhSectionDocuments')}</span>
+                  <span className="dh-section-count">{tableRows.length}</span>
+                </div>
+              )}
 
               {tableRows.length === 0 ? (
-                <div className="dh-empty" role="status">
-                  {emptyMessage}
-                </div>
-              ) : (
-                <div
-                  className={`dh-doc-table${viewMode === 'grid' ? ' grid-mode' : ''}`}
-                  role="table"
-                  aria-label={t('uhSectionDocuments')}
-                >
-                  <div className="dh-doc-head" role="row">
-                    <div className="dh-col-name" role="columnheader">
-                      {t('uhColName')}
-                    </div>
-                    <div className="dh-col-access" role="columnheader">
-                      {t('uhColAccess')}
-                    </div>
-                    <div className="dh-col-person" role="columnheader">
-                      {t('uhColUpdatedBy')}
-                    </div>
-                    <div className="dh-col-time" role="columnheader">
-                      {t('uhColUpdatedAt')}
-                    </div>
-                    <div className="dh-col-size" role="columnheader">
-                      {t('uhColSize')}
-                    </div>
-                    <div
-                      className="dh-col-actions"
-                      role="columnheader"
-                      aria-label={t('uhColActions')}
-                    />
+                shelfView ? (
+                  <div className="dh-empty dh-shelved-empty" role="status">
+                    <p className="dh-shelved-empty-title">
+                      {hasActiveFilters(filters) || shelvedBy !== null
+                        ? t('uhShelvedNoMatchTitle')
+                        : t('uhShelvedEmptyTitle')}
+                    </p>
+                    <p className="dh-shelved-empty-desc">
+                      {hasActiveFilters(filters) || shelvedBy !== null
+                        ? t('uhShelvedNoMatchDesc')
+                        : t('uhShelvedEmptyDesc')}
+                    </p>
                   </div>
-
-                  {tableItems.map((row) => {
-                    if (row.type === 'group') {
-                      return (
-                        <div key={row.id} role="row" className="dh-group-row">
-                          <div role="rowheader" aria-colspan={6} className="dh-group-cell">
-                            <span className="dh-group-title">
-                              {documentsHomeGroupLabel(row.group, t)}
-                            </span>
-                            <span className="dh-group-count">{row.group.rows.length}</span>
-                          </div>
-                        </div>
-                      )
+                ) : // V-STATES F-09: a search with no hit is the shared empty state with Xóa tìm kiếm
+                query.length > 0 ? (
+                  <ListState
+                    kind="empty"
+                    glyph="search"
+                    title={t('dlSearchNoResults', { query })}
+                    action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
+                  />
+                ) : (
+                  <div className="dh-empty" role="status">
+                    {emptyMessage}
+                  </div>
+                )
+              ) : (
+                <>
+                  <BulkBar
+                    screen={screen}
+                    docs={selectedDocs}
+                    busy={bulkBusy}
+                    onAction={onBulkAction}
+                    onClear={() => setSelected(new Set())}
+                  />
+                  <DocList
+                    screen={screen}
+                    rows={tableRows}
+                    sort={flatActivitySort ? defaultSort('workspace') : docSort}
+                    onSortChange={setDocSort}
+                    moreToLoad={page.nextCursor !== null}
+                    selected={selected}
+                    onSelectedChange={setSelected}
+                    label={
+                      shelfView
+                        ? t('uhNavArchive')
+                        : elsewhereView
+                          ? currentHeading
+                          : t('uhSectionDocuments')
                     }
-                    if (row.type === 'source') {
-                      return (
-                        <DocumentsSourceRow
-                          key={row.id}
-                          source={row.source}
-                          menuOpen={openMenuId === row.id}
-                          onMenuOpenChange={(o) => setOpenMenuId(o ? row.id : null)}
-                          onOpen={(source) => void openSourceFile(source)}
-                          onDownload={(source) => void downloadSourceFile(source)}
-                        />
-                      )
+                    openingId={trashView ? null : openingId}
+                    openMenuId={openMenuId}
+                    onOpenMenuChange={setOpenMenuId}
+                    menuFor={rowMenuFor}
+                    actionsFor={
+                      shelfView ? shelfActionsFor : trashView ? trashActionsFor : undefined
                     }
-                    const doc = row.doc
-                    const access = formatAccessCell(doc, t, lang)
-                    const person = formatUpdatedByCell(doc)
-                    const menuItems = docMenuFor(doc)
-                    const renaming = docRename?.doc.id === doc.id ? docRename : null
-                    const isSearchHitPath = query.length > 0 && Boolean(doc.path)
-                    const searchPath = isSearchHitPath
-                      ? shortPath(
-                          labelMyFolderPath(doc.path!, resolvedMyFolderId, myFolderLabel),
-                          t('ufRoot'),
-                        )
-                      : subView === 'shared-with-me' && doc.workspaceName?.trim()
-                        ? { short: doc.workspaceName.trim(), full: doc.workspaceName.trim() }
-                        : null
-                    const isOpening = openingId === doc.id
-
-                    return (
-                      <div
-                        key={doc.id}
-                        role="row"
-                        data-doc-id={doc.id}
-                        aria-busy={isOpening || undefined}
-                        className={`dh-doc-row${isOpening ? ' opening' : ''}`}
-                        onDoubleClick={() => {
-                          if (!renaming && !isFolderEntry(doc)) void openDoc(doc)
-                        }}
-                      >
-                        <div className="dh-cell-name" role="cell">
-                          <FileBadge
-                            ext={doc.kind === 'page' ? 'page' : docExtension(doc)}
-                            size={28}
-                          />
-                          {renaming ? (
-                            <RenameField
-                              initial={renameParts(doc.title, renameFormatOf(doc)).base}
-                              label={doc.title}
-                              error={renaming.error}
-                              busy={renaming.busy}
-                              errorKeys={DOC_NAME_ERROR_KEYS}
-                              onSave={(val) => void handleSaveDocRename(doc, val)}
-                              onCancel={() => setDocRename(null)}
-                              onEdit={() =>
-                                setDocRename((prev) => (prev ? { ...prev, error: null } : null))
-                              }
-                            />
-                          ) : (
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <button
-                                type="button"
-                                className="dh-doc-open"
-                                title={doc.title}
-                                onClick={() => void openDoc(doc)}
-                              >
-                                {doc.title}
-                              </button>
-                              {searchPath && (
-                                <span
-                                  className={`dh-doc-subpath${isSearchHitPath ? ' uwf-path' : ''}`}
-                                  title={searchPath.full}
-                                >
-                                  {isSearchHitPath ? (
-                                    <>
-                                      <span aria-hidden="true">{searchPath.short}</span>
-                                      <span className="uw-sr-only">
-                                        {t('ufPathLabel', { path: searchPath.full })}
-                                      </span>
-                                    </>
-                                  ) : (
-                                    searchPath.short
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="dh-cell-access" role="cell">
-                          {access.visibilityLabel ? (
-                            <span className={`dh-vis-badge dh-vis-${access.tone}`}>
-                              {access.visibilityLabel}
-                            </span>
-                          ) : (
-                            <span className="dh-cell-empty">—</span>
-                          )}
-                          {access.levelLabel && (
-                            <span className="dh-level-sub">{access.levelLabel}</span>
-                          )}
-                        </div>
-
-                        <div className="dh-cell-person" role="cell">
-                          {person.name ? (
-                            <>
-                              <span className="dh-avatar" aria-hidden="true">
-                                {person.initial}
-                              </span>
-                              <span className="dh-person-name" title={person.name}>
-                                {person.name}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="dh-cell-empty">—</span>
-                          )}
-                        </div>
-
-                        <div className="dh-cell-time" role="cell">
-                          {formatShortDate(doc.updatedAt, dateLocale)}
-                        </div>
-
-                        <div className="dh-cell-size" role="cell">
-                          {formatBytes(rowSizeBytes(row), dateLocale)}
-                        </div>
-
-                        <div
-                          className="dh-cell-actions"
-                          role="cell"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {menuItems.length > 0 && (
-                            <FolderMenu
-                              label={t('ufActionsFor', { name: doc.title })}
-                              items={menuItems}
-                              dataFor={doc.id}
-                              open={openMenuId === doc.id}
-                              onOpenChange={(o) => setOpenMenuId(o ? doc.id : null)}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                    // UNI-2047 B7: only Starred rows know their star state (the "Sao · ⋯" Sao button)
+                    onUnstar={
+                      starredView && canFavoriteDocuments()
+                        ? (doc) => void handleFavorite(doc, false)
+                        : undefined
+                    }
+                    onOpen={(doc) => void openDoc(doc)}
+                    sublineFor={trashView ? undefined : sublineFor}
+                    groups={subView !== 'trash' || trashView}
+                    rename={
+                      docRename
+                        ? {
+                            docId: docRename.doc.id,
+                            error: docRename.error,
+                            busy: docRename.busy,
+                            onSave: (value) => void handleSaveDocRename(docRename.doc, value),
+                            onCancel: () => setDocRename(null),
+                            onEdit: () =>
+                              setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
+                          }
+                        : undefined
+                    }
+                    renderSource={(source, columns) => (
+                      <DocumentsSourceRow
+                        key={`source:${source.id}`}
+                        source={source}
+                        columns={columns}
+                        menuOpen={openMenuId === `source:${source.id}`}
+                        onMenuOpenChange={(o) => setOpenMenuId(o ? `source:${source.id}` : null)}
+                        onOpen={(src) => void openSourceFile(src)}
+                        onDownload={(src) => void downloadSourceFile(src)}
+                      />
+                    )}
+                  />
+                </>
               )}
 
               {page.moreError && (
@@ -2416,7 +2572,7 @@ export function DocumentsHome({
                 </p>
               )}
 
-              {(page.nextCursor || (sourcesMerged && sources.nextCursor)) && (
+              {(page.nextCursor || (elsewhereView && sources.nextCursor)) && (
                 <div className="dh-load-more-row">
                   <button
                     type="button"
@@ -2455,6 +2611,21 @@ export function DocumentsHome({
         />
       )}
 
+      {details && (
+        <aside className="dl-details">
+          <UniworkDocInfoPanel
+            key={details.id}
+            title={details.title}
+            load={details.load}
+            onClose={closeDetails}
+            onRetry={() => {
+              const target = tableRows.find((r) => r.type === 'doc' && r.doc.id === details.id)
+              if (target?.type === 'doc') showDetails(target.doc)
+            }}
+          />
+        </aside>
+      )}
+
       {archiveTarget && (
         <ArchiveConfirm
           name={archiveTarget.title}
@@ -2468,6 +2639,17 @@ export function DocumentsHome({
           name={shelvedTrashTarget.title}
           onConfirm={() => void handleConfirmShelvedTrash()}
           onCancel={() => setShelvedTrashTarget(null)}
+        />
+      )}
+
+      {bulkTrashConfirm && (
+        <BulkTrashConfirm
+          count={selectedDocs.length}
+          onConfirm={() => {
+            setBulkTrashConfirm(false)
+            void runBulkById('trash')
+          }}
+          onCancel={() => setBulkTrashConfirm(false)}
         />
       )}
 

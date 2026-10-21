@@ -31,12 +31,17 @@ import { zh as wbZh } from '../src/renderer/src/i18n/workbench/zh'
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
-function makeEntry(path: string, name: string, uniwork?: RecentEntry['uniwork']): RecentEntry {
+function makeEntry(
+  path: string,
+  name: string,
+  uniwork?: RecentEntry['uniwork'],
+  mtimeMs = 1_700_000_000_000,
+): RecentEntry {
   return {
     path,
     name,
     ext: 'docx',
-    mtimeMs: 1_700_000_000_000,
+    mtimeMs,
     sizeBytes: 2048,
     starred: true,
     ...(uniwork ? { uniwork } : {}),
@@ -286,7 +291,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
 
   async function mountHome() {
     await act(async () => {
-      root.render(createElement(LocaleProvider, null, createElement(Home)))
+      root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(Home)))
     })
     await flush()
   }
@@ -527,13 +532,14 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.querySelector('.folder-panel')).toBeNull()
     expect(host.textContent).toContain('Root Cloud Doc.docx')
 
-    // DocumentsHome sub-nav in UniWork area renders the 6 available entries (My Folder is a tree row; Lưu trữ since UNI-1961) and hides starred
+    // DocumentsHome sub-nav in UniWork area renders the 7 available entries (My Folder is a tree row; Lưu trữ since UNI-1961; Gắn sao since UNI-2047 B6; Từ nơi khác is its own section since the UNI-2047 sidebar)
     const uwNavIds = Array.from(host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item')).map(
       (el) => el.getAttribute('data-nav'),
     )
     expect(uwNavIds).toEqual([
       'workspace',
       'recent',
+      'starred',
       'shared-with-me',
       'shared-by-me',
       'archive',
@@ -688,13 +694,28 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
           title: `UW Full ${i}.docx`,
         }),
       ),
-      makeEntry('/Users/linh/Documents/Device Full 1.docx', 'Device Full 1.docx'),
+      makeEntry(
+        '/Users/linh/Documents/Device Full 1.docx',
+        'Device Full 1.docx',
+        undefined,
+        1_700_000_300_000,
+      ),
     ]
     const shortPage2: RecentEntry[] = [
-      makeEntry('/Users/linh/Documents/Device Short 2.docx', 'Device Short 2.docx'),
+      makeEntry(
+        '/Users/linh/Documents/Device Short 2.docx',
+        'Device Short 2.docx',
+        undefined,
+        1_700_000_200_000,
+      ),
     ]
     const tailPage3: RecentEntry[] = [
-      makeEntry('/Users/linh/Documents/Device Oldest Tail 3.docx', 'Device Oldest Tail 3.docx'),
+      makeEntry(
+        '/Users/linh/Documents/Device Oldest Tail 3.docx',
+        'Device Oldest Tail 3.docx',
+        undefined,
+        1_700_000_100_000,
+      ),
     ]
     api.recents = vi.fn(async ({ offset = 0 }: { offset?: number }) => {
       if (offset === 0) return { entries: fullPage1, total: 202 }
@@ -716,43 +737,34 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.textContent).toContain('Device Short 2.docx')
     expect(host.textContent).not.toContain('Device Oldest Tail 3.docx')
 
-    // (c) FE13-R3-5: switching fileSort to 'oldest' over a partially loaded list (201 < 202) drains the remaining page(s)
-    const sortBtn = host.querySelector<HTMLButtonElement>('.cloud-col-sort-btn')
-    expect(sortBtn).not.toBeNull()
+    // (c) FE13-R3-5: sorting Cập nhật oldest-first (second click on the sorted header) over a partially loaded
+    //     list (201 < 202) drains the remaining page(s)
+    const updatedSort = () =>
+      Array.from(
+        host.querySelectorAll<HTMLButtonElement>('[role="columnheader"] button.dh-sort-head'),
+      ).find((h) => h.textContent === 'Updated')!
+    expect(updatedSort().textContent).toContain('Updated')
     await act(async () => {
-      sortBtn!.click()
-    })
-    await flush()
-    const oldestItem = Array.from(
-      host.querySelectorAll<HTMLButtonElement>('.cloud-sort-menu [role="menuitemradio"]'),
-    ).find((btn) => btn.textContent?.includes('Oldest'))
-    expect(oldestItem).toBeDefined()
-    await act(async () => {
-      oldestItem!.click()
+      updatedSort().click()
     })
     await flush()
 
     expect(api.recents).toHaveBeenCalledTimes(3)
     expect(api.recents).toHaveBeenNthCalledWith(3, expect.objectContaining({ offset: 201 }))
-    const rowNames = Array.from(host.querySelectorAll('.recent-list .recent-name')).map(
-      (el) => el.textContent,
-    )
+    const rowNames = Array.from(
+      host.querySelectorAll(
+        '.dh-doc-table .dh-doc-row .dh-doc-open, .dh-doc-table .dh-doc-row .dh-doc-title',
+      ),
+    ).map((el) => el.textContent)
     expect(rowNames).toEqual([
       'Device Oldest Tail 3.docx',
       'Device Short 2.docx',
       'Device Full 1.docx',
     ])
 
-    // Switch sort back to 'recent' before testing empty-page stop
+    // Flip the sort once more (newest first, a real date sort) before testing empty-page stop
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('.cloud-col-sort-btn')!.click()
-    })
-    await flush()
-    const recentSortItem = Array.from(
-      host.querySelectorAll<HTMLButtonElement>('.cloud-sort-menu [role="menuitemradio"]'),
-    ).find((btn) => !btn.textContent?.includes('Oldest'))!
-    await act(async () => {
-      recentSortItem.click()
+      updatedSort().click()
     })
     await flush()
 
@@ -808,19 +820,13 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     })
     await flush()
 
-    expect(api.starred).toHaveBeenCalledTimes(1)
+    // the header sort set in (c) is still active, and a sorted list drains its remaining pages:
+    // the second page is requested with the same group without waiting for Load more
+    expect(api.starred).toHaveBeenCalledTimes(2)
     expect(api.starred).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ offset: 0, group: 'Finance' }),
     )
-    expect(host.querySelector('.load-more')).not.toBeNull()
-
-    await act(async () => {
-      intersectCb!([{ isIntersecting: true }])
-    })
-    await flush()
-
-    expect(api.starred).toHaveBeenCalledTimes(2)
     expect(api.starred).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ offset: 1, group: 'Finance' }),
@@ -1538,7 +1544,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     }
   })
 
-  it('defines every var(--x) used in home.css and uniwork-folders.css and enforces board tab metrics, coarse-pointer target size, and >= 4.5:1 .recent-path contrast (FE13-R1-3, FE13-R1-10, V13-2, V13-3)', async () => {
+  it('defines every var(--x) used in home.css and uniwork-folders.css and enforces board tab metrics, coarse-pointer target size, and >= 4.5:1 device list second-line contrast (FE13-R1-3, FE13-R1-10, V13-2, V13-3)', async () => {
     const tokensCss = readFileSync(
       resolve(__dirname, '../../../packages/ui/src/tokens.css'),
       'utf8',
@@ -1549,6 +1555,11 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       'utf8',
     )
     const tabbarCss = readFileSync(resolve(__dirname, '../src/renderer/src/tabbar.css'), 'utf8')
+    // the device list is the shared DocList: its second line is styled by the Documents table sheet
+    const docsCss = readFileSync(
+      resolve(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
+      'utf8',
+    )
 
     // FE13-R1-3: every var(--x) in home.css and uniwork-folders.css is defined in tokens.css or shell CSS
     const definedVars = new Set<string>()
@@ -1573,7 +1584,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     const cleanedHomeCss = homeCss
       .replace(/@keyframes\s+[\w-]+\s*\{(?:\{[^{}]*\}|[^{}])*\}/g, '')
       .replace(/@position-try\s+[\w-]+\s*\{[^{}]*\}/g, '')
-    style.textContent = `${tokensCss}\n${cleanedHomeCss}`
+    style.textContent = `${tokensCss}\n${cleanedHomeCss}\n${docsCss}`
     document.head.appendChild(style)
 
     try {
@@ -1582,7 +1593,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
 
       const tablist = host.querySelector<HTMLElement>('.home-area-tabs')!
       const tab = host.querySelector<HTMLElement>('.home-area-tab.active')!
-      const recentPath = host.querySelector<HTMLElement>('.recent-item .recent-path')!
+      const recentPath = host.querySelector<HTMLElement>('.dh-doc-row .dh-doc-subpath')!
 
       expect(window.getComputedStyle(tablist).padding).toBe('4px')
       expect(window.getComputedStyle(tab).minHeight).toBe('34px')
@@ -1620,7 +1631,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
         return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
       }
 
-      // Check computed property on .recent-path uses var(--text-secondary)
+      // Check computed property on the second line uses var(--text-secondary)
       expect(window.getComputedStyle(recentPath).color).toBe('var(--text-secondary)')
       const lightSec = tokensCss.match(
         /:root\s*\{[\s\S]*?--text-secondary:\s*(#[0-9a-fA-F]{6})/,
@@ -1686,6 +1697,38 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     })
     await flush()
     expect(host.querySelector('.dh-main h1')?.textContent).toBe('Trash')
+  })
+  it('keeps the picked Từ nơi khác source with the sub-view across an area switch (RV-16)', async () => {
+    const listSources = vi.fn(async () => ok({ items: [], nextCursor: null }))
+    ;(api as unknown as Record<string, unknown>).uniworkListSources = listSources
+    await mountHome()
+
+    const meeting = host.querySelector<HTMLButtonElement>(
+      '.dl-side-sources [data-source="meeting"]',
+    )
+    expect(meeting).not.toBeNull()
+    await act(async () => {
+      meeting!.click()
+    })
+    await flush()
+    expect(listSources).toHaveBeenLastCalledWith({ workspaceId: 'ws-1', source: 'meeting' })
+
+    const tabs = host.querySelectorAll<HTMLButtonElement>(
+      '[role="tablist"][aria-label="Area"] [role="tab"]',
+    )
+    await act(async () => {
+      tabs[1]!.click()
+    })
+    await flush()
+    await act(async () => {
+      tabs[0]!.click()
+    })
+    await flush()
+
+    // the page is filtered again and the same source row is the current one
+    expect(listSources).toHaveBeenLastCalledWith({ workspaceId: 'ws-1', source: 'meeting' })
+    const current = host.querySelector<HTMLElement>('.dl-side-sources [aria-current="page"]')
+    expect(current?.getAttribute('data-source')).toBe('meeting')
   })
   it('resets the UniWork sub-view and open folder to the workspace root on a workspace switch (VDH-7)', async () => {
     await mountHome()

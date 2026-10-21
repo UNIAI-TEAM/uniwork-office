@@ -128,7 +128,7 @@ test.describe('html editor', () => {
       await frame.locator('#dot').dispatchEvent('click')
       const float = editorPage.locator('.hx-float')
       await expect(float.getByRole('button', { name: /Flip horizontally/ })).toBeVisible()
-      await expect(float.getByRole('button', { name: /^Bold$/ })).toHaveCount(0)
+      await expect(float.getByRole('button', { name: /^Bold(?: \(|$)/ })).toHaveCount(0)
       const panel = editorPage.locator('.preview-stage .hx-panel')
       await expect(panel.locator('.hx-panel-tag')).toHaveText('<img>')
       await expect(panel.locator('.hx-panel-section', { hasText: /Typography/ })).toHaveCount(0)

@@ -193,8 +193,9 @@ describe('UniNote icon = web option J (UNI-2050, web 8be093cdb)', () => {
     for (const rel of [
       'uniwork-home/NewMenu.tsx',
       'uniwork-home/DocumentsHome.tsx',
-      'uniwork-home/ShelvedDocumentsView.tsx',
-      'uniwork-folders/BrowserContents.tsx',
+      // UNI-2047: shelf and folder-browser rows are drawn by the shared doclist rows
+      'doclist/DocRow.tsx',
+      'doclist/PickerList.tsx',
     ]) {
       expect(readFileSync(join(RENDERER, rel), 'utf8'), rel).toMatch(/<FileBadge/)
     }
