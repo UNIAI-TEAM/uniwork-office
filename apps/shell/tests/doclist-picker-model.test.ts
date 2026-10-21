@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  PICKER_COARSE_EXTRA,
   PICKER_COLUMNS,
   PICKER_EDITOR_RUNG,
   pickerColumnsFor,
+  pickerEditorRungFor,
   pickerSublineOf,
   pickerTrackOf,
 } from '../src/renderer/src/doclist/picker'
@@ -48,6 +50,56 @@ describe('picker columns', () => {
     expect(tracks(['name', 'updated'])[0]).toMatch(/^minmax\(/)
     // Cập nhật is a fixed track so the dates line up from row to row
     expect(tracks(['name', 'updated'])[1]).toMatch(/^\d+px$/)
+  })
+})
+
+// R-FE3 M2: the host's own buttons (Desk's pill / Resolve) take room the ladder must keep clear
+describe('picker columns follow the reserve the host asks for', () => {
+  const ALL = ['name', 'editor', 'updated']
+  const TWO = ['name', 'updated']
+
+  it('moves the rung up with the reserve and keeps the default one without it', () => {
+    expect(pickerColumnsFor(PICKER_EDITOR_RUNG)).toEqual(ALL)
+    expect(PICKER_EDITOR_RUNG).toBe(pickerEditorRungFor(76))
+    expect(pickerEditorRungFor(128)).toBeGreaterThan(pickerEditorRungFor(76))
+    expect(pickerEditorRungFor(232)).toBeGreaterThan(pickerEditorRungFor(128))
+    expect(pickerEditorRungFor(44)).toBeLessThan(pickerEditorRungFor(76))
+  })
+
+  it('keeps Người sửa in a list wide enough for Tên floor + Người sửa + Cập nhật + the reserve', () => {
+    // Tên 168 + Người sửa 112 + Cập nhật 116 + padding 16 = 412 + reserve
+    for (const reserve of [44, 128, 232]) {
+      const need = 412 + reserve
+      expect(pickerColumnsFor(need - 1, reserve)).toEqual(TWO)
+      expect(pickerColumnsFor(need + 16, reserve)).toEqual(ALL)
+    }
+  })
+
+  it('pins the Desk widths: reserve 232 needs 656px, 128 needs 544px, the browser 44 needs 464px', () => {
+    expect(pickerColumnsFor(640, 232)).toEqual(TWO)
+    expect(pickerColumnsFor(656, 232)).toEqual(ALL)
+    expect(pickerColumnsFor(528, 128)).toEqual(TWO)
+    expect(pickerColumnsFor(544, 128)).toEqual(ALL)
+    expect(pickerColumnsFor(448, 44)).toEqual(TWO)
+    expect(pickerColumnsFor(464, 44)).toEqual(ALL)
+  })
+
+  it('counts the room a coarse pointer adds to the row buttons', () => {
+    expect(PICKER_COARSE_EXTRA).toBe(28)
+    const wide = pickerEditorRungFor(128)
+    expect(pickerColumnsFor(wide, 128)).toEqual(ALL)
+    expect(pickerColumnsFor(wide, 128 + PICKER_COARSE_EXTRA)).toEqual(TWO)
+  })
+
+  it('lets Tên shrink under its floor once Người sửa is gone, so a row never runs under the buttons', () => {
+    const tracks = (columns: Parameters<typeof pickerTrackOf>[0]) =>
+      pickerTrackOf(columns).split(/\s(?![^(]*\))/)
+    const full = tracks(['name', 'editor', 'updated'])[0]!
+    const two = tracks(['name', 'updated'])[0]!
+    expect(full).toBe('minmax(168px, 1fr)')
+    const floor = (track: string) => Number(/minmax\((\d+)px/.exec(track)![1])
+    expect(floor(two)).toBeLessThan(floor(full))
+    expect(floor(two)).toBeLessThanOrEqual(96)
   })
 })
 

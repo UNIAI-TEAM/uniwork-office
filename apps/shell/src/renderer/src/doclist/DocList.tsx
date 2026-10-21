@@ -23,6 +23,8 @@ export interface DocListProps {
   screen: DocListScreen
   /** the loaded rows, in any order: the table sorts them */
   rows: readonly DocumentsHomeTableRow[]
+  /** more rows wait on the next page: the last group is partial, so it shows no count */
+  moreToLoad?: boolean
   /** the sort the person chose on this screen; null = the screen default */
   sort: SortSpec | null
   onSortChange: (next: SortSpec) => void
@@ -102,6 +104,7 @@ function SortArrow() {
 export function DocList({
   screen,
   rows,
+  moreToLoad = false,
   sort,
   onSortChange,
   selected,
@@ -307,7 +310,7 @@ export function DocList({
         {columns.map(headerFor)}
       </div>
       {runs
-        ? runs.flatMap((run) => {
+        ? runs.flatMap((run, index) => {
             const open = run.id === null || !collapsed.has(run.id)
             return [
               run.id !== null && (
@@ -315,7 +318,7 @@ export function DocList({
                   key={`group:${run.id}`}
                   id={run.id}
                   open={open}
-                  count={run.rows.length}
+                  count={moreToLoad && index === runs.length - 1 ? undefined : run.rows.length}
                   onToggle={onToggleGroup}
                 />
               ),

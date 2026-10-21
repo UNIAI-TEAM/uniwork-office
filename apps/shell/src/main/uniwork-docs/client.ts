@@ -716,12 +716,16 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
   /**
    * The flat `/documents` route sorts by updated | name | size | editor only (any other key is a
    * 400) and has no `activity` param (it would be ignored without a word): when Recent moves onto
-   * it, the Recent-only params are dropped here.
+   * it, the Recent-only params are dropped here (an order is dropped with the sort it belonged to).
    */
   const dropRecentOnlyParams = (params: URLSearchParams): void => {
     params.delete('activity')
     const sort = params.get('sort')
-    if (sort !== null && !FLAT_LIST_SORTS.has(sort)) params.delete('sort')
+    // an order with no sort is a 400 on the flat route: it goes with the sort it belonged to
+    if (sort !== null && !FLAT_LIST_SORTS.has(sort)) {
+      params.delete('sort')
+      params.delete('order')
+    }
   }
   /**
    * FD-11: one document's own fields, whatever its kind (a folder has no file

@@ -1595,19 +1595,6 @@ export function formatWhen(iso: string, locale: string, now: Date = new Date()):
   return formatListDate(date, now, locale)
 }
 
-/** "Updated 10:42 by Linh" for a picker row ('' when there is no time to show) */
-export function pickerRowMeta(
-  doc: UniworkDocSummary,
-  t: TFunc,
-  dateLocale: string,
-  now: Date = new Date(),
-): string {
-  const time = formatWhen(doc.updatedAt, dateLocale, now)
-  if (!time) return ''
-  const name = doc.updatedByName?.trim()
-  return name ? t('uwPickUpdatedBy', { name, time }) : t('uwPickUpdated', { time })
-}
-
 // ── Organization choice (after sign-in, Settings › Account) ─────────
 
 export type OrgMembership = 'active' | 'member_deactivated' | 'organization_suspended'

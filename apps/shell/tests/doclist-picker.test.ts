@@ -131,6 +131,36 @@ describe('DocPickerList: the compact picker variant (UNI-2047 B2)', () => {
     expect(host.querySelector('[role="table"], [role="row"], [role="cell"]')).toBeNull()
   })
 
+  // R-FE3 M1: a tray whose title button is the real control is a plain list, not a listbox
+  it('renders a plain list with semantics "list": no option roles, no selection state', async () => {
+    await mount(DOCS, { semantics: 'list', activeId: null, id: 'tray', className: 'wb-tray' })
+    expect(host.querySelector('[role="listbox"], [role="option"], [aria-selected]')).toBeNull()
+    const box = host.querySelector<HTMLElement>('ul')!
+    expect(box.getAttribute('role')).toBe('list')
+    expect(box.id).toBe('tray')
+    expect(box.classList.contains('wb-tray')).toBe(true)
+    const items = Array.from(box.querySelectorAll(':scope > li'))
+    expect(items).toHaveLength(3)
+    // the items are real list items; the row keeps its data-id and its cells
+    for (const li of items) {
+      expect(li.getAttribute('role')).toBeNull()
+      expect(li.querySelector(':scope > .uw-pick-row')).not.toBeNull()
+    }
+    expect(box.querySelector('.uw-pick-row[data-id="budget"] [data-col="updated"]')).not.toBeNull()
+  })
+
+  it('keeps the host row props and the title button reachable in list semantics', async () => {
+    const onClick = vi.fn()
+    await mount(DOCS, {
+      semantics: 'list',
+      optionProps: () => ({ onClick }),
+      nameFor: (d) => createElement('button', { type: 'button', className: 'tray-title' }, d.title),
+    })
+    host.querySelector<HTMLElement>('.uw-pick-row [data-col="updated"]')!.click()
+    expect(onClick).toHaveBeenCalledTimes(1)
+    expect(host.querySelectorAll('button.tray-title')).toHaveLength(3)
+  })
+
   it('carries the host id, describedby and class on the listbox', async () => {
     await mount(DOCS, { id: 'uw-pick-list', describedBy: 'hint', className: 'uwf-contents' })
     const box = host.querySelector('[role="listbox"]')!

@@ -24,7 +24,6 @@ import {
   pathKey,
   pickerBodyOf,
   pickerReducer,
-  pickerRowMeta,
   recentOpenAction,
   recentRowIsMissing,
   recentRowModifiedMs,
@@ -727,21 +726,6 @@ describe('time and path helpers', () => {
     expect(formatWhen('2026-04-02T09:30:00', 'vi-VN', now)).toBe('02/04')
     expect(formatWhen('2025-10-18T09:30:00', 'en-US', now)).toBe('Oct 18, 2025')
     expect(formatWhen('2025-10-18T09:30:00', 'vi-VN', now)).toBe('18/10/2025')
-  })
-
-  it('shows the shared date in the picker row meta', () => {
-    const base = { ...doc('a', 'A.docx', 'docx'), updatedAt: '2026-04-30T16:30:00' }
-    expect(pickerRowMeta(base, t, 'en-US', now)).toBe('Updated Yesterday, 16:30')
-    expect(pickerRowMeta({ ...base, updatedByName: 'Linh' }, t, 'vi-VN', now)).toMatch(
-      /Hôm qua, 16:30/,
-    )
-  })
-
-  it('names who updated a document when the server says', () => {
-    const base = { ...doc('a', 'A.docx', 'docx'), updatedAt: '2026-04-02T09:30:00' }
-    expect(pickerRowMeta(base, t, 'en-US', now)).toMatch(/^Updated Apr/)
-    expect(pickerRowMeta({ ...base, updatedByName: 'Linh' }, t, 'en-US', now)).toMatch(/by Linh$/)
-    expect(pickerRowMeta({ ...base, updatedAt: '' }, t, 'en-US', now)).toBe('')
   })
 
   it('compares Windows paths regardless of slash direction and drive-letter case', () => {

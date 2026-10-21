@@ -374,6 +374,38 @@ describe('Home local file list shares the list formats, sort and columns (UNI-20
     expect(rowCells().map((r) => r.sub)).toEqual(['Finance', 'Documents', 'Documents'])
   })
 
+  // R-FE3 L4: a hit is a search over files on disk, so even a UniWork working copy shows its file time
+  it('shows the file time of a search hit that is a UniWork working copy', async () => {
+    await mountHome('en')
+    const copy = {
+      ...entry('Contract.docx', at(2026, 10, 20, 16, 30), 2_969, '/Users/linh/.uniwork/doc-1'),
+      uniwork: {
+        documentId: 'doc-1',
+        workspaceId: 'ws-1',
+        title: 'Contract',
+        access: 'edit' as const,
+      },
+    }
+    ;(window as unknown as { aiOffice: Record<string, unknown> }).aiOffice.searchFiles = vi.fn(
+      async () => ({
+        hits: [{ ...copy, snippet: null, needles: ['c'] }],
+        total: 1,
+        index: { pending: 0, scanning: false },
+      }),
+    )
+    const input = host.querySelector<HTMLInputElement>('input[type="search"]')!
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      setValue.call(input, 'c')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+    })
+    await flush()
+    expect(rowCells().map((r) => r.time)).toEqual(['Yesterday, 16:30'])
+  })
+
   it('renders the folder view with the shared columns and "Folder" under a sub-folder name', async () => {
     const dir = '/Users/linh/Documents'
     folderRoots = [{ path: dir, name: 'Documents', usable: true, readable: true, removable: false }]

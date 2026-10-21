@@ -232,7 +232,7 @@ describe('DocumentsHome: the Recent screen on the recent-canvas layout (UNI-2047
       )
     })
 
-    it('orders by last touch whatever the table sorts by, and skips folders and trashed rows', async () => {
+    it('ranks by last touch and skips folders and trashed rows', async () => {
       recentItems = [
         touched('a-old', 'opened', iso(2026, 10, 1, 9, 0), { updatedAt: iso(2026, 10, 21, 11, 0) }),
         touched('folder', 'opened', iso(2026, 10, 21, 11, 30), { kind: 'folder' }),
@@ -240,11 +240,28 @@ describe('DocumentsHome: the Recent screen on the recent-canvas layout (UNI-2047
         touched('z-new', 'edited', iso(2026, 10, 21, 10, 0)),
       ]
       await mount('recent')
-      await click(host.querySelector('[data-col="updated"] .dh-sort-head'))
       expect(cards().map((c) => c.querySelector('.dh-continue-name')?.textContent)).toEqual([
         'z-new.docx',
         'a-old.docx',
       ])
+    })
+
+    // R-FE3 L1: the strip ranks the loaded page only, so it is right only on the server's own order
+    it('is there only while Recent is on its default sort (Lần mở gần nhất, newest first)', async () => {
+      await mount('recent')
+      expect(strip()).not.toBeNull()
+      // Cập nhật: the first page is then the 50 most recently saved, not the last touched
+      await click(host.querySelector('[data-col="updated"] .dh-sort-head'))
+      expect(strip()).toBeNull()
+      // Tên
+      await click(host.querySelector('[data-col="name"] .dh-sort-head'))
+      expect(strip()).toBeNull()
+      // back to the default column, newest first: the strip returns
+      await click(host.querySelector('[data-col="activity"] .dh-sort-head'))
+      expect(strip()).not.toBeNull()
+      // oldest first is not the default either
+      await click(host.querySelector('[data-col="activity"] .dh-sort-head'))
+      expect(strip()).toBeNull()
     })
 
     it('opens the document from a card (a real button, keyboard reachable)', async () => {
@@ -330,6 +347,21 @@ describe('DocumentsHome: the Recent screen on the recent-canvas layout (UNI-2047
       expect(header('yesterday')).toBe('Hôm qua· 1 tài liệu')
       expect(header('this_week')).toBe('Tuần này· 1 tài liệu')
       expect(header('earlier')).toBe('Trước đó· 1 tài liệu')
+    })
+
+    // R-FE3 L5: the last run of a paged list is partial until the next page lands
+    it('count only the runs that are complete while a next page exists', async () => {
+      api.uniworkListDocuments.mockImplementation(async () =>
+        ok({ documents: recentItems, nextCursor: 'cursor-2' }),
+      )
+      await mount('recent')
+      const header = (group: string) =>
+        host.querySelector<HTMLElement>(`.dh-group-row[data-group="${group}"] button`)?.textContent
+      expect(header('today')).toBe('Hôm nay· 2 tài liệu')
+      expect(header('yesterday')).toBe('Hôm qua· 1 tài liệu')
+      expect(header('this_week')).toBe('Tuần này· 1 tài liệu')
+      // the last run may continue on the next page: the label stands alone
+      expect(header('earlier')).toBe('Trước đó')
     })
 
     it('count in English with the plural', async () => {

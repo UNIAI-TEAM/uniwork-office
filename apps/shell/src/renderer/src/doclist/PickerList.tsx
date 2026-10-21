@@ -19,7 +19,14 @@ import { Person } from './cells'
 import { COLUMN_LABEL_KEY } from './columns'
 import type { DocSubline } from './DocRow'
 import { formatListDate } from './format'
-import { pickerColumnsFor, pickerSublineOf, pickerTrackOf, type PickerColumnId } from './picker'
+import {
+  PICKER_BUTTONS,
+  PICKER_COARSE_EXTRA,
+  pickerColumnsFor,
+  pickerSublineOf,
+  pickerTrackOf,
+  type PickerColumnId,
+} from './picker'
 import { editorNameOf } from './table-model'
 
 /** what a row is, for the classes the Open dialog styles */
@@ -38,8 +45,14 @@ export type PickerOptionProps = HTMLAttributes<HTMLDivElement> & { 'data-id'?: s
 export interface DocPickerListProps {
   /** the rows, in the order to show them: the picker never sorts */
   docs: readonly UniworkDocSummary[]
-  /** accessible name of the listbox */
+  /** accessible name of the listbox (or list) */
   label: string
+  /**
+   * `listbox` (default): one choice, the host drives it with its own keys (aria-activedescendant).
+   * `list`: a plain list whose rows hold their own controls (a title button): no option role, no
+   * aria-selected, no highlighted row.
+   */
+  semantics?: 'listbox' | 'list'
   /** the highlighted row (the host moves it with its own keys) */
   activeId: string | null
   id?: string
@@ -105,6 +118,7 @@ export function DocPickerList({
   className,
   listRef,
   reserve,
+  semantics = 'listbox',
   stateOf,
   titleOf,
   sublineFor,
@@ -115,9 +129,16 @@ export function DocPickerList({
 }: DocPickerListProps) {
   const { t, dateLocale } = useI18n()
   const [width, measure] = useWidth()
-  const columns = pickerColumnsFor(width > 0 ? width : undefined)
+  const coarse =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+  // the same room the CSS keeps clear at the row's end (its coarse-pointer extra included)
+  const keptClear = (reserve ?? PICKER_BUTTONS) + (coarse ? PICKER_COARSE_EXTRA : 0)
+  const columns = pickerColumnsFor(width > 0 ? width : undefined, keptClear)
   const showEditor = columns.includes('editor')
   const track = pickerTrackOf(columns)
+  const listbox = semantics === 'listbox'
   const now = new Date()
   const style =
     reserve === undefined ? undefined : ({ '--pick-trail-base': `${reserve}px` } as CSSProperties)
@@ -134,7 +155,7 @@ export function DocPickerList({
       <ul
         className={`uw-pick-list${className ? ` ${className}` : ''}`}
         id={id}
-        role="listbox"
+        role={listbox ? 'listbox' : 'list'}
         aria-label={label}
         aria-describedby={describedBy}
         ref={listRef}
@@ -150,15 +171,15 @@ export function DocPickerList({
           const renamed = nameFor?.(doc)
           const icon = iconFor?.(doc)
           return (
-            <li key={doc.id} role="presentation" className="uw-pick-item">
+            <li key={doc.id} role={listbox ? 'presentation' : undefined} className="uw-pick-item">
               <div
                 {...rest}
-                role="option"
+                role={listbox ? 'option' : undefined}
                 data-id={doc.id}
-                aria-selected={active}
+                aria-selected={listbox ? active : undefined}
                 className={[
                   'uw-pick-row dh-pick-row',
-                  active && 'active',
+                  listbox && active && 'active',
                   state.disabled && 'disabled',
                   state.archived && 'archived',
                   state.opening && 'opening',

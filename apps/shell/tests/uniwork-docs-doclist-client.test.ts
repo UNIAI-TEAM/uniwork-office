@@ -101,10 +101,31 @@ describe('sort / order / activity are sent only when set', () => {
       sort: 'activity',
     })
     expect(seen).toEqual([
-      `${BASE}?limit=50&kind=file&updated_by=u_1&order=desc`,
-      `${BASE}?limit=50&kind=file&updated_by=u_1&order=asc`,
+      `${BASE}?limit=50&kind=file&updated_by=u_1`,
+      `${BASE}?limit=50&kind=file&updated_by=u_1`,
       `${BASE}?limit=50&kind=file&updated_by=u_1&sort=size&order=asc`,
       `${BASE}?q=budget&limit=50&kind=file`,
+    ])
+  })
+
+  // R-FE3 L2: an order with no sort is a 400 on the flat route, so it goes with the sort it belonged to
+  it('listDocuments: a title search under sort=activity drops the order with the sort', async () => {
+    const { api, seen } = setup()
+    await api.listDocuments({
+      workspaceId: 'ws_1',
+      query: 'budget',
+      sort: 'activity',
+      order: 'desc',
+    })
+    await api.listDocuments({
+      workspaceId: 'ws_1',
+      query: 'budget',
+      sort: 'name',
+      order: 'asc',
+    })
+    expect(seen).toEqual([
+      `${BASE}?q=budget&limit=50&kind=file`,
+      `${BASE}?q=budget&limit=50&kind=file&sort=name&order=asc`,
     ])
   })
 
