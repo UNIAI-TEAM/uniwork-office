@@ -15,7 +15,7 @@ import {
 } from './columns'
 import { DocRow, type DocRowRename, type DocSubline } from './DocRow'
 import { GroupHeader } from './GroupHeader'
-import { groupRows, groupsActive, type GroupInput } from './groups'
+import { groupRows, groupsActive, type GroupId, type GroupInput } from './groups'
 import { useCollapsedGroups } from './use-collapsed-groups'
 import { effectiveSort, sortTableRows, specialPresent, visibleColumns } from './table-model'
 
@@ -140,12 +140,32 @@ export function DocList({
     groups && GROUPED_SCREENS.includes(screen) && present && groupsActive(screen, active)
   const runs = grouped ? groupRows(screen, sorted, now, (row) => groupInputOf(screen, row)) : null
 
-  const allSelected = docs.length > 0 && docs.every((doc) => selected.has(doc.id))
-  const someSelected = !allSelected && docs.some((doc) => selected.has(doc.id))
+  // select-all and the header box stand for the rows on screen: a closed group's rows are not
+  const docsOf = (rows: readonly DocumentsHomeTableRow[]) =>
+    rows.flatMap((row) => (row.type === 'doc' ? [row.doc] : []))
+  const shownDocs = runs
+    ? runs.flatMap((run) => (run.id === null || !collapsed.has(run.id) ? docsOf(run.rows) : []))
+    : docs
+  const allSelected = shownDocs.length > 0 && shownDocs.every((doc) => selected.has(doc.id))
+  const someSelected = !allSelected && shownDocs.some((doc) => selected.has(doc.id))
   const allRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (allRef.current) allRef.current.indeterminate = someSelected
   }, [someSelected])
+
+  // closing a group takes its rows out of the selection: the bar must not count rows nobody sees
+  const onToggleGroup = (id: GroupId) => {
+    const run = runs?.find((candidate) => candidate.id === id)
+    if (run && !collapsed.has(id)) {
+      const hidden = docsOf(run.rows).filter((doc) => selected.has(doc.id))
+      if (hidden.length > 0) {
+        const next = new Set(selected)
+        for (const doc of hidden) next.delete(doc.id)
+        onSelectedChange(next)
+      }
+    }
+    toggleGroup(id)
+  }
 
   const toggleOne = (id: string, on: boolean) => {
     const next = new Set(selected)
@@ -170,9 +190,9 @@ export function DocList({
             className="dh-check"
             aria-label={t('dlColSelect')}
             checked={allSelected}
-            disabled={docs.length === 0}
+            disabled={shownDocs.length === 0}
             onChange={(e) =>
-              onSelectedChange(e.target.checked ? new Set(docs.map((d) => d.id)) : new Set())
+              onSelectedChange(e.target.checked ? new Set(shownDocs.map((d) => d.id)) : new Set())
             }
           />
         </div>
@@ -255,7 +275,7 @@ export function DocList({
                   id={run.id}
                   open={open}
                   count={screen === 'trash' ? run.rows.length : undefined}
-                  onToggle={toggleGroup}
+                  onToggle={onToggleGroup}
                 />
               ),
               open ? (
