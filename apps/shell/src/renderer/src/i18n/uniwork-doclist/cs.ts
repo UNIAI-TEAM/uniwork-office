@@ -95,6 +95,9 @@ export const cs = {
   dlElsewhereUnavailableTitle: 'Soubory odjinud zatím na tomto serveru nejsou dostupné',
   dlElsewhereUnavailableHint:
     'Server UniWork je potřeba aktualizovat, aby uměl zobrazit soubory odeslané v chatu, schůzkách, e-mailech a úkolech. Požádejte správce o aktualizaci a zkuste to znovu.',
-  dlSourceSentIn: 'Odesláno v: {origin}',
+  dlSourceOriginChat: 'Odesláno v chatu',
+  dlSourceOriginTask: 'Z úkolu',
+  dlSourceOriginMeeting: 'Ze schůzky',
+  dlSourceOriginEmail: 'Z e-mailu',
   dlSearchNoResults: 'Nic nenalezeno pro „{query}“',
 } satisfies Record<keyof typeof zh, string>

@@ -95,6 +95,9 @@ export const vi = {
   dlElsewhereUnavailableTitle: 'Từ nơi khác chưa dùng được trên máy chủ này',
   dlElsewhereUnavailableHint:
     'Máy chủ UniWork của bạn cần được cập nhật để hiển thị tệp gửi trong Trò chuyện, Cuộc họp, Email và Công việc. Hãy nhờ quản trị viên cập nhật rồi thử lại.',
-  dlSourceSentIn: 'Gửi trong {origin}',
+  dlSourceOriginChat: 'Gửi trong Chat',
+  dlSourceOriginTask: 'Từ công việc',
+  dlSourceOriginMeeting: 'Từ cuộc họp',
+  dlSourceOriginEmail: 'Từ email',
   dlSearchNoResults: 'Không có kết quả cho “{query}”',
 } satisfies Record<keyof typeof zh, string>

@@ -97,6 +97,9 @@ export const nl = {
   dlElsewhereUnavailableTitle: 'Van elders is nog niet beschikbaar op deze server',
   dlElsewhereUnavailableHint:
     'Je UniWork-server moet worden bijgewerkt om bestanden uit Chat, Vergaderingen, E-mail en Taken te kunnen tonen. Vraag een beheerder om de update en probeer het daarna opnieuw.',
-  dlSourceSentIn: 'Verstuurd in {origin}',
+  dlSourceOriginChat: 'Verstuurd in chat',
+  dlSourceOriginTask: 'Uit een taak',
+  dlSourceOriginMeeting: 'Uit een vergadering',
+  dlSourceOriginEmail: 'Uit een e-mail',
   dlSearchNoResults: 'Geen resultaten voor “{query}”',
 } satisfies Record<keyof typeof zh, string>

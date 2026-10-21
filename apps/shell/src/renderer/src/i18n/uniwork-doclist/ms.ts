@@ -96,6 +96,9 @@ export const ms = {
   dlElsewhereUnavailableTitle: 'Dari tempat lain belum tersedia pada pelayan ini',
   dlElsewhereUnavailableHint:
     'Pelayan UniWork anda perlu dikemas kini sebelum dapat memaparkan fail yang dihantar dalam Sembang, Mesyuarat, E-mel dan Tugasan. Minta pentadbir mengemas kininya, kemudian cuba lagi.',
-  dlSourceSentIn: 'Dihantar dalam {origin}',
+  dlSourceOriginChat: 'Dihantar dalam Sembang',
+  dlSourceOriginTask: 'Daripada tugasan',
+  dlSourceOriginMeeting: 'Daripada mesyuarat',
+  dlSourceOriginEmail: 'Daripada e-mel',
   dlSearchNoResults: 'Tiada hasil untuk “{query}”',
 } satisfies Record<keyof typeof zh, string>

@@ -95,6 +95,9 @@ export const pl = {
   dlElsewhereUnavailableTitle: 'Z innych miejsc nie jest jeszcze dostępne na tym serwerze',
   dlElsewhereUnavailableHint:
     'Serwer UniWork wymaga aktualizacji, aby wyświetlać pliki wysłane na czacie, w spotkaniach, e-mailach i zadaniach. Poproś administratora o aktualizację i spróbuj ponownie.',
-  dlSourceSentIn: 'Wysłano w: {origin}',
+  dlSourceOriginChat: 'Wysłano na czacie',
+  dlSourceOriginTask: 'Z zadania',
+  dlSourceOriginMeeting: 'Ze spotkania',
+  dlSourceOriginEmail: 'Z e-maila',
   dlSearchNoResults: 'Brak wyników dla „{query}”',
 } satisfies Record<keyof typeof zh, string>

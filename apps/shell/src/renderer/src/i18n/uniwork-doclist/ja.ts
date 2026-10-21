@@ -94,6 +94,9 @@ export const ja = {
   dlElsewhereUnavailableTitle: 'このサーバーではまだ「他の場所から」を利用できません',
   dlElsewhereUnavailableHint:
     'UniWork サーバーを更新すると、チャット、会議、メール、タスクで送られたファイルを表示できるようになります。管理者に更新を依頼してから、もう一度お試しください。',
-  dlSourceSentIn: '{origin}で送信',
+  dlSourceOriginChat: 'チャットで送信',
+  dlSourceOriginTask: 'タスクから',
+  dlSourceOriginMeeting: 'ミーティングから',
+  dlSourceOriginEmail: 'メールから',
   dlSearchNoResults: '「{query}」に一致する結果はありません',
 } satisfies Record<keyof typeof zh, string>

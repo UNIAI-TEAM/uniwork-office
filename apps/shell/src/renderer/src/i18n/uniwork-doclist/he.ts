@@ -94,6 +94,9 @@ export const he = {
   dlElsewhereUnavailableTitle: 'ממקומות אחרים עדיין לא זמין בשרת הזה',
   dlElsewhereUnavailableHint:
     'שרת UniWork שלך צריך עדכון כדי להציג קבצים שנשלחו בצ\'אט, בפגישות, בדוא"ל ובמשימות. בקשו ממנהל לעדכן אותו ונסו שוב.',
-  dlSourceSentIn: 'נשלח ב{origin}',
+  dlSourceOriginChat: 'נשלח בצ׳אט',
+  dlSourceOriginTask: 'ממשימה',
+  dlSourceOriginMeeting: 'מפגישה',
+  dlSourceOriginEmail: 'מאימייל',
   dlSearchNoResults: 'אין תוצאות עבור “{query}”',
 } satisfies Record<keyof typeof zh, string>

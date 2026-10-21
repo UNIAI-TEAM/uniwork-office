@@ -94,6 +94,9 @@ export const en = {
   dlElsewhereUnavailableTitle: 'From elsewhere is not available on this server yet',
   dlElsewhereUnavailableHint:
     'Your UniWork server needs an update before it can list files sent in Chat, Meetings, Email and Tasks. Ask an admin to update it, then try again.',
-  dlSourceSentIn: 'Sent in {origin}',
+  dlSourceOriginChat: 'Sent in Chat',
+  dlSourceOriginTask: 'From a task',
+  dlSourceOriginMeeting: 'From a meeting',
+  dlSourceOriginEmail: 'From an email',
   dlSearchNoResults: 'No results for “{query}”',
 } satisfies Record<keyof typeof zh, string>

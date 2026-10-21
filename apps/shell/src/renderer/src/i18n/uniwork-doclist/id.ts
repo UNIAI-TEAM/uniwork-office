@@ -94,6 +94,9 @@ export const id = {
   dlElsewhereUnavailableTitle: 'Dari tempat lain belum tersedia di server ini',
   dlElsewhereUnavailableHint:
     'Server UniWork Anda perlu diperbarui agar dapat menampilkan file yang dikirim di Obrolan, Rapat, Email, dan Tugas. Minta admin memperbaruinya, lalu coba lagi.',
-  dlSourceSentIn: 'Dikirim di {origin}',
+  dlSourceOriginChat: 'Dikirim di Chat',
+  dlSourceOriginTask: 'Dari tugas',
+  dlSourceOriginMeeting: 'Dari rapat',
+  dlSourceOriginEmail: 'Dari email',
   dlSearchNoResults: 'Tidak ada hasil untuk “{query}”',
 } satisfies Record<keyof typeof zh, string>

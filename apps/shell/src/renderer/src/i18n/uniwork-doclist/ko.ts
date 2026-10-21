@@ -94,6 +94,9 @@ export const ko = {
   dlElsewhereUnavailableTitle: '이 서버에서는 아직 “다른 곳에서”를 사용할 수 없습니다',
   dlElsewhereUnavailableHint:
     'UniWork 서버를 업데이트해야 채팅, 회의, 이메일, 작업에서 보낸 파일을 볼 수 있습니다. 관리자에게 업데이트를 요청한 뒤 다시 시도하세요.',
-  dlSourceSentIn: '{origin}에서 보냄',
+  dlSourceOriginChat: '채팅에서 보냄',
+  dlSourceOriginTask: '작업에서',
+  dlSourceOriginMeeting: '회의에서',
+  dlSourceOriginEmail: '이메일에서',
   dlSearchNoResults: '“{query}”에 대한 결과가 없습니다',
 } satisfies Record<keyof typeof zh, string>

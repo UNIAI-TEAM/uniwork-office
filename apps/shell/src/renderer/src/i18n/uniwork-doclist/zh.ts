@@ -92,6 +92,9 @@ export const zh = {
   dlElsewhereUnavailableTitle: '此服务器暂不支持“来自其他位置”',
   dlElsewhereUnavailableHint:
     '你的 UniWork 服务器需要更新后才能显示聊天、会议、邮件和任务中发送的文件。请联系管理员更新，然后重试。',
-  dlSourceSentIn: '发送于{origin}',
+  dlSourceOriginChat: '发送于聊天',
+  dlSourceOriginTask: '来自任务',
+  dlSourceOriginMeeting: '来自会议',
+  dlSourceOriginEmail: '来自邮件',
   dlSearchNoResults: '没有找到“{query}”的结果',
 }

@@ -97,6 +97,9 @@ export const es = {
   dlElsewhereUnavailableTitle: 'De otros lugares aún no está disponible en este servidor',
   dlElsewhereUnavailableHint:
     'Tu servidor de UniWork necesita una actualización para mostrar los archivos enviados en Chat, Reuniones, Correo y Tareas. Pide a un administrador que lo actualice y vuelve a intentarlo.',
-  dlSourceSentIn: 'Enviado en {origin}',
+  dlSourceOriginChat: 'Enviado en el chat',
+  dlSourceOriginTask: 'De una tarea',
+  dlSourceOriginMeeting: 'De una reunión',
+  dlSourceOriginEmail: 'De un correo',
   dlSearchNoResults: 'Sin resultados para «{query}»',
 } satisfies Record<keyof typeof zh, string>

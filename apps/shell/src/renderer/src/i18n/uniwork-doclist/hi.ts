@@ -94,6 +94,9 @@ export const hi = {
   dlElsewhereUnavailableTitle: 'इस सर्वर पर अन्य जगहों से अभी उपलब्ध नहीं है',
   dlElsewhereUnavailableHint:
     'चैट, मीटिंग, ईमेल और कार्यों में भेजी गई फ़ाइलें दिखाने के लिए आपके UniWork सर्वर को अपडेट करना होगा। किसी एडमिन से अपडेट करने को कहें, फिर दोबारा कोशिश करें।',
-  dlSourceSentIn: '{origin} में भेजा गया',
+  dlSourceOriginChat: 'चैट में भेजा गया',
+  dlSourceOriginTask: 'किसी कार्य से',
+  dlSourceOriginMeeting: 'किसी मीटिंग से',
+  dlSourceOriginEmail: 'किसी ईमेल से',
   dlSearchNoResults: '“{query}” के लिए कोई परिणाम नहीं मिला',
 } satisfies Record<keyof typeof zh, string>

@@ -95,6 +95,9 @@ export const ru = {
   dlElsewhereUnavailableTitle: 'Раздел «Из других мест» пока недоступен на этом сервере',
   dlElsewhereUnavailableHint:
     'Сервер UniWork нужно обновить, чтобы он мог показывать файлы, отправленные в чате, встречах, почте и задачах. Попросите администратора обновить его и повторите попытку.',
-  dlSourceSentIn: 'Отправлено в разделе «{origin}»',
+  dlSourceOriginChat: 'Отправлено в чате',
+  dlSourceOriginTask: 'Из задачи',
+  dlSourceOriginMeeting: 'Из встречи',
+  dlSourceOriginEmail: 'Из письма',
   dlSearchNoResults: 'Ничего не найдено по запросу «{query}»',
 } satisfies Record<keyof typeof zh, string>
