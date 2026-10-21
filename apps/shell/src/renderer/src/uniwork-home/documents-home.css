@@ -647,6 +647,44 @@
   background: var(--hover);
 }
 
+/* UNI-2047: the type chips every screen shares (doclist/FilterBar) */
+.dh-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.dh-filter-type {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dh-filter-type:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.dh-filter-type.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.dh-filter-type:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* Sections */
 .dh-section {
   display: flex;

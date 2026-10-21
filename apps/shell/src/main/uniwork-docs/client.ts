@@ -287,7 +287,7 @@ export interface UniworkDocsClient {
     workspaceId: string
     cursor?: string
     limit?: number
-    format?: UniworkDocFormat
+    format?: UniworkListFilters['format']
     /** UNI-2047: SV-0 lets the shelf sort like the other lists */
     sort?: UniworkListFilters['sort']
     order?: UniworkListFilters['order']
