@@ -31,7 +31,7 @@ export const th = {
   aiFootprintOverwritten: 'เซลล์ที่มีข้อมูลถูกเขียนทับ: {count}',
   aiFootprintOverwrittenMin: 'เซลล์ที่มีข้อมูลถูกเขียนทับ: อย่างน้อย {count}',
   aiFootprintNoOverwrite: 'ไม่มีข้อมูลเดิมถูกเขียนทับ',
-  aiUndoTitle: 'เลิกทำการเปลี่ยนแปลงของ AI นี้ (เหมือน ⌘Z)',
+  aiUndoTitle: 'เลิกทำการเปลี่ยนแปลงของ AI นี้ (เหมือน {undoKeys})',
   aiUndo: 'เลิกทำ',
   aiPreviewAria: 'ตัวอย่างการเปลี่ยนแปลง',
   aiProposedChanges: 'การเปลี่ยนแปลงที่เสนอ',

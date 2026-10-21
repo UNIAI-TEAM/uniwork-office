@@ -31,7 +31,7 @@ export const ar = {
   aiFootprintOverwritten: 'الخلايا التي تحتوي بيانات وتمت الكتابة فوقها: {count}',
   aiFootprintOverwrittenMin: 'الخلايا التي تحتوي بيانات وتمت الكتابة فوقها: {count} على الأقل',
   aiFootprintNoOverwrite: 'لم تتم الكتابة فوق أي بيانات موجودة',
-  aiUndoTitle: 'التراجع عن تغيير الذكاء الاصطناعي هذا (مثل ⌘Z)',
+  aiUndoTitle: 'التراجع عن تغيير الذكاء الاصطناعي هذا (مثل {undoKeys})',
   aiUndo: 'تراجع',
   aiPreviewAria: 'معاينة التغييرات',
   aiProposedChanges: 'التغييرات المقترحة',

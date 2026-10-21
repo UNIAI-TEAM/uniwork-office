@@ -34,6 +34,9 @@ interface FakeWebContents {
   focus: ReturnType<typeof vi.fn>
   isFocused: ReturnType<typeof vi.fn>
   isDestroyed: ReturnType<typeof vi.fn>
+  isDevToolsOpened: ReturnType<typeof vi.fn>
+  openDevTools: ReturnType<typeof vi.fn>
+  closeDevTools: ReturnType<typeof vi.fn>
   listeners: Map<string, () => void>
 }
 
@@ -61,6 +64,9 @@ function makeFakeView(): FakeView {
       focus: vi.fn(),
       isFocused: vi.fn(() => false),
       isDestroyed: vi.fn(() => false),
+      isDevToolsOpened: vi.fn(() => false),
+      openDevTools: vi.fn(),
+      closeDevTools: vi.fn(),
     },
     setVisible: vi.fn(),
     setBounds: vi.fn(),
@@ -191,6 +197,9 @@ function makeShellWindow(): FakeShellWindow {
       }),
       once: vi.fn(),
       focus: vi.fn(),
+      isDevToolsOpened: vi.fn(() => false),
+      openDevTools: vi.fn(),
+      closeDevTools: vi.fn(),
       listeners,
     },
     isDestroyed: vi.fn(() => false),
@@ -233,6 +242,93 @@ describe('initial state', () => {
     expect(manager.list()).toEqual([
       { id: 'home', kind: 'home', title: 'UniWork Office', closable: false, active: true },
     ])
+  })
+})
+
+describe('F6 / Shift+F6 and F12 key events', () => {
+  type InputHandler = (event: { preventDefault: () => void }, input: unknown) => void
+  const key = (over: Record<string, unknown> = {}) => ({
+    type: 'keyDown',
+    key: 'F6',
+    code: 'F6',
+    control: false,
+    meta: false,
+    alt: false,
+    shift: false,
+    ...over,
+  })
+  const press = (wc: { listeners: Map<string, () => void> }, input: unknown) => {
+    const preventDefault = vi.fn()
+    const handler = wc.listeners.get('before-input-event') as unknown as InputHandler
+    handler({ preventDefault }, input)
+    return preventDefault
+  }
+
+  it('F6 moves focus from the shell chrome to the active tab and back', () => {
+    manager.openPdfTab('/tmp/a.pdf')
+    const view = lastCreatedView(createPdfView)
+    view.webContents.focus.mockClear()
+    shellWindow.webContents.focus.mockClear()
+    expect(press(shellWindow.webContents, key())).toHaveBeenCalledTimes(1)
+    expect(view.webContents.focus).toHaveBeenCalledTimes(1)
+    expect(press(view.webContents, key({ shift: true }))).toHaveBeenCalledTimes(1)
+    expect(shellWindow.webContents.focus).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves F6 to the page on Home (one region) and from a hidden view', () => {
+    expect(press(shellWindow.webContents, key())).not.toHaveBeenCalled()
+    manager.openSheetsTab()
+    manager.openPdfTab('/tmp/a.pdf')
+    const hiddenSheets = createSheetsView.mock.results[0]!.value as FakeView
+    expect(press(hiddenSheets.webContents, key())).not.toHaveBeenCalled()
+  })
+
+  it('does not take F6 while an IME composition is running', () => {
+    manager.openPdfTab('/tmp/a.pdf')
+    expect(press(shellWindow.webContents, key({ isComposing: true }))).not.toHaveBeenCalled()
+  })
+
+  describe('F12', () => {
+    beforeEach(() => {
+      manager = new TabManager(
+        shellWindow as never,
+        () => onChanged(),
+        (kind) => applyMenuFor(kind),
+        undefined,
+        () => 1,
+        () => true,
+      )
+    })
+
+    it('toggles the detached developer tools of a tab whose module does not bind F12', () => {
+      manager.openPdfTab('/tmp/a.pdf')
+      const view = lastCreatedView(createPdfView)
+      const f12 = key({ key: 'F12', code: 'F12' })
+      expect(press(view.webContents, f12)).toHaveBeenCalledTimes(1)
+      expect(view.webContents.openDevTools).toHaveBeenCalledWith({ mode: 'detach' })
+      view.webContents.isDevToolsOpened.mockReturnValue(true)
+      press(view.webContents, f12)
+      expect(view.webContents.closeDevTools).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves F12 to Save As in Sheets', () => {
+      manager.openSheetsTab()
+      const view = lastCreatedView(createSheetsView)
+      expect(press(view.webContents, key({ key: 'F12', code: 'F12' }))).not.toHaveBeenCalled()
+      expect(view.webContents.openDevTools).not.toHaveBeenCalled()
+    })
+
+    it('does nothing in a packaged build', () => {
+      manager = new TabManager(
+        shellWindow as never,
+        () => onChanged(),
+        (kind) => applyMenuFor(kind),
+      )
+      manager.openPdfTab('/tmp/a.pdf')
+      const view = lastCreatedView(createPdfView)
+      expect(press(view.webContents, key({ key: 'F12', code: 'F12' }))).not.toHaveBeenCalled()
+      expect(view.webContents.openDevTools).not.toHaveBeenCalled()
+    })
   })
 })
 
@@ -560,6 +656,7 @@ describe('closing tabs', () => {
     const chord = (over: Record<string, unknown> = {}) => ({
       type: 'keyDown',
       key: 'w',
+      code: 'KeyW',
       control: true,
       meta: false,
       alt: false,
@@ -581,14 +678,40 @@ describe('closing tabs', () => {
       await vi.waitFor(() => expect(manager.list().map((t) => t.id)).toEqual(['home']))
     })
 
-    it('also takes Cmd+W, and Ctrl+W under a non-Latin layout', async () => {
+    it('takes Ctrl+W under a non-Latin layout', async () => {
       manager.openSheetsTab()
       manager.openSheetsTab()
-      press(lastCreatedView(createSheetsView).webContents, chord({ control: false, meta: true }))
+      press(lastCreatedView(createSheetsView).webContents, chord({ key: 'ц', code: 'KeyW' }))
       await vi.waitFor(() => expect(manager.list()).toHaveLength(2))
-      const first = createSheetsView.mock.results[0]!.value as FakeView
-      press(first.webContents, chord({ key: 'ц', code: 'KeyW' }))
-      await vi.waitFor(() => expect(manager.list()).toHaveLength(1))
+    })
+
+    it('takes Cmd+W, not Ctrl+W, on macOS', async () => {
+      const real = process.platform
+      Object.defineProperty(process, 'platform', { value: 'darwin' })
+      try {
+        manager.openSheetsTab()
+        const view = lastCreatedView(createSheetsView)
+        expect(press(view.webContents, chord())).not.toHaveBeenCalled()
+        expect(manager.list()).toHaveLength(2)
+        press(view.webContents, chord({ control: false, meta: true }))
+        await vi.waitFor(() => expect(manager.list()).toHaveLength(1))
+      } finally {
+        Object.defineProperty(process, 'platform', { value: real })
+      }
+    })
+
+    it('does not take Cmd+W on Windows', () => {
+      manager.openSheetsTab()
+      const view = lastCreatedView(createSheetsView)
+      expect(press(view.webContents, chord({ control: false, meta: true }))).not.toHaveBeenCalled()
+      expect(manager.list()).toHaveLength(2)
+    })
+
+    it('ignores a key while an IME composition is running', () => {
+      manager.openSheetsTab()
+      const view = lastCreatedView(createSheetsView)
+      expect(press(view.webContents, chord({ isComposing: true }))).not.toHaveBeenCalled()
+      expect(manager.list()).toHaveLength(2)
     })
 
     it('ignores other chords, key repeat and key-up', () => {
@@ -1624,6 +1747,7 @@ describe('tab title decoration (UNI-2033)', () => {
       (kind) => applyMenuFor(kind),
       undefined,
       () => 1,
+      () => false,
       (filePath, title) => (filePath?.includes('@v2') ? `${title} · v2` : title),
     )
 

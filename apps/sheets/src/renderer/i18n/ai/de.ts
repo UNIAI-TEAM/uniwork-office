@@ -33,7 +33,7 @@ export const de = {
   aiFootprintOverwritten: 'Überschriebene Zellen mit Daten: {count}',
   aiFootprintOverwrittenMin: 'Überschriebene Zellen mit Daten: mindestens {count}',
   aiFootprintNoOverwrite: 'Keine vorhandenen Daten überschrieben',
-  aiUndoTitle: 'Diese KI-Änderung rückgängig machen (entspricht ⌘Z)',
+  aiUndoTitle: 'Diese KI-Änderung rückgängig machen (entspricht {undoKeys})',
   aiUndo: 'Rückgängig',
   aiPreviewAria: 'Änderungsvorschau',
   aiProposedChanges: 'Vorgeschlagene Änderungen',

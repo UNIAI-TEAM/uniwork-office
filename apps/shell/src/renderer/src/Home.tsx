@@ -55,6 +55,7 @@ import { PracticeHome } from './PracticeHome'
 import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
+import { shortcutHint, withShortcutHint } from './home-shortcut-hints'
 import { UniworkOpenCard } from './UniworkOpenCard'
 import { publishUniworkNotice } from './uniwork-notice-bus'
 import { openRecentEntry, openUniworkDocument } from './uniwork-open'
@@ -2353,7 +2354,13 @@ export function Home() {
     return (
       <div className="quick-cards">
         {QUICK_CARD_ITEMS.map((item) => (
-          <button key={item.ext} className="quick-card" onClick={() => void item.action()}>
+          <button
+            key={item.ext}
+            className="quick-card"
+            // Ctrl/Cmd+N is the Home menu's New document
+            {...(item.ext === 'docx' ? { title: withShortcutHint(item.title, 'common-01') } : {})}
+            onClick={() => void item.action()}
+          >
             <FileBadge ext={item.ext} size={30} />
             <span className="quick-text">
               <span className="quick-title-row">
@@ -2370,6 +2377,7 @@ export function Home() {
           className="quick-card"
           onClick={() => void window.aiOffice.browse()}
           data-tip={OPEN_LOCAL_EXTENSIONS}
+          data-tip-kbd={shortcutHint('common-03') || undefined}
         >
           <span className="quick-folder">
             <FolderIcon size={18} />

@@ -33,7 +33,8 @@ import { useModalDialog } from './modal-dialog'
 /// settings the user actually changed.
 
 const TABS = ['Number', 'Alignment', 'Font', 'Border', 'Fill', 'Protection'] as const
-type Tab = (typeof TABS)[number]
+export type FormatCellsTab = (typeof TABS)[number]
+type Tab = FormatCellsTab
 
 const TAB_LABELS: Record<Tab, StringKey> = {
   Number: 'dlgFcTabNumber',
@@ -129,15 +130,18 @@ export function FormatCellsDialog({
   anchorValue,
   onCommand,
   onClose,
+  initialTab = 'Number',
 }: {
   readonly selectionFormat: SelectionFormat | null
   /// Value of the selection's top-left cell, for the number-format preview.
   readonly anchorValue: number | string | null
   readonly onCommand: (command: string) => void
   readonly onClose: () => void
+  /// Ctrl+Shift+F opens the dialog on its Font tab (Excel)
+  readonly initialTab?: Tab
 }): React.JSX.Element {
   const { t } = useI18n()
-  const [tab, setTab] = useState<Tab>('Number')
+  const [tab, setTab] = useState<Tab>(initialTab)
   // The selection format at open time is the change baseline; the live echo
   // must not move it while the dialog is up.
   const initialRef = useRef(draftFromSelection(selectionFormat))

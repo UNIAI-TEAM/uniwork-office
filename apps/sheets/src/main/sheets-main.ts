@@ -168,6 +168,7 @@ import {
   type WorkbookSaveRequest,
 } from '../shared/desktop-api'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
+import { sheetsMenuAccelerator, type SheetsMenuShortcut } from '../shared/sheets-shortcuts'
 import { createOpenRetryPaths } from './open-retry-paths'
 import { fetchAiImage } from './ai-fetch-image'
 import { atomicWriteFile } from './atomic-write'
@@ -4680,6 +4681,11 @@ export function setSheetsCloseTabHook(fn: (() => void) | null): void {
 function installApplicationMenu(): void {
   const sendMenuAction = sendSheetsMenuAction
   const labels = appMenuLabels(getUiLang())
+  // the menu item's accelerator from the shortcut table (none when its key has no menu form)
+  const acc = (item: SheetsMenuShortcut): { accelerator?: string } => {
+    const accelerator = sheetsMenuAccelerator(item, process.platform === 'darwin' ? 'mac' : 'win')
+    return accelerator ? { accelerator } : {}
+  }
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
@@ -4688,7 +4694,7 @@ function installApplicationMenu(): void {
         submenu: [
           {
             label: tm('menuOpenWorkbook'),
-            accelerator: 'CmdOrCtrl+O',
+            ...acc('open'),
             click: () => sendMenuAction('open'),
           },
           ...(extraFileMenuItems.length > 0
@@ -4697,18 +4703,19 @@ function installApplicationMenu(): void {
           { type: 'separator' },
           {
             label: tm('menuSave'),
-            accelerator: 'CmdOrCtrl+S',
+            ...acc('save'),
             click: () => sendMenuAction('save'),
           },
           {
+            // Excel's F12 / Shift+Cmd+S; the renderer handles the other Save As chords
             label: tm('menuSaveAs'),
-            accelerator: 'Shift+CmdOrCtrl+S',
+            ...acc('saveAs'),
             click: () => sendMenuAction('save-as'),
           },
           { type: 'separator' },
           {
             label: tm('menuPrint'),
-            accelerator: 'CmdOrCtrl+P',
+            ...acc('print'),
             click: () => sendMenuAction('print'),
           },
           { type: 'separator' },
@@ -4725,7 +4732,7 @@ function installApplicationMenu(): void {
             ? {
                 // closes the tab on every platform (the hook only exists in tab mode)
                 label: tm('menuClose'),
-                accelerator: 'CmdOrCtrl+W',
+                ...acc('close'),
                 click: () => closeActiveTabHook?.(),
               }
             : process.platform === 'darwin'
@@ -4740,12 +4747,13 @@ function installApplicationMenu(): void {
           // no-op that starves Univer of the shortcut — forward it instead.
           {
             label: tm('menuUndo'),
-            accelerator: 'CmdOrCtrl+Z',
+            ...acc('undo'),
             click: () => sendMenuAction('undo'),
           },
           {
+            // Excel's Ctrl+Y / Cmd+Y; Shift+Ctrl+Z still redoes through the renderer
             label: tm('menuRedo'),
-            accelerator: 'Shift+CmdOrCtrl+Z',
+            ...acc('redo'),
             click: () => sendMenuAction('redo'),
           },
           { type: 'separator' },

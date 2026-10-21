@@ -241,10 +241,10 @@ export interface ActionCtx {
   setChartDataDialogOpen: Set<boolean>
   setFindOpen: Set<boolean>
   setPrintDlgOpen: Set<boolean>
-  /** Open the AI annotation popover on the current selection (no-op when nothing is selected) */
-  openAskPopover: () => void
   zoom: number
   setZoom: Set<number>
+  /** Fit the slide to the window (View > Fit, Ctrl+Alt+O / ⌥⌘O) */
+  zoomToFit: () => void
   masterItems: MasterPartItem[] | null
   /** slideLayout list of the open deck (null until fetched) */
   layouts: GetLayoutsResult['layouts'] | null

@@ -35,6 +35,14 @@ import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
 import { isDraftPreviewPath } from './uniwork-sync/sync-center'
 import { applyUiScaleTo, applyUiScaleToAll, onUiScaleChanged, readUiScale } from './ui-scale'
 import { uiScaleMenuItems, withViewMenu } from './ui-scale-menu'
+import {
+  devToolsAccelerator,
+  editMenuAccelerators,
+  fileMenuAccelerators,
+  fullScreenAccelerator,
+  interfaceScaleAccelerators,
+  interfaceScaleAliasAccelerators,
+} from './shell-shortcuts'
 import menuDocxIcon1x from './assets/menu-docx.png?asset'
 import menuDocxIcon2x from './assets/menu-docx@2x.png?asset'
 import menuXlsxIcon1x from './assets/menu-xlsx.png?asset'
@@ -72,6 +80,7 @@ import {
   aboutMenuItem,
   checkUpdatesMenuItem,
   setUpdateCheckInvoker,
+  toggleDevToolsItem,
   installRendererProtocol,
 } from '@genoffice/electron-utils'
 import {
@@ -3650,9 +3659,44 @@ function applyMenuFor(kind: TabKind): void {
   withViewMenu(kind, tm, APP_SETTINGS_PATH)
 }
 
+/** `{ accelerator }` when the shortcut table gives the item one, to spread into a menu item */
+function acc(accelerator: string | undefined): { accelerator?: string } {
+  return accelerator ? { accelerator } : {}
+}
+
+/** Full screen and, in a development build, Developer tools: the View items every
+ *  shell-built menu carries (the same keys in every window, common-20 / common-21) */
+function shellViewItems(): MenuItemConstructorOptions[] {
+  const labels = appMenuLabels(currentLang())
+  return [
+    ...(app.isPackaged
+      ? []
+      : [toggleDevToolsItem(labels, devToolsAccelerator()), { type: 'separator' as const }]),
+    { role: 'togglefullscreen', label: labels.fullscreen, ...acc(fullScreenAccelerator()) },
+  ]
+}
+
 /** The Home menu's View menu: the interface-scale items (Home follows the scale). */
 function viewMenuTemplate(): MenuItemConstructorOptions {
-  return { label: tm('menuView'), submenu: uiScaleMenuItems(tm, APP_SETTINGS_PATH) }
+  return {
+    label: tm('menuView'),
+    submenu: [
+      ...uiScaleMenuItems(
+        tm,
+        APP_SETTINGS_PATH,
+        interfaceScaleAccelerators(),
+        interfaceScaleAliasAccelerators(),
+      ),
+      { type: 'separator' },
+      ...shellViewItems(),
+    ],
+  }
+}
+
+/** The View menu of the PDF, Markdown and HTML windows. No reload (a packaged build has none,
+ *  common-22) and no zoom items: each module's renderer owns its zoom keys. */
+function moduleViewMenuTemplate(): MenuItemConstructorOptions {
+  return { label: appMenuLabels(currentLang()).view, submenu: shellViewItems() }
 }
 
 /// Interface scale (genoffice#1913). Read once at boot, then replaced by the View menu.
@@ -3771,6 +3815,8 @@ function createShellWindow(): void {
               : tm('untitledSheet'),
     // the tab strip is interface chrome, so its height follows the scale
     () => currentUiScale,
+    // F12 opens the developer tools in a development build only
+    () => !app.isPackaged,
     // UNI-2033: a read-only copy of an older version says so in its title
     (filePath, title) => withViewVersionTitle(title, filePath, currentLang(), inUniworkStore),
   )
@@ -6056,6 +6102,7 @@ async function openFileViaDialog(): Promise<void> {
 
 function buildHomeMenu(): void {
   const isMac = process.platform === 'darwin'
+  const a = fileMenuAccelerators('home')
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
@@ -6064,7 +6111,7 @@ function buildHomeMenu(): void {
         { label: tm('menuSectionNew'), type: 'header', enabled: false },
         {
           label: tm('menuNewDoc'),
-          accelerator: 'CmdOrCtrl+N',
+          ...acc(a.new),
           click: () => newDocTab(),
         },
         {
@@ -6079,15 +6126,15 @@ function buildHomeMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuOpen'),
-          accelerator: 'CmdOrCtrl+O',
+          ...acc(a.open),
           click: () => void openFileViaDialog(),
         },
         { type: 'separator' },
-        { role: 'close', label: tm('menuClose') },
+        { role: 'close', label: tm('menuClose'), ...acc(a.close) },
       ],
     },
     viewMenuTemplate(),
-    editMenuTemplate(process.platform, appMenuLabels(currentLang())),
+    editMenuTemplate(process.platform, appMenuLabels(currentLang()), editMenuAccelerators()),
     windowMenuTemplate(process.platform, appMenuLabels(currentLang())),
     {
       role: 'help',
@@ -6107,26 +6154,32 @@ function buildHomeMenu(): void {
 
 function buildPdfMenu(): void {
   const isMac = process.platform === 'darwin'
+  const a = fileMenuAccelerators('pdf')
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
       label: tm('menuFile'),
       submenu: [
         {
+          label: tm('menuNewPdf'),
+          ...acc(a.new),
+          click: () => void newPdfTab(),
+        },
+        { type: 'separator' },
+        {
           label: tm('menuOpen'),
-          accelerator: 'CmdOrCtrl+O',
+          ...acc(a.open),
           click: () => void openFileViaDialog(),
         },
         { type: 'separator' },
         {
           label: tm('backToHome'),
-          accelerator: 'Shift+CmdOrCtrl+H',
           click: () => tabManager?.openHomeTab(),
         },
         { type: 'separator' },
         {
           label: tm('menuSave'),
-          accelerator: 'CmdOrCtrl+S',
+          ...acc(a.save),
           click: () => {
             const tab = activePdfTarget()
             if (tab) void flushPdfSave(tab.webContents)
@@ -6134,7 +6187,7 @@ function buildPdfMenu(): void {
         },
         {
           label: tm('menuSaveAs'),
-          accelerator: 'CmdOrCtrl+Shift+S',
+          ...acc(a.saveAs),
           click: () => void savePdfAs(),
         },
         { type: 'separator' },
@@ -6156,7 +6209,7 @@ function buildPdfMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuPrint'),
-          accelerator: 'CmdOrCtrl+P',
+          ...acc(a.print),
           click: () => {
             const tab = activePdfTarget()
             if (tab) sendPdfPrintRequest(tab.webContents)
@@ -6165,12 +6218,13 @@ function buildPdfMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuClose'),
-          accelerator: 'CmdOrCtrl+W',
+          ...acc(a.close),
           click: () => closeFocusedEditor(),
         },
       ],
     },
-    editMenuTemplate(process.platform, appMenuLabels(currentLang())),
+    moduleViewMenuTemplate(),
+    editMenuTemplate(process.platform, appMenuLabels(currentLang()), editMenuAccelerators()),
     windowMenuTemplate(process.platform, appMenuLabels(currentLang())),
     {
       role: 'help',
@@ -6190,26 +6244,32 @@ function buildPdfMenu(): void {
 
 function buildMarkdownMenu(): void {
   const isMac = process.platform === 'darwin'
+  const a = fileMenuAccelerators('markdown')
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
       label: tm('menuFile'),
       submenu: [
         {
+          label: tm('menuNewMarkdown'),
+          ...acc(a.new),
+          click: () => newMarkdownTab(),
+        },
+        { type: 'separator' },
+        {
           label: tm('menuOpen'),
-          accelerator: 'CmdOrCtrl+O',
+          ...acc(a.open),
           click: () => void openFileViaDialog(),
         },
         { type: 'separator' },
         {
           label: tm('backToHome'),
-          accelerator: 'Shift+CmdOrCtrl+H',
           click: () => tabManager?.openHomeTab(),
         },
         { type: 'separator' },
         {
           label: tm('menuSave'),
-          accelerator: 'CmdOrCtrl+S',
+          ...acc(a.save),
           click: () => {
             const tab = activeMarkdownTarget()
             if (tab) void requestMarkdownSave(tab.webContents, 'save')
@@ -6217,7 +6277,7 @@ function buildMarkdownMenu(): void {
         },
         {
           label: tm('menuSaveAs'),
-          accelerator: 'CmdOrCtrl+Shift+S',
+          ...acc(a.saveAs),
           click: () => {
             const tab = activeMarkdownTarget()
             if (tab) void requestMarkdownSave(tab.webContents, 'saveAs')
@@ -6255,7 +6315,7 @@ function buildMarkdownMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuPrint'),
-          accelerator: 'CmdOrCtrl+P',
+          ...acc(a.print),
           click: () => {
             const tab = activeMarkdownTarget()
             if (tab) sendMarkdownPrintRequest(tab.webContents)
@@ -6264,12 +6324,13 @@ function buildMarkdownMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuClose'),
-          accelerator: 'CmdOrCtrl+W',
+          ...acc(a.close),
           click: () => closeFocusedEditor(),
         },
       ],
     },
-    editMenuTemplate(process.platform, appMenuLabels(currentLang())),
+    moduleViewMenuTemplate(),
+    editMenuTemplate(process.platform, appMenuLabels(currentLang()), editMenuAccelerators()),
     windowMenuTemplate(process.platform, appMenuLabels(currentLang())),
     {
       role: 'help',
@@ -6289,26 +6350,32 @@ function buildMarkdownMenu(): void {
 
 function buildHtmlMenu(): void {
   const isMac = process.platform === 'darwin'
+  const a = fileMenuAccelerators('html')
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
       label: tm('menuFile'),
       submenu: [
         {
+          label: tm('menuNewHtml'),
+          ...acc(a.new),
+          click: () => newHtmlTab(),
+        },
+        { type: 'separator' },
+        {
           label: tm('menuOpen'),
-          accelerator: 'CmdOrCtrl+O',
+          ...acc(a.open),
           click: () => void openFileViaDialog(),
         },
         { type: 'separator' },
         {
           label: tm('backToHome'),
-          accelerator: 'Shift+CmdOrCtrl+H',
           click: () => tabManager?.openHomeTab(),
         },
         { type: 'separator' },
         {
           label: tm('menuSave'),
-          accelerator: 'CmdOrCtrl+S',
+          ...acc(a.save),
           click: () => {
             const tab = activeHtmlTarget()
             if (tab) void requestHtmlSave(tab.webContents, 'save')
@@ -6316,7 +6383,7 @@ function buildHtmlMenu(): void {
         },
         {
           label: tm('menuSaveAs'),
-          accelerator: 'CmdOrCtrl+Shift+S',
+          ...acc(a.saveAs),
           click: () => {
             const tab = activeHtmlTarget()
             if (tab) void requestHtmlSave(tab.webContents, 'saveAs')
@@ -6347,7 +6414,7 @@ function buildHtmlMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuPrint'),
-          accelerator: 'CmdOrCtrl+P',
+          ...acc(a.print),
           click: () => {
             const tab = activeHtmlTarget()
             if (tab) sendHtmlPrintRequest(tab.webContents)
@@ -6356,12 +6423,13 @@ function buildHtmlMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuClose'),
-          accelerator: 'CmdOrCtrl+W',
+          ...acc(a.close),
           click: () => closeFocusedEditor(),
         },
       ],
     },
-    editMenuTemplate(process.platform, appMenuLabels(currentLang())),
+    moduleViewMenuTemplate(),
+    editMenuTemplate(process.platform, appMenuLabels(currentLang()), editMenuAccelerators()),
     windowMenuTemplate(process.platform, appMenuLabels(currentLang())),
     {
       role: 'help',
@@ -6689,7 +6757,6 @@ function openThirdPartyNotices(): Promise<string> {
 function installBackToHomeItems(): void {
   const backToHomeItem: MenuItemConstructorOptions = {
     label: tm('backToHome'),
-    accelerator: 'Shift+CmdOrCtrl+H',
     click: () => tabManager?.openHomeTab(),
   }
   const saveToUniWorkItem: MenuItemConstructorOptions = {

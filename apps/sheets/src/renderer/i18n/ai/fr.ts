@@ -33,7 +33,7 @@ export const fr = {
   aiFootprintOverwritten: 'Cellules avec données écrasées : {count}',
   aiFootprintOverwrittenMin: 'Cellules avec données écrasées : au moins {count}',
   aiFootprintNoOverwrite: 'Aucune donnée existante écrasée',
-  aiUndoTitle: 'Annuler cette modification IA (équivaut à ⌘Z)',
+  aiUndoTitle: 'Annuler cette modification IA (équivaut à {undoKeys})',
   aiUndo: 'Annuler',
   aiPreviewAria: 'Aperçu des modifications',
   aiProposedChanges: 'Modifications proposées',

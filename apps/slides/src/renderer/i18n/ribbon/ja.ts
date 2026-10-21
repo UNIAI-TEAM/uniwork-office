@@ -48,14 +48,11 @@ export const ja = {
   ribbonPasteTipDisabled: '貼り付け（先にキャンバスの要素をコピーまたは切り取り）',
   ribbonCutTip: '切り取り（⌘X）',
   ribbonCopyTip: 'コピー（⌘C）',
-  ribbonBrushTipNoSelection:
-    '書式のコピー/貼り付け（要素を選択すると使用可能；⌘⇧C 書式のコピー / ⌘⇧V 書式の貼り付け）',
+  ribbonBrushTipNoSelection: '書式のコピー/貼り付け（要素を選択すると使用可能）',
   ribbonBrushTipContinuous: '書式のコピー/貼り付け 連続モード（Esc で終了）',
   ribbonBrushTipOnce: '書式のコピー/貼り付け 1 回モード（対象の要素をクリックして適用）',
-  ribbonBrushTipHasFormat:
-    '書式のコピー/貼り付け（クリックで 1 回 / ダブルクリックで連続；⌘⇧C 書式のコピー / ⌘⇧V 書式の貼り付け）',
-  ribbonBrushTipDefault:
-    '書式のコピー/貼り付け（クリックで書式をコピーして適用；⌘⇧C 書式のコピー / ⌘⇧V 書式の貼り付け）',
+  ribbonBrushTipHasFormat: '書式のコピー/貼り付け（クリックで 1 回 / ダブルクリックで連続）',
+  ribbonBrushTipDefault: '書式のコピー/貼り付け（クリックで書式をコピーして適用）',
   // Home: slides
   ribbonGroupSlides: 'スライド',
   ribbonNewSlide: '新しいスライド',
@@ -375,10 +372,9 @@ export const ja = {
   // Slide show
   ribbonGroupStartShow: 'スライドショーの開始',
   ribbonFromBeginning: '最初から',
-  ribbonFromBeginningTip:
-    'スライド 1 から全画面でスライドショーを開始（F5；非表示スライドはスキップ）',
+  ribbonFromBeginningTip: 'スライド 1 から全画面でスライドショーを開始（非表示スライドはスキップ）',
   ribbonFromCurrent: '現在のスライドから',
-  ribbonFromCurrentTip: '現在のスライドから全画面でスライドショーを開始（⇧F5）',
+  ribbonFromCurrentTip: '現在のスライドから全画面でスライドショーを開始',
   ribbonPresenterView: '発表者ツール',
   ribbonPresenterViewTip:
     '発表者ツール：ノート/次のスライド/タイマー/ペン；マルチディスプレイ時はもう一方の画面で全画面放映',

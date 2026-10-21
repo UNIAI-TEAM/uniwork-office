@@ -30,7 +30,7 @@ export const zh = {
   aiFootprintOverwritten: '被覆盖的已有数据单元格：{count}',
   aiFootprintOverwrittenMin: '被覆盖的已有数据单元格：至少 {count}',
   aiFootprintNoOverwrite: '未覆盖已有数据',
-  aiUndoTitle: '撤销本次 AI 修改（等同于 ⌘Z）',
+  aiUndoTitle: '撤销本次 AI 修改（等同于 {undoKeys}）',
   aiUndo: '撤销',
   aiPreviewAria: '变更预览',
   aiProposedChanges: '拟定变更',

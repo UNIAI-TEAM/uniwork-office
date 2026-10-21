@@ -1,4 +1,5 @@
 import type { PdfPasswordUiState, PdfPasswordWindowApi } from '../../shared/pdf-password-api'
+import { pdfPasswordKeyAction } from './pdf-password-keys'
 
 // exposed by src/preload/pdf-password.ts
 const api = (window as unknown as { aiOfficePdfPassword: PdfPasswordWindowApi }).aiOfficePdfPassword
@@ -70,7 +71,7 @@ password.addEventListener('input', () => {
   error.classList.remove('visible')
 })
 password.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') submit()
+  if (pdfPasswordKeyAction(e, 'field') === 'submit') submit()
 })
 // keep the caret in the password field: without this, clicking the toggle
 // focuses the button and further typing goes nowhere
@@ -93,7 +94,7 @@ eye.addEventListener('click', () => {
   requestAnimationFrame(restore)
 })
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !busy) api.cancel()
+  if (pdfPasswordKeyAction(e, 'other') === 'cancel' && !busy) api.cancel()
 })
 
 api.onState(render)

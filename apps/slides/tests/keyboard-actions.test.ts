@@ -50,6 +50,8 @@ function makeCtx(over: Record<string, unknown> = {}): ActionCtx {
     overlayOpen: false,
     findNodeCtx: () => null,
     flushNotes: vi.fn(async () => {}),
+    // Ctrl+Alt+M is PowerPoint's Insert comment
+    newComment: vi.fn(),
     ...over,
   } as unknown as ActionCtx
 }
@@ -1034,7 +1036,7 @@ describe('text formatting shortcuts', () => {
   ] as const)('toggles %s on selected shapes with Command+%s', (key, kind) => {
     const ctx = makeCtx({ selectedIds: ['a'] })
     const e = keydown(key)
-    handleGlobalKeydown(ctx, e)
+    handleGlobalKeydown(ctx, e, 'MacIntel')
     expect(e.defaultPrevented).toBe(true)
     expect(styleActions.onTextToggle).toHaveBeenCalledWith(ctx, kind)
   })

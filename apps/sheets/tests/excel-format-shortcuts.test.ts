@@ -1,67 +1,35 @@
 import { describe, expect, it } from 'vitest'
 
+import { findShortcut } from '@genoffice/shortcuts'
 import {
   accountingStyle,
+  BORDER_SHORTCUT_ROW,
   COMMA_STYLE,
   currencyStyle,
-  formatShortcutCommand,
+  NUMBER_FORMAT_SHORTCUTS,
   PERCENT_STYLE,
-  type FormatShortcutKey,
 } from '../src/renderer/excel-format-shortcuts'
 import { numfmtOptionsOf, numfmtPreview } from '../src/renderer/numfmt-dialog'
 
-const key = (code: string, extra: Partial<FormatShortcutKey> = {}): FormatShortcutKey => ({
-  code,
-  metaKey: false,
-  ctrlKey: false,
-  altKey: false,
-  shiftKey: false,
-  ...extra,
-})
-const ctrlShift = (code: string) => key(code, { ctrlKey: true, shiftKey: true })
-const cmdShift = (code: string) => key(code, { metaKey: true, shiftKey: true })
-
-describe('formatShortcutCommand', () => {
+// The chords themselves are matched in global-shortcuts.test.ts; this file
+// locks which table row applies which format.
+describe('number format shortcuts by table row', () => {
   it.each([
-    ['Backquote', 'format:General'],
-    ['Digit1', 'format:#,##0.00'],
-    ['Digit2', 'format:h:mm AM/PM'],
-    ['Digit3', 'format:d-mmm-yy'],
-    ['Digit4', 'format:$#,##0.00_);($#,##0.00)'],
-    ['Digit5', 'format:0%'],
-    ['Digit6', 'format:0.00E+00'],
-    ['Digit7', 'border:outer'],
-    ['Minus', 'border:none'],
-  ])('Ctrl+Shift+%s and Cmd+Shift+%s map to %s', (code, command) => {
-    expect(formatShortcutCommand(ctrlShift(code))).toBe(command)
-    expect(formatShortcutCommand(cmdShift(code))).toBe(command)
+    ['sheets-68', 'General'],
+    ['sheets-69', '#,##0.00'],
+    ['sheets-70', 'h:mm AM/PM'],
+    ['sheets-71', 'd-mmm-yy'],
+    ['sheets-72', '$#,##0.00_);($#,##0.00)'],
+    ['sheets-73', '0%'],
+    ['sheets-74', '0.00E+00'],
+  ])('%s applies %s', (id, pattern) => {
+    expect(NUMBER_FORMAT_SHORTCUTS[id]).toBe(pattern)
   })
 
-  it('accepts the Excel for Mac border variants Cmd+Opt+0 and Cmd+Opt+-', () => {
-    expect(formatShortcutCommand(key('Digit0', { metaKey: true, altKey: true }), true)).toBe(
-      'border:outer',
-    )
-    expect(formatShortcutCommand(key('Minus', { metaKey: true, altKey: true }), true)).toBe(
-      'border:none',
-    )
-  })
-
-  it('ignores the mac-only border variants on Windows and Linux', () => {
-    expect(formatShortcutCommand(key('Digit0', { metaKey: true, altKey: true }))).toBeNull()
-    expect(formatShortcutCommand(key('Minus', { metaKey: true, altKey: true }))).toBeNull()
-  })
-
-  it('ignores other modifier combinations', () => {
-    expect(formatShortcutCommand(key('Digit5', { ctrlKey: true }))).toBeNull()
-    expect(formatShortcutCommand(key('Digit5', { shiftKey: true }))).toBeNull()
-    expect(
-      formatShortcutCommand(key('Digit5', { ctrlKey: true, shiftKey: true, altKey: true })),
-    ).toBeNull()
-    expect(formatShortcutCommand(key('Digit0', { ctrlKey: true, shiftKey: true }))).toBeNull()
-    expect(
-      formatShortcutCommand(key('Digit0', { metaKey: true, altKey: true, shiftKey: true })),
-    ).toBeNull()
-    expect(formatShortcutCommand(ctrlShift('Digit8'))).toBeNull()
+  it('names rows of the sheets table only', () => {
+    for (const id of [...Object.keys(NUMBER_FORMAT_SHORTCUTS), BORDER_SHORTCUT_ROW]) {
+      expect(findShortcut('sheets', id), id).toBeDefined()
+    }
   })
 })
 

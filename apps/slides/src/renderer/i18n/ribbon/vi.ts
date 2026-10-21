@@ -46,14 +46,12 @@ export const vi = {
   ribbonPasteTipDisabled: 'Dán (sao chép hoặc cắt một phần tử trên canvas trước)',
   ribbonCutTip: 'Cắt (⌘X)',
   ribbonCopyTip: 'Sao chép (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Chổi sao chép định dạng (chọn một phần tử trước; ⌘⇧C sao chép định dạng / ⌘⇧V dán định dạng)',
+  ribbonBrushTipNoSelection: 'Chổi sao chép định dạng (chọn một phần tử trước)',
   ribbonBrushTipContinuous: 'Chế độ sao chép định dạng liên tục (nhấn Esc để thoát)',
   ribbonBrushTipOnce: 'Chế độ sao chép định dạng một lần (nhấp vào phần tử đích để áp dụng)',
   ribbonBrushTipHasFormat:
-    'Chổi sao chép định dạng (nhấp một lần để dùng một lần / nhấp đúp để dùng liên tục; ⌘⇧C sao chép định dạng / ⌘⇧V dán định dạng)',
-  ribbonBrushTipDefault:
-    'Chổi sao chép định dạng (nhấp để sao chép và áp dụng định dạng; ⌘⇧C sao chép định dạng / ⌘⇧V dán định dạng)',
+    'Chổi sao chép định dạng (nhấp một lần để dùng một lần / nhấp đúp để dùng liên tục)',
+  ribbonBrushTipDefault: 'Chổi sao chép định dạng (nhấp để sao chép và áp dụng định dạng)',
   ribbonGroupSlides: 'Trang chiếu',
   ribbonNewSlide: 'Trang chiếu mới',
   ribbonNewSlideTip: 'Tạo trang chiếu trống mới (giữ lại nền bố cục của trang hiện tại)',
@@ -366,9 +364,9 @@ export const vi = {
   ribbonAnimDelayTip: 'Độ trễ sau khi kích hoạt trước khi bắt đầu (giây)',
   ribbonGroupStartShow: 'Bắt đầu trình chiếu',
   ribbonFromBeginning: 'Từ đầu',
-  ribbonFromBeginningTip: 'Trình chiếu toàn màn hình từ trang chiếu 1 (F5; bỏ qua các trang ẩn)',
+  ribbonFromBeginningTip: 'Trình chiếu toàn màn hình từ trang chiếu 1 (bỏ qua các trang ẩn)',
   ribbonFromCurrent: 'Từ trang chiếu hiện tại',
-  ribbonFromCurrentTip: 'Trình chiếu toàn màn hình từ trang chiếu hiện tại (⇧F5)',
+  ribbonFromCurrentTip: 'Trình chiếu toàn màn hình từ trang chiếu hiện tại',
   ribbonPresenterView: 'Chế độ xem của diễn giả',
   ribbonPresenterViewTip:
     'Chế độ xem của diễn giả: ghi chú / trang tiếp theo / đồng hồ bấm giờ / bút vẽ; khi có nhiều màn hình, bài trình chiếu sẽ chạy toàn màn hình trên màn hình còn lại',

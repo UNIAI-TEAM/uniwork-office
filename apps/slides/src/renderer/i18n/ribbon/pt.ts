@@ -46,15 +46,13 @@ export const pt = {
   ribbonPasteTipDisabled: 'Colar (copie ou recorte um elemento do canvas primeiro)',
   ribbonCutTip: 'Recortar (⌘X)',
   ribbonCopyTip: 'Copiar (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Pincel de Formatação (selecione um elemento primeiro; ⌘⇧C copia o formato / ⌘⇧V cola o formato)',
+  ribbonBrushTipNoSelection: 'Pincel de Formatação (selecione um elemento primeiro)',
   ribbonBrushTipContinuous: 'Pincel de Formatação em modo contínuo (pressione Esc para sair)',
   ribbonBrushTipOnce:
     'Pincel de Formatação em modo único (clique no elemento de destino para aplicar)',
   ribbonBrushTipHasFormat:
-    'Pincel de Formatação (clique para uma vez / clique duplo para contínuo; ⌘⇧C copia o formato / ⌘⇧V cola o formato)',
-  ribbonBrushTipDefault:
-    'Pincel de Formatação (clique para copiar e aplicar a formatação; ⌘⇧C copia o formato / ⌘⇧V cola o formato)',
+    'Pincel de Formatação (clique para uma vez / clique duplo para contínuo)',
+  ribbonBrushTipDefault: 'Pincel de Formatação (clique para copiar e aplicar a formatação)',
   ribbonGroupSlides: 'Slides',
   ribbonNewSlide: 'Novo Slide',
   ribbonNewSlideTip: 'Novo slide em branco (mantém o plano de fundo do layout do slide atual)',
@@ -369,9 +367,9 @@ export const pt = {
   ribbonGroupStartShow: 'Iniciar Apresentação de Slides',
   ribbonFromBeginning: 'Do Começo',
   ribbonFromBeginningTip:
-    'Apresentação em tela cheia a partir do slide 1 (F5; slides ocultos são ignorados)',
+    'Apresentação em tela cheia a partir do slide 1 (slides ocultos são ignorados)',
   ribbonFromCurrent: 'Do Slide Atual',
-  ribbonFromCurrentTip: 'Apresentação em tela cheia a partir do slide atual (⇧F5)',
+  ribbonFromCurrentTip: 'Apresentação em tela cheia a partir do slide atual',
   ribbonPresenterView: 'Modo de Exibição do Apresentador',
   ribbonPresenterViewTip:
     'Modo do apresentador: anotações / próximo slide / cronômetro / caneta; com várias telas, a apresentação vai para tela cheia na outra',

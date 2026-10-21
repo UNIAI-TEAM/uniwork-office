@@ -1,11 +1,13 @@
 /**
  * Word's keyboard-shortcut reference (File ▸ Options ▸ Customize Keyboard in
  * Word; Help ▸ Keyboard Shortcuts here). Read-only: it renders the registry in
- * shortcuts.ts, so a binding added there shows up without touching this file.
+ * shortcuts.ts with the docs shortcut table's keys for this platform and
+ * surface (desktop or web frame), so a binding added there shows up without
+ * touching this file; a command with no key here is left out.
  */
 import { useState } from 'react'
 import { useI18n } from '../i18n/locale'
-import { SHORTCUT_GROUPS, SHORTCUTS, shortcutKeys } from '../shortcuts'
+import { SHORTCUT_GROUPS, shortcutKeys, visibleShortcuts } from '../shortcuts'
 import { useModalKeys } from './modal-keys'
 
 export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
@@ -14,17 +16,19 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('')
 
   const needle = query.trim().toLowerCase()
-  const rows = SHORTCUTS.map((def) => ({
-    id: def.id,
-    group: def.group,
-    label: t(def.labelKey) + (def.labelSuffix ?? ''),
-    keys: shortcutKeys(def),
-  })).filter(
-    (row) =>
-      !needle ||
-      row.label.toLowerCase().includes(needle) ||
-      row.keys.toLowerCase().includes(needle),
-  )
+  const rows = visibleShortcuts()
+    .map((def) => ({
+      id: def.id,
+      group: def.group,
+      label: t(def.labelKey) + (def.labelSuffix ?? ''),
+      keys: shortcutKeys(def),
+    }))
+    .filter(
+      (row) =>
+        !needle ||
+        row.label.toLowerCase().includes(needle) ||
+        row.keys.toLowerCase().includes(needle),
+    )
 
   return (
     <div

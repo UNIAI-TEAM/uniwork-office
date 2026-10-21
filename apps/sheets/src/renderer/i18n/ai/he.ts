@@ -31,7 +31,7 @@ export const he = {
   aiFootprintOverwritten: 'תאים עם נתונים שנדרסו: {count}',
   aiFootprintOverwrittenMin: 'תאים עם נתונים שנדרסו: לפחות {count}',
   aiFootprintNoOverwrite: 'לא נדרסו נתונים קיימים',
-  aiUndoTitle: 'ביטול שינוי ה-AI הזה (כמו ⌘Z)',
+  aiUndoTitle: 'ביטול שינוי ה-AI הזה (כמו {undoKeys})',
   aiUndo: 'בטל',
   aiPreviewAria: 'תצוגה מקדימה של שינויים',
   aiProposedChanges: 'שינויים מוצעים',

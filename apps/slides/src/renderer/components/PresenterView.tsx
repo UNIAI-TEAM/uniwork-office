@@ -29,12 +29,13 @@ import {
   gotoPosition,
   INITIAL_SHOW_KEYS,
   reduceAudienceNav,
-  reduceShowKey,
+  reducePresenterKey,
   toggleScreen,
   type ShowKeyState,
   type ShowScreen,
 } from '../show-keys'
 import { liftShowCurtain } from '../show-actions'
+import { shortcutPlatform, shortcutSurface } from '../shortcuts'
 import { cap, isWeb } from '../capabilities'
 import { requestShowFullscreen } from '../fullscreen-request'
 
@@ -303,7 +304,7 @@ export function PresenterView({
   // Keyboard navigation (capture beats the editor's generic shortcuts; keys match SlideShowView)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const r = reduceShowKey(showKeysRef.current, e.key)
+      const r = reducePresenterKey(showKeysRef.current, e, shortcutPlatform(), shortcutSurface())
       if (!r) return
       e.preventDefault()
       setKeys(ended ? { ...r.state, screen: 'none' } : r.state)

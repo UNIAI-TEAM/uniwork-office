@@ -6,8 +6,10 @@ import {
   useRibbonCollapse,
   UniAiMark,
 } from '@genoffice/ui'
+import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n } from '../i18n/locale'
 import { cap } from '../capabilities'
+import { htmlSurface, withHtmlHint } from '../shortcuts'
 import { useRibbonFit } from './ribbon-fit'
 import type { StringKey } from '../i18n/locale'
 import type { InsertKind, InsertOptions } from '../document/insert-presets'
@@ -156,10 +158,17 @@ export function Ribbon(p: Props) {
     bodyRef,
     `${lang}|${p.showAi !== false}|${p.presentNewTab !== false}|${p.readOnly ?? false}`,
   )
-  const collapse = useRibbonCollapse('htmlapp.ribbonCollapsed', {
-    collapse: t('ribbonCollapse'),
-    expand: t('ribbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'htmlapp.ribbonCollapsed',
+    {
+      collapse: t('ribbonCollapse'),
+      expand: t('ribbonExpand'),
+    },
+    {
+      action: findShortcut('html', 'html-023'),
+      surface: htmlSurface(),
+    },
+  )
   const [themeOpen, setThemeOpen] = useState(false)
   const themeRef = useRef<HTMLDivElement>(null)
   useDismissablePopover(themeOpen, () => setThemeOpen(false), {
@@ -247,8 +256,8 @@ export function Ribbon(p: Props) {
           <button
             type="button"
             className="qa-btn"
-            data-tip={t('save')}
-            aria-label={t('save')}
+            data-tip={withHtmlHint(t('save'), 'save')}
+            aria-label={withHtmlHint(t('save'), 'save')}
             disabled={off || (!p.dirty && !p.uniworkBound)}
             onMouseDown={(e) => e.preventDefault()}
             onClick={p.onSave}
@@ -260,7 +269,7 @@ export function Ribbon(p: Props) {
           <button
             type="button"
             className="qa-btn qa-save-as"
-            data-tip={t('saveAs')}
+            data-tip={withHtmlHint(t('saveAs'), 'saveAs')}
             aria-label={t('saveAs')}
             disabled={notReady}
             onMouseDown={(e) => e.preventDefault()}
@@ -285,8 +294,8 @@ export function Ribbon(p: Props) {
         <button
           type="button"
           className="qa-btn"
-          data-tip={t('undo')}
-          aria-label={t('undo')}
+          data-tip={withHtmlHint(t('undo'), 'undo')}
+          aria-label={withHtmlHint(t('undo'), 'undo')}
           disabled={off || !p.canUndo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onUndo}
@@ -296,8 +305,8 @@ export function Ribbon(p: Props) {
         <button
           type="button"
           className="qa-btn"
-          data-tip={t('redo')}
-          aria-label={t('redo')}
+          data-tip={withHtmlHint(t('redo'), 'redo')}
+          aria-label={withHtmlHint(t('redo'), 'redo')}
           disabled={off || !p.canRedo}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onRedo}
@@ -307,8 +316,8 @@ export function Ribbon(p: Props) {
         <button
           type="button"
           className="qa-btn"
-          data-tip={t('findTip')}
-          aria-label={t('findTip')}
+          data-tip={withHtmlHint(t('findTip'), 'find')}
+          aria-label={withHtmlHint(t('findTip'), 'find')}
           disabled={findOff}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onFind}

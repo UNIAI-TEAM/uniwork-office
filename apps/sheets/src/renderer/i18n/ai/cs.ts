@@ -32,7 +32,7 @@ export const cs = {
   aiFootprintOverwritten: 'Přepsané buňky s daty: {count}',
   aiFootprintOverwrittenMin: 'Přepsané buňky s daty: alespoň {count}',
   aiFootprintNoOverwrite: 'Žádná stávající data nebyla přepsána',
-  aiUndoTitle: 'Vzít zpět tuto změnu AI (stejné jako ⌘Z)',
+  aiUndoTitle: 'Vzít zpět tuto změnu AI (stejné jako {undoKeys})',
   aiUndo: 'Zpět',
   aiPreviewAria: 'Náhled změn',
   aiProposedChanges: 'Navržené změny',

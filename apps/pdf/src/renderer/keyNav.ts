@@ -1,3 +1,10 @@
+import {
+  currentShortcutPlatform,
+  matchShortcut,
+  pdfShortcuts,
+  type ShortcutKeyEvent,
+  type ShortcutPlatform,
+} from '@genoffice/shortcuts'
 import type { MarkupType } from '../shared/ipc'
 
 export type MarkupToolClickOutcome =
@@ -108,4 +115,26 @@ export function navAction(key: string, focusInThumbs: boolean): NavAction | null
     default:
       return null
   }
+}
+
+/**
+ * The viewer navigation a keydown asks for: the `nav` rows of the pdf table (Edge PDF: Space,
+ * Shift+Space, PageUp/PageDown, Home/End; ours: the arrows). Any Ctrl / Alt / Cmd chord is a
+ * shortcut or the browser's (Alt+Left is history back), Shift only reverses Space, and an IME
+ * composition never navigates: the matcher refuses all of those.
+ */
+export function navKeyAction(
+  event: Pick<
+    KeyboardEvent,
+    'key' | 'code' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey' | 'isComposing' | 'keyCode'
+  >,
+  focusInThumbs: boolean,
+  platform: ShortcutPlatform = currentShortcutPlatform(),
+): NavAction | null {
+  // Win and Mac print the same bare keys, and no `nav` row has a web column of its own
+  if (!matchShortcut(event as ShortcutKeyEvent, pdfShortcuts, platform, 'desktop', 'nav')) {
+    return null
+  }
+  if (event.shiftKey) return { type: 'scrollViewport', dir: -1 }
+  return navAction(event.key, focusInThumbs)
 }
