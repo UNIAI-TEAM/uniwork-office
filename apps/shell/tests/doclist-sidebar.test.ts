@@ -695,9 +695,7 @@ describe('VS-8: the My Folder stand-in lines up with the top-level rows when the
     const rule = standInRules().find((r) => /padding-inline-start/.test(r.body))
     expect(rule).toBeDefined()
     expect(rule!.selectors).toEqual(['.dh-sidebar-tree .dh-my-folder-standin'])
-    expect(rule!.body).toMatch(
-      new RegExp(`padding-inline-start:\s*${FIRST_LEVEL_INDENT}\s*;?\s*$`, 'm'),
-    )
+    expect(rule!.body).toContain(`padding-inline-start: ${FIRST_LEVEL_INDENT};`)
     // that is exactly the inline indent the tree draws on a level-1 row
     await mount('workspace')
     expect(rowOf('Alpha')?.style.paddingInlineStart).toBe(FIRST_LEVEL_INDENT)

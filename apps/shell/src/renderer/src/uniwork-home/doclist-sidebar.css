@@ -83,3 +83,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* VS-8: with the root row hidden the My Folder stand-in is a top-level row, not a child of the root.
+   documents-home.css keeps its old child indent (18px, written when it sat under the root row); here
+   it takes the 4px a level-1 tree row draws inline, so its twisty slot, glyph and label line up with
+   the folders below it. The folder picker and the Save dialog (root row visible) never render it. */
+.dh-sidebar-tree .dh-my-folder-standin {
+  padding-inline-start: 4px;
+}

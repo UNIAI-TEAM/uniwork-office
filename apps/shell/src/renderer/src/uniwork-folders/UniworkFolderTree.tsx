@@ -212,7 +212,12 @@ export function UniworkFolderTree({
   if (rows.length === 0) return null
 
   return (
-    <ul className="uwf-tree" role="tree" aria-label={label} ref={listRef}>
+    <ul
+      className={`uwf-tree${hideRoot ? ' uwf-tree-rootless' : ''}`}
+      role="tree"
+      aria-label={label}
+      ref={listRef}
+    >
       {rows.map((row) => {
         const block = blockOf?.(row.id) ?? null
         const selected = row.key === selectedKey
