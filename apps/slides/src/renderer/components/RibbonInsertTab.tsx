@@ -1,7 +1,7 @@
 /** Insert tab of the slides ribbon. Extracted from Ribbon.tsx. */
 import type { InsertKind } from '../../shared/ipc'
 import { platformShortcuts } from '@genoffice/i18n'
-import { slidesTipKbd } from '../shortcuts'
+import { slidesAriaProp, slidesTipKbd } from '../shortcuts'
 import { WORDART_PRESETS, wordArtStrokePx } from '@genoffice/ui'
 import {
   CHART_GALLERY,
@@ -106,6 +106,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
             onClick={onAddSlide}
             data-tip={platformShortcuts(t('ribbonNewSlideTip'))}
             data-tip-kbd={slidesTipKbd('slides-14')}
+            aria-keyshortcuts={slidesAriaProp('slides-14')}
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">

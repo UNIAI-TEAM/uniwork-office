@@ -19,6 +19,7 @@ vi.mock('react-konva', () => {
 })
 
 import { Ribbon } from '../src/renderer/components/Ribbon'
+import { ContextMenu } from '../src/renderer/components/ContextMenu'
 import { LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 import { resetForTest } from '../src/renderer/capabilities'
 import { shortcutSurface, slidesHint } from '../src/renderer/shortcuts'
@@ -157,8 +158,8 @@ describe.each<ShortcutPlatform>(['win', 'mac'])(
       expect(qa('Save').getAttribute('aria-keyshortcuts')).toBe(want('slides-03'))
       expect(qa('Undo').getAttribute('aria-keyshortcuts')).toBe(want('slides-07'))
       expect(qa('Redo').getAttribute('aria-keyshortcuts')).toBe(want('slides-08'))
-      // the visible tooltip keeps its chord where it has one
-      expect(qa('Save').getAttribute('data-tip')).toContain(slidesHint('slides-03', platform))
+      // the visible tooltip keeps its hand-written chord (it follows the i18n layer's platform)
+      expect(qa('Save').getAttribute('data-tip')).toMatch(/^Save \(.+\)$/)
 
       act(() => fileTab(el).click())
       const menu = (label: string) =>
@@ -200,3 +201,28 @@ describe.each<ShortcutPlatform>(['win', 'mac'])(
     })
   },
 )
+
+describe('Slides context menu', () => {
+  it('the hint is hidden from the name; a table-bound item carries aria-keyshortcuts', () => {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    act(() =>
+      root!.render(
+        createElement(ContextMenu, {
+          x: 0,
+          y: 0,
+          onClose: () => {},
+          items: [
+            { label: 'Cut', hint: '⌘X' },
+            { label: 'Group', hint: 'Ctrl+G', keys: 'Control+G' },
+          ],
+        }),
+      ),
+    )
+    const items = [...container.querySelectorAll<HTMLElement>('.ctx-item')]
+    expect(items.map(nameOf)).toEqual(['Cut', 'Group'])
+    expect(items.map((i) => i.getAttribute('aria-keyshortcuts'))).toEqual([null, 'Control+G'])
+    expect(items[1]!.querySelector('.ctx-hint')!.textContent).toBe('Ctrl+G')
+  })
+})

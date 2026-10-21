@@ -127,7 +127,14 @@ import { RibbonTabScroller } from './RibbonTabScroller'
 import { ShapeGalleryContent } from './ShapeGalleryPopover'
 import { autoContextTabForElement, contextTabForElement, type ContextTab } from './context-tabs'
 import { cap, isViewOnly, isWeb } from '../capabilities'
-import { shortcutPlatform, shortcutSurface, slidesHint, slidesTipKbd } from '../shortcuts'
+import {
+  shortcutPlatform,
+  shortcutSurface,
+  slidesAriaProp,
+  slidesHint,
+  slidesPlainLabel,
+  slidesTipKbd,
+} from '../shortcuts'
 
 /** Electron on macOS: file commands live in the native menu bar, traffic lights sit in the tab row */
 const IS_MAC = navigator.platform.toLowerCase().includes('mac') && !isWeb()
@@ -1109,7 +1116,12 @@ function ShapeFillMenu({
 /** The File menu's key label from the slides shortcut table; none when the action has no key here. */
 function FileMenuKey({ id }: { id: string }) {
   const hint = slidesHint(id)
-  return hint ? <span className="file-menu-key">{hint}</span> : null
+  // the chord is the button's aria-keyshortcuts, not part of its accessible name
+  return hint ? (
+    <span className="file-menu-key" aria-hidden="true">
+      {hint}
+    </span>
+  ) : null
 }
 
 export function Ribbon({
@@ -1799,6 +1811,7 @@ export function Ribbon({
               <div className="file-menu" onMouseDown={(e) => e.stopPropagation()}>
                 {cap('open') && (
                   <button
+                    aria-keyshortcuts={slidesAriaProp('slides-02')}
                     onClick={() => {
                       setFileOpen(false)
                       onOpen()
@@ -1809,6 +1822,7 @@ export function Ribbon({
                 )}
                 {cap('save') && (
                   <button
+                    aria-keyshortcuts={slidesAriaProp('slides-03')}
                     disabled={!hasDoc || uniworkReadOnly}
                     onClick={() => {
                       setFileOpen(false)
@@ -1820,6 +1834,7 @@ export function Ribbon({
                 )}
                 {cap('saveAs') && (
                   <button
+                    aria-keyshortcuts={slidesAriaProp('slides-04')}
                     disabled={!hasDoc}
                     onClick={() => {
                       setFileOpen(false)
@@ -1854,6 +1869,7 @@ export function Ribbon({
                 )}
                 {cap('print') && (
                   <button
+                    aria-keyshortcuts={slidesAriaProp('slides-05')}
                     disabled={!hasDoc}
                     onClick={() => {
                       setFileOpen(false)
@@ -1882,7 +1898,8 @@ export function Ribbon({
           <button
             className="qa-btn"
             data-tip={t('ribbonSaveTip')}
-            aria-label={t('ribbonSaveTip')}
+            aria-label={slidesPlainLabel(t('ribbonSaveTip'))}
+            aria-keyshortcuts={slidesAriaProp('slides-03')}
             disabled={uniworkReadOnly || (!dirty && !uniworkBound)}
             onClick={onSave}
           >
@@ -1895,6 +1912,7 @@ export function Ribbon({
           className="qa-btn"
           data-tip={t('ribbonUndo')}
           aria-label={t('ribbonUndo')}
+          aria-keyshortcuts={slidesAriaProp('slides-07')}
           disabled={!hasDoc || (!canUndo && !editing)}
           onMouseDown={(e) => {
             e.preventDefault()
@@ -1910,6 +1928,7 @@ export function Ribbon({
           className="qa-btn"
           data-tip={t('ribbonRedo')}
           aria-label={t('ribbonRedo')}
+          aria-keyshortcuts={slidesAriaProp('slides-08')}
           disabled={!hasDoc || (!canRedo && !editing)}
           onMouseDown={(e) => {
             e.preventDefault()
@@ -2518,6 +2537,7 @@ export function Ribbon({
                 onClick={() => onSlideShow(true)}
                 data-tip={t('ribbonFromBeginningTip')}
                 data-tip-kbd={slidesTipKbd('slides-22')}
+                aria-keyshortcuts={slidesAriaProp('slides-22')}
               >
                 <span className="rb-big-icon">
                   <IconPlayFromStart size={BIG} />
@@ -2530,6 +2550,7 @@ export function Ribbon({
                 onClick={() => onSlideShow(false)}
                 data-tip={t('ribbonFromCurrentTip')}
                 data-tip-kbd={slidesTipKbd('slides-23')}
+                aria-keyshortcuts={slidesAriaProp('slides-23')}
               >
                 <span className="rb-big-icon">
                   <IconPlayCurrent size={BIG} />
