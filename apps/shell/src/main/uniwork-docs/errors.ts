@@ -4,6 +4,15 @@ import { isDecimalString } from './formats'
 import { parseRejectedItems } from './share-rejected'
 
 /**
+ * UNI-2068: the zip download job's own refusals. They ride `UniworkDocError.zip`
+ * beside the generic `code` (always `server_error`) instead of widening
+ * `UniworkDocErrorCode`, which the renderer switches on exhaustively: every other
+ * caller still reads them as the plain server error they were before, and only
+ * the zip download service looks at `zip`.
+ */
+export type UniworkZipVerdict = 'zip_too_large' | 'zip_expired' | 'zip_busy'
+
+/**
  * A failed UniWork documents call. `code` is the user-facing code from the
  * shared contract; `serverCode` keeps the server's own `{error:{code}}` when
  * it answered with the UniWork envelope (the save pipeline switches on a few
@@ -72,6 +81,8 @@ export class UniworkDocError extends Error {
   readonly fields?: Record<string, unknown>
   /** UNI-2047 SD-A: the refused items of a 422 `document_access_rejected` (an access update) */
   readonly rejected?: ShareRejectedItem[]
+  /** UNI-2068: the zip download job's verdict of a 422 / 410 / 429 answer (see UniworkZipVerdict) */
+  readonly zip?: UniworkZipVerdict
 
   constructor(
     code: UniworkDocErrorCode,
@@ -93,6 +104,7 @@ export class UniworkDocError extends Error {
       byName?: string | null
       fields?: Record<string, unknown>
       rejected?: ShareRejectedItem[]
+      zip?: UniworkZipVerdict
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -115,6 +127,7 @@ export class UniworkDocError extends Error {
     this.byName = extra.byName
     this.fields = extra.fields
     this.rejected = extra.rejected
+    this.zip = extra.zip
   }
 }
 
@@ -253,6 +266,29 @@ export function errorFromResponse(
   // terminal 409 below, and keeps the server's own 5 s delay. A too-small
   // answer (422) is the threshold-drift fallback signal, and the three 422
   // part/probe verdicts each keep their serverCode for the caller to act on.
+  // UNI-2068: the zip download job's own verdicts. They come before the coded-410 ->
+  // `deleted` branch and the generic 429 below: an expired download link is not a
+  // deleted document, and a busy job slot is a refusal the user is told about at
+  // once. The code stays `server_error` (what every other caller already reads);
+  // the verdict rides `zip`.
+  if (serverCode === 'document_download_expired') {
+    return new UniworkDocError('server_error', { ...at, zip: 'zip_expired' })
+  }
+  if (serverCode === 'download_too_large') {
+    const rawMax = envelope?.fields?.max_bytes
+    const maxBytes =
+      typeof rawMax === 'number' && Number.isFinite(rawMax) && rawMax > 0
+        ? Math.floor(rawMax)
+        : undefined
+    return new UniworkDocError('server_error', {
+      ...at,
+      zip: 'zip_too_large',
+      ...(maxBytes !== undefined ? { maxBytes } : {}),
+    })
+  }
+  if (serverCode === 'download_jobs_busy') {
+    return new UniworkDocError('server_error', { ...retried, zip: 'zip_busy' })
+  }
   if (serverCode === 'upload_session_expired') return new UniworkDocError('not_found', at)
   if (serverCode === 'upload_session_busy') return new UniworkDocError('server_error', retried)
   if (serverCode === 'upload_session_too_small') return new UniworkDocError('server_error', at)
