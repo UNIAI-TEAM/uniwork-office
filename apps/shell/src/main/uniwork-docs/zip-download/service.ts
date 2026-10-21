@@ -53,8 +53,9 @@ export function defaultZipName(now: Date): string {
 /** the app's suggestion as a bare file name ending in .zip, or the default */
 function suggestedName(raw: unknown, fallback: string): string {
   if (typeof raw !== 'string') return fallback
-  const name = basename(raw.replace(/\\/g, '/'))
-    .replace(/[\u0000-\u001f<>:"|?*]/g, '_')
+  const name = [...basename(raw.replace(/\\/g, '/'))]
+    .map((char) => (char.charCodeAt(0) < 0x20 || '<>:"|?*'.includes(char) ? '_' : char))
+    .join('')
     .trim()
   if (!name || name === '.' || name === '..') return fallback
   return extname(name).toLowerCase() === '.zip' ? name : `${name}.zip`
