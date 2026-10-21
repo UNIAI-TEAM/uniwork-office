@@ -77,7 +77,6 @@ export const vi = {
   dlBulkDoneTrash: 'Đã chuyển {ok}/{total} tài liệu vào thùng rác',
   dlBulkConfirmTitleOne: 'Chuyển {n} tài liệu vào thùng rác?',
   dlBulkConfirmTitleOther: 'Chuyển {n} tài liệu vào thùng rác?',
-  dlBulkConfirmBody:
-    'Các mục sẽ nằm trong thùng rác 30 ngày rồi bị xóa vĩnh viễn. Mục bạn không có quyền sẽ được bỏ qua.',
+  dlBulkConfirmBody: 'Các mục sẽ nằm trong thùng rác 30 ngày rồi bị xóa vĩnh viễn.',
   dlTrashBanner30: 'Các mục sẽ nằm trong thùng rác 30 ngày rồi bị xóa vĩnh viễn.',
 } satisfies Record<keyof typeof zh, string>
