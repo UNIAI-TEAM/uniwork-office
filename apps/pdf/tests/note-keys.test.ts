@@ -368,6 +368,8 @@ describe('the in-place text editor textarea onKeyDown (App.tsx)', () => {
       'utf8',
     )
     expect(source).toContain("onTextEditKeyDown(e, textDraft.value === ''")
-    expect(source).not.toMatch(/matchPdfKey([^)]*'text-edit')?.id/)
+    // the old inline branch matched the key by its CSV id: it must not come back
+    expect(source).not.toMatch(/matchPdfKey\([^)]*'text-edit'[^)]*\)[?!]?\.id/)
+    expect(source).not.toContain("'pdf-24'")
   })
 })
