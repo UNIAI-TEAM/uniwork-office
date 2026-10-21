@@ -390,7 +390,7 @@ describe('UNI-1957 Documents parity', () => {
       expect(host.querySelector('.dh-quick-hint-icon')).toBeNull()
       const row = host.querySelector<HTMLElement>('.dh-quick-row')
       if (row) {
-        // the label, one pill per quick create kind (UNI-1953: UniNote + the file formats, minus Plain text, UNI-2046)
+        // the label, one pill per quick create kind (UNI-2047 N-05: UniNote + DOCX, XLSX, PPTX)
         // - nothing else: no lock glyph, no link, no share toggle (a create is always private, UNI-2038)
         expect(Array.from(row.children).map((el) => el.tagName)).toEqual([
           'SPAN',

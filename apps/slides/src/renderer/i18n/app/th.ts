@@ -236,6 +236,7 @@ export const th = {
   appStatusBarSlide: 'สไลด์ {current} จาก {total}',
   appStatusBarReady: 'พร้อม',
   appMediaCloseTitle: 'ปิด (Esc)',
+  appMediaCloseName: 'ปิด',
   appRehearseTitle: 'ซ้อมการกำหนดเวลา',
   appRehearseSummary:
     'เวลารวมของการนำเสนอคือ {duration} ต้องการบันทึกเวลาของแต่ละสไลด์เพื่อใช้เปลี่ยนสไลด์อัตโนมัติหรือไม่',

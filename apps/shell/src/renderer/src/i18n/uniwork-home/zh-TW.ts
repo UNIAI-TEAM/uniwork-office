@@ -192,6 +192,7 @@ export const zhTW = {
   fuRefUnknownFiles: '這些檔案超出上傳限制。',
   fuBarPreparing: '正在準備「{name}」…',
   fuBarPreparingFiles: '正在準備上傳…',
+  fuBarWaiting: '其他上傳正在進行，正在等待開始…',
   fuBarRunning: '正在上傳「{name}」 — {done}/{total} 個檔案',
   fuBarRunningFiles: '正在上傳 — {done}/{total} 個檔案',
   fuBarCancelAll: '全部取消',

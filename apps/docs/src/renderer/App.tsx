@@ -341,7 +341,14 @@ import {
 import { TablePropertiesDialog } from './components/TablePropertiesDialog'
 import { showToast, toastStatusLine } from './components/toast-bus'
 import { isNoDocumentPrintKey } from './print-shortcut'
-import { consumeWhen, createShortcutMatcher, shortcutHint, shortcutTip } from './shortcuts'
+import {
+  consumeWhen,
+  createShortcutMatcher,
+  shortcutAria,
+  shortcutHint,
+  shortcutTip,
+} from './shortcuts'
+import { keyHintAfterName } from '@genoffice/shortcuts'
 import { setTableAutoFit, toggleRepeatHeaderRows } from './editor/table-properties'
 import { distributeSelectedColumns } from './editor/table-sizing'
 import {
@@ -7063,7 +7070,8 @@ export function App() {
           <button
             className="qa-btn"
             data-tip={t('appSaveShortcutTip', { keys: shortcutHint('save') })}
-            aria-label={t('appSaveShortcutTip', { keys: shortcutHint('save') })}
+            aria-label={t('appSave')}
+            aria-keyshortcuts={shortcutAria('save') || undefined}
             // a UniWork document saves even when clean (retry after a failed upload)
             disabled={!hasDoc || uniwork.readOnly || (!hasUnsavedChanges && !uniwork.bound)}
             onClick={() => void save(false)}
@@ -7074,7 +7082,8 @@ export function App() {
         <button
           className="qa-btn"
           data-tip={shortcutTip(t('appUndo'), 'undo')}
-          aria-label={shortcutTip(t('appUndo'), 'undo')}
+          aria-label={t('appUndo')}
+          aria-keyshortcuts={shortcutAria('undo') || undefined}
           disabled={!hasDoc || !histState.canUndo}
           onClick={() => editor?.chain().focus().undo().run()}
         >
@@ -7083,7 +7092,8 @@ export function App() {
         <button
           className="qa-btn"
           data-tip={shortcutTip(t('appRedo'), 'redo')}
-          aria-label={shortcutTip(t('appRedo'), 'redo')}
+          aria-label={t('appRedo')}
+          aria-keyshortcuts={shortcutAria('redo') || undefined}
           disabled={!hasDoc || !histState.canRedo}
           onClick={() => editor?.chain().focus().redo().run()}
         >
@@ -7651,8 +7661,16 @@ export function App() {
               )}
             </div>
             {readMode && (
-              <button data-esc-local="" className="read-exit" onClick={() => setReadMode(false)}>
-                {t('appExitReadMode')}
+              <button
+                data-esc-local=""
+                className="read-exit"
+                aria-keyshortcuts="Escape"
+                onClick={() => setReadMode(false)}
+              >
+                {t('appExitReadModeName')}
+                <span aria-hidden="true">
+                  {keyHintAfterName(t('appExitReadMode'), t('appExitReadModeName'))}
+                </span>
               </button>
             )}
             {doc && serverMode && editor && (
@@ -7718,6 +7736,7 @@ export function App() {
                   <button
                     className="status-item status-btn status-page"
                     data-tip={t('appGoToTitle')}
+                    aria-keyshortcuts={shortcutAria('goto') || undefined}
                     onClick={() => {
                       setShowFind(true)
                       setFindFocusGoTo((n) => n + 1)
@@ -7728,6 +7747,7 @@ export function App() {
                   <button
                     className="status-item status-btn status-wordcount"
                     data-tip={t('appWordCountTitle')}
+                    aria-keyshortcuts={shortcutAria('word-count') || undefined}
                     onClick={openStats}
                   >
                     {selectionWordCount > 0
@@ -7923,6 +7943,7 @@ export function App() {
             fitToWindow: t('appImgFitWindow'),
             save: t('appSaveImageAs'),
             close: t('appCloseEsc'),
+            closeName: t('appClose'),
           }}
           onClose={() => setViewImage(null)}
           onSave={() => saveImageAs(viewImage)}

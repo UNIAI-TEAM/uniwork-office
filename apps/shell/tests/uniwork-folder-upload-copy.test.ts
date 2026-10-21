@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { format } from '@genoffice/i18n'
+import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { uniworkHomeStrings } from '../src/renderer/src/i18n/strings-uniwork-home'
 import type { StringKey, TFunc } from '../src/renderer/src/locale'
 import {
@@ -18,7 +19,11 @@ const GIB = 1024 * MIB
 const table =
   (lang: 'vi' | 'en'): TFunc =>
   (key: StringKey, params) =>
-    format((uniworkHomeStrings[lang] as Record<string, string>)[key]!, params)
+    format(
+      ((uniworkHomeStrings[lang] as Record<string, string>)[key] ??
+        (uniworkDocumentStrings[lang] as Record<string, string>)[key])!,
+      params,
+    )
 const vi = table('vi')
 const en = table('en')
 
@@ -158,6 +163,15 @@ describe('folder-upload copy', () => {
       expect(failureReasonMessage(en, 'http_503')).toBe('The server isn’t responding right now.')
       expect(failureReasonMessage(en, 'unreadable')).toContain('Couldn’t read this file')
       expect(failureReasonMessage(vi, 'storage_quota_exceeded')).toContain('Đã hết dung lượng')
+    })
+
+    it("FU-V5: unsupported_format reads as the app's own unsupported-type sentence", () => {
+      expect(failureReasonMessage(en, 'unsupported_format')).toBe(
+        'This file type isn’t supported in UniWork Office.',
+      )
+      expect(failureReasonMessage(vi, 'unsupported_format')).toBe(
+        'UniWork Office chưa hỗ trợ loại tệp này.',
+      )
     })
 
     it('a code this build does not know reads as the plain sentence', () => {

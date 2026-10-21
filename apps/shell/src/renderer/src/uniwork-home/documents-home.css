@@ -544,6 +544,27 @@
   outline-offset: 1px;
 }
 
+/* N-04: Người sửa and Cập nhật are one pair: they wrap together, never one up and one down, and
+   share one width (two equal tracks sized by the wider of the two). A long member name
+   ellipsises inside its select; the pair never grows past the row */
+.dh-filter-selects {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.dh-filter-selects .dh-filter-chip {
+  min-width: 0;
+}
+
+.dh-filter-selects .dh-filter-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
 .dh-filter-clear {
   height: 34px;
   padding: 0 12px;
@@ -1546,7 +1567,7 @@
   white-space: nowrap;
 }
 
-.dh-filter-bar.has-lead .dh-filter-chips + .dh-filter-chip {
+.dh-filter-bar.has-lead .dh-filter-selects {
   margin-inline-start: auto;
 }
 

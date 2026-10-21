@@ -4493,7 +4493,8 @@ export function App() {
                                 <button
                                   onClick={() => setMediaPlay(null)}
                                   data-tip={t('appMediaCloseTitle')}
-                                  aria-label={t('appMediaCloseTitle')}
+                                  aria-label={t('appMediaCloseName')}
+                                  aria-keyshortcuts="Escape"
                                   style={{
                                     position: 'absolute',
                                     top: 4,

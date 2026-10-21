@@ -193,6 +193,7 @@ export const ar = {
   fuRefUnknownFiles: 'هذه الملفات تتجاوز حدود الرفع.',
   fuBarPreparing: 'جارٍ تحضير “{name}”…',
   fuBarPreparingFiles: 'جارٍ تحضير الرفع…',
+  fuBarWaiting: 'هناك عمليات رفع أخرى قيد التشغيل — في انتظار البدء…',
   fuBarRunning: 'جارٍ رفع “{name}” — {done}/{total} ملف',
   fuBarRunningFiles: 'جارٍ الرفع — {done}/{total} ملف',
   fuBarCancelAll: 'إلغاء الكل',

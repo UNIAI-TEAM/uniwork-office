@@ -243,6 +243,7 @@ export const cs = {
   appStatusBarSlide: 'Snímek {current} z {total}',
   appStatusBarReady: 'Připraveno',
   appMediaCloseTitle: 'Zavřít (Esc)',
+  appMediaCloseName: 'Zavřít',
   appRehearseTitle: 'Vyzkoušet časování',
   appRehearseSummary:
     'Celková doba prezentace byla {duration}. Chcete uložit časování snímků pro automatické přepínání?',

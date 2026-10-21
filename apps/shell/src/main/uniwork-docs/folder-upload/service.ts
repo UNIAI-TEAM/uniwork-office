@@ -98,6 +98,8 @@ interface Target {
   siblingNames: string[]
   /** shares with the workspace already: the web's rule, which a folder never meets (UNI-1974) */
   shared: boolean
+  /** My Folder: the screen shows its localised name instead of the stored title */
+  myFolder: boolean
 }
 
 type Groups = { files: string[]; dirs: string[] }
@@ -169,14 +171,31 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
           level: hit.level,
           siblingNames: hit.node.children.map((child) => child.title),
           shared: false,
+          myFolder: hit.node.systemKind === 'my_folder' || folderId === null,
         }
       }
       // a My Folder the tree does not list yet is a root-level folder with nothing in it
       return folderId === null
-        ? { folderId: id, label: fallbackLabel, level: 1, siblingNames: [], shared: false }
+        ? {
+            folderId: id,
+            label: fallbackLabel,
+            level: 1,
+            siblingNames: [],
+            shared: false,
+            myFolder: true,
+          }
         : null
     } catch {
       return null
+    }
+  }
+
+  function targetOf(workspaceId: string, target: Target): PreflightSDO['target'] {
+    return {
+      workspaceId,
+      folderId: target.folderId,
+      label: target.label,
+      ...(target.myFolder ? { myFolder: true as const } : {}),
     }
   }
 
@@ -250,7 +269,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
       mode: 'folder',
       rootName,
       ...(plan.rootTitle && plan.rootTitle !== rootName ? { rootNamePreview: plan.rootTitle } : {}),
-      target: { workspaceId, folderId: target.folderId, label: target.label },
+      target: targetOf(workspaceId, target),
       totals: plan.totals,
       skipped: plan.skipped,
       refusal: plan.refusal,
@@ -285,7 +304,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
     return {
       preflightId,
       mode: 'files',
-      target: { workspaceId, folderId: target.folderId, label: target.label },
+      target: targetOf(workspaceId, target),
       totals: plan.totals,
       skipped: plan.skipped,
       refusal: plan.refusal,

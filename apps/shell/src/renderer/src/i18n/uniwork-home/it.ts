@@ -194,6 +194,7 @@ export const it = {
   fuRefUnknownFiles: 'Questi file superano i limiti di caricamento.',
   fuBarPreparing: 'Preparazione di «{name}»…',
   fuBarPreparingFiles: 'Preparazione del caricamento…',
+  fuBarWaiting: 'Sono in corso altri caricamenti — in attesa di iniziare…',
   fuBarRunning: 'Caricamento di «{name}» — {done}/{total} file',
   fuBarRunningFiles: 'Caricamento — {done}/{total} file',
   fuBarCancelAll: 'Annulla tutto',

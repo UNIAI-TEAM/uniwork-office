@@ -234,6 +234,7 @@ export const zh = {
   appSplitPaneLabel: '拆分窗格(只读预览,可独立滚动)',
   appRemoveSplit: '取消拆分',
   appExitReadMode: '退出阅读视图 (Esc)',
+  appExitReadModeName: '退出阅读视图',
   appExpandAiPanel: '展开 AI 编辑面板',
   appAiRail: 'AI',
   // Status bar / word count

@@ -199,6 +199,7 @@ export const fr = {
   fuRefUnknownFiles: 'Ces fichiers dépassent les limites de téléversement.',
   fuBarPreparing: 'Préparation de « {name} »…',
   fuBarPreparingFiles: 'Préparation du téléversement…',
+  fuBarWaiting: 'D’autres envois sont en cours — en attente du démarrage…',
   fuBarRunning: 'Téléversement de « {name} » — {done}/{total} fichiers',
   fuBarRunningFiles: 'Téléversement — {done}/{total} fichiers',
   fuBarCancelAll: 'Tout annuler',

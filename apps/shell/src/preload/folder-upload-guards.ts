@@ -47,6 +47,7 @@ const SKIP_REASONS: ReadonlySet<string> = new Set<BatchUploadSkipReason>([
 
 const PHASES: ReadonlySet<string> = new Set<BatchUploadPhase>([
   'planning',
+  'waiting',
   'uploading',
   'finishing',
   'done',
@@ -120,6 +121,7 @@ export function asPreflightSDO(raw: unknown): PreflightSDO | null {
       workspaceId: target.workspaceId,
       folderId: target.folderId as string | null,
       label: target.label,
+      ...(target.myFolder === true ? { myFolder: true as const } : {}),
     },
     totals: { files: totals.files, bytes: totals.bytes },
     skipped: r.skipped.map(skipOf).filter((skip): skip is BatchUploadSkip => skip !== null),

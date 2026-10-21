@@ -193,6 +193,7 @@ export const vi = {
   fuRefUnknownFiles: 'Các tệp này vượt giới hạn tải lên.',
   fuBarPreparing: 'Đang chuẩn bị “{name}”…',
   fuBarPreparingFiles: 'Đang chuẩn bị tải lên…',
+  fuBarWaiting: 'Đang có lượt tải lên khác chạy — đang chờ để bắt đầu…',
   fuBarRunning: 'Đang tải lên “{name}” — {done}/{total} tệp',
   fuBarRunningFiles: 'Đang tải lên — {done}/{total} tệp',
   fuBarCancelAll: 'Hủy tất cả',

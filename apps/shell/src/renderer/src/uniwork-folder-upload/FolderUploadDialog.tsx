@@ -2,7 +2,14 @@ import { useEffect, useId, useState } from 'react'
 import { ActionModal } from '../UniworkDocActions'
 import { useI18n } from '../locale'
 import type { PreflightSDO } from './bridge'
-import { formatRunSize, groupSkipped, pluralKey, refusalMessage, skipReasonLabel } from './copy'
+import {
+  formatRunSize,
+  groupSkipped,
+  pluralKey,
+  refusalMessage,
+  skipReasonLabel,
+  targetLabelOf,
+} from './copy'
 import './folder-upload.css'
 
 /**
@@ -96,7 +103,7 @@ export function FolderUploadDialog({
             </>
           )}
           <dt>{t('fuDlgTarget')}</dt>
-          <dd data-testid="folder-upload-target">{preflight.target.label}</dd>
+          <dd data-testid="folder-upload-target">{targetLabelOf(preflight.target, t)}</dd>
         </dl>
         {renamed && (
           <p className="fu-note" data-testid="folder-upload-renamed">

@@ -59,7 +59,14 @@ export interface PreflightSDO {
   rootName?: string
   /** folder mode, only when the name is taken at the destination: the name it will get ("Name (1)") */
   rootNamePreview?: string
-  target: { workspaceId: string; folderId: string | null; label: string }
+  target: {
+    workspaceId: string
+    folderId: string | null
+    /** the destination's stored title; the screen shows the localised name when `myFolder` is set */
+    label: string
+    /** the destination is the caller's My Folder (`systemKind` my_folder): the screen translates its name */
+    myFolder?: true
+  }
   totals: { files: number; bytes: number }
   skipped: BatchUploadSkip[]
   /** null = ready to start; a refusal blocks Upload and names the limit */
@@ -111,7 +118,8 @@ export type BatchUploadStartResult =
   { ok: true; runId: string } | { ok: false; error: BatchUploadStartError }
 
 export type BatchUploadPhase =
-  'planning' | 'uploading' | 'finishing' | 'done' | 'canceled' | 'failed'
+  /** `waiting`: a busy server holds the run for its Retry-After before it asks again */
+  'planning' | 'waiting' | 'uploading' | 'finishing' | 'done' | 'canceled' | 'failed'
 
 export interface BatchUploadFailure {
   /** relative path, root folder first (files mode: the file name) */

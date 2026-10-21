@@ -196,6 +196,7 @@ export const ms = {
   fuRefUnknownFiles: 'Fail-fail ini melebihi had muat naik.',
   fuBarPreparing: 'Menyediakan “{name}”…',
   fuBarPreparingFiles: 'Menyediakan muat naik…',
+  fuBarWaiting: 'Muat naik lain sedang berjalan — menunggu untuk bermula…',
   fuBarRunning: 'Memuat naik “{name}” — {done}/{total} fail',
   fuBarRunningFiles: 'Memuat naik — {done}/{total} fail',
   fuBarCancelAll: 'Batalkan semua',

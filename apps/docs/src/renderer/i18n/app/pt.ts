@@ -235,6 +235,7 @@ export const pt = {
   appSplitPaneLabel: 'Painel dividido (visualização somente leitura, rolagem independente)',
   appRemoveSplit: 'Remover divisão',
   appExitReadMode: 'Sair do modo de leitura (Esc)',
+  appExitReadModeName: 'Sair do modo de leitura',
   appExpandAiPanel: 'Expandir o painel de edição de IA',
   appAiRail: 'IA',
   appPageOf: 'Página {current} de {total}',

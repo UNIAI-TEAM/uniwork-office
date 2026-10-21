@@ -196,6 +196,7 @@ export const pt = {
   fuRefUnknownFiles: 'Estes arquivos excedem os limites de envio.',
   fuBarPreparing: 'Preparando “{name}”…',
   fuBarPreparingFiles: 'Preparando o envio…',
+  fuBarWaiting: 'Há outros envios em andamento — aguardando para começar…',
   fuBarRunning: 'Enviando “{name}” — {done}/{total} arquivos',
   fuBarRunningFiles: 'Enviando — {done}/{total} arquivos',
   fuBarCancelAll: 'Cancelar tudo',

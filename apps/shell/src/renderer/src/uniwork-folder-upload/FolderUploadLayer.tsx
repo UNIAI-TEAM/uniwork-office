@@ -2,6 +2,7 @@ import { ActionToast } from '../UniworkDocActions'
 import { useI18n } from '../locale'
 import { FolderUploadBars } from './FolderUploadBars'
 import { useOwnsFolderUploadBars } from './bars-owner'
+import { useModalDropGuard } from './drop-guard'
 import { FolderUploadDialog } from './FolderUploadDialog'
 import { FolderUploadReport } from './FolderUploadReport'
 import type { FolderUploadController } from './use-folder-upload'
@@ -13,6 +14,8 @@ export function FolderUploadLayer({ controller }: { controller: FolderUploadCont
   const reporting = controller.runs.find((run) => run.reportOpen)
   // a second mounted layer (the Open dialog over the home) leaves the bars to the first
   const ownsBars = useOwnsFolderUploadBars()
+  // a file dropped over the pre-flight or the report must not reach Home's drop-to-open
+  useModalDropGuard(first !== undefined || reporting !== undefined)
   return (
     <>
       {first && (

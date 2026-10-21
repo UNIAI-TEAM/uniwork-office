@@ -250,6 +250,7 @@ export const hi = {
   appStatusBarSlide: 'स्लाइड {current} / {total}',
   appStatusBarReady: 'तैयार',
   appMediaCloseTitle: 'बंद करें (Esc)',
+  appMediaCloseName: 'बंद करें',
   appRehearseTitle: 'समय का पूर्वाभ्यास',
   appRehearseSummary:
     'स्लाइड शो की कुल अवधि {duration} रही। क्या स्लाइड स्वतः बदलने के लिए प्रत्येक स्लाइड का समय सहेजना चाहते हैं?',

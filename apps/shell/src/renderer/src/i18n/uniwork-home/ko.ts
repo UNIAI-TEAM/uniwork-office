@@ -194,6 +194,7 @@ export const ko = {
   fuRefUnknownFiles: '이 파일들은 업로드 한도를 초과합니다.',
   fuBarPreparing: '“{name}” 준비 중…',
   fuBarPreparingFiles: '업로드 준비 중…',
+  fuBarWaiting: '다른 업로드가 진행 중입니다. 시작을 기다리는 중…',
   fuBarRunning: '“{name}” 업로드 중 — 파일 {done}/{total}개',
   fuBarRunningFiles: '업로드 중 — 파일 {done}/{total}개',
   fuBarCancelAll: '모두 취소',

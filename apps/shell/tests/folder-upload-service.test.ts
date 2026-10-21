@@ -228,7 +228,26 @@ describe('destination', () => {
     const { service, ensureMyFolder } = setup({ picked: { dir: join(root, 'Case') } })
     const sdo = await service.pick({ workspaceId: 'w', folderId: null, mode: 'folder' })
     expect(ensureMyFolder).toHaveBeenCalledWith('w')
-    expect(sdo?.target).toEqual({ workspaceId: 'w', folderId: 'my1', label: 'My Folder' })
+    expect(sdo?.target).toEqual({
+      workspaceId: 'w',
+      folderId: 'my1',
+      label: 'My Folder',
+      myFolder: true,
+    })
+  })
+
+  it('FU-V2: My Folder is marked whether it is the workspace root or opened by id, a plain folder is not', async () => {
+    file('Case/a.docx')
+    const { service } = setup({
+      picked: { dir: join(root, 'Case') },
+      tree: [node('my1', 'my-folder-raw', [], 'my_folder'), node('f1', 'Contracts')],
+    })
+    const byId = await service.pick({ workspaceId: 'w', folderId: 'my1', mode: 'folder' })
+    expect(byId?.target.myFolder).toBe(true)
+    const root0 = await service.pick({ workspaceId: 'w', folderId: null, mode: 'folder' })
+    expect(root0?.target.myFolder).toBe(true)
+    const plain = await service.pick({ workspaceId: 'w', folderId: 'f1', mode: 'folder' })
+    expect(plain?.target).toEqual({ workspaceId: 'w', folderId: 'f1', label: 'Contracts' })
   })
 
   it('an open folder is the target as it is: My Folder is not ensured', async () => {

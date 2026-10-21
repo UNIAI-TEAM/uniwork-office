@@ -251,6 +251,7 @@ export const pl = {
   appStatusBarSlide: 'Slajd {current} z {total}',
   appStatusBarReady: 'Gotowe',
   appMediaCloseTitle: 'Zamknij (Esc)',
+  appMediaCloseName: 'Zamknij',
   appRehearseTitle: 'Próba tempa',
   appRehearseSummary:
     'Łączny czas pokazu wyniósł {duration}. Czy zapisać czasy wyświetlania slajdów do automatycznego przełączania?',

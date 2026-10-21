@@ -5,6 +5,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { isDragClaimed } from '../src/renderer/src/drag-claim'
 import { announce } from '../src/renderer/src/uniwork-live'
 import { FolderUploadLayer } from '../src/renderer/src/uniwork-folder-upload/FolderUploadLayer'
 import {
@@ -269,6 +270,77 @@ describe('folder / multi-file upload screens', () => {
       expect(d.textContent).toContain('Áp dụng cho mọi tệp trong lần tải lên này.')
     })
 
+    it.each([
+      ['vi', 'Thư mục của tôi'],
+      ['en', 'My Folder'],
+    ] as const)(
+      'FU-V2: a My Folder destination shows the localised name, not the stored title (%s)',
+      async (lang, expected) => {
+        await mount(lang)
+        await stage(
+          preflightOf({
+            mode: 'files',
+            rootName: undefined,
+            target: {
+              workspaceId: 'ws-1',
+              folderId: 'my1',
+              label: 'my-folder-raw',
+              myFolder: true,
+            },
+          }),
+        )
+        expect(dialog()?.querySelector('[data-testid="folder-upload-target"]')?.textContent).toBe(
+          expected,
+        )
+        expect(dialog()?.textContent).not.toContain('my-folder-raw')
+      },
+    )
+
+    it('FU-V2: a plain destination keeps its own title', async () => {
+      await mount('en')
+      await stage(preflightOf())
+      expect(dialog()?.querySelector('[data-testid="folder-upload-target"]')?.textContent).toBe(
+        'Báo cáo HĐQT Q4',
+      )
+    })
+
+    it('a file drag while the pre-flight is open is claimed: Home\'s "Drop to open" and the open bridge stay out', async () => {
+      await mount()
+      const bubbled: Event[] = []
+      const record = (ev: Event) => bubbled.push(ev)
+      for (const name of ['dragenter', 'dragover', 'drop']) window.addEventListener(name, record)
+      const fileDrag = (name: string) => {
+        const ev = new Event(name, { bubbles: true, cancelable: true })
+        Object.defineProperty(ev, 'dataTransfer', {
+          value: { types: ['Files'], dropEffect: 'copy' },
+        })
+        document.body.dispatchEvent(ev)
+        return ev
+      }
+      // nothing staged: the drag is not ours
+      expect(fileDrag('drop').defaultPrevented).toBe(false)
+      await stage(preflightOf())
+      bubbled.length = 0
+      const enter = fileDrag('dragenter')
+      const over = fileDrag('dragover')
+      const drop = fileDrag('drop')
+      expect(isDragClaimed(enter)).toBe(true)
+      expect(over.defaultPrevented).toBe(true)
+      expect(
+        (over as unknown as { dataTransfer: { dropEffect: string } }).dataTransfer.dropEffect,
+      ).toBe('none')
+      expect(drop.defaultPrevented).toBe(true)
+      // a drag without files is left alone
+      const text = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(text, 'dataTransfer', { value: { types: ['text/plain'] } })
+      document.body.dispatchEvent(text)
+      expect(text.defaultPrevented).toBe(false)
+      // closing the dialog gives the window back
+      await click(buttonNamed('Hủy', dialog()!))
+      expect(fileDrag('drop').defaultPrevented).toBe(false)
+      for (const name of ['dragenter', 'dragover', 'drop']) window.removeEventListener(name, record)
+    })
+
     it('en reads "1 file" at exactly one', async () => {
       await mount('en')
       await stage(preflightOf({ totals: { files: 1, bytes: 2900 } }))
@@ -490,6 +562,51 @@ describe('folder / multi-file upload screens', () => {
       )
       await act(async () => bridge.emit(progressOf({ done: 3, total: 12 })))
       expect(bars()[0]!.textContent).toContain('Đang tải lên — 3/12 tệp')
+    })
+
+    it('FU-V6: a run held for a busy server says it is waiting, then goes back to preparing (vi + en)', async () => {
+      await mount()
+      await start()
+      await act(async () => bridge.emit(progressOf({ phase: 'waiting', done: 0 })))
+      expect(bars()[0]!.textContent).toContain('Đang có lượt tải lên khác chạy')
+      expect(bars()[0]!.textContent).not.toContain('Đang chuẩn bị')
+      expect(bars()[0]!.querySelector('button')?.textContent).toBe('Hủy tất cả')
+      await act(async () => bridge.emit(progressOf({ phase: 'planning', done: 0 })))
+      expect(bars()[0]!.textContent).toContain('Đang chuẩn bị')
+    })
+
+    it('FU-V6: en wording', async () => {
+      await mount('en')
+      await stage(preflightOf())
+      await click(buttonNamed('Upload', dialog()!))
+      await act(async () => bridge.emit(progressOf({ phase: 'waiting', done: 0 })))
+      expect(bars()[0]!.textContent).toContain('Other uploads are running')
+    })
+
+    it('FU-V3: the bars sit in the main pane, not over the sidebar, and keep the 380px / 16px rules', async () => {
+      const main = document.createElement('div')
+      main.className = 'dh-main'
+      const rect = { left: 300, right: 900, top: 0, bottom: 700, width: 600, height: 700 }
+      main.getBoundingClientRect = () => ({
+        ...rect,
+        x: rect.left,
+        y: rect.top,
+        toJSON: () => rect,
+      })
+      document.body.appendChild(main)
+      await mount()
+      await start()
+      const region = document.querySelector<HTMLElement>('.fu-bars')!
+      expect(region.style.left).toBe('316px')
+      expect(region.style.width).toBe('380px')
+      // a narrow pane: the bar shrinks to the pane minus the two gutters
+      rect.width = 300
+      rect.right = 600
+      await act(async () => {
+        window.dispatchEvent(new Event('resize'))
+      })
+      expect(region.style.width).toBe('268px')
+      main.remove()
     })
 
     it('applies progress that arrives before the start call has answered', async () => {

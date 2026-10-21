@@ -244,6 +244,7 @@ export const nl = {
   appSplitPaneLabel: 'Gesplitst deelvenster (alleen-lezen voorbeeld, onafhankelijk scrollen)',
   appRemoveSplit: 'Splitsing verwijderen',
   appExitReadMode: 'Leesmodus afsluiten (Esc)',
+  appExitReadModeName: 'Leesmodus afsluiten',
   appExpandAiPanel: 'AI-bewerkingspaneel uitvouwen',
   appAiRail: 'AI',
   appPageOf: 'Pagina {current} van {total}',

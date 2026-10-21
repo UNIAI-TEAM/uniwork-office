@@ -193,6 +193,7 @@ export const th = {
   fuRefUnknownFiles: 'ไฟล์เหล่านี้เกินขีดจำกัดการอัปโหลด',
   fuBarPreparing: 'กำลังเตรียม “{name}”…',
   fuBarPreparingFiles: 'กำลังเตรียมการอัปโหลด…',
+  fuBarWaiting: 'มีการอัปโหลดอื่นกำลังทำงานอยู่ — กำลังรอเริ่มต้น…',
   fuBarRunning: 'กำลังอัปโหลด “{name}” — {done}/{total} ไฟล์',
   fuBarRunningFiles: 'กำลังอัปโหลด — {done}/{total} ไฟล์',
   fuBarCancelAll: 'ยกเลิกทั้งหมด',

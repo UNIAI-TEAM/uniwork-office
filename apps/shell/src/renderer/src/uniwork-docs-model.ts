@@ -1438,10 +1438,16 @@ export const NEW_DIALOG_FORMATS = NEW_DOC_FORMATS.filter(
 export const NEW_DOC_KINDS = ['page', ...NEW_DOC_FORMATS] as const
 export type NewDocKind = (typeof NEW_DOC_KINDS)[number]
 
-/** The Quick create strip: every kind but Plain text, which lives only in the New menu (UNI-2046, user 2026-10-21). */
-export const QUICK_CREATE_KINDS = NEW_DOC_KINDS.filter(
-  (kind): kind is Exclude<NewDocKind, 'txt'> => kind !== 'txt',
-)
+/**
+ * The Quick create strip: UniNote and the three Office formats only (user 2026-10-21, UNI-2047 N-05). The
+ * rest (Markdown, HTML, PDF, Plain text) live in the New menu.
+ */
+export const QUICK_CREATE_KINDS = [
+  'page',
+  'docx',
+  'xlsx',
+  'pptx',
+] as const satisfies readonly NewDocKind[]
 
 /**
  * A library row with what S18 reads beyond the summary: the action flags main

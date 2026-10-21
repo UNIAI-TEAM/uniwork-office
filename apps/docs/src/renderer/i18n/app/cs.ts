@@ -233,6 +233,7 @@ export const cs = {
   appSplitPaneLabel: 'Rozdělené podokno (náhled jen pro čtení, posouvá se nezávisle)',
   appRemoveSplit: 'Odebrat rozdělení',
   appExitReadMode: 'Ukončit režim čtení (Esc)',
+  appExitReadModeName: 'Ukončit režim čtení',
   appExpandAiPanel: 'Rozbalit panel úprav AI',
   appAiRail: 'AI',
   appPageOf: 'Stránka {current} z {total}',

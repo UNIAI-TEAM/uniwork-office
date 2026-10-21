@@ -18,8 +18,10 @@
  * the codes the Univer rows rely on.
  */
 import {
+  ariaKeyshortcuts,
   chordsFor,
   currentShortcutPlatform,
+  formatAriaChord,
   formatChord,
   formatHint,
   isComposingEvent,
@@ -63,6 +65,22 @@ export function clipboardHint(
     (candidate) => parseChord(candidate)?.key === key,
   )
   return chord ? formatChord(chord, target.platform) : ''
+}
+
+/** `aria-keyshortcuts` value (`Control+1`, `Meta+1`) for a row on this platform and surface; '' without a key. */
+export function sheetsAria(id: string, target: SheetsKeyTarget = sheetsKeyTarget()): string {
+  return ariaKeyshortcuts(sheetsShortcut(id), target.platform, target.surface)
+}
+
+/** `aria-keyshortcuts` of Cut / Copy / Paste: the sheets-10 chord of that letter. */
+export function clipboardAria(
+  key: 'X' | 'C' | 'V',
+  target: SheetsKeyTarget = sheetsKeyTarget(),
+): string {
+  const chord = chordsFor(sheetsShortcut('sheets-10'), target.platform, target.surface).find(
+    (candidate) => parseChord(candidate)?.key === key,
+  )
+  return chord ? formatAriaChord(chord, target.platform) : ''
 }
 
 /** A tooltip label with its key in parentheses, or the bare label when the row has no key here. */

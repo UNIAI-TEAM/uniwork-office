@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { StringKey } from '../locale'
+import { useI18n, type StringKey } from '../locale'
 import {
   getFolderUploadBridge,
   type FolderUploadBridge,
@@ -16,6 +16,7 @@ import {
   subscribeFolderUploadStore,
   type StoredFolderUploadRun,
 } from './folder-upload-store'
+import { targetLabelOf } from './copy'
 
 /** Where an upload goes: the folder open on screen, or null for the workspace top (main uses My Folder) */
 export interface FolderUploadTarget {
@@ -106,6 +107,10 @@ export function useFolderUpload({
   const finished = useRef(onFinished)
   finished.current = onFinished
   const startingRef = useRef(false)
+  // `begin` names the run once, at start: it reads the translator from here, never from its deps
+  const { t } = useI18n()
+  const translate = useRef(t)
+  translate.current = t
 
   useEffect(() => {
     if (!bridge) return
@@ -133,14 +138,15 @@ export function useFolderUpload({
       try {
         const result = await bridge.start({ preflightId: sdo.preflightId, shareWithWorkspace })
         if (!result.ok) return false
+        const targetLabel = targetLabelOf(sdo.target, translate.current)
         startFolderUploadRun(bridge, {
           runId: result.runId,
           mode: sdo.mode,
           name:
             sdo.mode === 'folder'
-              ? (sdo.rootNamePreview ?? sdo.rootName ?? sdo.target.label)
-              : sdo.target.label,
-          targetLabel: sdo.target.label,
+              ? (sdo.rootNamePreview ?? sdo.rootName ?? targetLabel)
+              : targetLabel,
+          targetLabel,
           phase: 'planning',
           done: 0,
           failed: 0,

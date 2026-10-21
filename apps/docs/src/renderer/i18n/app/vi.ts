@@ -230,6 +230,7 @@ export const vi = {
   appSplitPaneLabel: 'Chia ngăn (xem trước chỉ đọc, cuộn độc lập)',
   appRemoveSplit: 'Hủy chia ngăn',
   appExitReadMode: 'Thoát chế độ đọc (Esc)',
+  appExitReadModeName: 'Thoát chế độ đọc',
   appExpandAiPanel: 'Mở rộng ngăn chỉnh sửa AI',
   appAiRail: 'AI',
   appPageOf: 'Trang {current} / {total}',
