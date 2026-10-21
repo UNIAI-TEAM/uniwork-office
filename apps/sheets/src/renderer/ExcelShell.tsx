@@ -1018,6 +1018,7 @@ export function ExcelShell({
             data-tip={t('appUndo')}
             aria-label={t('appUndo')}
             disabled={!canUndo}
+            aria-keyshortcuts={sheetsAria('sheets-07', SHORTCUT_TARGET) || undefined}
             onClick={() => onUndo()}
           >
             <UndoIcon />
@@ -1028,6 +1029,7 @@ export function ExcelShell({
             data-tip={t('appRedo')}
             aria-label={t('appRedo')}
             disabled={!canRedo}
+            aria-keyshortcuts={sheetsAria('sheets-08', SHORTCUT_TARGET) || undefined}
             onClick={onRedo}
           >
             <RedoIcon />
@@ -1052,6 +1054,7 @@ export function ExcelShell({
               <button
                 className={`ribbon-tab ${collapse.tabClass(tab === effectiveTab)} ${CONTEXTUAL_TABS.includes(tab) ? 'contextual' : ''}`}
                 data-tip={collapse.tabTip(tab === effectiveTab)}
+                aria-keyshortcuts={collapse.tabKeyshortcuts(tab === effectiveTab)}
                 key={tab}
                 onClick={() => {
                   collapse.onTabPress(tab === effectiveTab)
@@ -2715,6 +2718,7 @@ function Ribbon({
             label={t('appLink')}
             detail={t('appAtSelection')}
             symbol="🔗"
+            keys={sheetsAria('sheets-78', SHORTCUT_TARGET)}
             onClick={() => onCommand('link-open')}
           />
         </RibbonGroup>
@@ -2724,6 +2728,7 @@ function Ribbon({
             label={t('appNewComment')}
             detail={t('appAtSelection')}
             symbol="🗨"
+            keys={sheetsAria('sheets-79', SHORTCUT_TARGET)}
             onClick={() => onCommand('note-open')}
           />
         </RibbonGroup>
@@ -2987,6 +2992,7 @@ function Ribbon({
             label={t('appInsertFunction')}
             detail={t('appBrowseCatalog')}
             symbol="ƒx"
+            keys={sheetsAria('sheets-49', SHORTCUT_TARGET)}
             onClick={() => onCommand('insert-function-open')}
           />
           <div className="ribbon-tool large" data-tip={t('appAutoSumTitle')}>
@@ -3019,12 +3025,14 @@ function Ribbon({
             label={t('appNameManager')}
             detail={t('appNameManagerDetail')}
             symbol="🏷"
+            keys={sheetsAria('sheets-50', SHORTCUT_TARGET)}
             onClick={() => onCommand('name-manager-open')}
           />
           <div className="row-stack">
             <button
               className="styles-row as-button"
               data-tip={t('appDefineName')}
+              aria-keyshortcuts={sheetsAria('sheets-50', SHORTCUT_TARGET) || undefined}
               onClick={() => onCommand('name-manager-open')}
             >
               <ToolSymbol symbol="🏷" />
@@ -3120,6 +3128,7 @@ function Ribbon({
             <button
               className="styles-row as-button"
               data-tip={t('appCalculateNowTitle')}
+              aria-keyshortcuts={sheetsAria('sheets-53', SHORTCUT_TARGET) || undefined}
               onClick={() => onCommand('calculate-now')}
             >
               <ToolSymbol symbol="⟳" />
@@ -3128,6 +3137,7 @@ function Ribbon({
             <button
               className="styles-row as-button"
               data-tip={t('appCalculateSheetTitle')}
+              aria-keyshortcuts={sheetsAria('sheets-54', SHORTCUT_TARGET) || undefined}
               onClick={() => onCommand('calculate-sheet')}
             >
               <ToolSymbol symbol="▦" />
@@ -3248,6 +3258,7 @@ function Ribbon({
             label={t('appFlashFill')}
             detail={t('appFlashFillDetail')}
             symbol="⚡"
+            keys={sheetsAria('sheets-52', SHORTCUT_TARGET)}
             onClick={() => onCommand('flash-fill')}
           />
           <RibbonButton
@@ -3494,6 +3505,7 @@ function Ribbon({
             label={t('appNewComment')}
             detail={t('appNewCommentDetail')}
             symbol="🗨"
+            keys={sheetsAria('sheets-80', SHORTCUT_TARGET)}
             onClick={() => onCommand('comment-new')}
           />
           <RibbonButton
@@ -3753,6 +3765,7 @@ function Ribbon({
             <button
               data-tip={t('appBold')}
               className={selectionFormat?.bold ? 'is-active' : ''}
+              aria-keyshortcuts={sheetsAria('sheets-63', SHORTCUT_TARGET) || undefined}
               onClick={() => onCommand('bold')}
             >
               <b>B</b>
@@ -3760,6 +3773,7 @@ function Ribbon({
             <button
               data-tip={t('appItalic')}
               className={selectionFormat?.italic ? 'is-active' : ''}
+              aria-keyshortcuts={sheetsAria('sheets-64', SHORTCUT_TARGET) || undefined}
               onClick={() => onCommand('italic')}
             >
               <em>I</em>
@@ -3767,6 +3781,7 @@ function Ribbon({
             <button
               data-tip={t('appUnderline')}
               className={selectionFormat?.underline ? 'is-active' : ''}
+              aria-keyshortcuts={sheetsAria('sheets-65', SHORTCUT_TARGET) || undefined}
               onClick={() => onCommand('underline')}
             >
               <u>U</u>
@@ -3780,6 +3795,7 @@ function Ribbon({
             <button
               data-tip={t('appStrikethrough')}
               className={selectionFormat?.strike ? 'is-active' : ''}
+              aria-keyshortcuts={sheetsAria('sheets-66', SHORTCUT_TARGET) || undefined}
               onClick={() => onCommand('strike')}
             >
               <s>S</s>
