@@ -9,6 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import {
+  SHORTCUT_NOTES,
   SHORTCUT_UNMAPPED,
   chordsFor,
   findShortcut,
@@ -189,6 +190,64 @@ describe('Hidden text (docs-037)', () => {
     expect(editor.getAttributes('docTextStyle').vanishOwn).toBeFalsy()
     editor.destroy()
   })
+
+  it('is one undo step', () => {
+    const editor = makeEditor()
+    select(editor, 1, 7)
+    toggleHiddenText(editor)
+    expect(editor.view.dom.innerHTML).toContain('display: none')
+    expect(editor.commands.undo()).toBe(true)
+    expect(editor.view.dom.innerHTML).not.toContain('display: none')
+    editor.destroy()
+  })
+
+  const hiddenRuns = (editor: Editor) => {
+    const runs: [string, unknown][] = []
+    editor.state.doc.descendants((node) => {
+      if (node.isText)
+        runs.push([
+          node.text!,
+          node.marks.find((mark) => mark.type.name === 'docTextStyle')?.attrs.vanish ?? null,
+        ])
+    })
+    return runs
+  }
+  const mixedEditor = (order: 'hidden-first' | 'hidden-last') => {
+    const hidden = {
+      type: 'text',
+      text: 'ab',
+      marks: [{ type: 'docTextStyle', attrs: { vanish: true, vanishOwn: true } }],
+    }
+    const plain = { type: 'text', text: 'cd' }
+    return new Editor({
+      element: document.createElement('div'),
+      extensions: editorExtensions,
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'docParagraph',
+            content: order === 'hidden-first' ? [hidden, plain] : [plain, hidden],
+          },
+        ],
+      },
+    })
+  }
+
+  it.each(['hidden-first', 'hidden-last'] as const)(
+    'a selection mixing hidden and shown text hides all of it (%s)',
+    (order) => {
+      const editor = mixedEditor(order)
+      select(editor, 1, 5)
+      toggleHiddenText(editor)
+      expect(hiddenRuns(editor).every(([, vanish]) => vanish === true)).toBe(true)
+      // all hidden now, so the next press shows it again
+      select(editor, 1, 5)
+      toggleHiddenText(editor)
+      expect(hiddenRuns(editor).every(([, vanish]) => vanish === false)).toBe(true)
+      editor.destroy()
+    },
+  )
 })
 
 describe('Clear character formatting (docs-039)', () => {
@@ -219,6 +278,8 @@ describe('Go To in the web frame (docs-021)', () => {
     )
     // Ctrl+G is still Find there
     expect(on(key({ key: 'g', code: 'KeyG', ctrlKey: true }), 'win', 'web')).toBe('find')
+    // a held F5 keeps matching, so the frame swallows every auto-repeat and the page never reloads
+    expect(on({ ...f5, repeat: true }, 'win', 'web')).toBe('goto')
     expect(shortcutHint('goto', 'win', 'web')).toBe('F5')
     expect(shortcutHint('goto', 'win', 'desktop')).toBe('Ctrl+G')
   })
@@ -257,6 +318,31 @@ describe('rows left unmapped', () => {
     expect(reasons('docs-008', 'web.win').some((entry) => /Close/.test(entry.reason))).toBe(true)
     // the desktop menu keeps its accelerators
     expect(SHORTCUTS.find((def) => def.id === 'close')?.desktopOnly).toBe(true)
+  })
+
+  it('each row the slice rewrote keeps one reason per part, none of the CSV prose (RS-F-docs M1)', () => {
+    const expected: Record<string, string[]> = {
+      'docs-012': ['row'],
+      'docs-025': ['desktop.mac', 'desktop.win', 'web.mac', 'web.win'],
+      'docs-037': ['desktop.mac', 'web.mac'],
+      'docs-039': ['desktop.mac', 'web.mac'],
+    }
+    for (const [id, parts] of Object.entries(expected)) {
+      const entries = SHORTCUT_UNMAPPED.docs.filter((entry) => entry.id === id)
+      expect(entries.map((entry) => entry.part).sort(), id).toEqual(parts)
+      expect(
+        entries.filter((entry) =>
+          /proposal has prose|needs a decision|Conflicts with/.test(entry.reason),
+        ),
+        id,
+      ).toEqual([])
+    }
+    // the CSV's "no web chord" notes are covered by those entries
+    expect(
+      SHORTCUT_NOTES.docs.filter(
+        (note) => ['docs-037', 'docs-039'].includes(note.id) && note.part === 'web.mac',
+      ),
+    ).toEqual([])
   })
 
   it('Repeat (F4) stays deferred with its reason', () => {

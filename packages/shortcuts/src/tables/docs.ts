@@ -1337,7 +1337,9 @@ const manual: readonly ShortcutAction[] = [
     guard: { noRepeat: true },
   },
   // Go To on web: Ctrl+G is Find there, so Windows web takes Word's F5 (the browser's reload; the
-  // frame swallows it only while a document is open, see the `goto` command in App.tsx)
+  // frame swallows it only while a document is open, see the `goto` command in App.tsx). Repeats
+  // match too (no noRepeat): a held F5 must be swallowed key for key, or its auto-repeats reach
+  // the browser and reload the page; reopening Go To is idempotent, it only refocuses the field
   {
     id: 'docs-021',
     scope: 'docs',
@@ -1345,7 +1347,7 @@ const manual: readonly ShortcutAction[] = [
     mac: ['Alt+Cmd+G'],
     web: { win: ['F5'], mac: ['Alt+Cmd+G'] },
     match: 'key',
-    guard: { noRepeat: true },
+    guard: {},
   },
   // Strikethrough: Word for Mac only, Windows Word prints no key
   {
@@ -1611,6 +1613,16 @@ export const docsManualUnmapped: readonly UnmappedShortcut[] = [
     id: 'docs-037',
     part: 'desktop.mac',
     reason: 'Word for Mac documents no Hidden text key',
+  },
+  {
+    id: 'docs-037',
+    part: 'web.mac',
+    reason: 'Microsoft documents no Hidden text key on Mac, desktop or web',
+  },
+  {
+    id: 'docs-039',
+    part: 'desktop.mac',
+    reason: "Word for Mac documents no key and Control+Space is macOS' input-source switch",
   },
   {
     id: 'docs-039',

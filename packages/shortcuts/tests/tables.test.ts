@@ -28,7 +28,9 @@ import {
   chordsFor,
   isBrowserReserved,
   isValidChord,
+  mergeNotes,
   mergeRows,
+  mergeUnmapped,
   pruneUnmapped,
   type ShortcutAction,
   type UnmappedShortcut,
@@ -256,17 +258,48 @@ describe('table locks', () => {
         ...shellTable,
         ...slidesTable,
       } as unknown as Record<string, readonly unknown[]>
-      expect(SHORTCUT_UNMAPPED[scope]).toEqual([
-        ...pruneUnmapped(
-          (t[`${scope}Unmapped`] ?? []) as readonly UnmappedShortcut[],
-          SHORTCUT_TABLES[scope],
+      const generatedUnmapped = (t[`${scope}Unmapped`] ?? []) as readonly UnmappedShortcut[]
+      const manualUnmapped = (t[`${scope}ManualUnmapped`] ?? ['missing export']) as never
+      expect(SHORTCUT_UNMAPPED[scope]).toEqual(
+        mergeUnmapped(generatedUnmapped, SHORTCUT_TABLES[scope], manualUnmapped),
+      )
+      // every manual entry is in the list, last and unchanged
+      expect(
+        SHORTCUT_UNMAPPED[scope].slice(-(manualUnmapped as unknown[]).length || undefined),
+      ).toEqual((manualUnmapped as unknown[]).length ? manualUnmapped : SHORTCUT_UNMAPPED[scope])
+      expect(SHORTCUT_NOTES[scope]).toEqual(
+        mergeNotes(
+          (t[`${scope}Notes`] ?? []) as never,
+          (t[`${scope}ManualNotes`] ?? ['missing export']) as never,
+          manualUnmapped,
         ),
-        ...(t[`${scope}ManualUnmapped`] ?? ['missing export']),
-      ])
-      expect(SHORTCUT_NOTES[scope]).toEqual([
-        ...(t[`${scope}Notes`] ?? []),
-        ...(t[`${scope}ManualNotes`] ?? ['missing export']),
-      ])
+      )
+    }
+  })
+
+  it('a manual unmapped entry replaces the generated one for its id and part, in every scope', () => {
+    const manualByScope = {
+      docs: docsTable.docsManualUnmapped,
+      sheets: sheetsTable.sheetsManualUnmapped,
+    } as const
+    for (const [scope, manual] of Object.entries(manualByScope)) {
+      for (const own of manual) {
+        const same = SHORTCUT_UNMAPPED[scope as keyof typeof SHORTCUT_TABLES].filter(
+          (entry) => entry.id === own.id && (own.part === 'row' || entry.part === own.part),
+        )
+        expect(same, `${scope} ${own.id} ${own.part}`).toEqual(
+          own.part === 'row' ? manual.filter((m) => m.id === own.id && m.part === 'row') : [own],
+        )
+      }
+    }
+    for (const scope of Object.keys(SHORTCUT_TABLES) as (keyof typeof SHORTCUT_TABLES)[]) {
+      const seen = new Map<string, number>()
+      for (const entry of SHORTCUT_UNMAPPED[scope]) {
+        const key = `${entry.id} ${entry.part}`
+        seen.set(key, (seen.get(key) ?? 0) + 1)
+      }
+      const duplicated = [...seen].filter(([, n]) => n > 1).map(([key]) => key)
+      expect(duplicated, `${scope}: one reason per id and part`).toEqual([])
     }
   })
 
@@ -583,6 +616,69 @@ describe('pruneUnmapped', () => {
     expect(pruneUnmapped([entry('a', 'web.win'), entry('a', 'web.mac')], [alt])).toEqual([
       entry('a', 'web.mac'),
     ])
+  })
+})
+
+describe('mergeUnmapped', () => {
+  const row = (id: string): ShortcutAction => ({
+    id,
+    scope: 'docs',
+    win: ['Ctrl+O'],
+    mac: [],
+    match: 'key',
+    guard: {},
+  })
+  const entry = (id: string, part: UnmappedShortcut['part'], reason: string): UnmappedShortcut => ({
+    id,
+    part,
+    reason,
+  })
+
+  it('substitutes a manual entry for the generated one of the same id and part', () => {
+    const generated = [entry('a', 'desktop.mac', 'old'), entry('a', 'web.mac', 'old')]
+    const manual = [entry('a', 'desktop.mac', 'new')]
+    expect(mergeUnmapped(generated, [row('a')], manual)).toEqual([
+      entry('a', 'web.mac', 'old'),
+      entry('a', 'desktop.mac', 'new'),
+    ])
+  })
+
+  it('a manual row entry replaces every generated entry for the id, and only that id', () => {
+    const generated = [
+      entry('a', 'row', 'old'),
+      entry('a', 'desktop.mac', 'old'),
+      entry('b', 'desktop.mac', 'kept'),
+    ]
+    expect(mergeUnmapped(generated, [row('a'), row('b')], [entry('a', 'row', 'new')])).toEqual([
+      entry('b', 'desktop.mac', 'kept'),
+      entry('a', 'row', 'new'),
+    ])
+  })
+
+  it('without manual entries it is pruneUnmapped', () => {
+    const generated = [entry('a', 'desktop.win', 'x'), entry('a', 'desktop.mac', 'x')]
+    expect(mergeUnmapped(generated, [row('a')], [])).toEqual(pruneUnmapped(generated, [row('a')]))
+  })
+})
+
+describe('mergeNotes', () => {
+  const note = (id: string, part: 'web' | 'web.win' | 'web.mac', detail: string) => ({
+    id,
+    part,
+    detail,
+  })
+  const unmapped = (id: string, part: UnmappedShortcut['part']): UnmappedShortcut => ({
+    id,
+    part,
+    reason: 'x',
+  })
+
+  it('drops a generated note a manual unmapped entry now covers, keeps the rest, appends manual', () => {
+    const generated = [note('a', 'web.mac', 'g'), note('b', 'web.mac', 'g'), note('c', 'web', 'g')]
+    const manual = [note('d', 'web', 'm')]
+    expect(
+      mergeNotes(generated, manual, [unmapped('a', 'web.mac'), unmapped('c', 'web.win')]),
+    ).toEqual([note('b', 'web.mac', 'g'), note('d', 'web', 'm')])
   })
 })
 
