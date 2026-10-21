@@ -321,6 +321,7 @@ describe('ipc registration', () => {
     expect(ASKUNI_CHANNELS).toEqual({
       ask: 'uniwork:askuni:ask',
       context: 'uniwork:askuni:context',
+      openCitation: 'uniwork:askuni:open-citation',
     })
     expect(await handlers.get(ASKUNI_CHANNELS.ask)!({}, valid())).toBe(OK)
     expect(ask).toHaveBeenCalledTimes(1)

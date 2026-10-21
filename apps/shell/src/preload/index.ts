@@ -92,7 +92,12 @@ import type {
   SignOutProgress,
   SignOutPromptRequest,
 } from '../shared/home-api'
-import { ASKUNI_CHANNELS, asAskUniContext, asAskUniResult } from '../shared/askuni-api'
+import {
+  ASKUNI_CHANNELS,
+  asAskUniContext,
+  asAskUniOpenResult,
+  asAskUniResult,
+} from '../shared/askuni-api'
 import {
   HOME_CHANNELS,
   PROJECT_CHANNELS,
@@ -1225,6 +1230,12 @@ const homeApi: HomeApi = {
   },
   async uniworkAskUniContext() {
     return asAskUniContext(await ipcRenderer.invoke(ASKUNI_CHANNELS.context))
+  },
+  async uniworkAskUniOpenCitation(req) {
+    // only kind + href cross: main resolves them, a URL from here is never read
+    return asAskUniOpenResult(
+      await ipcRenderer.invoke(ASKUNI_CHANNELS.openCitation, { kind: req?.kind, href: req?.href }),
+    )
   },
   async uniworkListWorkspaces() {
     return asUniworkResult<UniworkWorkspaceRef[]>(

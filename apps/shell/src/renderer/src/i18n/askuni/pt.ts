@@ -47,4 +47,5 @@ export const pt = {
     'Você está offline. Perguntar à UNI precisa de conexão para pesquisar documentos.',
   askUniErrSession: 'Sua sessão do UniWork expirou. Entre novamente para continuar perguntando.',
   askUniErrDefault: 'Não foi possível perguntar agora; tente novamente mais tarde.',
+  askUniOpenFailed: 'Não foi possível abrir esta fonte. Tente novamente ou abra-a na web.',
 } satisfies Record<keyof typeof zh, string>

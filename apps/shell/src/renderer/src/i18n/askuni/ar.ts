@@ -43,4 +43,5 @@ export const ar = {
   askUniErrOffline: 'أنت غير متصل. يحتاج «اسأل UNI» إلى اتصال للبحث في المستندات.',
   askUniErrSession: 'انتهت جلسة UniWork. سجّل الدخول مجددًا لمتابعة الأسئلة.',
   askUniErrDefault: 'تعذّر إرسال السؤال الآن؛ حاول لاحقًا.',
+  askUniOpenFailed: 'تعذّر فتح هذا المصدر. حاول مرة أخرى أو افتحه على الويب.',
 } satisfies Record<keyof typeof zh, string>

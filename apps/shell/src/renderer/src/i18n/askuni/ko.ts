@@ -42,4 +42,5 @@ export const ko = {
   askUniErrOffline: '오프라인 상태입니다. UNI에게 질문하려면 문서를 검색할 연결이 필요합니다.',
   askUniErrSession: 'UniWork 세션이 만료되었습니다. 다시 로그인한 뒤 계속 질문하세요.',
   askUniErrDefault: '지금은 질문할 수 없습니다. 잠시 후 다시 시도하세요.',
+  askUniOpenFailed: '이 출처를 열 수 없습니다. 다시 시도하거나 웹에서 열어 보세요.',
 } satisfies Record<keyof typeof zh, string>

@@ -124,17 +124,12 @@ function KindIcon({ kind }: { kind: AskUniCitationKind }): ReactElement {
   )
 }
 
-interface PaneProps {
-  /** a source row was activated; the host decides how the citation opens (a no-op until then) */
-  onOpenCitation?: (citation: AskUniCitation) => void
-}
-
 /**
  * Ask UNI: the workspace-level question mode of the Home My AI pane. One conversation per
  * session (the id from the server is kept across turns, New chat drops it); the answer renders
  * as safe Markdown with a Sources list under it.
  */
-export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
+export function AskUniPane(): ReactElement {
   const { t, lang } = useI18n()
   const [context, setContext] = useState<ContextState>({ status: 'loading' })
   const [pickedWorkspace, setPickedWorkspace] = useState<string | null>(null)
@@ -142,6 +137,7 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
+  const [openFailed, setOpenFailed] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const conversationRef = useRef<string | undefined>(undefined)
@@ -194,6 +190,7 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
     requestRef.current += 1
     conversationRef.current = undefined
     setPending(false)
+    setOpenFailed(false)
     setTurns([])
     setInput('')
   }
@@ -205,6 +202,7 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
     const request = ++requestRef.current
     setTurns((prev) => [...prev, { id: nextId(), kind: 'user', text: question }])
     setInput('')
+    setOpenFailed(false)
     setPending(true)
     let result: AskUniResult
     try {
@@ -232,6 +230,23 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
     ])
     // the question comes back so a retry is one click, unless the user already typed something else
     setInput((current) => (current === '' ? question : current))
+  }
+
+  // main decides how a citation opens (a document in the app, else the web page) and refuses
+  // anything it cannot place on the signed-in server; a refusal only shows the note
+  const openCitation = async (c: AskUniCitation) => {
+    const b = bridge()
+    setOpenFailed(false)
+    if (!b.uniworkAskUniOpenCitation) {
+      setOpenFailed(true)
+      return
+    }
+    try {
+      const result = await b.uniworkAskUniOpenCitation({ kind: c.kind, href: c.href })
+      if (!result.ok) setOpenFailed(true)
+    } catch {
+      setOpenFailed(true)
+    }
   }
 
   const stop = () => {
@@ -358,6 +373,27 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
                           const kind = knownKind(c.kind)
                           const action =
                             kind === 'document' ? t('askUniOpenDocument') : t('askUniOpenBrowser')
+                          const body = (
+                            <>
+                              <KindIcon kind={kind} />
+                              <span className="askuni-source-text">
+                                <span className="askuni-source-title">{c.title}</span>
+                                {c.quote ? (
+                                  <span className="askuni-source-quote">{c.quote}</span>
+                                ) : null}
+                              </span>
+                            </>
+                          )
+                          // no server path to open (kind other without a page): a plain row, no action
+                          if (c.href === '') {
+                            return (
+                              <li key={`${c.sourceId}-${i}`}>
+                                <div className="askuni-source is-static" data-kind={kind}>
+                                  {body}
+                                </div>
+                              </li>
+                            )
+                          }
                           return (
                             <li key={`${c.sourceId}-${i}`}>
                               <button
@@ -369,15 +405,9 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
                                   title: c.title,
                                   action,
                                 })}
-                                onClick={() => onOpenCitation?.(c)}
+                                onClick={() => void openCitation(c)}
                               >
-                                <KindIcon kind={kind} />
-                                <span className="askuni-source-text">
-                                  <span className="askuni-source-title">{c.title}</span>
-                                  {c.quote ? (
-                                    <span className="askuni-source-quote">{c.quote}</span>
-                                  ) : null}
-                                </span>
+                                {body}
                                 <span className="askuni-source-action">{action}</span>
                               </button>
                             </li>
@@ -390,6 +420,11 @@ export function AskUniPane({ onOpenCitation }: PaneProps): ReactElement {
               )
             })}
             {pending ? <p className="askuni-note is-quiet">{t('askUniThinking')}</p> : null}
+            {openFailed ? (
+              <p className="askuni-note is-quiet askuni-open-note" role="status">
+                {t('askUniOpenFailed')}
+              </p>
+            ) : null}
             <div ref={bottomRef} />
           </div>
         </div>

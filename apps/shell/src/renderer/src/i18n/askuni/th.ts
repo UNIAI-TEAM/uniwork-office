@@ -42,4 +42,5 @@ export const th = {
   askUniErrOffline: 'คุณออฟไลน์อยู่ การถาม UNI ต้องมีการเชื่อมต่อเพื่อค้นหาเอกสาร',
   askUniErrSession: 'เซสชัน UniWork หมดอายุ ลงชื่อเข้าใช้อีกครั้งเพื่อถามต่อ',
   askUniErrDefault: 'ตอนนี้ยังถามไม่ได้ ลองใหม่ภายหลัง',
+  askUniOpenFailed: 'เปิดแหล่งข้อมูลนี้ไม่ได้ ลองอีกครั้งหรือเปิดบนเว็บ',
 } satisfies Record<keyof typeof zh, string>

@@ -44,4 +44,5 @@ export const id = {
   askUniErrOffline: 'Anda sedang offline. Tanya UNI membutuhkan koneksi untuk mencari dokumen.',
   askUniErrSession: 'Sesi UniWork Anda telah berakhir. Masuk lagi untuk terus bertanya.',
   askUniErrDefault: 'Tidak dapat bertanya saat ini; coba lagi nanti.',
+  askUniOpenFailed: 'Sumber ini tidak dapat dibuka. Coba lagi atau buka di web.',
 } satisfies Record<keyof typeof zh, string>

@@ -544,7 +544,11 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       ask.mockResolvedValue(answer('Xem nguồn', { citations: [CITATIONS[1]!] }))
       openCitation.mockResolvedValueOnce({ ok: false, code: 'error' })
       await mount('vi')
-      await sendQuestion('Ở đâu?')
+      await type('Ở đâu?')
+      await act(async () => {
+        ;(host.querySelector(`button[aria-label="${viStrings.askUniSend}"]`) as HTMLElement).click()
+      })
+      await flush()
       await act(async () => {
         ;(host.querySelector('.askuni-source') as HTMLButtonElement).click()
       })

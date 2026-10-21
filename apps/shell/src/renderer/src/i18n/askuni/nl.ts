@@ -46,4 +46,6 @@ export const nl = {
     'Je bent offline. Vraag het UNI heeft een verbinding nodig om documenten te doorzoeken.',
   askUniErrSession: 'Je UniWork-sessie is verlopen. Meld je opnieuw aan om verder te vragen.',
   askUniErrDefault: 'Vragen stellen lukt nu niet; probeer het later opnieuw.',
+  askUniOpenFailed:
+    'Deze bron kon niet worden geopend. Probeer het opnieuw of open hem op het web.',
 } satisfies Record<keyof typeof zh, string>

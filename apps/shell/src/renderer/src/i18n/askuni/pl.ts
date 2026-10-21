@@ -44,4 +44,6 @@ export const pl = {
   askUniErrOffline: 'Jesteś offline. Zapytaj UNI wymaga połączenia, aby przeszukiwać dokumenty.',
   askUniErrSession: 'Sesja UniWork wygasła. Zaloguj się ponownie, aby dalej pytać.',
   askUniErrDefault: 'Nie można teraz zadać pytania; spróbuj później.',
+  askUniOpenFailed:
+    'Nie udało się otworzyć tego źródła. Spróbuj ponownie lub otwórz je w przeglądarce.',
 } satisfies Record<keyof typeof zh, string>

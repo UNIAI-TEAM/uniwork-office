@@ -47,4 +47,5 @@ export const es = {
   askUniErrSession:
     'Tu sesión de UniWork ha caducado. Inicia sesión de nuevo para seguir preguntando.',
   askUniErrDefault: 'No se puede preguntar ahora; inténtalo más tarde.',
+  askUniOpenFailed: 'No se pudo abrir esta fuente. Inténtalo de nuevo o ábrela en la web.',
 } satisfies Record<keyof typeof zh, string>

@@ -46,4 +46,5 @@ export const hi = {
   askUniErrSession:
     'आपका UniWork सत्र समाप्त हो गया है। पूछना जारी रखने के लिए फिर से साइन इन करें।',
   askUniErrDefault: 'अभी सवाल नहीं पूछा जा सका; बाद में फिर कोशिश करें।',
+  askUniOpenFailed: 'यह स्रोत नहीं खुल सका। फिर से कोशिश करें या इसे वेब पर खोलें।',
 } satisfies Record<keyof typeof zh, string>

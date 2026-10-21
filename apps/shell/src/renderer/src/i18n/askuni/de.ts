@@ -47,4 +47,6 @@ export const de = {
   askUniErrSession:
     'Ihre UniWork-Sitzung ist abgelaufen. Melden Sie sich erneut an, um weiter zu fragen.',
   askUniErrDefault: 'Die Frage ist gerade nicht möglich; versuchen Sie es später erneut.',
+  askUniOpenFailed:
+    'Diese Quelle konnte nicht geöffnet werden. Versuche es erneut oder öffne sie im Web.',
 } satisfies Record<keyof typeof zh, string>

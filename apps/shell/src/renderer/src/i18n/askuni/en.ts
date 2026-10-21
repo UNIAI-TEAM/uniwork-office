@@ -42,4 +42,5 @@ export const en = {
   askUniErrOffline: 'You are offline. Ask UNI needs a connection to search documents.',
   askUniErrSession: 'Your UniWork session has expired. Sign in again to keep asking.',
   askUniErrDefault: 'Could not ask right now; try again later.',
+  askUniOpenFailed: "Couldn't open this source. Try again or open it from the web.",
 } satisfies Record<keyof typeof zh, string>

@@ -47,4 +47,5 @@ export const fr = {
   askUniErrSession:
     'Votre session UniWork a expiré. Reconnectez-vous pour continuer à poser des questions.',
   askUniErrDefault: 'Impossible de poser la question pour le moment ; réessayez plus tard.',
+  askUniOpenFailed: "Impossible d'ouvrir cette source. Réessayez ou ouvrez-la sur le web.",
 } satisfies Record<keyof typeof zh, string>

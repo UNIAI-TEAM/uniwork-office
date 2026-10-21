@@ -45,4 +45,5 @@ export const ja = {
   askUniErrSession:
     'UniWork のセッションが期限切れです。もう一度サインインして質問を続けてください。',
   askUniErrDefault: '今は質問できません。しばらくしてからもう一度お試しください。',
+  askUniOpenFailed: 'このソースを開けませんでした。もう一度試すか、ウェブで開いてください。',
 } satisfies Record<keyof typeof zh, string>

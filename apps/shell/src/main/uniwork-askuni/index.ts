@@ -3,6 +3,7 @@ import type { DeploymentProfile } from '../uniwork-auth/deployment'
 import { createUniworkDocsClient, type UniworkDocsClientOptions } from '../uniwork-docs/client'
 import { createAskUniClient } from './client'
 import { askUniFakeEnabled, createFakeAskUni } from './fake'
+import { createAskUniOpener, registerAskUniOpenIpc, type AskUniOpenDeps } from './open-citation'
 import { createAskUniService, registerAskUniIpc, type AskUniService } from './service'
 
 export interface UniworkAskUniWiring {
@@ -17,12 +18,17 @@ export interface UniworkAskUniWiring {
   activeWorkspaceId(): string | null
   packaged: boolean
   env: NodeJS.ProcessEnv
+  /** the docs service's open-by-id, the one path every UniWork document opens through */
+  openDocument: AskUniOpenDeps['openDocument']
+  /** shell.openExternal; the opener hands it only URLs on the deployment's web origin */
+  openExternal(url: string): Promise<void>
 }
 
 /**
  * Registers `uniwork:askuni:*`. The workspaces come from the same
  * `GET /orgs/{org}/workspaces` the Home doclist reads, the current one from
- * the workbench key the doclist writes; UNIWORK_ASKUNI_FAKE=1 (never in a
+ * the workbench key the doclist writes; a citation opens through `uniwork:askuni:open-citation`
+ * (the docs open-by-id for a document, the web origin for the rest); UNIWORK_ASKUNI_FAKE=1 (never in a
  * packaged build) swaps both and the answers for canned ones.
  */
 export function registerUniworkAskUni(
@@ -73,5 +79,14 @@ export function registerUniworkAskUni(
     })
   }
   registerAskUniIpc(ipcMain, service)
+  registerAskUniOpenIpc(
+    ipcMain,
+    createAskUniOpener({
+      isSignedIn: () => wiring.isSignedIn(),
+      profile: () => wiring.profile(),
+      openDocument: (id) => wiring.openDocument(id),
+      openExternal: (url) => wiring.openExternal(url),
+    }),
+  )
   return service
 }

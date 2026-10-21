@@ -43,4 +43,5 @@ export const cs = {
   askUniErrOffline: 'Jste offline. Zeptat se UNI vyžaduje připojení k vyhledávání dokumentů.',
   askUniErrSession: 'Relace UniWork vypršela. Přihlaste se znovu a pokračujte v dotazech.',
   askUniErrDefault: 'Teď se nelze zeptat; zkuste to později.',
+  askUniOpenFailed: 'Tento zdroj se nepodařilo otevřít. Zkuste to znovu nebo ho otevřete na webu.',
 } satisfies Record<keyof typeof zh, string>

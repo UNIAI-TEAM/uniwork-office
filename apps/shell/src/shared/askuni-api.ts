@@ -4,6 +4,7 @@
 export const ASKUNI_CHANNELS = {
   ask: 'uniwork:askuni:ask',
   context: 'uniwork:askuni:context',
+  openCitation: 'uniwork:askuni:open-citation',
 } as const
 
 export type AskUniLocale = 'vi' | 'en'
@@ -65,9 +66,19 @@ export interface AskUniContext {
   signedIn: boolean
 }
 
+/** what the renderer may ask to open: a citation's kind and its server path, never a URL */
+export interface AskUniOpenRequest {
+  kind: AskUniCitationKind
+  href: string
+}
+
+export type AskUniOpenResult = { ok: true } | { ok: false; code: AskUniErrorCode }
+
 export interface AskUniBridge {
   uniworkAskUni(req: AskUniRequest): Promise<AskUniResult>
   uniworkAskUniContext(): Promise<AskUniContext>
+  /** a document opens in the app, any other kind as the server's web page (main decides, see open-citation.ts) */
+  uniworkAskUniOpenCitation(req: AskUniOpenRequest): Promise<AskUniOpenResult>
 }
 
 const KINDS: ReadonlySet<string> = new Set<AskUniCitationKind>([
@@ -154,4 +165,16 @@ export function asAskUniContext(raw: unknown): AskUniContext {
     currentWorkspaceId: workspaces.some((w) => w.id === current) ? current : null,
     signedIn: r.signedIn,
   }
+}
+
+/** the preload's check of an open reply: anything not shaped like an AskUniOpenResult is an `error` */
+export function asAskUniOpenResult(raw: unknown): AskUniOpenResult {
+  const bad: AskUniOpenResult = { ok: false, code: 'error' }
+  if (!raw || typeof raw !== 'object') return bad
+  const r = raw as Record<string, unknown>
+  if (r.ok === true) return { ok: true }
+  if (r.ok === false && isStr(r.code) && CODES.has(r.code)) {
+    return { ok: false, code: r.code as AskUniErrorCode }
+  }
+  return bad
 }

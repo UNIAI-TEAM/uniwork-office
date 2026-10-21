@@ -45,4 +45,5 @@ export const ms = {
   askUniErrOffline: 'Anda luar talian. Tanya UNI memerlukan sambungan untuk mencari dokumen.',
   askUniErrSession: 'Sesi UniWork anda telah tamat. Log masuk semula untuk terus bertanya.',
   askUniErrDefault: 'Tidak dapat bertanya sekarang; cuba lagi nanti.',
+  askUniOpenFailed: 'Sumber ini tidak dapat dibuka. Cuba lagi atau buka di web.',
 } satisfies Record<keyof typeof zh, string>

@@ -42,4 +42,5 @@ export const vi = {
   askUniErrOffline: 'Không có kết nối mạng, Hỏi UNI cần kết nối để tìm tài liệu.',
   askUniErrSession: 'Phiên đăng nhập UniWork đã hết hạn. Hãy đăng nhập lại để tiếp tục hỏi.',
   askUniErrDefault: 'Không hỏi được lúc này, thử lại sau.',
+  askUniOpenFailed: 'Không mở được nguồn này. Hãy thử lại hoặc mở trên web.',
 } satisfies Record<keyof typeof zh, string>

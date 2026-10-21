@@ -974,6 +974,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     activeWorkspaceId: () => wiring.activeWorkspaceId?.() ?? null,
     packaged: app.isPackaged,
     env: process.env,
+    openDocument: (documentId) => service.openDocument(documentId),
+    openExternal: (url) => shell.openExternal(url),
   })
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
     service.listSources((query ?? {}) as UniworkSourceListQuery),

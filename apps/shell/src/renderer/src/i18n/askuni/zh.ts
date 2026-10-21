@@ -40,4 +40,5 @@ export const zh = {
   askUniErrOffline: '没有网络连接。问 UNI 需要联网才能搜索文档。',
   askUniErrSession: 'UniWork 登录已过期，请重新登录后继续提问。',
   askUniErrDefault: '现在无法提问，请稍后再试。',
+  askUniOpenFailed: '无法打开此来源。请重试，或在网页中打开。',
 }

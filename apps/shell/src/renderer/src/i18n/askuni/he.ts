@@ -42,4 +42,5 @@ export const he = {
   askUniErrOffline: 'אתם במצב לא מקוון. "שאלו את UNI" דורש חיבור כדי לחפש מסמכים.',
   askUniErrSession: 'פג תוקף ההתחברות ל-UniWork. היכנסו שוב כדי להמשיך לשאול.',
   askUniErrDefault: 'לא ניתן לשאול כרגע; נסו שוב מאוחר יותר.',
+  askUniOpenFailed: 'לא ניתן לפתוח את המקור הזה. נסו שוב או פתחו אותו באתר.',
 } satisfies Record<keyof typeof zh, string>
