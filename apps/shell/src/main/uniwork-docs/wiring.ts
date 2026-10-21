@@ -41,6 +41,7 @@ import type { BatchUploadProgress } from '../../shared/folder-upload-api'
 import { createFolderUploadService } from './folder-upload/service'
 import type { FolderUploadService } from './folder-upload/service'
 import type { FolderUploadRunnerPort } from './folder-upload/runner-port'
+import type { FolderUploadRunnerHooks } from './folder-upload/wire'
 import { createSequentialRunner } from './folder-upload/sequential-runner'
 import type { FolderUploadLimits } from './folder-upload/types'
 import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
@@ -219,7 +220,12 @@ export interface UniworkDocsWiring {
    */
   folderUpload?: {
     getLimits(): FolderUploadLimits | null | Promise<FolderUploadLimits | null>
-    runner: FolderUploadRunnerPort
+    /**
+     * The runner, or a factory the host calls once with the list refresh (the
+     * same tree-changed push this app's own uploads use) so the runner can
+     * refresh the lists while a run goes.
+     */
+    runner: FolderUploadRunnerPort | ((hooks: FolderUploadRunnerHooks) => FolderUploadRunnerPort)
   }
 }
 
@@ -327,7 +333,10 @@ const NO_BATCH_RUNNER: FolderUploadRunnerPort = {
 function createBatchUpload(
   service: UniworkDocsService,
   wiring: UniworkDocsWiring,
+  hooks: FolderUploadRunnerHooks,
 ): FolderUploadService {
+  const wired = wiring.folderUpload?.runner
+  const runner = typeof wired === 'function' ? wired(hooks) : (wired ?? NO_BATCH_RUNNER)
   const valueOf = async <T>(call: Promise<UniworkResult<T>>): Promise<T> => {
     const answer = await call
     if (!answer.ok) throw new Error(answer.error)
@@ -348,7 +357,7 @@ function createBatchUpload(
       maxDepth: SEQUENTIAL_MAX_DEPTH,
       perFileMaxBytes: (await service.limitsCache.get()).max_bytes,
     }),
-    runner: wiring.folderUpload?.runner ?? NO_BATCH_RUNNER,
+    runner,
     sequential: createSequentialRunner({
       uploadOne: (input) => service.uploadDocument(input),
       cancelOne: (uploadId) => service.cancelUpload(uploadId),
@@ -1059,7 +1068,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   })
   // UNI-2052: folder / several files. Main reads the disk and plans; the renderer
   // only sees pre-flights with relative paths and the pushed progress
-  const batchUpload = createBatchUpload(service, wiring)
+  const batchUpload = createBatchUpload(service, wiring, {
+    invalidate: (workspaceId) => treeChanged.notify(workspaceId),
+  })
   ipcMain.handle(UNIWORK_DOC_CHANNELS.batchUploadPick, (_event, input: unknown) =>
     batchUpload.pick(input),
   )

@@ -1,35 +1,20 @@
 import type { LocalFileProbePayload } from '../client'
 import type { FolderUploadTransport } from './transport'
+import type { FolderUploadPlan, PlannedFile } from './types'
 
 // Public shapes of `runFolderUpload` (CONTRACT section 5), kept apart from the
 // runner so the IPC layer can code against them while the runner changes.
 
-/**
- * What the runner needs of a planned file. A minimal local mirror of the web
- * planner's `PlannedFile`; the planner module (plan.ts) is a separate slice.
- */
-export interface PlannedFile {
-  /** Normalised relative path, root segment first. */
-  path: string
-  filename: string
-  /** Normalised path of the file's parent folder, root included; "" in files mode. */
-  folderPath: string
-  size: number
-  /** Position in the plan, so the caller maps back to the absolute path on disk. */
-  index: number
-}
+export type { PlannedFile }
 
-/** What the runner needs of a plan without refusal (mirrors the web `FolderUploadPlan`). */
-export interface PlannedBatch {
-  /** Root folder name as found; null in files mode, which has no root. */
-  rootName: string | null
-  /** Root folder name after the "(n)" preview; null in files mode. */
-  rootTitle: string | null
-  /** Relative folder paths including the root, top-down; [] in files mode. */
-  folders: string[]
-  files: PlannedFile[]
-  totals: { files: number; bytes: number }
-}
+/**
+ * What the runner needs of a plan without refusal: the planner's own plan
+ * (types.ts) minus the skip list and the refusal, which the runner never reads.
+ */
+export type PlannedBatch = Pick<
+  FolderUploadPlan,
+  'rootName' | 'rootTitle' | 'folders' | 'files' | 'totals'
+>
 
 export type FolderUploadPhase =
   /** Waiting for the plan answer. */
