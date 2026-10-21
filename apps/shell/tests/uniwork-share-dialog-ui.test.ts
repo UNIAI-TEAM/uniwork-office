@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -406,6 +408,33 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
     expect(create.getAttribute('aria-disabled')).toBe('true')
     await click(create)
     expect(calls(api, 'linkCreate')).toHaveLength(0)
+  })
+
+  describe('row layout (SD-FIX2 SD-01)', () => {
+    // `.uw-share-row-main` carries `flex: 1 1 160px`; inside a column container that basis is a
+    // HEIGHT, which made every access and link row ~193px tall. The title line inside a column
+    // (.stacked / .uw-share-row-text) is `.uw-share-row-head`, which has no flex basis.
+    it('no title line inside a column container carries the flex-basis class', async () => {
+      await open()
+      const dialog = q('[role="dialog"]')!
+      expect(dialog.querySelectorAll('.uw-share-row-main .uw-share-row-main')).toHaveLength(0)
+      expect(dialog.querySelectorAll('.uw-share-row-text .uw-share-row-main')).toHaveLength(0)
+      expect(row('home:ws_1')!.querySelector('.uw-share-row-head')).not.toBeNull()
+      expect(row('user:u_minh')!.querySelector('.uw-share-row-head')).not.toBeNull()
+      expect(section('links')!.querySelector('[data-link-id] .uw-share-row-head')).not.toBeNull()
+    })
+
+    it('the head class has no flex basis and the basis class stays off column children', () => {
+      const css = readFileSync(
+        join(__dirname, '../src/renderer/src/uniwork-share/share-dialog.css'),
+        'utf8',
+      )
+      const rule = (selector: string) =>
+        css.match(new RegExp(`(?:^|\\n)${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`))?.[1]
+      expect(rule('.uw-share-row-head')).toBeDefined()
+      expect(rule('.uw-share-row-head')).not.toMatch(/flex\s*:/)
+      expect(rule('.uw-share-row-main')).toMatch(/flex:\s*1 1 160px/)
+    })
   })
 
   describe('review fixes (SD-FIX1)', () => {

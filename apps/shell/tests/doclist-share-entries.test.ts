@@ -253,6 +253,17 @@ describe('Access cell: one button when the row passes the gate', () => {
     expect(button.querySelector('.dh-level-sub')?.textContent).toBe('Bạn: Quản lý')
   })
 
+  it('the name keeps the pill and the level line apart with a separator (SD-04)', async () => {
+    await mount([doc({ id: 'a', title: 'Hợp đồng.docx' })])
+    const b = cell('a').querySelector('button')!
+    const content = document.getElementById(
+      (b.getAttribute('aria-labelledby') ?? '').split(' ')[1],
+    )!
+    // the accessible name joins inline spans without whitespace: the separator is in the text
+    expect(content.textContent).toBe('Workspace, Bạn: Quản lý')
+    expect(content.querySelector('.uw-sr-only')?.textContent).toBe(', ')
+  })
+
   it('a workspace admin without a level also reads manage; everyone else reads view', async () => {
     await mount([
       doc({ id: 'adm', title: 'A', myLevel: undefined, adminScope: true }),

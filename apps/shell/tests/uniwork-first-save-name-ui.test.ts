@@ -264,6 +264,18 @@ describe('UNI-1959 first save: Name the document + Location', () => {
     expect($('.ufs-dialog .ufs-loc-value')?.textContent).toContain('Quý 4')
   })
 
+  it('names the workspace root like the Save dialog when the document sits at the top level (SD-02)', async () => {
+    await render('vi')
+    await request({ ...REQUEST, parentId: null })
+    expect($('.ufs-dialog .ufs-loc-value')?.textContent).toBe(folderVi.ufRoot)
+  })
+
+  it('names the workspace root in English too (SD-02)', async () => {
+    await render('en')
+    await request({ ...REQUEST, parentId: null })
+    expect($('.ufs-dialog .ufs-loc-value')?.textContent).toBe('Documents (root)')
+  })
+
   it('Save with the name and folder unchanged sends no rename and no move, then continues', async () => {
     await render()
     await request()

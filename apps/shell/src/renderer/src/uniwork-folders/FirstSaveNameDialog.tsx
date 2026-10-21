@@ -102,7 +102,11 @@ function FirstSaveNameDialog({
   const index = useMemo(() => buildFolderIndex(labelled ?? []), [labelled])
   const mineId = nodes ? myFolderIdOf(nodes) : null
   const path = place.path ?? (labelled ? folderPath(index, place.id) : null)
-  const placeText = path ? path.map((part) => part.title).join(' › ') : '…'
+  const placeText = path
+    ? path.length > 0
+      ? path.map((part) => part.title).join(' › ')
+      : t('ufRoot')
+    : '…'
   const inMyFolder = place.id !== null && place.id === mineId
 
   const cancel = () => {

@@ -171,7 +171,7 @@ export function HomeWorkspaceRow({
     <li className="uw-share-row stacked" data-share-row={rowKey}>
       <div className="uw-share-row-line">
         <span className="uw-share-row-main stacked">
-          <span className="uw-share-row-main">
+          <span className="uw-share-row-head">
             <SharePrincipalIcon principalType="workspace" />
             <span className="uw-share-row-name" title={displayLabel}>
               {displayLabel}
@@ -251,7 +251,7 @@ export function ShareRow({
     >
       <div className="uw-share-row-line">
         <div className="uw-share-row-text">
-          <span className="uw-share-row-main">
+          <span className="uw-share-row-head">
             <SharePrincipalIcon principalType={share.principalType} />
             <NameOrSkeleton name={label} />
           </span>

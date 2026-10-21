@@ -180,7 +180,7 @@ export function ShareLinksSection({
             return (
               <li key={link.id} className="uw-share-row" data-link-id={link.id}>
                 <span className="uw-share-row-text">
-                  <span className="uw-share-row-main">
+                  <span className="uw-share-row-head">
                     {createdAt}
                     {expired && <span className="uw-share-muted">{t('shrLinkExpiredBadge')}</span>}
                   </span>

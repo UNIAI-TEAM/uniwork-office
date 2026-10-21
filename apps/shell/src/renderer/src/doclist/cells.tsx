@@ -151,7 +151,13 @@ export function AccessContent({
   const content = (
     <>
       <span className={`dh-vis-badge dh-vis-${pill}`}>{t(ACCESS_PILL_KEY[pill])}</span>
-      {level && <span className="dh-level-sub">{level}</span>}
+      {level && (
+        <>
+          {/* the accessible name concatenates inline spans: keep the pill and the line apart */}
+          <span className="uw-sr-only">{', '}</span>
+          <span className="dh-level-sub">{level}</span>
+        </>
+      )}
     </>
   )
   if (!onShare || !canShareRow(doc)) return content
