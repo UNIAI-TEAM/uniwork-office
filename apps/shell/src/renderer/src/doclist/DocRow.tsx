@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { DragEvent, MouseEvent, ReactNode } from 'react'
 import { FileBadge } from '../FileBadge'
 import { useI18n } from '../locale'
 import { RenameField } from '../UniworkDocActions'
@@ -24,9 +24,26 @@ export interface DocSubline {
   full: string
   /** a folder path: it reads its full form to a screen reader */
   path?: boolean
+  /** drawn in place of `short` (a badge, highlighted text) */
+  node?: ReactNode
+  /** one more line under the second line (a search hit's snippet) */
+  detail?: ReactNode
+}
+
+/** what a caller may add to a row: its class and the drag, drop and context events */
+export interface DocRowExtra {
+  className?: string
+  draggable?: boolean
+  onDragStart?: (event: DragEvent) => void
+  onDragOver?: (event: DragEvent) => void
+  onDragLeave?: (event: DragEvent) => void
+  onDrop?: (event: DragEvent) => void
+  onContextMenu?: (event: MouseEvent) => void
 }
 
 export interface DocRowRename {
+  /** the name the field starts with; default = the title without its extension */
+  initial?: string
   error: DocNameError | null
   busy: boolean
   onSave: (value: string) => void
@@ -41,6 +58,11 @@ export interface DocRowProps {
   now: Date
   /** the row sits under a group header: it is indented */
   grouped?: boolean
+  /** false draws no Chọn box on the row (a folder or a UniWork copy on the device list) */
+  selectable?: boolean
+  /** the name's text when it is more than the title (a highlighted search hit) */
+  titleNode?: ReactNode
+  extra?: DocRowExtra
   selected: boolean
   onSelectedChange: (selected: boolean) => void
   opening: boolean
@@ -62,6 +84,9 @@ export function DocRow({
   columns,
   now,
   grouped,
+  selectable = true,
+  titleNode,
+  extra,
   selected,
   onSelectedChange,
   opening,
@@ -75,21 +100,23 @@ export function DocRow({
 }: DocRowProps) {
   const { t, dateLocale } = useI18n()
   const folder = isFolderEntry(doc)
-  // a folder never opens from its row, and a trashed file has no Mở in its menu either
-  const opens = !folder && screen !== 'trash' && !doc.archived
+  // a folder never opens from its row (the device list enters it), and a trashed file has no Mở in its menu either
+  const opens = (!folder || screen === 'device') && screen !== 'trash' && !doc.archived
   const special = specialColumn(screen)
   const cellFor = (col: ColumnId) => {
     switch (col) {
       case 'select':
         return (
           <Cell key={col} col={col}>
-            <input
-              type="checkbox"
-              className="dh-check"
-              aria-label={`${t('dlColSelect')} ${doc.title}`}
-              checked={selected}
-              onChange={(e) => onSelectedChange(e.target.checked)}
-            />
+            {selectable && (
+              <input
+                type="checkbox"
+                className="dh-check"
+                aria-label={`${t('dlColSelect')} ${doc.title}`}
+                checked={selected}
+                onChange={(e) => onSelectedChange(e.target.checked)}
+              />
+            )}
           </Cell>
         )
       case 'name':
@@ -104,7 +131,7 @@ export function DocRow({
             )}
             {rename ? (
               <RenameField
-                initial={renameParts(doc.title, renameFormatOf(doc)).base}
+                initial={rename.initial ?? renameParts(doc.title, renameFormatOf(doc)).base}
                 label={doc.title}
                 error={rename.error}
                 busy={rename.busy}
@@ -117,7 +144,7 @@ export function DocRow({
               <div className="dh-name-stack">
                 {!opens ? (
                   <span className="dh-doc-title" title={doc.title}>
-                    {doc.title}
+                    {titleNode ?? doc.title}
                   </span>
                 ) : (
                   <button
@@ -126,7 +153,7 @@ export function DocRow({
                     title={doc.title}
                     onClick={() => onOpen(doc)}
                   >
-                    {doc.title}
+                    {titleNode ?? doc.title}
                   </button>
                 )}
                 {subline && (
@@ -142,10 +169,11 @@ export function DocRow({
                         </span>
                       </>
                     ) : (
-                      subline.short
+                      (subline.node ?? subline.short)
                     )}
                   </span>
                 )}
+                {subline?.detail}
               </div>
             )}
           </Cell>
@@ -206,8 +234,14 @@ export function DocRow({
       data-doc-id={doc.id}
       aria-selected={selected || undefined}
       aria-busy={opening || undefined}
-      className={`dh-doc-row${grouped ? ' grouped' : ''}${opening ? ' opening' : ''}${selected ? ' selected' : ''}`}
+      className={`dh-doc-row${grouped ? ' grouped' : ''}${opening ? ' opening' : ''}${selected ? ' selected' : ''}${extra?.className ? ` ${extra.className}` : ''}`}
       style={{ gridTemplateColumns: trackOf(columns, screen) }}
+      draggable={extra?.draggable}
+      onDragStart={extra?.onDragStart}
+      onDragOver={extra?.onDragOver}
+      onDragLeave={extra?.onDragLeave}
+      onDrop={extra?.onDrop}
+      onContextMenu={extra?.onContextMenu}
       onDoubleClick={() => {
         if (!rename && opens) onOpen(doc)
       }}
