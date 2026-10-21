@@ -20,6 +20,8 @@ export type UniworkDocAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
 
 export interface UniworkListFilters {
   format?: UniworkDocFormat | 'txt'
+  /** UniNote chip: the server's `kind=page` (never together with `format`) */
+  kind?: 'page'
   updatedBy?: string
   updatedFrom?: string
 }
@@ -202,7 +204,9 @@ export function toUniworkListFilters(
   nowMs: number = Date.now(),
 ): UniworkListFilters {
   const filters: UniworkListFilters = {}
-  if (state.format !== 'all' && state.format !== 'page') {
+  if (state.format === 'page') {
+    filters.kind = 'page'
+  } else if (state.format !== 'all') {
     filters.format = state.format
   }
   const updatedBy = state.updatedBy.trim()
@@ -355,6 +359,7 @@ export interface DocumentsHomeApiAdapter {
       cursor?: string
       limit?: number
       format?: UniworkListFilters['format']
+      kind?: UniworkListFilters['kind']
     } & DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSources?: (q: UniworkSourceListQuery) => Promise<UniworkResult<UniworkSourceListPage>>
@@ -527,6 +532,7 @@ export async function fetchDocumentsHomePage(
       workspaceId,
       ...(cursor ? { cursor } : {}),
       ...(filters.format ? { format: filters.format } : {}),
+      ...(filters.kind ? { kind: filters.kind } : {}),
       ...sortArgs,
     })
     return {

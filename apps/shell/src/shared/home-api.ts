@@ -415,6 +415,12 @@ export type UniworkSystemKind = 'my_folder'
 export interface UniworkListFilters {
   /** a file format, or `txt` (the server takes it on every list route; documents themselves have no txt format) */
   format?: UniworkDocFormat | 'txt'
+  /**
+   * UNI-2047: `page` = UniNote only (the flat `/documents` route's `kind`; a UniNote has no file
+   * format, so it never rides with `format`). Recent and Shared with me have no such param: the
+   * renderer narrows their loaded rows.
+   */
+  kind?: 'page'
   updatedBy?: string
   updatedFrom?: string
   /** UNI-2047: server-side sort key; unset = the route's own order, nothing sent */
@@ -576,7 +582,10 @@ export type UniworkSharedPage = UniworkDocListPage
  * UNI-1961 / UNI-2047: the Lưu trữ shelf query. Only the type filter and the
  * sort apply (`updatedBy` / `updatedFrom` / `activity` are never forwarded).
  */
-export interface UniworkShelvedQuery extends Pick<UniworkListFilters, 'format' | 'sort' | 'order'> {
+export interface UniworkShelvedQuery extends Pick<
+  UniworkListFilters,
+  'format' | 'kind' | 'sort' | 'order'
+> {
   workspaceId: string
   cursor?: string
   limit?: number
