@@ -289,6 +289,206 @@ for (const platform of ['win', 'mac'] as const) {
   })
 }
 
+type TKey = Parameters<Loaded['t']>[0]
+
+/**
+ * Every row of the docs shortcut table is bound to a control here (the control
+ * must carry the row's `aria-keyshortcuts`), is covered by a lock above or
+ * below, or is named in NO_CONTROL with the reason it has none. A row added to
+ * the table without a decision fails.
+ */
+interface Spec {
+  /** the ribbon tab that shows the control (default: Home) */
+  tab?: TKey
+  /** the tooltip of the button that opens the dropdown holding the control */
+  open?: TKey
+  /** the control's tooltip (data-tip) */
+  tip?: TKey
+  /** the control's visible text or aria-label */
+  text?: TKey | string
+  /** a Quick Style card, by style id */
+  styleId?: string
+  /** the main button of a split button, not its caret */
+  cls?: string
+  /** Word for Windows only (the Editing group): the Mac ribbon has no such button */
+  winOnly?: boolean
+}
+
+const CONTROLS: Record<string, Spec> = {
+  paste: { text: 'ribbonPaste', cls: 'rb-big' },
+  'paste-plain': { text: 'appPasteTextOnly' },
+  'copy-format': { tip: 'ribbonPainterTip' },
+  strike: { tip: 'ribbonStrikethrough' },
+  subscript: { tip: 'ribbonSubscript' },
+  superscript: { tip: 'ribbonSuperscript' },
+  'grow-font': { tip: 'ribbonGrowFont' },
+  'shrink-font': { tip: 'ribbonShrinkFont' },
+  'change-case': { tip: 'ribbonChangeCase' },
+  'clear-formatting': { tip: 'ribbonClearFormatting' },
+  bullets: { tip: 'ribbonBullets', cls: 'rb-icon' },
+  numbering: { tip: 'ribbonNumbering', cls: 'rb-icon' },
+  indent: { tip: 'ribbonIncreaseIndent' },
+  outdent: { tip: 'ribbonDecreaseIndent' },
+  'formatting-marks': { tip: 'ribbonShowMarks' },
+  'spacing-1': { open: 'ribbonLineSpacing', text: '1.0' },
+  'spacing-15': { open: 'ribbonLineSpacing', text: '1.5' },
+  'spacing-2': { open: 'ribbonLineSpacing', text: '2.0' },
+  'style-normal': { styleId: 'Normal' },
+  'style-h1': { styleId: 'Heading1' },
+  'style-h2': { styleId: 'Heading2' },
+  'style-h3': { styleId: 'Heading3' },
+  'styles-pane': { tip: 'ribbonStylesPaneTip' },
+  find: { tip: 'ribbonFindTip', winOnly: true },
+  replace: { tip: 'ribbonReplaceTip', winOnly: true },
+  'select-all': { tip: 'ribbonSelectAllTip', winOnly: true },
+  'field-date': { tab: 'ribbonTabInsert', open: 'ribbonFieldTip', text: 'ribbonFieldDate' },
+  'field-time': { tab: 'ribbonTabInsert', open: 'ribbonFieldTip', text: 'ribbonFieldTime' },
+  footnote: { tab: 'ribbonTabReferences', tip: 'ribbonFootnoteTip' },
+  endnote: { tab: 'ribbonTabReferences', tip: 'ribbonEndnoteTip' },
+  comment: { tab: 'ribbonTabReview', tip: 'ribbonNewCommentSelectTip' },
+  'track-changes': { tab: 'ribbonTabReview', tip: 'ribbonTrackChangesTip' },
+  'print-preview': { tab: 'ribbonTabView', tip: 'ribbonPagePreviewTip' },
+  'zoom-out': { tab: 'ribbonTabView', tip: 'ribbonZoomOut' },
+  'zoom-in': { tab: 'ribbonTabView', tip: 'ribbonZoomIn' },
+  'zoom-100': { tab: 'ribbonTabView', tip: 'ribbonZoom100Tip' },
+}
+
+/** rows whose control is locked by a test above or a source lock below */
+const COVERED_ELSEWHERE = [
+  // File menu, quick access
+  'open',
+  'save',
+  'save-as',
+  'print',
+  'undo',
+  'redo',
+  // Home / shape / picture tabs
+  'cut',
+  'copy',
+  'bold',
+  'italic',
+  'underline',
+  'align-left',
+  'align-center',
+  'align-right',
+  'align-justify',
+  // Insert tab, Breaks menu, context menu
+  'page-break',
+  'column-break',
+  'link',
+  // the ribbon collapse buttons and tabs (packages/ui)
+  'ribbon-toggle',
+  'ribbon-compact',
+  // status bar buttons, context menu rows (source lock below)
+  'goto',
+  'word-count',
+  'font-dialog',
+  'update-fields',
+  'toggle-field-codes',
+]
+
+/** rows with no button in the app, and why */
+const NO_CONTROL: Record<string, string> = {
+  new: 'File > New is a native menu item and the Home screen card',
+  close: 'the window frame owns the close button',
+  'paste-format': 'the Format Painter button applies the copied formatting on click',
+  shortcuts: 'opened from the native Help menu',
+  'find-next': 'the Find panel Next button answers to Enter, not to this row',
+  proofread: 'runs the AI proofreader; the Review tab Editor button sends its own prompt',
+  'grow-font-1pt': 'keyboard only',
+  'shrink-font-1pt': 'keyboard only',
+  'all-caps': 'a Font dialog checkbox, not a button',
+  'small-caps': 'a Font dialog checkbox, not a button',
+  'hidden-text': 'a Font dialog checkbox, not a button',
+  'hanging-indent': 'keyboard only',
+  'hanging-indent-off': 'keyboard only',
+  'clear-para': 'keyboard only',
+  'line-break': 'keyboard only',
+  nbsp: 'keyboard only',
+  'nb-hyphen': 'keyboard only',
+  'opt-hyphen': 'keyboard only',
+  'move-up': 'editor keymap only',
+  'move-down': 'editor keymap only',
+  'list-demote': 'editor keymap only',
+  'list-promote': 'editor keymap only',
+}
+
+describe('Docs shortcut table rows', () => {
+  it('every row has a control or a stated reason for none', async () => {
+    vi.resetModules()
+    Object.assign(window, { desktop: { onLanguageChanged: () => () => undefined } })
+    const { SHORTCUTS } = await import('../src/renderer/shortcuts')
+    const known = new Set([
+      ...Object.keys(CONTROLS),
+      ...COVERED_ELSEWHERE,
+      ...Object.keys(NO_CONTROL),
+    ])
+    expect(SHORTCUTS.map((d) => d.id).filter((id) => !known.has(id))).toEqual([])
+    expect([...known].filter((id) => !SHORTCUTS.some((d) => d.id === id))).toEqual([])
+  })
+
+  for (const platform of ['win', 'mac'] as const) {
+    it(`every bound control carries its row's aria-keyshortcuts (${platform})`, async () => {
+      const l = (loaded = await load(platform))
+      const { t, container, click } = l
+      l.renderRibbon()
+      const tab = (key: TKey) =>
+        [...container.querySelectorAll('.ribbon-tab')].find((b) => b.textContent === t(key))!
+      const buttons = () => [...container.querySelectorAll('button')]
+      const offenders: string[] = []
+      for (const [id, spec] of Object.entries(CONTROLS)) {
+        if (!l.shortcuts.shortcutAria(id)) continue // no chord on this platform: nothing to announce
+        click(tab(spec.tab ?? 'ribbonTabHome'))
+        if (id === 'paste-plain') {
+          click(container.querySelector('[data-testid="ribbon-paste-menu"]')!)
+        } else if (spec.open) {
+          click(buttons().find((b) => b.getAttribute('data-tip') === t(spec.open!))!)
+        }
+        const text =
+          spec.text && /^(ribbon|app)[A-Z]/.test(spec.text) ? t(spec.text as TKey) : spec.text
+        const el = buttons().find((b) => {
+          if (spec.cls && !b.classList.contains(spec.cls)) return false
+          if (spec.styleId) return b.getAttribute('data-style-id') === spec.styleId
+          if (spec.tip) return b.getAttribute('data-tip') === t(spec.tip)
+          return (
+            text !== undefined &&
+            ((b.textContent ?? '').trim() === text || b.getAttribute('aria-label') === text)
+          )
+        })
+        if (!el) {
+          if (!(spec.winOnly && platform === 'mac')) offenders.push(`${id}: no control found`)
+          continue
+        }
+        const problems = accessibleShortcutProblems(
+          { name: accessibleName(el), keyshortcuts: el.getAttribute('aria-keyshortcuts') },
+          l.row(id),
+          platform,
+          'desktop',
+        )
+        if (problems.length) offenders.push(`${id}: ${problems.join('; ')}`)
+        // close what the row opened so the next row starts from the tab
+        click(tab(spec.tab ?? 'ribbonTabHome'))
+      }
+      expect(offenders).toEqual([])
+    })
+  }
+
+  it('the status bar page and word count buttons and the context menu field-codes row carry theirs', () => {
+    const app = readFileSync(join(RENDERER, 'App.tsx'), 'utf8')
+    for (const [tip, id] of [
+      ['appGoToTitle', 'goto'],
+      ['appWordCountTitle', 'word-count'],
+    ]) {
+      const at = app.indexOf(`data-tip={t('${tip}')}`)
+      expect(at, tip).toBeGreaterThan(0)
+      const button = app.slice(at, app.indexOf('onClick', at))
+      expect(button, tip).toContain(`aria-keyshortcuts={shortcutAria('${id}') || undefined}`)
+    }
+    const menu = readFileSync(join(RENDERER, 'components/ContextMenu.tsx'), 'utf8')
+    expect(menu).toMatch(/item\(t\('appToggleFieldCodes'\), \{\s+shortcut: 'toggle-field-codes',/)
+  })
+})
+
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name)
