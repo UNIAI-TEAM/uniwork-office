@@ -33,6 +33,7 @@ import {
   type UniworkSourceListQuery,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
+  type UniworkShelvedQuery,
 } from '../../shared/home-api'
 import { SOURCE_VIEW_CHANNELS } from '../../shared/source-view'
 import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
@@ -943,7 +944,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf, Bỏ lưu trữ and trash from Lưu trữ
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listShelved, (_event, query: unknown) =>
-    service.listShelved((query ?? {}) as UniworkDocListQuery),
+    service.listShelved((query ?? {}) as UniworkShelvedQuery),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.unshelveDocument, (_event, documentId: unknown) =>
     service.unshelveDocument(documentId as string),

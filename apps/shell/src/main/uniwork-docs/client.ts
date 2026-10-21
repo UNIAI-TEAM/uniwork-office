@@ -6,6 +6,7 @@ import type {
   UniworkDocSummary,
   UniworkFolderNode,
   UniworkListFilters,
+  UniworkListSort,
   UniworkSourceListPage,
   UniworkSourceListQuery,
   UniworkWorkspaceRef,
@@ -479,6 +480,9 @@ const LIST_SORTS: ReadonlySet<string> = new Set([
   'deleted',
   'shelved',
 ])
+/** UNI-2047: a sort key inside the server's vocabulary (also the IPC boundary's check) */
+export const isListSort = (value: unknown): value is UniworkListSort =>
+  typeof value === 'string' && LIST_SORTS.has(value)
 /**
  * SAVE-01 r2 (S01-R1-5): a `parent_id` that reaches the wire. Absent/null is
  * the caller's "no folder" (the field is then omitted - the absence IS the
@@ -678,7 +682,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     }
     // UNI-2047: sort/order/activity ride only when set and inside the server's
     // vocabulary, so an unset call stays byte-identical to today's request
-    if (typeof input.sort === 'string' && LIST_SORTS.has(input.sort)) {
+    if (isListSort(input.sort)) {
       params.set('sort', input.sort)
     }
     if (input.order === 'asc' || input.order === 'desc') params.set('order', input.order)

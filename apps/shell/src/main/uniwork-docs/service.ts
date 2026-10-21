@@ -56,6 +56,7 @@ import type {
   UniworkSearchQuery,
   UniworkSharedPage,
   UniworkSharedQuery,
+  UniworkShelvedQuery,
   UniworkTreeChangedEvent,
   UniworkUploadDocInput,
   UniworkUploadProgress,
@@ -96,6 +97,7 @@ import {
   type UniworkCreateTarget,
   type UniworkDocsClient,
   createUniworkDocsClient,
+  isListSort,
   uniworkId,
   uniworkSourceId,
 } from './client'
@@ -600,6 +602,59 @@ function parseOffsetCursor(cursor: string | undefined): number {
   if (!cursor) return 0
   const match = /^shared:(\d+)$/.exec(cursor)
   return match ? Number(match[1]) : 0
+}
+
+/**
+ * UNI-2047: the merge order of "Shared with me". Every workspace answers in the
+ * server's own order, so the aggregate re-sorts by the requested key. Each key
+ * has its own default direction (the web's); a row without the key sorts last
+ * in either direction. Nothing requested = newest first, as before.
+ */
+function sharedComparator(
+  sort: UniworkListFilters['sort'],
+  order: UniworkListFilters['order'],
+): (a: UniworkDocSummary, b: UniworkDocSummary) => number {
+  const key = sort ?? 'updated'
+  const sortKey = (row: UniworkDocSummary): string | number | undefined => {
+    switch (key) {
+      case 'name':
+        return row.title
+      case 'size':
+        return row.sizeBytes
+      case 'editor':
+        return row.updatedByUser?.name ?? row.updatedByName
+      case 'shared':
+        return row.shared?.at
+      case 'activity':
+        return row.lastActivity?.at
+      case 'starred':
+        return row.favoritedAt
+      case 'deleted':
+        return row.archivedAt
+      case 'shelved':
+        return row.shelvedAt
+      default:
+        return row.updatedAt
+    }
+  }
+  const ascending = (order ?? (key === 'name' || key === 'editor' ? 'asc' : 'desc')) === 'asc'
+  return (a, b) => {
+    const left = sortKey(a)
+    const right = sortKey(b)
+    if (left !== right) {
+      if (left === undefined) return 1
+      if (right === undefined) return -1
+      const cmp =
+        key === 'name' || key === 'editor'
+          ? String(left).localeCompare(String(right))
+          : left < right
+            ? -1
+            : 1
+      return ascending ? cmp : -cmp
+    }
+    // a stable tie-break: newest first
+    return a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0
+  }
 }
 
 /** UNI-1961: a source file's suggested save name: its last segment, never a path */
@@ -4655,6 +4710,15 @@ export class UniworkDocsService {
       const org = this.deps.selectedOrg()
       if (!org) return { documents: [], nextCursor: null }
       const api = this.api()
+      // UNI-2047: type / updater / date filters and the sort go to every workspace
+      const { format, updatedBy, updatedFrom, sort, order } = this.listFiltersOf(query)
+      const filters: UniworkListFilters = {
+        ...(format ? { format } : {}),
+        ...(updatedBy ? { updatedBy } : {}),
+        ...(updatedFrom ? { updatedFrom } : {}),
+        ...(sort ? { sort } : {}),
+        ...(order ? { order } : {}),
+      }
       const workspaces = await api.listWorkspaces(org.id)
       const nameOf = new Map(workspaces.map((ws) => [ws.id, ws.name]))
       const merged = new Map<string, UniworkDocSummary>()
@@ -4669,6 +4733,7 @@ export class UniworkDocsService {
                 cursor,
                 limit: SHARED_PAGE_SIZE,
                 ...(query.includePages === true ? { includePages: true } : {}),
+                ...filters,
               })
             for (const doc of page.documents) {
               if (!merged.has(doc.id)) {
@@ -4683,9 +4748,9 @@ export class UniworkDocsService {
           } while (cursor && pages < SHARED_MAX_PAGES && merged.size < SHARED_MAX_ROWS)
         }),
       )
-      const all = [...merged.values()].sort((a, b) =>
-        a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
-      )
+      // each workspace answers in its own order, so the merge re-sorts by the
+      // requested key; no sort/order = newest first, as before
+      const all = [...merged.values()].sort(sharedComparator(sort, order))
       const limit = Math.min(
         SHARED_PAGE_SIZE,
         Math.max(1, Math.floor(Number(query.limit) || SHARED_PAGE_SIZE)),
@@ -6521,15 +6586,31 @@ export class UniworkDocsService {
     if (names.size === 0) return rows
     return rows.map((row) => {
       const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
-      return updatedByName ? { ...row, updatedByName } : row
+      // UNI-2047: the trash's "deleted by"; a former member stays unnamed
+      const archivedByName = row.archivedById ? names.get(row.archivedById)?.trim() : undefined
+      return updatedByName || archivedByName
+        ? {
+            ...row,
+            ...(updatedByName ? { updatedByName } : {}),
+            ...(archivedByName ? { archivedByName } : {}),
+          }
+        : row
     })
   }
 
+  /**
+   * The IPC boundary of the list filters: a value outside the server's
+   * vocabulary (sort / order / activity) or of the wrong type is dropped, so an
+   * unset query stays today's request and a stray value never leaves.
+   */
   private listFiltersOf(q: UniworkListFilters): UniworkListFilters {
     return {
       ...(typeof q.format === 'string' && q.format ? { format: q.format } : {}),
       ...(typeof q.updatedBy === 'string' && q.updatedBy ? { updatedBy: q.updatedBy } : {}),
       ...(typeof q.updatedFrom === 'string' && q.updatedFrom ? { updatedFrom: q.updatedFrom } : {}),
+      ...(isListSort(q.sort) ? { sort: q.sort } : {}),
+      ...(q.order === 'asc' || q.order === 'desc' ? { order: q.order } : {}),
+      ...(q.activity === 'opened' || q.activity === 'edited' ? { activity: q.activity } : {}),
     }
   }
 
@@ -6603,22 +6684,20 @@ export class UniworkDocsService {
   }
 
   /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (paged, shelved_at DESC) */
-  listShelved(q: {
-    workspaceId: string
-    cursor?: string
-    limit?: number
-    format?: UniworkDocFormat
-  }): Promise<UniworkResult<UniworkDocListPage>> {
+  listShelved(q: UniworkShelvedQuery): Promise<UniworkResult<UniworkDocListPage>> {
     return result(async () => {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
-      const { format } = this.listFiltersOf(q)
+      // UNI-2047: the shelf takes the type filter and the sort, nothing else
+      const { format, sort, order } = this.listFiltersOf(q)
       const page = await this.api().listShelved({
         workspaceId: q.workspaceId,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
         ...(format ? { format } : {}),
+        ...(sort ? { sort } : {}),
+        ...(order ? { order } : {}),
       })
       const documents = await this.enrichShelvedRows(q.workspaceId, page.documents)
       return { documents, nextCursor: page.nextCursor }
