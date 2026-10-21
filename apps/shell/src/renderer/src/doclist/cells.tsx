@@ -42,13 +42,24 @@ const TRACK: Record<ColumnId, string> = {
 /** the shelf's row carries a Bỏ lưu trữ button and the trash row a Khôi phục button before its "…": their actions column is wider (columns.ts counts the same width in its ladder) */
 const BUTTON_ACTIONS_TRACK = `${BUTTON_ACTIONS_WIDTH}px`
 
-export function trackOf(columns: readonly ColumnId[], screen?: DocListScreen): string {
+/**
+ * The Starred screen's actions track while its rows draw the Sao button: 76px, which holds Sao 28 +
+ * gap 4 + "…" 28 on a fine pointer, and the width documents-home.css sets on `--dh-star-actions-track`
+ * for the two 44px buttons of a coarse pointer
+ */
+const STAR_ACTIONS_TRACK = 'var(--dh-star-actions-track, 76px)'
+
+export function trackOf(
+  columns: readonly ColumnId[],
+  screen?: DocListScreen,
+  star = false,
+): string {
   return columns
-    .map((column) =>
-      column === 'actions' && screen && hasButtonActions(screen)
-        ? BUTTON_ACTIONS_TRACK
-        : TRACK[column],
-    )
+    .map((column) => {
+      if (column !== 'actions') return TRACK[column]
+      if (screen && hasButtonActions(screen)) return BUTTON_ACTIONS_TRACK
+      return star ? STAR_ACTIONS_TRACK : TRACK[column]
+    })
     .join(' ')
 }
 

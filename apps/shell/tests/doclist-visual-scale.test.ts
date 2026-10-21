@@ -415,9 +415,12 @@ describe('DocumentsHome: the Sao button of "Sao · ⋯" (A-REC row 12)', () => {
 
   it('a double-click on the Sao button opens nothing and asks for one unstar (RV7-1)', async () => {
     const onOpenDocument = vi.fn()
-    let release: (value: UniworkResult<undefined>) => void = () => {}
+    const release = new Map<string, (value: UniworkResult<undefined>) => void>()
     api.uniworkUnfavoriteDocument!.mockImplementation(
-      () => new Promise<UniworkResult<undefined>>((resolve) => (release = resolve)),
+      (id: string) =>
+        new Promise<UniworkResult<undefined>>((resolve) => {
+          release.set(id, resolve)
+        }),
     )
     await mount('starred', 'vi', onOpenDocument)
     const star = host.querySelector<HTMLButtonElement>('[data-doc-id="a"] .dh-star-btn')!
@@ -439,7 +442,7 @@ describe('DocumentsHome: the Sao button of "Sao · ⋯" (A-REC row 12)', () => {
     expect(api.uniworkUnfavoriteDocument!.mock.calls.map((call) => call[0])).toEqual(['a', 'b'])
     // once the call is answered the document can be unstarred again (after a failed unstar, say)
     await act(async () => {
-      release({ ok: false, error: 'server_error' })
+      release.get('a')!({ ok: false, error: 'server_error' })
     })
     await flush()
     await act(async () => {

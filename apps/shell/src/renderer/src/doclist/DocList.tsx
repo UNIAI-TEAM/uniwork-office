@@ -172,7 +172,8 @@ export function DocList({
     [rows, active?.column, active?.dir, foldersFirst],
   )
 
-  const track = trackOf(columns, screen)
+  // the Sao button is drawn on the Starred screen only, and the track widens with it
+  const track = trackOf(columns, screen, screen === 'starred' && !!onUnstar)
   const now = new Date()
   const special = specialColumn(screen)
 

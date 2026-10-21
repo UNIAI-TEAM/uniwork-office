@@ -665,7 +665,7 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
-  color: var(--text);
+  color: var(--text-secondary);
   font: inherit;
   font-size: 13px;
   white-space: nowrap;
@@ -1226,6 +1226,13 @@
   .dh-row-btn {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  /* the Starred actions track (doclist/cells.tsx STAR_ACTIONS_TRACK) holds Sao 44 + gap 4 + "…" 44
+     and the cell's 8px on each side; other screens' tracks stay as columns.ts counts them */
+  .dh-doc-head,
+  .dh-doc-row {
+    --dh-star-actions-track: 108px;
   }
 
   /* the card's "…" is 44px here (.uw-pick-info-btn) + the actions box's 12px: keep the name clear of both */

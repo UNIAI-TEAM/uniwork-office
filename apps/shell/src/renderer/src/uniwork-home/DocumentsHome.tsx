@@ -1388,8 +1388,13 @@ export function DocumentsHome({
 
   // UNI-2047 B6: Gắn sao / Bỏ gắn sao from the row menu; an unstar rereads the Starred list, the
   // row is gone from it (no optimistic update)
+  // the ref answers a second click on the same row (a double-click on its Sao) before React re-renders
+  const favoritingRef = useRef<Set<string>>(new Set())
   const handleFavorite = async (doc: DocumentsHomeDoc, star: boolean) => {
+    if (favoritingRef.current.has(doc.id)) return
+    favoritingRef.current.add(doc.id)
     const res = star ? await favoriteDocument(doc.id) : await unfavoriteDocument(doc.id)
+    favoritingRef.current.delete(doc.id)
     if (res.ok) {
       const message = t(star ? 'uhStarDone' : 'uhUnstarDone', { title: doc.title })
       announce(message)
