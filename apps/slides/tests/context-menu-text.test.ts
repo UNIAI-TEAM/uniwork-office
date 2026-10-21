@@ -3,6 +3,7 @@ import { buildCtxItems } from '../src/renderer/context-menu-items'
 import * as styleActions from '../src/renderer/style-actions'
 import * as insertActions from '../src/renderer/insert-actions'
 import { restoreEditSelection } from '../src/renderer/TextEditOverlay'
+import { slidesAria } from '../src/renderer/shortcuts'
 import { t } from '../src/renderer/i18n/locale'
 import type { ActionCtx } from '../src/renderer/action-context'
 
@@ -70,6 +71,20 @@ describe('text edit context menu', () => {
       '|',
       t('paneFormatTitleTyped', { type: t('paneFormatTextBox') }),
     ])
+  })
+
+  it('Bold, Italic and Underline announce their table rows in aria-keyshortcuts (UNI-2060)', () => {
+    const ctx = makeTextCtx(false)
+    const rows = [
+      ['ribbonBold', 'slides-48'],
+      ['ribbonItalic', 'slides-49'],
+      ['ribbonUnderline', 'slides-50'],
+    ] as const
+    for (const [key, row] of rows) {
+      const keys = find(ctx, key)?.keys
+      expect(keys, key).toBe(slidesAria(row))
+      expect(keys, key).toMatch(/^(Control|Meta)\+[BIU]$/)
+    }
   })
 
   it('cut/copy need a ranged selection; paste needs clipboard content', () => {
