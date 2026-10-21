@@ -190,18 +190,17 @@ describe('DocumentsHome: the Recent screen on the recent-canvas layout (UNI-2047
       )
     })
 
-    it('has no create / upload buttons and no quick-create row (the board has none), other screens keep them', async () => {
+    it("keeps the app's own Tải lên / Tạo mới buttons and the quick-create row (the board draws none, UNI-1957 item 4 still holds)", async () => {
       await mount('recent')
-      expect(host.querySelector('.dh-btn-upload')).toBeNull()
-      expect(host.querySelector('.dh-toolbar-actions')).toBeNull()
-      expect(host.querySelector('.dh-quick-row')).toBeNull()
+      expect(host.querySelector('.dh-btn-upload')).not.toBeNull()
+      expect(host.querySelector('.dh-toolbar-actions')).not.toBeNull()
+      expect(host.querySelector('.dh-quick-row')).not.toBeNull()
+      // the subtitle is Recent's alone
       await act(async () => {
         root.unmount()
       })
       root = createRoot(host)
       await mount('workspace')
-      expect(host.querySelector('.dh-btn-upload')).not.toBeNull()
-      expect(host.querySelector('.dh-quick-row')).not.toBeNull()
       expect(host.querySelector('.dh-subtitle')).toBeNull()
     })
 

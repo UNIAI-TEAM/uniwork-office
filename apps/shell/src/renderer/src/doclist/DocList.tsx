@@ -274,7 +274,7 @@ export function DocList({
                   key={`group:${run.id}`}
                   id={run.id}
                   open={open}
-                  count={screen === 'trash' ? run.rows.length : undefined}
+                  count={run.rows.length}
                   onToggle={onToggleGroup}
                 />
               ),

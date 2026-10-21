@@ -4,7 +4,7 @@ import { GROUP_LABEL_KEY, type GroupId } from './groups'
 /**
  * The header row of a day / week group: a full-width toggle that collapses or
  * opens the rows under it (`aria-expanded`). Its name says which group it is;
- * the Trash adds how many rows the group holds.
+ * every header says how many documents the group holds ("· 3 tài liệu").
  */
 export function GroupHeader({
   id,
@@ -14,8 +14,8 @@ export function GroupHeader({
 }: {
   id: GroupId
   open: boolean
-  /** how many rows the group holds, when the screen shows it */
-  count?: number
+  /** how many documents the group holds */
+  count: number
   onToggle: (id: GroupId) => void
 }) {
   const { t } = useI18n()
@@ -45,7 +45,9 @@ export function GroupHeader({
             <path d="M2.5 3.5L5 6.5l2.5-3" />
           </svg>
           <span>{label}</span>
-          {count !== undefined && <span className="dh-group-count">· {count}</span>}
+          <span className="dh-group-count">
+            · {t(count === 1 ? 'dlGroupCountOne' : 'dlGroupCountOther', { n: count })}
+          </span>
         </button>
       </div>
     </div>
