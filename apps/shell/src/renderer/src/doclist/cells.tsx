@@ -27,10 +27,12 @@ export const DOC_ICON_SIZE = 32
  * V-LAYOUT F-06: Người sửa gần nhất takes 18px more than the ladder counts (the vi header "Người sửa
  * gần nhất" + its cell padding is ~136px) and Tên's grid floor gives the same 18px back, so the sum
  * of the floors, and every rung of the ladder (the web's), is unchanged.
+ * V-FIX3 N-03b: Dung lượng takes 8px more (92px: the 12px semibold label measured ~72px, past the
+ * 68px content box and still ellipsised), Tên's floor gives the 8px back (158 instead of 166).
  */
 const TRACK: Record<ColumnId, string> = {
   select: '32px',
-  name: 'minmax(166px, 3fr)',
+  name: 'minmax(158px, 3fr)',
   activity: 'minmax(118px, 1.3fr)',
   starred: 'minmax(118px, 1.3fr)',
   shared: 'minmax(118px, 1.3fr)',
@@ -40,7 +42,7 @@ const TRACK: Record<ColumnId, string> = {
   access: 'minmax(120px, 1fr)',
   editor: 'minmax(148px, 1.1fr)',
   updated: '118px',
-  size: '84px',
+  size: '92px',
   actions: '76px',
 }
 

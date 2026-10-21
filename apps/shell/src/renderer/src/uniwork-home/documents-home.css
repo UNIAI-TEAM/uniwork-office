@@ -1522,8 +1522,10 @@
   gap: 4px;
   /* V-FIX2 N-01: the one-row header (>= 1101px) must never outgrow its box: this group yields
      first (the select, the search and the buttons keep their size) and its subtitle ellipsises;
-     the floor keeps the title itself whole */
-  min-width: 10rem;
+     the floor keeps the title itself whole. N-08: 10rem cut "From elsewhere" (175px at 24px) under
+     the select, so the floor is 11.5rem (184px); min-content cannot do it, the nowrap subtitle
+     counts its whole text there. Only the subtitle gives way */
+  min-width: 11.5rem;
 }
 
 .dh-subtitle {

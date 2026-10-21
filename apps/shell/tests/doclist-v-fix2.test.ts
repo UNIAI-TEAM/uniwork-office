@@ -38,7 +38,8 @@ describe('N-01: the title row of a page with a subtitle shrinks its text, not it
   it('lets the title group yield first and the subtitle ellipsise', () => {
     const group = ruleOf('.dh-title-group.dh-title-stack')
     expect(group).toMatch(/flex:\s*0 100 auto;/)
-    expect(group).toMatch(/min-width:\s*10rem;/)
+    // N-08: the floor is the h1 "From elsewhere" (175px), never narrower
+    expect(group).toMatch(/min-width:\s*11\.5rem;/)
     const sub = ruleOf('.dh-subtitle')
     expect(sub).toMatch(/overflow:\s*hidden;/)
     expect(sub).toMatch(/text-overflow:\s*ellipsis;/)
