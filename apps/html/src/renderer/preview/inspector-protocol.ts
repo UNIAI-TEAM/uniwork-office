@@ -122,6 +122,23 @@ export type FromInspectorBody =
         | 'moveDown'
         | 'print'
     }
+  /**
+   * a modifier chord or function key pressed while focus is inside the frame: the frame's keydown
+   * never reaches the host window, so the raw key goes over and the host matches it against its
+   * shortcut table (the frame holds no table of its own)
+   */
+  | {
+      type: 'gx:keyEvent'
+      key: string
+      code: string
+      ctrlKey: boolean
+      altKey: boolean
+      shiftKey: boolean
+      metaKey: boolean
+      altGraph: boolean
+      repeat: boolean
+      composing: boolean
+    }
   /** ctrl/meta + wheel inside the frame (trackpad pinch); the host owns the zoom level */
   | { type: 'gx:zoom'; delta: number }
   | { type: 'gx:navigateBlocked'; href: string }

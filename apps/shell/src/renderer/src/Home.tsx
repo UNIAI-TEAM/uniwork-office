@@ -2506,9 +2506,7 @@ export function Home() {
             <span className="quick-title-row">
               <span className="quick-title">{t('openLocal')}</span>
             </span>
-            <span className="quick-sub" title={OPEN_LOCAL_EXTENSIONS}>
-              {OPEN_LOCAL_EXTENSIONS}
-            </span>
+            <span className="quick-sub">{OPEN_LOCAL_EXTENSIONS}</span>
           </span>
         </button>
         <UniworkOpenCard onOpenSettings={() => setSettingsRequest({ section: 'account' })} />

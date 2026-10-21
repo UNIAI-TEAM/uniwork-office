@@ -1074,6 +1074,38 @@
     },
     true,
   )
+  // A modifier chord or function key the handler above left alone (not relayed, not claimed) never
+  // reaches the host window while focus is in this frame (app-level keys: ribbon collapse, find,
+  // save, ...). Hand the host the raw key: it holds the shortcut table and decides. A page text
+  // field or an open inline edit keeps its own chords; function keys have no text meaning.
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.defaultPrevented || typeof e.key !== 'string') return
+      const fnKey = /^F\d{1,2}$/.test(e.key)
+      if (!fnKey && !(e.ctrlKey || e.metaKey || e.altKey)) return
+      if (/^(Control|Shift|Alt|Meta|AltGraph)$/.test(e.key)) return
+      // print is the claim above or the desktop menu's accelerator, never a replayed key
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'p') return
+      const inField =
+        e.target &&
+        (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable)
+      if (!fnKey && (editing || inField)) return
+      post({
+        type: 'gx:keyEvent',
+        key: e.key,
+        code: e.code || '',
+        ctrlKey: e.ctrlKey,
+        altKey: e.altKey,
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey,
+        altGraph: !!(e.getModifierState && e.getModifierState('AltGraph')),
+        repeat: e.repeat,
+        composing: e.isComposing || e.keyCode === 229,
+      })
+    },
+    true,
+  )
   // Chromium reports trackpad pinch as ctrl+wheel; the frame swallows wheel events, so relay it.
   // Browse mode (present views) has no zoom control: leave the event alone there.
   document.addEventListener(

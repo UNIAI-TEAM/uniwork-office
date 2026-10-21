@@ -19,7 +19,7 @@ import {
 } from '@genoffice/electron-utils/headless-export'
 import { useI18n } from './i18n/locale'
 import { cap, platform } from './capabilities'
-import { htmlWindowCommand, type HtmlShortcutCommand } from './shortcuts'
+import { htmlFrameKeyReplay, htmlWindowCommand, type HtmlShortcutCommand } from './shortcuts'
 import { LinkPopover } from './components/LinkPopover'
 import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { useNarrowFrame } from './narrow-frame'
@@ -758,6 +758,7 @@ export default function App() {
           msg.type === 'gx:scroll' ||
           msg.type === 'gx:zoom' ||
           msg.type === 'gx:navigateBlocked' ||
+          msg.type === 'gx:keyEvent' ||
           (msg.type === 'gx:keyCommand' && READ_ONLY_FRAME_KEYS.has(msg.command))
         )
       )
@@ -875,6 +876,12 @@ export default function App() {
         case 'gx:zoom':
           if (canvasModeRef.current !== 'present') setZoom((z) => clampZoom(z - msg.delta * 0.6))
           return
+        case 'gx:keyEvent': {
+          // focus is inside the frame: replay the table's app-level keys on the window
+          const replay = htmlFrameKeyReplay(msg)
+          if (replay) window.dispatchEvent(replay)
+          return
+        }
         case 'gx:keyCommand': {
           if (msg.command === 'print') {
             void runPrintRef.current()

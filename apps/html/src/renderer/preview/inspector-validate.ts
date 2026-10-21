@@ -17,6 +17,8 @@ import type {
 const MAX_HTML = 1 << 20
 const MAX_TEXT = 1 << 16
 const MAX_SHORT = 4096
+/** a KeyboardEvent key / code name ("ArrowDown", "MediaTrackPrevious") */
+const MAX_KEY = 32
 /** computed background images / image src can be data: URIs */
 const MAX_URLISH = 8 << 20
 const MAX_STYLES = 64
@@ -251,6 +253,25 @@ function body(type: string, m: Obj): FromInspectorBody | undefined {
             command: m.command as Extract<FromInspectorBody, { type: 'gx:keyCommand' }>['command'],
           }
         : undefined
+    case 'gx:keyEvent': {
+      const key = str(m.key, MAX_KEY)
+      const code = str(m.code, MAX_KEY)
+      const flags = [m.ctrlKey, m.altKey, m.shiftKey, m.metaKey, m.altGraph, m.repeat, m.composing]
+      if (key === undefined || code === undefined || !flags.every((f) => typeof f === 'boolean'))
+        return undefined
+      return {
+        type,
+        key,
+        code,
+        ctrlKey: m.ctrlKey as boolean,
+        altKey: m.altKey as boolean,
+        shiftKey: m.shiftKey as boolean,
+        metaKey: m.metaKey as boolean,
+        altGraph: m.altGraph as boolean,
+        repeat: m.repeat as boolean,
+        composing: m.composing as boolean,
+      }
+    }
     case 'gx:zoom': {
       const delta = num(m.delta)
       return delta === undefined ? undefined : { type, delta }

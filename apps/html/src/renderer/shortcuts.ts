@@ -13,6 +13,7 @@ import {
   findShortcut,
   formatHint,
   htmlShortcuts,
+  matchShortcut,
   type ShortcutKeyEvent,
   type ShortcutPlatform,
   type ShortcutSurface,
@@ -129,4 +130,57 @@ export function withHtmlHint(
   const bare = label.replace(TRAILING_HINT, '')
   const hint = htmlHint(command, platform, surface)
   return hint ? `${bare} (${hint})` : bare
+}
+
+/** commands a key pressed inside the Preview frame is replayed for: the app-level ones the frame cannot reach */
+const FRAME_REPLAYED: ReadonlySet<HtmlShortcutCommand> = new Set([
+  'save',
+  'saveAs',
+  'find',
+  'findNext',
+  'replace',
+  'cycleView',
+])
+
+/** the ribbon collapse row (the shared hook matches this same action on window keydown) */
+const COLLAPSE_ACTION = findShortcut('html', 'html-023')
+
+/**
+ * A key relayed from the Preview frame, as the keydown to replay on the host window, or null when
+ * the table has no app-level command for it. The frame's keydown never reaches the window; the
+ * replay does, so the ribbon's collapse listener and the window handler run with their own
+ * guards (IME, AltGr, repeat) unchanged. The frame is untrusted, hence the whitelist: a page
+ * script can forge a relay message, and bold / link / undo keys have their own checked path.
+ */
+export function htmlFrameKeyReplay(
+  relayed: {
+    key: string
+    code: string
+    ctrlKey: boolean
+    altKey: boolean
+    shiftKey: boolean
+    metaKey: boolean
+    altGraph: boolean
+    repeat: boolean
+    composing: boolean
+  },
+  platform: ShortcutPlatform = currentShortcutPlatform(),
+  surface: ShortcutSurface = htmlSurface(),
+): KeyboardEvent | null {
+  const event = new KeyboardEvent('keydown', {
+    key: relayed.key,
+    code: relayed.code,
+    ctrlKey: relayed.ctrlKey,
+    altKey: relayed.altKey,
+    shiftKey: relayed.shiftKey,
+    metaKey: relayed.metaKey,
+    modifierAltGraph: relayed.altGraph,
+    repeat: relayed.repeat,
+    isComposing: relayed.composing,
+    bubbles: true,
+    cancelable: true,
+  })
+  const command = htmlShortcutCommand(event, platform, surface)
+  const collapse = !!COLLAPSE_ACTION && matchShortcut(event, [COLLAPSE_ACTION], platform, surface)
+  return (command && FRAME_REPLAYED.has(command)) || collapse ? event : null
 }
