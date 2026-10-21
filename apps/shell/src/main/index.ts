@@ -41,6 +41,7 @@ import {
   fileMenuAccelerators,
   fullScreenAccelerator,
   interfaceScaleAccelerators,
+  interfaceScaleAliasAccelerators,
 } from './shell-shortcuts'
 import menuDocxIcon1x from './assets/menu-docx.png?asset'
 import menuDocxIcon2x from './assets/menu-docx@2x.png?asset'
@@ -3635,7 +3636,12 @@ function viewMenuTemplate(): MenuItemConstructorOptions {
   return {
     label: tm('menuView'),
     submenu: [
-      ...uiScaleMenuItems(tm, APP_SETTINGS_PATH, interfaceScaleAccelerators()),
+      ...uiScaleMenuItems(
+        tm,
+        APP_SETTINGS_PATH,
+        interfaceScaleAccelerators(),
+        interfaceScaleAliasAccelerators(),
+      ),
       { type: 'separator' },
       ...shellViewItems(),
     ],

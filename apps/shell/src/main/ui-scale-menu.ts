@@ -5,7 +5,11 @@ import { LANGS } from '@genoffice/i18n'
 
 import type { TabKind } from '../shared/tabs-api'
 import { changeUiScale } from './ui-scale'
-import { interfaceScaleAccelerators, type InterfaceScaleItem } from './shell-shortcuts'
+import {
+  interfaceScaleAccelerators,
+  interfaceScaleAliasAccelerators,
+  type InterfaceScaleItem,
+} from './shell-shortcuts'
 
 /**
  * Every View menu label produced by `appMenuLabels(lang)` across supported
@@ -35,17 +39,30 @@ const UI_SCALE_ITEM_ID = 'ui-scale-zoom-in'
  * The View › interface-scale items. `accelerators` come from the shortcut table (the zoom keys,
  * Ctrl/Cmd + = / - / 0) and are only given where those keys are the page zoom, that is on Home:
  * Sheets keeps Ctrl+- (Delete cells) and Ctrl+0 (Hide columns), and the Ctrl+Alt chords the
- * scale used to take are Excel's grid zoom and AltGr on many Windows layouts.
+ * scale used to take are Excel's grid zoom and AltGr on many Windows layouts. `aliases` are the
+ * rows' other chords (Ctrl+Shift+=, the keypad keys): each runs the same change on a hidden item.
  */
 export function uiScaleMenuItems(
   label: (key: 'menuUiZoomIn' | 'menuUiZoomOut' | 'menuUiZoomReset') => string,
   settingsPath: () => string,
   accelerators: Partial<Record<InterfaceScaleItem, string>> = {},
+  aliases: Partial<Record<InterfaceScaleItem, readonly string[]>> = {},
 ): MenuItemConstructorOptions[] {
   const key = (item: InterfaceScaleItem): { accelerator?: string } => {
     const accelerator = accelerators[item]
     return accelerator ? { accelerator } : {}
   }
+  const hidden = (
+    item: InterfaceScaleItem,
+    labelKey: 'menuUiZoomIn' | 'menuUiZoomOut' | 'menuUiZoomReset',
+    direction: -1 | 0 | 1,
+  ): MenuItemConstructorOptions[] =>
+    (aliases[item] ?? []).map((accelerator) => ({
+      label: label(labelKey),
+      accelerator,
+      visible: false,
+      click: () => changeUiScale(settingsPath(), direction),
+    }))
   return [
     {
       id: UI_SCALE_ITEM_ID,
@@ -64,6 +81,9 @@ export function uiScaleMenuItems(
       ...key('zoomReset'),
       click: () => changeUiScale(settingsPath(), 0),
     },
+    ...hidden('zoomIn', 'menuUiZoomIn', 1),
+    ...hidden('zoomOut', 'menuUiZoomOut', -1),
+    ...hidden('zoomReset', 'menuUiZoomReset', 0),
   ]
 }
 
@@ -89,6 +109,7 @@ export function withViewMenu(
     label,
     settingsPath,
     kind === 'home' ? interfaceScaleAccelerators() : {},
+    kind === 'home' ? interfaceScaleAliasAccelerators() : {},
   )
   const view = menu.items.find(
     (item) =>

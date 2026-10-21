@@ -1,4 +1,4 @@
-import { isComposingEvent, type ShortcutKeyEvent } from '@genoffice/shortcuts'
+import type { ShortcutKeyEvent } from '@genoffice/shortcuts'
 
 export type PdfPasswordKeyAction = 'submit' | 'cancel' | null
 
@@ -12,18 +12,9 @@ export function pdfPasswordKeyAction(
   event: Pick<ShortcutKeyEvent, 'key' | 'isComposing' | 'keyCode'>,
   target: 'field' | 'other',
 ): PdfPasswordKeyAction {
-  if (
-    isComposingEvent({
-      ...event,
-      code: '',
-      ctrlKey: false,
-      altKey: false,
-      shiftKey: false,
-      metaKey: false,
-    })
-  ) {
-    return null
-  }
+  // Read the fields off the event itself: on a real KeyboardEvent they are prototype
+  // accessors, which an object spread would not copy.
+  if (event.isComposing === true || event.keyCode === 229) return null
   if (event.key === 'Escape') return 'cancel'
   if (event.key === 'Enter' && target === 'field') return 'submit'
   return null
