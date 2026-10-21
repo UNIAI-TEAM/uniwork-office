@@ -7,7 +7,17 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { LANGS } from '@genoffice/i18n'
+import {
+  accessibleShortcutProblems,
+  findDisplayChord,
+  type ShortcutPlatform,
+  type ShortcutSurface,
+} from '@genoffice/shortcuts'
 import { describe, expect, it } from 'vitest'
+import { clipboardAria, clipboardHint, sheetsAria } from '../src/renderer/sheets-keymap'
+import { sheetsShortcut } from '../src/shared/sheets-shortcuts'
+import { tFor, type StringKey } from '../src/renderer/i18n/locale'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const SHELL = join(here, '../src/renderer/ExcelShell.tsx')
@@ -117,5 +127,69 @@ describe('Sheets ribbon buttons keep the chord out of their accessible name', ()
         !(tag.name === 'RibbonButton' && tag.attrs.has('keys')),
     )
     expect(bad.map((tag) => `ExcelShell.tsx:${tag.line} <${tag.name}>`)).toEqual([])
+  })
+})
+
+/** the command names the ribbon buttons use as their accessible name (aria-label or text) */
+const NAME_KEYS: readonly StringKey[] = [
+  'appSaveTitle',
+  'appSaveAs',
+  'appCutTitle',
+  'appCopyTitle',
+  'appPaste',
+  'appOpenWorkbookTitle',
+  'appFormatCells',
+  'appInsertCells',
+  'appDeleteCells',
+  'appFind',
+  'appGoTo',
+  'appFilter',
+]
+
+describe('Sheets command names are plain in every locale', () => {
+  it.each(LANGS)('%s', (lang) => {
+    for (const key of NAME_KEYS) {
+      expect(findDisplayChord(tFor(lang, key)), `${lang}.${key}`).toBeNull()
+    }
+  })
+})
+
+const TARGETS: ReadonlyArray<{ platform: ShortcutPlatform; surface: ShortcutSurface }> = [
+  { platform: 'win', surface: 'desktop' },
+  { platform: 'win', surface: 'web' },
+  { platform: 'mac', surface: 'desktop' },
+  { platform: 'mac', surface: 'web' },
+]
+const ROWS = [
+  'sheets-02',
+  'sheets-03',
+  'sheets-04',
+  'sheets-19',
+  'sheets-20',
+  'sheets-42',
+  'sheets-43',
+  'sheets-61',
+  'sheets-81',
+]
+
+describe.each(TARGETS)('Sheets aria-keyshortcuts ($platform, $surface)', (target) => {
+  it.each(ROWS)('%s: the ARIA chord of the same row as the hint', (id) => {
+    expect(
+      accessibleShortcutProblems(
+        { name: 'Command', keyshortcuts: sheetsAria(id, target) || undefined },
+        sheetsShortcut(id),
+        target.platform,
+        target.surface,
+      ),
+    ).toEqual([])
+  })
+
+  it('Cut / Copy / Paste each advertise their own letter', () => {
+    const meta = target.platform === 'mac' ? 'Meta' : 'Control'
+    expect(clipboardAria('X', target)).toBe(`${meta}+X`)
+    expect(clipboardAria('C', target)).toBe(`${meta}+C`)
+    expect(clipboardAria('V', target)).toBe(`${meta}+V`)
+    // the visible tooltip hint is unchanged
+    expect(clipboardHint('C', target)).toBe(target.platform === 'mac' ? '⌘C' : 'Ctrl+C')
   })
 })
