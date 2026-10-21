@@ -88,4 +88,19 @@ export const en = {
   dlBulkConfirmTitleOther: 'Move {n} documents to the trash?',
   dlBulkConfirmBody: 'Items stay in the trash for 30 days, then are deleted forever.',
   dlTrashBanner30: 'Items stay in the trash for 30 days, then are deleted forever.',
+  dlStarredUnavailableTitle: 'Starred is not available on this server yet',
+  dlStarredUnavailableHint:
+    'Your UniWork server needs an update before it can keep starred documents. Ask an admin to update it, then try again.',
+  dlElsewhereUnavailableTitle: 'From elsewhere is not available on this server yet',
+  dlElsewhereUnavailableHint:
+    'Your UniWork server needs an update before it can list files sent in Chat, Meetings, Email and Tasks. Ask an admin to update it, then try again.',
+  dlSourceOriginChat: 'Sent in Chat',
+  dlSourceOriginTask: 'From a task',
+  dlSourceOriginMeeting: 'From a meeting',
+  dlSourceOriginEmail: 'From an email',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Meetings',
+  dlSideSourceEmail: 'Email',
+  dlSideSourceTask: 'Tasks',
+  dlSearchNoResults: 'No results for “{query}”',
 } satisfies Record<keyof typeof zh, string>

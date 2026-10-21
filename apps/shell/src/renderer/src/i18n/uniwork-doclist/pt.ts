@@ -89,4 +89,19 @@ export const pt = {
   dlBulkConfirmTitleOther: 'Mover {n} documentos para a lixeira?',
   dlBulkConfirmBody: 'Os itens ficam 30 dias na lixeira e depois são excluídos para sempre.',
   dlTrashBanner30: 'Os itens ficam 30 dias na lixeira e depois são excluídos para sempre.',
+  dlStarredUnavailableTitle: 'Com estrela ainda não está disponível neste servidor',
+  dlStarredUnavailableHint:
+    'O servidor UniWork precisa de uma atualização para guardar documentos com estrela. Peça a um administrador para atualizá-lo e tente novamente.',
+  dlElsewhereUnavailableTitle: 'De outros lugares ainda não está disponível neste servidor',
+  dlElsewhereUnavailableHint:
+    'O servidor UniWork precisa de uma atualização para mostrar os ficheiros enviados no Chat, Reuniões, Email e Tarefas. Peça a um administrador para atualizá-lo e tente novamente.',
+  dlSourceOriginChat: 'Enviado no chat',
+  dlSourceOriginTask: 'De uma tarefa',
+  dlSourceOriginMeeting: 'De uma reunião',
+  dlSourceOriginEmail: 'De um e-mail',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Reuniões',
+  dlSideSourceEmail: 'E-mail',
+  dlSideSourceTask: 'Tarefas',
+  dlSearchNoResults: 'Nenhum resultado para “{query}”',
 } satisfies Record<keyof typeof zh, string>

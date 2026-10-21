@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type {
-  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocSummary,
   UniworkFolderNode,
+  UniworkResult,
   UniworkSourceFile,
   UniworkWorkspaceRef,
 } from '../../../shared/home-api'
@@ -86,7 +86,6 @@ import {
   getDocumentsHomeNavEntry,
   docMatchesUpdated,
   hasActiveFilters,
-  mergeNewestFirst,
   rowMatchesType,
   sourceAuthorsOf,
   sourceMatchesFilters,
@@ -130,11 +129,77 @@ import { screenOfSubView, specialPresent, wireSortOf } from '../doclist/table-mo
 import { RecentSegmentControl, useRecentSegment } from '../doclist/RecentSegment'
 import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
+import { ListState } from '../doclist/ListState'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
 import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
+import './doclist-sidebar.css'
+
+/** a source module of Từ nơi khác (the web's DocumentSourceKind) */
+export type ElsewhereSource = 'chat' | 'meeting' | 'email' | 'task'
+
+/**
+ * UNI-2047 sidebar: the web's SOURCE_KINDS, in its order, each drawn as its module is in the web
+ * app sidebar (module-icons.ts glyph, module-tones.ts tint): Chat blue, Meetings violet, Email
+ * orange, Tasks green.
+ */
+const ELSEWHERE_SOURCES: readonly {
+  source: ElsewhereSource
+  labelKey: StringKey
+  tone: 'blue' | 'violet' | 'orange' | 'green'
+}[] = [
+  { source: 'chat', labelKey: 'dlSideSourceChat', tone: 'blue' },
+  { source: 'meeting', labelKey: 'dlSideSourceMeeting', tone: 'violet' },
+  { source: 'email', labelKey: 'dlSideSourceEmail', tone: 'orange' },
+  { source: 'task', labelKey: 'dlSideSourceTask', tone: 'green' },
+]
+
+const SOURCE_ICON_NAMES: Record<ElsewhereSource, string> = {
+  chat: 'message-square',
+  meeting: 'video',
+  email: 'mail',
+  task: 'square-check-big',
+}
+
+/** the web module glyphs (lucide MessageSquare, Video, Mail, SquareCheckBig) */
+function SourceGlyph({ source }: { source: ElsewhereSource }) {
+  return (
+    <svg
+      data-icon={SOURCE_ICON_NAMES[source]}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {source === 'chat' && (
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      )}
+      {source === 'meeting' && (
+        <>
+          <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" />
+          <rect x="2" y="6" width="14" height="12" rx="2" />
+        </>
+      )}
+      {source === 'email' && (
+        <>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+        </>
+      )}
+      {source === 'task' && (
+        <>
+          <path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5" />
+          <path d="m9 11 3 3L22 4" />
+        </>
+      )}
+    </svg>
+  )
+}
 
 function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
   switch (id) {
@@ -307,6 +372,9 @@ export interface DocumentsHomeProps {
   /** sub-view to mount with (kept by the host so an area switch can restore it — VDH-7) */
   initialSubView?: DocumentsHomeSubViewId
   onSubViewChange?: (subView: DocumentsHomeSubViewId) => void
+  /** the Từ nơi khác source row kept by the host with the sub-view (RV-16); used only when the sub-view is Từ nơi khác */
+  initialElsewhereSource?: ElsewhereSource | null
+  onElsewhereSourceChange?: (source: ElsewhereSource | null) => void
   onFolderChange?: (folderId: string | null, path: PathPart[]) => void
 }
 
@@ -336,6 +404,8 @@ export function DocumentsHome({
   initialFolderId = null,
   initialSubView = 'workspace',
   onSubViewChange,
+  initialElsewhereSource = null,
+  onElsewhereSourceChange,
   onFolderChange,
 }: DocumentsHomeProps) {
   const { t, dateLocale } = useI18n()
@@ -344,6 +414,12 @@ export function DocumentsHome({
   const [subView, setSubView] = useState<DocumentsHomeSubViewId>(initialSubView)
   const [folderId, setFolderId] = useState<string | null>(initialFolderId)
   const [myFolderId, setMyFolderId] = useState<string | null>(null)
+  // UNI-2047 sidebar: the Từ nơi khác row picked (null = every module, the page opened otherwise)
+  const [elsewhereSource, setElsewhereSource] = useState<ElsewhereSource | null>(
+    initialSubView === 'elsewhere' ? initialElsewhereSource : null,
+  )
+  // the workspaces whose sources route answered: the section shows once it has (the web's probe)
+  const [sourcesAnswered, setSourcesAnswered] = useState<Readonly<Record<string, boolean>>>({})
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY]))
   const [tree, setTree] = useState<TreeState>({ status: 'loading', nodes: [] })
   const [treeTick, setTreeTick] = useState(0)
@@ -370,10 +446,10 @@ export function DocumentsHome({
     loadingMore: false,
   })
   const [listTick, setListTick] = useState(0)
-  // UNI-1961: the workspace root also lists the files of the other modules
-  // (the web's "other sources"), paged on their own
+  // UNI-1961 / V-STATES F-14: the files of the other modules (the web's "other sources"), read and
+  // paged on their own on the Từ nơi khác page only
   const [sources, setSources] = useState<{
-    /** the read of the first page: Từ nơi khác shows it; the root merge ignores a failed one */
+    /** the read of the first page: a failed one is the Từ nơi khác page's list error */
     status: 'idle' | 'loading' | 'ready' | 'error'
     error?: UniworkDocErrorCode
     items: UniworkSourceFile[]
@@ -383,10 +459,6 @@ export function DocumentsHome({
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
 
   // Dialogs & inline actions
-  // UNI-1959: "Share with workspace" of the New menu and the strip: off by default, kept while
-  // this view is open, reset after a create from the strip (the web's page-view behaviour)
-  const [shareWithWorkspace, setShareWithWorkspace] = useState(false)
-  const quickShareHintId = useId()
   // UNI-1959: kinds the server answered 404 / 501 for: disabled for the session
   const [unavailableKinds, setUnavailableKinds] = useState<ReadonlySet<NewDocKind>>(new Set())
   const [creating, setCreating] = useState(false)
@@ -462,6 +534,7 @@ export function DocumentsHome({
     setFolderId(null)
     setFolderNotice(null)
     setMyFolderId(null)
+    setElsewhereSource(null)
     setExpanded(new Set([ROOT_KEY]))
     resetFilters()
     setSearchDraft('')
@@ -564,6 +637,12 @@ export function DocumentsHome({
   useEffect(() => {
     onSubViewChangeRef.current?.(subView)
   }, [subView])
+  // RV-16: the picked source travels with the sub-view so the same row is current after an area switch
+  const onElsewhereSourceChangeRef = useRef(onElsewhereSourceChange)
+  onElsewhereSourceChangeRef.current = onElsewhereSourceChange
+  useEffect(() => {
+    onElsewhereSourceChangeRef.current?.(elsewhereSource)
+  }, [elsewhereSource])
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
   const listSeqRef = useRef(0)
@@ -731,20 +810,41 @@ export function DocumentsHome({
       })
   }, [workspaceId, subView, folderId, resolvedMyFolderId, wireFilters, wireSort, query, listTick])
 
-  // UNI-1961: as on the web, the sources merge only at the workspace root (no
-  // folder, no search); a failed sources read (an older server's 404/501 or any
-  // other) leaves the documents as they are
-  const rootSourcesWanted =
-    subView === 'workspace' &&
-    folderId === null &&
-    query.length === 0 &&
-    // UniNote is no file: the other-source list has nothing to show under it
-    filters.format !== 'page'
-  // UNI-2047 B4: the Từ nơi khác page lists the same rows on their own (a search lists the
+  // UNI-2047 B4 / V-STATES F-14: the files other modules sent (chat, tasks, meetings, email) are
+  // listed on the Từ nơi khác page only, never merged into the workspace root (a search lists the
   // workspace hits, as on every screen)
   const elsewhereView = subView === 'elsewhere' && query.length === 0
-  const sourcesWanted = rootSourcesWanted || elsewhereView
+  const sourcesWanted = elsewhereView
   const sourcesSeqRef = useRef(0)
+  // UNI-2047 sidebar: as on the web (use-documents-library.ts), the Từ nơi khác section shows once
+  // the sources route has answered for this workspace; a 404 or a bridge without the call hides
+  // it, any other failure leaves the last answer alone
+  const noteSourcesAnswer = useCallback((ws: string, res: UniworkResult<unknown> | null) => {
+    if (res && !res.ok && res.error !== 'not_found') return
+    const answered = Boolean(res?.ok)
+    setSourcesAnswered((prev) => (prev[ws] === answered ? prev : { ...prev, [ws]: answered }))
+  }, [])
+  const sourcesProbedRef = useRef<string | null>(null)
+  const sourcesKnown = workspaceId in sourcesAnswered
+  useEffect(() => {
+    // the page reads the route itself: its answer stands for the probe
+    if (sourcesWanted) return
+    if (sourcesKnown || sourcesProbedRef.current === workspaceId) return
+    sourcesProbedRef.current = workspaceId
+    // RV-15: only a definite answer (OK or 404) settles the probe; a transient failure frees it, so
+    // the next pass (workspace, page left, sidebar visible again) asks once more - no timer, no loop
+    const unsettle = () => {
+      if (sourcesProbedRef.current === workspaceId) sourcesProbedRef.current = null
+    }
+    const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
+    void fetchDocumentsHomeSources(api, { workspaceId, filters: {}, limit: 1 })
+      .then((res) => {
+        if (res && !res.ok && res.error !== 'not_found') unsettle()
+        noteSourcesAnswer(workspaceId, res)
+      })
+      .catch(unsettle)
+  }, [workspaceId, sourcesWanted, sourcesKnown, sidebarIdle, noteSourcesAnswer])
+  const sourcesAvailable = sourcesAnswered[workspaceId] === true
   useEffect(() => {
     const seq = ++sourcesSeqRef.current
     setSources({
@@ -755,8 +855,13 @@ export function DocumentsHome({
     })
     if (!sourcesWanted) return
     const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
-    void fetchDocumentsHomeSources(api, { workspaceId, filters: wireFilters })
+    void fetchDocumentsHomeSources(api, {
+      workspaceId,
+      filters: wireFilters,
+      source: elsewhereSource,
+    })
       .then((res) => {
+        noteSourcesAnswer(workspaceId, res)
         if (sourcesSeqRef.current !== seq) return
         setSources(
           res?.ok
@@ -786,10 +891,7 @@ export function DocumentsHome({
           loadingMore: false,
         })
       })
-  }, [workspaceId, sourcesWanted, wireFilters, listTick])
-  const sourcesMerged = rootSourcesWanted && sources.items.length > 0
-  // the source rows have a next page to ask for: merged into the root, or the whole page
-  const sourcesPaged = sourcesMerged || elsewhereView
+  }, [workspaceId, sourcesWanted, wireFilters, elsewhereSource, listTick, noteSourcesAnswer])
 
   const loadMoreSources = () => {
     const cursor = sources.nextCursor
@@ -797,7 +899,12 @@ export function DocumentsHome({
     const seq = sourcesSeqRef.current
     setSources((prev) => ({ ...prev, loadingMore: true }))
     const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
-    void fetchDocumentsHomeSources(api, { workspaceId, filters: wireFilters, cursor })
+    void fetchDocumentsHomeSources(api, {
+      workspaceId,
+      filters: wireFilters,
+      cursor,
+      source: elsewhereSource,
+    })
       .then((res) => {
         if (sourcesSeqRef.current !== seq) return
         setSources((prev) =>
@@ -818,7 +925,7 @@ export function DocumentsHome({
 
   const loadMore = () => {
     // UNI-1961: "Load more" asks both lists for their next page (the web's rule)
-    if (sourcesPaged) loadMoreSources()
+    if (elsewhereView) loadMoreSources()
     if (!page.nextCursor || page.loadingMore || page.status !== 'ready') return
     const cursor = page.nextCursor
     const seq = listSeqRef.current
@@ -925,6 +1032,12 @@ export function DocumentsHome({
       folderIdRef.current = null
       setFolderId(null)
     }
+  }
+
+  /** UNI-2047 sidebar: a Từ nơi khác row opens the page filtered to that module */
+  const openElsewhere = (source: ElsewhereSource) => {
+    setElsewhereSource(source)
+    selectSubView('elsewhere')
   }
 
   const openFolderInWorkspace = (id: string | null) => {
@@ -1088,10 +1201,6 @@ export function DocumentsHome({
     }
   }
 
-  // what a create sends: the "Share with workspace" choice, for documents only (a folder is never shared)
-  const createVisibility = (): UniworkCreateVisibility | undefined =>
-    shareWithWorkspace ? 'workspace' : undefined
-
   /** My Folder when no folder is known yet: main also places a null-folder create there */
   const ensureTargetFolder = async (target: DocTarget): Promise<string | null> => {
     if (target.folderId) return target.folderId
@@ -1106,12 +1215,10 @@ export function DocumentsHome({
 
   // UNI-1959: a menu / strip pick creates at once - the web's default name, the open place -
   // then opens it. No name dialog: the name is asked on the first save.
-  const createNow = async (kind: NewDocKind, fromStrip: boolean): Promise<void> => {
+  const createNow = async (kind: NewDocKind): Promise<void> => {
     if (creatingRef.current || unavailableKinds.has(kind)) return
     creatingRef.current = true
     setCreating(true)
-    const visibility = createVisibility()
-    if (fromStrip) setShareWithWorkspace(false)
     try {
       const target = activeTargetFolder
       const folderIdToUse = await ensureTargetFolder(target)
@@ -1123,14 +1230,12 @@ export function DocumentsHome({
               workspaceId: target.workspaceId,
               folderId: folderIdToUse,
               name,
-              ...(visibility ? { visibility } : {}),
             })
           : await createDocument({
               workspaceId: target.workspaceId,
               folderId: folderIdToUse,
               name,
               format: kind,
-              ...(visibility ? { visibility } : {}),
             })
       if (res.ok) {
         refreshAll()
@@ -1311,6 +1416,16 @@ export function DocumentsHome({
       ? (sources.error ?? 'server_error')
       : page.status === 'error'
         ? (page.error ?? 'server_error')
+        : null
+  // V-STATES F-03 / RV-1: an older server has no route for these two pages (404): they say so
+  // instead of the "document no longer exists" line; every other error is the generic list error
+  const unavailablePage: 'starred' | 'elsewhere' | null =
+    listError !== 'not_found' ? null : starredView ? 'starred' : elsewhereView ? 'elsewhere' : null
+  const unavailableKeys =
+    unavailablePage === 'starred'
+      ? ({ title: 'dlStarredUnavailableTitle', hint: 'dlStarredUnavailableHint' } as const)
+      : unavailablePage === 'elsewhere'
+        ? ({ title: 'dlElsewhereUnavailableTitle', hint: 'dlElsewhereUnavailableHint' } as const)
         : null
   const [shelvedBy, setShelvedBy] = useState<string | null>(null)
   useEffect(() => {
@@ -1720,9 +1835,8 @@ export function DocumentsHome({
     return { folders: myFolderFirst(ordered), files: split.files }
   }, [page.items, folderOrder, folderDesc, dateLocale])
 
-  // UNI-1961: the table's rows; at the root the source files join the documents
-  // newest first under the web's paging cutoff, and the home filters the server
-  // could not apply to them run here (the web's merge, use-documents-library.ts).
+  // UNI-1961: the table's rows: the documents, or on Từ nơi khác the source files, where the home
+  // filters the server could not apply to them run here (the web's use-documents-library.ts).
   // The table orders them itself (UNI-2047: header sort); the shelf lists folders as rows too.
   const tableRows = useMemo<DocumentsHomeTableRow[]>(() => {
     // the type chips the server cannot apply (UniNote, .txt on source files) and, on the shelf,
@@ -1752,28 +1866,14 @@ export function DocumentsHome({
           .map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
       )
     }
-    if (!sourcesMerged) {
-      return typed(files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })))
-    }
-    return typed(
-      mergeNewestFirst(page.items, sources.items, {
-        docs: page.nextCursor !== null,
-        sources: sources.nextCursor !== null,
-      }).filter((row) =>
-        row.type === 'source'
-          ? sourceMatchesFilters(row.source, wireFilters)
-          : row.doc.kind !== 'folder',
-      ),
-    )
+    return typed(files.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })))
   }, [
     shelfView,
     starredView,
     elsewhereView,
     shelvedBy,
-    sourcesMerged,
     files,
     page.items,
-    page.nextCursor,
     sources,
     wireFilters,
     filters.format,
@@ -1790,7 +1890,11 @@ export function DocumentsHome({
   }, [visibleDocs])
   const selectedDocs = useMemo(() => selectedDocsOf(visibleDocs, selected), [visibleDocs, selected])
 
-  const navEntries = useMemo(() => visibleDocumentsHomeNavEntries(), [])
+  // UNI-2047 sidebar: Từ nơi khác is its own section below the folders, as on the web
+  const navEntries = useMemo(
+    () => visibleDocumentsHomeNavEntries().filter((entry) => entry.id !== 'elsewhere'),
+    [],
+  )
 
   const currentHeadingSpec = useMemo<
     { kind: 'literal'; text: string } | { kind: 'key'; key: StringKey }
@@ -1836,7 +1940,8 @@ export function DocumentsHome({
         return folderId ? 'uhEmptyFolder' : 'uhEmptyWorkspace'
     }
   }, [query, filters, subView, folderId, recentSegment])
-  const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : t('ufNoResults', { query })
+  // a search has its own empty state (ListState); every other list says what it lacks
+  const emptyMessage = emptyMessageKey ? t(emptyMessageKey) : ''
 
   const treeSelectedKey = useMemo(() => {
     if (sidebarIdle) return '\u0000none'
@@ -1871,6 +1976,7 @@ export function DocumentsHome({
           )
         })}
       </nav>
+      {/* RV-14 / VS-9: the wrap is the one scroller; nav, folders and sources scroll together (as the web) */}
       <div className="dh-sidebar-folders">
         <div className="dh-sidebar-head">
           <span className="dh-sidebar-label">{t('uhSidebarFolders')}</span>
@@ -1881,10 +1987,8 @@ export function DocumentsHome({
             title={t('uhNewFolder')}
             onClick={() => {
               onSidebarNavigate?.()
-              folderActions.openCreate(
-                subView === 'workspace' ? folderId : null,
-                subView === 'workspace' && folderId !== null,
-              )
+              // the tree has no root row (and so no root menu): as on the web, "+" makes a top-level folder
+              folderActions.openCreate(null, false)
             }}
           >
             <svg
@@ -1937,6 +2041,7 @@ export function DocumentsHome({
           {tree.status === 'ready' && (
             <UniworkFolderTree
               idPrefix={`${uid}-tree`}
+              hideRoot
               nodes={tree.nodes}
               label={t('ufTreeLabel')}
               expanded={expanded}
@@ -1957,6 +2062,41 @@ export function DocumentsHome({
           )}
         </div>
       </div>
+      {sourcesAvailable && (
+        <div className="dl-side-sources" role="group" aria-labelledby={`${uid}-side-sources`}>
+          <div className="dh-sidebar-head">
+            <span className="dh-sidebar-label" id={`${uid}-side-sources`}>
+              {t('dlNavElsewhere')}
+            </span>
+          </div>
+          {ELSEWHERE_SOURCES.map((row) => {
+            const current =
+              !sidebarIdle && subView === 'elsewhere' && elsewhereSource === row.source
+            return (
+              <button
+                key={row.source}
+                type="button"
+                className={`dh-nav-item nav-item${current ? ' active' : ''}`}
+                data-source={row.source}
+                aria-current={current ? 'page' : undefined}
+                onClick={() => {
+                  onSidebarNavigate?.()
+                  openElsewhere(row.source)
+                }}
+              >
+                <span
+                  className={`dl-side-tile tone-${row.tone}`}
+                  data-tone={row.tone}
+                  aria-hidden="true"
+                >
+                  <SourceGlyph source={row.source} />
+                </span>
+                <span className="dl-side-label">{t(row.labelKey)}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 
@@ -2139,10 +2279,9 @@ export function DocumentsHome({
               unavailable={unavailableKinds}
               unavailableHint={t('uhCreateUnavailableHint')}
               busy={creating}
-              share={{ checked: shareWithWorkspace, onChange: setShareWithWorkspace }}
               onPick={(kind) => {
                 if (kind === 'folder') createFolderHere()
-                else void createNow(kind, false)
+                else void createNow(kind)
               }}
             />
           </div>
@@ -2159,44 +2298,13 @@ export function DocumentsHome({
                 data-quick-format={kind}
                 aria-disabled={creating || unavailableKinds.has(kind) || undefined}
                 title={unavailableKinds.has(kind) ? t('uhCreateUnavailableHint') : undefined}
-                onClick={() => void createNow(kind, true)}
+                onClick={() => void createNow(kind)}
               >
                 <FileBadge ext={kind} size={18} />
                 <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
                 <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
               </button>
             ))}
-            <button
-              type="button"
-              role="switch"
-              className="dh-quick-share"
-              aria-checked={shareWithWorkspace}
-              aria-disabled={creating || undefined}
-              aria-describedby={quickShareHintId}
-              onClick={() => {
-                if (!creating) setShareWithWorkspace(!shareWithWorkspace)
-              }}
-            >
-              <span className="dh-quick-check" aria-hidden="true">
-                {shareWithWorkspace && (
-                  <svg width="12" height="12" viewBox="0 0 16 16">
-                    <path
-                      d="m3.5 8.5 3 3 6-7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </span>
-              <span>{t('uhNewShare')}</span>
-            </button>
-            {/* always mounted and one line tall, so the toggle neither moves the pills nor goes unannounced */}
-            <p id={quickShareHintId} role="status" className="dh-quick-share-hint">
-              {shareWithWorkspace ? t('uhNewShareHint', { level: t('uhNewShareLevelView') }) : ''}
-            </p>
           </div>
         )}
 
@@ -2259,18 +2367,19 @@ export function DocumentsHome({
         )}
 
         {listError && (
-          <div className="uw-pick-state" role="alert">
-            <p className="uw-pick-state-title">{t(UNIWORK_ERROR_KEYS[listError])}</p>
-            {errorActionOf(listError) === 'retry' && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setListTick((n) => n + 1)}
-              >
-                {t('acctRetry')}
-              </button>
-            )}
-          </div>
+          <ListState
+            kind="error"
+            glyph={unavailablePage === 'starred' ? 'star' : 'error'}
+            title={unavailableKeys ? t(unavailableKeys.title) : t(UNIWORK_ERROR_KEYS[listError])}
+            hint={unavailableKeys ? t(unavailableKeys.hint) : undefined}
+            // Thử lại where asking again can help: a missing route (the server may be updated) and
+            // the transient codes; never a sign-in problem
+            action={
+              unavailableKeys || errorActionOf(listError) === 'retry'
+                ? { label: t('acctRetry'), onClick: () => setListTick((n) => n + 1) }
+                : undefined
+            }
+          />
         )}
 
         {pageShown && (
@@ -2372,6 +2481,14 @@ export function DocumentsHome({
                         : t('uhShelvedEmptyDesc')}
                     </p>
                   </div>
+                ) : // V-STATES F-09: a search with no hit is the shared empty state with Xóa tìm kiếm
+                query.length > 0 ? (
+                  <ListState
+                    kind="empty"
+                    glyph="search"
+                    title={t('dlSearchNoResults', { query })}
+                    action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
+                  />
                 ) : (
                   <div className="dh-empty" role="status">
                     {emptyMessage}
@@ -2451,7 +2568,7 @@ export function DocumentsHome({
                 </p>
               )}
 
-              {(page.nextCursor || (sourcesPaged && sources.nextCursor)) && (
+              {(page.nextCursor || (elsewhereView && sources.nextCursor)) && (
                 <div className="dh-load-more-row">
                   <button
                     type="button"

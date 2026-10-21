@@ -88,4 +88,19 @@ export const ko = {
   dlBulkConfirmTitleOther: '문서 {n}개를 휴지통으로 이동할까요?',
   dlBulkConfirmBody: '항목은 휴지통에 30일 동안 보관된 뒤 영구 삭제됩니다.',
   dlTrashBanner30: '항목은 휴지통에 30일 동안 보관된 뒤 영구 삭제됩니다.',
+  dlStarredUnavailableTitle: '이 서버에서는 아직 중요 문서함을 사용할 수 없습니다',
+  dlStarredUnavailableHint:
+    'UniWork 서버를 업데이트해야 중요 문서를 저장할 수 있습니다. 관리자에게 업데이트를 요청한 뒤 다시 시도하세요.',
+  dlElsewhereUnavailableTitle: '이 서버에서는 아직 “다른 곳에서”를 사용할 수 없습니다',
+  dlElsewhereUnavailableHint:
+    'UniWork 서버를 업데이트해야 채팅, 회의, 이메일, 작업에서 보낸 파일을 볼 수 있습니다. 관리자에게 업데이트를 요청한 뒤 다시 시도하세요.',
+  dlSourceOriginChat: '채팅에서 보냄',
+  dlSourceOriginTask: '작업에서',
+  dlSourceOriginMeeting: '회의에서',
+  dlSourceOriginEmail: '이메일에서',
+  dlSideSourceChat: '채팅',
+  dlSideSourceMeeting: '회의',
+  dlSideSourceEmail: '이메일',
+  dlSideSourceTask: '작업',
+  dlSearchNoResults: '“{query}”에 대한 결과가 없습니다',
 } satisfies Record<keyof typeof zh, string>

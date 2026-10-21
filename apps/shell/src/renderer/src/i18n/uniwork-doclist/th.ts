@@ -87,4 +87,19 @@ export const th = {
   dlBulkConfirmTitleOther: 'ย้าย {n} เอกสารไปยังถังขยะหรือไม่',
   dlBulkConfirmBody: 'รายการจะอยู่ในถังขยะ 30 วัน แล้วจะถูกลบถาวร',
   dlTrashBanner30: 'รายการจะอยู่ในถังขยะ 30 วัน แล้วจะถูกลบถาวร',
+  dlStarredUnavailableTitle: 'เซิร์ฟเวอร์นี้ยังไม่รองรับรายการติดดาว',
+  dlStarredUnavailableHint:
+    'เซิร์ฟเวอร์ UniWork ของคุณต้องอัปเดตก่อนจึงจะเก็บเอกสารที่ติดดาวได้ โปรดขอให้ผู้ดูแลระบบอัปเดต แล้วลองอีกครั้ง',
+  dlElsewhereUnavailableTitle: 'เซิร์ฟเวอร์นี้ยังไม่รองรับ “จากที่อื่น”',
+  dlElsewhereUnavailableHint:
+    'เซิร์ฟเวอร์ UniWork ของคุณต้องอัปเดตก่อนจึงจะแสดงไฟล์ที่ส่งในแชต การประชุม อีเมล และงานได้ โปรดขอให้ผู้ดูแลระบบอัปเดต แล้วลองอีกครั้ง',
+  dlSourceOriginChat: 'ส่งในแชต',
+  dlSourceOriginTask: 'จากงาน',
+  dlSourceOriginMeeting: 'จากการประชุม',
+  dlSourceOriginEmail: 'จากอีเมล',
+  dlSideSourceChat: 'แชต',
+  dlSideSourceMeeting: 'การประชุม',
+  dlSideSourceEmail: 'อีเมล',
+  dlSideSourceTask: 'งาน',
+  dlSearchNoResults: 'ไม่พบผลลัพธ์สำหรับ “{query}”',
 } satisfies Record<keyof typeof zh, string>

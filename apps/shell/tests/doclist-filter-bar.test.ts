@@ -60,7 +60,7 @@ const SOURCE = {
   updatedAt: iso(2026, 10, 20, 16, 30),
   source: 'chat',
   owner: { id: 'u-lan', name: 'Lan Nguyễn' },
-  parent: { kind: 'chat', title: 'Kế toán' },
+  parent: { kind: 'chat_channel', title: 'Kế toán' },
 } as unknown as UniworkSourceFile
 
 const CHIPS = [
@@ -322,12 +322,23 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       expect(rowIds()).toEqual(expect.arrayContaining(['doc-a', 'doc-b', 'page-c']))
     })
 
-    it('hides the other-source files under UniNote and keeps them under .pdf', async () => {
+    it('lists no other-source file on the workspace root, whatever the chip (UNI-2047 F-14)', async () => {
       sources = [SOURCE]
       await mount('workspace')
-      expect(host.textContent).toContain('Bảng giá.pdf')
-      await click(chip('page'))
+      // the only sources read is the sidebar's limit:1 probe (UNI-2047 sidebar); nothing is merged
+      const probe = [{ workspaceId: 'ws-1', limit: 1 }]
+      expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual(probe)
       expect(host.textContent).not.toContain('Bảng giá.pdf')
+      await click(chip('pdf'))
+      expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual(probe)
+      expect(host.textContent).not.toContain('Bảng giá.pdf')
+    })
+
+    it('keeps the other-source files under .pdf on From elsewhere, which offers no UniNote chip', async () => {
+      sources = [SOURCE]
+      await mount('elsewhere')
+      expect(host.textContent).toContain('Bảng giá.pdf')
+      expect(chip('page')).toBeNull()
       await click(chip('pdf'))
       expect(lastCall('uniworkListSources')).toEqual({ workspaceId: 'ws-1', type: 'pdf' })
       expect(host.textContent).toContain('Bảng giá.pdf')

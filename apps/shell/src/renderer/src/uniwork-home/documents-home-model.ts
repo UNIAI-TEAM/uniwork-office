@@ -127,7 +127,7 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
     id: 'elsewhere',
     labelKey: 'dlNavElsewhere',
     // UNI-2047 B4: the web's "From elsewhere": the files of Chat, Meetings, Email and Tasks, a page of
-    // their own (the workspace root keeps merging the same rows, as the web does)
+    // their own (the workspace root lists documents only)
     available: true,
     source: 'sources',
   },
@@ -646,42 +646,6 @@ export type DocumentsHomeTableRow =
   | { type: 'doc'; id: string; doc: DocumentsHomeDoc }
   | { type: 'source'; id: string; source: UniworkSourceFile }
 
-function rowTime(row: DocumentsHomeTableRow): number {
-  const time = Date.parse(row.type === 'doc' ? row.doc.updatedAt : row.source.updatedAt)
-  return Number.isNaN(time) ? 0 : time
-}
-
-/**
- * UNI-1961: the web home root's merge (D library-rows.ts `mergeNewestFirst`):
- * two independently paged lists as one newest-first table. A row shows only
- * when it is at least as new as the oldest loaded row of every list that still
- * has pages, so "Load more" never slots a row above what is on screen; a list
- * that is exhausted (or empty) sets no bound. A row with no date sinks.
- */
-export function mergeNewestFirst(
-  docs: readonly DocumentsHomeDoc[],
-  sources: readonly UniworkSourceFile[],
-  more: { docs: boolean; sources: boolean },
-): DocumentsHomeTableRow[] {
-  const rows: DocumentsHomeTableRow[] = [
-    ...docs.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
-    ...sources.map((source) => ({ type: 'source' as const, id: `source:${source.id}`, source })),
-  ]
-  const oldest = (list: DocumentsHomeTableRow[], paged: boolean): number =>
-    paged && list.length > 0 ? Math.min(...list.map(rowTime)) : Number.NEGATIVE_INFINITY
-  const cutoff = Math.max(
-    oldest(
-      rows.filter((row) => row.type === 'doc'),
-      more.docs,
-    ),
-    oldest(
-      rows.filter((row) => row.type === 'source'),
-      more.sources,
-    ),
-  )
-  return rows.filter((row) => rowTime(row) >= cutoff).sort((a, b) => rowTime(b) - rowTime(a))
-}
-
 /**
  * UNI-1961: the home filters a source row cannot get from the server (the web
  * runs them on merged source rows, use-documents-library.ts): the editor is the
@@ -732,17 +696,26 @@ export function docMatchesUpdated(doc: DocumentsHomeDoc, filters: UniworkListFil
 
 /**
  * UNI-1961: one page of the root's source files, with the home's format filter
- * as the sources `type`. Null when the bridge has no sources call.
+ * as the sources `type`. Null when the bridge has no sources call. `source` narrows to one
+ * module (a sidebar row of Từ nơi khác); `limit` is the sidebar's availability probe.
  */
 export async function fetchDocumentsHomeSources(
   api: DocumentsHomeApiAdapter,
-  params: { workspaceId: string; filters: UniworkListFilters; cursor?: string },
+  params: {
+    workspaceId: string
+    filters: UniworkListFilters
+    cursor?: string
+    source?: string | null
+    limit?: number
+  },
 ): Promise<UniworkResult<UniworkSourceListPage> | null> {
   if (typeof api.uniworkListSources !== 'function') return null
   return api.uniworkListSources({
     workspaceId: params.workspaceId,
+    ...(params.source ? { source: params.source } : {}),
     ...(params.filters.format ? { type: params.filters.format } : {}),
     ...(params.cursor ? { cursor: params.cursor } : {}),
+    ...(params.limit ? { limit: params.limit } : {}),
   })
 }
 

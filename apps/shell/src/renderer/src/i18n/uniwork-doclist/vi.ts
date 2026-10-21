@@ -89,4 +89,19 @@ export const vi = {
   dlBulkConfirmTitleOther: 'Chuyển {n} tài liệu vào thùng rác?',
   dlBulkConfirmBody: 'Các mục sẽ nằm trong thùng rác 30 ngày rồi bị xóa vĩnh viễn.',
   dlTrashBanner30: 'Các mục sẽ nằm trong thùng rác 30 ngày rồi bị xóa vĩnh viễn.',
+  dlStarredUnavailableTitle: 'Gắn sao chưa dùng được trên máy chủ này',
+  dlStarredUnavailableHint:
+    'Máy chủ UniWork của bạn cần được cập nhật để lưu tài liệu gắn sao. Hãy nhờ quản trị viên cập nhật rồi thử lại.',
+  dlElsewhereUnavailableTitle: 'Từ nơi khác chưa dùng được trên máy chủ này',
+  dlElsewhereUnavailableHint:
+    'Máy chủ UniWork của bạn cần được cập nhật để hiển thị tệp gửi trong Trò chuyện, Cuộc họp, Email và Công việc. Hãy nhờ quản trị viên cập nhật rồi thử lại.',
+  dlSourceOriginChat: 'Gửi trong Chat',
+  dlSourceOriginTask: 'Từ công việc',
+  dlSourceOriginMeeting: 'Từ cuộc họp',
+  dlSourceOriginEmail: 'Từ email',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Họp',
+  dlSideSourceEmail: 'Email',
+  dlSideSourceTask: 'Công việc',
+  dlSearchNoResults: 'Không có kết quả cho “{query}”',
 } satisfies Record<keyof typeof zh, string>

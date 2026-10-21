@@ -86,4 +86,19 @@ export const zh = {
   dlBulkConfirmTitleOther: '将 {n} 个文档移到回收站？',
   dlBulkConfirmBody: '项目会在回收站保留 30 天，之后永久删除。',
   dlTrashBanner30: '项目会在回收站保留 30 天，之后永久删除。',
+  dlStarredUnavailableTitle: '此服务器暂不支持星标',
+  dlStarredUnavailableHint:
+    '你的 UniWork 服务器需要更新后才能保存加星标的文档。请联系管理员更新，然后重试。',
+  dlElsewhereUnavailableTitle: '此服务器暂不支持“来自其他位置”',
+  dlElsewhereUnavailableHint:
+    '你的 UniWork 服务器需要更新后才能显示聊天、会议、邮件和任务中发送的文件。请联系管理员更新，然后重试。',
+  dlSourceOriginChat: '发送于聊天',
+  dlSourceOriginTask: '来自任务',
+  dlSourceOriginMeeting: '来自会议',
+  dlSourceOriginEmail: '来自邮件',
+  dlSideSourceChat: '聊天',
+  dlSideSourceMeeting: '会议',
+  dlSideSourceEmail: '邮件',
+  dlSideSourceTask: '任务',
+  dlSearchNoResults: '没有找到“{query}”的结果',
 }

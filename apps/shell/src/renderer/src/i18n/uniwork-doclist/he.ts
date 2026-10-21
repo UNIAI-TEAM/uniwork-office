@@ -88,4 +88,19 @@ export const he = {
   dlBulkConfirmTitleOther: 'להעביר {n} מסמכים לאשפה?',
   dlBulkConfirmBody: 'פריטים נשארים באשפה 30 יום ואז נמחקים לצמיתות.',
   dlTrashBanner30: 'פריטים נשארים באשפה 30 יום ואז נמחקים לצמיתות.',
+  dlStarredUnavailableTitle: 'מסומנים בכוכב עדיין לא זמינים בשרת הזה',
+  dlStarredUnavailableHint:
+    'שרת UniWork שלך צריך עדכון כדי לשמור מסמכים מסומנים בכוכב. בקשו ממנהל לעדכן אותו ונסו שוב.',
+  dlElsewhereUnavailableTitle: 'ממקומות אחרים עדיין לא זמין בשרת הזה',
+  dlElsewhereUnavailableHint:
+    'שרת UniWork שלך צריך עדכון כדי להציג קבצים שנשלחו בצ\'אט, בפגישות, בדוא"ל ובמשימות. בקשו ממנהל לעדכן אותו ונסו שוב.',
+  dlSourceOriginChat: 'נשלח בצ׳אט',
+  dlSourceOriginTask: 'ממשימה',
+  dlSourceOriginMeeting: 'מפגישה',
+  dlSourceOriginEmail: 'מאימייל',
+  dlSideSourceChat: 'צ׳אט',
+  dlSideSourceMeeting: 'פגישות',
+  dlSideSourceEmail: 'אימייל',
+  dlSideSourceTask: 'משימות',
+  dlSearchNoResults: 'אין תוצאות עבור “{query}”',
 } satisfies Record<keyof typeof zh, string>

@@ -91,4 +91,19 @@ export const it = {
     'Gli elementi restano nel cestino per 30 giorni, poi vengono eliminati definitivamente.',
   dlTrashBanner30:
     'Gli elementi restano nel cestino per 30 giorni, poi vengono eliminati definitivamente.',
+  dlStarredUnavailableTitle: 'Gli Speciali non sono ancora disponibili su questo server',
+  dlStarredUnavailableHint:
+    'Il tuo server UniWork deve essere aggiornato per conservare i documenti speciali. Chiedi a un amministratore di aggiornarlo, poi riprova.',
+  dlElsewhereUnavailableTitle: 'Da altrove non è ancora disponibile su questo server',
+  dlElsewhereUnavailableHint:
+    'Il tuo server UniWork deve essere aggiornato per mostrare i file inviati in Chat, Riunioni, Email e Attività. Chiedi a un amministratore di aggiornarlo, poi riprova.',
+  dlSourceOriginChat: 'Inviato in chat',
+  dlSourceOriginTask: 'Da un’attività',
+  dlSourceOriginMeeting: 'Da una riunione',
+  dlSourceOriginEmail: 'Da un’email',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Riunioni',
+  dlSideSourceEmail: 'Email',
+  dlSideSourceTask: 'Attività',
+  dlSearchNoResults: 'Nessun risultato per “{query}”',
 } satisfies Record<keyof typeof zh, string>

@@ -89,4 +89,19 @@ export const cs = {
   dlBulkConfirmTitleOther: 'Přesunout dokumenty ({n}) do koše?',
   dlBulkConfirmBody: 'Položky zůstanou v koši 30 dní a pak se trvale smažou.',
   dlTrashBanner30: 'Položky zůstanou v koši 30 dní a pak se trvale smažou.',
+  dlStarredUnavailableTitle: 'Dokumenty s hvězdičkou zatím na tomto serveru nejsou dostupné',
+  dlStarredUnavailableHint:
+    'Server UniWork je potřeba aktualizovat, aby uměl ukládat dokumenty s hvězdičkou. Požádejte správce o aktualizaci a zkuste to znovu.',
+  dlElsewhereUnavailableTitle: 'Soubory odjinud zatím na tomto serveru nejsou dostupné',
+  dlElsewhereUnavailableHint:
+    'Server UniWork je potřeba aktualizovat, aby uměl zobrazit soubory odeslané v chatu, schůzkách, e-mailech a úkolech. Požádejte správce o aktualizaci a zkuste to znovu.',
+  dlSourceOriginChat: 'Odesláno v chatu',
+  dlSourceOriginTask: 'Z úkolu',
+  dlSourceOriginMeeting: 'Ze schůzky',
+  dlSourceOriginEmail: 'Z e-mailu',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Schůzky',
+  dlSideSourceEmail: 'E-mail',
+  dlSideSourceTask: 'Úkoly',
+  dlSearchNoResults: 'Nic nenalezeno pro „{query}“',
 } satisfies Record<keyof typeof zh, string>

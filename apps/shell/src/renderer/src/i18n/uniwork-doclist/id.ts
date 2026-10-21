@@ -88,4 +88,19 @@ export const id = {
   dlBulkConfirmTitleOther: 'Pindahkan {n} dokumen ke sampah?',
   dlBulkConfirmBody: 'Item tetap di sampah selama 30 hari, lalu dihapus permanen.',
   dlTrashBanner30: 'Item tetap di sampah selama 30 hari, lalu dihapus permanen.',
+  dlStarredUnavailableTitle: 'Berbintang belum tersedia di server ini',
+  dlStarredUnavailableHint:
+    'Server UniWork Anda perlu diperbarui agar dapat menyimpan dokumen berbintang. Minta admin memperbaruinya, lalu coba lagi.',
+  dlElsewhereUnavailableTitle: 'Dari tempat lain belum tersedia di server ini',
+  dlElsewhereUnavailableHint:
+    'Server UniWork Anda perlu diperbarui agar dapat menampilkan file yang dikirim di Obrolan, Rapat, Email, dan Tugas. Minta admin memperbaruinya, lalu coba lagi.',
+  dlSourceOriginChat: 'Dikirim di Chat',
+  dlSourceOriginTask: 'Dari tugas',
+  dlSourceOriginMeeting: 'Dari rapat',
+  dlSourceOriginEmail: 'Dari email',
+  dlSideSourceChat: 'Chat',
+  dlSideSourceMeeting: 'Rapat',
+  dlSideSourceEmail: 'Email',
+  dlSideSourceTask: 'Tugas',
+  dlSearchNoResults: 'Tidak ada hasil untuk “{query}”',
 } satisfies Record<keyof typeof zh, string>
