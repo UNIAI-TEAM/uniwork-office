@@ -32,4 +32,31 @@ describe('the Documents screen draws one vertical scrollbar (W3)', () => {
     expect(rule(homeCss, '.uw-sr-only')).toMatch(/position:\s*absolute/)
     expect(rule(documentsHomeCss, '.dh-doc-subpath')).toMatch(/position:\s*relative/)
   })
+
+  // RV-11: any other absolutely positioned descendant must clip inside the list area too
+  it('the scroller is itself a containing block, so absolute descendants clip inside the list area', () => {
+    expect(rule(documentsHomeCss, '.dh-main')).toMatch(/position:\s*relative/)
+  })
+
+  // VS-4: the open dialog is a child of `.content` (the Open-from-UniWork card sits in it), so while it
+  // is up a wheel over its fixed overlay chains to the page scroller behind it, and that scroller's
+  // bar shows through the blurred overlay: two scrollers. The page holds still while a modal is open.
+  it('the page scroller holds still while a modal overlay is open inside it', () => {
+    const block = rule(homeCss, '.content:has(.modal-overlay)')
+    expect(block).toMatch(/overflow-y:\s*hidden/)
+    // the bar's track stays, so the page does not shift sideways behind the blur
+    expect(block).toMatch(/scrollbar-gutter:\s*stable/)
+  })
+})
+
+// RV-19: V-STATES removed the create-time Share with workspace toggle (New menu item + quick strip);
+// its rules had no caller left
+describe('documents-home.css keeps no rules for the removed create share toggle (RV-19)', () => {
+  it.each(['.dh-new-share', '.dh-new-check', '.dh-quick-share', '.dh-quick-check'])(
+    '%s is gone',
+    (selector) => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      expect(documentsHomeCss).not.toMatch(new RegExp(`${escaped}(?![\\w-])`))
+    },
+  )
 })
