@@ -248,7 +248,8 @@ describe('DocumentsHome: the Sao button of "Sao · ⋯" (A-REC row 12)', () => {
           children: [],
         }),
       ),
-      uniworkListChildren: vi.fn(async () => ok({ items: [], nextCursor: null })),
+      // the workspace root lists the root's children
+      uniworkListChildren: vi.fn(async () => ok({ items: [doc({ id: 'w1' })], nextCursor: null })),
       uniworkListDocuments: vi.fn(async () => listed()),
       uniworkListFavorites: vi.fn(() => favorites()),
       uniworkListSharedWithMe: vi.fn(async () => listed()),

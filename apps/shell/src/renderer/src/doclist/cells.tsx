@@ -16,6 +16,9 @@ import { EMPTY_CELL, formatDaysLeft, formatListDate } from './format'
 import { DELETING_SOON_DAYS, daysLeft } from './groups'
 import { editorInitials, editorNameOf } from './table-model'
 
+/** the file / folder icon box of a table row (doclist-canvas: 32px on every screen) */
+export const DOC_ICON_SIZE = 32
+
 /**
  * Grid track of each column. The fixed widths are the ones `columns.ts` builds
  * its narrow ladder on (cell padding included); Tên takes what is left.

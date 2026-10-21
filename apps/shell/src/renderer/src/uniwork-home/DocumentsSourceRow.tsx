@@ -2,7 +2,7 @@ import type { UniworkSourceFile } from '../../../shared/home-api'
 import { FileBadge } from '../FileBadge'
 import { useI18n } from '../locale'
 import { FolderMenu } from '../uniwork-folders/FolderMenu'
-import { Cell, Empty, Person, trackOf } from '../doclist/cells'
+import { Cell, DOC_ICON_SIZE, Empty, Person, trackOf } from '../doclist/cells'
 import type { ColumnId } from '../doclist/columns'
 import { formatBytes, formatListDate } from '../doclist/format'
 import { openable } from './source-open-model'
@@ -50,7 +50,7 @@ export function DocumentsSourceRow({
       case 'name':
         return (
           <Cell key={col} col={col}>
-            <FileBadge ext={sourceExtension(source)} size={28} />
+            <FileBadge ext={sourceExtension(source)} size={DOC_ICON_SIZE} />
             <div className="dh-name-stack">
               <button type="button" className="dh-doc-open" title={source.name} onClick={primary}>
                 {source.name}

@@ -13,7 +13,7 @@ import { FolderMenu, type FolderMenuItem } from '../uniwork-folders/FolderMenu'
 import { FolderGlyph } from '../uniwork-folders/UniworkFolderTree'
 import { isFolderEntry } from '../uniwork-folders/uniwork-folders-model'
 import { rowSizeBytes, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
-import { AccessContent, Cell, EditorContent, trackOf } from './cells'
+import { AccessContent, Cell, DOC_ICON_SIZE, EditorContent, trackOf } from './cells'
 import { specialColumn, type ColumnId, type DocListScreen } from './columns'
 import { formatBytes, formatListDate } from './format'
 import { SpecialCell } from './special-cells'
@@ -71,10 +71,30 @@ export interface DocRowProps {
   rename: DocRowRename | null
   /** the row's own buttons before its "…" (the shelf's Bỏ lưu trữ) */
   actions?: ReactNode
+  /**
+   * Bỏ gắn sao from the row's Sao button. The button is drawn only when this is given and the row
+   * knows it is starred (only the Starred list carries the star time): never a dead toggle.
+   */
+  onUnstar?: (doc: DocumentsHomeDoc) => void
   menu: FolderMenuItem[]
   menuOpen: boolean
   onMenuOpenChange: (open: boolean) => void
   onOpen: (doc: DocumentsHomeDoc) => void
+}
+
+/** the filled star of the Sao button (doclist-canvas Rules: "Sao · ⋯"); its colour is the button's */
+function StarGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
 }
 
 /** One document row of the shared Documents table. */
@@ -93,6 +113,7 @@ export function DocRow({
   subline,
   rename,
   actions,
+  onUnstar,
   menu,
   menuOpen,
   onMenuOpenChange,
@@ -127,7 +148,10 @@ export function DocRow({
                 <FolderGlyph />
               </span>
             ) : (
-              <FileBadge ext={doc.kind === 'page' ? 'page' : docExtension(doc)} size={28} />
+              <FileBadge
+                ext={doc.kind === 'page' ? 'page' : docExtension(doc)}
+                size={DOC_ICON_SIZE}
+              />
             )}
             {rename ? (
               <RenameField
@@ -205,6 +229,18 @@ export function DocRow({
       case 'actions':
         return (
           <Cell key={col} col={col} onClick={(e) => e.stopPropagation()}>
+            {onUnstar && doc.favoritedAt && (
+              <button
+                type="button"
+                className="dh-row-btn dh-star-btn"
+                aria-pressed="true"
+                aria-label={`${t('dlActUnstar')} ${doc.title}`}
+                title={t('dlActUnstar')}
+                onClick={() => onUnstar(doc)}
+              >
+                <StarGlyph />
+              </button>
+            )}
             {actions}
             {menu.length > 0 && (
               <FolderMenu

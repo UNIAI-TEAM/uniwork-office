@@ -63,6 +63,8 @@
   --warning-text: #8a5300;
   --warning-bg: #fff4e0;
   --warning-border: #f2d9a6;
+  /* a set star (Gắn sao): the amber the local list always drew, a lighter one on dark */
+  --star: #f5a623;
   /* UniWork module tints (pale fill + readable glyph) and the info signal (uniwork tokens.css) */
   --tint-gray: #eeeeef;
   --tint-gray-fg: #5c5c5c;
@@ -177,6 +179,7 @@
   --warning-text: #f0b95a;
   --warning-bg: #3a2f1a;
   --warning-border: #5a4a28;
+  --star: #fbbf24;
   /* UniWork module tints (pale fill + readable glyph) and the info signal (uniwork tokens.css) */
   --tint-gray: #262626;
   --tint-gray-fg: #a1a1aa;
@@ -273,6 +276,7 @@
     --warning-text: #f0b95a;
     --warning-bg: #3a2f1a;
     --warning-border: #5a4a28;
+    --star: #fbbf24;
     /* UniWork module tints (pale fill + readable glyph) and the info signal (uniwork tokens.css) */
     --tint-gray: #262626;
     --tint-gray-fg: #a1a1aa;

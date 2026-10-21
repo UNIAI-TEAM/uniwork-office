@@ -1,4 +1,5 @@
 import { useCallback, useState, type ReactNode } from 'react'
+import { FileBadge } from '../FileBadge'
 import { useI18n } from '../locale'
 import {
   DEFAULT_DOCUMENTS_HOME_FILTERS,
@@ -59,15 +60,18 @@ export function FilterBar({ filters, onChange, authors, lead }: FilterBarProps) 
       >
         {DOCUMENTS_HOME_TYPE_CHIPS.map((chip) => {
           const on = filters.format === chip.value
+          // every type but Mọi loại leads with its 18px badge (doclist-canvas chip)
+          const icon = chip.value !== 'all'
           return (
             <button
               key={chip.value}
               type="button"
-              className={`dh-filter-type${on ? ' on' : ''}`}
+              className={`dh-filter-type${icon ? ' has-icon' : ''}${on ? ' on' : ''}`}
               data-chip={chip.value}
               aria-pressed={on}
               onClick={() => patch({ format: chip.value as DocumentsHomeTypeFilter })}
             >
+              {icon && <FileBadge ext={chip.value} size={18} />}
               {chip.labelKey ? t(chip.labelKey) : chip.literal}
             </button>
           )

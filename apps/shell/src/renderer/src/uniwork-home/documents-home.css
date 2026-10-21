@@ -147,7 +147,8 @@
   gap: 18px;
   min-width: 0;
   min-height: 0;
-  padding: 20px 28px 36px;
+  /* doclist-canvas page padding: 24 top, 32 at the sides, 40 at the foot */
+  padding: 24px 32px 40px;
   overflow-y: auto;
 }
 
@@ -179,9 +180,9 @@
   margin: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -594,13 +595,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
-  padding: 0 10px;
+  height: 34px;
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .dh-filter-chip:focus-within {
@@ -619,7 +620,7 @@
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   outline: none;
@@ -631,14 +632,14 @@
 }
 
 .dh-filter-clear {
-  height: 32px;
-  padding: 0 10px;
+  height: 34px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: var(--accent);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -656,16 +657,28 @@
 }
 
 .dh-filter-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 32px;
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
-  color: var(--text-secondary);
+  color: var(--text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
+}
+
+/* a chip with its 18px type badge starts closer to the badge (doclist-canvas chip) */
+.dh-filter-type.has-icon {
+  padding-inline-start: 7px;
+}
+
+.dh-filter-type > :is(img, svg) {
+  flex: none;
 }
 
 .dh-filter-type:hover {
@@ -677,7 +690,7 @@
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .dh-filter-type:focus-visible {
@@ -808,15 +821,30 @@
 .dh-doc-head > [role='columnheader'],
 .dh-doc-row > [role='cell'] {
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 12px;
+}
+
+/* doclist-canvas cell: 9px over and under, so a row is 9 + the 32px icon + 9 */
+.dh-doc-row > [role='cell'] {
+  padding-block: 9px;
+}
+
+/* the fixed tracks (Chọn, Cập nhật, Dung lượng, Thao tác) keep 8px at the sides: their widths are
+   the web's ladder numbers (doclist/columns.ts), and 12px would clip "Hôm qua, 16:30" or the two
+   28px buttons of "Sao · ⋯" */
+.dh-doc-head
+  > :is([data-col='select'], [data-col='updated'], [data-col='size'], [data-col='actions']),
+.dh-doc-row
+  > :is([data-col='select'], [data-col='updated'], [data-col='size'], [data-col='actions']) {
+  padding-inline: 8px;
 }
 
 .dh-doc-head {
-  height: 36px;
+  height: 38px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-subtle);
   color: var(--text-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -887,7 +915,6 @@
 }
 
 .dh-doc-row {
-  min-height: 52px;
   border-bottom: 1px solid var(--border);
   font-size: 13px;
   cursor: pointer;
@@ -1156,6 +1183,21 @@
   color: var(--text);
 }
 
+/* UNI-2047 B7: the Sao of "Sao · ⋯" on a starred row (doclist/DocRow): a filled star in the star
+   token, Bỏ gắn sao on click */
+.dh-star-btn {
+  color: var(--star);
+}
+
+.dh-star-btn:hover {
+  color: var(--star);
+}
+
+.dh-star-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .dh-empty {
   padding: 28px 16px;
   border: 1px solid var(--border);
@@ -1359,7 +1401,7 @@
 }
 
 .dh-doc-row.grouped .dh-cell-name {
-  padding-inline-start: calc(8px + var(--dh-group-indent));
+  padding-inline-start: calc(12px + var(--dh-group-indent));
 }
 
 .dh-group-count {
@@ -1375,15 +1417,15 @@
 .dh-group-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  height: 32px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 8px 12px;
   border: 0;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -1435,25 +1477,27 @@
 }
 
 /* Recent's Tất cả / Đã mở / Đã sửa segment (doclist/RecentSegment) */
+/* doclist-canvas segment: a filled track, the picked one a raised thumb on it */
 .dh-segment {
+  --dh-segment-thumb-shadow: 0 1px 2px var(--border-strong);
   display: inline-flex;
   align-self: flex-start;
   gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-subtle);
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--bg-hover-subtle);
 }
 
 .dh-segment-btn {
-  height: 28px;
+  height: 30px;
   padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  border: 0;
+  border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -1468,10 +1512,10 @@
 }
 
 .dh-segment-btn[aria-pressed='true'] {
-  border-color: var(--border);
   background: var(--surface);
   color: var(--text);
   font-weight: 600;
+  box-shadow: var(--dh-segment-thumb-shadow);
 }
 
 .dh-segment-btn:focus-visible {

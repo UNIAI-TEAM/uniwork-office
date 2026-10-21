@@ -2285,8 +2285,9 @@ body.vib .home {
   background: var(--bg-hover-subtle);
 }
 
-.star-btn:hover {
-  color: #f5a623;
+.star-btn:hover,
+.star-btn.starred {
+  color: var(--star);
 }
 
 @keyframes menu-in {
