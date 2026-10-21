@@ -16,7 +16,7 @@ export interface NewMenuShare {
 
 /**
  * UNI-1959: the Documents home "New" button and the web's menu behind it
- * (documents-home-create.tsx `CreateMenu`): UniNote, a divider, the six file
+ * (documents-home-create.tsx `CreateMenu`): UniNote, a divider, the seven file
  * kinds, a divider, then "Share with workspace" with its hint; inside an open
  * folder a "Folder" row comes first, followed by a divider. Every row shows its
  * icon, its name and, right-aligned in muted mono, its extension. Menu-button

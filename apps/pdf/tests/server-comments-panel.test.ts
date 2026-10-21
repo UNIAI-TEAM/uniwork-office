@@ -125,6 +125,7 @@ function fakeBridge(
       }),
     ),
     searchMentions: vi.fn(() => ok({ candidates: [] })),
+    openVersion: vi.fn(() => Promise.resolve({ opened: true })),
     onReveal: vi.fn((handler) => {
       revealHandler = handler
       return () => {
@@ -392,6 +393,80 @@ describe('reveal (G8-15)', () => {
       await flush()
     })
     expect(onRevealRequest).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a lost comment and its older version (UNI-2033)', () => {
+  const VIEW = 'View in version 2'
+  const viewButtons = () =>
+    [...el.querySelectorAll<HTMLButtonElement>('button')].filter((b) => b.textContent === VIEW)
+
+  it('offers "View in version N" and asks the shell once, with the path, id and N', async () => {
+    const bridge = fakeBridge([
+      comment({
+        id: 'c1',
+        anchor_state: 'lost',
+        anchor_version_id: 'ver-0',
+        anchor_version_no: 2,
+      }),
+    ])
+    await mount(bridge)
+    expect(viewButtons()).toHaveLength(1)
+    await act(async () => {
+      viewButtons()[0]!.click()
+      await flush()
+    })
+    expect(bridge.openVersion).toHaveBeenCalledTimes(1)
+    expect(bridge.openVersion).toHaveBeenCalledWith({ path: PATH, commentId: 'c1', versionNo: 2 })
+    expect(el.textContent).not.toContain(collabStrings('en').collabVersionViewUnavailable)
+  })
+
+  it('shows the unavailable line when the shell could not open it', async () => {
+    const bridge = fakeBridge([
+      comment({
+        id: 'c1',
+        anchor_state: 'lost',
+        anchor_version_id: 'ver-0',
+        anchor_version_no: 2,
+      }),
+    ])
+    ;(bridge.openVersion as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      Promise.resolve({ opened: false }),
+    )
+    await mount(bridge)
+    await act(async () => {
+      viewButtons()[0]!.click()
+      await flush()
+    })
+    expect(el.textContent).toContain(collabStrings('en').collabVersionViewUnavailable)
+  })
+
+  it('no action without a version number', async () => {
+    const bridge = fakeBridge([
+      comment({ id: 'c1', anchor_state: 'lost', anchor_version_id: 'ver-0' }),
+    ])
+    await mount(bridge)
+    expect(el.textContent).not.toContain('View in version')
+  })
+
+  it('in the version it was last anchored on, a lost thread reveals at its page and rect', async () => {
+    // the context's open version is ver-1
+    const bridge = fakeBridge([
+      comment({
+        id: 'c1',
+        anchor: makePdfAnchor(3, RECT),
+        anchor_state: 'lost',
+        anchor_version_id: 'ver-1',
+        anchor_version_no: 1,
+      }),
+    ])
+    const { goTo } = await mount(bridge)
+    await act(async () => {
+      bridge.reveal({ path: PATH, commentId: 'c1' })
+      await flush()
+    })
+    expect(goTo).toHaveBeenCalledWith(2, RECT)
+    expect(el.textContent).not.toContain('View in version')
   })
 })
 

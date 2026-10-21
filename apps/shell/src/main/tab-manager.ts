@@ -145,6 +145,14 @@ export class TabManager {
     private readonly uiScale: () => number = () => 1,
     /** developer tools are offered (a development build): F12 opens them where the module does not bind it */
     private readonly devToolsEnabled: () => boolean = () => false,
+    /**
+     * UNI-2033: the title the tab strip shows for a tab (a read-only version copy says so). The
+     * stored title stays the file name, so renames and re-titles keep working on the raw value.
+     */
+    private readonly decorateTitle: (filePath: string | undefined, title: string) => string = (
+      _filePath,
+      title,
+    ) => title,
   ) {
     // Layout once synchronously for macOS/Windows (bounds are already correct),
     // then once more on the next tick. On Linux/X11, `resize` fires before the
@@ -406,7 +414,7 @@ export class TabManager {
     return this.tabs.map((t) => ({
       id: t.id,
       kind: t.kind,
-      title: t.title,
+      title: this.decorateTitle(t.filePath, t.title),
       closable: t.id !== HOME_ID,
       active: t.id === this.activeId,
       ...(t.filePath ? { filePath: t.filePath } : {}),

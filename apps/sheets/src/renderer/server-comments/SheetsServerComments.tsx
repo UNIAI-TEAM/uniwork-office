@@ -85,11 +85,21 @@ function versionOf(c: CollabComment): string | null {
   return typeof c.anchor_version_id === 'string' ? c.anchor_version_id : null
 }
 
-function rootsOf(ctl: CollabController): TrackedRoot[] {
+/**
+ * The roots the store locates. A root the server holds as lost is not located, except in the
+ * version it was last anchored on (UNI-2033: the read-only copy of that version), where its anchor
+ * is still the real one.
+ */
+function rootsOf(ctl: CollabController, openVersionId?: string): TrackedRoot[] {
   return [...ctl.threads, ...ctl.resolved].map((t) => ({
     id: t.id,
     anchor: t.root.anchor,
-    anchor_state: t.root.anchor_state,
+    anchor_state:
+      t.root.anchor_state === 'lost' &&
+      openVersionId !== undefined &&
+      versionOf(t.root) === openVersionId
+        ? null
+        : t.root.anchor_state,
     anchor_version_id: versionOf(t.root),
     deleted: t.deleted,
   }))
@@ -216,17 +226,6 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
     [store, storeVersion],
   )
 
-  const ctl = useCollabThreads(source, host, { adapter, strings })
-  const ctlRef = useRef(ctl)
-  ctlRef.current = ctl
-
-  // the latest server roots feed the store (new ids located once; known ids keep their live place);
-  // a reset (another open of the workbook) re-locates the listed roots at once
-  const epoch = useSyncExternalStore(store.subscribe, store.getEpoch)
-  useEffect(() => {
-    store.track(rootsOf(ctl), viewRef.current.sheets())
-  }, [store, epoch, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // base_version_id of a new root: the version open at load, then the last Save receipt
   const versionRef = useRef<string | null>(mode.versionId)
   // mirrored in state so the "save first" line appears and goes away with it
@@ -237,6 +236,32 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
     // roots anchored on this version are taken through the edits made from here on
     store.markVersion(mode.versionId)
   }, [mode.versionId, store])
+
+  // "View in version N" of a lost thread: the desktop shell opens that version read-only; a host
+  // without it (the web frame) gives the kit no handler, so the action does not show
+  const onViewVersion = useMemo(() => {
+    const { api, path } = mode
+    return api.openVersion
+      ? ({ commentId, versionNo }: { commentId: string; versionNo: number }) =>
+          api.openVersion!({ path, commentId, versionNo })
+      : undefined
+  }, [mode])
+
+  const ctl = useCollabThreads(source, host, {
+    adapter,
+    strings,
+    openVersionId: knownVersion ?? undefined,
+    ...(onViewVersion ? { onViewVersion } : {}),
+  })
+  const ctlRef = useRef(ctl)
+  ctlRef.current = ctl
+
+  // the latest server roots feed the store (new ids located once; known ids keep their live place);
+  // a reset (another open of the workbook) re-locates the listed roots at once
+  const epoch = useSyncExternalStore(store.subscribe, store.getEpoch)
+  useEffect(() => {
+    store.track(rootsOf(ctl, knownVersion ?? undefined), viewRef.current.sheets())
+  }, [store, epoch, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // after each Save receipt: one anchor map for every located (or lost) root, built from a fresh list
   // (with the panel closed nothing else lists, so a comment made since the first list would be missed).

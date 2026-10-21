@@ -3,6 +3,7 @@ import iconXlsx from './assets/file-xlsx.svg'
 import iconPptx from './assets/file-pptx.svg'
 import iconPdf from './assets/file-pdf.svg'
 import iconMd from './assets/file-md.svg'
+import iconTxt from './assets/file-txt.svg'
 import iconHtml from './assets/file-html.svg'
 
 const FILE_ICONS: Record<string, string> = {
@@ -13,6 +14,7 @@ const FILE_ICONS: Record<string, string> = {
   pdf: iconPdf,
   md: iconMd,
   markdown: iconMd,
+  txt: iconTxt,
   html: iconHtml,
   htm: iconHtml,
 }

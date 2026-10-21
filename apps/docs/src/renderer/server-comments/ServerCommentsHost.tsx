@@ -83,11 +83,21 @@ export interface ServerCommentsHostProps {
   codec?: DocxCodecOptions
 }
 
-function rootsOf(ctl: CollabController): TrackedRoot[] {
+/**
+ * The roots the tracker locates. A root the server holds as lost is not located, except in the
+ * version it was last anchored on (UNI-2033: the read-only copy of that version), where its anchor
+ * is still the real one.
+ */
+function rootsOf(ctl: CollabController, openVersionId?: string): TrackedRoot[] {
   return [...ctl.threads, ...ctl.resolved].map((t) => ({
     id: t.id,
     anchor: t.root.anchor,
-    anchor_state: t.root.anchor_state,
+    anchor_state:
+      t.root.anchor_state === 'lost' &&
+      openVersionId !== undefined &&
+      t.root.anchor_version_id === openVersionId
+        ? null
+        : t.root.anchor_state,
     resolved: t.resolved,
     deleted: t.deleted,
   }))
@@ -183,15 +193,6 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const adapter = useMemo(() => anchors?.adapter(), [anchors, adapterSeq])
 
-  const ctl = useCollabThreads(source, host, { adapter, strings })
-  const ctlRef = useRef(ctl)
-  ctlRef.current = ctl
-
-  // the latest server roots feed the tracker (new ids located once; known ids keep their live range)
-  useEffect(() => {
-    anchors?.syncThreads(rootsOf(ctl))
-  }, [anchors, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // base_version_id of a new root: the version open at load, then the last Save receipt
   const versionRef = useRef<string | null>(mode.versionId)
   // mirrored in state so the "save first" line appears and goes away with it
@@ -200,6 +201,30 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
     versionRef.current = mode.versionId
     setKnownVersion(mode.versionId)
   }, [mode.versionId])
+
+  // "View in version N" of a lost thread: the desktop shell opens that version read-only; a host
+  // without it (the web frame) gives the kit no handler, so the action does not show
+  const onViewVersion = useMemo(() => {
+    const { api, path } = mode
+    return api.openVersion
+      ? ({ commentId, versionNo }: { commentId: string; versionNo: number }) =>
+          api.openVersion!({ path, commentId, versionNo })
+      : undefined
+  }, [mode])
+
+  const ctl = useCollabThreads(source, host, {
+    adapter,
+    strings,
+    openVersionId: knownVersion ?? undefined,
+    ...(onViewVersion ? { onViewVersion } : {}),
+  })
+  const ctlRef = useRef(ctl)
+  ctlRef.current = ctl
+
+  // the latest server roots feed the tracker (new ids located once; known ids keep their live range)
+  useEffect(() => {
+    anchors?.syncThreads(rootsOf(ctl, knownVersion ?? undefined))
+  }, [anchors, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // after each Save receipt: one anchor map for every located (or lost) root, built from a fresh list
   // (with the panel closed nothing else lists, so a comment made since the first list would be missed).

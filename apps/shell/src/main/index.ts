@@ -142,6 +142,7 @@ import { createSourceSaveHint } from './uniwork-docs/source-view'
 import { saveTabToUniWork } from './uniwork-docs/first-save-open'
 import { mergeEditorStates, startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { createActiveDocRefresh } from './uniwork-docs/active-doc-refresh'
+import { withViewVersionTitle } from './uniwork-docs/view-title'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
@@ -368,6 +369,7 @@ import {
   type FolderErrors,
 } from './folder-tree'
 import { PendingProjects, type PendingProject, type PendingProjectKind } from './pending-project'
+import { createBlankTxtFile } from './new-txt-file'
 import {
   FOLDER_ROOTS_KEY,
   describeExtraRoot,
@@ -408,6 +410,7 @@ import {
   detachedSetFileFor,
   detachedWebContentsFor,
   detachedRetitleFile,
+  setDetachedTitleDecorator,
   detachedSetTitleFor,
   detachedWindowForWebContents,
   dockBandFor,
@@ -717,8 +720,10 @@ const tMain = createI18n({
     untitledMarkdown: '未命名 Markdown',
     untitledHtml: '未命名 HTML',
     untitledPdf: '未命名 PDF',
+    untitledTxt: '未命名文本',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: '导出为 PDF…',
@@ -834,8 +839,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Untitled Markdown',
     untitledHtml: 'Untitled HTML',
     untitledPdf: 'Untitled PDF',
+    untitledTxt: 'Untitled text',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Export as PDF…',
@@ -951,8 +958,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown chưa có tiêu đề',
     untitledHtml: 'HTML chưa có tiêu đề',
     untitledPdf: 'PDF chưa có tiêu đề',
+    untitledTxt: 'Văn bản chưa có tiêu đề',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Văn bản',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Xuất dưới dạng PDF…',
@@ -1072,8 +1081,10 @@ const tMain = createI18n({
     untitledMarkdown: '無題の Markdown',
     untitledHtml: '無題の HTML',
     untitledPdf: '無題の PDF',
+    untitledTxt: '無題のテキスト',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'PDF として書き出す…',
@@ -1194,8 +1205,10 @@ const tMain = createI18n({
     untitledMarkdown: '제목 없는 Markdown',
     untitledHtml: '제목 없는 HTML',
     untitledPdf: '제목 없는 PDF',
+    untitledTxt: '제목 없는 텍스트',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'PDF로 내보내기…',
@@ -1314,8 +1327,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown sans titre',
     untitledHtml: 'HTML sans titre',
     untitledPdf: 'PDF sans titre',
+    untitledTxt: 'Texte sans titre',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exporter en PDF…',
@@ -1438,8 +1453,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Unbenanntes Markdown',
     untitledHtml: 'Unbenanntes HTML',
     untitledPdf: 'Unbenanntes PDF',
+    untitledTxt: 'Unbenannter Text',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Als PDF exportieren…',
@@ -1561,8 +1578,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown sin título',
     untitledHtml: 'HTML sin título',
     untitledPdf: 'PDF sin título',
+    untitledTxt: 'Texto sin título',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exportar como PDF…',
@@ -1683,8 +1702,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown ไม่มีชื่อ',
     untitledHtml: 'HTML ไม่มีชื่อ',
     untitledPdf: 'PDF ไม่มีชื่อ',
+    untitledTxt: 'ข้อความไม่มีชื่อ',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'ส่งออกเป็น PDF…',
@@ -1801,8 +1822,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown tanpa judul',
     untitledHtml: 'HTML tanpa judul',
     untitledPdf: 'PDF tanpa judul',
+    untitledTxt: 'Teks tanpa judul',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Ekspor sebagai PDF…',
@@ -1923,8 +1946,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown без названия',
     untitledHtml: 'HTML без названия',
     untitledPdf: 'PDF без названия',
+    untitledTxt: 'Текст без названия',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Экспортировать в PDF…',
@@ -2045,8 +2070,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown بدون عنوان',
     untitledHtml: 'HTML بدون عنوان',
     untitledPdf: 'PDF بدون عنوان',
+    untitledTxt: 'نص بدون عنوان',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'تصدير بتنسيق PDF…',
@@ -2163,8 +2190,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown sem título',
     untitledHtml: 'HTML sem título',
     untitledPdf: 'PDF sem título',
+    untitledTxt: 'Texto sem título',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exportar como PDF…',
@@ -2285,8 +2314,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown senza titolo',
     untitledHtml: 'HTML senza titolo',
     untitledPdf: 'PDF senza titolo',
+    untitledTxt: 'Testo senza titolo',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Esporta come PDF…',
@@ -2407,8 +2438,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown bez tytułu',
     untitledHtml: 'HTML bez tytułu',
     untitledPdf: 'PDF bez tytułu',
+    untitledTxt: 'Tekst bez tytułu',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Eksportuj jako PDF…',
@@ -2529,8 +2562,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown bez názvu',
     untitledHtml: 'HTML bez názvu',
     untitledPdf: 'PDF bez názvu',
+    untitledTxt: 'Text bez názvu',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exportovat jako PDF…',
@@ -2649,8 +2684,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Naamloos Markdown',
     untitledHtml: 'Naamloos HTML',
     untitledPdf: 'Naamloze PDF',
+    untitledTxt: 'Naamloze tekst',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exporteren als PDF…',
@@ -2772,8 +2809,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown tanpa tajuk',
     untitledHtml: 'HTML tanpa tajuk',
     untitledPdf: 'PDF tanpa tajuk',
+    untitledTxt: 'Teks tanpa tajuk',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Eksport sebagai PDF…',
@@ -2892,8 +2931,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown ללא שם',
     untitledHtml: 'HTML ללא שם',
     untitledPdf: 'PDF ללא שם',
+    untitledTxt: 'טקסט ללא שם',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'ייצוא כ-PDF…',
@@ -3011,8 +3052,10 @@ const tMain = createI18n({
     untitledMarkdown: 'अनाम Markdown',
     untitledHtml: 'अनाम HTML',
     untitledPdf: 'अनाम PDF',
+    untitledTxt: 'अनाम पाठ',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'PDF के रूप में निर्यात…',
@@ -3132,8 +3175,10 @@ const tMain = createI18n({
     untitledMarkdown: '未命名 Markdown',
     untitledHtml: '未命名 HTML',
     untitledPdf: '未命名 PDF',
+    untitledTxt: '未命名文字',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: '匯出為 PDF…',
@@ -3739,6 +3784,8 @@ function createShellWindow(): void {
     activeDocRefresh.gainedFocus(tabManager?.activeFilePath())
   })
 
+  const inUniworkStore = (path: string): boolean =>
+    uniworkDocs?.service.store.isInside(path) === true
   const manager = new TabManager(
     win,
     () => {
@@ -3764,8 +3811,13 @@ function createShellWindow(): void {
     () => currentUiScale,
     // F12 opens the developer tools in a development build only
     () => !app.isPackaged,
+    // UNI-2033: a read-only copy of an older version says so in its title
+    (filePath, title) => withViewVersionTitle(title, filePath, currentLang(), inUniworkStore),
   )
   tabManager = manager
+  setDetachedTitleDecorator((filePath, title) =>
+    withViewVersionTitle(title, filePath, currentLang(), inUniworkStore),
+  )
 
   // Docking: a detached window dragged over this window's tab strip hands its
   // document back. The strip reports the insertion slot for each preview
@@ -4609,6 +4661,23 @@ function newMarkdownTab(): void {
   }
 }
 
+/**
+ * "New plain text" creates the blank .txt up front, like the blank PDF below: a .txt has no
+ * untitled mode in the markdown module (its mode follows the file name), so the file exists
+ * first and opens as plain source through the ordinary open route.
+ */
+function newTxtTab(): void {
+  // taken first: a failed write below must not leave the project waiting for a later file
+  const pendingProject = pendingProjects.take('txt')
+  try {
+    const filePath = createBlankTxtFile(newFileDir('txt'), tm('untitledTxt'))
+    if (pendingProject) assignToProject(filePath, pendingProject.projectId)
+    routeDocumentPath(filePath)
+  } catch (err) {
+    surfaceNewTabError(err)
+  }
+}
+
 function newHtmlTab(): void {
   try {
     bindPendingDir('html', () => tabManager?.openHtmlTab())
@@ -5086,6 +5155,12 @@ function registerHomeIpc(): void {
     rememberPendingDir('markdown', opts)
     rememberPendingProject('markdown', opts)
     newMarkdownTab()
+  })
+
+  ipcMain.handle(HOME_CHANNELS.newTxt, (_event, opts?: HomeNewOpts) => {
+    rememberPendingDir('txt', opts)
+    rememberPendingProject('txt', opts)
+    newTxtTab()
   })
 
   ipcMain.handle(HOME_CHANNELS.newHtml, (_event, opts?: HomeNewOpts) => {
@@ -5981,6 +6056,11 @@ function registerTabsIpc(): void {
         click: () => newMarkdownTab(),
       },
       {
+        label: tm('menuNewTxt'),
+        icon: menuIcons().md,
+        click: () => newTxtTab(),
+      },
+      {
         label: tm('menuNewHtml'),
         icon: menuIcons().html,
         click: () => newHtmlTab(),
@@ -6034,6 +6114,7 @@ function buildHomeMenu(): void {
         },
         { label: tm('menuNewSlide'), click: () => newSlideTab() },
         { label: tm('menuNewMarkdown'), click: () => newMarkdownTab() },
+        { label: tm('menuNewTxt'), click: () => newTxtTab() },
         { label: tm('menuNewHtml'), click: () => newHtmlTab() },
         { label: tm('menuNewPdf'), click: () => void newPdfTab() },
         { type: 'separator' },
@@ -6698,6 +6779,7 @@ function installDockMenu(): void {
       },
       { label: tm('menuNewSlide'), click: () => newSlideTab() },
       { label: tm('menuNewMarkdown'), click: () => newMarkdownTab() },
+      { label: tm('menuNewTxt'), click: () => newTxtTab() },
       { label: tm('menuNewPdf'), click: () => void newPdfTab() },
     ]),
   )

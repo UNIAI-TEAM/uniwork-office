@@ -16,12 +16,18 @@ const BY_EXTENSION: Record<string, UniworkDocFormat> = {
   pdf: 'pdf',
   md: 'md',
   markdown: 'md',
+  txt: 'txt',
   html: 'html',
   htm: 'html',
 }
 
-/** every extension the table resolves: the upload picker offers exactly these */
-export const UPLOAD_EXTENSIONS: readonly string[] = Object.keys(BY_EXTENSION)
+/**
+ * every extension the table resolves but txt: the upload picker offers exactly these. A .txt is
+ * created blank from the New menu and opens in the markdown module, but is not an upload type.
+ */
+export const UPLOAD_EXTENSIONS: readonly string[] = Object.keys(BY_EXTENSION).filter(
+  (ext) => ext !== 'txt',
+)
 
 const MIME: Record<UniworkDocFormat, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -29,6 +35,7 @@ const MIME: Record<UniworkDocFormat, string> = {
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   pdf: 'application/pdf',
   md: 'text/markdown',
+  txt: 'text/plain',
   html: 'text/html',
 }
 

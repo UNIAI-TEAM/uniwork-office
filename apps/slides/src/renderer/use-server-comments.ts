@@ -101,12 +101,29 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
     // the deck is read through the ref; only its order decides a new adapter
     [slideOrder, tracker],
   )
-  const controller = useCollabThreads(source, host, { adapter, strings })
+  // "View in version N" of a lost thread: the desktop shell opens that version read-only; the web
+  // frame's port has no such method, so the kit gets no handler and the action does not show
+  const onViewVersion = useMemo(() => {
+    const openVersion = bridge.openVersion?.bind(bridge)
+    return openVersion
+      ? ({ commentId, versionNo }: { commentId: string; versionNo: number }) =>
+          openVersion({ path, commentId, versionNo })
+      : undefined
+  }, [bridge, path])
+  const controller = useCollabThreads(source, host, {
+    adapter,
+    strings,
+    openVersionId: versionId ?? undefined,
+    ...(onViewVersion ? { onViewVersion } : {}),
+  })
   const ctlRef = useRef(controller)
   ctlRef.current = controller
   const lost = new WeakSet<object>()
   for (const t of [...controller.threads, ...controller.resolved]) {
-    if (t.root.anchor && t.root.anchor_state === 'lost') lost.add(t.root.anchor)
+    // lost stays lost, except in the version it was last anchored on (UNI-2033: the read-only copy
+    // of that version), where its anchor still names a real slide
+    const here = !!versionId && t.root.anchor_version_id === versionId
+    if (t.root.anchor && t.root.anchor_state === 'lost' && !here) lost.add(t.root.anchor)
   }
   lostRef.current = lost
 

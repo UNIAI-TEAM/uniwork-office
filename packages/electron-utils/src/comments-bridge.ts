@@ -19,6 +19,7 @@ import {
 } from './comments-ipc'
 import type {
   CommentsContextResult,
+  CommentsOpenVersionResult,
   CommentsRevealPayload,
   CommentsReply,
   CommentsSavedPayload,
@@ -73,6 +74,17 @@ export function createUniworkCommentsApi(): UniworkCommentsApi {
       }
     },
     context: (input) => call<CommentsContextResult>(COMMENTS_CHANNELS.context, input),
+    openVersion: async (input) => {
+      // UNI-2033: the answer is a plain `{ opened }`, never an envelope; anything but a literal
+      // true (a refusal, a malformed answer, a rejected invoke) reads as "not opened"
+      try {
+        const answer = (await ipcRenderer.invoke(COMMENTS_CHANNELS.openVersion, input)) as unknown
+        const opened = (answer as { opened?: unknown } | null | undefined)?.opened === true
+        return { opened } satisfies CommentsOpenVersionResult
+      } catch {
+        return { opened: false } satisfies CommentsOpenVersionResult
+      }
+    },
     onSaved: (handler) => {
       // G8-12: nothing is held for a late subscriber - the editor reads the
       // current version through context() when it mounts

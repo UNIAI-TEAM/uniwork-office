@@ -11,6 +11,7 @@ import {
   parseCommentsCreateInput,
   parseCommentsIdInput,
   parseCommentsListInput,
+  parseCommentsOpenVersionInput,
   parseCommentsUpdateInput,
   parseMentionsSearchInput,
 } from '@genoffice/electron-utils/comments-ipc'
@@ -21,6 +22,7 @@ import type {
   CommentsDocRef,
   CommentsIdInput,
   CommentsListInput,
+  CommentsOpenVersionResult,
   CommentsReply,
   CommentsUpdateInput,
   CommentsRevealPayload,
@@ -248,6 +250,30 @@ export function createUniworkComments(
         return { ok: true, value: deps.service.commentContext(input.path) ?? unbound() }
       } catch (error) {
         return { ok: false, error: errorShape(error) }
+      }
+    },
+  )
+
+  // UNI-2033: "View in version N" of a lost comment. The shell opens the read-only copy of that
+  // version and reveals the thread there. Only the editor showing `path` may ask, only for a
+  // path that is a copy of the signed-in account, and only for a comment of that document
+  // (one list read, no new endpoint); every refusal and failure is a plain `opened: false`
+  ipcMain.handle(
+    COMMENTS_CHANNELS.openVersion,
+    async (event, payload: unknown): Promise<CommentsOpenVersionResult> => {
+      const input = parseCommentsOpenVersionInput(payload)
+      if (!input) return { opened: false }
+      try {
+        if (!deps.shownPath || deps.shownPath(event.sender) !== input.path) return { opened: false }
+        const bound = resolveCommentBinding(deps.service, input.path)
+        if (!bound) return { opened: false }
+        const list = await api().list(bound, { path: input.path, kind: 'comment' })
+        const known = list.comments.some((c) => c.id === input.commentId && c.kind === 'comment')
+        if (!known) return { opened: false }
+        await deps.service.openVersionView(bound.documentId, input.versionNo, input.commentId)
+        return { opened: true }
+      } catch {
+        return { opened: false }
       }
     },
   )
