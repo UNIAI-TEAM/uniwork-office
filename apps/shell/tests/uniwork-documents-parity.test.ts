@@ -390,17 +390,13 @@ describe('UNI-1957 Documents parity', () => {
       expect(host.querySelector('.dh-quick-hint-icon')).toBeNull()
       const row = host.querySelector<HTMLElement>('.dh-quick-row')
       if (row) {
-        // the label, one pill per quick create kind (UNI-1953: UniNote + the file formats, minus Plain text, UNI-2046),
-        // then UNI-1959's share switch and its live hint - nothing else: no lock glyph, no link
+        // the label, one pill per quick create kind (UNI-1953: UniNote + the file formats, minus Plain text, UNI-2046)
+        // - nothing else: no lock glyph, no link, no share toggle (a create is always private, UNI-2038)
         expect(Array.from(row.children).map((el) => el.tagName)).toEqual([
           'SPAN',
           ...QUICK_CREATE_KINDS.map(() => 'BUTTON'),
-          'BUTTON',
-          'P',
         ])
         expect(row.querySelector('[data-quick-format]')).not.toBeNull()
-        expect(row.children[QUICK_CREATE_KINDS.length + 1]!.getAttribute('role')).toBe('switch')
-        expect(row.lastElementChild!.className).toBe('dh-quick-share-hint')
       }
       for (const text of NOTICE_VI) expect(host.textContent).not.toContain(text)
     }

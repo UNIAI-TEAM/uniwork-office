@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type {
-  UniworkCreateVisibility,
   UniworkDocErrorCode,
   UniworkDocSummary,
   UniworkFolderNode,
@@ -460,10 +459,6 @@ export function DocumentsHome({
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
 
   // Dialogs & inline actions
-  // UNI-1959: "Share with workspace" of the New menu and the strip: off by default, kept while
-  // this view is open, reset after a create from the strip (the web's page-view behaviour)
-  const [shareWithWorkspace, setShareWithWorkspace] = useState(false)
-  const quickShareHintId = useId()
   // UNI-1959: kinds the server answered 404 / 501 for: disabled for the session
   const [unavailableKinds, setUnavailableKinds] = useState<ReadonlySet<NewDocKind>>(new Set())
   const [creating, setCreating] = useState(false)
@@ -1206,10 +1201,6 @@ export function DocumentsHome({
     }
   }
 
-  // what a create sends: the "Share with workspace" choice, for documents only (a folder is never shared)
-  const createVisibility = (): UniworkCreateVisibility | undefined =>
-    shareWithWorkspace ? 'workspace' : undefined
-
   /** My Folder when no folder is known yet: main also places a null-folder create there */
   const ensureTargetFolder = async (target: DocTarget): Promise<string | null> => {
     if (target.folderId) return target.folderId
@@ -1224,12 +1215,10 @@ export function DocumentsHome({
 
   // UNI-1959: a menu / strip pick creates at once - the web's default name, the open place -
   // then opens it. No name dialog: the name is asked on the first save.
-  const createNow = async (kind: NewDocKind, fromStrip: boolean): Promise<void> => {
+  const createNow = async (kind: NewDocKind): Promise<void> => {
     if (creatingRef.current || unavailableKinds.has(kind)) return
     creatingRef.current = true
     setCreating(true)
-    const visibility = createVisibility()
-    if (fromStrip) setShareWithWorkspace(false)
     try {
       const target = activeTargetFolder
       const folderIdToUse = await ensureTargetFolder(target)
@@ -1241,14 +1230,12 @@ export function DocumentsHome({
               workspaceId: target.workspaceId,
               folderId: folderIdToUse,
               name,
-              ...(visibility ? { visibility } : {}),
             })
           : await createDocument({
               workspaceId: target.workspaceId,
               folderId: folderIdToUse,
               name,
               format: kind,
-              ...(visibility ? { visibility } : {}),
             })
       if (res.ok) {
         refreshAll()
@@ -2294,10 +2281,9 @@ export function DocumentsHome({
               unavailable={unavailableKinds}
               unavailableHint={t('uhCreateUnavailableHint')}
               busy={creating}
-              share={{ checked: shareWithWorkspace, onChange: setShareWithWorkspace }}
               onPick={(kind) => {
                 if (kind === 'folder') createFolderHere()
-                else void createNow(kind, false)
+                else void createNow(kind)
               }}
             />
           </div>
@@ -2314,44 +2300,13 @@ export function DocumentsHome({
                 data-quick-format={kind}
                 aria-disabled={creating || unavailableKinds.has(kind) || undefined}
                 title={unavailableKinds.has(kind) ? t('uhCreateUnavailableHint') : undefined}
-                onClick={() => void createNow(kind, true)}
+                onClick={() => void createNow(kind)}
               >
                 <FileBadge ext={kind} size={18} />
                 <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
                 <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
               </button>
             ))}
-            <button
-              type="button"
-              role="switch"
-              className="dh-quick-share"
-              aria-checked={shareWithWorkspace}
-              aria-disabled={creating || undefined}
-              aria-describedby={quickShareHintId}
-              onClick={() => {
-                if (!creating) setShareWithWorkspace(!shareWithWorkspace)
-              }}
-            >
-              <span className="dh-quick-check" aria-hidden="true">
-                {shareWithWorkspace && (
-                  <svg width="12" height="12" viewBox="0 0 16 16">
-                    <path
-                      d="m3.5 8.5 3 3 6-7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </span>
-              <span>{t('uhNewShare')}</span>
-            </button>
-            {/* always mounted and one line tall, so the toggle neither moves the pills nor goes unannounced */}
-            <p id={quickShareHintId} role="status" className="dh-quick-share-hint">
-              {shareWithWorkspace ? t('uhNewShareHint', { level: t('uhNewShareLevelView') }) : ''}
-            </p>
           </div>
         )}
 
