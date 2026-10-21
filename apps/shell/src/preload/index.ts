@@ -126,6 +126,18 @@ import type {
   UniworkOfflineLibraryApi,
 } from '../shared/offline-library'
 import { createLaunchReplay } from './launch-replay'
+import {
+  asBatchUploadProgress,
+  asBatchUploadStartResult,
+  asPreflightList,
+  asPreflightSDO,
+} from './folder-upload-guards'
+import type {
+  BatchUploadPickInput,
+  BatchUploadPreflightInput,
+  BatchUploadProgress,
+  BatchUploadStartInput,
+} from '../shared/folder-upload-api'
 
 // subscribed at preload time: a cold-start launch event can arrive before the
 // renderer subscribes, and is then held for the first subscriber
@@ -178,6 +190,16 @@ ipcRenderer.on(UNIWORK_DOC_CHANNELS.uploadProgress, (_event: IpcRendererEvent, r
   if (!event) return
   for (const cb of [...uploadProgressSubscribers]) cb(event)
 })
+// UNI-2052: progress of a folder / several-files upload run (one total per run)
+const batchUploadProgressSubscribers = new Set<(event: BatchUploadProgress) => void>()
+ipcRenderer.on(
+  UNIWORK_DOC_CHANNELS.batchUploadProgress,
+  (_event: IpcRendererEvent, raw: unknown) => {
+    const event = asBatchUploadProgress(raw)
+    if (!event) return
+    for (const cb of [...batchUploadProgressSubscribers]) cb(event)
+  },
+)
 // G5-11: sign-out progress (`waiting` while an in-flight save settles, `done` after)
 const signOutProgressSubscribers = new Set<(event: SignOutProgress) => void>()
 ipcRenderer.on(UNIWORK_DOC_CHANNELS.signOutProgress, (_event: IpcRendererEvent, raw: unknown) => {
@@ -1305,6 +1327,37 @@ const homeApi: HomeApi = {
   async uniworkCancelUploadDocument(uploadId: string) {
     if (typeof uploadId !== 'string' || !uploadId) return
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.cancelUpload, uploadId)
+  },
+  async uniworkBatchUploadPick(input: BatchUploadPickInput) {
+    return asPreflightSDO(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.batchUploadPick, input))
+  },
+  async uniworkBatchUploadPreflight(input: BatchUploadPreflightInput) {
+    return asPreflightList(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.batchUploadPreflight, input),
+    )
+  },
+  async uniworkBatchUploadStart(input: BatchUploadStartInput) {
+    return asBatchUploadStartResult(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.batchUploadStart, input),
+    )
+  },
+  onUniworkBatchUploadProgress(cb: (event: BatchUploadProgress) => void) {
+    batchUploadProgressSubscribers.add(cb)
+    return () => {
+      batchUploadProgressSubscribers.delete(cb)
+    }
+  },
+  async uniworkBatchUploadCancel(runId: string) {
+    if (typeof runId !== 'string' || !runId) return
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.batchUploadCancel, runId)
+  },
+  async uniworkBatchUploadRetry(runId: string) {
+    if (typeof runId !== 'string' || !runId) return
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.batchUploadRetry, runId)
+  },
+  async uniworkBatchUploadDismiss(runId: string) {
+    if (typeof runId !== 'string' || !runId) return
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.batchUploadDismiss, runId)
   },
   async uniworkRenameDocument(documentId: string, name: string) {
     return asUniworkActionResult<UniworkDocSummary>(
