@@ -161,6 +161,7 @@ export const ar = {
   cancel: 'إلغاء',
   modePresent: 'عرض',
   presentExit: 'إنهاء العرض (Esc)',
+  presentExitName: 'إنهاء العرض',
   presentInTab: 'في هذه العلامة',
   presentFullscreen: 'ملء الشاشة',
   presentNewTab: 'علامة تبويب جديدة',

@@ -164,6 +164,7 @@ export const de = {
   cancel: 'Abbrechen',
   modePresent: 'Präsentieren',
   presentExit: 'Präsentation beenden (Esc)',
+  presentExitName: 'Präsentation beenden',
   presentInTab: 'In diesem Tab',
   presentFullscreen: 'Vollbild',
   presentNewTab: 'Neuer Tab',

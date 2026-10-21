@@ -22,6 +22,7 @@ import { cap, platform } from './capabilities'
 import {
   createHtmlFrameKeyReplay,
   hostHasUserActivation,
+  htmlAria,
   htmlFrameKeyClaims,
   htmlWindowCommand,
   type HtmlShortcutCommand,
@@ -1926,6 +1927,8 @@ export default function App() {
                   <button
                     type="button"
                     className="present-exit"
+                    aria-label={t('presentExitName')}
+                    aria-keyshortcuts="Escape"
                     onClick={() => setCanvasMode('edit')}
                   >
                     {t('presentExit')}
@@ -2055,6 +2058,7 @@ export default function App() {
                 type="button"
                 className="zoom-btn"
                 aria-label={t('zoomOut')}
+                aria-keyshortcuts={htmlAria('zoomOut') || undefined}
                 onClick={zoomOut}
                 disabled={zoom <= MIN_ZOOM}
               >
@@ -2074,6 +2078,7 @@ export default function App() {
                 type="button"
                 className="zoom-btn"
                 aria-label={t('zoomIn')}
+                aria-keyshortcuts={htmlAria('zoomIn') || undefined}
                 onClick={zoomIn}
                 disabled={zoom >= MAX_ZOOM}
               >

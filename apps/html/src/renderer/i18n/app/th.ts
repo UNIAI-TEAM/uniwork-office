@@ -159,6 +159,7 @@ export const th = {
   cancel: 'ยกเลิก',
   modePresent: 'นำเสนอ',
   presentExit: 'ออกจากการนำเสนอ (Esc)',
+  presentExitName: 'ออกจากการนำเสนอ',
   presentInTab: 'ในแท็บนี้',
   presentFullscreen: 'เต็มจอ',
   presentNewTab: 'แท็บใหม่',

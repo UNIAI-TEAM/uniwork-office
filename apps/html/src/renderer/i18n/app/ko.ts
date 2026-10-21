@@ -161,6 +161,7 @@ export const ko = {
   cancel: '취소',
   modePresent: '프레젠테이션',
   presentExit: '프레젠테이션 종료 (Esc)',
+  presentExitName: '프레젠테이션 종료',
   presentInTab: '현재 탭에서',
   presentFullscreen: '전체 화면',
   presentNewTab: '새 탭',

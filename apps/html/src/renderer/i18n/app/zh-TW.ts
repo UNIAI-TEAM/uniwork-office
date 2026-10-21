@@ -157,6 +157,7 @@ export const zhTW = {
   cancel: '取消',
   modePresent: '演示',
   presentExit: '退出演示（Esc）',
+  presentExitName: '退出演示',
   presentInTab: '在目前分頁',
   presentFullscreen: '全螢幕',
   presentNewTab: '新分頁',

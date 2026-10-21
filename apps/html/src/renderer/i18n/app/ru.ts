@@ -162,6 +162,7 @@ export const ru = {
   cancel: 'Отмена',
   modePresent: 'Показ',
   presentExit: 'Выйти из показа (Esc)',
+  presentExitName: 'Выйти из показа',
   presentInTab: 'В этой вкладке',
   presentFullscreen: 'Во весь экран',
   presentNewTab: 'Новая вкладка',

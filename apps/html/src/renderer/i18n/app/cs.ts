@@ -150,6 +150,7 @@ export const cs = {
   cancel: 'Zrušit',
   modePresent: 'Prezentovat',
   presentExit: 'Ukončit prezentaci (Esc)',
+  presentExitName: 'Ukončit prezentaci',
   presentInTab: 'V této kartě',
   presentFullscreen: 'Celá obrazovka',
   presentNewTab: 'Nová karta',

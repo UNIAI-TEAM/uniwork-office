@@ -165,6 +165,7 @@ export const it = {
   cancel: 'Annulla',
   modePresent: 'Presenta',
   presentExit: 'Esci dalla presentazione (Esc)',
+  presentExitName: 'Esci dalla presentazione',
   presentInTab: 'In questa scheda',
   presentFullscreen: 'Schermo intero',
   presentNewTab: 'Nuova scheda',
