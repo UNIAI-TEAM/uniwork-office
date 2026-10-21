@@ -887,9 +887,13 @@ async function actionResult<T>(
       options.flagMissingEndpoint === true &&
       error instanceof UniworkDocError &&
       (error.status === 404 || error.status === 501)
+    // UNI-2047: a throttle (429 / 503) is the one failure a batch may repeat once
+    const retryable =
+      error instanceof UniworkDocError && (error.status === 429 || error.status === 503)
     return {
       ok: false,
       error: code,
+      ...(retryable ? { retryable: true } : {}),
       ...(max === undefined ? {} : { max }),
       ...(documentId === undefined ? {} : { documentId }),
       ...(documentTitle === undefined ? {} : { documentTitle }),
@@ -6605,7 +6609,8 @@ export class UniworkDocsService {
    */
   private listFiltersOf(q: UniworkListFilters): UniworkListFilters {
     return {
-      ...(typeof q.format === 'string' && q.format ? { format: q.format } : {}),
+      // a UniNote has no file format: the server answers 400 invalid_filter to both together
+      ...(typeof q.format === 'string' && q.format && q.kind !== 'page' ? { format: q.format } : {}),
       ...(q.kind === 'page' ? { kind: q.kind } : {}),
       ...(typeof q.updatedBy === 'string' && q.updatedBy ? { updatedBy: q.updatedBy } : {}),
       ...(typeof q.updatedFrom === 'string' && q.updatedFrom ? { updatedFrom: q.updatedFrom } : {}),

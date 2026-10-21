@@ -413,8 +413,8 @@ export type UniworkSystemKind = 'my_folder'
  * Unset = parameter omitted.
  */
 export interface UniworkListFilters {
-  /** a file format, or `txt` (the server takes it on every list route; documents themselves have no txt format) */
-  format?: UniworkDocFormat | 'txt'
+  /** a file format; the server takes it on every list route */
+  format?: UniworkDocFormat
   /**
    * UNI-2047: `page` = UniNote only (the flat `/documents` route's `kind`; a UniNote has no file
    * format, so it never rides with `format`). Recent and Shared with me have no such param: the
@@ -666,6 +666,12 @@ export type UniworkDocActionResult<T> =
       name?: string
       sizeBytes?: number
       maxBytes?: number
+      /**
+       * UNI-2047: the server throttled (429) or was briefly down (503), so the same call may be
+       * tried again once. Absent on every other failure: a `server_error` that is not a throttle
+       * may have been applied, and a second call would answer conflict / not_found.
+       */
+      retryable?: boolean
       /**
        * FD-11 / B-R2-01: `document_too_deep` carries the depth cap so the
        * renderer can show it; D's `document_too_deep` has no `fields` map and
