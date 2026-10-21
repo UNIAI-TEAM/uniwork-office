@@ -13,6 +13,7 @@ import {
   planBody,
   rateLimitWaitMs,
   RETRY_DELAYS_MS,
+  retryAfterMs,
   sleep,
   withRetry,
 } from './runner-helpers'
@@ -27,6 +28,7 @@ import type {
 import {
   asFolderUploadRefusal,
   FolderUploadApiError,
+  FolderUploadError,
   FolderUploadRefusedError,
   type FileTarget,
   type FolderUploadBatch,
@@ -308,11 +310,15 @@ export function runFolderUpload(opts: RunFolderUploadOptions): FolderUploadHandl
     let blob: Blob
     try {
       blob = await opts.file(f.planned.index)
-    } catch {
+    } catch (err) {
+      if (stopped()) return
+      // A link, or another file in the planned one's place: final, a retry would see the same.
+      if (err instanceof FolderUploadError) return fail(f, err.code, undefined, false)
       // The file is gone or unreadable now: nothing was sent, so a retry may find it again.
-      if (!stopped()) fail(f, 'unreadable')
-      return
+      return fail(f, 'unreadable')
     }
+    // The size is part of the plan (the server holds the file to it): a changed file is final.
+    if (blob.size !== f.planned.size) return fail(f, 'size_changed', undefined, false)
     let retries = 0
     let refreshed = false
     let waited429 = false
@@ -472,7 +478,9 @@ export function runFolderUpload(opts: RunFolderUploadOptions): FolderUploadHandl
           const seconds = Number(refusal.fields.retry_after)
           try {
             await sleep(
-              (Number.isFinite(seconds) && seconds >= 0 ? seconds : BUSY_WAIT_DEFAULT_S) * 1_000,
+              retryAfterMs(
+                Number.isFinite(seconds) && seconds >= 0 ? seconds : BUSY_WAIT_DEFAULT_S,
+              ),
               controller.signal,
             )
           } catch {

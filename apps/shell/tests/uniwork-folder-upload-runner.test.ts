@@ -1,3 +1,4 @@
+import { getEventListeners } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createFakeFolderUploadTransport,
@@ -11,6 +12,7 @@ import type {
   FolderUploadProgress,
   RunFolderUploadOptions,
 } from '../src/main/uniwork-docs/folder-upload/runner-types'
+import { sleep } from '../src/main/uniwork-docs/folder-upload/runner-helpers'
 import { FolderUploadRefusedError } from '../src/main/uniwork-docs/folder-upload/transport'
 
 function setup(
@@ -1001,5 +1003,52 @@ describe('runFolderUpload app file reads (disk, not the browser)', () => {
       expect.objectContaining({ filename: 'big.docx', index: 0, size: 11 }),
       expect.any(Blob),
     )
+  })
+})
+
+describe('FU-FIX1 m3: a server-sent wait is bounded', () => {
+  const HUGE = 999_999
+  const completes = (calls: FakeFolderUploadCall[]) => calls.filter((c) => c.method === 'complete')
+
+  it('a busy answer with a huge Retry-After waits at most 120 s, then plans again', async () => {
+    const busy = folderUploadApiError(429, 'folder_uploads_busy', { retry_after: HUGE }, HUGE)
+    const { transport, handle } = setup(files(1), { errors: { plan: [busy] } })
+    await vi.advanceTimersByTimeAsync(119_000)
+    expect(transport.calls.filter((c) => c.method === 'plan')).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(transport.calls.filter((c) => c.method === 'plan')).toHaveLength(2)
+    expect((await settle(handle.done)).done).toBe(1)
+  })
+
+  it('a 429 complete with a huge Retry-After is retried after at most 120 s', async () => {
+    const { transport, handle } = setup(files(1))
+    transport.failNext('complete', folderUploadApiError(429, 'rate_limited', {}, HUGE))
+    await vi.advanceTimersByTimeAsync(119_000)
+    expect(completes(transport.calls)).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(completes(transport.calls)).toHaveLength(2)
+    expect((await settle(handle.done)).done).toBe(1)
+  })
+
+  it('a 429 at the content PUT with a huge Retry-After is retried after at most 120 s', async () => {
+    const { transport, handle } = setup(files(1), {
+      putFailures: { 'f000.pdf': [{ status: 429, code: 'rate_limited', retryAfter: HUGE }] },
+    })
+    await vi.advanceTimersByTimeAsync(119_000)
+    expect(transport.calls.filter((c) => c.method === 'put')).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(transport.calls.filter((c) => c.method === 'put')).toHaveLength(2)
+    expect((await settle(handle.done)).done).toBe(1)
+  })
+})
+
+describe('FU-FIX1 n6: sleep', () => {
+  it('removes its abort listener when the timer completes', async () => {
+    const controller = new AbortController()
+    const waiting = sleep(1_000, controller.signal)
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1_000)
+    await waiting
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
   })
 })

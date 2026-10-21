@@ -23,7 +23,6 @@ import {
   ipcMain,
   nativeImage,
   nativeTheme,
-  net,
   powerMonitor,
   session,
   shell,
@@ -4275,7 +4274,8 @@ const requestUniworkModuleSave = createModuleSaveRequester({
  * UNI-2052: the folder / several-files upload. Limits come from the docs
  * service's cache once it exists (until then the server counts as having no
  * folder uploads), the transport rides the signed-in session, and storage PUTs
- * go through Electron's `net.fetch`.
+ * go through Node's global `fetch` (a file-backed Blob goes out with a
+ * Content-Length; Electron's `net.fetch` buffers or chunks a request body).
  */
 const uniworkFolderUpload = createFolderUploadWiring({
   limits: () => uniworkDocs?.service.limitsCache.get() ?? DEFAULT_DOCUMENT_LIMITS,
@@ -4288,7 +4288,7 @@ const uniworkFolderUpload = createFolderUploadWiring({
       isSignedIn: () => uniworkSessionIdentity() !== null,
     }
   },
-  storageFetch: (input, init) => net.fetch(input, init),
+  storageFetch: (input, init) => fetch(input, init),
 })
 
 function uniworkDocsWiring() {

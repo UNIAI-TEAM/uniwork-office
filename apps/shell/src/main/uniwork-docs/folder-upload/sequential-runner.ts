@@ -115,7 +115,11 @@ export function createSequentialRunner(deps: SequentialRunnerDeps): FolderUpload
       run.canceled = true
       if (run.currentUploadId) deps.cancelOne(run.currentUploadId)
       // between a finished run and its report there is nothing to abort
-      else if (!run.running) report(run, 'canceled')
+      else if (!run.running) {
+        // a finished run with failures: the report below is its end, so the entry goes too
+        runs.delete(runId)
+        report(run, 'canceled')
+      }
     },
     retry(runId) {
       const run = runs.get(runId)

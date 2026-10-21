@@ -162,7 +162,12 @@ export interface FolderUploadTransport {
 
 /** "session": the app is signed out, or the session ended, while a call ran. */
 export type FolderUploadErrorCode =
-  'missing_etag' | 'missing_part_url' | 'untrusted_target' | 'session'
+  | 'missing_etag'
+  | 'missing_part_url'
+  | 'untrusted_target'
+  | 'session'
+  | 'unreadable'
+  | 'size_changed'
 
 export class FolderUploadError extends Error {
   constructor(

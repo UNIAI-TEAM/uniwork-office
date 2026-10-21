@@ -3,7 +3,7 @@ import type { LocalFileProbePayload } from '../client'
 import { UniworkDocError } from '../errors'
 import type { FolderUploadRunLimits } from '../limits'
 import { readLocalFileProbe } from '../upload-session'
-import { openFileBlob } from './file-source'
+import { assertPlainFile, openFileBlob } from './file-source'
 import type {
   FolderUploadRunnerPort,
   FolderUploadRunOptions,
@@ -18,7 +18,7 @@ import type {
   PlannedBatch,
 } from './runner-types'
 import type { AppFolderUploadPlan } from './scan'
-import { asFolderUploadRefusal, type FolderUploadTransport } from './transport'
+import { asFolderUploadRefusal, FolderUploadError, type FolderUploadTransport } from './transport'
 import type { PlannedFile } from './types'
 
 /**
@@ -73,12 +73,19 @@ function remainingPlan(plan: AppFolderUploadPlan, files: PlannedFile[]): Planned
 const probeFailureCode = (error: unknown): string =>
   error instanceof UniworkDocError && error.code === 'unsupported_format'
     ? 'unsupported_format'
-    : 'unreadable'
+    : error instanceof FolderUploadError
+      ? error.code
+      : 'unreadable'
 
 export function createFolderUploadRunnerAdapter(deps: RunnerAdapterDeps): FolderUploadRunnerPort {
   const openFile = deps.openFile ?? openFileBlob
+  // the probe opens the path itself: a link or a changed file is refused before it reads
   const probeOf =
-    deps.probeOf ?? ((path, size, filename) => readLocalFileProbe({ path }, size, filename))
+    deps.probeOf ??
+    (async (path, size, filename) => {
+      await assertPlainFile(path, size)
+      return readLocalFileProbe({ path }, size, filename)
+    })
   const runs = new Map<string, Run>()
 
   function push(
@@ -271,7 +278,16 @@ export function createFolderUploadRunnerAdapter(deps: RunnerAdapterDeps): Folder
       )
     },
     dismiss(runId) {
+      const run = runs.get(runId)
       runs.delete(runId)
+      if (!run || run.canceled) return
+      // Closing the report ends the batch (CONTRACT section 5): without this a run
+      // that finished with failures leaves its batch open and counted against the cap.
+      const open = run.report?.batchId && !run.report.canceled && !run.report.expired
+      if (!run.settled || open) {
+        run.canceled = true
+        run.handle?.cancel()
+      }
     },
   }
 }

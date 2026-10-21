@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -24,6 +24,20 @@ describe('openFileBlob', () => {
 
   it('rejects when the file is gone', async () => {
     await expect(openFileBlob(join(dir, 'missing.txt'))).rejects.toThrow()
+  })
+
+  it('refuses a symlink to a file: a link is never followed at upload time', async () => {
+    const target = join(dir, 'secret.txt')
+    writeFileSync(target, 'not in the plan')
+    const link = join(dir, 'report.docx')
+    symlinkSync(target, link)
+    await expect(openFileBlob(link)).rejects.toMatchObject({ code: 'unreadable' })
+  })
+
+  it('a missing file keeps its native error (the runner reads it as retryable unreadable)', async () => {
+    await expect(openFileBlob(join(dir, 'missing.txt'))).rejects.not.toMatchObject({
+      code: 'unreadable',
+    })
   })
 
   it('refuses a directory', async () => {
