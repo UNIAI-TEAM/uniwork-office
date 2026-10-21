@@ -104,6 +104,57 @@ describe('context', () => {
     })
   })
 
+  it('RB-3: a failed list answers the cached list of the same scope (stale-if-error)', async () => {
+    let now = 1_000
+    let fail = false
+    const { service } = setup({
+      now: () => now,
+      listWorkspaces: async () => {
+        if (fail) throw new UniworkDocError('network')
+        return WORKSPACES
+      },
+    })
+    await service.context()
+    fail = true
+    now += 600_000
+    expect(await service.context()).toEqual({
+      workspaces: WORKSPACES,
+      currentWorkspaceId: WS_A,
+      signedIn: true,
+    })
+  })
+
+  it('RB-3: a failed list does not answer the cache of another scope', async () => {
+    let scope = 'acc_1:org_a'
+    let fail = false
+    const { service } = setup({
+      scopeKey: () => scope,
+      listWorkspaces: async () => {
+        if (fail) throw new UniworkDocError('network')
+        return WORKSPACES
+      },
+    })
+    await service.context()
+    fail = true
+    scope = 'acc_2:org_b'
+    expect(await service.context()).toEqual({
+      workspaces: [],
+      currentWorkspaceId: null,
+      signedIn: true,
+    })
+  })
+
+  it('RB-3: context is served from the 60 s cache while fresh, refetched once stale', async () => {
+    let now = 1_000
+    const { service, listWorkspaces } = setup({ now: () => now })
+    await service.context()
+    await service.context()
+    expect(listWorkspaces).toHaveBeenCalledTimes(1)
+    now += 61_000
+    await service.context()
+    expect(listWorkspaces).toHaveBeenCalledTimes(2)
+  })
+
   it('reads the current workspace from the key the Home doclist stores it under', () => {
     expect(ACTIVE_WORKSPACE_STORE_KEY).toBe(ACTIVE_WORKSPACE_KEY)
   })
@@ -218,6 +269,37 @@ describe('ask validation', () => {
     now += 61_000
     expect(await service.ask(valid({ workspaceId: WS_B }))).toEqual({ ok: false, code: 'error' })
     expect(ask).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('RB-4: the workspace cache follows the scope and the sign-in', () => {
+  it('does not cache a list read while the account or org changed under it', async () => {
+    let scope = 'acc_1:org_a'
+    let first = true
+    const listWorkspaces = vi.fn(async () => {
+      if (first) scope = 'acc_2:org_b'
+      first = false
+      return WORKSPACES
+    })
+    const { service } = setup({ scopeKey: () => scope, listWorkspaces })
+    await service.ask(valid())
+    // the account switched back within the TTL: B's list must not answer for A
+    scope = 'acc_1:org_a'
+    await service.ask(valid())
+    expect(listWorkspaces).toHaveBeenCalledTimes(2)
+  })
+
+  it('forgets the list on sign-out: a sign-in within 60 s reads it again', async () => {
+    let signedIn = true
+    const { service, listWorkspaces } = setup({ isSignedIn: () => signedIn })
+    await service.ask(valid())
+    expect(listWorkspaces).toHaveBeenCalledTimes(1)
+    signedIn = false
+    await service.ask(valid())
+    await service.context()
+    signedIn = true
+    await service.ask(valid())
+    expect(listWorkspaces).toHaveBeenCalledTimes(2)
   })
 })
 

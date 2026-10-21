@@ -42,6 +42,7 @@ function client(
   options: {
     authorized?: <T>(call: (token: string) => Promise<T>) => Promise<T>
     isSignedIn?: () => boolean
+    metadataTimeoutMs?: number
   } = {},
 ) {
   return createAskUniClient({
@@ -49,6 +50,9 @@ function client(
     authorized: options.authorized ?? ((call) => call('tok_secret')),
     isSignedIn: options.isSignedIn ?? (() => true),
     fetch,
+    ...(options.metadataTimeoutMs === undefined
+      ? {}
+      : { metadataTimeoutMs: options.metadataTimeoutMs }),
   })
 }
 
@@ -189,6 +193,25 @@ describe('error codes', () => {
     expect(await client(fetch).ask(REQ)).toEqual({ ok: false, code: 'error' })
   })
 
+  it('RB-5: a huge Retry-After is clamped to one hour', async () => {
+    expect(
+      await failing(envelope(429, 'ai_rate_limited', { 'Retry-After': '99999999999' })),
+    ).toEqual({ ok: false, code: 'rate_limited', retryAfterSec: 3600 })
+  })
+
+  it('RB-6: a call that outlives the timeout is an error, not offline', async () => {
+    const fetch = vi.fn<FetchLike>(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')))
+        }),
+    )
+    expect(await client(fetch, { metadataTimeoutMs: 20 }).ask(REQ)).toEqual({
+      ok: false,
+      code: 'error',
+    })
+  })
+
   it('anything else (500, 400, malformed body) -> error', async () => {
     expect(await failing(envelope(500, 'internal'))).toEqual({ ok: false, code: 'error' })
     expect(await failing(envelope(400, 'validation_failed'))).toEqual({ ok: false, code: 'error' })
@@ -248,15 +271,23 @@ describe('response mapping', () => {
     expect(unknown.ok && 'notice' in unknown.message).toBe(false)
   })
 
-  it('drops a citation of a kind the app cannot show and keeps the rest', async () => {
+  it('RB-1: keeps a citation of a kind the app does not know as kind other', async () => {
     const citations = [
-      { source_id: 'S1', quote: '', kind: 'hologram', title: 'x', href: '/x' },
+      { source_id: 'S1', quote: 'qx', kind: 'hologram', title: 'x', href: '/a/b/x/1' },
       { source_id: 'S2', quote: 'q', kind: 'task', title: 'Spec', href: '/a/b/tasks/t1' },
+      { source_id: 'S3', quote: 'qp', kind: 'project', title: 'P', href: '/a/b/projects/p1' },
+      { source_id: 'S4', quote: 'qe', kind: 'email_thread', title: 'E', href: '' },
     ]
     const result = await client(vi.fn<FetchLike>(async () => json(200, answer({ citations })))).ask(
       REQ,
     )
-    expect(result.ok && result.message.citations.map((c) => c.sourceId)).toEqual(['S2'])
+    expect(result.ok && result.message.citations.map((c) => [c.sourceId, c.kind])).toEqual([
+      ['S1', 'other'],
+      ['S2', 'task'],
+      ['S3', 'other'],
+      ['S4', 'other'],
+    ])
+    expect(result.ok && result.message.citations[0]).toMatchObject({ quote: 'qx', title: 'x' })
   })
 
   it('an empty_answer notice keeps its empty content', async () => {
@@ -264,6 +295,51 @@ describe('response mapping', () => {
       vi.fn<FetchLike>(async () => json(200, answer({ content: '', notice: 'empty_answer' }))),
     ).ask(REQ)
     expect(result.ok && result.message).toMatchObject({ content: '', notice: 'empty_answer' })
+  })
+})
+
+describe('RB-2: boundary hardening of citations and content', () => {
+  const one = async (over: Record<string, unknown>) => {
+    const citation = { source_id: 'S1', quote: 'q', kind: 'task', title: 't', href: '/a/b/t/1' }
+    const result = await client(
+      vi.fn<FetchLike>(async () => json(200, answer({ citations: [{ ...citation, ...over }] }))),
+    ).ask(REQ)
+    if (!result.ok) throw new Error('expected an answer')
+    return result.message.citations
+  }
+
+  it.each([
+    ['a protocol-relative href', '//evil.example/x'],
+    ['an absolute https href', 'https://evil.example/x'],
+    ['a javascript: href', 'javascript:alert(1)'],
+    ['a relative href', 'a/b/c'],
+    ['an href with a backslash', '/a\\evil.example'],
+    ['an href with whitespace', '/a/b c'],
+    ['an href with a control character', '/a/b\u0000c'],
+    ['an href with a newline', '/a/b\nc'],
+  ])('keeps the row but blanks %s', async (_name, href) => {
+    const rows = await one({ href })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ sourceId: 'S1', quote: 'q', title: 't', href: '' })
+  })
+
+  it('keeps a single-leading-slash path as it is', async () => {
+    expect((await one({ href: '/org_1/ws_1/tasks/t1?x=1#y' }))[0].href).toBe(
+      '/org_1/ws_1/tasks/t1?x=1#y',
+    )
+  })
+
+  it('clamps the title to 300 and the quote to 1000 characters', async () => {
+    const [row] = await one({ title: 't'.repeat(900), quote: 'q'.repeat(5000) })
+    expect(row.title).toHaveLength(300)
+    expect(row.quote).toHaveLength(1000)
+  })
+
+  it('clamps the answer text to 20 000 characters', async () => {
+    const result = await client(
+      vi.fn<FetchLike>(async () => json(200, answer({ content: 'a'.repeat(50_000) }))),
+    ).ask(REQ)
+    expect(result.ok && result.message.content).toHaveLength(20_000)
   })
 })
 

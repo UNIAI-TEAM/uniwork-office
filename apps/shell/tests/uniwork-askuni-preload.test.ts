@@ -103,6 +103,29 @@ describe('preload: window.aiOffice Ask UNI bridge', () => {
     expect(result.ok && result.message.citations.map((c) => c.sourceId)).toEqual(['S3'])
   })
 
+  it('RB-1: keeps a citation of the additive kind other', async () => {
+    const { bridge } = await loadPreload({
+      ok: true,
+      conversationId: 'c1',
+      message: {
+        id: 'm1',
+        content: 'a',
+        citations: [{ sourceId: 'S1', kind: 'other', title: 't', quote: 'q', href: '' }],
+      },
+    })
+    const result = await bridge.uniworkAskUni(REQ)
+    expect(result.ok && result.message.citations.map((c) => c.kind)).toEqual(['other'])
+  })
+
+  it('RB-5: clamps a huge retryAfterSec to one hour', async () => {
+    const { bridge } = await loadPreload({ ok: false, code: 'rate_limited', retryAfterSec: 1e12 })
+    expect(await bridge.uniworkAskUni(REQ)).toEqual({
+      ok: false,
+      code: 'rate_limited',
+      retryAfterSec: 3600,
+    })
+  })
+
   it('is exposed on the shell preload only', async () => {
     const { readFileSync, readdirSync } = await import('node:fs')
     const { join } = await import('node:path')
