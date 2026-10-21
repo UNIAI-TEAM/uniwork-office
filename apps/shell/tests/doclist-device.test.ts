@@ -359,7 +359,7 @@ describe('DocList on the device screen (UNI-2047 B1)', () => {
   it('applies a chosen sort and says it with aria-sort', async () => {
     const sort: SortSpec = { column: 'name', dir: 'asc' }
     await mount({ unsortedDefault: true, sort })
-    expect(names().slice(1)).toEqual(['Alpha notes.docx', 'Budget.xlsx', 'Zeta plan.docx'])
+    expect(names()).toEqual(['Alpha notes.docx', 'Budget.xlsx', 'Finance', 'Zeta plan.docx'])
     expect(host.querySelector('[data-col="name"]')!.getAttribute('aria-sort')).toBe('ascending')
   })
 

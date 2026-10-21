@@ -13,7 +13,7 @@ import {
   type DocListScreen,
   type SortSpec,
 } from './columns'
-import { DocRow, type DocRowRename, type DocSubline } from './DocRow'
+import { DocRow, type DocRowExtra, type DocRowRename, type DocSubline } from './DocRow'
 import { GroupHeader } from './GroupHeader'
 import { groupRows, groupsActive, type GroupId, type GroupInput } from './groups'
 import { useCollapsedGroups } from './use-collapsed-groups'
@@ -44,6 +44,23 @@ export interface DocListProps {
   renderSource?: (source: UniworkSourceFile, columns: readonly ColumnId[]) => ReactNode
   /** false lists the rows flat on a screen that groups (Trash search hits carry no purge date) */
   groups?: boolean
+  /**
+   * No sort applies until the person picks one: the rows stay in the order given and no
+   * header shows a sort state (the device list keeps its last-opened order). The first
+   * click still starts from the screen default, as a click on an applied default would.
+   */
+  unsortedDefault?: boolean
+  /** folder rows stay above the files under any sort (the device folder view) */
+  foldersFirst?: boolean
+  /**
+   * Which rows carry a Chọn box. A row it refuses has none and select-all skips it; when
+   * it refuses every row the Chọn column is not drawn at all. Default: every row.
+   */
+  selectableFor?: (doc: DocumentsHomeDoc) => boolean
+  /** a row's own class and drag, drop and context-menu events */
+  rowPropsFor?: (doc: DocumentsHomeDoc) => DocRowExtra | undefined
+  /** the name's text when it is more than the title (a highlighted search hit) */
+  titleFor?: (doc: DocumentsHomeDoc) => ReactNode
 }
 
 /** the screens whose rows fall in groups under their own column: day / week, or days left in the Trash */
@@ -100,6 +117,11 @@ export function DocList({
   rename,
   renderSource,
   groups = true,
+  unsortedDefault = false,
+  foldersFirst = false,
+  selectableFor,
+  rowPropsFor,
+  titleFor,
 }: DocListProps) {
   const { t } = useI18n()
 
@@ -121,13 +143,27 @@ export function DocList({
 
   const docs = useMemo(() => rows.flatMap((row) => (row.type === 'doc' ? [row.doc] : [])), [rows])
   const present = specialPresent(screen, docs)
-  const columns = visibleColumns(screen, docs, width > 0 ? width : undefined)
-  const active = effectiveSort(screen, sort, present)
+  const canSelect = (doc: DocumentsHomeDoc): boolean => !selectableFor || selectableFor(doc)
+  const selectableDocs = docs.filter(canSelect)
+  const allColumns = visibleColumns(screen, docs, width > 0 ? width : undefined)
+  // a list nothing on is selectable has no Chọn column
+  const columns =
+    selectableFor && selectableDocs.length === 0
+      ? allColumns.filter((c) => c !== 'select')
+      : allColumns
+  const effective = effectiveSort(screen, sort, present)
+  const active: SortSpec | null = unsortedDefault && !sort ? null : effective
   const sorted = useMemo(
-    () => sortTableRows(rows, active),
+    () => {
+      const ordered = active ? sortTableRows(rows, active) : [...rows]
+      if (!foldersFirst) return ordered
+      const isFolder = (row: DocumentsHomeTableRow) =>
+        row.type === 'doc' && row.doc.kind === 'folder'
+      return [...ordered.filter(isFolder), ...ordered.filter((row) => !isFolder(row))]
+    },
     // the sort object is rebuilt every render: its two parts are the dependencies
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, active.column, active.dir],
+    [rows, active?.column, active?.dir, foldersFirst],
   )
 
   const track = trackOf(columns, screen)
@@ -137,15 +173,17 @@ export function DocList({
   // groups follow the screen column: only while it is there and the list is sorted by it
   const [collapsed, toggleGroup] = useCollapsedGroups(screen)
   const grouped =
-    groups && GROUPED_SCREENS.includes(screen) && present && groupsActive(screen, active)
+    groups && GROUPED_SCREENS.includes(screen) && present && active && groupsActive(screen, active)
   const runs = grouped ? groupRows(screen, sorted, now, (row) => groupInputOf(screen, row)) : null
 
   // select-all and the header box stand for the rows on screen: a closed group's rows are not
   const docsOf = (rows: readonly DocumentsHomeTableRow[]) =>
     rows.flatMap((row) => (row.type === 'doc' ? [row.doc] : []))
   const shownDocs = runs
-    ? runs.flatMap((run) => (run.id === null || !collapsed.has(run.id) ? docsOf(run.rows) : []))
-    : docs
+    ? runs.flatMap((run) =>
+        run.id === null || !collapsed.has(run.id) ? docsOf(run.rows).filter(canSelect) : [],
+      )
+    : selectableDocs
   const allSelected = shownDocs.length > 0 && shownDocs.every((doc) => selected.has(doc.id))
   const someSelected = !allSelected && shownDocs.some((doc) => selected.has(doc.id))
   const allRef = useRef<HTMLInputElement>(null)
@@ -212,7 +250,7 @@ export function DocList({
         </div>
       )
     }
-    const here = active.column === col
+    const here = active?.column === col
     return (
       <div
         key={col}
@@ -224,7 +262,7 @@ export function DocList({
         <button
           type="button"
           className={`dh-sort-head${here ? ' sorted' : ''}${here && active.dir === 'desc' ? ' desc' : ''}`}
-          onClick={() => onSortChange(nextSort(screen, active, col))}
+          onClick={() => onSortChange(nextSort(screen, active ?? effective, col))}
         >
           <span>{text}</span>
           <SortArrow />
@@ -246,6 +284,9 @@ export function DocList({
         columns={columns}
         now={now}
         grouped={inGroup}
+        selectable={canSelect(doc)}
+        titleNode={titleFor?.(doc)}
+        extra={rowPropsFor?.(doc)}
         selected={selected.has(doc.id)}
         onSelectedChange={(on) => toggleOne(doc.id, on)}
         opening={openingId === doc.id}
