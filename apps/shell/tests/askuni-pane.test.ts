@@ -10,6 +10,8 @@ import { vi as viStrings } from '../src/renderer/src/i18n/askuni/vi'
 import type {
   AskUniCitation,
   AskUniContext,
+  AskUniOpenRequest,
+  AskUniOpenResult,
   AskUniRequest,
   AskUniResult,
 } from '../src/shared/askuni-api'
@@ -80,12 +82,13 @@ describe('Ask UNI mode (shell Home My AI)', () => {
   let root: Root
   let ask: ReturnType<typeof vi.fn<(req: AskUniRequest) => Promise<AskUniResult>>>
   let askContext: ReturnType<typeof vi.fn<() => Promise<AskUniContext>>>
-  let opened: AskUniCitation[]
+  let openCitation: ReturnType<typeof vi.fn<(req: AskUniOpenRequest) => Promise<AskUniOpenResult>>>
 
   function installBridge(extra: Record<string, unknown> = {}): void {
     ;(window as unknown as { aiOffice: unknown }).aiOffice = {
       uniworkAskUni: ask,
       uniworkAskUniContext: askContext,
+      uniworkAskUniOpenCitation: openCitation,
       setLanguage: vi.fn(async () => undefined),
       ...extra,
     }
@@ -102,7 +105,7 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       root.render(
         h(LocaleProvider, {
           initial: lang,
-          children: h(AskUniPane, { onOpenCitation: (c: AskUniCitation) => opened.push(c) }),
+          children: h(AskUniPane),
         }),
       )
     })
@@ -138,7 +141,7 @@ describe('Ask UNI mode (shell Home My AI)', () => {
     host = document.createElement('div')
     document.body.appendChild(host)
     root = createRoot(host)
-    opened = []
+    openCitation = vi.fn(async () => ({ ok: true as const }))
     ask = vi.fn(async () => answer('Plain answer'))
     askContext = vi.fn(async () => ctx())
     installBridge()
@@ -437,7 +440,7 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       }
     })
 
-    it('every row calls onOpenCitation with its citation', async () => {
+    it('every row calls the open bridge with its kind and href only', async () => {
       ask.mockResolvedValue(answer('See sources', { citations: CITATIONS }))
       await mount()
       await sendQuestion('Where?')
@@ -447,7 +450,108 @@ describe('Ask UNI mode (shell Home My AI)', () => {
           row.click()
         })
       }
-      expect(opened).toEqual(CITATIONS)
+      expect(openCitation.mock.calls.map(([req]) => req)).toEqual(
+        CITATIONS.map((c) => ({ kind: c.kind, href: c.href })),
+      )
+    })
+
+    it('rows are real buttons, so Enter and Space open them from the keyboard', async () => {
+      ask.mockResolvedValue(answer('See sources', { citations: CITATIONS }))
+      await mount()
+      await sendQuestion('Where?')
+      const rows = [...host.querySelectorAll('.askuni-source')]
+      expect(rows.length).toBe(CITATIONS.length)
+      for (const row of rows) {
+        expect(row.tagName).toBe('BUTTON')
+        expect(row.getAttribute('type')).toBe('button')
+        expect((row as HTMLButtonElement).disabled).toBe(false)
+      }
+    })
+
+    it('a row with an empty href is inert: no button, no action, no bridge call', async () => {
+      const bare: AskUniCitation = {
+        sourceId: 's7',
+        kind: 'other',
+        title: 'Project Phoenix',
+        quote: 'Kick-off notes',
+        href: '',
+      }
+      ask.mockResolvedValue(answer('See source', { citations: [bare, CITATIONS[1]!] }))
+      await mount()
+      await sendQuestion('Where?')
+      const rows = [...host.querySelectorAll('.askuni-source')]
+      expect(rows.map((r) => r.tagName)).toEqual(['DIV', 'BUTTON'])
+      const inert = rows[0] as HTMLElement
+      expect(inert.textContent).toContain('Project Phoenix')
+      expect(inert.textContent).toContain('Kick-off notes')
+      expect(inert.textContent).not.toContain(en.askUniOpenBrowser)
+      expect(inert.textContent).not.toContain(en.askUniOpenDocument)
+      expect(inert.getAttribute('role')).toBeNull()
+      expect(inert.getAttribute('tabindex')).toBeNull()
+      expect(inert.getAttribute('aria-label') ?? '').not.toContain(en.askUniOpenBrowser)
+      await act(async () => {
+        inert.click()
+      })
+      expect(openCitation).not.toHaveBeenCalled()
+    })
+
+    it('a refused open shows one inline note and a later success clears it', async () => {
+      ask.mockResolvedValue(answer('See sources', { citations: CITATIONS.slice(0, 2) }))
+      openCitation.mockResolvedValueOnce({ ok: false, code: 'error' })
+      await mount()
+      await sendQuestion('Where?')
+      const rows = [...host.querySelectorAll('.askuni-source')] as HTMLButtonElement[]
+      expect(host.textContent).not.toContain(en.askUniOpenFailed)
+      await act(async () => {
+        rows[0]!.click()
+      })
+      await flush()
+      const note = host.querySelector('[role="status"].askuni-open-note')
+      expect(note?.textContent).toBe(en.askUniOpenFailed)
+      expect(host.textContent?.split(en.askUniOpenFailed).length).toBe(2)
+      await act(async () => {
+        rows[1]!.click()
+      })
+      await flush()
+      expect(host.textContent).not.toContain(en.askUniOpenFailed)
+    })
+
+    it('a bridge that rejects also shows the note, never an unhandled error', async () => {
+      ask.mockResolvedValue(answer('See sources', { citations: [CITATIONS[1]!] }))
+      openCitation.mockRejectedValueOnce(new Error('ipc closed'))
+      await mount()
+      await sendQuestion('Where?')
+      await act(async () => {
+        ;(host.querySelector('.askuni-source') as HTMLButtonElement).click()
+      })
+      await flush()
+      expect(host.textContent).toContain(en.askUniOpenFailed)
+    })
+
+    it('a signed-out open says the session needs signing in again', async () => {
+      ask.mockResolvedValue(answer('See sources', { citations: [CITATIONS[1]!] }))
+      openCitation.mockResolvedValueOnce({ ok: false, code: 'signed_out' })
+      await mount()
+      await sendQuestion('Where?')
+      await act(async () => {
+        ;(host.querySelector('.askuni-source') as HTMLButtonElement).click()
+      })
+      await flush()
+      expect(host.textContent).toContain(en.askUniOpenFailed)
+    })
+
+    it('the open note is localized', async () => {
+      ask.mockResolvedValue(answer('Xem nguồn', { citations: [CITATIONS[1]!] }))
+      openCitation.mockResolvedValueOnce({ ok: false, code: 'error' })
+      await mount('vi')
+      await sendQuestion('Ở đâu?')
+      await act(async () => {
+        ;(host.querySelector('.askuni-source') as HTMLButtonElement).click()
+      })
+      await flush()
+      expect(viStrings.askUniOpenFailed).toBeTruthy()
+      expect(viStrings.askUniOpenFailed).not.toBe(en.askUniOpenFailed)
+      expect(host.textContent).toContain(viStrings.askUniOpenFailed)
     })
 
     it('renders a citation of kind other as a generic row with the open-in-browser affordance', async () => {
@@ -476,7 +580,7 @@ describe('Ask UNI mode (shell Home My AI)', () => {
       await act(async () => {
         row.click()
       })
-      expect(opened).toEqual([other])
+      expect(openCitation).toHaveBeenCalledWith({ kind: 'other', href: '/o/w/pages/9' })
     })
 
     it('maps a kind the app does not know to the generic row instead of crashing', async () => {

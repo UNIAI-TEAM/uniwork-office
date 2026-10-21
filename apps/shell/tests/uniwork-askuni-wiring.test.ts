@@ -39,6 +39,8 @@ function wiring(over: Partial<UniworkAskUniWiring> = {}): UniworkAskUniWiring {
     activeWorkspaceId: () => null,
     packaged: true,
     env: { UNIWORK_ASKUNI_FAKE: '1' },
+    openDocument: async () => ({ ok: true, value: { path: '/tmp/doc.docx' } }),
+    openExternal: async () => undefined,
     ...over,
   }
 }

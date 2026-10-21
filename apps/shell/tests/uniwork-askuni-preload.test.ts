@@ -126,6 +126,40 @@ describe('preload: window.aiOffice Ask UNI bridge', () => {
     })
   })
 
+  it('s4: uniworkAskUniOpenCitation sends only {kind, href} to its channel', async () => {
+    const { bridge, invoked } = await loadPreload({ ok: true })
+    const sent = { kind: 'document' as const, href: '/o/w/documents/1' }
+    expect(await bridge.uniworkAskUniOpenCitation(sent)).toEqual({ ok: true })
+    expect(invoked()).toEqual([{ channel: ASKUNI_CHANNELS.openCitation, args: [sent] }])
+    const extra = await loadPreload({ ok: true })
+    await extra.bridge.uniworkAskUniOpenCitation({
+      kind: 'task',
+      href: '/o/w/tasks/2',
+      url: 'https://evil.example',
+    } as never)
+    expect(extra.invoked()).toEqual([
+      { channel: ASKUNI_CHANNELS.openCitation, args: [{ kind: 'task', href: '/o/w/tasks/2' }] },
+    ])
+  })
+
+  it('s4: keeps the error code of a refused open', async () => {
+    const { bridge } = await loadPreload({ ok: false, code: 'offline' })
+    expect(await bridge.uniworkAskUniOpenCitation({ kind: 'task', href: '/o/w/tasks/2' })).toEqual({
+      ok: false,
+      code: 'offline',
+    })
+  })
+
+  it.each([undefined, null, 'x', 7, {}, { ok: 1 }, { ok: false }, { ok: false, code: 'nope' }])(
+    's4: a malformed open reply %j becomes an error result',
+    async (reply) => {
+      const { bridge } = await loadPreload(reply)
+      expect(
+        await bridge.uniworkAskUniOpenCitation({ kind: 'task', href: '/o/w/tasks/2' }),
+      ).toEqual({ ok: false, code: 'error' })
+    },
+  )
+
   it('is exposed on the shell preload only', async () => {
     const { readFileSync, readdirSync } = await import('node:fs')
     const { join } = await import('node:path')
