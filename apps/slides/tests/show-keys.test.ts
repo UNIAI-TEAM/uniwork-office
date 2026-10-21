@@ -66,6 +66,14 @@ describe('slide show keys', () => {
     expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('и', { code: 'KeyB' }))?.state.screen).toBe('black')
   })
 
+  it('reads the Period / Comma keys by position on a layout that types a letter there', () => {
+    // Russian layout: the Period key types "ю" (black, like "."), the Comma key "б" (white)
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('ю', { code: 'Period' }))?.state.screen).toBe(
+      'black',
+    )
+    expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('б', { code: 'Comma' }))?.state.screen).toBe('white')
+  })
+
   it('Ctrl+H on Windows, Cmd+I on the Mac hide the pointer (table slideshow row)', () => {
     const pointer = { type: 'pointer' }
     expect(reduceShowKey(INITIAL_SHOW_KEYS, ev('h', { ctrlKey: true }))?.action).toEqual(pointer)
