@@ -25,6 +25,7 @@ export const zh = {
   appScLineBreak: '换行符',
   appScNbsp: '不换行空格',
   appScNbHyphen: '不换行连字符',
+  appScFindNext: '查找下一个',
   appScOptHyphen: '可选连字符',
   appScGrowFont1: '增大字号 1 磅',
   appScShrinkFont1: '减小字号 1 磅',

@@ -1336,13 +1336,14 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
-  // Go To on web: Ctrl+G is Find there; F5 (reload) is not bound until tested in a browser
+  // Go To on web: Ctrl+G is Find there, so Windows web takes Word's F5 (the browser's reload; the
+  // frame swallows it only while a document is open, see the `goto` command in App.tsx)
   {
     id: 'docs-021',
     scope: 'docs',
     win: ['Ctrl+G'],
     mac: ['Alt+Cmd+G'],
-    web: { win: [], mac: ['Alt+Cmd+G'] },
+    web: { win: ['F5'], mac: ['Alt+Cmd+G'] },
     match: 'key',
     guard: { noRepeat: true },
   },
@@ -1385,13 +1386,46 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
-  // Clear character formatting: Ctrl+Space; the Mac key keeps today's Control+Space
-  // until a product decision (it is also macOS' input-source switch)
+  // Clear character formatting: Ctrl+Space on Windows. Mac has no key: Word for Mac documents
+  // none and Control+Space is macOS' input-source switch (Vietnamese input methods)
   {
     id: 'docs-039',
     scope: 'docs',
     win: ['Ctrl+Space'],
-    mac: ['Ctrl+Space'],
+    mac: [],
+    web: { win: ['Ctrl+Space'], mac: [] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Close document: the web frame has no Close action (the host's tab closes the document), so the
+  // generated Alt+Shift+W alternate would be a hint nothing runs
+  {
+    id: 'docs-008',
+    scope: 'docs',
+    win: ['Ctrl+W'],
+    mac: ['Cmd+W'],
+    web: { win: [], mac: [] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Double underline: the editor's underline mark carries no style, so there is nothing to bind
+  {
+    id: 'docs-025',
+    scope: 'docs',
+    win: [],
+    mac: [],
+    web: { win: [], mac: [] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Hidden text: Word for Windows' Ctrl+Shift+H (the shell's Back to Home is menu-only now);
+  // Word for Mac documents no key
+  {
+    id: 'docs-037',
+    scope: 'docs',
+    win: ['Ctrl+Shift+H'],
+    mac: [],
+    web: { win: ['Ctrl+Shift+H'], mac: [] },
     match: 'key',
     guard: { noRepeat: true },
   },
@@ -1537,6 +1571,52 @@ export const docsShortcuts: readonly ShortcutAction[] = mergeRows(generated, man
 /** Why a manual row has no chord on a surface or platform, and remarks on manual rows:
  * merged after the generated lists into `SHORTCUT_UNMAPPED` / `SHORTCUT_NOTES`. */
 export const docsManualUnmapped: readonly UnmappedShortcut[] = [
+  {
+    id: 'docs-008',
+    part: 'web.win',
+    reason:
+      'the web frame has no in-app Close action (the host closes the tab); Alt+Shift+W is not offered',
+  },
+  {
+    id: 'docs-008',
+    part: 'web.mac',
+    reason: 'the web frame has no in-app Close action (the host closes the tab)',
+  },
+  {
+    id: 'docs-012',
+    part: 'row',
+    reason: 'deferred: no repeat-last-command mechanism exists (F4 / Cmd+Y)',
+  },
+  {
+    id: 'docs-025',
+    part: 'desktop.win',
+    reason: 'no double-underline mark: the editor underline carries no style (Ctrl+Shift+D)',
+  },
+  {
+    id: 'docs-025',
+    part: 'desktop.mac',
+    reason: 'no double-underline mark: the editor underline carries no style (Cmd+Shift+D)',
+  },
+  {
+    id: 'docs-025',
+    part: 'web.win',
+    reason: 'no double-underline mark: the editor underline carries no style (Ctrl+Shift+D)',
+  },
+  {
+    id: 'docs-025',
+    part: 'web.mac',
+    reason: 'no double-underline mark: the editor underline carries no style (Cmd+Shift+D)',
+  },
+  {
+    id: 'docs-037',
+    part: 'desktop.mac',
+    reason: 'Word for Mac documents no Hidden text key',
+  },
+  {
+    id: 'docs-039',
+    part: 'web.mac',
+    reason: "Word for Mac documents no key and Control+Space is macOS' input-source switch",
+  },
   {
     id: 'docs-059',
     part: 'desktop.mac',

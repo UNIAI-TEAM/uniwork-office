@@ -26,6 +26,7 @@ export const th = {
   appScLineBreak: 'ตัวแบ่งบรรทัด',
   appScNbsp: 'ช่องว่างไม่แบ่งบรรทัด',
   appScNbHyphen: 'ยัติภังค์ไม่แบ่งบรรทัด',
+  appScFindNext: 'ค้นหาถัดไป',
   appScOptHyphen: 'ยัติภังค์ทางเลือก',
   appScGrowFont1: 'เพิ่มขนาดฟอนต์ 1 pt',
   appScShrinkFont1: 'ลดขนาดฟอนต์ 1 pt',

@@ -26,6 +26,7 @@ export const ar = {
   appScLineBreak: 'فاصل أسطر',
   appScNbsp: 'مسافة غير فاصلة',
   appScNbHyphen: 'واصلة غير فاصلة',
+  appScFindNext: 'بحث عن التالي',
   appScOptHyphen: 'واصلة اختيارية',
   appScGrowFont1: 'تكبير الخط 1 نقطة',
   appScShrinkFont1: 'تصغير الخط 1 نقطة',

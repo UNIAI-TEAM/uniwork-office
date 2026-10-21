@@ -26,6 +26,7 @@ export const ko = {
   appScLineBreak: '줄 바꿈',
   appScNbsp: '줄바꿈 없는 공백',
   appScNbHyphen: '줄바꿈 없는 하이픈',
+  appScFindNext: '다음 찾기',
   appScOptHyphen: '선택적 하이픈',
   appScGrowFont1: '글꼴 크기 1pt 크게',
   appScShrinkFont1: '글꼴 크기 1pt 작게',
