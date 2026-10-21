@@ -253,14 +253,13 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     await flush()
   }
 
-  it('lists Từ nơi khác last in the sub-nav (From elsewhere in English) and opens it from there', async () => {
+  it('opens Từ nơi khác from its sidebar section (From elsewhere in English), no longer a sub-nav item', async () => {
     await mount('workspace')
-    const labels = navLabels()
-    expect(labels[labels.length - 1]).toBe('Từ nơi khác')
-    const entry = Array.from(sidebarSlot.querySelectorAll('button')).find(
-      (b) => b.getAttribute('data-nav') === 'elsewhere',
-    )
+    expect(navLabels()).not.toContain('Từ nơi khác')
+    expect(sidebarSlot.querySelector('[data-nav="elsewhere"]')).toBeNull()
+    const entry = sidebarSlot.querySelector('.dl-side-sources [data-source="chat"]')
     await click(entry)
+    expect(lastCall('uniworkListSources')).toEqual({ workspaceId: 'ws-1', source: 'chat' })
     expect(sourceIds()).toEqual(['s-new', 's-old'])
     expect(host.querySelector('.dh-title')?.textContent).toBe('Từ nơi khác')
 
@@ -417,7 +416,8 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
 
   it('the workspace root no longer merges the same rows: they live here only (F-14, Q2=A)', async () => {
     await mount('workspace')
-    expect(api.uniworkListSources).not.toHaveBeenCalled()
+    // the only sources read off the page is the sidebar's limit:1 probe (UNI-2047 sidebar)
+    expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual([{ workspaceId: 'ws-1', limit: 1 }])
     expect(sourceIds()).toEqual([])
   })
 })

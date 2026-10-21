@@ -325,10 +325,12 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
     it('lists no other-source file on the workspace root, whatever the chip (UNI-2047 F-14)', async () => {
       sources = [SOURCE]
       await mount('workspace')
-      expect(api.uniworkListSources).not.toHaveBeenCalled()
+      // the only sources read is the sidebar's limit:1 probe (UNI-2047 sidebar); nothing is merged
+      const probe = [{ workspaceId: 'ws-1', limit: 1 }]
+      expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual(probe)
       expect(host.textContent).not.toContain('Bảng giá.pdf')
       await click(chip('pdf'))
-      expect(api.uniworkListSources).not.toHaveBeenCalled()
+      expect(api.uniworkListSources.mock.calls.map((c) => c[0])).toEqual(probe)
       expect(host.textContent).not.toContain('Bảng giá.pdf')
     })
 

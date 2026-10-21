@@ -272,8 +272,8 @@ describe('DocumentsHome: the states of the lists', () => {
         expect(state!.querySelector('.dl-state-hint')?.textContent).toMatch(reason)
         expect(state!.textContent).not.toMatch(/no longer exists|không còn tồn tại/i)
         expect(retryButton()?.textContent).toBe(retry)
-        // the entry stays in the nav
-        expect(navLabels()).toContain(lang === 'en' ? 'From elsewhere' : 'Từ nơi khác')
+        // UNI-2047 sidebar: the web hides the From elsewhere section while the route is not there
+        expect(sidebarSlot.querySelector('.dl-side-sources')).toBeNull()
       },
     )
 
