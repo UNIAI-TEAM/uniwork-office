@@ -162,11 +162,14 @@ describe('DocPickerList: the compact picker variant (UNI-2047 B2)', () => {
     expect(optionOf('budget').textContent).not.toMatch(/KB|Workspace|Chủ sở hữu|Bạn:/)
   })
 
-  it('writes Cập nhật with the shared date format, vi then en', async () => {
+  it('writes Cập nhật with the shared date format in vi', async () => {
     await mount()
     expect(cell('budget', 'updated')!.textContent).toBe('09:05')
     expect(cell('note', 'updated')!.textContent).toBe('Hôm qua, 16:30')
     expect(cell('report', 'updated')!.textContent).toBe('02/03/2025')
+  })
+
+  it('writes Cập nhật with the shared date format in en', async () => {
     await mount(DOCS, {}, 'en')
     expect(cell('budget', 'updated')!.textContent).toBe('09:05')
     expect(cell('note', 'updated')!.textContent).toBe('Yesterday, 16:30')
@@ -195,9 +198,7 @@ describe('DocPickerList: the compact picker variant (UNI-2047 B2)', () => {
   it('reads a path second line left-truncated, with the full path for a screen reader', async () => {
     await mount(DOCS, {
       sublineFor: (d) =>
-        d.id === 'budget'
-          ? { short: '…/Contracts', full: 'Alpha / Contracts', path: true }
-          : null,
+        d.id === 'budget' ? { short: '…/Contracts', full: 'Alpha / Contracts', path: true } : null,
     })
     const meta = cell('budget', 'name')!.querySelector<HTMLElement>('.uw-pick-row-meta')!
     expect(meta.classList.contains('uwf-path')).toBe(true)
@@ -302,9 +303,7 @@ describe('DocPickerList: the compact picker variant (UNI-2047 B2)', () => {
     expect(cell('budget', 'name')!.querySelector('.uw-pick-row-meta')?.textContent).toBe(
       'Pháp chế · Minh Trần',
     )
-    expect(cell('note', 'name')!.querySelector('.uw-pick-row-meta')?.textContent).toBe(
-      'Lan Nguyễn',
-    )
+    expect(cell('note', 'name')!.querySelector('.uw-pick-row-meta')?.textContent).toBe('Lan Nguyễn')
     expect(cell('report', 'name')!.querySelector('.uw-pick-row-meta')).toBeNull()
     // Cập nhật is always there
     expect(cell('budget', 'updated')!.textContent).toBe('09:05')

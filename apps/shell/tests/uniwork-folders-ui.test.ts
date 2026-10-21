@@ -975,8 +975,11 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     const bundleCss = `${foldersCss}\n${homeCss.replace(/@position-try[^{]*\{[^}]*\}/g, '')}`
 
     await render()
-    const regularMeta = $<HTMLElement>('.uw-pick-row-meta:not(.uwf-path)')!
-    expect(regularMeta).toBeTruthy()
+    // UNI-2047 B2: the rows carry their editor and date as columns, so a plain second line (the
+    // Open dialog's workspace name) is probed with a stand-in inside the same list
+    const regularMeta = document.createElement('span')
+    regularMeta.className = 'uw-pick-row-meta'
+    $('.uwf-contents .uw-pick-row')!.append(regularMeta)
 
     // Trigger search so BrowserContents renders <span class="uw-pick-row-meta uwf-path">
     await type($<HTMLInputElement>('.uwf-own-search')!, 'bud')
