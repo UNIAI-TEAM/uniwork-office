@@ -703,21 +703,12 @@ export type UniworkDocActionResult<T> =
 /** the file formats D's blank route generates (UNI-1953: the Office three plus md / html / pdf; UNI-2046: txt) */
 export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'txt' | 'html' | 'pdf'
 
-/**
- * UNI-1959: "Share with workspace" on a create. `workspace` is the only value
- * the New menu sends (the request then carries `visibility: "workspace"`); the
- * field is absent for a private create. Documents only: a folder is never
- * shared (D answers 422 `folder_not_shareable`), so a folder create has no field.
- */
-export type UniworkCreateVisibility = 'workspace'
-
 export interface UniworkCreateDocInput {
   workspaceId: string
   /** ULID of the parent folder/page; null = the workspace root */
   folderId: string | null
   name: string
   format: UniworkDocNewFormat
-  visibility?: UniworkCreateVisibility
 }
 
 /** UNI-1953: a UniNote is a page, not a file format: it has its own create call */
@@ -726,7 +717,6 @@ export interface UniworkCreatePageInput {
   /** ULID of the parent folder/page; null = the caller's My Folder */
   folderId: string | null
   name: string
-  visibility?: UniworkCreateVisibility
 }
 
 export interface UniworkUploadDocInput {
