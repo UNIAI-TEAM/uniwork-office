@@ -142,6 +142,8 @@ describe('SIZE-F1 desktop document size limits', () => {
         // BIGUP-A1: the chunked-upload threshold rides along, so the upload
         // path knows when to open a session instead of one big request
         chunked_upload_threshold_bytes: 40 * MB_BYTES,
+        // UNI-2052: no folder_upload block in this config = no folder uploads
+        folderUpload: null,
       })
 
       // every field is optional and falls back on its own
@@ -161,6 +163,7 @@ describe('SIZE-F1 desktop document size limits', () => {
         max_bytes: 150 * MB_BYTES,
         warn_ratio: DEFAULT_WARN_RATIO,
         warn_bytes: Math.floor(150 * MB_BYTES * DEFAULT_WARN_RATIO),
+        folderUpload: null,
       })
       // a non-config body is not a limits object
       expect(parseDocumentLimits('nope')).toEqual(DEFAULT_DOCUMENT_LIMITS)
@@ -241,6 +244,7 @@ describe('SIZE-F1 desktop document size limits', () => {
         max_bytes: 120 * MB_BYTES,
         warn_ratio: 0.8,
         warn_bytes: Math.floor(120 * MB_BYTES * 0.8),
+        folderUpload: null,
       })
     })
 

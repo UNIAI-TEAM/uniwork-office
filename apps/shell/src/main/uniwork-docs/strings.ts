@@ -47,6 +47,8 @@ const en = {
   connectNo: 'Cancel',
   uploadPickTitle: 'Choose a file to upload',
   uploadPickDocuments: 'Documents',
+  uploadPickFolderTitle: 'Choose a folder to upload',
+  uploadPickFilesTitle: 'Choose files to upload',
   signOutTitle: 'Sign out of UniWork?',
   signOutBody:
     'Documents with unsaved changes or queued saves: {count}. They stay locked on this computer and only your account can open them again.',
@@ -105,6 +107,8 @@ const vi = {
   connectNo: 'Hủy',
   uploadPickTitle: 'Chọn tệp để tải lên',
   uploadPickDocuments: 'Tài liệu',
+  uploadPickFolderTitle: 'Chọn thư mục để tải lên',
+  uploadPickFilesTitle: 'Chọn các tệp để tải lên',
   signOutTitle: 'Đăng xuất khỏi UniWork?',
   signOutBody:
     'Tài liệu còn thay đổi chưa lưu hoặc lần lưu đang chờ: {count}. Chúng được giữ khóa trên máy này và chỉ tài khoản của bạn mở lại được.',
