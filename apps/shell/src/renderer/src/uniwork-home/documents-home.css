@@ -1245,3 +1245,69 @@
   border-inline-start: none;
   background: var(--surface);
 }
+
+/* UNI-2047 A5: the bar over the table while rows are selected */
+.dl-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--surface-subtle);
+  color: var(--text);
+}
+
+.dl-bulk-count {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dl-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dl-bulk-action {
+  min-height: 32px;
+  padding-block: 4px;
+  font-size: 13px;
+}
+
+.dl-bulk-action.danger {
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
+.dl-bulk-action.danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+
+.dl-bulk-clear {
+  margin-inline-start: auto;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dl-bulk-clear:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.dl-bulk-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

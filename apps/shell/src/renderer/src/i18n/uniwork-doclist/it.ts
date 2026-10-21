@@ -69,4 +69,15 @@ export const it = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Azioni multiple',
+  dlBulkSelected: '{n} selezionati',
+  dlBulkClear: 'Deseleziona',
+  dlBulkDoneShelve: '{ok}/{total} documenti archiviati',
+  dlBulkDoneUnshelve: '{ok}/{total} documenti rimossi dall’archivio',
+  dlBulkDoneRestore: '{ok}/{total} documenti ripristinati',
+  dlBulkDoneTrash: '{ok}/{total} documenti spostati nel cestino',
+  dlBulkConfirmTitleOne: 'Spostare {n} documento nel cestino?',
+  dlBulkConfirmTitleOther: 'Spostare {n} documenti nel cestino?',
+  dlBulkConfirmBody:
+    'Gli elementi restano nel cestino per 30 giorni, poi vengono eliminati definitivamente. Quelli che non puoi gestire vengono saltati.',
 } satisfies Record<keyof typeof zh, string>

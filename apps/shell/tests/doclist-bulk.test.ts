@@ -85,9 +85,7 @@ describe('runBulk: fan-out of one batch (UNI-2047 A5)', () => {
   })
 
   it('gives up after the one retry: a still-throttled item is a failure, not a loop', async () => {
-    const work = vi.fn(
-      async (): Promise<BulkWorkResult> => ({ ok: false, error: 'rate_limited' }),
-    )
+    const work = vi.fn(async (): Promise<BulkWorkResult> => ({ ok: false, error: 'rate_limited' }))
     const result = await runBulk([doc('d1')], work, { sleep: noSleep })
     expect(work).toHaveBeenCalledTimes(2)
     expect(result.failed).toEqual([{ id: 'd1', error: 'rate_limited' }])

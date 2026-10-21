@@ -68,4 +68,15 @@ export const vi = {
   dlLinkCopyFailed: 'Không sao chép được link. Thử lại.',
   dlSortAscending: '{label}, đang sắp xếp tăng dần',
   dlSortDescending: '{label}, đang sắp xếp giảm dần',
+  dlBulkToolbar: 'Thao tác hàng loạt',
+  dlBulkSelected: '{n} đã chọn',
+  dlBulkClear: 'Bỏ chọn',
+  dlBulkDoneShelve: 'Đã lưu trữ {ok}/{total} tài liệu',
+  dlBulkDoneUnshelve: 'Đã bỏ lưu trữ {ok}/{total} tài liệu',
+  dlBulkDoneRestore: 'Đã khôi phục {ok}/{total} tài liệu',
+  dlBulkDoneTrash: 'Đã chuyển {ok}/{total} tài liệu vào thùng rác',
+  dlBulkConfirmTitleOne: 'Chuyển {n} tài liệu vào thùng rác?',
+  dlBulkConfirmTitleOther: 'Chuyển {n} tài liệu vào thùng rác?',
+  dlBulkConfirmBody:
+    'Các mục sẽ nằm trong thùng rác 30 ngày rồi bị xóa vĩnh viễn. Mục bạn không có quyền sẽ được bỏ qua.',
 } satisfies Record<keyof typeof zh, string>

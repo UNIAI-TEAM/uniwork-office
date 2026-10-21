@@ -69,4 +69,15 @@ export const hi = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'सामूहिक कार्रवाइयाँ',
+  dlBulkSelected: '{n} चुने गए',
+  dlBulkClear: 'चयन हटाएँ',
+  dlBulkDoneShelve: '{ok}/{total} दस्तावेज़ संग्रहीत किए गए',
+  dlBulkDoneUnshelve: '{ok}/{total} दस्तावेज़ संग्रह से हटाए गए',
+  dlBulkDoneRestore: '{ok}/{total} दस्तावेज़ पुनर्स्थापित किए गए',
+  dlBulkDoneTrash: '{ok}/{total} दस्तावेज़ ट्रैश में ले जाए गए',
+  dlBulkConfirmTitleOne: '{n} दस्तावेज़ ट्रैश में ले जाएँ?',
+  dlBulkConfirmTitleOther: '{n} दस्तावेज़ ट्रैश में ले जाएँ?',
+  dlBulkConfirmBody:
+    'आइटम 30 दिन तक ट्रैश में रहते हैं, फिर हमेशा के लिए हटा दिए जाते हैं। जिन आइटम को आप प्रबंधित नहीं कर सकते, वे छोड़ दिए जाएँगे।',
 } satisfies Record<keyof typeof zh, string>

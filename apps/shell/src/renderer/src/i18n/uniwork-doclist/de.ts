@@ -69,4 +69,15 @@ export const de = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Mehrfachaktionen',
+  dlBulkSelected: '{n} ausgewählt',
+  dlBulkClear: 'Auswahl aufheben',
+  dlBulkDoneShelve: '{ok}/{total} Dokumente archiviert',
+  dlBulkDoneUnshelve: '{ok}/{total} Dokumente aus dem Archiv geholt',
+  dlBulkDoneRestore: '{ok}/{total} Dokumente wiederhergestellt',
+  dlBulkDoneTrash: '{ok}/{total} Dokumente in den Papierkorb verschoben',
+  dlBulkConfirmTitleOne: '{n} Dokument in den Papierkorb verschieben?',
+  dlBulkConfirmTitleOther: '{n} Dokumente in den Papierkorb verschieben?',
+  dlBulkConfirmBody:
+    'Elemente bleiben 30 Tage im Papierkorb und werden dann endgültig gelöscht. Elemente, die Sie nicht verwalten können, werden übersprungen.',
 } satisfies Record<keyof typeof zh, string>

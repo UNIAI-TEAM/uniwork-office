@@ -68,4 +68,15 @@ export const en = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Bulk actions',
+  dlBulkSelected: '{n} selected',
+  dlBulkClear: 'Clear selection',
+  dlBulkDoneShelve: 'Archived {ok}/{total} documents',
+  dlBulkDoneUnshelve: 'Unarchived {ok}/{total} documents',
+  dlBulkDoneRestore: 'Restored {ok}/{total} documents',
+  dlBulkDoneTrash: 'Moved {ok}/{total} documents to the trash',
+  dlBulkConfirmTitleOne: 'Move {n} document to the trash?',
+  dlBulkConfirmTitleOther: 'Move {n} documents to the trash?',
+  dlBulkConfirmBody:
+    'Items stay in the trash for 30 days, then are deleted forever. Items you cannot manage are skipped.',
 } satisfies Record<keyof typeof zh, string>

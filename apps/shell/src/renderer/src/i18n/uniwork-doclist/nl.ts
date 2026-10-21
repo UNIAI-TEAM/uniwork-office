@@ -69,4 +69,15 @@ export const nl = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Bulkacties',
+  dlBulkSelected: '{n} geselecteerd',
+  dlBulkClear: 'Selectie wissen',
+  dlBulkDoneShelve: '{ok}/{total} documenten gearchiveerd',
+  dlBulkDoneUnshelve: '{ok}/{total} documenten uit het archief gehaald',
+  dlBulkDoneRestore: '{ok}/{total} documenten hersteld',
+  dlBulkDoneTrash: '{ok}/{total} documenten naar de prullenbak verplaatst',
+  dlBulkConfirmTitleOne: '{n} document naar de prullenbak verplaatsen?',
+  dlBulkConfirmTitleOther: '{n} documenten naar de prullenbak verplaatsen?',
+  dlBulkConfirmBody:
+    'Items blijven 30 dagen in de prullenbak en worden daarna definitief verwijderd. Items die je niet kunt beheren worden overgeslagen.',
 } satisfies Record<keyof typeof zh, string>

@@ -69,4 +69,15 @@ export const ru = {
   dlLinkCopyFailed: 'Could not copy the link. Try again.',
   dlSortAscending: '{label}, sorted ascending',
   dlSortDescending: '{label}, sorted descending',
+  dlBulkToolbar: 'Массовые действия',
+  dlBulkSelected: 'Выбрано: {n}',
+  dlBulkClear: 'Снять выбор',
+  dlBulkDoneShelve: 'В архив перемещено документов: {ok}/{total}',
+  dlBulkDoneUnshelve: 'Из архива возвращено документов: {ok}/{total}',
+  dlBulkDoneRestore: 'Восстановлено документов: {ok}/{total}',
+  dlBulkDoneTrash: 'В корзину перемещено документов: {ok}/{total}',
+  dlBulkConfirmTitleOne: 'Переместить документы ({n}) в корзину?',
+  dlBulkConfirmTitleOther: 'Переместить документы ({n}) в корзину?',
+  dlBulkConfirmBody:
+    'Элементы хранятся в корзине 30 дней, затем удаляются навсегда. Элементы, которыми вы не можете управлять, пропускаются.',
 } satisfies Record<keyof typeof zh, string>

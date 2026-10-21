@@ -153,9 +153,7 @@ describe('BulkBar: visible from one selected row, actions = what every row allow
     const dialog = document.body.querySelector('[role="dialog"]')
     expect(dialog).not.toBeNull()
     expect(dialog!.textContent).toContain('Chuyển 3 tài liệu vào thùng rác?')
-    await act(async () =>
-      document.body.querySelector<HTMLElement>('[data-bulk-confirm]')!.click(),
-    )
+    await act(async () => document.body.querySelector<HTMLElement>('[data-bulk-confirm]')!.click())
     expect(onConfirm).toHaveBeenCalledTimes(1)
     expect(onCancel).not.toHaveBeenCalled()
   })
@@ -192,7 +190,9 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
       uniworkListDocuments: vi.fn(async () => ok({ documents: items, nextCursor: null })),
       uniworkListTrash: vi.fn(async () =>
         ok({
-          documents: items.map((d) => mine(d, { archived: true, archivedAt: '2026-10-19T08:00:00Z' })),
+          documents: items.map((d) =>
+            mine(d, { archived: true, archivedAt: '2026-10-19T08:00:00Z' }),
+          ),
           nextCursor: null,
         }),
       ),
@@ -265,7 +265,9 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
     await flush()
   }
   const box = (id: string) =>
-    host.querySelector<HTMLInputElement>(`.dh-doc-table [data-doc-id="${id}"] input[type="checkbox"]`)
+    host.querySelector<HTMLInputElement>(
+      `.dh-doc-table [data-doc-id="${id}"] input[type="checkbox"]`,
+    )
   const bar = () => host.querySelector('[data-bulk-bar]')
   const bulk = (id: string) => host.querySelector(`[data-bulk-action="${id}"]`)
   const toast = () => document.body.querySelector('.uw-act-toast')?.textContent ?? ''

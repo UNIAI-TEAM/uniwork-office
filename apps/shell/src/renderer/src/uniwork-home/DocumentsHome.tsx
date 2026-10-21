@@ -111,10 +111,19 @@ import {
 } from '../uniwork-library-api'
 import { UniworkDocInfoPanel, type DocInfoLoad } from '../UniworkDocInfoPanel'
 import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
+import { BulkBar, BulkTrashConfirm } from '../doclist/BulkBar'
+import {
+  bulkActionsFor,
+  bulkSummary,
+  bulkWorkFor,
+  runBulkAction,
+  type BulkActionId,
+} from '../doclist/bulk'
 import { DocList } from '../doclist/DocList'
 import { copyDocLink } from '../doclist/copy-link'
 import { buildRowMenu } from '../doclist/row-menu'
 import type { DocSubline } from '../doclist/DocRow'
+import { pruneSelection, selectedDocsOf } from '../doclist/selection'
 import { screenOfSubView, wireSortOf } from '../doclist/table-model'
 import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
@@ -1193,13 +1202,37 @@ export function DocumentsHome({
     setSelected(new Set())
   }, [workspaceId, subView, folderId, query, wireFilters])
   useEffect(() => {
-    setSelected((prev) => {
-      if (prev.size === 0) return prev
-      const present = new Set(page.items.map((doc) => doc.id))
-      const next = new Set([...prev].filter((id) => present.has(id)))
-      return next.size === prev.size ? prev : next
-    })
+    setSelected((prev) => pruneSelection(prev, page.items))
   }, [page.items])
+
+  // UNI-2047 A5: the bulk bar acts on the selected rows; the destructive one asks once first
+  const selectedDocs = useMemo(() => selectedDocsOf(page.items, selected), [page.items, selected])
+  const [bulkTrashConfirm, setBulkTrashConfirm] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const bulkBusyRef = useRef(false)
+  const runBulkById = async (action: BulkActionId) => {
+    // the ref answers a second click that lands before React re-renders
+    if (bulkBusyRef.current) return
+    const docs = selectedDocs
+    if (docs.length === 0 || !bulkActionsFor(screen, docs).includes(action)) return
+    bulkBusyRef.current = true
+    setBulkBusy(true)
+    const result = await runBulkAction({
+      docs,
+      work: bulkWorkFor(action, screen),
+      refresh: refreshAll,
+    })
+    bulkBusyRef.current = false
+    setBulkBusy(false)
+    setSelected(new Set())
+    const { message, tone } = bulkSummary(action, result, t)
+    if (tone === 'ok') announce(message)
+    setToast({ message, tone })
+  }
+  const onBulkAction = (action: BulkActionId) => {
+    if (action === 'trash') setBulkTrashConfirm(true)
+    else void runBulkById(action)
+  }
   const [shelvedTrashTarget, setShelvedTrashTarget] = useState<DocumentsHomeDoc | null>(null)
   // the ref answers a second click that lands before React re-renders
   const unshelvingRef = useRef<Set<string>>(new Set())
@@ -2170,46 +2203,55 @@ export function DocumentsHome({
                   </div>
                 )
               ) : (
-                <DocList
-                  screen={screen}
-                  rows={tableRows}
-                  sort={docSort}
-                  onSortChange={setDocSort}
-                  selected={selected}
-                  onSelectedChange={setSelected}
-                  label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
-                  openingId={openingId}
-                  openMenuId={openMenuId}
-                  onOpenMenuChange={setOpenMenuId}
-                  menuFor={rowMenuFor}
-                  actionsFor={shelfView ? shelfActionsFor : undefined}
-                  onOpen={(doc) => void openDoc(doc)}
-                  sublineFor={sublineFor}
-                  rename={
-                    docRename
-                      ? {
-                          docId: docRename.doc.id,
-                          error: docRename.error,
-                          busy: docRename.busy,
-                          onSave: (value) => void handleSaveDocRename(docRename.doc, value),
-                          onCancel: () => setDocRename(null),
-                          onEdit: () =>
-                            setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
-                        }
-                      : undefined
-                  }
-                  renderSource={(source, columns) => (
-                    <DocumentsSourceRow
-                      key={`source:${source.id}`}
-                      source={source}
-                      columns={columns}
-                      menuOpen={openMenuId === `source:${source.id}`}
-                      onMenuOpenChange={(o) => setOpenMenuId(o ? `source:${source.id}` : null)}
-                      onOpen={(src) => void openSourceFile(src)}
-                      onDownload={(src) => void downloadSourceFile(src)}
-                    />
-                  )}
-                />
+                <>
+                  <BulkBar
+                    screen={screen}
+                    docs={selectedDocs}
+                    busy={bulkBusy}
+                    onAction={onBulkAction}
+                    onClear={() => setSelected(new Set())}
+                  />
+                  <DocList
+                    screen={screen}
+                    rows={tableRows}
+                    sort={docSort}
+                    onSortChange={setDocSort}
+                    selected={selected}
+                    onSelectedChange={setSelected}
+                    label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
+                    openingId={openingId}
+                    openMenuId={openMenuId}
+                    onOpenMenuChange={setOpenMenuId}
+                    menuFor={rowMenuFor}
+                    actionsFor={shelfView ? shelfActionsFor : undefined}
+                    onOpen={(doc) => void openDoc(doc)}
+                    sublineFor={sublineFor}
+                    rename={
+                      docRename
+                        ? {
+                            docId: docRename.doc.id,
+                            error: docRename.error,
+                            busy: docRename.busy,
+                            onSave: (value) => void handleSaveDocRename(docRename.doc, value),
+                            onCancel: () => setDocRename(null),
+                            onEdit: () =>
+                              setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
+                          }
+                        : undefined
+                    }
+                    renderSource={(source, columns) => (
+                      <DocumentsSourceRow
+                        key={`source:${source.id}`}
+                        source={source}
+                        columns={columns}
+                        menuOpen={openMenuId === `source:${source.id}`}
+                        onMenuOpenChange={(o) => setOpenMenuId(o ? `source:${source.id}` : null)}
+                        onOpen={(src) => void openSourceFile(src)}
+                        onDownload={(src) => void downloadSourceFile(src)}
+                      />
+                    )}
+                  />
+                </>
               )}
 
               {page.moreError && (
@@ -2285,6 +2327,17 @@ export function DocumentsHome({
           name={shelvedTrashTarget.title}
           onConfirm={() => void handleConfirmShelvedTrash()}
           onCancel={() => setShelvedTrashTarget(null)}
+        />
+      )}
+
+      {bulkTrashConfirm && (
+        <BulkTrashConfirm
+          count={selectedDocs.length}
+          onConfirm={() => {
+            setBulkTrashConfirm(false)
+            void runBulkById('trash')
+          }}
+          onCancel={() => setBulkTrashConfirm(false)}
         />
       )}
 
