@@ -1,5 +1,60 @@
 import type { zh } from './zh'
 import { en } from './en'
 
-// shortcut: English copy until this locale is translated (spec 6.8); replace the spread with real strings then
-export const ar = { ...en } satisfies Record<keyof typeof zh, string>
+// shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
+export const ar = {
+  ...en,
+  wbNotif_document_changed: 'غيّر {actor} {count} مستندات',
+  wbNotif_document_changed_renamed_many: 'أعاد {actor} تسمية {count} مستندات',
+  wbNotif_document_changed_renamed_one: 'أعاد {actor} تسمية “{document}”',
+  wbNotif_document_changed_renamed_untitled: 'أعاد {actor} تسمية مستند',
+  wbNotif_document_changed_moved_many: 'نقل {actor} {count} مستندات',
+  wbNotif_document_changed_moved_one: 'نقل {actor} “{document}”',
+  wbNotif_document_changed_moved_untitled: 'نقل {actor} مستندًا',
+  wbNotif_document_changed_trashed_many: 'نقل {actor} {count} مستندات إلى سلة المحذوفات',
+  wbNotif_document_changed_trashed_one: 'نقل {actor} “{document}” إلى سلة المحذوفات',
+  wbNotif_document_changed_trashed_untitled: 'نقل {actor} مستندًا إلى سلة المحذوفات',
+  wbNotif_document_changed_restored_many: 'استعاد {actor} {count} مستندات',
+  wbNotif_document_changed_restored_one: 'استعاد {actor} “{document}”',
+  wbNotif_document_changed_restored_untitled: 'استعاد {actor} مستندًا',
+  wbNotif_document_changed_deleted_many: 'حذف {actor} {count} مستندات نهائيًا',
+  wbNotif_document_changed_deleted_one: 'حذف {actor} “{document}” نهائيًا',
+  wbNotif_document_changed_deleted_untitled: 'حذف {actor} مستندًا نهائيًا',
+  wbNotif_document_changed_shelved_many: 'أرشف {actor} {count} مستندات',
+  wbNotif_document_changed_shelved_one: 'أرشف {actor} “{document}”',
+  wbNotif_document_changed_shelved_untitled: 'أرشف {actor} مستندًا',
+  wbNotif_document_changed_unshelved_many: 'أخرج {actor} {count} مستندات من الأرشيف',
+  wbNotif_document_changed_unshelved_one: 'أخرج {actor} “{document}” من الأرشيف',
+  wbNotif_document_changed_unshelved_untitled: 'أخرج {actor} مستندًا من الأرشيف',
+  wbNotif_document_changed_access_changed_many: 'غيّر {actor} صلاحية الوصول إلى {count} مستندات',
+  wbNotif_document_changed_access_changed_one: 'غيّر {actor} صلاحية الوصول إلى “{document}”',
+  wbNotif_document_changed_access_changed_untitled: 'غيّر {actor} صلاحية الوصول إلى مستند',
+  wbNotif_document_changed_version_created_many: 'أضاف {actor} إصدارًا جديدًا إلى {count} مستندات',
+  wbNotif_document_changed_version_created_one: 'أضاف {actor} إصدارًا جديدًا إلى “{document}”',
+  wbNotif_document_changed_version_created_untitled: 'أضاف {actor} إصدارًا جديدًا إلى مستند',
+  wbNotif_document_changed_relocated_many:
+    'نقل {actor} المجلد الذي يضم {count} من مستنداتك إلى سلة المحذوفات؛ أصبحت المستندات الآن في جذر مساحة العمل',
+  wbNotif_document_changed_relocated_one:
+    'نقل {actor} المجلد الذي يضم “{document}” إلى سلة المحذوفات؛ أصبح المستند الآن في جذر مساحة العمل',
+  wbNotif_document_changed_relocated_untitled:
+    'نقل {actor} المجلد الذي يضم أحد مستنداتك إلى سلة المحذوفات؛ أصبح المستند الآن في جذر مساحة العمل',
+  wbNotif_document_changed_generic_one: 'غيّر {actor} “{document}”',
+  wbNotif_document_changed_generic_untitled: 'غيّر {actor} مستندًا',
+  wbNotif_document_comment_resolved: 'وضع {actor} علامة «تم الحل» على تعليق في “{document}”.',
+  wbNotif_document_comment_resolved_untitled: 'وضع {actor} علامة «تم الحل» على تعليق.',
+  wbDeskPillChanged: 'تم التغيير',
+  wbDeskPillResolved: 'تم الحل',
+  wbDocChangeTitle: 'المستندات المتغيرة',
+  wbDocChangeLoading: 'جارٍ تحميل المستندات',
+  wbDocChangeEmptyTitle: 'لم يتبقَّ أي مستند يمكنك قراءته',
+  wbDocChangeEmptyDesc: 'حُذفت هذه المستندات أو لم تعد لديك صلاحية الوصول.',
+  wbDocChangeErrorTitle: 'تعذر تحميل المستندات',
+  wbDocChangeErrorDesc: 'حدث خطأ، حاول مرة أخرى',
+  wbDocChangeLoadMore: 'تحميل المزيد',
+  wbDocChangeLoadingMore: 'جارٍ التحميل…',
+  wbDocChangeDeleted: 'حُذف نهائيًا',
+  wbDocChangeInTrash: 'نُقل إلى سلة المحذوفات',
+  wbDocChangeUntitled: 'مستند بلا عنوان',
+  wbDocChangeViewList: 'عرض {count} مستندات',
+  wbDocChangeMore: 'و{count} أخرى',
+} satisfies Record<keyof typeof zh, string>

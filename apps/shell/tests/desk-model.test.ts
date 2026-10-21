@@ -13,6 +13,8 @@ import {
   inProgressRows,
   initials,
   inTrayRows,
+  noteSentence,
+  notePillKey,
   syncProblems,
 } from '../src/renderer/src/desk-model'
 
@@ -79,6 +81,50 @@ describe('in-tray sources', () => {
       note({ id: 'n4', kind: 'task_assigned', resource_type: 'task' }),
     ]
     expect(docNotifications(inbox).map((n) => n.id)).toEqual(['n1', 'n2'])
+  })
+
+  it('also keeps unread document changes and resolved comments', () => {
+    const inbox = [
+      note({ id: 'c1', kind: 'document_changed' }),
+      note({ id: 'c2', kind: 'document_comment_resolved' }),
+      note({ id: 'c3', kind: 'document_changed', read_at: '2026-10-14T02:00:00Z' }),
+      note({ id: 'c4', kind: 'document_shared' }),
+    ]
+    expect(docNotifications(inbox).map((n) => n.id)).toEqual(['c1', 'c2'])
+  })
+
+  it('counts a folded change row once: the Today foot is unread minus the tray notes', () => {
+    const inbox = [
+      note({ id: 'c1', kind: 'document_changed', count: 40 }),
+      note({ id: 'n1' }),
+      note({ id: 'x', kind: 'task_assigned', resource_type: 'task' }),
+    ]
+    const unread = 3
+    expect(unread - docNotifications(inbox).length).toBe(1)
+  })
+
+  it('words a note: change rows by verb and shape, resolved comments with or without a title', () => {
+    const changed = note({
+      kind: 'document_changed',
+      params: { actor: 'Lan', verb: 'trashed', document_count: '2' },
+      sample_documents: [{ id: 'd1', title: 'A' }],
+    })
+    expect(noteSentence(changed).key).toBe('wbNotif_document_changed_trashed_many')
+    expect(noteSentence(changed).params).toMatchObject({ actor: 'Lan', count: '2' })
+    const resolved = note({ kind: 'document_comment_resolved' })
+    expect(noteSentence(resolved).key).toBe('wbNotif_document_comment_resolved')
+    expect(noteSentence({ ...resolved, params: { actor: 'Lan' } }).key).toBe(
+      'wbNotif_document_comment_resolved_untitled',
+    )
+    expect(noteSentence(note()).key).toBe('wbNotif_document_commented')
+    expect(noteSentence(note()).params).toEqual({ actor: 'Lan', document: 'Contract' })
+  })
+
+  it('picks the pill by kind', () => {
+    expect(notePillKey(note())).toBe('wbDeskPillComment')
+    expect(notePillKey(note({ kind: 'document_mentioned' }))).toBe('wbDeskPillMention')
+    expect(notePillKey(note({ kind: 'document_changed' }))).toBe('wbDeskPillChanged')
+    expect(notePillKey(note({ kind: 'document_comment_resolved' }))).toBe('wbDeskPillResolved')
   })
 
   it('keeps shared documents from the last 7 days that were never opened here', () => {

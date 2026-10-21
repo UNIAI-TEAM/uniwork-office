@@ -1,5 +1,62 @@
 import type { zh } from './zh'
 import { en } from './en'
 
-// shortcut: English copy until this locale is translated (spec 6.8); replace the spread with real strings then
-export const ms = { ...en } satisfies Record<keyof typeof zh, string>
+// shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
+export const ms = {
+  ...en,
+  wbNotif_document_changed: '{actor} mengubah {count} dokumen',
+  wbNotif_document_changed_renamed_many: '{actor} menamakan semula {count} dokumen',
+  wbNotif_document_changed_renamed_one: '{actor} menamakan semula “{document}”',
+  wbNotif_document_changed_renamed_untitled: '{actor} menamakan semula sebuah dokumen',
+  wbNotif_document_changed_moved_many: '{actor} memindahkan {count} dokumen',
+  wbNotif_document_changed_moved_one: '{actor} memindahkan “{document}”',
+  wbNotif_document_changed_moved_untitled: '{actor} memindahkan sebuah dokumen',
+  wbNotif_document_changed_trashed_many: '{actor} memindahkan {count} dokumen ke tong sampah',
+  wbNotif_document_changed_trashed_one: '{actor} memindahkan “{document}” ke tong sampah',
+  wbNotif_document_changed_trashed_untitled: '{actor} memindahkan sebuah dokumen ke tong sampah',
+  wbNotif_document_changed_restored_many: '{actor} memulihkan {count} dokumen',
+  wbNotif_document_changed_restored_one: '{actor} memulihkan “{document}”',
+  wbNotif_document_changed_restored_untitled: '{actor} memulihkan sebuah dokumen',
+  wbNotif_document_changed_deleted_many: '{actor} memadam {count} dokumen secara kekal',
+  wbNotif_document_changed_deleted_one: '{actor} memadam “{document}” secara kekal',
+  wbNotif_document_changed_deleted_untitled: '{actor} memadam sebuah dokumen secara kekal',
+  wbNotif_document_changed_shelved_many: '{actor} mengarkibkan {count} dokumen',
+  wbNotif_document_changed_shelved_one: '{actor} mengarkibkan “{document}”',
+  wbNotif_document_changed_shelved_untitled: '{actor} mengarkibkan sebuah dokumen',
+  wbNotif_document_changed_unshelved_many: '{actor} mengeluarkan {count} dokumen daripada arkib',
+  wbNotif_document_changed_unshelved_one: '{actor} mengeluarkan “{document}” daripada arkib',
+  wbNotif_document_changed_unshelved_untitled: '{actor} mengeluarkan sebuah dokumen daripada arkib',
+  wbNotif_document_changed_access_changed_many: '{actor} menukar akses kepada {count} dokumen',
+  wbNotif_document_changed_access_changed_one: '{actor} menukar akses kepada “{document}”',
+  wbNotif_document_changed_access_changed_untitled: '{actor} menukar akses kepada sebuah dokumen',
+  wbNotif_document_changed_version_created_many:
+    '{actor} menambah versi baharu pada {count} dokumen',
+  wbNotif_document_changed_version_created_one: '{actor} menambah versi baharu pada “{document}”',
+  wbNotif_document_changed_version_created_untitled:
+    '{actor} menambah versi baharu pada sebuah dokumen',
+  wbNotif_document_changed_relocated_many:
+    '{actor} memindahkan folder yang mengandungi {count} dokumen anda ke tong sampah; dokumen kini berada di akar ruang kerja',
+  wbNotif_document_changed_relocated_one:
+    '{actor} memindahkan folder yang mengandungi “{document}” ke tong sampah; dokumen kini berada di akar ruang kerja',
+  wbNotif_document_changed_relocated_untitled:
+    '{actor} memindahkan folder yang mengandungi salah satu dokumen anda ke tong sampah; dokumen kini berada di akar ruang kerja',
+  wbNotif_document_changed_generic_one: '{actor} mengubah “{document}”',
+  wbNotif_document_changed_generic_untitled: '{actor} mengubah sebuah dokumen',
+  wbNotif_document_comment_resolved: '{actor} menandakan komen dalam “{document}” sebagai selesai.',
+  wbNotif_document_comment_resolved_untitled: '{actor} menandakan sebuah komen sebagai selesai.',
+  wbDeskPillChanged: 'Diubah',
+  wbDeskPillResolved: 'Selesai',
+  wbDocChangeTitle: 'Dokumen diubah',
+  wbDocChangeLoading: 'Memuatkan dokumen',
+  wbDocChangeEmptyTitle: 'Tiada lagi dokumen yang boleh anda baca',
+  wbDocChangeEmptyDesc: 'Dokumen ini telah dipadam atau anda tidak lagi mempunyai akses.',
+  wbDocChangeErrorTitle: 'Dokumen tidak dapat dimuatkan',
+  wbDocChangeErrorDesc: 'Berlaku ralat, cuba lagi',
+  wbDocChangeLoadMore: 'Muat lagi',
+  wbDocChangeLoadingMore: 'Memuatkan…',
+  wbDocChangeDeleted: 'Dipadam secara kekal',
+  wbDocChangeInTrash: 'Dipindahkan ke tong sampah',
+  wbDocChangeUntitled: 'Dokumen tanpa tajuk',
+  wbDocChangeViewList: 'Lihat {count} dokumen',
+  wbDocChangeMore: 'dan {count} lagi',
+} satisfies Record<keyof typeof zh, string>

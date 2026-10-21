@@ -1,5 +1,62 @@
 import type { zh } from './zh'
 import { en } from './en'
 
-// shortcut: English copy until this locale is translated (spec 6.8); replace the spread with real strings then
-export const es = { ...en } satisfies Record<keyof typeof zh, string>
+// shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
+export const es = {
+  ...en,
+  wbNotif_document_changed: '{actor} cambió {count} documentos',
+  wbNotif_document_changed_renamed_many: '{actor} cambió el nombre de {count} documentos',
+  wbNotif_document_changed_renamed_one: '{actor} cambió el nombre de “{document}”',
+  wbNotif_document_changed_renamed_untitled: '{actor} cambió el nombre de un documento',
+  wbNotif_document_changed_moved_many: '{actor} movió {count} documentos',
+  wbNotif_document_changed_moved_one: '{actor} movió “{document}”',
+  wbNotif_document_changed_moved_untitled: '{actor} movió un documento',
+  wbNotif_document_changed_trashed_many: '{actor} movió {count} documentos a la papelera',
+  wbNotif_document_changed_trashed_one: '{actor} movió “{document}” a la papelera',
+  wbNotif_document_changed_trashed_untitled: '{actor} movió un documento a la papelera',
+  wbNotif_document_changed_restored_many: '{actor} restauró {count} documentos',
+  wbNotif_document_changed_restored_one: '{actor} restauró “{document}”',
+  wbNotif_document_changed_restored_untitled: '{actor} restauró un documento',
+  wbNotif_document_changed_deleted_many: '{actor} eliminó definitivamente {count} documentos',
+  wbNotif_document_changed_deleted_one: '{actor} eliminó definitivamente “{document}”',
+  wbNotif_document_changed_deleted_untitled: '{actor} eliminó definitivamente un documento',
+  wbNotif_document_changed_shelved_many: '{actor} archivó {count} documentos',
+  wbNotif_document_changed_shelved_one: '{actor} archivó “{document}”',
+  wbNotif_document_changed_shelved_untitled: '{actor} archivó un documento',
+  wbNotif_document_changed_unshelved_many: '{actor} desarchivó {count} documentos',
+  wbNotif_document_changed_unshelved_one: '{actor} desarchivó “{document}”',
+  wbNotif_document_changed_unshelved_untitled: '{actor} desarchivó un documento',
+  wbNotif_document_changed_access_changed_many: '{actor} cambió el acceso a {count} documentos',
+  wbNotif_document_changed_access_changed_one: '{actor} cambió el acceso a “{document}”',
+  wbNotif_document_changed_access_changed_untitled: '{actor} cambió el acceso a un documento',
+  wbNotif_document_changed_version_created_many:
+    '{actor} añadió una nueva versión a {count} documentos',
+  wbNotif_document_changed_version_created_one: '{actor} añadió una nueva versión a “{document}”',
+  wbNotif_document_changed_version_created_untitled:
+    '{actor} añadió una nueva versión a un documento',
+  wbNotif_document_changed_relocated_many:
+    '{actor} movió a la papelera la carpeta que contiene {count} de tus documentos; los documentos ahora están en la raíz del espacio de trabajo',
+  wbNotif_document_changed_relocated_one:
+    '{actor} movió a la papelera la carpeta que contiene “{document}”; el documento ahora está en la raíz del espacio de trabajo',
+  wbNotif_document_changed_relocated_untitled:
+    '{actor} movió a la papelera la carpeta que contiene uno de tus documentos; el documento ahora está en la raíz del espacio de trabajo',
+  wbNotif_document_changed_generic_one: '{actor} cambió “{document}”',
+  wbNotif_document_changed_generic_untitled: '{actor} cambió un documento',
+  wbNotif_document_comment_resolved: '{actor} marcó como resuelto un comentario en “{document}”.',
+  wbNotif_document_comment_resolved_untitled: '{actor} marcó un comentario como resuelto.',
+  wbDeskPillChanged: 'Modificado',
+  wbDeskPillResolved: 'Resuelto',
+  wbDocChangeTitle: 'Documentos modificados',
+  wbDocChangeLoading: 'Cargando los documentos',
+  wbDocChangeEmptyTitle: 'No queda ningún documento que puedas leer',
+  wbDocChangeEmptyDesc: 'Estos documentos se eliminaron o ya no tienes acceso.',
+  wbDocChangeErrorTitle: 'No se pudieron cargar los documentos',
+  wbDocChangeErrorDesc: 'Algo salió mal, inténtalo de nuevo',
+  wbDocChangeLoadMore: 'Cargar más',
+  wbDocChangeLoadingMore: 'Cargando…',
+  wbDocChangeDeleted: 'Eliminado definitivamente',
+  wbDocChangeInTrash: 'Movido a la papelera',
+  wbDocChangeUntitled: 'Documento sin título',
+  wbDocChangeViewList: 'Ver {count} documentos',
+  wbDocChangeMore: 'y {count} más',
+} satisfies Record<keyof typeof zh, string>

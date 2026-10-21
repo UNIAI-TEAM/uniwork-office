@@ -1,5 +1,60 @@
 import type { zh } from './zh'
 import { en } from './en'
 
-// shortcut: English copy until this locale is translated (spec 6.8); replace the spread with real strings then
-export const he = { ...en } satisfies Record<keyof typeof zh, string>
+// shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
+export const he = {
+  ...en,
+  wbNotif_document_changed: '{actor} שינה/תה {count} מסמכים',
+  wbNotif_document_changed_renamed_many: '{actor} שינה/תה את שמם של {count} מסמכים',
+  wbNotif_document_changed_renamed_one: '{actor} שינה/תה את שם “{document}”',
+  wbNotif_document_changed_renamed_untitled: '{actor} שינה/תה את שמו של מסמך',
+  wbNotif_document_changed_moved_many: '{actor} העביר/ה {count} מסמכים',
+  wbNotif_document_changed_moved_one: '{actor} העביר/ה את “{document}”',
+  wbNotif_document_changed_moved_untitled: '{actor} העביר/ה מסמך',
+  wbNotif_document_changed_trashed_many: '{actor} העביר/ה {count} מסמכים לסל המחזור',
+  wbNotif_document_changed_trashed_one: '{actor} העביר/ה את “{document}” לסל המחזור',
+  wbNotif_document_changed_trashed_untitled: '{actor} העביר/ה מסמך לסל המחזור',
+  wbNotif_document_changed_restored_many: '{actor} שחזר/ה {count} מסמכים',
+  wbNotif_document_changed_restored_one: '{actor} שחזר/ה את “{document}”',
+  wbNotif_document_changed_restored_untitled: '{actor} שחזר/ה מסמך',
+  wbNotif_document_changed_deleted_many: '{actor} מחק/ה לצמיתות {count} מסמכים',
+  wbNotif_document_changed_deleted_one: '{actor} מחק/ה לצמיתות את “{document}”',
+  wbNotif_document_changed_deleted_untitled: '{actor} מחק/ה לצמיתות מסמך',
+  wbNotif_document_changed_shelved_many: '{actor} העביר/ה {count} מסמכים לארכיון',
+  wbNotif_document_changed_shelved_one: '{actor} העביר/ה את “{document}” לארכיון',
+  wbNotif_document_changed_shelved_untitled: '{actor} העביר/ה מסמך לארכיון',
+  wbNotif_document_changed_unshelved_many: '{actor} הוציא/ה {count} מסמכים מהארכיון',
+  wbNotif_document_changed_unshelved_one: '{actor} הוציא/ה את “{document}” מהארכיון',
+  wbNotif_document_changed_unshelved_untitled: '{actor} הוציא/ה מסמך מהארכיון',
+  wbNotif_document_changed_access_changed_many: '{actor} שינה/תה את ההרשאות ל-{count} מסמכים',
+  wbNotif_document_changed_access_changed_one: '{actor} שינה/תה את ההרשאות ל-“{document}”',
+  wbNotif_document_changed_access_changed_untitled: '{actor} שינה/תה את ההרשאות למסמך',
+  wbNotif_document_changed_version_created_many: '{actor} הוסיף/ה גרסה חדשה ל-{count} מסמכים',
+  wbNotif_document_changed_version_created_one: '{actor} הוסיף/ה גרסה חדשה ל-“{document}”',
+  wbNotif_document_changed_version_created_untitled: '{actor} הוסיף/ה גרסה חדשה למסמך',
+  wbNotif_document_changed_relocated_many:
+    '{actor} העביר/ה לסל המחזור את התיקייה שמכילה {count} מהמסמכים שלך; המסמכים הועברו לשורש סביבת העבודה',
+  wbNotif_document_changed_relocated_one:
+    '{actor} העביר/ה לסל המחזור את התיקייה שמכילה את “{document}”; המסמך הועבר לשורש סביבת העבודה',
+  wbNotif_document_changed_relocated_untitled:
+    '{actor} העביר/ה לסל המחזור את התיקייה שמכילה אחד מהמסמכים שלך; המסמך הועבר לשורש סביבת העבודה',
+  wbNotif_document_changed_generic_one: '{actor} שינה/תה את “{document}”',
+  wbNotif_document_changed_generic_untitled: '{actor} שינה/תה מסמך',
+  wbNotif_document_comment_resolved: '{actor} סימן/ה תגובה ב-“{document}” כפתורה.',
+  wbNotif_document_comment_resolved_untitled: '{actor} סימן/ה תגובה כפתורה.',
+  wbDeskPillChanged: 'שונה',
+  wbDeskPillResolved: 'נפתר',
+  wbDocChangeTitle: 'מסמכים ששונו',
+  wbDocChangeLoading: 'טוען את המסמכים',
+  wbDocChangeEmptyTitle: 'לא נותר מסמך שאפשר לקרוא',
+  wbDocChangeEmptyDesc: 'המסמכים האלה נמחקו או שאין לך עוד גישה אליהם.',
+  wbDocChangeErrorTitle: 'לא ניתן לטעון את המסמכים',
+  wbDocChangeErrorDesc: 'משהו השתבש, נסו שוב',
+  wbDocChangeLoadMore: 'טען עוד',
+  wbDocChangeLoadingMore: 'טוען…',
+  wbDocChangeDeleted: 'נמחק לצמיתות',
+  wbDocChangeInTrash: 'הועבר לסל המחזור',
+  wbDocChangeUntitled: 'מסמך ללא שם',
+  wbDocChangeViewList: 'הצג {count} מסמכים',
+  wbDocChangeMore: 'ועוד {count}',
+} satisfies Record<keyof typeof zh, string>

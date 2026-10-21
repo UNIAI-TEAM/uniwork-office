@@ -1,5 +1,62 @@
 import type { zh } from './zh'
 import { en } from './en'
 
-// shortcut: English copy until this locale is translated (spec 6.8); replace the spread with real strings then
-export const pl = { ...en } satisfies Record<keyof typeof zh, string>
+// shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
+export const pl = {
+  ...en,
+  wbNotif_document_changed: '{actor} zmienił(a) dokumenty: {count}',
+  wbNotif_document_changed_renamed_many: '{actor} zmienił(a) nazwy dokumentów: {count}',
+  wbNotif_document_changed_renamed_one: '{actor} zmienił(a) nazwę “{document}”',
+  wbNotif_document_changed_renamed_untitled: '{actor} zmienił(a) nazwę dokumentu',
+  wbNotif_document_changed_moved_many: '{actor} przeniósł(a) dokumenty: {count}',
+  wbNotif_document_changed_moved_one: '{actor} przeniósł(a) “{document}”',
+  wbNotif_document_changed_moved_untitled: '{actor} przeniósł(a) dokument',
+  wbNotif_document_changed_trashed_many: '{actor} przeniósł(a) do kosza dokumenty: {count}',
+  wbNotif_document_changed_trashed_one: '{actor} przeniósł(a) “{document}” do kosza',
+  wbNotif_document_changed_trashed_untitled: '{actor} przeniósł(a) dokument do kosza',
+  wbNotif_document_changed_restored_many: '{actor} przywrócił(a) dokumenty: {count}',
+  wbNotif_document_changed_restored_one: '{actor} przywrócił(a) “{document}”',
+  wbNotif_document_changed_restored_untitled: '{actor} przywrócił(a) dokument',
+  wbNotif_document_changed_deleted_many: '{actor} trwale usunął(ęła) dokumenty: {count}',
+  wbNotif_document_changed_deleted_one: '{actor} trwale usunął(ęła) “{document}”',
+  wbNotif_document_changed_deleted_untitled: '{actor} trwale usunął(ęła) dokument',
+  wbNotif_document_changed_shelved_many: '{actor} zarchiwizował(a) dokumenty: {count}',
+  wbNotif_document_changed_shelved_one: '{actor} zarchiwizował(a) “{document}”',
+  wbNotif_document_changed_shelved_untitled: '{actor} zarchiwizował(a) dokument',
+  wbNotif_document_changed_unshelved_many: '{actor} przywrócił(a) z archiwum dokumenty: {count}',
+  wbNotif_document_changed_unshelved_one: '{actor} przywrócił(a) z archiwum “{document}”',
+  wbNotif_document_changed_unshelved_untitled: '{actor} przywrócił(a) z archiwum dokument',
+  wbNotif_document_changed_access_changed_many: '{actor} zmienił(a) dostęp do dokumentów: {count}',
+  wbNotif_document_changed_access_changed_one: '{actor} zmienił(a) dostęp do “{document}”',
+  wbNotif_document_changed_access_changed_untitled: '{actor} zmienił(a) dostęp do dokumentu',
+  wbNotif_document_changed_version_created_many:
+    '{actor} dodał(a) nową wersję do dokumentów: {count}',
+  wbNotif_document_changed_version_created_one: '{actor} dodał(a) nową wersję do “{document}”',
+  wbNotif_document_changed_version_created_untitled: '{actor} dodał(a) nową wersję do dokumentu',
+  wbNotif_document_changed_relocated_many:
+    '{actor} przeniósł(a) do kosza folder z Twoimi dokumentami ({count}); dokumenty trafiły do katalogu głównego przestrzeni roboczej',
+  wbNotif_document_changed_relocated_one:
+    '{actor} przeniósł(a) do kosza folder z Twoim dokumentem “{document}”; dokument trafił do katalogu głównego przestrzeni roboczej',
+  wbNotif_document_changed_relocated_untitled:
+    '{actor} przeniósł(a) do kosza folder z jednym z Twoich dokumentów; dokument trafił do katalogu głównego przestrzeni roboczej',
+  wbNotif_document_changed_generic_one: '{actor} zmienił(a) “{document}”',
+  wbNotif_document_changed_generic_untitled: '{actor} zmienił(a) dokument',
+  wbNotif_document_comment_resolved:
+    '{actor} oznaczył(a) komentarz w “{document}” jako rozwiązany.',
+  wbNotif_document_comment_resolved_untitled: '{actor} oznaczył(a) komentarz jako rozwiązany.',
+  wbDeskPillChanged: 'Zmieniono',
+  wbDeskPillResolved: 'Rozwiązano',
+  wbDocChangeTitle: 'Zmienione dokumenty',
+  wbDocChangeLoading: 'Wczytywanie dokumentów',
+  wbDocChangeEmptyTitle: 'Nie został żaden dokument, który możesz czytać',
+  wbDocChangeEmptyDesc: 'Te dokumenty zostały usunięte lub nie masz już do nich dostępu.',
+  wbDocChangeErrorTitle: 'Nie udało się wczytać dokumentów',
+  wbDocChangeErrorDesc: 'Coś poszło nie tak, spróbuj ponownie',
+  wbDocChangeLoadMore: 'Wczytaj więcej',
+  wbDocChangeLoadingMore: 'Wczytywanie…',
+  wbDocChangeDeleted: 'Usunięto trwale',
+  wbDocChangeInTrash: 'Przeniesiono do kosza',
+  wbDocChangeUntitled: 'Dokument bez tytułu',
+  wbDocChangeViewList: 'Zobacz dokumenty: {count}',
+  wbDocChangeMore: 'i {count} więcej',
+} satisfies Record<keyof typeof zh, string>
