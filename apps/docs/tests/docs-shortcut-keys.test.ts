@@ -4,6 +4,8 @@
  * web frame), the old keys that collide with Word's leave, composition and
  * AltGr never fire, and menus / hints show the table's primary key.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   parseChord,
@@ -287,6 +289,21 @@ describe('F12 pass-through', () => {
     expect(ran).toBe(0)
     expect(consumeWhen(true, act)).toBe(true)
     expect(ran).toBe(1)
+  })
+})
+
+describe('Ctrl/Cmd+O pass-through', () => {
+  it('Open swallows its key only where the host grants an Open action', () => {
+    const src = readFileSync(join(__dirname, '../src/renderer/App.tsx'), 'utf8')
+    expect(src).toContain("open: () => consumeWhen(cap('open'), () => void openFile())")
+    let opened = 0
+    const openFile = () => {
+      opened += 1
+    }
+    expect(consumeWhen(false, openFile)).toBe(false)
+    expect(opened).toBe(0)
+    expect(consumeWhen(true, openFile)).toBe(true)
+    expect(opened).toBe(1)
   })
 })
 
